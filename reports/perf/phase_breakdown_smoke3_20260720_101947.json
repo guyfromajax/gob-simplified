@@ -1,0 +1,245 @@
+{
+  "generated_at": "2026-07-20T10:19:58",
+  "git_commit": "dbb82a32d5c2ab2ff8bb409a1fecf963e868fee1",
+  "git_dirty": true,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "cpu",
+  "workers": 1,
+  "probes_installed": 56,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 1,
+        "total_wall_s": 4.927,
+        "sum_game_s": 4.927,
+        "min_s": 4.9271,
+        "median_s": 4.927,
+        "mean_s": 4.927,
+        "p90_s": null,
+        "max_s": 4.9271
+      },
+      "phases": {
+        "anim.position_defenders": {
+          "self_s": 1.728370209923014,
+          "incl_s": 1.728370209923014,
+          "calls": 349
+        },
+        "db.read.plays._refresh": {
+          "self_s": 1.2122145798639394,
+          "incl_s": 1.2122145798639394,
+          "calls": 40
+        },
+        "core.micro_turn": {
+          "self_s": 0.5111996267223731,
+          "incl_s": 3.829891342087649,
+          "calls": 192
+        },
+        "core.hco": {
+          "self_s": 0.28499654156621546,
+          "incl_s": 2.1576218761038035,
+          "calls": 119
+        },
+        "db.read.teams._refresh": {
+          "self_s": 0.17322858411353081,
+          "incl_s": 0.17322858411353081,
+          "calls": 6
+        },
+        "db.read.players._refresh": {
+          "self_s": 0.15214783302508295,
+          "incl_s": 0.15214783302508295,
+          "calls": 4
+        },
+        "serialize.summary": {
+          "self_s": 0.15139904204988852,
+          "incl_s": 0.312344458012376,
+          "calls": 1
+        },
+        "db.read.franchise_team_data._refresh": {
+          "self_s": 0.14744808210525662,
+          "incl_s": 0.14744808210525662,
+          "calls": 6
+        },
+        "anim.compute_defender_grid": {
+          "self_s": 0.08983913098927587,
+          "incl_s": 1.838576793728862,
+          "calls": 349
+        },
+        "db.read.franchises._refresh": {
+          "self_s": 0.08197804098017514,
+          "incl_s": 0.08197804098017514,
+          "calls": 1
+        },
+        "db.read.franchise_players_data._refresh": {
+          "self_s": 0.07686499995179474,
+          "incl_s": 0.07686499995179474,
+          "calls": 4
+        },
+        "emit.animation_steps": {
+          "self_s": 0.06692146381828934,
+          "incl_s": 0.11242525884881616,
+          "calls": 272
+        },
+        "core.macro_turn": {
+          "self_s": 0.055764440970961004,
+          "incl_s": 3.94380825542612,
+          "calls": 192
+        },
+        "db.read.defenses._refresh": {
+          "self_s": 0.04381737601943314,
+          "incl_s": 0.04381737601943314,
+          "calls": 2
+        },
+        "core.shot_resolution": {
+          "self_s": 0.03557920845923945,
+          "incl_s": 0.03557920845923945,
+          "calls": 104
+        },
+        "setup.lineup": {
+          "self_s": 0.02516624896088615,
+          "incl_s": 0.12538237601984292,
+          "calls": 18
+        },
+        "anim.build_all_animations": {
+          "self_s": 0.02036745281657204,
+          "incl_s": 1.748737662739586,
+          "calls": 349
+        },
+        "setup.gm_init": {
+          "self_s": 0.016272292006760836,
+          "incl_s": 0.4255567920044996,
+          "calls": 1
+        },
+        "core.append_turn": {
+          "self_s": 0.013637169555295259,
+          "incl_s": 0.013637169555295259,
+          "calls": 351
+        },
+        "core.clock": {
+          "self_s": 0.012412340845912695,
+          "incl_s": 0.012412340845912695,
+          "calls": 248
+        },
+        "setup.ftd_prepare": {
+          "self_s": 0.006483625038526952,
+          "incl_s": 0.0503454590216279,
+          "calls": 2
+        },
+        "core.oreb_turn": {
+          "self_s": 0.005718581087421626,
+          "incl_s": 0.007202123990282416,
+          "calls": 11
+        },
+        "core.final_turn_shot": {
+          "self_s": 0.0035127089358866215,
+          "incl_s": 0.004468582978006452,
+          "calls": 3
+        },
+        "core.free_throw": {
+          "self_s": 0.0014381661312654614,
+          "incl_s": 0.0014681651373393834,
+          "calls": 30
+        },
+        "db.read.plays.find_one": {
+          "self_s": 0.0008222131291404366,
+          "incl_s": 0.9221398779191077,
+          "calls": 28
+        },
+        "setup.opening_tip": {
+          "self_s": 0.0007057079928927124,
+          "incl_s": 0.0007057079928927124,
+          "calls": 1
+        },
+        "db.read.plays.find": {
+          "self_s": 0.00046446104533970356,
+          "incl_s": 0.00046446104533970356,
+          "calls": 34
+        },
+        "db.read.teams.find_one": {
+          "self_s": 0.0004385398351587355,
+          "incl_s": 0.1738289169734344,
+          "calls": 6
+        },
+        "db.read.franchise_team_data.find_one": {
+          "self_s": 0.00030624878127127886,
+          "incl_s": 0.12147558195283636,
+          "calls": 4
+        },
+        "anim.skeleton_to_animations": {
+          "self_s": 0.0002311280113644898,
+          "incl_s": 0.0002311280113644898,
+          "calls": 245
+        },
+        "core.determine_next_turn": {
+          "self_s": 0.00019116641487926245,
+          "incl_s": 0.00019116641487926245,
+          "calls": 203
+        },
+        "db.read.teams.find": {
+          "self_s": 0.00016179302474483848,
+          "incl_s": 0.00016179302474483848,
+          "calls": 6
+        },
+        "db.read.franchise_team_data.find": {
+          "self_s": 0.00015387602616101503,
+          "incl_s": 0.00015387602616101503,
+          "calls": 5
+        },
+        "db.read.franchise_players_data.find": {
+          "self_s": 0.00013395800488069654,
+          "incl_s": 0.00013395800488069654,
+          "calls": 2
+        },
+        "anim.capture_halfcourt": {
+          "self_s": 0.0001145831192843616,
+          "incl_s": 0.0001145831192843616,
+          "calls": 117
+        },
+        "db.read.players.find": {
+          "self_s": 0.00010341702727600932,
+          "incl_s": 0.00010341702727600932,
+          "calls": 2
+        },
+        "db.read.defenses.find": {
+          "self_s": 4.445796366780996e-05,
+          "incl_s": 4.445796366780996e-05,
+          "calls": 1
+        },
+        "anim.capture_free_throw": {
+          "self_s": 2.999900607392192e-05,
+          "incl_s": 2.999900607392192e-05,
+          "calls": 30
+        },
+        "db.read.franchises.find_one": {
+          "self_s": 1.825008075684309e-05,
+          "incl_s": 0.08200245804619044,
+          "calls": 1
+        },
+        "anim.capture_fast_break": {
+          "self_s": 8.708098903298378e-06,
+          "incl_s": 8.708098903298378e-06,
+          "calls": 6
+        },
+        "db.read.franchises.find": {
+          "self_s": 6.166985258460045e-06,
+          "incl_s": 6.166985258460045e-06,
+          "calls": 1
+        }
+      },
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "Xavien @ Ocean City",
+          "wall_s": 4.9271,
+          "away_score": 76,
+          "home_score": 99
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\nanim.position_defenders                  1.73     35.1%       1.73         349\ndb.read.plays._refresh                   1.21     24.6%       1.21          40\ncore.micro_turn                          0.51     10.4%       3.83         192\ncore.hco                                 0.28      5.8%       2.16         119\ndb.read.teams._refresh                   0.17      3.5%       0.17           6\ndb.read.players._refresh                 0.15      3.1%       0.15           4\nserialize.summary                        0.15      3.1%       0.31           1\ndb.read.franchise_team_data._refresh       0.15      3.0%       0.15           6\nanim.compute_defender_grid               0.09      1.8%       1.84         349\ndb.read.franchises._refresh              0.08      1.7%       0.08           1\ndb.read.franchise_players_data._refresh       0.08      1.6%       0.08           4\nemit.animation_steps                     0.07      1.4%       0.11         272\ncore.macro_turn                          0.06      1.1%       3.94         192\ndb.read.defenses._refresh                0.04      0.9%       0.04           2\ncore.shot_resolution                     0.04      0.7%       0.04         104\nsetup.lineup                             0.03      0.5%       0.13          18\nanim.build_all_animations                0.02      0.4%       1.75         349\nsetup.gm_init                            0.02      0.3%       0.43           1\ncore.append_turn                         0.01      0.3%       0.01         351\ncore.clock                               0.01      0.3%       0.01         248\nsetup.ftd_prepare                        0.01      0.1%       0.05           2\ncore.oreb_turn                           0.01      0.1%       0.01          11\ncore.final_turn_shot                     0.00      0.1%       0.00           3\ncore.free_throw                          0.00      0.0%       0.00          30\ndb.read.plays.find_one                   0.00      0.0%       0.92          28\nsetup.opening_tip                        0.00      0.0%       0.00           1\ndb.read.plays.find                       0.00      0.0%       0.00          34\ndb.read.teams.find_one                   0.00      0.0%       0.17           6\ndb.read.franchise_team_data.find_one       0.00      0.0%       0.12           4\nanim.skeleton_to_animations              0.00      0.0%       0.00         245\ncore.determine_next_turn                 0.00      0.0%       0.00         203\ndb.read.teams.find                       0.00      0.0%       0.00           6\ndb.read.franchise_team_data.find         0.00      0.0%       0.00           5\ndb.read.franchise_players_data.find       0.00      0.0%       0.00           2\nanim.capture_halfcourt                   0.00      0.0%       0.00         117\ndb.read.players.find                     0.00      0.0%       0.00           2\ndb.read.defenses.find                    0.00      0.0%       0.00           1\nanim.capture_free_throw                  0.00      0.0%       0.00          30\ndb.read.franchises.find_one              0.00      0.0%       0.08           1\nanim.capture_fast_break                  0.00      0.0%       0.00           6\ndb.read.franchises.find                  0.00      0.0%       0.00           1\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)          0.01      0.1%\nTOTAL WALL                               4.93    100.0%"
+    }
+  }
+}

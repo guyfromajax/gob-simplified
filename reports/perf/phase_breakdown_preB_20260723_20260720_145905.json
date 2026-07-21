@@ -1,0 +1,715 @@
+{
+  "generated_at": "2026-07-20T15:08:30",
+  "git_commit": "70c4a49eee5f94bea6e1ad4db1dfba441c7be56a",
+  "git_dirty": true,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "both",
+  "workers": 1,
+  "seed": 20260723,
+  "probes_installed": 0,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 63,
+        "total_wall_s": 265.889,
+        "sum_game_s": 265.875,
+        "min_s": 3.3368,
+        "median_s": 4.215,
+        "mean_s": 4.22,
+        "p90_s": 4.646,
+        "max_s": 5.1042
+      },
+      "phases": {},
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "Xavien @ Ocean City",
+          "seed": 20260723,
+          "wall_s": 4.8926,
+          "away_score": 69,
+          "home_score": 90
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Little York @ Four Corners",
+          "seed": 20260724,
+          "wall_s": 3.9156,
+          "away_score": 76,
+          "home_score": 90
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Bentley-Truman @ Lancaster",
+          "seed": 20260725,
+          "wall_s": 4.1673,
+          "away_score": 89,
+          "home_score": 75
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Morristown @ South Lancaster",
+          "seed": 20260726,
+          "wall_s": 4.3518,
+          "away_score": 75,
+          "home_score": 62
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Casino Row @ IDA",
+          "seed": 20260727,
+          "wall_s": 4.3659,
+          "away_score": 101,
+          "home_score": 105
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Chapel Hill @ Durham",
+          "seed": 20260728,
+          "wall_s": 3.7198,
+          "away_score": 106,
+          "home_score": 97
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Nickel Beach @ Appalachia",
+          "seed": 20260729,
+          "wall_s": 3.9213,
+          "away_score": 90,
+          "home_score": 69
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Cagers World @ Crickstown",
+          "seed": 20260730,
+          "wall_s": 4.2301,
+          "away_score": 87,
+          "home_score": 91
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Ivy Prep @ Concord",
+          "seed": 20260731,
+          "wall_s": 4.1497,
+          "away_score": 85,
+          "home_score": 83
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Providence @ Independence",
+          "seed": 20260732,
+          "wall_s": 4.6553,
+          "away_score": 78,
+          "home_score": 75
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "D1 Institute @ Queen's Guard",
+          "seed": 20260733,
+          "wall_s": 4.7705,
+          "away_score": 93,
+          "home_score": 77
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Garden Elites @ Montpeiler",
+          "seed": 20260734,
+          "wall_s": 4.1817,
+          "away_score": 123,
+          "home_score": 77
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Long Island Methodist @ Falls Academy",
+          "seed": 20260735,
+          "wall_s": 4.7172,
+          "away_score": 78,
+          "home_score": 74
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Upstate @ Toronto Limited",
+          "seed": 20260736,
+          "wall_s": 4.2869,
+          "away_score": 75,
+          "home_score": 96
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Syracuse @ St Peters",
+          "seed": 20260737,
+          "wall_s": 4.011,
+          "away_score": 81,
+          "home_score": 84
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Amariabi International @ Empire City",
+          "seed": 20260738,
+          "wall_s": 4.1115,
+          "away_score": 89,
+          "home_score": 77
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Hardwood Fields @ Ann Arbor",
+          "seed": 20260739,
+          "wall_s": 4.287,
+          "away_score": 72,
+          "home_score": 88
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "North Columbus @ Columbus",
+          "seed": 20260740,
+          "wall_s": 4.5213,
+          "away_score": 73,
+          "home_score": 69
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Harding Central @ Mynsk",
+          "seed": 20260741,
+          "wall_s": 4.3063,
+          "away_score": 113,
+          "home_score": 62
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Upper Peninsula @ Cleveland-Carlysle",
+          "seed": 20260742,
+          "wall_s": 4.5577,
+          "away_score": 67,
+          "home_score": 93
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Templeton-Wesley @ Burroughs",
+          "seed": 20260743,
+          "wall_s": 3.8203,
+          "away_score": 84,
+          "home_score": 61
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Sacred Heart @ Quigley Catholic",
+          "seed": 20260744,
+          "wall_s": 4.4631,
+          "away_score": 46,
+          "home_score": 86
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Wacker West @ Evanston",
+          "seed": 20260745,
+          "wall_s": 4.0538,
+          "away_score": 69,
+          "home_score": 68
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Dillinger @ Archbishop McClellan",
+          "seed": 20260746,
+          "wall_s": 4.2397,
+          "away_score": 62,
+          "home_score": 83
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Washington Carver @ Myrtle Private",
+          "seed": 20260747,
+          "wall_s": 3.8827,
+          "away_score": 85,
+          "home_score": 108
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Biloxi @ Monroe-Hayes",
+          "seed": 20260748,
+          "wall_s": 4.646,
+          "away_score": 70,
+          "home_score": 94
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Mobile @ Lexington",
+          "seed": 20260749,
+          "wall_s": 4.0199,
+          "away_score": 107,
+          "home_score": 110
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Knoxville @ Crimson County",
+          "seed": 20260750,
+          "wall_s": 4.2043,
+          "away_score": 96,
+          "home_score": 123
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "DeLand @ Keys High",
+          "seed": 20260751,
+          "wall_s": 4.4257,
+          "away_score": 108,
+          "home_score": 97
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Valdosta Valley @ Tallahassee",
+          "seed": 20260752,
+          "wall_s": 3.3368,
+          "away_score": 79,
+          "home_score": 94
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Grayson Ranch @ Reardon-Mayes",
+          "seed": 20260753,
+          "wall_s": 3.6798,
+          "away_score": 66,
+          "home_score": 89
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Gainesville @ Dade Academy",
+          "seed": 20260754,
+          "wall_s": 4.1206,
+          "away_score": 124,
+          "home_score": 68
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Fielding @ Ozark Centre",
+          "seed": 20260755,
+          "wall_s": 4.1916,
+          "away_score": 102,
+          "home_score": 77
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Tri-Cities Prep @ Iowa Academy",
+          "seed": 20260756,
+          "wall_s": 4.2278,
+          "away_score": 65,
+          "home_score": 86
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Grupenberg @ Wash U Prep",
+          "seed": 20260757,
+          "wall_s": 4.2339,
+          "away_score": 72,
+          "home_score": 91
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Hyde Methodist @ Lawrence",
+          "seed": 20260758,
+          "wall_s": 3.7996,
+          "away_score": 82,
+          "home_score": 111
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Crofton @ Rodeo Circuit",
+          "seed": 20260759,
+          "wall_s": 4.3743,
+          "away_score": 129,
+          "home_score": 94
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Minot @ Mt Simmons",
+          "seed": 20260760,
+          "wall_s": 3.381,
+          "away_score": 50,
+          "home_score": 75
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Lewis Catholic @ Tower Academy",
+          "seed": 20260761,
+          "wall_s": 4.1967,
+          "away_score": 53,
+          "home_score": 75
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "HA Rushmore @ Two Rivers",
+          "seed": 20260762,
+          "wall_s": 4.0512,
+          "away_score": 93,
+          "home_score": 42
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Amarillo Tech @ Stormwood",
+          "seed": 20260763,
+          "wall_s": 4.3223,
+          "away_score": 80,
+          "home_score": 60
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Norman @ Kenton",
+          "seed": 20260764,
+          "wall_s": 4.2147,
+          "away_score": 79,
+          "home_score": 68
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Ada @ River's Edge",
+          "seed": 20260765,
+          "wall_s": 3.9905,
+          "away_score": 96,
+          "home_score": 110
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Pan Handle Limited @ Reyes-Santiago",
+          "seed": 20260766,
+          "wall_s": 4.1578,
+          "away_score": 100,
+          "home_score": 91
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Abilene @ MiddleTEX",
+          "seed": 20260767,
+          "wall_s": 4.252,
+          "away_score": 52,
+          "home_score": 81
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Austin West @ Bayou District",
+          "seed": 20260768,
+          "wall_s": 4.0465,
+          "away_score": 100,
+          "home_score": 110
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "GP Prep School @ Austin",
+          "seed": 20260769,
+          "wall_s": 4.0287,
+          "away_score": 73,
+          "home_score": 89
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Chambless Global @ Houston Jesuit",
+          "seed": 20260770,
+          "wall_s": 4.1309,
+          "away_score": 79,
+          "home_score": 98
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Border Academy @ Southwest Miner",
+          "seed": 20260771,
+          "wall_s": 4.294,
+          "away_score": 65,
+          "home_score": 83
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Pike's Prep @ Tucson",
+          "seed": 20260772,
+          "wall_s": 4.0348,
+          "away_score": 82,
+          "home_score": 61
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Barton Lutheran @ East Rockies",
+          "seed": 20260773,
+          "wall_s": 4.148,
+          "away_score": 70,
+          "home_score": 113
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Desert Regional @ Circus Circus",
+          "seed": 20260774,
+          "wall_s": 4.2222,
+          "away_score": 87,
+          "home_score": 86
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Seattle AAA @ Swoosh",
+          "seed": 20260775,
+          "wall_s": 4.2917,
+          "away_score": 69,
+          "home_score": 91
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Rainier Central @ Vancouver",
+          "seed": 20260776,
+          "wall_s": 4.2475,
+          "away_score": 107,
+          "home_score": 93
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Couer d'Alene @ Salem",
+          "seed": 20260777,
+          "wall_s": 5.1042,
+          "away_score": 106,
+          "home_score": 86
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Cardinal Conor @ Boise",
+          "seed": 20260778,
+          "wall_s": 4.2279,
+          "away_score": 63,
+          "home_score": 76
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Hollywood Prep @ Rancho Estrada",
+          "seed": 20260779,
+          "wall_s": 4.1789,
+          "away_score": 85,
+          "home_score": 59
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "West Ocean City @ DeCatur Dei",
+          "seed": 20260780,
+          "wall_s": 4.1878,
+          "away_score": 93,
+          "home_score": 70
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "San Jose @ Huntington Canyon",
+          "seed": 20260781,
+          "wall_s": 4.1538,
+          "away_score": 96,
+          "home_score": 87
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Berkley @ Valley High",
+          "seed": 20260782,
+          "wall_s": 4.8573,
+          "away_score": 77,
+          "home_score": 73
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Mahala Alou @ Melbourne Americas",
+          "seed": 20260783,
+          "wall_s": 4.5053,
+          "away_score": 92,
+          "home_score": 87
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Pacific All-Stars @ Cupertino",
+          "seed": 20260784,
+          "wall_s": 4.2757,
+          "away_score": 78,
+          "home_score": 90
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Grizzly Academy @ Redwood High",
+          "seed": 20260785,
+          "wall_s": 4.533,
+          "away_score": 59,
+          "home_score": 82
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)        265.89    100.0%\nTOTAL WALL                             265.89    100.0%"
+    },
+    "practice_squad": {
+      "workers": 1,
+      "timing": {
+        "games": 20,
+        "total_wall_s": 294.141,
+        "sum_game_s": 294.127,
+        "min_s": 4.9645,
+        "median_s": 17.708,
+        "mean_s": 14.706,
+        "p90_s": 20.573,
+        "max_s": 24.2766
+      },
+      "phases": {},
+      "per_game": [
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G All-Americans @ Region A All-Americans",
+          "seed": 20260723,
+          "wall_s": 4.9645,
+          "away_score": 75,
+          "home_score": 90
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F All-Americans @ Region H All-Americans",
+          "seed": 20260724,
+          "wall_s": 5.0257,
+          "away_score": 72,
+          "home_score": 81
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region E All-Americans @ Region B All-Americans",
+          "seed": 20260725,
+          "wall_s": 5.2992,
+          "away_score": 74,
+          "home_score": 81
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region D All-Americans @ Region C All-Americans",
+          "seed": 20260726,
+          "wall_s": 5.4594,
+          "away_score": 38,
+          "home_score": 100
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G All-Stars @ Region A All-Stars",
+          "seed": 20260727,
+          "wall_s": 5.8651,
+          "away_score": 77,
+          "home_score": 58
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F All-Stars @ Region H All-Stars",
+          "seed": 20260728,
+          "wall_s": 5.1052,
+          "away_score": 64,
+          "home_score": 70
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region E All-Stars @ Region B All-Stars",
+          "seed": 20260729,
+          "wall_s": 10.3562,
+          "away_score": 50,
+          "home_score": 59
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region D All-Stars @ Region C All-Stars",
+          "seed": 20260730,
+          "wall_s": 17.6318,
+          "away_score": 59,
+          "home_score": 63
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G Varsity @ Region A Varsity",
+          "seed": 20260731,
+          "wall_s": 18.9573,
+          "away_score": 47,
+          "home_score": 52
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F Varsity @ Region H Varsity",
+          "seed": 20260732,
+          "wall_s": 19.4836,
+          "away_score": 40,
+          "home_score": 53
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region E Varsity @ Region B Varsity",
+          "seed": 20260733,
+          "wall_s": 17.7428,
+          "away_score": 66,
+          "home_score": 60
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region D Varsity @ Region C Varsity",
+          "seed": 20260734,
+          "wall_s": 17.6741,
+          "away_score": 61,
+          "home_score": 39
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G JV @ Region A JV",
+          "seed": 20260735,
+          "wall_s": 19.6325,
+          "away_score": 58,
+          "home_score": 44
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F JV @ Region H JV",
+          "seed": 20260736,
+          "wall_s": 20.5735,
+          "away_score": 31,
+          "home_score": 23
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region E JV @ Region B JV",
+          "seed": 20260737,
+          "wall_s": 20.2058,
+          "away_score": 48,
+          "home_score": 71
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region D JV @ Region C JV",
+          "seed": 20260738,
+          "wall_s": 19.3376,
+          "away_score": 48,
+          "home_score": 38
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G Squad @ Region A Squad",
+          "seed": 20260739,
+          "wall_s": 24.2766,
+          "away_score": 69,
+          "home_score": 56
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F Squad @ Region H Squad",
+          "seed": 20260740,
+          "wall_s": 19.9676,
+          "away_score": 53,
+          "home_score": 45
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region E Squad @ Region B Squad",
+          "seed": 20260741,
+          "wall_s": 16.645,
+          "away_score": 62,
+          "home_score": 53
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region D Squad @ Region C Squad",
+          "seed": 20260742,
+          "wall_s": 19.9238,
+          "away_score": 56,
+          "home_score": 44
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)        294.14    100.0%\nTOTAL WALL                             294.14    100.0%"
+    }
+  }
+}

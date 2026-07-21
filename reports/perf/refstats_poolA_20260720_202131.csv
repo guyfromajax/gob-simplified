@@ -1,0 +1,17 @@
+kind,matchup,seed,side,team,team_id,final_score,possessions,FGM,FGA,FG_pct,TPM,TPA,TP_pct,FTM,FTA,FT_pct,TO,OREB,DREB,REB,AST,STL,BLK,PF
+cpu_full,Xavien @ Ocean City,20260720,home,Xavien,XAVIEN,64,67.12,20,59,33.9,7,33,21.21,17,23,73.91,3,5,12,17,17,5,0,25
+cpu_full,Xavien @ Ocean City,20260720,away,Ocean City,OCEAN_CITY,111,72.52,33,58,56.9,22,29,75.86,23,33,69.7,11,11,33,44,27,3,0,25
+cpu_full,Little York @ Four Corners,20260721,home,Little York,LITTLE_YORK,84,64.0,36,55,65.45,14,24,58.33,0,0,0.0,12,3,17,20,23,4,0,19
+cpu_full,Little York @ Four Corners,20260721,away,Four Corners,FOUR_CORNERS,92,62.08,35,66,53.03,15,25,60.0,5,7,71.43,7,14,16,30,27,9,0,4
+cpu_full,Bentley-Truman @ Lancaster,20260722,home,Bentley-Truman,BENTLEY_TRUMAN,94,54.76,38,56,67.86,16,26,61.54,2,4,50.0,5,8,13,21,29,6,0,12
+cpu_full,Bentley-Truman @ Lancaster,20260722,away,Lancaster,LANCASTER,74,53.28,27,48,56.25,12,25,48.0,8,12,66.67,8,8,10,18,20,4,0,14
+cpu_full,Morristown @ South Lancaster,20260723,home,Morristown,MORRISTOWN,98,68.28,37,59,62.71,15,23,65.22,7,12,58.33,10,6,20,26,29,7,1,19
+cpu_full,Morristown @ South Lancaster,20260723,away,South Lancaster,SOUTH_LANCASTER,93,76.04,35,61,57.38,13,26,50.0,12,16,75.0,9,1,19,20,28,7,0,18
+cpu_full,Casino Row @ IDA,20260724,home,Casino Row,CASINO_ROW,89,68.96,33,62,53.23,18,33,54.55,7,9,77.78,11,8,22,30,24,10,0,9
+cpu_full,Casino Row @ IDA,20260724,away,IDA,IDA,74,64.2,27,54,50.0,15,26,57.69,3,5,60.0,13,5,17,22,19,7,1,8
+cpu_full,Chapel Hill @ Durham,20260725,home,Chapel Hill,CHAPEL_HILL,103,75.16,38,64,59.38,19,37,51.35,8,14,57.14,10,5,23,28,31,6,0,18
+cpu_full,Chapel Hill @ Durham,20260725,away,Durham,DURHAM,94,71.04,35,69,50.72,14,26,53.85,10,16,62.5,7,12,20,32,24,7,0,21
+cpu_full,Nickel Beach @ Appalachia,20260726,home,Nickel Beach,NICKEL_BEACH,71,58.88,27,50,54.0,14,26,53.85,1,2,50.0,17,9,24,33,19,12,0,20
+cpu_full,Nickel Beach @ Appalachia,20260726,away,Appalachia,APPALACHIA,60,67.28,24,53,45.28,6,14,42.86,8,12,66.67,14,5,15,20,17,13,0,12
+cpu_full,Cagers World @ Crickstown,20260727,home,Cagers World,CAGERS_WORLD,84,85.16,35,72,48.61,16,37,43.24,4,14,28.57,20,13,33,46,19,7,0,12
+cpu_full,Cagers World @ Crickstown,20260727,away,Crickstown,CRICKSTOWN,78,79.84,28,72,38.89,12,33,36.36,4,11,36.36,14,11,28,39,24,15,0,23

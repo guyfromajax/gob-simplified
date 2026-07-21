@@ -1,0 +1,49 @@
+{
+  "generated_at": "2026-07-20T10:59:07",
+  "git_commit": "dbb82a32d5c2ab2ff8bb409a1fecf963e868fee1",
+  "git_dirty": true,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "cpu",
+  "workers": 1,
+  "seed": 12345,
+  "probes_installed": 0,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 2,
+        "total_wall_s": 9.61,
+        "sum_game_s": 9.61,
+        "min_s": 4.5043,
+        "median_s": 4.805,
+        "mean_s": 4.805,
+        "p90_s": null,
+        "max_s": 5.1052
+      },
+      "phases": {},
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "Xavien @ Ocean City",
+          "seed": 12345,
+          "wall_s": 5.1052,
+          "away_score": 76,
+          "home_score": 85
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Little York @ Four Corners",
+          "seed": 12346,
+          "wall_s": 4.5043,
+          "away_score": 78,
+          "home_score": 94
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)          9.61    100.0%\nTOTAL WALL                               9.61    100.0%"
+    }
+  }
+}

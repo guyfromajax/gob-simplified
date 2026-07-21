@@ -1,0 +1,165 @@
+{
+  "generated_at": "2026-07-20T09:50:29",
+  "git_commit": "dbb82a32d5c2ab2ff8bb409a1fecf963e868fee1",
+  "git_dirty": true,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "cpu",
+  "workers": 1,
+  "probes_installed": 56,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "timing": {
+    "games": 1,
+    "total_wall_s": 5.108,
+    "sum_game_s": 5.108,
+    "min_s": 5.1081,
+    "median_s": 5.108,
+    "mean_s": 5.108,
+    "p90_s": null,
+    "max_s": 5.1081
+  },
+  "phases": {
+    "db.read.cursor_fetch": {
+      "self_s": 2.09500541491434,
+      "incl_s": 2.09500541491434,
+      "calls": 66
+    },
+    "anim.position_defenders": {
+      "self_s": 1.7025118706515059,
+      "incl_s": 1.7025118706515059,
+      "calls": 310
+    },
+    "core.micro_turn": {
+      "self_s": 0.4956426094286144,
+      "incl_s": 4.041442996182013,
+      "calls": 186
+    },
+    "core.hco": {
+      "self_s": 0.30365056230220944,
+      "incl_s": 2.1447853384306654,
+      "calls": 109
+    },
+    "serialize.summary": {
+      "self_s": 0.14955037500476465,
+      "incl_s": 0.35978195804636925,
+      "calls": 1
+    },
+    "anim.compute_defender_grid": {
+      "self_s": 0.08508790493942797,
+      "incl_s": 1.8086324929026887,
+      "calls": 310
+    },
+    "emit.animation_steps": {
+      "self_s": 0.06387516018003225,
+      "incl_s": 0.0992440432892181,
+      "calls": 255
+    },
+    "core.macro_turn": {
+      "self_s": 0.04847036860883236,
+      "incl_s": 4.136891161615495,
+      "calls": 186
+    },
+    "core.shot_resolution": {
+      "self_s": 0.03542157891206443,
+      "incl_s": 0.03542157891206443,
+      "calls": 93
+    },
+    "setup.lineup": {
+      "self_s": 0.029111625684890896,
+      "incl_s": 0.12724233377957717,
+      "calls": 22
+    },
+    "anim.build_all_animations": {
+      "self_s": 0.021032717311754823,
+      "incl_s": 1.7235445879632607,
+      "calls": 310
+    },
+    "setup.gm_init": {
+      "self_s": 0.015558042039629072,
+      "incl_s": 0.3867567920242436,
+      "calls": 1
+    },
+    "core.append_turn": {
+      "self_s": 0.013598090969026089,
+      "incl_s": 0.013736465014517307,
+      "calls": 333
+    },
+    "core.clock": {
+      "self_s": 0.011777623964007944,
+      "incl_s": 0.011777623964007944,
+      "calls": 239
+    },
+    "setup.ftd_prepare": {
+      "self_s": 0.0075277070864103734,
+      "incl_s": 0.03538837505038828,
+      "calls": 2
+    },
+    "core.final_turn_shot": {
+      "self_s": 0.0075105816940777,
+      "incl_s": 0.010571667982731014,
+      "calls": 6
+    },
+    "core.oreb_turn": {
+      "self_s": 0.007053998939227313,
+      "incl_s": 0.00907979195471853,
+      "calls": 21
+    },
+    "core.free_throw": {
+      "self_s": 0.0029921697569079697,
+      "incl_s": 0.0030222928035072982,
+      "calls": 32
+    },
+    "setup.opening_tip": {
+      "self_s": 0.002467833983246237,
+      "incl_s": 0.002467833983246237,
+      "calls": 1
+    },
+    "db.read.find_one": {
+      "self_s": 0.0011364626698195934,
+      "incl_s": 1.5990267531014979,
+      "calls": 42
+    },
+    "db.read.find": {
+      "self_s": 0.0010802085744217038,
+      "incl_s": 0.0010802085744217038,
+      "calls": 54
+    },
+    "anim.skeleton_to_animations": {
+      "self_s": 0.00027367350412532687,
+      "incl_s": 0.00027367350412532687,
+      "calls": 233
+    },
+    "core.determine_next_turn": {
+      "self_s": 0.00018612522399052978,
+      "incl_s": 0.00018612522399052978,
+      "calls": 207
+    },
+    "anim.capture_halfcourt": {
+      "self_s": 0.00011312635615468025,
+      "incl_s": 0.00011312635615468025,
+      "calls": 106
+    },
+    "anim.capture_free_throw": {
+      "self_s": 3.0123046599328518e-05,
+      "incl_s": 3.0123046599328518e-05,
+      "calls": 32
+    },
+    "anim.capture_fast_break": {
+      "self_s": 1.5040917787700891e-05,
+      "incl_s": 1.5040917787700891e-05,
+      "calls": 11
+    }
+  },
+  "per_game": [
+    {
+      "game_index": 0,
+      "kind": "cpu_full",
+      "matchup": "Xavien @ Ocean City",
+      "wall_s": 5.1081,
+      "away_score": 69,
+      "home_score": 90
+    }
+  ],
+  "failures": []
+}

@@ -1,0 +1,167 @@
+kind,matchup,seed,side,team,team_id,final_score,possessions,FGM,FGA,FG_pct,TPM,TPA,TP_pct,FTM,FTA,FT_pct,TO,OREB,DREB,REB,AST,STL,BLK,PF
+cpu_full,Xavien @ Ocean City,20260723,home,Ocean City,OCEAN_CITY,90,70.04,32,61,52.46,15,26,57.69,13,16,81.25,13,11,32,43,26,2,2,26
+cpu_full,Xavien @ Ocean City,20260723,away,Xavien,XAVIEN,69,72.08,17,61,27.87,10,26,38.46,23,32,71.88,7,10,16,26,14,12,0,23
+cpu_full,Little York @ Four Corners,20260724,home,Four Corners,FOUR_CORNERS,90,60.76,37,60,61.67,14,26,53.85,2,4,50.0,4,5,23,28,27,9,0,8
+cpu_full,Little York @ Four Corners,20260724,away,Little York,LITTLE_YORK,76,66.88,31,58,53.45,14,30,46.67,0,2,0.0,10,2,18,20,23,4,0,13
+cpu_full,Bentley-Truman @ Lancaster,20260725,home,Lancaster,LANCASTER,75,66.64,29,54,53.7,12,28,42.86,5,6,83.33,15,5,21,26,26,6,0,16
+cpu_full,Bentley-Truman @ Lancaster,20260725,away,Bentley-Truman,BENTLEY_TRUMAN,89,68.16,33,60,55.0,15,26,57.69,8,14,57.14,7,5,19,24,24,12,3,13
+cpu_full,Morristown @ South Lancaster,20260726,home,South Lancaster,SOUTH_LANCASTER,62,61.64,22,50,44.0,13,30,43.33,5,6,83.33,14,5,20,25,17,4,0,13
+cpu_full,Morristown @ South Lancaster,20260726,away,Morristown,MORRISTOWN,75,62.96,30,59,50.85,10,21,47.62,5,9,55.56,7,7,23,30,28,8,0,15
+cpu_full,Casino Row @ IDA,20260727,home,IDA,IDA,105,72.28,41,64,64.06,14,22,63.64,7,12,58.33,10,7,15,22,27,7,1,11
+cpu_full,Casino Row @ IDA,20260727,away,Casino Row,CASINO_ROW,101,73.4,42,66,63.64,14,27,51.85,5,10,50.0,10,7,17,24,29,8,1,16
+cpu_full,Chapel Hill @ Durham,20260728,home,Durham,DURHAM,97,72.52,36,56,64.29,19,29,65.52,6,8,75.0,15,2,13,15,28,8,0,14
+cpu_full,Chapel Hill @ Durham,20260728,away,Chapel Hill,CHAPEL_HILL,106,72.84,38,60,63.33,22,36,61.11,8,11,72.73,14,6,15,21,33,11,0,15
+cpu_full,Nickel Beach @ Appalachia,20260729,home,Appalachia,APPALACHIA,69,56.32,24,44,54.55,16,29,55.17,3,3,100.0,11,0,21,21,21,8,0,21
+cpu_full,Nickel Beach @ Appalachia,20260729,away,Nickel Beach,NICKEL_BEACH,90,69.04,34,74,45.95,18,37,48.65,6,16,37.5,9,21,20,41,22,5,1,4
+cpu_full,Cagers World @ Crickstown,20260730,home,Crickstown,CRICKSTOWN,91,63.4,34,56,60.71,16,32,50.0,5,10,50.0,6,3,18,21,27,6,0,9
+cpu_full,Cagers World @ Crickstown,20260730,away,Cagers World,CAGERS_WORLD,87,70.64,33,62,53.23,19,34,55.88,4,6,66.67,13,7,21,28,27,4,0,13
+cpu_full,Ivy Prep @ Concord,20260731,home,Concord,CONCORD,83,72.2,32,64,50.0,11,29,37.93,4,5,80.0,9,3,30,33,26,5,1,10
+cpu_full,Ivy Prep @ Concord,20260731,away,Ivy Prep,IVY_PREP,85,80.08,37,77,48.05,11,33,33.33,4,7,57.14,11,11,28,39,29,3,0,10
+cpu_full,Providence @ Independence,20260732,home,Independence,INDEPENDENCE,75,71.76,30,66,45.45,11,34,32.35,2,4,50.0,7,3,20,23,27,14,1,19
+cpu_full,Providence @ Independence,20260732,away,Providence,PROVIDENCE,78,77.24,30,71,42.25,11,31,35.48,9,21,42.86,14,17,33,50,16,5,0,7
+cpu_full,D1 Institute @ Queen's Guard,20260733,home,Queen's Guard,queens_guard,77,66.44,30,56,53.57,16,32,50.0,1,1,100.0,12,2,22,24,23,3,0,14
+cpu_full,D1 Institute @ Queen's Guard,20260733,away,D1 Institute,D1_INSTITUTE,93,70.28,37,75,49.33,14,35,40.0,5,12,41.67,6,16,23,39,23,6,0,8
+cpu_full,Garden Elites @ Montpeiler,20260734,home,Montpeiler,MONTPEILER,77,63.88,29,62,46.77,11,31,35.48,2,2,100.0,6,5,12,17,23,6,0,4
+cpu_full,Garden Elites @ Montpeiler,20260734,away,Garden Elites,GARDEN_ELITES,123,74.32,49,70,70.0,29,40,72.5,2,3,66.67,9,6,28,34,38,3,0,3
+cpu_full,Long Island Methodist @ Falls Academy,20260735,home,Falls Academy,FALLS_ACADEMY,74,75.84,31,66,46.97,10,31,32.26,6,11,54.55,20,15,28,43,20,7,0,22
+cpu_full,Long Island Methodist @ Falls Academy,20260735,away,Long Island Methodist,LONG_ISLAND_METHODIST,78,73.12,28,60,46.67,12,31,38.71,6,23,26.09,13,10,21,31,20,11,0,10
+cpu_full,Upstate @ Toronto Limited,20260736,home,Toronto Limited,TORONTO_LIMITED,96,68.72,33,60,55.0,20,33,60.61,8,13,61.54,13,10,24,34,24,6,0,13
+cpu_full,Upstate @ Toronto Limited,20260736,away,Upstate,UPSTATE,75,69.08,32,60,53.33,8,25,32.0,5,7,71.43,8,2,16,18,21,3,0,15
+cpu_full,Syracuse @ St Peters,20260737,home,St Peters,ST_PETERS,84,64.2,31,54,57.41,14,29,48.28,5,5,100.0,15,7,20,27,24,8,0,13
+cpu_full,Syracuse @ St Peters,20260737,away,Syracuse,SYRACUSE,81,66.52,31,51,60.78,16,27,59.26,6,8,75.0,15,3,13,16,25,12,0,11
+cpu_full,Amariabi International @ Empire City,20260738,home,Empire City,EMPIRE_CITY,77,72.6,28,56,50.0,11,27,40.74,10,15,66.67,17,7,22,29,24,6,0,12
+cpu_full,Amariabi International @ Empire City,20260738,away,Amariabi International,AMARIABI_INTERNATIONAL,89,66.52,34,65,52.31,17,31,54.84,4,8,50.0,7,9,16,25,29,13,0,17
+cpu_full,Hardwood Fields @ Ann Arbor,20260739,home,Ann Arbor,ANN_ARBOR,88,68.64,34,63,53.97,15,26,57.69,5,6,83.33,15,12,27,39,24,5,1,6
+cpu_full,Hardwood Fields @ Ann Arbor,20260739,away,Hardwood Fields,HARDWOOD_FIELDS,72,64.76,28,59,47.46,14,30,46.67,2,4,50.0,10,6,13,19,22,10,1,11
+cpu_full,North Columbus @ Columbus,20260740,home,Columbus,COLUMBUS,69,77.96,28,85,32.94,8,38,21.05,5,9,55.56,13,24,29,53,20,3,0,17
+cpu_full,North Columbus @ Columbus,20260740,away,North Columbus,NORTH_COLUMBUS,73,74.6,28,64,43.75,11,32,34.38,6,15,40.0,11,7,28,35,23,8,1,8
+cpu_full,Harding Central @ Mynsk,20260741,home,Mynsk,MYNSK,62,63.44,21,44,47.73,13,29,44.83,1,1,100.0,21,2,15,17,20,2,1,14
+cpu_full,Harding Central @ Mynsk,20260741,away,Harding Central,HARDING_CENTRAL,113,77.6,44,70,62.86,24,38,63.16,7,15,46.67,5,4,21,25,35,11,1,4
+cpu_full,Upper Peninsula @ Cleveland-Carlysle,20260742,home,Cleveland-Carlysle,CLEVELAND_CARLYSLE,93,70.08,35,61,57.38,20,37,54.05,5,7,71.43,13,7,25,32,25,8,0,8
+cpu_full,Upper Peninsula @ Cleveland-Carlysle,20260742,away,Upper Peninsula,UPPER_PENINSULA,67,65.08,25,54,46.3,10,23,43.48,5,7,71.43,10,2,16,18,22,5,0,12
+cpu_full,Templeton-Wesley @ Burroughs,20260743,home,Burroughs,BURROUGHS,61,64.28,22,50,44.0,10,31,32.26,7,12,58.33,16,7,24,31,14,4,0,12
+cpu_full,Templeton-Wesley @ Burroughs,20260743,away,Templeton-Wesley,TEMPLETON_WESLEY,84,66.64,34,71,47.89,13,36,36.11,3,6,50.0,5,12,20,32,26,7,0,11
+cpu_full,Sacred Heart @ Quigley Catholic,20260744,home,Quigley Catholic,QUIGLEY_CATHOLIC,86,63.08,33,61,54.1,18,33,54.55,4,7,57.14,9,10,31,41,23,5,0,8
+cpu_full,Sacred Heart @ Quigley Catholic,20260744,away,Sacred Heart,SACRED_HEART,46,59.76,17,47,36.17,7,29,24.14,3,4,75.0,11,0,14,14,17,8,0,13
+cpu_full,Wacker West @ Evanston,20260745,home,Evanston,EVANSTON,68,67.44,28,53,52.83,12,31,38.71,0,1,0.0,16,2,31,33,23,1,0,10
+cpu_full,Wacker West @ Evanston,20260745,away,Wacker West,WACKER_WEST,69,67.76,27,68,39.71,11,23,47.83,4,4,100.0,7,9,20,29,23,10,0,9
+cpu_full,Dillinger @ Archbishop McClellan,20260746,home,Archbishop McClellan,ARCHBISHOP_MCCLELLAN,83,69.52,31,57,54.39,16,25,64.0,5,8,62.5,16,7,33,40,17,3,1,8
+cpu_full,Dillinger @ Archbishop McClellan,20260746,away,Dillinger,DILLINGER,62,63.08,22,61,36.07,13,34,38.24,5,7,71.43,6,7,15,22,19,7,0,9
+cpu_full,Washington Carver @ Myrtle Private,20260747,home,Myrtle Private,MYRTLE_PRIVATE,108,62.96,39,69,56.52,20,33,60.61,6,9,66.67,4,14,18,32,28,2,1,11
+cpu_full,Washington Carver @ Myrtle Private,20260747,away,Washington Carver,WASHINGTON_CARVER,85,67.92,34,58,58.62,11,24,45.83,10,18,55.56,6,4,15,19,28,4,0,13
+cpu_full,Biloxi @ Monroe-Hayes,20260748,home,Monroe-Hayes,MONROE_HAYES,94,70.32,38,68,55.88,19,34,55.88,1,3,33.33,12,11,22,33,27,10,0,9
+cpu_full,Biloxi @ Monroe-Hayes,20260748,away,Biloxi,BILOXI,70,63.52,27,48,56.25,11,23,47.83,3,8,37.5,14,2,16,18,25,5,0,8
+cpu_full,Mobile @ Lexington,20260749,home,Lexington,LEXINGTON,110,84.4,44,84,52.38,16,32,50.0,6,10,60.0,14,18,19,37,30,16,0,13
+cpu_full,Mobile @ Lexington,20260749,away,Mobile,MOBILE,107,83.52,38,59,64.41,24,37,64.86,7,8,87.5,22,1,20,21,31,6,0,13
+cpu_full,Knoxville @ Crimson County,20260750,home,Crimson County,CRIMSON_COUNTY,123,85.16,46,72,63.89,25,40,62.5,10,14,71.43,11,4,22,26,37,6,0,15
+cpu_full,Knoxville @ Crimson County,20260750,away,Knoxville,KNOXVILLE,96,68.64,34,58,58.62,19,31,61.29,5,6,83.33,12,4,19,23,31,10,0,18
+cpu_full,DeLand @ Keys High,20260751,home,Keys High,KEYS_HIGH,97,74.64,38,66,57.58,18,28,64.29,3,6,50.0,13,7,17,24,33,3,0,9
+cpu_full,DeLand @ Keys High,20260751,away,DeLand,DELAND,108,74.84,43,76,56.58,18,30,60.0,4,11,36.36,8,14,21,35,34,8,0,12
+cpu_full,Valdosta Valley @ Tallahassee,20260752,home,Tallahassee,TALLAHASSEE,94,74.84,37,58,63.79,13,28,46.43,7,11,63.64,14,2,27,29,31,7,0,5
+cpu_full,Valdosta Valley @ Tallahassee,20260752,away,Valdosta Valley,VALDOSTA_VALLEY,79,72.2,28,70,40.0,21,42,50.0,2,5,40.0,13,13,18,31,23,13,0,11
+cpu_full,Grayson Ranch @ Reardon-Mayes,20260753,home,Reardon-Mayes,REARDON_MAYES,89,66.76,38,56,67.86,15,25,60.0,2,4,50.0,15,6,25,31,27,9,0,2
+cpu_full,Grayson Ranch @ Reardon-Mayes,20260753,away,Grayson Ranch,GRAYSON_RANCH,66,58.0,25,57,43.86,12,27,44.44,0,0,0.0,9,8,11,19,19,10,0,13
+cpu_full,Gainesville @ Dade Academy,20260754,home,Dade Academy,DADE_ACADEMY,68,73.76,29,60,48.33,10,29,34.48,4,4,100.0,17,5,20,25,22,3,0,13
+cpu_full,Gainesville @ Dade Academy,20260754,away,Gainesville,GAINESVILLE,124,76.84,42,78,53.85,31,50,62.0,5,11,45.45,8,14,24,38,33,12,0,6
+cpu_full,Fielding @ Ozark Centre,20260755,home,Ozark Centre,OZARK_CENTRE,77,65.88,30,55,54.55,15,34,44.12,2,2,100.0,16,6,22,28,24,4,0,12
+cpu_full,Fielding @ Ozark Centre,20260755,away,Fielding,FIELDING,102,70.76,39,69,56.52,22,39,56.41,2,4,50.0,7,7,19,26,28,9,0,5
+cpu_full,Tri-Cities Prep @ Iowa Academy,20260756,home,Iowa Academy,IOWA_ACADEMY,86,58.64,32,54,59.26,17,27,62.96,5,6,83.33,10,8,15,23,24,6,0,9
+cpu_full,Tri-Cities Prep @ Iowa Academy,20260756,away,Tri-Cities Prep,TRI_CITIES_PREP,65,62.72,25,47,53.19,8,20,40.0,7,13,53.85,13,3,15,18,16,5,0,16
+cpu_full,Grupenberg @ Wash U Prep,20260757,home,Wash U Prep,WASH_U_PREP,91,66.4,34,70,48.57,12,29,41.38,9,10,90.0,7,15,26,41,26,7,1,6
+cpu_full,Grupenberg @ Wash U Prep,20260757,away,Grupenberg,GRUPENBERG,72,68.44,30,56,53.57,14,25,56.0,0,1,0.0,12,0,19,19,23,5,0,10
+cpu_full,Hyde Methodist @ Lawrence,20260758,home,Lawrence,LAWRENCE,111,63.28,42,73,57.53,18,32,56.25,7,12,58.33,0,15,18,33,32,8,0,18
+cpu_full,Hyde Methodist @ Lawrence,20260758,away,Hyde Methodist,HYDE_METHODIST,82,68.92,29,52,55.77,13,25,52.0,13,18,72.22,12,3,16,19,21,0,0,12
+cpu_full,Crofton @ Rodeo Circuit,20260759,home,Rodeo Circuit,RODEO_CIRCUIT,94,72.88,37,73,50.68,14,36,38.89,2,2,100.0,8,9,14,23,32,9,0,15
+cpu_full,Crofton @ Rodeo Circuit,20260759,away,Crofton,CROFTON,129,81.52,48,76,63.16,32,51,62.75,5,8,62.5,16,14,27,41,37,5,1,7
+cpu_full,Minot @ Mt Simmons,20260760,home,Mt Simmons,MT_SIMMONS,75,64.76,30,63,47.62,12,29,41.38,3,4,75.0,9,9,28,37,21,5,1,6
+cpu_full,Minot @ Mt Simmons,20260760,away,Minot,MINOT,50,60.32,20,49,40.82,9,25,36.0,1,3,33.33,12,2,23,25,18,3,0,5
+cpu_full,Lewis Catholic @ Tower Academy,20260761,home,Tower Academy,TOWER_ACADEMY,75,73.68,25,72,34.72,13,29,44.83,12,22,54.55,5,13,32,45,18,9,0,8
+cpu_full,Lewis Catholic @ Tower Academy,20260761,away,Lewis Catholic,LEWIS_CATHOLIC,53,69.2,22,54,40.74,8,27,29.63,1,5,20.0,16,3,29,32,19,3,0,18
+cpu_full,HA Rushmore @ Two Rivers,20260762,home,Two Rivers,TWO_RIVERS,42,60.32,20,56,35.71,4,33,12.12,2,3,66.67,6,3,19,22,15,2,0,21
+cpu_full,HA Rushmore @ Two Rivers,20260762,away,HA Rushmore,HA_RUSHMORE,93,60.6,31,56,55.36,20,31,64.52,7,15,46.67,7,9,33,42,24,1,0,4
+cpu_full,Amarillo Tech @ Stormwood,20260763,home,Stormwood,STORMWOOD,60,65.88,25,57,43.86,7,23,30.43,1,2,50.0,16,8,31,39,17,3,2,12
+cpu_full,Amarillo Tech @ Stormwood,20260763,away,Amarillo Tech,AMARILLO_TECH,80,71.52,31,66,46.97,16,34,47.06,4,8,50.0,7,5,23,28,25,12,0,5
+cpu_full,Norman @ Kenton,20260764,home,Kenton,KENTON,68,69.52,24,48,50.0,7,23,30.43,7,8,87.5,20,2,25,27,18,5,0,11
+cpu_full,Norman @ Kenton,20260764,away,Norman,NORMAN,79,70.76,34,63,53.97,15,30,50.0,2,4,50.0,9,3,21,24,24,15,1,9
+cpu_full,Ada @ River's Edge,20260765,home,River's Edge,rivers_edge,110,62.64,38,53,71.7,29,37,78.38,5,6,83.33,16,9,15,24,28,6,1,12
+cpu_full,Ada @ River's Edge,20260765,away,Ada,ADA,96,59.4,35,47,74.47,20,27,74.07,6,10,60.0,9,1,5,6,27,14,0,13
+cpu_full,Pan Handle Limited @ Reyes-Santiago,20260766,home,Reyes-Santiago,REYES_SANTIAGO,91,81.08,38,64,59.38,15,27,55.56,5,7,71.43,19,5,25,30,28,11,0,17
+cpu_full,Pan Handle Limited @ Reyes-Santiago,20260766,away,Pan Handle Limited,PAN_HANDLE_LIMITED,100,79.6,35,66,53.03,15,31,48.39,10,15,66.67,12,5,20,25,26,14,0,12
+cpu_full,Abilene @ MiddleTEX,20260767,home,MiddleTEX,MIDDLETEX,81,66.6,30,67,44.78,14,30,46.67,11,15,73.33,5,12,35,47,24,3,3,14
+cpu_full,Abilene @ MiddleTEX,20260767,away,Abilene,ABILENE,52,64.84,18,60,30.0,7,32,21.88,5,11,45.45,5,5,23,28,16,4,0,15
+cpu_full,Austin West @ Bayou District,20260768,home,Bayou District,BAYOU_DISTRICT,110,71.84,42,59,71.19,22,33,66.67,8,11,72.73,11,3,19,22,29,6,1,11
+cpu_full,Austin West @ Bayou District,20260768,away,Austin West,AUSTIN_WEST,100,71.08,35,62,56.45,21,33,63.64,5,7,71.43,11,5,16,21,31,9,0,14
+cpu_full,GP Prep School @ Austin,20260769,home,Austin,AUSTIN,89,72.04,33,55,60.0,15,27,55.56,8,16,50.0,15,5,24,29,29,8,0,2
+cpu_full,GP Prep School @ Austin,20260769,away,GP Prep School,GP_PREP_SCHOOL,73,69.0,30,59,50.85,13,33,39.39,0,0,0.0,12,2,20,22,27,6,0,17
+cpu_full,Chambless Global @ Houston Jesuit,20260770,home,Houston Jesuit,HOUSTON_JESUIT,98,62.76,35,54,64.81,22,33,66.67,4,4,100.0,14,7,16,23,28,11,0,12
+cpu_full,Chambless Global @ Houston Jesuit,20260770,away,Chambless Global,CHAMBLESS_GLOBAL,79,66.96,34,51,66.67,7,13,53.85,6,9,66.67,13,1,13,14,24,9,0,15
+cpu_full,Border Academy @ Southwest Miner,20260771,home,Southwest Miner,SOUTHWEST_MINER,83,66.52,31,56,55.36,15,27,55.56,4,8,50.0,11,4,20,24,23,11,0,8
+cpu_full,Border Academy @ Southwest Miner,20260771,away,Border Academy,BORDER_ACADEMY,65,66.76,27,56,48.21,11,25,44.0,2,4,50.0,17,8,24,32,18,8,0,14
+cpu_full,Pike's Prep @ Tucson,20260772,home,Tucson,TUCSON,61,63.4,22,59,37.29,11,31,35.48,6,10,60.0,11,11,15,26,19,9,1,6
+cpu_full,Pike's Prep @ Tucson,20260772,away,Pike's Prep,pikes_prep,82,64.32,31,60,51.67,17,31,54.84,3,3,100.0,15,12,25,37,27,5,1,14
+cpu_full,Barton Lutheran @ East Rockies,20260773,home,East Rockies,EAST_ROCKIES,113,70.84,36,63,57.14,29,43,67.44,10,11,90.91,11,8,24,32,33,11,0,14
+cpu_full,Barton Lutheran @ East Rockies,20260773,away,Barton Lutheran,BARTON_LUTHERAN,70,77.16,27,69,39.13,10,28,35.71,8,14,57.14,13,11,16,27,21,7,0,11
+cpu_full,Desert Regional @ Circus Circus,20260774,home,Circus Circus,CIRCUS_CIRCUS,86,72.64,35,63,55.56,13,32,40.62,5,6,83.33,16,9,26,35,21,2,0,20
+cpu_full,Desert Regional @ Circus Circus,20260774,away,Desert Regional,DESERT_REGIONAL,87,70.04,29,62,46.77,16,33,48.48,11,16,68.75,7,6,17,23,17,13,0,15
+cpu_full,Seattle AAA @ Swoosh,20260775,home,Swoosh,SWOOSH,91,62.08,36,62,58.06,13,26,50.0,6,7,85.71,7,10,24,34,24,5,0,8
+cpu_full,Seattle AAA @ Swoosh,20260775,away,Seattle AAA,SEATTLE_AAA,69,64.32,26,54,48.15,14,30,46.67,3,3,100.0,9,0,15,15,20,5,0,10
+cpu_full,Rainier Central @ Vancouver,20260776,home,Vancouver,VANCOUVER,93,72.76,34,65,52.31,14,40,35.0,2,4,50.0,16,10,20,30,22,6,0,13
+cpu_full,Rainier Central @ Vancouver,20260776,away,Rainier Central,RAINIER_CENTRAL,107,81.08,45,69,65.22,22,36,61.11,4,7,57.14,11,2,22,24,33,7,0,6
+cpu_full,Couer d'Alene @ Salem,20260777,home,Salem,SALEM,86,76.64,37,57,64.91,12,27,44.44,2,6,33.33,20,3,23,26,25,4,0,14
+cpu_full,Couer d'Alene @ Salem,20260777,away,Couer d'Alene,couer_d_alene,106,79.04,37,72,51.39,20,38,52.63,10,16,62.5,8,8,18,26,24,13,1,12
+cpu_full,Cardinal Conor @ Boise,20260778,home,Boise,BOISE,76,74.4,30,66,45.45,11,32,34.38,5,10,50.0,12,8,31,39,24,8,0,9
+cpu_full,Cardinal Conor @ Boise,20260778,away,Cardinal Conor,CARDINAL_CONOR,63,75.64,25,66,37.88,8,26,30.77,5,6,83.33,12,5,28,33,21,7,0,7
+cpu_full,Hollywood Prep @ Rancho Estrada,20260779,home,Rancho Estrada,RANCHO_ESTRADA,59,72.64,22,50,44.0,9,27,33.33,4,6,66.67,22,2,28,30,20,9,0,17
+cpu_full,Hollywood Prep @ Rancho Estrada,20260779,away,Hollywood Prep,HOLLYWOOD_PREP,85,82.56,29,76,38.16,14,37,37.84,15,24,62.5,11,15,26,41,21,15,0,5
+cpu_full,West Ocean City @ DeCatur Dei,20260780,home,DeCatur Dei,DECATUR_DEI,70,69.4,25,56,44.64,11,31,35.48,5,10,50.0,15,6,19,25,21,6,0,18
+cpu_full,West Ocean City @ DeCatur Dei,20260780,away,West Ocean City,WEST_OCEAN_CITY,93,80.04,37,67,55.22,14,30,46.67,9,16,56.25,13,7,25,32,25,9,0,6
+cpu_full,San Jose @ Huntington Canyon,20260781,home,Huntington Canyon,HUNTINGTON_CANYON,87,75.72,31,56,55.36,18,33,54.55,7,13,53.85,21,7,20,27,22,8,0,18
+cpu_full,San Jose @ Huntington Canyon,20260781,away,San Jose,SAN_JOSE,96,71.4,39,64,60.94,12,25,48.0,6,10,60.0,11,8,16,24,23,13,0,12
+cpu_full,Berkley @ Valley High,20260782,home,Valley High,VALLEY_HIGH,73,72.08,30,66,45.45,10,32,31.25,3,7,42.86,11,8,27,35,20,4,0,16
+cpu_full,Berkley @ Valley High,20260782,away,Berkley,BERKLEY,77,67.28,28,58,48.28,11,27,40.74,10,12,83.33,8,4,27,31,25,6,0,11
+cpu_full,Mahala Alou @ Melbourne Americas,20260783,home,Melbourne Americas,MELBOURNE_AMERICAS,87,78.16,30,59,50.85,17,33,51.52,12,14,85.71,21,8,24,32,19,6,0,17
+cpu_full,Mahala Alou @ Melbourne Americas,20260783,away,Mahala Alou,MAHALA_ALOU,92,75.36,30,61,49.18,17,32,53.12,13,19,68.42,13,7,15,22,21,14,0,18
+cpu_full,Pacific All-Stars @ Cupertino,20260784,home,Cupertino,CUPERTINO,90,71.72,38,63,60.32,10,22,45.45,9,13,69.23,12,9,25,34,27,5,0,3
+cpu_full,Pacific All-Stars @ Cupertino,20260784,away,Pacific All-Stars,PACIFIC_ALL_STARS,78,61.44,27,51,52.94,19,34,55.88,0,1,0.0,11,1,15,16,26,9,1,18
+cpu_full,Grizzly Academy @ Redwood High,20260785,home,Redwood High,REDWOOD_HIGH,82,70.36,31,72,43.06,18,37,48.65,4,19,21.05,4,14,27,41,26,12,0,5
+cpu_full,Grizzly Academy @ Redwood High,20260785,away,Grizzly Academy,GRIZZLY_ACADEMY,59,71.4,23,61,37.7,9,29,31.03,2,10,20.0,15,9,29,38,19,3,1,15
+practice_squad,Region G All-Americans @ Region A All-Americans,20260723,home,Region A All-Americans,ps_A_1,90,68.48,30,75,40.0,18,39,46.15,10,17,58.82,8,22,24,46,22,5,2,10
+practice_squad,Region G All-Americans @ Region A All-Americans,20260723,away,Region G All-Americans,ps_G_1,75,65.64,29,64,45.31,14,35,40.0,5,6,83.33,8,9,21,30,23,4,0,18
+practice_squad,Region F All-Americans @ Region H All-Americans,20260724,home,Region H All-Americans,ps_H_1,81,84.08,26,66,39.39,12,36,33.33,17,32,53.12,9,5,25,30,21,9,0,10
+practice_squad,Region F All-Americans @ Region H All-Americans,20260724,away,Region F All-Americans,ps_F_1,72,78.52,28,65,43.08,10,33,30.3,6,8,75.0,18,8,38,46,20,2,0,25
+practice_squad,Region E All-Americans @ Region B All-Americans,20260725,home,Region B All-Americans,ps_B_1,81,72.4,28,59,47.46,11,28,39.29,7,10,70.0,15,6,33,39,23,2,1,16
+practice_squad,Region E All-Americans @ Region B All-Americans,20260725,away,Region E All-Americans,ps_E_1,74,81.24,30,74,40.54,10,31,32.26,11,21,52.38,7,9,23,32,17,5,0,8
+practice_squad,Region D All-Americans @ Region C All-Americans,20260726,home,Region C All-Americans,ps_C_1,100,70.88,38,79,48.1,15,47,31.91,18,27,66.67,1,21,32,53,15,1,0,8
+practice_squad,Region D All-Americans @ Region C All-Americans,20260726,away,Region D All-Americans,ps_D_1,38,54.64,13,48,27.08,3,27,11.11,0,6,0.0,9,5,16,21,11,0,0,20
+practice_squad,Region G All-Stars @ Region A All-Stars,20260727,home,Region A All-Stars,ps_A_2,58,70.6,20,67,29.85,8,39,20.51,10,15,66.67,7,10,25,35,12,1,0,27
+practice_squad,Region G All-Stars @ Region A All-Stars,20260727,away,Region G All-Stars,ps_G_2,77,74.4,24,73,32.88,11,38,28.95,18,35,51.43,7,21,36,57,18,1,0,16
+practice_squad,Region F All-Stars @ Region H All-Stars,20260728,home,Region H All-Stars,ps_H_2,70,74.8,24,67,35.82,10,43,23.26,12,20,60.0,10,11,38,49,17,0,0,14
+practice_squad,Region F All-Stars @ Region H All-Stars,20260728,away,Region F All-Stars,ps_F_2,64,70.04,25,75,33.33,7,36,19.44,7,16,43.75,4,16,29,45,17,2,0,14
+practice_squad,Region E All-Stars @ Region B All-Stars,20260729,home,Region B All-Stars,ps_B_2,59,64.52,22,53,41.51,12,35,34.29,3,8,37.5,12,4,37,41,18,1,1,18
+practice_squad,Region E All-Stars @ Region B All-Stars,20260729,away,Region E All-Stars,ps_E_2,50,71.04,19,71,26.76,6,35,17.14,6,16,37.5,9,16,28,44,14,3,0,11
+practice_squad,Region D All-Stars @ Region C All-Stars,20260730,home,Region C All-Stars,ps_C_2,63,66.6,21,61,34.43,12,40,30.0,9,15,60.0,6,7,37,44,16,1,0,8
+practice_squad,Region D All-Stars @ Region C All-Stars,20260730,away,Region D All-Stars,ps_D_2,59,71.72,24,72,33.33,8,42,19.05,3,13,23.08,4,10,33,43,20,0,0,14
+practice_squad,Region G Varsity @ Region A Varsity,20260731,home,Region A Varsity,ps_A_3,52,78.52,21,77,27.27,6,46,13.04,4,8,50.0,11,13,45,58,13,2,0,17
+practice_squad,Region G Varsity @ Region A Varsity,20260731,away,Region G Varsity,ps_G_3,47,78.48,18,73,24.66,4,33,12.12,7,17,41.18,11,13,41,54,11,4,1,15
+practice_squad,Region F Varsity @ Region H Varsity,20260732,home,Region H Varsity,ps_H_3,53,71.16,21,76,27.63,4,37,10.81,7,14,50.0,2,13,37,50,14,4,1,9
+practice_squad,Region F Varsity @ Region H Varsity,20260732,away,Region F Varsity,ps_F_3,40,71.28,15,65,23.08,6,36,16.67,4,12,33.33,11,10,44,54,12,1,0,14
+practice_squad,Region E Varsity @ Region B Varsity,20260733,home,Region B Varsity,ps_B_3,60,68.48,20,66,30.3,6,30,20.0,12,17,70.59,4,9,28,37,15,0,0,13
+practice_squad,Region E Varsity @ Region B Varsity,20260733,away,Region E Varsity,ps_E_3,66,61.6,28,76,36.84,7,25,28.0,5,15,33.33,1,22,33,55,20,1,0,17
+practice_squad,Region D Varsity @ Region C Varsity,20260734,home,Region C Varsity,ps_C_3,39,60.52,15,55,27.27,4,33,12.12,5,8,62.5,9,7,31,38,13,1,1,19
+practice_squad,Region D Varsity @ Region C Varsity,20260734,away,Region D Varsity,ps_D_3,61,71.32,21,92,22.83,6,37,16.22,13,28,46.43,4,37,32,69,13,2,0,10
+practice_squad,Region G JV @ Region A JV,20260735,home,Region A JV,ps_A_4,44,72.04,17,66,25.76,2,32,6.25,8,16,50.0,6,7,31,38,11,2,0,15
+practice_squad,Region G JV @ Region A JV,20260735,away,Region G JV,ps_G_4,58,69.84,25,71,35.21,3,32,9.38,5,11,45.45,8,14,39,53,18,3,0,9
+practice_squad,Region F JV @ Region H JV,20260736,home,Region H JV,ps_H_4,23,68.48,9,68,13.24,1,44,2.27,4,17,23.53,3,10,39,49,9,0,0,22
+practice_squad,Region F JV @ Region H JV,20260736,away,Region F JV,ps_F_4,31,68.68,11,79,13.92,1,33,3.03,8,22,36.36,7,27,46,73,9,2,0,12
+practice_squad,Region E JV @ Region B JV,20260737,home,Region B JV,ps_B_4,71,71.04,27,75,36.0,9,35,25.71,10,16,62.5,5,16,37,53,17,0,0,13
+practice_squad,Region E JV @ Region B JV,20260737,away,Region E JV,ps_E_4,48,68.8,14,63,22.22,5,36,13.89,13,20,65.0,5,8,28,36,12,0,0,11
+practice_squad,Region D JV @ Region C JV,20260738,home,Region C JV,ps_C_4,38,77.96,16,66,24.24,3,36,8.33,3,9,33.33,10,2,39,41,11,0,0,18
+practice_squad,Region D JV @ Region C JV,20260738,away,Region D JV,ps_D_4,48,75.88,16,81,19.75,2,38,5.26,14,27,51.85,8,25,44,69,9,0,0,12
+practice_squad,Region G Squad @ Region A Squad,20260739,home,Region A Squad,ps_A_5,56,80.56,21,84,25.0,1,35,2.86,13,24,54.17,8,22,33,55,15,2,0,24
+practice_squad,Region G Squad @ Region A Squad,20260739,away,Region G Squad,ps_G_5,69,88.52,26,77,33.77,2,30,6.67,15,33,45.45,10,13,39,52,20,0,0,19
+practice_squad,Region F Squad @ Region H Squad,20260740,home,Region H Squad,ps_H_5,45,80.76,16,70,22.86,3,32,9.38,10,29,34.48,6,8,43,51,13,0,0,24
+practice_squad,Region F Squad @ Region H Squad,20260740,away,Region F Squad,ps_F_5,53,75.64,19,80,23.75,5,36,13.89,10,31,32.26,4,22,46,68,13,0,0,24
+practice_squad,Region E Squad @ Region B Squad,20260741,home,Region B Squad,ps_B_5,53,65.76,21,65,32.31,9,37,24.32,2,4,50.0,8,9,31,40,15,1,0,16
+practice_squad,Region E Squad @ Region B Squad,20260741,away,Region E Squad,ps_E_5,62,70.56,22,71,30.99,6,35,17.14,12,24,50.0,5,16,35,51,12,3,0,9
+practice_squad,Region D Squad @ Region C Squad,20260742,home,Region C Squad,ps_C_5,44,82.44,16,69,23.19,1,36,2.78,11,26,42.31,10,8,35,43,11,2,0,16
+practice_squad,Region D Squad @ Region C Squad,20260742,away,Region D Squad,ps_D_5,56,76.36,22,72,30.56,3,33,9.09,9,19,47.37,10,14,41,55,16,3,0,17

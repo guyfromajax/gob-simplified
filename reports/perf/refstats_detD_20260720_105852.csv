@@ -1,0 +1,5 @@
+kind,matchup,seed,side,team,team_id,final_score,possessions,FGM,FGA,FG_pct,TPM,TPA,TP_pct,FTM,FTA,FT_pct,TO,OREB,DREB,REB,AST,STL,BLK,PF
+cpu_full,Xavien @ Ocean City,12345,home,Ocean City,OCEAN_CITY,85,70.36,30,52,57.69,15,24,62.5,12,19,63.16,11,1,27,28,23,7,0,20
+cpu_full,Xavien @ Ocean City,12345,away,Xavien,XAVIEN,76,74.92,28,67,41.79,8,24,33.33,10,18,55.56,12,12,22,34,19,9,0,23
+cpu_full,Little York @ Four Corners,12346,home,Four Corners,FOUR_CORNERS,94,58.96,36,54,66.67,15,23,65.22,7,9,77.78,10,9,23,32,25,4,0,11
+cpu_full,Little York @ Four Corners,12346,away,Little York,LITTLE_YORK,78,60.64,28,58,48.28,17,37,45.95,5,6,83.33,6,6,9,15,24,6,0,17

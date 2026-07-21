@@ -1,0 +1,83 @@
+{
+  "generated_at": "2026-07-20T14:38:48",
+  "git_commit": "70c4a49eee5f94bea6e1ad4db1dfba441c7be56a",
+  "git_dirty": true,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "both",
+  "workers": 1,
+  "seed": 20260720,
+  "probes_installed": 0,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 2,
+        "total_wall_s": 9.268,
+        "sum_game_s": 9.267,
+        "min_s": 4.4571,
+        "median_s": 4.634,
+        "mean_s": 4.634,
+        "p90_s": null,
+        "max_s": 4.8103
+      },
+      "phases": {},
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "Xavien @ Ocean City",
+          "seed": 20260720,
+          "wall_s": 4.8103,
+          "away_score": 61,
+          "home_score": 87
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Little York @ Four Corners",
+          "seed": 20260721,
+          "wall_s": 4.4571,
+          "away_score": 62,
+          "home_score": 94
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)          9.27    100.0%\nTOTAL WALL                               9.27    100.0%"
+    },
+    "practice_squad": {
+      "workers": 1,
+      "timing": {
+        "games": 2,
+        "total_wall_s": 10.82,
+        "sum_game_s": 10.82,
+        "min_s": 5.3515,
+        "median_s": 5.41,
+        "mean_s": 5.41,
+        "p90_s": null,
+        "max_s": 5.4685
+      },
+      "phases": {},
+      "per_game": [
+        {
+          "kind": "practice_squad",
+          "matchup": "Region G All-Americans @ Region A All-Americans",
+          "seed": 20260720,
+          "wall_s": 5.3515,
+          "away_score": 69,
+          "home_score": 85
+        },
+        {
+          "kind": "practice_squad",
+          "matchup": "Region F All-Americans @ Region H All-Americans",
+          "seed": 20260721,
+          "wall_s": 5.4685,
+          "away_score": 81,
+          "home_score": 97
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)         10.82    100.0%\nTOTAL WALL                              10.82    100.0%"
+    }
+  }
+}

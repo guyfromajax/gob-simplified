@@ -1,0 +1,3 @@
+game_index,kind,matchup,wall_s,side,team,team_id,final_score,possessions,FGM,FGA,FG_pct,TPM,TPA,TP_pct,FTM,FTA,FT_pct,TO,OREB,DREB,REB,AST,STL,BLK,PF
+0,cpu_full,Xavien @ Ocean City,5.1081,home,,,0,0.0,0,0,0.0,0,0,0.0,0,0,0.0,0,0,0,0,0,0,0,0
+0,cpu_full,Xavien @ Ocean City,5.1081,away,,,0,0.0,0,0,0.0,0,0,0.0,0,0,0.0,0,0,0,0,0,0,0,0

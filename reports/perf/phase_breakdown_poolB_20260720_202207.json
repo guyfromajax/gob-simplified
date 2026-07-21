@@ -1,0 +1,89 @@
+{
+  "generated_at": "2026-07-20T20:22:41",
+  "git_commit": "50c1f3d8d378608ebbe46ad595a00f2b7a45d513",
+  "git_dirty": true,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "cpu",
+  "workers": 1,
+  "seed": 20260720,
+  "probes_installed": 0,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 4,
+      "pool": true,
+      "timing": {
+        "games": 8,
+        "total_wall_s": 27.725,
+        "min_s": null,
+        "median_s": null,
+        "mean_s": null,
+        "p90_s": null,
+        "max_s": null
+      },
+      "phases": {},
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "Xavien @ Ocean City",
+          "seed": 20260720,
+          "away_score": 111,
+          "home_score": 64
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Little York @ Four Corners",
+          "seed": 20260721,
+          "away_score": 92,
+          "home_score": 84
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Bentley-Truman @ Lancaster",
+          "seed": 20260722,
+          "away_score": 74,
+          "home_score": 94
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Morristown @ South Lancaster",
+          "seed": 20260723,
+          "away_score": 93,
+          "home_score": 98
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Casino Row @ IDA",
+          "seed": 20260724,
+          "away_score": 74,
+          "home_score": 89
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Chapel Hill @ Durham",
+          "seed": 20260725,
+          "away_score": 94,
+          "home_score": 103
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Nickel Beach @ Appalachia",
+          "seed": 20260726,
+          "away_score": 60,
+          "home_score": 71
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Cagers World @ Crickstown",
+          "seed": 20260727,
+          "away_score": 78,
+          "home_score": 84
+        }
+      ],
+      "failures": [],
+      "worker_leaks": {}
+    }
+  }
+}

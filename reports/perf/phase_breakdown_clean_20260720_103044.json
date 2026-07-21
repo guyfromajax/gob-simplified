@@ -1,0 +1,31 @@
+{
+  "generated_at": "2026-07-20T10:30:49",
+  "git_commit": "dbb82a32d5c2ab2ff8bb409a1fecf963e868fee1",
+  "git_dirty": true,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "cpu",
+  "workers": 1,
+  "probes_installed": 0,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 0,
+        "total_wall_s": 0.0,
+        "sum_game_s": 0,
+        "min_s": null,
+        "median_s": null,
+        "mean_s": null,
+        "p90_s": null,
+        "max_s": null
+      },
+      "phases": {},
+      "per_game": [],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)          0.00    100.0%\nTOTAL WALL                               0.00    100.0%"
+    }
+  }
+}

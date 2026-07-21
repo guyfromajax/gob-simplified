@@ -1,0 +1,9 @@
+kind,matchup,seed,side,team,team_id,final_score,possessions,FGM,FGA,FG_pct,TPM,TPA,TP_pct,FTM,FTA,FT_pct,TO,OREB,DREB,REB,AST,STL,BLK,PF
+cpu_full,Xavien @ Ocean City,20260720,home,Ocean City,OCEAN_CITY,88,59.6,30,51,58.82,14,23,60.87,12,15,80.0,8,6,26,32,27,5,0,18
+cpu_full,Xavien @ Ocean City,20260720,away,Xavien,XAVIEN,64,63.92,23,57,40.35,9,22,40.91,11,18,61.11,7,8,13,21,16,4,1,18
+cpu_full,Little York @ Four Corners,20260721,home,Four Corners,FOUR_CORNERS,97,62.04,39,62,62.9,14,27,51.85,9,16,56.25,3,10,16,26,23,6,0,15
+cpu_full,Little York @ Four Corners,20260721,away,Little York,LITTLE_YORK,71,57.16,24,45,53.33,9,16,56.25,10,14,71.43,9,3,13,16,21,2,0,21
+cpu_full,Bentley-Truman @ Lancaster,20260722,home,Lancaster,LANCASTER,94,69.64,37,55,67.27,18,30,60.0,4,6,66.67,17,5,24,29,30,6,0,19
+cpu_full,Bentley-Truman @ Lancaster,20260722,away,Bentley-Truman,BENTLEY_TRUMAN,97,68.96,36,62,58.06,18,24,75.0,5,9,55.56,7,4,13,17,28,14,0,13
+cpu_full,Morristown @ South Lancaster,20260723,home,South Lancaster,SOUTH_LANCASTER,86,63.16,28,47,59.57,12,25,48.0,10,14,71.43,13,3,15,18,23,4,0,12
+cpu_full,Morristown @ South Lancaster,20260723,away,Morristown,MORRISTOWN,95,65.4,38,57,66.67,17,26,65.38,10,10,100.0,6,2,13,15,25,5,0,12
