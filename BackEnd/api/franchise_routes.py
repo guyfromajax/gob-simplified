@@ -5766,6 +5766,11 @@ def _complete_week_finish_cpu_and_persist(
     # Phase 3: deferred full turn-based sims (run in parallel, persist sequentially).
     full_jobs: list[tuple[int, Any, Any, str, str]] = []
 
+    # [CPU-WEEK-TIMING] Quantify the week's CPU-sim cost + full-TbT/distant split.
+    # Pure observability; drives the Distant-Sim sunset decision (Task 1).
+    _cpu_week_t0 = time.time()
+    _cpu_distant_count = 0
+
     # Distant game sim: batch-load FTD (prestige, total_player_attrs) and team conferences for partition
     ftd_docs = list(franchise_team_data_collection.find(
         {"franchise_id": franchise_id},
@@ -5977,8 +5982,9 @@ def _complete_week_finish_cpu_and_persist(
                     skip_games_upsert=True,
                 )
                 _award_gp_sim(winner_id, g, (away_id, home_id))
+                _cpu_distant_count += 1  # [CPU-WEEK-TIMING]
                 continue
-    
+
         # Distant sim: regular season only; neither team in user's conference.
         away_conf = team_id_to_conference.get(str(away_id))
         home_conf = team_id_to_conference.get(str(home_id))
@@ -6076,8 +6082,9 @@ def _complete_week_finish_cpu_and_persist(
                 distant_rs_standings, away_id, home_id, away_score, home_score
             )
             _award_gp_sim(winner_id_rs, None, (away_id, home_id))
+            _cpu_distant_count += 1  # [CPU-WEEK-TIMING]
             continue
-    
+
         away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
         home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
         home_name = home_doc.get("name", "")
@@ -6108,6 +6115,7 @@ def _complete_week_finish_cpu_and_persist(
     _cpu_week_summaries: list[dict] = []
 
     if full_jobs:
+        _cpu_fullsim_t0 = time.time()  # [CPU-WEEK-TIMING] full-sim block only
         max_workers = min(_franchise_cpu_full_sim_max_workers(), len(full_jobs))
         logger.info(
             "[COMPLETE-WEEK-PHASE3] Parallel full CPU sims franchise_id=%s week=%s jobs=%s max_workers=%s",
@@ -6168,6 +6176,21 @@ def _complete_week_finish_cpu_and_persist(
                     sim_ok[sched_idx] = fut.result()
                 except Exception as ex:
                     sim_err[sched_idx] = ex
+
+        # [CPU-WEEK-TIMING] Headline: how long the week's CPU sim actually took, and
+        # the current full-TbT vs Distant split. `full_sim_block` is the parallel
+        # sim compute; `total_so_far` also includes the distant sims run inline above
+        # (persistence follows and is not counted here). When Distant is sunset,
+        # full_tbt should climb toward the whole slate and distant toward 0.
+        _fullsim_secs = time.time() - _cpu_fullsim_t0
+        logger.info(
+            "[CPU-WEEK-TIMING] franchise=%s week=%s | full_tbt=%s distant=%s | "
+            "engine=%s | full_sim_block=%.1fs (%.2fs/full-game) total_so_far=%.1fs | failures=%s",
+            franchise_id_str, week, len(full_jobs), _cpu_distant_count,
+            "pool" if _franchise_cpu_use_pool() else "thread",
+            _fullsim_secs, _fullsim_secs / max(1, len(full_jobs)),
+            time.time() - _cpu_week_t0, len(sim_err),
+        )
 
         # Collect each full-sim CPU game's shot-diagnostic summary (both teams
         # combined, stamped by summarize_game_state) and stash a slim copy on the
