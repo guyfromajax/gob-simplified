@@ -4473,7 +4473,7 @@ def _roll_defense_posture(game, rng=None):
     if posture not in _HCO_DEFENSE_POSTURES:
         posture = "normal"
     game_state["_hco_defense_posture"] = posture
-    logging.warning(f"🛡️ [DYNAMIC DEFENSE] turn posture = {posture} (from playcall)")
+    logging.debug(f"🛡️ [DYNAMIC DEFENSE] turn posture = {posture} (from playcall)")
     return posture
 
 
@@ -4567,7 +4567,7 @@ def _resolve_hco_dead_ball(skeleton, output_steps, step, bh_pos, bh_location, bh
         # No live dribble → the receiver catches and shoots; never an attack drive for the BH.
         _shot_type = "inside" if _is_inside_location(_tgt_loc) else "outside"
         _dec = {"action": SHOOT, "shooter_pos": _tgt, "shot_type": _shot_type}
-        logging.warning(
+        logging.debug(
             f"🧱 [DYNAMIC {kind}] DEAD BALL → forced pass {bh_pos}→{_tgt} "
             f"(open={len(_open)}/{len(_mates)})")
         return apply_dish_contest(_dec, _execute_motion_decision(
@@ -4580,14 +4580,14 @@ def _resolve_hco_dead_ball(skeleton, output_steps, step, bh_pos, bh_location, bh
         _cred_id = getattr(bh_defender, "player_id", None)
         game_state["_hco_moment_defender_id"] = _cred_id
         game_state["_hco_moment_stop_index"] = _stop_idx
-        logging.warning(
+        logging.debug(
             f"🧱 [DYNAMIC {kind}] DEAD BALL → all {len(_mates)} lanes denied → DEAD_BALL_TURNOVER")
         skeleton["steps"] = list(output_steps)
         return {"moment_result": "DEAD_BALL_TURNOVER", "skeleton": skeleton,
                 "moment_stop_index": _stop_idx, "moment_defender_id": _cred_id}
 
     _st = "inside" if _is_inside_location(bh_location) else "outside"
-    logging.warning(f"🧱 [DYNAMIC {kind}] DEAD BALL → all lanes denied → desperation {_st} shot")
+    logging.debug(f"🧱 [DYNAMIC {kind}] DEAD BALL → all lanes denied → desperation {_st} shot")
     return _execute_motion_decision(
         skeleton, output_steps, step, bh_pos, bh_location,
         {"action": SHOOT, "shooter_pos": bh_pos, "shot_type": _st},
@@ -5484,7 +5484,7 @@ def _track_hco_intercept_gates(game_state, in_lane, attempted, stage, pass_type=
         types_s = " ".join(
             f"{k}={d['passes']}·{d['g1']}·{d['g2']}·{d['g3b_int']}·{d['g3b_bat']}"
             for k, d in sorted(by_type.items()))
-        logging.warning(
+        logging.debug(
             "🚪 [INTERCEPT GATES] passes=%d | G1 in-lane %d (%s) | G2 attempt %d (%s of in-lane) | "
             "G3a passer-safe %d (%s of attempts) | G3b: INT=%d BAT=%d miss=%d | "
             "by-type[p·g1·g2·INT·BAT]: %s [is_full_sim=%s]",
@@ -5599,7 +5599,7 @@ def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lin
         posture=posture, game_state=game_state, pass_type=pass_type)
     if contest.get("outcome") not in ("INTERCEPT", "BAT_OOB"):
         return None
-    logging.warning(
+    logging.debug(
         f"🪡 [HCO PASS] {contest['outcome']} on SKELETON pass {passer}→{receiver} "
         f"by {contest.get('deflector')}")
     skeleton["steps"] = list(output_steps)
@@ -5809,7 +5809,7 @@ def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, d
             _surviving_shot, _pi, motion_shot_info.get("interceptor_pos"), _passer_pos,
             motion_shot_info.get("shooter_pos"), game_state.get("game_id"),
             game_state.get("_is_full_simulation"))
-    logging.warning(
+    logging.debug(
         f"🪡 [HCO INTERCEPTION] {getattr(ball_handler, 'player_id', None)} dish picked off by "
         f"{getattr(interceptor, 'player_id', None)} → STEAL "
         f"[pass_pin={_pi} surviving_shot_steps={_surviving_shot} "
@@ -5910,7 +5910,7 @@ def _finalize_hco_pass_bat_oob(motion_shot_info, game, roles, off_lineup, def_li
             "pass_pin=%s deflector=%s oob_target=%s game=%s",
             _cx, "away" if _is_away else "home", _zone, _stamped, _pi,
             motion_shot_info.get("interceptor_pos"), _oob_target, game_state.get("game_id"))
-    logging.warning(
+    logging.debug(
         f"🪣 [HCO BAT-OOB] pass by {getattr(ball_handler, 'player_id', None)} batted OOB by "
         f"{getattr(deflector, 'player_id', None)} → offense retains (side inbound, no reset, no stats) "
         f"[away={_is_away} zone={_zone} contact={_contact} oob_target={_oob_target} "
@@ -5952,7 +5952,7 @@ def _track_hco_pass_census(result, game):
     bt[play_type] = bt.get(play_type, 0) + same + split
     by_type_s = " ".join(f"{k}={v}" for k, v in sorted(bt.items()))
     w = gs.get("_hco_walk_census") or {}
-    logging.warning(
+    logging.debug(
         "🧮 [HCO PASS CENSUS] game: turns=%d passes=%d (same=%d split=%d) | by-type: %s | "
         "walk-saw: steps=%d pass_seen=%d pass_same=%d | "
         "this-turn: type=%s passes=%d event=%s posture=%s [is_full_sim=%s]",
@@ -6022,7 +6022,7 @@ def _track_hco_pass_lanes(result, game):
             t["full_n"] += 1
     mid_s = f"{t['mid_sum'] / t['mid_n']:.2f}" if t["mid_n"] else "n/a"
     full_s = f"{t['full_sum'] / t['full_n']:.2f}" if t["full_n"] else "n/a"
-    logging.warning(
+    logging.debug(
         f"📏 [HCO PASS LANES] this turn (mid/full)={turn_samples} | GAME: passes={t['count']} "
         f"mid_avg={mid_s} (n={t['mid_n']}) full_avg={full_s} (n={t['full_n']}) "
         f"[is_full_sim={game_state.get('_is_full_simulation')}]")
@@ -6275,7 +6275,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     aggression = (getattr(def_team, "strategy_settings", {}) or {}).get("aggression", 2)
     offense_reads = random.randint(1, 5) <= alterations   # alterations × 20% (0 = never)
     defense_pressure = random.randint(0, 4) <= aggression
-    logging.warning(
+    logging.debug(
         f"🎲 [DYNAMIC {_kind}] turn gate: offense_reads={offense_reads} "
         f"(alterations={alterations}) defense_pressure={defense_pressure} (aggression={aggression})"
     )
@@ -6315,7 +6315,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             result["interceptor_pos"] = contest.get("deflector")
             result["pass_bat_oob"] = contest["outcome"] == "BAT_OOB"
             result["pass_contact_point"] = contest.get("contact_point")
-            logging.warning(
+            logging.debug(
                 f"🪡 [HCO PASS] {contest['outcome']} on dish {passer_pos}→{recv} "
                 f"by {contest.get('deflector')}")
         # Tag the appended dish pass step so the final-skeleton coverage pass skips it.
@@ -6358,7 +6358,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                         _cred_id = getattr(_m_cred or _m_def, "player_id", None)
                         game_state["_hco_moment_defender_id"] = _cred_id
                         game_state["_hco_moment_stop_index"] = _stop_idx
-                        logging.warning(
+                        logging.debug(
                             f"⚔️ [DYNAMIC {_kind}] MOMENT {_m_rt} at step {i} "
                             f"({_m_bh}, {'zone' if zone else 'man'})")
                         skeleton["steps"] = list(output_steps)
@@ -6420,7 +6420,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                                  shot_clock_est, tempo, random, openness=0.0, allow_dish=True,
                                  blocked_dish_targets=blocked_dish, openness_map=_open_map)
             if shoot:
-                logging.warning(
+                logging.debug(
                     f"🎯 [DYNAMIC {_kind}] step {i}: SHOOT {shoot['shooter_pos']} "
                     f"{shoot['shot_type']} (hot_read={shoot.get('hot_read')})"
                 )
@@ -6438,7 +6438,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
         # the matrix runs only when the offense alters and/or the defense pressures;
         # neither engaged → static skeleton: just progress to the next step.
         if sm_precede:
-            logging.warning(f"🟡 [DYNAMIC {_kind}] step {i}: SM-precedence → subtle movement")
+            logging.debug(f"🟡 [DYNAMIC {_kind}] step {i}: SM-precedence → subtle movement")
             decision = {"action": SUBTLE_MOVEMENT}
         elif not offense_reads and not defense_pressure:
             continue
@@ -6447,7 +6447,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             decision = decide_step_action(game, steps[i], bh_pos, bh_defender, off_lineup, read_map, rng=random,
                                           offense_reads=offense_reads, defense_pressure=defense_pressure)
         action = decision.get("action")
-        logging.warning(f"🔹 [DYNAMIC {_kind}] step {i} ({bh_pos}@{bh_location}): {action}")
+        logging.debug(f"🔹 [DYNAMIC {_kind}] step {i} ({bh_pos}@{bh_location}): {action}")
         if action in shot_actions:
             return _apply_dish_contest(decision, _execute_motion_decision(
                 skeleton, output_steps, steps[i], bh_pos, bh_location, decision,
@@ -6474,7 +6474,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                 # DIAG (S3 altered actions) — one line per SM so the gate chain is traceable end to end.
                 # read True = defender reacts (man: sticks/covers, zone: adjusts); False = holds/frozen.
                 _rd = ", ".join(f"{d}:{'react' if v else 'HOLD'}" for d, v in (_alt_reads or {}).items())
-                logging.warning(
+                logging.debug(
                     f"🎬 [ALT {'zone' if zone else 'man'}] SM: cutters={list(_alt_moves)} reads=[{_rd}] "
                     f"open={ {p: round(o) for p, o in (_alt_open or {}).items()} }"
                 )
@@ -6591,7 +6591,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                 _res = "PROGRESS" if not post_shoot else (
                     f"{post_shoot['shooter_pos']}"
                     f"{'(DISH)' if post_shoot.get('via_pass') else '(BHself)'}")
-                logging.warning(f"🍽️ [ALT dish] cutters=[{_cut_dbg}] → {_res}")
+                logging.debug(f"🍽️ [ALT dish] cutters=[{_cut_dbg}] → {_res}")
             if post_shoot:
                 _sp = post_shoot["shooter_pos"]
                 _pdec = {"action": SHOOT, "shooter_pos": _sp, "shot_type": post_shoot["shot_type"]}
@@ -6609,7 +6609,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                         _pdec["cut_to_location"] = _alt_moves[_sp].get("location")
                     # jab step → the jabber shoots his OWN look at his spot (defender bit inward); the
                     # decision already carries SHOOT + shot_type, so just keep them + tag the VO.
-                logging.warning(
+                logging.debug(
                     f"🎯 [DYNAMIC {_kind}] post-subtle SHOOT {_sp} {post_shoot['shot_type']} "
                     f"(froze={froze}{', BACKDOOR' if _sstep is beat else ''})"
                 )
@@ -6623,12 +6623,12 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             # GATE 2 decides his fate from a fresh read right now — freelance (offense keeps playing)
             # vs dead ball (defenders swarm the stationary BH + deny the lanes).
             if _hco_recovery_roll(game):
-                logging.warning(f"↩️ [DYNAMIC {_kind}] recovery WON → re-enter skeleton at step {i + 1}")
+                logging.debug(f"↩️ [DYNAMIC {_kind}] recovery WON → re-enter skeleton at step {i + 1}")
                 continue  # next iteration appends the next defined step (players pop back to spots)
             _db_bh = off_lineup[bh_pos]
             if _hco_freelance_beats_dead_ball(game, _db_bh, bh_pos, off_lineup, steps[i],
                                               blocked_dish, random):
-                logging.warning(f"🌀 [DYNAMIC {_kind}] recovery LOST → FREELANCE (offense read wins)")
+                logging.debug(f"🌀 [DYNAMIC {_kind}] recovery LOST → FREELANCE (offense read wins)")
                 return _resolve_freelance(
                     skeleton, output_steps, steps[i], bh_pos,
                     game, off_lineup, def_lineup, is_away_offense, random,
@@ -6877,7 +6877,7 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
                     if contest.get("outcome") in ("INTERCEPT", "BAT_OOB"):
                         output.append(freelance_pass_step(cur_bh, rp, bh_coords, rc, last_ts + 300))
                         skeleton["steps"] = output
-                        logging.warning(
+                        logging.debug(
                             f"🪡 [HCO PASS] {contest['outcome']} on FREELANCE pass {cur_bh}→{rp} "
                             f"by {contest.get('deflector')}")
                         return {
@@ -8230,13 +8230,13 @@ def resolve_half_court_offense_logic(game):
         if is_setplay_dynamic:
             motion_shot_info = _hco_precomputed_shot_info
             if motion_shot_info is None:
-                logging.warning("🟢 [DYNAMIC SETPLAY] no precomputed walk — running dynamic resolver now")
+                logging.debug("🟢 [DYNAMIC SETPLAY] no precomputed walk — running dynamic resolver now")
                 try:
                     motion_shot_info = _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is_setplay=True)
                     if motion_shot_info is None:
-                        logging.info("ℹ️ [DYNAMIC SETPLAY] Resolver returned None; using standard set-play shot path")
+                        logging.debug("ℹ️ [DYNAMIC SETPLAY] Resolver returned None; using standard set-play shot path")
                 except Exception as e:
-                    logging.warning(f"⚠️ [DYNAMIC SETPLAY] Error in dynamic resolver, falling back to standard path: {e}")
+                    logging.debug(f"⚠️ [DYNAMIC SETPLAY] Error in dynamic resolver, falling back to standard path: {e}")
                     motion_shot_info = None
         else:
             # Motion: recalibration (shot-clock) → precomputed fusion walk → fresh walk (fallback).

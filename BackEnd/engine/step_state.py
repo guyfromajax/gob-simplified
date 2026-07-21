@@ -107,7 +107,7 @@ def build_step_states(result, game):
         step["_step_state"] = step_state
         step_states.append(step_state)
 
-    logging.warning(
+    logging.debug(
         "🔬 [STEPSTATE] stamped defense grid on %d/%d steps (posture=%s zone=%s src=%s) [is_full_sim=%s]",
         stamped, len(steps), posture, zone, anim_source, game_state.get("_is_full_simulation"))
 
@@ -211,7 +211,7 @@ def _diagnose(step_states, steps, game, off_lineup, def_lineup, matchups, zone, 
         dv, sm, mx, w, _bk = _grid_diff(canonical, render_def, step_states, steps)
         if sm:
             _w = f" | worst step {w[0]} {w[1]}({w[2]}) canonical={w[3]} redraw={w[4]}" if w else ""
-            logging.warning(
+            logging.debug(
                 "🔬 [STEPSTATE REDRAW-SPREAD] canonical-vs-fresh-redraw (RNG, eliminated by Option A): "
                 "%d/%d divergent (%.0f%%) max=%.1f zone=%s%s [is_full_sim=%s]",
                 dv, sm, 100.0 * dv / sm, mx, zone, _w,
@@ -238,7 +238,7 @@ def _diagnose(step_states, steps, game, off_lineup, def_lineup, matchups, zone, 
     if sm:
         _w = f" | worst step {w[0]} {w[1]}({w[2]}) canonical={w[3]} contest={w[4]}" if w else ""
         _bk = " ".join(f"{k}={v}" for k, v in bk.items() if v)
-        logging.warning(
+        logging.debug(
             "🔬 [STEPSTATE GAP] canonical-vs-contest: %d/%d divergent (%.0f%%) max=%.1f zone=%s | "
             "by-kind: %s%s [is_full_sim=%s]", dv, sm, 100.0 * dv / sm, mx, zone, _bk or "-", _w,
             game.game_state.get("_is_full_simulation"))

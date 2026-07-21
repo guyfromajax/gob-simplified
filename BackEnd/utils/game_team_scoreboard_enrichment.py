@@ -221,7 +221,7 @@ def enrich_franchise_teams_scoreboard_meta(
                 "losses_after": (ent or {}).get("losses"),
             }
         )
-    logger.warning(
+    logger.debug(
         "enrich_franchise_teams_scoreboard_meta OK franchise_id=%r franchise_oid=%s ftd_team_ids=%s "
         "standings_for_slots=%s debug_slots=%s",
         franchise_id,

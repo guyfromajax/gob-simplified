@@ -1937,7 +1937,7 @@ class TurnManager:
                         ),
                     )
                 except Exception as e:
-                    logging.warning("[FB_UESS] summary log failed: %s", e)
+                    logging.debug("[FB_UESS] summary log failed: %s", e)
         elif state == "FCP":
             self.logger.log("fcp:start")
             result = resolve_full_court_press_logic(self.game)
@@ -3080,21 +3080,21 @@ class TurnManager:
         # CPU teams may now carry customized playbook_settings too, so do not gate this by is_user_team.
         if str(team_id) == str(getattr(offense_team, "team_id", None)):
             has_attr = hasattr(offense_team, 'playbook_settings')
-            logging.warning(f"🔴🔴🔴 [DIAG] _load_playbook_settings OFFENSE: hasattr={has_attr}, team={offense_team.name}, team_id={getattr(offense_team, 'team_id', 'NO_ID')}")
+            logging.debug(f"🔴🔴🔴 [DIAG] _load_playbook_settings OFFENSE: hasattr={has_attr}, team={offense_team.name}, team_id={getattr(offense_team, 'team_id', 'NO_ID')}")
             if has_attr:
                 attr_value = getattr(offense_team, 'playbook_settings', None)
                 pc_count = len((attr_value.get("pc_order", {}) or {}).get("offense", [])) if attr_value else 0
-                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for offense team: pc_order.offense={pc_count}, value_type={type(attr_value)}")
+                logging.debug(f"✅ [LOAD PLAYBOOK] Using GameManager for offense team: pc_order.offense={pc_count}, value_type={type(attr_value)}")
                 return attr_value or {}  # Return empty dict if None (shouldn't happen after fix)
             else:
                 logging.error(f"🔴🔴🔴 [DIAG] OFFENSE TEAM MISSING playbook_settings ATTRIBUTE! team={offense_team.name}, dir(team)={[x for x in dir(offense_team) if not x.startswith('_')][:10]}")
         elif str(team_id) == str(getattr(defense_team, "team_id", None)):
             has_attr = hasattr(defense_team, 'playbook_settings')
-            logging.warning(f"🔴🔴🔴 [DIAG] _load_playbook_settings DEFENSE: hasattr={has_attr}, team={defense_team.name}, team_id={getattr(defense_team, 'team_id', 'NO_ID')}")
+            logging.debug(f"🔴🔴🔴 [DIAG] _load_playbook_settings DEFENSE: hasattr={has_attr}, team={defense_team.name}, team_id={getattr(defense_team, 'team_id', 'NO_ID')}")
             if has_attr:
                 attr_value = getattr(defense_team, 'playbook_settings', None)
                 pc_count = len((attr_value.get("pc_order", {}) or {}).get("defense", [])) if attr_value else 0
-                logging.warning(f"✅ [LOAD PLAYBOOK] Using GameManager for defense team: pc_order.defense={pc_count}, value_type={type(attr_value)}")
+                logging.debug(f"✅ [LOAD PLAYBOOK] Using GameManager for defense team: pc_order.defense={pc_count}, value_type={type(attr_value)}")
                 return attr_value or {}  # Return empty dict if None (shouldn't happen after fix)
             else:
                 logging.error(f"🔴🔴🔴 [DIAG] DEFENSE TEAM MISSING playbook_settings ATTRIBUTE! team={defense_team.name}, dir(team)={[x for x in dir(defense_team) if not x.startswith('_')][:10]}")
@@ -3111,7 +3111,7 @@ class TurnManager:
         # Get game document
         game_id = getattr(self.game, 'game_id', None)
         if not game_id:
-            logging.warning(f"⚠️ [LOAD PLAYBOOK] No game_id, cannot load from DB")
+            logging.debug(f"⚠️ [LOAD PLAYBOOK] No game_id, cannot load from DB")
             return None
         
         try:
@@ -3124,7 +3124,7 @@ class TurnManager:
                     pass
             
             if not game_doc:
-                logging.warning(f"⚠️ [LOAD PLAYBOOK] Game document not found: game_id={game_id}")
+                logging.debug(f"⚠️ [LOAD PLAYBOOK] Game document not found: game_id={game_id}")
                 return None
             
             # Check if this is a tournament or franchise game
@@ -3155,7 +3155,7 @@ class TurnManager:
                 doc = game_doc
             
             if not doc:
-                logging.warning(f"⚠️ [LOAD PLAYBOOK] Mode document not found: mode={mode}, doc_id={doc_id}")
+                logging.debug(f"⚠️ [LOAD PLAYBOOK] Mode document not found: mode={mode}, doc_id={doc_id}")
                 return None
             
             # ✅ PHASE 1.1: Resolve team_id to match document key format
@@ -3172,7 +3172,7 @@ class TurnManager:
                         team_obj = teams_obj.get(tid, {})
                         if team_obj.get("name") == offense_team_name:
                             resolved_team_id = tid
-                            logging.warning(f"⚠️ [LOAD PLAYBOOK] Resolved team_id from name: {team_id} → {resolved_team_id}")
+                            logging.debug(f"⚠️ [LOAD PLAYBOOK] Resolved team_id from name: {team_id} → {resolved_team_id}")
                             break
 
             # WIRED: DB fallback used when GameManager doesn't have playbook_settings (e.g. edge cases during gameplay).
@@ -3185,9 +3185,9 @@ class TurnManager:
                 team_obj = teams_obj_lookup.get(resolved_team_id, {})
                 playbook_settings = team_obj.get("playbook_settings")
                 if playbook_settings:
-                    logging.warning(f"✅ [LOAD PLAYBOOK] Loaded playbook_settings for offense team: team_id={resolved_team_id}")
+                    logging.debug(f"✅ [LOAD PLAYBOOK] Loaded playbook_settings for offense team: team_id={resolved_team_id}")
                 else:
-                    logging.warning(f"⚠️ [LOAD PLAYBOOK] No playbook_settings found for offense team: team_id={resolved_team_id}")
+                    logging.debug(f"⚠️ [LOAD PLAYBOOK] No playbook_settings found for offense team: team_id={resolved_team_id}")
                 return playbook_settings
             elif is_defense_team:
                 # For defense, we need the defense team's ID
@@ -3202,17 +3202,17 @@ class TurnManager:
                             team_obj = teams_obj.get(tid, {})
                             if team_obj.get("name") == defense_team_name:
                                 resolved_def_team_id = tid
-                                logging.warning(f"⚠️ [LOAD PLAYBOOK] Resolved defense team_id from name: {def_team_id} → {resolved_def_team_id}")
+                                logging.debug(f"⚠️ [LOAD PLAYBOOK] Resolved defense team_id from name: {def_team_id} → {resolved_def_team_id}")
                                 break
                 # Same lookup_doc/teams_obj_lookup as offense (franchise uses game_doc.teams)
                 team_obj = teams_obj_lookup.get(resolved_def_team_id, {})
                 playbook_settings = team_obj.get("playbook_settings")
                 if playbook_settings:
-                    logging.warning(f"⚠️ [LOAD PLAYBOOK] Fallback to DB for defense team: team_id={resolved_def_team_id} (GameManager should have settings)")
+                    logging.debug(f"⚠️ [LOAD PLAYBOOK] Fallback to DB for defense team: team_id={resolved_def_team_id} (GameManager should have settings)")
                     # ✅ SS&S: Apply to GameManager so future calls use GameManager
                     defense_team.playbook_settings = playbook_settings
                 else:
-                    logging.warning(f"⚠️ [LOAD PLAYBOOK] No playbook_settings found in DB for defense team: team_id={resolved_def_team_id}")
+                    logging.debug(f"⚠️ [LOAD PLAYBOOK] No playbook_settings found in DB for defense team: team_id={resolved_def_team_id}")
                 return playbook_settings
         except Exception as e:
             logging.warning(f"⚠️ Error loading playbook settings: {e}")

@@ -939,7 +939,7 @@ class ShotManager:
                 if isinstance(roles_shot_spot, dict)
                 else None
             )
-            logging.warning(
+            logging.debug(
                 "[3PT-READ] HCO shot classification: result_pending shot_type=%s "
                 "resolved_is_three=%s coord_is_three=%s role_spot_is_three=%s "
                 "spot_name_is_three=%s shooter_id=%s shooter_pos=%s "
@@ -1506,7 +1506,7 @@ class ShotManager:
             # 🔎 Make/miss reconciliation diagnostic — `_make_bar` is the effective bar (team
             # shot_threshold + 3pt/variant/zone modifiers, OR the undefended-outside formula).
             # This drives FG%, NOT the Motion optimal-look bar (that only gates SELECTION upstream).
-            logging.warning(
+            logging.debug(
                 "🎯 [SHOT RECON] state=%s type=%s is_three=%s contest=%s "
                 "shot_score=%.1f shot_threshold=%.1f → %s",
                 self.game_state.get("offensive_state"), shot_type, bool(is_three),

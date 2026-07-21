@@ -194,7 +194,7 @@ def inject_dead_ball_fumble_before_turn_stop(
     if not is_dead_ball_fumble_turn(turn_result):
         return
     if not steps:
-        logging.warning(
+        logging.debug(
             "[DEAD-BALL-FUMBLE] skip=no_steps current_turn=%s result_type=%s "
             "turnover_type=%s text=%s",
             turn_result.get("current_turn"),
@@ -204,7 +204,7 @@ def inject_dead_ball_fumble_before_turn_stop(
         )
         return
     if _has_fumble_flourish_step(steps):
-        logging.warning(
+        logging.debug(
             "[DEAD-BALL-FUMBLE] skip=already_injected current_turn=%s result_type=%s "
             "steps=%s",
             turn_result.get("current_turn"),
@@ -216,7 +216,7 @@ def inject_dead_ball_fumble_before_turn_stop(
     anchor_idx = _find_dead_ball_turn_stop_step_index(steps)
     if anchor_idx is None:
         terminal_next = (steps[-1].get("end") or {}).get("next") if steps else None
-        logging.warning(
+        logging.debug(
             "[DEAD-BALL-FUMBLE] skip=no_dead_ball_turn_stop current_turn=%s "
             "result_type=%s turnover_type=%s steps=%s terminal_next=%s",
             turn_result.get("current_turn"),
@@ -230,7 +230,7 @@ def inject_dead_ball_fumble_before_turn_stop(
     anchor = steps[anchor_idx]
     turn_stop_next = (anchor.get("end") or {}).get("next")
     if not isinstance(turn_stop_next, dict):
-        logging.warning(
+        logging.debug(
             "[DEAD-BALL-FUMBLE] skip=bad_turn_stop_next current_turn=%s "
             "result_type=%s anchor_idx=%s next=%s",
             turn_result.get("current_turn"),
@@ -242,7 +242,7 @@ def inject_dead_ball_fumble_before_turn_stop(
 
     end_coords = (anchor.get("end") or {}).get("coords") or {}
     if not end_coords:
-        logging.warning(
+        logging.debug(
             "[DEAD-BALL-FUMBLE] skip=no_end_coords current_turn=%s result_type=%s "
             "anchor_idx=%s",
             turn_result.get("current_turn"),
@@ -253,7 +253,7 @@ def inject_dead_ball_fumble_before_turn_stop(
 
     bh_id = _resolve_ball_handler_id(turn_result, end_coords)
     if not bh_id or bh_id not in end_coords:
-        logging.warning(
+        logging.debug(
             "[DEAD-BALL-FUMBLE] skip=no_handler_coord current_turn=%s result_type=%s "
             "anchor_idx=%s resolved_bh_id=%s victim_id=%s shooter_id=%s "
             "ball_handler_id=%s coords_count=%s",
@@ -285,7 +285,7 @@ def inject_dead_ball_fumble_before_turn_stop(
         turn_stop_next=turn_stop_next,
     )
     steps.append(fumble_step)
-    logging.warning(
+    logging.debug(
         "[DEAD-BALL-FUMBLE] injected current_turn=%s result_type=%s label=%s "
         "handler_id=%s anchor_idx=%s fumble_idx=%s steps=%s",
         turn_result.get("current_turn"),
@@ -313,7 +313,7 @@ def finalize_dead_ball_fumble_for_turn(
     steps = turn_result.get("animation_steps")
     if not isinstance(steps, list) or not steps:
         if is_dead_ball_fumble_turn(turn_result):
-            logging.warning(
+            logging.debug(
                 "[DEAD-BALL-FUMBLE] finalize_skip=no_animation_steps current_turn=%s "
                 "result_type=%s turnover_type=%s text=%s",
                 turn_result.get("current_turn"),

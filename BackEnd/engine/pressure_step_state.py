@@ -66,7 +66,7 @@ def build_pressure_step_states(
         step_states.append(state)
 
     result["pressure_step_states"] = step_states
-    logging.warning(
+    logging.debug(
         "🔬 [PRESSURE STEPSTATE] stamped %s states=%d terminal=%d",
         normalized or "PRESSURE",
         len(step_states),

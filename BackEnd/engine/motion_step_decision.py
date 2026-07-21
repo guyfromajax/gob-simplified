@@ -349,7 +349,7 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
                 best = {"pos": pos, "type": t, "quality": q, "optimal": opt, "mismatch": mm, "via_pass": True}
 
     # 🔎 Optimal-bar diagnostic: confirms the new clock×steepness×tempo bar is live.
-    logging.warning(
+    logging.debug(
         "🪟 [SHOT-SELECT] clock=%.1f tempo=%s bar=%.1f best_q=%.1f optimal=%s via_pass=%s",
         float(shot_clock or 0), tempo_call, float(_shoot_threshold(shot_clock, tempo_call)),
         float(best["quality"]), best["optimal"], best["via_pass"],

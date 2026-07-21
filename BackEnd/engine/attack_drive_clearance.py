@@ -1152,7 +1152,7 @@ def build_attack_drive_sequence(
                     is_ball_handler=True),
                 "action": "guard_ball",
             }
-        logging.warning(
+        logging.debug(
             "🛑 [DRIVE STOP] tier %s → BH stopped at %.0f%% (%s) shot=%s",
             drive_tier, drive_stop_fraction * 100, _bh_stop, _stop_shot_type)
 
@@ -1239,7 +1239,7 @@ def build_attack_drive_sequence(
     if _three_tier and drive_tier in ("B", "C"):
         # Stopped BH: dish if should_shoot found an open teammate, else the contested pull-up.
         driver_shoots = _s2e_dish_pos is None
-        logging.warning(
+        logging.debug(
             "🧭 [DRIVE STOP READ] tier %s bh=%s → %s",
             drive_tier, ball_handler_pos,
             ("DISH→" + _s2e_dish_pos) if _s2e_dish_pos else "PULL-UP",
@@ -1319,7 +1319,7 @@ def build_attack_drive_sequence(
     )
     # S2 observability — the 3-tier outcome from the shared contest (only when 3-tier is on).
     if _three_tier:
-        logging.warning(
+        logging.debug(
             "🚗 [DRIVE TIER] %s stop_fraction=%.2f contact=%s (shared _resolve_moment) win=%s dest=%s",
             drive_tier, drive_stop_fraction, drive_contact, drive_offense_wins, destination_location)
 

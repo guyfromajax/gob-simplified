@@ -51,7 +51,7 @@ def build_fast_break_step_states(result: Dict[str, Any]) -> List[Dict[str, Any]]
         step_states.append(state)
 
     result["fb_step_states"] = step_states
-    logging.warning(
+    logging.debug(
         "🔬 [FB STEPSTATE] stamped play=%s states=%d terminal=%d",
         play_key or "unknown",
         len(step_states),

@@ -278,7 +278,7 @@ def build_fb_drive_resolution_steps(
         "TURNOVER",
     }
     if result_type not in allowed:
-        logging.warning(
+        logging.debug(
             "🧩 [FB_DR] skip prefix=%s: result_type=%s not in allowed set",
             kind_prefix, result_type,
         )
@@ -286,7 +286,7 @@ def build_fb_drive_resolution_steps(
 
     fb_drive = turn_result.get("fb_drive_resolution") or {}
     if not stealer_id or stealer_id not in start_coords:
-        logging.warning(
+        logging.debug(
             "🧩 [FB_DR] EARLY-None prefix=%s stealer_id=%s in_start=%s "
             "(result_type=%s outcome=%s)",
             kind_prefix, stealer_id,
@@ -596,14 +596,14 @@ def build_fb_drive_resolution_steps(
         if projected_steps:
             steps = projected_steps
     except Exception as e:
-        logging.warning(
+        logging.debug(
             "🧩 [FB_DR] StepState projection failed prefix=%s result_type=%s: %s",
             kind_prefix,
             result_type,
             e,
         )
 
-    logging.warning(
+    logging.debug(
         "🧩 [FB_DR] prefix=%s result_type=%s outcome=%s uses_meet=%s "
         "stealer_id=%s n_steps=%d",
         kind_prefix, result_type, outcome, uses_meet_step, stealer_id, len(steps),

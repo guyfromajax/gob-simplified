@@ -253,7 +253,7 @@ def _emit_trace(event: str, payload: Dict[str, Any]) -> None:
         body = json.dumps(payload, default=str)
     except TypeError:
         body = str(payload)
-    logger.warning("%s %s %s", _TRACE_PREFIX, event, body)
+    logger.debug("%s %s %s", _TRACE_PREFIX, event, body)
 
 
 def log_eoq_step(

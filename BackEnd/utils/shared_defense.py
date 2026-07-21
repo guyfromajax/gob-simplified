@@ -1599,7 +1599,7 @@ def calculate_defender_coords(
         
         # Verify defender is closer to basket (BH defender requirement)
         if not verify_defender_closer_to_basket(def_x, def_y, ox, oy, basket_x, basket_y):
-            logging.warning(f"⚠️ [CALCULATE_DEFENDER_COORDS] BH defender not closer to basket! "
+            logging.debug(f"⚠️ [CALCULATE_DEFENDER_COORDS] BH defender not closer to basket! "
                            f"Defender: ({def_x}, {def_y}), BH: ({ox}, {oy}), Basket: ({basket_x}, {basket_y})")
         
     else:

@@ -1332,7 +1332,7 @@ class GameManager:
                 from BackEnd.utils.shared import summarize_game_state
                 from BackEnd.db import games_collection
                 # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log before save (Hypothesis 2)
-                logging.warning(
+                logging.debug(
                     "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout saving: game_id=%s, type=%s",
                     self.game_id, type(self.game_id).__name__,
                 )
@@ -1341,7 +1341,7 @@ class GameManager:
                     {"_id": self.game_id}, {"$set": db_summary}, upsert=False
                 )
                 save_matched = result.matched_count > 0
-                logging.warning(
+                logging.debug(
                     "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout first update_one: matched_count=%s, modified_count=%s",
                     result.matched_count, result.modified_count,
                 )
@@ -1354,7 +1354,7 @@ class GameManager:
                             {"_id": oid}, {"$set": db_summary}, upsert=False
                         )
                         save_matched = result2.matched_count > 0
-                        logging.warning(
+                        logging.debug(
                             "🔍 [FOUL_OUT DEBUG] _handle_foul_out_timeout ObjectId retry: matched_count=%s, modified_count=%s",
                             result2.matched_count, result2.modified_count,
                         )

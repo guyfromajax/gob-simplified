@@ -73,7 +73,7 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
 
     if game_id:
         # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log game_id type (string vs ObjectId mismatch can make find_one return None)
-        logging.warning(
+        logging.debug(
             "🔍 [FOUL_OUT DEBUG] _initialize_game_stats find_one: game_id=%s, type=%s",
             game_id, type(game_id).__name__,
         )
@@ -106,7 +106,7 @@ def _initialize_game_stats(gm: GameManager, game_id: str | None = None) -> None:
             return
         # 🔍 FOUL_OUT DATA-LOSS DEBUG: Doc missing or no game_stats_initialized → we are about to zero everyone
         _doc_flag = doc.get("game_stats_initialized") if doc else "N/A"
-        logging.warning(
+        logging.debug(
             "🔍 [FOUL_OUT DEBUG] _initialize_game_stats: doc_found=%s, doc.game_stats_initialized=%s → will RESET stats (data loss if this was timeout resume)",
             doc is not None, _doc_flag,
         )
@@ -449,7 +449,7 @@ def simulate_quarter(
     # Only initialize stats if game_stats_initialized flag is not set (prevents resetting stats mid-game)
     # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log before _initialize_game_stats (Hypothesis 1)
     _flag = gm.game_state.get("game_stats_initialized", False)
-    logging.warning(
+    logging.debug(
         "🔍 [FOUL_OUT DEBUG] simulate_quarter before _initialize_game_stats: game_id=%s, resume_from_timeout=%s, "
         "game_stats_initialized=%s (if False we will call _initialize_game_stats)",
         game_id, resume_from_timeout, _flag,

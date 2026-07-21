@@ -191,7 +191,7 @@ def _report_fb_uess_fallback_to_sentry(
                 level="error",
             )
     except Exception as exc:
-        logging.warning("[FB_UESS_SENTRY] report failed: %s", exc)
+        logging.debug("[FB_UESS_SENTRY] report failed: %s", exc)
 
 
 def _ball_owner(ball: Dict[str, Any]) -> Optional[str]:

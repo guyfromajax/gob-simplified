@@ -1205,7 +1205,7 @@ try:
                 return None
             
             # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log what we loaded (Hypothesis 2 - confirm doc has timeout state and game_stats_initialized)
-            logging.warning(
+            logging.debug(
                 "🔍 [FOUL_OUT DEBUG] restore_timeout_resume_state loaded doc: game_id=%s, timeout_trace_id=%s, timeout_next_play_type=%s, "
                 "quarter=%s, clock=%s, time_remaining=%s, game_stats_initialized=%s, has_teams=%s, top_level_score=%s",
                 game_id,
@@ -3011,7 +3011,7 @@ try:
             
             # ✅ CRITICAL FIX: Always load playbook_settings when game is cached (all modes: single, franchise, tournament)
             # Previously only single mode set playbook_settings here; franchise/tournament never did, causing 40+ DB fallbacks per quarter.
-            logging.warning(f"🔴🔴🔴 [DIAG] simulate-quarter CACHED PATH: gm={gm is not None}, mode={mode}, game_id={body.game_id}, quarter={body.quarter}")
+            logging.debug(f"🔴🔴🔴 [DIAG] simulate-quarter CACHED PATH: gm={gm is not None}, mode={mode}, game_id={body.game_id}, quarter={body.quarter}")
             if gm is not None and body.game_id:
                 doc_id = None
                 game_id_arg = None
@@ -3503,7 +3503,7 @@ try:
                             is_new_game = (body.quarter == 1 and saved_quarter > 1) and not body.resume_from_timeout
                             should_restore_stats = not is_new_game or body.resume_from_timeout
                             # 🔍 FOUL_OUT DATA-LOSS DEBUG: Log restore path so we can confirm Hypothesis 1
-                            logging.warning(
+                            logging.debug(
                                 "🔍 [FOUL_OUT DEBUG] Restore path: should_restore_stats=%s, resume_from_timeout=%s, "
                                 "saved_quarter=%s, body.quarter=%s, game_id=%s",
                                 should_restore_stats, body.resume_from_timeout, saved_quarter, body.quarter, game_id,
@@ -3664,7 +3664,7 @@ try:
                                     logging.info(f"🔄 game_stats_initialized restored: {saved['game_stats_initialized']}")
                                 else:
                                     # 🔍 FOUL_OUT DATA-LOSS DEBUG: Doc has no game_stats_initialized → simulate_quarter may call _initialize_game_stats and zero everyone
-                                    logging.warning(
+                                    logging.debug(
                                         "🔍 [FOUL_OUT DEBUG] should_restore_stats=True but saved doc has NO 'game_stats_initialized' "
                                         "(game_id=%s); gm.game_stats_initialized will stay False → risk of stats reset in simulate_quarter",
                                         game_id,
@@ -3995,12 +3995,12 @@ try:
                             
                             # ✅ FIX: Apply playbook_settings to GameManager so they're available during gameplay (prevents 37 DB lookups per quarter)
                             # Always set (even if empty dict) to ensure attribute exists
-                            logging.warning(f"🔴🔴🔴 [DIAG] NEW GAME PATH: Setting playbook_settings on GameManager. gm_id={id(gm)}, home_team_id={id(gm.home_team)}, away_team_id={id(gm.away_team)}")
+                            logging.debug(f"🔴🔴🔴 [DIAG] NEW GAME PATH: Setting playbook_settings on GameManager. gm_id={id(gm)}, home_team_id={id(gm.home_team)}, away_team_id={id(gm.away_team)}")
                             gm.home_team.playbook_settings = dict(home_playbook_settings) if home_playbook_settings else {}
                             gm.away_team.playbook_settings = dict(away_playbook_settings) if away_playbook_settings else {}
                             home_slots = len(home_playbook_settings.get("slot_assignments", {})) if home_playbook_settings else 0
                             away_slots = len(away_playbook_settings.get("slot_assignments", {})) if away_playbook_settings else 0
-                            logging.warning(f"🔴🔴🔴 [DIAG] NEW GAME PATH: Set playbook_settings: home_slots={home_slots}, away_slots={away_slots}, home_team_obj_id={id(gm.home_team)}, away_team_obj_id={id(gm.away_team)}")
+                            logging.debug(f"🔴🔴🔴 [DIAG] NEW GAME PATH: Set playbook_settings: home_slots={home_slots}, away_slots={away_slots}, home_team_obj_id={id(gm.home_team)}, away_team_obj_id={id(gm.away_team)}")
                             
                             # Create team objects with plays and playbook_settings for skeleton lookup
                             teams_obj = {
