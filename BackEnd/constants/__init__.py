@@ -1,4 +1,9 @@
-from BackEnd.utils.sim_random import sim_rng as random
+import random  # NOTE: constants only draws at IMPORT time (TEMPO_PASS_DICT below),
+# once per process before any game is seeded — so it must NOT import the sim RNG.
+# Doing so created a circular import (constants -> utils.sim_random -> utils/__init__
+# -> stat_updater -> constants) that silently killed FastAPI startup. See git history
+# for commit b269732fa. Leaf modules under constants/ still use sim_rng safely because
+# they load after this package __init__ has finished.
 import os
 
 # Debug flag - set DISABLE_DEBUG=1 environment variable to suppress verbose output
