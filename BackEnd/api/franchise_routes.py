@@ -12667,10 +12667,14 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
     if week >= 2 and week <= 19 and (franchise_doc.get("practice_squad") or {}).get("initialized"):
         from BackEnd.practice_squad.manager import run_practice_squad_week
 
-        # Bound the user-facing poll to one full game. The manager commits PS
-        # state after every attempt, making retries and refreshes resumable.
+        # Serial poll bounds each request to one full game (manager commits PS state
+        # after every attempt, so retries/refreshes are resumable). When the pool is
+        # on, run the whole week's pending batch in parallel in one call instead —
+        # ~24 games across the pool finishes in seconds, so no per-game poll needed.
+        _ps_batch = _franchise_cpu_use_pool()
         ps_state = run_practice_squad_week(
-            franchise_id, franchise_doc, week, max_games=1
+            franchise_id, franchise_doc, week,
+            max_games=None if _ps_batch else 1,
         )
         ps_fields["practice_squad"] = ps_state
         franchise_doc["practice_squad"] = ps_state

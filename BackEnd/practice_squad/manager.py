@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import random
+import time
 import uuid
 from datetime import datetime
 from typing import Any
@@ -415,59 +416,68 @@ def _update_scrubs_rosters(ps_state: dict, week: int) -> None:
     scrubs_rosters[str(week)] = combined
 
 
-def _sim_one_game(
+def _classify_ps_game(
+    game: dict, ps_state: dict, week: int
+) -> tuple[str, list[dict], list[dict], str | None, str | None]:
+    """Resolve rosters and decide how a game terminates WITHOUT simulating.
+
+    Returns ``(kind, home_roster, away_roster, home_name, away_name)`` where kind is
+    ``invalid`` | ``forfeit_home`` (home wins) | ``forfeit_away`` (away wins) | ``skip`` |
+    ``playable``. Shared by the serial and pooled paths so their forfeit/skip rules can
+    never diverge. Names are only resolved for a playable game.
+    """
+    home_id = game.get("home_team_id")
+    away_id = game.get("away_team_id")
+    if not home_id or not away_id:
+        return ("invalid", [], [], None, None)
+
+    home_roster = _resolve_team_roster(ps_state, str(home_id), week)
+    away_roster = _resolve_team_roster(ps_state, str(away_id), week)
+    home_team = (ps_state.get("teams") or {}).get(str(home_id)) or {}
+    away_team = (ps_state.get("teams") or {}).get(str(away_id)) or {}
+
+    if int(home_team.get("tier") or 0) == 6 and len(home_roster) < SCRUBS_MIN_PLAYERS_TO_COMPETE:
+        return ("forfeit_away", home_roster, away_roster, None, None)
+    if int(away_team.get("tier") or 0) == 6 and len(away_roster) < SCRUBS_MIN_PLAYERS_TO_COMPETE:
+        return ("forfeit_home", home_roster, away_roster, None, None)
+    if len(home_roster) < 5 or len(away_roster) < 5:
+        return ("skip", home_roster, away_roster, None, None)
+
+    home_name = home_team.get("display_name") or str(home_id)
+    away_name = away_team.get("display_name") or str(away_id)
+    return ("playable", home_roster, away_roster, home_name, away_name)
+
+
+def _apply_ps_terminal_kind(game: dict, ps_state: dict, kind: str) -> dict | None:
+    """Apply a non-playable outcome (invalid/forfeit/skip) to game + standings."""
+    home_id = str(game.get("home_team_id") or "")
+    away_id = str(game.get("away_team_id") or "")
+    if kind == "invalid":
+        return None
+    if kind == "forfeit_away":
+        _apply_standings(ps_state, away_id, home_id, 6)
+        game.update({"status": "forfeit", "home_score": 0, "away_score": 0, "winner": away_id})
+    elif kind == "forfeit_home":
+        _apply_standings(ps_state, home_id, away_id, 6)
+        game.update({"status": "forfeit", "home_score": 0, "away_score": 0, "winner": home_id})
+    elif kind == "skip":
+        game["status"] = "skipped"
+    return game
+
+
+def _persist_and_apply_ps_result(
     game: dict,
     ps_state: dict,
     week: int,
     franchise_id_str: str,
-    fpd_by_id: dict,
-    frd_by_id: dict,
-) -> dict | None:
-    home_id = game.get("home_team_id")
-    away_id = game.get("away_team_id")
-    if not home_id or not away_id:
-        return None
-
-    status = game.get("status")
-    if status in PS_TERMINAL_GAME_STATUSES:
-        return game
-
-    home_roster = _resolve_team_roster(ps_state, str(home_id), week)
-    away_roster = _resolve_team_roster(ps_state, str(away_id), week)
-
-    # Scrubs forfeit checks
-    home_team = (ps_state.get("teams") or {}).get(str(home_id)) or {}
-    away_team = (ps_state.get("teams") or {}).get(str(away_id)) or {}
-    if int(home_team.get("tier") or 0) == 6 and len(home_roster) < SCRUBS_MIN_PLAYERS_TO_COMPETE:
-        _apply_standings(ps_state, str(away_id), str(home_id), 6)
-        game.update({"status": "forfeit", "home_score": 0, "away_score": 0, "winner": str(away_id)})
-        return game
-    if int(away_team.get("tier") or 0) == 6 and len(away_roster) < SCRUBS_MIN_PLAYERS_TO_COMPETE:
-        _apply_standings(ps_state, str(home_id), str(away_id), 6)
-        game.update({"status": "forfeit", "home_score": 0, "away_score": 0, "winner": str(home_id)})
-        return game
-
-    if len(home_roster) < 5 or len(away_roster) < 5:
-        game["status"] = "skipped"
-        return game
-
-    home_name = home_team.get("display_name") or str(home_id)
-    away_name = away_team.get("display_name") or str(away_id)
-
-    game_id = str(game.get("game_id") or generate_game_id())
-    game["game_id"] = game_id
-    away_score, home_score, summary = run_ps_full_simulation(
-        home_display_name=home_name,
-        away_display_name=away_name,
-        home_team_id=str(home_id),
-        away_team_id=str(away_id),
-        home_roster=home_roster,
-        away_roster=away_roster,
-        fpd_by_id=fpd_by_id,
-        frd_by_id=frd_by_id,
-        game_id=game_id,
-    )
-
+    *,
+    away_score: int,
+    home_score: int,
+    summary: dict,
+) -> None:
+    """Serial apply of a completed PS sim: write box score, advance standings/bracket,
+    roll up player stats. Shared by the serial and pooled paths."""
+    game_id = str(game.get("game_id"))
     summary = dict(summary)
     summary["_id"] = game_id
     summary["franchise_id"] = franchise_id_str
@@ -499,7 +509,173 @@ def _sim_one_game(
         if str(game_id) not in applied:
             applied.append(str(game_id))
 
+
+def _sim_one_game(
+    game: dict,
+    ps_state: dict,
+    week: int,
+    franchise_id_str: str,
+    fpd_by_id: dict,
+    frd_by_id: dict,
+) -> dict | None:
+    if game.get("status") in PS_TERMINAL_GAME_STATUSES:
+        return game
+
+    kind, home_roster, away_roster, home_name, away_name = _classify_ps_game(game, ps_state, week)
+    if kind != "playable":
+        return _apply_ps_terminal_kind(game, ps_state, kind)
+
+    home_id = game.get("home_team_id")
+    away_id = game.get("away_team_id")
+    game_id = str(game.get("game_id") or generate_game_id())
+    game["game_id"] = game_id
+    away_score, home_score, summary = run_ps_full_simulation(
+        home_display_name=home_name,
+        away_display_name=away_name,
+        home_team_id=str(home_id),
+        away_team_id=str(away_id),
+        home_roster=home_roster,
+        away_roster=away_roster,
+        fpd_by_id=fpd_by_id,
+        frd_by_id=frd_by_id,
+        game_id=game_id,
+    )
+    _persist_and_apply_ps_result(
+        game, ps_state, week, franchise_id_str,
+        away_score=away_score, home_score=home_score, summary=summary,
+    )
     return game
+
+
+# Key sets persisted into training_job.games per game (mirror the serial loop's inline dicts).
+_PS_RUNNING_KEYS = (
+    "status", "game_id", "attempts", "attempt_id", "started_at", "last_error",
+    "home_team_id", "away_team_id", "tier", "phase", "round", "match_index",
+)
+_PS_RESULT_KEYS = (
+    "status", "game_id", "attempts", "attempt_id", "started_at", "updated_at",
+    "last_error", "last_error_type", "last_error_at", "fallback_reason",
+    "player_stats_status", "player_stats_error",
+    "home_team_id", "away_team_id", "tier", "phase", "round", "match_index",
+)
+
+
+def _ps_use_pool() -> bool:
+    """PS games ride the same pool kill-switch as the CPU-week games."""
+    try:
+        from BackEnd.api.franchise_routes import _franchise_cpu_use_pool
+        return _franchise_cpu_use_pool()
+    except Exception:  # noqa: BLE001 — never let a flag lookup break the sim
+        return False
+
+
+def _ps_handle_sim_error(game: dict, ps_state: dict, fid: str, week: int, ex: Exception) -> None:
+    """Sentry-report a failed PS game, then either fall back (attempts exhausted) or
+    mark it retry_pending. Extracted from the serial loop so the pooled path matches it."""
+    logger.error("PS sim error: %s", ex, exc_info=True)
+    try:
+        import sentry_sdk
+
+        with sentry_sdk.push_scope() as scope:
+            scope.set_tag("simulation_mode", "practice_squad")
+            scope.set_tag("practice_squad_game_id", str(game.get("game_id")))
+            scope.set_context("practice_squad_job", {
+                "franchise_id": fid,
+                "week": week,
+                "attempt": int(game.get("attempts") or 0),
+                "attempt_id": game.get("attempt_id"),
+            })
+            sentry_sdk.capture_exception(ex)
+    except Exception:
+        logger.debug("Sentry capture unavailable for PS sim failure", exc_info=True)
+    if int(game.get("attempts") or 0) >= PS_FULL_ENGINE_MAX_ATTEMPTS:
+        _complete_with_deterministic_fallback(
+            game, ps_state, franchise_id_str=fid, week=week, error=ex,
+        )
+    else:
+        # A retry restarts this game from tip-off while retaining its stable id.
+        game["status"] = "retry_pending"
+        game["last_error"] = str(ex)
+        game["last_error_type"] = type(ex).__name__
+        game["updated_at"] = datetime.utcnow().isoformat() + "Z"
+
+
+def _run_ps_pending_pooled(
+    pending: list[dict],
+    ps_state: dict,
+    week: int,
+    franchise_id: ObjectId,
+    fid: str,
+    fpd_by_id: dict,
+    frd_by_id: dict,
+    existing_job: dict,
+    job_games: dict,
+) -> None:
+    """Batch path: simulate all pending PS games in a spawn pool, then apply results
+    SERIALLY (standings/brackets/stats mutate one shared ps_state). Cheap outcomes
+    (forfeit/skip) and any game the pool couldn't finish fall to the serial ladder.
+    Persists ps_state once up front (all marked running) and once after the batch."""
+    from BackEnd.utils.cpu_week_pool import pool_worker_count, simulate_ps_games_pooled
+
+    _t0 = time.time()
+    # 1. Mark every pending game running + persist ONCE (resumable checkpoint).
+    for g in pending:
+        g["status"] = "running"
+        g["game_id"] = str(g.get("game_id") or generate_game_id())
+        g["attempts"] = int(g.get("attempts") or 0) + 1
+        g["attempt_id"] = str(uuid.uuid4())
+        g["started_at"] = datetime.utcnow().isoformat() + "Z"
+        job_games[_training_game_key(g)] = {k: g.get(k) for k in _PS_RUNNING_KEYS}
+    ps_state["training_job"] = {
+        **existing_job, "week": week, "status": "processing",
+        "games": job_games, "updated_at": datetime.utcnow().isoformat() + "Z",
+    }
+    db.franchises.update_one({"_id": franchise_id}, {"$set": {"practice_squad": ps_state}})
+
+    # 2. Classify: cheap outcomes applied inline now; playable games go to the pool.
+    jobs: list[tuple] = []
+    playable: list[tuple[int, dict]] = []
+    for g in pending:
+        kind, home_roster, away_roster, home_name, away_name = _classify_ps_game(g, ps_state, week)
+        if kind != "playable":
+            _apply_ps_terminal_kind(g, ps_state, kind)
+            job_games[_training_game_key(g)] = {k: g.get(k) for k in _PS_RESULT_KEYS}
+            continue
+        idx = len(jobs)
+        jobs.append((
+            idx, fid, g["game_id"], home_name, away_name,
+            str(g.get("home_team_id")), str(g.get("away_team_id")),
+            home_roster, away_roster,
+        ))
+        playable.append((idx, g))
+
+    # 3. Parallel sim (sim only — no state mutation in workers).
+    results, errors, _leaks = simulate_ps_games_pooled(jobs)
+
+    # 4. Serial apply, in stable order.
+    for idx, g in playable:
+        res = results.get(idx)
+        try:
+            if res is not None:
+                away_score, home_score, summary = res
+                _persist_and_apply_ps_result(
+                    g, ps_state, week, fid,
+                    away_score=away_score, home_score=home_score, summary=summary,
+                )
+            else:
+                # Pool couldn't finish this game — serial ladder owns retry/fallback + writes.
+                _sim_one_game(g, ps_state, week, fid, fpd_by_id, frd_by_id)
+        except Exception as ex:  # noqa: BLE001
+            _ps_handle_sim_error(g, ps_state, fid, week, ex)
+        job_games[_training_game_key(g)] = {k: g.get(k) for k in _PS_RESULT_KEYS}
+
+    db.franchises.update_one({"_id": franchise_id}, {"$set": {"practice_squad": ps_state}})
+    logger.warning(
+        "[PS-TIMING] franchise=%s week=%s | games=%s pooled=%s errors=%s | "
+        "workers=%s | total=%.1fs",
+        fid, week, len(pending), len(jobs), len(errors),
+        pool_worker_count(), time.time() - _t0,
+    )
 
 
 def run_practice_squad_week(
@@ -597,6 +773,16 @@ def run_practice_squad_week(
     ]
     if max_games is not None:
         pending = pending[:max(0, int(max_games))]
+
+    # Pooled batch path: when the pool is enabled and we're not capped to a single
+    # game (the one-game-per-poll UI budget), sim the whole pending batch in parallel
+    # and apply serially. Falls through to the serial loop otherwise.
+    if pending and max_games is None and _ps_use_pool() and len(pending) > 1:
+        _run_ps_pending_pooled(
+            pending, ps_state, week, franchise_id, fid, fpd_by_id, frd_by_id,
+            existing_job, job_games,
+        )
+        pending = []
 
     for g in pending:
         g["status"] = "running"
