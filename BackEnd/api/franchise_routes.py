@@ -2069,6 +2069,175 @@ def generate_random_coaching_focus() -> str:
     return random.choice(coaching_focus_options)
 
 
+# Player attribute keys persisted to FPD (mirrors the user-training write contract).
+_AUTOTRAIN_PLAYER_ATTRS = [
+    "SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO",
+]
+
+
+def auto_train_one_cpu_team(
+    franchise_id: ObjectId,
+    team_id: Any,
+    week: int,
+    *,
+    seed: int | None = None,
+    dry_run: bool = False,
+    ftd_doc: dict | None = None,
+    fpd_by_player_id: dict | None = None,
+) -> dict:
+    """Run REAL auto-train for ONE CPU team — the sunset replacement for distant training.
+
+    Unlike distant training (canned template deltas, no play/scouting effectiveness), this runs
+    the same ``execute_training`` engine the user's team uses, with a per-team auto-train roll, so
+    CPU teams train every surface the user does. Pure per-team: reads/writes only this team's FPD +
+    FTD (disjoint from every other team), so it parallelizes safely.
+
+    ``seed`` (test/repro only) seeds the module RNG so the allocation roll, coaching-focus roll, and
+    the engine's internal draws are reproducible for this team. ``dry_run=True`` computes and returns
+    the training report WITHOUT any DB write — used to verify correctness before wiring/persisting.
+    ``ftd_doc`` / ``fpd_by_player_id`` may be passed in to avoid re-querying in a batch.
+
+    Idempotency: training is DELTA-based (adds to attributes), so re-running double-trains. Guarded
+    by the per-FTD ``cpu_autotrain_week`` marker — a team already trained this week is skipped, and
+    the marker is set only after this team's FPD+FTD writes succeed.
+    """
+    from BackEnd.models.training_execution_v2 import execute_training
+    from BackEnd.utils.position_ratings import compute_position_ratings
+    from BackEnd.utils.franchise_coaching_focus_counts import user_ftd_coaching_focus_increment
+
+    team_object_id = team_id if isinstance(team_id, ObjectId) else ObjectId(str(team_id))
+
+    if ftd_doc is None:
+        ftd_doc = franchise_team_data_collection.find_one(
+            {"franchise_id": franchise_id, "team_id": team_object_id}
+        )
+    if not ftd_doc:
+        return {"status": "error", "reason": "ftd_not_found", "team_id": str(team_id)}
+
+    # Idempotency guard (skip on a real run; a dry_run always computes).
+    if not dry_run and ftd_doc.get("cpu_autotrain_week") == week:
+        return {"status": "skipped_already_trained", "team_id": str(team_id), "week": week}
+
+    if seed is not None:
+        random.seed(seed)
+
+    team_player_ids = ftd_doc.get("players") or []
+    if fpd_by_player_id is None:
+        fpd_by_player_id = {
+            str(d["player_id"]): d
+            for d in franchise_players_data_collection.find({"franchise_id": str(franchise_id)})
+        }
+
+    players_for_training: list[dict] = []
+    for pid in team_player_ids:
+        fp = fpd_by_player_id.get(str(pid))
+        if not fp:
+            continue
+        meta = dict(fp.get("meta") or {})
+        players_for_training.append({
+            "_id": str(pid),
+            "first_name": meta.get("first_name", ""),
+            "last_name": meta.get("last_name", ""),
+            "team": str(team_id),
+            "attributes": fp.get("attributes", {}),
+            "position_ratings": fp.get("position_ratings", {}),
+            "year": meta.get("year"),
+            "meta": meta,
+        })
+    if not players_for_training:
+        return {"status": "error", "reason": "no_players", "team_id": str(team_id)}
+
+    is_first = week == 1
+    points = 30 if is_first else 24
+    allocations = generate_random_training_allocations(points)  # per-team roll
+    coaching_focus = generate_random_coaching_focus()           # per-team roll
+
+    team_stats = dict(ftd_doc.get("team_attributes") or {})
+    plays_data = ftd_doc.get("plays") or {}
+    strategy_settings = ftd_doc.get("strategy_settings") or {}
+    playbook_settings = ftd_doc.get("playbook_settings") or {}
+    scouting_data = ftd_doc.get("scouting_data") or {}
+
+    updated_players, updated_team, updated_plays, updated_scouting, training_report = execute_training(
+        players_for_training,
+        team_stats,
+        allocations,
+        coaching_focus,
+        plays_data=plays_data,
+        strategy_settings=strategy_settings,
+        playbook_settings=playbook_settings,
+        scouting_data=scouting_data,
+        playbook_training_mode="current-playbooks",
+        skip_pre_training_depreciation=is_first,
+    )
+
+    position_ratings_updates: dict[str, dict] = {}
+    for player in updated_players:
+        meta = player.get("meta") or {}
+        position_ratings_updates[player["_id"]] = compute_position_ratings({
+            "attributes": player.get("attributes", {}),
+            "height": meta.get("height"),
+            "name": f"{player.get('first_name','')} {player.get('last_name','')}".strip(),
+        })
+
+    if dry_run:
+        return {
+            "status": "dry_run",
+            "team_id": str(team_id),
+            "week": week,
+            "coaching_focus": coaching_focus,
+            "report": training_report,
+            "updated_team": updated_team,
+            "updated_plays": updated_plays,
+            "updated_scouting": updated_scouting,
+            "orig_plays": plays_data,
+            "orig_scouting": scouting_data,
+        }
+
+    # --- persist: FPD per-player, then FTD (mirrors the user-training write contract) ---
+    for player in updated_players:
+        pid = player["_id"]
+        attrs = player.get("attributes", {})
+        fpd_set: dict[str, Any] = {}
+        for attr in _AUTOTRAIN_PLAYER_ATTRS:
+            anchor_key = f"anchor_{attr}"
+            if anchor_key in attrs:
+                fpd_set[f"attributes.{anchor_key}"] = attrs[anchor_key]
+                fpd_set[f"attributes.{attr}"] = attrs[attr]
+        if "NG" in attrs:
+            fpd_set["attributes.NG"] = attrs["NG"]
+        if pid in position_ratings_updates:
+            fpd_set["position_ratings"] = position_ratings_updates[pid]
+        if fpd_set:
+            franchise_players_data_collection.update_one(
+                {"franchise_id": str(franchise_id), "player_id": pid},
+                {"$set": fpd_set},
+            )
+
+    ftd_update: dict[str, Any] = {}
+    for field, value in updated_team.items():
+        if isinstance(value, dict):
+            continue
+        ftd_update[f"team_attributes.{field}"] = value
+    if updated_plays is not None:
+        ftd_update["plays"] = updated_plays
+    if updated_scouting is not None:
+        ftd_update["scouting_data"] = updated_scouting
+    ftd_update[f"training_reports.{week}"] = training_report
+    ftd_update["cpu_autotrain_week"] = week  # idempotency marker, set with the write
+
+    ftd_ops: dict[str, Any] = {"$set": ftd_update}
+    cf_inc = user_ftd_coaching_focus_increment(coaching_focus, training_camp_first_week=is_first)
+    if cf_inc:
+        ftd_ops["$inc"] = cf_inc
+    franchise_team_data_collection.update_one(
+        {"franchise_id": franchise_id, "team_id": team_object_id},
+        ftd_ops,
+    )
+
+    return {"status": "trained", "team_id": str(team_id), "week": week, "coaching_focus": coaching_focus}
+
+
 @router.get("/court.html")
 def serve_court_html():
     """Return the court page so query params work in production."""
