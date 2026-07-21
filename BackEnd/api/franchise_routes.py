@@ -2124,9 +2124,14 @@ def auto_train_one_cpu_team(
 
     team_player_ids = ftd_doc.get("players") or []
     if fpd_by_player_id is None:
+        # Load only THIS team's players (not the whole franchise) — cheap for a single
+        # team and essential per-worker efficiency when this runs in a pool.
+        _pid_strs = [str(p) for p in team_player_ids]
         fpd_by_player_id = {
             str(d["player_id"]): d
-            for d in franchise_players_data_collection.find({"franchise_id": str(franchise_id)})
+            for d in franchise_players_data_collection.find(
+                {"franchise_id": str(franchise_id), "player_id": {"$in": _pid_strs}}
+            )
         }
 
     players_for_training: list[dict] = []
@@ -2202,45 +2207,63 @@ def auto_train_one_cpu_team(
         }
 
     # --- persist: FPD per-player, then FTD (mirrors the user-training write contract) ---
-    for player in updated_players:
-        pid = player["_id"]
-        attrs = player.get("attributes", {})
-        fpd_set: dict[str, Any] = {}
-        for attr in _AUTOTRAIN_PLAYER_ATTRS:
-            anchor_key = f"anchor_{attr}"
-            if anchor_key in attrs:
-                fpd_set[f"attributes.{anchor_key}"] = attrs[anchor_key]
-                fpd_set[f"attributes.{attr}"] = attrs[attr]
-        if "NG" in attrs:
-            fpd_set["attributes.NG"] = attrs["NG"]
-        if pid in position_ratings_updates:
-            fpd_set["position_ratings"] = position_ratings_updates[pid]
-        if fpd_set:
-            franchise_players_data_collection.update_one(
-                {"franchise_id": str(franchise_id), "player_id": pid},
-                {"$set": fpd_set},
-            )
-
-    ftd_update: dict[str, Any] = {}
-    for field, value in updated_team.items():
-        if isinstance(value, dict):
-            continue
-        ftd_update[f"team_attributes.{field}"] = value
-    if updated_plays is not None:
-        ftd_update["plays"] = updated_plays
-    if updated_scouting is not None:
-        ftd_update["scouting_data"] = updated_scouting
-    ftd_update[f"training_reports.{week}"] = training_report
-    ftd_update["cpu_autotrain_week"] = week  # idempotency marker, set with the write
-
-    ftd_ops: dict[str, Any] = {"$set": ftd_update}
-    cf_inc = user_ftd_coaching_focus_increment(coaching_focus, training_camp_first_week=is_first)
-    if cf_inc:
-        ftd_ops["$inc"] = cf_inc
+    # CLAIM-FIRST: set the idempotency marker BEFORE writing the delta-based training.
+    # Training adds to attributes, so a retry after a worker died mid-write would
+    # double-apply. Claiming first means any retry sees the marker and skips — no
+    # double-training (the catastrophic outcome). If a write then fails, un-claim so a
+    # clean retry re-trains from scratch. Residual: a worker SIGKILLed after claim but
+    # before writes finish leaves the team marked-but-incomplete (rare; detectable via a
+    # missing training_reports.{week}; safe to backfill) — never doubled.
     franchise_team_data_collection.update_one(
         {"franchise_id": franchise_id, "team_id": team_object_id},
-        ftd_ops,
+        {"$set": {"cpu_autotrain_week": week}},
     )
+    try:
+        for player in updated_players:
+            pid = player["_id"]
+            attrs = player.get("attributes", {})
+            fpd_set: dict[str, Any] = {}
+            for attr in _AUTOTRAIN_PLAYER_ATTRS:
+                anchor_key = f"anchor_{attr}"
+                if anchor_key in attrs:
+                    fpd_set[f"attributes.{anchor_key}"] = attrs[anchor_key]
+                    fpd_set[f"attributes.{attr}"] = attrs[attr]
+            if "NG" in attrs:
+                fpd_set["attributes.NG"] = attrs["NG"]
+            if pid in position_ratings_updates:
+                fpd_set["position_ratings"] = position_ratings_updates[pid]
+            if fpd_set:
+                franchise_players_data_collection.update_one(
+                    {"franchise_id": str(franchise_id), "player_id": pid},
+                    {"$set": fpd_set},
+                )
+
+        ftd_update: dict[str, Any] = {}
+        for field, value in updated_team.items():
+            if isinstance(value, dict):
+                continue
+            ftd_update[f"team_attributes.{field}"] = value
+        if updated_plays is not None:
+            ftd_update["plays"] = updated_plays
+        if updated_scouting is not None:
+            ftd_update["scouting_data"] = updated_scouting
+        ftd_update[f"training_reports.{week}"] = training_report
+
+        ftd_ops: dict[str, Any] = {"$set": ftd_update}
+        cf_inc = user_ftd_coaching_focus_increment(coaching_focus, training_camp_first_week=is_first)
+        if cf_inc:
+            ftd_ops["$inc"] = cf_inc
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": team_object_id},
+            ftd_ops,
+        )
+    except Exception:
+        # Un-claim so this team is retryable instead of stuck marked-but-untrained.
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": team_object_id},
+            {"$unset": {"cpu_autotrain_week": ""}},
+        )
+        raise
 
     return {"status": "trained", "team_id": str(team_id), "week": week, "coaching_focus": coaching_focus}
 
@@ -12328,22 +12351,23 @@ def _run_all_cpu_autotrain(
 ) -> dict:
     """Sunset replacement for distant training: run REAL per-team auto-train for every CPU team.
 
-    SERIAL for now (step 1b) — the pool comes in step 2. Same team-selection as distant training
-    (skip user team + EOS-eliminated). Each team is idempotency-guarded inside
-    auto_train_one_cpu_team (cpu_autotrain_week), so a partial run is resumable: a re-run skips
-    already-trained teams and finishes the rest. FPD is batch-loaded once and shared across teams.
+    Same team-selection as distant training (skip user team + EOS-eliminated). Each team is
+    idempotency-guarded inside auto_train_one_cpu_team (cpu_autotrain_week), so a partial run is
+    resumable and the pool failure-ladder's retries never double-train.
+
+    ENGINE: pooled when FRANCHISE_CPU_SIM_USE_POOL is on (each team trains in a spawned worker that
+    loads its OWN fresh FTD/FPD — so the marker check is current, retry-safe), else serial in-process
+    with a single batch-loaded FPD shared across teams.
     """
     all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
     eliminated_team_ids = set()
     if week > ScheduleManager.REGULAR_SEASON_WEEKS and franchise_doc.get("eos_tournament_active"):
         eliminated_team_ids = ft.get_eliminated_team_ids(franchise_doc)
-    fpd_by_player_id = {
-        str(d["player_id"]): d
-        for d in franchise_players_data_collection.find({"franchise_id": str(franchise_id)})
-    }
-    _t0 = time.time()
-    trained = skipped = errored = 0
-    for idx, ftd_doc in enumerate(all_ftd_docs):
+
+    # Eligible CPU teams (skip user + EOS-eliminated). idx is stable over this list so a team's
+    # seed = seed_base + idx is the same in either engine.
+    eligible: list[tuple[int, ObjectId]] = []
+    for ftd_doc in all_ftd_docs:
         team_oid = ftd_doc.get("team_id")
         if team_oid is None:
             continue
@@ -12351,27 +12375,62 @@ def _run_all_cpu_autotrain(
             continue
         if str(team_oid) in eliminated_team_ids:
             continue
-        seed = None if seed_base is None else seed_base + idx
-        res = auto_train_one_cpu_team(
-            franchise_id, team_oid, week,
-            is_first_training=is_first_training, seed=seed,
-            ftd_doc=ftd_doc, fpd_by_player_id=fpd_by_player_id,
-        )
-        st = res.get("status")
-        if st == "trained":
-            trained += 1
-        elif st == "skipped_already_trained":
-            skipped += 1
-        else:
-            errored += 1
-            logger.warning("[CPU-AUTOTRAIN] team=%s status=%s reason=%s",
-                           str(team_oid), st, res.get("reason"))
+        eligible.append((len(eligible), team_oid))
+
+    use_pool = _franchise_cpu_use_pool()
+    _t0 = time.time()
+    trained = skipped = errored = 0
+
+    if use_pool and eligible:
+        from BackEnd.utils.cpu_week_pool import pool_worker_count, simulate_autotrain_pooled
+        jobs = [(idx, franchise_id, team_oid, week, is_first_training) for idx, team_oid in eligible]
+        results, errors, _leaks = simulate_autotrain_pooled(jobs, seed_base=seed_base)
+        for idx, team_oid in eligible:
+            if idx in errors:
+                errored += 1
+                logger.warning("[CPU-AUTOTRAIN] team=%s pooled-error=%s",
+                               str(team_oid), errors[idx])
+                continue
+            res = results.get(idx) or {}
+            st = res.get("status")
+            if st == "trained":
+                trained += 1
+            elif st == "skipped_already_trained":
+                skipped += 1
+            else:
+                errored += 1
+                logger.warning("[CPU-AUTOTRAIN] team=%s status=%s reason=%s",
+                               str(team_oid), st, res.get("reason"))
+    else:
+        fpd_by_player_id = {
+            str(d["player_id"]): d
+            for d in franchise_players_data_collection.find({"franchise_id": str(franchise_id)})
+        }
+        for idx, team_oid in eligible:
+            seed = None if seed_base is None else seed_base + idx
+            res = auto_train_one_cpu_team(
+                franchise_id, team_oid, week,
+                is_first_training=is_first_training, seed=seed,
+                ftd_doc=None, fpd_by_player_id=fpd_by_player_id,
+            )
+            st = res.get("status")
+            if st == "trained":
+                trained += 1
+            elif st == "skipped_already_trained":
+                skipped += 1
+            else:
+                errored += 1
+                logger.warning("[CPU-AUTOTRAIN] team=%s status=%s reason=%s",
+                               str(team_oid), st, res.get("reason"))
+
     _elapsed = time.time() - _t0
     _ran = trained + errored  # teams that actually executed (skipped were no-ops)
     logger.warning(
         "[CPU-AUTOTRAIN-TIMING] franchise=%s week=%s | trained=%s skipped=%s errors=%s | "
-        "engine=serial | total=%.1fs (%.2fs/team)",
+        "engine=%s workers=%s | total=%.1fs (%.2fs/team)",
         franchise_id, week, trained, skipped, errored,
+        "pool" if (use_pool and eligible) else "serial",
+        pool_worker_count() if (use_pool and eligible) else 1,
         _elapsed, _elapsed / max(1, _ran),
     )
     return {"trained": trained, "skipped": skipped, "errors": errored, "seconds": round(_elapsed, 2)}

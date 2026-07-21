@@ -215,3 +215,110 @@ def simulate_cpu_week_pooled(
             errors[idx] = ex_
 
     return results, errors, leaks
+
+
+# ---------------------------------------------------------------------------
+# CPU auto-train (parallel per-team training) — sunset of distant training.
+# ---------------------------------------------------------------------------
+# Each team's training is a pure function of its own DB state + roll, and writes
+# only its own FPD/FTD (disjoint), so it parallelizes like the games. Training is
+# DELTA-based, so auto_train_one_cpu_team is claim-first (sets cpu_autotrain_week
+# before writing, un-claims on error) — which makes the failure ladder's retries
+# idempotent (a re-run of a team already claimed skips it, never double-trains).
+
+def _autotrain_worker(task: tuple) -> tuple:
+    """Runs in a spawned worker: train ONE team (loads its own FTD/FPD fresh, writes)."""
+    idx, franchise_id, team_id, week, is_first, seed, collect_guard = task
+    from BackEnd.utils import sim_random
+    if collect_guard:
+        sim_random.install_global_draw_guard()
+        sim_random.reset_global_draw_guard()
+    from BackEnd.api.franchise_routes import auto_train_one_cpu_team
+    # ftd_doc=None -> the worker loads a FRESH FTD, so the claim/marker check sees
+    # current DB state (retry-safe). fpd=None -> team-scoped FPD load.
+    res = auto_train_one_cpu_team(
+        franchise_id, team_id, week, is_first_training=is_first, seed=seed
+    )
+    leaks = sim_random.global_draw_report() if collect_guard else {}
+    return idx, res, dict(leaks)
+
+
+def simulate_autotrain_pooled(
+    jobs: list[tuple],
+    *,
+    seed_base: int | None = None,
+    max_workers: int | None = None,
+    collect_guard: bool = False,
+) -> tuple[dict[int, dict], dict[int, Exception], dict[int, dict]]:
+    """Parallel per-team CPU auto-train across a spawn pool.
+
+    ``jobs``: list of ``(idx, franchise_id, team_id, week, is_first_training)``.
+    Returns ``(results, errors, leaks)`` — ``results[idx]`` is the per-team status dict
+    from auto_train_one_cpu_team (writes happen IN the worker), ``errors[idx]`` for teams
+    that failed every tier. Failure ladder mirrors the games (pool -> rebuild once ->
+    sequential in-process); safe because training is claim-first idempotent.
+    """
+    if max_workers is None:
+        max_workers = pool_worker_count()
+    if not jobs:
+        return {}, {}, {}
+
+    results: dict[int, dict] = {}
+    errors: dict[int, Exception] = {}
+    leaks: dict[int, dict] = {}
+
+    def _tasks(js):
+        return [
+            (j[0], j[1], j[2], j[3], j[4],
+             (None if seed_base is None else seed_base + j[0]), collect_guard)
+            for j in js
+        ]
+
+    def _remaining():
+        return [j for j in jobs if j[0] not in results]
+
+    def _run_pool(js) -> bool:
+        """One pool attempt. Returns True if the pool broke."""
+        if not js:
+            return False
+        ctx = mp.get_context("spawn")
+        workers = max(1, min(max_workers, len(js)))
+        try:
+            with ProcessPoolExecutor(max_workers=workers, mp_context=ctx) as ex:
+                fut_to_idx = {ex.submit(_autotrain_worker, t): t[0] for t in _tasks(js)}
+                for fut in as_completed(fut_to_idx):
+                    idx = fut_to_idx[fut]
+                    try:
+                        ridx, res, wl = fut.result()
+                        results[ridx] = res
+                        if collect_guard:
+                            leaks[ridx] = wl
+                    except BrokenProcessPool:
+                        raise
+                    except Exception as ex_:  # noqa: BLE001 — a team-level failure
+                        errors[idx] = ex_
+        except BrokenProcessPool as bpp:
+            logger.error("[AUTOTRAIN-POOL] BrokenProcessPool (worker died): %s", bpp)
+            return True
+        return False
+
+    broke = _run_pool(jobs)
+    if broke:
+        rem = _remaining()
+        logger.warning("[AUTOTRAIN-POOL] rebuilding pool once for %d incomplete team(s)", len(rem))
+        broke = _run_pool(rem)
+    if broke:
+        rem = _remaining()
+        logger.warning("[AUTOTRAIN-POOL] running %d team(s) in-process (claim-first idempotent)", len(rem))
+        from BackEnd.api.franchise_routes import auto_train_one_cpu_team
+        for (idx, fid, tid, wk, isf) in rem:
+            try:
+                seed = None if seed_base is None else seed_base + idx
+                results[idx] = auto_train_one_cpu_team(fid, tid, wk, is_first_training=isf, seed=seed)
+            except Exception as ex_:  # noqa: BLE001
+                errors[idx] = ex_
+
+    for idx in list(errors):
+        if idx in results:
+            errors.pop(idx)
+    return results, errors, leaks
