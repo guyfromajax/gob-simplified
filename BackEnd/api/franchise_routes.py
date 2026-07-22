@@ -6584,18 +6584,19 @@ def _complete_week_finish_cpu_and_persist(
                         "home_score": sim_res["team2_score"],
                     }
                 )
-                cpu_job = _persist_cpu_sim_job(
-                    franchise_id,
-                    week,
-                    _cpu_sim_mark_matchup_complete(
-                        cpu_job,
-                        aid,
-                        hid,
-                        engine="cpu_full_fallback",
-                        away_score=sim_res["team1_score"],
-                        home_score=sim_res["team2_score"],
-                        game_id=None,
-                    ),
+                # Mark in-memory only; the full cpu_sim_job is persisted ONCE after the
+                # loop (both the start-cpu-sims and phase-b/monolith paths do so). Game
+                # results are already durable per-game (db.games + results), and the
+                # resume skip-guard keys off those, not cpu_job status — so dropping the
+                # per-game job write removes ~2 Atlas round-trips/game with no data loss.
+                cpu_job = _cpu_sim_mark_matchup_complete(
+                    cpu_job,
+                    aid,
+                    hid,
+                    engine="cpu_full_fallback",
+                    away_score=sim_res["team1_score"],
+                    home_score=sim_res["team2_score"],
+                    game_id=None,
                 )
                 continue
 
@@ -6685,18 +6686,15 @@ def _complete_week_finish_cpu_and_persist(
                     "home_score": sim_res["team2_score"],
                 }
             )
-            cpu_job = _persist_cpu_sim_job(
-                franchise_id,
-                week,
-                _cpu_sim_mark_matchup_complete(
-                    cpu_job,
-                    aid,
-                    hid,
-                    engine="cpu_full",
-                    away_score=away_score,
-                    home_score=home_score,
-                    game_id=computer_game_id,
-                ),
+            # In-memory mark only — persisted once after the loop (see fallback note).
+            cpu_job = _cpu_sim_mark_matchup_complete(
+                cpu_job,
+                aid,
+                hid,
+                engine="cpu_full",
+                away_score=away_score,
+                home_score=home_score,
+                game_id=computer_game_id,
             )
 
     results = _order_franchise_week_results_like_schedule(results, week_games)
