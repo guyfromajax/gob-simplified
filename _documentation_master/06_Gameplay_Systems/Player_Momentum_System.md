@@ -110,7 +110,7 @@ A player with **MO > 0** has a **`|MO| × MO_NG_DECAY_BONUS_PCT_PER_LEVEL`%** ch
 
 ### Free Throw Impact
 
-When a shooter **misses the primary FT roll**, he gets a second-chance roll (miss → make). The base make chance is the crowd-tiered probability (**50% home or factor-1 away / 40% / 30% away**), shifted by the shooter's momentum:
+When a shooter **misses the primary FT roll**, he gets a second-chance roll (miss → make). The base make chance is the crowd-tiered probability (**60% home or factor-1 away / 50% / 40% away**), shifted by the shooter's momentum:
 
 `threshold = base_pct (after crowd factor) + ((2 × MO) × randint(*MO_FT_SECOND_CHANCE_ROLL))`, clamped to **[0, 100]**.
 

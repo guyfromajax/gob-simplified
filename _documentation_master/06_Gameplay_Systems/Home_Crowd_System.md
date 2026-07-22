@@ -38,13 +38,13 @@ All impacts are scoped to the single game. They are stored as deltas in `game_st
 | Factor | Away shot threshold | Home shot threshold | Away FT miss→make second chance |
 |---|---|---|---|
 | 1 | +0 | +0 | default (`FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE`) |
-| 2 | +0 | +0 | 0.4 |
-| 3 | +25 | +0 | 0.4 |
-| 4 | +50 | +0 | 0.3 |
-| 5 | +50 | −50 | 0.3 |
+| 2 | +0 | +0 | 0.5 |
+| 3 | +25 | +0 | 0.5 |
+| 4 | +50 | +0 | 0.4 |
+| 5 | +50 | −50 | 0.4 |
 
 - **Shot threshold deltas:** `_shot_threshold_deltas_for_factor(factor)` returns `(away_delta, home_delta)`.
-- **Free-throw second chance:** `effective_ft_miss_to_make_second_chance(game, offense_team_at_line)`. **Home** shooters always use the global 0.5 default; **away** shooters use the crowd tiers above (factor ≤1 → 0.5, 2–3 → 0.4, ≥4 → 0.3). See `Free_Throw_System.md` for how the miss→make second-chance roll is applied.
+- **Free-throw second chance:** `effective_ft_miss_to_make_second_chance(game, offense_team_at_line)`. **Home** shooters always use the global 0.6 default; **away** shooters use the crowd tiers above (factor ≤1 → 0.6, 2–3 → 0.5, ≥4 → 0.4). See `Free_Throw_System.md` for how the miss→make second-chance roll is applied.
 
 ---
 

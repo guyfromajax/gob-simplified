@@ -66,8 +66,8 @@ threshold is `crowd base + (2 × MO) × randint(1,3)`, clamped to 0–100, and t
 
 | Constant | File | Value | Effect |
 |---|---|---|---|
-| `FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE` | constants/__init__.py | `0.50` | Home shooters and away shooters at crowd factor 1 use a base 50% miss-to-make threshold. |
-| Away FT crowd tiers | home_crowd.py | `factor 2–3: 0.40; factor 4–5: 0.30` | Reduces the miss-to-make base for away shooters in stronger crowd environments. |
+| `FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE` | constants/__init__.py | `0.60` | Home shooters and away shooters at crowd factor 1 use a base 60% miss-to-make threshold. |
+| Away FT crowd tiers | home_crowd.py | `factor 2–3: 0.50; factor 4–5: 0.40` | Reduces the miss-to-make base for away shooters in stronger crowd environments. |
 | `MO_FT_SECOND_CHANCE_MULTIPLIER` | constants/momentum.py | `2` | Doubles the shooter's signed momentum before applying the random factor. |
 | `MO_FT_SECOND_CHANCE_ROLL` | constants/momentum.py | `(1,3)` | Random multiplier applied to doubled MO for each primary miss. |
 
