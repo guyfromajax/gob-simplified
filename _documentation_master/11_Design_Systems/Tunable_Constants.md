@@ -33,7 +33,7 @@ the configured value. Subtle-movement precedence may suppress the evaluation on 
 
 | Constant | File | Value | Effect |
 |---|---|---|---|
-| `OUTSIDE_SHOT_MIN_GAP_BY_TIER` | motion_step_decision.py | `{early:9, mid:6, late:3, very_late:0, forced:0}` | Minimum distance in grid units from the candidate to the nearest defender for an outside shot to be eligible. Tiers: early 23–30s, mid 15–22s, late 6–14s, very late 1–5s, forced <1s. |
+| `OUTSIDE_SHOT_MIN_GAP_BY_TIER` | motion_step_decision.py | `{early:11, mid:7, late:3, very_late:0, forced:0}` | Minimum distance in grid units from the candidate to the nearest defender for an outside shot to be eligible. Tiers: early 23–30s, mid 15–22s, late 6–14s, very late 1–5s, forced <1s. |
 | `RANDOM_TIER_SHOOT_PCT[early]` | motion_step_decision.py | `{slow:10, normal:20, fast:30}` | Random reader's conditional shoot percentage in the 23–30s tier, after choosing the `shoot` option. Effective direct-shot rates are 3.3% / 6.7% / 10.0% per evaluation. |
 | `RANDOM_TIER_SHOOT_PCT[mid]` | motion_step_decision.py | `{slow:20, normal:35, fast:50}` | Conditional percentage in the 15–22s tier. Effective direct-shot rates are 6.7% / 11.7% / 16.7%. |
 | `RANDOM_TIER_SHOOT_PCT[late]` | motion_step_decision.py | `{slow:95, normal:95, fast:95}` | Conditional percentage in the 6–14s tier. Effective direct-shot rate is 31.7% for every tempo. |

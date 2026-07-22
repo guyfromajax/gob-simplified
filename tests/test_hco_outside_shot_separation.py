@@ -13,16 +13,16 @@ def test_random_tier_tunables_match_hco_balance_grid():
 
 def test_outside_gap_gate_relaxes_by_clock_tier():
     assert OUTSIDE_SHOT_MIN_GAP_BY_TIER == {
-        "early": 9.0,
-        "mid": 6.0,
+        "early": 11.0,
+        "mid": 7.0,
         "late": 3.0,
         "very_late": 0.0,
         "forced": 0.0,
     }
-    assert not _outside_shot_is_eligible("PG", "outside", 25, {"PG": 8.99})
-    assert _outside_shot_is_eligible("PG", "outside", 25, {"PG": 9.0})
-    assert not _outside_shot_is_eligible("PG", "outside", 18, {"PG": 5.99})
-    assert _outside_shot_is_eligible("PG", "outside", 18, {"PG": 6.0})
+    assert not _outside_shot_is_eligible("PG", "outside", 25, {"PG": 10.99})
+    assert _outside_shot_is_eligible("PG", "outside", 25, {"PG": 11.0})
+    assert not _outside_shot_is_eligible("PG", "outside", 18, {"PG": 6.99})
+    assert _outside_shot_is_eligible("PG", "outside", 18, {"PG": 7.0})
     assert not _outside_shot_is_eligible("PG", "outside", 10, {"PG": 2.99})
     assert _outside_shot_is_eligible("PG", "outside", 10, {"PG": 3.0})
     assert _outside_shot_is_eligible("PG", "outside", 4, {"PG": 0.0})

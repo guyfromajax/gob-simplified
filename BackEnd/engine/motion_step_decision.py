@@ -231,8 +231,8 @@ RANDOM_TIER_SHOOT_PCT = {
 # Inside/attack candidates are unaffected. The gate relaxes with clock pressure and
 # is shared by optimal self shots, optimal dishes, and random-tier self shots.
 OUTSIDE_SHOT_MIN_GAP_BY_TIER = {
-    "early": 9.0,
-    "mid": 6.0,
+    "early": 11.0,
+    "mid": 7.0,
     "late": 3.0,
     "very_late": 0.0,
     "forced": 0.0,
