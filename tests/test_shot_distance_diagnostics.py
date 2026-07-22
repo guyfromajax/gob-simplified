@@ -2,8 +2,10 @@ from types import SimpleNamespace
 
 from BackEnd.utils.shot_split_tracker import (
     format_week_aggregate_report,
+    increment_block_funnel,
     merge_shot_diagnostics,
     record_shot_split,
+    restore_block_funnel_from_saved,
     restore_shot_distance_bands_from_saved,
 )
 
@@ -67,3 +69,34 @@ def test_distance_bands_restore_merge_and_render_contest_factor():
     report = format_week_aggregate_report(merged, games)
     assert "Nearest-defender distance bands" in report
     assert "100.0% make, 2 att  | factor 0.60" in report
+
+
+def test_block_funnel_restores_merges_and_renders():
+    game = _game()
+    for key in (
+        "eligible",
+        "eligible",
+        "reconciliation",
+        "block_band",
+        "actual_blocks",
+    ):
+        increment_block_funnel(game.game_state, key)
+
+    restored = {}
+    restore_block_funnel_from_saved(
+        restored,
+        {"block_funnel_tracking": game.game_state["block_funnel_tracking"]},
+    )
+    summary = {
+        "shot_split_tracking": {
+            "2pt_def": {"make": 0, "miss": 1},
+        },
+        "block_funnel_tracking": restored["block_funnel_tracking"],
+    }
+    merged, games = merge_shot_diagnostics([summary, summary])
+    assert games == 2
+    assert merged["block_funnel_tracking"]["eligible"] == 4
+    assert merged["block_funnel_tracking"]["actual_blocks"] == 2
+    report = format_week_aggregate_report(merged, games)
+    assert "Block funnel" in report
+    assert "Actual blocks" in report

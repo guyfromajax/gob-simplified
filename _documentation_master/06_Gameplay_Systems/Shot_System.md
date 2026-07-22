@@ -28,7 +28,7 @@
    - `roll = random.randint(1, 100)` → **make** if `roll < make_threshold`, else miss
    - When the helper does **not** apply (outside type, three, or distance > 11): uncontested inside/attack fall back to `shot_score >= shot_threshold`
 6. **Rim box shortcut path:** If `shot_type` is **inside** or **attack**, not a three, shooter is **in the rim box** (|shooter_x − basket_x| ≤ 6 and |shooter_y − basket_y| ≤ 6), **`has_contest` is false**, and not motion-geometry contest → resolve make/miss via the **universal uncontested helper** (item 5). This path **does not** run `calculate_shot_score` defense, **does not** run block reconciliation, charge/blocking foul, or defensive shooting fouls.
-7. **No contest, not using the rim shortcut:** Call `calculate_shot_score(..., apply_defense=False)` — offense-only scoring (base shot score, passer/dribble, screener, gravity, zone-vs-3 multiplier still apply); **no** defense subtraction, **no** `DEF_A`, **no** `d_foul` from `check_defensive_foul_on_shot`. **Make/miss then differs by shot type:** undefended **outside** uses the bespoke rule `shot_score > (200 − shooter.CH + round(euclidean(shooter, basket) × 1.8))` (see Step 9); undefended **inside/attack** use the universal uncontested helper when geo-eligible, else `shot_score >= shot_threshold`.
+7. **No contest, not using the rim shortcut:** Call `calculate_shot_score(..., apply_defense=False)` — offense-only scoring (base shot score, passer/dribble, screener, gravity, zone-vs-3 multiplier still apply); **no** defense subtraction, **no** `DEF_A`, **no** `d_foul` from `check_defensive_foul_on_shot`. **Make/miss then differs by shot type:** undefended **outside** uses the bespoke rule `shot_score > (200 − shooter.CH + round(euclidean(shooter, basket) × 2.0))` (see Step 9); undefended **inside/attack** use the universal uncontested helper when geo-eligible, else `shot_score >= shot_threshold`.
 8. **Contest:** Full defensive shot score, shooting-foul check, and (when applicable) block reconciliation and `calculate_charge` **only** when `has_contest` is true (charge remains **attack** shots only, plus existing fast-break defender gating).
 
 **Three-point classification**
@@ -88,8 +88,8 @@
 
 4. Apply Three-Point Modifier (standard `resolve_shot` only; not FLSS CH-vs-1–100 heaves)
    - Distance penalty: only threes add shooter-to-rim distance in `resolve_shot`.
-     - Twos: no distance addition
-     - Threes: `shot_threshold += round(distance × 1.8)`
+     - Twos: threshold `-20` under 10 grid; `-10` from 10 through 15 grid; no adjustment above 15
+     - Threes: `shot_threshold += round(distance × 2.0)`
      - Home offense rim: `HOME_RIM_COORDS` (91, 25); away offense rim: `AWAY_RIM_COORDS` (9, 25) — absolute coords, no home-flip
      - If shooter coords unavailable: `shot_threshold += THREE_POINT_SHOT_THRESHOLD_FALLBACK` (25)
 
@@ -165,7 +165,7 @@
 
 9. Determine Make/Miss
    - made = shot_score >= shot_threshold
-   - **Undefended OUTSIDE exception:** when `has_contest` is false **and** `shot_type == "outside"`, use the bespoke rule `made = shot_score > (200 − shooter.CH + round(euclidean(shooter, basket) × 1.8))` (strictly `>`; higher chemistry / closer to the basket = easier). `shot_threshold` is left intact for downstream variant selection. Undefended **inside/attack** shots are unchanged (rim-unguarded shortcut or the standard compare).
+   - **Undefended OUTSIDE exception:** when `has_contest` is false **and** `shot_type == "outside"`, use the bespoke rule `made = shot_score > (200 − shooter.CH + round(euclidean(shooter, basket) × 2.0))` (strictly `>`; higher chemistry / closer to the basket = easier). `shot_threshold` is left intact for downstream variant selection. Undefended **inside/attack** shots are unchanged (rim-unguarded shortcut or the standard compare).
 
 10. Shooting Foul Calibration (if d_foul)
    - if is_three: 40% chance foul forces miss (THREE_POINTER_FOUL_MISS_CHANCE = 0.4)
@@ -241,7 +241,7 @@ Shot resolution uses the following base constants:
 
 #### Step 4: Apply Three-Point Modifier
 - Scope: standard `resolve_shot()` only. FLSS heaves (CH vs roll 1–100) do not use this path.
-- Distance penalty: twos add no shooter-to-rim distance. Threes add `round(hypot(shooter_x − rim_x, shooter_y − rim_y) × 1.8)`, where rim is the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS` by offense side; absolute coords).
+- Distance adjustment: twos reduce the threshold by 20 under 10 grid, by 10 from 10 through 15 grid inclusive, and receive no adjustment above 15. Threes add `round(hypot(shooter_x − rim_x, shooter_y − rim_y) × 2.0)`, where rim is the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS` by offense side; absolute coords).
 - If shooter shot coords are unavailable: `shot_threshold += THREE_POINT_SHOT_THRESHOLD_FALLBACK` (25).
 - Typical perimeter spots (key / midWing / wing / midCorner / corner) land ~19–27 vs rim (~20–23 common).
 
@@ -302,7 +302,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 
 #### Step 9: Determine Make/Miss
 - `made = shot_score >= shot_threshold`
-- **Undefended OUTSIDE exception** (`not has_contest and shot_type == "outside"`): `made = shot_score > (200 − shooter.CH + round(euclidean(shooter, basket) × 1.8))` — strictly `>`; higher chemistry / closer = easier. `shot_threshold` is preserved for downstream variant selection (the effective bar is logged as `shot_threshold` in `[SHOT RECON]`). Undefended inside/attack are unchanged.
+- **Undefended OUTSIDE exception** (`not has_contest and shot_type == "outside"`): `made = shot_score > (200 − shooter.CH + round(euclidean(shooter, basket) × 2.0))` — strictly `>`; higher chemistry / closer = easier. `shot_threshold` is preserved for downstream variant selection (the effective bar is logged as `shot_threshold` in `[SHOT RECON]`). Undefended inside/attack are unchanged.
 
 #### Step 10: Shooting Foul Calibration
 - If d_foul: 3pt=40% miss chance, 2pt=20% miss chance
@@ -329,7 +329,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
    - **Motion offense**: Determines `shot_type` during shot resolution (checks possibilities, builds weighted list, selects)
    - **Set plays**: Determines `shot_type` from skeleton analysis (shooter location + attack detection)
    - Attack detection (Set): shoot step = last step; shoot location in PAINT_SPOTS; step before has shooter with action `"handle_ball"` and different location → has_drive = True. Paint + has_drive = attack; paint + no has_drive = inside; else = outside.
-3. **Distance Modifier**: Two-point attempts add no shooter-to-rim distance penalty. Three-point attempts add rounded Euclidean distance × 1.8 from the classified shot coordinate to the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS`). The same rule applies to the bespoke undefended-outside make bar. FLSS CH heaves are excluded.
+3. **Distance Modifier**: Two-point attempts reduce the standard shot threshold by 20 under 10 grid and by 10 from 10–15 grid inclusive; above 15 is neutral. Three-point attempts add rounded Euclidean distance × 2.0 from the classified shot coordinate to the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS`). The same three-point rule applies to the bespoke undefended-outside make bar. FLSS CH heaves are excluded.
 4. **Shot Value Classification**: `classify_shot_value()` is the canonical backend classifier. `roles["shot_spot"]` is authoritative when present; shooter coords are fallback; skeleton spot names are compatibility fallback only. Fast Breaks are 2-point unless the branch is explicitly `shot_type == "outside"` with a `shot_spot`. OREB putbacks force 2; free throws force 1.
 5. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
 6. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)

@@ -130,7 +130,7 @@ BLOCK_PROBABILITY = {
 # If diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD → shooting foul; if diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD → block; else → standard shot
 # Thresholds are independent: adjust either without affecting the other.
 BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 150
-BLOCK_RECONCILIATION_BLOCK_THRESHOLD = -150
+BLOCK_RECONCILIATION_BLOCK_THRESHOLD = -100
 # Block attempt roll: y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX); attempt when y <= aggression
 BLOCK_Y_ROLL_MIN = 0
 BLOCK_Y_ROLL_MAX = 4
@@ -216,7 +216,7 @@ THREE_POINTER_FOUL_MISS_CHANCE = 0.4  # 40% chance foul forces miss on 3-pointer
 TWO_POINTER_FOUL_MISS_CHANCE = 0.2    # 20% chance foul forces miss on 2-pointers
 # After primary FT roll (1–100 vs ft_shot_score), if miss: this probability upgrades miss → make (baseline;
 # home crowd / other systems can substitute an adjusted value at call site).
-FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE = 0.40
+FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE = 0.50
 # Three-point shot threshold modifier (standard shot system only; not FLSS CH rolls).
 # When shooter coords are available: add round(Euclidean distance to attacking rim).
 # When coords are missing: add this fixed fallback.

@@ -26,9 +26,10 @@ MO_FT_ALL_MAKE_DELTA = 1     # flat, once per trip, when ALL attempted FTs make
 
 # --- Free throw second-chance threshold bump (per missed-first-roll attempt) ---
 # After a missed primary FT roll, the second-chance threshold (base %, crowd-tiered)
-# is bumped by shooter MO × randint(*this) percentage points (signed). Threshold
+# is bumped by multiplier × shooter MO × randint(*this) percentage points (signed). Threshold
 # clamped to [0,100]; roll 1–100 < threshold = make. See Player_Momentum_System.md.
 MO_FT_SECOND_CHANCE_ROLL = (1, 3)
+MO_FT_SECOND_CHANCE_MULTIPLIER = 2
 
 # --- Set play: target shooter makes the shot in a successful skeleton ---
 MO_SET_PLAY_DELTA = 1

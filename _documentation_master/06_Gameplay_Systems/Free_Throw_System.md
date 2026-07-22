@@ -7,7 +7,7 @@
    - CH (Clutch): 20% weight
 2. **Random Roll**: `random.randint(1, 100)` (1-100 range)
 3. **Primary Success Check**: `result < ft_shot_score` → MAKE
-4. **Secondary Check (Miss-to-Make Conversion)**: a `1–100` roll vs a threshold to convert miss to make. Base %: **Home shooter** `FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE = 0.40`; **Away shooter** reduced by the home crowd factor (`effective_ft_miss_to_make_second_chance`): factor ≤1 → 0.40, factor 2–3 → **0.30**, factor ≥4 → **0.20** (see `Home_Crowd_System.md`). The base is then **shifted by shooter momentum**: `threshold = base% + MO × randint(*MO_FT_SECOND_CHANCE_ROLL)`, clamped to `[0,100]` (see `Player_Momentum_System.md § Free Throw Impact`).
+4. **Secondary Check (Miss-to-Make Conversion)**: a `1–100` roll vs a threshold to convert miss to make. Base %: **Home shooter** `FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE = 0.50`; **Away shooter** reduced by the home crowd factor (`effective_ft_miss_to_make_second_chance`): factor ≤1 → 0.50, factor 2–3 → **0.40**, factor ≥4 → **0.30** (see `Home_Crowd_System.md`). The base is then **shifted by shooter momentum**: `threshold = base% + (2 × MO) × randint(*MO_FT_SECOND_CHANCE_ROLL)`, clamped to `[0,100]` (see `Player_Momentum_System.md § Free Throw Impact`).
 5. **Bonus Thresholds**:
    - 5-9 team fouls: 1-and-1 free throws (must make first to unlock second)
    - 10+ team fouls: 2 free throws (double bonus)
@@ -28,9 +28,9 @@
    - Primary check: `makes_shot = result < ft_shot_score`
 
 3. **Apply Secondary Check (Miss-to-Make Conversion)**
-   - If `makes_shot = False`: `threshold = base_pct + MO × randint(*MO_FT_SECOND_CHANCE_ROLL)` (clamped `[0,100]`); `if randint(1,100) < threshold: makes_shot = True`
-   - `base_pct` = `effective_ft_miss_to_make_second_chance(game, off_team) × 100`: home (or away crowd factor ≤1) → 40; away crowd factor 2–3 → 30; ≥4 → 20
-   - Momentum shift: shooter `MO × randint(1,3)` pts (signed); MO 0 → no change. See `Player_Momentum_System.md § Free Throw Impact`
+   - If `makes_shot = False`: `threshold = base_pct + (2 × MO) × randint(*MO_FT_SECOND_CHANCE_ROLL)` (clamped `[0,100]`); `if randint(1,100) < threshold: makes_shot = True`
+   - `base_pct` = `effective_ft_miss_to_make_second_chance(game, off_team) × 100`: home (or away crowd factor ≤1) → 50; away crowd factor 2–3 → 40; ≥4 → 30
+   - Momentum shift: shooter `(2 × MO) × randint(1,3)` pts (signed); MO 0 → no change. See `Player_Momentum_System.md § Free Throw Impact`
 
 4. **Record Stat and Build Animation**
    - Record `FTA` (Free Throw Attempt) for shooter
@@ -96,14 +96,14 @@ if not makes_shot:
     second_chance_pct = effective_ft_miss_to_make_second_chance(game, off_team) * 100
     ft_mo = int(attrs.get("MO", 0) or 0)
     _lo, _hi = MO_FT_SECOND_CHANCE_ROLL
-    threshold = max(0, min(100, second_chance_pct + ft_mo * random.randint(_lo, _hi)))
+    threshold = max(0, min(100, second_chance_pct + (2 * ft_mo) * random.randint(_lo, _hi)))
     if random.randint(1, 100) < threshold:
         makes_shot = True
         ft_made_on_second_chance = True
 ```
 
-- **Base %** — **Home shooter** (`off_team.is_home_team`): `FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE = 0.40`. **Away shooter**: scaled down by `home_crowd_factor` — factor ≤1 → 0.40, factor 2–3 → **0.30**, factor ≥4 → **0.20** (home-court FT pressure; see `Home_Crowd_System.md`).
-- **Momentum shift** — shooter `MO × randint(*MO_FT_SECOND_CHANCE_ROLL)` percentage points (signed), clamped to `[0,100]`. Positive MO → more second-chance makes; negative → fewer; MO 0 → no change. See `Player_Momentum_System.md § Free Throw Impact`.
+- **Base %** — **Home shooter** (`off_team.is_home_team`): `FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE = 0.50`. **Away shooter**: scaled down by `home_crowd_factor` — factor ≤1 → 0.50, factor 2–3 → **0.40**, factor ≥4 → **0.30** (home-court FT pressure; see `Home_Crowd_System.md`).
+- **Momentum shift** — shooter `(2 × MO) × randint(*MO_FT_SECOND_CHANCE_ROLL)` percentage points (signed), clamped to `[0,100]`. Positive MO → more second-chance makes; negative → fewer; MO 0 → no change. See `Player_Momentum_System.md § Free Throw Impact`.
 
 This secondary check provides a "second chance" mechanic that increases overall free throw percentage, helping to achieve the target FT% of ~72% per game (lower for away shooters in a loud building).
 
@@ -112,7 +112,7 @@ This secondary check provides a "second chance" mechanic that increases overall 
 - `ft_shot_score = (80 * 0.8) + (70 * 0.2) = 64 + 14 = 78`
 - Random roll: `80` (1-100)
 - Initial result: `80 >= 78` → **MISS**
-- Secondary check (home, 0.40): `random.random() = 0.35` (35% < 40%) → **CONVERTED TO MAKE**
+- Secondary check (home, 0.50): second-chance roll `35` is below `50` → **CONVERTED TO MAKE**
 - Final result: **MAKE**
 
 ### When Free Throws Are Awarded

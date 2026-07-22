@@ -1,5 +1,6 @@
 import pytest
 
+from BackEnd.constants import BLOCK_RECONCILIATION_BLOCK_THRESHOLD
 from BackEnd.utils.shared import height_to_block_score
 
 
@@ -26,3 +27,6 @@ from BackEnd.utils.shared import height_to_block_score
 def test_height_to_block_score_ascends_and_clamps(height, expected):
     assert height_to_block_score(height) == expected
 
+
+def test_block_reconciliation_threshold_is_recalibrated():
+    assert BLOCK_RECONCILIATION_BLOCK_THRESHOLD == -100

@@ -3,14 +3,25 @@ from types import SimpleNamespace
 from BackEnd.constants import POSITION_LIST
 from BackEnd.models.shot_manager import ShotManager
 from BackEnd.utils.shared import _resolve_oreb_putback_defender
-from BackEnd.models.shot_manager import _shot_distance_threshold_bump
+from BackEnd.models.shot_manager import (
+    _inside_shot_threshold_bonus,
+    _shot_distance_threshold_bump,
+)
 
 
 def test_shot_distance_threshold_bump_applies_only_to_threes():
     assert _shot_distance_threshold_bump(0, is_three=False) == 0
     assert _shot_distance_threshold_bump(25, is_three=False) == 0
     assert _shot_distance_threshold_bump(0, is_three=True) == 0
-    assert _shot_distance_threshold_bump(25, is_three=True) == 45
+    assert _shot_distance_threshold_bump(25, is_three=True) == 50
+
+
+def test_inside_shot_threshold_bonus_uses_contiguous_distance_bands():
+    assert _inside_shot_threshold_bonus(9.99, is_three=False) == -20
+    assert _inside_shot_threshold_bonus(10, is_three=False) == -10
+    assert _inside_shot_threshold_bonus(15, is_three=False) == -10
+    assert _inside_shot_threshold_bonus(15.01, is_three=False) == 0
+    assert _inside_shot_threshold_bonus(5, is_three=True) == 0
 from BackEnd.utils.shot_geometry import is_three_point_shot_from_coords
 from tests.test_utils import MockPlayer
 

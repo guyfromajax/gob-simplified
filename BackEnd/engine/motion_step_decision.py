@@ -238,13 +238,16 @@ OUTSIDE_SHOT_MIN_GAP_BY_TIER = {
     "forced": 0.0,
 }
 
-# Final preference gate for HCO outside-shot decisions. It is applied after any
-# read path selects the shot (right/optimal, dish, safe-pass, or random), so a
-# rejected early/mid three keeps the skeleton walk alive to search for a later
-# or inside look. Clock pressure removes the discount from Late onward.
+# Outside-shot selection is discounted at the attack-vs-outside choice itself,
+# rather than rejecting an already-selected shot later in the walk. This keeps
+# shot volume/timing intact while steering eligible outside players toward drives.
+OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.75
+
+# Retained as an explicit all-tier acceptance dial. At 100, selected outside
+# shots are never discarded after the weighted attack-vs-outside choice.
 OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER = {
-    "early": 80,
-    "mid": 90,
+    "early": 100,
+    "mid": 100,
     "late": 100,
     "very_late": 100,
     "forced": 100,
@@ -269,7 +272,9 @@ def _weighted_attack_or_outside(player, off_team, rng):
     a = getattr(player, "attributes", {}) or {}
     s = getattr(off_team, "strategy_settings", {}) or {}
     attack_score = (a.get("AG", 0) + a.get("SC", 0)) / 2 + s.get("attack", 2) * 10
-    outside_score = a.get("SH", 0) + s.get("outside", 2) * 10
+    outside_score = (
+        a.get("SH", 0) + s.get("outside", 2) * 10
+    ) * OUTSIDE_SHOT_SELECTION_MULTIPLIER
     total = attack_score + outside_score
     if total <= 0:
         return "outside"

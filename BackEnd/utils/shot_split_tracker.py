@@ -70,6 +70,16 @@ _DISTANCE_BAND_ROWS = (
 )
 _DISTANCE_BANDS = tuple(key for _label, key in _DISTANCE_BAND_ROWS)
 
+_BLOCK_FUNNEL_KEYS = (
+    "eligible",
+    "reconciliation",
+    "foul_band",
+    "fallback_band",
+    "block_band",
+    "actual_blocks",
+    "foul_block_contacts",
+)
+
 
 def _empty_tracking():
     return {key: {"make": 0, "miss": 0} for key in _KEYS}
@@ -91,6 +101,21 @@ def _empty_shot_distance_bands():
         }
         for shot_value in ("2pt", "3pt")
     }
+
+
+def _empty_block_funnel():
+    return {key: 0 for key in _BLOCK_FUNNEL_KEYS}
+
+
+def increment_block_funnel(game_state, key):
+    """Increment one block-pipeline diagnostic counter without affecting gameplay."""
+    if not isinstance(game_state, dict) or key not in _BLOCK_FUNNEL_KEYS:
+        return
+    tracking = game_state.get("block_funnel_tracking")
+    if not isinstance(tracking, dict):
+        tracking = _empty_block_funnel()
+        game_state["block_funnel_tracking"] = tracking
+    tracking[key] = int(tracking.get(key, 0) or 0) + 1
 
 
 def _shot_distance_band(distance):
@@ -378,6 +403,38 @@ def restore_shot_distance_bands_from_saved(game_state, saved) -> None:
     game_state["shot_distance_bands"] = restored
 
 
+def restore_block_funnel_from_saved(game_state, saved) -> None:
+    """Restore cumulative block-funnel diagnostics across quarter saves."""
+    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+        return
+    prior = saved.get("block_funnel_tracking")
+    if not isinstance(prior, dict):
+        return
+    game_state["block_funnel_tracking"] = {
+        key: int(prior.get(key, 0) or 0) for key in _BLOCK_FUNNEL_KEYS
+    }
+
+
+def format_block_funnel_summary(game) -> str:
+    """Render the per-game block eligibility/reconciliation funnel."""
+    state = getattr(game, "game_state", None) or {}
+    b = state.get("block_funnel_tracking") or {}
+    eligible = int(b.get("eligible", 0) or 0)
+    recon = int(b.get("reconciliation", 0) or 0)
+    trigger_miss = max(0, eligible - recon)
+    lines = ["", "================ BLOCK FUNNEL ================="]
+    lines.append(f"Eligible contested inside/attack shots : {eligible}")
+    lines.append(f"  Trigger missed                       : {trigger_miss}")
+    lines.append(f"  Reconciliation reached               : {recon}")
+    lines.append(f"    Foul band                           : {int(b.get('foul_band', 0) or 0)}")
+    lines.append(f"    Fallback band                       : {int(b.get('fallback_band', 0) or 0)}")
+    lines.append(f"    Block band                          : {int(b.get('block_band', 0) or 0)}")
+    lines.append(f"      Actual blocks                     : {int(b.get('actual_blocks', 0) or 0)}")
+    lines.append(f"      Foul-owned block contacts         : {int(b.get('foul_block_contacts', 0) or 0)}")
+    lines.append("===============================================")
+    return "\n".join(lines)
+
+
 def format_shot_distance_band_summary(game) -> str:
     """Render makes/attempts and average applied primary contest factor by gap."""
     state = getattr(game, "game_state", None) or {}
@@ -638,6 +695,7 @@ def format_master_eog_report(game) -> str:
         format_turn_type_fga_summary(game),
         format_undefended_by_turn_type_summary(game),
         format_hco_shot_tier_summary(game),
+        format_block_funnel_summary(game),
         format_altered_action_summary(game),
         "###############################################################",
         "",
@@ -661,6 +719,7 @@ def merge_shot_diagnostics(summaries):
         "undefended_by_turn_type": _empty_undefended_by_turn_type(),
         "hco_shot_tier_counts": {t: 0 for t in _HCO_TIERS},
         "shot_distance_bands": _empty_shot_distance_bands(),
+        "block_funnel_tracking": _empty_block_funnel(),
     }
     n = 0
     for s in summaries or []:
@@ -671,6 +730,7 @@ def merge_shot_diagnostics(summaries):
         ubt = s.get("undefended_by_turn_type")
         tier = s.get("hco_shot_tier_counts")
         distance = s.get("shot_distance_bands")
+        block_funnel = s.get("block_funnel_tracking")
         if not any(isinstance(x, dict) and x for x in (sst, fbt, tier)):
             continue  # no shot data on this summary — don't count it as a game
         n += 1
@@ -692,6 +752,8 @@ def merge_shot_diagnostics(summaries):
                 target["make"] += int(source.get("make", 0) or 0)
                 target["miss"] += int(source.get("miss", 0) or 0)
                 target["contest_factor_total"] += float(source.get("contest_factor_total", 0.0) or 0.0)
+        for key in _BLOCK_FUNNEL_KEYS:
+            merged["block_funnel_tracking"][key] += int((block_funnel or {}).get(key, 0) or 0)
     return merged, n
 
 
@@ -704,6 +766,7 @@ def format_week_aggregate_report(merged, num_games) -> str:
     ubt = (merged or {}).get("undefended_by_turn_type") or {}
     tier = (merged or {}).get("hco_shot_tier_counts") or {}
     distance = (merged or {}).get("shot_distance_bands") or {}
+    block_funnel = (merged or {}).get("block_funnel_tracking") or {}
     num_teams = max(0, int(num_games)) * 2
 
     def _att(key):
@@ -777,6 +840,33 @@ def format_week_aggregate_report(merged, num_games) -> str:
     for label, t in _HCO_TIER_ROWS:
         v = int(tier.get(t, 0) or 0)
         lines.append(f"  {label:<18}: {_pct(v, tier_total):5.1f}%  ({v})")
+
+    eligible = int(block_funnel.get("eligible", 0) or 0)
+    recon = int(block_funnel.get("reconciliation", 0) or 0)
+    block_band = int(block_funnel.get("block_band", 0) or 0)
+    lines.append("")
+    lines.append("Block funnel (% of prior stage | quantity):")
+    lines.append(f"  Eligible contested inside/attack : {eligible}")
+    lines.append(
+        f"  Reconciliation reached           : {_pct(recon, eligible):5.1f}%  ({recon})"
+    )
+    lines.append(
+        f"  Foul band                        : {_pct(int(block_funnel.get('foul_band', 0) or 0), recon):5.1f}%  "
+        f"({int(block_funnel.get('foul_band', 0) or 0)})"
+    )
+    lines.append(
+        f"  Fallback band                    : {_pct(int(block_funnel.get('fallback_band', 0) or 0), recon):5.1f}%  "
+        f"({int(block_funnel.get('fallback_band', 0) or 0)})"
+    )
+    lines.append(f"  Block band                       : {_pct(block_band, recon):5.1f}%  ({block_band})")
+    lines.append(
+        f"    Actual blocks                  : {_pct(int(block_funnel.get('actual_blocks', 0) or 0), block_band):5.1f}%  "
+        f"({int(block_funnel.get('actual_blocks', 0) or 0)})"
+    )
+    lines.append(
+        f"    Foul-owned contacts            : {_pct(int(block_funnel.get('foul_block_contacts', 0) or 0), block_band):5.1f}%  "
+        f"({int(block_funnel.get('foul_block_contacts', 0) or 0)})"
+    )
 
     lines.append("============================================================================")
     return "\n".join(lines)

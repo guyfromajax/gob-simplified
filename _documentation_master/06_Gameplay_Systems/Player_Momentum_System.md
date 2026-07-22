@@ -28,7 +28,8 @@ Momentum models hot/cold streaks. Two distinct values — don't conflate them:
 | `MO_FT_MIN_ATTEMPTS` | 2 | only FT trips with >1 attempt qualify (make or miss) |
 | `MO_FT_ALL_MISS_DELTA` | −1 | flat, once per trip, when ALL attempted FTs miss |
 | `MO_FT_ALL_MAKE_DELTA` | 1 | flat, once per trip, when ALL attempted FTs make |
-| `MO_FT_SECOND_CHANCE_ROLL` | (1, 3) | FT second-chance threshold bump = MO × randint(\*this) pts (signed); see § Free Throw Impact |
+| `MO_FT_SECOND_CHANCE_MULTIPLIER` | 2 | Multiplies shooter MO before the FT second-chance random factor. |
+| `MO_FT_SECOND_CHANCE_ROLL` | (1, 3) | FT second-chance threshold bump = (2 × MO) × randint(\*this) pts (signed); see § Free Throw Impact |
 | `MO_SET_PLAY_DELTA` | 1 | target_shooter makes the shot in a successful set-play skeleton |
 | `MO_SHOT_ROLL_BASE` | (1, 6) | Default shot roll |
 | `MO_SHOT_ROLL_POSITIVE` | (2, 6) | Favorable roll when MO > 0 and chance hits |
@@ -62,7 +63,7 @@ Each event applies its delta via `add_momentum` (clamped). All file refs are fun
 | **Consecutive shots** | see below | `player.py` `record_shot_result` |
 | **Free Throws (all missed)** | shooter **−1** if he attempts **>1** FT in one trip and **misses all** of them (flat, once per trip) | `phase_resolution.py` `resolve_free_throw_logic` |
 | **Free Throws (all made)** | shooter **+1** if he attempts **>1** FT in one trip and **makes all** of them (flat, once per trip) | `phase_resolution.py` `resolve_free_throw_logic` |
-| **FT second-chance** | shooter MO shifts the miss→make threshold by **`MO × randint(1,3)`** pts (signed) — see *Free Throw Impact* | `phase_resolution.py` `resolve_free_throw_logic` |
+| **FT second-chance** | shooter MO shifts the miss→make threshold by **`(2 × MO) × randint(1,3)`** pts (signed) — see *Free Throw Impact* | `phase_resolution.py` `resolve_free_throw_logic` |
 | **Set Play make** | the **target_shooter** **+1** when he makes the shot in a **successful** set-play skeleton | `phase_resolution.py` `resolve_half_court_offense_logic` |
 | **Dunk** (made) | shooter **+1** when `micro_movement_family` is `dunk` or `drive_dunk` | `player_momentum.py` `apply_made_dunk_momentum()` — called **after** `select_and_stamp_shot_micro()` from every FG path (uses stamped family; `dunk_resolved=True` prevents a second dunk roll) |
 
@@ -109,9 +110,9 @@ A player with **MO > 0** has a **`|MO| × MO_NG_DECAY_BONUS_PCT_PER_LEVEL`%** ch
 
 ### Free Throw Impact
 
-When a shooter **misses the primary FT roll**, he gets a second-chance roll (miss → make). The base make chance is the crowd-tiered probability (**40% home / 30% / 20% away**, never a flat 50/50), shifted by the shooter's momentum:
+When a shooter **misses the primary FT roll**, he gets a second-chance roll (miss → make). The base make chance is the crowd-tiered probability (**50% home or factor-1 away / 40% / 30% away**), shifted by the shooter's momentum:
 
-`threshold = base_pct (after crowd factor) + (MO × randint(*MO_FT_SECOND_CHANCE_ROLL))`, clamped to **[0, 100]**.
+`threshold = base_pct (after crowd factor) + ((2 × MO) × randint(*MO_FT_SECOND_CHANCE_ROLL))`, clamped to **[0, 100]**.
 
 A **1–100** roll **less than the threshold** upgrades the miss to a make. Positive MO raises the threshold (more second-chance makes); negative MO lowers it; **MO = 0 → no change**. Per attempt, using the shooter's MO. Wired in `resolve_free_throw_logic` (`phase_resolution.py`).
 

@@ -16,6 +16,7 @@ from BackEnd.utils.shot_split_tracker import (
     record_shot_split,
     classify_resolve_shot_turn_type,
     resolve_hco_shot_clock_at_attempt,
+    increment_block_funnel,
 )
 from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
 from BackEnd.constants.shot_threshold_scale import MAX as SHOT_THRESHOLD_MAX
@@ -88,7 +89,11 @@ from BackEnd.constants.fast_break_play_types import (
 
 # Location-based contest / rim shortcuts (see Shot_System.md)
 RIM_BOX_HALF_SPAN = 6  # axis-aligned box around attacking basket: |Δx|, |Δy| ≤ 6
-THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER = 1.8
+THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER = 2.0
+INSIDE_SHOT_CLOSE_DISTANCE = 10.0
+INSIDE_SHOT_MID_DISTANCE = 15.0
+INSIDE_SHOT_CLOSE_THRESHOLD_BONUS = -20
+INSIDE_SHOT_MID_THRESHOLD_BONUS = -10
 
 # DREB→HCO outlet: rebounder.coords can lag defensive shell vs. actual board (see ball_bounce).
 DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD = 12.0
@@ -169,10 +174,22 @@ def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
 
 
 def _shot_distance_threshold_bump(distance, *, is_three):
-    """Location difficulty: no 2PT bump; 3PT adds rounded rim distance × 1.8."""
+    """Location difficulty: no 2PT bump; 3PT adds rounded rim distance × 2.0."""
     if not is_three:
         return 0
     return int(round(float(distance) * THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER))
+
+
+def _inside_shot_threshold_bonus(distance, *, is_three):
+    """Return the threshold reduction for a two-point shot's rim distance."""
+    if is_three:
+        return 0
+    distance = float(distance)
+    if distance < INSIDE_SHOT_CLOSE_DISTANCE:
+        return INSIDE_SHOT_CLOSE_THRESHOLD_BONUS
+    if distance <= INSIDE_SHOT_MID_DISTANCE:
+        return INSIDE_SHOT_MID_THRESHOLD_BONUS
+    return 0
 
 
 # Shared HCO/OREB graded contest curve (Dynamic_MM_Brief §7). Graded contest by the primary defender's
@@ -822,7 +839,8 @@ class ShotManager:
         shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, self.game)
 
         # Three-point difficulty scales with Euclidean distance from the attacking rim
-        # (rounded distance × 1.8). Two-point attempts receive no distance bump.
+        # (rounded distance × 2.0). Two-point attempts receive a threshold reduction
+        # inside 15 grid units, with a larger reduction inside 10.
         # Coords: the classification coord, else the shooter's shot spot.
         # FLSS heave (CH vs 1–100) does not use resolve_shot and is unaffected.
         spot_data = shot_classification.get("classification_coord")
@@ -835,6 +853,7 @@ class ShotManager:
             float(spot_data["y"]) - rim_y,
         )
         shot_threshold += _shot_distance_threshold_bump(dist, is_three=is_three)
+        shot_threshold += _inside_shot_threshold_bonus(dist, is_three=is_three)
         if playcall == "Set":
             playcall = "Attack"
 
@@ -1139,6 +1158,7 @@ class ShotManager:
                 and defender
                 and contest_result in ("neutral", "defense_win")
             ):
+                increment_block_funnel(game_state, "eligible")
                 # Slow It Down (Q4/OT) leading team plays passive defense → aggression 0 → fewer blocks.
                 from BackEnd.utils import situational_logic as sl
                 x = sl.slow_it_down_defense_setting(
@@ -1162,6 +1182,7 @@ class ShotManager:
                     player_block_threshold = (defender.attributes.get("ID", 0) or 0) + (def_eff * def_height_val)
                     should_attempt_block_reconciliation = z3 <= player_block_threshold
                 if should_attempt_block_reconciliation:
+                    increment_block_funnel(game_state, "reconciliation")
                     # Block reconciliation: use shot_score_pre_defense vs defense_block_score
                     shooter_coords_recon = getattr(shooter, "coords", {"x": 50, "y": 25})
                     logging.debug(
@@ -1178,6 +1199,7 @@ class ShotManager:
                     ) * random.randint(1, 6)
                     diff = shot_score_pre_defense - defense_block_score
                     if diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD:
+                        increment_block_funnel(game_state, "foul_band")
                         # Shooting foul from block: shooter_finish_score vs 250
                         # Outcome: AND-1 on make (1 FT), or 2 FTs on miss (shooting foul = 2 FTs on miss).
                         shoot_h = height_to_block_score(getattr(shooter, "height", None) or shooter.attributes.get("height") or 76)
@@ -1317,6 +1339,7 @@ class ShotManager:
                             )
                         return result
                     elif diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
+                        increment_block_funnel(game_state, "block_band")
                         is_away_offense = off_team.team_id == self.game.away_team.team_id
                         # Use explicit shot_spot from caller when present (same data as animation); else fall back to shooter.coords
                         shot_spot = roles.get("shot_spot")
@@ -1329,12 +1352,14 @@ class ShotManager:
                             sy = shooter_coords.get("y", 25)
                         block_contact_spot = calculate_block_spot(sx, sy, is_away_offense)
                         if d_foul:
+                            increment_block_funnel(game_state, "foul_block_contacts")
                             # Shooting foul wins the rules outcome. Preserve a
                             # blocked-shot-looking ball path, but do not create
                             # a true BLOCK result, block SFX/announcement, BLK
                             # stat, or block momentum.
                             self._foul_block_spot = block_contact_spot
                         else:
+                            increment_block_funnel(game_state, "actual_blocks")
                             # Block: set flags and fall through to miss path
                             # (FGA/3PTA recorded in normal path).
                             defender.record_stat("BLK")
@@ -1345,6 +1370,8 @@ class ShotManager:
                             shooter.add_momentum(-MO_BLOCK_DELTA)
                             self._block_spot = block_contact_spot
                             self._block_defender = defender
+                    else:
+                        increment_block_funnel(game_state, "fallback_band")
 
             # ✅ CHARGE/BLOCKING FOUL CHECK: Check for charge or blocking foul on attack shots
             # Fast Break: only allow charge/block when there is a shot defender defending the attempt (defender_count >= 1)

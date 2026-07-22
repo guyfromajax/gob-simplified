@@ -206,7 +206,7 @@ def effective_ft_miss_to_make_second_chance(game, offense_team_at_line) -> float
     if factor <= 1:
         return FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE
     if factor in (2, 3):
-        return 0.3
+        return 0.4
     if factor >= 4:
-        return 0.2
+        return 0.3
     return FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE

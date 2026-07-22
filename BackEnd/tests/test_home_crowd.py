@@ -91,13 +91,13 @@ def test_effective_ft_second_chance():
         == FREE_THROW_MISS_TO_MAKE_SECOND_CHANCE
     )
     game.game_state["home_crowd_factor"] = 2
-    assert hc.effective_ft_miss_to_make_second_chance(game, away) == pytest.approx(0.3)
+    assert hc.effective_ft_miss_to_make_second_chance(game, away) == pytest.approx(0.4)
     game.game_state["home_crowd_factor"] = 3
-    assert hc.effective_ft_miss_to_make_second_chance(game, away) == pytest.approx(0.3)
+    assert hc.effective_ft_miss_to_make_second_chance(game, away) == pytest.approx(0.4)
     game.game_state["home_crowd_factor"] = 4
-    assert hc.effective_ft_miss_to_make_second_chance(game, away) == pytest.approx(0.2)
+    assert hc.effective_ft_miss_to_make_second_chance(game, away) == pytest.approx(0.3)
     game.game_state["home_crowd_factor"] = 5
-    assert hc.effective_ft_miss_to_make_second_chance(game, away) == pytest.approx(0.2)
+    assert hc.effective_ft_miss_to_make_second_chance(game, away) == pytest.approx(0.3)
 
 
 def test_restore_home_crowd_from_saved_overwrites():

@@ -53,17 +53,21 @@ Non-strategic ("random") read tier: `randint(1,100) ≤ %` → shoot (self only)
 | Late | 95 | 95 | 95 |
 | Very late | 95 | 95 | 95 |
 
-### Outside-shot acceptance (`OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER`)
+### Outside-shot selection weight (`OUTSIDE_SHOT_SELECTION_MULTIPLIER`)
 
-After any read path selects an outside shot, a final clock-tier preference roll determines whether
-the offense takes it. This covers optimal self-shots, optimal dishes, safe-tier dishes, and
-random-tier self-shots. A rejection returns `None`, so the skeleton walk continues and the offense
-can find a later or inside look; it does not consume an FGA.
+When an outside/attack location chooses its shot type, the outside score
+`SH + outside emphasis × 10` is multiplied by `0.75` before it competes with the attack score.
+This redirects some former outside choices into attacks without rejecting a shot or delaying the
+skeleton walk. It applies to ball-handler and dish/hot-read candidates through the shared
+`_weighted_attack_or_outside` decision.
+
+`OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER` remains an explicit downstream dial, but is now 100% in every
+tier so an outside shot that wins selection is not subsequently discarded.
 
 | Tier | Acceptance |
 |---|---:|
-| Early | 80% |
-| Mid | 90% |
+| Early | 100% |
+| Mid | 100% |
 | Late | 100% |
 | Very late | 100% |
 | Forced | 100% |
@@ -190,9 +194,10 @@ The non-strategic ("random") tier no longer shoots a flat 50/50 each step — it
 
 Very-late is flat 95% for all tempos (clock pressure dominates). The "right" and "safe" tiers are unchanged.
 
-Every outside-shot decision produced by these or the strategic read paths then passes
-`OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER`: Early 80%, Mid 90%, and Late or later 100%. A rejected
-outside shot continues the per-step walk.
+Every outside-vs-attack decision produced by these or the strategic read paths discounts the
+outside candidate score with `OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.75`. The downstream
+`OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER` is 100% at every tier, so selection changes shot mix without
+rejecting an already-selected shot or pushing the possession later.
 
 ---
 

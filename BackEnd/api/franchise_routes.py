@@ -5993,6 +5993,7 @@ _SHOT_DIAG_KEYS = (
     "fga_by_turn_type",
     "undefended_by_turn_type",
     "hco_shot_tier_counts",
+    "block_funnel_tracking",
 )
 
 

@@ -253,6 +253,16 @@ class GameManager:
             "hco_shot_tier_counts": {
                 "early": 0, "mid": 0, "late": 0, "very_late": 0, "forced": 0,
             },
+            # Block funnel: eligible shots through trigger/reconciliation/outcome.
+            "block_funnel_tracking": {
+                "eligible": 0,
+                "reconciliation": 0,
+                "foul_band": 0,
+                "fallback_band": 0,
+                "block_band": 0,
+                "actual_blocks": 0,
+                "foul_block_contacts": 0,
+            },
             "motion_attack_shot_tracker": {
                 "total": 0,
                 "driver_shoot": 0,
