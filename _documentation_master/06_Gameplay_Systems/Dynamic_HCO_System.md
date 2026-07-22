@@ -171,6 +171,12 @@ HCO has a single on-ball defender, so it does **not** use FCP/HCT's multi-defend
 #### Universal Shoot Decision (`should_shoot`)
 Two-stage: **(1) is this an optimal look?** — shot-type mismatch score from the read map + openness vs the `_shoot_threshold` bar (`SHOOT_THRESHOLD_BASE` lowered by clock drain + tempo). **(2) read tier** — `(player_read_raw + discipline) × d6`: `> SHOOT_READ_RIGHT` shoot if optimal else progress; `> SHOOT_READ_SAFE` progress; else non-strategic ("random"). Shot type (attack vs outside) is a team-biased weighted pick (`_weighted_attack_or_outside`).
 
+For a teammate selected by a dish/hot read at a non-inside location, that same weighted
+attack-versus-outside result controls execution: **outside** emits pass → receive → immediate shot;
+**attack** emits pass → receive → the standard attack-drive clearance/contest sequence → finish
+(or its normal drive-contact/dish outcome). Thus an attack-labeled receiver never takes an
+attack-classified catch-and-shoot from the perimeter.
+
 ##### Random-tier shoot progression
 The non-strategic ("random") tier no longer shoots a flat 50/50 each step — it rolls `randint(1,100) ≤ _random_tier_shoot_pct(shot_clock, tempo)`, a clock+tempo progression (low early, high late) that stops undisciplined possessions from dumping early shots. Buckets (`RANDOM_TIER_SHOOT_PCT` in `motion_step_decision.py`):
 

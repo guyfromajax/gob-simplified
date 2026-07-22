@@ -169,6 +169,45 @@ def test_execute_attack_reuses_drive_sequence(monkeypatch):
     assert res["motion_attack_uncontested"] is True and res["motion_attack_defense_bonus"] == 100
 
 
+def test_execute_dished_attack_receives_then_reuses_drive_sequence(monkeypatch):
+    game = _FakeGame()
+    bh, sg = _FakePlayer("bh"), _FakePlayer("sg")
+    off = _lineup(PG=bh, SG=sg)
+    steps = _skeleton({"PG": "key", "SG": "upper wing"},
+                      {"PG": "key", "SG": "upper wing"})["steps"]
+    drive_step = _step({"SG": "midLane"})
+    canned = {
+        "steps": [drive_step],
+        "shooter": sg, "shooter_pos": "SG", "shooter_location": "midLane",
+        "resolved_shot_type": "attack", "playcall": "Attack",
+        "motion_attack_uncontested": False, "motion_attack_geometry_contest": True,
+        "motion_attack_defense_bonus": 20, "motion_attack_driver_shoots": True,
+    }
+    captured = {}
+
+    def fake_drive(pos, start, destination, timestamp, *args, **kwargs):
+        captured.update(pos=pos, start=start, destination=destination, timestamp=timestamp)
+        return canned
+
+    monkeypatch.setattr(PR, "_create_attack_drive_shoot_steps", fake_drive)
+    decision = {
+        "action": "HOT_READ_SHOOT", "shooter_pos": "SG",
+        "shot_type": "attack", "via_pass": True,
+    }
+    res = _execute_motion_decision(
+        {"steps": steps}, steps[:2], steps[1], "PG", "key", decision,
+        game, off, {}, is_away_offense=False,
+    )
+
+    assert captured["pos"] == "SG" and captured["start"] == "upper wing"
+    appended = res["skeleton"]["steps"][2:]
+    assert appended[0]["pos_actions"]["PG"]["action"] == "pass"
+    assert appended[0]["pos_actions"]["SG"]["action"] == "receive"
+    assert appended[1] is drive_step
+    assert res["shot_type"] == "attack" and res["shooter"] is sg
+    assert res["motion_attack_geometry_contest"] is True
+
+
 # ---------------------------------------------------------------- walk
 
 def test_walk_picks_first_shot_decision(monkeypatch):

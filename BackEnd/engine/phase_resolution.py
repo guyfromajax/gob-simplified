@@ -6830,7 +6830,10 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
             shooter = off_lineup[bh_pos]
             shooter_location = bh_location
     else:
-        # Pass to a specific receiver (kick-out / teammate hot read) → catch-and-shoot.
+        # Pass to a specific receiver (kick-out / teammate hot read). The read stage
+        # already chose attack vs outside with the same weighted logic used for the
+        # BH. Outside remains catch-and-shoot; attack becomes catch-and-drive through
+        # the same clearance/contest sequence as a BH self-attack.
         receiver = off_lineup.get(shooter_pos)
         # S3c: a BACKDOOR overrides the receiver's spot with the rim cut target — the receive step then
         # animates him cutting from his spot to the basket as the pass arrives (a cut-and-catch layup).
@@ -6842,11 +6845,35 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
         if decision.get("get_open_move"):
             _recv_step["_get_open_move"] = decision["get_open_move"]
         new_steps.append(_recv_step)
-        new_steps.append(_create_shoot_step(shooter_pos, receiver_location, last_timestamp + 600))
-        shooter = receiver
-        shooter_location = receiver_location
         if shot_type == "attack":
+            destination = random.choice(_determine_attack_drive_destination(receiver_location))
+            drive_result = _create_attack_drive_shoot_steps(
+                shooter_pos,
+                receiver_location,
+                destination,
+                last_timestamp + 600,
+                is_away_offense,
+                selected_step=shot_step,
+                off_lineup=off_lineup,
+                def_lineup=def_lineup,
+                game=game,
+            )
+            new_steps.extend(drive_result["steps"])
+            _dmeta = drive_result.get("attack_drive_meta") or {}
+            _drive_contact = _dmeta.get("drive_contact")
+            _drive_contact_def_id = _dmeta.get("drive_contact_defender_id")
+            # The receive is the first appended step; drive contact is the next one.
+            _drive_contact_step_index = len(base_steps) + 1 if _drive_contact else None
+            shooter_pos = drive_result.get("shooter_pos") or shooter_pos
+            shooter = drive_result.get("shooter") or receiver
+            shooter_location = drive_result.get("shooter_location") or destination
+            shot_type = drive_result.get("resolved_shot_type") or "attack"
+            playcall_override = drive_result.get("playcall")
             attack_penalty = _apply_attack_penalty(shooter_location, is_away_offense)
+        else:
+            new_steps.append(_create_shoot_step(shooter_pos, receiver_location, last_timestamp + 600))
+            shooter = receiver
+            shooter_location = receiver_location
 
     skeleton["steps"] = list(base_steps) + new_steps
     _playcall_map = {"inside": "Inside", "outside": "Outside", "attack": "Attack"}
