@@ -146,6 +146,24 @@ def _player_xy(player):
     return float(c.get("x", 50)), float(c.get("y", 25))
 
 
+def _shot_defender_xy(player, def_lineup, shot_attempt_geometry):
+    """Read a defender from the frozen shot frame, never mixed with mutable coords.
+
+    Legacy/non-HCO callers without a contract retain the existing ``Player.coords``
+    behavior.  Once a contract is supplied, a missing player is genuinely unknown;
+    falling back would recreate the mixed-frame bug the contract exists to prevent.
+    """
+    if shot_attempt_geometry is None:
+        return _player_xy(player)
+    coord = shot_attempt_geometry.defender_coord(
+        player_id=getattr(player, "player_id", None),
+        position=get_player_position(def_lineup, player),
+    )
+    if coord is None:
+        return None
+    return float(coord["x"]), float(coord["y"])
+
+
 def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
     return abs(sx - bx) <= margin and abs(sy - by) <= margin
 
@@ -581,7 +599,7 @@ class ShotManager:
 
         return forced_shot_type, is_paint_forced, shooter_location_str
 
-    def resolve_shot(self, roles):
+    def resolve_shot(self, roles, *, shot_attempt_geometry=None):
         
         game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(self.game)
         
@@ -725,7 +743,11 @@ class ShotManager:
                 is_paint = self.is_paint_shot(shooter, roles)
 
         # Plan micro footwork before 2/3 classification so value matches release coord.
-        pre_micro_sx, pre_micro_sy = _shooter_xy_from_roles(roles, shooter)
+        if shot_attempt_geometry is not None:
+            pre_micro_sx = float(shot_attempt_geometry.shooter_x)
+            pre_micro_sy = float(shot_attempt_geometry.shooter_y)
+        else:
+            pre_micro_sx, pre_micro_sy = _shooter_xy_from_roles(roles, shooter)
         _micro_plan = None
         if not roles.get("flss"):
             from BackEnd.engine.shot_micro_movements import plan_non_dunk_shot_micro
@@ -847,7 +869,10 @@ class ShotManager:
             for candidate in (def_lineup or {}).values():
                 if candidate is None:
                     continue
-                candidate_x, candidate_y = _player_xy(candidate)
+                candidate_xy = _shot_defender_xy(candidate, def_lineup, shot_attempt_geometry)
+                if candidate_xy is None:
+                    continue
+                candidate_x, candidate_y = candidate_xy
                 dist = math.hypot(candidate_x - sx, candidate_y - sy)
                 if dist <= contest_radius:
                     contest_pairs.append((candidate, dist))
@@ -877,7 +902,10 @@ class ShotManager:
             for candidate in (def_lineup or {}).values():
                 if candidate is None:
                     continue
-                candidate_x, candidate_y = _player_xy(candidate)
+                candidate_xy = _shot_defender_xy(candidate, def_lineup, shot_attempt_geometry)
+                if candidate_xy is None:
+                    continue
+                candidate_x, candidate_y = candidate_xy
                 if math.hypot(candidate_x - sx, candidate_y - sy) <= CONTEST_EUCLIDEAN_RADIUS:
                     geometry_has_contest = True
                     break
@@ -901,12 +929,16 @@ class ShotManager:
         # contest radius no longer contests — parity with the motion-geometry path (already ≤ radius).
         proximity_factor = 1.0
         if has_contest and game_state.get("_hco_defense_posture") and hasattr(defender, "coords"):
-            _dfx, _dfy = _player_xy(defender)
-            _pdist = math.hypot(_dfx - sx, _dfy - sy)
-            if not motion_geometry and _pdist > CONTEST_EUCLIDEAN_RADIUS:
+            defender_xy = _shot_defender_xy(defender, def_lineup, shot_attempt_geometry)
+            if defender_xy is None:
                 has_contest = False
             else:
-                proximity_factor = _proximity_contest_factor(_pdist)
+                _dfx, _dfy = defender_xy
+                _pdist = math.hypot(_dfx - sx, _dfy - sy)
+                if not motion_geometry and _pdist > CONTEST_EUCLIDEAN_RADIUS:
+                    has_contest = False
+                else:
+                    proximity_factor = _proximity_contest_factor(_pdist)
         rim_unguarded_99 = (
             _shot_in_rim_box(sx, sy, bx, by)
             and not has_contest

@@ -136,3 +136,12 @@ bootstrap still uses B's PG-first rule.
 - [stepState_gaps.md](stepState_gaps.md) — the broader UESS-compliance gaps; this is a new one in the
   same family (multi-source re-derivation of a game-relevant value).
 - bugs.md #1 (HCO entry-step DB-turnover teleport), #5 (DB turnover ball snaps back — fixed).
+
+## Related shot-frame finding (2026-07-22)
+
+The same multi-source pattern was confirmed in HCO shot defense, outside this audit's non-shot scope:
+full sims updated the shooter from the final skeleton step but left defenders on stale
+`Player.coords`, even though StepState already held per-step defender geometry. The first bounded
+resolve-once contract, `ShotAttemptGeometry`, now freezes shooter + defender coordinates and is passed
+directly to `resolve_shot()`. Treat it as a proving slice for a future universal decision/stop-state
+contract; do not overload it with victim/contact/ball-owner fields until the shot path is validated.

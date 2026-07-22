@@ -45,6 +45,26 @@ Separate handling:
 - 🟡 **#6 putback defender / OTB foul** (MED) — deferred with #5 (OREB-turn flow; putback "always nearest defender" so contest y/n stable, only attribution flips; OTB foul is low-freq bounded).
 - 🟡 **#7 zone defense_score** (MED) — deferred with #5 (named-spot based; margin-only effect on `defense_score`).
 
+## Update 2026-07-22 — full-sim HCO shot-frame hole closed
+
+The original #1 fix was complete only for animated turns. CPU/full simulations set
+`_is_full_simulation`, causing `Animator.skeleton_to_animations()` to return `[]`;
+`_uess_sync_emitted_shot_coords()` then returned `None`, and its fallback synchronized only the
+shooter. HCO shot contest therefore compared the current skeleton release coord with stale defender
+`Player.coords`—the 63-game week diagnostic exposed this as an abnormal undefended rate.
+
+HCO now freezes a `ShotAttemptGeometry` before `resolve_shot()`:
+
+- animated turns snapshot the emitter-synchronized shot frame;
+- full sims snapshot the final shot step's sim-safe `_step_state.defense` grid (and compute a final
+  grid only when a late rewrite left the step unstamped);
+- shot classification/contest receives the immutable value explicitly and never falls back to
+  mutable defender coords once the contract exists.
+
+This is deliberately a shot-attempt slice, not yet a universal stop-state migration. Its value-object
+shape is reusable for the broader resolve-once work in `hco_roles_audit.md` after shot behavior is
+validated.
+
 **Accepted-gaps rationale:** #5-#7 are all *attribution / second-order shot-difficulty* effects, not binary-outcome (contest/possession) flips. The four HIGH holes (#1-#4) that flip actual outcomes are closed. Revisit #5 if a zone-double-team or zone-FG% anomaly surfaces in tuning.
 
 The 4 HIGH fixes shift FG%/contest → land before shot-system re-tuning ([[project_shot_system_tuning]]).

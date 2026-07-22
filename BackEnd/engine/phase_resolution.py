@@ -4395,6 +4395,73 @@ def set_shooter_coords_from_skeleton_last_step(game, skeleton, roles):
     roles["shot_spot"] = coords  # Same data for block reconciliation (explicit shot location = animation location)
 
 
+def _freeze_hco_shot_attempt_geometry(game, skeleton, roles, *, emitted_sync_succeeded):
+    """Freeze the coordinate frame HCO shot logic must consume.
+
+    Animated turns snapshot ``Player.coords`` immediately after the UESS emitter
+    pre-pass synchronized all ten players.  Full sims have no emitter build, so
+    they consume the final skeleton shot step's sim-safe StepState defender grid.
+    If a late skeleton rewrite left that step unstamped, compute the final grid
+    once and use its shot-step row.
+    """
+    from BackEnd.utils.shot_attempt_geometry import ShotAttemptGeometry, freeze_coord_rows
+
+    shooter = roles.get("shooter")
+    shooter_id = getattr(shooter, "player_id", None)
+    shooter_coord = roles.get("shot_spot") or getattr(shooter, "coords", None) or {}
+    if shooter_id is None or shooter_coord.get("x") is None or shooter_coord.get("y") is None:
+        return None
+
+    steps = (skeleton or {}).get("steps") or []
+    shooter_pos = roles.get("shooter_pos") or get_player_position(game.offense_team.lineup, shooter)
+    shot_step_index = None
+    if shooter_pos:
+        for i in range(len(steps) - 1, -1, -1):
+            action = ((steps[i].get("pos_actions") or {}).get(shooter_pos) or {}).get("action")
+            if str(action or "").strip().lower() == "shoot":
+                shot_step_index = i
+                break
+
+    def_lineup = game.defense_team.lineup or {}
+    by_position = {}
+    source = "hco-emitter-shot-step"
+    if emitted_sync_succeeded:
+        for pos, player in def_lineup.items():
+            coord = getattr(player, "coords", None)
+            if isinstance(coord, dict):
+                by_position[pos] = coord
+    else:
+        source = "hco-stepstate-shot-step"
+        if shot_step_index is not None:
+            by_position = dict(
+                (((steps[shot_step_index].get("_step_state") or {}).get("defense")) or {})
+            )
+        if not by_position and shot_step_index is not None:
+            from BackEnd.models.animator import Animator
+            grid = Animator(game).compute_defender_grid(
+                skeleton, game.offense_team.lineup, def_lineup
+            )
+            by_position = dict(grid.get(shot_step_index) or {})
+            source = "hco-final-grid-shot-step"
+
+    by_id = []
+    for pos, coord in by_position.items():
+        player = def_lineup.get(pos)
+        pid = getattr(player, "player_id", None) if player is not None else None
+        if pid is not None:
+            by_id.append((pid, coord))
+
+    return ShotAttemptGeometry(
+        source=source,
+        shot_step_index=shot_step_index,
+        shooter_id=str(shooter_id),
+        shooter_x=float(shooter_coord["x"]),
+        shooter_y=float(shooter_coord["y"]),
+        defenders_by_id=freeze_coord_rows(by_id),
+        defenders_by_position=freeze_coord_rows(by_position.items()),
+    )
+
+
 def _ensure_skeleton_shot_role_positions(game, roles):
     """
     Normalize positional role fields for skeleton-driven shot turns.
@@ -8356,8 +8423,17 @@ def resolve_half_court_offense_logic(game):
         roles["shot_spot"] = dict(_terminal_shoot)
     else:
         set_shooter_coords_from_skeleton_last_step(game, skeleton, roles)  # fallback: skeleton shot location
+    shot_attempt_geometry = _freeze_hco_shot_attempt_geometry(
+        game,
+        skeleton,
+        roles,
+        emitted_sync_succeeded=_terminal_shoot is not None,
+    )
     hco_snap = build_hco_pre_resolve_shot_snapshot(game, off_lineup, def_lineup, skeleton, roles)
-    shot_result = game.shot_manager.resolve_shot(roles)
+    shot_result = game.shot_manager.resolve_shot(
+        roles,
+        shot_attempt_geometry=shot_attempt_geometry,
+    )
     attach_position_snapshots(shot_result, [hco_snap])
     # UESS single-coord-source: reuse the finalized single build for the step
     # emitter (mirrors the FCP shot path at ~L7855). build_skeleton_animation_steps
