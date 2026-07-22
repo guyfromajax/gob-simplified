@@ -88,7 +88,7 @@ from BackEnd.constants.fast_break_play_types import (
 
 # Location-based contest / rim shortcuts (see Shot_System.md)
 RIM_BOX_HALF_SPAN = 6  # axis-aligned box around attacking basket: |Δx|, |Δy| ≤ 6
-THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER = 1.5
+THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER = 1.8
 
 # DREB→HCO outlet: rebounder.coords can lag defensive shell vs. actual board (see ball_bounce).
 DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD = 12.0
@@ -169,7 +169,7 @@ def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
 
 
 def _shot_distance_threshold_bump(distance, *, is_three):
-    """Location difficulty: no 2PT bump; 3PT adds rounded rim distance × 1.5."""
+    """Location difficulty: no 2PT bump; 3PT adds rounded rim distance × 1.8."""
     if not is_three:
         return 0
     return int(round(float(distance) * THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER))
@@ -822,7 +822,7 @@ class ShotManager:
         shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, self.game)
 
         # Three-point difficulty scales with Euclidean distance from the attacking rim
-        # (rounded distance × 1.5). Two-point attempts receive no distance bump.
+        # (rounded distance × 1.8). Two-point attempts receive no distance bump.
         # Coords: the classification coord, else the shooter's shot spot.
         # FLSS heave (CH vs 1–100) does not use resolve_shot and is unaffected.
         spot_data = shot_classification.get("classification_coord")

@@ -1,6 +1,8 @@
 from BackEnd.engine.motion_step_decision import (
+    OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER,
     OUTSIDE_SHOT_MIN_GAP_BY_TIER,
     RANDOM_TIER_SHOOT_PCT,
+    _apply_outside_shot_acceptance,
     _outside_shot_is_eligible,
 )
 
@@ -31,6 +33,34 @@ def test_outside_gap_gate_relaxes_by_clock_tier():
 def test_gap_gate_does_not_restrict_inside_or_attack_candidates():
     assert _outside_shot_is_eligible("PG", "inside", 30, {"PG": 0.0})
     assert _outside_shot_is_eligible("PG", "attack", 30, {"PG": 0.0})
+
+
+def test_outside_acceptance_discount_relaxes_by_clock_tier():
+    assert OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER == {
+        "early": 80,
+        "mid": 90,
+        "late": 100,
+        "very_late": 100,
+        "forced": 100,
+    }
+
+
+class _AcceptanceRng:
+    def __init__(self, roll):
+        self.roll = roll
+
+    def randint(self, _lo, _hi):
+        return self.roll
+
+
+def test_outside_acceptance_rejects_early_and_mid_but_not_late():
+    outside = {"action": "shoot", "shot_type": "outside"}
+    inside = {"action": "shoot", "shot_type": "inside"}
+
+    assert _apply_outside_shot_acceptance(outside, 30, _AcceptanceRng(81)) is None
+    assert _apply_outside_shot_acceptance(outside, 20, _AcceptanceRng(91)) is None
+    assert _apply_outside_shot_acceptance(outside, 10, _AcceptanceRng(100)) is outside
+    assert _apply_outside_shot_acceptance(inside, 30, _AcceptanceRng(100)) is inside
 
 
 def test_authoritative_map_missing_candidate_rejects_early_outside():

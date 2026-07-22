@@ -48,10 +48,25 @@ Non-strategic ("random") read tier: `randint(1,100) ≤ %` → shoot (self only)
 
 | Tier | slow | normal | fast |
 |---|---|---|---|
-| Early | 30 | 40 | 50 |
-| Mid | 45 | 60 | 75 |
+| Early | 10 | 20 | 30 |
+| Mid | 20 | 35 | 50 |
 | Late | 95 | 95 | 95 |
 | Very late | 95 | 95 | 95 |
+
+### Outside-shot acceptance (`OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER`)
+
+After any read path selects an outside shot, a final clock-tier preference roll determines whether
+the offense takes it. This covers optimal self-shots, optimal dishes, safe-tier dishes, and
+random-tier self-shots. A rejection returns `None`, so the skeleton walk continues and the offense
+can find a later or inside look; it does not consume an FGA.
+
+| Tier | Acceptance |
+|---|---:|
+| Early | 80% |
+| Mid | 90% |
+| Late | 100% |
+| Very late | 100% |
+| Forced | 100% |
 
 ### Subtle-movement precedence (`SM_PRECEDENCE_TEMPOS`)
 When the turn's `offense_reads` (alterations) roll is on, these tempos make **subtle movement take precedence over the shoot decision** — the BH works the ball and defers his shot/hot-read. Reuses the per-turn alterations roll (NOT a second roll). Precedence retreats as the clock drains and tempo speeds up.
@@ -161,13 +176,17 @@ The non-strategic ("random") tier no longer shoots a flat 50/50 each step — it
 
 | Shot-clock bucket | slow | normal | fast |
 |---|---|---|---|
-| Early (23–30s) | 30% | 40% | 50% |
-| Mid (15–22s) | 45% | 60% | 75% |
+| Early (23–30s) | 10% | 20% | 30% |
+| Mid (15–22s) | 20% | 35% | 50% |
 | Late (6–14s) | 95% | 95% | 95% |
 | Very late (1–3s) | 95% | 95% | 95% |
 | Forced (<1s) | 100% (existing `<1s` forced-shot backstop) |
 
 Very-late is flat 95% for all tempos (clock pressure dominates). The "right" and "safe" tiers are unchanged.
+
+Every outside-shot decision produced by these or the strategic read paths then passes
+`OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER`: Early 80%, Mid 90%, and Late or later 100%. A rejected
+outside shot continues the per-step walk.
 
 ---
 

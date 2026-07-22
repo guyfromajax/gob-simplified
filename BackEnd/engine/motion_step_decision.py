@@ -238,6 +238,18 @@ OUTSIDE_SHOT_MIN_GAP_BY_TIER = {
     "forced": 0.0,
 }
 
+# Final preference gate for HCO outside-shot decisions. It is applied after any
+# read path selects the shot (right/optimal, dish, safe-pass, or random), so a
+# rejected early/mid three keeps the skeleton walk alive to search for a later
+# or inside look. Clock pressure removes the discount from Late onward.
+OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER = {
+    "early": 80,
+    "mid": 90,
+    "late": 100,
+    "very_late": 100,
+    "forced": 100,
+}
+
 # Subtle-movement precedence: per shot-clock tier, the tempos for which subtle
 # movement takes precedence over the shoot decision (the offense works the ball
 # instead of shooting). Gated upstream by the turn's offense_reads / alterations
@@ -319,6 +331,16 @@ def _outside_shot_is_eligible(pos, shot_type, shot_clock, separation_map):
     return gap is not None and float(gap) >= required
 
 
+def _apply_outside_shot_acceptance(decision, shot_clock, rng):
+    """Apply the clock-tier preference discount to a selected outside shot."""
+    if not decision or decision.get("shot_type") != "outside":
+        return decision
+    pct = OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER[_shot_clock_tier(shot_clock)]
+    if pct >= 100 or rng.randint(1, 100) <= pct:
+        return decision
+    return None
+
+
 def _evaluate_shot(player, position, location, read_scores, off_team, shot_clock,
                    tempo_call, openness, rng, separation_map=None):
     """(shot_type, quality, optimal, is_mismatch, eligible) for one candidate."""
@@ -397,8 +419,12 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
     tier = _shoot_read_tier(shooter, off_team, rng)
 
     def _dish_to_best():
-        return {"action": SHOOT, "shooter_pos": best["pos"], "shot_type": best["type"],
-                "via_pass": True, "hot_read": best["mismatch"]}
+        return _apply_outside_shot_acceptance(
+            {"action": SHOOT, "shooter_pos": best["pos"], "shot_type": best["type"],
+             "via_pass": True, "hot_read": best["mismatch"]},
+            shot_clock,
+            rng,
+        )
 
     def _nonstrategic():
         # SHOOT / HOLD / PASS coin flip: pass → dish to the best open man (finds a cutter when the BH
@@ -409,14 +435,22 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
             return _dish_to_best()
         if (c == "shoot" and s_eligible
                 and rng.randint(1, 100) <= _random_tier_shoot_pct(shot_clock, tempo_call)):
-            return {"action": SHOOT, "shooter_pos": shooter_pos, "shot_type": s_type,
-                    "via_pass": False, "hot_read": False}
+            return _apply_outside_shot_acceptance(
+                {"action": SHOOT, "shooter_pos": shooter_pos, "shot_type": s_type,
+                 "via_pass": False, "hot_read": False},
+                shot_clock,
+                rng,
+            )
         return None
 
     if tier == "right":
         if best["optimal"]:
-            return {"action": SHOOT, "shooter_pos": best["pos"], "shot_type": best["type"],
-                    "via_pass": best["via_pass"], "hot_read": best["mismatch"]}
+            return _apply_outside_shot_acceptance(
+                {"action": SHOOT, "shooter_pos": best["pos"], "shot_type": best["type"],
+                 "via_pass": best["via_pass"], "hot_read": best["mismatch"]},
+                shot_clock,
+                rng,
+            )
         return None  # nothing optimal → progress
     if tier == "safe":
         # Conservative read CASCADES by shot clock: lots of time → work the ball; mid → work it or take

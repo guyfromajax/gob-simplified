@@ -1455,7 +1455,7 @@ def height_to_block_score(height_inches):
         return 10
     if h <= 72:
         return 0
-    return 82 - h  # 81->9, 80->8, ..., 73->1
+    return h - 72  # 73->1, 74->2, ..., 81->9
 
 
 def calculate_block_spot(shooter_x, shooter_y, is_away_offense):

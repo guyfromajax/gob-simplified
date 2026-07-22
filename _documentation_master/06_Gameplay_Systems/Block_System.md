@@ -1,6 +1,6 @@
 # Block System (Blocks on Shot Attempts)
 
-**Status:** Implemented (re-verified against code June 2026; attempt roll, fight trigger, thresholds, and the third individual-player trigger now in code)  
+**Status:** Implemented (re-verified against code July 2026; attempt roll, fight trigger, thresholds, third individual-player trigger, and ascending 73–82+ height scale are in code)
 **Depends on:** Shot System, Rebound System, Animation System, Data Persistence
 
 ---
@@ -192,5 +192,6 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 - **Reuse:** Same shot_type, pre-penalty shot_score from calculate_shot_score (block uses it before penalty), aggression 0–4, rebound flow, result shape, persistence, foul/FT handling.
 
 **Implementation notes (post-implementation):**
+- Height mapping correction (July 2026): `height_to_block_score()` now implements the documented ascending scale as `height - 72` for 73–81 inches, clamped to 0 at 72 and below and 10 at 82 and above. The prior `82 - height` expression accidentally reversed the 73–81 tiers.
 - Block announcement order: "BLOCK!" is fired from `ShotAnimationSystem.handleMissedShot` when `result_type === 'BLOCK'` (turnData._blockAnnounced set); `finalizeTurnAfterAnimation` only announces BLOCK if `!turn._blockAnnounced` (fallback).
 - Ball snap fix: `executeCompleteShotSequence` uses block spot (`ball_bounce_x`/`ball_bounce_y`) as `rimCoords` for BLOCK so the miss path (bounce, rebound) never references the rim for blocks.

@@ -29,6 +29,7 @@ try:
     from fastapi.templating import Jinja2Templates
     from fastapi import Request
     from BackEnd.constants import POSITION_LIST
+    from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
     import uuid
     import math
     from BackEnd.main import run_simulation, simulate_quarter
@@ -751,7 +752,7 @@ try:
                         attrs = ftd_doc.get("team_attributes", {})
                         # Ensure all expected keys exist (with defaults if missing)
                         expected_keys = {
-                            "shot_threshold": 110,
+                            "shot_threshold": SHOT_THRESHOLD_MID,
                             "discipline": 0,
                             "fight": 0,
                             "rebound_modifier": 1.0,

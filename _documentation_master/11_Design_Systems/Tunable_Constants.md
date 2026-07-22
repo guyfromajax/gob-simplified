@@ -27,13 +27,16 @@ Central registry of tunable game-logic constants — the knobs for balancing gam
 The universal HCO shoot decision evaluates candidates at each reached skeleton step. Outside
 attempts must first pass a clock-tier nearest-defender separation gate; this applies to optimal
 self-shots, optimal dish/catch-and-shoot candidates, and random-tier self-shots. Inside and attack
-candidates are unaffected. The random percentage is evaluated only after the random reader chooses
+candidates are unaffected. Once any read path selects an outside shot, the final outside-acceptance
+gate retains 80% in Early, 90% in Mid, and 100% from Late onward; a rejected shot continues the
+skeleton walk rather than ending the possession. The random percentage is evaluated only after the random reader chooses
 `shoot` from `shoot / hold / pass`, so its direct-shot probability per evaluation is one-third of
 the configured value. Subtle-movement precedence may suppress the evaluation on reading turns.
 
 | Constant | File | Value | Effect |
 |---|---|---|---|
 | `OUTSIDE_SHOT_MIN_GAP_BY_TIER` | motion_step_decision.py | `{early:11, mid:7, late:3, very_late:0, forced:0}` | Minimum distance in grid units from the candidate to the nearest defender for an outside shot to be eligible. Tiers: early 23–30s, mid 15–22s, late 6–14s, very late 1–5s, forced <1s. |
+| `OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER` | motion_step_decision.py | `{early:80, mid:90, late:100, very_late:100, forced:100}` | Final preference gate for every selected outside shot: optimal self, optimal dish, safe-tier dish, and random-tier self. Rejection advances the HCO walk to search for another look. Inside/attack decisions bypass it. |
 | `RANDOM_TIER_SHOOT_PCT[early]` | motion_step_decision.py | `{slow:10, normal:20, fast:30}` | Random reader's conditional shoot percentage in the 23–30s tier, after choosing the `shoot` option. Effective direct-shot rates are 3.3% / 6.7% / 10.0% per evaluation. |
 | `RANDOM_TIER_SHOOT_PCT[mid]` | motion_step_decision.py | `{slow:20, normal:35, fast:50}` | Conditional percentage in the 15–22s tier. Effective direct-shot rates are 6.7% / 11.7% / 16.7%. |
 | `RANDOM_TIER_SHOOT_PCT[late]` | motion_step_decision.py | `{slow:95, normal:95, fast:95}` | Conditional percentage in the 6–14s tier. Effective direct-shot rate is 31.7% for every tempo. |
