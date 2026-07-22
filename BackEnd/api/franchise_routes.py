@@ -5988,6 +5988,7 @@ def _try_finalize_franchise_week_if_complete(
 # stash small (the full CPU summary is large).
 _SHOT_DIAG_KEYS = (
     "shot_split_tracking",
+    "shot_distance_bands",
     "fga_by_turn_type",
     "undefended_by_turn_type",
     "hco_shot_tier_counts",

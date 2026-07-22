@@ -230,6 +230,13 @@ class GameManager:
                 "2pt_def": {"make": 0, "miss": 0},
                 "2pt_undef": {"make": 0, "miss": 0},
             },
+            "shot_distance_bands": {
+                shot_value: {
+                    band: {"make": 0, "miss": 0, "contest_factor_total": 0.0}
+                    for band in ("0-3", "3-6", "6-9", "9-11", ">11", "unknown")
+                }
+                for shot_value in ("2pt", "3pt")
+            },
             # FGA-by-turn-type diagnostic (both teams combined).
             "fga_by_turn_type": {
                 "HCO": 0, "HCT": 0, "FCP": 0, "Fast Break": 0, "OREB": 0,

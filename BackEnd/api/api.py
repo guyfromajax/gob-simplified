@@ -1503,6 +1503,7 @@ try:
         from BackEnd.utils.shot_split_tracker import (
             restore_shot_split_from_saved, restore_fga_by_turn_type_from_saved,
             restore_undefended_by_turn_type_from_saved,
+            restore_shot_distance_bands_from_saved,
             restore_hco_shot_tier_from_saved,
             restore_altered_action_tracking_from_saved,
         )
@@ -1511,6 +1512,7 @@ try:
         restore_shot_split_from_saved(gm.game_state, saved)
         restore_fga_by_turn_type_from_saved(gm.game_state, saved)
         restore_undefended_by_turn_type_from_saved(gm.game_state, saved)
+        restore_shot_distance_bands_from_saved(gm.game_state, saved)
         restore_hco_shot_tier_from_saved(gm.game_state, saved)
         restore_altered_action_tracking_from_saved(gm.game_state, saved)
     
@@ -1623,6 +1625,7 @@ try:
         from BackEnd.utils.shot_split_tracker import (
             restore_shot_split_from_saved, restore_fga_by_turn_type_from_saved,
             restore_undefended_by_turn_type_from_saved,
+            restore_shot_distance_bands_from_saved,
             restore_hco_shot_tier_from_saved,
             restore_altered_action_tracking_from_saved,
         )
@@ -1631,6 +1634,7 @@ try:
         restore_shot_split_from_saved(gm.game_state, saved)
         restore_fga_by_turn_type_from_saved(gm.game_state, saved)
         restore_undefended_by_turn_type_from_saved(gm.game_state, saved)
+        restore_shot_distance_bands_from_saved(gm.game_state, saved)
         restore_hco_shot_tier_from_saved(gm.game_state, saved)
         restore_altered_action_tracking_from_saved(gm.game_state, saved)
         

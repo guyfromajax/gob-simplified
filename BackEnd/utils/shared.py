@@ -2957,6 +2957,9 @@ def summarize_game_state(game, exclude_animations=True):
         "shot_split_tracking": deepcopy(game.game_state.get("shot_split_tracking", {}))
         if isinstance(game.game_state.get("shot_split_tracking", {}), dict)
         else {},
+        "shot_distance_bands": deepcopy(game.game_state.get("shot_distance_bands", {}))
+        if isinstance(game.game_state.get("shot_distance_bands", {}), dict)
+        else {},
         "fga_by_turn_type": deepcopy(game.game_state.get("fga_by_turn_type", {}))
         if isinstance(game.game_state.get("fga_by_turn_type", {}), dict)
         else {},

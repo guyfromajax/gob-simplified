@@ -1,6 +1,6 @@
 """Shot diagnostics tracker (per-game, both teams combined).
 
-Three independent per-game tallies, stored on ``game.game_state`` and rendered
+Four independent per-game tallies, stored on ``game.game_state`` and rendered
 as end-of-game charts:
 
 1. ``shot_split_tracking`` — every field-goal attempt across three binary
@@ -22,6 +22,11 @@ as end-of-game charts:
    (3) ``shot_clock_remaining − elapsed_to_shot_step`` via
    ``calc_skeleton_step_timing_contract`` (same detach math as ``turn_manager``).
 
+4. ``shot_distance_bands`` — 2pt/3pt makes and misses grouped by the nearest
+   defender's authoritative shot-step distance (0-3, 3-6, 6-9, 9-11, >11),
+   plus the average primary contest factor actually applied. Callers without
+   shot geometry are retained in an explicit ``unknown`` bucket.
+
 Coverage (all tallies where applicable): HCO, FCP, Final Shot, and regular Fast Break via
 ``ShotManager.resolve_shot``; Dynamic HCT via ``resolve_hct_fast_break_shot``
 + ``_finalize_ab_shot``; After-Steal Fast Break via
@@ -34,6 +39,8 @@ are not counted.
 classified from ``game_state["offensive_state"]`` (set to the pressure type
 at turn start) + the fast-break / final-turn flags.
 """
+
+import math
 
 # --- shot_split_tracking (2/3 × def/undef × make/miss) ---------------------
 
@@ -52,6 +59,17 @@ _KEYS = tuple(key for _label, key in _ROWS)
 # Turn-type buckets, in report order. Final Shot / FLSS deliberately excluded.
 _TURN_TYPES = ("HCO", "HCT", "FCP", "Fast Break", "OREB")
 
+# Nearest-defender Euclidean distance at the authoritative shot step.
+_DISTANCE_BAND_ROWS = (
+    ("0-3", "0-3"),
+    ("3-6", "3-6"),
+    ("6-9", "6-9"),
+    ("9-11", "9-11"),
+    (">11", ">11"),
+    ("unknown", "unknown"),
+)
+_DISTANCE_BANDS = tuple(key for _label, key in _DISTANCE_BAND_ROWS)
+
 
 def _empty_tracking():
     return {key: {"make": 0, "miss": 0} for key in _KEYS}
@@ -63,6 +81,34 @@ def _empty_fga_by_turn_type():
 
 def _empty_undefended_by_turn_type():
     return {tt: {"make": 0, "miss": 0} for tt in _TURN_TYPES}
+
+
+def _empty_shot_distance_bands():
+    return {
+        shot_value: {
+            band: {"make": 0, "miss": 0, "contest_factor_total": 0.0}
+            for band in _DISTANCE_BANDS
+        }
+        for shot_value in ("2pt", "3pt")
+    }
+
+
+def _shot_distance_band(distance):
+    try:
+        value = float(distance)
+    except (TypeError, ValueError):
+        return "unknown"
+    if not math.isfinite(value) or value < 0:
+        return "unknown"
+    if value <= 3:
+        return "0-3"
+    if value <= 6:
+        return "3-6"
+    if value <= 9:
+        return "6-9"
+    if value <= 11:
+        return "9-11"
+    return ">11"
 
 
 def classify_resolve_shot_turn_type(game_state, roles):
@@ -178,6 +224,8 @@ def record_shot_split(
     roles=None,
     shot_step_index=None,
     off_lineup=None,
+    defender_distance=None,
+    contest_factor=None,
 ) -> None:
     """Register one field-goal attempt.
 
@@ -200,6 +248,28 @@ def record_shot_split(
     key = f"{'3pt' if is_three else '2pt'}_{'def' if defended else 'undef'}"
     bucket = tracking.setdefault(key, {"make": 0, "miss": 0})
     bucket["make" if made else "miss"] += 1
+
+    distance_tracking = state.get("shot_distance_bands")
+    if not isinstance(distance_tracking, dict):
+        distance_tracking = _empty_shot_distance_bands()
+        state["shot_distance_bands"] = distance_tracking
+    shot_value = "3pt" if is_three else "2pt"
+    band = _shot_distance_band(defender_distance)
+    distance_bucket = distance_tracking.setdefault(shot_value, {}).setdefault(
+        band, {"make": 0, "miss": 0, "contest_factor_total": 0.0}
+    )
+    distance_bucket["make" if made else "miss"] = int(
+        distance_bucket.get("make" if made else "miss", 0) or 0
+    ) + 1
+    try:
+        factor = float(contest_factor)
+        if not math.isfinite(factor):
+            raise ValueError
+    except (TypeError, ValueError):
+        factor = 1.0 if defended else 0.0
+    distance_bucket["contest_factor_total"] = float(
+        distance_bucket.get("contest_factor_total", 0.0) or 0.0
+    ) + factor
 
     if turn_type:
         by_turn = state.get("fga_by_turn_type")
@@ -287,6 +357,44 @@ def restore_undefended_by_turn_type_from_saved(game_state, saved) -> None:
                 "miss": int(bucket.get("miss", 0) or 0),
             }
     game_state["undefended_by_turn_type"] = restored
+
+
+def restore_shot_distance_bands_from_saved(game_state, saved) -> None:
+    """Restore cumulative distance-band diagnostics across quarter saves."""
+    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+        return
+    prior = saved.get("shot_distance_bands")
+    if not isinstance(prior, dict):
+        return
+    restored = _empty_shot_distance_bands()
+    for shot_value in ("2pt", "3pt"):
+        for band in _DISTANCE_BANDS:
+            bucket = (prior.get(shot_value) or {}).get(band) or {}
+            restored[shot_value][band] = {
+                "make": int(bucket.get("make", 0) or 0),
+                "miss": int(bucket.get("miss", 0) or 0),
+                "contest_factor_total": float(bucket.get("contest_factor_total", 0.0) or 0.0),
+            }
+    game_state["shot_distance_bands"] = restored
+
+
+def format_shot_distance_band_summary(game) -> str:
+    """Render makes/attempts and average applied primary contest factor by gap."""
+    state = getattr(game, "game_state", None) or {}
+    tracking = state.get("shot_distance_bands") or {}
+    lines = ["", "======= SHOTS BY NEAREST-DEFENDER DISTANCE ======="]
+    for shot_value in ("2pt", "3pt"):
+        lines.append(f"{shot_value.upper()} (make% | avg primary contest factor):")
+        for label, band in _DISTANCE_BAND_ROWS:
+            bucket = (tracking.get(shot_value) or {}).get(band) or {}
+            make = int(bucket.get("make", 0) or 0)
+            miss = int(bucket.get("miss", 0) or 0)
+            att = make + miss
+            pct = make / att * 100.0 if att else 0.0
+            avg_factor = float(bucket.get("contest_factor_total", 0.0) or 0.0) / att if att else 0.0
+            lines.append(f"  {label:<7}: {pct:5.1f}% make, {att:>3} att  | factor {avg_factor:4.2f}")
+    lines.append("==================================================")
+    return "\n".join(lines)
 
 
 def format_shot_split_summary(game) -> str:
@@ -526,6 +634,7 @@ def format_master_eog_report(game) -> str:
         "",
         "################# END-OF-GAME SHOT DIAGNOSTICS #################",
         format_shot_split_summary(game),
+        format_shot_distance_band_summary(game),
         format_turn_type_fga_summary(game),
         format_undefended_by_turn_type_summary(game),
         format_hco_shot_tier_summary(game),
@@ -551,6 +660,7 @@ def merge_shot_diagnostics(summaries):
         "fga_by_turn_type": _empty_fga_by_turn_type(),
         "undefended_by_turn_type": _empty_undefended_by_turn_type(),
         "hco_shot_tier_counts": {t: 0 for t in _HCO_TIERS},
+        "shot_distance_bands": _empty_shot_distance_bands(),
     }
     n = 0
     for s in summaries or []:
@@ -560,6 +670,7 @@ def merge_shot_diagnostics(summaries):
         fbt = s.get("fga_by_turn_type")
         ubt = s.get("undefended_by_turn_type")
         tier = s.get("hco_shot_tier_counts")
+        distance = s.get("shot_distance_bands")
         if not any(isinstance(x, dict) and x for x in (sst, fbt, tier)):
             continue  # no shot data on this summary — don't count it as a game
         n += 1
@@ -574,6 +685,13 @@ def merge_shot_diagnostics(summaries):
             merged["undefended_by_turn_type"][tt]["miss"] += int(ub.get("miss", 0) or 0)
         for t in _HCO_TIERS:
             merged["hco_shot_tier_counts"][t] += int((tier or {}).get(t, 0) or 0)
+        for shot_value in ("2pt", "3pt"):
+            for band in _DISTANCE_BANDS:
+                source = ((distance or {}).get(shot_value) or {}).get(band) or {}
+                target = merged["shot_distance_bands"][shot_value][band]
+                target["make"] += int(source.get("make", 0) or 0)
+                target["miss"] += int(source.get("miss", 0) or 0)
+                target["contest_factor_total"] += float(source.get("contest_factor_total", 0.0) or 0.0)
     return merged, n
 
 
@@ -585,6 +703,7 @@ def format_week_aggregate_report(merged, num_games) -> str:
     fbt = (merged or {}).get("fga_by_turn_type") or {}
     ubt = (merged or {}).get("undefended_by_turn_type") or {}
     tier = (merged or {}).get("hco_shot_tier_counts") or {}
+    distance = (merged or {}).get("shot_distance_bands") or {}
     num_teams = max(0, int(num_games)) * 2
 
     def _att(key):
@@ -620,6 +739,19 @@ def format_week_aggregate_report(merged, num_games) -> str:
             f"  {label:<16}: {_pct(att, total_fga):5.1f}% of FGA  "
             f"({_pct(_make(key), att):5.1f}% make, {att} att)"
         )
+
+    lines.append("")
+    lines.append("Nearest-defender distance bands (make% | avg primary contest factor):")
+    for shot_value in ("2pt", "3pt"):
+        lines.append(f"  {shot_value.upper()}:")
+        for label, band in _DISTANCE_BAND_ROWS:
+            b = (distance.get(shot_value) or {}).get(band) or {}
+            att = int(b.get("make", 0) or 0) + int(b.get("miss", 0) or 0)
+            avg_factor = float(b.get("contest_factor_total", 0.0) or 0.0) / att if att else 0.0
+            lines.append(
+                f"    {label:<7}: {_pct(int(b.get('make', 0) or 0), att):5.1f}% make, "
+                f"{att} att  | factor {avg_factor:4.2f}"
+            )
 
     tt_total = sum(int(fbt.get(tt, 0) or 0) for tt in _TURN_TYPES)
     lines.append("")

@@ -340,7 +340,10 @@ class ShotManager:
         _, shooter_spot = self._get_shooter_position_and_spot(shooter, roles)
         return calculate_bounce_spot(self.game, shooter_spot=shooter_spot)
 
-    def _record_shot_diagnostics(self, roles, off_lineup, shot_step_index, *, is_three, has_contest, made):
+    def _record_shot_diagnostics(
+        self, roles, off_lineup, shot_step_index, *, is_three, has_contest, made,
+        defender_distance=None, contest_factor=None,
+    ):
         """Shot-split + HCO tier tallies (at-attempt shot clock via skeleton detach math)."""
         turn_type = classify_resolve_shot_turn_type(self.game_state, roles)
         hco_sc = None
@@ -358,6 +361,8 @@ class ShotManager:
             made=made,
             turn_type=turn_type,
             hco_shot_clock=hco_sc,
+            defender_distance=defender_distance,
+            contest_factor=contest_factor,
         )
 
     def _ensure_schema_miss_bounce_for_free_throw(self, result, roles, shooter, off_team):
@@ -860,6 +865,7 @@ class ShotManager:
         sx, sy = float(pre_micro_sx), float(pre_micro_sy)
         bx, by = _attacking_basket_xy(off_team, self.game)
         geometry_has_contest = False
+        nearest_defender_distance = None
         motion_geometry = bool(roles.get("motion_attack_geometry_contest"))
         motion_uncontested = bool(roles.get("motion_attack_uncontested"))
         contest_radius = None
@@ -874,6 +880,8 @@ class ShotManager:
                     continue
                 candidate_x, candidate_y = candidate_xy
                 dist = math.hypot(candidate_x - sx, candidate_y - sy)
+                if nearest_defender_distance is None or dist < nearest_defender_distance:
+                    nearest_defender_distance = dist
                 if dist <= contest_radius:
                     contest_pairs.append((candidate, dist))
             contest_pairs.sort(key=lambda pair: pair[1])
@@ -906,7 +914,10 @@ class ShotManager:
                 if candidate_xy is None:
                     continue
                 candidate_x, candidate_y = candidate_xy
-                if math.hypot(candidate_x - sx, candidate_y - sy) <= CONTEST_EUCLIDEAN_RADIUS:
+                dist = math.hypot(candidate_x - sx, candidate_y - sy)
+                if nearest_defender_distance is None or dist < nearest_defender_distance:
+                    nearest_defender_distance = dist
+                if dist <= CONTEST_EUCLIDEAN_RADIUS:
                     geometry_has_contest = True
                     break
         if motion_geometry:
@@ -1196,6 +1207,8 @@ class ShotManager:
                         self._record_shot_diagnostics(
                             roles, off_lineup, shot_step_index,
                             is_three=is_three, has_contest=has_contest, made=made_from_foul,
+                            defender_distance=nearest_defender_distance,
+                            contest_factor=proximity_factor if has_contest else 0.0,
                         )
                         if made_from_foul:
                             apply_scoring(self.game, off_team, shooter, 3 if is_three else 2, ["FGM", "3PTM"] if is_three else ["FGM"])
@@ -1643,6 +1656,8 @@ class ShotManager:
         self._record_shot_diagnostics(
             roles, off_lineup, shot_step_index,
             is_three=is_three, has_contest=has_contest, made=made,
+            defender_distance=nearest_defender_distance,
+            contest_factor=proximity_factor if has_contest else 0.0,
         )
 
         # Shot_Result_List: record make (True) / clean miss or block (False);
