@@ -241,7 +241,7 @@ OUTSIDE_SHOT_MIN_GAP_BY_TIER = {
 # Outside-shot selection is discounted at the attack-vs-outside choice itself,
 # rather than rejecting an already-selected shot later in the walk. This keeps
 # shot volume/timing intact while steering eligible outside players toward drives.
-OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.75
+OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.55
 
 # Retained as an explicit all-tier acceptance dial. At 100, selected outside
 # shots are never discarded after the weighted attack-vs-outside choice.

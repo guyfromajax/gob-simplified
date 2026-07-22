@@ -29,4 +29,4 @@ def test_height_to_block_score_ascends_and_clamps(height, expected):
 
 
 def test_block_reconciliation_threshold_is_recalibrated():
-    assert BLOCK_RECONCILIATION_BLOCK_THRESHOLD == -100
+    assert BLOCK_RECONCILIATION_BLOCK_THRESHOLD == -50

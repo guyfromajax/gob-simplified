@@ -28,7 +28,7 @@ The universal HCO shoot decision evaluates candidates at each reached skeleton s
 attempts must first pass a clock-tier nearest-defender separation gate; this applies to optimal
 self-shots, optimal dish/catch-and-shoot candidates, and random-tier self-shots. Inside and attack
 candidates are unaffected. At outside/attack locations, the outside candidate score is multiplied
-by 0.75 before weighted selection; the downstream acceptance gate is 100% at every tier, preserving
+by 0.55 before weighted selection; the downstream acceptance gate is 100% at every tier, preserving
 shot timing and volume instead of rejecting selected outside shots. The random percentage is evaluated only after the random reader chooses
 `shoot` from `shoot / hold / pass`, so its direct-shot probability per evaluation is one-third of
 the configured value. Subtle-movement precedence may suppress the evaluation on reading turns.
@@ -36,7 +36,7 @@ the configured value. Subtle-movement precedence may suppress the evaluation on 
 | Constant | File | Value | Effect |
 |---|---|---|---|
 | `OUTSIDE_SHOT_MIN_GAP_BY_TIER` | motion_step_decision.py | `{early:11, mid:7, late:3, very_late:0, forced:0}` | Minimum distance in grid units from the candidate to the nearest defender for an outside shot to be eligible. Tiers: early 23–30s, mid 15–22s, late 6–14s, very late 1–5s, forced <1s. |
-| `OUTSIDE_SHOT_SELECTION_MULTIPLIER` | motion_step_decision.py | `0.75` | Multiplies the outside score in the shared attack-vs-outside weighted pick. Lower values redirect more outside-location decisions into attack shots without suppressing the shot attempt. |
+| `OUTSIDE_SHOT_SELECTION_MULTIPLIER` | motion_step_decision.py | `0.55` | Multiplies the outside score in the shared attack-vs-outside weighted pick. Lower values redirect more outside-location decisions into attack shots without suppressing the shot attempt. This applies at every tier, with most aggregate impact in early/mid HCO because those tiers contain most HCO attempts. Recalibrated from `0.75`. |
 | `OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER` | motion_step_decision.py | `{early:100, mid:100, late:100, very_late:100, forced:100}` | Downstream acceptance dial for selected outside shots. All tiers currently preserve the selection; lowering a tier would reject shots and continue the HCO walk. |
 | `RANDOM_TIER_SHOOT_PCT[early]` | motion_step_decision.py | `{slow:10, normal:20, fast:30}` | Random reader's conditional shoot percentage in the 23–30s tier, after choosing the `shoot` option. Effective direct-shot rates are 3.3% / 6.7% / 10.0% per evaluation. |
 | `RANDOM_TIER_SHOOT_PCT[mid]` | motion_step_decision.py | `{slow:20, normal:35, fast:50}` | Conditional percentage in the 15–22s tier. Effective direct-shot rates are 6.7% / 11.7% / 16.7%. |
@@ -80,7 +80,7 @@ middle band falls back to ordinary shot resolution. The two outcome thresholds a
 
 | Constant / variable | File | Value | Effect |
 |---|---|---|---|
-| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` | constants/__init__.py | `-100` | A reconciliation blocks when `diff < -100`. Raising toward zero creates more blocks; lowering creates fewer. Recalibrated from `-150`. |
+| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` | constants/__init__.py | `-50` | A reconciliation blocks when `diff < -50`. Raising toward zero creates more blocks; lowering creates fewer. Recalibrated from `-100` after the three-week sample averaged about 0.97 blocks per team-game. |
 | `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` | constants/__init__.py | `150` | A reconciliation creates a shooting foul when `diff > 150`. Independent of the block threshold. |
 | `BLOCK_Y_ROLL_MIN` / `BLOCK_Y_ROLL_MAX` | constants/__init__.py | `0 / 4` | First trigger rolls this inclusive range against defensive aggression; `roll <= aggression` reaches reconciliation. Default aggression 2 therefore passes 60%. |
 | Defensive `aggression` | team strategy | `0–4` | First-trigger comparison value. Higher aggression sends more eligible shots into reconciliation. Slow-It-Down can temporarily force this to 0. |

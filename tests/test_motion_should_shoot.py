@@ -39,11 +39,11 @@ class Rng:
 
 def test_weighted_pick_team_emphasis_shifts_the_boundary():
     bal = _P("p")  # AG=SC=SH=50 → base attack 50, outside 50
-    # Balanced settings (2/2): attack 70 / discounted outside 52.5 → roll 60 is attack.
+    # Balanced settings (2/2): attack 70 / discounted outside 38.5 → roll 60 is attack.
     assert _weighted_attack_or_outside(bal, _Team(attack=2, outside=2), Rng([60])) == "attack"
-    # Outside-heavy: attack 50 / discounted outside 67.5 → same roll is outside.
+    # Outside-heavy: attack 50 / discounted outside 49.5 → same roll is outside.
     assert _weighted_attack_or_outside(bal, _Team(attack=0, outside=4), Rng([60])) == "outside"
-    assert D.OUTSIDE_SHOT_SELECTION_MULTIPLIER == 0.75
+    assert D.OUTSIDE_SHOT_SELECTION_MULTIPLIER == 0.55
 
 
 # ---------------------------------------------------------------- threshold scaling

@@ -56,10 +56,11 @@ Non-strategic ("random") read tier: `randint(1,100) ≤ %` → shoot (self only)
 ### Outside-shot selection weight (`OUTSIDE_SHOT_SELECTION_MULTIPLIER`)
 
 When an outside/attack location chooses its shot type, the outside score
-`SH + outside emphasis × 10` is multiplied by `0.75` before it competes with the attack score.
+`SH + outside emphasis × 10` is multiplied by `0.55` before it competes with the attack score.
 This redirects some former outside choices into attacks without rejecting a shot or delaying the
 skeleton walk. It applies to ball-handler and dish/hot-read candidates through the shared
-`_weighted_attack_or_outside` decision.
+`_weighted_attack_or_outside` decision. The multiplier applies at every clock tier; because early
+and mid account for most HCO attempts, the aggregate reduction is concentrated in those tiers.
 
 `OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER` remains an explicit downstream dial, but is now 100% in every
 tier so an outside shot that wins selection is not subsequently discarded.
@@ -195,7 +196,7 @@ The non-strategic ("random") tier no longer shoots a flat 50/50 each step — it
 Very-late is flat 95% for all tempos (clock pressure dominates). The "right" and "safe" tiers are unchanged.
 
 Every outside-vs-attack decision produced by these or the strategic read paths discounts the
-outside candidate score with `OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.75`. The downstream
+outside candidate score with `OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.55`. The downstream
 `OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER` is 100% at every tier, so selection changes shot mix without
 rejecting an already-selected shot or pushing the possession later.
 
