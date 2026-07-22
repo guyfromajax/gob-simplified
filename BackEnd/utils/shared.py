@@ -25,6 +25,7 @@ from BackEnd.constants import (
     SHOT_MOTION_GRID_PER_GAME_SEC,
     SPRINT_GRID_PER_GAME_SEC,
     BURST_GRID_PER_GAME_SEC,
+    CONTEST_EUCLIDEAN_RADIUS,
 )
 
 # Legacy pace-rate fallbacks (Phase 4d). Used only when a caller doesn't
@@ -1043,7 +1044,19 @@ def resolve_offensive_rebound(game, rebounder):
         d_foul = False
         foul_player = None
         made = False
-        contested = bool(has_shot_defender and defender is not None)
+        # The closest defender remains the assigned putback defender, but his
+        # distance now governs whether/how strongly he can affect the shot.
+        contested = bool(
+            has_shot_defender
+            and defender is not None
+            and nearest_distance is not None
+            and nearest_distance <= CONTEST_EUCLIDEAN_RADIUS
+        )
+        putback_proximity_factor = 0.0
+        if contested:
+            from BackEnd.models.shot_manager import _proximity_contest_factor
+
+            putback_proximity_factor = _proximity_contest_factor(nearest_distance)
         shot_type = "inside"
         shot_score_pre_defense = 0
         shot_defense_score_for_sfx = 0
@@ -1076,6 +1089,7 @@ def resolve_offensive_rebound(game, rebounder):
                 None,
                 "oreb_putback",
                 apply_defense=True,
+                proximity_factor=putback_proximity_factor,
             )
             from BackEnd.engine.shot_micro_movements import resolve_contest
             putback_contest_result, putback_contest_margin = resolve_contest(
@@ -1161,7 +1175,7 @@ def resolve_offensive_rebound(game, rebounder):
             made=made,
             turn_type="OREB",
             defender_distance=nearest_distance,
-            contest_factor=1.0 if contested else 0.0,
+            contest_factor=putback_proximity_factor,
         )
         rebounder.record_stat("FGA")
 

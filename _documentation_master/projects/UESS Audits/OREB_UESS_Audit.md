@@ -13,7 +13,7 @@
 | Putback contest/dunk decided from the "wrong" spot | Putback resolves from the rebounder's **post-MISS crash position** (`rebounder.coords`) while the shot **renders** from `bounce_coords` (where he grabs the ball) → nearest-defender pick, dunk eligibility, and bounce calc use a coord the FE never shows as the shot origin | ⚠️ **MED** |
 | Chained putback misses slowly drain the shot clock | A chained `PUTBACK_MISS → OREB` does **not** reset the shot clock (Rule 3 lists `MISS`/`FREE_THROW` but not `PUTBACK_MISS`), though a normal `MISS → OREB` does | ⚠️ **MED** |
 | Ball teleport on rebound | **None found** — capture is seated-at-ball; every seam continuous | ✅ |
-| Uncontested putback makes (the Final-Turn bug) | **Not present** — make/miss is attribute-based, defender is "nearest always contests," coords from the same canonical source as the render | ✅ |
+| Uncontested putback makes (the Final-Turn bug) | **Distance-governed** — make/miss is attribute-based; nearest defender is assigned from render-matched coords, graded through 11 grid, and has zero impact beyond 11 | ✅ |
 | Clock at rebound | Schema-derived (§5.4), monotonic, no negative, correct resets (except MED-2) | ✅ |
 
 ### Compliance scorecard
@@ -39,7 +39,7 @@
 3. ✅ **LOW cleanup** (OREB-Task 3) — removed dead micro-injection call (L-2) + dead `rt=="OREB"` reset branch (L-4); wired `[UESS SEAM]` detection for OREB's emitter (L-1). Deferred (not real fixes): L-3 `None`-slot (a `None` slot = a genuinely-absent player, not a coord bug) and L-7 emitted-clock clamp (cosmetic; master clock already clamped, piecemeal clamp would be inconsistent).
 
 ### What's genuinely fine (don't touch)
-The self-contained emitter's step chaining · seated-at-ball capture · putback/kickout/`PUTBACK_MISS→DREB` seams · schema-burn clock derivation + putback floor + kickout-deferred-to-HCO · all-10 coverage · no mid-emit `player.coords` writes · the "nearest defender always contests" putback model.
+The self-contained emitter's step chaining · seated-at-ball capture · putback/kickout/`PUTBACK_MISS→DREB` seams · schema-burn clock derivation + putback floor + kickout-deferred-to-HCO · all-10 coverage · no mid-emit `player.coords` writes · nearest-defender attribution with distance-graded putback impact.
 
 ---
 ---
@@ -92,7 +92,7 @@ The OREB analog of the single-coord-source issue — but **milder** than HCO/Fin
 | Contract / boundary | Evidence | Result |
 |---|---|---|
 | **No `resolve_shot` / animator build** in putback — resolves inline via `calculate_shot_score` (attribute-based defense) | `shared.py:1036-1087, 1125-1129`; `shot_manager.py:2610-2622` | ✅ no HCO/FT defect |
-| Defender: nearest **always** contests (no stale-map "uncontested") | `_resolve_oreb_putback_defender`, `shared.py:841-862` | ✅ |
+| Defender: nearest is assigned; impact is graded at ≤11 and zero beyond 11 | `_resolve_oreb_putback_defender`, `resolve_offensive_rebound` | ✅ |
 | Coords from same canonical source (resolver live `player.coords` == emitter `prior_turn.final_coords` via `build_final_coords`) | `animation_step_helpers.py:22-45`; `game_manager.py:798`; `oreb_step_emitter.py:610-613` | ✅ |
 | Capture seated-at-ball (loose @ bounce, rebounder sprints to it, gate `player_reaches_position`) | `oreb_step_emitter.py:172-286`; `stamp_rebound_capture_player_motion` | ✅ §8.4 inv.3 |
 | Putback chain seams `capture→shoot→ball_flight→hold/bounce` (ball + coords) | `oreb_step_emitter.py:656, 692, 711, 743, 794, 824` | ✅ |

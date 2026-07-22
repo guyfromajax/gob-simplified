@@ -46,7 +46,7 @@
 - The coordinate arc uses the home-offense HCO spot model (`key`, wings, midCorners, corners) and linearly interpolates the boundary x-value by shooter y. Away-offense shots mirror x with `100 - x` before testing. The helper expects display-oriented coords.
 - Fast Break shots remain 2-point by default. Only explicit outside Fast Break branches with `shot_type == "outside"` and a backend `shot_spot` can classify as 3s. This covers Triangle corner/wing/kick branches without changing Steal FB, RR rim attacks, or CR rim attacks.
 - Dynamic HCT procedural attack-basket shots bypass `ShotManager.resolve_shot()`, so they call the same classification wrapper before `calculate_shot_score()` and carry `is_three_point_shot` through scoring, `3PTA`/`3PTM`, points, and shooting-foul free-throw count.
-- OREB putbacks are forced 2-point field goals and stamp a forced-two classification payload.
+- OREB putbacks are forced 2-point field goals and stamp a forced-two classification payload. Their nearest defender uses the shared graded proximity curve: full at ≤3, linear to 0.15 at 9, 0.15 through 11, and no contest beyond 11. This does not add the standard `resolve_shot()` shooter-to-rim threshold penalty to OREB.
 - Free throws are forced 1-point attempts. They do not use field-goal 2/3 geometry.
 - Made-three SFX is stamped by the backend schema emitter only when `turn_result["is_three_point_shot"] is True`, not by raw `points == 3` and not by frontend inference.
 

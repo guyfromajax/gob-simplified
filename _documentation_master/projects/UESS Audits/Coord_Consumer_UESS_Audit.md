@@ -42,7 +42,7 @@ Separate handling:
 - ✅ **#3/#4 rebounder + near-bounce pool** — COVERED by #1 (selection runs after the sync); severity revised (attribution, not possession — 0% possession flip measured).
 - ✅ **#2 Covert Release block** (HIGH) — FIXED (`fb_geometry_contest_resolved` flag; `resolve_shot` honors CR's render-matched defender). Regression-clean.
 - 🟡 **#5 zone matchup** (MED-HIGH) — **DEFERRED as accepted gap** (2026-07-05). Fix = rebuild `zone_defender_assignments_by_step` from render coords via `assign_all_zone_defenders`, which has load-bearing home/away orientation handling (animator.py:1910-1944) → high away-offense risk. Measured impact is second-order: zone contest ~95% stable + coarse zones → primary defender (hence `has_contest`) rarely flips; residual is double-team/attribution only. Risk/reward inverted vs the low-risk `player.coords` syncs of #1-#4.
-- 🟡 **#6 putback defender / OTB foul** (MED) — deferred with #5 (OREB-turn flow; putback "always nearest defender" so contest y/n stable, only attribution flips; OTB foul is low-freq bounded).
+- 🟡 **#6 putback defender / OTB foul** (MED) — putback reads the render-matched bounce origin and nearest live defender coords; that distance now affects graded contest strength through 11 and contest eligibility beyond 11. OTB foul remains low-frequency/bounded.
 - 🟡 **#7 zone defense_score** (MED) — deferred with #5 (named-spot based; margin-only effect on `defense_score`).
 
 ## Update 2026-07-22 — full-sim HCO shot-frame hole closed

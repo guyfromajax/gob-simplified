@@ -145,12 +145,18 @@ def test_offensive_rebound_putback_updates_stats(monkeypatch):
     assert game.score[game.offense_team.name] == 2
 
 
-def _force_putback_path(monkeypatch, made=True, defensive_reb=False):
+def _force_putback_path(monkeypatch, made=True, defensive_reb=False, distant_defenders=False):
     """Helper to drive resolve_offensive_rebound down specific branches."""
     from BackEnd.utils.shared import resolve_offensive_rebound
 
     game = build_mock_game()
     rebounder = game.offense_team.lineup["C"]
+
+    if distant_defenders:
+        rebounder.coords = {"x": 90.0, "y": 25.0}
+        game.turns = [{"ball_bounce_x": 90.0, "ball_bounce_y": 25.0}]
+        for defender in game.defense_team.lineup.values():
+            defender.coords = {"x": 50.0, "y": 25.0}
 
     # Choose putback path
     monkeypatch.setattr("BackEnd.utils.shared.random.random", lambda: 0.1)
@@ -226,6 +232,21 @@ def test_putback_diagnostic_records_nearest_distance_with_full_contest(monkeypat
     assert isinstance(captured["defender_distance"], float)
     assert captured["defender_distance"] >= 0
     assert captured["contest_factor"] == 1.0
+
+
+def test_distant_putback_defender_is_assigned_but_does_not_contest(monkeypatch):
+    captured = {}
+
+    def capture_diagnostic(_game, **kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr("BackEnd.utils.shared.record_shot_split", capture_diagnostic)
+    event = _force_putback_path(monkeypatch, made=True, distant_defenders=True)
+
+    assert event["event_type"] == "PUTBACK_ATTEMPT"
+    assert captured["defender_distance"] == 40.0
+    assert captured["defended"] is False
+    assert captured["contest_factor"] == 0.0
 
 
 def test_kickout_reset_event_payload(monkeypatch):

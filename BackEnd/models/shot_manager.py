@@ -168,13 +168,13 @@ def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
     return abs(sx - bx) <= margin and abs(sy - by) <= margin
 
 
-# Dynamic HCO Defense — S1 Part C (Dynamic_MM_Brief §7). Graded contest by the primary defender's
+# Shared HCO/OREB graded contest curve (Dynamic_MM_Brief §7). Graded contest by the primary defender's
 # Euclidean distance to the shot spot — the openness primitive (a beaten/lagged defender is farther)
 # turned into make probability. Replaces the old boolean "within CONTEST_EUCLIDEAN_RADIUS → full
 # contest" with a ramp: ≤ NEAR = full defensive weight (1.0), linear down to OPEN_FLOOR at OPEN_DIST,
 # flat FLOOR from there to the radius bound (9–11 = "not open, low impact"). HCO + dynamic-defense
-# only; every other caller passes factor 1.0 (byte-identical). Owner spec: ≤3 major advantage … ≥9
-# ~wide open. Tunable at the S1 Monte-Carlo checkpoint.
+# HCO dynamic-defense and OREB putbacks use this curve; every other caller passes
+# factor 1.0 (byte-identical). Owner spec: ≤3 major advantage … ≥9 ~wide open.
 PROXIMITY_CONTEST_NEAR_DIST = 3.0    # ≤ this grid → full contest (factor 1.0)
 PROXIMITY_CONTEST_OPEN_DIST = 9.0    # ≥ this grid → wide-open floor
 PROXIMITY_CONTEST_OPEN_FLOOR = 0.15  # residual defensive weight from OPEN_DIST out to the radius
@@ -2917,7 +2917,7 @@ class ShotManager:
                     defense_attrs["CH"] * 0.1
                 ) * random.randint(1, 6)
 
-            # Dynamic HCO Defense — S1 Part C: graded proximity scales the primary defender's impact
+            # Graded proximity (Dynamic HCO and OREB putbacks) scales the primary defender's impact
             # by his distance to the shot (1.0 = tight ≤3 grid, floor = far/open). Applied at the
             # source so it flows into shot_defense_score_raw (contest classification), the shot_score
             # penalty (make probability), AND the shooting-foul check. 1.0 for every non-HCO caller.

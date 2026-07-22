@@ -78,24 +78,20 @@ See `Announcement_System.md` for tiering, Block → Rebound ordering, and relate
 
 ## OREB Putback Shot Defender
 
-OREB putbacks now use a proximity-qualified shot defender system instead of the old weighted-by-position shortcut.
+OREB putbacks assign the nearest defender using Euclidean distance from the rendered putback origin (the prior miss's bounce spot). Distance then scales that defender's actual shot impact through the shared HCO/OREB proximity curve.
 
 ### Defender Qualification
-1. Only defenders within `10` Euclidean distance of the OREB shooter are initially eligible.
-2. Among those eligible defenders, first look for players whose `x` position is at least as close to the basket as the shooter:
-   - home offense attacking right basket: `defender_x >= shooter_x`
-   - away offense attacking left basket: `defender_x <= shooter_x`
-3. If exactly one qualifies, he is the shot defender.
-4. If more than one qualifies, choose the one closest to the shooter. Ties are broken randomly.
-5. If none qualify on the x-axis, take the closest initially eligible defender and run an IQ read:
-   - `x = random.randint(1, 100)`
-   - if `x <= defender.IQ`, move the defender to one x-grid closer to the basket than the shooter and within `-1` to `+1` y of the shooter, and he becomes the shot defender
-   - if `x > defender.IQ`, the putback is uncontested
+1. Measure every defender from the putback origin and assign the nearest defender.
+2. At `≤3` grid units, apply the defender at full strength (`1.0`).
+3. From `3–9`, linearly reduce defensive impact from `1.0` to `0.15`.
+4. From `9–11`, retain the `0.15` residual contest.
+5. Beyond `CONTEST_EUCLIDEAN_RADIUS=11`, retain the nearest-defender attribution but treat the shot as uncontested (`apply_defense=False`, factor `0.0`).
 
 ### Putback Resolution
-- Contested putback:
+- Contested putback (`≤11`):
   - use the same `inside` shot logic as a standard inside shot with no passer
-  - this includes standard make/miss thresholding, defensive foul checks, and and-1 / 2 FT outcomes
+  - the proximity factor scales defense at its source, so it also flows into contest classification, make probability, and defensive-foul evaluation
+  - this includes standard make/miss thresholding and and-1 / 2 FT outcomes
 - Uncontested putback:
   - Uses the **universal uncontested inside/attack make helper** (`BackEnd/utils/uncontested_shot.py`): `make_threshold = 99 + offense discipline − defense fight`; `roll = random.randint(1, 100)` → make if `roll < make_threshold` (geo-gated to distance ≤ 11 from basket; outside shots excluded). Falls back to `shot_score >= shot_threshold` when helper is ineligible.
 
