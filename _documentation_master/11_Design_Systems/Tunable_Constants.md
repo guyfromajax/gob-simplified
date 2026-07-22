@@ -22,6 +22,26 @@ Central registry of tunable game-logic constants — the knobs for balancing gam
 |---|---|---|
 | `TRAP_MOMENT_RANGE` | 5 | Max grid distance a defender can be from the ball-handler to count toward an HC trap/pressure double-team. |
 
+## HCO Step Logic
+
+The universal HCO shoot decision evaluates candidates at each reached skeleton step. Outside
+attempts must first pass a clock-tier nearest-defender separation gate; this applies to optimal
+self-shots, optimal dish/catch-and-shoot candidates, and random-tier self-shots. Inside and attack
+candidates are unaffected. The random percentage is evaluated only after the random reader chooses
+`shoot` from `shoot / hold / pass`, so its direct-shot probability per evaluation is one-third of
+the configured value. Subtle-movement precedence may suppress the evaluation on reading turns.
+
+| Constant | File | Value | Effect |
+|---|---|---|---|
+| `OUTSIDE_SHOT_MIN_GAP_BY_TIER` | motion_step_decision.py | `{early:9, mid:6, late:3, very_late:0, forced:0}` | Minimum distance in grid units from the candidate to the nearest defender for an outside shot to be eligible. Tiers: early 23–30s, mid 15–22s, late 6–14s, very late 1–5s, forced <1s. |
+| `RANDOM_TIER_SHOOT_PCT[early]` | motion_step_decision.py | `{slow:10, normal:20, fast:30}` | Random reader's conditional shoot percentage in the 23–30s tier, after choosing the `shoot` option. Effective direct-shot rates are 3.3% / 6.7% / 10.0% per evaluation. |
+| `RANDOM_TIER_SHOOT_PCT[mid]` | motion_step_decision.py | `{slow:20, normal:35, fast:50}` | Conditional percentage in the 15–22s tier. Effective direct-shot rates are 6.7% / 11.7% / 16.7%. |
+| `RANDOM_TIER_SHOOT_PCT[late]` | motion_step_decision.py | `{slow:95, normal:95, fast:95}` | Conditional percentage in the 6–14s tier. Effective direct-shot rate is 31.7% for every tempo. |
+| `RANDOM_TIER_SHOOT_PCT[very_late]` | motion_step_decision.py | `{slow:95, normal:95, fast:95}` | Conditional percentage in the 1–5s tier. Effective direct-shot rate is 31.7% for every tempo. |
+| `SM_PRECEDENCE_TEMPOS` | motion_step_decision.py | `early: all; mid: slow+normal; late: slow; very_late: none` | On an `offense_reads` turn, these tempos run subtle movement before evaluating a shot at that tier. |
+| `OPTIMAL_BAR_STEEPNESS` | motion_step_decision.py | `2.0` | Multiplier in `optimal bar = shot clock × steepness × tempo multiplier`; higher values demand stronger looks or later shots. |
+| `OPTIMAL_BAR_TEMPO_MULT` | motion_step_decision.py | `{slow:1.2, normal:1.0, fast:0.8}` | Slow raises the optimal-look bar; fast lowers it. |
+
 ## Dynamic HCO Defense (Pass Interception)
 
 The HCO pass-contest funnel runs on every HCO pass: **Gate 1** geometry (defender in the lane) → **Gate 2** attempt (aggression) → **Gate 3a** passer safety (clean pass?) → **Gate 3b** deflection threshold (`intercept_score > tier_mid` → DEFLECTED, else the pass completes) → **Gate 3c** deflection KIND (a `CH+IQ` vs d`PASS_DEFLECT_KIND_D` roll splits INTERCEPT vs BAT_OOB). HCO uses its own base/tier (below); the composite weights, d6 roll, and the split live in `pass_contest.py` and are **shared with HCT/FCP**. Feature flag: `GOB_DYNAMIC_HCO_DEFENSE` (falsy = off).

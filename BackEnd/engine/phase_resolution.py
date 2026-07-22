@@ -5240,6 +5240,15 @@ def _hco_nearest_def_dist(point, def_xy, exclude=None):
     return best
 
 
+def _hco_shooter_separation_map(off_lineup, def_xy, coord_fn):
+    """Nearest-defender gap for every active offensive position in one frozen step frame."""
+    return {
+        pos: _hco_nearest_def_dist(coord_fn(pos), def_xy)
+        for pos, player in (off_lineup or {}).items()
+        if player is not None
+    }
+
+
 def _hco_nudge_toward(xy, target, dist):
     """Point `dist` grid from `xy` straight toward `target` (jab-step defender bite: follow inward)."""
     import math
@@ -6451,6 +6460,8 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
         # intercept model reads (`_hco_step_def_xy`). ONE signal, thin consumers — mirrors S1's openness.
         # Additive (no consumer until S3b); man-first + flag-gated on posture (zone read = S4) → no work
         # and byte-identical when dynamic defense is off. Rides a dedicated top-level field.
+        _decision_def_xy = None
+        _decision_coord = None
         if game_state.get("_hco_defense_posture") and not zone:
             from BackEnd.engine.attack_drive_clearance import _basket_display_coords
             _c_def_xy, _c_coord, _c_loc, _c_pt = _hco_step_def_xy(
@@ -6460,12 +6471,20 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             _c_basket = _basket_display_coords(is_away_offense)
             steps[i]["_commitment"] = _hco_commitment_map(
                 off_lineup, _c_def_xy, _c_coord, bh_pos, _c_coord(bh_pos), _c_basket, off_to_def)
+            _decision_def_xy, _decision_coord = _c_def_xy, _c_coord
             # (S3 #2: the `_backdoor_cutter` stamp / `_hco_backdoor_read` denial-gate was RETIRED — the
             # backdoor now fires via the altered-action trigger/selection on the BH's SM, not a denial read.)
 
         # 1. Universal shoot decision — runs BEFORE the movement matrix, every step, all
         # conditions. shoot/dish → execute (terminate); else fall through to movement.
         locations = _step_locations(steps[i])
+        if _decision_def_xy is None:
+            _decision_def_xy, _decision_coord, _unused_loc, _unused_pt = _hco_step_def_xy(
+                steps[i], bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense,
+                _def_aggr_call, zone, game_state.get("defense_playcall"),
+                posture=game_state.get("_hco_defense_posture"))
+        _separation_map = _hco_shooter_separation_map(
+            off_lineup, _decision_def_xy, _decision_coord)
         # §4 hot-read "truly open" gate: drop dish targets whose passing lane is covered (man + zone).
         blocked_dish = _hco_blocked_dish_targets(
             steps[i], bh_pos, off_lineup, def_lineup, off_to_def,
@@ -6485,7 +6504,8 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             _open_map = _hco_openness_map(steps[i].get("_commitment"))
             shoot = should_shoot(bh_pos, off_lineup, locations, read_map, off_team,
                                  shot_clock_est, tempo, random, openness=0.0, allow_dish=True,
-                                 blocked_dish_targets=blocked_dish, openness_map=_open_map)
+                                 blocked_dish_targets=blocked_dish, openness_map=_open_map,
+                                 separation_map=_separation_map)
             if shoot:
                 logging.debug(
                     f"🎯 [DYNAMIC {_kind}] step {i}: SHOOT {shoot['shooter_pos']} "
@@ -6644,10 +6664,35 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             if _alt_moves:
                 for _mp, _mv in _alt_moves.items():
                     _alt_locs[_mp] = _mv.get("location") or _alt_locs.get(_mp)
+            # Re-freeze separation after the subtle beat: altered cuts, defender
+            # freezes, and explicit bite/front overrides can change the physical
+            # gap. Build through the same sim-safe animator grid that StepState
+            # uses, then read the final beat row. On any failure retain the reached
+            # step's authoritative pre-beat map rather than mutable Player.coords.
+            _post_separation_map = _separation_map
+            try:
+                from BackEnd.models.animator import Animator
+                _post_grid = Animator(game).compute_defender_grid(
+                    {"steps": list(output_steps)}, off_lineup, def_lineup)
+                _post_def_xy = _post_grid.get(len(output_steps) - 1) or {}
+                if _post_def_xy:
+                    beat["_step_state"] = {
+                        "index": len(output_steps) - 1,
+                        "defense": _post_def_xy,
+                    }
+                    _post_def_xy, _post_coord, _post_loc, _post_pt = _hco_step_def_xy(
+                        beat, bh_pos, off_lineup, def_lineup, off_to_def, is_away_offense,
+                        _def_aggr_call, zone, game_state.get("defense_playcall"),
+                        posture=game_state.get("_hco_defense_posture"))
+                    _post_separation_map = _hco_shooter_separation_map(
+                        off_lineup, _post_def_xy, _post_coord)
+            except Exception:
+                pass
             post_shoot = should_shoot(bh_pos, off_lineup, _alt_locs, read_map, off_team,
                                       shot_clock_est, tempo, random,
                                       openness=(20.0 if froze else 0.0), allow_dish=True,
-                                      blocked_dish_targets=blocked_dish, openness_map=_open_map)
+                                      blocked_dish_targets=blocked_dish, openness_map=_open_map,
+                                      separation_map=_post_separation_map)
             # DIAG — why an OPEN altered-action cutter is / isn't fed: per cutter, its openness + whether
             # its BH→cutter lane is BLOCKED, then what the shoot decision did (PROGRESS = tier safe /
             # nothing optimal → no dish; BHself = BH's own look won / random tier; DISH = fed a teammate).

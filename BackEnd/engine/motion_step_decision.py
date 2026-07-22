@@ -221,10 +221,21 @@ OPTIMAL_BAR_TEMPO_MULT = {"slow": 1.2, "normal": 1.0, "fast": 0.8}
 # possessions stop dumping early shots. Very-late is a flat 95% (clock pressure
 # dominates); <1s is the forced-shot backstop upstream.
 RANDOM_TIER_SHOOT_PCT = {
-    "early":     {"slow": 30, "normal": 40, "fast": 50},
-    "mid":       {"slow": 45, "normal": 60, "fast": 75},
+    "early":     {"slow": 10, "normal": 20, "fast": 30},
+    "mid":       {"slow": 20, "normal": 35, "fast": 50},
     "late":      {"slow": 95, "normal": 95, "fast": 95},
     "very_late": {"slow": 95, "normal": 95, "fast": 95},
+}
+
+# Minimum nearest-defender separation for an HCO OUTSIDE candidate to be eligible.
+# Inside/attack candidates are unaffected. The gate relaxes with clock pressure and
+# is shared by optimal self shots, optimal dishes, and random-tier self shots.
+OUTSIDE_SHOT_MIN_GAP_BY_TIER = {
+    "early": 9.0,
+    "mid": 6.0,
+    "late": 3.0,
+    "very_late": 0.0,
+    "forced": 0.0,
 }
 
 # Subtle-movement precedence: per shot-clock tier, the tempos for which subtle
@@ -289,8 +300,28 @@ def sm_takes_precedence(shot_clock, tempo_call):
     return tempo in SM_PRECEDENCE_TEMPOS.get(tier, ())
 
 
-def _evaluate_shot(player, location, read_scores, off_team, shot_clock, tempo_call, openness, rng):
-    """(shot_type, quality, optimal, is_mismatch) for one candidate shooter at his location."""
+def _outside_shot_is_eligible(pos, shot_type, shot_clock, separation_map):
+    """Clock-tier separation gate for outside candidates.
+
+    ``None`` preserves legacy behavior for non-HCO/specialized callers that have
+    not supplied an authoritative per-step geometry frame. An explicit map with a
+    missing player is treated as unknown/ineligible while a positive gap is required.
+    """
+    if shot_type != "outside":
+        return True
+    tier = _shot_clock_tier(shot_clock)
+    required = OUTSIDE_SHOT_MIN_GAP_BY_TIER[tier]
+    if required <= 0:
+        return True
+    if separation_map is None:
+        return True
+    gap = separation_map.get(pos)
+    return gap is not None and float(gap) >= required
+
+
+def _evaluate_shot(player, position, location, read_scores, off_team, shot_clock,
+                   tempo_call, openness, rng, separation_map=None):
+    """(shot_type, quality, optimal, is_mismatch, eligible) for one candidate."""
     from BackEnd.engine.motion_read_map import READ_THRESHOLD
     scores = read_scores.get(getattr(player, "player_id", None), {}) or {}
     if is_inside_location(location):
@@ -299,12 +330,19 @@ def _evaluate_shot(player, location, read_scores, off_team, shot_clock, tempo_ca
         shot_type = _weighted_attack_or_outside(player, off_team, rng)
     raw = float(scores.get(shot_type, 0.0))
     quality = raw + openness
-    return shot_type, quality, quality >= _shoot_threshold(shot_clock, tempo_call), raw > READ_THRESHOLD
+    eligible = _outside_shot_is_eligible(position, shot_type, shot_clock, separation_map)
+    return (
+        shot_type,
+        quality,
+        eligible and quality >= _shoot_threshold(shot_clock, tempo_call),
+        raw > READ_THRESHOLD,
+        eligible,
+    )
 
 
 def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
                  shot_clock, tempo_call, rng, openness=0.0, allow_dish=True,
-                 blocked_dish_targets=None, openness_map=None):
+                 blocked_dish_targets=None, openness_map=None, separation_map=None):
     """Universal shoot decision. Returns a SHOOT Decision
     ``{action, shooter_pos, shot_type, via_pass, hot_read}`` or ``None`` (progress).
 
@@ -332,9 +370,9 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
     def _openness_for(pos, default):
         return openness_map.get(pos, default) if openness_map else default
 
-    s_type, s_quality, s_optimal, s_mismatch = _evaluate_shot(
-        shooter, locations.get(shooter_pos, "key"), read_scores, off_team, shot_clock, tempo_call,
-        _openness_for(shooter_pos, openness), rng)
+    s_type, s_quality, s_optimal, s_mismatch, s_eligible = _evaluate_shot(
+        shooter, shooter_pos, locations.get(shooter_pos, "key"), read_scores, off_team,
+        shot_clock, tempo_call, _openness_for(shooter_pos, openness), rng, separation_map)
     best = {"pos": shooter_pos, "type": s_type, "quality": s_quality,
             "optimal": s_optimal, "mismatch": s_mismatch, "via_pass": False}
     if allow_dish:
@@ -343,8 +381,9 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
                 continue
             if pos in blocked_dish_targets:
                 continue  # covered passing lane → not "truly open" → not a dish candidate
-            t, q, opt, mm = _evaluate_shot(p, locations[pos], read_scores, off_team,
-                                           shot_clock, tempo_call, _openness_for(pos, 0.0), rng)
+            t, q, opt, mm, _eligible = _evaluate_shot(
+                p, pos, locations[pos], read_scores, off_team, shot_clock,
+                tempo_call, _openness_for(pos, 0.0), rng, separation_map)
             if opt and q > best["quality"]:
                 best = {"pos": pos, "type": t, "quality": q, "optimal": opt, "mismatch": mm, "via_pass": True}
 
@@ -368,7 +407,8 @@ def should_shoot(shooter_pos, off_lineup, locations, read_scores, off_team,
         c = rng.choice(("shoot", "hold", "pass"))
         if c == "pass" and best["via_pass"]:
             return _dish_to_best()
-        if c == "shoot" and rng.randint(1, 100) <= _random_tier_shoot_pct(shot_clock, tempo_call):
+        if (c == "shoot" and s_eligible
+                and rng.randint(1, 100) <= _random_tier_shoot_pct(shot_clock, tempo_call)):
             return {"action": SHOOT, "shooter_pos": shooter_pos, "shot_type": s_type,
                     "via_pass": False, "hot_read": False}
         return None
