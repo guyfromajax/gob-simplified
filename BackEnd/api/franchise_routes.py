@@ -1472,6 +1472,16 @@ def update_team_attributes_after_game(
             for kind, doc in candidate_docs
         ],
     )
+    # [EOG-IDGUARD-FIRED] Tier-3 Phase-0 instrumentation (log-only, no behavior change):
+    # count when the Feb-2026 dual-_id guardrail did real work — a duplicate doc exists,
+    # or the ObjectId doc (not the canonical string doc) was the richer one. If this NEVER
+    # fires across launch-prep traffic, the dual-_id read here is dead and Tier 3 may drop
+    # it. See _documentation_master/projects/EOG_Persistence_Tier3_Plan.md §Phase 0.
+    if selected_kind != "string" or len(candidate_docs) > 1:
+        logger.warning(
+            "[EOG-IDGUARD-FIRED] site=update_team_attributes game_id=%s selected=%s candidates=%s franchise_id=%s",
+            game_id_str, selected_kind, len(candidate_docs), franchise_id,
+        )
     
     # Get teams object for name fallback only
     teams_obj = game_doc.get("teams", {})
@@ -2421,6 +2431,13 @@ def _save_game_result(team1_id, team2_id, team1_score, team2_score, week, franch
                     existing_oid = db.games.find_one({"_id": game_oid})
                 if existing_oid:
                     filter_doc = {"_id": game_oid}
+                    # [EOG-IDGUARD-FIRED] Tier-3 Phase-0 (log-only): the canonical string-_id
+                    # doc was missing and a legacy ObjectId-_id doc was updated instead — the
+                    # _id-hygiene guardrail did real work.
+                    logger.warning(
+                        "[EOG-IDGUARD-FIRED] site=_save_game_result.objectid_fallback game_id=%s franchise_id=%s",
+                        game_id_str, franchise_id,
+                    )
                 else:
                     filter_doc = {"_id": game_id_str}
         except Exception as e:

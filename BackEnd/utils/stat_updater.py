@@ -1603,6 +1603,15 @@ def finalize_game(
             try:
                 game = games_collection.find_one({"_id": ObjectId(game_id)})
                 logger.info(f"🔍 [FINALIZE_GAME] Found game using ObjectId conversion: {game_id}")
+                # [EOG-IDGUARD-FIRED] Tier-3 Phase-0 (log-only): the canonical string-_id
+                # doc was missing and the ObjectId-_id doc was used — the _id-hygiene
+                # guardrail did real work. If this never fires for franchise CPU games in
+                # real traffic, Tier 3 can pass the in-memory doc instead of re-reading.
+                if game:
+                    logger.warning(
+                        "[EOG-IDGUARD-FIRED] site=finalize_game.objectid_fallback game_id=%s franchise_id=%s",
+                        game_id, franchise_id,
+                    )
             except Exception as e:
                 logger.warning(f"⚠️ [FINALIZE_GAME] Could not convert game_id to ObjectId: {game_id}, error: {e}")
                 game = None
