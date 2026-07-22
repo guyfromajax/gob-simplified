@@ -210,6 +210,24 @@ def test_putback_event_payload_and_possession(monkeypatch, made, def_reb, expect
     assert base_keys <= event.keys()
 
 
+def test_putback_diagnostic_records_nearest_distance_with_full_contest(monkeypatch):
+    captured = {}
+
+    def capture_diagnostic(_game, **kwargs):
+        captured.update(kwargs)
+
+    monkeypatch.setattr("BackEnd.utils.shared.record_shot_split", capture_diagnostic)
+    event = _force_putback_path(monkeypatch, made=True)
+
+    assert event["event_type"] == "PUTBACK_ATTEMPT"
+    assert captured["turn_type"] == "OREB"
+    assert captured["is_three"] is False
+    assert captured["defended"] is True
+    assert isinstance(captured["defender_distance"], float)
+    assert captured["defender_distance"] >= 0
+    assert captured["contest_factor"] == 1.0
+
+
 def test_kickout_reset_event_payload(monkeypatch):
     from BackEnd.utils.shared import resolve_offensive_rebound
 
@@ -292,4 +310,3 @@ def test_dreb_outlet_receiver_target_anchors_to_bounce_when_coords_stale(monkeyp
     # Toward HOME_RIM (91) from bounce-anchored x (~6..9): expect low 10s–20s, not ~72.
     assert target["x"] < 30
     assert target["x"] > bounce["x"]
-

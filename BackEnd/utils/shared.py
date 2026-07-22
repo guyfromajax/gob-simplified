@@ -1152,8 +1152,17 @@ def resolve_offensive_rebound(game, rebounder):
                 game.game_state.get("offensive_state"),
                 "oreb_putback",
             )
-        # Shot diagnostics: OREB putback is always a 2pt inside attempt.
-        record_shot_split(game, is_three=False, defended=contested, made=made, turn_type="OREB")
+        # Shot diagnostics: OREB remains binary/full-defense gameplay, but retain
+        # the already-resolved nearest-defender distance for calibration.
+        record_shot_split(
+            game,
+            is_three=False,
+            defended=contested,
+            made=made,
+            turn_type="OREB",
+            defender_distance=nearest_distance,
+            contest_factor=1.0 if contested else 0.0,
+        )
         rebounder.record_stat("FGA")
 
         # Shot_Result_List: record make (True) / clean miss (False); skip a miss

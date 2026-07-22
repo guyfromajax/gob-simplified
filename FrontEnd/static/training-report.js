@@ -574,11 +574,10 @@ function renderTrainingReportRecruitingBanner() {
   titleEl.classList.toggle('is-hidden', !h);
 
   // Preferred: render each recruit's lean as the shared ranked ladder (identical markup to the
-  // hub pool). Read-only; RT colored on the recruit scale; links through to the hub.
+  // hub pool). Read-only; RT colored on the recruit scale.
   const recruits = reportData && Array.isArray(reportData.recruiting_recruits) ? reportData.recruiting_recruits : [];
   const teamNameMap = (reportData && reportData.recruiting_team_name_map) || {};
   const recruitTeamId = reportData && reportData.recruiting_team_id;
-  const total = Number((reportData && reportData.recruiting_total) || recruits.length);
   const Spine = window.RecruitingSpine;
   if (recruits.length && recruitTeamId && Spine && Spine.Lean) {
     metaLineEl.textContent = '';
@@ -598,19 +597,6 @@ function renderTrainingReportRecruitingBanner() {
       list.appendChild(row);
     });
     metaLineEl.appendChild(list);
-    const foot = document.createElement('div');
-    foot.className = 'trr-lean-foot';
-    const moreN = Math.max(0, total - recruits.length);
-    const link = document.createElement('a');
-    link.className = 'trr-hub-link';
-    const params = new URLSearchParams();
-    if (franchiseId) params.set('franchise_id', franchiseId);
-    if (teamId) params.set('team_id', teamId);
-    params.set('from', 'training-report');
-    link.href = '/recruiting.html?' + params.toString();
-    link.textContent = (moreN > 0 ? '+' + moreN + ' more · ' : '') + 'View in Recruiting Hub →';
-    foot.appendChild(link);
-    metaLineEl.appendChild(foot);
     return;
   }
 

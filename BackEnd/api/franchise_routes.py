@@ -9054,7 +9054,9 @@ def _training_report_recruiting_display(
 ) -> dict[str, str | None] | None:
     """
     Copy for training-report.html recruiting column: visit weeks 20–26 vs lean weeks 1–19 / 27–34.
-    Returns dict with keys header, meta_line (strings; meta_line may be empty) or None when out of scope.
+    Lean weeks show the single highest-RT recruit leaning toward the user team
+    (random among RT ties). Empty lean weeks use header "No Recruits Leaning Your Way".
+    Returns dict with keys header, meta_line, recruits, total — or None when out of scope.
     """
     if not franchise_doc or not user_team_object_id:
         return None
@@ -9119,17 +9121,26 @@ def _training_report_recruiting_display(
                 {"franchise_id": fid_str, "$or": lean_or}, _proj,
             )
         )
-        recruits.sort(key=lambda r: (-_recruit_rt(r), str(r.get("recruit_id") or "")))
-        header = "Recruits Leaning Your Way"
         if not recruits:
-            return {"header": header, "meta_line": "", "recruits": [], "total": 0}
-        top = recruits[:3]
-        parts = [f"{_recruit_display_name_for_training_report(r)} - RT: {_recruit_rt(r)}" for r in top]
-        line = ", ".join(parts)
-        if len(recruits) > 3:
-            line += " ..."
-        return {"header": header, "meta_line": line,
-                "recruits": [_rec_item(r) for r in top], "total": len(recruits)}
+            return {
+                "header": "No Recruits Leaning Your Way",
+                "meta_line": "",
+                "recruits": [],
+                "total": 0,
+            }
+        max_rt = max(_recruit_rt(r) for r in recruits)
+        top_tied = [r for r in recruits if _recruit_rt(r) == max_rt]
+        # Stable among ties for a given franchise week (avoids re-roll on every page load).
+        top_tied.sort(key=lambda r: str(r.get("recruit_id") or ""))
+        top = random.Random(f"{fid_str}:{w}").choice(top_tied)
+        nm = _recruit_display_name_for_training_report(top)
+        rt = _recruit_rt(top)
+        return {
+            "header": "Top Recruit Leaning Your Way",
+            "meta_line": f"{nm} - RT: {rt}",
+            "recruits": [_rec_item(top)],
+            "total": 1,
+        }
 
     return None
 
@@ -14085,11 +14096,13 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 report_week_int = int(week)
             except (TypeError, ValueError):
                 report_week_int = 0
-            # Compute the structured display once; header/meta still prefer the saved snapshot.
+            # Compute the structured display once. Visit weeks prefer the saved snapshot;
+            # lean weeks always use the live struct (top-RT pick + empty-state header).
             rec_struct = _training_report_recruiting_display(
                 doc, report_week_int, str(authoritative_team_id)
             )
             visit_window = 20 <= report_week_int <= 26
+            lean_window = (1 <= report_week_int <= 19) or (27 <= report_week_int <= 34)
             rec_header_snap = report_data.get("recruiting_header")
             rec_meta_snap = report_data.get("recruiting_meta_line")
             meta_empty = (
@@ -14103,7 +14116,10 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             # Snapshots that saved "Recruiting Visit" with null/empty meta never refreshed; recompute
             # from current franchise + FRD when visit-week meta is missing (Training_System.md).
             stale_visit_strip = visit_window and meta_empty
-            if keys_present and not stale_visit_strip:
+            if lean_window and rec_struct is not None:
+                rec_header = rec_struct.get("header")
+                rec_meta = rec_struct.get("meta_line")
+            elif keys_present and not stale_visit_strip:
                 rec_header = rec_header_snap
                 rec_meta = rec_meta_snap
             elif rec_struct is not None:
