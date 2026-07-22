@@ -46,7 +46,7 @@
 - The coordinate arc uses the home-offense HCO spot model (`key`, wings, midCorners, corners) and linearly interpolates the boundary x-value by shooter y. Away-offense shots mirror x with `100 - x` before testing. The helper expects display-oriented coords.
 - Fast Break shots remain 2-point by default. Only explicit outside Fast Break branches with `shot_type == "outside"` and a backend `shot_spot` can classify as 3s. This covers Triangle corner/wing/kick branches without changing Steal FB, RR rim attacks, or CR rim attacks.
 - Dynamic HCT procedural attack-basket shots bypass `ShotManager.resolve_shot()`, so they call the same classification wrapper before `calculate_shot_score()` and carry `is_three_point_shot` through scoring, `3PTA`/`3PTM`, points, and shooting-foul free-throw count.
-- OREB putbacks are forced 2-point field goals and stamp a forced-two classification payload. Their nearest defender uses the shared graded proximity curve: full at ≤3, linear to 0.15 at 9, 0.15 through 11, and no contest beyond 11. This does not add the standard `resolve_shot()` shooter-to-rim threshold penalty to OREB.
+- OREB putbacks are forced 2-point field goals and stamp a forced-two classification payload. Their nearest defender uses the shared graded proximity curve: full at ≤3, linear to 0.15 at 9, 0.15 through 11, and no contest beyond 11. Like every 2PT path, OREB receives no shooter-to-rim threshold penalty.
 - Free throws are forced 1-point attempts. They do not use field-goal 2/3 geometry.
 - Made-three SFX is stamped by the backend schema emitter only when `turn_result["is_three_point_shot"] is True`, not by raw `points == 3` and not by frontend inference.
 
@@ -329,7 +329,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
    - **Motion offense**: Determines `shot_type` during shot resolution (checks possibilities, builds weighted list, selects)
    - **Set plays**: Determines `shot_type` from skeleton analysis (shooter location + attack detection)
    - Attack detection (Set): shoot step = last step; shoot location in PAINT_SPOTS; step before has shooter with action `"handle_ball"` and different location → has_drive = True. Paint + has_drive = attack; paint + no has_drive = inside; else = outside.
-3. **Distance Modifier**: On standard `resolve_shot` attempts, twos add rounded Euclidean distance from shooter shot coords to the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS`); threes add rounded distance × 1.5. FLSS CH heaves excluded.
+3. **Distance Modifier**: Two-point attempts add no shooter-to-rim distance penalty. Three-point attempts add rounded Euclidean distance × 1.5 from the classified shot coordinate to the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS`). The same rule applies to the bespoke undefended-outside make bar. FLSS CH heaves are excluded.
 4. **Shot Value Classification**: `classify_shot_value()` is the canonical backend classifier. `roles["shot_spot"]` is authoritative when present; shooter coords are fallback; skeleton spot names are compatibility fallback only. Fast Breaks are 2-point unless the branch is explicitly `shot_type == "outside"` with a `shot_spot`. OREB putbacks force 2; free throws force 1.
 5. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
 6. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)

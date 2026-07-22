@@ -3,6 +3,14 @@ from types import SimpleNamespace
 from BackEnd.constants import POSITION_LIST
 from BackEnd.models.shot_manager import ShotManager
 from BackEnd.utils.shared import _resolve_oreb_putback_defender
+from BackEnd.models.shot_manager import _shot_distance_threshold_bump
+
+
+def test_shot_distance_threshold_bump_applies_only_to_threes():
+    assert _shot_distance_threshold_bump(0, is_three=False) == 0
+    assert _shot_distance_threshold_bump(25, is_three=False) == 0
+    assert _shot_distance_threshold_bump(0, is_three=True) == 0
+    assert _shot_distance_threshold_bump(25, is_three=True) == 38
 from BackEnd.utils.shot_geometry import is_three_point_shot_from_coords
 from tests.test_utils import MockPlayer
 

@@ -61,7 +61,7 @@ When **`MIN`** changes, these values re-derive from `BackEnd/constants/shot_thre
 | **Tournament seeds** | See table below | `TOURNAMENT_SEED_ST_RANGES` |
 | **Score balancing** | Trailing **−10**, leading **190** | `MIN − 20` / `MAX − 20` |
 | **Rim-runner corner FB** | **190 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
-| **Uncontested-3 make bar** | **210 − CH + dist** | `SHOT_THRESHOLD_MAX` in `shot_manager.resolve_shot` — always tracks MAX |
+| **Uncontested-3 make bar** | **210 − CH + round(dist × 1.5)** | `SHOT_THRESHOLD_MAX` in `shot_manager.resolve_shot` — always tracks MAX |
 | **FTE tutorial** | User **10**, computer **110** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
 | **UI pills** | Center **110**, span **10–210** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
 
@@ -95,7 +95,7 @@ When retuning feel beyond moving the storage window, grep and revisit:
 | `balancing_shot_threshold_override` | Uses derived `BALANCING_*` if wired through scale module |
 | `shot_threshold += 100` (broken variant) | Runtime modifier in `shot_manager.py` — not part of attribute scale |
 | Zone threshold deltas (+25/−25 etc.) | `shot_manager._hco_zone_shot_threshold_delta` |
-| Distance threshold bump | `resolve_shot`: twos add `round(Euclid(shooter → attacking rim))`; threes add `round(Euclid × 1.5)` via `THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER` |
+| Distance threshold bump | `resolve_shot`: twos add **0**; threes add `round(Euclid × 1.5)` via `THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER`, including the undefended-outside make bar |
 | Home crowd shot deltas | `home_crowd.py` |
 | EOG / training **delta magnitudes** (+5, −10, etc.) | Same numeric delta = different feel if MID moved |
 | SFX tiers **101 / 210** on `shot_score_pre_defense` | **Not** team attribute scale — `gameSfx.js`, `ShotAnimationSystem.js` |

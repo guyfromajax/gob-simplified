@@ -168,6 +168,13 @@ def _shot_in_rim_box(sx, sy, bx, by, margin=RIM_BOX_HALF_SPAN):
     return abs(sx - bx) <= margin and abs(sy - by) <= margin
 
 
+def _shot_distance_threshold_bump(distance, *, is_three):
+    """Location difficulty: no 2PT bump; 3PT adds rounded rim distance × 1.5."""
+    if not is_three:
+        return 0
+    return int(round(float(distance) * THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER))
+
+
 # Shared HCO/OREB graded contest curve (Dynamic_MM_Brief §7). Graded contest by the primary defender's
 # Euclidean distance to the shot spot — the openness primitive (a beaten/lagged defender is farther)
 # turned into make probability. Replaces the old boolean "within CONTEST_EUCLIDEAN_RADIUS → full
@@ -814,10 +821,8 @@ class ShotManager:
 
         shot_threshold += home_crowd_shot_threshold_delta_for_offense(off_team, self.game)
 
-        # Shot difficulty scales with distance: threshold += Euclidean distance (shooter → attacking
-        # rim), rounded. Applies to ALL shots (2026-07-13; previously three-pointers only) — at-rim
-        # finishes get ~0, longer 2s and 3s get progressively more. Three-point attempts use a
-        # larger distance multiplier to tune 3PT% separately from long twos.
+        # Three-point difficulty scales with Euclidean distance from the attacking rim
+        # (rounded distance × 1.5). Two-point attempts receive no distance bump.
         # Coords: the classification coord, else the shooter's shot spot.
         # FLSS heave (CH vs 1–100) does not use resolve_shot and is unaffected.
         spot_data = shot_classification.get("classification_coord")
@@ -829,8 +834,7 @@ class ShotManager:
             float(spot_data["x"]) - rim_x,
             float(spot_data["y"]) - rim_y,
         )
-        distance_multiplier = THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER if is_three else 1.0
-        shot_threshold += int(round(dist * distance_multiplier))
+        shot_threshold += _shot_distance_threshold_bump(dist, is_three=is_three)
         if playcall == "Set":
             playcall = "Attack"
 
@@ -1510,15 +1514,20 @@ class ShotManager:
                         return result
 
             # Undefended OUTSIDE shots use a bespoke make rule (design): shot_score must clear
-            # the shot-threshold scale MAX (SHOT_THRESHOLD_MAX) − shooter CH + shooter's Euclidean
-            # distance to the basket — higher chemistry / closer = easier. The uncontested-3 bar
+            # the shot-threshold scale MAX (SHOT_THRESHOLD_MAX) − shooter CH plus the shared
+            # 3PT distance bump. Undefended outside twos receive no distance bump. The uncontested-3 bar
             # always tracks the top of the shot_threshold range, so it moves automatically when the
             # scale is retuned (see Shot_Threshold_Scale_Tuning.md). Undefended inside/attack
             # within geo range use the universal uncontested roll helper; farther uncontested
             # inside/attack fall back to ``shot_score >= shot_threshold``.
             if not has_contest and shot_type == "outside":
                 _undef_ch = float((getattr(shooter, "attributes", None) or {}).get("CH", 0) or 0)
-                _make_bar = float(SHOT_THRESHOLD_MAX) - _undef_ch + math.hypot(float(sx) - float(bx), float(sy) - float(by))
+                _shot_dist = math.hypot(float(sx) - float(bx), float(sy) - float(by))
+                _make_bar = (
+                    float(SHOT_THRESHOLD_MAX)
+                    - _undef_ch
+                    + _shot_distance_threshold_bump(_shot_dist, is_three=is_three)
+                )
                 made = shot_score > _make_bar
             elif not has_contest:
                 _helper_threshold = compute_uncontested_inside_attack_make_threshold(
