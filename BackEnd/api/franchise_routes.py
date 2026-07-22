@@ -6883,11 +6883,11 @@ def _complete_week_finish_cpu_and_persist(
             _summaries.append(_user_diag)
         _merged, _ngames = merge_shot_diagnostics(_summaries)
         if _ngames:
-            print(
+            logger.warning(
                 f"[WEEK AGGREGATE] franchise={franchise_id_str} week={week} "
-                f"({'user game + ' if _user_diag else ''}{len(_cpu_diags)} full-sim CPU games)"
+                f"({'user game + ' if _user_diag else ''}{len(_cpu_diags)} full-sim CPU games)\n"
+                f"{format_week_aggregate_report(_merged, _ngames)}"
             )
-            print(format_week_aggregate_report(_merged, _ngames))
     except Exception as _agg_e:
         logger.warning("[WEEK AGGREGATE] shot diagnostics failed: %s", _agg_e)
 

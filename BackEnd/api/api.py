@@ -1733,7 +1733,7 @@ try:
 
         # Consolidated end-of-game shot diagnostics (one master report).
         from BackEnd.utils.shot_split_tracker import format_master_eog_report
-        print(format_master_eog_report(game))
+        logger.warning(format_master_eog_report(game))
 
         summary = summarize_game_state(game)
     
@@ -4662,7 +4662,7 @@ try:
         # Shot diagnostics at game end (quarter-by-quarter path).
         if is_final:
             from BackEnd.utils.shot_split_tracker import format_master_eog_report
-            print(format_master_eog_report(gm))
+            logger.warning(format_master_eog_report(gm))
         summary_time = (time.time() - summary_start) * 1000
     
         # ✅ DEBUG: Check ongoing_games state after simulate_quarter completes
