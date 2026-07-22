@@ -115,6 +115,11 @@ RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD = "rank_prestige_last_applied_week"
 POSTSEASON_TRAINING_DISABLED_WEEKS = range(27, 35)
 POSTSEASON_EOG_TEAM_ATTRS_DISABLED_WEEKS = range(27, 35)
 CPU_SIM_RUNNING_STALE_SECONDS = 180
+# Heartbeat cadence for persisting cpu_sim_job progress during the CPU-week loop.
+# The per-game write was retired (results are durable independently); this keeps the
+# crash-recovery UI count (command-center "Finishing Week X/Y") within N games of
+# accurate for ~week/N writes instead of one-per-game.
+CPU_SIM_JOB_HEARTBEAT_GAMES = 10
 
 
 def _week_in_policy_range(week: Any, policy_weeks: range) -> bool:
@@ -6598,6 +6603,8 @@ def _complete_week_finish_cpu_and_persist(
                     home_score=sim_res["team2_score"],
                     game_id=None,
                 )
+                if (cpu_job.get("completed_matchups") or 0) % CPU_SIM_JOB_HEARTBEAT_GAMES == 0:
+                    cpu_job = _persist_cpu_sim_job(franchise_id, week, cpu_job)
                 continue
 
             away_score, home_score, summary = sim_ok[job_idx]
@@ -6696,6 +6703,8 @@ def _complete_week_finish_cpu_and_persist(
                 home_score=home_score,
                 game_id=computer_game_id,
             )
+            if (cpu_job.get("completed_matchups") or 0) % CPU_SIM_JOB_HEARTBEAT_GAMES == 0:
+                cpu_job = _persist_cpu_sim_job(franchise_id, week, cpu_job)
 
     results = _order_franchise_week_results_like_schedule(results, week_games)
 
