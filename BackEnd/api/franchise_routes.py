@@ -6530,6 +6530,7 @@ def _complete_week_finish_cpu_and_persist(
         except Exception as _stash_e:
             logger.warning("[WEEK AGGREGATE] stash cpu diagnostics failed: %s", _stash_e)
 
+        _persist_t0 = time.time()  # [CPU-PERSIST-TIMING] per-game EOG persistence loop
         for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
             if job_idx in sim_err:
                 logger.error(
@@ -6705,6 +6706,17 @@ def _complete_week_finish_cpu_and_persist(
             )
             if (cpu_job.get("completed_matchups") or 0) % CPU_SIM_JOB_HEARTBEAT_GAMES == 0:
                 cpu_job = _persist_cpu_sim_job(franchise_id, week, cpu_job)
+
+        # [CPU-PERSIST-TIMING] Per-game EOG persistence loop cost only (db.games write +
+        # finalize_game stat rollup + team-attribute/decay + records + momentum) — the
+        # sequential-round-trip chunk Tier 3 targets. Timed separately from full_sim_block;
+        # post-loop finalize (results / franchise-doc writes) is NOT included here.
+        _persist_secs = time.time() - _persist_t0
+        _pg_n = len(full_jobs)
+        logger.warning(
+            "[CPU-PERSIST-TIMING] franchise=%s week=%s | games=%s | persist_loop=%.1fs (%.3fs/game)",
+            franchise_id_str, week, _pg_n, _persist_secs, _persist_secs / max(1, _pg_n),
+        )
 
     results = _order_franchise_week_results_like_schedule(results, week_games)
 
