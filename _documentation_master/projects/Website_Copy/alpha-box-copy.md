@@ -8,9 +8,7 @@ Title:
 - ALPHA RELEASE
 
 Body (single paragraph in `.alpha-disclaimer-text`):
-- **July 22 Update** Improved sim speed times for training and CPU simmed games. Significant overhaul to recruiting logic and UX. Added two new man defenses (Deny Man and Loose Man - to pair with Base Man). Add defender distance calc to shot attempts, pass interceptions, and help defense on drives -- thus magnifying the impact of each defense play.
-
-NOTE -- if you are mid-season, in order to get the full effect of the recruiting overhaul we suggest you delete and start a new season.
+- **July 22 Update** Improved sim speed for training and CPU-simmed games. Significant overhaul to recruiting logic and UX. Added two new man defenses (Deny Man and Loose Man — to pair with Base Man). Added defender-distance calculation to shot attempts, pass interceptions, and help defense on drives — thus magnifying the impact of each defense play. **NOTE** — If you are mid-season, we suggest you delete and start a new season to get the full effect of the recruiting overhaul.
 
 Source:
 - `FrontEnd/static/mode-select.html`

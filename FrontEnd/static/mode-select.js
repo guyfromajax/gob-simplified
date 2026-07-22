@@ -7,7 +7,7 @@ function playSound(filename) {
 }
 
 const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_version';
-const ALPHA_DISCLAIMER_VERSION = '2026-06-29-mid-game-autosave-alpha-box';
+const ALPHA_DISCLAIMER_VERSION = '2026-07-22-recruiting-defenses-alpha-box';
 
 const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
 const franchiseNewBtn = document.getElementById('franchise-new-btn');
