@@ -60,9 +60,12 @@ and must run exactly once.
    the one genuinely tricky part; a bug here silently corrupts attributes league-wide.
 
 2. **RNG.** `execute_training` draws from the global `random` module at ~60 sites. In separate pool
-   processes that works but is non-reproducible and lights the leak guard. Convert
-   `training_execution_v2.py` to `sim_rng` (same mechanical import-swap the engine got), and seed
-   per team `seed = base + team_index` → independent rolls AND reproducible for balance auditing.
+   processes that works but is non-reproducible and lights the leak guard. Give training its **own
+   dedicated stream** `training_rng` (same pattern as `sim_rng`, NOT shared with it) — training runs
+   concurrently with sims, so sharing `sim_rng` would couple training activity to sim draws (the
+   pymongo-non-determinism disease, readmitted). Seed per team `seed = base + team_index` →
+   independent rolls AND reproducible for balance auditing. General rule: each independent subsystem
+   gets its own RNG stream.
 
 3. **Coordination with PS games.** Same trigger (user runs training) wants two pool batches: 127
    auto-trains + 24 PS games. Run as two sequential pool batches sharing one serialized post-step.
@@ -85,7 +88,7 @@ stays as instant fallback (same pattern as the CPU-game sunset `FRANCHISE_ALL_GA
    `scripts/training_delta_dry_run.py`. No parallelism yet.
 2. **Parallelize** across the pool once single-team output is proven correct.
 3. **Coordinate** with PS games + the serialized post-steps.
-4. **RNG → sim_rng** for reproducibility (can fold into 1).
+4. **RNG → dedicated `training_rng`** (its own stream, NOT sim_rng) for reproducibility (can fold into 1).
 
 Do NOT parallelize before step 1 proves training correctness — the delta/idempotency issue means a
 bug corrupts every team's attributes, far worse than a wrong game score.
