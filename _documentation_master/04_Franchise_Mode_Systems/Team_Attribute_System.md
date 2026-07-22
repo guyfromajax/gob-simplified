@@ -1,11 +1,11 @@
 # Team Attribute Management System (**verified 2026-06-13**)
 
-> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise: attr `(-1,1)`, `team_chemistry` 7-10, `rebound_modifier` 0.2 fixed, `shot_threshold` 100-110; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). EOG faucet/sink tables spot-checked in `update_team_attributes_after_game` (`franchise_routes.py`): team-chemistry win +1..+2/+1..+3/+2..+4 & loss −2..−1/−3..−2/−5..−3 (L1383-1398), shot_threshold FG% bands at 50/45 (L1287-1295), discipline +1..+2, rebound-down −0.05..−0.10, distant-sim override (`simulation_engine=="distant"`) — all confirmed. **Fixed:** stale "January 2025" header + badly drifted Key Files line numbers (see below). **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
+> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise: attr `(-1,1)`, `team_chemistry` 7-10, `rebound_modifier` 0.2 fixed, `shot_threshold` 90-100; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). EOG faucet/sink tables spot-checked in `update_team_attributes_after_game` (`franchise_routes.py`): team-chemistry win +1..+2/+1..+3/+2..+4 & loss −2..−1/−3..−2/−5..−3 (L1383-1398), shot_threshold FG% bands at 50/45 (L1287-1295), discipline +1..+2, rebound-down −0.05..−0.10, distant-sim override (`simulation_engine=="distant"`) — all confirmed. **Fixed:** stale "January 2025" header + badly drifted Key Files line numbers (see below). **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
 
 ## Base Constants
 
 1. **Core Team Attributes**:
-   - `shot_threshold` - Shot attempt threshold (range: 20 to 220; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+   - `shot_threshold` - Shot attempt threshold (range: 10 to 210; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
    - `discipline` - Turnover modifier (formerly `turnover_modifier`)
    - `fight` - Foul modifier (formerly `foul_modifier`)
    - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4)
@@ -48,7 +48,7 @@ The Team Attribute Management System handles the initialization, storage, and up
 All team attributes are stored in team objects across all game modes:
 
 **Core Attributes:**
-- `shot_threshold` - Shot attempt threshold (range: 20 to 220, center at 120 for pill display; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+- `shot_threshold` - Shot attempt threshold (range: 10 to 210, center at 110 for pill display; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
 - `discipline` - Turnover modifier (formerly `turnover_modifier`)
 - `fight` - Foul modifier (formerly `foul_modifier`)
 - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4, center at 0.2 for pill display)
@@ -71,14 +71,14 @@ All team attributes are stored in team objects across all game modes:
 **Single Game & Tournament Mode:**
 - Attribute range: `random.randint(-10, 10)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `shot_threshold`: `random.randint(20, 220)` (from `TEAM_ATTR_RANGES`; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+- `shot_threshold`: `random.randint(10, 210)` (from `TEAM_ATTR_RANGES`; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
 - `team_chemistry`: `random.randint(7, 25)`
 - `rebound_modifier`: `random.randint(0, 40) / 100.0` (random 0.0-0.4 in 0.01 increments)
 
 **Franchise Mode:**
 - Attribute range: `random.randint(-1, 1)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `shot_threshold`: `random.randint(100, 110)` (slightly better than MID 120; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+- `shot_threshold`: `random.randint(90, 100)` (slightly better than MID 110; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
 - `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
 - `rebound_modifier`: `0.2` (fixed center value)
 
@@ -189,21 +189,21 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 - **Training amplifiers:** Matching coaching focus can amplify positive training gains. `breaks` can also multiply positive session gains; it directly adds extra changes to `team_chemistry`, `discipline`, and `fight` at 3+ points.
 - **CPU teams:** When the user runs training, non-user teams use distant-training templates. Those template deltas are database-driven and can be positive or negative for any standard team attribute except `momentum_score`.
 
-### Shooting (`shot_threshold`) (range: 20 to 220)
+### Shooting (`shot_threshold`) (range: 10 to 210)
 
 This is the team's intangible mindset to convert baskets. Their overall belief in their identity as a basketball team who scores points. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
-**Scale reference (20–220, MID 120):** To change the scale, see **[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)** (agent workflow + manual checklist).
+**Scale reference (10–210, MID 110):** To change the scale, see **[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)** (agent workflow + manual checklist).
 
 | Area | Current value |
 |------|---------------|
-| Team attribute clamp (`TEAM_ATTR_RANGES`) | **20 – 220** |
-| Franchise init | **100 – 110** (slightly better than MID 120) |
-| Tournament seeds | 1: **20–120** · 2–4: **20–170** · 5–7: **70–220** · 8: **120–220** |
-| Score balancing (one turn) | Trailing **0**, leading **200** (`MIN−20` / `MAX−20`) |
-| Rim-runner corner FB | **200 − fb_efficiency** |
-| FTE tutorial | User **20**, computer **120** |
-| UI pills | Center **120**, span **20–220** → FCC, training report, tournament, court, box score |
+| Team attribute clamp (`TEAM_ATTR_RANGES`) | **10 – 210** |
+| Franchise init | **90 – 100** (slightly better than MID 110) |
+| Tournament seeds | 1: **10–110** · 2–4: **10–160** · 5–7: **60–210** · 8: **110–210** |
+| Score balancing (one turn) | Trailing **−10**, leading **190** (`MIN−20` / `MAX−20`) |
+| Rim-runner corner FB | **190 − fb_efficiency** |
+| FTE tutorial | User **10**, computer **110** |
+| UI pills | Center **110**, span **10–210** → FCC, training report, tournament, court, box score |
 
 - Initial seed: Franchise init / missing-FTD creation (`range: 130 to 140`, random).
 - Faucet: Training System / Scrimmages.
@@ -225,7 +225,7 @@ This is the team's intangible mindset to convert baskets. Their overall belief i
   Condition: team FG% `> 50%`.
   Range: **both** teams `+= random.randint(-10, -5)`.
 
-**UI (Shooting pill and deltas):** Raw `shot_threshold` is a golf score (lower is better). Horizontal pills use **120** as center, **20** at the favorable end and **220** at the unfavorable end. Shared helpers: `FrontEnd/static/js/shared/teamShotThresholdScale.js`. **Training report** and **box score attribute-change** copy invert the numeric delta for display: a raw **−10** shows as **+10** in green; a raw **+5** shows as **−5** in red. See **[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)**.
+**UI (Shooting pill and deltas):** Raw `shot_threshold` is a golf score (lower is better). Horizontal pills use **110** as center, **10** at the favorable end and **210** at the unfavorable end. Shared helpers: `FrontEnd/static/js/shared/teamShotThresholdScale.js`. **Training report** and **box score attribute-change** copy invert the numeric delta for display: a raw **−10** shows as **+10** in green; a raw **+5** shows as **−5** in red. See **[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)**.
 
 ### Rebounding (`rebound_modifier`) (range: 0.0 to 0.4)
 This is the team's intangible mindset when it comes to rebounding. Their overall belief in their identity as a basketball team who gets more rebounds than their opponent. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.

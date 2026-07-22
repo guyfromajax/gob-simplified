@@ -354,7 +354,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 
 ## Related
 
-- **Team attribute scale (20–220, center 120):** [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)
+- **Team attribute scale (10–210, center 110):** [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)
 
 ### Key Files
 

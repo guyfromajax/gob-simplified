@@ -7,9 +7,9 @@
 (function (global) {
   const SPAN = 200;
   const HALF_SPAN = SPAN / 2;
-  const MIN = 20;
-  const MAX = 220;
-  const MID = 120;
+  const MIN = 10;
+  const MAX = 210;
+  const MID = 110;
 
   function pillDeviation(raw) {
     return MID - Number(raw);

@@ -55,6 +55,7 @@ from BackEnd.models.training_execution_v2 import (
 from BackEnd.models.distant_game_stats import build_distant_game_summary
 from BackEnd.models.player import Player
 from BackEnd.constants import BOX_SCORE_KEYS
+from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
 from BackEnd.eog_attr_rules import (
     build_eog_inputs_from_game_doc,
 )
@@ -13887,7 +13888,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
             # Get current team attributes (after training)
             team_attrs = {
-                "shot_threshold": team_data.get("shot_threshold", 120),
+                "shot_threshold": team_data.get("shot_threshold", SHOT_THRESHOLD_MID),
                 "rebound_modifier": team_data.get("rebound_modifier", 0.2),
                 "offensive_efficiency": team_data.get("offensive_efficiency", 0),
                 "defensive_efficiency": team_data.get("defensive_efficiency", 0),
@@ -14033,7 +14034,7 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             
             # Get current team attributes from tournament teams (matches Franchise pattern)
             team_attrs = {
-                "shot_threshold": team_data.get("shot_threshold", 120),
+                "shot_threshold": team_data.get("shot_threshold", SHOT_THRESHOLD_MID),
                 "rebound_modifier": team_data.get("rebound_modifier", 0.2),
                 "offensive_efficiency": team_data.get("offensive_efficiency", 0),
                 "defensive_efficiency": team_data.get("defensive_efficiency", 0),
