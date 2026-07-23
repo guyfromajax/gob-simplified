@@ -55,8 +55,8 @@ comparisons; the universal uncontested inside/attack helper retains its separate
 | Constant | File | Value | Effect |
 |---|---|---|---|
 | `THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER` | shot_manager.py | `2.0` | Three-point threshold penalty is `round(distance × 2.0)`; also used by the bespoke undefended-outside make bar. |
-| `INSIDE_SHOT_CLOSE_DISTANCE` / `INSIDE_SHOT_CLOSE_THRESHOLD_BONUS` | shot_manager.py | `<10` / `-20` | Two-point shots under 10 grid units reduce the shot threshold by 20. |
-| `INSIDE_SHOT_MID_DISTANCE` / `INSIDE_SHOT_MID_THRESHOLD_BONUS` | shot_manager.py | `10–15 inclusive` / `-10` | Two-point shots from 10 through 15 grid units reduce the shot threshold by 10. Above 15 receives no inside-distance bonus. |
+| `INSIDE_SHOT_CLOSE_DISTANCE` / `INSIDE_SHOT_CLOSE_THRESHOLD_BONUS` | shot_manager.py | `≤12` / `-40` | Two-point shots at or within 12 grid units reduce the shot threshold by 40. |
+| `INSIDE_SHOT_MID_DISTANCE` / `INSIDE_SHOT_MID_THRESHOLD_BONUS` | shot_manager.py | `>12–19 inclusive` / `-20` | Two-point shots beyond 12 through 19 grid units reduce the shot threshold by 20. Above 19 receives no inside-distance bonus. |
 
 ## Free Throw Resolution
 

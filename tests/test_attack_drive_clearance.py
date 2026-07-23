@@ -13,6 +13,7 @@ from BackEnd.engine.attack_drive_clearance import (
     READ_THRESHOLD_FLOOR,
     build_attack_drive_sequence,
     build_attack_drive_clearance,
+    _shot_type_for_stopped_pullup_coords,
 )
 
 
@@ -238,3 +239,18 @@ def test_drive_contest_uses_doubled_def_chem_and_efficiency():
         _, _, offense_wins = _compute_drive_scores(driver, defender, off_team, def_team, "man")
 
     assert offense_wins is False
+
+
+def test_stopped_pullup_value_uses_release_geometry_home_and_away():
+    assert _shot_type_for_stopped_pullup_coords(
+        {"x": 70, "y": 25}, False
+    ) == ("attack", "Attack")
+    assert _shot_type_for_stopped_pullup_coords(
+        {"x": 50, "y": 25}, False
+    ) == ("outside", "Outside")
+    assert _shot_type_for_stopped_pullup_coords(
+        {"x": 30, "y": 25}, True
+    ) == ("attack", "Attack")
+    assert _shot_type_for_stopped_pullup_coords(
+        {"x": 50, "y": 25}, True
+    ) == ("outside", "Outside")

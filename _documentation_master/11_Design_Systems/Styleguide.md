@@ -118,7 +118,7 @@ Player class year is **always shown as a two-letter abbreviation** in UI/UX — 
 
 ### Behavior
 - Buttons should feel responsive, deliberate, and restrained.
-- All button copy uses `Bebas Neue Pro`.
+- All button copy uses `Bebas Neue Pro` Bold (`font-weight: 700`).
 - Button font size should satisfy both rules at once:
 - Horizontal: button text should fill approximately `60–70%` of the button's total width with comfortable equal padding on each side.
 - Vertical: cap height should sit at approximately `45–55%` of the button's total height with breathing room above and below.
@@ -419,7 +419,7 @@ Shown on lesson **sub-pages only**, and **only** when the user arrived via an al
 - Moment Modals and Strategic Modals require explicit button action to dismiss
 - ESC dismisses Functional Modals only
 - Only one modal visible at a time
-- All button copy uses Bebas Neue Pro
+- All button copy uses Bebas Neue Pro Bold (`font-weight: 700`)
 - Toggle visibility via `.is-visible` class, not inline `display` style
 
 ## Toast Notifications

@@ -17,10 +17,11 @@ def test_shot_distance_threshold_bump_applies_only_to_threes():
 
 
 def test_inside_shot_threshold_bonus_uses_contiguous_distance_bands():
-    assert _inside_shot_threshold_bonus(9.99, is_three=False) == -20
-    assert _inside_shot_threshold_bonus(10, is_three=False) == -10
-    assert _inside_shot_threshold_bonus(15, is_three=False) == -10
-    assert _inside_shot_threshold_bonus(15.01, is_three=False) == 0
+    assert _inside_shot_threshold_bonus(12, is_three=False) == -40
+    assert _inside_shot_threshold_bonus(12.01, is_three=False) == -20
+    assert _inside_shot_threshold_bonus(13, is_three=False) == -20
+    assert _inside_shot_threshold_bonus(19, is_three=False) == -20
+    assert _inside_shot_threshold_bonus(19.01, is_three=False) == 0
     assert _inside_shot_threshold_bonus(5, is_three=True) == 0
 from BackEnd.utils.shot_geometry import is_three_point_shot_from_coords
 from tests.test_utils import MockPlayer

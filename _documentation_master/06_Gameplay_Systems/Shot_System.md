@@ -88,7 +88,7 @@
 
 4. Apply Three-Point Modifier (standard `resolve_shot` only; not FLSS CH-vs-1–100 heaves)
    - Distance penalty: only threes add shooter-to-rim distance in `resolve_shot`.
-     - Twos: threshold `-20` under 10 grid; `-10` from 10 through 15 grid; no adjustment above 15
+     - Twos: threshold `-40` at or within 12 grid; `-20` beyond 12 through 19 grid; no adjustment above 19
      - Threes: `shot_threshold += round(distance × 2.0)`
      - Home offense rim: `HOME_RIM_COORDS` (91, 25); away offense rim: `AWAY_RIM_COORDS` (9, 25) — absolute coords, no home-flip
      - If shooter coords unavailable: `shot_threshold += THREE_POINT_SHOT_THRESHOLD_FALLBACK` (25)
@@ -241,7 +241,7 @@ Shot resolution uses the following base constants:
 
 #### Step 4: Apply Three-Point Modifier
 - Scope: standard `resolve_shot()` only. FLSS heaves (CH vs roll 1–100) do not use this path.
-- Distance adjustment: twos reduce the threshold by 20 under 10 grid, by 10 from 10 through 15 grid inclusive, and receive no adjustment above 15. Threes add `round(hypot(shooter_x − rim_x, shooter_y − rim_y) × 2.0)`, where rim is the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS` by offense side; absolute coords).
+- Distance adjustment: twos reduce the threshold by 40 at or within 12 grid, by 20 beyond 12 through 19 grid inclusive, and receive no adjustment above 19. Threes add `round(hypot(shooter_x − rim_x, shooter_y − rim_y) × 2.0)`, where rim is the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS` by offense side; absolute coords).
 - If shooter shot coords are unavailable: `shot_threshold += THREE_POINT_SHOT_THRESHOLD_FALLBACK` (25).
 - Typical perimeter spots (key / midWing / wing / midCorner / corner) land ~19–27 vs rim (~20–23 common).
 
@@ -329,7 +329,7 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
    - **Motion offense**: Determines `shot_type` during shot resolution (checks possibilities, builds weighted list, selects)
    - **Set plays**: Determines `shot_type` from skeleton analysis (shooter location + attack detection)
    - Attack detection (Set): shoot step = last step; shoot location in PAINT_SPOTS; step before has shooter with action `"handle_ball"` and different location → has_drive = True. Paint + has_drive = attack; paint + no has_drive = inside; else = outside.
-3. **Distance Modifier**: Two-point attempts reduce the standard shot threshold by 20 under 10 grid and by 10 from 10–15 grid inclusive; above 15 is neutral. Three-point attempts add rounded Euclidean distance × 2.0 from the classified shot coordinate to the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS`). The same three-point rule applies to the bespoke undefended-outside make bar. FLSS CH heaves are excluded.
+3. **Distance Modifier**: Two-point attempts reduce the standard shot threshold by 40 at or within 12 grid and by 20 beyond 12 through 19 grid inclusive; above 19 is neutral. Three-point attempts add rounded Euclidean distance × 2.0 from the classified shot coordinate to the attacking rim (`HOME_RIM_COORDS` / `AWAY_RIM_COORDS`). The same three-point rule applies to the bespoke undefended-outside make bar. FLSS CH heaves are excluded.
 4. **Shot Value Classification**: `classify_shot_value()` is the canonical backend classifier. `roles["shot_spot"]` is authoritative when present; shooter coords are fallback; skeleton spot names are compatibility fallback only. Fast Breaks are 2-point unless the branch is explicitly `shot_type == "outside"` with a `shot_spot`. OREB putbacks force 2; free throws force 1.
 5. **Foul Thresholds by Shot Type**: Different hard/soft thresholds for inside (50/110), attack (70/130), and outside (30/90) shots
 6. **Defense Scheme Multiplier**: Only Zone vs 3pt gets 1.1x multiplier (makes shot more likely to be successful)

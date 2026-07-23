@@ -4,5 +4,6 @@ input[type="submit"],
 input[type="reset"] {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif !important;
   font-size: 18px !important;
+  font-weight: 700 !important;
   letter-spacing: 1.5px !important;
 }

@@ -6979,6 +6979,8 @@ def _execute_motion_decision(skeleton, base_steps, shot_step, bh_pos, bh_locatio
             "motion_attack_geometry_contest": drive_result.get("motion_attack_geometry_contest", False),
             "motion_attack_defense_bonus": drive_result.get("motion_attack_defense_bonus", 0),
             "motion_attack_driver_shoots": drive_result.get("motion_attack_driver_shoots"),
+            "stopped_attack_pullup": drive_result.get("stopped_attack_pullup", False),
+            "stopped_attack_pullup_coord": drive_result.get("stopped_attack_pullup_coord"),
         })
 
     # Hot read = conscious break from pattern → fire a coach VO. Backend picks the clip and
@@ -8531,6 +8533,11 @@ def resolve_half_court_offense_logic(game):
                 roles["motion_attack_defense_bonus"] = motion_shot_info["motion_attack_defense_bonus"]
             if motion_shot_info.get("motion_attack_driver_shoots") is not None:
                 roles["motion_attack_driver_shoots"] = motion_shot_info["motion_attack_driver_shoots"]
+            if motion_shot_info.get("stopped_attack_pullup"):
+                roles["stopped_attack_pullup"] = True
+                roles["stopped_attack_pullup_coord"] = dict(
+                    motion_shot_info["stopped_attack_pullup_coord"]
+                )
             
             # ✅ FIX: Re-derive passer from modified skeleton (Motion plays add pass/receive steps)
             # Use the same criteria as Set Plays: last pass to shooter within 5 steps, pass/receive in same step

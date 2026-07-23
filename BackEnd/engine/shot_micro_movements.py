@@ -642,6 +642,18 @@ def plan_non_dunk_shot_micro(
     }
 
 
+def plan_stopped_attack_pullup(shooter_x: float, shooter_y: float) -> Dict[str, Any]:
+    """Freeze a stopped Attack as a stationary pull-up at its wall coordinate."""
+    return {
+        "family_id": "pullup_attack",
+        "micro_move_to_coord": None,
+        "micro_release_coord": {
+            "x": float(shooter_x),
+            "y": float(shooter_y),
+        },
+    }
+
+
 def estimate_micro_pre_release_seconds(
     family_id: str,
     *,

@@ -19,13 +19,6 @@
     } catch (e) {}
   }
 
-  /** Man variants disabled for custom training CMD selection (temporary). */
-  const DISABLED_MAN_DEFENSE_IDS = new Set(['man_pressure', 'man_loose']);
-
-  function isManDefenseRowDisabled(row) {
-    return row.kind === 'defense' && DISABLED_MAN_DEFENSE_IDS.has(String(row.id));
-  }
-
   const params = new URLSearchParams(window.location.search);
   const mode = params.get('mode') || 'franchise';
   const franchiseId = params.get('franchise_id') || '';
@@ -195,18 +188,12 @@
   }
 
   function renderCard(container, row, selectedSet) {
-    const disabled = isManDefenseRowDisabled(row);
     const btn = document.createElement('button');
     btn.type = 'button';
-    const selected = !disabled && selectedSet.has(row.id);
-    btn.className = 'tp-card' + (selected ? ' is-selected' : '') + (disabled ? ' is-disabled' : '');
+    const selected = selectedSet.has(row.id);
+    btn.className = 'tp-card' + (selected ? ' is-selected' : '');
     btn.dataset.id = row.id;
     btn.setAttribute('aria-pressed', selected ? 'true' : 'false');
-    if (disabled) {
-      btn.disabled = true;
-      btn.setAttribute('aria-disabled', 'true');
-      btn.title = 'Not selectable for custom training yet';
-    }
 
     const top = document.createElement('div');
     top.className = 'tp-card-top';
@@ -260,16 +247,14 @@
     if (meta.childElementCount) btn.appendChild(meta);
     btn.appendChild(cmdRow);
 
-    if (!disabled) {
-      btn.addEventListener('click', () => {
-        playSound('click-tiny.wav');
-        if (selectedSet.has(row.id)) selectedSet.delete(row.id);
-        else selectedSet.add(row.id);
-        syncCardVisual(btn, row.id, selectedSet);
-        updateDock();
-        updateSaveState();
-      });
-    }
+    btn.addEventListener('click', () => {
+      playSound('click-tiny.wav');
+      if (selectedSet.has(row.id)) selectedSet.delete(row.id);
+      else selectedSet.add(row.id);
+      syncCardVisual(btn, row.id, selectedSet);
+      updateDock();
+      updateSaveState();
+    });
 
     container.appendChild(btn);
   }
@@ -324,14 +309,13 @@
       (o.offense || []).forEach((id) => offenseSel.add(String(id)));
       (o.defense || []).forEach((id) => defenseSel.add(String(id)));
     } catch (e) {}
-    DISABLED_MAN_DEFENSE_IDS.forEach((id) => defenseSel.delete(id));
   }
 
   function persistAndLeave() {
     playSound('confirm-2-lowervol.wav');
     const payload = {
       offense: Array.from(offenseSel),
-      defense: Array.from(defenseSel).filter((id) => !DISABLED_MAN_DEFENSE_IDS.has(String(id))),
+      defense: Array.from(defenseSel),
     };
     sessionStorage.setItem(STORAGE_FOCUS, JSON.stringify(payload));
     sessionStorage.setItem(STORAGE_MODE, 'custom');

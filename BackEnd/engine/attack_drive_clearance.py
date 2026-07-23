@@ -11,6 +11,7 @@ from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS
 from BackEnd.utils.defense_identity import defense_zone_shell_variant
 from BackEnd.utils.defense_utils import is_zone_defense
 from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
+from BackEnd.utils.shot_geometry import is_three_point_shot_from_coords
 from BackEnd.utils.shared import (
     calculate_ball_handling_score,
     calculate_defender_pressure_score,
@@ -646,6 +647,16 @@ def _shot_type_for_coords(
     return "outside", "Outside"
 
 
+def _shot_type_for_stopped_pullup_coords(
+    coords: Dict[str, float],
+    is_away_offense: bool,
+) -> Tuple[str, str]:
+    """Score a stopped Attack pull-up by its exact release geometry."""
+    if is_three_point_shot_from_coords(coords, is_away_offense=is_away_offense):
+        return "outside", "Outside"
+    return "attack", "Attack"
+
+
 def _stationary_pos_actions(
     drive_end_by_pos: Dict[str, Dict[str, Any]],
 ) -> Dict[str, Dict[str, Any]]:
@@ -1126,6 +1137,7 @@ def build_attack_drive_sequence(
     # foul/charge/TO contact; S2e the pull-up/dish/reset options. See Dynamic_MM_Brief §S2.
     _stop_shot_type = None
     _stop_shot_playcall = None
+    _stopped_pullup_coord = None
     if _three_tier and drive_tier in ("B", "C") and drive_stop_fraction < 1.0:
         if drive_tier == "C":
             # Defense WON — the BH is walled almost at once: cap his advance to an ABSOLUTE 0–2 grid
@@ -1136,8 +1148,17 @@ def build_attack_drive_sequence(
             _bh_stop = _drive_stop_coord(driver_start, drive_end, _cap_frac)
         else:
             _bh_stop = _drive_stop_coord(driver_start, drive_end, drive_stop_fraction)  # B: contested pull-up midway
-        _stop_shot_type, _stop_shot_playcall = _shot_type_for_coords(_bh_stop, is_away_offense)
-        drive_end_by_pos[ball_handler_pos] = {"location": destination_location, "coords": _bh_stop}
+        # A stopped attack is a stationary pull-up at the exact wall coordinate.
+        # Geometry decides its value; the originating Attack decision only controls
+        # the non-relocating pull-up footwork.
+        _stopped_pullup_coord = dict(_bh_stop)
+        _stop_shot_type, _stop_shot_playcall = _shot_type_for_stopped_pullup_coords(
+            _bh_stop, is_away_offense
+        )
+        # Do not retain destination_location on this target: _pos_action_for_target
+        # intentionally prefers named locations, which would discard the physical
+        # stop coordinate before UESS/emission.
+        drive_end_by_pos[ball_handler_pos] = {"coords": dict(_bh_stop)}
         drive_pos_actions[ball_handler_pos] = _pos_action_for_target(
             drive_end_by_pos[ball_handler_pos], "drive")
         final_off_for_defense[ball_handler_pos] = {
@@ -1301,6 +1322,12 @@ def build_attack_drive_sequence(
         "drive_tier": drive_tier,
         "drive_stop_fraction": drive_stop_fraction,
         "drive_contact": drive_contact,
+        "stopped_attack_pullup": bool(_stopped_pullup_coord and driver_shoots),
+        "stopped_attack_pullup_coord": (
+            dict(_stopped_pullup_coord)
+            if _stopped_pullup_coord and driver_shoots
+            else None
+        ),
         "drive_contact_defender_id": (
             getattr(def_lineup.get(bh_defender_pos), "player_id", None)
             if (drive_contact and bh_defender_pos) else None),
@@ -1401,6 +1428,12 @@ def build_attack_drive_sequence(
         "motion_attack_geometry_contest": True,
         "motion_attack_defense_bonus": defense_bonus,
         "motion_attack_driver_shoots": bool(driver_shoots),
+        "stopped_attack_pullup": bool(_stopped_pullup_coord and driver_shoots),
+        "stopped_attack_pullup_coord": (
+            dict(_stopped_pullup_coord)
+            if _stopped_pullup_coord and driver_shoots
+            else None
+        ),
         "attack_drive_meta": attack_drive_meta,
         "drive_pos_actions": drive_pos_actions,
         "attack_drive_meta_legacy": attack_drive_meta,

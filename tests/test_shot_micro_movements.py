@@ -17,6 +17,17 @@ from BackEnd.engine.shot_micro_movements import (
 )
 
 
+def test_stopped_attack_pullup_is_stationary_at_authoritative_stop():
+    from BackEnd.engine.shot_micro_movements import plan_stopped_attack_pullup
+
+    plan = plan_stopped_attack_pullup(72.5, 18.25)
+    assert plan == {
+        "family_id": "pullup_attack",
+        "micro_move_to_coord": None,
+        "micro_release_coord": {"x": 72.5, "y": 18.25},
+    }
+
+
 class TestResolveContest:
     def test_offense_win_above_threshold(self):
         result, margin = resolve_contest(400.0, 200.0)

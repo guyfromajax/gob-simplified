@@ -91,10 +91,10 @@ from BackEnd.constants.fast_break_play_types import (
 # Location-based contest / rim shortcuts (see Shot_System.md)
 RIM_BOX_HALF_SPAN = 6  # axis-aligned box around attacking basket: |Δx|, |Δy| ≤ 6
 THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER = 2.0
-INSIDE_SHOT_CLOSE_DISTANCE = 10.0
-INSIDE_SHOT_MID_DISTANCE = 15.0
-INSIDE_SHOT_CLOSE_THRESHOLD_BONUS = -20
-INSIDE_SHOT_MID_THRESHOLD_BONUS = -10
+INSIDE_SHOT_CLOSE_DISTANCE = 12.0
+INSIDE_SHOT_MID_DISTANCE = 19.0
+INSIDE_SHOT_CLOSE_THRESHOLD_BONUS = -40
+INSIDE_SHOT_MID_THRESHOLD_BONUS = -20
 
 # DREB→HCO outlet: rebounder.coords can lag defensive shell vs. actual board (see ball_bounce).
 DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD = 12.0
@@ -186,7 +186,7 @@ def _inside_shot_threshold_bonus(distance, *, is_three):
     if is_three:
         return 0
     distance = float(distance)
-    if distance < INSIDE_SHOT_CLOSE_DISTANCE:
+    if distance <= INSIDE_SHOT_CLOSE_DISTANCE:
         return INSIDE_SHOT_CLOSE_THRESHOLD_BONUS
     if distance <= INSIDE_SHOT_MID_DISTANCE:
         return INSIDE_SHOT_MID_THRESHOLD_BONUS
@@ -782,23 +782,32 @@ class ShotManager:
             pre_micro_sx, pre_micro_sy = _shooter_xy_from_roles(roles, shooter)
         _micro_plan = None
         if not roles.get("flss"):
-            from BackEnd.engine.shot_micro_movements import plan_non_dunk_shot_micro
+            from BackEnd.engine.shot_micro_movements import (
+                plan_non_dunk_shot_micro,
+                plan_stopped_attack_pullup,
+            )
 
-            _micro_plan_kwargs = {
-                "shot_type": shot_type,
-                "shooter_id": str(shooter.player_id),
-                "shooter_x": float(pre_micro_sx),
-                "shooter_y": float(pre_micro_sy),
-                "off_lineup": off_lineup,
-                "def_lineup": def_lineup,
-                "away_offense": off_team.team_id == self.game.away_team.team_id,
-                "shooter_player": shooter,
-            }
-            if self.game_state.get("final_turn"):
-                _micro_plan_kwargs["max_pre_release_seconds"] = self.game_state.get(
-                    "_final_turn_micro_budget_seconds"
-                )
-            _micro_plan = plan_non_dunk_shot_micro(**_micro_plan_kwargs)
+            if roles.get("stopped_attack_pullup"):
+                # A wall ended the Attack movement. Preserve the authoritative
+                # stop coordinate and use the existing stationary pull-up family;
+                # never let the generic outside pool relocate this shot to the arc.
+                _micro_plan = plan_stopped_attack_pullup(pre_micro_sx, pre_micro_sy)
+            else:
+                _micro_plan_kwargs = {
+                    "shot_type": shot_type,
+                    "shooter_id": str(shooter.player_id),
+                    "shooter_x": float(pre_micro_sx),
+                    "shooter_y": float(pre_micro_sy),
+                    "off_lineup": off_lineup,
+                    "def_lineup": def_lineup,
+                    "away_offense": off_team.team_id == self.game.away_team.team_id,
+                    "shooter_player": shooter,
+                }
+                if self.game_state.get("final_turn"):
+                    _micro_plan_kwargs["max_pre_release_seconds"] = self.game_state.get(
+                        "_final_turn_micro_budget_seconds"
+                    )
+                _micro_plan = plan_non_dunk_shot_micro(**_micro_plan_kwargs)
             release = _micro_plan.get("micro_release_coord")
             if isinstance(release, dict) and release.get("x") is not None:
                 roles["shot_spot"] = {
@@ -843,7 +852,7 @@ class ShotManager:
 
         # Three-point difficulty scales with Euclidean distance from the attacking rim
         # (rounded distance × 2.0). Two-point attempts receive a threshold reduction
-        # inside 15 grid units, with a larger reduction inside 10.
+        # through 19 grid units, with a larger reduction through 12.
         # Coords: the classification coord, else the shooter's shot spot.
         # FLSS heave (CH vs 1–100) does not use resolve_shot and is unaffected.
         spot_data = shot_classification.get("classification_coord")
@@ -1649,7 +1658,11 @@ class ShotManager:
                 # logging.warning(f"   📊 Shot result changed: {('MADE' if original_made else 'MISS')} → {('MADE' if made else 'MISS')}")
                 pass
 
-        if not roles.get("flss") and shot_type in ("inside", "attack"):
+        if (
+            not roles.get("flss")
+            and not roles.get("stopped_attack_pullup")
+            and shot_type in ("inside", "attack")
+        ):
             from BackEnd.engine.shot_micro_movements import prepare_dunk_stamp
 
             is_away_offense_dunk = off_team.team_id == self.game.away_team.team_id

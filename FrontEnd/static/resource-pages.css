@@ -246,6 +246,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   color: #15181f;
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
+  font-weight: 700;
   letter-spacing: 0.06em;
   line-height: 1;
   text-decoration: none;
@@ -455,6 +456,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   color: #15181f;
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
+  font-weight: 700;
   letter-spacing: 0.04em;
   cursor: pointer;
   transition: filter 0.14s ease, transform 0.14s ease;
@@ -480,6 +482,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   color: rgba(255, 255, 255, 0.8);
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
+  font-weight: 700;
   letter-spacing: 0.04em;
   cursor: pointer;
   transition: background 0.14s ease, border-color 0.14s ease;
@@ -501,6 +504,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   color: rgba(255, 255, 255, 0.8);
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 16px;
+  font-weight: 700;
   letter-spacing: 0.04em;
   cursor: pointer;
   transition: background 0.14s ease, border-color 0.14s ease;

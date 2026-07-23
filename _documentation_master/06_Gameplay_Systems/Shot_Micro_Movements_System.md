@@ -169,6 +169,25 @@ Each family expands to an ordered list of beats. The **last beat is always `shot
 | `dribble_pump_shoot` | move_to → pump_fake → shoot | Composite; static fallback = set_pump pattern |
 | `pump_dribble_shoot` | pump_fake → move_to → shoot | Composite |
 
+### 6.2.1 Stopped Attack pull-ups
+
+A Tier B/C HCO Attack drive that is stopped and not dished is a special
+stationary release:
+
+- The authoritative drive-stop coordinate is preserved through the skeleton,
+  UESS, shot geometry, and emission.
+- Shot value is classified geometrically from that coordinate. A stop inside
+  the arc is a two; a stop behind it is a three.
+- The family is pinned to `pullup_attack`, with
+  `micro_move_to_coord = null` and `micro_release_coord` equal to the stop
+  coordinate.
+- It cannot enter the generic outside pool, relocate to an arc spot, or become
+  a dunk. A geometric three uses Outside shot weights and the existing
+  three-point distance penalty; a two retains Attack pull-up scoring.
+
+This is local hot-path state only: no database access, extra animator pass,
+geometry rebuild, or bulk-sim diagnostic is introduced.
+
 ### 6.3 Outside dribble target selection
 
 Moving outside families (`dribble_shoot`, `dribble_pump_shoot`, `pump_dribble_shoot`):

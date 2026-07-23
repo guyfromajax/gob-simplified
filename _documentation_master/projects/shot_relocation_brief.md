@@ -60,11 +60,16 @@ Attack families:
 There is no implemented family named `upper_and_under`; `under_and_up` is the
 applicable family.
 
-All semantic `inside` and `attack` attempts must remain two-point attempts.
-Their micro displacement must never reclassify them as threes, even if the
-release coordinate crosses the geometric arc. This includes a shooter whose
-pre-micro coordinate is accidentally behind the arc. Dunks remain forced-two
-as they are today.
+Ordinary semantic `inside` and `attack` movement families must not manufacture
+a three through micro displacement. Dunks remain forced-two.
+
+**Implemented exception — stopped Attack pull-up (2026-07-23):** a Tier B/C
+drive stop freezes the exact stop coordinate and pins the stationary
+`pullup_attack` family. It never enters an outside relocating family, but its
+shot value is determined geometrically from the frozen coordinate. Therefore
+an inside-arc stop is a two and a genuine behind-arc stop is a three. A
+geometric three uses Outside scoring weights and the existing three-point
+distance penalty.
 
 ### 2.3 Starting-value authority
 
@@ -213,7 +218,9 @@ seam:
 1. Resolve the semantic `shot_type` as today.
 2. Select the micro-movement family from the existing family pool as today.
 3. If semantic `shot_type` is `inside` or `attack`, preserve its current
-   movement and force final shot-value classification to two.
+   movement and prevent micro displacement from manufacturing a three. The
+   implemented stopped-Attack exception instead pins `pullup_attack` and
+   classifies the exact frozen stop coordinate geometrically.
 4. If the family is static or otherwise not in `OUTSIDE_MOVING_FAMILIES`,
    preserve its current behavior.
 5. For an outside relocating family:
@@ -266,8 +273,10 @@ No implementation is authorized yet. When resumed:
 
 ### Phase 3: Inside/attack two-point invariant
 
-1. At final shot-value classification, pass `allow_three=False` whenever the
-   semantic `shot_type` is `inside` or `attack`.
+1. At final shot-value classification, prevent ordinary `inside`/`attack`
+   micro displacement from manufacturing a three. Exempt the implemented
+   stopped-Attack pull-up: its frozen stop coordinate remains authoritative
+   for 2/3 classification.
 2. Preserve current micro release coordinates and animation.
 3. Ensure block, foul, PIP, threshold, and stat logic continues to receive the
    same semantic shot type.
