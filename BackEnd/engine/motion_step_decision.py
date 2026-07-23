@@ -113,7 +113,10 @@ def _choose_attack_or_outside(player, rng):
     attack_score = (a.get("AG", 0) + a.get("SC", 0)) / 2
     outside_score = a.get("SH", 0)
     total = attack_score + outside_score
-    if total <= 0:
+    # Guard the sub-1 case, not just <=0: int(round(total)) collapses 0<total<1 to
+    # 0, which makes rng.randint(1, 0) raise "empty range for randrange()". A player
+    # with near-zero AG/SC/SH (e.g. practice-squad marginals) trips it.
+    if int(round(total)) < 1:
         return "outside"
     shot_roll = rng.randint(1, int(round(total)))
     return "attack" if shot_roll <= attack_score else "outside"
@@ -276,7 +279,10 @@ def _weighted_attack_or_outside(player, off_team, rng):
         a.get("SH", 0) + s.get("outside", 2) * 10
     ) * OUTSIDE_SHOT_SELECTION_MULTIPLIER
     total = attack_score + outside_score
-    if total <= 0:
+    # Same sub-1 rounding guard as _choose_attack_or_outside: int(round(total)) can
+    # collapse 0<total<1 to 0 and make rng.randint(1, 0) raise. Latent here (emphasis
+    # defaults usually floor total ~20) but real if both emphases are set to 0.
+    if int(round(total)) < 1:
         return "outside"
     return "attack" if rng.randint(1, int(round(total))) <= attack_score else "outside"
 
