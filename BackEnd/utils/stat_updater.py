@@ -1680,7 +1680,8 @@ def finalize_game(
         # ✅ FIX: Re-read game document with retry logic to ensure we have the final version
         # This is critical because the game document is saved multiple times during gameplay (Q1, Q2, Q3, Q4)
         # We need to wait for the final Q4 save (or OT save) before processing stats
-        import time
+        # (time is imported at module level; a function-local `import time` here would make
+        # `time` a local for the whole function and break earlier time.time() calls.)
         max_retries = 10
         retry_delay = 0.2  # 200ms between retries
         
