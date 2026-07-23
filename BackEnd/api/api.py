@@ -4565,6 +4565,18 @@ try:
                 saved_log_levels = {log: log.level for log in loggers_to_quiet}
                 for log in loggers_to_quiet:
                     log.setLevel(logging.ERROR)
+            # Bulk full-game sims (full_sim=True: Sim Quarter / Sim Full Game) aren't watched
+            # turn-by-turn, so suppress the per-turn engine logs the same way CPU/PS games do —
+            # they're pure I/O overhead here (FB_UESS / ALT / FCP / pts-reconcile / …) and trip
+            # Railway's log rate limit. quiet_headless is contextvar-scoped (only THIS request's
+            # logs), so it never suppresses concurrent requests; it's log-only — no _headless flag,
+            # so foul-out handling and the game result are unchanged. Play Quarter (full_sim=False)
+            # keeps its logs.
+            _quiet_full_sim = None
+            if (not turn_by_turn_mode) and not quiet_sim:
+                from BackEnd.utils.headless_simulation import quiet_headless_simulation_logs
+                _quiet_full_sim = quiet_headless_simulation_logs()
+                _quiet_full_sim.__enter__()
             try:
                 if body.locked_exhausted_user_lineup:
                     from BackEnd.main import activate_locked_exhausted_user_lineup
@@ -4619,6 +4631,8 @@ try:
                 if saved_log_levels is not None:
                     for log, level in saved_log_levels.items():
                         log.setLevel(level)
+                if _quiet_full_sim is not None:
+                    _quiet_full_sim.__exit__(None, None, None)
             
         except ValueError as e:
             logging.error(
