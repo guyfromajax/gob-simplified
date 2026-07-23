@@ -121,26 +121,29 @@ def _build_franchise_team_maps_from_ftd(
         logger.warning(f"⚠️ [_build_franchise_team_maps_from_ftd] FTD query failed: {e}")
         return team_name_to_id, team_id_to_object_id
 
-    for d in ftd_docs:
-        team_obj_id = d.get("team_id")
-        if not team_obj_id:
-            continue
+    # Batch the team lookups into ONE $in query instead of a find_one per team.
+    # This was an N+1: ~128 find_one round-trips per call, and the function is called
+    # per game in finalize_game + both season_stats updaters — ~250+ needless lookups of
+    # STATIC team data per game × 63 games. It was the dominant CPU-week persistence cost
+    # (season_stats ~20s/week; see Sim_Perf_Capstone). One $in query is identical output.
+    team_obj_ids = [d.get("team_id") for d in ftd_docs if d.get("team_id")]
+    if team_obj_ids:
         try:
-            team_doc = teams_collection.find_one(
-                {"_id": team_obj_id},
+            team_docs = teams_collection.find(
+                {"_id": {"$in": team_obj_ids}},
                 {"name": 1, "team_id": 1},
             )
-        except Exception:
-            continue
-        if not team_doc:
-            continue
-        team_id_str = str(team_obj_id)
-        name = team_doc.get("name")
-        canonical = team_doc.get("team_id")
-        if name:
-            team_name_to_id[name] = team_id_str
-        if canonical:
-            team_id_to_object_id[canonical] = team_id_str
+        except Exception as e:
+            logger.warning(f"⚠️ [_build_franchise_team_maps_from_ftd] teams query failed: {e}")
+            team_docs = []
+        for team_doc in team_docs:
+            team_id_str = str(team_doc.get("_id"))
+            name = team_doc.get("name")
+            canonical = team_doc.get("team_id")
+            if name:
+                team_name_to_id[name] = team_id_str
+            if canonical:
+                team_id_to_object_id[canonical] = team_id_str
 
     return team_name_to_id, team_id_to_object_id
 
