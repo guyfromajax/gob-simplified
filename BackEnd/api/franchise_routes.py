@@ -3310,7 +3310,6 @@ def select_team(
     profile: bool = False,
 ):
     import sys
-    import time
     endpoint_start = time.time()
     print(f"🔵 [DEBUG] select_team: POST /franchise/select-team called with team: {selection.team_name}", file=sys.stderr, flush=True)
     try:
@@ -7438,7 +7437,6 @@ def command_center_data(
     profile: bool = False,
 ):
     """FCC main data load. Add ?profile=1 to get profile_summary in the response."""
-    import time
     def _build():
         team_name = None
         team_id = None
@@ -8209,7 +8207,6 @@ def standings(
     region: Optional[str] = None,
 ):
     """Add ?profile=1 for profile_summary. scope=user_region&team_id=... returns only user + sister conference."""
-    import time
     def _build():
         franchise_doc = db.franchises.find_one(
             {"_id": ObjectId(franchise_id)},
@@ -8348,7 +8345,6 @@ def get_leaders(
 
     ✅ FPD: Reads from franchise_players_data (season/career stats), not franchise.players.
     """
-    import time
     start_time = time.time()
 
     try:
@@ -8459,7 +8455,6 @@ def leaders(
     limit: int = 10,
     view_scope: str = "national",
 ):
-    import time
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/leaders START - franchise_id={franchise_id}, scope={scope}")
     
@@ -8534,7 +8529,6 @@ def team_stats(franchise_id: str, scope: str = "national"):
     ✅ SS&S: Aggregates from franchise.players object (franchise-specific stats),
     not from universal players_collection.
     """
-    import time
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/team-stats START - franchise_id={franchise_id}")
     
@@ -8627,7 +8621,6 @@ def team_traits(franchise_id: str, scope: str = "national"):
     ✅ SS&S: Aggregates from franchise.players object (franchise-specific attributes),
     not from universal players_collection.
     """
-    import time
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/team-traits START - franchise_id={franchise_id}")
     
@@ -8887,7 +8880,6 @@ def user_team_player_stats_endpoint(
 @router.get("/franchise/recruits")
 def recruits(franchise_id: str = Query(...)):
     """Get recruits for a specific franchise. Reads from FRD (franchise_recruits_data)."""
-    import time
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/recruits START - franchise_id={franchise_id}")
     db_query_start = time.time()
@@ -11948,7 +11940,6 @@ def get_franchise_team_data(franchise_id: str, team_id: str = None, team_name: s
     Get team data (attributes, plays, scouting_data) from FTD.
     Prefers team_id (ObjectId); falls back to team_name resolution.
     """
-    import time
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/team-data START - franchise_id={franchise_id}, team_id={team_id}, team_name={team_name}")
     
@@ -12086,7 +12077,6 @@ def get_franchise_roster(franchise_id: str, team_name: str = None):
     """
     Get roster with franchise-specific player attributes.
     """
-    import time
     start_time = time.time()
     # logger.info(f"⏱️ [PERF] /franchise/roster START - franchise_id={franchise_id}, team_name={team_name}")
     
@@ -13027,7 +13017,6 @@ def get_training_points(franchise_id: str):
     Get the number of training points available for a franchise.
     Returns 30 for first training (before first game), 24 otherwise.
     """
-    import time
     endpoint_start = time.time()
     
     try:
@@ -13089,7 +13078,6 @@ def run_franchise_training(req: FranchiseTrainingRequest, profile: bool = False)
     Updates only the franchise document, not the core collections.
     Add ?profile=1 to get a profile_summary in the response.
     """
-    import time
     if profile:
         from BackEnd.utils.profiling import run_profiled
         _out = [None]
@@ -13153,7 +13141,6 @@ def run_franchise_training_distant_cpu(
 
 def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = "full"):
     """Inner implementation so run_franchise_training can be profiled with ?profile=1."""
-    import time
 
     try:
         franchise_id = ObjectId(req.franchise_id)
