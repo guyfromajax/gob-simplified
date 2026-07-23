@@ -1,0 +1,7 @@
+kind,matchup,seed,side,team,team_id,final_score,possessions,FGM,FGA,FG_pct,TPM,TPA,TP_pct,FTM,FTA,FT_pct,TO,OREB,DREB,REB,AST,STL,BLK,PF
+cpu_full,Xavien @ Ocean City,20260722,home,Ocean City,OCEAN_CITY,86,59.84,23,46,50.0,10,19,52.63,30,36,83.33,7,9,21,30,15,5,1,18
+cpu_full,Xavien @ Ocean City,20260722,away,Xavien,XAVIEN,61,62.6,20,50,40.0,9,22,40.91,12,15,80.0,10,4,15,19,16,5,0,30
+cpu_full,Little York @ Four Corners,20260723,home,Four Corners,FOUR_CORNERS,67,60.56,20,46,43.48,6,17,35.29,21,24,87.5,11,7,24,31,14,4,4,11
+cpu_full,Little York @ Four Corners,20260723,away,Little York,LITTLE_YORK,51,57.08,21,48,43.75,6,21,28.57,3,7,42.86,7,1,16,17,14,10,0,24
+cpu_full,Bentley-Truman @ Lancaster,20260724,home,Lancaster,LANCASTER,63,58.64,26,53,49.06,6,18,33.33,5,6,83.33,9,6,25,31,19,2,3,29
+cpu_full,Bentley-Truman @ Lancaster,20260724,away,Bentley-Truman,BENTLEY_TRUMAN,72,64.64,23,57,40.35,6,18,33.33,20,31,64.52,2,8,20,28,15,7,6,17

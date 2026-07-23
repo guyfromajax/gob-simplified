@@ -1741,8 +1741,10 @@ try:
         # print("🧪 Turns sample:", game.turns[:3])
 
         # Consolidated end-of-game shot diagnostics (one master report).
-        from BackEnd.utils.shot_split_tracker import format_master_eog_report
-        logger.warning(format_master_eog_report(game))
+        from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
+        if calibration_diagnostics_enabled(game):
+            from BackEnd.utils.shot_split_tracker import format_master_eog_report
+            logger.warning(format_master_eog_report(game))
 
         summary = summarize_game_state(game)
     
@@ -4649,7 +4651,11 @@ try:
         # 1. WITH animations for frontend (exclude_animations=False)
         # 2. WITHOUT animations for database save (exclude_animations=True)
         summary_start = time.time()
-        frontend_summary = summarize_game_state(gm, exclude_animations=False)
+        frontend_summary = summarize_game_state(
+            gm,
+            exclude_animations=False,
+            include_calibration_diagnostics=not body.full_sim,
+        )
         from BackEnd.utils.game_team_scoreboard_enrichment import (
             attach_home_away_team_scoreboard_shards,
             attach_team_scoreboard_meta_by_name_for_simulate,
@@ -4669,9 +4675,11 @@ try:
         # Get is_final status
         is_final = frontend_summary.get("is_final", False)
         # Shot diagnostics at game end (quarter-by-quarter path).
-        if is_final:
-            from BackEnd.utils.shot_split_tracker import format_master_eog_report
-            logger.warning(format_master_eog_report(gm))
+        if is_final and not body.full_sim:
+            from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
+            if calibration_diagnostics_enabled(gm):
+                from BackEnd.utils.shot_split_tracker import format_master_eog_report
+                logger.warning(format_master_eog_report(gm))
         summary_time = (time.time() - summary_start) * 1000
     
         # ✅ DEBUG: Check ongoing_games state after simulate_quarter completes
@@ -4684,7 +4692,11 @@ try:
         # Save to database (WITHOUT animations to reduce document size)
         db_save_start = time.time()
         try:
-            db_summary = summarize_game_state(gm, exclude_animations=True)
+            db_summary = summarize_game_state(
+                gm,
+                exclude_animations=True,
+                include_calibration_diagnostics=not body.full_sim,
+            )
             # ✅ FIX: Log quarter before save to debug save/load issues
             logging.info(f"💾 Saving game state: game_id={game_id}, quarter={db_summary.get('quarter')}, gm.quarter={gm.quarter}")
             

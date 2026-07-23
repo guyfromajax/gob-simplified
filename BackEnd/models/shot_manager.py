@@ -18,6 +18,7 @@ from BackEnd.utils.shot_split_tracker import (
     resolve_hco_shot_clock_at_attempt,
     increment_block_funnel,
 )
+from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
 from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
 from BackEnd.constants.shot_threshold_scale import MAX as SHOT_THRESHOLD_MAX
 from BackEnd.constants import (
@@ -369,6 +370,8 @@ class ShotManager:
         defender_distance=None, contest_factor=None,
     ):
         """Shot-split + HCO tier tallies (at-attempt shot clock via skeleton detach math)."""
+        if not calibration_diagnostics_enabled(self.game_state):
+            return
         turn_type = classify_resolve_shot_turn_type(self.game_state, roles)
         hco_sc = None
         if turn_type == "HCO":
@@ -984,12 +987,17 @@ class ShotManager:
         # Get shooter location for debug logs
         shooter_pos, shooter_location = self._get_shooter_position_and_spot(shooter, roles)
         shooter_location_str = shooter_location if shooter_location else "unknown"
-        if game_state.get("offensive_state") == "HCO" and (
-            shot_type == "outside"
-            or roles.get("motion_playcall")
-            or roles.get("motion_shot_type")
-            or roles.get("motion_attack_geometry_contest")
-            or isinstance(roles.get("shot_spot"), dict)
+        if (
+            calibration_diagnostics_enabled(game_state)
+            and logging.getLogger().isEnabledFor(logging.DEBUG)
+            and game_state.get("offensive_state") == "HCO"
+            and (
+                shot_type == "outside"
+                or roles.get("motion_playcall")
+                or roles.get("motion_shot_type")
+                or roles.get("motion_attack_geometry_contest")
+                or isinstance(roles.get("shot_spot"), dict)
+            )
         ):
             is_away_offense_for_log = off_team.team_id == self.game.away_team.team_id
             coord_three_for_log = is_three_point_shot_from_coords(

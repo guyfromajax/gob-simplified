@@ -1,0 +1,57 @@
+{
+  "generated_at": "2026-07-23T08:27:48",
+  "git_commit": "911b4f0db40d5ee28608fad0e4ea9eeb94eccf5b",
+  "git_dirty": true,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "cpu",
+  "workers": 1,
+  "seed": 20260723,
+  "probes_installed": 0,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 3,
+        "total_wall_s": 10.87,
+        "sum_game_s": 10.869,
+        "min_s": 3.1967,
+        "median_s": 3.229,
+        "mean_s": 3.623,
+        "p90_s": 4.443,
+        "max_s": 4.4426
+      },
+      "phases": {},
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "Xavien @ Ocean City",
+          "seed": 20260723,
+          "wall_s": 4.4426,
+          "away_score": 59,
+          "home_score": 86
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Little York @ Four Corners",
+          "seed": 20260724,
+          "wall_s": 3.1967,
+          "away_score": 42,
+          "home_score": 75
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Bentley-Truman @ Lancaster",
+          "seed": 20260725,
+          "wall_s": 3.2294,
+          "away_score": 57,
+          "home_score": 53
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)         10.87    100.0%\nTOTAL WALL                              10.87    100.0%"
+    }
+  }
+}

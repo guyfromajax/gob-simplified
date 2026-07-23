@@ -2421,7 +2421,11 @@ def _gm_playbook_non_empty_for_summarize(pb: dict) -> bool:
     return False
 
 
-def summarize_game_state(game, exclude_animations=True):
+def summarize_game_state(
+    game,
+    exclude_animations=True,
+    include_calibration_diagnostics=None,
+):
     """
     Summarize game state for persistence/API responses.
     Uses nested team structure and always excludes animations from saves.
@@ -2429,6 +2433,8 @@ def summarize_game_state(game, exclude_animations=True):
     Args:
         game: GameManager instance
         exclude_animations: Always True for saves (animations only for real-time frontend)
+        include_calibration_diagnostics: Optional explicit override for callers
+            whose bulk-mode flag has already been cleared before serialization.
     """
     
     def _collect_player_ids(obj, acc):
@@ -2955,6 +2961,37 @@ def summarize_game_state(game, exclude_animations=True):
                 "summarize_game_state: franchise scoreboard enrichment failed: %s", e
             )
 
+    from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
+
+    diagnostic_summary = {}
+    diagnostics_enabled = calibration_diagnostics_enabled(game)
+    if include_calibration_diagnostics is not None:
+        diagnostics_enabled = bool(include_calibration_diagnostics)
+    if diagnostics_enabled:
+        diagnostic_summary = {
+            "shot_split_tracking": deepcopy(game.game_state.get("shot_split_tracking", {}))
+            if isinstance(game.game_state.get("shot_split_tracking", {}), dict)
+            else {},
+            "shot_distance_bands": deepcopy(game.game_state.get("shot_distance_bands", {}))
+            if isinstance(game.game_state.get("shot_distance_bands", {}), dict)
+            else {},
+            "fga_by_turn_type": deepcopy(game.game_state.get("fga_by_turn_type", {}))
+            if isinstance(game.game_state.get("fga_by_turn_type", {}), dict)
+            else {},
+            "undefended_by_turn_type": deepcopy(game.game_state.get("undefended_by_turn_type", {}))
+            if isinstance(game.game_state.get("undefended_by_turn_type", {}), dict)
+            else {},
+            "hco_shot_tier_counts": deepcopy(game.game_state.get("hco_shot_tier_counts", {}))
+            if isinstance(game.game_state.get("hco_shot_tier_counts", {}), dict)
+            else {},
+            "block_funnel_tracking": deepcopy(game.game_state.get("block_funnel_tracking", {}))
+            if isinstance(game.game_state.get("block_funnel_tracking", {}), dict)
+            else {},
+            "altered_action_tracking": deepcopy(game.game_state.get("altered_action_tracking", {}))
+            if isinstance(game.game_state.get("altered_action_tracking", {}), dict)
+            else {},
+        }
+
     # ✅ UNIFIED STRUCTURE: All team data in teams object, referenced by home_team_id/away_team_id
     # ✅ Eliminated home_team/away_team duplication - single source of truth in teams object
     return {
@@ -2976,28 +3013,8 @@ def summarize_game_state(game, exclude_animations=True):
         "no_defender_shots_breakdown": deepcopy(game.game_state.get("no_defender_shots_breakdown", {}))
         if isinstance(game.game_state.get("no_defender_shots_breakdown", {}), dict)
         else {},
-        # Shot diagnostics — persist so the cumulative survives quarter-by-quarter DB round trips.
-        "shot_split_tracking": deepcopy(game.game_state.get("shot_split_tracking", {}))
-        if isinstance(game.game_state.get("shot_split_tracking", {}), dict)
-        else {},
-        "shot_distance_bands": deepcopy(game.game_state.get("shot_distance_bands", {}))
-        if isinstance(game.game_state.get("shot_distance_bands", {}), dict)
-        else {},
-        "fga_by_turn_type": deepcopy(game.game_state.get("fga_by_turn_type", {}))
-        if isinstance(game.game_state.get("fga_by_turn_type", {}), dict)
-        else {},
-        "undefended_by_turn_type": deepcopy(game.game_state.get("undefended_by_turn_type", {}))
-        if isinstance(game.game_state.get("undefended_by_turn_type", {}), dict)
-        else {},
-        "hco_shot_tier_counts": deepcopy(game.game_state.get("hco_shot_tier_counts", {}))
-        if isinstance(game.game_state.get("hco_shot_tier_counts", {}), dict)
-        else {},
-        "block_funnel_tracking": deepcopy(game.game_state.get("block_funnel_tracking", {}))
-        if isinstance(game.game_state.get("block_funnel_tracking", {}), dict)
-        else {},
-        "altered_action_tracking": deepcopy(game.game_state.get("altered_action_tracking", {}))
-        if isinstance(game.game_state.get("altered_action_tracking", {}), dict)
-        else {},
+        # Shot diagnostics are omitted entirely from bulk/headless summaries.
+        **diagnostic_summary,
         # ✅ TIMEOUT/FOUL_OUT: Only write when truthy so normal saves don't overwrite DB and wipe resume state (we $unset on actual resume in main.py)
         **({"timeout_next_play_type": game.game_state["timeout_next_play_type"]} if game.game_state.get("timeout_next_play_type") else {}),
         **({"timeout_offense_team_id": game.game_state["timeout_offense_team_id"]} if game.game_state.get("timeout_offense_team_id") else {}),

@@ -42,6 +42,8 @@ at turn start) + the fast-break / final-turn flags.
 
 import math
 
+from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
+
 # --- shot_split_tracking (2/3 × def/undef × make/miss) ---------------------
 
 # Display label → tracking key. Order is the chart's row order.
@@ -109,7 +111,11 @@ def _empty_block_funnel():
 
 def increment_block_funnel(game_state, key):
     """Increment one block-pipeline diagnostic counter without affecting gameplay."""
-    if not isinstance(game_state, dict) or key not in _BLOCK_FUNNEL_KEYS:
+    if (
+        not isinstance(game_state, dict)
+        or not calibration_diagnostics_enabled(game_state)
+        or key not in _BLOCK_FUNNEL_KEYS
+    ):
         return
     tracking = game_state.get("block_funnel_tracking")
     if not isinstance(tracking, dict):
@@ -254,8 +260,9 @@ def record_shot_split(
 ) -> None:
     """Register one field-goal attempt.
 
-    Always updates ``shot_split_tracking``. When ``turn_type`` is one of the
-    tracked buckets (HCO/HCT/FCP/Fast Break/OREB), also increments
+    Updates ``shot_split_tracking`` in interactive/turn-by-turn games. Bulk and
+    headless simulations skip all work. When ``turn_type`` is one of the tracked
+    buckets (HCO/HCT/FCP/Fast Break/OREB), also increments
     ``fga_by_turn_type`` — pass ``None`` (e.g. Final Shot / FLSS) to count the
     attempt in the split chart but not the turn-type breakdown.
 
@@ -263,7 +270,7 @@ def record_shot_split(
     breaks a shot resolution for the sake of a diagnostic).
     """
     state = getattr(game, "game_state", None)
-    if not isinstance(state, dict):
+    if not isinstance(state, dict) or not calibration_diagnostics_enabled(state):
         return
 
     tracking = state.get("shot_split_tracking")
@@ -333,7 +340,11 @@ def restore_shot_split_from_saved(game_state, saved) -> None:
     the prior quarters' totals so the current quarter adds to them. Defensive:
     no-op on missing / malformed input, and only keeps the known buckets.
     """
-    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+    if (
+        not isinstance(game_state, dict)
+        or not calibration_diagnostics_enabled(game_state)
+        or not isinstance(saved, dict)
+    ):
         return
     prior = saved.get("shot_split_tracking")
     if not isinstance(prior, dict):
@@ -353,7 +364,11 @@ def restore_fga_by_turn_type_from_saved(game_state, saved) -> None:
     """Reapply cumulative per-turn-type FGA from a loaded game document
     (quarter-by-quarter persistence; mirrors ``restore_shot_split_from_saved``).
     """
-    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+    if (
+        not isinstance(game_state, dict)
+        or not calibration_diagnostics_enabled(game_state)
+        or not isinstance(saved, dict)
+    ):
         return
     prior = saved.get("fga_by_turn_type")
     if not isinstance(prior, dict):
@@ -368,7 +383,11 @@ def restore_undefended_by_turn_type_from_saved(game_state, saved) -> None:
     """Reapply cumulative per-turn-type undefended make/miss from a loaded game
     document (quarter-by-quarter persistence; mirrors
     ``restore_fga_by_turn_type_from_saved``)."""
-    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+    if (
+        not isinstance(game_state, dict)
+        or not calibration_diagnostics_enabled(game_state)
+        or not isinstance(saved, dict)
+    ):
         return
     prior = saved.get("undefended_by_turn_type")
     if not isinstance(prior, dict):
@@ -386,7 +405,11 @@ def restore_undefended_by_turn_type_from_saved(game_state, saved) -> None:
 
 def restore_shot_distance_bands_from_saved(game_state, saved) -> None:
     """Restore cumulative distance-band diagnostics across quarter saves."""
-    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+    if (
+        not isinstance(game_state, dict)
+        or not calibration_diagnostics_enabled(game_state)
+        or not isinstance(saved, dict)
+    ):
         return
     prior = saved.get("shot_distance_bands")
     if not isinstance(prior, dict):
@@ -405,7 +428,11 @@ def restore_shot_distance_bands_from_saved(game_state, saved) -> None:
 
 def restore_block_funnel_from_saved(game_state, saved) -> None:
     """Restore cumulative block-funnel diagnostics across quarter saves."""
-    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+    if (
+        not isinstance(game_state, dict)
+        or not calibration_diagnostics_enabled(game_state)
+        or not isinstance(saved, dict)
+    ):
         return
     prior = saved.get("block_funnel_tracking")
     if not isinstance(prior, dict):
@@ -566,7 +593,7 @@ def record_hco_shot_tier(game, shot_clock) -> None:
     """Record one HCO shot attempt in the shot-clock-tier tally, by the clock at
     the moment the shot was attempted. No-op without a usable game_state."""
     state = getattr(game, "game_state", None)
-    if not isinstance(state, dict):
+    if not isinstance(state, dict) or not calibration_diagnostics_enabled(state):
         return
     counts = state.get("hco_shot_tier_counts")
     if not isinstance(counts, dict):
@@ -579,7 +606,11 @@ def record_hco_shot_tier(game, shot_clock) -> None:
 def restore_hco_shot_tier_from_saved(game_state, saved) -> None:
     """Reapply cumulative HCO shot-tier counts from a loaded game document
     (quarter-by-quarter persistence)."""
-    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+    if (
+        not isinstance(game_state, dict)
+        or not calibration_diagnostics_enabled(game_state)
+        or not isinstance(saved, dict)
+    ):
         return
     prior = saved.get("hco_shot_tier_counts")
     if not isinstance(prior, dict):
@@ -624,7 +655,11 @@ def _altered_bucket(game):
     Per-game_state → the tracking is naturally contained to this game's two teams."""
     state = getattr(game, "game_state", None)
     team = getattr(game, "offense_team", None)
-    if not isinstance(state, dict) or team is None:
+    if (
+        not isinstance(state, dict)
+        or not calibration_diagnostics_enabled(state)
+        or team is None
+    ):
         return None
     tid = str(getattr(team, "team_id", "?"))
     return state.setdefault("altered_action_tracking", {}).setdefault(tid, _empty_altered_team(team))
@@ -650,7 +685,11 @@ def record_altered_action(game, action) -> None:
 def restore_altered_action_tracking_from_saved(game_state, saved) -> None:
     """Reapply the per-team subtle-movement / altered-action tallies from a loaded game document
     (quarter-by-quarter persistence), so the end-of-game report covers the whole game."""
-    if not isinstance(game_state, dict) or not isinstance(saved, dict):
+    if (
+        not isinstance(game_state, dict)
+        or not calibration_diagnostics_enabled(game_state)
+        or not isinstance(saved, dict)
+    ):
         return
     prior = saved.get("altered_action_tracking")
     if isinstance(prior, dict):
@@ -687,6 +726,8 @@ def format_altered_action_summary(game) -> str:
 def format_master_eog_report(game) -> str:
     """One consolidated end-of-game shot-diagnostics report — all tallies in a
     single block. Grep ``END-OF-GAME SHOT DIAGNOSTICS`` to find it in stdout."""
+    if not calibration_diagnostics_enabled(game):
+        return ""
     return "\n".join([
         "",
         "################# END-OF-GAME SHOT DIAGNOSTICS #################",

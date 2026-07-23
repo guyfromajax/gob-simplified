@@ -5253,6 +5253,76 @@ def _hco_shooter_separation_map(off_lineup, def_xy, coord_fn):
     }
 
 
+def _hco_post_subtle_defender_row(
+    game,
+    reached_step,
+    subtle_beat,
+    reached_def_xy,
+    off_lineup,
+    def_lineup,
+    *,
+    output_step_index,
+):
+    """Return the animator-exact defender row for one appended subtle beat.
+
+    The former path rebuilt every accumulated output step to obtain only its
+    final row. Defender placement is Markovian at this boundary: the subtle row
+    needs the reached offensive frame plus its already-authoritative defender
+    row. Seed a two-step animator window with explicit defender overrides on the
+    reached frame, then let the existing man/zone placement code resolve the
+    subtle frame unchanged.
+
+    Zone placement writes an assignment map keyed by local step index. Preserve
+    the existing map around the two-step calculation and remap the new row from
+    local index 1 to the subtle beat's real output index.
+    """
+    if not reached_def_xy:
+        return {}
+
+    prior = copy.deepcopy(reached_step)
+    prior.pop("_attack_drive", None)
+    prior.pop("_defender_reads", None)
+    prior["_subtle_movement"] = {
+        "defender_overrides": {
+            dpos: {"coords": dict(coords), "action": "guard_offball"}
+            for dpos, coords in reached_def_xy.items()
+            if isinstance(coords, dict)
+            and coords.get("x") is not None
+            and coords.get("y") is not None
+        }
+    }
+
+    had_assignments = hasattr(game, "zone_defender_assignments_by_step")
+    saved_assignments = getattr(game, "zone_defender_assignments_by_step", None)
+    # Isolate the animator's local 0/1 assignment keys instead of deep-copying
+    # the game's accumulated assignment ledger on every subtle beat.
+    game.zone_defender_assignments_by_step = {}
+    local_assignment = None
+    try:
+        from BackEnd.models.animator import Animator
+
+        grid = Animator(game).compute_defender_grid(
+            {"steps": [prior, subtle_beat]},
+            off_lineup,
+            def_lineup,
+        )
+        local_assignment = (
+            getattr(game, "zone_defender_assignments_by_step", {}).get(1)
+        )
+        return grid.get(1) or {}
+    finally:
+        if had_assignments:
+            game.zone_defender_assignments_by_step = saved_assignments
+        else:
+            delattr(game, "zone_defender_assignments_by_step")
+        if isinstance(local_assignment, dict):
+            assignments = getattr(game, "zone_defender_assignments_by_step", None)
+            if not isinstance(assignments, dict):
+                assignments = {}
+                game.zone_defender_assignments_by_step = assignments
+            assignments[output_step_index] = local_assignment
+
+
 def _hco_nudge_toward(xy, target, dist):
     """Point `dist` grid from `xy` straight toward `target` (jab-step defender bite: follow inward)."""
     import math
@@ -6581,10 +6651,12 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                 continue
             # Dynamic MM tracking (per-team, this game only via game_state): one SM entered + each altered
             # action actually performed on it (backdoor / jab step / flash / post up).
-            from BackEnd.utils.shot_split_tracker import record_subtle_movement, record_altered_action
-            record_subtle_movement(game)
-            for _ap, _amv in (_alt_moves or {}).items():
-                record_altered_action(game, (_amv or {}).get("action") or "backdoor")
+            from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
+            if calibration_diagnostics_enabled(game_state):
+                from BackEnd.utils.shot_split_tracker import record_subtle_movement, record_altered_action
+                record_subtle_movement(game)
+                for _ap, _amv in (_alt_moves or {}).items():
+                    record_altered_action(game, (_amv or {}).get("action") or "backdoor")
             # Per-defender reads (man + zone, applied in the animator) ride on the beat. Roll all (incl. the
             # BH's, for his froze bonus), then OVERRIDE the altered-action cutters' defenders with their
             # dynamic-threshold reactions (backdoor: good=stick / poor=freeze).
@@ -6670,15 +6742,21 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
                     _alt_locs[_mp] = _mv.get("location") or _alt_locs.get(_mp)
             # Re-freeze separation after the subtle beat: altered cuts, defender
             # freezes, and explicit bite/front overrides can change the physical
-            # gap. Build through the same sim-safe animator grid that StepState
-            # uses, then read the final beat row. On any failure retain the reached
-            # step's authoritative pre-beat map rather than mutable Player.coords.
+            # gap. Resolve only the appended beat from the reached step's already-
+            # authoritative defender row; rebuilding the entire output prefix here
+            # made this per-subtle path quadratic. On failure retain the reached
+            # step map rather than mutable Player.coords.
             _post_separation_map = _separation_map
             try:
-                from BackEnd.models.animator import Animator
-                _post_grid = Animator(game).compute_defender_grid(
-                    {"steps": list(output_steps)}, off_lineup, def_lineup)
-                _post_def_xy = _post_grid.get(len(output_steps) - 1) or {}
+                _post_def_xy = _hco_post_subtle_defender_row(
+                    game,
+                    steps[i],
+                    beat,
+                    _decision_def_xy,
+                    off_lineup,
+                    def_lineup,
+                    output_step_index=len(output_steps) - 1,
+                )
                 if _post_def_xy:
                     beat["_step_state"] = {
                         "index": len(output_steps) - 1,
