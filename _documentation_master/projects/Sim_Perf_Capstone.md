@@ -259,9 +259,24 @@ Measured on Railway (colocated Atlas), a 63-game week:
 | `persist_loop` (per-game EOG persistence) | **~95s** | **~1.5s** |
 
 Sub-timing (`[CPU-PERSIST-SUBTIMING]`) attributed **~89% of persistence to one function** —
-`stat_updater.finalize_game` (~82s), which did **~30 sequential acknowledged DB writes per game**,
-dominated by a **per-player FPD `update_one` loop (~24 writes/game)**. Reads are ~2 ms on colocated
-Atlas, but *acknowledged writes* are several× that and ran sequentially × 63.
+`stat_updater.finalize_game` (~82s). **Two guesses at the sub-cause, only the second measured
+right** — a cautionary tale worth recording:
+
+1. **First guess (partly wrong): the per-player FPD `update_one` loop (~24 writes/game).** Batched
+   into one `bulk_write(ordered=False)` (disjoint `(franchise_id, player_id)` docs, identical
+   `$inc`/`$set`; verified reversibly on staging). It *helped* — `fpd_write` is now ~2.6 s — but it
+   was never the dominant cost. **Inference from a write-count is not measurement.**
+2. **Real cause (measured via `[FINALIZE-SUBTIMING]`): an N+1 query.** The internal split showed
+   `season_stats` ≈ 20 s and `box_rollup` ≈ 9 s, both dominated by
+   `_build_franchise_team_maps_from_ftd` doing a **`teams_collection.find_one` per team (~128
+   round-trips/call)** to fetch **static** team names/ids. It's called **3× per game** (both
+   `season_stats` updaters + `finalize_game`'s `box_rollup`) → ~250–380 needless lookups/game × 63.
+   Reads are ~2 ms each on colocated Atlas, but ~16 k of them per week is ~20 s.
+
+**Fix shipped:** batch the ~128 `find_one`s into one `$in` query (`_build_franchise_team_maps_from_ftd`).
+Verified on staging: byte-identical maps (128 name + 128 id entries, NEW == OLD). Read-only, no
+semantic change. Collapses `season_stats` and shrinks `box_rollup`, taking `finalize_game` from ~33 s
+toward single digits.
 
 **Not a `finalize_game` code regression** (its code was unchanged; shot-cal never touched
 `stat_updater`). The **pool scaled the sim but the persistence was never batched or parallelized**,
@@ -269,10 +284,11 @@ so raising the slate from ~8 to 63 full games turned a tolerable ~10 s cost into
 separate shot-cal *engine* regression — HCO post-subtle defender-grid rebuild — was already fixed;
 see the calibration thread.)
 
-**Fix shipped:** batch the per-player FPD writes into one `bulk_write(ordered=False)` —
-`(franchise_id, player_id)` docs are disjoint, `$inc`/`$set` semantics identical, ~24 round-trips →
-1 (`stat_updater.finalize_game`). Verified reversibly on staging (per-doc `$inc` equivalence across
-disjoint docs).
+**Also required — worker-count vs container vCPUs (contention).** `start-cpu-sims` runs the CPU-week
+pool *concurrently with the user's live game*. `FRANCHISE_CPU_SIM_POOL_WORKERS=16` on a smaller
+Railway container oversubscribed CPU and ~2×-slowed the user's quarters (`sim` 2.7 s → 5.5 s). Set
+workers ≈ **container vCPUs − 2** (env var, not code; Railway restart applies it). This is separate
+from persistence — it's the live-game lever.
 
 **Still open (Tier 3):** parallel-flush the per-game persistence across the pool (disjoint per game)
 + a one-snapshot EOG orchestrator to drop the redundant game-doc re-reads. Design +
