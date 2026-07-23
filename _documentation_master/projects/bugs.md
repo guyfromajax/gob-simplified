@@ -1,54 +1,50 @@
 ##Bugs
 1. Teleported an HCO entry step, result was a DB turnover
 2. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
-9. Fix triple teams on HCT and FCP
 
 
 ##Full Product Readiness
-105. More responsive front end
-106. Monetization plan
-107. Stripe
-108. Steam Strategy
-119. PvP sim
-121. Tunable Constants file
-123. Downloadable game vs Live game dynamics
-127. Add a new hire news story for user team
-128. Add a badass design appraoch to New Stories
-129. Comprehensive Blowout Governor
-129. HCO Roles Audit & Fixes
-130. Better timing on shots, most shoudl be more immediate, those that are not should have pre-shot movement
+2. Stripe
+3. PvP sim
+4. Tunable Constants file
+5. Downloadable game vs Live game dynamics
+7. Comprehensive Blowout Governor
+8. HCO Roles Audit & Fixes
+9. Better timing on shots, most should be more immediate, those that are not should have pre-shot movement
 
 
 ##Full Product Perfection
 1. Training Camp News Report
 2. Week 20 Recruiting Report to Inbox
 3. Recruiting Round Up Results
+6. Add a new hire news story for user team
 25. Fast Break and P/T callouts in the Scouting Report of opponent
 26. Add tournament design magic to the UX -- court screen, modals, FCC, etc
 102. Team court images
 108. Message board
 110. Strategic Geek Points system
 113. Bring logic to screens
-114. Better defense stat tracking
+114. Better individual player defense stat tracking
 116. User account -- link X & Facebook?
 117. More action on Signing Day
-118. Make Tranining feed based on news -- previous week's results and this week's upcoming games.
 125. MM: Micro Movement SFX
 127. Get Aggressive / Get Conservative settings and Playcall Center buttons
+128. Add a badass design appraoch to New Stories
 129: Loose Balls!
 131. Centralized Turn Transition Helper / System
 132. Players as Characters
-133. Loose/Normal/Tight Defense Play Types
-134. Better simming of computer games
 135. Better simming of computer training
 136. Need to better calibrate season to season player attribute progression
 137. Watermark free version of player headshots
 
+199. Mobile
 200. PvP live
 
 ##Continuous Evolution (base is built)
 1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
 2. Advanced Topics tutorials
+3. Steam Strategy
+4. Monetization plan
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

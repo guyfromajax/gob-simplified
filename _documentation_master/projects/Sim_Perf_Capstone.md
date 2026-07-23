@@ -310,3 +310,47 @@ explicitly perf-only and forbade basketball-logic changes.
 
 Baseline (pre-initiative) state is commit `dbb82a32d`. Docs-only commits (`70c4a49ee`,
 `0567e22bf`, `dbafafcf4`, `bb95978ee`) carry the phase reports and are omitted here.
+
+---
+
+## Tactical principles — preserving sim speed when adding features
+
+*Added 2026-07-22 after a regression: a batch of shot-calibration commits slowed an isolated
+user-game sim 16→26s, the 63-game week 67→131s, and PS-game sims (training) 12→55s — all from new
+gameplay/diagnostic work in the per-step/per-shot engine path. The sim is a top-priority perf
+surface; every feature that touches the engine must respect these.*
+
+1. **Know your code's execution granularity before adding to it.** per-step ≫ per-shot ≫ per-turn ≫
+   per-possession ≫ per-game. A line in `motion_step_decision` runs *thousands* of times/game; the
+   same line at EOG runs once. Always ask "how many times per game does this fire?" — that count is
+   the multiplier on your cost.
+2. **The sim is CPU-bound pure Python — every added computation is paid in full.** No I/O wait to
+   hide work behind. A loop / `hypot` / dict-build in the hot path adds `wall × executions/game ×
+   games/week`. Small-looking hot-path additions are not small.
+3. **Diagnostics must be near-zero-cost or gated OFF for bulk sims.** Aggregate trackers, geo
+   logging, shot-split recorders are debug aids — keep them to trivial counter increments, or put
+   them behind a flag that is **OFF during full-sim / CPU-week / PS** (mirror `_is_full_simulation`).
+   A "tracking on" flag must never default-on for the 63+24-game bulk path.
+4. **Never do a DB write inside the sim loop.** The engine is pure compute; a per-turn/per-shot
+   write serializes on Atlas latency × thousands of turns = catastrophic — *and* re-entangles the
+   RNG stream (the Phase-2 bug: `pymongo.bulk_write` consumes global `random`). Persist once at game
+   end.
+5. **Beware eager evaluation in log/diagnostic args.** `logger.debug(f"{build_report()}")` runs
+   `build_report()` even when logs are filtered to ERROR (which `quiet_headless` does). Use
+   `logger.debug("%s", cheap_value)` and never compute inside a log argument.
+6. **Anything in `shared.py`'s shot-resolution path taxes every mode at once.** It is called by user
+   games, CPU weeks, and PS games — a cost there has the widest blast radius (exactly this
+   regression). Treat it as the most expensive place to add anything.
+7. **Measure before AND after every hot-path change.** One profiled game (`GOB_SIM_PROFILE=1` /
+   `perf_sim_baseline.py`) shows the phase breakdown in seconds; a moved phase self-time is visible
+   immediately. Don't merge hot-path work without a before/after — this regression would have been a
+   one-line profile diff.
+8. **Draw-count changes follow the determinism contract.** Any engine change that adds/removes RNG
+   draws needs the **poison-stash test** (not exact-diff) and a re-cut reference. Balance retunes
+   that intentionally move stats get distributional verification + a new anchor. (See *Standing
+   rules* and *Verification toolkit* above.)
+
+**Fix strategy when a regression is found:** separate *intentional gameplay* additions (which
+legitimately change basketball and may cost some compute — verify distributionally, budget them)
+from *pure diagnostics* (gate OFF for bulk sims — free win, no behavior change). Profile to attribute
+the cost per phase before touching anything.
