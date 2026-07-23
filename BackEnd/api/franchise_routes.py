@@ -6551,6 +6551,10 @@ def _complete_week_finish_cpu_and_persist(
             logger.warning("[WEEK AGGREGATE] stash cpu diagnostics failed: %s", _stash_e)
 
         _persist_t0 = time.time()  # [CPU-PERSIST-TIMING] per-game EOG persistence loop
+        # [CPU-PERSIST-SUBTIMING] accumulate wall per major persist op across the 63-game
+        # loop, so we can see whether the 1.5s/game is one hot op or evenly spread.
+        _sub = {"games_write": 0.0, "finalize_game": 0.0, "records": 0.0,
+                "team_attrs": 0.0, "momentum": 0.0}
         for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
             if job_idx in sim_err:
                 logger.error(
@@ -6634,16 +6638,21 @@ def _complete_week_finish_cpu_and_persist(
             summary["_id"] = computer_game_id
             summary["franchise_id"] = str(franchise_id_str)
             summary["week"] = week
+            _s = time.time()
             db.games.update_one({"_id": computer_game_id}, {"$set": summary}, upsert=True)
+            _sub["games_write"] += time.time() - _s
+            _s = time.time()
             stat_updater.finalize_game(
                 computer_game_id, mode="franchise", franchise_id=franchise_id_str
             )
+            _sub["finalize_game"] += time.time() - _s
             sim_res = {
                 "team1_id": str(aid),
                 "team2_id": str(hid),
                 "team1_score": away_score,
                 "team2_score": home_score,
             }
+            _s = time.time()
             if week_games_meta and job_idx < len(week_games_meta):
                 g_cpu = week_games_meta[job_idx]
                 ftp.record_tournament_game_result(
@@ -6663,6 +6672,7 @@ def _complete_week_finish_cpu_and_persist(
                 sim_res = _save_game_result(
                     aid, hid, away_score, home_score, week, franchise_id=franchise_id_str, game_id=computer_game_id
                 )
+            _sub["records"] += time.time() - _s
             home_id_str = _normalize_team_id_to_string(hid) or str(hid)
             away_id_str = _normalize_team_id_to_string(aid) or str(aid)
             if home_score > away_score:
@@ -6671,6 +6681,7 @@ def _complete_week_finish_cpu_and_persist(
             else:
                 winner_id_str, loser_id_str = away_id_str, home_id_str
                 ws, ls = away_score, home_score
+            _s = time.time()
             _finalize_team_attributes_for_game(
                 game_id=computer_game_id,
                 franchise_id=franchise_id,
@@ -6682,6 +6693,7 @@ def _complete_week_finish_cpu_and_persist(
                 loser_score=ls,
                 week=week,
             )
+            _sub["team_attrs"] += time.time() - _s
             winner_oid = hid if home_score > away_score else aid
             # Distant Sim sunset: momentum was game-driven via the distant path. When
             # all games are full-sim, apply that same (RNG-free, win/loss-driven)
@@ -6692,6 +6704,7 @@ def _complete_week_finish_cpu_and_persist(
             # games (week_games_meta present) don't carry season momentum streaks.
             if _franchise_all_games_full_sim() and week not in ft.EOS_WEEKS:
                 loser_oid = aid if home_score > away_score else hid
+                _s = time.time()
                 try:
                     _distant_sim_persist_momentum_score_updates(
                         franchise_id,
@@ -6704,6 +6717,7 @@ def _complete_week_finish_cpu_and_persist(
                         "[CPU-WEEK] momentum update failed franchise_id=%s week=%s winner=%s loser=%s",
                         franchise_id_str, week, str(winner_oid), str(loser_oid),
                     )
+                _sub["momentum"] += time.time() - _s
             sim_eos_g = week_games_meta[job_idx] if week_games_meta and job_idx < len(week_games_meta) else None
             _award_gp_sim(winner_oid, sim_eos_g, (aid, hid))
             results.append(
@@ -6736,6 +6750,17 @@ def _complete_week_finish_cpu_and_persist(
         logger.warning(
             "[CPU-PERSIST-TIMING] franchise=%s week=%s | games=%s | persist_loop=%.1fs (%.3fs/game)",
             franchise_id_str, week, _pg_n, _persist_secs, _persist_secs / max(1, _pg_n),
+        )
+        # [CPU-PERSIST-SUBTIMING] where the per-game persist wall goes (totals across the
+        # loop). One hot op => targeted fix; evenly spread => Tier 3 parallel flush.
+        logger.warning(
+            "[CPU-PERSIST-SUBTIMING] franchise=%s week=%s | games=%s | "
+            "games_write=%.1fs finalize_game=%.1fs records=%.1fs team_attrs=%.1fs momentum=%.1fs "
+            "| accounted=%.1fs/%.1fs",
+            franchise_id_str, week, _pg_n,
+            _sub["games_write"], _sub["finalize_game"], _sub["records"],
+            _sub["team_attrs"], _sub["momentum"],
+            sum(_sub.values()), _persist_secs,
         )
 
     results = _order_franchise_week_results_like_schedule(results, week_games)
