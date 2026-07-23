@@ -1,5 +1,27 @@
 from typing import Any, Dict
 import logging
+import time
+
+# [FINALIZE-SUBTIMING] optional per-section accumulator for finalize_game's franchise
+# branch. The CPU-week loop resets it before the persist loop and reads it after, so we
+# can see which section of finalize_game (~1.3s/game) actually dominates.
+_FINALIZE_SUB: Dict[str, float] = {}
+
+
+def reset_finalize_subtiming() -> None:
+    _FINALIZE_SUB.clear()
+
+
+def pop_finalize_subtiming() -> Dict[str, float]:
+    out = dict(_FINALIZE_SUB)
+    _FINALIZE_SUB.clear()
+    return out
+
+
+def _fsub_mark(bucket: str, ck: float) -> float:
+    now = time.time()
+    _FINALIZE_SUB[bucket] = _FINALIZE_SUB.get(bucket, 0.0) + (now - ck)
+    return now
 
 from bson import ObjectId
 from pymongo import ReturnDocument, UpdateOne
@@ -1590,7 +1612,8 @@ def finalize_game(
         logger = logging.getLogger(__name__)
         print(f"🔍 [FINALIZE_GAME] Starting franchise stats rollup: game_id={game_id}, franchise_id={franchise_id}")
         logger.info(f"🔍 [FINALIZE_GAME] Starting franchise stats rollup: game_id={game_id}, franchise_id={franchise_id}")
-        
+        _ck = time.time()  # [FINALIZE-SUBTIMING]
+
         try:
             fid = ObjectId(franchise_id)
         except Exception as e:
@@ -1813,7 +1836,9 @@ def finalize_game(
         # in the per-period archetype stash. Safe here: the applied_games claim
         # above already guarantees once-per-game. Best-effort; never raises.
         from BackEnd.utils.user_game_commit import commit_user_game_record
+        _ck = _fsub_mark("read_claim_names", _ck)  # [FINALIZE-SUBTIMING] branch start → career
         commit_user_game_record(game, franchise_id, home_team_name, away_team_name)
+        _ck = _fsub_mark("career", _ck)
 
         players = game.get("players", [])
         
@@ -2052,6 +2077,7 @@ def finalize_game(
                     if p_id:
                         player_to_team[p_id] = tname
 
+        _ck = _fsub_mark("box_rollup", _ck)  # [FINALIZE-SUBTIMING] career → FPD section (box-score $inc build + FTD updates)
         existing_fpd_ids = {
             d["player_id"] for d in franchise_players_data_collection.find(
                 {"franchise_id": str(fid)}, {"player_id": 1}
@@ -2131,6 +2157,7 @@ def finalize_game(
                 )
         if _fpd_ops:
             franchise_players_data_collection.bulk_write(_fpd_ops, ordered=False)
+        _ck = _fsub_mark("fpd_write", _ck)  # [FINALIZE-SUBTIMING] FPD load+init+bulk_write
 
         logger.info(f"🔍 [FINALIZE_GAME] Applied stats/meta to FPD for {len(processed_player_ids)} players")
 
@@ -2143,9 +2170,10 @@ def finalize_game(
         
         # Update defensive playcall season_stats from game_stats
         _update_defensive_playcall_season_stats(game, "franchise", fid)
-        
+
         # Update offensive play season_stats from game_stats
         _update_offensive_play_season_stats(game, "franchise", fid)
+        _ck = _fsub_mark("season_stats", _ck)  # [FINALIZE-SUBTIMING] def+off playcall season_stats
         
         logger.info(f"✅ [FINALIZE_GAME] Franchise stats finalization complete for game_id={game_id}")
 

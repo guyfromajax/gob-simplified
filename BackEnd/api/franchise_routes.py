@@ -6555,6 +6555,7 @@ def _complete_week_finish_cpu_and_persist(
         # loop, so we can see whether the 1.5s/game is one hot op or evenly spread.
         _sub = {"games_write": 0.0, "finalize_game": 0.0, "records": 0.0,
                 "team_attrs": 0.0, "momentum": 0.0}
+        stat_updater.reset_finalize_subtiming()  # [FINALIZE-SUBTIMING] split finalize_game internals
         for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
             if job_idx in sim_err:
                 logger.error(
@@ -6762,6 +6763,17 @@ def _complete_week_finish_cpu_and_persist(
             _sub["team_attrs"], _sub["momentum"],
             sum(_sub.values()), _persist_secs,
         )
+        # [FINALIZE-SUBTIMING] which section of finalize_game (the ~89% chunk) dominates.
+        _fsub = stat_updater.pop_finalize_subtiming()
+        if _fsub:
+            logger.warning(
+                "[FINALIZE-SUBTIMING] franchise=%s week=%s | read_claim_names=%.1fs career=%.1fs "
+                "box_rollup=%.1fs fpd_write=%.1fs season_stats=%.1fs",
+                franchise_id_str, week,
+                _fsub.get("read_claim_names", 0.0), _fsub.get("career", 0.0),
+                _fsub.get("box_rollup", 0.0), _fsub.get("fpd_write", 0.0),
+                _fsub.get("season_stats", 0.0),
+            )
 
     results = _order_franchise_week_results_like_schedule(results, week_games)
 
