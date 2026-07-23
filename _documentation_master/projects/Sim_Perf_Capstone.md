@@ -246,6 +246,44 @@ per-service with no code deploy. Both paths call the same core function and prod
 
 ---
 
+## CPU-week EOG persistence — the post-rollout bottleneck (2026-07-22)
+
+Completing the rollout above (full turn-by-turn for all 63 games, `full_tbt=63 distant=0`) exposed a
+cost the three phases never touched: **per-game end-of-game persistence, not the sim.**
+
+Measured on Railway (colocated Atlas), a 63-game week:
+
+| Phase | Wall | Per game |
+|---|---|---|
+| `full_sim_block` (pooled engine sim) | ~20s | 0.32s |
+| `persist_loop` (per-game EOG persistence) | **~95s** | **~1.5s** |
+
+Sub-timing (`[CPU-PERSIST-SUBTIMING]`) attributed **~89% of persistence to one function** —
+`stat_updater.finalize_game` (~82s), which did **~30 sequential acknowledged DB writes per game**,
+dominated by a **per-player FPD `update_one` loop (~24 writes/game)**. Reads are ~2 ms on colocated
+Atlas, but *acknowledged writes* are several× that and ran sequentially × 63.
+
+**Not a `finalize_game` code regression** (its code was unchanged; shot-cal never touched
+`stat_updater`). The **pool scaled the sim but the persistence was never batched or parallelized**,
+so raising the slate from ~8 to 63 full games turned a tolerable ~10 s cost into ~82 s. (The
+separate shot-cal *engine* regression — HCO post-subtle defender-grid rebuild — was already fixed;
+see the calibration thread.)
+
+**Fix shipped:** batch the per-player FPD writes into one `bulk_write(ordered=False)` —
+`(franchise_id, player_id)` docs are disjoint, `$inc`/`$set` semantics identical, ~24 round-trips →
+1 (`stat_updater.finalize_game`). Verified reversibly on staging (per-doc `$inc` equivalence across
+disjoint docs).
+
+**Still open (Tier 3):** parallel-flush the per-game persistence across the pool (disjoint per game)
++ a one-snapshot EOG orchestrator to drop the redundant game-doc re-reads. Design +
+instrumentation-first plan: `_documentation_master/projects/EOG_Persistence_Tier3_Plan.md`.
+
+**Instrumentation (all WARNING-level):** `[CPU-WEEK-TIMING]` (sim block), `[CPU-PERSIST-TIMING]`
+(persist total), `[CPU-PERSIST-SUBTIMING]` (per-op split), `[EOG-IDGUARD-FIRED]` (dead-guard counter)
+— in `BackEnd/api/franchise_routes.py` and `BackEnd/utils/stat_updater.py`.
+
+---
+
 ## Parked — tuning backlog (NOT performance; basketball realism)
 
 These are stat-realism issues surfaced by the multi-seed arms. None were touched — Phase 1–3 were

@@ -2,7 +2,7 @@ from typing import Any, Dict
 import logging
 
 from bson import ObjectId
-from pymongo import ReturnDocument
+from pymongo import ReturnDocument, UpdateOne
 
 from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.db import (
@@ -2109,6 +2109,14 @@ def finalize_game(
                 except Exception as e:
                     logger.warning(f"⚠️ [FINALIZE_GAME] Could not init FPD for {pid_str}: {e}")
 
+        # Batch the per-player FPD stat writes into ONE bulk_write. Each op targets a
+        # disjoint (franchise_id, player_id) doc, so per-doc atomicity and the exact
+        # $inc/$set semantics are identical to the per-player update_one loop — but ~24
+        # sequential acknowledged round-trips/game collapse to one. This loop was the
+        # dominant CPU-week persistence cost (finalize_game ~1.3s/game × 63 ≈ 82s; see
+        # Sim_Perf_Capstone "CPU-week EOG persistence" and End_of_Game_System). ordered=False
+        # is safe (disjoint docs) and lets the server apply them concurrently.
+        _fpd_ops: list[UpdateOne] = []
         for pid_str in processed_player_ids:
             fpd_inc = {k.replace(f"players.{pid_str}.", ""): v for k, v in inc_doc.items() if k.startswith(f"players.{pid_str}.")}
             fpd_set = {k.replace(f"players.{pid_str}.", ""): v for k, v in set_doc.items() if k.startswith(f"players.{pid_str}.")}
@@ -2118,10 +2126,11 @@ def finalize_game(
                     update_op["$inc"] = fpd_inc
                 if fpd_set:
                     update_op["$set"] = fpd_set
-                franchise_players_data_collection.update_one(
-                    {"franchise_id": str(fid), "player_id": pid_str},
-                    update_op,
+                _fpd_ops.append(
+                    UpdateOne({"franchise_id": str(fid), "player_id": pid_str}, update_op)
                 )
+        if _fpd_ops:
+            franchise_players_data_collection.bulk_write(_fpd_ops, ordered=False)
 
         logger.info(f"🔍 [FINALIZE_GAME] Applied stats/meta to FPD for {len(processed_player_ids)} players")
 
