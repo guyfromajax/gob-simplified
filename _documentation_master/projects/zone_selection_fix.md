@@ -46,16 +46,47 @@ the **credit** (stash `_hco_moment_defender_id`, L6292/L6304/L6508). So almost c
   change (different defender's attributes contest → outcomes move). Credit-only → attribution/render
   (cheaper). Expect ROLL.
 
-## Work plan
-1. **Confirm roll-vs-credit** (read `_zone_bh_defender` + the moment roll path; one targeted probe if needed).
-2. **Root-cause `_zone_bh_defender`**: why it returns a non-nearest zone defender (heuristic vs. the
-   rendered grid). The grid already knows the true positions (`compute_defender_grid`); the on-ball
-   pick should agree with "nearest in the grid".
-3. **Design the fix**: make the zone on-ball defender = the actual nearest defender in the rendered
-   grid (single source with `compute_defender_grid`, mirroring the emitter-as-god principle). Watch
-   for the pass-contest which already *excludes* `_zone_bh_defender` from picking its own passer's pass
-   — keep that consistent.
-4. **Implement + verify** (see below).
+## ⚠️ UPDATE 2026-07-24 — Attempt 1 (distance-in-grid) FAILED; use the `_guard` map
+
+**Confirmed:** it's the ROLL (not just the credit). `_zone_bh_defender`'s result feeds both the strip
+roll (`decide_step_action`) and the stash — the moment rolls the strip against the wrong zone defender.
+So the fix is a gameplay change (distributional verify + re-cut), as expected.
+
+**Attempt 1 — make `_zone_bh_defender` pick the NEAREST defender in the stamped grid — DID NOT WORK.**
+Implemented (added optional `step`, read `step["_step_state"]["defense"]`, nearest by squared distance,
+polygon fallback; passed `step` at the moment L6519 + pass-contest L5673 callers). The functional
+re-probe showed zone got **worse** (credited-defender-is-nearest fell, and *farthest*-defender picks
+appeared). Root cause: the stamp holds **defender** coords only, so I compared them to the **idealized
+BH spot** (`_spot_display_coords(bh_location)`) — but the rendered BH is *nudged* off its spot, and
+there's a coord-frame subtlety. **Reconstructing "who guards the BH" by distance is too fragile.**
+Reverted.
+
+**Perf, however, is a NON-issue** (poison-isolated: run the grid-read code but return the OLD result →
+byte-identical games → **cpu/turn 5.43 == baseline 5.43**). Reading the stamped grid is free. The
+blocker is *correctness of the selection*, not speed.
+
+**Correct approach — the render's own guard map.** `assign_all_zone_defenders` (`shared_defense.py:1070`)
+already returns `(def_xy, _guard)` where **`_guard` = {def_pos: guarded_offensive_player_id}** — the
+exact "which defender guards the BH", frame-independent, the same assignment the render draws. It is
+**discarded everywhere** (e.g. `_hco_step_def_xy` L4978 unpacks `_guard` and throws it away). The
+on-ball zone defender = the def_pos whose `_guard` value == the BH's player_id. No distance guessing.
+
+**Plumbing needed (the real work):** `_guard` is NOT in the stamp (`_step_state.defense` = coords only).
+Options: (a) **stamp the guard map** alongside the grid — thread it through `compute_defender_grid` /
+`_stamp_contest_defender_grid` so the moment reads it cheaply per-step (preferred; one grid, one
+source); or (b) call `assign_all_zone_defenders` inside `_zone_bh_defender` (rebuilds offense coords
+per-step → a real per-step cost — avoid). Prefer (a).
+
+## Work plan (revised)
+1. ~~Confirm roll-vs-credit~~ ✅ ROLL. ~~distance approach~~ ✅ tried, failed (above).
+2. **Surface `_guard`**: extend the defender-grid stamp to also carry the render's guard map
+   (`assign_all_zone_defenders`'s 2nd return), per step — the single-source of "who guards whom".
+3. **Fix `_zone_bh_defender`**: when the guard map is stamped, return the defender whose guarded
+   player == the BH (exact); polygon path stays as the unstamped fallback. Pass `step` at the moment
+   (L6519) + pass-contest (L5673) callers (attack_drive twin deferred).
+4. **Verify**: functional re-probe (credited zone defender now == guarded/nearest) → distributional
+   multi-seed + reference re-cut (batched with Seam-3's owed one), pausing for human OK on the re-cut.
+   Perf: already shown free; re-confirm with the poison isolation after the guard-map plumbing.
 
 ## Verification (Plan A + Sim-Perf non-disruption)
 - **Per-change draw check:** if it changes the roll (expected) → **draw-moving → distributional
