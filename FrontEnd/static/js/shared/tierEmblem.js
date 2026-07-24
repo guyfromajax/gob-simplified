@@ -36,7 +36,7 @@
   var EMBLEM_SIZING = {
     fccFranchiseHeader: { emblem: 52, labelL1: 19, labelL2: 11 },       // logo+emblem object, 2-line lockup
     fccGameCardHeader:  { emblem: 27, labelL1: 14, labelL2: 8.5, gap: 8 }, // Next/Last Game header, right-justified
-    courtScoreboard:    { emblem: 16, mode: 'mono' },                    // round-label strip, monochrome
+    courtScoreboard:    { emblem: 22, mode: 'color' },                   // round-label strip; full-color w/ value to match the FCC emblem
     minColorSize: 28,   // below this, use mode:'mono'
     monoMaxSize: 20
   };

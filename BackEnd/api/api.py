@@ -6752,6 +6752,8 @@ try:
             "team_name": team.get("name", match if match else team_identifier),
             "primary_color": team.get("primary_color", "#000000"),
             "secondary_color": team.get("secondary_color", "#ffffff"),
+            "conference": team.get("conference"),
+            "region": team.get("region", ""),
             "team_chemistry": roster_team_chemistry,
             "players": players,
             "training_squad": training_squad,

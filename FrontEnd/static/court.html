@@ -4012,6 +4012,21 @@
   line-height: 0.8 !important;
 }
 
+/* Clock + period grouped so the period row stretches only to the clock's width:
+   Q1 sits flush-left and the shot clock flush-right against the digits, regardless
+   of the wider round-label strip below. Vertical spacing is unchanged (the gap that
+   used to sit between clock and period on .center now lives on the stack). */
+#scoreboard .center .sb-clock-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: max-content;
+  gap: 5px;
+}
+#scoreboard.sb-eos .center .sb-clock-stack {
+  gap: 3px;
+}
+
 /* ---- Surface C — court scoreboard tournament theming ----------------------
    All rules gate on #scoreboard.sb-eos (added by JS only in an EOS week), so the
    base scoreboard is untouched when no tournament is active. Overlay only — the
@@ -4376,10 +4391,15 @@
     
     <!-- Center Clock/Quarter - Grid column 14 -->
     <div class="center">
-      <div id="game-clock" class="clock">8:00</div>
-      <div class="period-row">
-        <div id="quarter" class="quarter">Q1</div>
-        <div id="shot-clock" class="shot-clock">30</div>
+      <!-- Clock + period grouped so the period row can only stretch to the clock's
+           width (Q1 flush-left, shot clock flush-right against the digits), independent
+           of the wider round-label strip below. -->
+      <div class="sb-clock-stack">
+        <div id="game-clock" class="clock">8:00</div>
+        <div class="period-row">
+          <div id="quarter" class="quarter">Q1</div>
+          <div id="shot-clock" class="shot-clock">30</div>
+        </div>
       </div>
       <!-- Tournament round-label strip (Surface C): mono tier emblem + round name + elimination chip.
            Overlay only (lives inside the absolutely-positioned .center); populated by JS in EOS weeks,
@@ -6560,6 +6580,13 @@
         if (!homeRes.ok || !awayRes.ok) return false;
 
         const [homeRoster, awayRoster] = await Promise.all([homeRes.json(), awayRes.json()]);
+        // Capture the user team's conference/region for the scoreboard emblem value.
+        const mtRoster = new URLSearchParams(window.location.search).get('my_team');
+        const userRoster = mtRoster === 'away' ? awayRoster : homeRoster;
+        if (userRoster) {
+          eosUserConference = (userRoster.conference === 0 || userRoster.conference) ? userRoster.conference : null;
+          eosUserRegion = userRoster.region || null;
+        }
         const homeColor = homeRoster?.primary_color;
         const awayColor = awayRoster?.primary_color;
         if (!homeColor || !awayColor) return false;
@@ -6584,12 +6611,33 @@
       }
     }
 
+    // User team's conference / region, captured from the roster fetch, so the
+    // scoreboard emblem carries the same value as the FCC emblem (conference
+    // number / region letter). National takes no value (always 3 stars).
+    let eosUserConference = null;
+    let eosUserRegion = null;
+
+    function courtEmblemValueForTier(tier) {
+      if (tier === 'conference') {
+        return (eosUserConference === 0 || eosUserConference) ? String(eosUserConference) : '';
+      }
+      if (tier === 'region') {
+        if (eosUserRegion) return String(eosUserRegion).toUpperCase();
+        // Fallback: derive region letter from conference (conf 1-16 -> A-H).
+        const c = Number(eosUserConference);
+        if (Number.isInteger(c) && c >= 1 && c <= 16) return String.fromCharCode(65 + Math.floor((c - 1) / 2));
+        return '';
+      }
+      return null;
+    }
+
     /**
      * Surface C — apply tournament tier chrome to the scoreboard.
-     * Fully week-derived (tier + round from the `week` URL param); no fetch, no
-     * backend, nothing in the per-possession loop. All EOS games are single-
-     * elimination, so the WIN OR GO HOME chip is always shown when a tier is active.
-     * Self-gating: does nothing outside an EOS week / franchise game.
+     * Tier + round are week-derived (the `week` URL param); the emblem VALUE
+     * (conference number / region letter) comes from the roster fetch already made
+     * for team colors, so nothing new is fetched. The full-color emblem matches the
+     * FCC emblem exactly. All EOS games are single-elimination, so the WIN OR GO
+     * HOME chip is always shown. Self-gating outside an EOS week / franchise game.
      */
     function applyEosScoreboardChrome() {
       const sb = document.getElementById('scoreboard');
@@ -6607,10 +6655,12 @@
       const T = window.GOBTierEmblem.TIER_TOKENS[tier];
       sb.style.setProperty('--eos-metal', T.metal);
       sb.style.setProperty('--eos-metal-hi', T.metalHi);
+      const sz = window.GOBTierEmblem.EMBLEM_SIZING.courtScoreboard;
       const emblem = window.GOBTierEmblem.renderEmblem({
         tier,
-        size: window.GOBTierEmblem.EMBLEM_SIZING.courtScoreboard.emblem,
-        mode: 'mono'
+        value: courtEmblemValueForTier(tier),
+        size: sz.emblem,
+        mode: sz.mode
       });
       const round = window.GOBTierEmblem.roundLabelForWeek(p.get('week')) || '';
       strip.innerHTML = emblem
@@ -6667,7 +6717,6 @@
 
     const redirected = await redirectIfFranchiseGameplayAlreadyCommitted(urlParams);
     if (!redirected) {
-      applyEosScoreboardChrome();
       // Update Player Box Score headers with actual team names
       if (homeTeam) {
         const homePlayersHeader = document.getElementById('home-players-header');
@@ -6693,6 +6742,10 @@
       } else {
         console.warn('⚠️ No teams found in URL, using default vibrant colors');
       }
+
+      // Tournament scoreboard chrome — after the roster fetch so the emblem can
+      // carry the user team's conference/region value (matches the FCC emblem).
+      applyEosScoreboardChrome();
 
       // Load accumulated stats if this is a resumed game
       await initializeGameStats();
