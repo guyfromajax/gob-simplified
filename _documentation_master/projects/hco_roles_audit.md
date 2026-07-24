@@ -201,3 +201,21 @@ Fix: at L8145 drop the `and not roles.get("defender")` guard so the moment-defen
 - **Root cause:** the credited defender's *identity* is not terminal — it feeds foul/steal accumulation → **foul-outs → substitutions → downstream game state**, and likely attribute-driven RNG resolution. So re-crediting the *correct* defender changes the game's evolution.
 - **Plan-A reclassification:** this is a **basketball change**, not a relabel → distributional verification (N seeds before/after) + a reference **re-cut** (requires human OK per the harness-access decision), NOT exact-diff.
 - **Direction still likely correct** (matches the human-eye "wrong defender" disconnect), but "correct" now means "moves the stat distribution" — needs the heavier path + ideally an in-app visual confirm that the defender now renders on the right player.
+- **Committed + pushed + in-app confirmed "significantly better"** (2026-07-24). Still owed: distributional verification + reference re-cut (batch with any further defender-credit fix).
+
+### Seam-2 measurement — Path B is largely CORRECT (2026-07-24, temp probe, reverted)
+Instrumented `_finalize_hco_pass_interception` over 20 games (163 interception-steals). Contrary to the hypothesis that Seam 2 was the visual residual, **Path B holds up**:
+- **Defender (interceptor): missing 0/163.** It's the actual pass-contest interceptor — genuinely the right defender, never absent. **No "wrong defender" bug here** (unlike Seam 3's Path A).
+- **Victim: stale-fallback only 6/163 = 4%** (`passer_pos` present 96% → victim = the real passer). Small edge.
+- **Contact-point / interceptor step-in: present 100% for BOTH man AND zone.** The `# Man defense only` comment (L5903) is **stale** — zone interceptions DO get the step-in. No zone render gap.
+
+**Conclusion:** the big Seam-2 consolidation is **not worth it** — Path B isn't the residual. The measurement (again) prevented a risky, low-value rewrite (cf. Seam 1 dead-in-practice). Only a 4% stale-victim edge remains, and fixing it is itself a stat-moving change (turnover credit → cascade), so it'd batch into the same distributional pass, low priority.
+
+**So the remaining visual "not 100%" is NOT the defender on either path's finalization.** Human-eye localization (2026-07-24): "SOME steals stolen by a defender NOT guarding the BH; interceptions/fouls/DBTOs now correct." → isolates it to **moment-steals** (on-ball strips).
+
+### Residual root cause = (A) zone defender SELECTION, not finalization/render (2026-07-24, discriminator probe, reverted)
+Probe (`[SEAM2B]`, sim-safe `_build_all_animations` grid): at each moment-steal, ranked the credited defender by distance-to-BH among all defenders. 70 moment-steals:
+- **MAN: credited defender is the NEAREST to the BH 100% of measurable cases** (avg credited-dist == nearest-dist = 3.7). Man is correct.
+- **ZONE: credited defender is NOT the nearest ~62% of measurable cases** (rank distribution 1:12, 2:8, 3:11, 4:1). **avg credited-dist-to-BH = 7.3 vs nearest = 3.1** — the credited zone defender is >2× farther from the BH than the actual nearest defender.
+
+**Verdict: (A) SELECTION, zone-only.** The on-ball moment credits (and renders the strip on) a zone defender who isn't the one contesting the BH. NOT a finalization bug (roles audit) and NOT a render step-in gap (B). This is the **zone on-ball-defender selection** feeding the moment — the **defender-grid / dynamic-defense layer**, adjacent to but distinct from this roles audit. The fix is upstream (which zone defender the moment rolls/credits) and — because it changes which defender's attributes roll the strip — a **genuine gameplay change** (draw-moving, distributional verification), bigger than the Seam-3 credit fix.
