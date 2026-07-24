@@ -5670,7 +5670,7 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
     # and "pick"/bat his own man's pass. MAN → the matchup defender. ZONE → the on-ball zone defender
     # (`_zone_bh_defender`: whose zone polygon covers the passer's spot), mapped back to its lineup key.
     if zone:
-        _zbd = _zone_bh_defender(defense_playcall, _loc(bh_pos), is_away_offense, def_lineup, bh_pos)
+        _zbd = _zone_bh_defender(defense_playcall, _loc(bh_pos), is_away_offense, def_lineup, bh_pos, step=step, bh_player_id=getattr(off_lineup.get(bh_pos), "player_id", None))
         _zbd_pos = next((dp for dp, p in def_lineup.items() if p is _zbd), None)
         _passer_def = {_zbd_pos} if _zbd_pos else set()
     else:
@@ -5781,11 +5781,20 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
             return
         from BackEnd.models.animator import Animator
         grid = Animator(game).compute_defender_grid(skeleton, off_lineup, def_lineup)
+        # The zone who-guards-whom map is freshly populated on game.zone_defender_assignments_by_step
+        # by the compute_defender_grid above (its zone branch). Stamp it per step — ZONE ONLY, since the
+        # shared ledger is stale/irrelevant for man — so the on-ball moment + pass-contest read the
+        # render's EXACT assignment instead of reconstructing "who's on the BH" (zone_selection_fix.md).
+        from BackEnd.utils.defense_utils import is_zone_defense
+        _is_zone_stamp = is_zone_defense((getattr(game, "game_state", {}) or {}).get("defense_playcall"))
+        _guard_by_step = (getattr(game, "zone_defender_assignments_by_step", {}) or {}) if _is_zone_stamp else {}
         _empty_pass_drive = []
         for i, step in enumerate(steps):
             ss = step.get("_step_state") or {"index": i}
             _dfn = grid.get(i) or {}
             ss["defense"] = _dfn
+            if _is_zone_stamp:
+                ss["guard"] = _guard_by_step.get(i)
             step["_step_state"] = ss
             # DIAGNOSTIC (2026-07-13): an EMPTY stamped grid for a PASS/DRIVE step makes _hco_step_def_xy
             # fall back to LEGACY reconstruction — which for zone+away emits HOME-frame coords → the
@@ -6197,11 +6206,23 @@ def _resolve_hco_moment(game, ball_handler, bh_defender, event_scalar=None):
                            def_mod=def_eff, off_mod=off_eff, event_scalar=event_scalar)
 
 
-def _zone_bh_defender(defense_playcall, bh_location, is_away_offense, def_lineup, bh_pos):
-    """On-ball ZONE defender at a step: the defender whose zone polygon contains the ball-handler's
-    spot (mirrors attack_drive's ``bh_zone_def``). Falls back to the nearest zone (by polygon
-    centroid, compared in the polygons' home space) and finally to the position-on-position
-    defender. Used by the per-step moment when the defense is in a zone (no 1:1 man matchup)."""
+def _zone_bh_defender(defense_playcall, bh_location, is_away_offense, def_lineup, bh_pos, step=None, bh_player_id=None):
+    """On-ball ZONE defender at a step. PREFERS the render's EXACT guard assignment stamped on the step
+    (``step["_step_state"]["guard"]`` = ``{def_pos: guarded_off_player_id}`` from
+    ``assign_all_zone_defenders``): the defender whose guarded player == the ball handler — the same
+    who-guards-whom the render draws, frame-independent (zone_selection_fix.md). Falls back to the
+    legacy polygon selection (defender whose zone polygon contains the BH spot, then nearest centroid,
+    then position) when no guard is stamped. Used by the per-step moment + the pass-contest exclusion."""
+    # Guard-map path: the defender the render assigned to the ball handler (exact, no distance guessing).
+    _guard = ((step or {}).get("_step_state") or {}).get("guard") if isinstance(step, dict) else None
+    if _guard and bh_player_id is not None:
+        _guard_def = None
+        for _dp, _off_pid in _guard.items():
+            if _off_pid is not None and str(_off_pid) == str(bh_player_id):
+                _guard_def = def_lineup.get(_dp)
+                break
+        if _guard_def is not None:
+            return _guard_def
     from BackEnd.engine.attack_drive_clearance import (
         _zone_boundaries_for_spot, _defender_for_zone_point, _closest_defender_to_point,
         _spot_display_coords,
@@ -6496,7 +6517,8 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
             if _m_bh and off_lineup.get(_m_bh):
                 if zone:
                     _m_def = _zone_bh_defender(
-                        game_state.get("defense_playcall"), _m_loc, is_away_offense, def_lineup, _m_bh)
+                        game_state.get("defense_playcall"), _m_loc, is_away_offense, def_lineup, _m_bh,
+                        step=steps[i], bh_player_id=getattr(off_lineup.get(_m_bh), "player_id", None))
                 else:
                     _m_def = def_lineup.get(off_to_def.get(_m_bh, _m_bh))
                 if _m_def is not None:

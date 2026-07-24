@@ -46,6 +46,23 @@ the **credit** (stash `_hco_moment_defender_id`, L6292/L6304/L6508). So almost c
   change (different defender's attributes contest → outcomes move). Credit-only → attribution/render
   (cheaper). Expect ROLL.
 
+## ✅ UPDATE 2026-07-24 — Attempt 2 (guard-map) WORKS; implemented, uncommitted, distributional-verify owed
+Fix (4 targeted edits, `phase_resolution.py`): (1) `_stamp_contest_defender_grid` stamps the render's
+per-step guard map `step["_step_state"]["guard"] = game.zone_defender_assignments_by_step.get(i)`
+(ZONE-only; freshly populated by the `compute_defender_grid` it already calls). (2) `_zone_bh_defender`
+gains `step`+`bh_player_id`, returns the defender whose guarded player == the BH (inverts the map);
+polygon path kept as unstamped fallback. (3)+(4) moment (L6519) + pass-contest (L5673) callers pass
+`step`+`bh_player_id`. attack_drive twin still deferred.
+- **Functional (re-probe):** ZONE credited-defender-is-nearest **38%→65%**, and the farthest-defender
+  picks Attempt-1 introduced are GONE (rank dist tops at r3). MAN still 100%. The remaining r2/r3 are
+  cases where the render's *own* guardian isn't the raw-nearest — the fix now MATCHES the render by
+  construction (credited == who the render draws guarding the BH). Any residual is the render's
+  `assign_all_zone_defenders` assignment quality — a deeper/separate layer, not this fix.
+- **Perf: FREE.** Poison-isolated (guard code runs, old result returned → identical 7914-turn games) →
+  cpu/turn **5.46 ≈ baseline 5.48**. The stamp-read + inversion loop add nothing. Sim Perf not disrupted.
+- **Owed before done:** user in-app visual confirm + distributional multi-seed verification + reference
+  re-cut (batch w/ Seam-3's, pause for human OK). Fix is **uncommitted** in the working tree.
+
 ## ⚠️ UPDATE 2026-07-24 — Attempt 1 (distance-in-grid) FAILED; use the `_guard` map
 
 **Confirmed:** it's the ROLL (not just the credit). `_zone_bh_defender`'s result feeds both the strip
