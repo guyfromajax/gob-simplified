@@ -1075,11 +1075,39 @@ function buildActiveGameCourtUrl(resume) {
   return './court.html?' + params.toString();
 }
 
+// Tournament tier emblem on the mode-select franchise card. Tier comes from the
+// displayed week; value (conference number / region letter) from command-center
+// data — the same sources the FCC uses. Cleared outside an EOS week (27-34).
+function renderModeSelectTierEmblem(franchiseData, commandCenterData) {
+  const slot = document.getElementById('franchise-card-tier-emblem');
+  if (!slot || !window.GOBTierEmblem) return;
+  const week = (franchiseData && franchiseData.week != null)
+    ? franchiseData.week
+    : (commandCenterData && commandCenterData.week);
+  const tier = window.GOBTierEmblem.tierForWeek(week);
+  if (!tier) { slot.innerHTML = ''; return; }
+  let value = null;
+  if (tier === 'conference') {
+    const c = commandCenterData ? commandCenterData.user_conference : null;
+    value = (c === 0 || c) ? String(c) : '';
+  } else if (tier === 'region') {
+    const r = commandCenterData ? commandCenterData.user_region : null;
+    if (r) {
+      value = String(r).toUpperCase();
+    } else {
+      const c = Number(commandCenterData ? commandCenterData.user_conference : NaN);
+      if (Number.isInteger(c) && c >= 1 && c <= 16) value = String.fromCharCode(65 + Math.floor((c - 1) / 2));
+    }
+  }
+  slot.innerHTML = window.GOBTierEmblem.renderEmblem({ tier, value, size: 40, mode: 'color' });
+}
+
 function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
   if (!franchisePlayNowBtn) return;
 
   const teamName = safeText(franchiseData.user_team_id, 'Program');
   if (franchiseCardTeamName) franchiseCardTeamName.textContent = teamName;
+  renderModeSelectTierEmblem(franchiseData, commandCenterData);
   const bannerUrl = getSquareLogoPath(teamName);
   if (franchiseCardBanner) {
     franchiseCardBanner.src = bannerUrl;

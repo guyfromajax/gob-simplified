@@ -60,6 +60,7 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 }
 
 .lineup-context-bar {
+  position: relative;
   flex: 0 0 auto;
   display: flex;
   align-items: center;
@@ -70,6 +71,24 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   background: rgba(28, 33, 43, 0.97);
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
   box-shadow: 0 10px 24px rgba(0, 0, 0, 0.24);
+}
+
+/* Tournament tier emblem, right-justified to the Attributes/Stats panel's right
+   edge. The panel boundary sits at ~41% from the context bar's right (the right
+   panel's 38% content width plus its fixed padding/border, measured on desktop).
+   Overlay — does not affect the score pill / Play button layout. Collapses when
+   empty so the bar is unchanged with no tournament active. */
+.lineup-tier-emblem {
+  position: absolute;
+  right: 41%;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+.lineup-tier-emblem:empty {
+  display: none;
 }
 
 .game-state-pill {

@@ -975,6 +975,24 @@ body.mode-select-page .franchise-card-season-line {
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
 }
 
+/* Tournament tier emblem on the team-name row, right-justified to the card width
+   (aligns with the chips/buttons below). Slot collapses when empty, so the card
+   renders exactly as before with no tournament active. */
+body.mode-select-page .franchise-card-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+body.mode-select-page .franchise-card-tier-emblem {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+}
+body.mode-select-page .franchise-card-tier-emblem:empty {
+  display: none;
+}
+
 body.mode-select-page .franchise-card-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

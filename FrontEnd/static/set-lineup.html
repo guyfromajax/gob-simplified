@@ -51,6 +51,9 @@
         </div>
       </div>
 
+      <!-- Tournament tier emblem; right-justified to the Attributes/Stats panel edge below, EOS weeks only. -->
+      <div id="lineup-tier-emblem" class="lineup-tier-emblem" aria-hidden="true"></div>
+
       <div class="context-actions">
         <button id="play-now" class="lineup-btn lineup-btn-green disabled" type="button">Play Game</button>
       </div>
@@ -210,6 +213,7 @@
   <!-- ✅ PHASE 2: Load pointer validation before set-lineup.js -->
   <script src="/js/shared/pointerValidation.js"></script>
   <script src="/js/shared/playerYear.js"></script>
+  <script src="/js/shared/tierEmblem.js"></script>
   <script src="/set-lineup.js?v=__BUILD_TS__"></script>
   <script type="module">
     import { startTimeoutLoop } from '/js/musicController.js';

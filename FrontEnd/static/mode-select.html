@@ -57,7 +57,11 @@
           <img id="franchise-card-banner" class="franchise-card-banner" alt="">
           <div class="franchise-card-content">
             <div>
-              <div id="franchise-card-team-name" class="franchise-card-team-name">Program</div>
+              <div class="franchise-card-name-row">
+                <div id="franchise-card-team-name" class="franchise-card-team-name">Program</div>
+                <!-- Tournament tier emblem; populated by renderFranchiseActiveState in an EOS week, empty otherwise -->
+                <div id="franchise-card-tier-emblem" class="franchise-card-tier-emblem" aria-hidden="true"></div>
+              </div>
               <div id="franchise-card-season-progress" class="franchise-card-season-line">Season 1 · Week 1 of 26</div>
             </div>
             <div class="franchise-card-grid">
@@ -175,6 +179,7 @@
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/archetypeBadge.js"></script>
   <script src="/common.js"></script>
+  <script src="/js/shared/tierEmblem.js"></script>
   <script src="./mode-select.js"></script>
 </body>
 </html>

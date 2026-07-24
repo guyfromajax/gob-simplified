@@ -705,6 +705,32 @@ function initLineupPlaybooksModal() {
   });
 }
 
+// User team's conference / region (captured from the roster fetch) for the
+// tournament tier emblem value — same value as the FCC/court emblems.
+let lineupUserConference = null;
+let lineupUserRegion = null;
+
+// Surface: tier emblem on the set-lineup context bar (score/time row). Tier from
+// the week URL param; value from the roster. Cleared outside a franchise EOS week.
+function renderLineupTierEmblem() {
+  const slot = document.getElementById('lineup-tier-emblem');
+  if (!slot || !window.GOBTierEmblem) return;
+  const tier = franchiseId ? window.GOBTierEmblem.tierForWeek(weekParam) : null;
+  if (!tier) { slot.innerHTML = ''; return; }
+  let value = null;
+  if (tier === 'conference') {
+    value = (lineupUserConference === 0 || lineupUserConference) ? String(lineupUserConference) : '';
+  } else if (tier === 'region') {
+    if (lineupUserRegion) {
+      value = String(lineupUserRegion).toUpperCase();
+    } else {
+      const c = Number(lineupUserConference);
+      if (Number.isInteger(c) && c >= 1 && c <= 16) value = String.fromCharCode(65 + Math.floor((c - 1) / 2));
+    }
+  }
+  slot.innerHTML = window.GOBTierEmblem.renderEmblem({ tier, value, size: 34, mode: 'color' });
+}
+
 async function loadRoster() {
   if (!teamName) return;
   
@@ -728,6 +754,9 @@ async function loadRoster() {
   if (abortIfAccessDenied(res)) return;
   if (!res.ok) return;
   const data = await res.json();
+  lineupUserConference = (data.conference === 0 || data.conference) ? data.conference : null;
+  lineupUserRegion = data.region || null;
+  renderLineupTierEmblem();
   rosterTeamChemistry = data.team_chemistry != null && data.team_chemistry !== ''
     ? Number(data.team_chemistry)
     : 15;
