@@ -1,70 +1,15 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <!-- Google Tag Manager (production only) -->
-  <script src="/js/shared/gtm-loader.js"></script>
-  <!-- End Google Tag Manager -->
-  <script src="/js/shared/authGuard.js"></script>
-  <script src="/js/shared/sentryInit.js"></script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-  <title>Tournament Command Center</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/tournament.css">
-  <link rel="stylesheet" href="/css/auth-bar.css">
-  <script src="/js/shared/pageLoadOverlay.js"></script>
-  <link rel="stylesheet" href="/css/fonts.css">
+  <meta http-equiv="refresh" content="0;url=/mode-select.html">
+  <title>Tournament Mode Retired</title>
+  <script>
+    window.location.replace('/mode-select.html');
+  </script>
 </head>
-<body class="tcc-page">
-  <div id="page-load-overlay" role="status" aria-live="polite" aria-busy="true" style="position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.92);display:flex;align-items:center;justify-content:center;margin:0;padding:0;">
-    <img src="/images/loader1.gif" alt="Loading…" style="width:240px;height:auto;max-width:90vw;">
-  </div>
-  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
-  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
-  <div id="cc-loading-overlay" class="cc-loading-overlay" style="display:none;">Loading...</div>
-
-  <div id="tournament-container">
-    <div id="tournament-top">
-      <img id="user-team-logo" src="" alt="Team Logo" class="team-logo">
-      <button id="exit-tournament" type="button" class="mode-exit-btn">Exit Tournament</button>
-    </div>
-
-    <div class="arena-scroll">
-      <div class="arena is-playing" id="tournament-arena">
-        <div class="arena__spot" aria-hidden="true"></div>
-        <div class="arena__floor" aria-hidden="true"></div>
-        <div class="arena__grain" aria-hidden="true"></div>
-        <div class="arena__vignette" aria-hidden="true"></div>
-        <div id="bracket" class="bracket" aria-live="polite"></div>
-      </div>
-    </div>
-  </div>
-
-  <div id="bracket-tip" class="tip" role="tooltip" aria-hidden="true"></div>
-
-  <div id="tournament-celebrate" class="celebrate" aria-hidden="true">
-    <div class="celebrate__rays" aria-hidden="true"></div>
-    <div class="celebrate__glow" aria-hidden="true"></div>
-    <div class="confetti" id="tcc-confetti" aria-hidden="true"></div>
-    <div class="celebrate__inner">
-      <div class="celebrate__trophy" aria-hidden="true"></div>
-      <div class="celebrate__eyebrow" id="tcc-cele-eyebrow"></div>
-      <div class="celebrate__title">Champions</div>
-      <img class="celebrate__logo" id="tcc-cele-logo" src="" alt="">
-      <div class="celebrate__team" id="tcc-cele-team"></div>
-      <div class="celebrate__sub" id="tcc-cele-sub"></div>
-      <button type="button" class="celebrate__close" id="tcc-cele-close">Continue</button>
-    </div>
-  </div>
-
-  <script src="/js/config/api-config.js"></script>
-  <script src="/js/shared/accessDenied.js"></script>
-  <script src="/js/shared/analytics.js"></script>
-  <script src="/common.js"></script>
-  <script src="/bracket.js"></script>
-  <script src="/js/shared/alphaBanner.js"></script>
-  <script src="/js/shared/teamShotThresholdScale.js"></script>
-  <script src="/tournament.js"></script>
+<body>
+  <p>Standalone Tournament Mode has been retired. <a href="/mode-select.html">Continue to Mode Select</a>.</p>
 </body>
 </html>

@@ -10,5 +10,9 @@
 # ENABLE THIS DURING MAINTENANCE:
 # /*        /maintenance.html 200!
 
+# Legacy standalone Tournament Mode sunset
+/tournament-select.html  /mode-select.html  302!
+/tournament.html         /mode-select.html  302!
+
 # Redirect root to homepage.html
 /  /homepage.html  200!

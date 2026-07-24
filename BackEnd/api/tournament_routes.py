@@ -29,6 +29,11 @@ from BackEnd.utils.ownership import verify_tournament_owned_by_user
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
+TOURNAMENT_MODE_SUNSET_DETAIL = (
+    "Standalone Tournament Mode has been retired. "
+    "Continue from Mode Select or use Franchise tournament weeks."
+)
+
 
 def get_user_team_from_tournament(tournament_doc: dict) -> tuple[str | None, str | None]:
     """
@@ -280,16 +285,8 @@ def start_tournament(
     user: dict = Depends(get_current_user),
     profile: bool = False,
 ):
-    if profile:
-        from BackEnd.utils.profiling import run_profiled
-        _out = [None]
-        def _wrapped():
-            _out[0] = _do_start_tournament(request, user)
-        profile_summary = run_profiled(_wrapped, top_n=60)
-        result = _out[0]
-        result["profile_summary"] = profile_summary
-        return result
-    return _do_start_tournament(request, user)
+    """Reject creation after the standalone Tournament Mode sunset."""
+    raise HTTPException(status_code=410, detail=TOURNAMENT_MODE_SUNSET_DETAIL)
 
 @router.post("/tournament/simulate-round")
 @router.post("/simulate-tournament-round")  # Backward compatibility; prefer /tournament/simulate-round

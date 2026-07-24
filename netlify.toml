@@ -20,8 +20,19 @@
 
 # Redirect root to homepage.html
 [[redirects]]
+  from = "/tournament-select.html"
+  to = "/mode-select.html"
+  status = 302
+  force = true
+
+[[redirects]]
+  from = "/tournament.html"
+  to = "/mode-select.html"
+  status = 302
+  force = true
+
+[[redirects]]
   from = "/"
   to = "/homepage.html"
   status = 200
   force = true
-

@@ -1,7 +1,6 @@
 from fastapi.testclient import TestClient
 
 from BackEnd.api.api import app
-from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.db import players_collection, teams_collection, tournaments_collection
 
 
@@ -27,7 +26,7 @@ def _make_team_docs():
     ]
 
 
-def test_start_tournament_resets_player_stats():
+def test_start_tournament_is_gone_and_does_not_mutate_player_stats():
     teams_collection.insert_many(_make_team_docs())
     players_collection.insert_one(
         {
@@ -45,12 +44,12 @@ def test_start_tournament_resets_player_stats():
     )
 
     resp = client.post("/tournament/start", json={"user_team_id": "Lancaster"})
-    assert resp.status_code == 200
+    assert resp.status_code == 410
+    assert "retired" in resp.json()["detail"].lower()
 
     player = players_collection.find_one({"_id": "p1"})
-    zero_stats = {k: 0 for k in BOX_SCORE_KEYS}
-    assert player["stats"]["game"] == zero_stats
-    assert player["stats"]["season"] == zero_stats
-    assert player["stats"]["career"] == zero_stats
-    assert player["stats"]["applied_games"] == []
-
+    assert player["stats"]["game"] == {"PTS": 5}
+    assert player["stats"]["season"] == {"PTS": 5}
+    assert player["stats"]["career"] == {"PTS": 10}
+    assert player["stats"]["applied_games"] == ["old"]
+    assert tournaments_collection.count_documents({}) == 0
