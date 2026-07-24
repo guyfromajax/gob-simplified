@@ -67,7 +67,11 @@ from BackEnd.utils.shared import (
     clamp_animation_grid_coords,
     get_away_player_coords,
 )
-from BackEnd.engine.cutoff_resolution import best_cutoff_on_drive, resolve_cutoff_contest
+from BackEnd.engine.cutoff_resolution import (
+    best_cutoff_on_drive,
+    map_cutoff_outcome_to_hct_transition,
+    resolve_cutoff_contest,
+)
 from BackEnd.constants.hct_trap_play_types import STANDARD_DIAMOND
 from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL, compute_hct_trap_formation
 from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec, drift_or_hold_coord
@@ -745,7 +749,7 @@ def _resolve_moment(
             # contested NEUTRAL below (:785) — graded by how decisively he won (`m_norm`, already
             # computed → no new roll). `score_ratio` = the drive-path fraction the BH reached before
             # the wall-off (lower = stopped earlier). FB/HCT (default `clean_stop=False`) keep the
-            # original `NEUTRAL, 1.0` → byte-identical. See projects/attack_contest_unification.md.
+            # original `NEUTRAL, 1.0` → byte-identical for FB/HCT default.
             if clean_stop:
                 return "D_STOP", _clampf(1.0 - m_norm, 0.0, 1.0), None
             return "NEUTRAL", 1.0, None
@@ -2451,9 +2455,9 @@ def compute_dynamic_hct_turn(
     # Set when the BH reaches the Attack Basket Area and a shot is chosen (§7).
     # Carries the offense/defense coords for the in-Attack-Basket shot resolver.
     ab_seed: Dict[str, Any] = {}
-    # D21 dribble-dead state: False once the BH gathers his dribble on a
-    # broken-HCT cutoff win → reads collapse to pass/hold, no drive. Resets to
-    # True whenever a pass transfers the ball to a new BH (and at turn end).
+    # D21 dribble-dead state: False when the BH gathers (non-cutoff paths).
+    # Broken-cutoff meet no longer RETAIN+gathers — POS_O continues to ABA;
+    # NEUTRAL/D_STOP → STOP_HCO. Resets True on a completed pass (and turn end).
     dribble_alive = True
 
     # --- FCP engagement: aggression-driven BH ↔ def PG meet (§FCP) ------------
@@ -2640,14 +2644,56 @@ def compute_dynamic_hct_turn(
                 if drifted:
                     coords[pos] = _clamp_xy(drifted_xy)
 
+    def _finish_broken_cutoff_to_aba(
+        *,
+        aba_target: Dict[str, int],
+        chase_pos: str,
+        chase_def: Any,
+        label: str,
+        fb_context: str,
+    ) -> str:
+        """Drive BH from current spot to the y-keyed ABA target; chase defender
+        trails (cosmetic). Then §2 ABA read → HCO or FAST_BREAK."""
+        nonlocal bh_xy
+        def_rate = _ag_grid_per_game_sec(chase_def, "standard")
+        seconds = max(0.3, _euclid(bh_xy, aba_target) / bh_drive_rate)
+        atk_snap_off, atk_snap_def = _snap_loop_coords()
+        off_coords[bh_pos] = aba_target
+        if def_rate > 0 and chase_pos in def_coords:
+            def_coords[chase_pos] = _clamp_xy(
+                _interrupted_coord(def_coords[chase_pos], aba_target, def_rate, seconds)
+            )
+        bh_xy = off_coords[bh_pos]
+        if turn_mode == "fcp" and fcp_offball is not None:
+            _fcp_move_offense(bh_xy, seconds, aba_only=True)
+        else:
+            _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", chase_pos)})
+        _append_loop_segment(
+            "hct_attack",
+            seconds,
+            ("off", bh_pos),
+            bh_pos,
+            label,
+            snap_off=atk_snap_off,
+            snap_def=atk_snap_def,
+        )
+        nonlocal_shot_clock_dec(seconds)
+        if _aba_hco_or_fb():
+            return "HCO"
+        _do_fast_break(context=fb_context)
+        return "FAST_BREAK"
+
     def _do_broken_hct_cutoff() -> str:
-        """§5 / D21 broken-HCT cutoff race. The BH drives to a y-keyed ABA spot
-        (topLane / upper apex / lower apex) vs the single closest defender; the
-        other 8 hold (test cut). Returns:
-        "FAST_BREAK" / "HCO" (clean arrival → §7 numbers), "TERMINAL" (a
-        meet-point foul / dead ball — ``result_type`` already set), or "RETAIN"
-        (the BH won the collision and is now dribble-dead → re-read)."""
-        nonlocal bh_xy, dribble_alive, result_type, text_suffix, pending_dfoul_trapper
+        """§5 / D21 broken-HCT/FCP cutoff race. BH drives to a y-keyed ABA spot
+        vs the closest defender. Returns:
+        ``FAST_BREAK`` / ``HCO`` (ABA arrival → §7 numbers), ``STOP_HCO``
+        (meet NEUTRAL/D_STOP → break ends → HCO), or ``TERMINAL`` (foul /
+        dead ball — ``result_type`` already set).
+
+        Meet consumption mirrors FB vocabulary (POS_O continue / stop → HCO);
+        no half-court pull-up/dish on the stop.
+        """
+        nonlocal bh_xy, result_type, text_suffix, pending_dfoul_trapper
         if turn_mode == "fcp" and fcp_offball is not None:
             fcp_offball.enter_aba_mode(off_coords, bh_pos)
             fcp_offball.sync_off_targets(off_targets, bh_pos)
@@ -2671,36 +2717,13 @@ def compute_dynamic_hct_turn(
             # No angle → clean drive to the y-keyed ABA spot; nearest trail defender
             # chases (cosmetic — no contest).
             trail_pos = min(POSITIONS, key=lambda p: _euclid(bh_xy, def_coords[p]))
-            trail_def = def_lineup.get(trail_pos)
-            def_rate = _ag_grid_per_game_sec(trail_def, "standard")
-            seconds = max(0.3, _euclid(bh_xy, target) / bh_drive_rate)
-            atk_snap_off, atk_snap_def = _snap_loop_coords()
-            off_coords[bh_pos] = target
-            if def_rate > 0:
-                def_coords[trail_pos] = _clamp_xy(
-                    _interrupted_coord(def_coords[trail_pos], target, def_rate, seconds)
-                )
-            bh_xy = off_coords[bh_pos]
-            if turn_mode == "fcp" and fcp_offball is not None:
-                _fcp_move_offense(bh_xy, seconds, aba_only=True)
-            else:
-                _apply_off_ball_drift(seconds, {("off", bh_pos), ("def", trail_pos)})
-            _append_loop_segment(
-                "hct_attack",
-                seconds,
-                ("off", bh_pos),
-                bh_pos,
-                "attack (broken-HCT cutoff drive — clean to ABA spot)",
-                snap_off=atk_snap_off,
-                snap_def=atk_snap_def,
+            return _finish_broken_cutoff_to_aba(
+                aba_target=target,
+                chase_pos=trail_pos,
+                chase_def=def_lineup.get(trail_pos),
+                label="attack (broken-HCT cutoff drive — clean to ABA spot)",
+                fb_context="broken-HCT clean arrival",
             )
-            nonlocal_shot_clock_dec(seconds)
-            # D23: a clean broken-HCT arrival runs the same §2 3-tier ABA read
-            # (HCO vs Fast Break) as any other ABA arrival.
-            if _aba_hco_or_fb():
-                return "HCO"
-            _do_fast_break(context="broken-HCT clean arrival")
-            return "FAST_BREAK"
 
         # Angle → the BH and the cutoff defender collide at the meet point.
         seconds = max(0.3, _euclid(bh_xy, meet) / bh_drive_rate)
@@ -2740,11 +2763,22 @@ def compute_dynamic_hct_turn(
             result_type = "DEAD BALL"
             text_suffix = " — stripped at the point of attack, turnover!"
             return "TERMINAL"
-        # POS_O / NEUTRAL → BH beats the defender but has gathered his dribble.
-        dribble_alive = False
-        if turn_mode == "fcp" and fcp_offball is not None:
-            fcp_offball.exit_aba_to_incremental(bh_xy, off_coords, bh_pos)
-        return "RETAIN"
+
+        branch = map_cutoff_outcome_to_hct_transition(outcome)
+        if branch == "STOP_HCO":
+            # Contested / clean wall-off → break ends → HCO (transition reset).
+            if turn_mode == "fcp" and fcp_offball is not None:
+                fcp_offball.exit_aba_to_incremental(bh_xy, off_coords, bh_pos)
+            return "STOP_HCO"
+
+        # POS_O — beat the man → continue meet → ABA, then same §2 read as clean.
+        return _finish_broken_cutoff_to_aba(
+            aba_target=target,
+            chase_pos=cutoff_pos,
+            chase_def=cutoff_def,
+            label="attack (broken-HCT cutoff drive — POS_O continue to ABA)",
+            fb_context="broken-HCT POS_O arrival",
+        )
 
     def _seed_fast_break() -> None:
         """Snapshot the post-drive offense/defense coords for the FB resolver."""
@@ -3006,6 +3040,10 @@ def compute_dynamic_hct_turn(
                     result_type = "HCO"
                     text_suffix = " open floor — they break the trap & establish their half court offense"
                     return "break"
+                if status == "STOP_HCO":
+                    result_type = "HCO"
+                    text_suffix = " the drive is cut off — they settle into the half court"
+                    return "break"
                 if status == "TERMINAL":
                     return "break"
             return "continue"
@@ -3093,9 +3131,8 @@ def compute_dynamic_hct_turn(
 
         if decision == "attack":
             if moment == "none":
-                # Broken-HCT cutoff race (D21): drive to topLane vs the closest
-                # defender → clean FB/HCO, a meet-point contest, or a retained
-                # (now dribble-dead) ball.
+                # Broken-HCT/FCP cutoff race (D21): drive to ABA vs closest
+                # defender → clean/POS_O ABA read, STOP_HCO, or terminal foul/TO.
                 status = _do_broken_hct_cutoff()
                 if status == "FAST_BREAK":
                     result_type = "FAST_BREAK_SHOT"
@@ -3105,10 +3142,14 @@ def compute_dynamic_hct_turn(
                     result_type = "HCO"
                     text_suffix = " open floor — they break the trap & establish their half court offense"
                     break
+                if status == "STOP_HCO":
+                    result_type = "HCO"
+                    text_suffix = " the drive is cut off — they settle into the half court"
+                    break
                 if status == "TERMINAL":
                     break
                 _finish_loop_iteration()
-                continue  # RETAIN → dribble-dead, re-read next iteration
+                continue
             mlabel = "two-defender trap" if moment == "trap" else "single-defender pressure"
             outcome, score_ratio, credited = _resolve_attack(moment, in_range)
             if _apply_moment_outcome(outcome, score_ratio, credited, context=mlabel):

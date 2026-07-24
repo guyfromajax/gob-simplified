@@ -145,3 +145,59 @@ full sims updated the shooter from the final skeleton step but left defenders on
 resolve-once contract, `ShotAttemptGeometry`, now freezes shooter + defender coordinates and is passed
 directly to `resolve_shot()`. Treat it as a proving slice for a future universal decision/stop-state
 contract; do not overload it with victim/contact/ball-owner fields until the shot path is validated.
+
+---
+
+## Static write/read map — mapping pass (2026-07-24, read-only, no code changes)
+
+Full field-flow trace of the non-shot finalize path. All line refs `phase_resolution.py` unless noted.
+
+### Two disjoint finalize spines
+- **Path A — non-shot block** (`result` already flipped to a non-shot type): `apply_stopper_system_to_skeleton` (L7711) → **defender-override block** (L7729–7894) → non-shot finalize (L8100–8259) → `resolve_turnover_logic` (L8239). Finalizes **DBTO, SHOT_CLOCK_VIOLATION, O_FOUL, D_FOUL, moment-STEAL**.
+- **Path B — interception finalizer** (`result` stays `"SHOT"`, a walked/coverage pass got picked): shot branch L8480 → `_finalize_hco_pass_interception` (L5880) **returns early**, bypassing Path A. Finalizes **interception-STEAL** (+ `_finalize_hco_pass_bat_oob` L5970 for BAT_OOB).
+- `result` flips to Path A when the fused resolver returns `{"moment_result": …}` (consumed spine L7596), or drive-contact foul (L7604).
+
+### The seams (where one fact is derived ≥2 ways / can go stale)
+
+**Seam 1 — stale intended-shooter vs true stop-step handler (bug-#5 family; has a REMAINING GAP).** `assign_roles` seeds `roles["ball_handler"] = shooter` = the **final step's `shoot` action** (turn_manager ~L6300). On a non-shot outcome the true handler is at the *stop* step. The override block scrubs it (L7742 `get_ball_handler_from_skeleton(step_index=stop_step_index)` → L7757 sync) — **but only `if stop_step_index is not None` (L7740)**. With no pin/index it falls back to `roles.get("ball_handler")` (L7745) = the stale shooter; `victim_id` (L2614) and the dead-ball fumble (`_resolve_ball_handler_id`, dead_ball_fumble.py L69, precedence `victim_id > shooter_id > ball_handler_id`) inherit it. **→ bug #5's fix does not cover the no-index path — a concrete residual to confirm + close.**
+
+**Seam 2 — the two STEAL paths derive victim / stop-step / defender / contact independently.** Never share code past `resolve_turnover_logic`:
+| Field | moment-STEAL (Path A) | interception-STEAL (Path B) |
+|---|---|---|
+| victim/handler | `get_ball_handler_from_skeleton(step_index=steal_stop_step_index)` L7742 → synced L7757 | `off_lineup[passer_pos]` L5888 |
+| stop step | `_hco_moment_stop_index` L6510 → `steal_stop_step_index` L3814 | `_hco_last_pass_step_index` → `_hco_pass_intercept_stop_index` L5894 |
+| defender | matchup/zone recompute at stop-handler L7875/7884 | `def_lineup[interceptor_pos]` L5930 |
+| contact | reverse-engineered from animation end coords L8219 | geometric `pass_contact_point` L5904 |
+
+**Seam 3 — moment-defender stash usually silently discarded.** `game_state["_hco_moment_defender_id"]` (live writer = fused resolver L6509) is consumed at L8144 **only `if not roles.get("defender")`** — but the override block already set `roles["defender"]` from a fresh matchup/zone recompute (L7875/7884). Docstring (L6250) says the stash exists precisely because the man position-match ≠ the actual zone contesting defender → the credited moment defender and the finalized defender can disagree, stash loses.
+
+**Seam 4 — `_hco_moment_stop_index` pin leak.** Written by 4 sites (L4653/L6308/L6510/L7610), popped by `apply_stopper` (L3693). If a writer sets it but the result routes to SHOT (L7622 fallback) instead of through `apply_stopper`, the pin survives into a later turn's stopper (guarded by pop-on-consume + defensive clears L6264/L6447 — verify the guard holds).
+
+### Draw-impact classification (drives Plan-A verification per fix)
+- **Attribution-only (no RNG draw change → exact-diff verifiable; scores/flow byte-identical, only credit/sprite moves):** Seam 1 handler propagation, Seam 2 victim unification, Seam 3 defender-credit, the emitter `_walk_ball_owners` (render-only, no RNG at all).
+- **Draw-changing (→ poison-stash + re-cut reference):** anything touching the **stop-step PIN** logic in `apply_stopper` — O_FOUL/D_FOUL random step `random.randint(1,len-2)` L3709, DBTO/STEAL random blast-radius L3714–3732, zone-tie defender `random.choice` L7869. If a fix makes a pin *always present* so a `random.*` fallback stops firing, it removes draws by construction.
+
+### Sim vs render
+Every field write/read above runs in the **backend sim** (`phase_resolution.py`/`turn_manager.py`/`pass_contest.py`), RNG all `sim_rng`. `_walk_ball_owners` (emitter) + `_resolve_ball_handler_id` (dead_ball_fumble) run **render-only**, no core RNG → **zero bulk-sim cost.**
+
+## Dynamic measurement — 20-game exhibition sim (2026-07-24, temp probes, reverted)
+
+Ran `scripts/test_hco_resolution_stats.py` (20 full Morristown-vs-Four-Corners games, in-memory, no DB writes) with 4 read-only ERROR probes at the seam branches. 494 non-shot finalizations. Probes reverted via `git checkout` (tree was clean).
+
+| Seam | Measured | Verdict |
+|---|---|---|
+| **1 — no-index stale-handler gap** | **0 / 494** hit the fallback (`apply_stopper` always sets `steal_stop_step_index`, so `stop_step_index` at L7735 is always truthy → the scrub always runs) | **Dead in practice.** Bug #5 is effectively closed live. Fix = optional defensive comment only. |
+| **2 — two independent steal finalizers** | Path A moment-steal **76** vs Path B interception-steal **173** (~**70% of steals** go through the *separate* `_finalize_hco_pass_interception`) | **High-frequency structural seam.** ~250 steals/20 games split across two victim/defender/contact derivations. |
+| **3 — moment-defender stash discarded** | stash present on **460/494**; **discarded 100%** (override block always pre-set `roles["defender"]`). Refined probe: credited defender **differs** from the stash in **238/487 = 49%** overall — **MAN 13%, ZONE 69%** | **Pervasive + wrong ~half the time.** The stash (designed as the *accurate* contesting defender, esp. zone) never wins; the credited/rendered defender is the position-on-position recompute, wrong on ~½ of non-shot outcomes (69% in zone). |
+| **stop-step pin** | **0** random fallbacks — every stop-step pinned (moment/intercept pin) | The `random.randint` fallbacks in `apply_stopper` (L3709/L3730) **never fire** → stop-step consolidation is **draw-neutral in practice**. |
+
+**Reprioritization from the data:**
+1. **Seam 3 is the highest-value target** — 49% wrong defender (69% zone), and the *minimal* fix (prefer the stash at L8145 even when `roles["defender"]` is preset) is **attribution-only / draw-neutral**: the zone-tie `random.choice` in the recompute still fires (draw preserved), we just keep the stash value → exact-diff verifiable, no reference re-cut (Plan A cheap tier).
+2. **Seam 2 (two steal finalizers) is the biggest structural cleanup** but higher-risk (two paths may draw differently) — a later, heavier consolidation.
+3. **Seam 1 is dead in practice** — deprioritize (defensive hardening at most).
+
+### Seam-3 fix candidate — implemented, verification OVERTURNED the "cheap" prediction (2026-07-24)
+Fix: at L8145 drop the `and not roles.get("defender")` guard so the moment-defender stash is **preferred** over the override block's recompute (matches the code's own docstring intent). **Seeded before/after (12 exhibition games, `scratchpad/seam3_verify.py`, PYTHONHASHSEED=0): NOT draw-neutral — 8/12 games diverged** (scores/turns/outcome-sequence). The prediction that this was attribution-only was **wrong, and the exact-diff caught it.**
+- **Root cause:** the credited defender's *identity* is not terminal — it feeds foul/steal accumulation → **foul-outs → substitutions → downstream game state**, and likely attribute-driven RNG resolution. So re-crediting the *correct* defender changes the game's evolution.
+- **Plan-A reclassification:** this is a **basketball change**, not a relabel → distributional verification (N seeds before/after) + a reference **re-cut** (requires human OK per the harness-access decision), NOT exact-diff.
+- **Direction still likely correct** (matches the human-eye "wrong defender" disconnect), but "correct" now means "moves the stat distribution" — needs the heavier path + ideally an in-app visual confirm that the defender now renders on the right player.

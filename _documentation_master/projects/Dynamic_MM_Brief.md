@@ -335,7 +335,7 @@ of scope. The bullets below are the SUPERSEDED S4-prototype notes, kept only for
 - **Verified headless:** `defense_playcall` stays canonical `man` (no `man_deny` leak → every `is_zone`/`=="man"` consumer unaffected — the exact-string fixes the recon flagged proved unnecessary); posture varies tight/normal/loose from the playcall.
 - **Deferred (the other half of S4):** zone posture parity (2-3/3-2/1-3-1 deny/loose + the net-new `assign_all_zone_defenders(posture=…)` geometry); the active-defense HUD label surfacing posture (today shows canonical `Man`); tuning the CPU weights.
 
-**Drive-contact outcome set (S2, locked):** `clean stop · block · shooting foul on miss · shooting foul on make (and-1) · defensive non-shooting foul · offensive foul / charge · db-turnover` — all feed existing stat tracking. `resolve_drive_contact` is the ONE seeded (SS&S) path for "driver meets defender," shared by FB + HCO drives. (A broader "unify all moment resolution across FB/HCO/HCT" is a deliberate FOLLOW-UP, not this feature.)
+**Drive-contact outcome set (S2, locked):** `clean stop · block · shooting foul on miss · shooting foul on make (and-1) · defensive non-shooting foul · offensive foul / charge · db-turnover` — all feed existing stat tracking. `resolve_drive_contact` is the ONE seeded (SS&S) path for "driver meets defender," shared by FB + HCO drives. (**HCT/FCP broken-press cutoff consumption aligned 2026-07-24** — see [`attack_contest_unification.md`](./attack_contest_unification.md): POS_O → continue to ABA; NEUTRAL/D_STOP → STOP_HCO; no half-court pull-up on transition stops.)
 
 ### S2 — RECONCILED system-level design (2026-07-14)
 

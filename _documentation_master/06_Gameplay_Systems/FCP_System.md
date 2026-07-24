@@ -207,7 +207,7 @@ During **`hct_advance`**, **`hct_hold`**, and **`hct_pass`** beats, non-BH offen
 | **T3** | **50 < x ≤ 64** | Release (same) | key / midWings / wings | midLane + front half spots |
 | **T4** | **x > 64** | Release until terminal | Same as T3 | Same as T3 |
 
-Constants: `FCP_TIER1_MAX = 34`, `FCP_TIER2_MAX = 50`, `FCP_TIER3_MAX = 64`. Broken-trap drives flood all non-BH to ABA spots until cutoff **RETAIN** reverts to incremental tiers.
+Constants: `FCP_TIER1_MAX = 34`, `FCP_TIER2_MAX = 50`, `FCP_TIER3_MAX = 64`. Broken-trap drives flood all non-BH to ABA spots until a cutoff **STOP_HCO** (or other terminal) exits ABA mode back to incremental tiers.
 
 #### FCP Straight Pressure — PF/C zone & man release (current)
 

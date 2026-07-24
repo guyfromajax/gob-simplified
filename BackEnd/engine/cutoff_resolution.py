@@ -167,7 +167,7 @@ def map_cutoff_outcome_to_fb(outcome: str) -> Tuple[str, Dict[str, Any]]:
     """Map a D8 cutoff outcome to a Fast Break ``event_type`` + fb_roles flags."""
     if outcome == "POS_O":
         return "SHOT", {"ball_handler_beats_defender": True}
-    if outcome == "NEUTRAL":
+    if outcome in ("NEUTRAL", "D_STOP"):
         return "DEFENSIVE_STOP", {}
     if outcome == "D_FOUL":
         return "FOUL", {"foul_team": "DEFENSE", "foul_player": None}
@@ -176,3 +176,19 @@ def map_cutoff_outcome_to_fb(outcome: str) -> Tuple[str, Dict[str, Any]]:
     if outcome == "DEAD BALL":
         return "DEAD BALL", {}
     return "DEFENSIVE_STOP", {}
+
+
+def map_cutoff_outcome_to_hct_transition(outcome: str) -> str:
+    """Map a non-terminal D8 cutoff outcome for broken HCT/FCP attack drives.
+
+    Shared vocabulary with FB; transition-appropriate consumption (not HCO
+    pull-up/dish):
+      - ``POS_O`` → ``CONTINUE_ATTACK`` (finish to ABA, then existing ABA read)
+      - ``NEUTRAL`` / ``D_STOP`` / unknown → ``STOP_HCO`` (break ends → HCO)
+
+    Terminals (``D_FOUL`` / ``O_FOUL`` / ``DEAD BALL``) are handled by the
+    caller before this helper runs.
+    """
+    if outcome == "POS_O":
+        return "CONTINUE_ATTACK"
+    return "STOP_HCO"

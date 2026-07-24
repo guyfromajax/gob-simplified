@@ -117,7 +117,7 @@ Each loop iteration (after step 0 walk-up):
 3. **Moment detection** — `play.detect_moment(bh_xy, def_coords)` → `none` | `pressure` | `trap` (+ in-range defender list). Defenders must be within **`TRAP_MOMENT_RANGE` (5)** and on the basket-side of the BH (x gate). **Center-band gate (all HCT plays):** while BH y ∈ [20, 30], never return `"trap"` — downgrade to `"pressure"` (matches Standard Trap formation, which only builds trap spots on upper/lower shifts). Straight Pressure further requires the **rover** in range before a trap is allowed.
 4. **BH read** — `player_read`-style score → **attack / pass / hold** (thresholds dynamic on `BH + AG`; see [`Dynamic_HCT_Brief.md`](../projects/Z-Completed/Dynamic_HCT_Brief.md) for the full table). Strong-handler sum: `BH + AG > 80` (`READ_STRONG_HANDLER_SUM`).
 5. **Resolve branch:**
-   - **attack + none (broken HCT)** → cutoff race to y-keyed ABA spot (`topLane` / upper or lower apex); meet → D8 contest (`_resolve_moment`, steal excluded on drives); no meet → ABA arrival → HCO/FB read or shot.
+   - **attack + none (broken HCT)** → cutoff race to y-keyed ABA spot (`topLane` / upper or lower apex); meet → D8 contest (`resolve_cutoff_contest`, steal excluded): **POS_O** → continue to ABA then HCO/FB read; **NEUTRAL/D_STOP** → `STOP_HCO`; foul/TO → terminal. No meet → ABA arrival → HCO/FB read.
    - **attack + pressure/trap** → D8 moment at contact.
    - **hold** → defenders converge; if a defender reaches BH → same D8 contest.
    - **pass** → vertical-half or central pass movement; **`resolve_pass_contest`** on flight (on-ball trappers excluded from intercept pool).
@@ -126,7 +126,7 @@ Each loop iteration (after step 0 walk-up):
 
 **Pass receipt (off-ball re-key):** When the pass completes and a new teammate becomes BH (e.g. PG→SG), `_refresh_hct_off_targets_for_bh` rebuilds alias-map spacing for **SG-as-handler** — fresh pos1..pos4 range targets for the other four; the new BH keeps their **catch spot** (no x=44 snap). Teammates sprint toward those targets during pass flight and on subsequent hold/advance beats.
 
-**Dribble-dead:** winning an attack cutoff collision → BH picks up dribble; loop continues **pass/hold only**.
+**Broken-cutoff consumption** (shared with FCP via `turn_mode="fcp"`): see [`attack_contest_unification.md`](../projects/attack_contest_unification.md). No dribble-dead RETAIN on meet — stop resets to HCO; beat-the-man continues the drive.
 
 ---
 
@@ -135,7 +135,7 @@ Each loop iteration (after step 0 walk-up):
 `_resolve_moment(off_team, def_team, bh, primary_def, trapper, exclude_steal=...)` — attribute-driven regions:
 
 - Defense wins → `STEAL`, `DEAD BALL`, or `O_FOUL` (charge).
-- Offense wins → BH advances (or dribble-dead on cutoff), or `D_FOUL` (reach-in, 60/30/10 fouler spread).
+- Offense wins → BH advances, or `D_FOUL` (reach-in, 60/30/10 fouler spread). Broken-cutoff `POS_O` continues the drive (separate path).
 - Neutral → hold / stall (trap loop continues).
 
 Aggression multiplier on defense-wins rates; offense `fight` suppresses. **Steal excluded** on full-speed drive cutoff collisions.

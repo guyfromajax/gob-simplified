@@ -8139,10 +8139,14 @@ def resolve_half_court_offense_logic(game):
         ball_handler_pos = getattr(ball_handler, 'position', None) or "PG"
         
         # Dynamic HCO: the per-step moment stashed the ACTUAL contesting defender (the man matchup
-        # OR the resolved zone defender). Prefer it so the steal credit + reach-in lunge land on the
-        # right player — for a zone, the position-on-position fallback below would pick the wrong one.
+        # OR the resolved zone defender). PREFER it — override the defender-override block's
+        # position-on-position recompute, which is wrong on ~half of non-shot outcomes (measured 69%
+        # in zone; hco_roles_audit.md Seam 3). The `and not roles.get("defender")` guard used to
+        # demote this to a never-taken fallback (the override block always pre-set roles["defender"]),
+        # so the credited defender + reach-in lunge landed on the wrong player. Attribution-only /
+        # draw-neutral: the recompute (incl. its zone-tie draw) still ran; we just keep the stash.
         _moment_def_id = game_state.pop("_hco_moment_defender_id", None)
-        if _moment_def_id and not roles.get("defender"):
+        if _moment_def_id:
             for _dp in def_lineup.values():
                 if getattr(_dp, "player_id", None) == _moment_def_id:
                     roles["defender"] = _dp
