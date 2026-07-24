@@ -113,7 +113,7 @@ Steps 1-3+: Animation Skeleton (required)
 -Kickout — player_reaches_position (positioning) + ball_reaches_player (pass sub-step)
 -Walk Up — player_reaches_position (gate player(s) reach their destination)
 -Skeleton step (regular movement) — player_reaches_position (slowest **offensive** mover reaches destination)
--Pass step (skeleton w/ ownership transfer) — player_reaches_position (slowest offensive mover, or ball_reaches_player when pass flight gates step T)
+-Pass step (skeleton w/ ownership transfer) — player_reaches_position (slowest offensive mover, or ball_reaches_player when pass flight gates step T). Split-encoded reversals (`pass` and `receive` emitted on separate steps — receiver relocating into the catch) transfer on the **receive** step via the walk's pending-pass carry, so they gate the same way (fixes DBTO fumble firing before ball arrival — see Stopper_System.md).
 -Stopper step (FCP foul/steal/turnover truncation) — player_reaches_position (players involved in stop action)
 -Shoot — player_reaches_position (gate switches to shooter reaching shot spot)
 -Ball flight — shot_resolved (ball reaches rim/sweet spot)
