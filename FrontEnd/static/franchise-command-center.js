@@ -346,28 +346,32 @@ function renderFccHeaderEmblem(data) {
 
 /**
  * Surface B — right-justified compact tier lockup in the Next/Last Game card
- * headers. Cleared (headers render as today) outside an EOS week.
+ * headers. Each card's emblem is derived from THAT game's own week, not the
+ * current franchise week: a finished conference game keeps its conference emblem
+ * through region week, and a regular-season game (week <= 26) shows no emblem.
+ * The value inside the emblem is always the logged-in franchise's conf/region.
  */
-function renderFccGameCardLockups(data) {
+function renderFccGameCardLockups() {
   if (!window.GOBTierEmblem) return;
-  const ids = ['home-next-game-lockup', 'home-last-game-lockup'];
-  const tier = window.GOBTierEmblem.tierForWeek(data && data.week);
-  let html = '';
-  if (tier) {
-    window.GOBTierEmblem.injectCss();
-    const sz = window.GOBTierEmblem.EMBLEM_SIZING.fccGameCardHeader;
-    html = window.GOBTierEmblem.renderLockup({
-      tier,
-      value: emblemValueForTier(tier, data),
-      size: sz.emblem,
-      l1: sz.labelL1,
-      l2: sz.labelL2,
-      variant: 'stack'
-    });
-  }
-  ids.forEach((id) => {
-    const el = document.getElementById(id);
-    if (el) el.innerHTML = html;
+  const data = commandCenterTopDataCache || {};
+  renderOneGameCardLockup('home-next-game-lockup', data, data.next_game_summary);
+  renderOneGameCardLockup('home-last-game-lockup', data, data.last_game_summary);
+}
+
+function renderOneGameCardLockup(slotId, data, gameSummary) {
+  const el = document.getElementById(slotId);
+  if (!el) return;
+  const tier = window.GOBTierEmblem.tierForWeek(gameSummary ? gameSummary.week : null);
+  if (!tier) { el.innerHTML = ''; return; }
+  window.GOBTierEmblem.injectCss();
+  const sz = window.GOBTierEmblem.EMBLEM_SIZING.fccGameCardHeader;
+  el.innerHTML = window.GOBTierEmblem.renderLockup({
+    tier,
+    value: emblemValueForTier(tier, data),
+    size: sz.emblem,
+    l1: sz.labelL1,
+    l2: sz.labelL2,
+    variant: 'stack'
   });
 }
 
@@ -377,7 +381,6 @@ function populateTop(data) {
   const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   document.getElementById('team-logo').src = logoSrc;
   renderFccHeaderEmblem(data);
-  renderFccGameCardLockups(data);
   const seasonLabelEl = document.getElementById('fcc-season-label');
   const rankLabelEl = document.getElementById('fcc-rank-label');
   if (seasonLabelEl) {
@@ -1436,6 +1439,7 @@ async function renderHomeTab() {
     emptyMessage: commandCenterTopDataCache?.next_game_is_bye ? 'Bye' : 'N/A'
   });
   renderHomeMatchupCard('home-last-game-body', commandCenterTopDataCache?.last_game_summary || null);
+  renderFccGameCardLockups();
 }
 
 async function loadHomeTabData() {

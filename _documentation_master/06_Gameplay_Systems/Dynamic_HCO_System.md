@@ -84,7 +84,7 @@ When the turn's `offense_reads` (alterations) roll is on, these tempos make **su
 | Very late | ✗ | ✗ | ✗ |
 
 ### Read tiers (`_shoot_read_tier`)
-`(player_read_raw + discipline) × d6`: `> SHOOT_READ_RIGHT (300)` → right (take the best optimal look, self or dish); `> SHOOT_READ_SAFE (100)` → safe (always progress); else random (use the % grid above). SM-precedence is evaluated **before** this — when it fires, the read tier is bypassed for that step.
+`(player_read_raw + discipline) × d6`: `> SHOOT_READ_RIGHT (200)` → right (take the best optimal look, self or dish); `> SHOOT_READ_SAFE (125)` → safe (always progress); else random (use the % grid above). SM-precedence is evaluated **before** this — when it fires, the read tier is bypassed for that step.
 
 ---
 
@@ -174,7 +174,7 @@ HCO has a single on-ball defender, so it does **not** use FCP/HCT's multi-defend
 - **SHOOT / KICKOUT_SHOOT / HOT_READ_SHOOT** terminate and append shot steps via `_execute_motion_decision`. If no shot fires by the last step, force one (with a `SUBTLE_FORCED_SHOT_PENALTY` if the clock forced it).
 
 #### Universal Shoot Decision (`should_shoot`)
-Two-stage: **(1) is this an optimal look?** — shot-type mismatch score from the read map + openness vs the `_shoot_threshold` bar (`SHOOT_THRESHOLD_BASE` lowered by clock drain + tempo). **(2) read tier** — `(player_read_raw + discipline) × d6`: `> SHOOT_READ_RIGHT` shoot if optimal else progress; `> SHOOT_READ_SAFE` progress; else non-strategic ("random"). Shot type (attack vs outside) is a team-biased weighted pick (`_weighted_attack_or_outside`).
+Two-stage: **(1) is this an optimal look?** — shot-type mismatch score from the read map + openness vs the continuous optimal bar `clock × OPTIMAL_BAR_STEEPNESS × OPTIMAL_BAR_TEMPO_MULT` (see § Optimal-look bar above). **(2) read tier** — `(player_read_raw + discipline) × d6`: `> SHOOT_READ_RIGHT` shoot if optimal else progress; `> SHOOT_READ_SAFE` progress; else non-strategic ("random"). Shot type (attack vs outside) is a team-biased weighted pick (`_weighted_attack_or_outside`).
 
 For a teammate selected by a dish/hot read at a non-inside location, that same weighted
 attack-versus-outside result controls execution: **outside** emits pass → receive → immediate shot;
@@ -408,8 +408,8 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 #### Shoot decision
 | Constant | File | Default | Effect |
 |---|---|---|---|
-| `SHOOT_THRESHOLD_BASE` | motion_step_decision.py | `30` | "Optimal look" bar at full clock, normal tempo (mismatch-score scale). |
-| `SHOOT_TEMPO_ADJ` | motion_step_decision.py | `{slow:-8, normal:0, fast:8}` | Fast lowers the bar (shoot sooner). |
+| `OPTIMAL_BAR_STEEPNESS` | motion_step_decision.py | `2.0` | Optimal-look bar = `clock × steepness × tempo mult`. |
+| `OPTIMAL_BAR_TEMPO_MULT` | motion_step_decision.py | `{slow:1.2, normal:1.0, fast:0.8}` | Slow raises the bar; fast lowers it. |
 | `SHOOT_READ_RIGHT` / `SHOOT_READ_SAFE` | motion_step_decision.py | `200` / `125` | Read tiers: right = optimal decision, safe = progress. |
 | `READ_THRESHOLD` | motion_read_map.py | `15` | Mismatch score above which a shot-type read is an "edge". |
 | `TEMPO_MOD` | motion_step_decision.py | `{slow:-25, normal:0, fast:25}` | Tempo shift on the desperation offense-score pre-check. |
@@ -431,7 +431,7 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 |---|---|
 | **Zone-defense moments** | ✅ Shipped (June 2026). On-ball defender resolved by zone polygon (`_zone_bh_defender`); `HCO_ZONE_MOMENT_SCALAR` dial; contest uses the **same D8 weights** as man for v1 (reweighting toward deflections/help is a future tuning pass). |
 | **Zone contest reweighting** | Deferred — v1 reuses man's D8 steal/dead-ball/charge weights. Zones realistically strip less and force more deflections/help; revisit `HCT_D8_*` weights (or a zone-specific set) + `HCO_ZONE_MOMENT_SCALAR` after live observation. |
-| **Passing lanes & hot-read openness** | ✅ Shipped — needs prototype tuning (see §4). Decision gate ("truly open") + interception contest, **man + zone**, hot-read/kickout dishes only. Gate clears the 0.1–0.9 lane band, so the contest's net-new interceptions are the **receiver's man jumping the entry pass** (t→1.0), gated by passer skill — frequency tunable via `HCO_PASS_LANE_DIST_*` / `PASS_SAFETY_BASE`. Intercept → STEAL (`is_interception`) via `_finalize_hco_pass_interception` (resolve_turnover_logic + stopper). |
+| **Passing lanes & hot-read openness** | ✅ Shipped — needs prototype tuning (see §4). Decision gate ("truly open") + interception contest, **man + zone**, hot-read/kickout dishes only. Gate clears the 0.1–0.9 lane band, so the contest's net-new interceptions are the **receiver's man jumping the entry pass** (t→1.0), gated by passer skill — frequency tunable via `HCO_PASS_LANE_DIST_*` / `HCO_PASS_SAFETY_BASE` / `HCO_PASS_INTERCEPT_TIER_MID`. Intercept → STEAL (`is_interception`) via `_finalize_hco_pass_interception` (resolve_turnover_logic + stopper). |
 | **FCP pass contests @ 8** | 🔨 Planned (§4 stage 3). FCP has **no** pass-disruption today — needs a pass-beat audit (inbound / press-break / advance) before wiring `resolve_pass_contest` with `FCP_PASS_LANE_DIST = 8.0`. (NB: interceptions seen on "FCP" today are the post-steal **rim-runner fast break** mechanic, labeled `FAST_BREAK`, not FCP.) |
 | **Set-play overlay** | ✅ Shipped (flag retired, always on) — variant skeleton + the unified resolver (`is_setplay=True`); recovery roll after forced subtle (see **§ Set plays**). |
 | **True per-step shoot↔moment interleaving** | ✅ **Done (2026-07-12, moment fusion).** The moment now rolls inside the walk, moment-first on each reached step, so it no longer pre-empts a shot the offense never reached. See **§ StepState**. |

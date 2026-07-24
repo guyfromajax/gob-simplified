@@ -36,13 +36,13 @@ def test_unauthenticated_franchise_select_team_blocked():
         app.dependency_overrides[get_current_user] = _test_user
 
 
-def test_unauthenticated_tournament_start_blocked():
-    """Without auth, POST /tournament/start must return 401."""
+def test_unmounted_tournament_start_is_unavailable_without_auth():
+    """The sunset route is unavailable before authentication is relevant."""
     if get_current_user in app.dependency_overrides:
         del app.dependency_overrides[get_current_user]
     try:
         resp = client.post("/tournament/start", json={"user_team_id": "Lancaster"})
-        assert resp.status_code == 401, resp.text
+        assert resp.status_code in {404, 405}, resp.text
     finally:
         app.dependency_overrides[get_current_user] = _test_user
 

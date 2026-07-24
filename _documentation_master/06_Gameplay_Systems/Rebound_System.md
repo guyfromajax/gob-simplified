@@ -146,11 +146,13 @@ OREB turns are UESS-compliant (`oreb_step_emitter.py` → `animation_steps[]`). 
 
 **Rebound Resolution Flow** (`calculate_bounce_spot`, `determine_rebounder`, `select_rebounder_by_score`, `calculate_rebound_score` — all in `BackEnd/utils/shared.py`)
 
-1. **Calculate the missed-shot bounce spot** (`calculate_bounce_spot`). Variance widens with shot distance (distance from shooter spot to basket), x is always outward from the basket into the paint:
-   - short (distance < 15): x offset `randint(2, 6)`, y `±6`
-   - medium (15–20): x offset `randint(2, 8)`, y `±8`
-   - long (> 20): x offset `randint(2, 10)`, y `±10`
-   - (defaults to medium when no shooter spot is provided). Bounce clamped to court bounds (x 0–100, y 0–50).
+1. **Calculate the missed-shot bounce spot** (`calculate_bounce_spot` → `_bounce_variance_for_shot_distance`). Variance widens with shot distance (Euclidean shooter→basket); x is always outward from the basket into the paint:
+   - distance **&lt; 15**: x `randint(2, 6)`, y `±6`
+   - **≤ 20**: x `randint(2, 8)`, y `±8`
+   - **≤ 30**: x `randint(3, 14)`, y `±10`
+   - **≤ 45**: x `randint(5, 22)`, y `±12`
+   - **else** (deep heaves): x `randint(8, min(40, int(0.55·d)))`, y `±14`
+   - no shooter spot → medium default `(2, 8, ±8)`. Bounce clamped to court bounds (x 0–100, y 0–50). See [Tunable_Constants.md](../11_Design_Systems/Tunable_Constants.md) Promotion Pass `BOUNCE_VAR_*`.
 2. **Identify eligible rebounders** (per turn type — see the prefilter grid below). HCO removes get-back / release players; Fast Break paths use the frontcourt-half x filter plus the **25-grid** Euclidean near-bounce candidate filter; Dynamic HCT / OREB putback misses use the **20-grid** Euclidean near-bounce candidate filter; FT uses the `max_x_delta_from_bounce` x-gate.
 3. **Identify upper-half rebounders** from that eligible pool:
    - Fast Break: upper half is Euclidean distance to bounce **≤ 12.5** (`0.5 × FAST_BREAK_REBOUND_GEO_DISTANCE`).

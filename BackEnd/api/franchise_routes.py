@@ -7568,6 +7568,7 @@ def command_center_data(
                             opponent_leaders = _build_team_leader_summary(fid, opponent_id)
                             opponent_standings = standings_data.get(opponent_id, {}) or {}
                             response["next_game_summary"] = {
+                                "week": next_game.get("week"),
                                 "matchup_label": "vs" if str(next_game.get("home_team_id")) == str(team_id) else "@",
                                 "opponent_team_id": opponent_id,
                                 "opponent_team_name": teams_docs.get(opponent_id, {}).get("name", team_name_by_id.get(opponent_id, "Opponent")),
@@ -7597,6 +7598,7 @@ def command_center_data(
                             home_id = str(last_game.get("home_team_id") or "")
                             game_doc = last_game.get("game_doc") or {}
                             response["last_game_summary"] = {
+                                "week": last_game.get("week"),
                                 "matchup_label": "vs" if home_id == str(team_id) else "@",
                                 "opponent_team_id": away_id if home_id == str(team_id) else home_id,
                                 "opponent_team_name": teams_docs.get(away_id if home_id == str(team_id) else home_id, {}).get("name", team_name_by_id.get(away_id if home_id == str(team_id) else home_id, "Opponent")),

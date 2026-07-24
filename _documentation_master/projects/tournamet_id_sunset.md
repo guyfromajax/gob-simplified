@@ -1,6 +1,6 @@
 # `tournament_id` Sunset
 
-**Status:** Phases 0–1 completed; standalone entry and creation closed
+**Status:** Phases 0–2A completed; standalone router unmounted
 **Created:** July 24, 2026  
 **Scope:** Retire the legacy standalone Tournament Mode and its
 `tournament_id` compatibility surface without disrupting Franchise tournament
@@ -429,7 +429,107 @@ then identify and remove direct callers that become dead with it.
 
 ---
 
-## 7. Proposed Retirement Sequence
+## 7. Phase 2A Execution Record
+
+**Completed:** July 24, 2026
+
+Phase 2A unmounts the standalone Tournament Mode router without deleting its
+module or shared helper functions.
+
+### 7.1 Application route change
+
+`BackEnd/api/api.py` no longer:
+
+- imports `router as tournament_router`;
+- calls `app.include_router(tournament_router)`.
+
+As a result, the application route table no longer contains any of the
+standalone `/tournament/*` endpoints or the two backward-compatible aliases:
+
+```text
+/start-tournament
+/simulate-tournament-round
+```
+
+Because the application mounts static files at the root, unmatched GET
+requests normally return `404`, while unmatched POST requests may return `405`.
+The authoritative assertion is that none of the legacy paths exists in the
+FastAPI route table.
+
+### 7.2 Code intentionally retained
+
+`BackEnd/api/tournament_routes.py` remains in the repository and remains
+importable. Shared compatibility code still imports
+`get_user_team_from_tournament()` from it in:
+
+- `BackEnd/api/api.py`;
+- `BackEnd/api/gameplan_routes.py`;
+- `BackEnd/api/franchise_routes.py`;
+- `BackEnd/utils/team_settings_manager.py`;
+- `BackEnd/utils/team_id_resolver.py`.
+
+Removing that module now would break application startup and shared code paths.
+Separating the unmount from helper extraction/deletion is the risk boundary
+that defines Phase 2A.
+
+The Tournament Manager, standalone endpoint functions, request models, and old
+creation implementation are now unreachable through the application, but are
+left intact for the Phase 2B dependency cleanup.
+
+### 7.3 Behavior after Phase 2A
+
+- standalone frontend pages still redirect to Mode Select;
+- no standalone API route can be invoked;
+- no new standalone tournament can be created;
+- old standalone saves are no longer playable, as explicitly approved;
+- old tournament documents and tournament-linked games remain stored;
+- no ownership, pointer, retention, or shared request contract has been
+  removed;
+- active Franchise tournament routes remain mounted.
+
+The Phase 1 `410` and unauthenticated `401` behavior is now historical: once the
+router is unmounted, the request cannot reach either the endpoint handler or
+its authentication dependency.
+
+### 7.4 Phase 2A regression coverage
+
+Tests now assert:
+
+- the complete legacy endpoint set is absent from the application route table;
+- active Franchise play-next, complete-week phase A/B, and schedule routes
+  remain present;
+- requests to the retired start path are unavailable and cannot reset player
+  statistics or create tournament documents;
+- both redirect-only frontend fallbacks remain closed;
+- shared application imports and startup still succeed.
+
+Focused route, mutation, and security result:
+
+```text
+12 passed
+```
+
+The full checkpoint also includes the Franchise EOS bracket-invariant and
+week-26 transition suites:
+
+```text
+37 passed
+```
+
+All verification uses `PYTHONHASHSEED=0` and the isolated
+`tournament_sunset_test` `mongomock` database.
+
+### 7.5 Phase 2A checkpoint
+
+Phase 2A is complete. The next step is a discussion checkpoint before Phase 2B.
+
+Phase 2B is not a no-risk deletion. It requires extracting or replacing shared
+helpers, removing endpoint-only implementation, and updating legacy tests
+without changing active Franchise or normal game behavior.
+
+---
+
+## 8. Proposed Retirement Sequence
 
 ### Phase 0 — Freeze and inventory
 
@@ -566,9 +666,9 @@ active.
 
 ---
 
-## 8. Verification Plan
+## 9. Verification Plan
 
-### 6.1 Franchise tournament-week regressions
+### 9.1 Franchise tournament-week regressions
 
 Verify at minimum:
 
@@ -584,7 +684,7 @@ Verify at minimum:
 - refresh and direct-navigation flows preserve `franchise_id`;
 - no surviving request requires `tournament_id`.
 
-### 6.2 Normal-mode regressions
+### 9.2 Normal-mode regressions
 
 Verify:
 
@@ -593,7 +693,7 @@ Verify:
   expect a tournament identifier;
 - game retention and cleanup still apply their intended normal-mode policies.
 
-### 6.3 Intentional legacy behavior
+### 9.3 Intentional legacy behavior
 
 Verify:
 
@@ -605,7 +705,7 @@ Verify:
   created;
 - no persisted records are deleted by the code-removal deployment.
 
-### 6.4 Performance and determinism
+### 9.4 Performance and determinism
 
 This is primarily a context and persistence cleanup, but it touches simulation
 entry points. Follow `Sim_Perf_Capstone.md`:
@@ -621,7 +721,7 @@ The sunset should be performance-neutral or a small improvement.
 
 ---
 
-## 9. Acceptance Criteria
+## 10. Acceptance Criteria
 
 The sunset is complete only when:
 
@@ -644,7 +744,7 @@ The sunset is complete only when:
 
 ---
 
-## 10. Non-Goals
+## 11. Non-Goals
 
 This project does not:
 
@@ -658,7 +758,7 @@ This project does not:
 
 ---
 
-## 11. Recommended First Implementation Slice
+## 12. Recommended First Implementation Slice
 
 After the old-save policy is confirmed, begin with a reversible boundary slice:
 

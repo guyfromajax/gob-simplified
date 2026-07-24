@@ -65,7 +65,6 @@ try:
     from fastapi.staticfiles import StaticFiles
     from BackEnd.models.animator import Animator   
     # ✅ PERFORMANCE: Removed debug print statements
-    from .tournament_routes import router as tournament_router
     from .training_routes import router as training_router
     from .franchise_routes import router as franchise_router
     from .player_image_routes import router as player_image_router
@@ -334,7 +333,6 @@ try:
     _rate_limit_turn = limiter.limit(SIM_TURN_RATE_LIMIT) if limiter else _no_limit
     
     # Include routers AFTER CORS middleware is configured
-    app.include_router(tournament_router)
     app.include_router(training_router)
     app.include_router(franchise_router)
     app.include_router(player_image_router)

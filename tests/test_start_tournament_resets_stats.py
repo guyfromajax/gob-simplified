@@ -44,8 +44,7 @@ def test_start_tournament_is_gone_and_does_not_mutate_player_stats():
     )
 
     resp = client.post("/tournament/start", json={"user_team_id": "Lancaster"})
-    assert resp.status_code == 410
-    assert "retired" in resp.json()["detail"].lower()
+    assert resp.status_code in {404, 405}
 
     player = players_collection.find_one({"_id": "p1"})
     assert player["stats"]["game"] == {"PTS": 5}

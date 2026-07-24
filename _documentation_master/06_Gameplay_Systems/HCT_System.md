@@ -16,7 +16,7 @@
 6. **BH advance beat (beat pressure/trap):** `+random(6, 12)` x toward basket, `+random(-6, 6)` y.
 7. **Drive / cutoff pace:** `ATTACK_DRIVE_GRID_SPOTS_PER_GAME_SECOND = 12`; AG-scaled via `ag_to_grid_per_game_sec`.
 8. **Off-ball drift (cutoff + FB drive):** `HCT_DRIFT_PROBABILITY = 0.5` — each off-ball player (both teams) rolls 50% to drift toward rim at `DRIFT_GRID_PER_GAME_SEC = 8`, else hold.
-9. **Pass contest lane width:** `PASS_LANE_DIST = 8` (`pass_contest.py`); safety gate base `PASS_SAFETY_BASE = 200`; intercept tiers `250` / `200` → STEAL / bat-OOB.
+9. **Pass contest lane width:** `PASS_LANE_DIST = 8` (`pass_contest.py`); safety gate base `PASS_SAFETY_BASE = 200`; **deflection** if intercept score &gt; `PASS_INTERCEPT_TIER_MID` (`200`, − defensive efficiency); kind via `PASS_DEFLECT_KIND_D` (`200`) → INTERCEPT vs BAT_OOB. (`PASS_INTERCEPT_TIER_HI` is **retired** / unused.)
 10. **Trap play weights (user default):** `standard_trap` 34 / `straight_pressure` 33 / `standard_diamond` 33 (`hct_trap_play_types.DEFAULT_HCT_TRAP_WEIGHTS`). CPU teams use Standard Diamond at 0% unless projected starting SG AG &gt; 50 (see `cpu_playbook_customization.py`).
 11. **Shift bands (Standard Trap):** BH y &lt; 20 → lower; y &gt; 30 → upper; else normal (`SHIFT_LOWER_Y` / `SHIFT_UPPER_Y`).
 
@@ -181,8 +181,8 @@ Each beat, `_move_defense` asks the active play for targets, then applies mid-co
 On each HCT pass, `_resolve_hct_pass_contest` → `resolve_pass_contest()`:
 
 1. **Geometry gate** — in lane (perp distance ≤ 8) + D21 reachable-in-time with IQ anticipation head-start.
-2. **Passer safety gate** — `(PS·0.6 + CH·0.2 + IQ·0.2) × d6` vs `200 − pt_opp_modifier` (HCT offense modifier).
-3. **Intercept band** — defender composite vs tiers → **COMPLETE**, **INTERCEPT** (→ `STEAL` terminal), or **BAT_OOB** (→ dead ball, offense keeps).
+2. **Passer safety gate** — `(PS·0.6 + CH·0.2 + IQ·0.2) × d6` vs `200 − pt_opp_modifier` (HCT offense modifier / `PASS_SAFETY_BASE`).
+3. **Deflection + kind** — defender composite vs `PASS_INTERCEPT_TIER_MID` (`200 − def_eff`): above → **DEFLECTED**, then `PASS_DEFLECT_KIND_D` splits **INTERCEPT** (→ `STEAL` terminal) vs **BAT_OOB** (→ dead ball, offense keeps). Below mid → **COMPLETE**. (`TIER_HI` retired — not used.)
 
 On-ball defenders within moment range of the passer are **excluded** from the intercept pool (trappers can't peel to steal their own trap outlet).
 

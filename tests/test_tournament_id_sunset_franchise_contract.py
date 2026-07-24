@@ -9,7 +9,6 @@ identifier while that legacy mode is removed.
 from pathlib import Path
 
 from bson import ObjectId
-from fastapi.testclient import TestClient
 
 from BackEnd.api.franchise_routes import (
     CompleteWeekRequest,
@@ -18,10 +17,8 @@ from BackEnd.api.franchise_routes import (
     router as franchise_router,
 )
 from BackEnd.api.api import app
-from BackEnd.db import tournaments_collection
 from BackEnd.tournament import franchise_tournament as ft
 
-client = TestClient(app)
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -102,15 +99,32 @@ def test_franchise_eos_schedule_uses_week_and_bracket_metadata_without_legacy_id
     assert "tournament_id" not in game
 
 
-def test_standalone_tournament_creation_endpoints_are_gone():
-    tournaments_collection.delete_many({})
+def test_standalone_tournament_router_is_unmounted():
+    mounted_api_paths = {
+        route.path
+        for route in app.routes
+        if hasattr(route, "path") and getattr(route, "methods", None)
+    }
+    legacy_paths = {
+        "/tournament/team-stats",
+        "/tournament/leaders",
+        "/tournament/current",
+        "/tournament/delete-current",
+        "/tournament/start",
+        "/start-tournament",
+        "/tournament/simulate-round",
+        "/simulate-tournament-round",
+        "/tournament/save-result",
+        "/tournament/command-center/data",
+        "/tournament/state",
+        "/tournament/team-data",
+        "/tournament/scouting-report",
+        "/tournament/roster",
+        "/tournament/sim-remaining",
+        "/tournament/run-training",
+    }
 
-    for path in ("/tournament/start", "/start-tournament"):
-        response = client.post(path, json={"user_team_id": "Lancaster"})
-        assert response.status_code == 410
-        assert "retired" in response.json()["detail"].lower()
-
-    assert tournaments_collection.count_documents({}) == 0
+    assert legacy_paths.isdisjoint(mounted_api_paths)
 
 
 def test_standalone_tournament_pages_are_redirect_only_fallbacks():

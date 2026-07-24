@@ -260,7 +260,7 @@ Triggered once the BH commits to a subtle movement (how he gets there is the **T
 
 ## Universal Shoot Decision (IMPLEMENTED — tune the constants)
 
-One shared decision, `should_shoot` (`motion_step_decision.py`), evaluated at three call sites. Two steps: **(1) is the look optimal?** then **(2) does the shooter make the right call?**. Constants to tune: `SHOOT_THRESHOLD_BASE` (30), `SHOOT_TEMPO_ADJ` (±8), `SHOOT_READ_RIGHT/SAFE` (200/125).
+One shared decision, `should_shoot` (`motion_step_decision.py`), evaluated at three call sites. Two steps: **(1) is the look optimal?** then **(2) does the shooter make the right call?**. Constants to tune: `OPTIMAL_BAR_STEEPNESS` (2.0), `OPTIMAL_BAR_TEMPO_MULT` (slow 1.2 / normal 1.0 / fast 0.8), `SHOOT_READ_RIGHT/SAFE` (200/125). (`SHOOT_THRESHOLD_BASE` / `SHOOT_TEMPO_ADJ` were retired — see [Tunable_Constants.md](../../11_Design_Systems/Tunable_Constants.md) / [Dynamic_HCO_System.md](../../06_Gameplay_Systems/Dynamic_HCO_System.md).)
 
 **What's live:**
 - **Per-step BH** (`_resolve_motion_offense_shot_dynamic` walk): runs every step before the movement matrix, universal (decoupled from `alterations`). A shoot/dish terminates the walk.

@@ -1,6 +1,8 @@
 # Dynamic HCT (Half Court Trap) Turns
 
 > **Operational bible:** `_documentation_master/06_Gameplay_Systems/HCT_System.md` is the canonical reference for the **implemented** dynamic HCT system (for agents and runtime debugging). **This file** remains the design brief, deep specs, and implementation tracker from the Dynamic HCT project.
+>
+> **Value drift (2026-07):** Live D8 bases are **`HCT_D8_DEF_WIN_BASE=0.25`** and **`HCT_D8_DFOUL_BASE=0.25`** (not 0.45 / 0.12 below). Pass contest uses a **single** `PASS_INTERCEPT_TIER_MID` deflection bar + `PASS_DEFLECT_KIND_D` kind split (`TIER_HI` retired). Prefer [Tunable_Constants.md](../../11_Design_Systems/Tunable_Constants.md) and `HCT_System.md` for live dials.
 
 Target design for resolving an HCT possession as a **dynamic, looped turn** rather
 than a fixed skeleton. This document is the north star (full target design); the

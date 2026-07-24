@@ -2,7 +2,150 @@
 
 Central registry of tunable game-logic constants — the knobs for balancing gameplay. Each entry lists the constant, its current value, and a one-line effect.
 
-**Workflow:** edit values here first → agents implement in code and keep this file in sync. **Scope:** live game + franchise EOG + training; exclude distant sim. **Geometry** and **`USE_*` feature flags** are out of the main console for now. Inventory by turn type: **HCO → HCT → FCP → FB → OREB → DREB** (Sessions 1–6). Inline magic is documented with **proposed names only** until a promotion pass.
+**Workflow:** edit values here first → agents implement in code and keep this file in sync. **Scope:** live game + franchise EOG + training; exclude distant sim. **Geometry** and **`USE_*` feature flags** are out of the main console for now. Inventory by turn type: **HCO → HCT → FCP → FB → OREB → DREB** (Sessions 1–6). Inline literals awaiting named constants are tracked in **Promotion Pass** below (status board); per-turn Inline Magic tables keep file/context detail.
+
+## Promotion Pass
+
+**Own section** — the queue for lifting inline magic into named constants. Per-turn “Inline Magic” tables below remain the detailed source (file + effect); this section is the **value + status board** for the pass.
+
+### Rules
+
+1. **Promote at current literal** — create the proposed name in code with the value listed here; do **not** retune in the same change.
+2. **Then sync** — move the row into the appropriate named-dial table above/below, set Status → `done`, and drop (or mark done) the per-turn Inline Magic row.
+3. **Retunes** happen after promotion: edit the named value in this file first, then implement.
+4. Status: `pending` | `done` | `skip` (geometry / cosmetic / duplicate of an existing named dial).
+
+### HCO
+
+| Proposed name | Current value | Affects | Status |
+|---|---|---|---|
+| `DESPERATION_BH_SHOT_FRAC` | `0.75` | volume | pending |
+| `DESPERATION_CLOCK_MULT` | `4` | volume | pending |
+| `DISRUPTION_SUBTLE_FRAC` | `0.50` | volume | pending |
+| `DISRUPTION_FF_BASE` / `_AGGR_DELTA` | `0.20` / `±0.10` | TO / volume | pending |
+| `DISRUPTION_NONE_BASE` / `_AGGR_DELTA` | `0.30` / `∓0.10` | volume | pending |
+| `NEUTRAL_PASS_BASE` / `_OFF_AGGR_DELTA` / `_DEF_AGGR_DELTA` | `0.50` / `±0.20` / `∓0.20` | volume / intercept | pending |
+| `NEUTRAL_PASS_CLAMP` | `(0.10, 0.90)` | volume | pending |
+| `STRATEGY_EMPHASIS_POINTS_PER_LEVEL` | `10` | volume / FG% | pending |
+| `SHOT_CLOCK_TIER_EARLY_MIN` / `_MID` / `_LATE` / `_VERY_LATE` | `23` / `15` / `6` / `1` | volume | pending |
+| `ALTERING_TURN_ROLL_SIDES` | `randint(1,5) ≤ alterations` | volume | pending |
+| `DEFENSE_PRESSURE_ROLL_SIDES` | `randint(0,4) ≤ aggression` | contest / volume | pending |
+| `ALTERED_PERFORM_IQ_WEIGHT` / `_CH_WEIGHT` | `0.8` / `0.2` | volume | pending |
+| `ALTERED_READ_FLAT_FALLBACK` | `110.0` | contest | pending |
+| `DRIVE_DOUBLE_TEAM_SHOOT_PROB` | `0.25` | volume / drive | pending |
+| `DRIVE_OPEN_RIM_SHOOT_PROB` | `1.0` | volume / drive | pending |
+| `DRIVE_SINGLE_GUARD_SHOOT_PROB` | `0.75` | volume / drive | pending |
+| `DRIVE_DOUBLE_TEAM_DEFENSE_BONUS` | `100` | FG% / contest | pending |
+| `DRIVE_DISH_PREFER_INTERIOR_PROB` | `0.75` | volume | pending |
+| `DRIVE_EFF_ROLL_RANGE` | `randint(1,3)` | drive | pending |
+| `MOTION_DEFENSE_BONUS_SHOT_SCALE` | `0.2` | FG% | pending |
+| `CONTEST_LOSS_SHOT_PENALTY` | `100` | FG% / contest | pending |
+| `BLOCK_COMPOSITE_HEIGHT_W` / `_ID_W` / `_IQ_W` | `0.4` / `0.4` / `0.2` | contest / foul | pending |
+| `BLOCK_COMPOSITE_ROLL` | `randint(1,6)` | contest / foul | pending |
+| `AND_ONE_FINISH_THRESHOLD` | `250` | foul / FG% | pending |
+| `AND_ONE_FINISH_ST_W` / `_SC_W` / `_HEIGHT_W` / `_IQ_W` | `0.4` / `0.3` / `0.2` / `0.1` | foul / FG% | pending |
+| `PASSER_ASSIST_PS_W` / `_IQ_W` / `_ASSIST_SHARE` | `0.8` / `0.2` / `0.2` | FG% | pending |
+| `DRIBBLE_AG_W` / `_IQ_W` / `_DRIBBLE_SHARE` | `0.8` / `0.2` / `0.2` | FG% | pending |
+| `SECOND_DEFENDER_IMPACT_FRAC` | `0.35` | contest / FG% | pending |
+| `DEFENSE_SCORE_TO_SHOT_SCALE` | `0.2` | FG% | pending |
+| `ZONE_23_INSIDE_DELTA` / `_ATTACK` / `_OUTSIDE` | `+25` / `+10` / `−25` | FG% | pending |
+| `ZONE_32_INSIDE_DELTA` / `_ATTACK` / `_OUTSIDE` | `−30` / `−30` / `+50` | FG% | pending |
+
+### HCT / shared moment
+
+| Proposed name | Current value | Affects | Status |
+|---|---|---|---|
+| `HCT_DFOUL_FRONTCOURT_P` | `0.10` | foul | pending |
+| `HCT_TRAPPER_PRESSURE_FRAC` | `0.5` | foul / steal / TO / contest | pending |
+| `HCT_CHEM_GATE_DIVISOR` | `4` (`chem/4`) | foul / steal / TO / drive | pending |
+| `HCT_STEAL_CREDIT_OD_W` / `_AG_W` / `_IQ_W` | `0.4` / `0.4` / `0.2` | steal | pending |
+| `HCT_BH_SECURE_CH_W` / `_BH_W` / `_IQ_W` | `0.4` / `0.4` / `0.2` | steal | pending |
+| `HCT_BH_HANDLE_BH_W` / `_CH_W` / `_IQ_W` | `0.4` / `0.3` / `0.3` | TO | pending |
+| `BALL_HANDLING_BH_W` / `_AG_W` / `_IQ_W` / `_CH_W` | `0.5` / `0.2` / `0.2` / `0.1` | foul / steal / TO / drive | pending |
+| `DEF_PRESSURE_OD_W` / `_AG_W` / `_IQ_W` / `_CH_W` | `0.3` / `0.3` / `0.2` / `0.2` | foul / steal / TO / drive | pending |
+| `PLAYER_READ_IQ_W` / `_CH_W` | `0.8` / `0.2` | volume / drive / FG% | pending |
+| `HCT_ABA_LOW_TIER_COIN` | `50/50` (`getrandbits(1)`) | volume / FG% | pending |
+| `HCT_SHOT_TREE_SUBOPTIMAL_POOL` | `("shoot","drive","pass")` equal | volume / FG% / drive | pending |
+| `HCT_PFC_DENY_INTERP` | `0.6` | intercept / contest | pending |
+
+### FCP
+
+| Proposed name | Current value | Affects | Status |
+|---|---|---|---|
+| `FCP_ENGAGEMENT_MIN_SECONDS` | `0.4` | volume / TO | pending |
+| `FCP_ZONE_DENY_FRAC` | `0.6` | intercept / contest | pending |
+| `FCP_PASS_FLIGHT_MIN_SEC` | `0.3` | volume / intercept | pending |
+| `FCP_STOPPER_HOLD_SEC` | `0.5` | volume / TO | pending |
+
+### FB
+
+| Proposed name | Current value | Affects | Status |
+|---|---|---|---|
+| `FB_CHARGE_READ_MIN_X_HOME` / `_MAX_X_AWAY` | `64.0` / `37.0` | foul / drive | pending |
+| `FB_STEAL_MEET_MIN_X_AHEAD` | `1.0` | drive | pending |
+| `FB_STOP_PASS_SH_MIN` | `49` (`SH > 49`) | volume | pending |
+| `FB_OUTLET_SCORE_PS_W` / `_ST_W` / `_IQ_W` | `0.6` / `0.2` / `0.2` | contest / drive | pending |
+| `FB_CR_BH_FALLBACK_WEIGHTS` | `PG/SG/SF = 75/15/10` | volume | pending |
+| `FB_CR_SHARP_STOP_READ_MULT` | `3` (`outlet_score × 3`) | drive / contest | pending |
+| `FB_CR_OUTLET_CUTOFF_X_OFFSET` | `2` | drive | pending |
+| `FB_DEFENDER_TARGET_X_OFFSET` | `2.0` | contest | pending |
+| `RR_OUTLET_CONTEST_RANGE` | `10.0` | TO / volume | pending |
+| `RR_OUTLET_OFF_PS_W` / `_ST_W` / `_IQ_W` | `0.5` / `0.3` / `0.2` | TO / volume | pending |
+| `RR_OUTLET_DEF_IQ_W` / `_OD_W` / `_ST_W` | `0.5` / `0.3` / `0.2` | TO / volume | pending |
+| `RR_OUTLET_OFF_SCORE_MULT` / `_FB_EFF_MULT` / `_FB_OPP_MULT` | `1.5` / `3` / `2` | TO / volume | pending |
+| `RR_LANE_READ_BASE` / `_FB_EFF_COEF` | `200` / `5` | volume / intercept | pending |
+| `RR_MISREAD_AGGRESSION_MIN` | `3` | volume / intercept | pending |
+| `RR_OPEN_LANE_MAX_THREATS` / `_PASSIVE` | `1` / `0` | volume / intercept | pending |
+| `RR_LANE_INT_OD_W` / `_AG_W` / `_IQ_W` | `0.6` / `0.2` / `0.2` | intercept / steal | pending |
+| `RR_LANE_TIER_HI_BASE` / `_MID_BASE` | `250` / `200` | intercept / steal | pending |
+| `RR_SHOT_THRESH_MULTI_DEF_ADD` / `_FIGHT_MULT` | `100` / `2` | FG% | pending |
+| `TRIANGLE_DECISION_D8` | `randint(1,8)` tree | volume / FG% / drive | pending |
+| `TRIANGLE_DRIVE_DECISION_D5` | `randint(1,5)` tree | volume / FG% / drive | pending |
+| `RR_BURST_AG_W` / `_IQ_W` / `_CH_W` | `0.6` / `0.2` / `0.2` | contest / intercept | pending |
+| `RR_BURST_DX_SUCCESS` / `_FAIL` | `20–25` / `9–14` | contest / intercept | pending |
+
+### OREB / shared rebound
+
+| Proposed name | Current value | Affects | Status |
+|---|---|---|---|
+| `OREB_PUTBACK_PCT_AGGRESSIVE` / `_NORMAL` / `_PASSIVE` | `90` / `75` / `60` | volume | pending |
+| `OREB_MIN_SHOT_CLOCK_FOR_ATTEMPT` | `2` | TO / possession | pending |
+| `OTB_MAX_EUCLIDEAN` | `4` | foul | pending |
+| `OTB_OFFENSE_THRESHOLD_BASE` | `90` | foul | pending |
+| `OTB_DEFENSE_THRESHOLD_BASE` | `10` | foul | pending |
+| `OTB_IQ_GATE_ROLL` | `≤ foul_player.IQ` on `1–100` | foul | pending |
+| `OTB_FINAL_CALL_SIDES` | `50%` (`randint(1,2)`) | foul | pending |
+| `REBOUND_ATTR_RB_W` / `_ST_W` / `_IQ_W` / `_CH_W` | `0.5` / `0.3` / `0.1` / `0.1` | oreb | pending |
+| `REBOUND_SCORE_ROLL` | `randint(1,6)` | oreb | pending |
+| `REBOUND_UPPER_HALF_DEFAULT` | `12` | oreb | pending |
+| `REBOUND_LOWER_DISCOUNT_STRONG` / `_WEAK` | `0.7` / `0.95` | oreb | pending |
+| `REBOUND_UPPER_COUNT_FOR_STRONG` | `2` | oreb | pending |
+| `REBOUND_SHOOTER_PUTBACK_SCORE_PENALTY` | `0.8` | oreb | pending |
+| `REBOUND_FALLBACK_START` / `_STEP` / `_MAX` | `20` / `5` / `150` | oreb | pending |
+| `OFFENSE_GETBACK_CHANCES` | `{0:1; 1:.5/.5; 2:.25/.75; 3:.1/.8/.1; 4:0/.5/.5}` | oreb | pending |
+| `PUTBACK_INSIDE_HARD_FOUL_BASE` / `_SOFT_FOUL_BASE` | `35` / `105` | foul | pending |
+| `PUTBACK_PAINT_DEF_ID_W` / `_ST_W` / `_IQ_W` / `_CH_W` | `0.6` / `0.2` / `0.1` / `0.1` | contest / FG% / foul | pending |
+| `BOUNCE_VAR_*` tiers | see OREB Inline Magic | oreb | pending |
+
+### DREB
+
+| Proposed name | Current value | Affects | Status |
+|---|---|---|---|
+| `DREB_TURN_TIME_ELAPSED_FLOOR` | `1` game-sec | possession | pending |
+| `DREB_EMERGENCY_GETBACK_ROLL` | `randint(0,10) ≤ fb_opp` | contest / drive / possession | pending |
+| `DREB_CR_RELEASE_IQ_READ` | `randint(1,100) < release.IQ` | contest / drive | pending |
+| `DREB_CR_GETBACK_IQ_READ` | `randint(1,100) < getback.IQ` | contest / drive | pending |
+| `DREB_CR_RELEASE_AG_X_MIN_HI` / `_MID` / `_LO` | `50` / `47` / `45` | contest / drive | pending |
+| `DREB_CR_GETBACK_AG_X_MIN_HI` / `_MID` / `_LO` | `55` / `53` / `50` | contest / drive | pending |
+| `DREB_HCO_OUTLET_RX_X_OFFSET` / `_Y_JITTER` | `randint(3,6)` / `randint(−6,6)` | possession | pending |
+| `DREB_HCO_OUTLET_BOUNCE_REANCHOR_XY` | `±3` x / `±5` y | possession | pending |
+| `FB_MISS_FRONTCOURT_X_SPLIT` | `50` (home ≥ / away ≤) | dreb | pending |
+
+### Already named (do not re-promote)
+
+| Name | Value | Note |
+|---|---|---|
+| `FB_CONTEST_MAX_X_TRAIL` | `3` | Already a named constant in `fast_break_constants.py`; consolidate duplicate defs only. |
 
 ## FLSS (Forced Last Second Shot)
 
@@ -270,8 +413,7 @@ Global shot/foul/contest dials that dominate HCO makes and volume. Listed here s
 
 ## HCO Inline Magic (proposed names — document only)
 
-Literals that change outcomes but are **not yet named constants**. Proposed names are for the markdown console only this session — **do not rename in code until a follow-up promotion pass**.
-
+Literals awaiting promotion. **Status board + values:** [Promotion Pass](#promotion-pass). This table keeps file/context detail.
 | Proposed name | File / context | Current literal | Affects | Effect |
 |---|---|---|---|---|
 | `DESPERATION_BH_SHOT_FRAC` | motion_step_decision.py `_forced_action` | `0.75` | volume | Forced clock: 75% BH shoots / 25% kick-out. |
@@ -382,6 +524,8 @@ Placement dials that change who is in the lane / covered (intercept + contest), 
 
 ## HCT Inline Magic (proposed names — document only)
 
+**Status board + values:** [Promotion Pass](#promotion-pass). File/context detail below. (`FB_CONTEST_MAX_X_TRAIL` is already named — listed under Already named.)
+
 | Proposed name | File / context | Current literal | Affects | Effect |
 |---|---|---|---|---|
 | `HCT_DFOUL_FRONTCOURT_P` | dynamic_hct.py D_FOUL spread | `0.10` (= `1 − 0.60 − 0.30`) | foul | Residual D_FOUL attribution to PF/C help. |
@@ -400,7 +544,7 @@ Placement dials that change who is in the lane / covered (intercept + contest), 
 
 ### Unsure / needs judgment (HCT inventory)
 
-- **Brief vs code:** `Dynamic_HCT_Brief` still lists `DEF_WIN_BASE=0.45`, `DFOUL_BASE=0.12`; live code is **`0.25` / `0.25`**. This console follows code.
+- **Brief vs code:** `Dynamic_HCT_Brief` historically listed `DEF_WIN_BASE=0.45`, `DFOUL_BASE=0.12`; live code is **`0.25` / `0.25`**. Brief now has a value-drift banner; this console follows code.
 - **`MOMENT_RANGE` (11) vs `TRAP_MOMENT_RANGE` (5):** different “in range” meanings — do not collapse.
 - **Default chem/4 neutral band vs HCO `DRIVE_NEUTRAL_BAND=100`:** intentional near-binary trap moments vs wide HCO drive B band — confirm before retuning D8 for HCO.
 - **Deny fractions / drift:** included as contest/intercept levers; pure advance x/y jitter omitted (geometry).
@@ -428,6 +572,8 @@ Cross-ref: **HCT Moment Contact (D8)**, **HCT Reads / Loop / Shot Tree**, **HCT 
 | `OOB_PASS_PS_WEIGHT` / `OOB_PASS_CH_WEIGHT` | over_and_back.py | `0.8` / `0.2` | volume / intercept | Shared FCP+HCT: awareness floor `0.8·PS+0.2·CH`; pass only if `randint(1,100) > floor` (else hold). |
 
 ### FCP Inline Magic (proposed names — document only)
+
+**Status board + values:** [Promotion Pass](#promotion-pass).
 
 | Proposed name | File / context | Current literal | Affects | Effect |
 |---|---|---|---|---|
@@ -492,6 +638,8 @@ Cross-ref: **HCT Moment Contact (D8)**, `CHARGE_THRESHOLD` / `BLOCKING_FOUL_THRE
 
 ### FB Inline Magic (proposed names — document only)
 
+**Status board + values:** [Promotion Pass](#promotion-pass).
+
 | Proposed name | File / context | Current literal | Affects | Effect |
 |---|---|---|---|---|
 | `FB_CHARGE_READ_MIN_X_HOME` / `_MAX_X_AWAY` | fb_drive_resolution.py | `64.0` / `37.0` | foul / drive | Charge/block only if meet is past this x toward attacking basket. |
@@ -550,6 +698,8 @@ Cross-ref: **HCO Micro Movements** (`PROXIMITY_CONTEST_*`), `CONTEST_EUCLIDEAN_R
 | `TEAM_ATTR_RANGES["rebound_modifier"]` | constants/__init__.py | `(0.0, 0.4)` | oreb | Feeds `team_chemistry × rebound_modifier` into rebound score + first tie-break. |
 
 ### OREB Inline Magic (proposed names — document only)
+
+**Status board + values:** [Promotion Pass](#promotion-pass).
 
 | Proposed name | File / context | Current literal | Affects | Effect |
 |---|---|---|---|---|
@@ -611,6 +761,8 @@ Cross-ref: **OREB** shared rebound scoring / bounce / OTB / `OREB_REBOUND_SCORE_
 
 ### DREB Inline Magic (proposed names — document only)
 
+**Status board + values:** [Promotion Pass](#promotion-pass).
+
 | Proposed name | File / context | Current literal | Affects | Effect |
 |---|---|---|---|---|
 | `DREB_TURN_TIME_ELAPSED_FLOOR` | game_manager.py `_build_dreb_turn_from_miss` | `≥ 1` game-sec | possession | Discrete DREB always burns ≥1 game-second on the master clock (even if schema T is 0.5–0.99). |
@@ -643,4 +795,4 @@ Cross-ref: **OREB** shared rebound scoring / bounce / OTB / `OREB_REBOUND_SCORE_
 - HCO shot path = one FB roll; FT/putback/FB-miss = `arm_dreb_fast_break` re-rolls — intentional dual initiation?
 - `HCO_STEP_T_FLOOR` + hard `time_elapsed ≥ 1`: presentation vs true possession dial?
 - Covert AG x_min bands: contest levers vs pure geometry on promotion?
-- **Turn-type inventory complete** (HCO / HCT / FCP / FB / OREB / DREB). Next work: promotion pass (name inline magic in code) and/or edit dial values in this console.
+- **Turn-type inventory complete.** Next work: execute **Promotion Pass** (status board near top of this file) and/or edit already-named dial values.

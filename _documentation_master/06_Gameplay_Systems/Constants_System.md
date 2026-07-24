@@ -1,21 +1,23 @@
 # Constants System
 
-This document lists all constants and variables that were previously on the deprecated **jamies-cc** (God mode) page, with their **current values** in one place for reference. The game engine now reads them only from `BackEnd/constants/__init__.py` (no runtime file I/O). This file is the human-readable reference; the code is the source of truth.
+This document lists all constants and variables that were previously on the deprecated **jamies-cc** (God mode) page, with their **current values** in one place for reference. The game engine now reads them only from `BackEnd/constants/__init__.py` (no runtime file I/O). For **gameplay balance dials**, prefer the central console [Tunable_Constants.md](../11_Design_Systems/Tunable_Constants.md) — this file is a secondary human-readable reference; the code is the source of truth.
 
 ---
 
-## Turn Results
+## Turn Results (legacy / sunset on live HCO)
 
-| Key | Current value | Notes |
+> **Sunset:** Live HCO motion + set play skip these up-front percentile tables (`skip_upfront_events` in `resolve_hco_outcome`). Fouls / steals / dead balls come from per-step moments (`HCT_D8_*` via `HCO_MOMENT_SCALAR`). Values below still exist in `BackEnd/constants/__init__.py` for flag-off / historical callers only — **not** live tuning dials. See [Tunable_Constants.md](../11_Design_Systems/Tunable_Constants.md).
+
+| Key | Current value (code) | Notes |
 |-----|---------------|--------|
-| `STANDARD_D_FOUL` | 95 | |
-| `STANDARD_O_FOUL` | 5 | |
-| `HARD_STEAL` | -135 | |
-| `SOFT_STEAL` | -35 | |
-| `HARD_FOUL` | 250 | |
-| `SOFT_FOUL` | 150 | |
-| `STEAL_ATTEMPT` | 30 | |
-| `DEAD_BALL_TURNOVER` | 10 | |
+| `STANDARD_D_FOUL` | 96 | Legacy |
+| `STANDARD_O_FOUL` | 4 | Legacy |
+| `HARD_STEAL` | -135 | Legacy |
+| `SOFT_STEAL` | -35 | Legacy |
+| `HARD_FOUL` | 250 | Legacy |
+| `SOFT_FOUL` | 150 | Legacy |
+| `STEAL_ATTEMPT` | 30 | Legacy |
+| `DEAD_BALL_TURNOVER` | 10 | Legacy |
 
 ---
 
@@ -64,7 +66,7 @@ Levels 1–5 map to aggression indices 0–4.
 | `SOFT_PROB` | 0.16 | |
 | `THREE_POINTER_FOUL_MISS_CHANCE` | 0.4 | chance defensive shooting foul forces miss on 3PT |
 | `TWO_POINTER_FOUL_MISS_CHANCE` | 0.2 | chance defensive shooting foul forces miss on 2PT |
-| `THREE_POINT_SHOT_THRESHOLD_INCREASE` | 55 | shot_threshold += (this - (random(1,5)*momentum)) for 3PT |
+| `THREE_POINT_DISTANCE_THRESHOLD_MULTIPLIER` | 2.0 | 3PT threshold penalty = `round(distance × 2.0)` in `shot_manager` (replaces retired flat `THREE_POINT_SHOT_THRESHOLD_INCREASE`) |
 
 ---
 
