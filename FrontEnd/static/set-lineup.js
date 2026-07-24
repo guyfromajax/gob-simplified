@@ -728,7 +728,8 @@ function renderLineupTierEmblem() {
       if (Number.isInteger(c) && c >= 1 && c <= 16) value = String.fromCharCode(65 + Math.floor((c - 1) / 2));
     }
   }
-  slot.innerHTML = window.GOBTierEmblem.renderEmblem({ tier, value, size: 34, mode: 'color' });
+  window.GOBTierEmblem.injectCss();
+  slot.innerHTML = window.GOBTierEmblem.renderLockup({ tier, value, size: 34, variant: 'stack', l1: 13, l2: 8 });
 }
 
 async function loadRoster() {

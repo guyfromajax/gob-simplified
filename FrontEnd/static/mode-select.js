@@ -1099,7 +1099,8 @@ function renderModeSelectTierEmblem(franchiseData, commandCenterData) {
       if (Number.isInteger(c) && c >= 1 && c <= 16) value = String.fromCharCode(65 + Math.floor((c - 1) / 2));
     }
   }
-  slot.innerHTML = window.GOBTierEmblem.renderEmblem({ tier, value, size: 40, mode: 'color' });
+  window.GOBTierEmblem.injectCss();
+  slot.innerHTML = window.GOBTierEmblem.renderLockup({ tier, value, size: 40, variant: 'stack', l1: 16, l2: 9 });
 }
 
 function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
