@@ -389,6 +389,16 @@ def _walk_ball_owners(
     """
     walks: List[tuple] = []
     current_owner: Optional[str] = seed_owner_pos
+    # A `pass` whose matching `receive` is emitted on a LATER step (split-encoded reversal — the
+    # receiver relocates into the catch, so his `receive` lands on its own motion step). The ball is
+    # in flight; ownership must flip on the RECEIVE step (below), not here. Without this, a lone pass
+    # never transferred via the walk (the transfer rule required pass+receive in ONE step), so
+    # `is_pass_step` stayed false → no timed ball flight → the ball only "moved" when a later injected
+    # step hardcoded it (dead-ball fumble fired + announced BEFORE the ball reached the receiver on
+    # split reversals — some-but-not-all DBTOs). Flipping on the receive step keeps flight geometry
+    # correct (meet-point resolves from the receiver's actual catch motion). See the DBTO timing trace
+    # in projects/hco_roles_audit.md.
+    pending_pass = False
     for step in skeleton_steps:
         pos_actions = step.get("pos_actions") or {}
         # Bootstrap the owner ONLY when we don't already have a running one (step 0 with no seed, or a
@@ -414,7 +424,19 @@ def _walk_ball_owners(
             if (pos_actions.get(p) or {}).get("action") == "receive"
         ]
         if passers and receivers:
+            # Same-step pass→receive: ownership transfers at this step end (original behavior).
             current_owner = receivers[0]
+            pending_pass = False
+        elif receivers and pending_pass:
+            # Split-encoded reversal: the `pass` was on an earlier step; its `receive` lands here.
+            # Flip ownership on THIS (receive) step so is_pass_step → a timed flight is emitted where
+            # the receiver is actually catching.
+            current_owner = receivers[0]
+            pending_pass = False
+        elif passers:
+            # Lone `pass` (no same-step receive): the ball is in flight — owner stays with the passer
+            # until the matching `receive` step flips it above.
+            pending_pass = True
         end_owner = current_owner
         walks.append((start_owner, end_owner))
     return walks

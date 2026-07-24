@@ -44,7 +44,11 @@
         <button id="exit-franchise" class="mode-exit-btn">Exit Franchise</button>
       </div>
       <div id="top-center">
-        <img id="team-logo" src="" alt="Team Logo" class="team-logo">
+        <div id="fcc-logo-lockup-row" class="fcc-logo-lockup-row">
+          <img id="team-logo" src="" alt="Team Logo" class="team-logo">
+          <!-- Tournament tier emblem lockup (Surface A); populated by populateTop when in an EOS week, empty otherwise -->
+          <div id="fcc-header-emblem" class="fcc-header-emblem" aria-hidden="true"></div>
+        </div>
         <div class="fcc-meta-row">
           <div id="fcc-season-label" class="fcc-season-label">Season --</div>
           <div id="fcc-record-label" class="fcc-season-label fcc-record-label">Record: --</div>
@@ -82,7 +86,10 @@
             <div id="home-standings-body" class="fcc-home-card-body">In Development</div>
           </section>
           <section class="fcc-home-card">
-            <h3>Next Game</h3>
+            <div class="fcc-home-card-head fcc-home-card-head--tier">
+              <h3>Next Game</h3>
+              <div id="home-next-game-lockup" class="fcc-card-tier-lockup" aria-hidden="true"></div>
+            </div>
             <div id="home-next-game-body" class="fcc-home-card-body">In Development</div>
           </section>
           <section class="fcc-home-card">
@@ -105,7 +112,10 @@
             <div id="home-rankings-body" class="fcc-home-card-body">In Development</div>
           </section>
           <section class="fcc-home-card">
-            <h3>Last Game</h3>
+            <div class="fcc-home-card-head fcc-home-card-head--tier">
+              <h3>Last Game</h3>
+              <div id="home-last-game-lockup" class="fcc-card-tier-lockup" aria-hidden="true"></div>
+            </div>
             <div id="home-last-game-body" class="fcc-home-card-body">In Development</div>
           </section>
           <section class="fcc-home-card">
@@ -584,6 +594,7 @@
   <script src="/js/shared/alphaFeedbackModal.js"></script>
   <script src="/js/shared/regionByeModal.js"></script>
   <script src="/js/shared/bigNewsModals.js"></script>
+  <script src="/js/shared/tierEmblem.js"></script>
   <script src="/franchise-command-center.js"></script>
 </body>
 </html>

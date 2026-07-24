@@ -15,6 +15,7 @@
   <script src="/js/shared/pageLoadOverlay.js"></script>
   <script src="/js/shared/playbookTeamId.js"></script>
   <script src="/js/shared/teamShotThresholdScale.js"></script>
+  <script src="/js/shared/tierEmblem.js"></script>
   <script src="/defense-display.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
@@ -4002,6 +4003,81 @@
   margin-top: 2px !important;
   padding-bottom: 2px !important;
 }
+
+/* ---- §6 Universal clock/period compression (ALL weeks) --------------------
+   Tuck the quarter/shot-clock row up under the digits by reclaiming the clock's
+   line-box air. No font shrink (clock stays 54px), no bar growth. Applies whether
+   or not a tournament is active; tournament-inactive weeks simply read tighter. */
+#scoreboard .center .clock {
+  line-height: 0.8 !important;
+}
+
+/* ---- Surface C — court scoreboard tournament theming ----------------------
+   All rules gate on #scoreboard.sb-eos (added by JS only in an EOS week), so the
+   base scoreboard is untouched when no tournament is active. Overlay only — the
+   fixed grid is never widened or restructured. Metal tokens are namespaced
+   --eos-metal* to avoid the existing --tier-* (strategy-bar) custom properties. */
+#scoreboard .sb-eos-strip {
+  display: none;
+}
+#scoreboard.sb-eos .center {
+  top: 50% !important;
+  gap: 3px !important;
+  padding: 4px 0 6px !important;
+}
+#scoreboard.sb-eos .sb-eos-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+#scoreboard.sb-eos .sb-eos-strip svg {
+  display: block;
+}
+#scoreboard.sb-eos .sb-eos-round {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  color: #e8ecf4;
+}
+#scoreboard.sb-eos .sb-eos-chip {
+  font-family: 'Inter', sans-serif;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  line-height: 1;
+  color: #ffe0e0;
+  background: rgba(210, 44, 44, 0.16);
+  border: 1px solid rgba(230, 74, 74, 0.55);
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+/* Tier-metal bottom trim — recolors + thickens the always-present accent.
+   Higher specificity than #scoreboard::after, so it wins without !important. */
+#scoreboard.sb-eos::after {
+  height: 3px;
+  background: linear-gradient(
+    to right,
+    var(--eos-metal, #d4a848) 0%,
+    var(--eos-metal-hi, #f0c560) 50%,
+    var(--eos-metal, #d4a848) 100%
+  );
+}
+/* Optional restrained pulse in the final two minutes (idle otherwise). */
+@media (prefers-reduced-motion: no-preference) {
+  #scoreboard.sb-eos .sb-eos-chip.is-final2 {
+    animation: sbEosChipPulse 1.6s ease-in-out infinite;
+  }
+}
+@keyframes sbEosChipPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(230, 74, 74, 0); }
+  50%      { box-shadow: 0 0 8px 1px rgba(230, 74, 74, 0.55); }
+}
 #scoreboard #away-logo-container {
   grid-column: 2 !important;
 }
@@ -4305,6 +4381,10 @@
         <div id="quarter" class="quarter">Q1</div>
         <div id="shot-clock" class="shot-clock">30</div>
       </div>
+      <!-- Tournament round-label strip (Surface C): mono tier emblem + round name + elimination chip.
+           Overlay only (lives inside the absolutely-positioned .center); populated by JS in EOS weeks,
+           hidden and inert otherwise so the grid is untouched. -->
+      <div id="sb-eos-strip" class="sb-eos-strip" aria-hidden="true"></div>
     </div>
     
     <!-- COMMENTED OUT: Now shown in Playcall Center below court -->
@@ -6504,6 +6584,54 @@
       }
     }
 
+    /**
+     * Surface C — apply tournament tier chrome to the scoreboard.
+     * Fully week-derived (tier + round from the `week` URL param); no fetch, no
+     * backend, nothing in the per-possession loop. All EOS games are single-
+     * elimination, so the WIN OR GO HOME chip is always shown when a tier is active.
+     * Self-gating: does nothing outside an EOS week / franchise game.
+     */
+    function applyEosScoreboardChrome() {
+      const sb = document.getElementById('scoreboard');
+      const strip = document.getElementById('sb-eos-strip');
+      if (!sb || !strip || !window.GOBTierEmblem) return;
+      const p = new URLSearchParams(window.location.search);
+      const tier = (p.get('mode') === 'franchise')
+        ? window.GOBTierEmblem.tierForWeek(p.get('week'))
+        : null;
+      if (!tier) {
+        sb.classList.remove('sb-eos');
+        strip.innerHTML = '';
+        return;
+      }
+      const T = window.GOBTierEmblem.TIER_TOKENS[tier];
+      sb.style.setProperty('--eos-metal', T.metal);
+      sb.style.setProperty('--eos-metal-hi', T.metalHi);
+      const emblem = window.GOBTierEmblem.renderEmblem({
+        tier,
+        size: window.GOBTierEmblem.EMBLEM_SIZING.courtScoreboard.emblem,
+        mode: 'mono'
+      });
+      const round = window.GOBTierEmblem.roundLabelForWeek(p.get('week')) || '';
+      strip.innerHTML = emblem
+        + '<span class="sb-eos-round">' + round + '</span>'
+        + '<span class="sb-eos-chip" id="sb-eos-chip">WIN OR GO HOME</span>';
+      sb.classList.add('sb-eos');
+    }
+
+    /**
+     * Optional: pulse the elimination chip inside the final two minutes.
+     * Idle otherwise; respects prefers-reduced-motion via the CSS gate.
+     * Safe no-op if the chip isn't present. Call from the clock-update path with
+     * the current quarter and seconds remaining when wiring is desired.
+     */
+    function updateEosChipUrgency(quarter, secondsRemaining) {
+      const chip = document.getElementById('sb-eos-chip');
+      if (!chip) return;
+      const isLate = Number(quarter) >= 4 && Number(secondsRemaining) <= 120;
+      chip.classList.toggle('is-final2', isLate);
+    }
+
     async function redirectIfFranchiseGameplayAlreadyCommitted(urlParams) {
       const mode = urlParams.get('mode');
       const franchiseId = urlParams.get('franchise_id');
@@ -6539,6 +6667,7 @@
 
     const redirected = await redirectIfFranchiseGameplayAlreadyCommitted(urlParams);
     if (!redirected) {
+      applyEosScoreboardChrome();
       // Update Player Box Score headers with actual team names
       if (homeTeam) {
         const homePlayersHeader = document.getElementById('home-players-header');

@@ -242,6 +242,27 @@ body.has-auth-bar #franchise-container {
   filter: drop-shadow(0 8px 14px rgba(0, 0, 0, 0.32));
 }
 
+/* Tournament tier emblem — Surface A.
+   Logo + emblem are treated as ONE horizontally-centered object on the same row
+   as the username / hero button; the meta-row stays centered directly beneath.
+   The emblem slot collapses when empty, so with no tournament active the logo is
+   centered alone exactly as before (no layout shift). */
+#franchise-container #top-center .fcc-logo-lockup-row {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+#franchise-container #top-center .fcc-header-emblem {
+  display: inline-flex;
+  align-items: center;
+  flex: 0 0 auto;
+}
+#franchise-container #top-center .fcc-header-emblem:empty {
+  display: none;
+}
+
 #franchise-container #top-right.right-controls {
   display: flex;
   justify-content: flex-end;
@@ -673,6 +694,19 @@ body.has-auth-bar #franchise-container {
 
 #franchise-container #home-tab .fcc-home-card-head h3 {
   margin: 0;
+}
+
+/* Tournament tier lockup in the Next/Last Game card headers — Surface B.
+   Right-justified on the same row as the <h3>; collapses when empty so the
+   header renders exactly as before with no tournament active. */
+#franchise-container #home-tab .fcc-home-card-head--tier {
+  align-items: center;
+}
+#franchise-container #home-tab .fcc-card-tier-lockup {
+  flex: 0 0 auto;
+}
+#franchise-container #home-tab .fcc-card-tier-lockup:empty {
+  display: none;
 }
 
 #franchise-container #home-tab .fcc-home-card-link {

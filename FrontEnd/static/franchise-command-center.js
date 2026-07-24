@@ -294,11 +294,90 @@ function formatConferenceTooltipLabel(conference) {
   return `${conferenceNumber}${regionLetter}`;
 }
 
+/**
+ * Tournament tier emblem value derivation (shared by Surface A + B).
+ * Conference crest carries the conference number (user_conference, 1-16);
+ * Region badge carries the region letter (user_region, A-H); National takes none.
+ * Centralized here so the exact representation is one place to change.
+ */
+function conferenceEmblemValue(data) {
+  const c = data ? data.user_conference : null;
+  return (c === 0 || c) ? String(c) : '';
+}
+function regionEmblemValue(data) {
+  const r = data ? data.user_region : null;
+  if (r) return String(r).toUpperCase();
+  // Fallback: derive the region letter from the conference (mirrors backend
+  // ft._conference_to_region: conf 1-16 -> A-H via (conf-1)//2) so the Region
+  // badge is never blank when the team doc lacks an explicit region field.
+  const c = Number(data ? data.user_conference : NaN);
+  if (Number.isInteger(c) && c >= 1 && c <= 16) {
+    return String.fromCharCode(65 + Math.floor((c - 1) / 2));
+  }
+  return '';
+}
+function emblemValueForTier(tier, data) {
+  if (tier === 'conference') return conferenceEmblemValue(data);
+  if (tier === 'region') return regionEmblemValue(data);
+  return null; // national: always 3 stars, no value
+}
+
+/**
+ * Surface A — render the tier emblem lockup to the right of the team logo.
+ * Only during an EOS week (tierForWeek 27-34); cleared otherwise so the logo
+ * sits centered alone exactly as in the base layout.
+ */
+function renderFccHeaderEmblem(data) {
+  const slot = document.getElementById('fcc-header-emblem');
+  if (!slot || !window.GOBTierEmblem) return;
+  const tier = window.GOBTierEmblem.tierForWeek(data && data.week);
+  if (!tier) { slot.innerHTML = ''; return; }
+  window.GOBTierEmblem.injectCss();
+  const sz = window.GOBTierEmblem.EMBLEM_SIZING.fccFranchiseHeader;
+  slot.innerHTML = window.GOBTierEmblem.renderLockup({
+    tier,
+    value: emblemValueForTier(tier, data),
+    size: sz.emblem,
+    l1: sz.labelL1,
+    l2: sz.labelL2,
+    variant: 'stack'
+  });
+}
+
+/**
+ * Surface B — right-justified compact tier lockup in the Next/Last Game card
+ * headers. Cleared (headers render as today) outside an EOS week.
+ */
+function renderFccGameCardLockups(data) {
+  if (!window.GOBTierEmblem) return;
+  const ids = ['home-next-game-lockup', 'home-last-game-lockup'];
+  const tier = window.GOBTierEmblem.tierForWeek(data && data.week);
+  let html = '';
+  if (tier) {
+    window.GOBTierEmblem.injectCss();
+    const sz = window.GOBTierEmblem.EMBLEM_SIZING.fccGameCardHeader;
+    html = window.GOBTierEmblem.renderLockup({
+      tier,
+      value: emblemValueForTier(tier, data),
+      size: sz.emblem,
+      l1: sz.labelL1,
+      l2: sz.labelL2,
+      variant: 'stack'
+    });
+  }
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = html;
+  });
+}
+
 function populateTop(data) {
   if (!data) return;
   const formattedTeam = formatTeamName(data.team);
   const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   document.getElementById('team-logo').src = logoSrc;
+  renderFccHeaderEmblem(data);
+  renderFccGameCardLockups(data);
   const seasonLabelEl = document.getElementById('fcc-season-label');
   const rankLabelEl = document.getElementById('fcc-rank-label');
   if (seasonLabelEl) {
