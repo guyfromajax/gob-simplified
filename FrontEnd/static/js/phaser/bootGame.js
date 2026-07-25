@@ -2807,28 +2807,38 @@ async function handleSimFullGame() {
     console.error('Error fetching rosters for auto-set:', err);
   }
 
-  // Act 1 cover (§6): Sim Full Game plays the pre-game cinematic (display-only,
-  // no drag/submit) while quarters sim in the background; Sim Rest of Game skips it.
-  // Fully guarded — any failure degrades to straight-to-Act-2. scene=null is safe
-  // (audio bed uses createAudio; reveal SFX guard a null scene).
-  let act1CoverPromise = Promise.resolve();
+  // Act 1 cover (§6): Sim Full Game plays the pre-game cinematic (display-only, with
+  // a simple "Tip Off" advance button) as a full-screen cover while quarters sim in
+  // the background, holding the tip-off veil until the sim finishes. Launched AFTER
+  // Q1's response so /lineup-for-matchups returns the populated lineup — mirroring
+  // how Play Quarter's first simulate-quarter sets up the game (most SS&S). Sim Rest
+  // of Game skips it. Fully guarded — any failure degrades to straight-to-Act-2.
   const isSimFullGame = Math.max(0, quarter) < 2;
-  if (isSimFullGame && gameId) {
+  let resolveSimDone;
+  const simDonePromise = new Promise((r) => { resolveSimDone = r; });
+  let act1CoverPromise = Promise.resolve();
+  let act1Launched = false;
+  const launchAct1Cover = (gid) => {
+    if (act1Launched || !gid) return;
+    act1Launched = true;
     act1CoverPromise = (async () => {
       try {
         const res = await fetch(
-          API_CONFIG.buildUrl(`/api/game/${gameId}/lineup-for-matchups`),
+          API_CONFIG.buildUrl(`/api/game/${gid}/lineup-for-matchups`),
           { headers: { 'Content-Type': 'application/json' } }
         );
         if (!res.ok) return;
         const normalized = normalizeMatchupsPayload(await res.json());
-        await showPreGameExperience(gameId, null, normalized, { displayOnly: true });
+        await showPreGameExperience(gid, null, normalized, {
+          displayOnly: true,
+          waitForSim: simDonePromise,
+        });
       } catch (coverErr) {
         console.warn('⚠️ [SIM-PRES] Act 1 cover skipped:', coverErr);
         document.querySelectorAll('.pgxp-root').forEach((n) => n.remove());
       }
     })();
-  }
+  };
 
   try {
     let currentQ = quarter;
@@ -2839,7 +2849,8 @@ async function handleSimFullGame() {
     while (true) {
       // ✅ Show "Simulating Q1", "Simulating Q2", etc. for Sim Full Game / Sim Rest of Game
       // Stop at Q4 (don't show Q5+)
-      if (currentQ <= 4) {
+      // Sim Full Game hides the status overlay — Act 1 covers the screen while it sims.
+      if (!isSimFullGame && currentQ <= 4) {
         const periodLabel = currentQ <= 4 ? `Q${currentQ}` : `OT${currentQ - 4}`;
         showStatus(`Simulating ${periodLabel}...`);
       }
@@ -2941,6 +2952,9 @@ async function handleSimFullGame() {
       quarterSummaries.push(lastSummary); // collect per-quarter responses for Act 2 (no extra requests)
       // Ensure game_id is a string (backend might return ObjectId)
       gId = lastSummary.game_id ? String(lastSummary.game_id) : lastSummary.game_id;
+      // Launch the Act 1 cover once the first (Q1) response has set up the game so
+      // /lineup-for-matchups returns the populated lineup (see launchAct1Cover).
+      if (isSimFullGame) launchAct1Cover(gId);
       console.log('🎮 Quarter simulation response:', {
         quarter: currentQ,
         gameId: gId,
@@ -2985,10 +2999,12 @@ async function handleSimFullGame() {
     });
 
     // ── Act 2: Sim Game Presentation ──────────────────────────────────────
-    // Wait for the Act 1 cover to finish its cinematic, then play the simmed game
-    // back as a broadcast, then hand off to the existing completion popup. Consumes
-    // ONLY the per-quarter responses already received (no extra requests, no payload
-    // changes). Fully guarded: any failure skips straight to the completion popup.
+    // Signal the Act 1 cover that the sim is finished so its held tip-off veil can
+    // dissolve; wait for the user to have tipped off + the cover to clear; then play
+    // the broadcast full-width below the scoreboard, then hand off to the existing
+    // completion popup. Consumes ONLY the per-quarter responses already received.
+    // Fully guarded: any failure skips straight to the completion popup.
+    if (typeof resolveSimDone === 'function') resolveSimDone();
     try {
       await act1CoverPromise;
     } catch (e) { /* cover is self-guarded */ }
@@ -2999,9 +3015,7 @@ async function handleSimFullGame() {
         homeTeamName: homeTeam,
         awayTeamName: awayTeam,
       });
-      await showSimGamePresentation(timeline, {
-        mount: document.getElementById('phaser-container') || undefined,
-      });
+      await showSimGamePresentation(timeline, {}); // full-width overlay below the scoreboard
     } catch (presErr) {
       console.error('⚠️ [SIM-PRES] Presentation failed; continuing to completion popup:', presErr);
     }

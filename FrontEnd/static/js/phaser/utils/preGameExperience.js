@@ -262,7 +262,6 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
   // CTA, no save. "Sim" opts out of setting matchups. The interactive Q1 flow is
   // unchanged when this flag is absent.
   const displayOnly = !!(options && options.displayOnly);
-  let _resolve = null;
 
   const { userTeamSide, homeTeam, awayTeam, currentMatchups, franchiseWeek } = normalized;
   const homePrimary = homeTeam.primary_color || "#1F8A5B";
@@ -437,20 +436,38 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
       p.classList.add("in");
       p.classList.remove("spot");
     });
-    timers.push(setTimeout(displayOnly ? finishDisplay : toMatchups, 600));
+    timers.push(setTimeout(displayOnly ? toTipOffButton : toMatchups, 600));
   }
 
-  // Display-only tip-off: veil + dissolve + resolve, no matchups save.
-  function finishDisplay() {
+  // Display-only: after the reveal, show a simple "Tip Off" advance button — no
+  // matchups drag/submit (Sim opts out of setting matchups).
+  function toTipOffButton() {
+    clearTimers();
+    root.dataset.phase = "tipoff-ready";
+    root.querySelectorAll(".pgxp-pair").forEach((p) => p.classList.add("in"));
+    board.classList.remove("revealing");
+    title.textContent = `${String(awayName).toUpperCase()}  @  ${String(homeName).toUpperCase()}`;
+    cta.textContent = "Tip Off";
+    cta.classList.add("show");
+    playPregameRevealClick(scene);
+    paintSlots();
+  }
+
+  // Tip Off pressed: show the veil, then HOLD it until the sim finishes (§3), then
+  // dissolve and hand off to Act 2. No matchups save.
+  function toDisplayTipoff(resolve) {
     clearTimers();
     root.dataset.phase = "tipoff";
-    timers.push(
-      setTimeout(() => {
-        root.classList.add("dissolved");
-        fadeOutPregameBed(PREGAME_BED_FADE_MS);
-        timers.push(setTimeout(() => finishAndResolve(_resolve), 450));
-      }, 1400)
-    );
+    playMatchupsUiSfx("confirm-1-lowervol.wav");
+    const waitForSim =
+      options && options.waitForSim && typeof options.waitForSim.then === "function"
+        ? options.waitForSim
+        : Promise.resolve();
+    waitForSim.catch(() => {}).then(() => {
+      root.classList.add("dissolved");
+      fadeOutPregameBed(PREGAME_BED_FADE_MS);
+      timers.push(setTimeout(() => finishAndResolve(resolve), 450));
+    });
   }
 
   function toMatchups() {
@@ -496,7 +513,6 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
   }
 
   return new Promise((resolve) => {
-    _resolve = resolve;
     startPregameBed(scene, {
       week: franchiseWeek ?? normalized.franchiseWeek ?? 1,
       userNatlRank,
@@ -511,6 +527,7 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
 
     cta.addEventListener("click", () => {
       if (root.dataset.phase === "matchups") toTipoff(resolve);
+      else if (displayOnly && root.dataset.phase === "tipoff-ready") toDisplayTipoff(resolve);
     });
   });
 }

@@ -250,23 +250,69 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
   const fouledOut = new Set();
   let prevCourt = null;
 
-  const makeScore = (turn, summary, teamFoulsFn) => {
-    const s = (turn && turn.score) || {};
-    const homePts = num(s[homeName]);
-    const awayPts = num(s[awayName]);
-    return {
-      away: awayPts,
-      home: homePts,
-      clock: (turn && turn.clock) || '0:00',
-      quarter: quarterLabel(turn && turn.quarter),
-      shot: turn && turn.shot_clock_remaining != null ? num(turn.shot_clock_remaining) : 0,
-      afoul: teamFoulsFn('away'),
-      hfoul: teamFoulsFn('home'),
-      // Timeouts: best-effort per-quarter value (not stamped per turn) — flagged as a bend.
-      atol: timeoutsFor(summary, summary && summary.away_team_id),
-      htol: timeoutsFor(summary, summary && summary.home_team_id),
-    };
+  // 5a fix: turns[] is CUMULATIVE across the per-quarter responses (backend caches
+  // gm in ongoing_games; turns clear only for a new Q1). The FINAL response's
+  // turns[] already contains the whole game — use it as the single source instead
+  // of concatenating (which replayed Q1 four times, Q2 three times, ...).
+  const allTurns = Array.isArray(last.turns) ? last.turns : [];
+
+  // Per-quarter emitted cumulative snapshots for reconciliation. Each response is
+  // cumulative through the quarter it simmed; key by that quarter number.
+  const emittedByQuarter = {};
+  summaries.forEach((s) => {
+    const ts = Array.isArray(s.turns) ? s.turns : [];
+    let q = 0;
+    ts.forEach((t) => { q = Math.max(q, num(t.quarter)); });
+    if (q > 0 && Array.isArray(s.players)) emittedByQuarter[q] = s.players;
+  });
+
+  const reconcileQuarter = (q) => {
+    const emitted = emittedByQuarter[q];
+    if (!Array.isArray(emitted)) return;
+    emitted.forEach((p) => {
+      const id = nid(p.playerId || p.player_id || p._id);
+      if (!id) return;
+      const emittedStats = p.stats || {};
+      const accStats = cum[id] || {};
+      ['PTS', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'F', 'DEF_A', 'DEF_S', 'TO'].forEach((key) => {
+        reconciliation.checks += 1;
+        const acc = num(accStats[key]);
+        const emit = num(emittedStats[key]);
+        if (acc !== emit) {
+          reconciliation.drifts.push({
+            quarter: q, playerId: id, name: (directory[id] || {}).name,
+            stat: key, accumulated: acc, emitted: emit, delta: acc - emit,
+          });
+          accStats[key] = emit; // emitted wins — snap display state to authoritative
+          cum[id] = accStats;
+        }
+      });
+    });
   };
+
+  // 5b fix: helper turns (inbound / rebound / timeout) omit `score` — carry forward
+  // the last known scoreboard values instead of resetting to 0-0 / 0:00.
+  const sb = {
+    away: 0, home: 0, clock: (openTurn && openTurn.clock) || '8:00', quarter: 1, shot: 24,
+    atol: timeoutsFor(last, last && last.away_team_id),
+    htol: timeoutsFor(last, last && last.home_team_id),
+  };
+  const applyTurnToScoreboard = (turn) => {
+    const s = (turn && turn.score) || null;
+    if (s && (s[homeName] != null || s[awayName] != null)) {
+      sb.away = num(s[awayName]);
+      sb.home = num(s[homeName]);
+    }
+    if (turn && turn.clock) sb.clock = turn.clock;
+    if (turn && turn.quarter != null) sb.quarter = num(turn.quarter);
+    if (turn && turn.shot_clock_remaining != null) sb.shot = num(turn.shot_clock_remaining);
+  };
+  const scoreSnapshot = () => ({
+    away: sb.away, home: sb.home, clock: sb.clock,
+    quarter: quarterLabel(sb.quarter), shot: sb.shot,
+    afoul: teamFouls('away'), hfoul: teamFouls('home'),
+    atol: sb.atol, htol: sb.htol,
+  });
 
   // ── Pre-tip frame ──────────────────────────────────────────────────────
   if (openTurn) {
@@ -302,114 +348,79 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     prevCourt = new Set([...homeCourt, ...awayCourt]);
   }
 
-  // ── Live frames, quarter by quarter ────────────────────────────────────
-  summaries.forEach((summary, qIdx) => {
-    const turns = Array.isArray(summary.turns) ? summary.turns : [];
-    const isFinalQuarter = qIdx === summaries.length - 1 && summary.is_final;
-
-    turns.forEach((turn, tIdx) => {
-      addDeltas(turn.deltas);
-
-      // Foul-out tracking (persist).
-      const foId = nid(turn.foul_out_player || (turn.fouled_out && turn.fouled_out.player_id));
-      if (foId) fouledOut.add(foId);
-
-      const homeLineup = turn.home_lineup || {};
-      const awayLineup = turn.away_lineup || {};
-      const homeCourt = onCourtIds(homeLineup);
-      const awayCourt = onCourtIds(awayLineup);
-      const court = [...homeCourt, ...awayCourt];
-      court.forEach((id) => everPlayed.add(id));
-
-      // Subs IN this frame = on court now, not on court previous frame.
-      const subIds = new Set();
-      if (prevCourt) court.forEach((id) => { if (!prevCourt.has(id)) subIds.add(id); });
-
-      // OUT flag: a player who fouled out this turn but still shows on the row
-      // for the beat before the swap. On court + fouledOut → flash OUT.
-      const outIds = new Set(court.filter((id) => fouledOut.has(id)));
-
-      const momentumMap = turn.player_momentum || {};
-      const spotlightId = computeSpotlight(court);
-
-      const margin = num((turn.score || {})[homeName]) - num((turn.score || {})[awayName]);
-      worm.push(margin);
-
-      const isQuarterEnd = tIdx === turns.length - 1;
-      let phase = 'live';
-      if (isQuarterEnd && isFinalQuarter) phase = 'final';
-
-      const frame = {
-        phase,
-        quarter: num(turn.quarter) || qIdx + 1,
-        score: makeScore(turn, summary, teamFouls),
-        worm: worm.slice(),
-        away: POSITIONS.map((pos) =>
-          buildPlayer(nid(awayLineup[pos]), pos, momentumMap, spotlightId, subIds, outIds)
-        ),
-        home: POSITIONS.map((pos) =>
-          buildPlayer(nid(homeLineup[pos]), pos, momentumMap, spotlightId, subIds, outIds)
-        ),
-        benchAway: benchChips(court, 'away', fouledOut),
-        benchHome: benchChips(court, 'home', fouledOut),
-        ticker: null, // moments tabled — engine leaves the 44px slot empty
-      };
-
-      if (isQuarterEnd) {
-        const awayPts = frame.score.away;
-        const homePts = frame.score.home;
-        if (isFinalQuarter) {
-          frame.final = {
-            home_won: homePts > awayPts,
-            summaryAway: awayPts,
-            summaryHome: homePts,
-          };
-        } else {
-          // Top performer note across everyone who played, this quarter's cumulative.
-          const spot = computeSpotlight(Array.from(everPlayed));
-          const spotDir = directory[spot] || {};
-          const spotPts = num((cum[spot] || {}).PTS);
-          frame.breakSummary = {
-            summaryQ: quarterLabel(turn.quarter),
-            summaryAway: awayPts,
-            summaryHome: homePts,
-            summaryNote: spot ? `Top performer — ${spotDir.name}, ${spotPts} PTS` : '',
-          };
-        }
+  // ── Live frames from the single cumulative stream (final response) ─────
+  let curQuarter = openTurn ? (num(openTurn.quarter) || 1) : 1;
+  allTurns.forEach((turn, idx) => {
+    // Quarter boundary FIRST — reconcile the quarter that just ended BEFORE this
+    // turn's deltas land (§4: reconcile at every boundary + final). Otherwise the
+    // new quarter's first delta corrupts the previous quarter's check.
+    const tQ = num(turn.quarter) || curQuarter;
+    if (tQ > curQuarter) {
+      reconcileQuarter(curQuarter);
+      if (frames.length) {
+        const prev = frames[frames.length - 1];
+        const spot = computeSpotlight(Array.from(everPlayed));
+        const spotDir = directory[spot] || {};
+        prev.breakSummary = {
+          summaryQ: quarterLabel(curQuarter),
+          summaryAway: prev.score.away,
+          summaryHome: prev.score.home,
+          summaryNote: spot ? `Top performer — ${spotDir.name}, ${num((cum[spot] || {}).PTS)} PTS` : '',
+        };
       }
+      curQuarter = tQ;
+    }
 
-      frames.push(frame);
-      prevCourt = new Set(court);
-    });
+    addDeltas(turn.deltas);
 
-    // ── Reconciliation guard (Prompt 2 §4): quarter boundary + final ──────
-    const emitted = Array.isArray(summary.players) ? summary.players : [];
-    emitted.forEach((p) => {
-      const id = nid(p.playerId || p.player_id || p._id);
-      if (!id) return;
-      const emittedStats = p.stats || {};
-      const accStats = cum[id] || {};
-      ['PTS', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'F', 'DEF_A', 'DEF_S', 'TO'].forEach((key) => {
-        reconciliation.checks += 1;
-        const acc = num(accStats[key]);
-        const emit = num(emittedStats[key]);
-        if (acc !== emit) {
-          reconciliation.drifts.push({
-            quarter: qIdx + 1,
-            playerId: id,
-            name: (directory[id] || {}).name,
-            stat: key,
-            accumulated: acc,
-            emitted: emit,
-            delta: acc - emit,
-          });
-          // Emitted wins — snap display state to the authoritative value.
-          accStats[key] = emit;
-          cum[id] = accStats;
-        }
-      });
-    });
+    // Foul-out tracking (persist).
+    const foId = nid(turn.foul_out_player || (turn.fouled_out && turn.fouled_out.player_id));
+    if (foId) fouledOut.add(foId);
+
+    applyTurnToScoreboard(turn);
+
+    const homeLineup = turn.home_lineup || {};
+    const awayLineup = turn.away_lineup || {};
+    const homeCourt = onCourtIds(homeLineup);
+    const awayCourt = onCourtIds(awayLineup);
+    const court = [...homeCourt, ...awayCourt];
+    court.forEach((id) => everPlayed.add(id));
+
+    // Subs IN this frame = on court now, not on court previous frame.
+    const subIds = new Set();
+    if (prevCourt) court.forEach((id) => { if (!prevCourt.has(id)) subIds.add(id); });
+    // OUT: fouled-out player still on the row for the beat before the swap.
+    const outIds = new Set(court.filter((id) => fouledOut.has(id)));
+
+    const momentumMap = turn.player_momentum || {};
+    const spotlightId = computeSpotlight(court);
+
+    worm.push(sb.home - sb.away);
+
+    const isLast = idx === allTurns.length - 1;
+    const frame = {
+      phase: isLast ? 'final' : 'live',
+      quarter: tQ,
+      score: scoreSnapshot(),
+      worm: worm.slice(),
+      away: POSITIONS.map((pos) =>
+        buildPlayer(nid(awayLineup[pos]), pos, momentumMap, spotlightId, subIds, outIds)
+      ),
+      home: POSITIONS.map((pos) =>
+        buildPlayer(nid(homeLineup[pos]), pos, momentumMap, spotlightId, subIds, outIds)
+      ),
+      benchAway: benchChips(court, 'away', fouledOut),
+      benchHome: benchChips(court, 'home', fouledOut),
+      ticker: null, // moments tabled — engine leaves the 44px slot empty
+    };
+    if (isLast) {
+      frame.final = { home_won: sb.home > sb.away, summaryAway: sb.away, summaryHome: sb.home };
+    }
+    frames.push(frame);
+    prevCourt = new Set(court);
   });
+
+  reconcileQuarter(curQuarter); // final quarter
 
   if (reconciliation.drifts.length) {
     console.warn(

@@ -56,7 +56,10 @@ function ensureStyles() {
   const style = document.createElement('style');
   style.id = 'sim-game-pres-styles';
   style.textContent = `
-    .sgp-root{position:absolute;inset:0;z-index:60;overflow:hidden;display:flex;align-items:stretch;
+    /* Full-width overlay from just below the scoreboard to the viewport bottom
+       (covers the court + both side panels; only the scoreboard stays). The top
+       offset is set in JS from the live scoreboard height so no row hides under it. */
+    .sgp-root{position:fixed;left:0;right:0;bottom:0;top:0;z-index:60;overflow:hidden;display:flex;align-items:stretch;
       font-family:Inter,system-ui,sans-serif;color:rgba(255,255,255,.90);-webkit-font-smoothing:antialiased}
     .sgp-root .overlay{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;padding:16px 26px 12px;isolation:isolate;
       background:radial-gradient(120% 80% at 50% 34%,rgba(39,64,142,.14),transparent 60%),radial-gradient(90% 70% at 50% 118%,rgba(247,148,32,.05),transparent 60%),#0b0d14}
@@ -344,12 +347,22 @@ export function showSimGamePresentation(timeline, opts = {}) {
     return Promise.resolve();
   }
 
-  const mount = opts.mount || document.getElementById('phaser-container') || document.body;
+  const mount = opts.mount || document.body;
   const driveScoreboard = opts.driveScoreboard !== false;
   const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   const root = buildSkeleton(teams);
   mount.appendChild(root);
+
+  // Sit directly beneath the real scoreboard so its top edge never hides a row and
+  // the worm reads as attached to the scoreboard (Bug 4). Track on resize.
+  const positionBelowScoreboard = () => {
+    const sbEl = document.getElementById('scoreboard');
+    const top = sbEl ? Math.max(0, Math.round(sbEl.getBoundingClientRect().bottom)) : 0;
+    root.style.top = `${top}px`;
+  };
+  positionBelowScoreboard();
+  window.addEventListener('resize', positionBelowScoreboard);
 
   const overlay = root.querySelector('.overlay');
   const wormHost = root.querySelector('.worm-host');
@@ -437,6 +450,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
       if (done) return;
       done = true;
       timers.forEach(clearTimeout);
+      window.removeEventListener('resize', positionBelowScoreboard);
       root.classList.add('dissolving');
       const t = setTimeout(() => { root.remove(); resolve(); }, prefersReduced ? 0 : 450);
       timers.push(t);
