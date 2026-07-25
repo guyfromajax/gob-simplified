@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GOB — Sim Game Presentation</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d14; --green:#34EC27; --blue:#4A90D9; --orange:#F79420; --red:#ff6d6d; --yellow:#FFD700;
+  --w90:rgba(255,255,255,0.90); --w70:rgba(255,255,255,0.70); --w55:rgba(255,255,255,0.55); --w40:rgba(255,255,255,0.40);
+  --hair:rgba(255,255,255,0.08); --bebas:'Bebas Neue',sans-serif; --inter:'Inter',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--inter);background:#05060a;color:var(--w90);-webkit-font-smoothing:antialiased}
+.cap{position:absolute;top:-64px;left:2px;display:flex;align-items:baseline;gap:14px}
+.cap .lt{font-family:var(--bebas);font-size:34px;letter-spacing:.03em;color:#0b0d14;line-height:1}
+.cap .ld{font-size:13px;color:rgba(11,13,20,0.62);letter-spacing:.02em;max-width:1200px}
+.cap .lk{font-family:var(--bebas);font-size:22px;color:var(--orange);letter-spacing:.06em}
+
+/* ── full game screen ── */
+.screen{position:relative;background:#05060a;overflow:hidden;border:1px solid var(--hair);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,.5)}
+
+/* scoreboard (faithful to court.html) */
+.sb{position:relative;height:96px;background:#000;border-bottom:1px solid rgba(255,255,255,.06);font-family:var(--bebas);display:flex;align-items:center;justify-content:space-between;padding:0 14px;flex-shrink:0;color:#fff}
+.sb-side{display:flex;align-items:center;gap:20px}
+.sb-logo{width:150px;height:74px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:34px;letter-spacing:.04em;color:rgba(255,255,255,.92);border:1px solid rgba(255,255,255,.08)}
+.sb-meta{display:flex;flex-direction:column;gap:3px}
+.sb-meta.right{align-items:flex-end}
+.sb-rank{font-size:17px;letter-spacing:.05em;color:rgba(255,255,255,.78)}
+.sb-rec{font-family:var(--inter);font-size:12px;font-weight:600;color:rgba(255,255,255,.42)}
+.sb-score{font-size:66px;line-height:1;font-weight:700;min-width:80px;text-align:center}
+.sb-tf{display:flex;flex-direction:column;gap:2px;font-size:17px;line-height:1.15;color:rgba(255,255,255,.6)}
+.sb-tf.right{align-items:flex-end}
+.sb-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:3px}
+.sb-clock{font-size:64px;line-height:1;font-weight:700;letter-spacing:.01em}
+.sb-per{display:flex;align-items:center;gap:26px}
+.sb-q{font-size:22px;color:var(--orange)}
+.sb-shot{font-size:22px;color:var(--yellow);font-weight:700}
+.sb-edge{position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(to right,var(--al) 0%,rgba(255,255,255,.1) 48%,rgba(255,255,255,.1) 52%,var(--hl) 100%)}
+
+/* stage row: side panels flank the overlay */
+.stage-row{flex:1;display:flex;align-items:center;min-height:0}
+.sidepanel{width:345px;align-self:stretch;background:linear-gradient(180deg,rgba(13,16,24,.97),rgba(9,11,17,.97));border-left:1px solid var(--hair);border-right:1px solid var(--hair);padding:20px 18px;opacity:.34;display:flex;flex-direction:column;gap:11px;filter:saturate(.6)}
+.sidepanel.left{border-left:none}.sidepanel.right{border-right:none}
+.gp-head{font-family:var(--bebas);font-size:19px;letter-spacing:.1em;color:var(--w55);margin-bottom:6px}
+.gp-row{display:flex;gap:10px;align-items:center}
+.gp-a{width:34px;height:34px;border-radius:8px;background:rgba(255,255,255,.06);flex-shrink:0}
+.gp-b{height:12px;flex:1;border-radius:4px;background:linear-gradient(90deg,rgba(255,255,255,.09),rgba(255,255,255,.03))}
+.gp-note{margin-top:auto;font-family:ui-monospace,Menlo,monospace;font-size:9.5px;letter-spacing:.02em;color:var(--w40)}
+.ovhost{flex:1;height:100%;display:flex;align-items:center;justify-content:center}
+
+/* ── the overlay (1229×768 center region) ── */
+.overlay{position:relative;width:1229px;height:768px;border-radius:18px;overflow:hidden;
+  background:radial-gradient(120% 80% at 50% 34%,rgba(39,64,142,0.14),transparent 60%),radial-gradient(90% 70% at 50% 118%,rgba(247,148,32,0.05),transparent 60%),var(--bg);
+  border:1px solid rgba(255,255,255,.07);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 20px 50px rgba(0,0,0,.5);
+  display:flex;flex-direction:column;padding:20px 28px 16px;isolation:isolate}
+.overlay::before{content:'';position:absolute;left:50%;bottom:-52%;width:96%;aspect-ratio:1/1;transform:translateX(-50%);border-radius:50%;border:1px solid rgba(255,255,255,.045);pointer-events:none}
+
+/* lead worm */
+.ov-worm{position:relative;flex-shrink:0;margin-bottom:6px}
+.wl-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:3px}
+.wl-cap{font-size:9.5px;font-weight:800;letter-spacing:.22em;color:var(--w40)}
+.wl-team{font-family:var(--bebas);font-size:20px;letter-spacing:.04em}
+.wormsvg{display:block;width:100%;height:66px}
+.wormdot{filter:drop-shadow(0 0 4px currentColor)}
+.wl-axis{display:flex;justify-content:space-between;margin-top:2px;font-family:ui-monospace,Menlo,monospace;font-size:8px;letter-spacing:.06em;color:var(--w40)}
+
+.pretip-lbl{position:absolute;top:44px;left:0;right:0;text-align:center;font-family:var(--bebas);font-size:16px;letter-spacing:.28em;color:var(--w40);z-index:2;pointer-events:none}
+
+/* player rows */
+.rows{flex:1;display:flex;flex-direction:column;justify-content:center;gap:9px;min-height:0;position:relative;z-index:1}
+.pair{display:grid;grid-template-columns:1fr 84px 1fr;align-items:center;gap:0;position:relative}
+.pair:not(:last-child)::after{content:'';position:absolute;left:9%;right:9%;bottom:-5px;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08) 24%,rgba(255,255,255,.08) 76%,transparent)}
+.poscol{display:flex;align-items:center;justify-content:center}
+.posmark{font-family:var(--bebas);font-size:24px;letter-spacing:.04em}
+
+.prow{display:flex;align-items:center;gap:13px;position:relative;padding:5px 8px;border-radius:12px;transition:transform .3s,filter .3s}
+.prow.home{flex-direction:row-reverse}
+.prow.isout{filter:saturate(.5) brightness(.82)}
+/* spotlight */
+.prow.spot{background:radial-gradient(120% 160% at 50% 50%,rgba(247,148,32,0.12),transparent 72%)}
+.prow.spot::before{content:'';position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(247,148,32,0.4),0 0 22px rgba(247,148,32,0.16);animation:spotPulse 2.6s ease-in-out infinite}
+@keyframes spotPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(247,148,32,0.34),0 0 16px rgba(247,148,32,0.1)}50%{box-shadow:inset 0 0 0 1px rgba(247,148,32,0.55),0 0 28px rgba(247,148,32,0.22)}}
+
+.head{position:relative;flex-shrink:0;width:66px;height:66px;border-radius:13px;overflow:hidden;background:linear-gradient(180deg,#1b2130,#10141d);border:2px solid rgba(255,255,255,.16);box-shadow:0 6px 16px rgba(0,0,0,.4)}
+.head .sil{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center}
+.head .sil svg{width:80%;height:90%}
+.posb{position:absolute;top:4px;left:4px;font-family:var(--bebas);font-size:12px;line-height:1;letter-spacing:.03em;padding:2px 5px 1px;border-radius:4px;color:#0b0d14;z-index:2}
+.prow.home .posb{left:auto;right:4px}
+.rtb{position:absolute;top:4px;left:4px;z-index:2;font-family:var(--bebas);font-size:13px;line-height:1;letter-spacing:.02em;padding:2px 5px 1px;border-radius:4px;color:#0b0d14;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+
+.pbody{flex:1;min-width:0}
+.pname{display:flex;align-items:center;gap:7px;line-height:1;margin-bottom:5px}
+.prow.home .pname{flex-direction:row-reverse}
+.pname .nm{font-size:15px;font-weight:700;color:#fff;white-space:nowrap}
+.pname .jn{font-size:12px;font-weight:600;color:var(--w40)}
+.spotmark{font-family:var(--bebas);font-size:12px;letter-spacing:.08em}
+.tag-in{font-family:var(--bebas);font-size:11px;letter-spacing:.06em;color:var(--green);border:1px solid rgba(52,236,39,.5);border-radius:4px;padding:1px 5px 0}
+.tag-out{font-family:var(--bebas);font-size:11px;letter-spacing:.06em;color:#fff;background:var(--red);border-radius:4px;padding:2px 6px 1px}
+.tag-ft{font-family:var(--bebas);font-size:11px;letter-spacing:.06em;color:#15181f;background:var(--yellow);border-radius:4px;padding:2px 6px 1px}
+
+.status{display:flex;align-items:center;gap:8px;margin-bottom:6px;height:16px}
+.prow.home .status{flex-direction:row-reverse}
+.mo{display:flex;width:15px;height:15px}
+.mo svg{width:100%;height:100%}
+.flame{animation:flick 1.1s ease-in-out infinite}
+@keyframes flick{0%,100%{transform:scale(1) rotate(-1deg);opacity:.92}50%{transform:scale(1.14) rotate(2deg);opacity:1}}
+.pips{display:flex;gap:2.5px}
+.prow.home .pips{flex-direction:row-reverse}
+.pip{width:11px;height:4px;border-radius:2px}
+
+.bars{display:flex;flex-direction:column;gap:4px}
+.barrow{display:grid;grid-template-columns:26px 1fr 30px;align-items:center;gap:8px}
+.barrow.home{grid-template-columns:30px 1fr 26px}
+.bl{font-size:8px;font-weight:800;letter-spacing:.06em;color:var(--w40);text-transform:uppercase}
+.barrow.away .bl{text-align:left}.barrow.home .bl{text-align:right}
+.bv{font-size:12px;font-weight:700;color:var(--w90);font-variant-numeric:tabular-nums}
+.barrow.away .bv{text-align:right}.barrow.home .bv{text-align:left}
+.track{position:relative;height:9px;border-radius:5px;background:rgba(255,255,255,.07);overflow:hidden}
+.track.home{display:flex;justify-content:flex-end}
+.fill{height:100%;border-radius:5px;transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.fill.maxed{box-shadow:0 0 8px 0 currentColor}
+
+/* bench rail */
+.bench-wrap{display:flex;justify-content:space-between;gap:20px;flex-shrink:0;margin:8px 0 2px;min-height:22px}
+.bench{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.bench.home{flex-direction:row-reverse}
+.bench-lbl{font-size:8px;font-weight:800;letter-spacing:.16em;color:var(--w40)}
+.bchip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.05);border:1px solid var(--hair);border-radius:20px;padding:3px 10px;font-size:11px}
+.bchip b{font-weight:700;color:var(--w70)}
+.bchip .bstat{color:var(--w40);font-variant-numeric:tabular-nums}
+.bchip.out{opacity:.7}
+.bout{font-family:var(--bebas);font-size:10px;color:#fff;background:var(--red);border-radius:3px;padding:1px 4px 0;letter-spacing:.04em}
+
+/* moments ticker */
+.ticker{flex-shrink:0;height:44px;display:flex;align-items:center;background:linear-gradient(90deg,rgba(255,255,255,.05),rgba(255,255,255,.02));border:1px solid var(--hair);border-radius:10px;padding:0 14px;overflow:hidden}
+.tk-item{display:flex;align-items:center;gap:12px;animation:tkArrive .5s cubic-bezier(.2,.8,.3,1)}
+@keyframes tkArrive{0%{opacity:0;transform:translateY(10px)}100%{opacity:1;transform:none}}
+.tk-tag{font-family:var(--bebas);font-size:14px;letter-spacing:.08em;border:1px solid;border-radius:5px;padding:2px 8px 1px}
+.tk-txt{font-size:14px;font-weight:600;color:var(--w90);letter-spacing:.01em}
+
+/* quarter break */
+.overlay.breaking .rows,.overlay.breaking .bench-wrap,.overlay.breaking .ticker{filter:blur(3px) brightness(.42);opacity:.5}
+.breakcard{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:5;background:radial-gradient(60% 60% at 50% 50%,rgba(11,13,20,.62),rgba(11,13,20,.9))}
+.bc-eyebrow{font-size:12px;font-weight:800;letter-spacing:.34em;color:var(--w40)}
+.bc-title{font-family:var(--bebas);font-size:88px;line-height:.9;letter-spacing:.02em;color:#fff}
+.bc-score{font-family:var(--bebas);font-size:44px;letter-spacing:.03em;display:flex;gap:16px;align-items:baseline}
+.bc-dash{color:var(--w40)}
+.bc-note{font-size:13px;color:var(--w55);margin-top:6px}
+
+/* final + handoff */
+.finalstamp{position:absolute;top:88px;left:50%;transform:translateX(-50%);z-index:6;font-family:var(--bebas);font-size:30px;letter-spacing:.28em;color:#fff;background:rgba(11,13,20,.6);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:5px 20px 3px}
+.popup{position:absolute;left:50%;bottom:-16px;transform:translateX(-50%);width:560px;height:300px;z-index:7;border-radius:16px 16px 0 0;overflow:hidden;background:rgba(13,17,36,.98);border:1px solid rgba(255,255,255,.14);border-bottom:none;box-shadow:0 -24px 60px rgba(0,0,0,.6);animation:puRise .6s cubic-bezier(.2,.8,.3,1)}
+@keyframes puRise{0%{transform:translate(-50%,120px);opacity:.4}100%{transform:translate(-50%,0);opacity:1}}
+.pu-banner{position:absolute;inset:0;opacity:.5}
+.pu-badge{position:absolute;top:16px;right:18px;z-index:2;width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--bebas);font-size:22px;color:#0a1f06;background:var(--green)}
+.pu-inner{position:relative;z-index:2;padding:34px 30px}
+.pu-team{font-family:var(--bebas);font-size:44px;letter-spacing:.02em;color:#fff;line-height:.95}
+.pu-score{font-family:var(--bebas);font-size:30px;color:var(--w90);margin-top:8px;letter-spacing:.03em}
+.pu-note{font-family:ui-monospace,Menlo,monospace;font-size:10px;color:var(--w40);margin-top:14px}
+
+/* ── notes cards ── */
+.notecard{position:absolute;background:linear-gradient(160deg,rgba(255,255,255,.03),rgba(255,255,255,.012) 40%,transparent),rgba(14,16,24,.96);border:1px solid rgba(255,255,255,.1);border-radius:20px;padding:34px 40px;box-shadow:0 20px 48px rgba(0,0,0,.45)}
+.notecard h2{font-family:var(--bebas);font-size:38px;letter-spacing:.03em;color:#fff;margin-bottom:4px}
+/* caption link glyph stays orange for contrast on light backdrop */
+.notecard .sub{font-size:14px;color:var(--w55);margin-bottom:24px;max-width:900px;line-height:1.55}
+.ngrid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px 34px}
+.n{border:1px solid rgba(255,255,255,.09);border-radius:13px;padding:18px 20px;background:rgba(255,255,255,.015)}
+.n .k{font-size:11px;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--orange);margin-bottom:9px}
+.n p{font-size:13.5px;line-height:1.62;color:var(--w70)}.n p+p{margin-top:8px}
+.n b{color:var(--w90);font-weight:700}
+.n .swatch{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:middle;margin:0 3px 0 1px}
+.legend{display:flex;flex-wrap:wrap;gap:10px 20px;margin-top:4px}
+.legend .li{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--w70)}
+.recdiag{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.rd-slot{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:10px;color:var(--w40);letter-spacing:.04em}
+.rd-box{width:52px;height:34px;border-radius:8px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.04);display:flex;align-items:center;justify-content:center;font-family:var(--bebas);font-size:15px;color:var(--w70)}
+.rd-box.swap{border-color:var(--green);color:var(--green)}
+.rd-box.bench{border-style:dashed;opacity:.6}
+.rd-arrow{color:var(--w40);font-size:18px}
+/* ── print / paged ── */
+*{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+*{animation-delay:-99s!important;animation-duration:.001s!important;animation-iteration-count:1!important;animation-fill-mode:both!important;animation-play-state:running!important;transition-duration:0s!important}
+doc-page:not(:defined){visibility:hidden}
+.page{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;padding:24px 20px;background:#fff}
+.pagecap{width:1018px;max-width:100%;display:flex;align-items:baseline;gap:12px}
+.pagecap .lk{font-family:var(--bebas);font-size:22px;color:var(--orange);letter-spacing:.06em}
+.pagecap .lt{font-family:var(--bebas);font-size:26px;letter-spacing:.03em;color:#0b0d14;line-height:1;white-space:nowrap}
+.pagecap .ld{font-size:11px;color:rgba(11,13,20,.6);line-height:1.4}
+.scaler{position:relative}
+.scaler .fit{position:absolute;top:0;left:0;transform:scale(0.53);transform-origin:top left}
+</style>
+</head>
+<body>
+<doc-page orientation="landscape" id="doc"></doc-page>
+<script src="doc-page.js"></script>
+<script src="sim-presentation.js"></script>
+<script>
+const T = {
+  away:{ abbr:'AA', name:'Ann Arbor', color:'#9E1B32', rank:18, rec:'15–8' },
+  home:{ abbr:'FC', name:'Four Corners', color:'#1F8A5B', rank:11, rec:'20–4' }
+};
+const AWAY = [
+  {pos:'PG',name:'M. Whitney',jersey:38,rt:78},{pos:'SG',name:'E. Terrell',jersey:13,rt:54},
+  {pos:'SF',name:'C. Conway',jersey:53,rt:84},{pos:'PF',name:"A. O'Brien",jersey:42,rt:89},{pos:'C',name:'L. Gordon',jersey:66,rt:37}
+];
+const HOME = [
+  {pos:'PG',name:'M. Reed',jersey:4,rt:86},{pos:'SG',name:'D. Pratt',jersey:22,rt:33},
+  {pos:'SF',name:'I. Frank',jersey:31,rt:92},{pos:'PF',name:'T. Wu',jersey:45,rt:59},{pos:'C',name:'M. Soto',jersey:55,rt:73}
+];
+// merge base roster with per-state stat line
+const mk = (base, lines) => base.map((b,i)=>Object.assign({fouls:0,pts:0,reb:0,ast:0,def:0}, b, lines[i]));
+
+const STATES = {
+  a:{ phase:'pretip',
+    score:{away:0,home:0,clock:'8:00',quarter:'Q1',shot:24,atol:5,afoul:0,htol:5,hfoul:0},
+    worm:[0],
+    away:mk(AWAY,[{fouls:0},{fouls:0},{fouls:0},{fouls:0},{fouls:0}]),
+    home:mk(HOME,[{fouls:0},{fouls:0},{fouls:0},{fouls:0},{fouls:0}]),
+    ticker:{tag:'TIP',txt:'Ann Arbor @ Four Corners — opening tip, 8:00 Q1'} },
+
+  b:{ phase:'live',
+    score:{away:8,home:11,clock:'5:12',quarter:'Q1',shot:14,atol:5,afoul:2,htol:4,hfoul:1},
+    worm:[0,1,-1,0,1,3,2,3],
+    away:mk(AWAY,[{pts:2,reb:1,ast:2,def:44,fouls:1},{pts:3,reb:0,ast:1,def:52,fouls:0},{pts:3,reb:2,ast:0,def:61,fouls:1},{pts:0,reb:3,ast:0,def:70,fouls:0},{pts:0,reb:1,ast:0,def:58,fouls:0}]),
+    home:mk(HOME,[{pts:4,reb:0,ast:3,def:55,fouls:0},{pts:2,reb:1,ast:0,def:48,fouls:1},{pts:5,reb:1,ast:1,def:66,fouls:0,spot:true},{pts:0,reb:2,ast:0,def:72,fouls:1},{pts:0,reb:3,ast:0,def:68,fouls:0}]),
+    ticker:{tag:'RUN',txt:'Four Corners open on a 7–0 run'} },
+
+  c:{ phase:'live',
+    score:{away:71,home:74,clock:'2:34',quarter:'Q4',shot:17,atol:2,afoul:7,htol:1,hfoul:8},
+    worm:[0,2,4,1,-2,-4,-1,3,6,4,7,3,-1,2,5,6,3],
+    away:mk(AWAY,[{pts:12,reb:3,ast:7,def:46,fouls:3},{pts:9,reb:2,ast:3,def:44,fouls:2},{pts:18,reb:7,ast:2,def:58,fouls:4,hot:true},{pts:24,reb:12,ast:1,def:64,fouls:2,spot:true},{pts:8,reb:9,ast:1,def:55,fouls:3}]),
+    home:mk(HOME,[{pts:16,reb:4,ast:9,def:57,fouls:2},{pts:11,reb:3,ast:2,def:45,fouls:3,cold:true},{pts:21,reb:7,ast:4,def:66,fouls:3,hot:true},{pts:8,reb:9,ast:1,def:64,fouls:5,out:true},{pts:12,reb:13,ast:2,def:84,fouls:4}]),
+    benchAway:[{name:'Q. Vale',pts:5,reb:2}],
+    benchHome:[{name:'R. Ellis',pts:6,reb:3}],
+    ticker:{tag:'HEAT',txt:'I. Frank heat check — 21 and climbing'} },
+
+  d:{ phase:'break', summaryQ:'Q1', summaryAway:18, summaryHome:22, summaryNote:'Top performer — FC · I. Frank, 8 PTS',
+    score:{away:18,home:22,clock:'0:00',quarter:'Q1',shot:0,atol:4,afoul:3,htol:4,hfoul:2},
+    worm:[0,1,3,2,4,2,5,4],
+    away:mk(AWAY,[{pts:4,reb:1,ast:3,def:45,fouls:1},{pts:5,reb:0,ast:1,def:50,fouls:0},{pts:6,reb:2,ast:0,def:60,fouls:1},{pts:3,reb:4,ast:0,def:66,fouls:1},{pts:0,reb:2,ast:0,def:57,fouls:0}]),
+    home:mk(HOME,[{pts:6,reb:1,ast:4,def:56,fouls:0},{pts:4,reb:1,ast:0,def:47,fouls:1},{pts:8,reb:2,ast:1,def:64,fouls:1,spot:true},{pts:2,reb:3,ast:0,def:70,fouls:1},{pts:2,reb:4,ast:0,def:67,fouls:0}]),
+    ticker:{tag:'RUN',txt:'Four Corners close the quarter on a 6–2 run'} },
+
+  e:{ phase:'final', home_won:true, summaryAway:79, summaryHome:83,
+    score:{away:79,home:83,clock:'FINAL',quarter:'',shot:0,atol:0,afoul:12,htol:1,hfoul:14},
+    worm:[0,2,4,1,-2,-3,2,5,3,6,4,7,3,1,4,6,5,4],
+    away:mk(AWAY,[{pts:14,reb:4,ast:8,def:46,fouls:4},{pts:11,reb:3,ast:4,def:45,fouls:3},{pts:20,reb:8,ast:3,def:58,fouls:4},{pts:26,reb:13,ast:1,def:63,fouls:3,spot:true},{pts:8,reb:10,ast:1,def:55,fouls:4}]),
+    home:mk(HOME,[{pts:18,reb:5,ast:11,def:57,fouls:3},{pts:13,reb:4,ast:2,def:45,fouls:4},{pts:23,reb:8,ast:5,def:66,fouls:3,hot:true},{pos:'PF',name:'J. Cross',jersey:34,rt:46,pts:5,reb:3,ast:0,def:60,fouls:2,sub:true},{pts:15,reb:14,ast:3,def:82,fouls:5}]),
+    benchAway:[{name:'Q. Vale',pts:6,reb:3}],
+    benchHome:[{name:'T. Wu',pts:9,reb:9,out:true},{name:'R. Ellis',pts:8,reb:4}],
+    ticker:{tag:'FINAL',txt:'Four Corners hold on — 83–79'} }
+};
+
+const W=1920;
+const doc=document.getElementById('doc');
+const SCALE=0.53;
+function addPage(capHtml, contentHtml){
+  const pg=document.createElement('section'); pg.className='page';
+  pg.innerHTML=`${capHtml?`<div class="pagecap">${capHtml}</div>`:''}<div class="scaler"><div class="fit">${contentHtml}</div></div>`;
+  doc.appendChild(pg);
+  const inner=pg.querySelector('.fit>*'), sc=pg.querySelector('.scaler');
+  const set=()=>{ sc.style.width=(inner.offsetWidth*SCALE)+'px'; sc.style.height=(inner.offsetHeight*SCALE)+'px'; };
+  requestAnimationFrame(set); setTimeout(set,300);
+}
+const cap=(lk,lt,ld)=>`<span class="lk">${lk}</span><span class="lt">${lt}</span><span class="ld">${ld}</span>`;
+const phaseTitle=k=>STATES[k].phase==='pretip'?'ZERO-STATE / PRE-TIP':STATES[k].phase==='break'?'QUARTER BREAK':STATES[k].phase==='final'?'FINAL / HANDOFF':(k==='c'?'LATE-GAME LIVE':'EARLY-GAME LIVE');
+const layout=[
+  {k:'a',lt:'A',ld:'Zero-state / pre-tip — lineups placed on the floor, 0–0, Q1 8:00, empty bars. Doubles as the buffer state: no spinner, ever.'},
+  {k:'b',lt:'B',ld:'Early-game live — bars filling green, worm finding its shape, first scoring-run moment on the ticker, spotlight resting on the early leader.'},
+  {k:'c',lt:'C',ld:'Late-game — maxed (blue) bars, flame + snowflake momentum, a fouled-out player mid-swap, foul-trouble flags, spotlight on the game\u2019s best performer.'},
+  {k:'d',lt:'D',ld:'Quarter break — a 2\u20133s breath. Rows recede; a mini summary reads the score and the quarter\u2019s top performer, then dissolves back to play.'},
+  {k:'e',lt:'E',ld:'Final frame \u2192 handoff — FINAL stamp, the existing game-completion popup rising to take over. Sub occupies the fouled-out slot; bench rail keeps the full night.'}
+];
+layout.forEach(f=>{ addPage(cap(f.lt, phaseTitle(f.k), f.ld), SimPres.frame(STATES[f.k],T)); });
+addPage(cap('↔','1280 × 720 SANITY PASS','Live late-game state at minimum supported resolution — the whole screen scales down; worm, rows, bench and ticker all survive.'), `<div style="width:1280px;height:720px;overflow:hidden;border:1px solid var(--hair)"><div style="width:1920px;height:1080px;transform:scale(.66667);transform-origin:top left">${SimPres.frame(STATES.c,T)}</div></div>`);
+
+// motion note
+const motion=document.createElement('div');
+motion.className='notecard';
+motion.style.width=W+'px';
+motion.innerHTML=`<h2>Motion Note</h2><div class="sub">The engine feeds ~45 frames per quarter (clock · score · cumulative per-player stats); the presentation tweens between them, stretching each quarter across 15\u201330s. Everything below is idle-loop behaviour designed to sit under that tween — nothing competes with the score.</div>
+<div class="ngrid">
+<div class="n"><div class="k">Bar fill</div><p>Each bar eases to its new value over <b>~450ms</b> (<code>cubic-bezier(.2,.7,.2,1)</code>) as frames tween — never a jump. Fill is <b>green</b> the whole way up; on reaching the scale max (PTS 20 · REB 10 · AST 10) it crosses to <b>blue</b> with a soft outer glow — the "he\u2019s gone elite" tell. DEF% is the one threshold bar: <b>blue at \u226580%</b>, green below. Values above scale render as max-fill, true number to the right.</p><div class="legend"><span class="li"><span class="swatch" style="background:#34EC27"></span>filling (green)</span><span class="li"><span class="swatch" style="background:#4A90D9"></span>maxed / elite (blue)</span></div></div>
+<div class="n"><div class="k">Worm draw</div><p>The lead worm draws left-to-right in step with the clock — the leading edge <b>extends one segment per tween</b>, dot pinned to "now" with a faint glow. Above the axis fills the <b>home</b> color, below fills <b>away</b>; the crossover at a lead change is the emotional beat. On a blowout the line rides one band and flattens; a seesaw keeps crossing zero — shape is legible at a glance without reading a number.</p></div>
+<div class="n"><div class="k">Ticker arrival</div><p>Moments are sparse — <b>5\u20138 per game</b>, never play-by-play. A new moment <b>rises 10px and fades in over 500ms</b> as the outgoing one lifts away; the category tag (RUN / HEAT / FOUL / LEAD) flicks color-first. Each moment holds ~4\u20136s. Arrivals are debounced so two events never collide during a fast run.</p></div>
+<div class="n"><div class="k">Spotlight migration</div><p>One soft orange glow + hairline ring marks the <b>current best performer</b> and a "\u25c6 TOP" flag. When the lead changes hands the ring doesn\u2019t cut \u2014 it <b>travels</b>: fades out over ~300ms, the new row scales to 1.02 and the glow fades in. Only ever one at a time, so the eye always has a place to rest.</p></div>
+<div class="n"><div class="k">Quarter break</div><p>Between quarters the rows blur back (<code>blur(3px)</code>, 42% brightness) for a <b>2\u20133s breath</b> while a centered summary states the running score and the quarter\u2019s top line, then dissolves forward into the next quarter\u2019s first frame. The scoreboard above stays live throughout.</p></div>
+<div class="n"><div class="k">Tight finish</div><p>No new components \u2014 the engine simply <b>slows the tween</b> in the final minutes of a close game. Bars inch, the worm crawls near zero, moment cadence tightens. The spotlight ring pulse is the only motion that holds steady, anchoring the tension.</p></div>
+</div>`;
+addPage('', motion.outerHTML);
+
+// rows recommendation
+const rec=document.createElement('div');
+rec.className='notecard';
+rec.style.width=W+'px';
+rec.innerHTML=`<h2>Rows-Per-Team — Recommendation</h2><div class="sub">Starters are five; simmed games rotate benches. Three models were on the table: fixed-five-with-swap, a growing list, or starters + collapsed bench. Recommendation below.</div>
+<div class="ngrid" style="grid-template-columns:1.15fr .85fr">
+<div class="n"><div class="k">Recommended · Fixed five on the floor + bench rail</div><p><b>Five rows per team, always</b> = whoever is currently on the court. This preserves the pre-game cinematic\u2019s five-row DNA exactly, so Act 2 inherits Act 1\u2019s composition with zero reflow — the strongest continuity signal we have.</p><p>When a bench player checks in, their row <b>swaps in place</b>: the outgoing player slides/fades out, the incoming slides up into the same slot (~350ms), tagged <b>IN</b>. No list growth, no layout jump mid-broadcast.</p><p>A thin <b>bench rail</b> under each column keeps everyone\u2019s night visible as condensed chips (name · pts · reb) — nobody who scored disappears.</p></div>
+<div class="n"><div class="k">Foul-out handling</div><p>Foul trouble (<b>4 fouls</b>) flags the at-risk player in yellow while he keeps playing. The fifth foul flashes a red <b>FOULED OUT</b> state on his row (state C), then the row swaps to his replacement; the fouled-out player drops to the bench rail with a red <b>OUT</b> marker (state E).</p><div class="recdiag"><div class="rd-slot"><div class="rd-box">PF</div><span>T. Wu · 5F</span></div><span class="rd-arrow">\u2192</span><div class="rd-slot"><div class="rd-box swap">PF</div><span>J. Cross IN</span></div><span class="rd-arrow" style="margin:0 4px">then</span><div class="rd-slot"><div class="rd-box bench">Wu</div><span>bench · OUT</span></div></div><p style="margin-top:12px">Why not a growing list? It breaks the five-row silhouette and forces the rows to shrink as the roster expands — readability and continuity both suffer. Fixed-five keeps every row full-size for the whole show.</p></div>
+</div>`;
+addPage('', rec.outerHTML);
+</script>
+</body>
+</html>
