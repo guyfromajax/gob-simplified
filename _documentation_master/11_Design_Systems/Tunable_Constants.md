@@ -796,3 +796,21 @@ Cross-ref: **OREB** shared rebound scoring / bounce / OTB / `OREB_REBOUND_SCORE_
 - `HCO_STEP_T_FLOOR` + hard `time_elapsed ≥ 1`: presentation vs true possession dial?
 - Covert AG x_min bands: contest levers vs pure geometry on promotion?
 - **Turn-type inventory complete.** Next work: execute **Promotion Pass** (status board near top of this file) and/or edit already-named dial values.
+
+---
+
+## Sim Game Experience
+
+Playback pacing for the **Sim Full Game / Sim Rest of Game** broadcast overlay (Act 2). All six live at the top of `FrontEnd/static/js/phaser/utils/simGamePresentation.js`. Stat bars, on-court lineups, worm, scoreboard, and spotlight all update **together, once per emitted turn** (one frame = one `turns[]` entry); a quarter is normalized to `QUARTER_MS` regardless of how many turns it contains.
+
+| Constant | File | Value | Affects | Effect |
+|---|---|---|---|---|
+| `QUARTER_MS` | simGamePresentation.js | `18000` | playback | Each quarter stretched across ~18s. Per-turn hold = `QUARTER_MS ÷ turns-in-quarter`, clamped to [`FRAME_MIN_MS`, `FRAME_MAX_MS`]. |
+| `FRAME_MIN_MS` | simGamePresentation.js | `130` | playback | Fastest a single turn can tick (dense-quarter clamp). |
+| `FRAME_MAX_MS` | simGamePresentation.js | `900` | playback | Slowest a single turn can tick (sparse-quarter clamp). |
+| `PRETIP_MS` | simGamePresentation.js | `2200` | playback | Tip-off / pre-tip zero-state hold. |
+| `BREAK_MS` | simGamePresentation.js | `2800` | playback | Quarter-break summary card hold. |
+| `FINAL_MS` | simGamePresentation.js | `2600` | playback | Final hold before handoff to the existing completion popup. |
+| `LINEUP_CHANGE_MS` | simGamePresentation.js | `1000` | playback | Extra hold on a frame where the on-court five changed (foul-out swap / sub) so the swap reads. Overrides the normal per-turn hold on those frames, so a quarter with lineup changes runs slightly over `QUARTER_MS` (≈ `LINEUP_CHANGE_MS − normal per-turn hold` per change). |
+
+**Whole game ≈ ~80–85s** (4 × ~18s + three break cards + tip-off + final). Bars ease via a 0.5s CSS `width` transition between emitted values; reduced-motion fast-forwards (live ~40ms, holds ~400ms).

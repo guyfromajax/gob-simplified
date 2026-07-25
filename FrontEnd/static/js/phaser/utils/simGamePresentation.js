@@ -29,6 +29,7 @@ const FRAME_MAX_MS = 900;
 const PRETIP_MS = 2200;
 const BREAK_MS = 2800;
 const FINAL_MS = 2600;
+const LINEUP_CHANGE_MS = 1000; // extra hold on a frame where the on-court five changed (foul-out swap / sub), so the swap reads
 
 const SIL = `<svg viewBox="0 0 100 100"><circle cx="50" cy="34" r="19" fill="rgba(255,255,255,0.15)"/><path d="M12 100c0-22 17-36 38-36s38 14 38 36" fill="rgba(255,255,255,0.15)"/></svg>`;
 const FLAME = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-1 4.5-2.5 6.5C8 10.7 7 12.4 7 14.5 7 18 9.2 21 12 21s5-3 5-6.5c0-2.4-1.3-4-2.4-5.6.2 1.6-.4 2.7-1.3 3.3.5-2.6-.9-6.4-1.3-10.2z"/></svg>`;
@@ -434,11 +435,14 @@ export function showSimGamePresentation(timeline, opts = {}) {
   frames.forEach((f) => {
     if (f.phase === 'live' && !f.breakSummary) quarterCounts[f.quarter] = (quarterCounts[f.quarter] || 0) + 1;
   });
+  const hasLineupChange = (frame) =>
+    [...(frame.away || []), ...(frame.home || [])].some((p) => p && (p.sub || p.out));
   const holdFor = (frame) => {
     if (prefersReduced) return frame.breakSummary || frame.phase !== 'live' ? 400 : 40;
     if (frame.phase === 'pretip') return PRETIP_MS;
     if (frame.phase === 'final') return FINAL_MS;
     if (frame.breakSummary) return BREAK_MS;
+    if (hasLineupChange(frame)) return LINEUP_CHANGE_MS; // let the foul-out swap / sub read before advancing
     const c = quarterCounts[frame.quarter] || 1;
     return Math.min(FRAME_MAX_MS, Math.max(FRAME_MIN_MS, Math.round(QUARTER_MS / c)));
   };
