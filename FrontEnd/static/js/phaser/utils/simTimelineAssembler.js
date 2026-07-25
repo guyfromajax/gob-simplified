@@ -350,6 +350,8 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
 
   // ── Live frames from the single cumulative stream (final response) ─────
   let curQuarter = openTurn ? (num(openTurn.quarter) || 1) : 1;
+  let lastHomeLineup = null;
+  let lastAwayLineup = null;
   allTurns.forEach((turn, idx) => {
     // Quarter boundary FIRST — reconcile the quarter that just ended BEFORE this
     // turn's deltas land (§4: reconcile at every boundary + final). Otherwise the
@@ -379,8 +381,15 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
 
     applyTurnToScoreboard(turn);
 
-    const homeLineup = turn.home_lineup || {};
-    const awayLineup = turn.away_lineup || {};
+    // Bug 4 fix: helper turns (inbound / rebound / timeout) omit the lineups — carry
+    // forward the last known five so on-court stats hold instead of the bars pulsing
+    // to 0 on those turns.
+    const homeLineup =
+      turn.home_lineup && Object.keys(turn.home_lineup).length ? turn.home_lineup : (lastHomeLineup || {});
+    const awayLineup =
+      turn.away_lineup && Object.keys(turn.away_lineup).length ? turn.away_lineup : (lastAwayLineup || {});
+    lastHomeLineup = homeLineup;
+    lastAwayLineup = awayLineup;
     const homeCourt = onCourtIds(homeLineup);
     const awayCourt = onCourtIds(awayLineup);
     const court = [...homeCourt, ...awayCourt];
