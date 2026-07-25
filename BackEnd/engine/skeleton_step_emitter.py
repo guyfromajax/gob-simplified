@@ -81,15 +81,20 @@ HCO_DRIVE_SFX_FIRE_PROB = 0.5
 HCO_GREAT_STOP_SFX = "duke-great-stop.wav"
 HCO_GREAT_STOP_VOLUME = 0.85
 # Get-open-move reception VO (SFX_System.md) — fired at the CATCH (ball arrival) of a backdoor / flash /
-# jab dish, so exactly ONE plays per COMPLETED action (never when the move is merely performed — a cut
-# that doesn't get fed makes no pass, so no cue). One variant picked per catch by a local seeded RNG
+# jab / post-up dish, so exactly ONE plays per COMPLETED action (never when the move is merely performed —
+# a cut that doesn't get fed makes no pass, so no cue). One variant picked per catch by a local seeded RNG
 # (SS&S-reproducible, no global draw). The move type is tagged on the pass/receive step by the resolver.
+#
+# MUTE (2026-07): while True, catches tagged with these moves play neither move VO nor generic receive.
+# Flip to False to restore VO from the map below (post still needs files wired when re-enabled).
+HCO_GET_OPEN_RECEIVE_SFX_MUTED = True
+HCO_GET_OPEN_RECEIVE_SILENT_MOVES = frozenset({"backdoor", "flash", "jab", "post"})
 HCO_GET_OPEN_RECEIVE_SFX = {
     "backdoor": ("braddock-backdoor.wav", "sammy-backdoor.wav"),
     "flash": ("braddock-flash.wav", "sammy-flash.mp3"),
     "jab": ("braddock-jab.wav", "sammy-jab.mp3"),
     # POST UP: audio not created yet. Add braddock-post.wav + sammy-post.mp3 to FrontEnd/static/sounds/
-    # then re-add the key below → post-up catches get their VO (dispatch already tags them "post"):
+    # then re-add the key below → post-up catches get their VO when unmuted (dispatch already tags "post"):
     #   "post": ("braddock-post.wav", "sammy-post.mp3"),
 }
 HCO_GET_OPEN_RECEIVE_VOLUME = 0.8
@@ -2097,20 +2102,24 @@ def build_skeleton_animation_steps(
                 # Backend resolves the tier from attributes; FE just plays.
                 step["start"]["sfx_on_ball_release"] = pass_release_sfx(passer_player)
                 step["start"]["sfx_on_ball_arrival"] = pass_arrival_sfx(receiver_player)
-                # Get-open-move reception VO: on a backdoor / flash / jab dish, the receiver's catch VO
-                # REPLACES the generic reception sound — fired only here (ball arrival = the catch), so one
-                # cue per completed action. Move type tagged on the pass/receive step by the resolver;
-                # variant chosen by a local seeded RNG (never touches the global stream — cosmetic).
+                # Get-open-move reception VO: on a backdoor / flash / jab / post dish, the receiver's
+                # catch VO REPLACES the generic reception sound — fired only here (ball arrival = the
+                # catch). Move type tagged on the pass/receive step by the resolver; variant chosen by
+                # a local seeded RNG (never touches the global stream — cosmetic).
+                # While HCO_GET_OPEN_RECEIVE_SFX_MUTED: silent catch (no VO, no generic receive).
                 _gom = (skeleton_steps[i] or {}).get("_get_open_move") if i < len(skeleton_steps) else None
-                _gom_files = HCO_GET_OPEN_RECEIVE_SFX.get(_gom) if _gom else None
-                if _gom_files:
-                    import zlib as _zlib
-                    _gseed = _zlib.crc32(
-                        f"{receiver_id_mp}|{i}|{step.get('timestamp', 0)}|{_gom}".encode())
-                    step["start"]["sfx_on_ball_arrival"] = {
-                        "file": _gom_files[_gseed % len(_gom_files)],
-                        "event": f"get_open_{_gom}", "volume": HCO_GET_OPEN_RECEIVE_VOLUME,
-                    }
+                if _gom and HCO_GET_OPEN_RECEIVE_SFX_MUTED and _gom in HCO_GET_OPEN_RECEIVE_SILENT_MOVES:
+                    step["start"].pop("sfx_on_ball_arrival", None)
+                else:
+                    _gom_files = HCO_GET_OPEN_RECEIVE_SFX.get(_gom) if _gom else None
+                    if _gom_files:
+                        import zlib as _zlib
+                        _gseed = _zlib.crc32(
+                            f"{receiver_id_mp}|{i}|{step.get('timestamp', 0)}|{_gom}".encode())
+                        step["start"]["sfx_on_ball_arrival"] = {
+                            "file": _gom_files[_gseed % len(_gom_files)],
+                            "event": f"get_open_{_gom}", "volume": HCO_GET_OPEN_RECEIVE_VOLUME,
+                        }
         # Dynamic HCO Motion hot-read VO: the resolver flags the initiation skeleton step with
         # ``_hot_read_sfx``. Fire it at step-processing start (not ball motion) so it doesn't
         # collide with the shot/pass launch sound. See SFX_System.md.

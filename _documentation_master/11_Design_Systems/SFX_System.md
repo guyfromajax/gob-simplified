@@ -44,13 +44,14 @@ Single source of truth for in-game sound: bindings, triggers, variant rules, run
 
 ### HCO get-open-move reception VO (S3 Goal 2)
 
-- **Status:** ✅ live for **backdoor** (2026-07-14); **flash** / **jab** wired but dormant until those moves ship.
-- **Trigger:** the **catch** — a player *receives* the pass off a get-open move. Fired via `sfx_on_ball_arrival` on the pass/receive step, so it lands exactly at the ball's arrival, **once per completed action**. Deliberately NOT fired when the move is merely performed (a cut that doesn't get fed makes no pass → no cue), which avoids many players' cues sounding at once.
+- **Status:** **muted** (2026-07-25). `HCO_GET_OPEN_RECEIVE_SFX_MUTED = True` in `skeleton_step_emitter.py`. Catches tagged `backdoor` / `flash` / `jab` / `post` play **nothing** on ball arrival (no move VO and no generic receive). File map retained for re-enable — flip the mute flag to `False` (post still needs audio files wired when unmuted).
+- **Trigger (when unmuted):** the **catch** — a player *receives* the pass off a get-open / altered-action move. Fired via `sfx_on_ball_arrival` on the pass/receive step, so it lands exactly at the ball's arrival, **once per completed action**. Deliberately NOT fired when the move is merely performed (a cut that doesn't get fed makes no pass → no cue), which avoids many players' cues sounding at once.
 - **Files** (`HCO_GET_OPEN_RECEIVE_SFX`, vol `HCO_GET_OPEN_RECEIVE_VOLUME = 0.8`), 50/50 per catch by a **local seeded RNG** (SS&S-reproducible; no global-stream draw):
   - backdoor → `braddock-backdoor.wav` / `sammy-backdoor.wav`
   - flash → `braddock-flash.wav` / `sammy-flash.mp3`
   - jab → `braddock-jab.wav` / `sammy-jab.mp3`
-- **Path:** the resolver tags the pass/receive step with `_get_open_move` (`_execute_motion_decision`, from the decision's `get_open_move`); the emitter reads that tag and **replaces** the generic reception sound with the move VO. To add flash/jab: set `get_open_move` on their dish decision — no emitter change needed.
+  - post → *(not wired yet — add `braddock-post.wav` / `sammy-post.mp3` when unmuted)*
+- **Path:** the resolver tags the pass/receive step with `_get_open_move` (`_execute_motion_decision`, from the decision's `get_open_move`); the emitter reads that tag. Unmuted: **replaces** the generic reception sound with the move VO. Muted: **clears** `sfx_on_ball_arrival` for `HCO_GET_OPEN_RECEIVE_SILENT_MOVES`.
 
 ## Backend Terms
 
