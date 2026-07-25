@@ -200,7 +200,6 @@ function buildSkeleton(teams) {
       </div>
       <div class="pretip-lbl">STARTING LINEUPS · TIP-OFF</div>
       <div class="rows">${rows}</div>
-      <div class="bench-wrap"><div class="bench away"></div><div class="bench home"></div></div>
       <div class="ticker"></div>
       <div class="breakcard">
         <div class="bc-eyebrow">QUARTER BREAK</div>
@@ -368,8 +367,6 @@ export function showSimGamePresentation(timeline, opts = {}) {
   const overlay = root.querySelector('.overlay');
   const wormHost = root.querySelector('.worm-host');
   const wlTeam = root.querySelector('.wl-team');
-  const benchAwayEl = root.querySelector('.bench.away');
-  const benchHomeEl = root.querySelector('.bench.home');
 
   const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
   const updateScoreboard = (frame) => {
@@ -407,10 +404,6 @@ export function showSimGamePresentation(timeline, opts = {}) {
       updatePlayerRow(pair.querySelector('.prow.away'), frame.away[i], 'away', teams.away.color);
       updatePlayerRow(pair.querySelector('.prow.home'), frame.home[i], 'home', teams.home.color);
     });
-
-    // Bench rails.
-    benchAwayEl.innerHTML = benchHtml(frame.benchAway);
-    benchHomeEl.innerHTML = benchHtml(frame.benchHome);
 
     // Phase flags.
     root.classList.toggle('is-pretip', frame.phase === 'pretip');

@@ -6073,7 +6073,7 @@ try:
     
     
     @app.get("/api/game/{game_id}/lineup-for-matchups")
-    def get_lineup_for_matchups(game_id: str):
+    def get_lineup_for_matchups(game_id: str, prefer_opening: bool = False):
         """
         Get lineup data for both teams with player stats and attributes for the matchups popup
         and franchise Q1 pre-game experience.
@@ -6168,8 +6168,28 @@ try:
             except (TypeError, ValueError):
                 return 0
 
+        # Sim Full Game reveal: resolve the OPENING five (immutable tip-off snapshot =
+        # the lineup the user set), not the current (post-Q1) lineup. Gated by
+        # ?prefer_opening=1 so the Play-Quarter pre-game (default) is unchanged.
+        _opening = gm.game_state.get("opening_lineup") if prefer_opening else None
+        _POS_ORDER = ["PG", "SG", "SF", "PF", "C"]
+
+        def _player_by_id(team, pid):
+            for p in team.get_all_players():
+                if str(getattr(p, "player_id", "")) == str(pid):
+                    return p
+            return None
+
         def build_player_data(team, position: str):
-            player = team.lineup.get(position)
+            player = None
+            if _opening:
+                ids = _opening.get(str(getattr(team, "team_id", "")))
+                if ids and position in _POS_ORDER:
+                    idx = _POS_ORDER.index(position)
+                    if idx < len(ids):
+                        player = _player_by_id(team, ids[idx])
+            if not player:
+                player = team.lineup.get(position)
             if not player:
                 return None
 

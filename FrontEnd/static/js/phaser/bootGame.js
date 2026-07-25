@@ -2824,7 +2824,9 @@ async function handleSimFullGame() {
     act1CoverPromise = (async () => {
       try {
         const res = await fetch(
-          API_CONFIG.buildUrl(`/api/game/${gid}/lineup-for-matchups`),
+          // prefer_opening=1 → the endpoint returns the immutable tip-off five (the
+          // lineup you set), not the current post-Q1 lineup.
+          API_CONFIG.buildUrl(`/api/game/${gid}/lineup-for-matchups?prefer_opening=1`),
           { headers: { 'Content-Type': 'application/json' } }
         );
         if (!res.ok) return;
