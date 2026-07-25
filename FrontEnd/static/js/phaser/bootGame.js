@@ -9,6 +9,10 @@ import { generateBothLineupsFromApi } from './utils/autosetLineupApi.js';
 import { getOrStartFranchiseStartCpuSims } from './utils/franchiseStartCpuSimsClient.js';
 import { preloadGameSfx } from './utils/gameSfx.js';
 import { getGameMode } from '../shared/getGameMode.js';
+import { buildSimTimeline } from './utils/simTimelineAssembler.js';
+import { showSimGamePresentation } from './utils/simGamePresentation.js';
+import { showPreGameExperience } from './utils/preGameExperience.js';
+import { normalizeMatchupsPayload } from './utils/matchupsUiShared.js';
 import {
   COURT_BOOT_MODES,
   classifyCourtBootMode,
@@ -2803,10 +2807,34 @@ async function handleSimFullGame() {
     console.error('Error fetching rosters for auto-set:', err);
   }
 
+  // Act 1 cover (§6): Sim Full Game plays the pre-game cinematic (display-only,
+  // no drag/submit) while quarters sim in the background; Sim Rest of Game skips it.
+  // Fully guarded — any failure degrades to straight-to-Act-2. scene=null is safe
+  // (audio bed uses createAudio; reveal SFX guard a null scene).
+  let act1CoverPromise = Promise.resolve();
+  const isSimFullGame = Math.max(0, quarter) < 2;
+  if (isSimFullGame && gameId) {
+    act1CoverPromise = (async () => {
+      try {
+        const res = await fetch(
+          API_CONFIG.buildUrl(`/api/game/${gameId}/lineup-for-matchups`),
+          { headers: { 'Content-Type': 'application/json' } }
+        );
+        if (!res.ok) return;
+        const normalized = normalizeMatchupsPayload(await res.json());
+        await showPreGameExperience(gameId, null, normalized, { displayOnly: true });
+      } catch (coverErr) {
+        console.warn('⚠️ [SIM-PRES] Act 1 cover skipped:', coverErr);
+        document.querySelectorAll('.pgxp-root').forEach((n) => n.remove());
+      }
+    })();
+  }
+
   try {
     let currentQ = quarter;
     let gId = gameId;
     let lastSummary;
+    const quarterSummaries = []; // each quarter's response — Act 2 timeline source (already-received data only)
     const bulkAdvanceMethod = Math.max(0, quarter) >= 2 ? 'sim_rest_of_game' : 'sim_full_game';
     while (true) {
       // ✅ Show "Simulating Q1", "Simulating Q2", etc. for Sim Full Game / Sim Rest of Game
@@ -2910,6 +2938,7 @@ async function handleSimFullGame() {
         throw new Error(`Q${currentQ} simulation failed: ${errorDetail}`);
       }
       lastSummary = await res.json();
+      quarterSummaries.push(lastSummary); // collect per-quarter responses for Act 2 (no extra requests)
       // Ensure game_id is a string (backend might return ObjectId)
       gId = lastSummary.game_id ? String(lastSummary.game_id) : lastSummary.game_id;
       console.log('🎮 Quarter simulation response:', {
@@ -2954,6 +2983,28 @@ async function handleSimFullGame() {
       score: lastSummary.score,
       isFinal: lastSummary.is_final
     });
+
+    // ── Act 2: Sim Game Presentation ──────────────────────────────────────
+    // Wait for the Act 1 cover to finish its cinematic, then play the simmed game
+    // back as a broadcast, then hand off to the existing completion popup. Consumes
+    // ONLY the per-quarter responses already received (no extra requests, no payload
+    // changes). Fully guarded: any failure skips straight to the completion popup.
+    try {
+      await act1CoverPromise;
+    } catch (e) { /* cover is self-guarded */ }
+    try {
+      const timeline = buildSimTimeline(quarterSummaries, {
+        homeRoster,
+        awayRoster,
+        homeTeamName: homeTeam,
+        awayTeamName: awayTeam,
+      });
+      await showSimGamePresentation(timeline, {
+        mount: document.getElementById('phaser-container') || undefined,
+      });
+    } catch (presErr) {
+      console.error('⚠️ [SIM-PRES] Presentation failed; continuing to completion popup:', presErr);
+    }
 
     // ✅ SS&S: Use shared game completion handler (same as handleSimQuarter)
     await handleGameCompletion({

@@ -252,10 +252,17 @@ function recordsStripHtml(awayTeam, homeTeam) {
     </div>`;
 }
 
-export function showPreGameExperience(gameId, scene, normalized) {
+export function showPreGameExperience(gameId, scene, normalized, options = {}) {
   ensureStyles();
   const existing = document.querySelector(".pgxp-root");
   if (existing) existing.remove();
+
+  // Display-only mode (Sim Full Game cover, §6): play the reveal cinematic and
+  // tip-off veil, but SKIP the interactive matchups phase entirely — no drag, no
+  // CTA, no save. "Sim" opts out of setting matchups. The interactive Q1 flow is
+  // unchanged when this flag is absent.
+  const displayOnly = !!(options && options.displayOnly);
+  let _resolve = null;
 
   const { userTeamSide, homeTeam, awayTeam, currentMatchups, franchiseWeek } = normalized;
   const homePrimary = homeTeam.primary_color || "#1F8A5B";
@@ -430,7 +437,20 @@ export function showPreGameExperience(gameId, scene, normalized) {
       p.classList.add("in");
       p.classList.remove("spot");
     });
-    timers.push(setTimeout(toMatchups, 600));
+    timers.push(setTimeout(displayOnly ? finishDisplay : toMatchups, 600));
+  }
+
+  // Display-only tip-off: veil + dissolve + resolve, no matchups save.
+  function finishDisplay() {
+    clearTimers();
+    root.dataset.phase = "tipoff";
+    timers.push(
+      setTimeout(() => {
+        root.classList.add("dissolved");
+        fadeOutPregameBed(PREGAME_BED_FADE_MS);
+        timers.push(setTimeout(() => finishAndResolve(_resolve), 450));
+      }, 1400)
+    );
   }
 
   function toMatchups() {
@@ -476,6 +496,7 @@ export function showPreGameExperience(gameId, scene, normalized) {
   }
 
   return new Promise((resolve) => {
+    _resolve = resolve;
     startPregameBed(scene, {
       week: franchiseWeek ?? normalized.franchiseWeek ?? 1,
       userNatlRank,

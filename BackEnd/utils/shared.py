@@ -2460,6 +2460,25 @@ def summarize_game_state(
     if not exclude_animations and game.turns:
         _collect_player_ids(game.turns, referenced_ids)
 
+    # Sim Game Presentation (Chunk 0): the roster RT badge needs each player's
+    # overall rating. The court/game payload otherwise omits it, so surface it here
+    # using the SAME _player_rt_max helper the blowout-lineup logic uses — the
+    # "max across position ratings" definition stays in one place. Additive display
+    # field only; no sim logic, no per-turn payload growth.
+    try:
+        from BackEnd.utils.db_utils import _player_rt_max as _rt_max_fn
+    except Exception:  # pragma: no cover - defensive import guard
+        _rt_max_fn = None
+
+    def _display_rt(p):
+        if _rt_max_fn is None:
+            return None
+        try:
+            v = _rt_max_fn(p)
+            return int(v) if v and v > 0 else None
+        except Exception:
+            return None
+
     players = []
     for team_key, team_obj in [("home", game.home_team), ("away", game.away_team)]:
         # ✅ SS&S FIX: Save ALL players (lineup + bench) to preserve real-time NG values for all players
@@ -2472,7 +2491,7 @@ def summarize_game_state(
                 if lineup_player.player_id == player.player_id:
                     pos = lineup_pos
                     break
-            
+
             coords = getattr(player, "coords", None) or {"x": 0, "y": 0}
             players.append({
                 "playerId": player.player_id,
@@ -2480,6 +2499,7 @@ def summarize_game_state(
                 "team": team_key,
                 "team_id": team_obj.team_id,
                 "pos": pos,  # None for bench players
+                "rt": _display_rt(player),  # Chunk 0: roster RT (max slot rating) for the presentation badge
                 "jersey": player.jersey,
                 "height": getattr(player, "height", None),  # Integer inches; used by v2 player sprite (height-linked headshot radius)
                 "photo": getattr(player, "photo", None),  # Player headshot image

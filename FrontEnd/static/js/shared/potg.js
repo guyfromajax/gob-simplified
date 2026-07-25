@@ -130,7 +130,7 @@ function buildCandidates(gameData, scoreOverride = null) {
   return { candidates: Array.from(map.values()), teamCtx };
 }
 
-function calculatePotgPoints(player) {
+export function calculatePotgPoints(player) {
   const stats = player.stats || {};
   const pts = toNumber(stats.PTS);
   const ast = toNumber(stats.AST);
