@@ -30,7 +30,7 @@ Sim Quarter / Sim Full Game never open matchups UI (unchanged gate: `shouldShowM
 4. Phases:
    - **Reveal** — “Tale of the Tape”; rows land PG→C (~820ms apart) with `click-beep`
    - **Matchups** — reveal automatically settles into the interactive board; drag user defenders; CTA is **Submit & Tip Off**
-   - **Tip Off** — veil ~1.9s, then dissolve; pregame bed stops; promise resolves → tip-off / Q1 animation
+   - **Tip Off** — veil ~1.9s, then dissolve; pregame bed **fades out over 6s** (non-blocking under early gameplay); promise resolves → tip-off / Q1 animation
 5. Later Play Quarter entries use the **in-game modal** only (same cards, game stats, Strategic Modal box)
 
 ---
@@ -107,7 +107,7 @@ Regular season = franchise weeks **1–26**. Bed selection (`resolvePregameBedFi
 | Reveal clicks | `click-beep.wav` | Each reveal row land (×5), plus the **Submit & Tip Off** CTA reveal |
 | In-game modal open | `defense-sammy.mp3` | In-game modal only (first time per game); **not** during pre-game |
 
-Bed starts with the cinematic and **stops** when the Tip Off veil dissolves. It must not play during mid-game modals.
+Bed starts with the cinematic and **fades out over 6s** (`PREGAME_BED_FADE_MS` / `fadeOutPregameBed` in `gameSfx.js`) when the Tip Off veil dissolves — tip-off / Q1 proceed immediately while the bed fades under the court. It must not play during mid-game modals.
 
 Sounds live under `FrontEnd/static/sounds/` (gitignored; track via Git LFS when adding new files).
 
@@ -118,7 +118,7 @@ Sounds live under `FrontEnd/static/sounds/` (gitignored; track via Git LFS when 
 - `FrontEnd/static/js/phaser/utils/defenseMatchupsPopup.js` — entry, franchise Q1 gate, in-game modal
 - `FrontEnd/static/js/phaser/utils/preGameExperience.js` — cinematic phases
 - `FrontEnd/static/js/phaser/utils/matchupsUiShared.js` — tiles, order↔matchups, save helper
-- `FrontEnd/static/js/phaser/utils/gameSfx.js` — `startPregameBed` / `stopPregameBed` / `playPregameRevealClick`
+- `FrontEnd/static/js/phaser/utils/gameSfx.js` — `startPregameBed` / `fadeOutPregameBed` / `stopPregameBed` / `playPregameRevealClick`
 - `FrontEnd/static/js/phaser/gameScene.js` — passes `{ isQ1Start }` into the popup await
 
 ---
@@ -130,6 +130,6 @@ Sounds live under `FrontEnd/static/sounds/` (gitignored; track via Git LFS when 
 - Pre-game season stats from FPD; in-game modal uses live game stats
 - Reveal auto-settles into the matchups board; there is no Skip Intro button or second “set matchups” click
 - Don’t Show Again uses the sessionStorage key above
-- Pregame bed + click-beep on franchise Q1 only; bed stops at tip-off
+- Pregame bed + click-beep on franchise Q1 only; bed fades 6s from tip-off dissolve
 - Tutorial skips; single-game never gets the cinematic
 - Mid-game modal matches Defense Matchups in-game mock footprint (~1000px Strategic Modal)

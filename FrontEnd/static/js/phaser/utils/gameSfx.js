@@ -72,8 +72,17 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "click-beep.wav",
 ]);
 
-/** Long-form pre-game bed (not pooled — one instance, stopped at tip-off). */
+/** Long-form pre-game bed (not pooled — one instance, faded out at tip-off). */
 let pregameBedAudio = null;
+let pregameBedFadeRaf = null;
+/** Tip-off dissolve → silence (ms). Fade continues under early gameplay; does not block tip-off. */
+export const PREGAME_BED_FADE_MS = 6000;
+
+function cancelPregameBedFade() {
+  if (pregameBedFadeRaf == null) return;
+  cancelAnimationFrame(pregameBedFadeRaf);
+  pregameBedFadeRaf = null;
+}
 
 // Heavy rattle fires 8 hops at 40 ms each — needs a big enough pool to hold
 // overlapping plays without truncating earlier ones.
@@ -804,8 +813,11 @@ export function startPregameBed(scene, options = {}) {
   }
 }
 
-/** Stop the franchise pre-game bed (tip-off / dissolve). */
+/**
+ * Hard-stop the franchise pre-game bed (cleanup / restart). Cancels any in-flight fade.
+ */
 export function stopPregameBed() {
+  cancelPregameBedFade();
   if (!pregameBedAudio) return;
   try {
     pregameBedAudio.pause();
@@ -814,6 +826,49 @@ export function stopPregameBed() {
     // ignore
   }
   pregameBedAudio = null;
+}
+
+/**
+ * Linear volume fade of the pre-game bed, then pause/clear.
+ * Non-blocking — tip-off / Q1 can proceed while the bed fades under the court.
+ */
+export function fadeOutPregameBed(durationMs = PREGAME_BED_FADE_MS) {
+  const audio = pregameBedAudio;
+  if (!audio) return;
+  cancelPregameBedFade();
+  const startVol = Number(audio.volume) || 0;
+  if (startVol <= 0 || !(durationMs > 0)) {
+    stopPregameBed();
+    return;
+  }
+  const startTs = performance.now();
+  debugSfx("pregame_bed_fade_start", { durationMs, startVol });
+  const tick = (now) => {
+    if (pregameBedAudio !== audio) {
+      pregameBedFadeRaf = null;
+      return;
+    }
+    const t = Math.min(1, (now - startTs) / durationMs);
+    try {
+      audio.volume = startVol * (1 - t);
+    } catch (_err) {
+      // ignore
+    }
+    if (t < 1) {
+      pregameBedFadeRaf = requestAnimationFrame(tick);
+      return;
+    }
+    pregameBedFadeRaf = null;
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+    } catch (_err) {
+      // ignore
+    }
+    if (pregameBedAudio === audio) pregameBedAudio = null;
+    debugSfx("pregame_bed_fade_done", { durationMs });
+  };
+  pregameBedFadeRaf = requestAnimationFrame(tick);
 }
 
 /** Click as each starting-five reveal row lands (franchise Q1 cinematic). */

@@ -4,7 +4,8 @@
 
 import {
   startPregameBed,
-  stopPregameBed,
+  fadeOutPregameBed,
+  PREGAME_BED_FADE_MS,
   playPregameRevealClick,
 } from "./gameSfx.js";
 import {
@@ -466,7 +467,8 @@ export function showPreGameExperience(gameId, scene, normalized) {
         timers.push(
           setTimeout(() => {
             root.classList.add("dissolved");
-            stopPregameBed();
+            // 6s linear fade under the court reveal / tip-off — do not block resolve.
+            fadeOutPregameBed(PREGAME_BED_FADE_MS);
             timers.push(setTimeout(() => finishAndResolve(resolve), 450));
           }, 1900)
         );
