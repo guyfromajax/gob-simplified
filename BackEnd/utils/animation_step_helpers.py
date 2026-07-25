@@ -637,6 +637,19 @@ def dunk_make_sfx() -> Dict[str, Any]:
     }
 
 
+def dunk_miss_sfx() -> Dict[str, Any]:
+    """Primary arrival SFX for a missed dunk at rim contact.
+
+    Stamped only when the resolved dunk micro beat carries ``dunk_miss: true``.
+    The FE plays it at the same slam timing as a made dunk's arrival cue.
+    """
+    return {
+        "file": "missed-dunk.wav",
+        "volume": _SFX_DEFAULT_VOLUME,
+        "event": "shot_result_miss_dunk",
+    }
+
+
 def shot_followup_timed_sfx(
     shot_variant: Optional[str],
     result_type: str,

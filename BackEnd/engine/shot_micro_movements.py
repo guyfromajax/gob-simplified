@@ -69,6 +69,7 @@ from BackEnd.utils.animation_step_helpers import (
     _motion_end_toward_dest,
     _player_lookup_by_id,
     dunk_make_sfx,
+    dunk_miss_sfx,
     shot_result_sfx,
     stamp_tween_durations,
 )
@@ -1385,6 +1386,8 @@ def build_shot_micro_steps(
                 dunk_arrival_sfx = dunk_make_sfx()
             else:
                 dunk_ball_end = {"owner_player_id": str(shooter_id)}
+                if result_upper == "MISS" and dunk_miss:
+                    dunk_arrival_sfx = dunk_miss_sfx()
 
         if defender_id and defender_behavior and defender_id in current_coords:
             pump_dir = None

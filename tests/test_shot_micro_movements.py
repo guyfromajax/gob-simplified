@@ -573,6 +573,7 @@ class TestDunkMicroMovement:
         meta = steps[-1]["start"]["advance_trigger"]["metadata"]
         assert meta["yield_before_slam"] is True
         assert steps[-1]["end"]["ball"] == {"owner_player_id": "s1"}
+        assert "sfx_on_ball_arrival" not in steps[-1]["start"]
 
     def test_dunk_make_skips_ball_flight_in_post_shot(self):
         from BackEnd.engine.skeleton_step_emitter import _build_post_shot_sub_steps
@@ -872,6 +873,11 @@ class TestDunkSelection:
         meta = steps[-1]["start"]["advance_trigger"]["metadata"]
         assert meta["dunk_miss"] is True
         assert meta["yield_before_slam"] is False
+        assert steps[-1]["start"]["sfx_on_ball_arrival"] == {
+            "file": "missed-dunk.wav",
+            "volume": 0.7,
+            "event": "shot_result_miss_dunk",
+        }
 
         shoot_step = steps[-1]
         turn = {

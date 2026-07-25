@@ -232,6 +232,7 @@ Net result: **one dispatch point per tier** (`window.showAnnouncementOverlay` an
 - File: **33/33/34** random each show — `braddock-dunk.mp3` or `duke-dunk.mp3` or `sammy-dunk.mp3`
 - Resolver: `resolveDunkMakeSfxFile()` (gameSfx.js). `meta.sfx` key: `"dunk_make"` (passed on the "Dunk!" announce payload).
 - **Slam SFX (separate layer):** `dunk-sfx.wav` fires at the dunk slam via schema `sfx_on_ball_arrival` on the terminal dunk micro beat (`dunk_make_sfx()` → `shot_micro_movements.py`; FE: `dunkPlayback.js` at the slam). Same stamping/playback path as `swish.wav` on a clean make — distinct from the announce VO above.
+- **Missed-dunk contact SFX:** `missed-dunk.wav` fires at the same slam/rim-contact moment only when the backend stamps `dunk_miss: true` (`dunk_miss_sfx()` → `sfx_on_ball_arrival`). It replaces the silence on the missed-dunk animation; it does not play the made-dunk announce VO and does not apply to normal missed inside/attack shots or blocked dunk attempts.
 
 **Airball Announce**
 
@@ -409,7 +410,7 @@ When two filenames are listed for a slot (e.g. `bb-clank.wav` / `bb-clank-2.wav`
 | Heavy Rattle | `rattle-leather.wav` × 8 hops, then `swish.wav` follow-up | HEAVY RATTLE → make resolve | `rattle-leather.wav` × 8 hops | HEAVY RATTLE → miss resolve |
 | Bank Off Backboard | `bb-rim-swish.wav`, then `swish.wav` 100 ms later | BACKBOARD-MAKE | `bb-clank.wav` / `bb-clank-2.wav` (50/50) | BACKBOARD-MISS |
 | Airball | — | — | `airball.wav` | AIRBALL → OOB (no rebound, → BIP) |
-| Dunk (make) | `dunk-sfx.wav` | dunk micro slam → MSSS | — | — |
+| Dunk | `dunk-sfx.wav` | dunk micro slam → MSSS | `missed-dunk.wav` | full dunk slam → normal miss bounce |
 
 **SFX timing notes**
 
@@ -418,6 +419,7 @@ When two filenames are listed for a slot (e.g. `bb-clank.wav` / `bb-clank-2.wav`
 - **BANK_MAKE follow-up**: net layer 100 ms after `bb-rim-swish.wav` — `swish.wav` (FG) or `free-throw-swish.wav` (FT). Knob: `BANK_MAKE_SWISH_DELAY_MS` in `gameSfx.js`.
 - **All other variants**: SFX fires at ball-flight `onComplete` (the moment the ball lands at its variant-specific flight target).
 - **Made dunk**: `dunk-sfx.wav` fires at the slam (`p ≥ 0.5` in `dunkPlayback.js`) via `sfx_on_ball_arrival` on the terminal dunk micro beat — not on the skipped `[ball_flight]` sub-step. Announce VO (`dunk_make`) is a separate layer at the following `[hold]` step.
+- **Missed dunk**: `missed-dunk.wav` fires at the same slam threshold via backend-stamped `sfx_on_ball_arrival`; the following bounce step retains its existing animation and does not replay the cue. Blocked dunk attempts yield before the slam and carry no dunk-arrival SFX.
 
 ---
 

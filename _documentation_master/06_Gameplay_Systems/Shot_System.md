@@ -434,7 +434,7 @@ Only when `dunk_in_play`. `roll = random.randint(1, 100)` vs `DUNK_HEIGHT_SCALE[
 
 | Roll | Outcome |
 |------|---------|
-| `roll == scale + 1` | **Missed dunk** — `dunk_miss: true`, forces `result_type: MISS`, full dunk animation through slam, then normal miss bounce (no hold) |
+| `roll == scale + 1` | **Missed dunk** — `dunk_miss: true`, forces `result_type: MISS`, full dunk animation through slam with `missed-dunk.wav` at rim contact, then normal miss bounce (no hold) |
 | `roll ≤ scale` and **MAKE** | **Made dunk** — family `dunk` or `drive_dunk`, skip `[ball_flight]` → `[hold]` with **Dunk!** announce + random dunk VO (`meta.sfx: "dunk_make"`) + `dunk-sfx.wav` at slam (`sfx_on_ball_arrival`); shooter **+MO_DUNK_DELTA** (Player Momentum System) |
 | `roll ≤ scale` and **BLOCK** | **Blocked dunk attempt** — same family, `yield_before_slam: true` (rise only), then existing block `[ball_flight]` |
 | `roll ≤ scale` and normal **MISS** | No dunk animation — fall through to normal micro pool |
@@ -470,6 +470,7 @@ When `contest_result == offense_win` (margin ≥ 150), block attempt is gated of
 ### Key files
 
 - `BackEnd/engine/shot_micro_movements.py`: `resolve_dunk_micro_stamp()`, `select_and_stamp_shot_micro()` dunk kwargs
+- `BackEnd/utils/animation_step_helpers.py`: made/missed dunk arrival-SFX payloads
 - `BackEnd/constants/shot_micro_movements_constants.py`: dunk selection thresholds + height scale
 - `BackEnd/engine/skeleton_step_emitter.py`: `_build_post_shot_sub_steps()` MAKE dunk hold skip; MISS dunk bounce wiring
 - `FrontEnd/static/js/phaser/animation/dunkPlayback.js`: `yield_before_slam` vs full slam

@@ -94,7 +94,6 @@ All **field-goal shot attempts** that emit schema `animation_steps[]` and resolv
 | **Free throws** | Separate emitter; no micro chain |
 | **CHARGE** early return | Nullified shot attempt — no micro (Block policy B3) |
 | **Blocking foul** early return (attack charge path) | Nullified shot attempt — no micro (B3) |
-| **Dunks** | Flourish kind registered in schema; **no auto-selection** in v1 |
 | **Legacy `animations[]` path** | No `animation_steps[]` → hook is a no-op |
 | **Static legacy HCT** (`hct_step_emitter` via old phase resolution) | Not wired unless turn uses dynamic schema emitters |
 
@@ -543,13 +542,29 @@ Tunable in `shot_micro_movements_constants.py` — see §15. Logic in `BackEnd/u
 
 **Wired emitters:** HCO skeleton, Dynamic HCT, after-steal FB, Rim Runner, Covert Release, OREB putback (each calls `inject_shot_micro_before_post_shot` + shared `[ball_flight]` builders).
 
+### 17.3 Dunk result SFX
+
+Dunk families use the terminal dunk micro beat instead of a normal
+`[ball_flight]` arrival:
+
+| Outcome | Backend stamp | Playback |
+|---------|---------------|----------|
+| Made dunk | `dunk_make_sfx()` → `dunk-sfx.wav` | Slam/rim-contact moment in `dunkPlayback.js` |
+| Missed dunk (`dunk_miss: true`) | `dunk_miss_sfx()` → `missed-dunk.wav` | Same slam/rim-contact moment, once, before the normal miss bounce |
+| Blocked dunk | No dunk-arrival SFX | Playback yields before the slam; existing block path continues |
+
+The backend selects and stamps the cue through `sfx_on_ball_arrival`; the
+frontend does not infer make/miss from animation or coordinates. Ordinary
+missed inside/attack shots that did not select a dunk family continue through
+the existing shot-variant SFX logic.
+
 ---
 
 ## 18. v1 Limitations and Future Work
 
 | Item | v1 status |
 |------|-----------|
-| Dunks | Schema kind exists; not in selection pool |
+| Dunks | Selected separately from the normal movement pool; implemented for eligible inside/attack attempts |
 | Second defender contest animation | Not rendered; only primary defender track |
 | Per-turn RNG seed | Uses global `random` like rest of sim |
 | Static legacy HCT emitter | Not hooked |
