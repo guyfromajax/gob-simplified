@@ -5,10 +5,12 @@ from fastapi.encoders import jsonable_encoder
 from pydantic import BaseModel
 from pathlib import Path
 from bson import ObjectId
+import json
 import logging
 import math
 import os
 import random
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import re
@@ -1345,6 +1347,54 @@ def _set_team_attribute_changes_on_game(game_id_str: str, tac: dict) -> bool:
     return False
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# EOG team-attribute band instrumentation (Phase 0, log-only, draw-preserving).
+#
+# When GOB_EOG_BAND_LOG is truthy, calculate_attr_changes appends one structured
+# JSONL record per attribute per team per game to a dedicated file (default
+# ./eog_band_log.jsonl, overridable via GOB_EOG_BAND_LOG_FILE). Default OFF: the
+# only cost when disabled is one env read per team-game. EOG finalization runs in
+# the PARENT process (never inside the cpu_week_pool workers), so a single append
+# handle guarded by a lock captures all 64 games/week, not just the user's game.
+# Each line is `[EOG-BAND] {json}` so it stays greppable if ever merged elsewhere.
+# ─────────────────────────────────────────────────────────────────────────────
+_EOG_BAND_LOG_LOCK = threading.Lock()
+_EOG_BAND_LOG_FH = None
+_EOG_BAND_LOG_FH_PATH = None
+
+
+def _eog_band_log_enabled() -> bool:
+    return os.environ.get("GOB_EOG_BAND_LOG", "0").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _eog_band_log_path() -> str:
+    return os.environ.get("GOB_EOG_BAND_LOG_FILE", "eog_band_log.jsonl")
+
+
+def _emit_eog_band_record(record: dict) -> None:
+    """Append one [EOG-BAND] JSONL record to the dedicated measurement file.
+
+    No-op unless GOB_EOG_BAND_LOG is truthy. Instrumentation must never break a
+    game, so all failures are swallowed.
+    """
+    global _EOG_BAND_LOG_FH, _EOG_BAND_LOG_FH_PATH
+    try:
+        line = "[EOG-BAND] " + json.dumps(record, default=str)
+        path = _eog_band_log_path()
+        with _EOG_BAND_LOG_LOCK:
+            if _EOG_BAND_LOG_FH is None or _EOG_BAND_LOG_FH_PATH != path:
+                if _EOG_BAND_LOG_FH is not None:
+                    try:
+                        _EOG_BAND_LOG_FH.close()
+                    except Exception:
+                        pass
+                _EOG_BAND_LOG_FH = open(path, "a", buffering=1)
+                _EOG_BAND_LOG_FH_PATH = path
+            _EOG_BAND_LOG_FH.write(line + "\n")
+    except Exception:
+        pass
+
+
 def _finalize_team_attributes_for_game(
     game_id,
     franchise_id: ObjectId,
@@ -1392,6 +1442,7 @@ def _finalize_team_attributes_for_game(
             loser_id=loser_id,
             winner_score=winner_score,
             loser_score=loser_score,
+            week=week,
         )
         logger.debug(
             "🧭 [EOG-CALL-SITE] update_team_attributes_after_game returned game_id=%s has_changes=%s keys=%s",
@@ -1402,6 +1453,14 @@ def _finalize_team_attributes_for_game(
         tac = attribute_changes if attribute_changes else {}
         _set_team_attribute_changes_on_game(game_id_str, tac)
     except Exception as e:
+        # [EOG-ATTR-FAILURE] Phase-0 instrumentation: a throw here means this game
+        # silently contributes no attribute movement. Emit a distinct, greppable
+        # line (always on — failures are rare and are the proof of "zero silent
+        # holes"). Count occurrences via grep, same style as [EOG-IDGUARD-FIRED].
+        logger.error(
+            "[EOG-ATTR-FAILURE] game_id=%s week=%s exc_type=%s exc=%s",
+            str(game_id), str(week), type(e).__name__, e,
+        )
         logger.error(f"❌ [FINALIZE-TEAM-ATTRS] Error for game_id={game_id}: {e}")
         import traceback
         logger.error(traceback.format_exc())
@@ -1415,7 +1474,8 @@ def update_team_attributes_after_game(
     winner_id: str,
     loser_id: str,
     winner_score: int,
-    loser_score: int
+    loser_score: int,
+    week: int | None = None,
 ) -> dict:
     """
     Update team attributes based on game performance.
@@ -1717,40 +1777,58 @@ def update_team_attributes_after_game(
             },
         )
         
+        # [EOG-BAND] Phase-0 instrumentation. band_log_on is read once; when off,
+        # the only added cost is recording a stable branch label per attr (a dict
+        # write, no I/O, no draws). All extended-input capture + file emit is gated.
+        band_log_on = _eog_band_log_enabled()
+        _band_labels: dict[str, str] = {}
+
         # shot_threshold is a golf score: lower is better, higher is worse.
         if fg_pct > 50:
             changes["shot_threshold"] = random.randint(-10, -5)
+            _band_labels["shot_threshold"] = "fg_gt_50"
         elif fg_pct > 45:
+            _band_labels["shot_threshold"] = "fg_45_to_50"
             if is_winner:
                 changes["shot_threshold"] = random.randint(-5, 0)
             else:
                 changes["shot_threshold"] = random.randint(0, 5)
         else:
             changes["shot_threshold"] = random.randint(5, 10)
-        
+            _band_labels["shot_threshold"] = "fg_le_45"
+
         team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
-        opp_f_plus_to_with_buffer = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0) + 8
+        opp_f_plus_to = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0)
+        opp_f_plus_to_with_buffer = opp_f_plus_to + 8
         if team_f_plus_to < opp_f_plus_to_with_buffer:
             changes["discipline"] = random.randint(1, 2)
+            _band_labels["discipline"] = "below_opp_plus_8"
         elif team_f_plus_to > opp_f_plus_to_with_buffer:
             changes["discipline"] = random.randint(-2, -1)
+            _band_labels["discipline"] = "above_opp_plus_8"
         else:
             changes["discipline"] = random.randint(-1, 0)
-        
+            _band_labels["discipline"] = "equal_buffered"
+
         # fight: winning 0..+2, losing -2..0
         if is_winner:
             changes["fight"] = random.randint(0, 2)
+            _band_labels["fight"] = "win"
         else:
             changes["fight"] = random.randint(-2, 0)
-        
+            _band_labels["fight"] = "loss"
+
         # rebound_modifier
         if treb > (opp_treb + 8):
             changes["rebound_modifier"] = random.randint(0, 5) / 100.0
+            _band_labels["rebound_modifier"] = "outrebound_by_8"
         elif treb < (opp_treb - 8):
             changes["rebound_modifier"] = -random.randint(5, 10) / 100.0
+            _band_labels["rebound_modifier"] = "outrebounded_by_8"
         else:
             changes["rebound_modifier"] = -random.randint(1, 5) / 100.0
-        
+            _band_labels["rebound_modifier"] = "near_even"
+
         if is_distant_sim:
             changes["offensive_efficiency"] = random.randint(-2, 1)
             changes["defensive_efficiency"] = random.randint(-2, 1)
@@ -1758,6 +1836,11 @@ def update_team_attributes_after_game(
             changes["fb_opp_modifier"] = random.randint(-2, 1)
             changes["pt_efficiency"] = random.randint(-2, 1)
             changes["pt_opp_modifier"] = random.randint(-2, 1)
+            for _distant_attr in (
+                "offensive_efficiency", "defensive_efficiency", "fb_efficiency",
+                "fb_opp_modifier", "pt_efficiency", "pt_opp_modifier",
+            ):
+                _band_labels[_distant_attr] = "distant_uniform"
             logger.warning(
                 "🧪 [EOG-DISTANT-ATTRS] team=%s off_eff=%s def_eff=%s fb_eff=%s fb_opp=%s pt_eff=%s pt_opp=%s",
                 str(team_id_label),
@@ -1771,63 +1854,169 @@ def update_team_attributes_after_game(
         else:
             if offensive_play_count > 12:
                 changes["offensive_efficiency"] = random.randint(0, 1)
+                _band_labels["offensive_efficiency"] = "plays_gt_12"
             elif offensive_play_count > 10:
                 changes["offensive_efficiency"] = random.randint(-1, 0)
+                _band_labels["offensive_efficiency"] = "plays_gt_10"
             else:
                 changes["offensive_efficiency"] = random.randint(-2, -1)
+                _band_labels["offensive_efficiency"] = "plays_le_10"
 
             if defensive_max_share <= 0.39:
                 changes["defensive_efficiency"] = random.randint(0, 1)
+                _band_labels["defensive_efficiency"] = "max_share_le_39"
             elif defensive_max_share <= 0.49:
                 changes["defensive_efficiency"] = random.randint(-1, 0)
+                _band_labels["defensive_efficiency"] = "max_share_le_49"
             else:
                 changes["defensive_efficiency"] = random.randint(-2, -1)
+                _band_labels["defensive_efficiency"] = "max_share_gt_49"
 
             if team_fb_max_share > 0.60:
                 changes["fb_efficiency"] = random.randint(-2, -1)
+                _band_labels["fb_efficiency"] = "top_share_gt_60"
             elif team_fb_max_share > 0.50:
                 changes["fb_efficiency"] = random.randint(-1, 0)
+                _band_labels["fb_efficiency"] = "top_share_gt_50"
             else:
                 changes["fb_efficiency"] = random.randint(0, 1)
+                _band_labels["fb_efficiency"] = "balanced"
 
             if opponent_fb_total > 15:
                 changes["fb_opp_modifier"] = random.randint(-2, -1)
+                _band_labels["fb_opp_modifier"] = "opp_fb_gt_15"
             elif opponent_fb_total > 10:
                 changes["fb_opp_modifier"] = random.randint(-1, 0)
+                _band_labels["fb_opp_modifier"] = "opp_fb_gt_10"
             else:
                 changes["fb_opp_modifier"] = random.randint(0, 1)
+                _band_labels["fb_opp_modifier"] = "opp_fb_le_10"
 
             if team_pt_total > 20:
                 changes["pt_efficiency"] = random.randint(-2, -1)
+                _band_labels["pt_efficiency"] = "pt_gt_20"
             elif team_pt_total > 16:
                 changes["pt_efficiency"] = random.randint(-1, 0)
+                _band_labels["pt_efficiency"] = "pt_gt_16"
             else:
                 changes["pt_efficiency"] = random.randint(0, 1)
+                _band_labels["pt_efficiency"] = "pt_le_16"
 
             if opponent_pt_total > 16:
                 changes["pt_opp_modifier"] = random.randint(-2, -1)
+                _band_labels["pt_opp_modifier"] = "opp_pt_gt_16"
             elif opponent_pt_total > 12:
                 changes["pt_opp_modifier"] = random.randint(-1, 0)
+                _band_labels["pt_opp_modifier"] = "opp_pt_gt_12"
             else:
                 changes["pt_opp_modifier"] = random.randint(0, 1)
-        
+                _band_labels["pt_opp_modifier"] = "opp_pt_le_12"
+
         # team_chemistry: rank-relative performance. Lower natl_rank integer is better.
         if is_winner:
             if opponent_rank > team_rank:
                 changes["team_chemistry"] = random.randint(0, 1)
+                _band_labels["team_chemistry"] = "beat_lower_ranked"
             elif opponent_rank <= 10:
                 changes["team_chemistry"] = random.randint(2, 4)
+                _band_labels["team_chemistry"] = "beat_top10"
             else:
                 changes["team_chemistry"] = random.randint(1, 2)
+                _band_labels["team_chemistry"] = "beat_higher_non_top10"
         else:
             if opponent_rank < team_rank and opponent_rank <= 10:
                 changes["team_chemistry"] = random.randint(-1, 0)
+                _band_labels["team_chemistry"] = "lose_to_top10"
             elif opponent_rank < team_rank:
                 changes["team_chemistry"] = random.randint(-2, 0)
+                _band_labels["team_chemistry"] = "lose_to_higher_non_top10"
             elif 100 <= opponent_rank <= 128:
                 changes["team_chemistry"] = random.randint(-5, -3)
+                _band_labels["team_chemistry"] = "lose_to_100_128"
             else:
                 changes["team_chemistry"] = random.randint(-3, -2)
+                _band_labels["team_chemistry"] = "lose_to_other_lower"
+
+        # [EOG-BAND] Extended per-attribute inputs — computed ONLY when logging is
+        # enabled so the disabled path stays free. These are read-only (no draws).
+        attr_inputs: dict[str, dict] = {}
+        if band_log_on:
+            from BackEnd.utils.defense_identity import CANONICAL_HCO_DEFENSE_ROW_KEYS
+
+            def _distinct_plays_run(tobj: dict) -> int:
+                # Read-only companion to _offensive_play_usage: count playbook rows
+                # actually run this game (times_run > 0). Logged, NOT used to select
+                # a branch — we need the real distribution before re-gating.
+                count = 0
+                for _pk, _pd, _dn in iter_team_plays((tobj or {}).get("plays", {})):
+                    if int((_pd.get("game_stats", {}) or {}).get("times_run", 0) or 0) > 0:
+                        count += 1
+                return count
+
+            def _fb_play_counts(tobj: dict) -> dict:
+                off = (tobj.get("scouting", {}) or {}).get("offense", {}) or {}
+                fbp = off.get("fast_break_plays", {}) or {}
+                return {
+                    key: int((fbp.get(key, {}) or {}).get("A", 0) or 0)
+                    for key in ("covert_release", "rim_runner", "triangle", "after_steal")
+                }
+
+            def _pt_variant_counts(tobj: dict) -> dict:
+                # Per-variant press/trap usage ("A" = attempts). These DO survive into
+                # the finished-game scouting snapshot as defense.hct_trap_plays /
+                # defense.fcp_press_plays (parallel to offense.fast_break_plays), so we
+                # can log them here — read-only, keyed by the canonical variant strings.
+                dfn = (tobj.get("scouting", {}) or {}).get("defense", {}) or {}
+                hct = dfn.get("hct_trap_plays", {}) or {}
+                fcp = dfn.get("fcp_press_plays", {}) or {}
+                return {
+                    "hct_variants": {k: int((v or {}).get("A", 0) or 0) for k, v in hct.items()},
+                    "fcp_variants": {k: int((v or {}).get("A", 0) or 0) for k, v in fcp.items()},
+                }
+
+            _def = (team_obj.get("scouting", {}) or {}).get("defense", {}) or {}
+            def_row_counts = {
+                key: int((_stat_bucket(_def.get(key, {}))).get("used", 0) or 0)
+                for key in CANONICAL_HCO_DEFENSE_ROW_KEYS
+            }
+            team_fb_counts = _fb_play_counts(team_obj)
+            opp_fb_counts = _fb_play_counts(opponent_team_obj)
+            team_pt_variants = _pt_variant_counts(team_obj)
+            opp_pt_variants = _pt_variant_counts(opponent_team_obj)
+
+            attr_inputs = {
+                "shot_threshold": {"fg_pct": fg_pct, "fgm": fgm, "fga": fga},
+                "discipline": {"team_f_plus_to": team_f_plus_to, "opp_f_plus_to": opp_f_plus_to},
+                "fight": {"is_winner": bool(is_winner)},
+                "rebound_modifier": {"treb": treb, "opp_treb": opp_treb},
+                "offensive_efficiency": {
+                    "total_times_run": offensive_play_count,
+                    "distinct_plays_run": _distinct_plays_run(team_obj),
+                },
+                "defensive_efficiency": {"max_share": defensive_max_share, **def_row_counts},
+                "fb_efficiency": {
+                    "max_share": team_fb_max_share,
+                    "fb_total": _team_fb_total,
+                    **team_fb_counts,
+                },
+                "fb_opp_modifier": {"opponent_fb_total": opponent_fb_total, **opp_fb_counts},
+                # The branch uses the aggregate pt_total_attempts (hct_used + fcp_used);
+                # per-variant counts are logged alongside for the later concentration
+                # measure (they survive as defense.hct_trap_plays / fcp_press_plays).
+                "pt_efficiency": {
+                    "pt_total_attempts": team_pt_total,
+                    "hct_used": int(team_scouting.get("hct_used", 0) or 0),
+                    "fcp_used": int(team_scouting.get("fcp_used", 0) or 0),
+                    **team_pt_variants,
+                },
+                "pt_opp_modifier": {
+                    "pt_total_attempts": opponent_pt_total,
+                    "hct_used": int(opponent_scouting.get("hct_used", 0) or 0),
+                    "fcp_used": int(opponent_scouting.get("fcp_used", 0) or 0),
+                    **opp_pt_variants,
+                },
+                "team_chemistry": {"team_rank": team_rank, "opponent_rank": opponent_rank},
+            }
 
         # Apply changes and clamp to valid ranges
         ftd_update = {}
@@ -1850,7 +2039,26 @@ def update_team_attributes_after_game(
                     clamped_val,
                     changes[attr_name],
                 )
-        
+                if band_log_on:
+                    # `change` is raw_delta (pre-overwrite); clamping occurred iff the
+                    # unclamped new_val differs from clamped_val (exact, FP-safe).
+                    _emit_eog_band_record({
+                        "game_id": game_id_str,
+                        "week": week,
+                        "franchise_id": str(franchise_id),
+                        "team_id_label": str(team_id_label),
+                        "is_winner": bool(is_winner),
+                        "is_distant_sim": bool(is_distant_sim),
+                        "attr": attr_name,
+                        "inputs": attr_inputs.get(attr_name, {}),
+                        "band": _band_labels.get(attr_name),
+                        "raw_delta": change,
+                        "pre": current_val,
+                        "post": clamped_val,
+                        "applied": changes[attr_name],
+                        "clamped": (new_val != clamped_val),
+                    })
+
         # ✅ FTD: Update FTD collection instead of franchise document
         if ftd_update:
             franchise_team_data_collection.update_one(
