@@ -256,6 +256,12 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
   // of concatenating (which replayed Q1 four times, Q2 three times, ...).
   const allTurns = Array.isArray(last.turns) ? last.turns : [];
 
+  // Sim Rest of Game: only emit playback frames from this quarter onward (join at
+  // Q2+). Earlier quarters still accumulate stats/score/worm below so the join is
+  // correct (carried score + cumulative stats), with no replay of already-played
+  // quarters. Sim Full Game passes 1 (whole game).
+  const startQuarter = Math.max(1, num(ctx.startQuarter) || 1);
+
   // Per-quarter emitted cumulative snapshots for reconciliation. Each response is
   // cumulative through the quarter it simmed; key by that quarter number.
   const emittedByQuarter = {};
@@ -315,7 +321,9 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
   });
 
   // ── Pre-tip frame ──────────────────────────────────────────────────────
-  if (openTurn) {
+  // Tip-off zero-state only makes sense when starting at Q1 (Sim Full Game); a
+  // mid-game Sim Rest join begins directly at its quarter's first frame.
+  if (openTurn && startQuarter <= 1) {
     const homeCourt = onCourtIds(openTurn.home_lineup);
     const awayCourt = onCourtIds(openTurn.away_lineup);
     [...homeCourt, ...awayCourt].forEach((id) => everPlayed.add(id));
@@ -395,38 +403,42 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     const court = [...homeCourt, ...awayCourt];
     court.forEach((id) => everPlayed.add(id));
 
-    // Subs IN this frame = on court now, not on court previous frame.
-    const subIds = new Set();
-    if (prevCourt) court.forEach((id) => { if (!prevCourt.has(id)) subIds.add(id); });
-    // OUT: fouled-out player still on the row for the beat before the swap.
-    const outIds = new Set(court.filter((id) => fouledOut.has(id)));
-
-    const momentumMap = turn.player_momentum || {};
-    const spotlightId = computeSpotlight(court);
-
+    // Worm history spans the whole game (context even when we join mid-game at Q2+).
     worm.push(sb.home - sb.away);
 
-    const isLast = idx === allTurns.length - 1;
-    const frame = {
-      phase: isLast ? 'final' : 'live',
-      quarter: tQ,
-      score: scoreSnapshot(),
-      worm: worm.slice(),
-      away: POSITIONS.map((pos) =>
-        buildPlayer(nid(awayLineup[pos]), pos, momentumMap, spotlightId, subIds, outIds)
-      ),
-      home: POSITIONS.map((pos) =>
-        buildPlayer(nid(homeLineup[pos]), pos, momentumMap, spotlightId, subIds, outIds)
-      ),
-      benchAway: benchChips(court, 'away', fouledOut),
-      benchHome: benchChips(court, 'home', fouledOut),
-      ticker: null, // moments tabled — engine leaves the 44px slot empty
-    };
-    if (isLast) {
-      frame.final = { home_won: sb.home > sb.away, summaryAway: sb.away, summaryHome: sb.home };
+    // Emit playback frames only from startQuarter onward (Sim Rest joins at Q2+).
+    if (tQ >= startQuarter) {
+      // Subs IN this frame = on court now, not on court previous frame.
+      const subIds = new Set();
+      if (prevCourt) court.forEach((id) => { if (!prevCourt.has(id)) subIds.add(id); });
+      // OUT: fouled-out player still on the row for the beat before the swap.
+      const outIds = new Set(court.filter((id) => fouledOut.has(id)));
+
+      const momentumMap = turn.player_momentum || {};
+      const spotlightId = computeSpotlight(court);
+
+      const isLast = idx === allTurns.length - 1;
+      const frame = {
+        phase: isLast ? 'final' : 'live',
+        quarter: tQ,
+        score: scoreSnapshot(),
+        worm: worm.slice(),
+        away: POSITIONS.map((pos) =>
+          buildPlayer(nid(awayLineup[pos]), pos, momentumMap, spotlightId, subIds, outIds)
+        ),
+        home: POSITIONS.map((pos) =>
+          buildPlayer(nid(homeLineup[pos]), pos, momentumMap, spotlightId, subIds, outIds)
+        ),
+        benchAway: benchChips(court, 'away', fouledOut),
+        benchHome: benchChips(court, 'home', fouledOut),
+        ticker: null, // moments tabled — engine leaves the 44px slot empty
+      };
+      if (isLast) {
+        frame.final = { home_won: sb.home > sb.away, summaryAway: sb.away, summaryHome: sb.home };
+      }
+      frames.push(frame);
+      prevCourt = new Set(court);
     }
-    frames.push(frame);
-    prevCourt = new Set(court);
   });
 
   reconcileQuarter(curQuarter); // final quarter

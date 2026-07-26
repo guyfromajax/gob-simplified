@@ -535,3 +535,32 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
     });
   });
 }
+
+/**
+ * "Prepping Sim" cover for Sim Rest of Game (Q2+): reuses the pre-game tip-off veil
+ * with different copy (no reveal/lineup — the game is already underway). Shows
+ * immediately, holds until the sim finishes (`waitForSim`), then dissolves.
+ * @param {Promise} waitForSim resolves when the background sim is done
+ * @returns {Promise<void>} resolves after the cover dissolves
+ */
+export function showPreppingSimCover(waitForSim) {
+  ensureStyles();
+  document.querySelectorAll(".pgxp-root").forEach((n) => n.remove());
+  const root = document.createElement("div");
+  root.className = "pgxp-root";
+  root.dataset.phase = "tipoff"; // reuse the tip-off veil styling
+  root.innerHTML = `<div class="pgxp-tipoff"><div class="to">PREPPING SIM</div></div>`;
+  document.body.appendChild(root);
+  const wait =
+    waitForSim && typeof waitForSim.then === "function" ? waitForSim : Promise.resolve();
+  return wait.catch(() => {}).then(
+    () =>
+      new Promise((resolve) => {
+        root.classList.add("dissolved");
+        setTimeout(() => {
+          root.remove();
+          resolve();
+        }, 450);
+      })
+  );
+}

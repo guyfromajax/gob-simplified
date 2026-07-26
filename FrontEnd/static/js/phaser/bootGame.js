@@ -11,7 +11,7 @@ import { preloadGameSfx } from './utils/gameSfx.js';
 import { getGameMode } from '../shared/getGameMode.js';
 import { buildSimTimeline } from './utils/simTimelineAssembler.js';
 import { showSimGamePresentation } from './utils/simGamePresentation.js';
-import { showPreGameExperience } from './utils/preGameExperience.js';
+import { showPreGameExperience, showPreppingSimCover } from './utils/preGameExperience.js';
 import { normalizeMatchupsPayload } from './utils/matchupsUiShared.js';
 import {
   COURT_BOOT_MODES,
@@ -2814,6 +2814,10 @@ async function handleSimFullGame() {
   // how Play Quarter's first simulate-quarter sets up the game (most SS&S). Sim Rest
   // of Game skips it. Fully guarded — any failure degrades to straight-to-Act-2.
   const isSimFullGame = Math.max(0, quarter) < 2;
+  // Broadcast (Act 2) starts at the quarter we begin simming — captured NOW because
+  // `quarter` gets reassigned to the final quarter after the loop. Sim Full Game = 1
+  // (whole game); Sim Rest of Game = the current quarter (join at Q2+, no replay).
+  const broadcastStartQuarter = Math.max(1, quarter);
   let resolveSimDone;
   const simDonePromise = new Promise((r) => { resolveSimDone = r; });
   let act1CoverPromise = Promise.resolve();
@@ -2842,6 +2846,16 @@ async function handleSimFullGame() {
     })();
   };
 
+  // Sim Rest of Game (Q2+): show the "Prepping Sim" cover immediately (reuses the Tip
+  // Off veil), holding until the sim finishes — hides the "Simulating Qn" overlays.
+  // Sim Full Game uses the Act 1 cover instead.
+  let preppingCoverPromise = Promise.resolve();
+  if (!isSimFullGame) {
+    preppingCoverPromise = showPreppingSimCover(simDonePromise).catch((e) => {
+      console.warn('⚠️ [SIM-PRES] Prepping Sim cover skipped:', e);
+    });
+  }
+
   try {
     let currentQ = quarter;
     let gId = gameId;
@@ -2851,11 +2865,8 @@ async function handleSimFullGame() {
     while (true) {
       // ✅ Show "Simulating Q1", "Simulating Q2", etc. for Sim Full Game / Sim Rest of Game
       // Stop at Q4 (don't show Q5+)
-      // Sim Full Game hides the status overlay — Act 1 covers the screen while it sims.
-      if (!isSimFullGame && currentQ <= 4) {
-        const periodLabel = currentQ <= 4 ? `Q${currentQ}` : `OT${currentQ - 4}`;
-        showStatus(`Simulating ${periodLabel}...`);
-      }
+      // Both Sim Full Game (Act 1 cover) and Sim Rest of Game (Prepping Sim cover)
+      // hide the "Simulating Qn" status overlay while the game sims underneath.
       
       const payload = {
         home_team: homeTeam,
@@ -3009,13 +3020,15 @@ async function handleSimFullGame() {
     if (typeof resolveSimDone === 'function') resolveSimDone();
     try {
       await act1CoverPromise;
-    } catch (e) { /* cover is self-guarded */ }
+      await preppingCoverPromise;
+    } catch (e) { /* covers are self-guarded */ }
     try {
       const timeline = buildSimTimeline(quarterSummaries, {
         homeRoster,
         awayRoster,
         homeTeamName: homeTeam,
         awayTeamName: awayTeam,
+        startQuarter: broadcastStartQuarter, // Sim Rest joins at Q2+ (no replay of played quarters)
       });
       await showSimGamePresentation(timeline, {}); // full-width overlay below the scoreboard
     } catch (presErr) {
