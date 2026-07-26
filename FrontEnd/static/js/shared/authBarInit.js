@@ -431,9 +431,20 @@
   function resolveStoredFranchiseTeamPrimaryColor() {
     if (typeof localStorage === 'undefined') return null;
     try {
-      var storedPrimary = normalizeHexColor(localStorage.getItem('franchise_user_team_primary_color'));
+      var fid = null;
+      if (window.FranchiseLS && typeof window.FranchiseLS.resolveFranchiseIdFromUrl === 'function') {
+        fid = window.FranchiseLS.resolveFranchiseIdFromUrl();
+      } else {
+        try {
+          fid = new URLSearchParams(window.location.search).get('franchise_id');
+        } catch (e2) {}
+      }
+      // Hybrid C: only paint franchise team chrome when URL has franchise_id
+      if (!fid) return null;
+      var ctx = window.FranchiseLS ? window.FranchiseLS.getTeamContext(fid) : null;
+      var storedPrimary = normalizeHexColor(ctx && ctx.primaryColor);
       if (storedPrimary) return storedPrimary;
-      var storedTeam = localStorage.getItem('franchise_user_team');
+      var storedTeam = (ctx && ctx.teamName) || '';
       return normalizeHexColor(CORE_TEAM_PRIMARY_COLORS[storedTeam || '']);
     } catch (e) {
       return null;
@@ -511,7 +522,18 @@
     } catch (e) {}
     return {
       mode: 'franchise',
-      hasActiveFranchiseTeam: !!(typeof localStorage !== 'undefined' && (localStorage.getItem('franchise_user_team') || localStorage.getItem('franchise_user_team_id'))),
+      hasActiveFranchiseTeam: (function () {
+        try {
+          var fid = window.FranchiseLS
+            ? window.FranchiseLS.resolveFranchiseIdFromUrl()
+            : new URLSearchParams(window.location.search).get('franchise_id');
+          if (!fid || !window.FranchiseLS) return false;
+          var ctx = window.FranchiseLS.getTeamContext(fid);
+          return !!(ctx && (ctx.teamName || ctx.teamId));
+        } catch (e) {
+          return false;
+        }
+      })(),
       teamPrimaryColor: resolveStoredFranchiseTeamPrimaryColor()
     };
   }

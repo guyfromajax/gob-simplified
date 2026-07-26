@@ -322,14 +322,16 @@ const API_CONFIG = {
   },
 
   // Franchise id for the current page. Every franchise screen carries it as the
-  // `franchise_id` query param (that's how the whole app sources it); fall back
-  // to localStorage for the rare context that doesn't.
+  // `franchise_id` query param (source of truth for multi-slot). No localStorage
+  // fallback — inventing an id from bare LS cross-contaminates slots
+  // (multi_franchises_brief Phase 1 thin Phase 3 warm-up).
   currentFranchiseId() {
     try {
       const q = new URLSearchParams(window.location.search).get('franchise_id');
-      if (q) return q;
-    } catch (e) { /* no window/search */ }
-    try { return localStorage.getItem('franchise_id') || null; } catch (e) { return null; }
+      return q || null;
+    } catch (e) {
+      return null;
+    }
   },
 };
 

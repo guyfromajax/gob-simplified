@@ -247,11 +247,10 @@ Mirrors a subset of the FCC pattern:
 - `auth_user` — Serialized user object (username, email, etc.).
 
 **Franchise Context**
-- `franchise_user_team_id` — User's selected franchise team ID
-- `franchise_user_team` — Franchise team display name
-- `franchise_user_team_primary_color` — Team primary color hex
-- `franchise_week` — Current week number (1-26)
+- **Canonical (Phase 3 hybrid):** `franchise:{id}:week`, `franchise:{id}:user_team`, `franchise:{id}:user_team_id`, `franchise:{id}:user_team_primary_color`, `franchise:{id}:complete_week_pending`, `franchise:{id}:eog_pgpc_snapshot`, `franchise:{id}:last_game_id`, `franchise:{id}:last_game_user_team_side` — via `window.FranchiseLS` (`FrontEnd/static/js/shared/franchiseLocalStorage.js`).
 - `playbooks_position_filters_franchise_*` (dynamic prefix) — Per-franchise playbook filter state
+- **Identity:** `API_CONFIG.currentFranchiseId()` is **URL-only** (`?franchise_id=`). Do not store or fall back to bare `franchise_id` / `franchiseId`.
+- **Legacy bare keys** (`franchise_user_team`, `franchise_week`, `franchise_complete_week_pending`, etc.): no longer written; migrated one-shot on read where needed; wiped by `FranchiseLS.clearOnFranchiseExit()` / mode-select exit.
 
 **Game State (Single / Franchise)**
 - `last_game_id` — For resume functionality
@@ -267,7 +266,7 @@ Mirrors a subset of the FCC pattern:
 - `alpha_disclaimer_dismissed_version` — Alpha disclaimer dismissal version
 - `gob_dont_show_new_franchise_warning` — Warning suppression flag
 
-**Canonical cleanup:** `mode-select.js:clearFranchiseLocalStorage()` removes ~10 keys when exiting franchise mode.
+**Canonical cleanup:** `mode-select.js:clearFranchiseLocalStorage()` → `FranchiseLS.clearOnFranchiseExit()` (bare keys + all `franchise:*` namespaces + last-game globals + playbook filter prefixes).
 
 **Orphans flagged:**
 - `franchiseId` in `tournament.js` — legacy; superseded by `userTeamId` / `activeTournament`

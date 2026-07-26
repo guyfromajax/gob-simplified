@@ -128,8 +128,8 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
     week = parseInt(params.get('week'), 10);
   }
   if (!Number.isInteger(week) || week < 1) {
-    if (typeof localStorage !== 'undefined') {
-      week = parseInt(localStorage.getItem('franchise_week'), 10);
+    if (franchiseId && window.FranchiseLS) {
+      week = window.FranchiseLS.getWeek(franchiseId);
     }
   }
   if (!Number.isInteger(week) || week < 1) {
@@ -142,8 +142,8 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
   }
   if ((!Number.isInteger(week) || week < 1) && franchiseId && !tournamentId) {
     week = await recoverFranchiseWeek(franchiseId);
-    if (Number.isInteger(week) && week >= 1 && typeof localStorage !== 'undefined') {
-      localStorage.setItem('franchise_week', String(week));
+    if (Number.isInteger(week) && week >= 1 && franchiseId && window.FranchiseLS) {
+      window.FranchiseLS.setWeek(franchiseId, week);
     }
   }
 
@@ -351,31 +351,28 @@ export async function finalizeGame({ simData, tournamentId, franchiseId, game })
       } else {
         console.log('✅ Franchise phase-a completed.');
         try {
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(
-              'franchise_complete_week_pending',
-              JSON.stringify({ franchise_id: franchiseId, week })
-            );
+          if (franchiseId && window.FranchiseLS) {
+            window.FranchiseLS.setPendingCompleteWeek(franchiseId, {
+              franchise_id: franchiseId,
+              week,
+            });
             const teamIdSnap =
               params.get('team_id') || params.get('home_id') || params.get('away_id') || null;
             const gid = simData.game_id || simData._id;
-            localStorage.setItem(
-              'franchise_eog_pgpc_snapshot',
-              JSON.stringify({
-                gameId: gid,
-                franchiseId,
-                teamId: teamIdSnap,
-                week,
-                my_team: params.get('my_team'),
-                homeTeam: homeTeamObj.name,
-                awayTeam: awayTeamObj.name,
-                homeScore,
-                awayScore,
-                winner,
-                franchisePhaseBPending: { franchise_id: franchiseId, week },
-                franchisePhaseAOk: true,
-              })
-            );
+            window.FranchiseLS.setEogSnapshot(franchiseId, {
+              gameId: gid,
+              franchiseId,
+              teamId: teamIdSnap,
+              week,
+              my_team: params.get('my_team'),
+              homeTeam: homeTeamObj.name,
+              awayTeam: awayTeamObj.name,
+              homeScore,
+              awayScore,
+              winner,
+              franchisePhaseBPending: { franchise_id: franchiseId, week },
+              franchisePhaseAOk: true,
+            });
           }
         } catch (_) {}
       }

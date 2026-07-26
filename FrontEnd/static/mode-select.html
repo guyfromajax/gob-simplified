@@ -42,58 +42,8 @@
 
   <div class="mode-wrapper">
     <section class="franchise-home-section">
-      <div id="franchise-home-slot" class="franchise-home-slot">
-        <div id="franchise-empty-card" class="franchise-home-card franchise-home-card-empty">
-          <div class="franchise-empty-state">
-            <div class="franchise-empty-icon" aria-hidden="true">
-              <img src="/images/buttons/whiteball.svg" alt="">
-            </div>
-            <h2 class="franchise-empty-title">Start Your Coaching Journey</h2>
-            <button id="franchise-new-btn" class="franchise-empty-cta">Find Your Program</button>
-          </div>
-        </div>
-
-        <div id="franchise-play-now-btn" class="franchise-home-card franchise-home-card-active" role="link" tabindex="0" style="display: none;">
-          <img id="franchise-card-banner" class="franchise-card-banner" alt="">
-          <div class="franchise-card-content">
-            <div>
-              <div class="franchise-card-name-row">
-                <div id="franchise-card-team-name" class="franchise-card-team-name">Program</div>
-                <!-- Tournament tier emblem; populated by renderFranchiseActiveState in an EOS week, empty otherwise -->
-                <div id="franchise-card-tier-emblem" class="franchise-card-tier-emblem" aria-hidden="true"></div>
-              </div>
-              <div id="franchise-card-season-progress" class="franchise-card-season-line">Season 1 · Week 1 of 26</div>
-            </div>
-            <div class="franchise-card-grid">
-              <div class="franchise-chip">
-                <div class="franchise-chip-label">Record</div>
-                <div id="franchise-card-record" class="franchise-chip-value">0-0</div>
-              </div>
-              <div class="franchise-chip">
-                <div class="franchise-chip-label">Rank</div>
-                <div id="franchise-card-rank" class="franchise-chip-value">-</div>
-              </div>
-              <div class="franchise-chip">
-                <div class="franchise-chip-label">Prestige</div>
-                <div id="franchise-card-prestige" class="franchise-chip-value">-</div>
-              </div>
-              <div class="franchise-chip">
-                <div class="franchise-chip-label">Next Opponent</div>
-                <div id="franchise-card-next" class="franchise-chip-value franchise-chip-value-small">TBD</div>
-              </div>
-            </div>
-            <div id="franchise-resume-card" class="franchise-resume-card" hidden>
-              <div>
-                <div class="franchise-resume-kicker">Game In Progress</div>
-                <div id="franchise-resume-matchup" class="franchise-resume-matchup">Resume current game</div>
-                <div id="franchise-resume-detail" class="franchise-resume-detail">Latest saved game state</div>
-              </div>
-              <div id="franchise-resume-score" class="franchise-resume-score">0 - 0</div>
-            </div>
-            <button id="franchise-enter-btn" class="franchise-enter-btn" type="button">Enter Franchise →</button>
-          </div>
-        </div>
-      </div>
+      <!-- Phase 2: always two slots (empty and/or occupied), filled by mode-select.js from GET /franchise/list -->
+      <div id="franchise-home-slots" class="franchise-home-slots" aria-label="Franchise slots"></div>
     </section>
 
     <section class="community-section">
@@ -118,14 +68,6 @@
       </div>
     </section>
 
-    <section class="franchise-delete-section">
-      <div id="franchise-delete-row" class="franchise-delete-row" style="display: none;">
-        <button id="franchise-delete-link" class="franchise-delete-link" type="button">
-          Delete existing franchise and start a new one
-        </button>
-      </div>
-    </section>
-
     <section class="around-the-league-section">
       <div class="around-the-league-panel">
         <div class="community-panel-header">
@@ -146,18 +88,24 @@
     </section>
   </div>
 
-  <!-- New Franchise confirmation (when user has existing franchise) -->
-  <div id="new-franchise-modal" class="confirm-modal" style="display: none;">
-    <div class="confirm-modal-content">
-      <h2 class="confirm-modal-title">New Franchise</h2>
-      <p class="confirm-modal-text">Creating a new franchise will delete your existing one. This cannot be undone.</p>
-      <label class="confirm-modal-checkbox">
-        <input type="checkbox" id="new-franchise-dont-show-again">
-        <span>Don't show this again</span>
-      </label>
+  <!-- Delete franchise confirmation (per-slot; never wipe-current) -->
+  <div id="delete-franchise-modal" class="confirm-modal" style="display: none;" aria-hidden="true">
+    <div class="confirm-modal-content" role="dialog" aria-modal="true" aria-labelledby="delete-franchise-modal-title">
+      <h2 id="delete-franchise-modal-title" class="confirm-modal-title">Delete Franchise</h2>
+      <p id="delete-franchise-modal-text" class="confirm-modal-text">This cannot be undone.</p>
       <div class="confirm-modal-actions">
-        <button id="new-franchise-modal-cancel" class="confirm-modal-cancel">Cancel</button>
-        <button id="new-franchise-modal-confirm" class="confirm-modal-confirm">New Franchise</button>
+        <button id="delete-franchise-modal-cancel" class="confirm-modal-cancel" type="button">Cancel</button>
+        <button id="delete-franchise-modal-confirm" class="confirm-modal-confirm" type="button">Delete Franchise</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="slots-full-modal" class="confirm-modal" style="display: none;" aria-hidden="true">
+    <div class="confirm-modal-content" role="dialog" aria-modal="true" aria-labelledby="slots-full-modal-title">
+      <h2 id="slots-full-modal-title" class="confirm-modal-title">Franchise Slots Full</h2>
+      <p class="confirm-modal-text">You already have two franchises. Delete one to start another.</p>
+      <div class="confirm-modal-actions">
+        <button id="slots-full-modal-ok" class="confirm-modal-confirm" type="button">OK</button>
       </div>
     </div>
   </div>
@@ -177,6 +125,7 @@
   </div>
 
   <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/franchiseLocalStorage.js"></script>
   <script src="/js/shared/archetypeBadge.js"></script>
   <script src="/common.js"></script>
   <script src="/js/shared/tierEmblem.js"></script>

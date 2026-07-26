@@ -285,7 +285,11 @@ async function resolveOpponentName() {
       franchise_id: reportState.franchiseId,
     });
     if (data) {
-      const myTeamName = formatTeamName(localStorage.getItem('franchise_user_team') || '');
+      const myTeamName = formatTeamName(
+        (window.FranchiseLS && reportState.franchiseId
+          ? window.FranchiseLS.get(reportState.franchiseId, 'user_team')
+          : '') || ''
+      );
       const myTeamId = reportState.teamId;
       const home = formatTeamName(data.home || '');
       const away = formatTeamName(data.away || '');

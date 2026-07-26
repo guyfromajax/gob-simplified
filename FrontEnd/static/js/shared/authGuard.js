@@ -85,8 +85,18 @@
     window.location.replace("/login.html?redirect=" + redirectParam);
   }
 
-  /* Load auth bar init - shows user email on all screens except court and lineup */
-  var s = document.createElement("script");
-  s.src = "/js/shared/authBarInit.js";
-  document.head.appendChild(s);
+  /* Franchise LS helper before auth bar (multi-slot Phase 3). */
+  var fls = document.createElement("script");
+  fls.src = "/js/shared/franchiseLocalStorage.js";
+  fls.onload = function () {
+    var s = document.createElement("script");
+    s.src = "/js/shared/authBarInit.js";
+    document.head.appendChild(s);
+  };
+  fls.onerror = function () {
+    var s = document.createElement("script");
+    s.src = "/js/shared/authBarInit.js";
+    document.head.appendChild(s);
+  };
+  document.head.appendChild(fls);
 })();

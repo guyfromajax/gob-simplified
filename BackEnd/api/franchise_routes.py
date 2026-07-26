@@ -28,7 +28,13 @@ from BackEnd.db import (
     franchise_players_data_collection,
     franchise_recruits_data_collection,
     games_collection,
+    press_conference_sessions_collection,
 )
+
+from BackEnd.constants.multi_franchise import MAX_FRANCHISES_PER_USER
+
+# Multi-franchise slots (see _documentation_master/projects/multi_franchises_brief.md).
+# Cap constant lives in BackEnd.constants.multi_franchise.
 from BackEnd.utils.shared import format_height, summarize_game_state
 from BackEnd.utils.player_year import format_player_year_display
 from BackEnd.utils import stat_updater
@@ -3313,12 +3319,15 @@ def select_team(
     endpoint_start = time.time()
     print(f"🔵 [DEBUG] select_team: POST /franchise/select-team called with team: {selection.team_name}", file=sys.stderr, flush=True)
     try:
-        # Step 7.2: One franchise per user - block creation if user already has one
+        # Cap concurrent franchises per account (multi_franchises_brief Phase 1).
         existing_franchises = db.franchises.count_documents({"user_id": user.get("user_id")})
-        if existing_franchises >= 1:
+        if existing_franchises >= MAX_FRANCHISES_PER_USER:
             raise HTTPException(
                 status_code=400,
-                detail="You already have an active franchise. Delete it first to start a new one.",
+                detail=(
+                    f"You already have {MAX_FRANCHISES_PER_USER} active franchises. "
+                    "Delete one before starting another."
+                ),
             )
 
         # Resolve team name to ObjectId - try multiple strategies for matching
@@ -7375,19 +7384,101 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
         )
     return out
 
+def _franchise_summary_for_list(doc: dict) -> dict:
+    """Compact franchise card payload for mode-select / slot UI."""
+    eos = doc.get("eos_tournament") or {}
+    team_object_id = doc.get("user_team_object_id")
+    primary_color = None
+    secondary_color = None
+    if team_object_id:
+        try:
+            team_doc = db.teams.find_one(
+                {"_id": ObjectId(str(team_object_id))},
+                {"primary_color": 1, "secondary_color": 1, "name": 1},
+            ) or {}
+            primary_color = team_doc.get("primary_color")
+            secondary_color = team_doc.get("secondary_color")
+        except Exception:
+            team_doc = {}
+    else:
+        team_doc = {}
+    return {
+        "franchise_id": str(doc["_id"]),
+        "user_team_id": doc.get("user_team_id") or team_doc.get("name"),
+        "user_team_object_id": str(team_object_id) if team_object_id else None,
+        "week": doc.get("week", 1),
+        "current_season": doc.get("current_season", 1),
+        "primary_color": primary_color,
+        "secondary_color": secondary_color,
+        "eos_tournament_active": doc.get("eos_tournament_active", False),
+        "eos_current_round": eos.get("current_round", 1),
+        "eos_completed": eos.get("completed", False),
+    }
+
+
+def _cascade_delete_franchise(fid: ObjectId) -> None:
+    """Wipe one franchise and related collections. Caller must own ``fid``."""
+    # GC painted signed-recruit masters from R2 before wiping FPD (helper reads FPD).
+    try:
+        from BackEnd.api.player_image_routes import delete_signed_masters_for_franchise
+        delete_signed_masters_for_franchise(fid)
+    except Exception:
+        logger.exception("[IMG-GC] cleanup failed on franchise delete fid=%s", str(fid))
+    # FTD: ObjectId; FPD/FRD/games: string; press sessions: ObjectId (and string fallback).
+    franchise_team_data_collection.delete_many({"franchise_id": fid})
+    franchise_players_data_collection.delete_many({"franchise_id": str(fid)})
+    franchise_recruits_data_collection.delete_many({"franchise_id": str(fid)})
+    db.games.delete_many({"franchise_id": str(fid)})
+    try:
+        press_conference_sessions_collection.delete_many(
+            {"franchise_id": {"$in": [fid, str(fid)]}}
+        )
+    except Exception:
+        logger.exception("[PRESS-GC] cleanup failed on franchise delete fid=%s", str(fid))
+    db.franchises.delete_one({"_id": fid})
+
+
+@router.get("/franchise/list")
+def list_user_franchises(user: dict = Depends(get_current_user)):
+    """
+    Return all franchises owned by the current user (0..MAX_FRANCHISES_PER_USER).
+    Newest first. Used by multi-slot mode-select (Phase 2).
+    """
+    uid = user.get("user_id")
+    cursor = db.franchises.find(
+        {"user_id": uid},
+        projection={
+            "_id": 1,
+            "user_team_id": 1,
+            "user_team_object_id": 1,
+            "week": 1,
+            "current_season": 1,
+            "eos_tournament": 1,
+            "eos_tournament_active": 1,
+        },
+    ).sort("_id", -1)
+    franchises = [_franchise_summary_for_list(doc) for doc in cursor]
+    return {
+        "franchises": franchises,
+        "count": len(franchises),
+        "max": MAX_FRANCHISES_PER_USER,
+    }
+
+
 @router.get("/franchise/current")
 def get_current_franchise(user: dict = Depends(get_current_user)):
     """
-    Return the current user's franchise.
-    Used by mode-select to show instance and Play Now / New Franchise.
-    Returns 404 if the user has no franchise.
+    Transitional singular endpoint for legacy mode-select.
+    Returns the newest franchise for the user (deterministic sort by _id desc).
+    Prefer GET /franchise/list for multi-slot UI. Returns 404 if none.
     """
     doc = db.franchises.find_one(
         {"user_id": user.get("user_id")},
         projection={
             "_id": 1, "user_team_id": 1, "week": 1,
-            "eos_tournament": 1, "eos_tournament_active": 1
-        }
+            "eos_tournament": 1, "eos_tournament_active": 1,
+        },
+        sort=[("_id", -1)],
     )
     if not doc:
         raise HTTPException(status_code=404, detail="No franchise found")
@@ -7406,28 +7497,42 @@ def get_current_franchise(user: dict = Depends(get_current_user)):
 @router.delete("/franchise/current")
 def delete_current_franchise(user: dict = Depends(get_current_user)):
     """
-    Delete the current user's franchise (and related FTD, FPD, FRD) so they can start a new one from mode-select.
-    Used when user confirms "New Franchise" in the confirmation modal.
-    Returns 200 with deleted=True if a franchise was deleted, deleted=False if none existed.
+    Legacy wipe for old mode-select "New Franchise" flow.
+    Safe only when the user has 0 or 1 franchises. If two exist, returns 409 —
+    client must DELETE /franchise/{franchise_id} for a specific slot.
+    Registered before DELETE /franchise/{franchise_id} so ``current`` is not
+    captured as a path param.
     """
-    doc = db.franchises.find_one({"user_id": user.get("user_id")}, {"_id": 1})
+    uid = user.get("user_id")
+    count = db.franchises.count_documents({"user_id": uid})
+    if count == 0:
+        return {"deleted": False, "count": 0}
+    if count > 1:
+        raise HTTPException(
+            status_code=409,
+            detail=(
+                "Multiple franchises exist. Delete a specific franchise with "
+                "DELETE /franchise/{franchise_id}."
+            ),
+        )
+    doc = db.franchises.find_one({"user_id": uid}, {"_id": 1}, sort=[("_id", -1)])
     if not doc:
         return {"deleted": False, "count": 0}
     fid = doc["_id"]
-    # GC this franchise's painted signed-recruit masters from R2 before wiping FPD
-    # (the helper reads FPD to find the keys). Best-effort — never blocks the delete.
-    try:
-        from BackEnd.api.player_image_routes import delete_signed_masters_for_franchise
-        delete_signed_masters_for_franchise(fid)
-    except Exception:
-        logger.exception("[IMG-GC] cleanup failed on franchise delete fid=%s", str(fid))
-    # FTD stores franchise_id as ObjectId; FPD/FRD store as string; games store franchise_id as string
-    franchise_team_data_collection.delete_many({"franchise_id": fid})
-    franchise_players_data_collection.delete_many({"franchise_id": str(fid)})
-    franchise_recruits_data_collection.delete_many({"franchise_id": str(fid)})
-    db.games.delete_many({"franchise_id": str(fid)})
-    db.franchises.delete_one({"_id": fid})
-    return {"deleted": True, "count": 1}
+    _cascade_delete_franchise(fid)
+    return {"deleted": True, "count": 1, "franchise_id": str(fid)}
+
+
+@router.delete("/franchise/{franchise_id}")
+def delete_franchise_by_id(franchise_id: str, user: dict = Depends(get_current_user)):
+    """
+    Delete a specific franchise owned by the current user (and related FTD/FPD/FRD/games/press).
+    Preferred path for multi-slot — never deletes a sibling.
+    """
+    doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    fid = doc["_id"]
+    _cascade_delete_franchise(fid)
+    return {"deleted": True, "count": 1, "franchise_id": str(fid)}
 
 
 @router.get("/franchise/command-center/data")

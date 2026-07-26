@@ -239,8 +239,10 @@ async function selectTeam(team) {
       throw new Error(msg);
     }
     const data = await res.json();
-    localStorage.setItem("franchiseId", data.franchise_id);
-    localStorage.setItem("franchise_user_team", team);
+    if (window.FranchiseLS && data.franchise_id) {
+      window.FranchiseLS.clearBareKeys();
+      window.FranchiseLS.setTeamContext(data.franchise_id, { teamName: team });
+    }
     window.location.href = `./franchise-command-center.html?franchise_id=${encodeURIComponent(data.franchise_id)}`;
   } catch (err) {
     console.error(err);

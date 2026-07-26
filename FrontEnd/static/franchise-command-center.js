@@ -58,8 +58,12 @@ async function recoverCpuSimsBeforeFccRender(topData) {
       throw new Error(`phase-b failed (${res ? res.status : 'no response'}) ${detail}`);
     }
     try {
-      localStorage.removeItem('franchise_complete_week_pending');
-      localStorage.removeItem('franchise_eog_pgpc_snapshot');
+      if (window.FranchiseLS) {
+        window.FranchiseLS.clearPendingAndEog(franchiseId);
+      } else {
+        localStorage.removeItem('franchise_complete_week_pending');
+        localStorage.removeItem('franchise_eog_pgpc_snapshot');
+      }
     } catch (_) {}
     const refreshed = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
     return refreshed || topData;
@@ -71,7 +75,12 @@ async function recoverCpuSimsBeforeFccRender(topData) {
 }
 
 let franchiseId = null;
-const userTeamName = localStorage.getItem('franchise_user_team') || '';
+const _urlFidEarly = (typeof URLSearchParams !== 'undefined')
+  ? new URLSearchParams(window.location.search).get('franchise_id')
+  : null;
+const userTeamName = (_urlFidEarly && window.FranchiseLS)
+  ? (window.FranchiseLS.get(_urlFidEarly, 'user_team') || '')
+  : '';
 // ✅ SS&S: Store team ObjectId for consistent navigation
 let userTeamId = null; // Will be resolved from command center data or URL params
 let userTeamNameForLeaders = null; // Store user team name for leaderboard highlighting
@@ -246,7 +255,9 @@ function adoptAuthoritativeFccTeamId(topData) {
 
   if (previousTeamId !== authoritativeTeamId) {
     userTeamId = authoritativeTeamId;
-    localStorage.setItem('franchise_user_team_id', userTeamId);
+    if (franchiseId && window.FranchiseLS) {
+      window.FranchiseLS.set(franchiseId, 'user_team_id', userTeamId);
+    }
     emitDisplayContextUpdate();
     return true;
   }
@@ -531,16 +542,15 @@ function emitDisplayContextUpdate() {
 }
 
 function persistFranchiseDisplayColorContext(topData) {
-  if (typeof localStorage === 'undefined') return;
+  if (!franchiseId || !window.FranchiseLS) return;
   try {
     const teamName = String(topData?.team || '').trim();
     const teamPrimaryColor = normalizeHexColor(topData?.primary_color);
-    if (teamName) localStorage.setItem('franchise_user_team', teamName);
-    if (teamPrimaryColor) {
-      localStorage.setItem('franchise_user_team_primary_color', teamPrimaryColor);
-    } else {
-      localStorage.removeItem('franchise_user_team_primary_color');
-    }
+    window.FranchiseLS.setTeamContext(franchiseId, {
+      teamName: teamName || undefined,
+      primaryColor: teamPrimaryColor || undefined,
+      clearPrimaryColor: !teamPrimaryColor,
+    });
   } catch (error) {}
 }
 
@@ -3253,10 +3263,13 @@ async function init() {
   const urlTeamId = urlParams.get('team_id');
   if (urlTeamId) {
     userTeamId = urlTeamId;
-    localStorage.setItem('franchise_user_team_id', userTeamId);
+    if (franchiseId && window.FranchiseLS) {
+      window.FranchiseLS.set(franchiseId, 'user_team_id', userTeamId);
+    }
+  } else if (franchiseId && window.FranchiseLS) {
+    userTeamId = window.FranchiseLS.get(franchiseId, 'user_team_id') || null;
   } else {
-    // Fallback to localStorage
-    userTeamId = localStorage.getItem('franchise_user_team_id');
+    userTeamId = null;
   }
   
   const initStartTime = performance.now();
@@ -3515,6 +3528,10 @@ async function init() {
 }
 
 function clearFranchiseLocalStorage() {
+  if (window.FranchiseLS && typeof window.FranchiseLS.clearOnFranchiseExit === 'function') {
+    window.FranchiseLS.clearOnFranchiseExit();
+    return;
+  }
   if (typeof localStorage === 'undefined') return;
   const toRemove = [
     'franchiseId',
@@ -3523,10 +3540,13 @@ function clearFranchiseLocalStorage() {
     'franchise_user_team',
     'franchise_user_team_id',
     'franchise_user_team_primary_color',
+    'franchise_complete_week_pending',
+    'franchise_eog_pgpc_snapshot',
   ];
   toRemove.forEach((k) => localStorage.removeItem(k));
   Object.keys(localStorage).forEach((k) => {
     if (k.startsWith('playbooks_position_filters_franchise_')) localStorage.removeItem(k);
+    if (k.startsWith('franchise:')) localStorage.removeItem(k);
   });
   localStorage.removeItem('last_game_id');
   localStorage.removeItem('last_box_score_gameId');
@@ -3542,12 +3562,15 @@ function clearFranchiseLocalStorage() {
  */
 function appendFranchiseBoxScoreUserHints(params, homeTeamName, awayTeamName) {
   if (!params || typeof params.set !== 'function') return;
+  const ctx = (franchiseId && window.FranchiseLS)
+    ? window.FranchiseLS.getTeamContext(franchiseId)
+    : { teamId: '', teamName: '' };
   const tid =
     (userTeamId && String(userTeamId).trim()) ||
-    (typeof localStorage !== 'undefined' && (localStorage.getItem('franchise_user_team_id') || '').trim()) ||
+    (ctx.teamId || '').trim() ||
     '';
   const teamNameRaw =
-    (typeof localStorage !== 'undefined' && (localStorage.getItem('franchise_user_team') || '').trim()) ||
+    (ctx.teamName || '').trim() ||
     (userTeamName || '').trim();
   if (tid) params.set('team_id', tid);
   const hn = (homeTeamName || '').trim();
@@ -4067,7 +4090,9 @@ playNowBtn.addEventListener('click', async () => {
     const { home, away, week, home_id, away_id } = await res.json();
     if (!home || !away) throw new Error('Matchup not found');
     try {
-      localStorage.setItem('franchise_week', week);
+      if (franchiseId && window.FranchiseLS) {
+        window.FranchiseLS.setWeek(franchiseId, week);
+      }
     } catch {}
     // Same approach as tournament: prefer API-sourced team name (userTeamNameForLeaders from topData), then derive from userTeamId vs home_id/away_id. Avoids reliance on localStorage franchise_user_team which may be missing or stale.
     let resolvedSide = (userTeamNameForLeaders === home ? 'home' : (userTeamNameForLeaders === away ? 'away' : ''));

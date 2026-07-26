@@ -1,8 +1,8 @@
 # Multi-Franchise — LS / URL Hardening Audit
 
-> **Date:** 2026-07-25  
-> **Scope:** Inventory-only. No code changes. Reinforces Phase 3 of [`multi_franchises_brief.md`](./multi_franchises_brief.md).  
-> **Companion:** `_documentation_master/01_Data_Persistence/Cache_Usage_Documentation.md` §9 (broader cache inventory; this doc is multi-slot–focused).
+> **Date:** 2026-07-25 (inventory); **Phase 3 hybrid landed 2026-07-26**  
+> **Scope:** Originally inventory-only. Implementation: Hybrid C via `FrontEnd/static/js/shared/franchiseLocalStorage.js` (`window.FranchiseLS`).  
+> **Companion:** `_documentation_master/01_Data_Persistence/Cache_Usage_Documentation.md` §9; brief Phase 3 in [`multi_franchises_brief.md`](./multi_franchises_brief.md).
 
 ---
 
@@ -152,6 +152,8 @@ FCC, schedule, stats, rankings, leaders, news, brackets, recruiting hub/orders/i
 | **C — Hybrid (recommended)** | Namespace week/team/pending; **remove** identity LS entirely; URL-only id; clear bare orphans on login/mode-select | Matches “URL is law” | Medium effort |
 
 **Recommendation:** **C**. Identity never in LS; context cache namespaced; pending namespaced or single-pending with hard id checks everywhere.
+
+**Status (2026-07-26):** Hybrid C implemented. Writers/readers use `FranchiseLS`; bare keys cleared on franchise exit; auth bar only paints namespaced team chrome when URL has `franchise_id`. Phase 2 mode-select dual slots unblocked on LS grounds.
 
 ---
 

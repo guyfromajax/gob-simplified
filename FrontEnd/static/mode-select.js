@@ -9,23 +9,7 @@ function playSound(filename) {
 const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_version';
 const ALPHA_DISCLAIMER_VERSION = '2026-07-22-recruiting-defenses-alpha-box';
 
-const franchisePlayNowBtn = document.getElementById('franchise-play-now-btn');
-const franchiseNewBtn = document.getElementById('franchise-new-btn');
-const franchiseDeleteLink = document.getElementById('franchise-delete-link');
-const franchiseDeleteRow = document.getElementById('franchise-delete-row');
-const franchiseEmptyCard = document.getElementById('franchise-empty-card');
-const franchiseCardBanner = document.getElementById('franchise-card-banner');
-const franchiseCardTeamName = document.getElementById('franchise-card-team-name');
-const franchiseCardSeasonProgress = document.getElementById('franchise-card-season-progress');
-const franchiseCardRecord = document.getElementById('franchise-card-record');
-const franchiseCardRank = document.getElementById('franchise-card-rank');
-const franchiseCardPrestige = document.getElementById('franchise-card-prestige');
-const franchiseCardNext = document.getElementById('franchise-card-next');
-const franchiseEnterBtn = document.getElementById('franchise-enter-btn');
-const franchiseResumeCard = document.getElementById('franchise-resume-card');
-const franchiseResumeMatchup = document.getElementById('franchise-resume-matchup');
-const franchiseResumeDetail = document.getElementById('franchise-resume-detail');
-const franchiseResumeScore = document.getElementById('franchise-resume-score');
+const franchiseHomeSlots = document.getElementById('franchise-home-slots');
 const alphaDisclaimer = document.getElementById('alpha-disclaimer');
 const alphaDisclaimerDismiss = document.getElementById('alpha-disclaimer-dismiss');
 const leaderboardHost = document.getElementById('community-leaderboard');
@@ -46,9 +30,13 @@ const A1_CONFERENCE_TEAMS = [
   { id: 'south_lancaster', name: 'South Lancaster', primary: '#7c2b24', secondary: '#e39649' },
 ];
 
-let currentFranchise = null;
-let currentActiveGameResume = null;
-let currentCpuSimResume = null;
+/** Up to MAX_FRANCHISE_SLOTS franchise summaries from GET /franchise/list (newest first). */
+let franchisesList = [];
+let maxFranchiseSlots = 2;
+/** Per franchise_id: { franchise, activeGameResume, cpuSimResume } */
+const slotRuntimeById = {};
+/** Pending delete confirmation target */
+let pendingDeleteFranchise = null;
 let currentLeaderboardData = null;
 let currentLeaderboardView = 'geek_points';
 
@@ -74,6 +62,10 @@ function getSquareLogoPath(teamName) {
 }
 
 function clearFranchiseLocalStorage() {
+  if (window.FranchiseLS && typeof window.FranchiseLS.clearOnFranchiseExit === 'function') {
+    window.FranchiseLS.clearOnFranchiseExit();
+    return;
+  }
   if (typeof localStorage === 'undefined') return;
   const toRemove = [
     'franchiseId',
@@ -82,10 +74,13 @@ function clearFranchiseLocalStorage() {
     'franchise_user_team',
     'franchise_user_team_id',
     'franchise_user_team_primary_color',
+    'franchise_complete_week_pending',
+    'franchise_eog_pgpc_snapshot',
   ];
   toRemove.forEach((k) => localStorage.removeItem(k));
   Object.keys(localStorage).forEach((k) => {
     if (k.startsWith('playbooks_position_filters_franchise_')) localStorage.removeItem(k);
+    if (k.startsWith('franchise:')) localStorage.removeItem(k);
   });
   localStorage.removeItem('last_game_id');
   localStorage.removeItem('last_box_score_gameId');
@@ -1007,12 +1002,13 @@ function wireAlphaBanner() {
   });
 }
 
-function renderFranchiseEmptyState() {
-  currentActiveGameResume = null;
-  currentCpuSimResume = null;
-  if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'block';
-  if (franchisePlayNowBtn) franchisePlayNowBtn.style.display = 'none';
-  if (franchiseDeleteRow) franchiseDeleteRow.style.display = 'none';
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 function formatResumePeriod(resume) {
@@ -1039,29 +1035,29 @@ function cpuSimNeedsResume(cpuSimResume) {
   );
 }
 
-function formatCpuSimProgress(cpuSimResume) {
+function formatCpuSimProgress(cpuSimResume, franchiseData) {
   const completed = Number(cpuSimResume && cpuSimResume.completed_matchups) || 0;
   const expected = Number(cpuSimResume && cpuSimResume.expected_matchups) || 0;
   const failed = Number(cpuSimResume && cpuSimResume.failed_matchups) || 0;
-  const week = Number(cpuSimResume && cpuSimResume.week) || Number(currentFranchise && currentFranchise.week) || 1;
+  const week = Number(cpuSimResume && cpuSimResume.week) || Number(franchiseData && franchiseData.week) || 1;
   const base = expected > 0
     ? `Week ${week} · ${completed}/${expected} computer games complete`
     : `Week ${week} · Computer games need to finish`;
   return failed > 0 ? `${base} · ${failed} retrying` : base;
 }
 
-function buildActiveGameCourtUrl(resume) {
-  if (!currentFranchise || !currentFranchise.franchise_id || !resume || !resume.game_id) return null;
+function buildActiveGameCourtUrl(franchiseData, resume) {
+  if (!franchiseData || !franchiseData.franchise_id || !resume || !resume.game_id) return null;
   const params = new URLSearchParams();
   params.set('mode', 'franchise');
   params.set('active_resume', 'true');
-  params.set('franchise_id', currentFranchise.franchise_id);
+  params.set('franchise_id', franchiseData.franchise_id);
   params.set('game_id', resume.game_id);
   params.set('home', resume.home_team_name || 'Home');
   params.set('away', resume.away_team_name || 'Away');
   params.set('home_id', resume.home_team_id || resume.home_team_name || 'Home');
   params.set('away_id', resume.away_team_id || resume.away_team_name || 'Away');
-  params.set('team_id', currentFranchise.user_team_id || '');
+  params.set('team_id', franchiseData.user_team_id || '');
   params.set('my_team', resume.user_team_side || 'home');
   params.set('quarter', String(Number(resume.quarter) || 1));
   params.set('period', formatResumePeriod(resume));
@@ -1075,17 +1071,17 @@ function buildActiveGameCourtUrl(resume) {
   return './court.html?' + params.toString();
 }
 
-// Tournament tier emblem on the mode-select franchise card. Tier comes from the
+// Tournament tier emblem on a mode-select franchise card. Tier comes from the
 // displayed week; value (conference number / region letter) from command-center
 // data — the same sources the FCC uses. Cleared outside an EOS week (27-34).
-function renderModeSelectTierEmblem(franchiseData, commandCenterData) {
-  const slot = document.getElementById('franchise-card-tier-emblem');
-  if (!slot || !window.GOBTierEmblem) return;
+function renderModeSelectTierEmblem(slotEl, franchiseData, commandCenterData) {
+  const emblem = slotEl && slotEl.querySelector('.franchise-card-tier-emblem');
+  if (!emblem || !window.GOBTierEmblem) return;
   const week = (franchiseData && franchiseData.week != null)
     ? franchiseData.week
     : (commandCenterData && commandCenterData.week);
   const tier = window.GOBTierEmblem.tierForWeek(week);
-  if (!tier) { slot.innerHTML = ''; return; }
+  if (!tier) { emblem.innerHTML = ''; return; }
   let value = null;
   if (tier === 'conference') {
     const c = commandCenterData ? commandCenterData.user_conference : null;
@@ -1100,143 +1096,199 @@ function renderModeSelectTierEmblem(franchiseData, commandCenterData) {
     }
   }
   window.GOBTierEmblem.injectCss();
-  slot.innerHTML = window.GOBTierEmblem.renderLockup({ tier, value, size: 40, variant: 'stack', l1: 16, l2: 9 });
+  emblem.innerHTML = window.GOBTierEmblem.renderLockup({ tier, value, size: 40, variant: 'stack', l1: 16, l2: 9 });
 }
 
-function renderFranchiseActiveState(franchiseData, teamDoc, commandCenterData) {
-  if (!franchisePlayNowBtn) return;
+function buildEmptySlotHtml(slotIndex) {
+  const title = franchisesList.length > 0
+    ? 'Start Another Franchise'
+    : 'Start Your Coaching Journey';
+  const cta = 'Find Your Program';
+  return (
+    '<div class="franchise-home-slot-cell" data-slot-index="' + slotIndex + '">' +
+      '<div class="franchise-home-card franchise-home-card-empty">' +
+        '<div class="franchise-empty-state">' +
+          '<div class="franchise-empty-icon" aria-hidden="true">' +
+            '<img src="/images/buttons/whiteball.svg" alt="">' +
+          '</div>' +
+          '<h2 class="franchise-empty-title">' + escapeHtml(title) + '</h2>' +
+          '<button type="button" class="franchise-empty-cta" data-action="start-franchise">' +
+            escapeHtml(cta) +
+          '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
+}
 
+function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIndex) {
+  const franchiseId = String(franchiseData.franchise_id || '');
   const teamName = safeText(franchiseData.user_team_id, 'Program');
-  if (franchiseCardTeamName) franchiseCardTeamName.textContent = teamName;
-  renderModeSelectTierEmblem(franchiseData, commandCenterData);
   const bannerUrl = getSquareLogoPath(teamName);
-  if (franchiseCardBanner) {
-    franchiseCardBanner.src = bannerUrl;
-    franchiseCardBanner.alt = teamName;
-    franchiseCardBanner.style.display = 'none';
-  }
-  if (franchisePlayNowBtn) {
-    franchisePlayNowBtn.style.backgroundImage = "url('" + bannerUrl + "')";
-    franchisePlayNowBtn.style.backgroundSize = 'cover';
-    franchisePlayNowBtn.style.backgroundPosition = 'center';
-  }
-  if (franchiseCardSeasonProgress) franchiseCardSeasonProgress.textContent = deriveSeasonProgress(commandCenterData, franchiseData);
-  if (franchiseCardRecord) franchiseCardRecord.textContent = deriveRecord(commandCenterData, teamName);
-  if (franchiseCardRank) {
-    const rank = deriveRank(teamDoc, commandCenterData);
-    franchiseCardRank.textContent = rank === '-' ? '-' : '#' + rank;
-  }
-  if (franchiseCardPrestige) franchiseCardPrestige.textContent = derivePrestige(teamDoc, commandCenterData);
-  if (franchiseCardNext) franchiseCardNext.textContent = deriveNextOpponent(commandCenterData, teamName);
-  const activeGameResume = commandCenterData && commandCenterData.active_game_resume ? commandCenterData.active_game_resume : null;
-  currentActiveGameResume = activeGameResume && activeGameResume.status === 'stoppage_anchor'
-    ? activeGameResume
+  const seasonProgress = deriveSeasonProgress(commandCenterData, franchiseData);
+  const record = deriveRecord(commandCenterData, teamName);
+  const rankRaw = deriveRank(teamDoc, commandCenterData);
+  const rank = rankRaw === '-' ? '-' : '#' + rankRaw;
+  const prestige = derivePrestige(teamDoc, commandCenterData);
+  const nextOpponent = deriveNextOpponent(commandCenterData, teamName);
+
+  const activeGameResume = commandCenterData && commandCenterData.active_game_resume
+    && commandCenterData.active_game_resume.status === 'stoppage_anchor'
+    ? commandCenterData.active_game_resume
     : null;
-  currentCpuSimResume = commandCenterData && cpuSimNeedsResume(commandCenterData.cpu_sim_resume) ? commandCenterData.cpu_sim_resume : null;
-  console.warn('[MODE-RESUME-CLIENT] render franchise card', {
-    has_command_center_data: !!commandCenterData,
-    has_active_game_resume: !!currentActiveGameResume,
-    has_cpu_sim_resume: !!currentCpuSimResume,
-    game_id: currentActiveGameResume && currentActiveGameResume.game_id,
-    status: currentActiveGameResume && currentActiveGameResume.status,
-    quarter: currentActiveGameResume && currentActiveGameResume.quarter,
-    clock: currentActiveGameResume && currentActiveGameResume.clock,
-    away_score: currentActiveGameResume && currentActiveGameResume.away_score,
-    home_score: currentActiveGameResume && currentActiveGameResume.home_score,
-  });
-  if (currentActiveGameResume && franchiseResumeCard) {
-    franchiseResumeCard.classList.remove('franchise-resume-card-cpu');
-    franchiseResumeCard.hidden = false;
-    const kicker = franchiseResumeCard.querySelector('.franchise-resume-kicker');
-    if (kicker) kicker.textContent = 'Game In Progress';
-    if (franchiseResumeMatchup) {
-      franchiseResumeMatchup.textContent = (currentActiveGameResume.away_team_name || 'Away') + ' at ' + (currentActiveGameResume.home_team_name || 'Home');
-    }
-    if (franchiseResumeDetail) {
-      franchiseResumeDetail.textContent = formatResumePeriod(currentActiveGameResume) + ' · ' + formatResumeClockForModeSelect(currentActiveGameResume);
-    }
-    if (franchiseResumeScore) {
-      franchiseResumeScore.textContent = String(currentActiveGameResume.away_score ?? 0) + ' - ' + String(currentActiveGameResume.home_score ?? 0);
-    }
-    if (franchiseEnterBtn) franchiseEnterBtn.textContent = 'Resume Game →';
-  } else if (currentCpuSimResume && franchiseResumeCard) {
-    franchiseResumeCard.classList.add('franchise-resume-card-cpu');
-    franchiseResumeCard.hidden = false;
-    const kicker = franchiseResumeCard.querySelector('.franchise-resume-kicker');
-    if (kicker) kicker.textContent = 'Finishing Week';
-    if (franchiseResumeMatchup) {
-      franchiseResumeMatchup.textContent = 'Finishing Computer Games';
-    }
-    if (franchiseResumeDetail) {
-      franchiseResumeDetail.textContent = formatCpuSimProgress(currentCpuSimResume);
-    }
-    if (franchiseResumeScore) {
-      const completed = Number(currentCpuSimResume.completed_matchups) || 0;
-      const expected = Number(currentCpuSimResume.expected_matchups) || 0;
-      franchiseResumeScore.textContent = expected > 0 ? `${completed}/${expected}` : '...';
-    }
-    if (franchiseEnterBtn) franchiseEnterBtn.textContent = 'Finish Week →';
-  } else {
-    if (franchiseResumeCard) franchiseResumeCard.classList.remove('franchise-resume-card-cpu');
-    if (franchiseResumeCard) franchiseResumeCard.hidden = true;
-    if (franchiseEnterBtn) franchiseEnterBtn.textContent = 'Enter Franchise →';
+  const cpuSimResume = commandCenterData && cpuSimNeedsResume(commandCenterData.cpu_sim_resume)
+    ? commandCenterData.cpu_sim_resume
+    : null;
+
+  slotRuntimeById[franchiseId] = {
+    franchise: franchiseData,
+    activeGameResume: activeGameResume,
+    cpuSimResume: cpuSimResume,
+  };
+
+  let resumeHtml = '';
+  let enterLabel = 'Enter Franchise →';
+  if (activeGameResume) {
+    enterLabel = 'Resume Game →';
+    resumeHtml =
+      '<div class="franchise-resume-card">' +
+        '<div>' +
+          '<div class="franchise-resume-kicker">Game In Progress</div>' +
+          '<div class="franchise-resume-matchup">' +
+            escapeHtml((activeGameResume.away_team_name || 'Away') + ' at ' + (activeGameResume.home_team_name || 'Home')) +
+          '</div>' +
+          '<div class="franchise-resume-detail">' +
+            escapeHtml(formatResumePeriod(activeGameResume) + ' · ' + formatResumeClockForModeSelect(activeGameResume)) +
+          '</div>' +
+        '</div>' +
+        '<div class="franchise-resume-score">' +
+          escapeHtml(String(activeGameResume.away_score ?? 0) + ' - ' + String(activeGameResume.home_score ?? 0)) +
+        '</div>' +
+      '</div>';
+  } else if (cpuSimResume) {
+    enterLabel = 'Finish Week →';
+    const completed = Number(cpuSimResume.completed_matchups) || 0;
+    const expected = Number(cpuSimResume.expected_matchups) || 0;
+    resumeHtml =
+      '<div class="franchise-resume-card franchise-resume-card-cpu">' +
+        '<div>' +
+          '<div class="franchise-resume-kicker">Finishing Week</div>' +
+          '<div class="franchise-resume-matchup">Finishing Computer Games</div>' +
+          '<div class="franchise-resume-detail">' +
+            escapeHtml(formatCpuSimProgress(cpuSimResume, franchiseData)) +
+          '</div>' +
+        '</div>' +
+        '<div class="franchise-resume-score">' +
+          escapeHtml(expected > 0 ? (completed + '/' + expected) : '...') +
+        '</div>' +
+      '</div>';
   }
 
-  if (franchiseEmptyCard) franchiseEmptyCard.style.display = 'none';
-  franchisePlayNowBtn.style.display = 'block';
-  if (franchiseDeleteRow) franchiseDeleteRow.style.display = 'block';
+  return (
+    '<div class="franchise-home-slot-cell" data-slot-index="' + slotIndex + '" data-franchise-id="' + escapeHtml(franchiseId) + '">' +
+      '<div class="franchise-home-card franchise-home-card-active" role="link" tabindex="0" data-action="enter-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '" style="background-image:url(\'' + escapeHtml(bannerUrl) + '\');background-size:cover;background-position:center;">' +
+        '<img class="franchise-card-banner" src="' + escapeHtml(bannerUrl) + '" alt="' + escapeHtml(teamName) + '" style="display:none;">' +
+        '<div class="franchise-card-content">' +
+          '<div>' +
+            '<div class="franchise-card-name-row">' +
+              '<div class="franchise-card-team-name">' + escapeHtml(teamName) + '</div>' +
+              '<div class="franchise-card-tier-emblem" aria-hidden="true"></div>' +
+            '</div>' +
+            '<div class="franchise-card-season-line">' + escapeHtml(seasonProgress) + '</div>' +
+          '</div>' +
+          '<div class="franchise-card-grid">' +
+            '<div class="franchise-chip"><div class="franchise-chip-label">Record</div><div class="franchise-chip-value">' + escapeHtml(record) + '</div></div>' +
+            '<div class="franchise-chip"><div class="franchise-chip-label">Rank</div><div class="franchise-chip-value">' + escapeHtml(rank) + '</div></div>' +
+            '<div class="franchise-chip"><div class="franchise-chip-label">Prestige</div><div class="franchise-chip-value">' + escapeHtml(prestige) + '</div></div>' +
+            '<div class="franchise-chip"><div class="franchise-chip-label">Next Opponent</div><div class="franchise-chip-value franchise-chip-value-small">' + escapeHtml(nextOpponent) + '</div></div>' +
+          '</div>' +
+          resumeHtml +
+          '<div class="franchise-card-actions">' +
+            '<button type="button" class="franchise-enter-btn" data-action="enter-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '">' + escapeHtml(enterLabel) + '</button>' +
+            '<button type="button" class="franchise-slot-delete-btn" data-action="delete-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '">Delete</button>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+    '</div>'
+  );
 }
 
-function goToFranchiseCommandCenter() {
-  if (currentFranchise && currentFranchise.franchise_id) {
-    const resumeUrl = buildActiveGameCourtUrl(currentActiveGameResume);
+function renderFranchiseSlots(franchises, teamsByName, commandCenterById) {
+  if (!franchiseHomeSlots) return;
+  Object.keys(slotRuntimeById).forEach(function (k) { delete slotRuntimeById[k]; });
+
+  const occupied = Array.isArray(franchises) ? franchises.slice(0, maxFranchiseSlots) : [];
+  const emptyCount = Math.max(0, maxFranchiseSlots - occupied.length);
+  let html = '';
+  occupied.forEach(function (franchiseData, index) {
+    const teamName = safeText(franchiseData.user_team_id, '');
+    const teamDoc = teamsByName[teamName] || null;
+    const commandCenterData = commandCenterById[String(franchiseData.franchise_id)] || null;
+    html += buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, index);
+  });
+  for (let i = 0; i < emptyCount; i++) {
+    html += buildEmptySlotHtml(occupied.length + i);
+  }
+  franchiseHomeSlots.innerHTML = html;
+
+  occupied.forEach(function (franchiseData) {
+    const cell = Array.prototype.find.call(
+      franchiseHomeSlots.querySelectorAll('.franchise-home-slot-cell[data-franchise-id]'),
+      function (el) {
+        return String(el.getAttribute('data-franchise-id')) === String(franchiseData.franchise_id);
+      }
+    );
+    if (!cell) return;
+    const commandCenterData = commandCenterById[String(franchiseData.franchise_id)] || null;
+    renderModeSelectTierEmblem(cell, franchiseData, commandCenterData);
+  });
+}
+
+function goToFranchiseCommandCenter(franchiseId) {
+  const runtime = franchiseId ? slotRuntimeById[String(franchiseId)] : null;
+  const franchiseData = runtime && runtime.franchise;
+  if (franchiseData && franchiseData.franchise_id) {
+    const resumeUrl = buildActiveGameCourtUrl(franchiseData, runtime.activeGameResume);
     if (resumeUrl) {
       console.warn('[MODE-RESUME-CLIENT] route resume', {
-        franchise_id: currentFranchise.franchise_id,
-        game_id: currentActiveGameResume && currentActiveGameResume.game_id,
+        franchise_id: franchiseData.franchise_id,
+        game_id: runtime.activeGameResume && runtime.activeGameResume.game_id,
         url: resumeUrl,
-      });
-      console.info('[MGR-RESUME-CLIENT] mode-select route resume', {
-        franchise_id: currentFranchise.franchise_id,
-        game_id: currentActiveGameResume && currentActiveGameResume.game_id,
-        quarter: currentActiveGameResume && currentActiveGameResume.quarter,
-        clock: currentActiveGameResume && currentActiveGameResume.clock,
-        away_score: currentActiveGameResume && currentActiveGameResume.away_score,
-        home_score: currentActiveGameResume && currentActiveGameResume.home_score,
       });
       window.location.href = resumeUrl;
       return;
     }
-    if (currentCpuSimResume) {
+    if (runtime.cpuSimResume) {
       const params = new URLSearchParams();
-      params.set('franchise_id', currentFranchise.franchise_id);
+      params.set('franchise_id', franchiseData.franchise_id);
       params.set('finish_cpu_sims', '1');
-      if (currentCpuSimResume.week) params.set('week', String(currentCpuSimResume.week));
+      if (runtime.cpuSimResume.week) params.set('week', String(runtime.cpuSimResume.week));
       console.warn('[MODE-RESUME-CLIENT] route cpu sim recovery', {
-        franchise_id: currentFranchise.franchise_id,
-        week: currentCpuSimResume.week,
+        franchise_id: franchiseData.franchise_id,
+        week: runtime.cpuSimResume.week,
       });
       window.location.href = './franchise-command-center.html?' + params.toString();
       return;
     }
     console.warn('[MODE-RESUME-CLIENT] route fcc', {
-      franchise_id: currentFranchise.franchise_id,
-      has_active_game_resume: !!currentActiveGameResume,
+      franchise_id: franchiseData.franchise_id,
     });
-    window.location.href = './franchise-command-center.html?franchise_id=' + encodeURIComponent(currentFranchise.franchise_id);
-  } else {
-    console.warn('[MODE-RESUME-CLIENT] route franchise select', {
-      has_current_franchise: !!currentFranchise,
-    });
-    window.location.href = './franchise-select-team.html';
+    window.location.href = './franchise-command-center.html?franchise_id=' + encodeURIComponent(franchiseData.franchise_id);
+    return;
   }
+  console.warn('[MODE-RESUME-CLIENT] route franchise select', { franchiseId: franchiseId });
+  window.location.href = './franchise-select-team.html';
 }
 
 /** Tutorial alert "I'll do this later" for Player Attributes → FCC when a franchise exists. */
 function getFranchiseCommandCenterUrlForLater() {
+  const currentFranchise = franchisesList[0] || null;
   if (!currentFranchise || !currentFranchise.franchise_id) return null;
   var fid = currentFranchise.franchise_id;
-  var tid = currentFranchise.user_team_id || (typeof localStorage !== 'undefined' ? localStorage.getItem('franchise_user_team_id') : null);
+  var tid = currentFranchise.user_team_id || null;
+  if (!tid && window.FranchiseLS) {
+    tid = window.FranchiseLS.get(fid, 'user_team_id') || null;
+  }
   if (typeof buildFranchiseLockerRoomUrl === 'function') {
     return buildFranchiseLockerRoomUrl(fid, tid);
   }
@@ -1247,104 +1299,142 @@ function getFranchiseCommandCenterUrlForLater() {
 window.GOBModeSelect = window.GOBModeSelect || {};
 window.GOBModeSelect.getFranchiseCommandCenterUrlForLater = getFranchiseCommandCenterUrlForLater;
 
-const newFranchiseModal = document.getElementById('new-franchise-modal');
-const newFranchiseDontShowAgain = document.getElementById('new-franchise-dont-show-again');
-const newFranchiseModalCancel = document.getElementById('new-franchise-modal-cancel');
-const newFranchiseModalConfirm = document.getElementById('new-franchise-modal-confirm');
-const DONT_SHOW_NEW_FRANCHISE_WARNING_KEY = 'gob_dont_show_new_franchise_warning';
+const deleteFranchiseModal = document.getElementById('delete-franchise-modal');
+const deleteFranchiseModalText = document.getElementById('delete-franchise-modal-text');
+const deleteFranchiseModalCancel = document.getElementById('delete-franchise-modal-cancel');
+const deleteFranchiseModalConfirm = document.getElementById('delete-franchise-modal-confirm');
+const slotsFullModal = document.getElementById('slots-full-modal');
+const slotsFullModalOk = document.getElementById('slots-full-modal-ok');
 
-function openNewFranchiseModal() {
-  if (newFranchiseModal) newFranchiseModal.style.display = 'flex';
+function openDeleteFranchiseModal(franchiseData) {
+  pendingDeleteFranchise = franchiseData || null;
+  if (!pendingDeleteFranchise) return;
+  const teamName = safeText(pendingDeleteFranchise.user_team_id, 'this franchise');
+  const week = pendingDeleteFranchise.week != null ? pendingDeleteFranchise.week : '?';
+  const season = pendingDeleteFranchise.current_season != null ? pendingDeleteFranchise.current_season : '?';
+  if (deleteFranchiseModalText) {
+    deleteFranchiseModalText.textContent =
+      'Delete ' + teamName + ' (Season ' + season + ' · Week ' + week + ')? This cannot be undone.';
+  }
+  if (deleteFranchiseModal) {
+    deleteFranchiseModal.style.display = 'flex';
+    deleteFranchiseModal.setAttribute('aria-hidden', 'false');
+  }
 }
 
-function closeNewFranchiseModal() {
-  if (newFranchiseModal) newFranchiseModal.style.display = 'none';
+function closeDeleteFranchiseModal() {
+  pendingDeleteFranchise = null;
+  if (deleteFranchiseModal) {
+    deleteFranchiseModal.style.display = 'none';
+    deleteFranchiseModal.setAttribute('aria-hidden', 'true');
+  }
+}
+
+function openSlotsFullModal() {
+  if (slotsFullModal) {
+    slotsFullModal.style.display = 'flex';
+    slotsFullModal.setAttribute('aria-hidden', 'false');
+  }
+}
+
+function closeSlotsFullModal() {
+  if (slotsFullModal) {
+    slotsFullModal.style.display = 'none';
+    slotsFullModal.setAttribute('aria-hidden', 'true');
+  }
 }
 
 function goToNewFranchise() {
   window.location.href = './franchise-select-team.html';
 }
 
-async function startNewFranchiseFlow() {
+function startNewFranchiseFlow() {
   playSound('click-beep.wav');
-  const dontShow = typeof localStorage !== 'undefined' && localStorage.getItem(DONT_SHOW_NEW_FRANCHISE_WARNING_KEY) === '1';
-  const hasExistingFranchise = !!currentFranchise;
-  if (hasExistingFranchise && !dontShow) {
-    openNewFranchiseModal();
+  if (franchisesList.length >= maxFranchiseSlots) {
+    openSlotsFullModal();
     return;
   }
-  if (hasExistingFranchise && dontShow) {
-    try {
-      const res = await fetch(API_CONFIG.buildUrl('/franchise/delete-current'), {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      });
-      if (res.ok) clearFranchiseLocalStorage();
-    } catch (e) {
-      console.warn('[mode-select] delete-current franchise (dontShow path):', e);
-    }
-  }
+  // Fill an empty slot — do not delete any existing franchise.
   goToNewFranchise();
 }
 
-if (franchisePlayNowBtn) {
-  franchisePlayNowBtn.addEventListener('click', function () {
-    playSound('click-strong.wav');
-    goToFranchiseCommandCenter();
-  });
-  franchisePlayNowBtn.addEventListener('keydown', function (event) {
-    if (event.key === 'Enter' || event.key === ' ') {
+async function confirmDeleteFranchise() {
+  const target = pendingDeleteFranchise;
+  if (!target || !target.franchise_id) {
+    closeDeleteFranchiseModal();
+    return;
+  }
+  const franchiseId = String(target.franchise_id);
+  if (deleteFranchiseModalConfirm) deleteFranchiseModalConfirm.disabled = true;
+  try {
+    const res = await fetch(
+      API_CONFIG.buildUrl('/franchise/' + encodeURIComponent(franchiseId)),
+      { method: 'DELETE', headers: getAuthHeaders() }
+    );
+    if (!res.ok) {
+      console.warn('[mode-select] delete franchise failed:', res.status);
+      alert('Could not delete that franchise. Try again.');
+      return;
+    }
+    if (window.FranchiseLS && typeof window.FranchiseLS.clearAllForFranchise === 'function') {
+      window.FranchiseLS.clearAllForFranchise(franchiseId);
+    }
+    closeDeleteFranchiseModal();
+    window.location.reload();
+  } catch (e) {
+    console.warn('[mode-select] delete franchise error:', e);
+    alert('Could not delete that franchise. Try again.');
+  } finally {
+    if (deleteFranchiseModalConfirm) deleteFranchiseModalConfirm.disabled = false;
+  }
+}
+
+if (franchiseHomeSlots) {
+  franchiseHomeSlots.addEventListener('click', function (event) {
+    const actionEl = event.target.closest('[data-action]');
+    if (!actionEl || !franchiseHomeSlots.contains(actionEl)) return;
+    const action = actionEl.getAttribute('data-action');
+    const franchiseId = actionEl.getAttribute('data-franchise-id');
+
+    if (action === 'start-franchise') {
       event.preventDefault();
+      startNewFranchiseFlow();
+      return;
+    }
+    if (action === 'delete-franchise') {
+      event.preventDefault();
+      event.stopPropagation();
+      playSound('click-beep.wav');
+      const runtime = franchiseId ? slotRuntimeById[String(franchiseId)] : null;
+      if (runtime && runtime.franchise) openDeleteFranchiseModal(runtime.franchise);
+      return;
+    }
+    if (action === 'enter-franchise') {
+      event.preventDefault();
+      event.stopPropagation();
       playSound('click-strong.wav');
-      goToFranchiseCommandCenter();
+      goToFranchiseCommandCenter(franchiseId);
     }
   });
-}
 
-if (franchiseEnterBtn) {
-  franchiseEnterBtn.addEventListener('click', function (event) {
-    event.stopPropagation();
+  franchiseHomeSlots.addEventListener('keydown', function (event) {
+    if (event.key !== 'Enter' && event.key !== ' ') return;
+    const card = event.target.closest('[data-action="enter-franchise"].franchise-home-card-active');
+    if (!card || !franchiseHomeSlots.contains(card)) return;
+    event.preventDefault();
     playSound('click-strong.wav');
-    goToFranchiseCommandCenter();
+    goToFranchiseCommandCenter(card.getAttribute('data-franchise-id'));
   });
 }
 
-if (franchiseNewBtn) {
-  franchiseNewBtn.addEventListener('click', startNewFranchiseFlow);
+if (deleteFranchiseModalCancel) {
+  deleteFranchiseModalCancel.addEventListener('click', closeDeleteFranchiseModal);
 }
-
-if (franchiseDeleteLink) {
-  franchiseDeleteLink.addEventListener('click', function (event) {
-    event.stopPropagation();
-    startNewFranchiseFlow();
-  });
+if (deleteFranchiseModalConfirm) {
+  deleteFranchiseModalConfirm.addEventListener('click', confirmDeleteFranchise);
 }
-
-if (newFranchiseModalCancel) {
-  newFranchiseModalCancel.addEventListener('click', closeNewFranchiseModal);
-}
-
-if (newFranchiseModalConfirm) {
-  newFranchiseModalConfirm.addEventListener('click', async function () {
-    if (newFranchiseDontShowAgain && newFranchiseDontShowAgain.checked && typeof localStorage !== 'undefined') {
-      localStorage.setItem(DONT_SHOW_NEW_FRANCHISE_WARNING_KEY, '1');
-    }
-    closeNewFranchiseModal();
-    try {
-      const res = await fetch(API_CONFIG.buildUrl('/franchise/delete-current'), {
-        method: 'POST',
-        headers: getAuthHeaders(),
-      });
-      if (!res.ok) {
-        console.warn('[mode-select] delete-current franchise failed:', res.status);
-      } else {
-        clearFranchiseLocalStorage();
-      }
-    } catch (e) {
-      console.warn('[mode-select] delete-current franchise error:', e);
-    }
-    goToNewFranchise();
-  });
+if (slotsFullModalOk) {
+  slotsFullModalOk.addEventListener('click', closeSlotsFullModal);
 }
 
 document.addEventListener('DOMContentLoaded', async function () {
@@ -1440,8 +1530,9 @@ document.addEventListener('DOMContentLoaded', async function () {
   }
 
   const headers = getAuthHeaders();
-  const currentFranchiseData = await safeJsonFetch(API_CONFIG.buildUrl('/franchise/current'), { headers: headers });
-  currentFranchise = currentFranchiseData;
+  const listData = await safeJsonFetch(API_CONFIG.buildUrl('/franchise/list'), { headers: headers });
+  franchisesList = (listData && Array.isArray(listData.franchises)) ? listData.franchises : [];
+  maxFranchiseSlots = (listData && listData.max) ? Number(listData.max) || 2 : 2;
 
   const teamsData = await safeJsonFetch(API_CONFIG.buildUrl('/teams'), { headers: headers }) || [];
   const teamsByName = {};
@@ -1449,25 +1540,22 @@ document.addEventListener('DOMContentLoaded', async function () {
     if (team && team.name) teamsByName[team.name] = team;
   });
 
-  if (!currentFranchise) {
-    renderFranchiseEmptyState();
-    revealModeSelect();
-    return;
-  }
+  const commandCenterById = {};
+  await Promise.all(franchisesList.map(async function (franchiseData) {
+    if (!franchiseData || !franchiseData.franchise_id) return;
+    const fid = String(franchiseData.franchise_id);
+    const commandCenterData = await safeJsonFetch(
+      API_CONFIG.buildUrl('/franchise/command-center/data?franchise_id=' + encodeURIComponent(fid)),
+      { headers: headers }
+    );
+    commandCenterById[fid] = commandCenterData;
+    console.warn('[MODE-RESUME-CLIENT] command center data loaded', {
+      franchise_id: fid,
+      has_data: !!commandCenterData,
+      has_active_game_resume: !!(commandCenterData && commandCenterData.active_game_resume),
+    });
+  }));
 
-  const commandCenterData = await safeJsonFetch(
-    API_CONFIG.buildUrl('/franchise/command-center/data?franchise_id=' + encodeURIComponent(currentFranchise.franchise_id)),
-    { headers: headers }
-  );
-  console.warn('[MODE-RESUME-CLIENT] command center data loaded', {
-    franchise_id: currentFranchise.franchise_id,
-    has_data: !!commandCenterData,
-    has_active_game_resume: !!(commandCenterData && commandCenterData.active_game_resume),
-    active_game_resume: commandCenterData && commandCenterData.active_game_resume,
-  });
-
-  const teamName = safeText(currentFranchise.user_team_id, '');
-  const teamDoc = teamsByName[teamName] || null;
-  renderFranchiseActiveState(currentFranchise, teamDoc, commandCenterData);
+  renderFranchiseSlots(franchisesList, teamsByName, commandCenterById);
   revealModeSelect();
 });

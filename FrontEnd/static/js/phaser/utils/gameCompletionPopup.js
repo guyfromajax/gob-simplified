@@ -908,7 +908,9 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
         const res = await getOrStartFranchisePhaseB(franchisePhaseBPending);
         if (res.ok) {
           okToNavigate = true;
-          if (typeof localStorage !== 'undefined') {
+          if (window.FranchiseLS && franchiseId) {
+            window.FranchiseLS.clearPendingAndEog(franchiseId);
+          } else if (typeof localStorage !== 'undefined') {
             localStorage.removeItem('franchise_complete_week_pending');
             localStorage.removeItem('franchise_eog_pgpc_snapshot');
           }

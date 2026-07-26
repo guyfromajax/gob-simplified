@@ -161,8 +161,10 @@ if (!franchiseId && urlMode === 'franchise') {
 // ✅ PHASE 1.1: Only write to localStorage for explicit "Resume Last Game" feature (not implemented yet)
 // For now, we don't write franchise_id to localStorage - it must always come from URL
 const weekParam = parseInt(urlParams.get('week'), 10);
-if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined') {
-  localStorage.setItem('franchise_week', weekParam);
+if (weekParam && !Number.isNaN(weekParam) && typeof localStorage !== 'undefined' && franchiseId) {
+  if (window.FranchiseLS) {
+    window.FranchiseLS.setWeek(franchiseId, weekParam);
+  }
 }
 // ✅ SS&S: Explicitly set mode to 'single' if not provided and not tournament/franchise
 const mode = urlMode || getMode({ tournamentId, franchiseId });

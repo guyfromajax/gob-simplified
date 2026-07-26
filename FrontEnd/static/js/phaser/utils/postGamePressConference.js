@@ -232,9 +232,13 @@ export async function launchPostGamePressConference(opts) {
           } catch (_) {}
         }
         try {
-          if (phaseBOk && typeof localStorage !== 'undefined') {
-            localStorage.removeItem('franchise_complete_week_pending');
-            localStorage.removeItem('franchise_eog_pgpc_snapshot');
+          if (phaseBOk) {
+            if (window.FranchiseLS && franchiseId) {
+              window.FranchiseLS.clearPendingAndEog(franchiseId);
+            } else if (typeof localStorage !== 'undefined') {
+              localStorage.removeItem('franchise_complete_week_pending');
+              localStorage.removeItem('franchise_eog_pgpc_snapshot');
+            }
           }
         } catch (_) {}
         if (allAnswered()) {

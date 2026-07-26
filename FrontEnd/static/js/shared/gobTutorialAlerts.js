@@ -61,7 +61,14 @@
   function portraitFor(id) {
     if (id === 'player-attributes') return GENERIC_SAMMY;
     var team = '';
-    try { team = localStorage.getItem('franchise_user_team') || ''; } catch (e) {}
+    try {
+      var fid = window.FranchiseLS
+        ? window.FranchiseLS.resolveFranchiseIdFromUrl()
+        : new URLSearchParams(window.location.search).get('franchise_id');
+      if (fid && window.FranchiseLS) {
+        team = window.FranchiseLS.get(fid, 'user_team') || '';
+      }
+    } catch (e) {}
     var abbr = TEAM_COACH_ABBR[team];
     return abbr ? '/images/coaches/' + abbr + '/Sammy-' + abbr + '.png' : GENERIC_SAMMY;
   }
@@ -266,8 +273,13 @@
       return window.GOBModeSelect.getFranchiseCommandCenterUrlForLater();
     }
     try {
-      var fid = localStorage.getItem('franchise_id') || localStorage.getItem('franchiseId');
-      var tid = localStorage.getItem('franchise_user_team_id');
+      var fid = window.FranchiseLS
+        ? window.FranchiseLS.resolveFranchiseIdFromUrl()
+        : new URLSearchParams(window.location.search).get('franchise_id');
+      var tid =
+        fid && window.FranchiseLS
+          ? window.FranchiseLS.get(fid, 'user_team_id')
+          : null;
       if (fid && typeof buildFranchiseLockerRoomUrl === 'function') {
         return buildFranchiseLockerRoomUrl(fid, tid);
       }

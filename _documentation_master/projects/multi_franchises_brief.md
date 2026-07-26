@@ -1,6 +1,6 @@
 # Multi-Franchise Slots Brief
 
-> **Status:** Proposed — feasibility audited 2026-07-25; **LS/URL hardening audited 2026-07-25**  
+> **Status:** Phase 1–3 done; **Phase 2 dual mode-select landed** (2026-07-26). Next: Phase 4 career/ATL polish as needed.  
 > **Goal:** Let each account hold **two** concurrent franchise slots so a user can run two careers at once.  
 > **Constraint:** Protect ownership isolation and session identity. Do not invent soft-archive in v1 unless product demands it.
 
@@ -71,39 +71,43 @@
 
 ### Phase 1 — Backend API (no FE polish yet)
 
-- [ ] Raise create gate: `>= 1` → `>= 2` (constant `MAX_FRANCHISES_PER_USER = 2`).
-- [ ] Add `GET /franchise/list` → all franchises for JWT user (id, team, week, season, colors, updated_at).
-- [ ] Deprecate / stop relying on `GET /franchise/current` for multi-slot (keep temporarily as “first list item” only if needed for grandfather clients — prefer remove from mode-select).
-- [ ] Replace delete-current with **`DELETE /franchise/{franchise_id}`** (ownership-verified). Remove “delete whatever find_one returns.”
-- [ ] Cascade on delete: FTD, FPD, FRD, games (existing) **+** `press_conference_sessions` for that franchise; clear ATL presence for that franchise if any.
-- [ ] Fix ATL / any other `find_one(user_id)` to require `franchise_id` or featured-slot field on user/franchise.
+- [x] Raise create gate: `>= 1` → `>= 2` (constant `MAX_FRANCHISES_PER_USER = 2`).
+- [x] Add `GET /franchise/list` → all franchises for JWT user (id, team, week, season, colors).
+- [x] Keep `GET /franchise/current` as transitional (newest franchise) for old mode-select — Phase 2 switches to list.
+- [x] Add **`DELETE /franchise/{franchise_id}`** (ownership-verified). `delete-current` remains for old UI but only when the user has ≤1 franchise (409 if two exist).
+- [x] Cascade on delete: FTD, FPD, FRD, games + press_conference_sessions + R2 signed masters.
+- [ ] Fix ATL / any other `find_one(user_id)` — deferred (needs featured-slot product call); still nondeterministic with two franchises.
+- [x] **Thin Phase 3 warm-up:** `API_CONFIG.currentFranchiseId()` is URL-only (no LS fallback).
 
 **Acceptance:** A test user can create two franchises via API; list returns both; delete A leaves B intact; ownership still rejects other users’ ids.
 
-### Phase 2 — Mode-select UX
+### Phase 2 — Mode-select UX (dual franchise container)
 
-- [ ] Two slot cards from `/franchise/list`.
-- [ ] Empty slot → team select (create).
-- [ ] Occupied → Resume / Play into that `franchise_id` (URL).
-- [ ] Delete confirms **which** franchise (team name + week); never “replace your franchise” without picking.
-- [ ] Clear or rewrite global franchise LS when entering a slot (see Phase 3).
+The mode-select **user / franchise home container** must hold **two franchise instances** side by side (or stacked on narrow viewports).
 
-**Acceptance:** User with 0 / 1 / 2 franchises sees correct UI; creating second does not touch first; deleting one does not touch the other.
+- [x] Replace single `#franchise-home-slot` card with a **two-slot layout** fed by `GET /franchise/list`.
+- [x] **Empty state per slot** — each empty slot shows its own empty card / CTA (e.g. “Start Franchise” / “Find Your Program”), not one shared empty that disappears when either slot is filled. Occupied+empty = one active card + one empty card.
+- [x] Occupied slot → Resume / Enter into that slot’s `franchise_id` (URL).
+- [x] Delete confirms **which** franchise (team name + week) via `DELETE /franchise/{id}`; never “replace your franchise” / wipe-current.
+- [x] If both full → create blocked until a specific slot is deleted.
+- [x] Clear or rewrite global franchise LS when entering a slot — **done in Phase 3** (`FranchiseLS`); Phase 2 wires dual empty-state cards.
+
+**Acceptance:** User with 0 / 1 / 2 franchises sees correct UI (two empties / one+empty / two occupied); creating second does not touch first; deleting one does not touch the other. ✅
 
 ### Phase 3 — FE session isolation (cross-contam kill)
 
 > Full inventory + file map: [`multi_franchises_ls_url_audit.md`](./multi_franchises_ls_url_audit.md).  
-> **Recommended strategy (audit §6): Hybrid C** — URL-only identity; namespace week/team/pending; clear bare orphan keys on mode-select.
+> **Strategy (audit §6): Hybrid C** — URL-only identity; namespace week/team/pending; clear bare orphan keys on mode-select. **Landed 2026-07-26.**
 
-- [ ] Prefer **namespaced LS**: `franchise:{id}:week`, `franchise:{id}:user_team`, etc. — drop bare identity keys.
-- [ ] Kill bare LS fallbacks: `currentFranchiseId()` URL-only; auth bar / tutorials / paint helpers.
-- [ ] Collapse `franchiseId` vs `franchise_id` dual-key smell (create writes camelCase; reader expects underscore).
-- [ ] `franchise_complete_week_pending` / EOG: keep box-score id-check; namespace so two slots don’t clobber; extend `clearFranchiseLocalStorage` to include these keys.
-- [ ] Court / FCC: refuse franchise flows without URL `franchise_id` (court already fails loud — keep).
-- [ ] Auth bar: no Slot A chrome on Slot B URL.
+- [x] Prefer **namespaced LS**: `franchise:{id}:week`, `franchise:{id}:user_team`, etc. — via `FrontEnd/static/js/shared/franchiseLocalStorage.js` (`window.FranchiseLS`).
+- [x] Kill bare LS fallbacks: `currentFranchiseId()` URL-only; auth bar / tutorials / playbook-report / box-score read namespaced context only when URL has `franchise_id`.
+- [x] Collapse `franchiseId` vs `franchise_id` dual-key smell (no longer write bare identity; clear both on exit).
+- [x] `franchise_complete_week_pending` / EOG: namespaced as `complete_week_pending` / `eog_pgpc_snapshot`; box-score still id-checks; `clearOnFranchiseExit` wipes bare + all namespaces.
+- [x] Court / FCC: refuse franchise flows without URL `franchise_id` (court already fails loud — keep).
+- [x] Auth bar: no Slot A chrome on Slot B URL (and no franchise chrome without URL `franchise_id`).
 
 **Acceptance:** Two tabs on two different franchise URLs do not overwrite each other’s week/team/pending complete-week; switching slots on mode-select leaves the other franchise’s server state untouched.  
-**Gate:** Do not ship Phase 2 mode-select dual cards until Phase 3 hybrid (or equivalent) lands — see audit §7.
+**Gate:** Do not ship Phase 2 mode-select dual cards until Phase 3 hybrid (or equivalent) lands — see audit §7. ✅ Phase 3 hybrid landed.
 
 ### Phase 4 — Career / side systems (explicit)
 
@@ -138,10 +142,10 @@
 | P0 | Delete by explicit `franchise_id` only | ✓ |
 | P0 | Mode-select never calls delete-current blindly | ✓ |
 | P1 | No `find_one({user_id})` for “the” franchise in live paths | ✓ |
-| P1 | LS namespaced or cleared on slot switch | ✓ |
+| P1 | LS namespaced or cleared on slot switch | ✓ Phase 3 hybrid (`FranchiseLS`) |
 | P1 | Pending complete-week / EOG refuse wrong franchise_id | ✓ |
 | P2 | ATL / board hydration franchise-explicit | ✓ |
-| P2 | `currentFranchiseId()` LS fallback removed or scoped | ✓ |
+| P2 | `currentFranchiseId()` LS fallback removed or scoped | ✓ URL-only + namespaced context |
 | P3 | Press sessions cascade on franchise delete | ✓ |
 
 ---
@@ -169,6 +173,7 @@
 | FCC | `FrontEnd/static/franchise-command-center.js` |
 | API config | `FrontEnd/static/js/config/api-config.js` (`currentFranchiseId`) |
 | Auth chrome | `FrontEnd/static/js/shared/authBarInit.js` |
+| Franchise LS helper | `FrontEnd/static/js/shared/franchiseLocalStorage.js` (`FranchiseLS`) |
 | Complete-week pending | `FrontEnd/static/box-score.js`, finalize / EOG paths |
 | ATL | `BackEnd/utils/around_the_league.py` |
 

@@ -89,7 +89,11 @@ function resolveUserTeamNameForPhaseBPulse(urlParams) {
     userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeName, awayName, homeTeamId, awayTeamId);
   }
   if (userTeamSide == null && !teamIdParam && !myTeamParam && typeof localStorage !== 'undefined') {
-    const stored = localStorage.getItem('last_game_user_team_side');
+    const fid = urlParams.get('franchise_id');
+    const stored =
+      fid && window.FranchiseLS
+        ? window.FranchiseLS.getLastGameUserTeamSide(fid)
+        : null;
     if (stored === 'home' || stored === 'away') userTeamSide = stored;
   }
   if (bannerTeamParam) {
@@ -110,7 +114,11 @@ function resolveUserTeamSideForPhaseBPulse(urlParams) {
   if (myTeamParam === 'home' || myTeamParam === 'away') return myTeamParam;
   if (teamIdParam) return mapTeamIdToSide(teamIdParam, gameData, homeName, awayName, homeTeamId, awayTeamId);
   if (typeof localStorage !== 'undefined') {
-    const stored = localStorage.getItem('last_game_user_team_side');
+    const fid = urlParams.get('franchise_id');
+    const stored =
+      fid && window.FranchiseLS
+        ? window.FranchiseLS.getLastGameUserTeamSide(fid)
+        : null;
     if (stored === 'home' || stored === 'away') return stored;
   }
   return null;
@@ -690,7 +698,11 @@ function renderHeader() {
     userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeName, awayName, homeTeamId, awayTeamId);
   }
   if (userTeamSide == null && !teamIdParam && !myTeamParam && typeof localStorage !== 'undefined') {
-    const stored = localStorage.getItem('last_game_user_team_side');
+    const fid = urlParams.get('franchise_id');
+    const stored =
+      fid && window.FranchiseLS
+        ? window.FranchiseLS.getLastGameUserTeamSide(fid)
+        : null;
     if (stored === 'home' || stored === 'away') userTeamSide = stored;
   }
 
@@ -2228,18 +2240,16 @@ function setupLockerRoomButton() {
     urlFranchiseId &&
     typeof localStorage !== 'undefined'
   ) {
-    const pendingRaw = localStorage.getItem('franchise_complete_week_pending');
-    if (pendingRaw) {
-      try {
-        const pending = JSON.parse(pendingRaw);
-        if (
-          pending &&
-          pending.franchise_id != null &&
-          String(pending.franchise_id) === String(urlFranchiseId)
-        ) {
-          showSimComputerGamesLabel = true;
-        }
-      } catch (_e) {}
+    const pending =
+      window.FranchiseLS && urlFranchiseId
+        ? window.FranchiseLS.getPendingCompleteWeek(urlFranchiseId)
+        : null;
+    if (
+      pending &&
+      pending.franchise_id != null &&
+      String(pending.franchise_id) === String(urlFranchiseId)
+    ) {
+      showSimComputerGamesLabel = true;
     }
   }
 
@@ -2252,10 +2262,12 @@ function setupLockerRoomButton() {
     e.stopPropagation();
     // Franchise EOG: if phase-a ran and user opened box score first, finish CPU week before FCC (button label: "Go To Locker Room" when post_game_phase_b pending)
     if (navMode === 'franchise' && isFinalGame && typeof localStorage !== 'undefined') {
-      const pendingRaw = localStorage.getItem('franchise_complete_week_pending');
-      if (pendingRaw && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) {
+      const pending =
+        window.FranchiseLS && urlFranchiseId
+          ? window.FranchiseLS.getPendingCompleteWeek(urlFranchiseId)
+          : null;
+      if (pending && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) {
         try {
-          const pending = JSON.parse(pendingRaw);
           const phaseBBody =
             pending &&
             pending.franchise_id != null &&
@@ -2302,7 +2314,9 @@ function setupLockerRoomButton() {
                 body: JSON.stringify(fetchBody),
               });
               if (res.ok) {
-                localStorage.removeItem('franchise_complete_week_pending');
+                if (window.FranchiseLS && urlFranchiseId) {
+                  window.FranchiseLS.clearPendingAndEog(urlFranchiseId);
+                }
               } else {
                 console.error('[BOX-SCORE] week finish failed:', res.status, await res.text());
                 alert('Could not finish the week (computer games). Try again.');
