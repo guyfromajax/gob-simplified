@@ -7,7 +7,7 @@ import { DEBUG } from './utils/debug.js';
 import gameStore from '../state/gameStore.js';
 import { generateBothLineupsFromApi } from './utils/autosetLineupApi.js';
 import { getOrStartFranchiseStartCpuSims } from './utils/franchiseStartCpuSimsClient.js';
-import { preloadGameSfx } from './utils/gameSfx.js';
+import { preloadGameSfx, startPregameBed } from './utils/gameSfx.js';
 import { getGameMode } from '../shared/getGameMode.js';
 import { buildSimTimeline } from './utils/simTimelineAssembler.js';
 import { showSimGamePresentation } from './utils/simGamePresentation.js';
@@ -2854,6 +2854,31 @@ async function handleSimFullGame() {
     preppingCoverPromise = showPreppingSimCover(simDonePromise).catch((e) => {
       console.warn('⚠️ [SIM-PRES] Prepping Sim cover skipped:', e);
     });
+    // Play the SAME pregame bed the pre-game experience uses (varies by week/game
+    // conditions), looping through the Prepping Sim cover + Act 2; faded out when Act 2
+    // ends (simGamePresentation.finish). Async so it never delays the sim; the game is
+    // already set up (Q1 was played), so /lineup-for-matchups returns week + ranks.
+    if (gameId) {
+      (async () => {
+        try {
+          const bres = await fetch(
+            API_CONFIG.buildUrl(`/api/game/${gameId}/lineup-for-matchups`),
+            { headers: { 'Content-Type': 'application/json' } }
+          );
+          if (!bres.ok) return;
+          const n = normalizeMatchupsPayload(await bres.json());
+          const userIsHome = n.userTeamSide === 'home';
+          startPregameBed(null, {
+            week: n.franchiseWeek ?? weekParam ?? 1,
+            userNatlRank: userIsHome ? n.homeTeam?.natl_rank : n.awayTeam?.natl_rank,
+            opponentNatlRank: userIsHome ? n.awayTeam?.natl_rank : n.homeTeam?.natl_rank,
+            loop: true,
+          });
+        } catch (bedErr) {
+          console.warn('⚠️ [SIM-PRES] Prepping Sim bed skipped:', bedErr);
+        }
+      })();
+    }
   }
 
   try {
