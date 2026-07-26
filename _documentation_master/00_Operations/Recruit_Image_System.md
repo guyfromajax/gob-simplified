@@ -67,6 +67,11 @@ forever after** — no pre-generation, no batch job, no queue:
   {image_id}` finishes the kit bust. No recolor.
 - **Uniformed master** (`players/master/<player_id>.png`, post-signing) → `POST
   /player-image/ensure` recolors the kit into the signed team's colors.
+- **Practice Squad surfaces** preserve a display-only portrait descriptor through projected
+  starting-five and saved-game player payloads. FRD players carry
+  `portrait_source="recruit"` + `image_id` and use the white-master flow; FPD players carry
+  `portrait_source="player"` and use the uniformed-player flow. Team cards and Player of the
+  Game use the same ensure → retry → generic fallback sequence as player detail.
 
 > **`player_id` is a fresh unique uuid at signing — NOT the recruit_id.** Set recruits share one
 > recruit_id across every franchise (all draw set_0001), so keying the uniformed master by

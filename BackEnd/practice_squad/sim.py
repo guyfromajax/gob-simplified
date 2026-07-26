@@ -81,6 +81,8 @@ def _player_payload_from_roster_slot(slot: dict, fpd_by_id: dict, frd_by_id: dic
         meta = fpd.get("meta") or {}
         return {
             "_id": pid,
+            "portrait_source": "player",
+            "image_id": (meta.get("image_id") or None),
             "first_name": str(meta.get("first_name") or ""),
             "last_name": str(meta.get("last_name") or ""),
             "team": slot.get("parent_team_name") or "",
@@ -98,6 +100,8 @@ def _player_payload_from_roster_slot(slot: dict, fpd_by_id: dict, frd_by_id: dic
     last = parts[1] if len(parts) > 1 else ""
     return {
         "_id": pid,
+        "portrait_source": "recruit",
+        "image_id": (frd.get("image_id") or None),
         "first_name": first,
         "last_name": last,
         "team": "",

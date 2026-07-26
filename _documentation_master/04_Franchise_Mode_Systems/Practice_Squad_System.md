@@ -176,8 +176,10 @@ walk-on fill = 15, then Training Camp re-trims to 12 + 3.
   top (shared `renderProjectedStartingFiveCards`; franchise, base/tutorial, and Practice
   Squad team pages; not tournament). Same "Training Squad" section below the roster.
 - **Practice Squad team pages** (`GET /franchise/practice-squad/team`) also return
-  `projected_starting_five` enriched from `ps_season_stats` (images fall back to
-  `generic_headshot.png` until recruit portraits exist).
+  `projected_starting_five` enriched from `ps_season_stats`. The PS portrait contract carries
+  `portrait_source` plus `image_id`: unsigned FRD recruits use their white recruit master,
+  while FPD players use the normal player master. Both retry the existing lazy-paint endpoint
+  on a missing generated master, then fall back to `generic_headshot.png`.
 - **Walk-on tag** — a transient "(walk on)" name tag shows on the roster only in the new
   season's week-1 preseason (pre-camp) for first-year walk-ons; gated server-side.
   See it drop after Training Camp. (The underlying `meta.archetype="Walk On"`

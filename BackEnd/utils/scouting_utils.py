@@ -229,6 +229,10 @@ def compute_projected_starting_five(players: List[Dict[str, Any]]) -> List[Dict[
             {
                 "position": pos,
                 "player_id": _player_sort_key(p),
+                "portrait_source": p.get("portrait_source") or (
+                    "recruit" if p.get("source") == "frd" else "player"
+                ),
+                "image_id": p.get("image_id"),
                 "name": (p.get("name") or f"{p.get('first_name', '')} {p.get('last_name', '')}").strip(),
                 "jersey": p.get("jersey"),
                 "year": p.get("year") or "",

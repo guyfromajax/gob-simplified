@@ -69,6 +69,16 @@ function inferTeamFromBoxScoreKey(key, teamCtx) {
 
 function getPlayerImage(player) {
   const id = player.playerId || player._id || player.player_id || '';
+  const imageId = player.imageId || player.image_id || '';
+  const portraitSource = player.portraitSource || player.portrait_source || '';
+  if (
+    portraitSource === 'recruit' &&
+    imageId &&
+    typeof window !== 'undefined' &&
+    window.API_CONFIG?.getRecruitImageUrl
+  ) {
+    return window.API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' });
+  }
   if (typeof window !== 'undefined' && window.API_CONFIG?.getPlayerImageUrl) {
     return window.API_CONFIG.getPlayerImageUrl(id, { size: 'card' });
   }
@@ -94,11 +104,19 @@ function buildCandidates(gameData, scoreOverride = null) {
       teamName: fallbackTeam === 'home' ? teamCtx.homeTeamName : (fallbackTeam === 'away' ? teamCtx.awayTeamName : 'Unknown Team'),
       teamColor: fallbackTeam === 'home' ? teamCtx.homePrimaryColor : (fallbackTeam === 'away' ? teamCtx.awayPrimaryColor : '#1a1a2e'),
       photo: getPlayerImage(raw),
+      portraitSource: raw.portraitSource || raw.portrait_source || 'player',
+      imageId: raw.imageId || raw.image_id || null,
       stats: {},
     };
 
     existing.name = raw.name || existing.name;
-    existing.photo = getPlayerImage(raw) || existing.photo;
+    const rawPortraitSource = raw.portraitSource || raw.portrait_source;
+    const rawImageId = raw.imageId || raw.image_id;
+    if (rawPortraitSource || rawImageId || !existing.photo) {
+      existing.portraitSource = rawPortraitSource || existing.portraitSource;
+      existing.imageId = rawImageId || existing.imageId;
+      existing.photo = getPlayerImage(raw) || existing.photo;
+    }
     if (fallbackTeam) {
       existing.team = fallbackTeam;
       existing.teamName = fallbackTeam === 'home' ? teamCtx.homeTeamName : teamCtx.awayTeamName;
@@ -241,6 +259,8 @@ export function calculatePlayerOfTheGame(gameData, options = {}) {
     teamName: winner.teamName,
     teamColor: winner.teamColor || '#1a1a2e',
     photo: winner.photo,
+    portraitSource: winner.portraitSource || 'player',
+    imageId: winner.imageId || null,
     potgPoints: winner.score,
     stats: {
       pts: winner.pts,

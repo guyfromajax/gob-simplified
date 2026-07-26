@@ -495,15 +495,35 @@ async function renderPlayerOfTheGameSection() {
     statsLine.textContent = `${potg.stats.pts} PTS  ${potg.stats.reb} REB  ${potg.stats.ast} AST  ${potg.stats.stl} STL  ${potg.stats.blk} BLK  ${potg.stats.defPct} DEF%`;
     if (potgPortrait && potg.playerId) {
       potgPortrait.style.display = '';
-      potgPortrait.src = window.API_CONFIG?.getPlayerImageUrl
-        ? window.API_CONFIG.getPlayerImageUrl(potg.playerId, { size: 'card' })
-        : `${staticBase}/images/players/${potg.playerId}.png`;
+      potgPortrait.src = potg.photo || (
+        window.API_CONFIG?.getPlayerImageUrl
+          ? window.API_CONFIG.getPlayerImageUrl(potg.playerId, { size: 'card' })
+          : `${staticBase}/images/players/${potg.playerId}.png`
+      );
       potgPortrait.alt = potg.name || '';
       potgPortrait.onerror = function () {
         this.onerror = null;
-        this.src = window.API_CONFIG?.getGenericHeadshotUrl
-          ? window.API_CONFIG.getGenericHeadshotUrl({ size: 'card' })
-          : `${staticBase}/images/players/generic_headshot.png`;
+        const api = window.API_CONFIG;
+        const ensure = potg.portraitSource === 'recruit' && potg.imageId
+          ? api?.ensureRecruitImage?.(potg.imageId)
+          : api?.ensurePlayerImage?.(api.currentFranchiseId?.(), potg.playerId);
+        Promise.resolve(ensure).then(() => {
+          this.onerror = () => {
+            this.onerror = null;
+            this.src = api?.getGenericHeadshotUrl
+              ? api.getGenericHeadshotUrl({ size: 'card' })
+              : `${staticBase}/images/players/generic_headshot.png`;
+          };
+          const retryUrl = potg.portraitSource === 'recruit' && potg.imageId
+            ? api?.getRecruitImageUrl?.(potg.imageId, { size: 'card' })
+            : api?.getPlayerImageUrl?.(potg.playerId, { size: 'card' });
+          const resolvedRetryUrl = retryUrl || potg.photo;
+          if (!resolvedRetryUrl) {
+            this.onerror();
+            return;
+          }
+          this.src = `${resolvedRetryUrl}${resolvedRetryUrl.includes('?') ? '&' : '?'}r=1`;
+        });
       };
     } else if (potgPortrait) {
       potgPortrait.style.display = 'none';

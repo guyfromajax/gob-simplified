@@ -100,6 +100,15 @@
 | Box score | `/box-score.html?mode=practice_squad&game_id=…` |
 | FCC Recruits tab link | **Practice Squad Season** → standings |
 
+### Player portraits
+
+Practice Squad simulation payloads carry display-only `portrait_source` and `image_id` fields
+from the FPD/FRD records already loaded before the game. `summarize_game_state` persists those
+fields with each player so Player of the Game displays can resolve unsigned recruits through
+`recruits/white/<image_id>.png` and FPD players through `players/master/<player_id>.png`.
+Missing generated masters use the existing lazy-paint endpoints and then the generic fallback.
+This propagation performs no database or image-service calls inside the simulation loop.
+
 ## Key files
 
 | Area | Path |

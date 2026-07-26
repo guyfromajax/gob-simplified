@@ -11633,6 +11633,8 @@ def get_practice_squad_team(
             players.append({
                 "player_id": pid,
                 "source": "fpd",
+                "portrait_source": "player",
+                "image_id": (meta.get("image_id") or None),
                 "name": slot.get("name") or f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip(),
                 "parent_team_name": parent_name,
                 "position_ratings": doc.get("position_ratings") or {},
@@ -11648,6 +11650,8 @@ def get_practice_squad_team(
             players.append({
                 "player_id": pid,
                 "source": "frd",
+                "portrait_source": "recruit",
+                "image_id": (doc.get("image_id") or None),
                 "name": slot.get("name") or doc.get("name") or "",
                 "parent_team_name": None,
                 "position_ratings": doc.get("position_ratings") or {},

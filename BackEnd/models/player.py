@@ -65,6 +65,10 @@ class Player:
         self.jersey = data.get("jersey", 0)
         self.year = data.get("year", "")
         self.photo = data.get("photo", None)  # Player headshot image path
+        # Display-only portrait contract. Practice Squad recruits resolve their
+        # white master by image_id; signed/league players resolve by player_id.
+        self.portrait_source = data.get("portrait_source", "player")
+        self.image_id = data.get("image_id")
         # Optional per-position ratings (franchise / universal roster payloads)
         self.position_ratings = dict(data.get("position_ratings") or {})
         self.stats = self._init_stats()
@@ -330,7 +334,6 @@ def player_to_dict(player):
 
     
     
-
 
 
 

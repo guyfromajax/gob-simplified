@@ -152,10 +152,14 @@ function renderProjectedStartingFiveCards(rows, opts) {
   row.className = 'p5-row';
   rows.forEach((r) => {
     const pid = r.player_id != null ? String(r.player_id) : '';
+    const imageId = r.image_id != null ? String(r.image_id) : '';
+    const isRecruitPortrait = r.portrait_source === 'recruit' && imageId;
     const name = r.name || '—';
     const imgSrc =
-      pid && window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function'
-        ? window.API_CONFIG.getPlayerImageUrl(pid, { size: 'card' })
+      isRecruitPortrait && window.API_CONFIG && typeof window.API_CONFIG.getRecruitImageUrl === 'function'
+        ? window.API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })
+        : pid && window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function'
+          ? window.API_CONFIG.getPlayerImageUrl(pid, { size: 'card' })
         : genericUrl;
     const rt = r.rt != null ? r.rt : '—';
     const rtClass =
@@ -196,7 +200,26 @@ function renderProjectedStartingFiveCards(rows, opts) {
     if (img) {
       img.addEventListener('error', function onImgError() {
         img.removeEventListener('error', onImgError);
-        img.src = genericUrl;
+        const api = window.API_CONFIG;
+        const ensure =
+          isRecruitPortrait && typeof api?.ensureRecruitImage === 'function'
+            ? api.ensureRecruitImage(imageId)
+            : r.portrait_source === 'player' && imageId && pid && typeof api?.ensurePlayerImage === 'function'
+              ? api.ensurePlayerImage(api.currentFranchiseId?.(), pid)
+              : Promise.resolve({ status: 'skip' });
+        Promise.resolve(ensure).then(() => {
+          img.addEventListener('error', function onRetryError() {
+            img.removeEventListener('error', onRetryError);
+            img.src = genericUrl;
+          });
+          const retryUrl =
+            isRecruitPortrait && typeof api?.getRecruitImageUrl === 'function'
+              ? api.getRecruitImageUrl(imageId, { size: 'card' })
+              : pid && typeof api?.getPlayerImageUrl === 'function'
+                ? api.getPlayerImageUrl(pid, { size: 'card' })
+                : genericUrl;
+          img.src = `${retryUrl}${retryUrl.includes('?') ? '&' : '?'}r=1`;
+        });
       });
     }
     row.appendChild(article);

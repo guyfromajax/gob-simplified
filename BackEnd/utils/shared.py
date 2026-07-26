@@ -2479,6 +2479,16 @@ def summarize_game_state(
         except Exception:
             return None
 
+    def _display_portrait(p):
+        """Persist portrait metadata only for players linked to recruit artwork."""
+        image_id = getattr(p, "image_id", None)
+        if not image_id:
+            return {}
+        return {
+            "portrait_source": getattr(p, "portrait_source", "player"),
+            "image_id": image_id,
+        }
+
     players = []
     for team_key, team_obj in [("home", game.home_team), ("away", game.away_team)]:
         # ✅ SS&S FIX: Save ALL players (lineup + bench) to preserve real-time NG values for all players
@@ -2503,6 +2513,7 @@ def summarize_game_state(
                 "jersey": player.jersey,
                 "height": getattr(player, "height", None),  # Integer inches; used by v2 player sprite (height-linked headshot radius)
                 "photo": getattr(player, "photo", None),  # Player headshot image
+                **_display_portrait(player),
                 "primary_color": getattr(team_obj, "primary_color", "#000000"),
                 "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
                 "x": coords.get("x", 0),
@@ -2539,6 +2550,7 @@ def summarize_game_state(
                     "jersey": player_obj.jersey,
                     "height": getattr(player_obj, "height", None),  # Integer inches; used by v2 player sprite (height-linked headshot radius)
                     "photo": getattr(player_obj, "photo", None),  # Player headshot image
+                    **_display_portrait(player_obj),
                     "primary_color": getattr(team_obj, "primary_color", "#000000"),
                     "secondary_color": getattr(team_obj, "secondary_color", "#ffffff"),
                     "x": coords.get("x", 0),

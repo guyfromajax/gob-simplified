@@ -231,9 +231,12 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     if (resolvedGameDoc) {
       potg = calculatePlayerOfTheGame(resolvedGameDoc, { gameId, scoreOverride });
       if (potg?.playerId) {
-        potgImageUrl = (typeof window !== 'undefined' && window.API_CONFIG?.getPlayerImageUrl)
-          ? window.API_CONFIG.getPlayerImageUrl(potg.playerId, { size: 'modal' })
-          : `${staticBase}/images/players/${potg.playerId}.png`;
+        const api = typeof window !== 'undefined' ? window.API_CONFIG : null;
+        potgImageUrl = potg.portraitSource === 'recruit' && potg.imageId && api?.getRecruitImageUrl
+          ? api.getRecruitImageUrl(potg.imageId, { size: 'modal' })
+          : api?.getPlayerImageUrl
+            ? api.getPlayerImageUrl(potg.playerId, { size: 'modal' })
+            : `${staticBase}/images/players/${potg.playerId}.png`;
       }
     }
   } catch (err) {
@@ -455,7 +458,6 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
                 class="potg-image"
                 src="${potgImageUrl || (staticBase + '/images/players/generic_headshot.png')}"
                 alt="${potg.name}"
-                onerror="this.onerror=null;this.src='${staticBase}/images/players/generic_headshot.png';"
               />
               <div class="potg-info">
                 <div class="potg-player-name">${potg.name}</div>
@@ -782,6 +784,34 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   }
 
   document.body.appendChild(popup);
+  const potgImg = popup.querySelector('.potg-image');
+  if (potgImg && potg?.playerId) {
+    potgImg.addEventListener('error', function onPotgImageError() {
+      potgImg.removeEventListener('error', onPotgImageError);
+      const api = window.API_CONFIG;
+      const ensure = potg.portraitSource === 'recruit' && potg.imageId
+        ? api?.ensureRecruitImage?.(potg.imageId)
+        : potg.imageId
+          ? api?.ensurePlayerImage?.(api.currentFranchiseId?.(), potg.playerId)
+          : Promise.resolve({ status: 'skip' });
+      Promise.resolve(ensure).then(() => {
+        potgImg.addEventListener('error', function onPotgRetryError() {
+          potgImg.removeEventListener('error', onPotgRetryError);
+          potgImg.src = api?.getGenericHeadshotUrl
+            ? api.getGenericHeadshotUrl({ size: 'modal' })
+            : `${staticBase}/images/players/generic_headshot.png`;
+        });
+        const retryUrl = potg.portraitSource === 'recruit' && potg.imageId
+          ? api?.getRecruitImageUrl?.(potg.imageId, { size: 'modal' })
+          : api?.getPlayerImageUrl?.(potg.playerId, { size: 'modal' });
+        if (!retryUrl) {
+          potgImg.dispatchEvent(new Event('error'));
+          return;
+        }
+        potgImg.src = `${retryUrl}${retryUrl.includes('?') ? '&' : '?'}r=1`;
+      });
+    });
+  }
 
   if (franchisePhaseBPending && typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl) {
     getOrStartFranchisePhaseB(franchisePhaseBPending).catch((err) => {
