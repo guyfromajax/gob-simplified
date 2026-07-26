@@ -17,6 +17,8 @@
  * slot is rendered empty and never filled or reflowed away.
  */
 
+import { fadeOutPregameBed } from './gameSfx.js';
+
 const POSC = { PG: '#4A90D9', SG: '#7B5EA7', SF: '#3A8C4A', PF: '#C0392B', C: '#D4A017' };
 const RT_HEX = { 'rt-elite': '#4A90D9', 'rt-high': '#34EC27', 'rt-mid': '#FFD700', 'rt-low': '#ff6d6d' };
 const GREEN = '#34EC27', BLUE = '#4A90D9', ORANGE = '#F79420', RED = '#ff6d6d';
@@ -446,6 +448,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
     const finish = () => {
       if (done) return;
       done = true;
+      fadeOutPregameBed(); // stop the Sim Full Game music at the end (no-op if none playing)
       timers.forEach(clearTimeout);
       window.removeEventListener('resize', positionBelowScoreboard);
       root.classList.add('dissolving');

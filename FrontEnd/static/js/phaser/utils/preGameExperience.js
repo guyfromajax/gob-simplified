@@ -463,9 +463,10 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
       options && options.waitForSim && typeof options.waitForSim.then === "function"
         ? options.waitForSim
         : Promise.resolve();
+    // Do NOT fade the bed here — for Sim Full Game it keeps playing through the Act 2
+    // broadcast and is faded out when the presentation ends.
     waitForSim.catch(() => {}).then(() => {
       root.classList.add("dissolved");
-      fadeOutPregameBed(PREGAME_BED_FADE_MS);
       timers.push(setTimeout(() => finishAndResolve(resolve), 450));
     });
   }
@@ -517,6 +518,9 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
       week: franchiseWeek ?? normalized.franchiseWeek ?? 1,
       userNatlRank,
       opponentNatlRank,
+      // Sim Full Game: loop the bed so it plays through Act 1 + the Act 2 broadcast
+      // (faded out when the presentation ends). Interactive Play Quarter does not loop.
+      loop: displayOnly,
     });
     renderBoard();
     toReveal();

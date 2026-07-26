@@ -783,7 +783,7 @@ export function startPregameBed(scene, options = {}) {
   }
   try {
     const audio = createAudio(filename);
-    audio.loop = false;
+    audio.loop = !!options.loop; // loop for the Sim Full Game cover (plays through Act 1 + Act 2)
     audio.volume = DEFAULT_VOLUME;
     pregameBedAudio = audio;
     const releaseSceneRef = retainActiveSfx(scene, audio);
