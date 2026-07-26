@@ -128,6 +128,19 @@ def week_coverage(records: list[dict]) -> None:
         print("  (no integer week values present)")
         return
     print(f"  weeks present: {weeks[0]}-{weeks[-1]}  (distinct={len(weeks)})")
+    # Distinct game_ids per week — a full franchise week is 64 games (128 teams / 2).
+    # Gate #1: week 1 must show 64. Any regular-season week != 64 means a game was
+    # dropped from capture (worker log loss, EOG failure, etc.).
+    games_by_week: dict[int, set] = defaultdict(set)
+    for r in records:
+        w = r.get("week")
+        if isinstance(w, int):
+            games_by_week[w].add(r.get("game_id"))
+    print("  games captured per week (expect 64 each):")
+    for w in weeks:
+        n = len(games_by_week[w])
+        flag = "" if n == 64 else "  ⚠️  != 64"
+        print(f"    week {w:>2}: {n:>3} games{flag}")
     missing_regular = [w for w in range(1, REGULAR_SEASON_LAST_WEEK + 1) if w not in weeks]
     if missing_regular:
         print(f"  note: regular-season weeks with NO bands: {missing_regular} "

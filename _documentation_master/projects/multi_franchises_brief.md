@@ -168,6 +168,7 @@ The mode-select **user / franchise home container** must hold **two franchise in
 | Current / delete | same file — list + delete-by-id |
 | Ownership | `BackEnd/utils/ownership.py` |
 | Indexes | `BackEnd/db.py` (`ensure_franchises_user_id_index` — keep non-unique; optional `(user_id, slot)` later) |
+| Mode-select slot | `franchises.home_slot` (1|2); list ordered by slot; create accepts optional `home_slot` |
 | Mode select | `FrontEnd/static/mode-select.js` |
 | Team select LS write | `FrontEnd/static/franchise-select-team.js` |
 | FCC | `FrontEnd/static/franchise-command-center.js` |

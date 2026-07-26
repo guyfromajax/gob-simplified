@@ -2583,6 +2583,8 @@ def get_select_team_page():
 
 class TeamSelection(BaseModel):
     team_name: str
+    # Optional mode-select slot (1 or 2). Server assigns first free slot if omitted/invalid.
+    home_slot: int | None = None
 
 class PlayGameRequest(BaseModel):
     franchise_id: str
@@ -3604,6 +3606,10 @@ def select_team(
                 ),
             )
 
+        # Stable mode-select slot (1 = top, 2 = bottom). Backfill siblings first.
+        _ensure_home_slots_for_user(user.get("user_id"))
+        home_slot = _allocate_home_slot(user.get("user_id"), selection.home_slot)
+
         # Resolve team name to ObjectId - try multiple strategies for matching
         print(f"🔵 [DEBUG] select_team: Looking up team in database: {selection.team_name}", file=sys.stderr, flush=True)
         
@@ -3680,7 +3686,22 @@ def select_team(
         )
 
         print(f"✅ [DEBUG] select_team: Franchise initialized successfully, franchise_id: {manager.franchise_id}", file=sys.stderr, flush=True)
-        result = {"status": "ok", "franchise_id": str(manager.franchise_id)}
+        try:
+            db.franchises.update_one(
+                {"_id": manager.franchise_id},
+                {"$set": {"home_slot": home_slot}},
+            )
+        except Exception:
+            logger.exception(
+                "[MULTI-FRANCHISE] failed to set home_slot=%s for franchise_id=%s",
+                home_slot,
+                manager.franchise_id,
+            )
+        result = {
+            "status": "ok",
+            "franchise_id": str(manager.franchise_id),
+            "home_slot": home_slot,
+        }
         if profile:
             result["profile_summary"] = profile_summary
         print(f"🔵 [DEBUG] select_team: Returning response: {result}", file=sys.stderr, flush=True)
@@ -7676,6 +7697,13 @@ def _franchise_summary_for_list(doc: dict) -> dict:
             team_doc = {}
     else:
         team_doc = {}
+    home_slot = doc.get("home_slot")
+    try:
+        home_slot = int(home_slot) if home_slot is not None else None
+    except (TypeError, ValueError):
+        home_slot = None
+    if home_slot not in (1, 2):
+        home_slot = None
     return {
         "franchise_id": str(doc["_id"]),
         "user_team_id": doc.get("user_team_id") or team_doc.get("name"),
@@ -7687,7 +7715,83 @@ def _franchise_summary_for_list(doc: dict) -> dict:
         "eos_tournament_active": doc.get("eos_tournament_active", False),
         "eos_current_round": eos.get("current_round", 1),
         "eos_completed": eos.get("completed", False),
+        "home_slot": home_slot,
     }
+
+
+def _allocate_home_slot(user_id: str, requested: int | None = None) -> int:
+    """Pick a free mode-select slot (1..MAX). Prefer ``requested`` when free."""
+    used: set[int] = set()
+    for doc in db.franchises.find({"user_id": user_id}, {"home_slot": 1}):
+        try:
+            slot = int(doc.get("home_slot"))
+        except (TypeError, ValueError):
+            continue
+        if 1 <= slot <= MAX_FRANCHISES_PER_USER:
+            used.add(slot)
+    if (
+        requested is not None
+        and 1 <= int(requested) <= MAX_FRANCHISES_PER_USER
+        and int(requested) not in used
+    ):
+        return int(requested)
+    for slot in range(1, MAX_FRANCHISES_PER_USER + 1):
+        if slot not in used:
+            return slot
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            f"You already have {MAX_FRANCHISES_PER_USER} active franchises. "
+            "Delete one before starting another."
+        ),
+    )
+
+
+def _ensure_home_slots_for_user(user_id: str) -> list[dict]:
+    """
+    Return the user's franchises with stable home_slot values (1..MAX), oldest first.
+    Backfills missing home_slot so mode-select containers stay put across sessions.
+    """
+    docs = list(
+        db.franchises.find(
+            {"user_id": user_id},
+            projection={
+                "_id": 1,
+                "user_team_id": 1,
+                "user_team_object_id": 1,
+                "week": 1,
+                "current_season": 1,
+                "eos_tournament": 1,
+                "eos_tournament_active": 1,
+                "home_slot": 1,
+            },
+        ).sort("_id", 1)
+    )
+    used: set[int] = set()
+    for doc in docs:
+        try:
+            slot = int(doc.get("home_slot"))
+        except (TypeError, ValueError):
+            slot = None
+        if slot in range(1, MAX_FRANCHISES_PER_USER + 1) and slot not in used:
+            used.add(slot)
+            doc["home_slot"] = slot
+        else:
+            doc["home_slot"] = None
+
+    free = [s for s in range(1, MAX_FRANCHISES_PER_USER + 1) if s not in used]
+    for doc in docs:
+        if doc.get("home_slot") is not None:
+            continue
+        if not free:
+            break
+        slot = free.pop(0)
+        db.franchises.update_one({"_id": doc["_id"]}, {"$set": {"home_slot": slot}})
+        doc["home_slot"] = slot
+        used.add(slot)
+
+    docs.sort(key=lambda d: (d.get("home_slot") or 99, str(d.get("_id"))))
+    return docs
 
 
 def _cascade_delete_franchise(fid: ObjectId) -> None:
@@ -7716,22 +7820,11 @@ def _cascade_delete_franchise(fid: ObjectId) -> None:
 def list_user_franchises(user: dict = Depends(get_current_user)):
     """
     Return all franchises owned by the current user (0..MAX_FRANCHISES_PER_USER).
-    Newest first. Used by multi-slot mode-select (Phase 2).
+    Ordered by stable ``home_slot`` (1 = top, 2 = bottom on mode-select).
     """
     uid = user.get("user_id")
-    cursor = db.franchises.find(
-        {"user_id": uid},
-        projection={
-            "_id": 1,
-            "user_team_id": 1,
-            "user_team_object_id": 1,
-            "week": 1,
-            "current_season": 1,
-            "eos_tournament": 1,
-            "eos_tournament_active": 1,
-        },
-    ).sort("_id", -1)
-    franchises = [_franchise_summary_for_list(doc) for doc in cursor]
+    docs = _ensure_home_slots_for_user(uid)
+    franchises = [_franchise_summary_for_list(doc) for doc in docs]
     return {
         "franchises": franchises,
         "count": len(franchises),

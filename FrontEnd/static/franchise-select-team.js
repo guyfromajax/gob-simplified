@@ -38,6 +38,10 @@ const backLink = document.getElementById("team-select-back-link");
 // FTE v2 tutorial branch: when ?mode=tutorial is present, this page is the
 // first step of the new-user funnel rather than a franchise-creation entry.
 const TUTORIAL_MODE = new URLSearchParams(window.location.search).get("mode") === "tutorial";
+const HOME_SLOT_PARAM = (function () {
+  const n = parseInt(new URLSearchParams(window.location.search).get("home_slot"), 10);
+  return n === 1 || n === 2 ? n : null;
+})();
 
 // Mascot map (team name → mascot string) loaded on demand from /teams.
 // Single source of truth = team_doc.mascot in the teams collection. Used by
@@ -225,10 +229,12 @@ async function selectTeam(team) {
   showLoading(team);
   try {
     const headers = { ...API_CONFIG.getAuthHeaders(), "Content-Type": "application/json" };
+    const payload = { team_name: team };
+    if (HOME_SLOT_PARAM) payload.home_slot = HOME_SLOT_PARAM;
     const res = await fetch(API_CONFIG.buildUrl('/franchise/select-team?profile=1'), {
       method: "POST",
       headers,
-      body: JSON.stringify({ team_name: team })
+      body: JSON.stringify(payload)
     });
     if (!res.ok) {
       let msg = "Unable to start franchise";

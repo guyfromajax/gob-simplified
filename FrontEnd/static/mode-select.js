@@ -1099,20 +1099,39 @@ function renderModeSelectTierEmblem(slotEl, franchiseData, commandCenterData) {
   emblem.innerHTML = window.GOBTierEmblem.renderLockup({ tier, value, size: 40, variant: 'stack', l1: 16, l2: 9 });
 }
 
+function formatSlotLabel(slotIndex) {
+  const n = Number(slotIndex) || 1;
+  return String(n).padStart(2, '0');
+}
+
+function buildSlotShellOpen(slotIndex, franchiseId) {
+  const slotAttr = ' data-slot-index="' + slotIndex + '"';
+  const fidAttr = franchiseId
+    ? ' data-franchise-id="' + escapeHtml(String(franchiseId)) + '"'
+    : '';
+  return (
+    '<div class="franchise-home-slot-cell"' + slotAttr + fidAttr + '>' +
+      '<div class="franchise-slot-label">' +
+        '<span class="franchise-slot-num">' + escapeHtml(formatSlotLabel(slotIndex)) + '</span>' +
+        '<span class="franchise-slot-rule" aria-hidden="true"></span>' +
+      '</div>'
+  );
+}
+
 function buildEmptySlotHtml(slotIndex) {
   const title = franchisesList.length > 0
     ? 'Start Another Franchise'
     : 'Start Your Coaching Journey';
   const cta = 'Find Your Program';
   return (
-    '<div class="franchise-home-slot-cell" data-slot-index="' + slotIndex + '">' +
+    buildSlotShellOpen(slotIndex, null) +
       '<div class="franchise-home-card franchise-home-card-empty">' +
         '<div class="franchise-empty-state">' +
           '<div class="franchise-empty-icon" aria-hidden="true">' +
             '<img src="/images/buttons/whiteball.svg" alt="">' +
           '</div>' +
           '<h2 class="franchise-empty-title">' + escapeHtml(title) + '</h2>' +
-          '<button type="button" class="franchise-empty-cta" data-action="start-franchise">' +
+          '<button type="button" class="franchise-empty-cta" data-action="start-franchise" data-home-slot="' + slotIndex + '">' +
             escapeHtml(cta) +
           '</button>' +
         '</div>' +
@@ -1186,7 +1205,7 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
   }
 
   return (
-    '<div class="franchise-home-slot-cell" data-slot-index="' + slotIndex + '" data-franchise-id="' + escapeHtml(franchiseId) + '">' +
+    buildSlotShellOpen(slotIndex, franchiseId) +
       '<div class="franchise-home-card franchise-home-card-active" role="link" tabindex="0" data-action="enter-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '" style="background-image:url(\'' + escapeHtml(bannerUrl) + '\');background-size:cover;background-position:center;">' +
         '<img class="franchise-card-banner" src="' + escapeHtml(bannerUrl) + '" alt="' + escapeHtml(teamName) + '" style="display:none;">' +
         '<div class="franchise-card-content">' +
@@ -1212,35 +1231,64 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
   );
 }
 
+function assignFranchisesToSlots(franchises) {
+  const maxSlots = maxFranchiseSlots || 2;
+  const bySlot = {};
+  for (let s = 1; s <= maxSlots; s++) bySlot[s] = null;
+
+  const list = Array.isArray(franchises) ? franchises.slice() : [];
+  const unassigned = [];
+  list.forEach(function (franchiseData) {
+    const slot = Number(franchiseData && franchiseData.home_slot);
+    if (slot >= 1 && slot <= maxSlots && !bySlot[slot]) {
+      bySlot[slot] = franchiseData;
+    } else {
+      unassigned.push(franchiseData);
+    }
+  });
+  unassigned.forEach(function (franchiseData) {
+    for (let s = 1; s <= maxSlots; s++) {
+      if (!bySlot[s]) {
+        bySlot[s] = franchiseData;
+        return;
+      }
+    }
+  });
+  return bySlot;
+}
+
 function renderFranchiseSlots(franchises, teamsByName, commandCenterById) {
   if (!franchiseHomeSlots) return;
   Object.keys(slotRuntimeById).forEach(function (k) { delete slotRuntimeById[k]; });
 
-  const occupied = Array.isArray(franchises) ? franchises.slice(0, maxFranchiseSlots) : [];
-  const emptyCount = Math.max(0, maxFranchiseSlots - occupied.length);
+  const bySlot = assignFranchisesToSlots(franchises);
   let html = '';
-  occupied.forEach(function (franchiseData, index) {
-    const teamName = safeText(franchiseData.user_team_id, '');
-    const teamDoc = teamsByName[teamName] || null;
-    const commandCenterData = commandCenterById[String(franchiseData.franchise_id)] || null;
-    html += buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, index);
-  });
-  for (let i = 0; i < emptyCount; i++) {
-    html += buildEmptySlotHtml(occupied.length + i);
+  for (let slot = 1; slot <= maxFranchiseSlots; slot++) {
+    const franchiseData = bySlot[slot];
+    if (franchiseData) {
+      const teamName = safeText(franchiseData.user_team_id, '');
+      const teamDoc = teamsByName[teamName] || null;
+      const commandCenterData = commandCenterById[String(franchiseData.franchise_id)] || null;
+      html += buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slot);
+    } else {
+      html += buildEmptySlotHtml(slot);
+    }
   }
   franchiseHomeSlots.innerHTML = html;
 
-  occupied.forEach(function (franchiseData) {
+  for (let slot = 1; slot <= maxFranchiseSlots; slot++) {
+    const franchiseData = bySlot[slot];
+    if (!franchiseData) continue;
     const cell = Array.prototype.find.call(
       franchiseHomeSlots.querySelectorAll('.franchise-home-slot-cell[data-franchise-id]'),
       function (el) {
         return String(el.getAttribute('data-franchise-id')) === String(franchiseData.franchise_id);
       }
     );
-    if (!cell) return;
+    if (!cell) continue;
     const commandCenterData = commandCenterById[String(franchiseData.franchise_id)] || null;
     renderModeSelectTierEmblem(cell, franchiseData, commandCenterData);
-  });
+  }
 }
 
 function goToFranchiseCommandCenter(franchiseId) {
@@ -1281,7 +1329,12 @@ function goToFranchiseCommandCenter(franchiseId) {
 
 /** Tutorial alert "I'll do this later" for Player Attributes → FCC when a franchise exists. */
 function getFranchiseCommandCenterUrlForLater() {
-  const currentFranchise = franchisesList[0] || null;
+  const sorted = franchisesList.slice().sort(function (a, b) {
+    const sa = Number(a && a.home_slot) || 99;
+    const sb = Number(b && b.home_slot) || 99;
+    return sa - sb;
+  });
+  const currentFranchise = sorted[0] || null;
   if (!currentFranchise || !currentFranchise.franchise_id) return null;
   var fid = currentFranchise.franchise_id;
   var tid = currentFranchise.user_team_id || null;
@@ -1343,18 +1396,20 @@ function closeSlotsFullModal() {
   }
 }
 
-function goToNewFranchise() {
-  window.location.href = './franchise-select-team.html';
+function goToNewFranchise(homeSlot) {
+  const slot = Number(homeSlot);
+  const q = (slot === 1 || slot === 2) ? ('?home_slot=' + encodeURIComponent(String(slot))) : '';
+  window.location.href = './franchise-select-team.html' + q;
 }
 
-function startNewFranchiseFlow() {
+function startNewFranchiseFlow(homeSlot) {
   playSound('click-beep.wav');
   if (franchisesList.length >= maxFranchiseSlots) {
     openSlotsFullModal();
     return;
   }
-  // Fill an empty slot — do not delete any existing franchise.
-  goToNewFranchise();
+  // Fill the chosen empty slot — do not delete any existing franchise.
+  goToNewFranchise(homeSlot);
 }
 
 async function confirmDeleteFranchise() {
@@ -1397,7 +1452,7 @@ if (franchiseHomeSlots) {
 
     if (action === 'start-franchise') {
       event.preventDefault();
-      startNewFranchiseFlow();
+      startNewFranchiseFlow(actionEl.getAttribute('data-home-slot'));
       return;
     }
     if (action === 'delete-franchise') {
