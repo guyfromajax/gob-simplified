@@ -57,3 +57,25 @@ def test_atl_week_label_tournament_uses_fcc_copy():
 def test_atl_week_labels_cover_eos_weeks_27_through_34():
     for week in range(27, 35):
         assert atl_week_label(week) == ATL_WEEK_LABELS[week]
+
+
+def test_franchise_matches_last_game_by_scores():
+    from BackEnd.utils.around_the_league import _franchise_matches_last_game
+
+    franchise_doc = {
+        "user_team_id": "Morristown",
+        "user_team_object_id": "morristown-oid",
+        "results": {
+            "1": [
+                {
+                    "away_id": "morristown-oid",
+                    "home_id": "casino-oid",
+                    "away_score": 60,
+                    "home_score": 71,
+                }
+            ]
+        },
+    }
+    last_game = {"user_score": 60, "opp_score": 71, "opponent": "Casino Row"}
+    assert _franchise_matches_last_game(franchise_doc, last_game) is True
+    assert _franchise_matches_last_game(franchise_doc, {"user_score": 1, "opp_score": 0}) is False

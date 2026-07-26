@@ -2,7 +2,8 @@
 Around The League board (Mode Select): last 8 franchise game completions (phase B).
 
 Persists an ordered 8-slot board with the §6 reorder rule. Card fields are hydrated
-live from each user's franchise on read; last_game is frozen at completion time.
+live from the franchise that owns the stored last game (`franchise_id` frozen at
+completion); last_game itself is frozen at completion time.
 """
 
 from __future__ import annotations
@@ -17,7 +18,6 @@ from bson import ObjectId
 from BackEnd.db import (
     around_the_league_collection,
     franchises_collection,
-    franchise_team_data_collection,
     teams_collection,
     users_collection,
 )
@@ -121,6 +121,105 @@ def _resolve_next_opponent(
     return {"is_away": bool(is_away), "team_name": opp_name}
 
 
+def _franchise_owned_by(franchise_doc: dict[str, Any], user_id_str: str, user_oid: ObjectId) -> bool:
+    owner = franchise_doc.get("user_id")
+    if owner is None:
+        return False
+    if owner == user_oid:
+        return True
+    return str(owner) == user_id_str
+
+
+def _row_scores_for_user(row: dict[str, Any], user_team_id_str: str) -> tuple[int, int] | None:
+    """Return (user_score, opp_score) for a results row, or None if user not in matchup."""
+    ut = str(user_team_id_str or "").strip()
+    away_id = str(row.get("away_id") or "")
+    home_id = str(row.get("home_id") or "")
+    try:
+        away_score = int(row.get("away_score") or 0)
+        home_score = int(row.get("home_score") or 0)
+    except (TypeError, ValueError):
+        return None
+    if teams_match_for_franchise(away_id, ut):
+        return away_score, home_score
+    if teams_match_for_franchise(home_id, ut):
+        return home_score, away_score
+    return None
+
+
+def _franchise_matches_last_game(franchise_doc: dict[str, Any], last_game: dict[str, Any]) -> bool:
+    """Best-effort heal for legacy board rows that lack franchise_id."""
+    _, user_team_id_str = _resolve_user_team(franchise_doc)
+    if not user_team_id_str:
+        return False
+    try:
+        target_user = int(last_game.get("user_score") or 0)
+        target_opp = int(last_game.get("opp_score") or 0)
+    except (TypeError, ValueError):
+        return False
+    opp_name = str(last_game.get("opponent") or "").strip().lower()
+    results = franchise_doc.get("results") or {}
+    if not isinstance(results, dict):
+        return False
+    for week_rows in results.values():
+        if not isinstance(week_rows, list):
+            continue
+        for row in week_rows:
+            if not isinstance(row, dict):
+                continue
+            scores = _row_scores_for_user(row, str(user_team_id_str))
+            if not scores:
+                continue
+            user_score, opp_score = scores
+            if user_score != target_user or opp_score != target_opp:
+                continue
+            if not opp_name:
+                return True
+            for key in ("away_team", "home_team", "team1", "team2", "opponent"):
+                val = str(row.get(key) or "").strip().lower()
+                if val and val == opp_name:
+                    return True
+            return True
+    return False
+
+
+def _load_franchises_for_user(user_id_str: str, user_oid: ObjectId) -> list[dict[str, Any]]:
+    return list(
+        franchises_collection.find(
+            {"$or": [{"user_id": user_id_str}, {"user_id": user_oid}]},
+        ).sort("_id", -1)
+    )
+
+
+def _resolve_franchise_doc_for_slot(
+    stored: dict[str, Any],
+    user_id_str: str,
+    user_oid: ObjectId,
+) -> dict[str, Any] | None:
+    """Prefer frozen franchise_id from the completion that produced last_game."""
+    fid_raw = stored.get("franchise_id")
+    if fid_raw:
+        try:
+            doc = franchises_collection.find_one({"_id": ObjectId(str(fid_raw))})
+            if doc and _franchise_owned_by(doc, user_id_str, user_oid):
+                return doc
+        except Exception:
+            logger.debug("[ATL] invalid franchise_id on board slot: %s", fid_raw, exc_info=True)
+
+    candidates = _load_franchises_for_user(user_id_str, user_oid)
+    if not candidates:
+        return None
+
+    last_game = stored.get("last_game") if isinstance(stored.get("last_game"), dict) else {}
+    if last_game:
+        for doc in candidates:
+            if _franchise_matches_last_game(doc, last_game):
+                return doc
+
+    # Last resort for pre-multi-franchise board rows with no matchable last_game.
+    return candidates[0]
+
+
 def record_around_the_league_completion(
     *,
     owner_user_id: Any,
@@ -140,9 +239,13 @@ def record_around_the_league_completion(
     user_id_str = str(owner_user_id)
     completed_at = datetime.now(timezone.utc).isoformat()
     is_away = _last_game_is_away(franchise_doc, int(completed_week), str(user_team_id_str))
+    franchise_id = franchise_doc.get("_id")
+    if franchise_id is None:
+        return
 
     stored_entry: dict[str, Any] = {
         "user_id": user_id_str,
+        "franchise_id": str(franchise_id),
         "completed_at": completed_at,
         "last_game": {
             "won": bool(user_won),
@@ -189,9 +292,7 @@ def _hydrate_slot(stored: dict[str, Any]) -> dict[str, Any] | None:
         {"_id": user_oid},
         {"username": 1, "email": 1, "lead_archetype": 1},
     )
-    franchise_doc = franchises_collection.find_one({"user_id": user_id_str})
-    if not franchise_doc:
-        franchise_doc = franchises_collection.find_one({"user_id": user_oid})
+    franchise_doc = _resolve_franchise_doc_for_slot(stored, user_id_str, user_oid)
     if not franchise_doc:
         return None
 
@@ -218,6 +319,7 @@ def _hydrate_slot(stored: dict[str, Any]) -> dict[str, Any] | None:
 
     return {
         "user_id": user_id_str,
+        "franchise_id": str(franchise_id),
         "username": _display_username_for_highlight(user_doc),
         "lead_archetype": str((user_doc or {}).get("lead_archetype") or ""),
         "team_name": team_name,

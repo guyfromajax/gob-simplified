@@ -76,7 +76,7 @@
 - [x] Keep `GET /franchise/current` as transitional (newest franchise) for old mode-select — Phase 2 switches to list.
 - [x] Add **`DELETE /franchise/{franchise_id}`** (ownership-verified). `delete-current` remains for old UI but only when the user has ≤1 franchise (409 if two exist).
 - [x] Cascade on delete: FTD, FPD, FRD, games + press_conference_sessions + R2 signed masters.
-- [ ] Fix ATL / any other `find_one(user_id)` — deferred (needs featured-slot product call); still nondeterministic with two franchises.
+- [x] Fix ATL / any other `find_one(user_id)` — ATL stores `franchise_id` at write and hydrates from that franchise (most recent completed game).
 - [x] **Thin Phase 3 warm-up:** `API_CONFIG.currentFranchiseId()` is URL-only (no LS fallback).
 
 **Acceptance:** A test user can create two franchises via API; list returns both; delete A leaves B intact; ownership still rejects other users’ ids.
@@ -144,7 +144,7 @@ The mode-select **user / franchise home container** must hold **two franchise in
 | P1 | No `find_one({user_id})` for “the” franchise in live paths | ✓ |
 | P1 | LS namespaced or cleared on slot switch | ✓ Phase 3 hybrid (`FranchiseLS`) |
 | P1 | Pending complete-week / EOG refuse wrong franchise_id | ✓ |
-| P2 | ATL / board hydration franchise-explicit | ✓ |
+| P2 | ATL / board hydration franchise-explicit | ✓ hydrate from stored `franchise_id` (most recent game) |
 | P2 | `currentFranchiseId()` LS fallback removed or scoped | ✓ URL-only + namespaced context |
 | P3 | Press sessions cascade on franchise delete | ✓ |
 
@@ -183,6 +183,6 @@ The mode-select **user / franchise home container** must hold **two franchise in
 ## 9. Open questions for product (if not using §3 defaults)
 
 1. Shared vs per-slot career record/GP — confirm shared for v1.  
-2. Should “featured” franchise drive ATL / public board when both exist?  
+2. ATL card = franchise that owns the most recent completed game (`franchise_id` on board write).  
 3. Soft-delete retention later, or always hard-delete only?  
 4. Allow same school in both slots (recommended yes)?
