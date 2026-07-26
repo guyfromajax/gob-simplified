@@ -251,6 +251,81 @@ def saturation(records: list[dict]) -> None:
               f"{_cell(floor_weeks.get(attr, []), floor_vals.get(attr, set())):>22}")
 
 
+# Clamp bounds mirror TEAM_ATTR_CLAMPS (BackEnd/models/training_execution_v2.py) —
+# used only to detect unclamped transitions. Keep in sync if clamps change.
+CLAMP_BOUNDS = {
+    "shot_threshold": (0, 200),
+    "rebound_modifier": (0.0, 0.4),
+    "team_chemistry": (7, 25),
+}
+
+
+def _clamp_bounds(attr: str) -> tuple:
+    return CLAMP_BOUNDS.get(attr, (-10, 10))
+
+
+def combined_drift(records: list[dict]) -> None:
+    """Decompose per-season drift into EOG + training.
+
+    EOG/season = mean(raw_delta) × 26 (pre-clamp band pressure). Training/season is
+    measured directly: for a team+attr, the gap between one game's `post` and the
+    next game's `pre` is that week's applied training (nothing else moves team
+    attributes between games). We average that gap over UNCLAMPED transitions (both
+    endpoints strictly inside the clamp) to recover the raw training pressure,
+    unbiased by saturation, then × 26. Combined = EOG + training is the drift we
+    tune; stability means combined ≈ 0, i.e. EOG ≈ −(training input). (Week-1's
+    30-pt training isn't measurable here — no prior game — so training is the
+    25×24-pt rate; the true season figure is marginally larger.)
+    """
+    eog_sum: dict[str, float] = defaultdict(float)
+    eog_n: Counter = Counter()
+    seq: dict[tuple, list] = defaultdict(list)
+    for r in records:
+        a = r.get("attr")
+        rd = r.get("raw_delta")
+        if isinstance(rd, (int, float)):
+            eog_sum[a] += rd
+            eog_n[a] += 1
+        w = r.get("week")
+        if isinstance(w, int) and r.get("pre") is not None and r.get("post") is not None:
+            seq[(r.get("franchise_id"), r.get("team_id_label"), a)].append((w, r["pre"], r["post"]))
+
+    tr_sum: dict[str, float] = defaultdict(float)
+    tr_n: Counter = Counter()
+    for (_f, _t, a), recs in seq.items():
+        recs.sort()
+        lo, hi = _clamp_bounds(a)
+        for i in range(len(recs) - 1):
+            w1, _pre1, post1 = recs[i]
+            w2, pre2, _post2 = recs[i + 1]
+            if w2 != w1 + 1:
+                continue
+            if lo < post1 < hi and lo < pre2 < hi:  # unclamped → raw training delta
+                tr_sum[a] += pre2 - post1
+                tr_n[a] += 1
+
+    rows = []
+    for a in eog_n:
+        eog = (eog_sum[a] / eog_n[a]) * 26 if eog_n[a] else 0.0
+        tr = (tr_sum[a] / tr_n[a]) * 26 if tr_n[a] else float("nan")
+        comb = eog + (tr if tr == tr else 0.0)
+        rows.append((a, eog, tr, comb))
+    rows.sort(key=lambda x: -abs(x[3]))  # worst combined drift first
+
+    print("\n## 2b. Net drift per SEASON — EOG + training = combined "
+          "(tuning target: combined ≈ 0, i.e. EOG ≈ −training)")
+    print(f"  {'attr':<22}{'EOG':>9}{'training':>10}{'COMBINED':>10}   {'driver':<16}")
+    for a, eog, tr, comb in rows:
+        if tr == tr and abs(tr) > abs(eog) * 1.5:
+            driver = "training-driven"
+        elif abs(eog) > abs(tr if tr == tr else 0) * 1.5:
+            driver = "EOG-driven"
+        else:
+            driver = "both"
+        trs = f"{tr:>+10.1f}" if tr == tr else f"{'n/a':>10}"
+        print(f"  {a:<22}{eog:>+9.1f}{trs}{comb:>+10.1f}   {driver:<16}")
+
+
 def _histogram(values: list, is_float: bool) -> None:
     if not values:
         print("      (no data)")
@@ -302,6 +377,7 @@ def report_section(title: str, records: list[dict]) -> None:
     week_coverage(records)
     branch_frequency(records)
     saturation(records)
+    combined_drift(records)
     input_histograms(records)
 
 

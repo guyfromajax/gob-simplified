@@ -80,7 +80,6 @@ body.mode-select-page .mode-wrapper {
   display: grid;
   grid-template-columns: minmax(0, 1.3fr) minmax(0, 0.7fr);
   grid-template-areas:
-    "head head"
     "franchise findgame"
     "aroundleague aroundleague"
     "highlights community";
@@ -1574,7 +1573,6 @@ body.mode-select-page .lbt-no-leaders {
   body.mode-select-page .mode-wrapper {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "head"
       "franchise"
       "findgame"
       "aroundleague"
@@ -1641,41 +1639,8 @@ body.mode-select-page .lbt-no-leaders {
 }
 
 /* ============================================
-   HOME BASE — PAGE HEAD + HERO ROW (2026 redesign)
+   HOME BASE — HERO ROW (2026 redesign)
    ============================================ */
-
-body.mode-select-page .ms-page-head {
-  grid-area: head;
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
-  padding-bottom: 4px;
-}
-
-body.mode-select-page .ms-page-eyebrow {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.3);
-}
-
-body.mode-select-page .ms-page-title {
-  margin: 0;
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 34px;
-  line-height: 1;
-  letter-spacing: 0.05em;
-  color: #ffffff;
-}
-
-body.mode-select-page .ms-page-head::after {
-  content: '';
-  flex: 1 1 auto;
-  height: 1px;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0));
-  transform: translateY(-6px);
-}
 
 body.mode-select-page .ms-hero {
   position: relative;
@@ -1875,7 +1840,6 @@ body.mode-select-page .fag-status-dot {
   body.mode-select-page .mode-wrapper {
     grid-template-columns: 1fr;
     grid-template-areas:
-      "head"
       "franchise"
       "findgame"
       "aroundleague"
