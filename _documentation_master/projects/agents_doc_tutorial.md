@@ -77,3 +77,38 @@ touches the sim, training, or week-advance paths:
 - [ ] Symlink `CLAUDE.md → AGENTS.md`.
 - [ ] Add the Sim performance invariant snippet.
 - [ ] Trim the rest of the old content — delete anything dated/no-longer-true (it loads every session).
+
+## Working practices that keep agent error rate low
+
+Captured after a long, multi-session build (Sim Game Presentation) that shipped a
+genuinely complex feature with very few errors. These are the **collaboration habits**
+that did it — worth encoding as a working agreement so any agent (and the user)
+defaults to them.
+
+| Practice | What it means in action |
+|---|---|
+| **Trace, don't guess** | Before proposing a fix, trace the real code path / data shape and confirm the root cause with evidence (`file:line`), not inference. If a value's source is unknown, read it or ask — never assume. (This repeatedly changed the fix: e.g. "turns[] is cumulative", "RT comes from `_rt_at_position`, not the max".) |
+| **Verify each piece before moving on** | Unit-test pure logic in isolation; **poison-test** guards to prove they actually fire (not just pass the happy path); app-boot check after touching any live-endpoint file; parse/compile-check before every commit. Don't stack unverified changes. |
+| **Tight test-and-report loop** | Ship small increments to staging, user tests, reports **specific** findings (screenshot + console lines), iterate. Beats batching many changes and debugging them together. |
+| **Scoped commits** | Commit only the files for *this* change (explicit pathspec), especially on a shared branch with concurrent agents — avoid sweeping in others' staged work. (We got bitten once by a bare `git commit` picking up a stray staged file.) |
+| **Answer routing honestly** | When a task fits a different agent/approach better, say so with reasons instead of grabbing it. When a change touches a shared system, gate it so existing paths are untouched and confirm intent first. |
+| **Report verified vs. inferred** | State plainly what was tested vs. what wasn't (e.g. "logic verified in node; browser render still needs your eyes"). Flag design bends/tradeoffs explicitly rather than silently adapting. |
+
+### Reusable snippet — working agreement (drop into root `AGENTS.md`)
+
+```markdown
+**How to work here (keeps error rate low):**
+- **Trace, don't guess.** Confirm root cause / data shape with file:line evidence
+  before proposing a fix. If a value's source is unknown, read it or ask.
+- **Verify each piece before moving on:** unit-test pure logic, poison-test guards
+  to prove they fire, app-boot check after editing live-endpoint code, parse/compile
+  before committing. No stacking unverified changes.
+- **Small increments + report specifically.** Ship to staging, get a real test,
+  report screenshot + console lines, iterate.
+- **Scoped commits** (explicit paths) — the branch is shared with other agents; never
+  sweep in files you didn't change.
+- **Be honest:** verified vs. inferred, what wasn't tested, and any design bend —
+  say it, don't paper over it.
+- **Shared systems:** gate changes so existing paths are unaffected; confirm intent
+  before altering a shared endpoint/behavior.
+```
