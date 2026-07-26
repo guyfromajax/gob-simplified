@@ -171,33 +171,84 @@ def branch_frequency(records: list[dict]) -> None:
 
 
 def saturation(records: list[dict]) -> None:
+    # Rail direction is derived from raw_delta's sign: a record is `clamped` only
+    # when pre+raw_delta crossed a bound, so raw_delta>0 railed the CEILING (upper
+    # clamp) and raw_delta<0 railed the FLOOR (lower clamp). `post` is the rail
+    # value itself (e.g. shot_threshold 200 = ceiling, team_chemistry 7 = floor).
+    # Direction matters for diagnosis: a whole league pinned at one rail is a
+    # runaway feedback loop; a 50/50 split across both rails is a scale problem.
     per_attr_total: Counter = Counter()
     per_attr_clamped: Counter = Counter()
-    # (franchise_id, team_id_label, attr) -> earliest week with clamped=true
-    first_rail: dict[tuple, int] = {}
+    # Net drift: E[delta]/game = mean(raw_delta) = Σ band_freq·band_midpoint (law of
+    # total expectation). raw_delta is the pre-clamp band PRESSURE — it keeps showing
+    # even when a saturated attr's applied delta is clamped to 0, so it's the tuning
+    # target. 26-week projection = per-game drift × 26 (one EOG update per game).
+    drift_sum: dict[str, float] = defaultdict(float)
+    drift_n: Counter = Counter()
+    # (franchise_id, team_id_label, attr) -> earliest railed week, per direction
+    first_ceiling: dict[tuple, int] = {}
+    first_floor: dict[tuple, int] = {}
+    ceiling_vals: dict[str, set] = defaultdict(set)
+    floor_vals: dict[str, set] = defaultdict(set)
+
     for rec in records:
         attr = rec.get("attr")
         per_attr_total[attr] += 1
-        if rec.get("clamped"):
-            per_attr_clamped[attr] += 1
-            week = rec.get("week")
-            if isinstance(week, int):
-                key = (rec.get("franchise_id"), rec.get("team_id_label"), attr)
-                if key not in first_rail or week < first_rail[key]:
-                    first_rail[key] = week
+        rd = rec.get("raw_delta")
+        if isinstance(rd, (int, float)):
+            drift_sum[attr] += rd
+            drift_n[attr] += 1
+        if not rec.get("clamped"):
+            continue
+        per_attr_clamped[attr] += 1
+        if not isinstance(rd, (int, float)) or rd == 0:
+            continue  # can't happen for a real clamp, but stay defensive
+        week = rec.get("week")
+        key = (rec.get("franchise_id"), rec.get("team_id_label"), attr)
+        if rd > 0:  # ceiling
+            ceiling_vals[attr].add(rec.get("post"))
+            if isinstance(week, int) and week < first_ceiling.get(key, 10**9):
+                first_ceiling[key] = week
+        else:  # floor
+            floor_vals[attr].add(rec.get("post"))
+            if isinstance(week, int) and week < first_floor.get(key, 10**9):
+                first_floor[key] = week
 
-    weeks_by_attr: dict[str, list[int]] = defaultdict(list)
-    for (_fid, _team, attr), week in first_rail.items():
-        weeks_by_attr[attr].append(week)
+    ceil_weeks: dict[str, list] = defaultdict(list)
+    for (_f, _t, attr), wk in first_ceiling.items():
+        ceil_weeks[attr].append(wk)
+    floor_weeks: dict[str, list] = defaultdict(list)
+    for (_f, _t, attr), wk in first_floor.items():
+        floor_weeks[attr].append(wk)
 
-    print("\n## 2. Saturation (clamped share; median week a team first rails)")
-    print(f"  {'attr':<24} {'clamped%':>9}  {'median_first_rail_wk':>20}  {'teams_railed':>12}")
+    def _rail_val(vals: set) -> str:
+        clean = [v for v in vals if v is not None]
+        if not clean:
+            return "?"
+        if len(set(clean)) == 1:
+            v = clean[0]
+            return f"{v:g}" if isinstance(v, (int, float)) else str(v)
+        return "mixed"
+
+    def _cell(teams: list, vals: set) -> str:
+        if not teams:
+            return f"{'0':>5} {'-':>6}  {'':>8}"
+        med = f"wk{statistics.median(teams):.0f}"
+        return f"{len(teams):>5} {med:>6}  {'@' + _rail_val(vals):>8}"
+
+    print("\n## 2. Saturation & net drift  "
+          "(E[Δ]/g = mean raw_delta = Σ band_freq·midpoint; 26wk = ×26)")
+    print(f"  {'attr':<22} {'clamped%':>8} {'E[Δ]/g':>8} {'26wk':>8}   "
+          f"{'CEILING t/medwk/@val':>22}   {'FLOOR t/medwk/@val':>22}")
     for attr in sorted(per_attr_total):
         total = per_attr_total[attr]
         clamped = per_attr_clamped[attr]
-        weeks = weeks_by_attr.get(attr, [])
-        median_wk = f"{statistics.median(weeks):.0f}" if weeks else "-"
-        print(f"  {attr:<24} {_pct(clamped, total):>9}  {median_wk:>20}  {len(weeks):>12}")
+        n = drift_n.get(attr, 0)
+        egm = (drift_sum[attr] / n) if n else 0.0
+        proj = egm * 26
+        print(f"  {attr:<22} {_pct(clamped, total):>8} {egm:>+8.3f} {proj:>+8.2f}   "
+              f"{_cell(ceil_weeks.get(attr, []), ceiling_vals.get(attr, set())):>22}   "
+              f"{_cell(floor_weeks.get(attr, []), floor_vals.get(attr, set())):>22}")
 
 
 def _histogram(values: list, is_float: bool) -> None:

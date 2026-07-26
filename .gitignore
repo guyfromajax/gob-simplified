@@ -12,6 +12,10 @@
 # MongoDB backup output (mongodump)
 dump/
 
+# EOG band measurement datasets + run logs (large local artifacts, not source)
+eog_band_*.jsonl
+season_run.log
+
 # Local backups (avoid committing large zips)
 gob-backup-*.zip
 
