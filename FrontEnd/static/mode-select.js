@@ -1127,9 +1127,6 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
   const bannerUrl = getSquareLogoPath(teamName);
   const seasonProgress = deriveSeasonProgress(commandCenterData, franchiseData);
   const record = deriveRecord(commandCenterData, teamName);
-  const rankRaw = deriveRank(teamDoc, commandCenterData);
-  const rank = rankRaw === '-' ? '-' : '#' + rankRaw;
-  const prestige = derivePrestige(teamDoc, commandCenterData);
   const nextOpponent = deriveNextOpponent(commandCenterData, teamName);
 
   const activeGameResume = commandCenterData && commandCenterData.active_game_resume
@@ -1150,12 +1147,16 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
   let enterLabel = 'Enter Franchise →';
   if (activeGameResume) {
     enterLabel = 'Resume Game →';
+    const resumeIsAway = String(activeGameResume.user_team_side || 'home').toLowerCase() === 'away';
+    const resumeOpponent = resumeIsAway
+      ? (activeGameResume.home_team_name || 'Opponent')
+      : (activeGameResume.away_team_name || 'Opponent');
     resumeHtml =
       '<div class="franchise-resume-card">' +
         '<div>' +
           '<div class="franchise-resume-kicker">Game In Progress</div>' +
           '<div class="franchise-resume-matchup">' +
-            escapeHtml((activeGameResume.away_team_name || 'Away') + ' at ' + (activeGameResume.home_team_name || 'Home')) +
+            escapeHtml((resumeIsAway ? '@ ' : 'vs ') + resumeOpponent) +
           '</div>' +
           '<div class="franchise-resume-detail">' +
             escapeHtml(formatResumePeriod(activeGameResume) + ' · ' + formatResumeClockForModeSelect(activeGameResume)) +
@@ -1198,14 +1199,12 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
           '</div>' +
           '<div class="franchise-card-grid">' +
             '<div class="franchise-chip"><div class="franchise-chip-label">Record</div><div class="franchise-chip-value">' + escapeHtml(record) + '</div></div>' +
-            '<div class="franchise-chip"><div class="franchise-chip-label">Rank</div><div class="franchise-chip-value">' + escapeHtml(rank) + '</div></div>' +
-            '<div class="franchise-chip"><div class="franchise-chip-label">Prestige</div><div class="franchise-chip-value">' + escapeHtml(prestige) + '</div></div>' +
             '<div class="franchise-chip"><div class="franchise-chip-label">Next Opponent</div><div class="franchise-chip-value franchise-chip-value-small">' + escapeHtml(nextOpponent) + '</div></div>' +
           '</div>' +
           resumeHtml +
           '<div class="franchise-card-actions">' +
             '<button type="button" class="franchise-enter-btn" data-action="enter-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '">' + escapeHtml(enterLabel) + '</button>' +
-            '<button type="button" class="franchise-slot-delete-btn" data-action="delete-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '">Delete</button>' +
+            '<button type="button" class="franchise-slot-delete-btn" data-action="delete-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '">Delete Franchise</button>' +
           '</div>' +
         '</div>' +
       '</div>' +

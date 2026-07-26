@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coach's Home Base — Redesign Preview</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="./FrontEnd/static/mode-select.css">
+<style>
+/* preview-only chrome — not part of the delivered CSS */
+body.mode-select-page{padding-top:44px}
+.pv-bar{position:fixed;top:0;left:0;right:0;z-index:50;display:flex;align-items:center;gap:14px;padding:0 18px;height:34px;background:rgba(10,12,18,0.94);border-bottom:1px solid rgba(255,255,255,0.08);font:600 10px/1 'Inter',sans-serif;letter-spacing:0.14em;text-transform:uppercase;color:rgba(255,255,255,0.34)}
+.pv-states{margin-left:auto;display:flex;gap:6px}
+.pv-variants{margin-left:22px}
+.pv-bar button{height:22px;padding:0 12px;border-radius:999px;border:1px solid rgba(255,255,255,0.16);background:transparent;color:rgba(255,255,255,0.6);font:600 10px/1 'Inter',sans-serif;letter-spacing:0.1em;text-transform:uppercase;cursor:pointer}
+.pv-bar button:hover{color:#fff;border-color:rgba(255,255,255,0.3)}
+.pv-bar button.is-on{color:#0b0d14;background:#F79420;border-color:#F79420}
+</style>
+</head>
+<body class="mode-select-page">
+<div class="pv-bar">Preview · mock data, real team banner art<span class="pv-states pv-variants"><button type="button" class="pv-variant is-on" data-fv="fv-a">A · Stacked band</button><button type="button" class="pv-variant" data-fv="fv-b">B · Status band</button><button type="button" class="pv-variant" data-fv="fv-c">C · Editorial</button></span><span class="pv-states"><button type="button" class="pv-state is-on" data-state="0">1 franchise + empty slot</button><button type="button" class="pv-state" data-state="1">2 franchises</button><button type="button" class="pv-state" data-state="2">2 franchises, both mid-game</button></span></div>
+
+<div class="mode-wrapper">
+  <header class="ms-page-head">
+    <div class="ms-page-eyebrow">Geeked-Out Basketball</div>
+    <h1 class="ms-page-title">Coach's Home Base</h1>
+  </header>
+
+  <section class="franchise-home-section">
+    <div class="ms-hero ms-hero--franchise">
+      <div class="ms-hero-head">
+        <h2 class="ms-hero-title">My Franchises</h2>
+        <span class="ms-hero-note">Two program slots</span>
+      </div>
+      <div id="franchise-home-slots" class="franchise-home-slots fv-a" aria-label="Franchise slots"></div>
+    </div>
+  </section>
+
+  <section class="find-a-game-section">
+    <div class="ms-hero ms-hero--pvp fag-panel">
+      <div class="fag-bloom" aria-hidden="true"></div>
+      <div class="fag-court" aria-hidden="true"></div>
+      <div class="fag-body">
+        <div class="fag-eyebrow">Head to head</div>
+        <h2 class="fag-title">Find A Game</h2>
+        <p class="fag-hook">Your program against another coach's program.</p>
+        <div class="fag-sweep" aria-hidden="true"><span></span></div>
+        <div class="fag-status"><span class="fag-status-dot" aria-hidden="true"></span>Coming Soon</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="around-the-league-section">
+    <div class="around-the-league-panel">
+      <div class="community-panel-header">
+        <h2 class="community-panel-title">Around The League</h2>
+        <span class="ms-panel-note">Latest results, league-wide</span>
+      </div>
+      <div id="around-the-league-grid" class="around-the-league-grid" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="community-section">
+    <div class="community-panel">
+      <div class="community-panel-header">
+        <h2 class="community-panel-title">Leaderboard</h2>
+        <div class="ms-leaderboard-toggle-wrap">
+          <button type="button" id="leaderboard-view-geek-points" class="ms-leaderboard-toggle active">Geek Points</button>
+          <button type="button" id="leaderboard-view-titles" class="ms-leaderboard-toggle">Titles</button>
+        </div>
+      </div>
+      <div class="ms-leaderboard-subtitle">Earn Geek Points after each game based on your coaching performance.</div>
+      <div id="community-leaderboard" class="community-leaderboard"></div>
+      <div class="leaders-by-team-triggers">
+        <div class="leaders-by-team-trigger"><button id="leaders-by-team-btn" class="leaders-by-team-link" type="button">→ View leaders by team</button></div>
+        <div class="leaders-by-team-trigger"><button type="button" class="leaders-by-team-link">→ Coaching Archetypes</button></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="community-highlights-section">
+    <div class="community-highlights-panel">
+      <div class="community-panel-header">
+        <h2 class="community-panel-title">Community Highlights</h2>
+      </div>
+      <div class="community-highlights-body" aria-live="polite"></div>
+    </div>
+  </section>
+</div>
+
+<script>
+// Mock renderer: markup mirrors what mode-select.js injects, so the CSS is
+// exercised exactly as it will be in production.
+var BANNER = {
+  'Four Corners': './FrontEnd/static/images/teams/four_corners/four_corners_banner_primary.jpg',
+  'Little York': './FrontEnd/static/images/teams/little_york/little_york_banner_primary.jpg'
+};
+var TEAM_ART = {
+  'Four Corners': "url('./FrontEnd/static/images/teams/four_corners/four_corners_banner_primary.jpg')",
+  'Little York': "url('./FrontEnd/static/images/teams/little_york/little_york_banner_primary.jpg')"
+};
+
+function occupiedSlot(o, i) {
+  var resume = o.resume ? '<div class="franchise-resume-card"><div>' +
+      '<div class="franchise-resume-kicker">Game In Progress</div>' +
+      '<div class="franchise-resume-matchup">' + o.resume.matchup + '</div>' +
+      '<div class="franchise-resume-detail">' + o.resume.detail + '</div>' +
+    '</div><div class="franchise-resume-score">' + o.resume.score + '</div></div>' : '';
+  return '<div class="franchise-home-slot-cell" data-slot-index="' + i + '" data-franchise-id="f' + i + '">' +
+    '<div class="franchise-home-card franchise-home-card-active" role="link" tabindex="0" data-action="enter-franchise" style="background-image:' + (TEAM_ART[o.team] || TEAM_ART['Four Corners']) + ';background-size:cover;background-position:center;">' +
+      '<img class="franchise-card-banner" src="' + (BANNER[o.team] || BANNER['Four Corners']) + '" alt="' + o.team + '" style="display:none;">' +
+      '<div class="franchise-card-content">' +
+        '<div>' +
+          '<div class="franchise-card-name-row">' +
+            '<div class="franchise-card-team-name">' + o.team + '</div>' +
+            '<div class="franchise-card-tier-emblem" aria-hidden="true"></div>' +
+          '</div>' +
+          '<div class="franchise-card-season-line">' + o.season + '</div>' +
+        '</div>' +
+        '<div class="franchise-card-grid">' +
+          '<div class="franchise-chip"><div class="franchise-chip-label">Record</div><div class="franchise-chip-value">' + o.record + '</div></div>' +
+          '<div class="franchise-chip"><div class="franchise-chip-label">Rank</div><div class="franchise-chip-value">' + o.rank + '</div></div>' +
+          '<div class="franchise-chip"><div class="franchise-chip-label">Prestige</div><div class="franchise-chip-value">' + o.prestige + '</div></div>' +
+          '<div class="franchise-chip"><div class="franchise-chip-label">Next Opponent</div><div class="franchise-chip-value franchise-chip-value-small">' + o.next + '</div></div>' +
+        '</div>' +
+        resume +
+        '<div class="franchise-card-actions">' +
+          '<button type="button" class="franchise-enter-btn">' + (o.resume ? 'Resume Game →' : 'Enter Franchise →') + '</button>' +
+          '<button type="button" class="franchise-slot-delete-btn">Delete Franchise</button>' +
+        '</div>' +
+      '</div>' +
+    '</div></div>';
+}
+
+function emptySlot(i) {
+  return '<div class="franchise-home-slot-cell" data-slot-index="' + i + '">' +
+    '<div class="franchise-home-card franchise-home-card-empty"><div class="franchise-empty-state">' +
+      '<div class="franchise-empty-icon" aria-hidden="true"><img src="./FrontEnd/static/images/buttons/whiteball.svg" alt=""></div>' +
+      '<h2 class="franchise-empty-title">Start Another Franchise</h2>' +
+      '<button type="button" class="franchise-empty-cta" data-action="start-franchise">Find Your Program</button>' +
+    '</div></div></div>';
+}
+
+var FRANCHISE_A = { team: 'Four Corners', season: 'Season 3 · Week 12 of 26', record: '9-3', rank: '#14', prestige: '62', next: '@ Lancaster',
+  resume: { matchup: '@ Morristown', detail: 'Q3 · 4:18', score: '54 - 61' } };
+var FRANCHISE_B = { team: 'Little York', season: 'Season 1 · Week 4 of 26', record: '3-1', rank: '#31', prestige: '48', next: 'vs Xavien' };
+var FRANCHISE_B_LIVE = Object.assign({}, FRANCHISE_B, {
+  resume: { matchup: 'vs Xavien', detail: 'Q2 · 6:04', score: '31 - 28' }
+});
+
+// 0 = one franchise + empty slot, 1 = two franchises, 2 = two franchises mid-game
+function renderSlots(state) {
+  var second = state === 0 ? emptySlot(1) : occupiedSlot(state === 2 ? FRANCHISE_B_LIVE : FRANCHISE_B, 1);
+  document.getElementById('franchise-home-slots').innerHTML = occupiedSlot(FRANCHISE_A, 0) + second;
+}
+renderSlots(0);
+[].forEach.call(document.querySelectorAll('.pv-variant'), function (btn) {
+  btn.addEventListener('click', function () {
+    [].forEach.call(document.querySelectorAll('.pv-variant'), function (b) { b.classList.remove('is-on'); });
+    btn.classList.add('is-on');
+    var host = document.getElementById('franchise-home-slots');
+    host.classList.remove('fv-a', 'fv-b', 'fv-c');
+    host.classList.add(btn.dataset.fv);
+  });
+});
+[].forEach.call(document.querySelectorAll('.pv-state'), function (btn) {
+  btn.addEventListener('click', function () {
+    [].forEach.call(document.querySelectorAll('.pv-state'), function (b) { b.classList.remove('is-on'); });
+    btn.classList.add('is-on');
+    renderSlots(Number(btn.dataset.state));
+  });
+});
+
+var LB = [
+  { rank: 1, user: 'hoopsmith', pts: 4820 },
+  { rank: 2, user: 'coachdrew', pts: 4415 },
+  { rank: 3, user: 'guyfromajax', pts: 4106, me: true },
+  { rank: 4, user: 'pressandtrap', pts: 3990 },
+  { rank: 5, user: 'zonebuster', pts: 3872 }
+];
+document.getElementById('community-leaderboard').innerHTML = LB.map(function (e) {
+  return '<div class="community-leaderboard-row' + (e.me ? ' is-current-user' : '') + '">' +
+    '<div class="community-rank">' + e.rank + '.</div>' +
+    '<div class="community-username">' + e.user + '</div>' +
+    '<div class="community-score">' + e.pts + '</div></div>';
+}).join('');
+
+var ATL = [
+  { u: 'hoopsmith', t: 'Bentley-Truman', p: '#4066b2', w: 11, l: 2, r: '#4', wk: 'Week 13', next: 'vs Xavien', win: true, opp: 'Lancaster', us: 78, them: 65, fresh: true },
+  { u: 'coachdrew', t: 'Lancaster', p: '#d24a1b', w: 8, l: 5, r: '#19', wk: 'Week 13', next: '@ Ocean City', win: false, opp: 'Bentley-Truman', us: 65, them: 78 },
+  { u: 'guyfromajax', t: 'Four Corners', p: '#c0976a', w: 9, l: 3, r: '#14', wk: 'Week 12', next: '@ Lancaster', win: true, opp: 'Little York', us: 81, them: 74 },
+  { u: 'zonebuster', t: 'Ocean City', p: '#2a2168', w: 7, l: 6, r: '#26', wk: 'Week 13', next: 'vs Morristown', win: true, opp: 'Xavien', us: 70, them: 68 },
+  { u: 'pressandtrap', t: 'Morristown', p: '#ec1d28', w: 10, l: 3, r: '#9', wk: 'Tournament', next: 'N/A', win: true, opp: 'South Lancaster', us: 88, them: 71, tourney: true },
+  { u: 'baselinebob', t: 'Little York', p: '#65308e', w: 4, l: 9, r: '#48', wk: 'Week 12', next: 'vs Four Corners', win: false, opp: 'Four Corners', us: 74, them: 81 }
+];
+function atlCard(e) {
+  return '<article class="atl-card" style="--atl-primary:' + e.p + ';--atl-secondary:#15181f;--atl-accent:color-mix(in srgb, ' + e.p + ' 72%, white);">' +
+    (e.fresh ? '<span class="atl-new-marker"></span>' : '') +
+    '<div class="atl-card-inner">' +
+      '<div class="atl-card-head"><div class="atl-user-row"><div class="atl-user">' + e.u + '</div></div>' +
+      '<div class="atl-team">' + e.t + '</div></div>' +
+      '<div class="atl-chips">' +
+        '<div class="atl-chip"><div class="atl-chip-label">Record</div><div class="atl-chip-value">' + e.w + '-' + e.l + '</div></div>' +
+        '<div class="atl-chip"><div class="atl-chip-label">Nat\'l Rank</div><div class="atl-chip-value">' + e.r + '</div></div>' +
+      '</div>' +
+      '<div class="atl-status' + (e.tourney ? ' is-tourney' : '') + '"><span class="atl-status-dot"></span><span class="atl-status-text">' + e.wk + '</span></div>' +
+      '<div class="atl-next' + (e.next === 'N/A' ? ' is-na' : '') + '">Next: <span class="atl-next-opp">' + e.next + '</span></div>' +
+      '<div class="atl-last ' + (e.win ? 'is-win' : 'is-loss') + '">' +
+        '<div class="atl-result">' + (e.win ? 'W' : 'L') + '</div>' +
+        '<div class="atl-last-detail">vs ' + e.opp + '</div>' +
+        '<div class="atl-last-score">' + e.us + '&ndash;' + e.them + '</div>' +
+      '</div>' +
+    '</div></article>';
+}
+var atlHtml = ATL.map(atlCard).join('') +
+  '<div class="atl-empty"><div class="atl-empty-mark"><span></span></div><div class="atl-empty-text">Waiting for<br>next result</div></div>' +
+  '<div class="atl-empty"><div class="atl-empty-mark"><span></span></div><div class="atl-empty-text">Waiting for<br>next result</div></div>';
+document.getElementById('around-the-league-grid').innerHTML = atlHtml;
+
+document.querySelector('.community-highlights-body').innerHTML = [
+  '<div class="community-highlight-row community-highlight-row--stacked community-highlight-row--national-gold" style="--ch-primary:#4066b2;--ch-secondary:#15181f">' +
+    '<div class="community-highlight-row-inner community-highlight-row-inner--stacked"><div class="community-highlight-copy-wrap">' +
+    '<div class="community-highlight-announcement"><strong class="ch-username">hoopsmith</strong>, coaching Bentley-Truman, is your national champion.</div>' +
+    '<div class="community-highlight-details">Beat Morristown 81-77 in the title game to finish 28-4.</div></div>' +
+    '<div class="community-highlight-gp is-pos">+240 GP</div></div></div>',
+  '<div class="community-highlight-row" style="--ch-primary:#c0976a;--ch-secondary:#15181f">' +
+    '<div class="community-highlight-row-inner"><div class="community-highlight-copy">' +
+    '<strong class="ch-username">guyfromajax</strong>, coaching Four Corners, beat Little York 81-74. Four Corners is now 9-3 &amp; ranked #14 in the nation.</div>' +
+    '<div class="community-highlight-gp is-pos">+38 GP</div></div></div>',
+  '<div class="community-highlight-row community-highlight-row--debut" style="--ch-primary:#2a2168;--ch-secondary:#15181f">' +
+    '<div class="community-highlight-row-inner"><div class="community-highlight-copy">' +
+    '<strong class="ch-username">newcoach91</strong> has completed his onboarding game. Coaching Ocean City he defeated Xavien by a score of 70-68.</div></div></div>',
+  '<div class="community-highlight-row" style="--ch-primary:#ec1d28;--ch-secondary:#15181f">' +
+    '<div class="community-highlight-row-inner"><div class="community-highlight-copy">' +
+    '<strong class="ch-username">pressandtrap</strong> has evolved his coaching archetype to The Intimidator.</div></div></div>'
+].join('');
+</script>
+</body>
+</html>

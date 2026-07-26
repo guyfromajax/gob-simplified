@@ -1356,11 +1356,14 @@ def _set_team_attribute_changes_on_game(game_id_str: str, tac: dict) -> bool:
 # only cost when disabled is one env read per team-game. EOG finalization runs in
 # the PARENT process (never inside the cpu_week_pool workers), so a single append
 # handle guarded by a lock captures all 64 games/week, not just the user's game.
-# Each line is `[EOG-BAND] {json}` so it stays greppable if ever merged elsewhere.
+# Data lines are `[EOG-BAND] {json}`; each file open first writes one
+# `[EOG-BAND-HEADER] {json}` provenance record (timestamp, git SHA, flag state)
+# so the dataset is self-describing independent of the app logs.
 # ─────────────────────────────────────────────────────────────────────────────
 _EOG_BAND_LOG_LOCK = threading.Lock()
 _EOG_BAND_LOG_FH = None
 _EOG_BAND_LOG_FH_PATH = None
+_EOG_BAND_GIT_SHA = None
 
 
 def _eog_band_log_enabled() -> bool:
@@ -1369,6 +1372,53 @@ def _eog_band_log_enabled() -> bool:
 
 def _eog_band_log_path() -> str:
     return os.environ.get("GOB_EOG_BAND_LOG_FILE", "eog_band_log.jsonl")
+
+
+def _eog_band_git_sha() -> str:
+    """Best-effort short git SHA for dataset provenance (cached). Tries Railway's
+    injected commit env, then a local `git rev-parse`; 'unknown' if neither works."""
+    global _EOG_BAND_GIT_SHA
+    if _EOG_BAND_GIT_SHA is not None:
+        return _EOG_BAND_GIT_SHA
+    sha = (
+        os.environ.get("RAILWAY_GIT_COMMIT_SHA")
+        or os.environ.get("GIT_COMMIT_SHA")
+        or os.environ.get("SOURCE_VERSION")
+        or ""
+    ).strip()
+    if not sha:
+        try:
+            import subprocess
+            sha = subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=os.path.dirname(os.path.abspath(__file__)),
+                stderr=subprocess.DEVNULL,
+            ).decode().strip()
+        except Exception:
+            sha = ""
+    _EOG_BAND_GIT_SHA = sha[:12] if sha else "unknown"
+    return _EOG_BAND_GIT_SHA
+
+
+def _eog_band_header_record() -> dict:
+    """Self-describing header written once per file open: run timestamp, git SHA,
+    and the three sunset flags (resolved bool + raw env). Keeps the dataset
+    interpretable on its own, separate from the app logs."""
+    return {
+        "record_type": "header",
+        "utc": datetime.utcnow().isoformat() + "Z",
+        "git_sha": _eog_band_git_sha(),
+        "flags": {
+            "FRANCHISE_ALL_GAMES_FULL_SIM": _franchise_all_games_full_sim(),
+            "FRANCHISE_ALL_TEAMS_AUTOTRAIN": _franchise_all_teams_autotrain(),
+            "FRANCHISE_CPU_SIM_USE_POOL": _franchise_cpu_use_pool(),
+        },
+        "flags_raw": {
+            "FRANCHISE_ALL_GAMES_FULL_SIM": os.environ.get("FRANCHISE_ALL_GAMES_FULL_SIM"),
+            "FRANCHISE_ALL_TEAMS_AUTOTRAIN": os.environ.get("FRANCHISE_ALL_TEAMS_AUTOTRAIN"),
+            "FRANCHISE_CPU_SIM_USE_POOL": os.environ.get("FRANCHISE_CPU_SIM_USE_POOL"),
+        },
+    }
 
 
 def _emit_eog_band_record(record: dict) -> None:
@@ -1390,6 +1440,13 @@ def _emit_eog_band_record(record: dict) -> None:
                         pass
                 _EOG_BAND_LOG_FH = open(path, "a", buffering=1)
                 _EOG_BAND_LOG_FH_PATH = path
+                # Provenance header once per open (a run appending to an existing
+                # file adds a fresh header; the parser reads the last one).
+                _EOG_BAND_LOG_FH.write(
+                    "[EOG-BAND-HEADER] "
+                    + json.dumps(_eog_band_header_record(), default=str)
+                    + "\n"
+                )
             _EOG_BAND_LOG_FH.write(line + "\n")
     except Exception:
         pass
@@ -3145,6 +3202,15 @@ def _should_use_tbt_for_eos_game(
     user_scope: dict[str, Any],
 ) -> bool:
     """Return True when an EOS matchup should use turn-by-turn sim."""
+    # Distant Sim sunset (flag, default OFF): when full-sim is forced, EVERY EOS
+    # game — not just the user's bracket — runs turn-by-turn. These fall through to
+    # the same full_jobs/pool path the user-bracket EOS games already use, so
+    # bracket advancement is unchanged; it just skips the distant scorer. This is
+    # the EOS half of the sunset (regular season is gated in the is_distant ladder).
+    # See _documentation_master/projects/Distant_Sim_Removal_Plan.md (Phase A).
+    if _franchise_all_games_full_sim():
+        return True
+
     if not user_scope.get("active"):
         return False
 

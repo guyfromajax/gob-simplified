@@ -29,6 +29,7 @@ import sys
 from collections import Counter, defaultdict
 
 TAG = "[EOG-BAND] "
+HEADER_TAG = "[EOG-BAND-HEADER] "
 
 # Raw inputs to histogram, by the attribute record that carries them.
 HISTOGRAM_INPUTS = [
@@ -42,13 +43,21 @@ HISTOGRAM_INPUTS = [
 ]
 
 
-def load_records(path: str) -> list[dict]:
+def load_records(path: str) -> tuple[list[dict], list[dict]]:
+    """Return (headers, data_records). Header lines carry run provenance."""
+    headers: list[dict] = []
     records: list[dict] = []
     bad = 0
     with open(path, "r") as fh:
         for line in fh:
             line = line.strip()
             if not line:
+                continue
+            if line.startswith(HEADER_TAG):
+                try:
+                    headers.append(json.loads(line[len(HEADER_TAG):]))
+                except json.JSONDecodeError:
+                    bad += 1
                 continue
             payload = line[len(TAG):] if line.startswith(TAG) else line
             try:
@@ -57,7 +66,37 @@ def load_records(path: str) -> list[dict]:
                 bad += 1
     if bad:
         print(f"# warning: skipped {bad} unparseable line(s)", file=sys.stderr)
-    return records
+    return headers, records
+
+
+def print_headers(headers: list[dict]) -> None:
+    print("\n## Run provenance ([EOG-BAND-HEADER])")
+    if not headers:
+        print("  ⚠️  NO header record found — dataset provenance unknown "
+              "(file predates header support, or was truncated).")
+        return
+    if len(headers) > 1:
+        print(f"  {len(headers)} headers (file appended across runs); showing each:")
+    for i, h in enumerate(headers):
+        tag = f"  [{i + 1}] " if len(headers) > 1 else "  "
+        flags = h.get("flags", {})
+        print(f"{tag}utc={h.get('utc')}  git_sha={h.get('git_sha')}")
+        print(f"{'    ' if len(headers) > 1 else '  '}flags: "
+              f"ALL_GAMES_FULL_SIM={flags.get('FRANCHISE_ALL_GAMES_FULL_SIM')}  "
+              f"ALL_TEAMS_AUTOTRAIN={flags.get('FRANCHISE_ALL_TEAMS_AUTOTRAIN')}  "
+              f"CPU_SIM_USE_POOL={flags.get('FRANCHISE_CPU_SIM_USE_POOL')}")
+
+
+def check_strict_distant(records: list[dict]) -> list[dict]:
+    """Distant rows in the measured window (weeks 1-26) — these corrupt the six
+    usage-gated attributes (they get randint(-2,1) instead of a real band). Returns
+    the offending records."""
+    return [
+        r for r in records
+        if r.get("is_distant_sim")
+        and isinstance(r.get("week"), int)
+        and 1 <= r["week"] <= REGULAR_SEASON_LAST_WEEK
+    ]
 
 
 def split_by_distant(records: list[dict]) -> dict[bool, list[dict]]:
@@ -210,14 +249,34 @@ def main() -> int:
         default=os.environ.get("GOB_EOG_BAND_LOG_FILE", "eog_band_log.jsonl"),
         help="Path to the [EOG-BAND] JSONL file.",
     )
+    parser.add_argument(
+        "--strict",
+        action="store_true",
+        help="Hard-fail (exit 2) if any distant-sim row appears in weeks 1-26 — "
+             "those corrupt the six usage-gated attributes' thresholds.",
+    )
     args = parser.parse_args()
 
     if not os.path.exists(args.path):
         print(f"error: file not found: {args.path}", file=sys.stderr)
         return 1
 
-    records = load_records(args.path)
+    headers, records = load_records(args.path)
     print(f"# Loaded {len(records)} [EOG-BAND] records from {args.path}")
+    print_headers(headers)
+
+    offenders = check_strict_distant(records)
+    if offenders:
+        weeks = sorted({r["week"] for r in offenders})
+        games = sorted({r.get("game_id") for r in offenders})
+        msg = (f"{len(offenders)} distant-sim row(s) in weeks 1-26 "
+               f"(weeks={weeks}, {len(games)} game(s)) — the six usage-gated "
+               f"attributes are GARBAGE for those games. Re-run with "
+               f"FRANCHISE_ALL_GAMES_FULL_SIM=1.")
+        if args.strict:
+            print(f"\n❌ STRICT FAIL: {msg}", file=sys.stderr)
+            return 2
+        print(f"\n⚠️  {msg}", file=sys.stderr)
 
     by_distant = split_by_distant(records)
     report_section("LIVE GAMES (is_distant_sim=false)", by_distant[False])
