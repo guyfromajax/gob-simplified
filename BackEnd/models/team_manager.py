@@ -746,7 +746,7 @@ class TeamManager:
             # Common/single/franchise or tournament without seed (fallback)
             rm_lo, rm_hi = TEAM_ATTR_RANGES["rebound_modifier"]
             if mode == "franchise":
-                attr_range = (-1, 1)
+                attr_range = (-2, 0)
                 team_chemistry = random.randint(7, 10)
                 rebound_modifier = 0.2
                 shot_threshold = random.randint(FRANCHISE_INIT_LO, FRANCHISE_INIT_HI)
@@ -774,6 +774,58 @@ class TeamManager:
             "pt_efficiency": random.randint(attr_range[0], attr_range[1]),
             "fb_opp_modifier": random.randint(attr_range[0], attr_range[1]),
             "pt_opp_modifier": random.randint(attr_range[0], attr_range[1])
+        }
+
+    # The 8 core team attributes that re-roll at a new-season franchise rollover.
+    ROLLOVER_CORE_ATTRS = (
+        "discipline", "fight", "offensive_efficiency", "defensive_efficiency",
+        "fb_efficiency", "pt_efficiency", "fb_opp_modifier", "pt_opp_modifier",
+    )
+
+    @staticmethod
+    def rollover_core_attr_range(carryover_count):
+        """(lo, hi) randint range for the 8 core team attributes at a new-season
+        rollover, scaled by how many players carry over from the prior season
+        (active roster + training/practice squad, graduating seniors excluded):
+
+            >=10 -> (-1, 2)   strong continuity
+             7-9 -> (-2, 1)
+              <7 -> (-3, 0)   heavy turnover
+
+        See Team_Attribute_System.md (§ Season Rollover Re-Roll).
+        """
+        if carryover_count >= 10:
+            return (-1, 2)
+        if carryover_count >= 7:
+            return (-2, 1)
+        return (-3, 0)
+
+    @staticmethod
+    def init_franchise_rollover_team_attributes(carryover_count):
+        """Fresh team_attributes for a new season in an EXISTING franchise.
+
+        Nothing carries over from the prior season. Non-core fields
+        (shot_threshold, rebound_modifier, team_chemistry) plus momentum/streaks
+        re-initialize exactly like franchise creation; the 8 core attributes
+        re-roll with a carryover-scaled range (rollover_core_attr_range).
+        """
+        base = TeamManager.init_team_attributes(mode="franchise")
+        lo, hi = TeamManager.rollover_core_attr_range(carryover_count)
+        return {
+            "shot_threshold": base["shot_threshold"],
+            "rebound_modifier": base["rebound_modifier"],
+            "team_chemistry": base["team_chemistry"],
+            "momentum_score": 0,
+            "distant_win_streak": 0,
+            "distant_loss_streak": 0,
+            "offensive_efficiency": random.randint(lo, hi),
+            "defensive_efficiency": random.randint(lo, hi),
+            "discipline": random.randint(lo, hi),
+            "fight": random.randint(lo, hi),
+            "pt_opp_modifier": random.randint(lo, hi),
+            "fb_opp_modifier": random.randint(lo, hi),
+            "fb_efficiency": random.randint(lo, hi),
+            "pt_efficiency": random.randint(lo, hi),
         }
 
     def _init_team_attributes(self, mode="single", shot_threshold_override=None):

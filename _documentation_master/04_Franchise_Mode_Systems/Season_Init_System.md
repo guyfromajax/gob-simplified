@@ -30,6 +30,7 @@ Season init resets:
 - recruiting state
 - season-progress fields
 - current-season game docs
+- **`team_attributes`** — re-rolled, not carried over: the 8 core attrs re-roll on a range scaled by roster carryover; other fields re-init like franchise creation (see `Team_Attribute_System.md` → § Season Rollover Re-Roll).
 
 Season init does not intentionally wipe:
 - the franchise team’s play library metadata

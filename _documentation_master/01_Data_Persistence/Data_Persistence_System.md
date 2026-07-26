@@ -95,18 +95,18 @@ This system documents data persistence across all three game modes when users ar
 
 **For each of the 128 teams in the franchise**, team-level data (attributes, settings, plays, scouting) is stored in the `franchise_team_data` collection, keyed by `(franchise_id, team_id)`. The franchise document no longer stores `franchise_teams` (deprecated).
 
-**Team Attributes** (mode-specific, randomized on init, updated by training):
+**Team Attributes** (mode-specific, randomized on init, updated by training). Ranges below are **franchise creation**; at **season rollover** the 8 core attrs re-roll on a carryover-scaled range and other fields re-init like creation — see `Team_Attribute_System.md` → § Season Rollover Re-Roll:
 - `team_chemistry`: 7-10 (franchise mode range)
-- `offensive_efficiency`: -1 to +1
+- `offensive_efficiency`: -2 to 0
 - `shot_threshold`: 80 to 90 in franchise init (center 100 for pill display)
-- `discipline`: -1 to +1 (formerly `turnover_modifier`)
-- `fight`: -1 to +1 (formerly `foul_modifier`)
+- `discipline`: -2 to 0 (formerly `turnover_modifier`)
+- `fight`: -2 to 0 (formerly `foul_modifier`)
 - `rebound_modifier`: 0.2 (fixed center value for Franchise mode)
-- `defensive_efficiency`: -1 to +1
-- `fb_efficiency`: -1 to +1
-- `pt_efficiency`: -1 to +1
-- `fb_opp_modifier`: -1 to +1
-- `pt_opp_modifier`: -1 to +1
+- `defensive_efficiency`: -2 to 0
+- `fb_efficiency`: -2 to 0
+- `pt_efficiency`: -2 to 0
+- `fb_opp_modifier`: -2 to 0
+- `pt_opp_modifier`: -2 to 0
 
 **Strategy Settings & Playbook Settings:**
 - See "Game Plan & Playbook Settings Persistence" section below for complete documentation

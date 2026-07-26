@@ -14893,9 +14893,15 @@ def finish_season(req: FinishSeasonRequest):
     def highest_rt(player_id: str) -> int:
         return int((_best_position((next_fpd_map.get(player_id) or {}).get("position_ratings") or {}).get("rating") or 0))
 
+    from BackEnd.models.team_manager import TeamManager
+
     next_ftd_state_by_team_id: dict[str, dict[str, Any]] = {}
     for ftd_doc in ftd_docs:
         team_id = str(ftd_doc.get("team_id"))
+        # Carryover count = returning players (active roster + training/practice
+        # squad, graduating seniors already excluded), BEFORE this season's signed
+        # recruits are appended. Drives the scaled team-attribute re-roll below.
+        carryover_count = len(returning_players_by_team.get(team_id, []))
         roster = list(returning_players_by_team.get(team_id, []))
         scholarship_players = set(returning_scholarships_by_team.get(team_id, set()))
         pt_promise_players = []
@@ -14922,6 +14928,11 @@ def finish_season(req: FinishSeasonRequest):
             "Recruits": {str(i): None for i in range(1, 21)},
             RECRUITING_ORDERS_WEEK_35_FIELD: {},
             "recruit_visit": None,
+            # Team attributes do NOT carry over: re-roll the 8 core attributes on a
+            # carryover-scaled range; other fields re-init like franchise creation.
+            "team_attributes": TeamManager.init_franchise_rollover_team_attributes(
+                carryover_count
+            ),
             "training_reports": {},
             "coaching_focus": carryover_coaching_focus_counts_for_new_season(
                 existing_ftd.get("coaching_focus")
@@ -14972,6 +14983,7 @@ def finish_season(req: FinishSeasonRequest):
                     "Recruits": state["Recruits"],
                     RECRUITING_ORDERS_WEEK_35_FIELD: state[RECRUITING_ORDERS_WEEK_35_FIELD],
                     "recruit_visit": state["recruit_visit"],
+                    "team_attributes": state["team_attributes"],
                     "training_reports": state["training_reports"],
                     "coaching_focus": state["coaching_focus"],
                     "total_player_attrs": state["total_player_attrs"],

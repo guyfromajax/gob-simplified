@@ -1,6 +1,6 @@
 # Team Attribute Management System (**verified 2026-06-13**)
 
-> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise: attr `(-1,1)`, `team_chemistry` 7-10, `rebound_modifier` 0.2 fixed, `shot_threshold` 80-90; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). EOG faucet/sink tables spot-checked in `update_team_attributes_after_game` (`franchise_routes.py`): team-chemistry win +1..+2/+1..+3/+2..+4 & loss −2..−1/−3..−2/−5..−3 (L1383-1398), shot_threshold FG% bands at 50/45 (L1287-1295), discipline +1..+2, rebound-down −0.05..−0.10, distant-sim override (`simulation_engine=="distant"`) — all confirmed. **Fixed:** stale "January 2025" header + badly drifted Key Files line numbers (see below). **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
+> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise **creation**: attr `(-2,0)`, `team_chemistry` 7-10, `rebound_modifier` 0.2 fixed, `shot_threshold` 80-90; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). **Season rollover** (new season in an existing franchise) does NOT carry team_attributes: non-core fields re-init like creation and the 8 core attrs re-roll on a carryover-scaled range — see § Season Rollover Re-Roll. EOG faucet/sink tables spot-checked in `update_team_attributes_after_game` (`franchise_routes.py`): team-chemistry win +1..+2/+1..+3/+2..+4 & loss −2..−1/−3..−2/−5..−3 (L1383-1398), shot_threshold FG% bands at 50/45 (L1287-1295), discipline +1..+2, rebound-down −0.05..−0.10, distant-sim override (`simulation_engine=="distant"`) — all confirmed. **Fixed:** stale "January 2025" header + badly drifted Key Files line numbers (see below). **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
 
 ## Base Constants
 
@@ -19,7 +19,8 @@
 
 2. **Mode-Specific Attribute Ranges**:
    - **Single Game & Tournament**: Most attributes use `random.randint(-10, 10)`, `team_chemistry=random(7-25)`, `rebound_modifier=random(0.0-0.4)`
-   - **Franchise**: Most attributes use `random.randint(-1, 1)`, `team_chemistry=random(7-10)`, `rebound_modifier=0.2` (fixed)
+   - **Franchise (creation)**: Most attributes use `random.randint(-2, 0)`, `team_chemistry=random(7-10)`, `rebound_modifier=0.2` (fixed)
+   - **Franchise (season rollover)**: team_attributes do not carry over; the 8 core attrs re-roll on a carryover-scaled range (§ Season Rollover Re-Roll), other fields re-init like creation
 
 3. **Initialization Source**: Universal `teams` collection in MongoDB → Team objects → Fallback to `TeamManager.init_team_attributes()`
 
@@ -75,14 +76,33 @@ All team attributes are stored in team objects across all game modes:
 - `team_chemistry`: `random.randint(7, 25)`
 - `rebound_modifier`: `random.randint(0, 40) / 100.0` (random 0.0-0.4 in 0.01 increments)
 
-**Franchise Mode:**
-- Attribute range: `random.randint(-1, 1)` for:
+**Franchise Mode (creation):**
+- Attribute range: `random.randint(-2, 0)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
 - `shot_threshold`: `random.randint(80, 90)` (slightly better than MID 100; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
 - `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
 - `rebound_modifier`: `0.2` (fixed center value)
 
+**Franchise Mode (season rollover):** see § Season Rollover Re-Roll — team_attributes do **not** carry over; the 8 core attrs re-roll on a carryover-scaled range, other fields re-init like creation.
+
 **New Attributes**: All default to `0` if not present in the universal collection.
+
+### Season Rollover Re-Roll
+
+When an existing franchise advances to a new season, `finish_season` (`BackEnd/api/franchise_routes.py`) **re-rolls** each team's `team_attributes` — nothing carries over. Implemented by `TeamManager.init_franchise_rollover_team_attributes(carryover_count)` (`team_manager.py`).
+
+- **Non-core fields** re-init exactly like franchise creation: `shot_threshold` `randint(80,90)`, `rebound_modifier` `0.2`, `team_chemistry` `randint(7,10)`, `momentum_score`/`distant_win_streak`/`distant_loss_streak` `0`.
+- **The 8 core attrs** (`discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`) re-roll with `randint(lo, hi)` where `(lo,hi)` is scaled by **carryover count**.
+
+**Carryover count** = returning players from the prior season (active roster **+** training/practice squad, graduating seniors excluded), counted **before** this season's signed recruits are added. Source: `len(returning_players_by_team[team_id])`.
+
+| Carryover players | Core-attr range | Bias |
+|-------------------|-----------------|------|
+| **≥ 10**          | `-1 to 2`       | strong continuity |
+| **7 – 9**         | `-2 to 1`       | moderate turnover |
+| **< 7**           | `-3 to 0`       | heavy turnover |
+
+Boundary: exactly **10 → top bucket** (`>= 10`). Range logic lives in `TeamManager.rollover_core_attr_range()`.
 
 ### Attribute Initialization
 
@@ -205,7 +225,7 @@ This is the team's intangible mindset to convert baskets. Their overall belief i
 | FTE tutorial | User **0**, computer **100** |
 | UI pills | Center **100**, span **0–200** → FCC, training report, tournament, court, box score |
 
-- Initial seed: Franchise init / missing-FTD creation (`range: 130 to 140`, random).
+- Initial seed: Franchise creation / missing-FTD creation (`range: 80 to 90`, random). Season rollover re-inits identically (does not carry over).
 - Faucet: Training System / Scrimmages.
   Condition: `scrimmages` slider at `0`.
   Range: `0 pts -> +5 to +15` (worse shooting attribute).
@@ -230,7 +250,7 @@ This is the team's intangible mindset to convert baskets. Their overall belief i
 ### Rebounding (`rebound_modifier`) (range: 0.0 to 0.4)
 This is the team's intangible mindset when it comes to rebounding. Their overall belief in their identity as a basketball team who gets more rebounds than their opponent. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
-- Initial seed: Franchise init / missing-FTD creation (`0.2` fixed).
+- Initial seed: Franchise creation / missing-FTD creation (`0.2` fixed). Season rollover re-inits identically (does not carry over).
 - Faucet: Training System / Rebounding drill.
   Condition: `rebounding` slider contributes rounded effective points.
   Range: `<1 effective pt -> -0.05 to -0.03`, `1-2 -> -0.03 to +0.03`, `3-4 -> +0.03 to +0.05`, `5+ -> +0.03 to +0.10`.
@@ -245,7 +265,7 @@ This is the team's intangible mindset when it comes to rebounding. Their overall
 ### Offense Efficiency (`offensive_efficiency`) (range: -10 to 10)
 This is how well your team executes the Xs & Os of your offense — running plays, setting screens, making reads, and getting open. This affects how cleanly your offense operates as a unit, independent of raw talent. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through diverse play-calling and offense-focused training activities.
 
-- Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
+- Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
 - Faucet + Sink: Training System / Offense Install.
   Condition: offense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
@@ -261,7 +281,7 @@ This is how well your team executes the Xs & Os of your offense — running play
 ### Defense Efficiency (`defensive_efficiency`) (range: -10 to 10)
 This is how well your team executes the Xs & Os of your defense — rotating on time, closing out, communicating switches, and making life difficult for the offense. Raw athleticism only takes you so far; this is what separates a disciplined unit from a collection of individuals. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through diverse play-calling and defense-focused training activities.
 
-- Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
+- Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
 - Faucet + Sink: Training System / Defense Install.
   Condition: defense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
@@ -277,7 +297,7 @@ This is how well your team executes the Xs & Os of your defense — rotating on 
 ### Fast Break Efficiency (`fb_efficiency`) (range: -10 to 10)
 This is how well your team executes in transition — pushing the pace, hitting the right moments to run, and converting opportunities before the defense can set up. This affects both how often your team generates fast break chances and how effectively they finish them. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed fast break install, a balanced Fast Break playbook and dedicated fast break training activities.
 
-- Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
+- Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
 - Faucet + Sink: Training System / Fast Break Offense Install.
   Condition: fast-break offense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
@@ -293,7 +313,7 @@ This is how well your team executes in transition — pushing the pace, hitting 
 ### Press/Trap Break Efficiency (`pt_efficiency`) (range: -10 to 10)
 This is how well your team executes full court presses and half court traps — timing the traps, cutting off passing lanes, and turning defensive pressure into live ball turnovers. This affects both how often your team disrupts the opponent's offense and how effectively they convert that pressure into scoring opportunities. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed press/trap install, a disciplined approach to how often you deploy it, and dedicated press/trap training activities.
 
-- Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
+- Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
 - Faucet + Sink: Training System / P/T Defense Install.
   Condition: press/trap defense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
@@ -309,7 +329,7 @@ This is how well your team executes full court presses and half court traps — 
 ### Fight (`fight`) (range: -10 to 10)
 Represents your team’s competitive edge. High Fight teams have great resilience, they handle adverse situations well, and perform with urgency when trailing. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
-- Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
+- Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
 - Faucet: Training System / Strength + Conditioning.
   Condition: strength and conditioning contribute positive rounded effective points.
   Range (shared fight/discipline bucket table after 0.5× accrual rounds): `0 -> -4 to -3`, `1 -> -1 to +1`, `2 -> 0 to +2`, `3 -> +1 to +3`, `4 -> +2 to +4`, `5+ -> +3 to +5`.
@@ -330,7 +350,7 @@ Represents your team’s competitive edge. High Fight teams have great resilienc
 ### Discipline (`discipline`) (range: -10 to 10)
 Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and maintain composure late in games. It balances Fight very well — aggression without structure becomes chaos. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
-- Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
+- Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
 - Faucet: Training System / Inside Defense, Outside Defense, Passing, Ball Handling.
   Condition: those drills contribute positive rounded effective points (0.25× per drill point, summed, half-up).
   Range: same bucket table as **Fight** after rounding: `0 -> -4 to -3`, `1 -> -1 to +1`, `2 -> 0 to +2`, `3 -> +1 to +3`, `4 -> +2 to +4`, `5+ -> +3 to +5`.
@@ -351,19 +371,19 @@ Reflects polish and control. Disciplined teams commit fewer unnecessary fouls an
 
 ### Momentum (`momentum_score`) (range: -10 to 10)
 
-- Initial seed: Franchise init / season rollover sets **`0`**.
+- Initial seed: Franchise creation **and** season rollover both set **`0`** (rollover reset now implemented in `finish_season` via `init_franchise_rollover_team_attributes`).
 - **Distant sim only (Phase 2):** updated after each persisted distant franchise game via `_distant_sim_persist_momentum_score_updates()` in `franchise_routes.py`.
   - **Win:** `+1.5 × chemistry_scale` (+ `+0.5 × (win_streak − 2)` when streak ≥ 3 after the win).
   - **Loss:** `−0.8 × chemistry_scale` (+ extra **−2.0** when loss ends a win streak ≥ 3).
   - `chemistry_scale = max(1.0, team_chemistry / 10)`.
   - Contributes to distant win probability as **`momentum_score × 8`** combined-score points (`BackEnd/constants/distant_sim.py`).
-- Companion distant-sim fields (not UI attrs): `distant_win_streak`, `distant_loss_streak` on FTD `team_attributes`; reset to **0** at season init.
+- Companion distant-sim fields (not UI attrs): `distant_win_streak`, `distant_loss_streak` on FTD `team_attributes`; reset to **0** at franchise creation and at season rollover.
 - Training and EOG flows do **not** update `momentum_score`.
 
 ### Team Chemistry (`team_chemistry`) (range: 7 to 25)
 The connective tissue of your roster. Chemistry influences how well players support one another through mistakes, adversity, and high-pressure moments. Winning strengthens it. Internal friction and extended losing can strain it. You may not see the impact of this attribute directly — but you will definitely feel it. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
-- Initial seed: Franchise init / missing-FTD creation (`range: 7 to 10`, random).
+- Initial seed: Franchise creation / missing-FTD creation (`range: 7 to 10`, random). Season rollover re-inits identically (does not carry over).
 - Faucet: Training System / Free Throws, Film Study, Scrimmages.
   Condition: those drills contribute positive rounded effective points.
   Range: chemistry training range after rounding: `0 -> -3 to -1`, `1 -> 0 to +1`, `2 -> +1 to +2`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
@@ -383,7 +403,7 @@ The connective tissue of your roster. Chemistry influences how well players supp
 ### FB Opp Modifier (`fb_opp_modifier`) (range: -10 to 10)
 This is how well your team defends fast breaks and transition offenses. Containing the pace, cutting off passing lanes, and not allowing easy transition buckets. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed Fast Break Defense install and film study of your opponent.
 
-- Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
+- Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
 - Faucet + Sink: Training System / Fast Break Defense Install.
   Condition: fast-break defense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
@@ -399,7 +419,7 @@ This is how well your team defends fast breaks and transition offenses. Containi
 ### P/T Opp Modifier (`pt_opp_modifier`) (range: -10 to 10)
 This is how well your team and work through your opponent's presses and traps. Handling the pressure of these disruptive defenses is key to avoiding the many mistakes they can cause. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed Press/Trap Offense install and film study of your opponent.
 
-- Initial seed: Franchise init / missing-FTD creation (`range: -1 to +1`, random).
+- Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
 - Faucet + Sink: Training System / P/T Offense Install.
   Condition: press/trap offense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
