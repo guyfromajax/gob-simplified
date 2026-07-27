@@ -16,6 +16,7 @@ from BackEnd.constants import (
     POSITION_LIST,
     HCO_STRING_SPOTS,
     OREB_REBOUND_SCORE_DISCOUNT,
+    REBOUND_TEAM_CHEMISTRY_FACTOR,
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
@@ -1699,6 +1700,14 @@ def _team_chemistry(team):
         return 0.0
 
 
+def _team_rebound_bonus(team):
+    return (
+        REBOUND_TEAM_CHEMISTRY_FACTOR
+        * _team_chemistry(team)
+        * _team_rebound_modifier(team)
+    )
+
+
 def select_rebounder_by_score(
     off_team,
     def_team,
@@ -1760,7 +1769,7 @@ def select_rebounder_by_score(
     for entry in entries:
         player = entry["player"]
         team = entry["team"]
-        value = calculate_rebound_score(player) + (_team_chemistry(team) * _team_rebound_modifier(team))
+        value = calculate_rebound_score(player) + _team_rebound_bonus(team)
         if entry["distance"] > float(upper_half_distance):
             value *= lower_half_discount
         # Offensive rebounders are discounted — defense's box-out / positioning edge on a

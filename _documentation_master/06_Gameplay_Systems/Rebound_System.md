@@ -163,8 +163,9 @@ OREB turns are UESS-compliant (`oreb_step_emitter.py` → `animation_steps[]`). 
    - Otherwise, lower-half discount is **0.95**.
 5. **Score every eligible rebounder**:
    - `rebound_function = (RB×0.5 + ST×0.3 + IQ×0.1 + CH×0.1) × randint(1, 6)`
-   - Upper-half player final score: `rebound_function + (team_chemistry × rebound_modifier)`
-   - Lower-half player final score: `(rebound_function + (team_chemistry × rebound_modifier)) × lower_half_discount`
+   - Team bonus: `REBOUND_TEAM_CHEMISTRY_FACTOR (0.5) × team_chemistry × rebound_modifier`
+   - Upper-half player final score: `rebound_function + team_bonus`
+   - Lower-half player final score: `(rebound_function + team_bonus) × lower_half_discount`
    - **Offensive-rebounder discount:** offensive players' final score is multiplied by **`OREB_REBOUND_SCORE_DISCOUNT` (0.8)** — modeling the defense's box-out / positioning edge on a miss (offense and defense were otherwise scored identically). Applied in `select_rebounder_by_score`; defense scores untouched. Tune against the week-aggregate **OREB%** (D1 target ~30%; `1.0` = legacy no-discount). Note: a 0.8 *score* discount is **not** a 20% *rate* reduction — the winner is a max-of-`d6` pick, so the OREB% effect is non-linear and tuned empirically.
    - Shooter / putback shooter penalty: after the score above is calculated, apply the existing **20% discount** (`× 0.8`) to the shooter or putback shooter if he is in the eligible pool.
 6. **No eligible rebounder fallback:** if the eligible pool is empty, expand the Euclidean search radius by **5** until at least one rebounder is found. HCO / Free Throw fallback starts at **20**. Geo-gated paths start from their path radius, then expand by 5 from there.

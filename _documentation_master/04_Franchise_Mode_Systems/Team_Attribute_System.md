@@ -250,6 +250,10 @@ This is the team's intangible mindset to convert baskets. Their overall belief i
 ### Rebounding (`rebound_modifier`) (range: 0.0 to 0.4)
 This is the team's intangible mindset when it comes to rebounding. Their overall belief in their identity as a basketball team who gets more rebounds than their opponent. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
+- Live rebound impact: each eligible player's rebound score receives
+  `REBOUND_TEAM_CHEMISTRY_FACTOR (0.5) × team_chemistry × rebound_modifier`
+  before geography, offensive-rebound, and shooter/putback discounts. See
+  [Rebound_System.md](../06_Gameplay_Systems/Rebound_System.md) for the full winner-selection flow.
 - Initial seed: Franchise creation / missing-FTD creation (`0.2` fixed). Season rollover re-inits identically (does not carry over).
 - Faucet: Training System / Rebounding drill.
   Condition: `rebounding` slider contributes rounded effective points.

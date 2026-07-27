@@ -690,12 +690,13 @@ Cross-ref: **HCO Micro Movements** (`PROXIMITY_CONTEST_*`), `CONTEST_EUCLIDEAN_R
 | Constant | File | Value | Affects | Effect |
 |---|---|---|---|---|
 | `OREB_REBOUND_SCORE_DISCOUNT` | constants/__init__.py | `0.8` | oreb | Offensive candidates’ final rebound score ×0.8 in `select_rebounder_by_score` (box-out edge). Tune vs ~30% OREB%; `1.0` = no discount. Applies on all paths using this helper (HCO/FT/FB/HCT + putback-miss chains). |
+| `REBOUND_TEAM_CHEMISTRY_FACTOR` | constants/__init__.py | `0.5` | rebound outcomes | Scales the team component of every eligible player's rebound score: `0.5 × team_chemistry × rebound_modifier`. |
 | `OREB_PUTBACK_ONLY_THRESHOLD` | eoq_clock_progression.py | `6` | volume / possession | `time_remaining < 6` → force putback (no kickout), including chained OREBs. |
 | `OREB_PUTBACK_MIN_TIME_ELAPSED` | constants/__init__.py | `2` | possession | Floor on putback `time_elapsed` after schema burn. Kickout is **not** floored. |
 | `NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE` | shared.py | `20` | oreb | Putback-miss first-pass Euclidean candidate radius; upper-half = `20 × 0.5 = 10`. Also failed-attemptor collect radius (shared with DREB). |
 | `MO_OREB_DELTA` | momentum.py | `1` | other | +MO on OREB once threshold met. |
 | `MO_OREB_THRESHOLD` | momentum.py | `3` | other | +`MO_OREB_DELTA` on a player’s **3rd** OREB and each after. |
-| `TEAM_ATTR_RANGES["rebound_modifier"]` | constants/__init__.py | `(0.0, 0.4)` | oreb | Feeds `team_chemistry × rebound_modifier` into rebound score + first tie-break. |
+| `TEAM_ATTR_RANGES["rebound_modifier"]` | constants/__init__.py | `(0.0, 0.4)` | oreb | Feeds `REBOUND_TEAM_CHEMISTRY_FACTOR × team_chemistry × rebound_modifier` into rebound score + first tie-break. |
 
 ### OREB Inline Magic (proposed names — document only)
 
