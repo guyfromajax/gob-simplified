@@ -28,6 +28,8 @@ import math
 from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+from BackEnd.utils.team_attr_scale import core8_gameplay
+
 # --- Tunable knobs (§14.6) ---------------------------------------------------
 # Spatial lane width: a defender farther than this (perpendicular) from the pass
 # line is not "in the lane" and cannot contest, however fast he is.
@@ -218,7 +220,7 @@ def resolve_offense_pass_modifier(turn_type: Any, off_team_attributes: Any) -> f
     FAST_BREAK→fb_efficiency, else→offensive_efficiency)."""
     key = OFFENSE_PASS_MODIFIER_KEYS.get(turn_type, DEFAULT_OFFENSE_PASS_MODIFIER_KEY)
     try:
-        return float((off_team_attributes or {}).get(key, 0) or 0)
+        return core8_gameplay((off_team_attributes or {}).get(key, 0))
     except (TypeError, ValueError, AttributeError):
         return 0.0
 
@@ -267,8 +269,8 @@ def resolve_pass_contest(
     ball_speed: float,
     defenders: Iterable[Dict[str, Any]],
     *,
-    offense_modifier: float = 0.0,
-    defense_modifier: float = 0.0,
+    offense_modifier_g: float = 0.0,   # CONTRACT: already core8_gameplay()-normalized (±10 scale)
+    defense_modifier_g: float = 0.0,   # CONTRACT: already core8_gameplay()-normalized (±10 scale)
     lane_dist: float = PASS_LANE_DIST,
     rng: Any = random,
     safety_base: float = None,
@@ -284,10 +286,16 @@ def resolve_pass_contest(
     ``passer`` is a descriptor ``{"xy", "PS", "CH", "IQ"}``. Resolution order:
       1. Geometry — if no defender is eligible (in the lane + reachable), COMPLETE.
       2. Passer safety gate — ``pass_score = (PS·0.6 + CH·0.2 + IQ·0.2)×rand(1,6)``;
-         if it exceeds ``PASS_SAFETY_BASE − offense_modifier`` the pass is safe
-         (COMPLETE, no interception in play). A higher ``offense_modifier`` (the
+         if it exceeds ``PASS_SAFETY_BASE − offense_modifier_g`` the pass is safe
+         (COMPLETE, no interception in play). A higher ``offense_modifier_g`` (the
          turn-type offense rating — see ``resolve_offense_pass_modifier``) lowers the
          bar, so good offenses complete more passes.
+
+    ⚠️ CONTRACT: ``offense_modifier_g`` / ``defense_modifier_g`` MUST arrive already
+    ``core8_gameplay()``-normalized (±10 scale). Callers resolve them via
+    ``resolve_offense_pass_modifier`` (which wraps) and the ``_hco_def_efficiency``
+    stash (wrapped at stash time). Do NOT pass a raw ±20 team attribute here — the
+    ``_g`` suffix marks the normalized contract.
       3. Interception band — ``intercept_score = (OD·0.6 + CH·0.2 + IQ·0.2)×rand(1,6)``.
          ``score ≤ tier_mid`` → COMPLETE. Over it → the pass is DEFLECTED, and the defender's
          ball skill splits the kind: ``rand(1, PASS_DEFLECT_KIND_D) < (CH + IQ)`` → INTERCEPT, else BAT_OOB.
@@ -310,11 +318,11 @@ def resolve_pass_contest(
     _mid = PASS_INTERCEPT_TIER_MID if tier_mid is None else tier_mid
     # When efficiency_in_composite (HCO): team efficiency is added to the composite AND subtracted
     # from the bar/tiers (doubly favors the stronger team). HCT/FCP leave it off → old behavior.
-    _pass_add = offense_modifier if efficiency_in_composite else 0.0
-    _int_add = defense_modifier if efficiency_in_composite else 0.0
+    _pass_add = offense_modifier_g if efficiency_in_composite else 0.0
+    _int_add = defense_modifier_g if efficiency_in_composite else 0.0
 
     # Passer safety gate (3a) — a good passer evades the lurking defender entirely.
-    if _pass_score(passer, rng, add=_pass_add) > (_base - offense_modifier):
+    if _pass_score(passer, rng, add=_pass_add) > (_base - offense_modifier_g):
         return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "passer_safe"}
 
     # Interceptor skill band (3b). A SINGLE deflection threshold (tier_mid, efficiency-adjusted):

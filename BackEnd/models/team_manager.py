@@ -721,6 +721,8 @@ class TeamManager:
 
         # Tournament seed-based ranges (Mode_Init_System.md): Seed 1 = best, Seed 8 = worst
         if mode == "tournament" and tournament_seed is not None and 1 <= tournament_seed <= 8:
+            # Tournament is a SUNSET mode: rebound cents left on the original 0.0-0.4
+            # spread (harmless + truthful inside the 0.0-1.0 clamp; not re-centered).
             if tournament_seed == 1:
                 a_lo, a_hi = 5, 10
                 tc_lo, tc_hi = 20, 25
@@ -743,12 +745,14 @@ class TeamManager:
             rebound_modifier = round(random.randint(rm_lo, rm_hi) / 100.0, 2)
             shot_threshold = random.randint(st_lo, st_hi)
         else:
-            # Common/single/franchise or tournament without seed (fallback)
-            rm_lo, rm_hi = TEAM_ATTR_RANGES["rebound_modifier"]
+            # Common/single/franchise or tournament without seed (fallback).
+            # Single-game is a SUNSET mode: keep its original 0.0-0.4 rebound spread
+            # (not the widened 0.0-1.0 clamp range) — harmless + not re-centered.
+            rm_lo, rm_hi = 0.0, 0.4
             if mode == "franchise":
                 attr_range = (-2, 0)
                 team_chemistry = random.randint(7, 10)
-                rebound_modifier = 0.2
+                rebound_modifier = 0.2  # init center stays 0.2 on the new 0.0-1.0 scale (Task 2)
                 shot_threshold = random.randint(FRANCHISE_INIT_LO, FRANCHISE_INIT_HI)
             else:
                 # Single Game or tournament fallback (no seed)

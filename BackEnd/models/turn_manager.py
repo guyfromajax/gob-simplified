@@ -1,9 +1,9 @@
 from BackEnd.models.logger import Logger
-from BackEnd.models.rebound_manager import ReboundManager
 from BackEnd.models.playbook_manager import PlaybookManager
 from BackEnd.models.animator import Animator
 import math
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 import json
 import logging
 import uuid
@@ -33,7 +33,6 @@ from BackEnd.constants import (
 from BackEnd.utils.shared import (
     weighted_random_from_dict,
     generate_pass_chain,
-    get_team_thresholds,
     get_foul_and_turnover_positions,
     get_name_safe,
     get_player_position,
@@ -95,7 +94,6 @@ class TurnManager:
     def __init__(self, game_manager: "GameManager"):
         self.game = game_manager
         self.logger = Logger()
-        self.rebound_manager = ReboundManager(self.game)
         self.playbook_manager = PlaybookManager(self.game.offense_team)
         self.animator = Animator(self.game)
         self._ensure_lineup_fields()
@@ -6382,16 +6380,16 @@ class TurnManager:
 
                 # Slightly bias toward foul when high activity + tempo
                 foul_margin = o_score - d_score
-                if foul_margin < off_team.team_attributes["fight"] * 0.7:
+                if foul_margin < core8_gameplay(off_team.team_attributes["fight"]) * 0.7:
                     foul_risks.append(("O_FOUL", step_index, offender, defender))
-                elif d_score < def_team.team_attributes["fight"] * 1.3:
+                elif d_score < core8_gameplay(def_team.team_attributes["fight"]) * 1.3:
                     foul_risks.append(("D_FOUL", step_index, offender, defender))
 
         # Step 4: Decide event
         turnover_risks.sort(key=lambda x: x[0])
         foul_risks.sort(key=lambda x: x[1])  # prioritize earlier fouls
 
-        if turnover_risks and turnover_risks[0][0] < off_team.team_attributes["discipline"]:
+        if turnover_risks and turnover_risks[0][0] < core8_gameplay(off_team.team_attributes["discipline"]):
             _, player, defender = turnover_risks[0]
             roles["event_step"] = None  # You could optionally track when
             roles["turnover_player"] = player

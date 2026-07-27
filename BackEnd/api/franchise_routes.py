@@ -1703,13 +1703,16 @@ def update_team_attributes_after_game(
         total = sum(positive_counts)
         return max(positive_counts) / total if total > 0 else 0.0
 
-    def _offensive_play_usage(team_obj: dict) -> int:
-        total = 0
-        for _play_key, play_data, _display_name in iter_team_plays(team_obj.get("plays", {})):
-            total += int((play_data.get("game_stats", {}) or {}).get("times_run", 0) or 0)
-        return total
+    def _offensive_play_concentration(team_obj: dict) -> tuple[int, float]:
+        # Task 3: concentration (largest play's share), NOT total usage. Total is
+        # returned only to detect the data-integrity zero-usage case.
+        counts = [
+            int((play_data.get("game_stats", {}) or {}).get("times_run", 0) or 0)
+            for _pk, play_data, _dn in iter_team_plays(team_obj.get("plays", {}))
+        ]
+        return sum(counts), _max_share_from_counts(counts)
 
-    def _defensive_play_max_share(team_obj: dict) -> float:
+    def _defensive_play_usage_and_share(team_obj: dict) -> tuple[int, float]:
         defense = (team_obj.get("scouting", {}) or {}).get("defense", {}) or {}
         from BackEnd.utils.defense_identity import CANONICAL_HCO_DEFENSE_ROW_KEYS
 
@@ -1717,15 +1720,33 @@ def update_team_attributes_after_game(
             int((_stat_bucket(defense.get(key, {}))).get("used", 0) or 0)
             for key in CANONICAL_HCO_DEFENSE_ROW_KEYS
         ]
-        return _max_share_from_counts(counts)
+        return sum(counts), _max_share_from_counts(counts)
+
+    # after_steal is a forced event off a steal, not a strategic choice — excluded
+    # from both the fb concentration and the opponent fb volume (Task 4).
+    _FB_STRATEGIC_KEYS = ("covert_release", "rim_runner", "triangle")
 
     def _fast_break_usage(team_obj: dict) -> tuple[int, float]:
         offense = (team_obj.get("scouting", {}) or {}).get("offense", {}) or {}
         fb_plays = offense.get("fast_break_plays", {}) or {}
         counts = [
             int((fb_plays.get(key, {}) or {}).get("A", 0) or 0)
-            for key in ("covert_release", "rim_runner", "triangle", "after_steal")
+            for key in _FB_STRATEGIC_KEYS
         ]
+        return sum(counts), _max_share_from_counts(counts)
+
+    def _pt_concentration(team_obj: dict, fcp_used: int) -> tuple[int, float]:
+        # Concentration over the 4 press/trap plays: 3 HCT variant A counts + fcp_used
+        # (the single live FCP variant). fcp_press_plays[*].A is a DEAD counter (never
+        # incremented in the engine), so fcp_used stands in for the FCP variant. Valid
+        # only while FCP has one live variant — revisit when FCP variants expand.
+        dfn = (team_obj.get("scouting", {}) or {}).get("defense", {}) or {}
+        hct = dfn.get("hct_trap_plays", {}) or {}
+        counts = [
+            int((hct.get(k, {}) or {}).get("A", 0) or 0)
+            for k in ("standard_trap", "straight_pressure", "standard_diamond")
+        ]
+        counts.append(int(fcp_used or 0))
         return sum(counts), _max_share_from_counts(counts)
 
     home_team_obj = _resolve_game_team_obj(canonical_home_team_id, home_team_name)
@@ -1755,12 +1776,15 @@ def update_team_attributes_after_game(
         # Calculate TREB
         treb = team_totals.get("DREB", 0) + team_totals.get("OREB", 0)
         opp_treb = opponent_totals.get("DREB", 0) + opponent_totals.get("OREB", 0)
-        offensive_play_count = _offensive_play_usage(team_obj)
-        defensive_max_share = _defensive_play_max_share(team_obj)
-        _team_fb_total, team_fb_max_share = _fast_break_usage(team_obj)
-        opponent_fb_total, _ = _fast_break_usage(opponent_team_obj)
-        team_pt_total = int(team_scouting.get("pt_total_attempts", 0) or 0)
-        opponent_pt_total = int(opponent_scouting.get("pt_total_attempts", 0) or 0)
+        team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
+        opp_f_plus_to = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0)
+        # Concentration measures (own team) + volume measures (opponent) — see Tasks 3/4/5.
+        off_total, off_max_share = _offensive_play_concentration(team_obj)
+        def_total, def_max_share = _defensive_play_usage_and_share(team_obj)
+        team_fb_total, team_fb_max_share = _fast_break_usage(team_obj)          # after_steal excl
+        opponent_fb_total, _opp_fb_share = _fast_break_usage(opponent_team_obj)  # after_steal excl
+        pt_total, pt_max_share = _pt_concentration(team_obj, team_scouting.get("fcp_used", 0))
+        opponent_pt_total = int(opponent_scouting.get("pt_total_attempts", 0) or 0)  # used-based volume
         
         # ✅ FTD: Get current team attributes from FTD collection (keyed by ObjectId)
         ftd_doc = franchise_team_data_collection.find_one(
@@ -1834,165 +1858,57 @@ def update_team_attributes_after_game(
             },
         )
         
-        # [EOG-BAND] Phase-0 instrumentation. band_log_on is read once; when off,
-        # the only added cost is recording a stable branch label per attr (a dict
-        # write, no I/O, no draws). All extended-input capture + file emit is gated.
+        # Band selection is the single implementation in eog_attr_rules (Task 7);
+        # this dispatches to it and records (label, delta) per attribute. delta None
+        # = data-integrity (mandatory usage was zero) → log, apply no change.
+        from BackEnd import eog_attr_rules as _rules
         band_log_on = _eog_band_log_enabled()
         _band_labels: dict[str, str] = {}
+        _data_integrity_attrs: list[str] = []
 
-        # shot_threshold is a golf score: lower is better, higher is worse.
-        if fg_pct > 50:
-            changes["shot_threshold"] = random.randint(-10, -5)
-            _band_labels["shot_threshold"] = "fg_gt_50"
-        elif fg_pct > 45:
-            _band_labels["shot_threshold"] = "fg_45_to_50"
-            if is_winner:
-                changes["shot_threshold"] = random.randint(-5, 0)
+        def _apply_band(attr: str, result: tuple) -> None:
+            label, delta = result
+            _band_labels[attr] = label
+            if delta is None:
+                _data_integrity_attrs.append(attr)
             else:
-                changes["shot_threshold"] = random.randint(0, 5)
-        else:
-            changes["shot_threshold"] = random.randint(5, 10)
-            _band_labels["shot_threshold"] = "fg_le_45"
+                changes[attr] = delta
 
-        team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
-        opp_f_plus_to = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0)
-        opp_f_plus_to_with_buffer = opp_f_plus_to + 8
-        if team_f_plus_to < opp_f_plus_to_with_buffer:
-            changes["discipline"] = random.randint(1, 2)
-            _band_labels["discipline"] = "below_opp_plus_8"
-        elif team_f_plus_to > opp_f_plus_to_with_buffer:
-            changes["discipline"] = random.randint(-2, -1)
-            _band_labels["discipline"] = "above_opp_plus_8"
-        else:
-            changes["discipline"] = random.randint(-1, 0)
-            _band_labels["discipline"] = "equal_buffered"
-
-        # fight: winning 0..+2, losing -2..0
-        if is_winner:
-            changes["fight"] = random.randint(0, 2)
-            _band_labels["fight"] = "win"
-        else:
-            changes["fight"] = random.randint(-2, 0)
-            _band_labels["fight"] = "loss"
-
-        # rebound_modifier
-        if treb > (opp_treb + 8):
-            changes["rebound_modifier"] = random.randint(0, 5) / 100.0
-            _band_labels["rebound_modifier"] = "outrebound_by_8"
-        elif treb < (opp_treb - 8):
-            changes["rebound_modifier"] = -random.randint(5, 10) / 100.0
-            _band_labels["rebound_modifier"] = "outrebounded_by_8"
-        else:
-            changes["rebound_modifier"] = -random.randint(1, 5) / 100.0
-            _band_labels["rebound_modifier"] = "near_even"
+        _apply_band("shot_threshold", _rules.shot_threshold_change(fg_pct, is_winner))
+        _apply_band("discipline", _rules.discipline_change(team_f_plus_to, opp_f_plus_to))
+        _apply_band("fight", _rules.fight_change(is_winner))
+        _apply_band("rebound_modifier", _rules.rebound_modifier_change(treb, opp_treb))
 
         if is_distant_sim:
-            changes["offensive_efficiency"] = random.randint(-2, 1)
-            changes["defensive_efficiency"] = random.randint(-2, 1)
-            changes["fb_efficiency"] = random.randint(-2, 1)
-            changes["fb_opp_modifier"] = random.randint(-2, 1)
-            changes["pt_efficiency"] = random.randint(-2, 1)
-            changes["pt_opp_modifier"] = random.randint(-2, 1)
-            for _distant_attr in (
+            # Distant override — LEAVE (distant is live behind FRANCHISE_ALL_GAMES_FULL_SIM).
+            for _attr in (
                 "offensive_efficiency", "defensive_efficiency", "fb_efficiency",
                 "fb_opp_modifier", "pt_efficiency", "pt_opp_modifier",
             ):
-                _band_labels[_distant_attr] = "distant_uniform"
+                _apply_band(_attr, _rules.distant_uniform_change())
             logger.warning(
                 "🧪 [EOG-DISTANT-ATTRS] team=%s off_eff=%s def_eff=%s fb_eff=%s fb_opp=%s pt_eff=%s pt_opp=%s",
                 str(team_id_label),
-                changes.get("offensive_efficiency"),
-                changes.get("defensive_efficiency"),
-                changes.get("fb_efficiency"),
-                changes.get("fb_opp_modifier"),
-                changes.get("pt_efficiency"),
-                changes.get("pt_opp_modifier"),
+                changes.get("offensive_efficiency"), changes.get("defensive_efficiency"),
+                changes.get("fb_efficiency"), changes.get("fb_opp_modifier"),
+                changes.get("pt_efficiency"), changes.get("pt_opp_modifier"),
             )
         else:
-            if offensive_play_count > 12:
-                changes["offensive_efficiency"] = random.randint(0, 1)
-                _band_labels["offensive_efficiency"] = "plays_gt_12"
-            elif offensive_play_count > 10:
-                changes["offensive_efficiency"] = random.randint(-1, 0)
-                _band_labels["offensive_efficiency"] = "plays_gt_10"
-            else:
-                changes["offensive_efficiency"] = random.randint(-2, -1)
-                _band_labels["offensive_efficiency"] = "plays_le_10"
+            # Own-team efficiency = concentration (offense/fb/pt); opponent modifiers = volume.
+            _apply_band("offensive_efficiency", _rules.offensive_efficiency_change(off_total, off_max_share))
+            _apply_band("defensive_efficiency", _rules.defensive_efficiency_change(def_total, def_max_share))
+            _apply_band("fb_efficiency", _rules.fb_efficiency_change(team_fb_total, team_fb_max_share))
+            _apply_band("fb_opp_modifier", _rules.fb_opp_modifier_change(opponent_fb_total))
+            _apply_band("pt_efficiency", _rules.pt_efficiency_change(pt_total, pt_max_share))
+            _apply_band("pt_opp_modifier", _rules.pt_opp_modifier_change(opponent_pt_total))
 
-            if defensive_max_share <= 0.39:
-                changes["defensive_efficiency"] = random.randint(0, 1)
-                _band_labels["defensive_efficiency"] = "max_share_le_39"
-            elif defensive_max_share <= 0.49:
-                changes["defensive_efficiency"] = random.randint(-1, 0)
-                _band_labels["defensive_efficiency"] = "max_share_le_49"
-            else:
-                changes["defensive_efficiency"] = random.randint(-2, -1)
-                _band_labels["defensive_efficiency"] = "max_share_gt_49"
+        _apply_band("team_chemistry", _rules.team_chemistry_change(is_winner, team_rank, opponent_rank))
 
-            if team_fb_max_share > 0.60:
-                changes["fb_efficiency"] = random.randint(-2, -1)
-                _band_labels["fb_efficiency"] = "top_share_gt_60"
-            elif team_fb_max_share > 0.50:
-                changes["fb_efficiency"] = random.randint(-1, 0)
-                _band_labels["fb_efficiency"] = "top_share_gt_50"
-            else:
-                changes["fb_efficiency"] = random.randint(0, 1)
-                _band_labels["fb_efficiency"] = "balanced"
-
-            if opponent_fb_total > 15:
-                changes["fb_opp_modifier"] = random.randint(-2, -1)
-                _band_labels["fb_opp_modifier"] = "opp_fb_gt_15"
-            elif opponent_fb_total > 10:
-                changes["fb_opp_modifier"] = random.randint(-1, 0)
-                _band_labels["fb_opp_modifier"] = "opp_fb_gt_10"
-            else:
-                changes["fb_opp_modifier"] = random.randint(0, 1)
-                _band_labels["fb_opp_modifier"] = "opp_fb_le_10"
-
-            if team_pt_total > 20:
-                changes["pt_efficiency"] = random.randint(-2, -1)
-                _band_labels["pt_efficiency"] = "pt_gt_20"
-            elif team_pt_total > 16:
-                changes["pt_efficiency"] = random.randint(-1, 0)
-                _band_labels["pt_efficiency"] = "pt_gt_16"
-            else:
-                changes["pt_efficiency"] = random.randint(0, 1)
-                _band_labels["pt_efficiency"] = "pt_le_16"
-
-            if opponent_pt_total > 16:
-                changes["pt_opp_modifier"] = random.randint(-2, -1)
-                _band_labels["pt_opp_modifier"] = "opp_pt_gt_16"
-            elif opponent_pt_total > 12:
-                changes["pt_opp_modifier"] = random.randint(-1, 0)
-                _band_labels["pt_opp_modifier"] = "opp_pt_gt_12"
-            else:
-                changes["pt_opp_modifier"] = random.randint(0, 1)
-                _band_labels["pt_opp_modifier"] = "opp_pt_le_12"
-
-        # team_chemistry: rank-relative performance. Lower natl_rank integer is better.
-        if is_winner:
-            if opponent_rank > team_rank:
-                changes["team_chemistry"] = random.randint(0, 1)
-                _band_labels["team_chemistry"] = "beat_lower_ranked"
-            elif opponent_rank <= 10:
-                changes["team_chemistry"] = random.randint(2, 4)
-                _band_labels["team_chemistry"] = "beat_top10"
-            else:
-                changes["team_chemistry"] = random.randint(1, 2)
-                _band_labels["team_chemistry"] = "beat_higher_non_top10"
-        else:
-            if opponent_rank < team_rank and opponent_rank <= 10:
-                changes["team_chemistry"] = random.randint(-1, 0)
-                _band_labels["team_chemistry"] = "lose_to_top10"
-            elif opponent_rank < team_rank:
-                changes["team_chemistry"] = random.randint(-2, 0)
-                _band_labels["team_chemistry"] = "lose_to_higher_non_top10"
-            elif 100 <= opponent_rank <= 128:
-                changes["team_chemistry"] = random.randint(-5, -3)
-                _band_labels["team_chemistry"] = "lose_to_100_128"
-            else:
-                changes["team_chemistry"] = random.randint(-3, -2)
-                _band_labels["team_chemistry"] = "lose_to_other_lower"
+        if _data_integrity_attrs:
+            logger.warning(
+                "[EOG-DATA-INTEGRITY] team=%s game_id=%s zero-usage (no change applied) for: %s",
+                str(team_id_label), game_id_str, _data_integrity_attrs,
+            )
 
         # [EOG-BAND] Extended per-attribute inputs — computed ONLY when logging is
         # enabled so the disabled path stays free. These are read-only (no draws).
@@ -2001,9 +1917,9 @@ def update_team_attributes_after_game(
             from BackEnd.utils.defense_identity import CANONICAL_HCO_DEFENSE_ROW_KEYS
 
             def _distinct_plays_run(tobj: dict) -> int:
-                # Read-only companion to _offensive_play_usage: count playbook rows
-                # actually run this game (times_run > 0). Logged, NOT used to select
-                # a branch — we need the real distribution before re-gating.
+                # Count playbook rows actually run this game (times_run > 0). Logged
+                # for reference only — the offense measure is concentration (max_share),
+                # NOT distinct-play count (which just tracks playbook size).
                 count = 0
                 for _pk, _pd, _dn in iter_team_plays((tobj or {}).get("plays", {})):
                     if int((_pd.get("game_stats", {}) or {}).get("times_run", 0) or 0) > 0:
@@ -2046,28 +1962,30 @@ def update_team_attributes_after_game(
                 "discipline": {"team_f_plus_to": team_f_plus_to, "opp_f_plus_to": opp_f_plus_to},
                 "fight": {"is_winner": bool(is_winner)},
                 "rebound_modifier": {"treb": treb, "opp_treb": opp_treb},
+                # Measures now drive the bands: concentration (own team) / volume (opp).
                 "offensive_efficiency": {
-                    "total_times_run": offensive_play_count,
-                    "distinct_plays_run": _distinct_plays_run(team_obj),
+                    "max_share": off_max_share,
+                    "total_usage": off_total,
+                    "distinct_plays_run": _distinct_plays_run(team_obj),  # logged, not a gate
                 },
-                "defensive_efficiency": {"max_share": defensive_max_share, **def_row_counts},
+                "defensive_efficiency": {"max_share": def_max_share, "total_usage": def_total, **def_row_counts},
                 "fb_efficiency": {
-                    "max_share": team_fb_max_share,
-                    "fb_total": _team_fb_total,
-                    **team_fb_counts,
+                    "max_share": team_fb_max_share,   # over CR/RR/Triangle (after_steal excl)
+                    "volume": team_fb_total,
+                    **team_fb_counts,                 # includes after_steal for visibility
                 },
-                "fb_opp_modifier": {"opponent_fb_total": opponent_fb_total, **opp_fb_counts},
-                # The branch uses the aggregate pt_total_attempts (hct_used + fcp_used);
-                # per-variant counts are logged alongside for the later concentration
-                # measure (they survive as defense.hct_trap_plays / fcp_press_plays).
+                "fb_opp_modifier": {"opponent_fb_volume": opponent_fb_total, **opp_fb_counts},
+                # Concentration over [3 HCT variant A's + fcp_used]. fcp_variants is the
+                # DEAD fcp_press_plays.A counter (all zero) — logged to document that.
                 "pt_efficiency": {
-                    "pt_total_attempts": team_pt_total,
+                    "max_share": pt_max_share,
+                    "volume": pt_total,
                     "hct_used": int(team_scouting.get("hct_used", 0) or 0),
                     "fcp_used": int(team_scouting.get("fcp_used", 0) or 0),
                     **team_pt_variants,
                 },
                 "pt_opp_modifier": {
-                    "pt_total_attempts": opponent_pt_total,
+                    "opponent_pt_volume": opponent_pt_total,
                     "hct_used": int(opponent_scouting.get("hct_used", 0) or 0),
                     "fcp_used": int(opponent_scouting.get("fcp_used", 0) or 0),
                     **opp_pt_variants,

@@ -33,12 +33,17 @@ HEADER_TAG = "[EOG-BAND-HEADER] "
 
 # Raw inputs to histogram, by the attribute record that carries them.
 HISTOGRAM_INPUTS = [
+    # Post-Structural-Pass measures: concentration (max_share) for offense/fb/pt,
+    # volume for the two opponent modifiers. distinct_plays_run is logged for
+    # reference only (not a gate).
+    ("offensive_efficiency", "max_share", "float"),
     ("offensive_efficiency", "distinct_plays_run", "int"),
-    ("offensive_efficiency", "total_times_run", "int"),
-    ("pt_efficiency", "pt_total_attempts", "int"),
-    ("pt_opp_modifier", "pt_total_attempts", "int"),
-    ("fb_efficiency", "fb_total", "int"),
-    ("fb_opp_modifier", "opponent_fb_total", "int"),
+    ("fb_efficiency", "max_share", "float"),
+    ("fb_efficiency", "volume", "int"),
+    ("pt_efficiency", "max_share", "float"),
+    ("pt_efficiency", "volume", "int"),
+    ("fb_opp_modifier", "opponent_fb_volume", "int"),
+    ("pt_opp_modifier", "opponent_pt_volume", "int"),
     ("defensive_efficiency", "max_share", "float"),
 ]
 
@@ -255,13 +260,15 @@ def saturation(records: list[dict]) -> None:
 # used only to detect unclamped transitions. Keep in sync if clamps change.
 CLAMP_BOUNDS = {
     "shot_threshold": (0, 200),
-    "rebound_modifier": (0.0, 0.4),
+    "rebound_modifier": (0.0, 1.0),
     "team_chemistry": (7, 25),
+    "momentum_score": (-10, 10),
 }
 
 
 def _clamp_bounds(attr: str) -> tuple:
-    return CLAMP_BOUNDS.get(attr, (-10, 10))
+    # Default (-20, 20) is the core-8 clamp; momentum_score keeps its own (-10, 10) above.
+    return CLAMP_BOUNDS.get(attr, (-20, 20))
 
 
 def combined_drift(records: list[dict]) -> None:

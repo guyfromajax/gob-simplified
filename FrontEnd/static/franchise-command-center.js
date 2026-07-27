@@ -4777,18 +4777,23 @@ function getTeamAttrVisualConfig(attrKey, value) {
     fillPercent = st.pillFillPercent(value);
     pulse = st.shouldPulse(value);
   } else if (attrKey === 'rebound_modifier') {
+    // 0.0-1.0 range. Center = neutral = init = 0.2 (NOT the midpoint). Asymmetric
+    // span: 0.2 of room below, 0.8 above, each mapped to the ±20 normalized scale so
+    // the shared cardTone (±12) / pulse (±14) thresholds apply as for the core-8 span.
     const deviation = value - 0.2;
-    normalized = (deviation / 0.2) * 10;
-    fillPercent = Math.min((Math.abs(deviation) / 0.2) * 50, 50);
-    pulse = Math.abs(deviation) >= 0.06;
+    const halfSpan = deviation < 0 ? 0.2 : 0.8;
+    normalized = (deviation / halfSpan) * 20;
+    fillPercent = Math.min((Math.abs(deviation) / halfSpan) * 50, 50);
+    pulse = Math.abs(normalized) >= 14;
   } else {
-    fillPercent = Math.min((Math.abs(normalized) / 10) * 50, 50);
-    pulse = Math.abs(normalized) >= 7;
+    // core-8 stored on ±20 now (EOG structural pass); pill + cardTone sized to ±20.
+    fillPercent = Math.min((Math.abs(normalized) / 20) * 50, 50);
+    pulse = Math.abs(normalized) >= 14;
   }
 
   let cardTone = '';
-  if (normalized <= -6) cardTone = 'negative';
-  else if (normalized >= 6) cardTone = 'positive';
+  if (normalized <= -12) cardTone = 'negative';
+  else if (normalized >= 12) cardTone = 'positive';
 
   return {
     direction: normalized > 0 ? 'positive' : (normalized < 0 ? 'negative' : 'zero'),

@@ -1206,28 +1206,28 @@ function renderAttributeChangePills(container, attributeDeltas) {
   const ATTR_CONFIG = {
     // invert: raw delta sign flipped in copy (raw −10 → display +10 green); pill fill uses same golf-score sense.
     shot_threshold: { label: 'Shooting', scale: window.TeamShotThresholdScale?.HALF_SPAN ?? 100, invert: true },
-    rebound_modifier: { label: 'Rebounding', scale: 0.2, invert: false },
-    offensive_efficiency: { label: 'Offense', scale: 10, invert: false },
-    defensive_efficiency: { label: 'Defense', scale: 10, invert: false },
-    fb_efficiency: { label: 'Fast Break', scale: 10, invert: false },
-    fb_defense: { label: 'FB Defense', scale: 10, invert: false },
-    pt_efficiency: { label: 'Press/Trap', scale: 10, invert: false },
-    pt_breaks: { label: 'P/T Breaks', scale: 10, invert: false },
-    fight: { label: 'Fight', scale: 10, invert: false },
-    discipline: { label: 'Discipline', scale: 10, invert: false },
+    rebound_modifier: { label: 'Rebounding', scale: 0.5, invert: false },  // 0.0-1.0 range; scale<1 → 2-decimal delta (this view shows deltas, not a centered gauge)
+    offensive_efficiency: { label: 'Offense', scale: 20, invert: false },
+    defensive_efficiency: { label: 'Defense', scale: 20, invert: false },
+    fb_efficiency: { label: 'Fast Break', scale: 20, invert: false },
+    fb_defense: { label: 'FB Defense', scale: 20, invert: false },
+    pt_efficiency: { label: 'Press/Trap', scale: 20, invert: false },
+    pt_breaks: { label: 'P/T Breaks', scale: 20, invert: false },
+    fight: { label: 'Fight', scale: 20, invert: false },
+    discipline: { label: 'Discipline', scale: 20, invert: false },
     momentum_score: { label: 'Momentum', scale: 10, invert: false },
     team_chemistry: { label: 'Chemistry', scale: 10, invert: false },
-    fb_opp_modifier: { label: 'FB Defense', scale: 10, invert: false },
-    pt_opp_modifier: { label: 'P/T Breaks', scale: 10, invert: false },
-    offensiveefficiency: { label: 'Offense', scale: 10, invert: false },
-    defensiveefficiency: { label: 'Defense', scale: 10, invert: false },
-    reboundmodifier: { label: 'Rebounding', scale: 0.2, invert: false },
+    fb_opp_modifier: { label: 'FB Defense', scale: 20, invert: false },
+    pt_opp_modifier: { label: 'P/T Breaks', scale: 20, invert: false },
+    offensiveefficiency: { label: 'Offense', scale: 20, invert: false },
+    defensiveefficiency: { label: 'Defense', scale: 20, invert: false },
+    reboundmodifier: { label: 'Rebounding', scale: 0.5, invert: false },
     shotthreshold: { label: 'Shooting', scale: window.TeamShotThresholdScale?.HALF_SPAN ?? 100, invert: true }, // same as shot_threshold
     teamchemistry: { label: 'Chemistry', scale: 10, invert: false },
     momentumscore: { label: 'Momentum', scale: 10, invert: false },
-    fbefficiency: { label: 'Fast Break', scale: 10, invert: false },
-    ptefficiency: { label: 'Press/Trap', scale: 10, invert: false },
-    ptbreaks: { label: 'P/T Breaks', scale: 10, invert: false }
+    fbefficiency: { label: 'Fast Break', scale: 20, invert: false },
+    ptefficiency: { label: 'Press/Trap', scale: 20, invert: false },
+    ptbreaks: { label: 'P/T Breaks', scale: 20, invert: false }
   };
   container.innerHTML = '';
   container.className = 'attr-changes';
@@ -1247,7 +1247,7 @@ function renderAttributeChangePills(container, attributeDeltas) {
     const isPositive = effectiveDelta > 0;
     const isNegative = effectiveDelta < 0;
     const sign = effectiveDelta > 0 ? '+' : '';
-    const displayDelta = config.scale === 0.2
+    const displayDelta = config.scale < 1
       ? `${sign}${effectiveDelta.toFixed(2)}`
       : `${sign}${Math.round(effectiveDelta)}`;
 

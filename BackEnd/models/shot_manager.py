@@ -1,4 +1,5 @@
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 import logging
 import math
 from BackEnd.constants.momentum import (
@@ -1186,13 +1187,13 @@ class ShotManager:
                 should_attempt_block_reconciliation = y <= x
                 if not should_attempt_block_reconciliation:
                     z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)
-                    defense_fight = def_team.team_attributes.get("fight", 0)
+                    defense_fight = core8_gameplay(def_team.team_attributes.get("fight", 0))
                     should_attempt_block_reconciliation = z <= defense_fight
                 if not should_attempt_block_reconciliation:
                     # Third trigger: the individual shot defender's rim-protection ability —
                     # ID + (team defensive_efficiency × defender height-rating 0-10) vs a 1-300 roll.
                     z3 = random.randint(BLOCK_PLAYER_ROLL_MIN, BLOCK_PLAYER_ROLL_MAX)
-                    def_eff = def_team.team_attributes.get("defensive_efficiency", 0) or 0
+                    def_eff = core8_gameplay(def_team.team_attributes.get("defensive_efficiency", 0))
                     def_height_val = height_to_block_score(
                         getattr(defender, "height", None) or defender.attributes.get("height") or 76
                     )
@@ -3097,7 +3098,7 @@ class ShotManager:
             return False, None
 
         defense_team = self.game.defense_team
-        discipline = defense_team.team_attributes.get("discipline", 0)
+        discipline = core8_gameplay(defense_team.team_attributes.get("discipline", 0))
 
         # Base thresholds by shot_type
         if shot_type == "inside":

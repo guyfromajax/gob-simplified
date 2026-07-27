@@ -272,12 +272,6 @@ def install(verbose: bool = True) -> list[str]:
              "core.shot_resolution")
     except Exception:
         pass
-    try:
-        from BackEnd.models.rebound_manager import ReboundManager
-        note(_patch_method(ReboundManager, "resolve_rebound", "core.rebound_resolution"),
-             "core.rebound_resolution")
-    except Exception:
-        pass
 
     # --- animation packet construction -------------------------------------
     from BackEnd.models.animator import Animator

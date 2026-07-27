@@ -289,19 +289,25 @@ def normalize_coaching_focus_custom_by_player(
 
 
 from BackEnd.constants import TEAM_ATTR_RANGES
+# Core-8 widened to ±20 (EOG Structural Pass, Task 1): the ±10 scale was too narrow
+# for the step sizes and railed every team. momentum_score stays (-10, 10) — it is
+# NOT one of the widened 8, and its own path enforces DISTANT_MOMENTUM_SCORE_MIN/MAX
+# (distant_sim.py), which agree with (-10, 10). team_chemistry (7-25) and
+# shot_threshold (0-200) scales are unchanged; rebound_modifier now 0.0-1.0 via
+# TEAM_ATTR_RANGES (Task 2).
 TEAM_ATTR_CLAMPS = {
     "shot_threshold": TEAM_ATTR_RANGES["shot_threshold"],
-    "discipline": (-10, 10),
-    "fight": (-10, 10),
+    "discipline": (-20, 20),
+    "fight": (-20, 20),
     "rebound_modifier": TEAM_ATTR_RANGES["rebound_modifier"],
     "momentum_score": (-10, 10),
-    "offensive_efficiency": (-10, 10),
+    "offensive_efficiency": (-20, 20),
     "team_chemistry": (7, 25),
-    "defensive_efficiency": (-10, 10),
-    "fb_efficiency": (-10, 10),
-    "pt_efficiency": (-10, 10),
-    "fb_opp_modifier": (-10, 10),
-    "pt_opp_modifier": (-10, 10),
+    "defensive_efficiency": (-20, 20),
+    "fb_efficiency": (-20, 20),
+    "pt_efficiency": (-20, 20),
+    "fb_opp_modifier": (-20, 20),
+    "pt_opp_modifier": (-20, 20),
 }
 
 # Player attribute clamps (lower, upper)
@@ -1358,10 +1364,15 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     low, high = ranges[points_bucket]
     delta = random.randint(low, high)
 
-    # Apply focus amplifier if this attribute is amplified by the selected focus
+    # Apply focus amplifier if this attribute is amplified by the selected focus.
+    # Flat 2x, no randomness (EOG Structural Pass, Task 6): the old
+    # int(delta * random.choice([1.5..1.8])) truncated to a no-op at delta=1 (the
+    # most common allocation) and gave identical output for delta 1-4. Doubling
+    # integers stays integral. Positive deltas only — focus accelerates growth, it
+    # does not amplify decay. (The identical bug at _apply_player_training_points is
+    # a separate system, intentionally left this pass.)
     if delta > 0 and _should_amplify_team_attr(team_attr, archetype, sub_option):
-        focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
-        delta = int(delta * focus_multiplier)
+        delta = delta * 2
 
     current_val = team.get(team_attr, 0)
     team[team_attr] = current_val + delta
@@ -1398,19 +1409,20 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
     
     final_increase = increase
     
-    # Apply focus amplifier if rebound_modifier is amplified by the selected focus
+    # Apply focus amplifier if rebound_modifier is amplified by the selected focus.
+    # Flat 2x, no randomness (Task 6 — the "collapse focus multipliers to flat 2x"
+    # decision applies here too, not only where int() truncation bit). Positive only.
     if final_increase > 0 and _should_amplify_team_attr("rebound_modifier", archetype, sub_option):
-        focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
-        final_increase = final_increase * focus_multiplier
+        final_increase = final_increase * 2
     
     # Keep rebound_modifier on the 0.01 grid (never truncate with int()).
     final_increase = round(final_increase, 2)
 
     # Apply to team
-    current_val = float(team.get("rebound_modifier", 0.2))  # Default to 0.2 (center)
+    current_val = float(team.get("rebound_modifier", 0.2))  # init center stays 0.2 on the 0.0-1.0 scale
     team["rebound_modifier"] = round(current_val + final_increase, 2)
-    
-    # Clamp to valid range [0.0, 0.4]
+
+    # Clamp to valid range [0.0, 1.0] (Task 2 rescale; TEAM_ATTR_RANGES)
     team["rebound_modifier"] = round(
         max(
             TEAM_ATTR_CLAMPS["rebound_modifier"][0],

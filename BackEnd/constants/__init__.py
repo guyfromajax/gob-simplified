@@ -637,5 +637,9 @@ from BackEnd.constants.shot_threshold_scale import team_attr_range as _shot_thre
 
 TEAM_ATTR_RANGES = {
     "shot_threshold": _shot_threshold_team_attr_range(),
-    "rebound_modifier": (0.0, 0.4),
+    # 0.0-0.4 → 0.0-1.0 (EOG Structural Pass, Task 2): widened so the 5-band EOG
+    # ladder and training have headroom. Live consumption is select_rebounder_by_score
+    # (shared.py, already rescaled by owner). The dead ReboundManager (0-0.4-calibrated,
+    # never called) was deleted in this pass.
+    "rebound_modifier": (0.0, 1.0),
 }

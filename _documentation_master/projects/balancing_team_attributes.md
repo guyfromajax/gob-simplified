@@ -6,18 +6,18 @@ This doc summarizes how each persisted franchise team attribute moves during nor
 
 | Attribute | Range | Better Direction | Main Use |
 |---|---:|---|---|
-| `shot_threshold` | 20 to 220 | Lower | Shot make difficulty |
-| `discipline` | -10 to 10 | Higher | Fouls, turnovers, pressure/contest checks |
-| `fight` | -10 to 10 | Higher | Physicality, blocks, fast break/contact moments |
-| `rebound_modifier` | 0.0 to 0.4 | Higher | Team rebound tie/score modifier |
+| `shot_threshold` | 0 to 200 | Lower | Shot make difficulty |
+| `discipline` | -20 to 20 | Higher | Fouls, turnovers, pressure/contest checks |
+| `fight` | -20 to 20 | Higher | Physicality, blocks, fast break/contact moments |
+| `rebound_modifier` | 0.0 to 1.0 | Higher | Team rebound tie/score modifier |
 | `momentum_score` | -10 to 10 | Higher | Distant sim season momentum |
-| `offensive_efficiency` | -10 to 10 | Higher | HCO/pass/read execution |
+| `offensive_efficiency` | -20 to 20 | Higher | HCO/pass/read execution |
 | `team_chemistry` | 7 to 25 | Higher | Team cohesion, distant sim, rebounding ties, foul/contest factors |
-| `defensive_efficiency` | -10 to 10 | Higher | Defensive execution and contest/read checks |
-| `fb_efficiency` | -10 to 10 | Higher | Fast break offensive execution |
-| `pt_efficiency` | -10 to 10 | Higher | Press/trap defensive execution |
-| `fb_opp_modifier` | -10 to 10 | Higher | Fast break prevention/defense |
-| `pt_opp_modifier` | -10 to 10 | Higher | Press/trap offense resistance |
+| `defensive_efficiency` | -20 to 20 | Higher | Defensive execution and contest/read checks |
+| `fb_efficiency` | -20 to 20 | Higher | Fast break offensive execution |
+| `pt_efficiency` | -20 to 20 | Higher | Press/trap defensive execution |
+| `fb_opp_modifier` | -20 to 20 | Higher | Fast break prevention/defense |
+| `pt_opp_modifier` | -20 to 20 | Higher | Press/trap offense resistance |
 
 ## Shared Training Tables
 
@@ -85,7 +85,7 @@ At end of game:
 - FG% above 45% and loss: `0` to `+5`.
 - FG% at or below 45%: `+5` to `+10`.
 
-CPU distant training can also move it through `distant_training.team_values` template deltas. All persisted writes clamp to 20-220.
+CPU distant training can also move it through `distant_training.team_values` template deltas. All persisted writes clamp to 0-200 (via `shot_threshold_scale.py`).
 
 ## Discipline
 
@@ -344,6 +344,8 @@ Other code paths found in the scan:
 Bottom line: for franchise balancing, the persistent team-attribute movement to watch is training, CPU distant training, end-of-game progression, and distant-sim momentum. I did not find another normal runtime path that silently progresses the core `team_attributes`.
 
 ## 100-Season Simulation Snapshot
+
+> ⚠️ **STALE — do not read as current behavior.** These snapshots pre-date (a) the `shot_threshold` MIN retune (they show a start ~`105`; franchise init now yields **80-90**) and (b) the EOG Structural Pass (core-8 ranges now **±20**, `rebound_modifier` **0.0-1.0**, offense/fb/pt on **concentration**, fb_opp/pt_opp on a **volume ladder**, flat **2×** focus multiplier). The uniform-random-band model also over-samples atrophy vs the real threshold-gated distribution. Superseded by the real `[EOG-BAND]` measurement + `scripts/eog_band_report.py`; retained for historical comparison only.
 
 Read-only dry run via `scripts/team_attr_season_dry_run.py` after the latest training-range recalibration.
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import math
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS, CONTEST_EUCLIDEAN_RADIUS
@@ -263,7 +264,7 @@ def _offensive_positions_from_step(
 def _perimeter_offense_threshold(off_team: Any) -> int:
     attrs = getattr(off_team, "team_attributes", {}) or {}
     chem = int(attrs.get("team_chemistry") or 0)
-    off_eff = int(attrs.get("offensive_efficiency") or 0)
+    off_eff = int(core8_gameplay(attrs.get("offensive_efficiency")))
     raw = PERIMETER_OFFENSE_READ_BASE - (chem + off_eff)
     return max(READ_THRESHOLD_FLOOR, raw)
 
@@ -271,7 +272,7 @@ def _perimeter_offense_threshold(off_team: Any) -> int:
 def _perimeter_defense_threshold(def_team: Any) -> int:
     attrs = getattr(def_team, "team_attributes", {}) or {}
     chem = int(attrs.get("team_chemistry") or 0)
-    def_eff = int(attrs.get("defensive_efficiency") or 0)
+    def_eff = int(core8_gameplay(attrs.get("defensive_efficiency")))
     raw = PERIMETER_DEFENSE_READ_BASE - (chem + def_eff)
     return max(READ_THRESHOLD_FLOOR, raw)
 
@@ -279,7 +280,7 @@ def _perimeter_defense_threshold(def_team: Any) -> int:
 def _defender_help_threshold(def_team: Any) -> int:
     attrs = getattr(def_team, "team_attributes", {}) or {}
     chem = int(attrs.get("team_chemistry") or 0)
-    execution = int(attrs.get("defensive_efficiency") or 0)
+    execution = int(core8_gameplay(attrs.get("defensive_efficiency")))
     raw = HELP_READ_BASE - (chem + execution)
     return max(READ_THRESHOLD_FLOOR, raw)
 
@@ -456,8 +457,8 @@ def _compute_drive_scores(
 ) -> Tuple[float, float, bool]:
     off_attrs = getattr(off_team, "team_attributes", {}) or {}
     def_attrs = getattr(def_team, "team_attributes", {}) or {}
-    off_eff = int(off_attrs.get("offensive_efficiency") or 0)
-    def_eff = int(def_attrs.get("defensive_efficiency") or 0)
+    off_eff = int(core8_gameplay(off_attrs.get("offensive_efficiency")))
+    def_eff = int(core8_gameplay(def_attrs.get("defensive_efficiency")))
     def_chem = int(def_attrs.get("team_chemistry") or 0)
 
     off_score = float(calculate_ball_handling_score(driver))
@@ -549,11 +550,11 @@ def _resolve_hco_drive_contest(driver, primary_def, off_team, def_team):
     from BackEnd.engine.dynamic_hct import _resolve_moment
     off_attrs = getattr(off_team, "team_attributes", {}) or {}
     def_attrs = getattr(def_team, "team_attributes", {}) or {}
-    off_eff = int(off_attrs.get("offensive_efficiency") or 0)
-    def_eff = int(def_attrs.get("defensive_efficiency") or 0)
+    off_eff = int(core8_gameplay(off_attrs.get("offensive_efficiency")))
+    def_eff = int(core8_gameplay(def_attrs.get("defensive_efficiency")))
     outcome, ratio, _credited = _resolve_moment(
         off_team, def_team, driver, primary_def,
-        exclude_steal=True, clean_stop=True, def_mod=def_eff, off_mod=off_eff,
+        exclude_steal=True, clean_stop=True, def_mod_g=def_eff, off_mod_g=off_eff,
         neutral_band=DRIVE_NEUTRAL_BAND)
     if outcome == "POS_O":
         return "A", 1.0, None

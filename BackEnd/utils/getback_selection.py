@@ -8,6 +8,7 @@ from typing import Any, Dict, List, Optional, Set
 
 from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS
 from BackEnd.utils.defense_utils import is_zone_defense
+from BackEnd.utils.team_attr_scale import core8_gameplay
 
 GETBACK_QUALIFYING_SPOTS: Set[str] = frozenset(
     {
@@ -235,7 +236,7 @@ def try_emergency_getback_vs_poised_fb(
         return list(current_getback_list)
 
     try:
-        fb_opp = int((getattr(off_team, "team_attributes", None) or {}).get("fb_opp_modifier", 0) or 0)
+        fb_opp = int(core8_gameplay((getattr(off_team, "team_attributes", None) or {}).get("fb_opp_modifier", 0)))
     except (TypeError, ValueError):
         fb_opp = 0
     fb_opp = max(-10, min(10, fb_opp))

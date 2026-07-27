@@ -73,6 +73,7 @@ from BackEnd.engine.cutoff_resolution import (
     resolve_cutoff_contest,
 )
 from BackEnd.constants.hct_trap_play_types import STANDARD_DIAMOND
+from BackEnd.utils.team_attr_scale import core8_gameplay
 from BackEnd.utils.shared_defense import HCT_STANDARD_NORMAL, compute_hct_trap_formation
 from BackEnd.utils.animation_step_helpers import _ag_grid_per_game_sec, drift_or_hold_coord
 from BackEnd.utils.transition_bridge import _interrupted_coord
@@ -678,8 +679,8 @@ def _resolve_moment(
     bh_defender,
     trapper=None,
     exclude_steal: bool = False,
-    def_mod=None,
-    off_mod=None,
+    def_mod_g=None,   # CONTRACT: if set, already core8_gameplay()-normalized (±10 scale)
+    off_mod_g=None,   # CONTRACT: if set, already core8_gameplay()-normalized (±10 scale)
     event_scalar: float = 1.0,
     clean_stop: bool = False,
     neutral_band: Optional[float] = None,
@@ -703,14 +704,15 @@ def _resolve_moment(
     def_attrs = getattr(def_team, "team_attributes", {}) or {}
 
     # Team modifiers: HCT uses pt_efficiency (def) / pt_opp_modifier (off). Callers in other
-    # turn types (HCO) inject their own symmetric modifiers via def_mod/off_mod (e.g. def_eff /
+    # turn types (HCO) inject their own symmetric modifiers via def_mod_g/off_mod_g (e.g. def_eff /
     # off_eff) so the same attribute contest + HCT_D8_* levels apply with the right team ratings.
-    pt_eff = float(def_attrs.get("pt_efficiency", 0) or 0) if def_mod is None else float(def_mod or 0)
-    pt_opp = float(off_attrs.get("pt_opp_modifier", 0) or 0) if off_mod is None else float(off_mod or 0)
+    # The _g suffix marks the caller-normalized contract: injected values skip core8_gameplay().
+    pt_eff = core8_gameplay(def_attrs.get("pt_efficiency", 0)) if def_mod_g is None else float(def_mod_g or 0)
+    pt_opp = core8_gameplay(off_attrs.get("pt_opp_modifier", 0)) if off_mod_g is None else float(off_mod_g or 0)
     off_chem = int((off_attrs.get("team_chemistry", 0) or 0) / 4)
     def_chem = int((def_attrs.get("team_chemistry", 0) or 0) / 4)
-    discipline = float(def_attrs.get("discipline", 0) or 0)
-    fight_off = float(off_attrs.get("fight", 0) or 0)
+    discipline = core8_gameplay(def_attrs.get("discipline", 0))
+    fight_off = core8_gameplay(off_attrs.get("fight", 0))
 
     d_score = calculate_defender_pressure_score(bh_defender, "man")
     if trapper is not None:
@@ -2123,7 +2125,7 @@ def _resolve_hct_pass_contest(
         receiver_xy,
         PASS_GRID_PER_GAME_SEC,
         defenders,
-        offense_modifier=offense_modifier,
+        offense_modifier_g=offense_modifier,
     )
 
 

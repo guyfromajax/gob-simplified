@@ -76,76 +76,24 @@ The backend is the only authority for whether a completed period enters End of G
 
 **Team Attributes Update System**
 Team attributes will adjust at the end of game based on the notes below. Note this will replace the team attribute decay we had coded into the Training System. For a side-by-side comparison with Training, see `docs/To Do/team_attributes_eog_vs_training_comparison.md`.
-- Values will be capped to normal ranges:
-  - `shot_threshold`: 0 to 200
-  - `rebound_modifier`: 0 to 0.4
-  - `team_chemistry`: 7 to 25
-  - all others: -10 to 10
-- End of game attribute adjustments (applies to each team, all stat conditions for the game just run):
-  - `shot_threshold`
-    - Golf-score style attr: lower is better, higher is worse.
-    - **Both teams:** If game FG% > 50%: `+= random.randint(-10, -5)`.
-    - **Winning team:** If FG% > 45% (and ≤ 50%): `+= random.randint(-5, 0)`.
-    - **Losing team:** If FG% > 45% (and ≤ 50%): `+= random.randint(0, 5)`.
-    - **Both teams:** If FG% ≤ 45%: `+= random.randint(5, 10)`.
-  - `discipline` (both teams, same criteria)
-    - Compare team `(F + TO)` to opponent `(F + TO) + 8`.
-    - If lower: `+= random.randint(1, 2)`.
-    - If higher: `+= random.randint(-2, -1)`.
-    - If equal: `+= random.randint(-1, 0)`.
-    - F = team fouls for the game (from box score / team totals).
-  - `fight`
-    - **Winning team:** += random.randint(0, 2).
-    - **Losing team:** += random.randint(-2, 0).
-  - `rebound_modifier` (winning and losing team have same criteria)
-    - if team TREB for the game > opponents TREB for the game + 8: += `0.00 to 0.05`
-    - elif TREB for the game < opponents TREB for the game - 8: += `-0.10 to -0.05`
-    - else: += `-0.05 to -0.01`
-  - `offensive_efficiency` (winning and losing team have same criteria; distant sim uses the distant-sim override below instead of these bands)
-    - Sum of offensive `game_stats.times_run` across all playbook rows in the finished-game snapshot.
-    - If total > 12: `+= random.randint(0, 1)`
-    - elif total > 7: `+= random.randint(-2, -1)`
-    - else: `+= random.randint(-3, -2)`
-  - `defensive_efficiency` (winning and losing team have same criteria)
-    - Max **share** of HCO defense `used` counts (`man`, `2-3-zone`, `3-2-zone`, `1-3-1-zone`) among positive rows.
-    - If max share ≤ 39%: `+= random.randint(0, 1)`
-    - elif max share ≤ 49%: `+= random.randint(-2, -1)`
-    - else: `+= random.randint(-3, -2)`
-  - `fb_efficiency`
-    - Uses per-play fast break usage from the completed game's scouting snapshot (same FB try counts as elsewhere).
-    - If any one fast break play was > 60% of fast break calls: `+= random.randint(-3, -2)`
-    - elif any one fast break play was > 50%: `+= random.randint(-2, -1)`
-    - else: `+= random.randint(-1, 1)`
-  - `fb_opp_modifier` - Fast break opponent modifier
-    - Uses opponent fast-break try total (same source as scouting FB entries / try sum).
-    - If opponent tries > 15: `+= random.randint(-3, -2)`
-    - elif opponent tries > 10: `+= random.randint(-2, -1)`
-    - else: `+= random.randint(0, 1)`
-  - `pt_efficiency` - Press/Trap efficiency rating
-    - Uses team's total HCT + FCP uses for the game.
-    - If total > 20: `+= random.randint(-3, -1)`
-    - elif total > 16: `+= random.randint(-2, -1)`
-    - elif total ≤ 12: `+= random.randint(0, 1)`
-    - else (13–16 attempts): `+= random.randint(0, 1)`
-  - `pt_opp_modifier` - Press/Trap opponent modifier
-    - If opponent HCT + FCP uses > 16: `+= random.randint(-3, -2)`
-    - elif opponent uses > 12: `+= random.randint(-2, -1)`
-    - else: `+= random.randint(0, 1)`
-  - **Distant-sim override (Franchise distant games only, `simulation_engine == "distant"`):**
-    - Bypass normal usage-based logic for **six** attrs and apply `random.randint(-2, 1)` to each:
-      - `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `fb_opp_modifier`, `pt_efficiency`, `pt_opp_modifier`
-    - All other EOG team-attribute logic (shot threshold, discipline, fight, rebound modifier, team chemistry, etc.) still uses the normal finished-game snapshot rules.
-  - `team_chemistry` - Team chemistry rating
-    - score delta = winning team final score - losing team final score
-    - if score_delta < 4:
-      - winning team += random.randint(1,2)
-      - losing team += random.randint(-2,-1)
-    - elif score_delta < 10:
-      - winning team += random.randint(1,3)
-      - losing team += random.randint(-3,-2)
-    - else:
-      - winning team += random.randint(2,4)
-      - losing team += random.randint(-5,-3)
+- Values are clamped to `TEAM_ATTR_CLAMPS` (`BackEnd/models/training_execution_v2.py`):
+  - `shot_threshold`: 0 to 200 · `rebound_modifier`: 0.0 to 1.0 · `team_chemistry`: 7 to 25 · `momentum_score`: -10 to 10
+  - core 8 (`discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`): **-20 to 20** (widened from ±10 in the Structural Pass)
+- **Band selection lives in `BackEnd/eog_attr_rules.py`** — the SINGLE implementation `calculate_attr_changes` calls. All thresholds, band ranges, and label strings are named constants in **`BackEnd/constants/eog_attr_bands.py`**. All values below are **PROVISIONAL** (structural pass lands mechanism; the leveling phase retunes after re-measuring). End-of-game adjustments (each team, from the finished-game snapshot):
+  - `shot_threshold` (golf score, lower better): FG% > 50 → `-10..-5`; FG% > 45 winner `-5..0` / loser `0..5`; FG% ≤ 45 → `5..10`.
+  - `discipline`: team `(F+TO)` vs opponent `(F+TO)+8` → below `+1..+2` / above `-2..-1` / equal `-1..0`.
+  - `fight`: winner `0..+2` / loser `-2..0`.
+  - `rebound_modifier` (**5-band ladder**, deltas in cents /100; asymmetric on purpose — rebound differential is zero-sum, so symmetric bands net zero drift): outrebound by **≥8** → `+0.02..+0.12`; by **4-7** → `0.00..+0.05`; **within ±3** → `-0.02..-0.08`; outrebounded by **4-7** → `-0.05..-0.10`; by **≥8** → `-0.15..-0.25`.
+  - `offensive_efficiency` (**concentration** = largest play's share of offensive possessions): `≤0.30` → `0..+1`; `≤0.45` → `-1..0`; `>0.45` → `-2..-1`. Zero possessions = **data-integrity** (log, no change) — every game has offense, so zero means broken data, not a choice.
+  - `defensive_efficiency` (max share of HCO defense `used`): `≤0.39` → `0..+1`; `≤0.49` → `-1..0`; `>0.49` → `-2..-1`. Zero defensive possessions = **data-integrity** (log, no change).
+  - `fb_efficiency` (**concentration** over CR / RR / Triangle — `after_steal` excluded as a forced, non-strategic event): `≤0.45` → `0..+1`; `≤0.60` → `-1..0`; `>0.60` → `-2..-1`. Zero fast-break volume → **atrophy** `-1..0` (a coaching choice).
+  - `pt_efficiency` (**concentration** over the 4 press/trap plays = 3 HCT variant `A` counts + `fcp_used`): `≤0.50` → `0..+1`; `≤0.75` → `-1..0`; `>0.75` → `-2..-1`. Zero P/T volume → **atrophy** `-1..0`. NOTE: `fcp_press_plays[*].A` is a **dead counter** (never incremented); `fcp_used` stands in for the single live FCP variant — revisit when FCP variants expand.
+  - `fb_opp_modifier` (opponent fast-break **volume**, `after_steal` excluded; healthy `5-10`): `0` → atrophy `-1..0`; `<5` under `-1..0`; `5-10` healthy `0..+1`; `>10` over `-1..0`.
+  - `pt_opp_modifier` (opponent press/trap **volume** = `hct_used + fcp_used`; healthy `7-14`): `0` → atrophy `-1..0`; `<7` under `-1..0`; `7-14` healthy `0..+1`; `>14` over `-1..0`.
+  - **Distant-sim override** (`simulation_engine == "distant"` — STILL LIVE, gated behind `FRANCHISE_ALL_GAMES_FULL_SIM`, default OFF): the six efficiency attrs each draw `random.randint(-2, 1)`; all other attrs use the normal rules.
+  - `team_chemistry` (**rank-driven** — lower `natl_rank` int is better. `winner_score` / `loser_score` are **DEAD parameters**, a fossil of the old score-margin design; margin is NOT used):
+    - winner: opponent worse-ranked → `0..+1`; opponent top-10 → `+2..+4`; else → `+1..+2`.
+    - loser: lost to better-ranked top-10 → `-1..0`; lost to better-ranked non-top-10 → `-2..0`; lost to rank 100-128 → `-5..-3`; else → `-3..-2`.
 - **Offensive play CMD (effectiveness) decay — franchise FTD only:**
   - After the team-attribute `calculate_attr_changes` pass, `update_team_attributes_after_game()` applies **separate** updates to **`franchise_team_data.plays.<storage_key>.effectiveness`** for each team (same EOG entry point as FTD `team_attributes`).
   - For each offensive play row in the finished-game snapshot (`iter_team_plays` over `teams[team_id].plays`), let `times_run` be that play’s `game_stats.times_run`, `successes` that play’s `game_stats.successes`, and `T` the sum of `times_run` over all those plays for that team in that game.

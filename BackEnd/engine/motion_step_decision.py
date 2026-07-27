@@ -13,6 +13,7 @@ so there is no double random.
 """
 import logging
 from BackEnd.utils.sim_random import sim_rng as _random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 from BackEnd.constants import HCO_STRING_SPOTS
 from BackEnd.utils.shared import (
     player_read_raw, defender_pressure_raw, inside_defender_raw, ball_handling_raw,
@@ -296,7 +297,7 @@ def _shoot_threshold(shot_clock, tempo_call):
 
 def _shoot_read_tier(shooter, off_team, rng):
     """Decision-quality tier: right (> SHOOT_READ_RIGHT=200) / safe (> SHOOT_READ_SAFE=125) / random (else)."""
-    read = (player_read_raw(shooter) + _team_attr(off_team, "discipline", 0)) * rng.randint(1, 6)
+    read = (player_read_raw(shooter) + core8_gameplay(_team_attr(off_team, "discipline", 0))) * rng.randint(1, 6)
     if read > SHOOT_READ_RIGHT:
         return "right"
     if read > SHOOT_READ_SAFE:
@@ -520,10 +521,10 @@ def decide_step_action(game, step, bh_pos, bh_defender, off_lineup, read_map, rn
     bh_location = locations.get(bh_pos, "key")
     bh_at_inside = is_inside_location(bh_location)
 
-    discipline = _team_attr(off_team, "discipline", 0)
-    fight = _team_attr(def_team, "fight", 0)
-    off_eff = _team_attr(off_team, "offensive_efficiency", 0)
-    def_eff = _team_attr(def_team, "defensive_efficiency", 0)
+    discipline = core8_gameplay(_team_attr(off_team, "discipline", 0))
+    fight = core8_gameplay(_team_attr(def_team, "fight", 0))
+    off_eff = core8_gameplay(_team_attr(off_team, "offensive_efficiency", 0))
+    def_eff = core8_gameplay(_team_attr(def_team, "defensive_efficiency", 0))
     off_chem = _team_attr(off_team, "team_chemistry", 7)
     def_chem = _team_attr(def_team, "team_chemistry", 7)
     off_aggr = _aggr_call(off_team)

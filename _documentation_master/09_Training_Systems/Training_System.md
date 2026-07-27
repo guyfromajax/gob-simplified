@@ -20,7 +20,7 @@ This document should reflect the current franchise training implementation in co
    - `POST /franchise/run-training` - **Legacy / full path**: same end state as user + distant in one request; if user phase is already applied for the current week but distant is not, handler runs **distant only** (resume). Does not require auth in the same way as the split routes (existing behavior).
    - `GET /franchise/training-report` - Get training report data
 7. **Coaching Focus Archetypes**: Authoritarian, Systems Coach, Player Maximizer, Culture Builder — per-leaf code behavior: `Coaching_Focus_Implementation_Map.md` in this folder
-8. **Rebound Modifier Range**: 0.0-0.4 (clamped)
+8. **Rebound Modifier Range**: 0.0-1.0 (clamped)
 9. **Pre-Training defense CMD decay**: Scouting defense rows with effectiveness > 0 reduced by `random.randint(5, 15)` before install training. **Offensive** play effectiveness is **not** decayed here; it is reduced at **EOG** from playcall share (see `End_Of_Game_System.md`).
 
 **Training System Flow (16 Steps)**

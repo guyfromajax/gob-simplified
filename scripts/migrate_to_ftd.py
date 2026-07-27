@@ -93,7 +93,7 @@ def migrate_franchise_to_ftd(franchise_doc, db, dry_run=False):
             # Extract team attributes (flatten from top-level keys)
             team_attributes = {
                 "shot_threshold": team_data.get("shot_threshold", 90),
-                "rebound_modifier": team_data.get("rebound_modifier", 1.0),
+                "rebound_modifier": team_data.get("rebound_modifier", 0.2),
                 "team_chemistry": team_data.get("team_chemistry", 8),
                 "momentum_score": 0,  # Not stored in franchise_teams, default to 0
                 "offensive_efficiency": team_data.get("offensive_efficiency", 0),

@@ -1180,7 +1180,7 @@ def ensure_team_objects_exist(mode: str, doc_id: str, team_id: str, franchise_do
                 "shot_threshold": ftd_doc.get("team_attributes", {}).get("shot_threshold", SHOT_THRESHOLD_MID),
                 "discipline": ftd_doc.get("team_attributes", {}).get("discipline", 0),
                 "fight": ftd_doc.get("team_attributes", {}).get("fight", 0),
-                "rebound_modifier": ftd_doc.get("team_attributes", {}).get("rebound_modifier", 1.0),
+                "rebound_modifier": ftd_doc.get("team_attributes", {}).get("rebound_modifier", 0.2),
                 "defensive_efficiency": ftd_doc.get("team_attributes", {}).get("defensive_efficiency", 0),
                 "fb_efficiency": ftd_doc.get("team_attributes", {}).get("fb_efficiency", 0),
                 "pt_efficiency": ftd_doc.get("team_attributes", {}).get("pt_efficiency", 0),

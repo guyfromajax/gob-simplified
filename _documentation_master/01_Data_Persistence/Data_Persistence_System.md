@@ -214,7 +214,7 @@ This system documents data persistence across all three game modes when users ar
 - `shot_threshold`: 0 to 200 (randomized, center at 100 for pill display)
 - `discipline`: -10 to +10 (formerly `turnover_modifier`)
 - `fight`: -10 to +10 (formerly `foul_modifier`)
-- `rebound_modifier`: 0.0-0.4 (random in 0.01 increments)
+- `rebound_modifier`: 0.0-0.4 (random in 0.01 increments; sunset-mode init, unchanged)
 - `defensive_efficiency`: -10 to +10
 - `fb_efficiency`: -10 to +10
 - `pt_efficiency`: -10 to +10
@@ -290,7 +290,7 @@ This system documents data persistence across all three game modes when users ar
 - `shot_threshold`: 0 to 200 (randomized, center at 100 for pill display)
 - `discipline`: -10 to +10 (formerly `turnover_modifier`)
 - `fight`: -10 to +10 (formerly `foul_modifier`)
-- `rebound_modifier`: 0.0-0.4 (random in 0.01 increments)
+- `rebound_modifier`: 0.0-0.4 (random in 0.01 increments; sunset-mode init, unchanged)
 - `defensive_efficiency`: -10 to +10
 - `fb_efficiency`: -10 to +10
 - `pt_efficiency`: -10 to +10

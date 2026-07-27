@@ -75,11 +75,11 @@ def update_teams_collection():
         # For others: default to 0
         set_ops["foul_modifier"] = random.randint(-10, 10)
         set_ops["turnover_modifier"] = random.randint(-10, 10)
-        set_ops["defensive_efficiency"] = random.randint(-10, 10)
-        set_ops["fb_efficiency"] = random.randint(-10, 10)
-        set_ops["pt_efficiency"] = random.randint(-10, 10)
-        set_ops["fb_opp_modifier"] = random.randint(-10, 10)
-        set_ops["pt_opp_modifier"] = random.randint(-10, 10)
+        set_ops["defensive_efficiency"] = random.randint(-20, 20)
+        set_ops["fb_efficiency"] = random.randint(-20, 20)
+        set_ops["pt_efficiency"] = random.randint(-20, 20)
+        set_ops["fb_opp_modifier"] = random.randint(-20, 20)
+        set_ops["pt_opp_modifier"] = random.randint(-20, 20)
         
         # Combine operations
         update_ops = {}

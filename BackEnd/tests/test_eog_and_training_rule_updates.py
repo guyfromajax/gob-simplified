@@ -7,86 +7,76 @@ from BackEnd.models.training_execution_v2 import (
     _apply_training_camp_bonus,
     _pre_training_decay_range_for_year,
 )
-from BackEnd.eog_attr_rules import calculate_fb_opp_modifier_change, calculate_pt_opp_modifier_change
+# Task 7: the drifted standalone band funcs were deleted. These tests now exercise
+# the SINGLE extracted implementation production runs (volume ladder for the two
+# opponent modifiers).
+from BackEnd.eog_attr_rules import fb_opp_modifier_change, pt_opp_modifier_change
 from BackEnd.eog_attr_rules import (
     build_eog_inputs_from_game_doc,
     calculate_special_situations_from_sources,
     calculate_team_totals_from_sources,
 )
+from BackEnd.constants import eog_attr_bands as B
+
+
+class _FakeRng:
+    """Deterministic rng stub: returns the low or high end of each band."""
+    def __init__(self, end="lo"):
+        self.end = end
+        self.calls = []
+
+    def randint(self, a, b):
+        self.calls.append((a, b))
+        return a if self.end == "lo" else b
 
 
 class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
-    def test_fb_opp_modifier_uses_low_volume_branch(self):
-        calls = []
+    # fb_opp_modifier — volume ladder, healthy band FB_OPP_HEALTHY_BAND (5, 10).
+    def test_fb_opp_modifier_zero_volume_atrophy(self):
+        rng = _FakeRng("lo")
+        label, delta = fb_opp_modifier_change(0, rng=rng)
+        self.assertEqual(label, "fb_opp_atrophy")
+        self.assertEqual(rng.calls[-1], B.VOL_ATROPHY_DELTA)
 
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return a
+    def test_fb_opp_modifier_under_volume(self):
+        rng = _FakeRng("lo")
+        label, _ = fb_opp_modifier_change(B.FB_OPP_HEALTHY_BAND[0] - 1, rng=rng)
+        self.assertEqual(label, "fb_opp_under")
+        self.assertEqual(rng.calls[-1], B.VOL_UNDER_DELTA)
 
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_fb_opp_modifier_change({"fb_rate": 10, "fb_entries": 5})
-        self.assertEqual(change, 0)
-        self.assertEqual(calls[-1], (0, 1))
+    def test_fb_opp_modifier_healthy_volume(self):
+        rng = _FakeRng("hi")
+        label, delta = fb_opp_modifier_change(B.FB_OPP_HEALTHY_BAND[0], rng=rng)
+        self.assertEqual(label, "fb_opp_healthy")
+        self.assertEqual(rng.calls[-1], B.VOL_HEALTHY_DELTA)
 
-    def test_fb_opp_modifier_uses_high_volume_branch(self):
-        calls = []
+    def test_fb_opp_modifier_over_volume(self):
+        rng = _FakeRng("lo")
+        label, _ = fb_opp_modifier_change(B.FB_OPP_HEALTHY_BAND[1] + 1, rng=rng)
+        self.assertEqual(label, "fb_opp_over")
+        self.assertEqual(rng.calls[-1], B.VOL_OVER_DELTA)
 
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return a
+    # pt_opp_modifier — volume ladder, healthy band PT_HEALTHY_BAND (7, 14).
+    def test_pt_opp_modifier_zero_volume_atrophy(self):
+        rng = _FakeRng("lo")
+        label, _ = pt_opp_modifier_change(0, rng=rng)
+        self.assertEqual(label, "pt_opp_atrophy")
 
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_fb_opp_modifier_change({"fb_rate": 40, "fb_entries": 13})
-        self.assertEqual(change, -2)
-        self.assertEqual(calls[-1], (-2, -1))
+    def test_pt_opp_modifier_under_volume(self):
+        rng = _FakeRng("lo")
+        label, _ = pt_opp_modifier_change(B.PT_HEALTHY_BAND[0] - 1, rng=rng)
+        self.assertEqual(label, "pt_opp_under")
 
-    def test_fb_opp_modifier_uses_mid_branch(self):
-        calls = []
+    def test_pt_opp_modifier_healthy_volume(self):
+        rng = _FakeRng("hi")
+        label, _ = pt_opp_modifier_change(B.PT_HEALTHY_BAND[1], rng=rng)
+        self.assertEqual(label, "pt_opp_healthy")
+        self.assertEqual(rng.calls[-1], B.VOL_HEALTHY_DELTA)
 
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return b
-
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_fb_opp_modifier_change({"fb_rate": 35, "fb_entries": 8})
-        self.assertEqual(change, 1)
-        self.assertEqual(calls[-1], (0, 1))
-
-    def test_pt_opp_modifier_uses_low_volume_branch(self):
-        calls = []
-
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return b
-
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_pt_opp_modifier_change({"pt_combined_rate": 10, "pt_total_attempts": 2})
-        self.assertEqual(change, 1)
-        self.assertEqual(calls[-1], (0, 1))
-
-    def test_pt_opp_modifier_uses_high_volume_branch(self):
-        calls = []
-
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return b
-
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_pt_opp_modifier_change({"pt_combined_rate": 35, "pt_total_attempts": 13})
-        self.assertEqual(change, -1)
-        self.assertEqual(calls[-1], (-2, -1))
-
-    def test_pt_opp_modifier_uses_mid_branch(self):
-        calls = []
-
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return a
-
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_pt_opp_modifier_change({"pt_combined_rate": 35, "pt_total_attempts": 8})
-        self.assertEqual(change, 0)
-        self.assertEqual(calls[-1], (0, 1))
+    def test_pt_opp_modifier_over_volume(self):
+        rng = _FakeRng("lo")
+        label, _ = pt_opp_modifier_change(B.PT_HEALTHY_BAND[1] + 1, rng=rng)
+        self.assertEqual(label, "pt_opp_over")
 
     def test_pre_training_decay_ranges_match_doc(self):
         self.assertEqual(_pre_training_decay_range_for_year("freshman"), (-5, -2))
@@ -336,13 +326,13 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
         eog_inputs = build_eog_inputs_from_game_doc(game_doc, "LANCASTER", "MORRISTOWN")
         opponent_scouting = eog_inputs["away"]["scouting"]
-        self.assertGreater(int(opponent_scouting.get("pt_total_attempts", 0)), 16)
+        opponent_pt_volume = int(opponent_scouting.get("pt_total_attempts", 0))
+        # HCT.used 11 + FCP.used 6 = 17 > PT_HEALTHY_BAND hi (14) → over-volume band.
+        self.assertGreater(opponent_pt_volume, B.PT_HEALTHY_BAND[1])
 
-        with patch.object(random, "randint", return_value=-3) as fake_randint:
-            change = calculate_pt_opp_modifier_change(opponent_scouting)
-
-        self.assertEqual(change, -3)
-        fake_randint.assert_called_with(-3, -2)
+        rng = _FakeRng("lo")
+        label, _ = pt_opp_modifier_change(opponent_pt_volume, rng=rng)
+        self.assertEqual(label, "pt_opp_over")
 
     def test_build_eog_inputs_falls_back_to_team_stats_when_teams_scouting_empty(self):
         game_doc = {

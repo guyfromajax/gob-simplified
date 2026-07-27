@@ -8,7 +8,7 @@
    - `shot_threshold` - Shot attempt threshold (range: 0 to 200; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
    - `discipline` - Turnover modifier (formerly `turnover_modifier`)
    - `fight` - Foul modifier (formerly `foul_modifier`)
-   - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4)
+   - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-1.0)
    - `offensive_efficiency` - Offensive efficiency rating
    - `team_chemistry` - Team chemistry rating
    - `defensive_efficiency` - Defensive efficiency rating
@@ -52,7 +52,7 @@ All team attributes are stored in team objects across all game modes:
 - `shot_threshold` - Shot attempt threshold (range: 0 to 200, center at 100 for pill display; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
 - `discipline` - Turnover modifier (formerly `turnover_modifier`)
 - `fight` - Foul modifier (formerly `foul_modifier`)
-- `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-0.4, center at 0.2 for pill display)
+- `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-1.0, center at 0.5 for pill display)
 - `offensive_efficiency` - Offensive efficiency rating
 - `team_chemistry` - Team chemistry rating
 
@@ -247,7 +247,7 @@ This is the team's intangible mindset to convert baskets. Their overall belief i
 
 **UI (Shooting pill and deltas):** Raw `shot_threshold` is a golf score (lower is better). Horizontal pills use **100** as center, **0** at the favorable end and **200** at the unfavorable end. Shared helpers: `FrontEnd/static/js/shared/teamShotThresholdScale.js`. **Training report** and **box score attribute-change** copy invert the numeric delta for display: a raw **−10** shows as **+10** in green; a raw **+5** shows as **−5** in red. See **[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)**.
 
-### Rebounding (`rebound_modifier`) (range: 0.0 to 0.4)
+### Rebounding (`rebound_modifier`) (range: 0.0 to 1.0)
 This is the team's intangible mindset when it comes to rebounding. Their overall belief in their identity as a basketball team who gets more rebounds than their opponent. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
 - Live rebound impact: each eligible player's rebound score receives
@@ -266,7 +266,7 @@ This is the team's intangible mindset when it comes to rebounding. Their overall
   <!-- Range: `> opp + 5 -> +0.00 to +0.10`, `< opp - 5 -> -0.10 to +0.00`, otherwise `-0.05 to +0.05`. -->
   Range: `> opp + 8 -> +0.00 to +0.05`, `< opp - 8 -> -0.10 to -0.05`, otherwise `-0.05 to -0.01`.
 
-### Offense Efficiency (`offensive_efficiency`) (range: -10 to 10)
+### Offense Efficiency (`offensive_efficiency`) (range: -20 to 20)
 This is how well your team executes the Xs & Os of your offense — running plays, setting screens, making reads, and getting open. This affects how cleanly your offense operates as a unit, independent of raw talent. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through diverse play-calling and offense-focused training activities.
 
 - Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
@@ -282,7 +282,7 @@ This is how well your team executes the Xs & Os of your offense — running play
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
 
-### Defense Efficiency (`defensive_efficiency`) (range: -10 to 10)
+### Defense Efficiency (`defensive_efficiency`) (range: -20 to 20)
 This is how well your team executes the Xs & Os of your defense — rotating on time, closing out, communicating switches, and making life difficult for the offense. Raw athleticism only takes you so far; this is what separates a disciplined unit from a collection of individuals. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through diverse play-calling and defense-focused training activities.
 
 - Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
@@ -298,7 +298,7 @@ This is how well your team executes the Xs & Os of your defense — rotating on 
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
 
-### Fast Break Efficiency (`fb_efficiency`) (range: -10 to 10)
+### Fast Break Efficiency (`fb_efficiency`) (range: -20 to 20)
 This is how well your team executes in transition — pushing the pace, hitting the right moments to run, and converting opportunities before the defense can set up. This affects both how often your team generates fast break chances and how effectively they finish them. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed fast break install, a balanced Fast Break playbook and dedicated fast break training activities.
 
 - Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
@@ -314,7 +314,7 @@ This is how well your team executes in transition — pushing the pace, hitting 
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
 
-### Press/Trap Break Efficiency (`pt_efficiency`) (range: -10 to 10)
+### Press/Trap Break Efficiency (`pt_efficiency`) (range: -20 to 20)
 This is how well your team executes full court presses and half court traps — timing the traps, cutting off passing lanes, and turning defensive pressure into live ball turnovers. This affects both how often your team disrupts the opponent's offense and how effectively they convert that pressure into scoring opportunities. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed press/trap install, a disciplined approach to how often you deploy it, and dedicated press/trap training activities.
 
 - Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
@@ -330,7 +330,7 @@ This is how well your team executes full court presses and half court traps — 
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
 
-### Fight (`fight`) (range: -10 to 10)
+### Fight (`fight`) (range: -20 to 20)
 Represents your team’s competitive edge. High Fight teams have great resilience, they handle adverse situations well, and perform with urgency when trailing. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
 - Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
@@ -351,7 +351,7 @@ Represents your team’s competitive edge. High Fight teams have great resilienc
   Condition: team lost the game.
   Range: `-2 to 0`.
 
-### Discipline (`discipline`) (range: -10 to 10)
+### Discipline (`discipline`) (range: -20 to 20)
 Reflects polish and control. Disciplined teams commit fewer unnecessary fouls and turnovers, execute aggressive strategies with precision, and maintain composure late in games. It balances Fight very well — aggression without structure becomes chaos. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
 - Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
@@ -404,7 +404,7 @@ The connective tissue of your roster. Chemistry influences how well players supp
   Condition: rank-relative result using `natl_rank` (lower integer is better; missing rank = 999).
   Range: beat lower-ranked `0 to +1`; beat higher-ranked non-top-10 `+1 to +2`; beat top-10 `+2 to +4`; lose to top-10 `-1 to 0`; lose to higher-ranked non-top-10 `-2 to 0`; lose to lower-ranked 100-128 `-5 to -3`; lose to other lower-ranked `-3 to -2`.
 
-### FB Opp Modifier (`fb_opp_modifier`) (range: -10 to 10)
+### FB Opp Modifier (`fb_opp_modifier`) (range: -20 to 20)
 This is how well your team defends fast breaks and transition offenses. Containing the pace, cutting off passing lanes, and not allowing easy transition buckets. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed Fast Break Defense install and film study of your opponent.
 
 - Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).
@@ -420,7 +420,7 @@ This is how well your team defends fast breaks and transition offenses. Containi
   Condition: distant-simmed franchise games only.
   Range: `-2 to +1`.
 
-### P/T Opp Modifier (`pt_opp_modifier`) (range: -10 to 10)
+### P/T Opp Modifier (`pt_opp_modifier`) (range: -20 to 20)
 This is how well your team and work through your opponent's presses and traps. Handling the pressure of these disruptive defenses is key to avoiding the many mistakes they can cause. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed Press/Trap Offense install and film study of your opponent.
 
 - Initial seed: Franchise creation / missing-FTD creation (`range: -2 to 0`, random). Season rollover re-rolls this on a carryover-scaled range (§ Season Rollover Re-Roll).

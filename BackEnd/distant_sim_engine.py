@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from BackEnd.utils.team_attr_scale import core8_gameplay
 from BackEnd.constants.distant_sim import (
     DISTANT_CHEMISTRY_MAX,
     DISTANT_CHEMISTRY_MIN,
@@ -144,8 +145,8 @@ def distant_sim_team_attr_composite(team_attributes: dict | None) -> int:
     if not team_attributes:
         return 0
     try:
-        offensive = int(team_attributes.get("offensive_efficiency") or 0)
-        defensive = int(team_attributes.get("defensive_efficiency") or 0)
+        offensive = int(core8_gameplay(team_attributes.get("offensive_efficiency")))
+        defensive = int(core8_gameplay(team_attributes.get("defensive_efficiency")))
         st_raw = team_attributes.get("shot_threshold")
         shot_penalty = int(int(st_raw) / 20) if st_raw is not None else 0
     except (TypeError, ValueError):

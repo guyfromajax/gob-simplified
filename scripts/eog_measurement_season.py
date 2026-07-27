@@ -41,10 +41,12 @@ _REPO = Path(__file__).resolve().parent.parent
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
-# Hardcoded target — do NOT resolve "most recent franchise"; that stops being
-# true the moment another franchise exists.
-TARGET_FRANCHISE_ID = "6a66449127f0298bd27584c5"
-EXPECTED_USER_TEAM = "South Lancaster"
+# Explicit target — never "most recent franchise" (stops being true the moment
+# another exists). Overridable via env for a freshly-provisioned franchise.
+# Arms franchise (provisioned week-1). The old measurement franchise
+# 6a66449127f0298bd27584c5 is at week 27 — its band log is the baseline; leave it.
+TARGET_FRANCHISE_ID = os.environ.get("GOB_MEASUREMENT_FRANCHISE_ID", "6a67882a2b2eb443f8c7789f")
+EXPECTED_USER_TEAM = os.environ.get("GOB_MEASUREMENT_TEAM", "South Lancaster")
 EXPECTED_DB_MARKER = "gob-staging"
 REGULAR_SEASON_LAST_WEEK = 26
 
@@ -59,7 +61,16 @@ def main() -> int:
     parser.add_argument(
         "--stop-after-week", type=int, default=REGULAR_SEASON_LAST_WEEK,
         help="Advance until franchise week exceeds this (default 26). Use 1 for the "
-             "week-1 capture gate, then re-run with 26 for the rest.",
+             "week-1 capture gate, then re-run with 26 for the rest. For the "
+             "distributional arms use a SHORT length (e.g. 5).",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=None,
+        help="Seed sim_rng + global random for a REPRODUCIBLE arm (re-run same code "
+             "+ same seed + same restored start → same result). Requires the thread "
+             "path (FRANCHISE_CPU_SIM_USE_POOL=0) — spawned pool workers can't be "
+             "seeded deterministically. NOT a paired-comparison tool: Task 6 removes "
+             "a draw, so seeded baseline vs changed desync at the first focus call.",
     )
     args = parser.parse_args()
     stop_after = min(int(args.stop_after_week), REGULAR_SEASON_LAST_WEEK)
@@ -96,6 +107,19 @@ def main() -> int:
     if not _franchise_all_games_full_sim():
         _abort("FRANCHISE_ALL_GAMES_FULL_SIM is not 1 — regular-season games would go "
                "distant and the six usage-gated attributes would be GARBAGE. Set it.")
+
+    # ---- Optional reproducibility: seed BOTH streams, require single-process ----
+    if args.seed is not None:
+        from BackEnd.api.franchise_routes import _franchise_cpu_use_pool
+        if _franchise_cpu_use_pool():
+            _abort("--seed requires FRANCHISE_CPU_SIM_USE_POOL=0 (spawned pool workers "
+                   "re-seed per process and can't be made deterministic). Set it to 0.")
+        import random as _random
+        from BackEnd.utils import sim_random
+        _random.seed(args.seed)          # EOG band deltas draw from global random
+        sim_random.seed(args.seed)       # the engine draws from the isolated sim_rng
+        print(f"🎲 Seeded arm: sim_rng + global random = {args.seed} (single-process). "
+              f"Reproducible given the SAME restored start + PYTHONHASHSEED=0.")
 
     # ---- Safety gate 3: the franchise is who we think it is --------------------
     fid = ObjectId(TARGET_FRANCHISE_ID)

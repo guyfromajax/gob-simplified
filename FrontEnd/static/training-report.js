@@ -1430,10 +1430,11 @@ function createPill(originalValue, attrKey) {
   if (attrKey === 'shot_threshold') {
     ({ maxValue, value } = window.TeamShotThresholdScale.pillFillFromRaw(originalValue));
   } else if (attrKey === 'rebound_modifier') {
-    // Rebound modifier is 0.0-0.4, center at 0.2
-    // We'll show deviation from 0.2
-    maxValue = 0.2; // Max deviation is 0.2 (from 0.0 to 0.2 or 0.2 to 0.4)
-    value = originalValue - 0.2; // Center at 0 for fill calculation
+    // Rebound modifier is 0.0-1.0; center = neutral = init = 0.2 (NOT the midpoint).
+    // Asymmetric span: 0.2 of room below, 0.8 above. is-extreme (value/maxValue >= 0.7)
+    // then triggers at 70% of whichever half-span the value is on.
+    value = originalValue - 0.2;
+    maxValue = value < 0 ? 0.2 : 0.8;
     displayValue = originalValue.toFixed(2); // Show original value with 2 decimals
   }
   

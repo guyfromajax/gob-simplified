@@ -753,7 +753,7 @@ try:
                             "shot_threshold": SHOT_THRESHOLD_MID,
                             "discipline": 0,
                             "fight": 0,
-                            "rebound_modifier": 1.0,
+                            "rebound_modifier": 0.2,
                             "momentum_score": 0,
                             "offensive_efficiency": 0,
                             "team_chemistry": 8,

@@ -6434,14 +6434,16 @@
       centerLine.style.zIndex = '2';
       pill.appendChild(centerLine);
 
-      let maxValue = 10;
+      let maxValue = 20;
       let value = originalValue;
 
       if (attrKey === 'shot_threshold') {
         ({ maxValue, value } = window.TeamShotThresholdScale.pillFillFromRaw(originalValue));
       } else if (attrKey === 'rebound_modifier') {
-        maxValue = 0.2;
+        // Center = neutral = init = 0.2 (not the range midpoint). Asymmetric span:
+        // 0.2 of room below, 0.8 above, so 0.0-1.0 fills each half correctly.
         value = originalValue - 0.2;
+        maxValue = value < 0 ? 0.2 : 0.8;
       }
 
       if (value > 0) {

@@ -1,5 +1,6 @@
 import math
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 import logging
 
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
@@ -911,8 +912,8 @@ def resolve_over_the_back_foul(game, rebounder, rebound_team, opposing_lineup):
     offense_candidate = rebounder if rebound_team == off_team else nearest_opponent
     defense_candidate = rebounder if rebound_team == def_team else nearest_opponent
 
-    offense_threshold = 90 + off_team.team_attributes.get("discipline", 0)
-    defense_threshold = 10 - def_team.team_attributes.get("discipline", 0)
+    offense_threshold = 90 + core8_gameplay(off_team.team_attributes.get("discipline", 0))
+    defense_threshold = 10 - core8_gameplay(def_team.team_attributes.get("discipline", 0))
     otb_roll = random.randint(1, 100)
 
     if otb_roll > offense_threshold:
@@ -2140,19 +2141,6 @@ def determine_rebounder(
 
     with temp_lineup_court_absolute_for_away_rebound_math(game, is_away_offense):
         return _core()
-
-def get_team_thresholds(game):
-    
-    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-
-    off_attr = off_team.team_attributes
-    def_attr = def_team.team_attributes
-
-    return {
-        "discipline": off_attr.get("discipline", 10),
-        "d_fight": def_attr.get("fight", 10),
-        "o_fight": off_attr.get("fight", 10)
-    }
 
 def get_foul_and_turnover_positions(pass_count):
     return {
@@ -3841,7 +3829,7 @@ def calculate_charge(shooter, defender, off_team, def_team):
     def_chemistry = int((def_team.team_attributes.get("team_chemistry", 0) or 0) / 4)
 
     def _discipline_factor(team, chemistry_factor):
-        discipline = team.team_attributes.get("discipline", 0) or 0
+        discipline = core8_gameplay(team.team_attributes.get("discipline", 0))
         if discipline >= 0:
             return discipline * random.randint(0, max(0, chemistry_factor))
         # Invert chemistry factor on 1–6 scale: 1->6, 2->5, 3->4, 4->3, 5->2, 6->1

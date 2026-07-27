@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from BackEnd.constants import (
@@ -332,8 +333,8 @@ def resolve_dunk_micro_stamp(
         return None
 
     if not uncontested:
-        off_fight = float(getattr(off_team, "team_attributes", {}).get("fight", 0) or 0)
-        def_fight = float(getattr(def_team, "team_attributes", {}).get("fight", 0) or 0)
+        off_fight = core8_gameplay(getattr(off_team, "team_attributes", {}).get("fight", 0))
+        def_fight = core8_gameplay(getattr(def_team, "team_attributes", {}).get("fight", 0))
         margin = dunk_in_play_margin(
             shot_score_pre_defense,
             shot_defense_score_raw,
