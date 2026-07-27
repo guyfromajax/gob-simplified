@@ -1695,20 +1695,39 @@ try:
     
     @app.get("/teams")
     def get_team_names():
+        # conference + region are required by the franchise team-select / Team Builder
+        # picker (search, conference grouping, region filter). Additive fields only —
+        # existing consumers that ignore unknown keys keep working.
+        #
+        # object_id = str(Mongo _id). Canonical franchise/schedule/FTD key.
+        # team_id   = slug (e.g. BENTLEY_TRUMAN). Game-doc / TeamManager key.
         teams = teams_collection.find(
-            {}, {"name": 1, "primary_color": 1, "secondary_color": 1, "mascot": 1, "_id": 0}
+            {},
+            {
+                "name": 1,
+                "primary_color": 1,
+                "secondary_color": 1,
+                "mascot": 1,
+                "conference": 1,
+                "region": 1,
+                "team_id": 1,
+            },
         )
         return sorted(
             [
                 {
+                    "object_id": str(team["_id"]) if team.get("_id") is not None else None,
                     "name": team.get("name"),
+                    "team_id": team.get("team_id"),
                     "primary_color": team.get("primary_color"),
                     "secondary_color": team.get("secondary_color"),
                     "mascot": team.get("mascot"),
+                    "conference": team.get("conference"),
+                    "region": team.get("region"),
                 }
                 for team in teams
             ],
-            key=lambda t: t["name"],
+            key=lambda t: (t["name"] or ""),
         )
     
     
@@ -6781,6 +6800,24 @@ try:
             "practice_squad_recruiting_done": practice_squad_recruiting_done,
             "projected_starting_five": projected_starting_five,
         }
+
+        # Team Builder: overlay identity when this roster is loaded in a franchise.
+        if franchise_id and team.get("_id") is not None:
+            try:
+                from BackEnd.utils.franchise_team_display import resolve_team_display
+
+                display = resolve_team_display(franchise_id, team.get("_id"), core_doc=team)
+                response_data["team"] = display.get("name") or response_data["team"]
+                response_data["team_name"] = display.get("name") or response_data["team_name"]
+                response_data["primary_color"] = display.get("primary_color") or response_data["primary_color"]
+                response_data["secondary_color"] = display.get("secondary_color") or response_data["secondary_color"]
+                response_data["mascot"] = display.get("mascot")
+                response_data["abbreviation"] = display.get("abbreviation")
+                response_data["short_name"] = display.get("short_name")
+                response_data["asset_strategy"] = display.get("asset_strategy") or "core"
+                response_data["is_custom_team"] = bool(display.get("is_custom"))
+            except Exception:
+                pass
         
         # ✅ DEBUG: Log response details for box score debugging
         if franchise_id:

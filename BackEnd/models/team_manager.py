@@ -288,6 +288,23 @@ class TeamManager:
         # Load BASE team data from universal teams collection (name, team_id, colors, mascot)
         team_doc_start = time.time()
         team_doc = teams_collection.find_one({"name": name}) if roster_override is None else None
+        # Team Builder: custom display name won't match core teams.name — resolve via overlay.
+        if not team_doc and franchise_id and roster_override is None:
+            try:
+                from BackEnd.utils.franchise_team_display import (
+                    get_team_builder_overlay,
+                    resolve_team_display,
+                )
+
+                overlay = get_team_builder_overlay(franchise_id)
+                if overlay and str(overlay.get("name") or "").strip() == str(name or "").strip():
+                    from bson import ObjectId
+
+                    replaced = overlay.get("replaced_object_id")
+                    if replaced:
+                        team_doc = teams_collection.find_one({"_id": ObjectId(str(replaced))})
+            except Exception:
+                pass
         team_doc_time = (time.time() - team_doc_start) * 1000
         if not team_doc and roster_override is None:
             print(f"⚠️ No team document found for team: {name}")
@@ -302,6 +319,25 @@ class TeamManager:
         self.primary_color = team_doc.get("primary_color", "#000000") if team_doc else "#000000"
         self.secondary_color = team_doc.get("secondary_color", "#ffffff") if team_doc else "#ffffff"
         self.mascot = team_doc.get("mascot", "") if team_doc else ""
+
+        # Team Builder overlay: pass-through when absent. Prefer ObjectId from the
+        # core team doc so custom renames still resolve the replaced slot.
+        self.abbreviation = None
+        self.asset_strategy = "core"
+        if franchise_id and team_doc and team_doc.get("_id") is not None:
+            try:
+                from BackEnd.utils.franchise_team_display import resolve_team_display
+
+                display = resolve_team_display(franchise_id, team_doc.get("_id"), core_doc=team_doc)
+                if display.get("is_custom"):
+                    self.name = display.get("name") or self.name
+                    self.primary_color = display.get("primary_color") or self.primary_color
+                    self.secondary_color = display.get("secondary_color") or self.secondary_color
+                    self.mascot = display.get("mascot") if display.get("mascot") is not None else self.mascot
+                    self.abbreviation = display.get("abbreviation")
+                    self.asset_strategy = display.get("asset_strategy") or "generated"
+            except Exception:
+                pass
 
         self.points = 0
         self.points_by_quarter = [0, 0, 0, 0]

@@ -2504,6 +2504,26 @@ class TeamSelection(BaseModel):
     # Optional mode-select slot (1 or 2). Server assigns first free slot if omitted/invalid.
     home_slot: int | None = None
 
+
+class TeamBuilderApplyRequest(BaseModel):
+    """Apply Team Builder at franchise creation. Franchise is created only on Apply."""
+
+    replaced_object_id: str
+    home_slot: int | None = None
+    name: str
+    short_name: str | None = None
+    abbreviation: str
+    mascot: str | None = None
+    city_state: str | None = None
+    primary_color: str
+    secondary_color: str
+    accent_color: str | None = None
+    jersey_preset: int | None = 1
+    # keep | generate | import
+    roster_mode: str = "keep"
+    imported_players: list[dict[str, Any]] | None = None
+
+
 class PlayGameRequest(BaseModel):
     franchise_id: str
 
@@ -3633,6 +3653,229 @@ def select_team(
         traceback.print_exc(file=sys.stderr)
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
+@router.get("/franchise/team-builder")
+def get_team_builder_page():
+    return FileResponse(STATIC_DIR / "team-builder.html")
+
+
+@router.get("/franchise/team-builder/slot-roster.csv")
+def team_builder_slot_roster_csv(
+    object_id: str = Query(..., description="Core team ObjectId for the replaced slot"),
+    user: dict = Depends(get_current_user),
+):
+    """Export a core team's scholarship roster as CSV for Team Builder Step 3."""
+    from BackEnd.utils.team_builder_roster import build_slot_roster_csv
+
+    _ = user  # auth required; roster is core data readable by any signed-in user
+    try:
+        team_oid = ObjectId(str(object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="object_id must be a team ObjectId")
+
+    team_doc = db.teams.find_one({"_id": team_oid}, {"name": 1})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Program not found")
+
+    try:
+        csv_body = build_slot_roster_csv(db, team_oid)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Program not found")
+
+    slug = re.sub(r"[^a-z0-9]+", "-", str(team_doc.get("name") or "roster").lower()).strip("-")
+    filename = f"{slug or 'slot'}-roster.csv"
+    return Response(
+        content=csv_body,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@router.post("/franchise/team-builder/apply")
+def team_builder_apply(
+    body: TeamBuilderApplyRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Create a franchise with a Team Builder overlay for one replaced slot.
+    Franchise creation begins here — not when the wizard opens.
+    """
+    from BackEnd.constants.team_builder_budget import evaluate_roster_budget
+    from BackEnd.utils.franchise_team_display import TEAM_BUILDER_FIELD
+
+    existing_franchises = db.franchises.count_documents({"user_id": user.get("user_id")})
+    if existing_franchises >= MAX_FRANCHISES_PER_USER:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"You already have {MAX_FRANCHISES_PER_USER} active franchises. "
+                "Delete one before starting another."
+            ),
+        )
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+
+    team_doc = db.teams.find_one({"_id": replaced_oid})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Replaced program not found")
+
+    custom_name = (body.name or "").strip()
+    if not custom_name:
+        raise HTTPException(status_code=400, detail="School name is required")
+    abbreviation = (body.abbreviation or "").strip().upper()[:3]
+    if len(abbreviation) != 3:
+        raise HTTPException(status_code=400, detail="Abbreviation must be 3 characters")
+
+    # Abbreviation uniqueness vs slice(0,3) of all 128 names (§6 Step 1)
+    for t in db.teams.find({}, {"name": 1}):
+        other = str(t.get("name") or "")
+        if str(t.get("_id")) == str(replaced_oid):
+            continue
+        if other[:3].upper() == abbreviation:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{abbreviation} is already used by {other}. Try another abbreviation.",
+            )
+
+    _ensure_home_slots_for_user(user.get("user_id"))
+    home_slot = _allocate_home_slot(user.get("user_id"), body.home_slot)
+
+    replaced_name = team_doc.get("name") or ""
+    overlay = {
+        "replaced_object_id": str(replaced_oid),
+        "replaced_name": replaced_name,
+        "name": custom_name,
+        "short_name": (body.short_name or custom_name).strip() or custom_name,
+        "abbreviation": abbreviation,
+        "mascot": (body.mascot or "").strip(),
+        "city_state": (body.city_state or "").strip(),
+        "primary_color": body.primary_color,
+        "secondary_color": body.secondary_color,
+        "accent_color": body.accent_color or body.primary_color,
+        "jersey_preset": int(body.jersey_preset or 1),
+        "asset_strategy": "generated",
+        "roster_mode": body.roster_mode or "keep",
+    }
+
+    manager = FranchiseManager(db)
+    # Bake custom name into franchise.user_team_id at write time (no news/game docs yet).
+    manager.initialize_season(
+        user_team_id=custom_name,
+        user_team_object_id=str(replaced_oid),
+        user_id=user.get("user_id"),
+    )
+    franchise_id = manager.franchise_id
+
+    roster_mode = (body.roster_mode or "keep").strip().lower()
+    if roster_mode in ("import", "generate"):
+        from BackEnd.utils.team_builder_roster import collect_budget_attrs, replace_slot_roster
+
+        try:
+            replace_slot_roster(
+                franchise_id=franchise_id,
+                team_object_id=replaced_oid,
+                team_name=custom_name,
+                roster_mode=roster_mode,
+                imported_players=body.imported_players,
+                franchise_team_data_collection=franchise_team_data_collection,
+                franchise_players_data_collection=franchise_players_data_collection,
+            )
+        except Exception:
+            logger.exception(
+                "[TEAM-BUILDER] roster replace failed franchise_id=%s mode=%s",
+                franchise_id,
+                roster_mode,
+            )
+            raise HTTPException(status_code=500, detail="Unable to apply roster changes")
+
+    # Soft budget metadata (forward-looking). Re-evaluate after import/generate.
+    budget_meta: dict[str, Any] = {
+        "eligible_for_online": True,
+        "hasEverExceededBudget": False,
+        "roster_shape_at_creation": None,
+    }
+    try:
+        ftd = franchise_team_data_collection.find_one(
+            {"franchise_id": franchise_id, "team_id": replaced_oid},
+            {"players": 1},
+        ) or {}
+        pids = [str(pid) for pid in (ftd.get("players") or []) if pid]
+        attrs_list = collect_budget_attrs(
+            franchise_players_data_collection,
+            franchise_id,
+            pids,
+        )
+        if attrs_list:
+            evaluation = evaluate_roster_budget(attrs_list)
+            budget_meta = {
+                "eligible_for_online": bool(evaluation["eligible_for_online"]),
+                "hasEverExceededBudget": bool(evaluation["has_ever_exceeded_budget"]),
+                "roster_shape_at_creation": evaluation["roster_shape"],
+            }
+    except Exception:
+        logger.exception("[TEAM-BUILDER] budget eval failed franchise_id=%s", franchise_id)
+
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {
+            "$set": {
+                "home_slot": home_slot,
+                TEAM_BUILDER_FIELD: overlay,
+                "user_team_id": custom_name,
+                "online_eligibility": budget_meta["eligible_for_online"],
+                "hasEverExceededBudget": budget_meta["hasEverExceededBudget"],
+                "roster_shape_at_creation": budget_meta["roster_shape_at_creation"],
+            }
+        },
+    )
+
+    # Rewrite FPD meta.team for the replaced slot so leaders / baked identity match.
+    try:
+        franchise_players_data_collection.update_many(
+            {
+                "franchise_id": str(franchise_id),
+                "meta.team_id": str(replaced_oid),
+            },
+            {"$set": {"meta.team": custom_name}},
+        )
+        # Also match by core name if team_id wasn't stamped as ObjectId string.
+        franchise_players_data_collection.update_many(
+            {
+                "franchise_id": str(franchise_id),
+                "meta.team": replaced_name,
+            },
+            {"$set": {"meta.team": custom_name}},
+        )
+    except Exception:
+        logger.exception("[TEAM-BUILDER] FPD meta.team rewrite failed")
+
+    # Persist display fields on FTD (partial overlay precedent).
+    try:
+        franchise_team_data_collection.update_one(
+            {"franchise_id": franchise_id, "team_id": replaced_oid},
+            {
+                "$set": {
+                    "team_name": custom_name,
+                    "primary_color": body.primary_color,
+                    "secondary_color": body.secondary_color,
+                }
+            },
+        )
+    except Exception:
+        logger.exception("[TEAM-BUILDER] FTD overlay write failed")
+
+    return {
+        "status": "ok",
+        "franchise_id": str(franchise_id),
+        "home_slot": home_slot,
+        "team_builder": overlay,
+        "online_eligibility": budget_meta["eligible_for_online"],
+    }
+
+
 @router.get("/franchise/command-center")
 def command_center():
     return FileResponse(STATIC_DIR / "franchise-command-center.html")
@@ -3653,7 +3896,7 @@ def play_next_game(
     user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     if not user_team_name or not user_team_object_id:
         raise HTTPException(status_code=404, detail="User team not found in franchise")
-    
+
     # Resolve user_team_object_id to ObjectId for matching
     try:
         user_team_id = ObjectId(user_team_object_id)
@@ -7599,22 +7842,14 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
 
 def _franchise_summary_for_list(doc: dict) -> dict:
     """Compact franchise card payload for mode-select / slot UI."""
+    from BackEnd.utils.franchise_team_display import resolve_team_display
+
     eos = doc.get("eos_tournament") or {}
     team_object_id = doc.get("user_team_object_id")
-    primary_color = None
-    secondary_color = None
-    if team_object_id:
-        try:
-            team_doc = db.teams.find_one(
-                {"_id": ObjectId(str(team_object_id))},
-                {"primary_color": 1, "secondary_color": 1, "name": 1},
-            ) or {}
-            primary_color = team_doc.get("primary_color")
-            secondary_color = team_doc.get("secondary_color")
-        except Exception:
-            team_doc = {}
-    else:
-        team_doc = {}
+    display = resolve_team_display(doc, team_object_id) if team_object_id else {}
+    primary_color = display.get("primary_color")
+    secondary_color = display.get("secondary_color")
+    display_name = display.get("name") or doc.get("user_team_id")
     home_slot = doc.get("home_slot")
     try:
         home_slot = int(home_slot) if home_slot is not None else None
@@ -7624,7 +7859,7 @@ def _franchise_summary_for_list(doc: dict) -> dict:
         home_slot = None
     return {
         "franchise_id": str(doc["_id"]),
-        "user_team_id": doc.get("user_team_id") or team_doc.get("name"),
+        "user_team_id": display_name,
         "user_team_object_id": str(team_object_id) if team_object_id else None,
         "week": doc.get("week", 1),
         "current_season": doc.get("current_season", 1),
@@ -7634,6 +7869,11 @@ def _franchise_summary_for_list(doc: dict) -> dict:
         "eos_current_round": eos.get("current_round", 1),
         "eos_completed": eos.get("completed", False),
         "home_slot": home_slot,
+        "is_custom_team": bool(display.get("is_custom")),
+        "team_builder_replaced_name": display.get("replaced_name"),
+        "abbreviation": display.get("abbreviation"),
+        "mascot": display.get("mascot"),
+        "asset_strategy": display.get("asset_strategy") or "core",
     }
 
 
@@ -7898,6 +8138,35 @@ def command_center_data(
         response["primary_color"] = team_doc.get("primary_color", "#27408E")
         response["user_conference"] = team_doc.get("conference")
         response["user_region"] = team_doc.get("region", "")
+        # Team Builder overlay — pass-through when absent.
+        if franchise_doc and team_id:
+            try:
+                from BackEnd.utils.franchise_team_display import resolve_team_display
+
+                display = resolve_team_display(franchise_doc, team_id, core_doc=team_doc)
+                response["team"] = display.get("name") or response.get("team")
+                response["primary_color"] = display.get("primary_color") or response["primary_color"]
+                response["secondary_color"] = display.get("secondary_color")
+                response["accent_color"] = display.get("accent_color")
+                response["mascot"] = display.get("mascot")
+                response["abbreviation"] = display.get("abbreviation")
+                response["short_name"] = display.get("short_name")
+                response["asset_strategy"] = display.get("asset_strategy") or "core"
+                response["is_custom_team"] = bool(display.get("is_custom"))
+                response["team_builder_replaced_name"] = display.get("replaced_name")
+                response["jersey_preset"] = display.get("jersey_preset")
+                response["user_team_object_id"] = str(team_id)
+                # Frozen at Apply (§9.4) — surface as franchise metadata only.
+                if "online_eligibility" in franchise_doc:
+                    response["online_eligibility"] = bool(franchise_doc.get("online_eligibility"))
+                else:
+                    response["online_eligibility"] = True
+                if "hasEverExceededBudget" in franchise_doc:
+                    response["hasEverExceededBudget"] = bool(
+                        franchise_doc.get("hasEverExceededBudget")
+                    )
+            except Exception:
+                logger.exception("[FCC] team display resolve failed franchise_id=%s", franchise_id)
         # Rankings list for Rankings tab: all FTD teams with natl_rank and team name, sorted by natl_rank
         if franchise_id and franchise_doc:
             try:
@@ -8455,6 +8724,7 @@ def _build_season_schedule_payload(
             "national_tournament": 1,
             "user_team_id": 1,
             "user_team_object_id": 1,
+            "team_builder": 1,
             "_id": 1,
         },
     )
@@ -8481,7 +8751,11 @@ def _build_season_schedule_payload(
 
     team_docs = list(db.teams.find({}, {"_id": 1, "conference": 1, "name": 1, "mascot": 1}))
     team_conferences = {str(t["_id"]): t.get("conference") for t in team_docs}
-    team_name_lookup = {str(t["_id"]): t.get("name", str(t["_id"])) for t in team_docs}
+    # Resolver pass-through when no Team Builder overlay — identical to core names.
+    team_name_lookup = _format_team_name_map(franchise=franchise_doc)
+    # Ensure every core team is present even if the map was filtered.
+    for t in team_docs:
+        team_name_lookup.setdefault(str(t["_id"]), t.get("name", str(t["_id"])))
     game_doc_map = _get_schedule_game_doc_map(franchise_id, 26)
 
     weeks: list[list[dict[str, Any]]] = []
@@ -10510,7 +10784,15 @@ def _best_position(position_ratings: dict[str, Any]) -> dict[str, Any]:
     return {"pos": best_pos, "rating": best_rating}
 
 
-def _format_team_name_map(team_ids: list[ObjectId] | None = None) -> dict[str, str]:
+def _format_team_name_map(
+    team_ids: list[ObjectId] | None = None,
+    franchise: Any = None,
+) -> dict[str, str]:
+    """ObjectId → display name. Pass-through core names unless a Team Builder overlay applies."""
+    from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+    if franchise is not None:
+        return resolve_team_name_map(franchise, team_ids)
     query: dict[str, Any] = {}
     if team_ids:
         query = {"_id": {"$in": team_ids}}
@@ -11227,7 +11509,7 @@ def _append_franchise_week_news(
         if team_id is not None and rank is not None:
             rank_by_team_id[str(team_id)] = int(rank)
 
-    team_name_map = _format_team_name_map()
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
 
     recruiting_leans_story = None
     if new_lean_events:
@@ -11324,7 +11606,7 @@ def _season_awards_score(season_stats: dict[str, Any]) -> tuple[int, int]:
 
 def _compute_all_american_teams(franchise_doc: dict[str, Any]) -> dict[str, Any]:
     fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_doc["_id"])}))
-    team_name_map = _format_team_name_map()
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
     candidates = []
     for doc in fpd_docs:
         meta = doc.get("meta", {})
@@ -12010,7 +12292,7 @@ def get_practice_squad_team(
         )
     } if frd_ids else {}
 
-    team_name_map = _format_team_name_map()
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
     players = []
     for slot in roster_slots:
         pid = str(slot.get("player_id") or "")

@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/css/username-modal.css">
   <link rel="stylesheet" href="/franchise-select-team.css">
+  <link rel="stylesheet" href="/css/team-picker.css">
   <script src="/js/shared/pageLoadOverlay.js"></script>
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
@@ -27,6 +28,13 @@
     <a id="team-select-back-link" class="team-select-back-link" href="/mode-select.html">Back</a>
     <h1 id="page-title">Who Are You Coaching?</h1>
     <p id="page-subtitle">You're building this program from the ground up. Choose wisely.</p>
+    <div id="team-builder-entry" class="team-builder-entry">
+      <div class="team-builder-entry-copy">
+        <strong>Team Builder</strong>
+        <span>Put your own program in the league. Your school takes an existing team's place — the league stays at 128 teams and every schedule is unchanged.</span>
+      </div>
+      <a id="team-builder-cta" class="team-builder-cta" href="/team-builder.html">Open Team Builder</a>
+    </div>
     <div id="team-select-error" class="team-select-error" hidden></div>
     <div id="team-container"></div>
   </div>
@@ -44,6 +52,7 @@
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/franchiseLocalStorage.js"></script>
   <script src="/common.js"></script>
+  <script src="/js/shared/teamPicker.js"></script>
   <script src="/franchise-select-team.js"></script>
 </body>
 </html>

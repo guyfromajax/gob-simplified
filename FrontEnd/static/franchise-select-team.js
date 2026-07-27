@@ -6,34 +6,12 @@ function playSound(filename) {
   } catch (e) {}
 }
 
-const teams = [
-  "Bentley-Truman",
-  "Lancaster",
-  "Four Corners",
-  "Ocean City",
-  "Morristown",
-  "Little York",
-  "Xavien",
-  "South Lancaster"
-];
-
-const taglines = {
-  'Bentley-Truman': 'Top-Shelf Talent',
-  'Lancaster': 'Muscle & Defense',
-  'Four Corners': 'Hustle & Attitude',
-  'Ocean City': 'Sharpshooters Galore',
-  'Morristown': 'Perfectly Balanced',
-  'Little York': 'Wicked Smart',
-  'Xavien': 'Youthful Exuberance',
-  'South Lancaster': 'Us vs The World'
-};
-
-const teamContainer = document.getElementById("team-container");
 const errorHost = document.getElementById("team-select-error");
 const loadingOverlay = document.getElementById("team-select-loading");
 const loadingBanner = document.getElementById("team-select-loading-banner");
 const loadingSubline = document.getElementById("team-select-loading-subline");
 const backLink = document.getElementById("team-select-back-link");
+const pickerRoot = document.getElementById("team-container");
 
 // FTE v2 tutorial branch: when ?mode=tutorial is present, this page is the
 // first step of the new-user funnel rather than a franchise-creation entry.
@@ -43,33 +21,7 @@ const HOME_SLOT_PARAM = (function () {
   return n === 1 || n === 2 ? n : null;
 })();
 
-// Mascot map (team name → mascot string) loaded on demand from /teams.
-// Single source of truth = team_doc.mascot in the teams collection. Used by
-// the username modal copy ("you're now coaching the {mascot}, Coach"). Fired
-// once at module load when in tutorial mode so the click handler can await
-// without an extra round-trip mid-click.
-let mascotMapPromise = null;
-function fetchMascotMap() {
-  if (mascotMapPromise) return mascotMapPromise;
-  mascotMapPromise = fetch(API_CONFIG.buildUrl('/teams'), { headers: API_CONFIG.getAuthHeaders() })
-    .then(res => res.ok ? res.json() : [])
-    .then(teams => {
-      const map = {};
-      for (const t of teams || []) {
-        if (t && t.name && t.mascot) map[t.name] = t.mascot;
-      }
-      return map;
-    })
-    .catch(err => {
-      console.warn('[franchise-select-team] could not load mascots:', err);
-      return {};
-    });
-  return mascotMapPromise;
-}
-if (TUTORIAL_MODE) {
-  // Prefetch so the click handler's await is effectively free.
-  fetchMascotMap();
-}
+let teamPicker = null;
 
 function buildReturnUrl() {
   return window.location.pathname + window.location.search;
@@ -101,60 +53,17 @@ function hideLoading() {
   if (loadingOverlay) loadingOverlay.hidden = true;
 }
 
-function createButtons() {
-  if (!teamContainer) return;
-  teams.forEach(team => {
-    const card = document.createElement("div");
-    card.className = "team-card";
-    card.dataset.team = team;
-    const overlayHtml = `<button class="team-card-action team-card-action-scout" type="button">Scout</button>
-       <button class="team-card-action team-card-action-select" type="button">Select</button>`;
-    const overlayClass = 'team-card-overlay';
-    card.innerHTML = `
-      <div class="team-card-check" aria-hidden="true">✓</div>
-      <div class="team-card-banner">
-        <img src="${typeof getTeamAssetPath === 'function' ? getTeamAssetPath(team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg'}" alt="${team}">
-        <div class="team-card-tagline">${taglines[team] || team}</div>
-        <div class="${overlayClass}">
-          ${overlayHtml}
-        </div>
-      </div>
-    `;
-    const scoutBtn = card.querySelector(".team-card-action-scout");
-    const selectBtn = card.querySelector(".team-card-action-select");
-    if (scoutBtn) {
-      scoutBtn.addEventListener("click", () => {
-        playSound("click-beep.wav");
-        const scoutParams = new URLSearchParams();
-        scoutParams.set('team_name', team);
-        scoutParams.set('return_url', buildReturnUrl());
-        // FTE v2 tutorial: carry mode=tutorial so authBarInit's routeToTutorial
-        // treats team-roster-view as a shoulder page and doesn't bounce the
-        // user back to the team-select step.
-        if (TUTORIAL_MODE) scoutParams.set('mode', 'tutorial');
-        window.location.href = '/team-roster-view.html?' + scoutParams.toString();
-      });
-    }
-    if (selectBtn) {
-      selectBtn.addEventListener("click", () => {
-        playSound("click-beep.wav");
-        if (TUTORIAL_MODE) {
-          // Visually commit the selection so the choice feels registered
-          // before the username modal opens. Clear prior selections so we
-          // never end up with two highlighted cards if the user changes
-          // their mind in the few hundred ms before the modal appears.
-          if (teamContainer) {
-            teamContainer.querySelectorAll('.team-card.is-selected').forEach(el => el.classList.remove('is-selected'));
-          }
-          card.classList.add('is-selected');
-          selectTutorialTeam(team);
-        } else {
-          selectTeam(team);
-        }
-      });
-    }
-    teamContainer.appendChild(card);
-  });
+function scoutTeam(team) {
+  const name = team && team.name ? team.name : team;
+  playSound("click-beep.wav");
+  const scoutParams = new URLSearchParams();
+  scoutParams.set('team_name', name);
+  scoutParams.set('return_url', buildReturnUrl());
+  // FTE v2 tutorial: carry mode=tutorial so authBarInit's routeToTutorial
+  // treats team-roster-view as a shoulder page and doesn't bounce the
+  // user back to the team-select step.
+  if (TUTORIAL_MODE) scoutParams.set('mode', 'tutorial');
+  window.location.href = '/team-roster-view.html?' + scoutParams.toString();
 }
 
 // FTE v2 tutorial flow: team selection records the pick in tutorial_state,
@@ -162,13 +71,15 @@ function createButtons() {
 // situation card page. No franchise is created here — the tutorial game is
 // throwaway (single mode behind the scenes).
 async function selectTutorialTeam(team) {
+  const name = team && team.name ? team.name : team;
   hideError();
+  if (teamPicker) teamPicker.setSelected(team);
   try {
     // Step 1: persist the team pick + advance tutorial_state to "username".
     const advanceRes = await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
       method: 'POST',
       headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-      body: JSON.stringify({ step: 'username', team_pick: team }),
+      body: JSON.stringify({ step: 'username', team_pick: name }),
     });
     if (!advanceRes.ok) {
       throw new Error('Could not start tutorial');
@@ -183,11 +94,10 @@ async function selectTutorialTeam(team) {
   // Mascot drives the title ("YOU'RE COACHING THE STERLING KNIGHTS").
   // Team name drives the Sammy portrait variant (team-linked kit).
   // Pre-fill the input with the user's existing username (if any) so
-  // returning users who are being re-tour'd through the funnel (post-
+  // returning users who are being re-funnel'd through the funnel (post-
   // reset_fte_v2_for_all) can confirm-without-retyping. New signups
   // get an empty input as before.
-  const mascotMap = await fetchMascotMap();
-  const mascot = mascotMap[team] || team;
+  const mascot = (team && team.mascot) || name;
   let existingUsername = '';
   try {
     const raw = localStorage.getItem('auth_user');
@@ -195,7 +105,7 @@ async function selectTutorialTeam(team) {
   } catch (_) { /* private mode / corrupt JSON — fall back to empty */ }
   const { openUsernameModal } = await import('/js/shared/usernameModal.js');
   openUsernameModal({
-    teamName: team,
+    teamName: name,
     mascot,
     initialUsername: existingUsername,
     onSuccess: async () => {
@@ -225,11 +135,12 @@ async function selectTutorialTeam(team) {
 }
 
 async function selectTeam(team) {
+  const name = team && team.name ? team.name : team;
   hideError();
-  showLoading(team);
+  showLoading(name);
   try {
     const headers = { ...API_CONFIG.getAuthHeaders(), "Content-Type": "application/json" };
-    const payload = { team_name: team };
+    const payload = { team_name: name };
     if (HOME_SLOT_PARAM) payload.home_slot = HOME_SLOT_PARAM;
     const res = await fetch(API_CONFIG.buildUrl('/franchise/select-team?profile=1'), {
       method: "POST",
@@ -247,7 +158,7 @@ async function selectTeam(team) {
     const data = await res.json();
     if (window.FranchiseLS && data.franchise_id) {
       window.FranchiseLS.clearBareKeys();
-      window.FranchiseLS.setTeamContext(data.franchise_id, { teamName: team });
+      window.FranchiseLS.setTeamContext(data.franchise_id, { teamName: name });
     }
     window.location.href = `./franchise-command-center.html?franchise_id=${encodeURIComponent(data.franchise_id)}`;
   } catch (err) {
@@ -255,6 +166,33 @@ async function selectTeam(team) {
     hideLoading();
     showError(err.message || "Unable to start franchise");
   }
+}
+
+function mountTeamPicker() {
+  if (!pickerRoot || !window.TeamPicker) {
+    showError('Team picker failed to load. Refresh and try again.');
+    return;
+  }
+
+  teamPicker = window.TeamPicker.mount(pickerRoot, {
+    primaryAction: {
+      label: 'Select',
+      onClick: function (team) {
+        if (TUTORIAL_MODE) {
+          selectTutorialTeam(team);
+        } else {
+          selectTeam(team);
+        }
+      },
+    },
+    secondaryAction: {
+      label: 'Scout',
+      onClick: scoutTeam,
+    },
+    // Task B Step 0 will enable confirmation + swap CTA; franchise select
+    // keeps the existing immediate-create path.
+    confirmation: { enabled: false },
+  });
 }
 
 document.addEventListener("DOMContentLoaded", function () {
@@ -276,6 +214,8 @@ document.addEventListener("DOMContentLoaded", function () {
     if (subtitle) {
       subtitle.textContent = "This one's your onboarding — a single game to feel out the controls. Your real franchise comes next. Pick whoever speaks to you.";
     }
+    const tbEntry = document.getElementById('team-builder-entry');
+    if (tbEntry) tbEntry.hidden = true;
     // Mount the quiet 5-step progress thread (Pick Program = step 2 of 5).
     import('/js/shared/tutorialProgressThread.js')
       .then(({ mountTutorialProgress }) => mountTutorialProgress('program'))
@@ -285,6 +225,10 @@ document.addEventListener("DOMContentLoaded", function () {
       event.preventDefault();
       window.location.href = '/mode-select.html';
     });
+    const tbCta = document.getElementById('team-builder-cta');
+    if (tbCta && HOME_SLOT_PARAM) {
+      tbCta.href = '/team-builder.html?home_slot=' + HOME_SLOT_PARAM;
+    }
   }
-  createButtons();
+  mountTeamPicker();
 });

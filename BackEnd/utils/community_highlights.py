@@ -255,19 +255,22 @@ def build_community_highlight_pending(
 
 
 def _ftd_team_display(franchise_id: ObjectId, team_id_str: str) -> tuple[str, str, str, int]:
-    """team_name, primary_hex, secondary_hex, natl_rank from FTD with teams fallback."""
+    """team_name, primary_hex, secondary_hex, natl_rank via franchise display resolver."""
+    from BackEnd.utils.franchise_team_display import resolve_team_display
+
     try:
         tid = ObjectId(str(team_id_str).strip())
     except Exception:
         return "?", "#27408E", "#15181f", 999
+
     ftd = franchise_team_data_collection.find_one(
         {"franchise_id": franchise_id, "team_id": tid},
-        {"team_name": 1, "primary_color": 1, "secondary_color": 1, "natl_rank": 1},
+        {"natl_rank": 1},
     )
-    core = teams_collection.find_one({"_id": tid}, {"name": 1, "primary_color": 1, "secondary_color": 1})
-    name = (ftd or {}).get("team_name") or (core or {}).get("name") or "?"
-    primary = (ftd or {}).get("primary_color") or (core or {}).get("primary_color") or "#27408E"
-    secondary = (ftd or {}).get("secondary_color") or (core or {}).get("secondary_color") or "#15181f"
+    display = resolve_team_display(franchise_id, tid)
+    name = display.get("name") or "?"
+    primary = display.get("primary_color") or "#27408E"
+    secondary = display.get("secondary_color") or "#15181f"
     raw_nr = (ftd or {}).get("natl_rank")
     try:
         nr = int(raw_nr) if raw_nr is not None and str(raw_nr).strip() != "" else 999

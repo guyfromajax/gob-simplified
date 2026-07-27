@@ -386,11 +386,69 @@ function renderOneGameCardLockup(slotId, data, gameSummary) {
   });
 }
 
+function resolveFccTeamBanner(data) {
+  if (!data) return '/images/teams/general/general_banner_primary.jpg';
+  // Visual must already be hydrated from the franchise payload (memory), not LS.
+  if (typeof getTeamAssetPath === 'function') {
+    return getTeamAssetPath(data.team, 'banner_primary');
+  }
+  return '/images/teams/general/general_banner_primary.jpg';
+}
+
 function populateTop(data) {
   if (!data) return;
   const formattedTeam = formatTeamName(data.team);
-  const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+  // Hydrate from franchise payload — FranchiseLS is cache only.
+  const visual =
+    typeof hydrateTeamBuilderVisualFromFranchisePayload === 'function'
+      ? hydrateTeamBuilderVisualFromFranchisePayload(
+          data,
+          typeof franchiseId !== 'undefined' ? franchiseId : null
+        )
+      : null;
+  if (window.FranchiseLS && typeof franchiseId !== 'undefined' && franchiseId) {
+    window.FranchiseLS.setTeamContext(franchiseId, {
+      teamName: data.team,
+      primaryColor: data.primary_color,
+    });
+  }
+  const logoSrc = resolveFccTeamBanner(data);
   document.getElementById('team-logo').src = logoSrc;
+  const orient = document.getElementById('tb-orientation');
+  if (orient) {
+    if (data.is_custom_team && data.team_builder_replaced_name) {
+      const conf =
+        data.user_conference != null && data.user_conference !== ''
+          ? 'Conference ' + data.user_conference
+          : 'your conference';
+      orient.hidden = false;
+      orient.textContent =
+        (data.team || 'Your program') +
+        ' · ' +
+        conf +
+        ' · replacing ' +
+        data.team_builder_replaced_name +
+        ' in this franchise';
+    } else {
+      orient.hidden = true;
+      orient.textContent = '';
+    }
+  }
+  const eligEl = document.getElementById('tb-eligibility');
+  if (eligEl) {
+    if (data.is_custom_team || data.asset_strategy === 'generated') {
+      const eligible = data.online_eligibility !== false;
+      eligEl.hidden = false;
+      eligEl.className = 'tb-eligibility ' + (eligible ? 'is-yes' : 'is-no');
+      eligEl.textContent = eligible
+        ? 'Eligible for online competitions'
+        : "Not eligible for online competitions — everything else works normally";
+    } else {
+      eligEl.hidden = true;
+      eligEl.textContent = '';
+      eligEl.className = 'tb-eligibility';
+    }
+  }
   renderFccHeaderEmblem(data);
   const seasonLabelEl = document.getElementById('fcc-season-label');
   const rankLabelEl = document.getElementById('fcc-rank-label');
@@ -408,7 +466,18 @@ function populateTop(data) {
   const abbr = teamMap[formattedTeam];
   const sammyEl = document.getElementById('coach-sammy');
   const dukeEl = document.getElementById('coach-duke');
-  if (abbr) {
+  if (typeof getTeamCoachAssetPath === 'function') {
+    const sammySrc = getTeamCoachAssetPath(data.team, 'Sammy', visual || undefined);
+    const dukeSrc = getTeamCoachAssetPath(data.team, 'Duke', visual || undefined);
+    if (sammyEl) {
+      if (sammySrc) sammyEl.src = sammySrc;
+      else sammyEl.removeAttribute('src');
+    }
+    if (dukeEl) {
+      if (dukeSrc) dukeEl.src = dukeSrc;
+      else dukeEl.removeAttribute('src');
+    }
+  } else if (abbr) {
     if (sammyEl) {
       sammyEl.src = `/images/coaches/${abbr}/Sammy-${abbr}.png`;
       console.log('Coach Sammy URL:', sammyEl.src);
@@ -4786,7 +4855,6 @@ function getTeamAttrVisualConfig(attrKey, value) {
     fillPercent = Math.min((Math.abs(deviation) / halfSpan) * 50, 50);
     pulse = Math.abs(normalized) >= 14;
   } else {
-    // core-8 stored on ±20 now (EOG structural pass); pill + cardTone sized to ±20.
     fillPercent = Math.min((Math.abs(normalized) / 20) * 50, 50);
     pulse = Math.abs(normalized) >= 14;
   }
