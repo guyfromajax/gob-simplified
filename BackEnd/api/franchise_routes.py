@@ -11591,7 +11591,7 @@ def _append_franchise_week_news(
         if team_id is not None and rank is not None:
             rank_by_team_id[str(team_id)] = int(rank)
 
-    team_name_map = _format_team_name_map()
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
 
     recruiting_leans_story = None
     if new_lean_events:
@@ -11688,7 +11688,7 @@ def _season_awards_score(season_stats: dict[str, Any]) -> tuple[int, int]:
 
 def _compute_all_american_teams(franchise_doc: dict[str, Any]) -> dict[str, Any]:
     fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_doc["_id"])}))
-    team_name_map = _format_team_name_map()
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
     candidates = []
     for doc in fpd_docs:
         meta = doc.get("meta", {})
@@ -12374,7 +12374,7 @@ def get_practice_squad_team(
         )
     } if frd_ids else {}
 
-    team_name_map = _format_team_name_map()
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
     players = []
     for slot in roster_slots:
         pid = str(slot.get("player_id") or "")
