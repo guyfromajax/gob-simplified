@@ -25,24 +25,379 @@ var TEAM_ASSET_SPEC = {
   court: { ext: 'jpg', fallbackSlug: 'general' },
   logo_square: { ext: 'png', fallbackSlug: 'general' },
   background: { ext: 'png', fallbackSlug: 'general' },
-  banner_primary: { ext: 'jpg', fallbackSlug: 'general' }
+  banner_primary: { ext: 'jpg', fallbackSlug: 'general' },
+  // Picker-grid derivative: ~400px wide WebP. Full banners stay banner_primary.
+  banner_card: { ext: 'webp', fallbackSlug: 'general' }
 };
 
+/** Known on-disk core team asset folders (excl. general). */
+var CORE_TEAM_ASSET_SLUGS = {
+  'abilene': 1,
+  'ada': 1,
+  'amariabi_international': 1,
+  'amarillo_tech': 1,
+  'ann_arbor': 1,
+  'appalachia': 1,
+  'archbishop_mcclellan': 1,
+  'austin': 1,
+  'austin_west': 1,
+  'barton_lutheran': 1,
+  'bayou_district': 1,
+  'bentley_truman': 1,
+  'berkley': 1,
+  'biloxi': 1,
+  'boise': 1,
+  'border_academy': 1,
+  'burroughs': 1,
+  'cagers_world': 1,
+  'cardinal_conor': 1,
+  'casino_row': 1,
+  'chambless_global': 1,
+  'chapel_hill': 1,
+  'circus_circus': 1,
+  'cleveland_carlysle': 1,
+  'columbus': 1,
+  'concord': 1,
+  'couer_dalene': 1,
+  'crickstown': 1,
+  'crimson_county': 1,
+  'crofton': 1,
+  'cupertino': 1,
+  'd1_institute': 1,
+  'dade_academy': 1,
+  'decatur_dei': 1,
+  'deland': 1,
+  'desert_regional': 1,
+  'dillinger': 1,
+  'durham': 1,
+  'east_rockies': 1,
+  'empire_city': 1,
+  'evanston': 1,
+  'falls_academy': 1,
+  'fielding': 1,
+  'four_corners': 1,
+  'gainesville': 1,
+  'garden_elites': 1,
+  'gp_prep_school': 1,
+  'grayson_ranch': 1,
+  'grizzly_academy': 1,
+  'grupenberg': 1,
+  'ha_rushmore': 1,
+  'hana_road': 1,
+  'harding_central': 1,
+  'hardwood_fields': 1,
+  'hollywood_prep': 1,
+  'houston_jesuit': 1,
+  'huntington_canyon': 1,
+  'hyde_methodist': 1,
+  'ida': 1,
+  'independence': 1,
+  'iowa_academy': 1,
+  'ivy_prep': 1,
+  'juneau_nome': 1,
+  'kenton': 1,
+  'keys_high': 1,
+  'knoxville': 1,
+  'lancaster': 1,
+  'lawrence': 1,
+  'lewis_catholic': 1,
+  'lexington': 1,
+  'little_york': 1,
+  'long_island_methodist': 1,
+  'mahala_alou': 1,
+  'melbourne_americas': 1,
+  'middletex': 1,
+  'minot': 1,
+  'mobile': 1,
+  'monroe_hayes': 1,
+  'montpeiler': 1,
+  'morristown': 1,
+  'mt_simmons': 1,
+  'mynsk': 1,
+  'myrtle_private': 1,
+  'nickel_beach': 1,
+  'norman': 1,
+  'north_columbus': 1,
+  'ocean_city': 1,
+  'ozark_centre': 1,
+  'pacific_all_stars': 1,
+  'pan_handle_limited': 1,
+  'pikes_prep': 1,
+  'providence': 1,
+  'queens_guard': 1,
+  'quigley_catholic': 1,
+  'rainier_central': 1,
+  'rancho_estrada': 1,
+  'reardon_mayes': 1,
+  'redwood_high': 1,
+  'reyes_santiago': 1,
+  'rivers_edge': 1,
+  'rodeo_circuit': 1,
+  'sacred_heart': 1,
+  'salem': 1,
+  'san_jose': 1,
+  'seattle_aaa': 1,
+  'south_lancaster': 1,
+  'southwest_miner': 1,
+  'st_peters': 1,
+  'stormwood': 1,
+  'swoosh': 1,
+  'syracuse': 1,
+  'tallahassee': 1,
+  'templeton_wesley': 1,
+  'toronto_limited': 1,
+  'tower_academy': 1,
+  'tri_cities_prep': 1,
+  'tucson': 1,
+  'two_rivers': 1,
+  'upper_peninsula': 1,
+  'upstate': 1,
+  'valdosta_valley': 1,
+  'valley_high': 1,
+  'vancouver': 1,
+  'wacker_west': 1,
+  'wash_u_prep': 1,
+  'washington_carver': 1,
+  'west_ocean_city': 1,
+  'xavien': 1
+};
+
+/** Core-8 coach folder abbreviations (Sammy/Duke portraits). */
+var TEAM_COACH_ABBR = {
+  'Four Corners': 'FC',
+  'Bentley-Truman': 'BT',
+  'Lancaster': 'Lan',
+  'Little York': 'LY',
+  'Morristown': 'Mor',
+  'Ocean City': 'OC',
+  'South Lancaster': 'SL',
+  'Xavien': 'Xav',
+};
+
+var GENERIC_TEAM_SAMMY = '/images/sammy_tutorial.png';
+
+/** In-memory Team Builder visual for this page session (hydrated from franchise payload). */
+var _activeTeamBuilderVisual = null;
+
 /**
- * Build path for a team asset. Uses team_slug if provided, else derives from team name.
- * @param {string} teamNameOrSlug - Team display name or team_slug (from API)
- * @param {string} assetKey - One of: court, logo_square, background, banner_primary
- * @returns {string} Path e.g. /images/teams/bentley_truman/bentley_truman_court.jpg
+ * Set the session Team Builder visual. FranchiseLS is an optional warm cache only.
  */
-function getTeamAssetPath(teamNameOrSlug, assetKey) {
+function setActiveTeamBuilderVisual(visual) {
+  _activeTeamBuilderVisual = visual || null;
+}
+
+/**
+ * Active Team Builder visual overlay for the franchise in the URL (or null).
+ * Prefers in-memory hydrate from franchise payload; localStorage is cache only.
+ * Pass-through no-op when absent — same property as the §3.2 name resolver.
+ */
+function getActiveTeamBuilderVisual() {
+  if (_activeTeamBuilderVisual) return _activeTeamBuilderVisual;
+  if (typeof window === 'undefined' || !window.FranchiseLS) return null;
+  try {
+    var cached = window.FranchiseLS.getTeamBuilderVisual() || null;
+    if (cached) {
+      _activeTeamBuilderVisual = cached;
+      return cached;
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
+ * Build + hydrate Team Builder visual from a franchise API payload.
+ * Writes memory (source of truth for this page) and optionally caches to FranchiseLS.
+ * @param {object} data - FCC /me, mode-select card, Apply response, etc.
+ * @param {string} [franchiseId]
+ * @returns {object|null} visual or null when not a custom program
+ */
+function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
+  if (!data) {
+    setActiveTeamBuilderVisual(null);
+    return null;
+  }
+  var isCustom = !!(data.is_custom_team || data.is_custom || data.asset_strategy === 'generated');
+  if (!isCustom) {
+    setActiveTeamBuilderVisual(null);
+    if (franchiseId && typeof window !== 'undefined' && window.FranchiseLS) {
+      try {
+        window.FranchiseLS.setTeamBuilderVisual(franchiseId, null);
+      } catch (e) {}
+    }
+    return null;
+  }
+  var name = data.team || data.user_team_id || data.name || '';
+  var visual = {
+    name: name,
+    short_name: data.short_name || name,
+    abbreviation: data.abbreviation,
+    primary_color: data.primary_color || data.primary,
+    secondary_color: data.secondary_color || data.secondary,
+    accent_color: data.accent_color || data.accent || data.primary_color || data.primary,
+    jersey_preset: data.jersey_preset,
+    asset_strategy: 'generated',
+    is_custom: true,
+    replaced_name: data.team_builder_replaced_name || data.replaced_name,
+    replaced_object_id: data.user_team_object_id || data.replaced_object_id || data.team_object_id,
+  };
+  setActiveTeamBuilderVisual(visual);
+  if (franchiseId && typeof window !== 'undefined' && window.FranchiseLS) {
+    try {
+      window.FranchiseLS.setTeamBuilderVisual(franchiseId, visual);
+    } catch (e) {}
+  }
+  return visual;
+}
+
+function normalizeTeamNameKey(name) {
+  return String(name || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ');
+}
+
+function teamBuilderVisualMatchesName(visual, teamNameOrSlug) {
+  if (!visual || !teamNameOrSlug) return false;
+  if (visual.asset_strategy && visual.asset_strategy !== 'generated' && !visual.is_custom) {
+    return false;
+  }
+  if (!(visual.asset_strategy === 'generated' || visual.is_custom)) return false;
+  var needle = normalizeTeamNameKey(teamNameOrSlug);
+  if (!needle || needle === 'general') return false;
+  var candidates = [visual.name, visual.short_name, visual.abbreviation];
+  for (var i = 0; i < candidates.length; i++) {
+    if (candidates[i] && normalizeTeamNameKey(candidates[i]) === needle) return true;
+  }
+  // Slug form of the custom name (spaces → underscores)
+  if (visual.name && nameToTeamSlug(visual.name) === String(teamNameOrSlug).trim().toLowerCase()) {
+    return true;
+  }
+  return false;
+}
+
+function generatedTeamAssetDataUrl(visual, assetKey) {
+  var opts = {
+    name: visual.name || 'Custom Program',
+    abbreviation: visual.abbreviation,
+    primary: visual.primary_color || visual.primary || '#27408E',
+    secondary: visual.secondary_color || visual.secondary || '#15181f',
+    accent: visual.accent_color || visual.accent || visual.primary_color || '#F79420',
+    jerseyPreset: visual.jersey_preset || 1,
+    asset_strategy: 'generated',
+    is_custom: true,
+  };
+  if (typeof window !== 'undefined' && window.TeamGeneratedArt) {
+    if (assetKey === 'logo_square' || assetKey === 'mark') return window.TeamGeneratedArt.markDataUrl(opts);
+    if (assetKey === 'banner_card' || assetKey === 'banner_primary' || assetKey === 'background') {
+      return window.TeamGeneratedArt.bannerCardDataUrl(opts);
+    }
+    if (assetKey === 'court') return window.TeamGeneratedArt.courtPreviewDataUrl(opts);
+    if (assetKey === 'jersey') return window.TeamGeneratedArt.jerseyPreviewDataUrl(opts);
+  }
+  // Inline fallback so pages that only load common.js never emit a broken custom slug.
+  var initials = String(opts.abbreviation || opts.name || 'TB')
+    .trim()
+    .toUpperCase()
+    .slice(0, 3);
+  if (!opts.abbreviation) {
+    var parts = String(opts.name || '')
+      .trim()
+      .split(/[\s\-]+/)
+      .filter(Boolean);
+    if (parts.length === 1) initials = parts[0].slice(0, 3).toUpperCase();
+    else if (parts.length > 1) initials = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+  var w = assetKey === 'logo_square' || assetKey === 'mark' ? 128 : 400;
+  var h = assetKey === 'logo_square' || assetKey === 'mark' ? 128 : 141;
+  var svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="' +
+    w +
+    '" height="' +
+    h +
+    '" viewBox="0 0 ' +
+    w +
+    ' ' +
+    h +
+    '">' +
+    '<defs><linearGradient id="tb" x1="0" y1="0" x2="1" y2="1">' +
+    '<stop offset="0%" stop-color="' +
+    opts.primary +
+    '"/><stop offset="100%" stop-color="' +
+    opts.secondary +
+    '"/></linearGradient></defs>' +
+    '<rect width="' +
+    w +
+    '" height="' +
+    h +
+    '" fill="url(#tb)"/>' +
+    '<text x="' +
+    w / 2 +
+    '" y="' +
+    (h / 2 + 8) +
+    '" text-anchor="middle" fill="#ffffff" font-family="Bebas Neue, sans-serif" font-size="' +
+    (h > 100 ? 42 : 36) +
+    '">' +
+    initials +
+    '</text></svg>';
+  return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
+}
+
+/**
+ * Filesystem team asset path (core programs). Used as the no-op pass-through.
+ * Unknown / custom slugs fall back to generic art (§1: never broken).
+ */
+function filesystemTeamAssetPath(teamNameOrSlug, assetKey) {
   var slug = (teamNameOrSlug && typeof teamNameOrSlug === 'string' && teamNameOrSlug.indexOf(' ') === -1 && teamNameOrSlug.indexOf('-') === -1)
     ? teamNameOrSlug.toLowerCase()
     : nameToTeamSlug(teamNameOrSlug);
   var spec = TEAM_ASSET_SPEC[assetKey];
   if (!spec) return '/images/teams/general/general_logo_square.png';
   var useSlug = slug || spec.fallbackSlug;
-  var base = '/images/teams/' + useSlug + '/' + useSlug + '_' + assetKey + '.' + spec.ext;
-  return base;
+  if (!useSlug || useSlug === 'general' || !CORE_TEAM_ASSET_SLUGS[useSlug]) {
+    useSlug = spec.fallbackSlug || 'general';
+  }
+  return '/images/teams/' + useSlug + '/' + useSlug + '_' + assetKey + '.' + spec.ext;
+}
+
+/**
+ * Build path for a team asset. Franchise-aware shared producer (§3.3 / Task B #8):
+ * when the active franchise has a Team Builder overlay and the requested name is
+ * that custom program, return generated art. Otherwise identical to the former
+ * filesystem behavior (mandatory no-op for non-overlay franchises / other teams).
+ *
+ * @param {string} teamNameOrSlug
+ * @param {string} assetKey - court | logo_square | background | banner_primary | banner_card
+ * @param {object} [visualOverride] - optional overlay (e.g. mode-select multi-slot cards)
+ */
+function getTeamAssetPath(teamNameOrSlug, assetKey, visualOverride) {
+  var visual = visualOverride || getActiveTeamBuilderVisual();
+  if (teamBuilderVisualMatchesName(visual, teamNameOrSlug)) {
+    return generatedTeamAssetDataUrl(visual, assetKey);
+  }
+  return filesystemTeamAssetPath(teamNameOrSlug, assetKey);
+}
+
+/**
+ * Coach portrait path. Custom programs inherit the replaced slot's Core-8 coach
+ * art when the replaced program is Core-8; otherwise generic Sammy.
+ * @param {string} teamName
+ * @param {string} [coach] - 'Sammy' | 'Duke' (default Sammy)
+ * @param {object} [visualOverride]
+ */
+function getTeamCoachAssetPath(teamName, coach, visualOverride) {
+  var which = coach === 'Duke' ? 'Duke' : 'Sammy';
+  var visual = visualOverride || getActiveTeamBuilderVisual();
+  var lookupName = teamName;
+  if (teamBuilderVisualMatchesName(visual, teamName) && visual.replaced_name) {
+    lookupName = visual.replaced_name;
+  }
+  var formatted = typeof formatTeamName === 'function' ? formatTeamName(lookupName) : lookupName;
+  var abbr = TEAM_COACH_ABBR[formatted] || TEAM_COACH_ABBR[lookupName];
+  if (!abbr) {
+    return which === 'Duke' ? '' : GENERIC_TEAM_SAMMY;
+  }
+  return '/images/coaches/' + abbr + '/' + which + '-' + abbr + '.png';
 }
 
 // Map stored year values to UI abbreviations (JH, FR, SO, JR, SR, GR)

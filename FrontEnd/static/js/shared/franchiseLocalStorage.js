@@ -3,7 +3,7 @@
  *
  * Identity: URL `?franchise_id=` only — never store a bare "current" franchise id.
  * Context cache: `franchise:{id}:week|user_team|user_team_id|user_team_primary_color|
- *   complete_week_pending|eog_pgpc_snapshot|last_game_id|last_game_user_team_side`
+ *   team_builder_visual|complete_week_pending|eog_pgpc_snapshot|last_game_id|last_game_user_team_side`
  *
  * Classic script (IIFE). Loaded before authBarInit via authGuard; also include
  * explicitly on court / FCC / mode-select / box-score / team-select pages.
@@ -107,6 +107,11 @@
     } else if (opts.clearPrimaryColor) {
       remove(franchiseId, 'user_team_primary_color');
     }
+    if (opts.teamBuilderVisual != null) {
+      setJson(franchiseId, 'team_builder_visual', opts.teamBuilderVisual);
+    } else if (opts.clearTeamBuilderVisual) {
+      remove(franchiseId, 'team_builder_visual');
+    }
   }
 
   function getTeamContext(franchiseId) {
@@ -114,7 +119,42 @@
       teamName: get(franchiseId, 'user_team') || '',
       teamId: get(franchiseId, 'user_team_id') || '',
       primaryColor: get(franchiseId, 'user_team_primary_color') || '',
+      teamBuilderVisual: getJson(franchiseId, 'team_builder_visual'),
     };
+  }
+
+  function setTeamBuilderVisual(franchiseId, visual) {
+    if (!franchiseId) return;
+    if (visual == null) {
+      remove(franchiseId, 'team_builder_visual');
+      if (typeof setActiveTeamBuilderVisual === 'function') {
+        try {
+          // Only clear session visual when this franchise is the URL franchise.
+          var activeId = resolveFranchiseIdFromUrl();
+          if (!activeId || String(activeId) === String(franchiseId)) {
+            setActiveTeamBuilderVisual(null);
+          }
+        } catch (e) {}
+      }
+      return;
+    }
+    setJson(franchiseId, 'team_builder_visual', visual);
+    if (typeof setActiveTeamBuilderVisual === 'function') {
+      try {
+        var activeId2 = resolveFranchiseIdFromUrl();
+        if (!activeId2 || String(activeId2) === String(franchiseId)) {
+          setActiveTeamBuilderVisual(visual);
+        }
+      } catch (e2) {}
+    }
+  }
+
+  function getTeamBuilderVisual(franchiseId) {
+    if (!franchiseId) {
+      franchiseId = resolveFranchiseIdFromUrl();
+    }
+    if (!franchiseId) return null;
+    return getJson(franchiseId, 'team_builder_visual');
   }
 
   function setWeek(franchiseId, week) {
@@ -238,6 +278,7 @@
       'user_team',
       'user_team_id',
       'user_team_primary_color',
+      'team_builder_visual',
       'complete_week_pending',
       'eog_pgpc_snapshot',
       'last_game_id',
@@ -283,6 +324,8 @@
     setJson: setJson,
     setTeamContext: setTeamContext,
     getTeamContext: getTeamContext,
+    setTeamBuilderVisual: setTeamBuilderVisual,
+    getTeamBuilderVisual: getTeamBuilderVisual,
     setWeek: setWeek,
     getWeek: getWeek,
     setPendingCompleteWeek: setPendingCompleteWeek,

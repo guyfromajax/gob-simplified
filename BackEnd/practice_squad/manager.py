@@ -208,7 +208,11 @@ def _empty_standings() -> dict[str, dict[str, dict[str, int]]]:
     return standings
 
 
-def _format_team_name_map() -> dict[str, str]:
+def _format_team_name_map(franchise: dict | None = None) -> dict[str, str]:
+    if franchise is not None:
+        from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+        return resolve_team_name_map(franchise)
     return {
         str(team["_id"]): team.get("name", str(team["_id"]))
         for team in db.teams.find({}, {"name": 1})
@@ -247,7 +251,7 @@ def initialize_practice_squad(
 ) -> dict[str, Any]:
     """Build rosters + schedule after week 1 training camp."""
     fid = str(franchise_id)
-    team_name_map = _format_team_name_map()
+    team_name_map = _format_team_name_map(franchise_doc)
     region_team_map = _build_region_team_map()
 
     ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
