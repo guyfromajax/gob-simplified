@@ -61,6 +61,23 @@ function getSquareLogoPath(teamName) {
   return '/images/teams/general/general_banner_primary.jpg';
 }
 
+function resolveFranchiseSlotBanner(franchiseData) {
+  const teamName = safeText(franchiseData && franchiseData.user_team_id, 'Program');
+  if (franchiseData && (franchiseData.asset_strategy === 'generated' || franchiseData.is_custom_team)) {
+    return getTeamAssetPath(teamName, 'banner_card', {
+      name: franchiseData.user_team_id,
+      abbreviation: franchiseData.abbreviation,
+      primary_color: franchiseData.primary_color,
+      secondary_color: franchiseData.secondary_color,
+      accent_color: franchiseData.primary_color,
+      asset_strategy: 'generated',
+      is_custom: true,
+      replaced_name: franchiseData.team_builder_replaced_name,
+    });
+  }
+  return getSquareLogoPath(teamName);
+}
+
 function clearFranchiseLocalStorage() {
   if (window.FranchiseLS && typeof window.FranchiseLS.clearOnFranchiseExit === 'function') {
     window.FranchiseLS.clearOnFranchiseExit();
@@ -1143,7 +1160,7 @@ function buildEmptySlotHtml(slotIndex) {
 function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIndex) {
   const franchiseId = String(franchiseData.franchise_id || '');
   const teamName = safeText(franchiseData.user_team_id, 'Program');
-  const bannerUrl = getSquareLogoPath(teamName);
+  const bannerUrl = resolveFranchiseSlotBanner(franchiseData);
   const seasonProgress = deriveSeasonProgress(commandCenterData, franchiseData);
   const record = deriveRecord(commandCenterData, teamName);
   const nextOpponent = deriveNextOpponent(commandCenterData, teamName);

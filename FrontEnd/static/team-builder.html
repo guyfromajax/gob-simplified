@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Team Builder</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/css/team-picker.css">
+  <link rel="stylesheet" href="/team-builder.css">
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <div class="tb-page">
+    <a id="tb-back" class="tb-back" href="/franchise-select-team.html">Back to team select</a>
+    <header class="tb-header">
+      <h1>Team Builder</h1>
+      <p class="tb-subtitle">Put your own program in the league. Your school takes an existing team's place; the league stays at 128.</p>
+    </header>
+
+    <nav class="tb-steps" aria-label="Team Builder steps">
+      <button type="button" class="tb-step is-active" data-step="0">Slot</button>
+      <button type="button" class="tb-step" data-step="1">Identity</button>
+      <button type="button" class="tb-step" data-step="2">Colors</button>
+      <button type="button" class="tb-step" data-step="3">Roster</button>
+      <button type="button" class="tb-step" data-step="4">Review</button>
+    </nav>
+
+    <div id="tb-error" class="tb-error" hidden></div>
+
+    <section id="tb-step-0" class="tb-panel is-active">
+      <h2 class="tb-panel-title">Choose the slot</h2>
+      <p class="tb-panel-copy">Your program takes an existing team's place — schedule and conference stay put.</p>
+      <div id="tb-picker"></div>
+    </section>
+
+    <section id="tb-step-1" class="tb-panel" hidden>
+      <h2 class="tb-panel-title">Identity</h2>
+      <div class="tb-identity-grid">
+        <form id="tb-identity-form" class="tb-form" autocomplete="off">
+          <label>School name<input id="tb-name" name="name" required maxlength="48"></label>
+          <label>Short name (box scores)<input id="tb-short" name="short_name" maxlength="24"></label>
+          <label>Abbreviation (3 characters)<input id="tb-abbr" name="abbreviation" required maxlength="3" minlength="3" pattern="[A-Za-z0-9]{3}">
+            <span id="tb-abbr-hint" class="tb-field-hint" hidden></span>
+          </label>
+          <label>Mascot<input id="tb-mascot" name="mascot" maxlength="48"></label>
+          <label>City/State<input id="tb-city" name="city_state" maxlength="48"></label>
+        </form>
+        <aside class="tb-preview" id="tb-identity-preview">
+          <div class="tb-preview-bug" id="tb-scorebug">HOME</div>
+          <div class="tb-preview-standings" id="tb-standings-row">1 · — · 0–0</div>
+        </aside>
+      </div>
+      <div class="tb-actions">
+        <button type="button" class="tb-btn tb-btn-secondary" data-nav="0">Back</button>
+        <button type="button" class="tb-btn tb-btn-primary" data-nav="2">Next: Colors →</button>
+      </div>
+    </section>
+
+    <section id="tb-step-2" class="tb-panel" hidden>
+      <h2 class="tb-panel-title">Colors &amp; look</h2>
+      <div class="tb-colors-grid">
+        <form class="tb-form">
+          <label>Primary<input type="color" id="tb-primary" value="#27408E"></label>
+          <label>Secondary<input type="color" id="tb-secondary" value="#15181f"></label>
+          <label>Accent<input type="color" id="tb-accent" value="#F79420"></label>
+          <fieldset class="tb-jersey-presets">
+            <legend>Jersey style</legend>
+            <label><input type="radio" name="jersey" value="1" checked> Solid</label>
+            <label><input type="radio" name="jersey" value="2"> Accent trim</label>
+            <label><input type="radio" name="jersey" value="3"> Yoke</label>
+            <label><input type="radio" name="jersey" value="4"> Hoops</label>
+            <label><input type="radio" name="jersey" value="5"> Split</label>
+          </fieldset>
+          <p class="tb-optional-note">Logo is optional — a generated mark from your colors and initials is used by default.</p>
+        </form>
+        <aside class="tb-preview tb-preview-colors">
+          <img id="tb-mark-preview" alt="Generated mark" width="96" height="96">
+          <img id="tb-jersey-preview" alt="Jersey preview" width="120" height="150">
+          <img id="tb-court-preview" alt="Court preview" width="200" height="116">
+        </aside>
+      </div>
+      <div class="tb-actions">
+        <button type="button" class="tb-btn tb-btn-secondary" data-nav="1">Back</button>
+        <button type="button" class="tb-btn tb-btn-secondary" data-nav="4" data-skip-roster="1">Skip roster — use generated players</button>
+        <button type="button" class="tb-btn tb-btn-primary" data-nav="3">Next: Roster →</button>
+      </div>
+    </section>
+
+    <section id="tb-step-3" class="tb-panel" hidden>
+      <h2 class="tb-panel-title">Roster</h2>
+      <div class="tb-roster-cards" id="tb-roster-cards">
+        <button type="button" class="tb-roster-card is-selected" data-mode="keep">
+          <strong id="tb-keep-label">Keep this program's roster</strong>
+          <span>Fastest, zero risk. This is the default.</span>
+        </button>
+        <button type="button" class="tb-roster-card" data-mode="generate">
+          <strong>Generate a new roster</strong>
+          <span>Fresh fictional players at the slot's talent band.</span>
+        </button>
+        <button type="button" class="tb-roster-card" data-mode="import">
+          <strong>Import my roster</strong>
+          <span>CSV upload — optional columns left blank are generated.</span>
+        </button>
+      </div>
+      <div id="tb-import-panel" class="tb-import-panel" hidden>
+        <p>Required: <code>first_name</code>, <code>last_name</code>, <code>class_year</code> (FR, SO, JR, or SR)</p>
+        <p>Optional: everything else — see the template. Anything we don't recognize is ignored. Anything you leave blank, we generate.</p>
+        <div class="tb-import-actions">
+          <button type="button" class="tb-btn tb-btn-secondary" id="tb-dl-blank">Download blank template (CSV)</button>
+          <button type="button" class="tb-btn tb-btn-secondary" id="tb-dl-slot">Download current roster</button>
+        </div>
+        <input type="file" id="tb-csv" accept=".csv,text/csv">
+        <label class="tb-toggle-row"><input type="checkbox" id="tb-first-row-headers" checked> First row is headers</label>
+        <p class="tb-optional-note">or skip this — we'll generate a roster.</p>
+        <div id="tb-import-status" class="tb-field-hint"></div>
+        <div id="tb-import-blocking" class="tb-import-blocking" hidden></div>
+        <div id="tb-import-progress" class="tb-import-progress" hidden></div>
+        <div id="tb-column-map-wrap" class="tb-column-map-wrap" hidden>
+          <h3 class="tb-subheading">Column mapping</h3>
+          <table id="tb-column-map" class="tb-column-map">
+            <thead><tr><th>Your column</th><th>First 3 rows</th><th>Maps to</th><th>Status</th></tr></thead>
+            <tbody></tbody>
+          </table>
+        </div>
+        <div id="tb-import-errors" class="tb-import-messages tb-import-errors" hidden></div>
+        <div id="tb-import-warnings" class="tb-import-messages tb-import-warnings" hidden></div>
+        <div id="tb-too-many-rows" class="tb-too-many-rows" hidden></div>
+        <div id="tb-parts-picker" class="tb-parts-picker" hidden>
+          <p class="tb-subheading">Use from this file:</p>
+          <label><input type="checkbox" id="tb-part-identity" checked> Team identity (name, mascot, colors)</label>
+          <label><input type="checkbox" id="tb-part-roster" checked> Roster (15 players)</label>
+          <button type="button" class="tb-btn tb-btn-secondary" id="tb-preview-import">Preview import →</button>
+        </div>
+      </div>
+      <div id="tb-budget-meter" class="tb-budget-meter">
+        <div class="tb-budget-track" data-bar="team">
+          <div class="tb-budget-bar" id="tb-budget-bar-team">
+            <span id="tb-budget-fill"></span>
+            <i class="tb-budget-marker" id="tb-team-marker-median" style="left:0%" title="Median program"></i>
+            <i class="tb-budget-marker is-best" id="tb-team-marker-best" style="left:0%" title="Best program"></i>
+          </div>
+          <div id="tb-budget-label">Team total: — / 6,400</div>
+          <div id="tb-budget-context" class="tb-budget-context">median program 5,567 · best program 7,027</div>
+        </div>
+        <div class="tb-budget-track" data-bar="top5">
+          <div class="tb-budget-bar" id="tb-budget-bar-top5">
+            <span id="tb-top5-fill"></span>
+            <i class="tb-budget-marker" id="tb-top5-marker-median" style="left:0%" title="Median program"></i>
+            <i class="tb-budget-marker is-best" id="tb-top5-marker-best" style="left:0%" title="Best program"></i>
+          </div>
+          <div id="tb-top5-label">Top-5: — / 3,950</div>
+          <div id="tb-top5-context" class="tb-budget-context">median program 3,148 · best program 3,954</div>
+        </div>
+        <div id="tb-ceiling-line" class="tb-ceiling-line">Per-player ceiling: pass</div>
+        <div id="tb-floor-line" class="tb-floor-line">Per-player floor (top 12): pass</div>
+        <div id="tb-budget-warn" class="tb-budget-warn" hidden></div>
+        <div id="tb-elig-badge" class="tb-elig is-yes">Eligible for online competitions</div>
+        <button type="button" class="tb-budget-details-toggle" id="tb-budget-details-toggle" hidden>Show details</button>
+        <div id="tb-budget-details" class="tb-budget-details" hidden></div>
+      </div>
+      <div class="tb-actions">
+        <button type="button" class="tb-btn tb-btn-secondary" data-nav="2">Back</button>
+        <button type="button" class="tb-btn tb-btn-primary" data-nav="4">Next: Review →</button>
+      </div>
+    </section>
+
+    <section id="tb-step-4" class="tb-panel" hidden>
+      <h2 class="tb-panel-title">Review &amp; apply</h2>
+      <div id="tb-review" class="tb-review"></div>
+      <div class="tb-actions">
+        <button type="button" class="tb-btn tb-btn-secondary" data-nav="3">Back</button>
+        <button type="button" class="tb-btn tb-btn-primary" id="tb-apply">Apply and start franchise</button>
+      </div>
+    </section>
+  </div>
+
+  <div id="tb-preview-modal" class="tb-modal" hidden>
+    <div class="tb-modal-card tb-modal-wide">
+      <h3>Preview import</h3>
+      <div id="tb-preview-body"></div>
+      <div id="tb-preview-errors-host" class="tb-import-messages tb-import-errors"></div>
+      <div class="tb-actions">
+        <button type="button" class="tb-btn tb-btn-secondary" id="tb-preview-cancel">Cancel</button>
+        <button type="button" class="tb-btn tb-btn-secondary" id="tb-preview-dl-errors">Download rows with errors</button>
+        <button type="button" class="tb-btn tb-btn-primary" id="tb-preview-commit">Import players</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tb-confirm-modal" class="tb-modal" hidden>
+    <div class="tb-modal-card">
+      <h3>Apply Team Builder changes?</h3>
+      <div id="tb-confirm-body"></div>
+      <div class="tb-actions">
+        <button type="button" class="tb-btn tb-btn-secondary" id="tb-confirm-cancel">Cancel</button>
+        <button type="button" class="tb-btn tb-btn-primary" id="tb-confirm-apply">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tb-loading" class="tb-loading" hidden>
+    <div class="tb-loading-card">
+      <h2>Building Your Franchise, Coach</h2>
+      <p id="tb-loading-sub">Applying Team Builder…</p>
+    </div>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/franchiseLocalStorage.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/teamPicker.js"></script>
+  <script src="/js/shared/teamGeneratedArt.js"></script>
+  <script src="/team-builder.js"></script>
+</body>
+</html>
