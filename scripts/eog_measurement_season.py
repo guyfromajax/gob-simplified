@@ -24,9 +24,6 @@ Env (set by scripts/run_eog_measurement.sh, validated here):
   MONGO_URI                     must contain 'gob-staging'
   GOB_EOG_BAND_LOG=1            band capture on
   GOB_EOG_BAND_LOG_FILE=<abs>   durable local path for the dataset
-  FRANCHISE_ALL_GAMES_FULL_SIM=1  REQUIRED — else regular-season games go distant
-                                  and the six usage-gated attributes are garbage
-  FRANCHISE_ALL_TEAMS_AUTOTRAIN=1 (recommended) real CPU training
   FRANCHISE_CPU_SIM_USE_POOL=1     (recommended) fast CPU slate
 """
 from __future__ import annotations
@@ -98,16 +95,11 @@ def main() -> int:
         FranchiseTrainingRequest,
         _eog_band_log_enabled,
         _eog_band_log_path,
-        _franchise_all_games_full_sim,
     )
 
     # ---- Safety gate 2: capture + clean-data flags ----------------------------
     if not _eog_band_log_enabled():
         _abort("GOB_EOG_BAND_LOG is not on — nothing would be captured.")
-    if not _franchise_all_games_full_sim():
-        _abort("FRANCHISE_ALL_GAMES_FULL_SIM is not 1 — regular-season games would go "
-               "distant and the six usage-gated attributes would be GARBAGE. Set it.")
-
     # ---- Optional reproducibility: seed BOTH streams, require single-process ----
     if args.seed is not None:
         from BackEnd.api.franchise_routes import _franchise_cpu_use_pool

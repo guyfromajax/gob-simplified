@@ -473,5 +473,5 @@ def team_chemistry_change(is_winner, team_rank, opponent_rank, rng=random):
 
 def distant_uniform_change(rng=random):
     """Distant-sim override for the 6 efficiency attrs — LEAVE (distant is live
-    behind FRANCHISE_ALL_GAMES_FULL_SIM, default OFF)."""
+    for historical distant-game documents until the EOG cleanup phase)."""
     return "distant_uniform", _roll(rng, _B.DISTANT_UNIFORM)

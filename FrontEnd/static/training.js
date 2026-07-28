@@ -1230,7 +1230,7 @@ submitBtn.addEventListener('click', async function() {
             }
           }, TRAINING_DISTANT_HIGHLIGHT_MS);
 
-          const distantUrl = API_CONFIG.buildUrl('/franchise/run-training/distant-cpu');
+          const distantUrl = API_CONFIG.buildUrl('/franchise/run-training/cpu-train');
           do {
             const distantRes = await fetch(distantUrl, {
               method: 'POST',
@@ -1355,7 +1355,7 @@ async function resumeDistantTraining(franchiseId) {
   }
   let result = null;
   do {
-    const response = await fetch(API_CONFIG.buildUrl('/franchise/run-training/distant-cpu'), {
+    const response = await fetch(API_CONFIG.buildUrl('/franchise/run-training/cpu-train'), {
       method: 'POST',
       headers,
       body: JSON.stringify({ franchise_id: franchiseId })

@@ -87,8 +87,6 @@ def print_headers(headers: list[dict]) -> None:
         flags = h.get("flags", {})
         print(f"{tag}utc={h.get('utc')}  git_sha={h.get('git_sha')}")
         print(f"{'    ' if len(headers) > 1 else '  '}flags: "
-              f"ALL_GAMES_FULL_SIM={flags.get('FRANCHISE_ALL_GAMES_FULL_SIM')}  "
-              f"ALL_TEAMS_AUTOTRAIN={flags.get('FRANCHISE_ALL_TEAMS_AUTOTRAIN')}  "
               f"CPU_SIM_USE_POOL={flags.get('FRANCHISE_CPU_SIM_USE_POOL')}")
 
 
@@ -418,8 +416,7 @@ def main() -> int:
         games = sorted({r.get("game_id") for r in offenders})
         msg = (f"{len(offenders)} distant-sim row(s) in weeks 1-26 "
                f"(weeks={weeks}, {len(games)} game(s)) — the six usage-gated "
-               f"attributes are GARBAGE for those games. Re-run with "
-               f"FRANCHISE_ALL_GAMES_FULL_SIM=1.")
+               f"attributes are GARBAGE for those historical games.")
         if args.strict:
             print(f"\n❌ STRICT FAIL: {msg}", file=sys.stderr)
             return 2

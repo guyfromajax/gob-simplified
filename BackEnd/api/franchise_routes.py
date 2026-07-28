@@ -1401,21 +1401,15 @@ def _eog_band_git_sha() -> str:
 
 
 def _eog_band_header_record() -> dict:
-    """Self-describing header written once per file open: run timestamp, git SHA,
-    and the three sunset flags (resolved bool + raw env). Keeps the dataset
-    interpretable on its own, separate from the app logs."""
+    """Self-describing header written once per file open."""
     return {
         "record_type": "header",
         "utc": datetime.utcnow().isoformat() + "Z",
         "git_sha": _eog_band_git_sha(),
         "flags": {
-            "FRANCHISE_ALL_GAMES_FULL_SIM": _franchise_all_games_full_sim(),
-            "FRANCHISE_ALL_TEAMS_AUTOTRAIN": _franchise_all_teams_autotrain(),
             "FRANCHISE_CPU_SIM_USE_POOL": _franchise_cpu_use_pool(),
         },
         "flags_raw": {
-            "FRANCHISE_ALL_GAMES_FULL_SIM": os.environ.get("FRANCHISE_ALL_GAMES_FULL_SIM"),
-            "FRANCHISE_ALL_TEAMS_AUTOTRAIN": os.environ.get("FRANCHISE_ALL_TEAMS_AUTOTRAIN"),
             "FRANCHISE_CPU_SIM_USE_POOL": os.environ.get("FRANCHISE_CPU_SIM_USE_POOL"),
         },
     }
@@ -1880,7 +1874,7 @@ def update_team_attributes_after_game(
         _apply_band("rebound_modifier", _rules.rebound_modifier_change(treb, opp_treb))
 
         if is_distant_sim:
-            # Distant override — LEAVE (distant is live behind FRANCHISE_ALL_GAMES_FULL_SIM).
+            # Historical distant-game override remains until EOG cleanup.
             for _attr in (
                 "offensive_efficiency", "defensive_efficiency", "fb_efficiency",
                 "fb_opp_modifier", "pt_efficiency", "pt_opp_modifier",
@@ -3141,37 +3135,8 @@ def _should_use_tbt_for_eos_game(
     game_meta: dict[str, Any],
     user_scope: dict[str, Any],
 ) -> bool:
-    """Return True when an EOS matchup should use turn-by-turn sim."""
-    # Distant Sim sunset (flag, default OFF): when full-sim is forced, EVERY EOS
-    # game — not just the user's bracket — runs turn-by-turn. These fall through to
-    # the same full_jobs/pool path the user-bracket EOS games already use, so
-    # bracket advancement is unchanged; it just skips the distant scorer. This is
-    # the EOS half of the sunset (regular season is gated in the is_distant ladder).
-    # See _documentation_master/projects/Distant_Sim_Removal_Plan.md (Phase A).
-    if _franchise_all_games_full_sim():
-        return True
-
-    if not user_scope.get("active"):
-        return False
-
-    if week in ft.EOS_CONFERENCE_WEEKS:
-        conference = game_meta.get("conference")
-        if week in (27, 28):
-            return conference == user_scope.get("conference")
-        if week == 29:
-            return conference in set(user_scope.get("region_conferences") or ())
-        return False
-
-    if week in ft.EOS_REGION_WEEKS:
-        return (
-            game_meta.get("phase") == "region"
-            and game_meta.get("region") == user_scope.get("region")
-        )
-
-    if week in ft.EOS_NATIONAL_WEEKS:
-        return True
-
-    return False
+    """All EOS matchups use the authoritative turn-by-turn simulation engine."""
+    return True
 
 
 def _get_user_eos_phase_status(
@@ -4234,30 +4199,6 @@ def _franchise_cpu_use_pool() -> bool:
     per-service with FRANCHISE_CPU_SIM_USE_POOL=1 (no code deploy needed to flip).
     """
     return os.environ.get("FRANCHISE_CPU_SIM_USE_POOL", "0") in ("1", "true", "True")
-
-
-def _franchise_all_games_full_sim() -> bool:
-    """Sunset Distant Sim: route EVERY regular-season CPU game to full Turn-by-Turn.
-
-    FLAG — DEFAULTS OFF, so the deploy is behavior-neutral. When on
-    (FRANCHISE_ALL_GAMES_FULL_SIM=1), the is_distant decision is forced False for
-    regular-season games (EOS already forces full sim), AND the full-sim path
-    applies the post-game momentum update that the distant path used to own — so
-    momentum keeps being game-driven for all teams. Flip to 0 to revert instantly,
-    no deploy. Pair with FRANCHISE_CPU_SIM_USE_POOL=1 so 63 full games stay fast.
-    """
-    return os.environ.get("FRANCHISE_ALL_GAMES_FULL_SIM", "0") in ("1", "true", "True")
-
-
-def _franchise_all_teams_autotrain() -> bool:
-    """Sunset Distant Training: run REAL auto-train (execute_training) for every CPU team.
-
-    FLAG — DEFAULTS OFF, so the deploy is behavior-neutral. When on
-    (FRANCHISE_ALL_TEAMS_AUTOTRAIN=1), _apply_franchise_distant_cpu_training routes to
-    _run_all_cpu_autotrain instead of the template deltas — so CPU teams train play +
-    scouting effectiveness like the user's team does. Flip to 0 to revert instantly.
-    """
-    return os.environ.get("FRANCHISE_ALL_TEAMS_AUTOTRAIN", "0") in ("1", "true", "True")
 
 
 def _utc_now_iso() -> str:
@@ -6577,12 +6518,11 @@ def _complete_week_finish_cpu_and_persist(
     # Phase 3: deferred full turn-based sims (run in parallel, persist sequentially).
     full_jobs: list[tuple[int, Any, Any, str, str]] = []
 
-    # [CPU-WEEK-TIMING] Quantify the week's CPU-sim cost + full-TbT/distant split.
-    # Pure observability; drives the Distant-Sim sunset decision (Task 1).
+    # [CPU-WEEK-TIMING] Quantify the week's CPU-sim cost.
     _cpu_week_t0 = time.time()
     _cpu_distant_count = 0
 
-    # Distant game sim: batch-load FTD (prestige, total_player_attrs) and team conferences for partition
+    # Keep a lightweight FTD cache for the deferred post-game momentum update.
     ftd_docs = list(franchise_team_data_collection.find(
         {"franchise_id": franchise_id},
         {
@@ -6601,17 +6541,6 @@ def _complete_week_finish_cpu_and_persist(
         },
     ))
     ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
-    distant_fpd_by_player_id = _distant_sim_batch_fpd_map(franchise_id, ftd_by_team_id)
-    distant_rs_standings = _distant_sim_regular_season_standings(franchise_doc, ftd_by_team_id)
-    team_ids_for_conf = [d["team_id"] for d in ftd_docs if d.get("team_id")]
-    if user_team_id_str and ObjectId.is_valid(user_team_id_str):
-        team_ids_for_conf.append(ObjectId(user_team_id_str))
-    team_conference_docs = list(db.teams.find(
-        {"_id": {"$in": team_ids_for_conf}},
-        {"_id": 1, "conference": 1},
-    ))
-    team_id_to_conference = {str(d["_id"]): d.get("conference") for d in team_conference_docs}
-    user_conference = team_id_to_conference.get(str(user_team_id_str)) if user_team_id_str else None
     
     for idx, (away_id, home_id) in enumerate(week_games):
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
@@ -6713,193 +6642,6 @@ def _complete_week_finish_cpu_and_persist(
                 )
             continue
     
-        if week_games_meta and idx < len(week_games_meta):
-            g = week_games_meta[idx]
-            if not _should_use_tbt_for_eos_game(week, g, user_eos_sim_scope):
-                cpu_job = _persist_cpu_sim_job(
-                    franchise_id,
-                    week,
-                    _cpu_sim_mark_matchup_running(cpu_job, away_id, home_id, engine="distant"),
-                )
-                home_ftd = ftd_by_team_id.get(str(home_id), {})
-                away_ftd = ftd_by_team_id.get(str(away_id), {})
-                home_combined = _distant_sim_team_combined(
-                    home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
-                    fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-                )
-                away_combined = _distant_sim_team_combined(
-                    away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
-                    fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-                )
-                home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
-                try:
-                    sim_res, distant_game_id = _persist_distant_franchise_game(
-                        franchise_id=franchise_id,
-                        week=week,
-                        away_team_object_id=away_id,
-                        home_team_object_id=home_id,
-                        away_score=away_score,
-                        home_score=home_score,
-                        ftd_cache=ftd_by_team_id,
-                    )
-                except Exception:
-                    logger.exception(
-                        "❌ [COMPLETE-WEEK] EOS distant sim persistence failed; falling back to standings-only result. franchise_id=%s week=%s away_id=%s home_id=%s",
-                        franchise_id_str,
-                        week,
-                        away_id,
-                        home_id,
-                    )
-                    sim_res = _save_game_result(
-                        away_id,
-                        home_id,
-                        away_score,
-                        home_score,
-                        week,
-                        franchise_id=franchise_id_str,
-                    )
-                    distant_game_id = ""
-                results.append({
-                    "away_id": sim_res["team1_id"],
-                    "home_id": sim_res["team2_id"],
-                    "away_score": sim_res["team1_score"],
-                    "home_score": sim_res["team2_score"],
-                })
-                cpu_job = _persist_cpu_sim_job(
-                    franchise_id,
-                    week,
-                    _cpu_sim_mark_matchup_complete(
-                        cpu_job,
-                        away_id,
-                        home_id,
-                        engine="distant",
-                        away_score=sim_res["team1_score"],
-                        home_score=sim_res["team2_score"],
-                        game_id=distant_game_id,
-                    ),
-                )
-                winner_id = home_id if home_score > away_score else away_id
-                ftp.record_tournament_game_result(
-                    franchise_doc,
-                    g,
-                    week=week,
-                    franchise_id_str=franchise_id_str,
-                    game_id=distant_game_id or None,
-                    team1_id=away_id,
-                    team2_id=home_id,
-                    team1_score=away_score,
-                    team2_score=home_score,
-                    source="distant",
-                    skip_games_upsert=True,
-                )
-                _award_gp_sim(winner_id, g, (away_id, home_id))
-                _cpu_distant_count += 1  # [CPU-WEEK-TIMING]
-                continue
-
-        # Distant sim: regular season only; neither team in user's conference.
-        away_conf = team_id_to_conference.get(str(away_id))
-        home_conf = team_id_to_conference.get(str(home_id))
-        is_distant = (
-            eos_current_round is None
-            and user_conference is not None
-            and away_conf != user_conference
-            and home_conf != user_conference
-        )
-        # Scout next opponent: always full sim for their game this week (not distant), any conference.
-        next_opp = _user_next_regular_season_opponent_id(
-            franchise_doc,
-            current_week=week,
-            user_team_id_str=user_team_id_str,
-        )
-        if is_distant and next_opp and (
-            str(away_id) == str(next_opp) or str(home_id) == str(next_opp)
-        ):
-            is_distant = False
-        if is_distant:
-            from BackEnd.distant_sim_engine import distant_sim_should_promote_ranked_fullsim
-
-            away_ftd = ftd_by_team_id.get(str(away_id), {})
-            home_ftd = ftd_by_team_id.get(str(home_id), {})
-            if distant_sim_should_promote_ranked_fullsim(away_ftd, home_ftd):
-                is_distant = False
-        # Distant Sim sunset (flag, default OFF): route every remaining regular-season
-        # game to full Turn-by-Turn. Momentum is preserved by the full-sim path below.
-        if is_distant and _franchise_all_games_full_sim():
-            is_distant = False
-        if is_distant:
-            cpu_job = _persist_cpu_sim_job(
-                franchise_id,
-                week,
-                _cpu_sim_mark_matchup_running(cpu_job, away_id, home_id, engine="distant"),
-            )
-            home_ftd = ftd_by_team_id.get(str(home_id), {})
-            away_ftd = ftd_by_team_id.get(str(away_id), {})
-            home_combined = _distant_sim_team_combined(
-                home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-            )
-            away_combined = _distant_sim_team_combined(
-                away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-            )
-            home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
-            _distant_game_id = None
-            try:
-                sim_res, _distant_game_id = _persist_distant_franchise_game(
-                    franchise_id=franchise_id,
-                    week=week,
-                    away_team_object_id=away_id,
-                    home_team_object_id=home_id,
-                    away_score=away_score,
-                    home_score=home_score,
-                    ftd_cache=ftd_by_team_id,
-                )
-            except Exception:
-                logger.exception(
-                    "❌ [COMPLETE-WEEK] Regular-season distant sim persistence failed; falling back to standings-only result. franchise_id=%s week=%s away_id=%s home_id=%s user_conference=%s away_conf=%s home_conf=%s",
-                    franchise_id_str,
-                    week,
-                    away_id,
-                    home_id,
-                    user_conference,
-                    away_conf,
-                    home_conf,
-                )
-                sim_res = _save_game_result(
-                    away_id,
-                    home_id,
-                    away_score,
-                    home_score,
-                    week,
-                    franchise_id=franchise_id_str,
-                )
-            results.append({
-                "away_id": sim_res["team1_id"],
-                "home_id": sim_res["team2_id"],
-                "away_score": sim_res["team1_score"],
-                "home_score": sim_res["team2_score"],
-            })
-            cpu_job = _persist_cpu_sim_job(
-                franchise_id,
-                week,
-                _cpu_sim_mark_matchup_complete(
-                    cpu_job,
-                    away_id,
-                    home_id,
-                    engine="distant",
-                    away_score=sim_res["team1_score"],
-                    home_score=sim_res["team2_score"],
-                    game_id=_distant_game_id,
-                ),
-            )
-            winner_id_rs = home_id if home_score > away_score else away_id
-            _distant_sim_apply_result_to_standings_cache(
-                distant_rs_standings, away_id, home_id, away_score, home_score
-            )
-            _award_gp_sim(winner_id_rs, None, (away_id, home_id))
-            _cpu_distant_count += 1  # [CPU-WEEK-TIMING]
-            continue
-
         away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
         home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
         home_name = home_doc.get("name", "")
@@ -7168,14 +6910,13 @@ def _complete_week_finish_cpu_and_persist(
             )
             _sub["team_attrs"] += time.time() - _s
             winner_oid = hid if home_score > away_score else aid
-            # Distant Sim sunset: momentum was game-driven via the distant path. When
-            # all games are full-sim, apply that same (RNG-free, win/loss-driven)
-            # momentum + streak update here so it stays game-driven for every team.
+            # Deferred legacy season-momentum behavior remains game-driven after
+            # full turn-by-turn simulation becomes universal.
             # Reuses the existing engine-agnostic helper; momentum is output-only
             # (the sim never reads it), so post-game application is safe. Wrapped so a
             # momentum error can never fail the week. Regular season only — EOS/tourney
             # games (week_games_meta present) don't carry season momentum streaks.
-            if _franchise_all_games_full_sim() and week not in ft.EOS_WEEKS:
+            if week not in ft.EOS_WEEKS:
                 loser_oid = aid if home_score > away_score else hid
                 _s = time.time()
                 try:
@@ -11564,7 +11305,7 @@ def _append_franchise_week_news(
             user_conference,
         )
 
-    # PS game-results news publishes at distant-CPU training (see _franchise_training_distant_phase_only).
+    # PS game-results news publishes during the CPU-training completion phase.
     stories = [
         story
         for story in (
@@ -13226,7 +12967,7 @@ class FranchiseTrainingRequest(BaseModel):
     training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
 
 
-class FranchiseDistantTrainingRequest(BaseModel):
+class FranchiseCPUTrainingRequest(BaseModel):
     franchise_id: str
 
 
@@ -13326,142 +13067,26 @@ def _run_all_cpu_autotrain(
     return {"trained": trained, "skipped": skipped, "errors": errored, "seconds": round(_elapsed, 2)}
 
 
-def _apply_franchise_distant_cpu_training(
+def _apply_franchise_cpu_training(
     franchise_id: ObjectId,
     *,
     franchise_doc: dict,
     user_team_id_str: str,
     week: int,
     is_first_training: bool,
-    franchise_players: dict,
 ) -> None:
-    """Template-based distant CPU training for all non-user FTDs. Idempotent per FTD via cpu_distant_trained_week."""
-    # Sunset switch (default OFF): route to REAL per-team auto-train instead of template deltas.
-    if _franchise_all_teams_autotrain():
-        _run_all_cpu_autotrain(
-            franchise_id,
-            franchise_doc=franchise_doc,
-            user_team_id_str=user_team_id_str,
-            week=week,
-            is_first_training=is_first_training,
-        )
-        return
-    all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
-    training_type = "tc" if is_first_training else "regular"
-    eliminated_team_ids = set()
-    if week > ScheduleManager.REGULAR_SEASON_WEEKS and franchise_doc.get("eos_tournament_active"):
-        eliminated_team_ids = ft.get_eliminated_team_ids(franchise_doc)
-    distant_templates = list(db["distant_training"].find({"training_type": training_type}))
-    if not distant_templates:
-        logger.warning(
-            f"⚠️ [DISTANT TRAINING] No templates found for training_type={training_type}, skipping computer teams"
-        )
-        return
-    for ftd_doc in all_ftd_docs:
-        computer_team_oid = ftd_doc.get("team_id")
-        if computer_team_oid is None:
-            continue
-        computer_team_id_str = str(computer_team_oid)
-        if computer_team_id_str == str(user_team_id_str):
-            continue
-        if computer_team_id_str in eliminated_team_ids:
-            continue
-        if int(ftd_doc.get("cpu_distant_trained_week") or 0) == week:
-            continue
-        try:
-            template = random.choice(distant_templates)
-            team_values = template.get("team_values", {})
-            players_template = template.get("players", {})
-            current_team_attrs = ftd_doc.get("team_attributes", {})
-            ftd_update = {}
-            for attr_name, delta in team_values.items():
-                if attr_name not in TEAM_ATTR_CLAMPS:
-                    continue
-                current = current_team_attrs.get(attr_name, 0)
-                if isinstance(current, (int, float)) and isinstance(delta, (int, float)):
-                    lower, upper = TEAM_ATTR_CLAMPS[attr_name]
-                    delta_val = float(delta) if attr_name == "rebound_modifier" else int(delta)
-                    new_val = current + delta_val
-                    if upper is not None:
-                        new_val = max(lower, min(upper, new_val))
-                    else:
-                        new_val = max(lower, new_val)
-                    if attr_name == "rebound_modifier":
-                        new_val = round(new_val, 2)
-                    else:
-                        new_val = int(round(new_val))
-                    ftd_update[f"team_attributes.{attr_name}"] = new_val
-            set_payload = dict(ftd_update)
-            if template.get("community_engagement"):
-                set_payload["pending_community_engagement"] = True
-            if set_payload:
-                franchise_team_data_collection.update_one(
-                    {"franchise_id": franchise_id, "team_id": computer_team_oid},
-                    {"$set": set_payload},
-                )
-            player_order = ftd_doc.get("players")
-            if not player_order:
-                team_doc = db.teams.find_one({"_id": computer_team_oid}, {"player_ids": 1})
-                player_order = [str(pid) for pid in (team_doc.get("player_ids") or [])] if team_doc else []
-            else:
-                player_order = [str(pid) for pid in player_order]
-            for i in range(min(12, len(player_order))):
-                pid = player_order[i]
-                player_key = f"player_{i}"
-                if player_key not in players_template:
-                    continue
-                fpd = franchise_players.get(pid)
-                if not fpd:
-                    continue
-                deltas = players_template[player_key]
-                current_attrs = fpd.get("attributes", {})
-                fpd_set = {}
-                for attr_name, delta in deltas.items():
-                    if not isinstance(delta, (int, float)):
-                        continue
-                    current = current_attrs.get(attr_name, 0) or current_attrs.get(f"anchor_{attr_name}", 0)
-                    try:
-                        cur = int(current) if isinstance(current, (int, float)) else 0
-                    except (TypeError, ValueError):
-                        cur = 0
-                    new_val = cur + int(delta)
-                    new_val = max(PLAYER_ATTR_CLAMP[0], new_val)
-                    fpd_set[f"attributes.{attr_name}"] = new_val
-                    fpd_set[f"attributes.anchor_{attr_name}"] = new_val
-                if fpd_set:
-                    franchise_players_data_collection.update_one(
-                        {"franchise_id": str(franchise_id), "player_id": pid},
-                        {"$set": fpd_set},
-                    )
-                core_player = db.players.find_one({"_id": pid}, {"height": 1})
-                height = core_player.get("height") if core_player else None
-                updated_attrs = dict(current_attrs)
-                for k, v in fpd_set.items():
-                    if k.startswith("attributes."):
-                        updated_attrs[k.replace("attributes.", "")] = v
-                meta = fpd.get("meta", {})
-                player_for_ratings = {
-                    "attributes": updated_attrs,
-                    "height": height,
-                    "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}",
-                }
-                new_ratings = compute_position_ratings(player_for_ratings)
-                franchise_players_data_collection.update_one(
-                    {"franchise_id": str(franchise_id), "player_id": pid},
-                    {"$set": {"position_ratings": new_ratings}},
-                )
-            franchise_team_data_collection.update_one(
-                {"franchise_id": franchise_id, "team_id": computer_team_oid},
-                {"$set": {"cpu_distant_trained_week": week}},
-            )
-            logger.info(f"✅ [DISTANT TRAINING] Applied template for team_id={computer_team_id_str}")
-        except Exception as e:
-            logger.error(f"❌ [DISTANT TRAINING] Error for team_id={computer_team_id_str}: {e}", exc_info=True)
-            continue
+    """Run authoritative per-team CPU auto-training for all eligible teams."""
+    _run_all_cpu_autotrain(
+        franchise_id,
+        franchise_doc=franchise_doc,
+        user_team_id_str=user_team_id_str,
+        week=week,
+        is_first_training=is_first_training,
+    )
 
 
-def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
-    """Finish franchise week training: distant CPU teams + optional camp cuts + training_completed."""
+def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
+    """Finish franchise week training: CPU teams, camp cuts, PS work, and completion."""
     try:
         franchise_id = ObjectId(franchise_id_str)
     except Exception:
@@ -13523,16 +13148,12 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
         raise HTTPException(status_code=404, detail="User team not found in franchise document")
     team_id = user_team_object_id
 
-    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": franchise_id_str}))
-    franchise_players = {d["player_id"]: d for d in fpd_docs}
-
-    _apply_franchise_distant_cpu_training(
+    _apply_franchise_cpu_training(
         franchise_id,
         franchise_doc=franchise_doc,
         user_team_id_str=str(team_id),
         week=week,
         is_first_training=is_first_training,
-        franchise_players=franchise_players,
     )
 
     cuts_ran_this_call = False
@@ -13783,7 +13404,7 @@ def run_franchise_training_user(
     user: dict = Depends(get_current_user),
     profile: bool = False,
 ):
-    """Persist user-team training only. Client should call /franchise/run-training/distant-cpu next."""
+    """Persist user-team training only. Client should call the CPU-training phase next."""
     verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
     if profile:
         from BackEnd.utils.profiling import run_profiled
@@ -13801,13 +13422,14 @@ def run_franchise_training_user(
     return _run_franchise_training_impl(req, phase="user_only")
 
 
-@router.post("/franchise/run-training/distant-cpu")
-def run_franchise_training_distant_cpu(
-    req: FranchiseDistantTrainingRequest,
+@router.post("/franchise/run-training/cpu-train")
+@router.post("/franchise/run-training/distant-cpu", include_in_schema=False)
+def run_franchise_training_cpu_train(
+    req: FranchiseCPUTrainingRequest,
     user: dict = Depends(get_current_user),
     profile: bool = False,
 ):
-    """Apply distant CPU template training, camp cuts (week 1), and set training_completed."""
+    """Run CPU auto-training, camp cuts, Practice Squad work, and mark completion."""
     verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
     if profile:
         from BackEnd.utils.profiling import run_profiled
@@ -13815,14 +13437,14 @@ def run_franchise_training_distant_cpu(
         _out = [None]
 
         def _wrapped():
-            _out[0] = _franchise_training_distant_phase_only(req.franchise_id)
+            _out[0] = _franchise_training_cpu_phase_only(req.franchise_id)
 
         profile_summary = run_profiled(_wrapped, top_n=60)
         result = _out[0]
         if isinstance(result, dict):
             result["profile_summary"] = profile_summary
         return result
-    return _franchise_training_distant_phase_only(req.franchise_id)
+    return _franchise_training_cpu_phase_only(req.franchise_id)
 
 
 def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = "full"):
@@ -13887,7 +13509,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         if franchise_user_training_applied_for_week(training_status, week) and int(
             training_status.get("cpu_distant_complete_week") or 0
         ) != week:
-            return _franchise_training_distant_phase_only(req.franchise_id)
+            return _franchise_training_cpu_phase_only(req.franchise_id)
     elif phase == "user_only":
         if franchise_training_fully_complete_for_week(training_status, week):
             user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
@@ -14366,13 +13988,12 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             "redirect": None,
         }
 
-    _apply_franchise_distant_cpu_training(
+    _apply_franchise_cpu_training(
         franchise_id,
         franchise_doc=franchise_doc,
         user_team_id_str=str(team_id),
         week=week,
         is_first_training=is_first_training,
-        franchise_players=franchise_players,
     )
 
     cuts_ran_this_call = False
@@ -15071,27 +14692,6 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             raise HTTPException(status_code=400, detail="No games in current EOS round.")
 
     _user_team_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
-    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
-    ftd_docs = list(franchise_team_data_collection.find(
-        {"franchise_id": franchise_id},
-        {
-            "team_id": 1,
-            "players": 1,
-            "prestige": 1,
-            "total_player_attrs": 1,
-            "natl_rank": 1,
-            "team_attributes.team_chemistry": 1,
-            "team_attributes.momentum_score": 1,
-            "team_attributes.distant_win_streak": 1,
-            "team_attributes.distant_loss_streak": 1,
-            "team_attributes.offensive_efficiency": 1,
-            "team_attributes.defensive_efficiency": 1,
-            "team_attributes.shot_threshold": 1,
-        },
-    ))
-    ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
-    distant_fpd_by_player_id = _distant_sim_batch_fpd_map(franchise_id, ftd_by_team_id)
-    distant_rs_standings = _distant_sim_regular_season_standings(franchise_doc, ftd_by_team_id)
 
     results = []
     for g in week_games_meta:
@@ -15101,62 +14701,6 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
         home_name = home_doc.get("name", "")
         away_name = away_doc.get("name", "")
-        if not _should_use_tbt_for_eos_game(week, g, user_eos_sim_scope):
-            home_ftd = ftd_by_team_id.get(str(home_id), {})
-            away_ftd = ftd_by_team_id.get(str(away_id), {})
-            home_combined = _distant_sim_team_combined(
-                home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-            )
-            away_combined = _distant_sim_team_combined(
-                away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-            )
-            home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
-            winner_id = home_id if home_score > away_score else away_id
-            ftp.record_tournament_game_result(
-                franchise_doc,
-                g,
-                week=week,
-                franchise_id_str=str(franchise_id),
-                game_id=None,
-                team1_id=away_id,
-                team2_id=home_id,
-                team1_score=away_score,
-                team2_score=home_score,
-                source="distant",
-            )
-            results.append({
-                "away_id": str(away_id),
-                "home_id": str(home_id),
-                "away_score": away_score,
-                "home_score": home_score,
-            })
-            maybe_award_franchise_win_geek_points(
-                owner_user_id=franchise_doc.get("user_id"),
-                user_team_id_str=user_team_id_str,
-                winner_team_id=winner_id,
-                week=week,
-                eos_game_meta=g,
-            )
-            maybe_award_franchise_loss_geek_points(
-                owner_user_id=franchise_doc.get("user_id"),
-                user_team_id_str=user_team_id_str,
-                winner_team_id=winner_id,
-                participant_team_ids=(away_id, home_id),
-                week=week,
-                eos_game_meta=g,
-            )
-            maybe_award_franchise_eos_title_championship(
-                owner_user_id=franchise_doc.get("user_id"),
-                user_team_id_str=user_team_id_str,
-                winner_team_id=winner_id,
-                week=week,
-                eos_game_meta=g,
-            )
-            logger.info("✅ [EOS] Distant-simmed %s: %s vs %s", g["phase"], away_id, home_id)
-            continue
-
         if not home_name or not away_name:
             logger.error("❌ [EOS] Missing team names for sim round")
             continue

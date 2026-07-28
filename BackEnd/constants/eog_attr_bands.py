@@ -121,7 +121,7 @@ CHEM_LOSE_TO_HIGHER_NON_TOP10 = (-2, 0)
 CHEM_LOSE_TO_100_128 = (-5, -3)
 CHEM_LOSE_TO_OTHER_LOWER = (-3, -2)
 
-# distant-sim uniform band (LEAVE — distant is live behind FRANCHISE_ALL_GAMES_FULL_SIM)
+# Historical distant-sim uniform band (retained until the EOG cleanup phase).
 DISTANT_UNIFORM = (-2, 1)
 
 # ─────────────────────────────────────────────────────────────────────────────

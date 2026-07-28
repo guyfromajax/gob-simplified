@@ -1,10 +1,12 @@
 # Distant Systems — Final Sunset and Removal Plan
 
-**Status:** Master plan, reconciled 2026-07-28.
+**Status:** Phase 2 implemented on `codex/distant-sunset-phase2`; verification pending prototype.
 **Scope:** Distant franchise game simulation **and** distant/template CPU training.
-**Implementation status:** Both replacements exist, but the repository still defaults to the
-legacy systems when their semantic environment flags are absent. No distant code or data may be
-deleted until the rollout gates below have been satisfied in the deployed environments.
+**Implementation status:** Full turn-by-turn CPU games and real CPU auto-training are now
+authoritative in source. The two semantic environment flags and their routing branches are gone.
+The old CPU-training URL remains as a hidden compatibility alias. Legacy completion/resume field
+names and distant momentum fields remain deliberately deferred; no distant files or database data
+have been deleted yet.
 
 This document supersedes separate game-sim and training removal notes. It is the single execution
 plan for both systems.
@@ -143,6 +145,12 @@ Do not begin deletion.
 
 **Purpose:** Make the validated replacements authoritative in code before deleting their fallbacks.
 
+**Implementation checkpoint (2026-07-28):** Complete in source. A fresh pre-change reference was
+cut with `PYTHONHASHSEED=0`, seed `20260720`, and four CPU games. The matching post-change arm was
+byte-identical across all eight team-stat rows and both arms reported zero global RNG leaks.
+Focused EOS routing and training-state tests pass. Prototype validation remains required before
+Phase 3 deletion.
+
 ### Games
 
 1. Route every non-user CPU matchup directly into the full-job pipeline.
@@ -157,16 +165,16 @@ Do not begin deletion.
 
 1. Rename `_apply_franchise_distant_cpu_training` to a neutral CPU-training orchestration name.
 2. Route it unconditionally to `_run_all_cpu_autotrain`.
-3. Rename the `/franchise/run-training/distant-cpu` endpoint and frontend caller to a neutral
-   CPU-training name.
+3. Add `/franchise/run-training/cpu-train` and move the frontend caller to it. Retain
+   `/franchise/run-training/distant-cpu` temporarily as a hidden compatibility alias.
 4. Remove `_franchise_all_teams_autotrain()` and
    `FRANCHISE_ALL_TEAMS_AUTOTRAIN`.
-5. Rename completion/resume state:
-   - `training_status.cpu_distant_complete_week` → `cpu_autotrain_complete_week`
-   - other `distant_training_resume` / `cpu_distant_*` orchestration names → `cpu_autotrain_*`
-6. Existing active franchises must cross the rename safely. Use either a one-release dual-read
-   compatibility window or a narrowly scoped migration; choose and document the method before
-   implementation. Do not silently strand an in-progress training week.
+5. Defer completion/resume state renames:
+   - `training_status.cpu_distant_complete_week`
+   - `cpu_distant_trained_week`
+   - `distant_training_resume`
+6. Do not migrate or dual-write those fields during the routing collapse. Their existing names
+   preserve in-progress franchise compatibility and will be handled as a separate B8 cleanup.
 
 ### Phase 2 exit gate
 
