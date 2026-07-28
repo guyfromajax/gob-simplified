@@ -24,6 +24,18 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
         # Find the team document by name
         team_query_start = time.time()
         team_doc = teams_collection.find_one({"name": team_name})
+        # Team Builder: custom display name won't match core teams.name — resolve via overlay.
+        if not team_doc and franchise_id:
+            try:
+                from BackEnd.utils.franchise_team_display import get_team_builder_overlay
+
+                overlay = get_team_builder_overlay(franchise_id)
+                if overlay and str(overlay.get("name") or "").strip() == str(team_name or "").strip():
+                    replaced = overlay.get("replaced_object_id")
+                    if replaced:
+                        team_doc = teams_collection.find_one({"_id": ObjectId(str(replaced))})
+            except Exception:
+                pass
         team_query_time = (time.time() - team_query_start) * 1000
         # logger.warning(f"⏱️ [DB TIMING] teams_collection.find_one(name={team_name}): {team_query_time:.2f}ms")
         

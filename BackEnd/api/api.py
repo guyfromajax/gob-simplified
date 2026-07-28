@@ -522,6 +522,9 @@ try:
         game_id: str | None = None
         home_team: str
         away_team: str
+        # Franchise structural identity (ObjectId strings). Prefer over display names for matchup checks.
+        home_id: str | None = None
+        away_id: str | None = None
         quarter: int = 1
         home_lineup: dict[str, str] | None = None
         away_lineup: dict[str, str] | None = None
@@ -565,6 +568,37 @@ try:
             return None
         method = str(value).strip().lower()
         return method if method in VALID_ADVANCE_METHODS else None
+
+    def _request_side_matches_gm_team(request_name: str | None, request_id: str | None, gm_team) -> bool:
+        """Match a request side to a live GM team by ObjectId/slug first, display name second.
+
+        Team Builder overlays rename ``gm_team.name`` (e.g. Hardwood Fields → Hanson) while
+        schedule/FTD identity stays the slot ObjectId / slug. Name-only equality bricks sim.
+        """
+        from BackEnd.utils.franchise_geek_points import teams_match_for_franchise
+
+        gm_tid = getattr(gm_team, "team_id", None)
+        gm_name = getattr(gm_team, "name", None)
+        if request_id and gm_tid and teams_match_for_franchise(request_id, gm_tid):
+            return True
+        if request_name and gm_name and request_name == gm_name:
+            return True
+        if request_name and gm_tid and teams_match_for_franchise(request_name, gm_tid):
+            return True
+        if request_id and gm_name and teams_match_for_franchise(request_id, gm_name):
+            return True
+        return False
+
+    def _request_matchup_matches_gm(body, gm) -> bool:
+        return _request_side_matches_gm_team(
+            getattr(body, "home_team", None),
+            getattr(body, "home_id", None),
+            gm.home_team,
+        ) and _request_side_matches_gm_team(
+            getattr(body, "away_team", None),
+            getattr(body, "away_id", None),
+            gm.away_team,
+        )
 
     def _apply_bulk_sim_metadata(summary: dict, body: QuarterSimulationRequest, previous_doc: dict | None = None) -> bool:
         """Persist sticky user bulk-sim metadata onto a game summary.
@@ -821,17 +855,37 @@ try:
         from bson import ObjectId
         
         try:
-            # Resolve Mongo team _id: explicit team_id (init-game often passes None), invalid ObjectId, or name-only.
+            # Resolve Mongo team _id: explicit team_id (ObjectId), invalid ObjectId, or name-only.
             team_object_id = None
             if team_id:
                 try:
                     team_object_id = ObjectId(team_id)
                 except Exception:
                     team_object_id = None
+                # Slug / non-ObjectId refs (e.g. HARDWOOD_FIELDS)
+                if not team_object_id and team_id:
+                    from BackEnd.utils.franchise_geek_points import _resolve_to_object_id_str
+                    resolved = _resolve_to_object_id_str(team_id)
+                    if resolved:
+                        try:
+                            team_object_id = ObjectId(resolved)
+                        except Exception:
+                            team_object_id = None
             if not team_object_id and team_name:
                 team_doc = teams_collection.find_one({"name": team_name})
                 if team_doc:
                     team_object_id = team_doc.get("_id")
+                else:
+                    # Team Builder: custom display name won't match core teams.name
+                    try:
+                        from BackEnd.utils.franchise_team_display import get_team_builder_overlay
+                        overlay = get_team_builder_overlay(franchise_id)
+                        if overlay and str(overlay.get("name") or "").strip() == str(team_name or "").strip():
+                            replaced = overlay.get("replaced_object_id")
+                            if replaced:
+                                team_object_id = ObjectId(str(replaced))
+                    except Exception:
+                        pass
             if not team_object_id:
                 return None
             
@@ -2794,9 +2848,10 @@ try:
             # Game is in memory - return settings from GameManager
             # Determine which team
             target_team = None
-            if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+            from BackEnd.utils.franchise_geek_points import gm_team_matches_ref
+            if gm_team_matches_ref(gm.home_team, team_id):
                 target_team = gm.home_team
-            elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+            elif gm_team_matches_ref(gm.away_team, team_id):
                 target_team = gm.away_team
             
             if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
@@ -2968,18 +3023,20 @@ try:
             # Preserve user_team_side from in-memory game
             if gm and gm.game_state.get("user_team_side"):
                 preserved_user_team_side = gm.game_state.get("user_team_side")
-            if gm is not None and (
-                body.home_team != gm.home_team.name
-                or body.away_team != gm.away_team.name
-            ):
+            if gm is not None and not _request_matchup_matches_gm(body, gm):
                 if debug:
                     logging.debug(
-                        "simulate_quarter_endpoint team mismatch: game_id=%s expected=%s vs %s got=%s vs %s",
+                        "simulate_quarter_endpoint team mismatch: game_id=%s expected=%s/%s vs %s/%s "
+                        "got names=%s vs %s ids=%s vs %s",
                         game_id,
                         gm.home_team.name,
+                        gm.home_team.team_id,
                         gm.away_team.name,
+                        gm.away_team.team_id,
                         body.home_team,
                         body.away_team,
+                        getattr(body, "home_id", None),
+                        getattr(body, "away_id", None),
                     )
                 raise HTTPException(
                     status_code=400,
@@ -3862,12 +3919,12 @@ try:
 
                             home_ftd = load_ftd_data_for_team(
                                 body.franchise_id,
-                                None,  # team_id will be resolved from team_name
+                                getattr(body, "home_id", None),
                                 body.home_team
                             )
                             away_ftd = load_ftd_data_for_team(
                                 body.franchise_id,
-                                None,  # team_id will be resolved from team_name
+                                getattr(body, "away_id", None),
                                 body.away_team
                             )
                             home_prepared = prepare_ftd_for_new_game(home_ftd)
@@ -3895,6 +3952,8 @@ try:
                                 body.home_team,
                                 body.away_team,
                                 body.user_team_side,
+                                home_id=getattr(body, "home_id", None),
+                                away_id=getattr(body, "away_id", None),
                             )
                         gm = GameManager(
                             body.home_team, 
@@ -6882,6 +6941,8 @@ try:
 
         home_team = request.get("home_team")
         away_team = request.get("away_team")
+        home_id = request.get("home_id")
+        away_id = request.get("away_id")
         mode = request.get("mode", "single")
         tournament_id = request.get("tournament_id")
         franchise_id = request.get("franchise_id")
@@ -6889,6 +6950,22 @@ try:
         
         if not home_team or not away_team:
             raise HTTPException(status_code=400, detail="home_team and away_team required")
+
+        # Franchise + TB: prefer ObjectId for FTD load; resolve display names for GM construction
+        # so score maps / chrome use Hanson (not Hardwood Fields) when overlay is present.
+        if mode == "franchise" and franchise_id and (home_id or away_id):
+            try:
+                from BackEnd.utils.franchise_team_display import resolve_team_display
+                if home_id:
+                    home_disp = resolve_team_display(franchise_id, home_id)
+                    if home_disp.get("name"):
+                        home_team = home_disp["name"]
+                if away_id:
+                    away_disp = resolve_team_display(franchise_id, away_id)
+                    if away_disp.get("name"):
+                        away_team = away_disp["name"]
+            except Exception:
+                pass
         
         # ✅ SS&S: Load playbook_settings for single mode only (franchise/tournament mode loads from their documents during gameplay)
         # For franchise/tournament mode, _load_playbook_settings() loads directly from franchise/tournament documents
@@ -6914,6 +6991,7 @@ try:
 
             ce_crowd_shift = consume_franchise_community_engagement_for_matchup(
                 franchise_id, home_team, away_team, user_team_side,
+                home_id=home_id, away_id=away_id,
             )
 
         home_team_attributes = None
@@ -6932,8 +7010,8 @@ try:
 
             _refresh_cpu_playbooks_for_franchise_game_init(str(franchise_id))
 
-            home_ftd_row = load_ftd_data_for_team(franchise_id, None, home_team)
-            away_ftd_row = load_ftd_data_for_team(franchise_id, None, away_team)
+            home_ftd_row = load_ftd_data_for_team(franchise_id, home_id, home_team)
+            away_ftd_row = load_ftd_data_for_team(franchise_id, away_id, away_team)
             if not home_ftd_row:
                 logging.warning(
                     "⚠️ [INIT-GAME] No FTD row for home team=%s franchise_id=%s",
@@ -7051,9 +7129,9 @@ try:
         gm_time = (time.time() - gm_start) * 1000
         
         # Create minimal game document with players
-        # CRITICAL: Ensure scores are zeroed before summarizing
+        # CRITICAL: Ensure scores are zeroed before summarizing (use GM display names after TB overlay)
         summary_start = time.time()
-        gm.score = {home_team: 0, away_team: 0}
+        gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}
         summary = summarize_game_state(gm, exclude_animations=True)
         try:
             _ts = summary.get("teams") or {}

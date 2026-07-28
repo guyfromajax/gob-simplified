@@ -21,6 +21,13 @@ const awayTeam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('away'
 const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
 let myTeamSide = urlParams.get('my_team');
+
+/** Attach structural ObjectIds when present (Team Builder franchise matchup identity). */
+function attachMatchupTeamIds(payload) {
+  if (homeId) payload.home_id = homeId;
+  if (awayId) payload.away_id = awayId;
+  return payload;
+}
 // FT shooter lock: when the first turn out of Set Lineup is a free throw, the
 // designated shooter cannot be removed from the active lineup (reorder still ok).
 // See Timeout_System.md § Designated Free Throw Shooter Lock.
@@ -364,7 +371,12 @@ if (gameId && quarter === 1 && !urlParams.has('resume_from_timeout')) {
   // (Backend will create new game_id via init-game)
   const storedHome = typeof localStorage !== 'undefined' ? localStorage.getItem('game_home') : null;
   const storedAway = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null;
-  const isNewMatchup = storedHome && storedAway && (storedHome !== homeTeam || storedAway !== awayTeam);
+  const storedHomeId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_home_id') : null;
+  const storedAwayId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away_id') : null;
+  // Prefer ObjectId identity when both sides have ids; fall back to display names.
+  const isNewMatchup = (homeId && awayId && storedHomeId && storedAwayId)
+    ? (storedHomeId !== homeId || storedAwayId !== awayId)
+    : (storedHome && storedAway && (storedHome !== homeTeam || storedAway !== awayTeam));
   
   if (isNewMatchup) {
     // Teams changed = definitely a new matchup, clear game_id from URL
@@ -378,12 +390,16 @@ if (gameId && quarter === 1 && !urlParams.has('resume_from_timeout')) {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('game_home', homeTeam || '');
       localStorage.setItem('game_away', awayTeam || '');
+      if (homeId) localStorage.setItem('game_home_id', homeId);
+      if (awayId) localStorage.setItem('game_away_id', awayId);
     }
   } else {
     // Teams match, update stored teams
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('game_home', homeTeam || '');
       localStorage.setItem('game_away', awayTeam || '');
+      if (homeId) localStorage.setItem('game_home_id', homeId);
+      if (awayId) localStorage.setItem('game_away_id', awayId);
     }
   }
 }
@@ -796,6 +812,7 @@ async function loadRoster() {
         away_team: awayTeam,
         mode: mode
       };
+      attachMatchupTeamIds(initPayload);
       
       // ✅ CRITICAL: Pass user_team_side to init-game so GameManager can set is_user_team flags
       // This ensures user team settings are protected from autoset_strategy_settings()
@@ -826,6 +843,8 @@ async function loadRoster() {
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('game_home', homeTeam);
           localStorage.setItem('game_away', awayTeam);
+          if (homeId) localStorage.setItem('game_home_id', homeId);
+          if (awayId) localStorage.setItem('game_away_id', awayId);
         }
         
         // ✅ SS&S: URL is the source of truth - update URL with gameId (without page reload)
@@ -1873,12 +1892,23 @@ function resolveTeam() {
   // For single game mode, my_team ('home' or 'away') should be in URL
   const storedId = userTeamIdParam || teamIdParam;
   if (storedId) {
-    if (storedId === homeId || storedId === homeTeam) {
+    if (homeId && storedId === homeId) {
       myTeamSide = 'home';
       teamName = homeTeam;
       return true;
     }
-    if (storedId === awayId || storedId === awayTeam) {
+    if (awayId && storedId === awayId) {
+      myTeamSide = 'away';
+      teamName = awayTeam;
+      return true;
+    }
+    // Name fallback for legacy URLs without home_id/away_id
+    if (storedId === homeTeam) {
+      myTeamSide = 'home';
+      teamName = homeTeam;
+      return true;
+    }
+    if (storedId === awayTeam) {
       myTeamSide = 'away';
       teamName = awayTeam;
       return true;
@@ -2092,6 +2122,7 @@ function wireLineupNavButtons() {
         try {
           const mode = modeParam || 'single';
           const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: mode };
+          attachMatchupTeamIds(initPayload);
           if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
           else if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
           const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
@@ -2404,6 +2435,7 @@ async function init() {
           initGameInProgress = true;
           try {
             const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: 'single' };
+            attachMatchupTeamIds(initPayload);
             if (myTeamSide) initPayload.user_team_side = myTeamSide;
             const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
               method: 'POST',

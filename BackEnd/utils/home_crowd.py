@@ -91,11 +91,45 @@ def _team_object_ids_for_names(home_team_name: str, away_team_name: str) -> Tupl
     return home_oid, away_oid
 
 
+def _team_object_id_from_ref(team_id: Any = None, team_name: str | None = None, franchise_id: Any = None) -> Any:
+    """Resolve ObjectId from explicit id, core name, or Team Builder overlay name."""
+    from bson import ObjectId
+
+    from BackEnd.db import teams_collection
+    from BackEnd.utils.franchise_geek_points import _resolve_to_object_id_str
+
+    if team_id is not None:
+        resolved = _resolve_to_object_id_str(team_id)
+        if resolved:
+            try:
+                return ObjectId(resolved)
+            except Exception:
+                pass
+    if team_name:
+        doc = teams_collection.find_one({"name": team_name}, {"_id": 1})
+        if doc:
+            return doc["_id"]
+        if franchise_id:
+            try:
+                from BackEnd.utils.franchise_team_display import get_team_builder_overlay
+
+                overlay = get_team_builder_overlay(franchise_id)
+                if overlay and str(overlay.get("name") or "").strip() == str(team_name).strip():
+                    replaced = overlay.get("replaced_object_id")
+                    if replaced:
+                        return ObjectId(str(replaced))
+            except Exception:
+                pass
+    return None
+
+
 def consume_franchise_community_engagement_for_matchup(
     franchise_id: Any,
     home_team_name: str,
     away_team_name: str,
     user_team_side: str | None,
+    home_id: Any = None,
+    away_id: Any = None,
 ) -> str:
     """
     Franchise only: read pending Community Engagement on both FTDs, compute crowd_shift, clear both flags.
@@ -111,7 +145,11 @@ def consume_franchise_community_engagement_for_matchup(
         fid_oid = ObjectId(str(franchise_id))
     except Exception:
         return "none"
-    home_oid, away_oid = _team_object_ids_for_names(home_team_name, away_team_name)
+    home_oid = _team_object_id_from_ref(home_id, home_team_name, franchise_id)
+    away_oid = _team_object_id_from_ref(away_id, away_team_name, franchise_id)
+    if home_oid is None or away_oid is None:
+        # Legacy name-only path
+        home_oid, away_oid = _team_object_ids_for_names(home_team_name, away_team_name)
     if home_oid is None or away_oid is None:
         return "none"
 

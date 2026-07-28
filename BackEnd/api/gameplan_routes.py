@@ -9,6 +9,7 @@ from typing import Optional
 from BackEnd.db import db, games_collection, franchise_team_data_collection, players_collection, tournaments_collection, franchises_collection
 from BackEnd.api.franchise_routes import get_user_team_from_franchise
 from BackEnd.api.tournament_routes import get_user_team_from_tournament
+from BackEnd.utils.franchise_geek_points import gm_team_matches_ref
 from BackEnd.utils.team_id_resolver import resolve_team_id_to_canonical as unified_resolve_team_id_to_canonical
 from BackEnd.utils.defense_identity import (
     PLAYBOOK_MAN_KEY_TO_DEFENSE_ID,
@@ -1439,9 +1440,9 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 if gm:
                     # Determine which team
                     target_team = None
-                    if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                    if gm_team_matches_ref(gm.home_team, team_id):
                         target_team = gm.home_team
-                    elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                    elif gm_team_matches_ref(gm.away_team, team_id):
                         target_team = gm.away_team
                     
                     if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
@@ -1696,9 +1697,9 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
                 # GameManager has settings - we'll use them directly later
                 # Still need to get actual_team_id for logging purposes
                 target_team = None
-                if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                if gm_team_matches_ref(gm.home_team, team_id):
                     actual_team_id = gm.home_team.team_id
-                elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                elif gm_team_matches_ref(gm.away_team, team_id):
                     actual_team_id = gm.away_team.team_id
             else:
                 # GameManager not available - use load_team_settings_from_doc() (same logic as game start)
@@ -1732,9 +1733,9 @@ def get_gameplan(mode: str, team_id: str, franchise_id: str = None, tournament_i
         if mode in ("single", "tutorial") and use_gamemanager_settings and gm:
             # Use GameManager settings (already verified above)
             target_team = None
-            if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+            if gm_team_matches_ref(gm.home_team, team_id):
                 target_team = gm.home_team
-            elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+            elif gm_team_matches_ref(gm.away_team, team_id):
                 target_team = gm.away_team
 
             if target_team and hasattr(target_team, 'strategy_settings') and target_team.strategy_settings:
@@ -1934,9 +1935,9 @@ def get_playbooks(
                     if gm:
                         # Determine which team
                         target_team = None
-                        if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                        if gm_team_matches_ref(gm.home_team, team_id):
                             target_team = gm.home_team
-                        elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                        elif gm_team_matches_ref(gm.away_team, team_id):
                             target_team = gm.away_team
                         
                         if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
@@ -2699,9 +2700,9 @@ def get_playbooks(
         if mode == "single" and use_gamemanager_settings and gm:
             # Use GameManager settings (already verified above)
             target_team = None
-            if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+            if gm_team_matches_ref(gm.home_team, team_id):
                 target_team = gm.home_team
-            elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+            elif gm_team_matches_ref(gm.away_team, team_id):
                 target_team = gm.away_team
             
             if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
@@ -2814,9 +2815,9 @@ def get_playbooks(
                 )
             if mode == "single" and use_gamemanager_settings and gm:
                 target_team = None
-                if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+                if gm_team_matches_ref(gm.home_team, team_id):
                     target_team = gm.home_team
-                elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+                elif gm_team_matches_ref(gm.away_team, team_id):
                     target_team = gm.away_team
                 if target_team and hasattr(target_team, "playbook_settings"):
                     target_team.playbook_settings = dict(playbook_settings)
@@ -3216,9 +3217,9 @@ def save_playbooks(request: PlaybookSettingsRequest):
                     from BackEnd.api.api import ongoing_games
                     gm = ongoing_games.get(request.game_id)
                     if gm:
-                        if gm.home_team.team_id == plays_team_id or gm.home_team.name == request.team_id:
+                        if gm_team_matches_ref(gm.home_team, plays_team_id) or gm_team_matches_ref(gm.home_team, request.team_id):
                             gm.home_team.plays = dict(current_plays)
-                        elif gm.away_team.team_id == plays_team_id or gm.away_team.name == request.team_id:
+                        elif gm_team_matches_ref(gm.away_team, plays_team_id) or gm_team_matches_ref(gm.away_team, request.team_id):
                             gm.away_team.plays = dict(current_plays)
                 except Exception:
                     pass

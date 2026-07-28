@@ -1067,6 +1067,10 @@ export function createGameScene(Phaser) {
       }
       
       const payload = { home_team: homeTeam, away_team: awayTeam, quarter: this.quarter };
+      const urlHomeId = urlParams.get('home_id');
+      const urlAwayId = urlParams.get('away_id');
+      if (urlHomeId) payload.home_id = urlHomeId;
+      if (urlAwayId) payload.away_id = urlAwayId;
       const hRim = urlParams.get('home_rim_runner_player_id');
       const aRim = urlParams.get('away_rim_runner_player_id');
       if (hRim) payload.home_rim_runner_player_id = hRim;

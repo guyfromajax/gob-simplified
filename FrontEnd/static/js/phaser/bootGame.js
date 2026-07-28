@@ -129,10 +129,18 @@ const bootGameParams = {
 const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
+const homeId = urlParams.get('home_id');
+const awayId = urlParams.get('away_id');
 // ✅ PHASE 1.1: Remove localStorage fallback - franchise_id must come from URL params only
 const queryFranchiseId = urlParams.get('franchise_id');
 const urlMode = urlParams.get('mode');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', queryFranchiseId || null) : (queryFranchiseId || null);
+
+function attachMatchupTeamIds(payload) {
+  if (homeId) payload.home_id = homeId;
+  if (awayId) payload.away_id = awayId;
+  return payload;
+}
 
 // ✅ PHASE 1.1: Fail loudly if franchise_id is required but missing
 if (!franchiseId && urlMode === 'franchise') {
@@ -525,8 +533,9 @@ function redirectResumeAnchorToSetLineup(resumeState) {
   const overrides = {
     home: resumeState.home_team_name || sourceParams.get('home') || homeTeam,
     away: resumeState.away_team_name || sourceParams.get('away') || awayTeam,
-    home_id: resumeState.home_team_id || sourceParams.get('home_id') || resumeState.home_team_name || homeTeam,
-    away_id: resumeState.away_team_id || sourceParams.get('away_id') || resumeState.away_team_name || awayTeam,
+    // Prefer ObjectIds; never fall back structural id slots to display names
+    home_id: resumeState.home_team_id || sourceParams.get('home_id') || homeId || '',
+    away_id: resumeState.away_team_id || sourceParams.get('away_id') || awayId || '',
     mode: sourceParams.get('mode') || mode,
     my_team: sourceParams.get('my_team') || userTeamSide || 'home',
     team_id: sourceParams.get('team_id') || teamId || '',
@@ -2089,6 +2098,7 @@ async function createFreshGameForPreAnchorQ1Refresh() {
     away_team: awayTeam,
     mode,
   };
+  attachMatchupTeamIds(initPayload);
   if (userTeamSide) initPayload.user_team_side = userTeamSide;
   if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
   if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
@@ -2542,6 +2552,7 @@ async function handleSimQuarter() {
       quarter: nextQuarter,
       game_id: gameId, // Always pass gameId for tournament games
     };
+    attachMatchupTeamIds(payload);
     
     // ✅ SS&S: Add mode and mode-specific IDs to payload (matches gameScene.js pattern)
     // This ensures backend sets correct mode on game document for finalize_game() processing
@@ -2713,8 +2724,8 @@ async function handleSimQuarter() {
       const params = new URLSearchParams();
       params.set('home', homeTeam);
       params.set('away', awayTeam);
-      params.set('home_id', urlParams.get('home_id') || homeTeam);
-      params.set('away_id', urlParams.get('away_id') || awayTeam);
+      if (urlParams.get('home_id') || homeId) params.set('home_id', urlParams.get('home_id') || homeId);
+      if (urlParams.get('away_id') || awayId) params.set('away_id', urlParams.get('away_id') || awayId);
       params.set('mode', mode);
       if (franchiseId) params.set('franchise_id', franchiseId);
       if (weekParam && !Number.isNaN(weekParam)) params.set('week', weekParam);
@@ -2900,6 +2911,7 @@ async function handleSimFullGame() {
         away_team: awayTeam,
         quarter: currentQ,
       };
+      attachMatchupTeamIds(payload);
       if (gId) payload.game_id = gId;
       
       // ✅ SS&S: Add mode and mode-specific IDs to payload (matches gameScene.js pattern)

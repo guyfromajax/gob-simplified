@@ -3947,9 +3947,13 @@ def play_next_game(
                 eos_meta["conference"] = g.get("conference")
             if g.get("region") is not None:
                 eos_meta["region"] = g.get("region")
+            from BackEnd.utils.franchise_team_display import resolve_team_display
+
+            home_disp = resolve_team_display(franchise_doc, home_id, core_doc=home_doc)
+            away_disp = resolve_team_display(franchise_doc, away_id, core_doc=away_doc)
             matchup = {
-                "home": home_doc.get("name", "") if home_doc else "",
-                "away": away_doc.get("name", "") if away_doc else "",
+                "home": home_disp.get("name") or (home_doc.get("name", "") if home_doc else ""),
+                "away": away_disp.get("name") or (away_doc.get("name", "") if away_doc else ""),
                 "home_id": str(home_id),
                 "away_id": str(away_id),
                 "week": manager.week,
@@ -3963,9 +3967,13 @@ def play_next_game(
                 if away_id == user_team_id or home_id == user_team_id:
                     away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
                     home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
+                    from BackEnd.utils.franchise_team_display import resolve_team_display
+
+                    home_disp = resolve_team_display(franchise_doc, home_id, core_doc=home_doc)
+                    away_disp = resolve_team_display(franchise_doc, away_id, core_doc=away_doc)
                     matchup = {
-                        "home": home_doc.get("name", ""),
-                        "away": away_doc.get("name", ""),
+                        "home": home_disp.get("name") or (home_doc.get("name", "") if home_doc else ""),
+                        "away": away_disp.get("name") or (away_doc.get("name", "") if away_doc else ""),
                         "home_id": str(home_id),
                         "away_id": str(away_id),
                         "week": manager.week,

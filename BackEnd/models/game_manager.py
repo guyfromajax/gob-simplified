@@ -44,7 +44,8 @@ class GameManager:
 
         # Recalculate position ratings for all players (attributes may have changed)
         self._update_position_ratings()
-        self.score = {home_team_name: 0, away_team_name: 0}
+        # Use TeamManager.name after overlay resolve (TB custom display), not constructor args.
+        self.score = {self.home_team.name: 0, self.away_team.name: 0}
         self.quarter = 1
         self.turns = []
         self.text_log = []

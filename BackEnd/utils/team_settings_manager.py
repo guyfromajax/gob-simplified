@@ -14,6 +14,7 @@ Key Functions:
 
 import logging
 from typing import Optional, Dict, Tuple
+from BackEnd.utils.franchise_geek_points import gm_team_matches_ref
 
 logger = logging.getLogger(__name__)
 
@@ -254,14 +255,14 @@ def save_team_settings(
             gm = ongoing_games.get(game_id)
             if gm:
                 if settings_type == "strategy_settings":
-                    if gm.home_team.team_id == actual_team_id or gm.home_team.name == team_id:
+                    if gm_team_matches_ref(gm.home_team, actual_team_id) or gm_team_matches_ref(gm.home_team, team_id):
                         gm.home_team.strategy_settings = dict(settings_data)
-                    elif gm.away_team.team_id == actual_team_id or gm.away_team.name == team_id:
+                    elif gm_team_matches_ref(gm.away_team, actual_team_id) or gm_team_matches_ref(gm.away_team, team_id):
                         gm.away_team.strategy_settings = dict(settings_data)
                 elif settings_type == "playbook_settings":
-                    if gm.home_team.team_id == actual_team_id or gm.home_team.name == team_id:
+                    if gm_team_matches_ref(gm.home_team, actual_team_id) or gm_team_matches_ref(gm.home_team, team_id):
                         gm.home_team.playbook_settings = dict(settings_data)
-                    elif gm.away_team.team_id == actual_team_id or gm.away_team.name == team_id:
+                    elif gm_team_matches_ref(gm.away_team, actual_team_id) or gm_team_matches_ref(gm.away_team, team_id):
                         gm.away_team.playbook_settings = dict(settings_data)
         
         return True, actual_team_id, collection.name if hasattr(collection, 'name') else "unknown"

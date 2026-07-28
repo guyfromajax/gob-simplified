@@ -67,6 +67,19 @@ def teams_match_for_franchise(team_a: Any, team_b: Any) -> bool:
     return bool(oid_a and oid_b and oid_a == oid_b)
 
 
+def gm_team_matches_ref(gm_team: Any, team_ref: Any) -> bool:
+    """True if ``team_ref`` (ObjectId, slug, or display name) identifies ``gm_team``.
+
+    Handles Team Builder: GM may hold overlay display name while ``team_ref`` is
+    the slot ObjectId / core name / slug.
+    """
+    if gm_team is None or team_ref is None:
+        return False
+    if str(getattr(gm_team, "name", None) or "") == str(team_ref):
+        return True
+    return teams_match_for_franchise(team_ref, getattr(gm_team, "team_id", None))
+
+
 def franchise_win_geek_points_delta(
     week: int,
     eos_game: dict | None,
