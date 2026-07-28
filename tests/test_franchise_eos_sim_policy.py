@@ -6,6 +6,7 @@ from BackEnd.api.franchise_routes import (
     RegionByeModalSeenRequest,
     SimRestOfTournamentRequest,
     _get_user_eos_phase_status,
+    _mark_completed_full_game_summary_final,
     _save_user_eos_bracket_result,
     _should_show_region_bye_modal,
     _should_use_tbt_for_eos_game,
@@ -43,6 +44,14 @@ def test_all_eos_matchups_use_tbt_when_user_is_not_active():
     assert _should_use_tbt_for_eos_game(28, {"phase": "conference", "conference": 3}, user_scope) is True
     assert _should_use_tbt_for_eos_game(30, {"phase": "region", "region": "B"}, user_scope) is True
     assert _should_use_tbt_for_eos_game(33, {"phase": "national"}, user_scope) is True
+
+
+def test_completed_full_game_summary_is_final_without_rewriting_played_quarter():
+    regulation = _mark_completed_full_game_summary_final({"quarter": 4, "is_final": False})
+    overtime = _mark_completed_full_game_summary_final({"quarter": 5, "is_final": False})
+
+    assert regulation == {"quarter": 4, "is_final": True}
+    assert overtime == {"quarter": 5, "is_final": True}
 
 
 def test_user_eos_bracket_result_persists_without_game_id():

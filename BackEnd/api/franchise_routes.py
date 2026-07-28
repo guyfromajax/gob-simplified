@@ -14625,6 +14625,12 @@ def dismiss_championship_moment(
     return {"status": "ok", "removed": bool(removed)}
 
 
+def _mark_completed_full_game_summary_final(summary: dict[str, Any]) -> dict[str, Any]:
+    """Stamp a summary from ``run_simulation`` as final without rewriting its played quarter."""
+    summary["is_final"] = True
+    return summary
+
+
 @router.post("/franchise/sim-rest-of-tournament")
 def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     """Simulate all games in the current EOS round (when user has no game: bye or did not qualify)."""
@@ -14708,7 +14714,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             gm = run_simulation(home_name, away_name)
             home_score = gm.score.get(home_name, 0)
             away_score = gm.score.get(away_name, 0)
-            summary = summarize_game_state(gm)
+            summary = _mark_completed_full_game_summary_final(summarize_game_state(gm))
             game_id = generate_game_id()
             summary["_id"] = game_id
             summary["franchise_id"] = str(franchise_id)
@@ -14826,7 +14832,7 @@ def sim_championship(req: SimChampionshipRequest):
         gm = run_simulation(home_name, away_name)
         home_score = gm.score.get(home_name, 0)
         away_score = gm.score.get(away_name, 0)
-        summary = summarize_game_state(gm)
+        summary = _mark_completed_full_game_summary_final(summarize_game_state(gm))
         game_id = generate_game_id()
         summary["_id"] = game_id
         summary["franchise_id"] = str(franchise_id)

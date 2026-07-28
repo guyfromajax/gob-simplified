@@ -148,8 +148,12 @@ Do not begin deletion.
 **Implementation checkpoint (2026-07-28):** Complete in source. A fresh pre-change reference was
 cut with `PYTHONHASHSEED=0`, seed `20260720`, and four CPU games. The matching post-change arm was
 byte-identical across all eight team-stat rows and both arms reported zero global RNG leaks.
-Focused EOS routing and training-state tests pass. Prototype validation remains required before
-Phase 3 deletion.
+Focused EOS routing and training-state tests pass. Prototype runs verified regular-season CPU
+games, real CPU auto-training, Practice Squad games, and the normal EOS completion path. The
+eliminated-team `sim-rest-of-tournament` run also routed through `cpu_full` and advanced the region
+bracket, but exposed regulation summaries persisted with `is_final=False`; the two direct
+`run_simulation` persistence boundaries now explicitly stamp completed summaries final while
+preserving their played quarter. Re-test that path before Phase 3 deletion.
 
 ### Games
 
