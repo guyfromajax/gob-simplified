@@ -45,6 +45,7 @@ Roster size rule: teams carry **12–15 players** from post-recruiting through t
 
 ## Detailed system docs
 
+- `Team_Builder_System.md` (this folder) — per-franchise slot overlay (custom program); identity/ObjectId rules, Apply, resolver, assets
 - `FCC.md` (this folder) — the Franchise Command Center: tabs, hero CTA state machine, data wiring, caches, endpoints
 - `06_GMO_Supporting_Systems/Season_Init_System.md` — franchise/season initialization detail
 - `06_GMO_Supporting_Systems/Training_System.md` — training camp + weekly training, attribute/effectiveness movement
