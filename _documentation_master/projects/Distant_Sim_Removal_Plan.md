@@ -1,59 +1,320 @@
-# Distant Systems — Removal Plan (game sim + training)
+# Distant Systems — Final Sunset and Removal Plan
 
-**Status (2026-07-26): NEITHER is actually sunset.** Both are staged behind **default-OFF flags that are unset in prod**, so both are still live:
-- Distant **game sim** — flag `FRANCHISE_ALL_GAMES_FULL_SIM` ([franchise_routes.py:3983](../../BackEnd/api/franchise_routes.py#L3983)). Out-of-conf regular-season + EOS games still run the distant engine.
-- Distant **training** — flag `FRANCHISE_ALL_TEAMS_AUTOTRAIN` ([franchise_routes.py:3996](../../BackEnd/api/franchise_routes.py#L3996)). CPU teams still train from the `distant_training` template collection; the real per-team auto-train replacement (`_run_all_cpu_autotrain`) has never been enabled.
+**Status:** Master plan, reconciled 2026-07-28.
+**Scope:** Distant franchise game simulation **and** distant/template CPU training.
+**Implementation status:** Both replacements exist, but the repository still defaults to the
+legacy systems when their semantic environment flags are absent. No distant code or data may be
+deleted until the rollout gates below have been satisfied in the deployed environments.
 
-⚠️ Removing either before flipping its flag + validating the replacement breaks prod (no game scorer / no CPU training).
+This document supersedes separate game-sim and training removal notes. It is the single execution
+plan for both systems.
 
-**Decisions (owner):** sequence = **sunset-then-remove** (both); `momentum_score` + `distant_win/loss_streak` = **remove entirely**; EOS games = **force full turn-by-turn sim**; distant **training** = **remove** (folded into this plan).
+## Final product decisions
 
-## ⚠️ Naming — the "distant"/"momentum" collisions
-| Thing | Scope | Identifiers |
+- Every franchise CPU game, including every regular-season and EOS matchup, uses the full
+  turn-by-turn engine.
+- Every eligible CPU team uses real auto-training through `execute_training`; template training is
+  removed.
+- `momentum_score`, `distant_win_streak`, and `distant_loss_streak` are removed. They are distant
+  game-system fields and are unrelated to live player/team momentum.
+- Historical game documents are not deleted merely because
+  `simulation_engine == "distant"`. Database cleanup is a separate, explicitly authorized
+  operation.
+- The semantic rollout flags are temporary and must disappear after validation:
+  - `FRANCHISE_ALL_GAMES_FULL_SIM`
+  - `FRANCHISE_ALL_TEAMS_AUTOTRAIN`
+- Operational execution controls may remain:
+  - `FRANCHISE_CPU_SIM_USE_POOL`
+  - `FRANCHISE_CPU_SIM_MAX_WORKERS`
+
+Operational controls may change *how* required work runs, but may not select a different
+basketball or training model.
+
+## Systems that must not be confused
+
+| System | Final disposition | Primary identifiers |
 |---|---|---|
-| Distant **game sim** | **REMOVE** (flag `FRANCHISE_ALL_GAMES_FULL_SIM`) | `distant_sim_engine.py`, `distant_game_stats.py`, `constants/distant_sim.py`, `simulation_engine=="distant"` |
-| Distant **training** | **REMOVE** (flag `FRANCHISE_ALL_TEAMS_AUTOTRAIN`; separate system, separate track) | `_apply_franchise_distant_cpu_training`, `distant_training` collection, `cpu_distant_*` fields, `Distant_Team_Training_System.md` |
-| Player `team_momentum` (engine, −50..+50) | **KEEP** (unrelated to FTD `momentum_score` −10..10) | `constants/momentum.py`, `utils/player_momentum.py`, `add_momentum` |
+| Distant game simulation | Remove | `distant_sim_engine.py`, `distant_game_stats.py`, `constants/distant_sim.py`, `simulation_engine == "distant"` |
+| Distant/template CPU training | Remove | `distant_training` collection, `_apply_franchise_distant_cpu_training`, `cpu_distant_*` fields |
+| Full CPU game simulation | Keep; becomes universal | `_run_franchise_cpu_full_simulation_core`, CPU-week orchestration |
+| Real CPU auto-training | Keep; becomes universal | `auto_train_one_cpu_team`, `_run_all_cpu_autotrain`, `execute_training` |
+| Live player/team momentum | Keep | `constants/momentum.py`, `utils/player_momentum.py`, `add_momentum` |
+
+## Current routing truth
+
+The replacement paths are complete enough to validate:
+
+- `_franchise_all_games_full_sim()` controls regular-season routing and
+  `_should_use_tbt_for_eos_game()` covers both EOS entry points.
+- `_franchise_all_teams_autotrain()` redirects the existing CPU-training orchestrator to
+  `_run_all_cpu_autotrain()`.
+- Real CPU auto-training uses the user training engine and persists player attributes, position
+  ratings, team attributes, play effectiveness, scouting effectiveness, training reports, and an
+  idempotency marker.
+
+The repository defaults both semantic flags to false. Therefore, source inspection alone cannot
+prove that staging or production is already distant-free. Effective deployment configuration and
+runtime output must be audited first.
 
 ---
 
-## Phase A — Complete both sunsets (behavioral, revertible, NO deletion)
-Prove the real replacements work everywhere before deleting the fallbacks. Flip **both** flags together (they jointly make CPU teams "real"), keep flip-back until validated.
+## Phase 0 — Deployment-state audit (read-only)
 
-- **A1. Games → full TbT** under one revertible flag:
-  - Regular season (Path A): set `FRANCHISE_ALL_GAMES_FULL_SIM=1` + `FRANCHISE_CPU_SIM_USE_POOL=1` in prod.
-  - EOS is **not** flag-covered today (Path A EOS block [6466-6540](../../BackEnd/api/franchise_routes.py#L6466-L6540); Path B `sim_rest_of_tournament` [14737-14790](../../BackEnd/api/franchise_routes.py#L14737-L14790), both via `_should_use_tbt_for_eos_game`). Small change: make `_should_use_tbt_for_eos_game` return True when `_franchise_all_games_full_sim()` — one flag forces every game to full sim, still revertible.
-- **A2. CPU training → real auto-train:** set `FRANCHISE_ALL_TEAMS_AUTOTRAIN=1` in prod → `_apply_franchise_distant_cpu_training` routes to `_run_all_cpu_autotrain` (parallel per-team, `cpu_week_pool.py` autotrain worker) instead of `distant_training` templates.
-- **A3. Validate a full season** with all flags ON (staging / controlled franchise): pool perf within [[project_sim_perf_optimization]] targets for 63+ full games/wk; out-of-conf + EOS box scores sane; `simulation_engine=="distant"` count == 0; CPU teams show real play/scouting-effectiveness training deltas (not template deltas); no `distant_training` reads.
-- **A4. Bake** in prod for an agreed window; confirm zero distant games + zero distant-template training in logs.
-- **Synergy:** capture the EOG band-measurement season (see [[project_eog_attr_retune]]) with the flags ON, so tuning data reflects the distant-free target world (no `distant_uniform` bands; CPU teams trained realistically).
+**Purpose:** Establish what staging and production actually run before changing behavior.
 
-## Phase B — Delete distant code (mechanical, after A proven)
-- **B1. Routing collapse:** delete the `is_distant` ladder ([6543-6644](../../BackEnd/api/franchise_routes.py#L6543-L6644)) + EOS distant block (6466-6540) + Path B distant block (14737-14790); remove flag `_franchise_all_games_full_sim` (behavior becomes unconditional full-sim), `distant_sim_should_promote_ranked_fullsim`, `_cpu_distant_count` timing arm.
-- **B2. Delete whole files:** `BackEnd/distant_sim_engine.py`, `BackEnd/models/distant_game_stats.py`, `BackEnd/constants/distant_sim.py` (momentum removed too → nothing survives).
-- **B3. Delete franchise_routes wrappers:** `_distant_sim_*` helpers (2829-3030), `_run_distant_game_sim`, `_persist_distant_franchise_game`, `_distant_sim_persist_momentum_score_updates`, the `build_distant_game_summary` import (63).
-- **B4. Prune shared functions' distant arms** (do NOT delete the functions):
-  - `update_team_attributes_after_game`: remove `is_distant_sim` ([1582](../../BackEnd/api/franchise_routes.py#L1582)) + the distant efficiency branch (1754-1770) + the `is_distant_sim`/`distant_uniform` arm of the Phase-0 EOG band instrumentation (all games are non-distant now).
-  - `franchise_tournament_progression.py`: drop `"distant"` from `source in (...)`.
-  - `api.py:4737` comment cleanup.
-- **B5. Remove momentum_score + streaks** (per decision):
-  - `momentum_score` out of `TEAM_ATTR_CLAMPS` ([training_execution_v2.py:297](../../BackEnd/models/training_execution_v2.py#L297)) + training allocation/report echoes (franchise_routes 14243/14389).
-  - Remove `momentum_score`/`distant_win_streak`/`distant_loss_streak` from FTD init (team_manager 818-820, franchise_manager 599-601, api.py 757, gameplan_routes 1116/2362) **and** from `init_franchise_rollover_team_attributes` (added in [[project_eog_attr_retune]]).
-  - Remove from projections (6339-6341, 14717-14719) + attr-key lists.
-  - Optional `$unset` migration on existing FTD docs (separate, non-destructive; do not wipe).
-- **B6. Tests/scripts:** delete `tests/test_distant_sim.py`, `tests/test_distant_sim_integration.py`, `scripts/distant_sim_monte_carlo.py` (+results); prune passing mentions.
+1. Record the effective boolean and raw deployment value for:
+   - `FRANCHISE_ALL_GAMES_FULL_SIM`
+   - `FRANCHISE_ALL_TEAMS_AUTOTRAIN`
+   - `FRANCHISE_CPU_SIM_USE_POOL`
+   - `FRANCHISE_CPU_SIM_MAX_WORKERS`
+2. Inspect recent complete-week logs:
+   - full CPU game count
+   - distant game count
+   - CPU-sim errors/fallbacks
+   - elapsed full-week time
+3. Inspect recent training logs:
+   - `CPU-AUTOTRAIN-TIMING`
+   - trained/skipped/error counts
+   - any `DISTANT TRAINING` template activity
+4. Inspect fresh franchise data for:
+   - `simulation_engine` values on CPU games
+   - `cpu_autotrain_week`
+   - `training_reports.<week>`
+   - legacy `cpu_distant_trained_week`
+5. Record findings in this document before Phase 1.
 
-### Distant TRAINING track (parallel; do a full inventory at execution time like the game-sim one)
-- **B7. Routing collapse:** in `_apply_franchise_distant_cpu_training` ([12962](../../BackEnd/api/franchise_routes.py#L12962)) delete the template-delta branch (12982-13088) and the flag `_franchise_all_teams_autotrain` ([3996](../../BackEnd/api/franchise_routes.py#L3996)) — behavior becomes unconditional `_run_all_cpu_autotrain`. Rename the function/route off "distant" (`/franchise/run-training/distant-cpu` → e.g. `/cpu-train`; keep it working as the CPU-train trigger).
-- **B8. Drop the template collection + data fields:** stop reading `db["distant_training"]`; remove `cpu_distant_trained_week` / `training_status.cpu_distant_complete_week` / `distant_training_resume` (rename to `cpu_autotrain_*` or drop) — audit `franchise_training_state.py:30`, franchise_routes 7949/13133/13224/13376/13521/14018.
-- **B9. Delete distant-training scripts:** `generate_distant_training_templates.py`, `replace_gob_distant_training_from_staging.py`, `test_distant_training_dry_run.py`. Optional: drop the `distant_training` Mongo collection (separate, non-destructive).
+### Phase 0 exit gate
 
-## Phase C — Documentation
-- **C1. Delete:** `04_Franchise_Mode_Systems/Distant_Game_Sim_System.md`, `Distant_Game_Sim_Player_Stats.md`, **`Distant_Team_Training_System.md`** (tuning history already in `Z-Completed/Distant_Sim_Tuning.md`).
-- **C2. Targeted edits** (remove momentum_score/streaks, `simulation_engine=="distant"`, and distant-training mentions): Team_Attribute_System.md, Training_System.md, projects/balancing_team_attributes.md, Box_Score_System.md, End_Of_Game_System.md, Tunable_Constants.md, Attribute_Clamp_System.md, Database_System.md, Franchise_Tournament_System.md, Rank_Prestige_System.md.
-- **C3.** With distant **training** now also removed, `team_momentum` (player momentum) is the only surviving "momentum/distant"-adjacent system — leave a one-line note in `Player_Momentum_System.md` so future agents don't hunt for a removed sibling.
+- Deployment truth is known for both environments.
+- No behavior or database state has been changed.
+- Any current error or performance blocker has an owner before the rollout begins.
 
-## Verification / exit gate
-- After B (both tracks): `grep -rin distant BackEnd/ scripts/` returns nothing.
-- Full-sim + real-autotrain paths are isolated `sim_rng`/`training_rng`; confirm no seed regressions post-removal.
-- Behavior-change surface (Phase A: both flags) is the only place that alters outcomes; Phase B/C are dead-code + docs only.
+---
+
+## Phase 1 — Revertible replacement validation
+
+**Purpose:** Run the target world while retaining immediate flag rollback. No code deletion.
+
+1. Enable together in staging:
+   - `FRANCHISE_ALL_GAMES_FULL_SIM=1`
+   - `FRANCHISE_ALL_TEAMS_AUTOTRAIN=1`
+2. Use the process pool only if its deployed spawn path has already been validated. Otherwise use
+   the serial/thread execution path for correctness validation first.
+3. Run a fresh controlled franchise through a complete season, including:
+   - training camp
+   - regular-season weeks
+   - Practice Squad weeks
+   - every EOS phase
+   - eliminated-team training exclusions
+   - retry/resume paths
+4. Validate games:
+   - zero new `simulation_engine == "distant"` game documents
+   - zero CPU-job rows with engine `distant`
+   - out-of-conference games have full box scores and player statistics
+   - regular-season standings and every EOS bracket advance correctly
+   - no duplicate results on retry
+5. Validate training:
+   - every eligible CPU FTD reaches `cpu_autotrain_week == week`
+   - every trained CPU FTD receives `training_reports.<week>`
+   - play and scouting effectiveness can change
+   - zero template reads or `DISTANT TRAINING` applications
+   - partial retries do not double-train teams
+6. Validate performance:
+   - full-week CPU simulation stays within the agreed budget
+   - CPU auto-training stays within the agreed budget
+   - Practice Squad performance does not regress
+   - persistence time is measured separately from engine time
+7. Repeat the same rollout in production and retain both rollback flags for an agreed bake window.
+
+### Phase 1 exit gate
+
+- At least one fresh full season passes in staging.
+- Production bake window passes.
+- Zero distant games and zero template training are observed.
+- CPU game, training, EOS, retry, and performance requirements are accepted.
+
+**Stop condition:** Any distant output, missing CPU training, EOS progression error, duplicate
+training, or unacceptable performance returns the affected environment to the previous flag state.
+Do not begin deletion.
+
+---
+
+## Phase 2 — Collapse semantic routing (behavioral SS&S)
+
+**Purpose:** Make the validated replacements authoritative in code before deleting their fallbacks.
+
+### Games
+
+1. Route every non-user CPU matchup directly into the full-job pipeline.
+2. Make both EOS entry points unconditionally use full turn-by-turn simulation.
+3. Delete the regular-season `is_distant` decision ladder from live routing.
+4. Remove ranked-matchup promotion logic; all matchups are already full simulations.
+5. Remove `_franchise_all_games_full_sim()` and
+   `FRANCHISE_ALL_GAMES_FULL_SIM`.
+6. Preserve existing CPU-job idempotency, retry, sequential persistence, and bracket advancement.
+
+### Training
+
+1. Rename `_apply_franchise_distant_cpu_training` to a neutral CPU-training orchestration name.
+2. Route it unconditionally to `_run_all_cpu_autotrain`.
+3. Rename the `/franchise/run-training/distant-cpu` endpoint and frontend caller to a neutral
+   CPU-training name.
+4. Remove `_franchise_all_teams_autotrain()` and
+   `FRANCHISE_ALL_TEAMS_AUTOTRAIN`.
+5. Rename completion/resume state:
+   - `training_status.cpu_distant_complete_week` → `cpu_autotrain_complete_week`
+   - other `distant_training_resume` / `cpu_distant_*` orchestration names → `cpu_autotrain_*`
+6. Existing active franchises must cross the rename safely. Use either a one-release dual-read
+   compatibility window or a narrowly scoped migration; choose and document the method before
+   implementation. Do not silently strand an in-progress training week.
+
+### Phase 2 exit gate
+
+- Unsetting either retired semantic flag cannot change behavior.
+- All game and training entry points use one authoritative model.
+- A fresh season and an in-progress-franchise resume both pass.
+- Pool-off and pool-on modes, where supported, produce the same functional workflow.
+
+---
+
+## Phase 3 — Remove the distant game system
+
+1. Delete:
+   - `BackEnd/distant_sim_engine.py`
+   - `BackEnd/models/distant_game_stats.py`
+   - `BackEnd/constants/distant_sim.py`
+2. Remove from `franchise_routes.py`:
+   - distant score wrappers
+   - distant FPD/FTD batch-preparation helpers
+   - `_run_distant_game_sim`
+   - `_persist_distant_franchise_game`
+   - distant standings-cache helpers
+   - distant game-summary imports
+   - distant counters and observability arms
+3. Remove the distant branch from end-of-game team-attribute updates and EOG band instrumentation.
+4. Remove `"distant"` as a live tournament-progression source.
+5. Remove `momentum_score`, `distant_win_streak`, and `distant_loss_streak` from:
+   - constants/clamps
+   - team initialization and rollover
+   - FTD projections
+   - training/report payloads
+   - API response key lists
+   - tests and instrumentation
+6. Do not delete historical game documents. Readers should tolerate old documents without keeping
+   a live distant execution path.
+
+### Phase 3 exit gate
+
+- No production code can create a distant game.
+- Full CPU games still finalize attributes, standings, results, awards, and EOS brackets.
+- Focused game-routing, CPU-week, EOG, and EOS test suites pass.
+
+---
+
+## Phase 4 — Remove the distant training system
+
+1. Delete the template-delta branch and all reads from `db["distant_training"]`.
+2. Remove legacy fields after the Phase 2 compatibility method has completed:
+   - `cpu_distant_trained_week`
+   - `training_status.cpu_distant_complete_week`
+   - distant resume/status names
+3. Delete obsolete scripts:
+   - `scripts/generate_distant_training_templates.py`
+   - `scripts/replace_gob_distant_training_from_staging.py`
+   - `scripts/test_distant_training_dry_run.py`
+   - template-comparison scripts whose only purpose is distant training
+4. Remove distant-training-specific tests and replace them with universal CPU auto-training tests.
+5. Optionally drop the MongoDB `distant_training` collection only after:
+   - all deployed code versions have stopped reading it
+   - rollback to a template-dependent release is no longer required
+   - the user explicitly authorizes the destructive database operation
+
+### Phase 4 exit gate
+
+- No production code or operational script reads distant training templates.
+- Every eligible CPU team uses real auto-training.
+- Idempotency, retry, training camp, elimination, play/scouting training, and reports are covered by
+  tests.
+
+---
+
+## Phase 5 — Tests, scripts, and operational cleanup
+
+1. Delete distant-only tests and Monte Carlo/tuning scripts:
+   - `tests/test_distant_sim.py`
+   - `tests/test_distant_sim_integration.py`
+   - `scripts/distant_sim_monte_carlo.py`
+   - generated distant-sim result artifacts
+2. Update shared tests that currently exercise both distant and full paths.
+3. Update performance and EOG measurement scripts so full simulation and real CPU training are
+   assumptions, not required semantic flags.
+4. Retain full-sim verification tools, poison-stash/determinism checks, CPU pool tests, and
+   auto-training retry tests.
+5. Run with `PYTHONHASHSEED=0` and follow the RNG verification rules in
+   `Sim_Perf_Capstone.md`.
+
+### Required verification
+
+- Focused CPU full-sim suite
+- CPU-week orchestration and retry suite
+- CPU auto-training and training-state suite
+- EOS/tournament progression suite
+- EOG team-attribute suite
+- Practice Squad regression suite
+- Full relevant backend suite
+- Staging full-season smoke run
+- Full-week and training performance measurements
+
+---
+
+## Phase 6 — Documentation cleanup
+
+Delete the retired system documents:
+
+- `04_Franchise_Mode_Systems/Distant_Game_Sim_System.md`
+- `04_Franchise_Mode_Systems/Distant_Game_Sim_Player_Stats.md`
+- `04_Franchise_Mode_Systems/Distant_Team_Training_System.md`
+
+Update live documentation to remove distant routing, momentum/streak fields, template training, and
+semantic flags:
+
+- Team Attribute System
+- Training System
+- Box Score System
+- End of Game System
+- Tunable Constants
+- Attribute Clamp System
+- Database/Data Persistence systems
+- Franchise Tournament/EOS systems
+- Rank and Prestige systems
+- simulation-performance and operational runbooks
+- `projects/balancing_team_attributes.md`
+
+Keep archived tuning history under `projects/Z-Completed` only when it is clearly marked historical.
+Add a note to the Player Momentum System that live player/team momentum is unrelated to—and survives
+the removal of—the old distant franchise momentum fields.
+
+---
+
+## Final completion gate
+
+The sunset is complete only when all statements are true:
+
+- Full turn-by-turn simulation is the only live franchise CPU game engine.
+- Real auto-training is the only live CPU training engine.
+- No semantic environment variable can reactivate distant behavior.
+- No live backend/frontend path, worker, or script reads the distant systems.
+- New game documents never use `simulation_engine == "distant"`.
+- CPU training produces no distant/template markers.
+- Regular season, EOS, retries, and in-progress training resumes are verified.
+- Performance budgets are accepted.
+- Operational documentation describes one authoritative game model and one authoritative training
+  model.
+- Optional database deletion, if desired, is performed separately with explicit authorization and
+  verified backups/targets.
+
+## Execution rule
+
+Do not combine Phase 1 validation with Phase 3/4 deletion in one deployment. The only intentional
+behavior change is replacement activation and routing collapse. Code deletion follows only after
+the replacement world has been observed and accepted.
