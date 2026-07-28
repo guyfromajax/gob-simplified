@@ -1,5 +1,11 @@
 
-##General Rule
+**Task Objective**
+We need to recalibrate players' starting attribute values and their growth/regression levels during in-season training and offseason transitions in order to bring a level of steadiness to this.
+
+Right now I get the sense that we have starting attyriburtes for the universal players colleciton too high, and growth of players coming up in the sytem too low as I'm antecdotally noticing steep team telent dropoffs from season 1 to season 2 (note this is antecdotal though, we should measure it)
+
+
+**#General Rule**
 Player attributres should roughly double over the course of a player entering the leage to the end of his final season. 
 
 This will encompass 4 seasons and 4 offseasons.
