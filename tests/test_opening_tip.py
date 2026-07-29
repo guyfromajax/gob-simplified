@@ -89,22 +89,18 @@ def test_opening_tip_animation_structure():
 
 
 def test_get_height_scale_value():
-    """Test height scale calculation"""
-    # Test very tall player (> 83 inches = 6'11")
-    scale_max = get_height_scale_value(84)
-    assert scale_max == 10
-    
-    # Test tall player (81-82 inches = 6'9"-6'10")
-    scale_tall = get_height_scale_value(81)
-    assert scale_tall == 9
-    
-    # Test mid-range height (78 inches = 6'6")
-    scale_mid = get_height_scale_value(78)
-    assert scale_mid == 7
-    
-    # Test short player (< 73 inches = 6'1")
-    scale_short = get_height_scale_value(70)
-    assert scale_short == 1
+    """Height scale calculation, re-banded +3 in. for the recalibrated
+    distribution (design §11.2): thresholds shifted 83->86, 81->84, 78->81, etc."""
+    # Very tall player (> 86 inches)
+    assert get_height_scale_value(87) == 10
+    # Tall player (84-85 inches)
+    assert get_height_scale_value(84) == 9
+    # New centre median (82 inches) lands mid-upper scale, as the old median did.
+    assert get_height_scale_value(82) == 8
+    # Mid-range height (81 inches)
+    assert get_height_scale_value(81) == 7
+    # Short-for-a-tipper (< 76 inches)
+    assert get_height_scale_value(70) == 1
 
 
 def test_opening_tip_text_generation():

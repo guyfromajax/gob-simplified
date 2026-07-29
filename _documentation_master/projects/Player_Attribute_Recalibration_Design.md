@@ -1,6 +1,6 @@
 # Player Attribute Recalibration — Design
 
-**Status:** Draft for review, 2026-07-29
+**Status:** Approved, 2026-07-29
 **Scope:** New franchises only. In-flight alpha saves are not migrated.
 **Repo path:** `_documentation_master/projects/Player_Attribute_Recalibration_Design.md`
 **Companion to:** the project brief at `_documentation_master/projects/Player_Attribute_Recalibration.md` and the audit at `_documentation_master/projects/rt_sanity_audit/`
@@ -103,11 +103,20 @@ Rebuild SF around SH, SC, ID and OD carrying the weight, with AG as the athletic
 - Zero RT change for any recruit when computed under the unified table versus the player table.
 - Exact-tie rate materially below 8.0%.
 
-### 3.5 Related, needs its own diagnostic
+### 3.5 Stored rating drift — DIAGNOSED
 
-Freshly computed ratings disagree with **stored** ratings for 1,794 of 1,920 players and 163 of 300 recruits. Stored RT is what the UI shows, what lineups read, what `primary_position_from_position_ratings` uses to select training-camp core attributes, and what CPU roster logic keys off.
+Freshly computed ratings disagreed with **stored** ratings for 1,794 of 1,920 players and 163 of 300 recruits. The cause is now confirmed: **multi-vintage formula-drift staleness, confined to PF and C. It is not fatigue.**
 
-Diagnostic: for the mismatched set, recompute three ways — player weights on anchor attributes, player weights on live (NG-scaled) attributes, recruit weights on anchor attributes — and see which matches the stored value. If it's the live-attribute variant, RT drifts with fatigue and that must be fixed before RT can anchor a four-season calibration.
+Live attributes equal anchor attributes everywhere in the data (NG = 1.0, no fatigue persisted), so the "RT drifts with energy" hypothesis originally recorded here finds nothing — `_update_position_ratings` is called only at game init, before scaling, and `recalculate_energy_scaled_attributes` has no live callers. That branch of the diagnostic is closed.
+
+What is actually there is three vintages:
+
+- **390 FPD docs** carry the recruit-profile RT verbatim — the signing/rollover copy flagged by H3, which nothing recomputes under the player profile.
+- **~1,404 FPD and all 163 FRD docs** match no current formula at all. They were written under older PF/C weight tables and height functions and never backfilled. PG, SG and SF weights never changed historically, which is exactly why those three positions mostly still match — 1,581 of the 1,794 mismatches are confined to PF and C.
+
+Stored RT is only refreshed by `GameManager._update_position_ratings` (universal collection, non-franchise games) and the training write paths (FPD), so any player who has not trained or played under the current formula keeps a stale value.
+
+**Architectural consequence, and it is load-bearing.** In-game RT for franchise games is recomputed fresh at `GameManager.__init__`, so a formula change bites in-sim immediately. But **lineup autoset, CPU roster and conversion logic, scouting, recruiting, and every UI surface read the stored `position_ratings`.** The formula change alone therefore does not move lineups, CPU behaviour or the interface. The bulk recompute in §11.3 is not cleanup — without it the new model is live in the simulation and invisible everywhere else.
 
 ### 3.6 Fitted values
 
@@ -339,6 +348,8 @@ CH is **always hidden and never revealed.** It is deliberately the one attribute
 
 **The ATTITUDE indicator is driven by `EM`, not CH**, so it is not currently a CH proxy. That leaves CH with nothing observable correlated to it at all. A hook is needed before alpha — training report flavor text is the cheapest option and requires no change to what ATTITUDE means.
 
+**Known conflict to resolve.** A CH tooltip already exists in the frontend at `attributeTooltips.js:7`, labelled "Clutch", which means CH is surfaced somewhere today. Either that surface is found and removed as part of the display sweep, or this section is aspirational rather than true. Resolve before the display task is scoped.
+
 **CH distribution — DECIDED: flat.** CH stays `randint(1,100)` (measured mean 49.4, sd 28.4).
 
 The peak-count target is reachable under any distribution, because only the composition of distribution and mapping is observable — 3% at three peaks is `CH > 97` under flat and `CH > 78` under Normal(50,15), with identical outcomes. The decision therefore rests on tuning ergonomics and blast radius, and both favour flat:
@@ -436,6 +447,13 @@ Every new franchise init draws its entire 128-team league from the universal pla
 
 **Approach: generate every pool player as a JH and simulate him forward to his class year using the real offseason development event.** Not a parallel "make a senior" routine — literally the same function, run one to four times. Internal consistency is then structural rather than maintained by hand.
 
+**Sequencing caveat — an interim form is needed first.** Simulate-forward depends on the offseason development event, which depends on the growth constants fitted in the Monte Carlo (§15). But the RT formula in §3.6 cannot merge without the new height distribution, which requires the generator. To break the cycle, generation splits in two:
+
+- **Interim (unblocks §3.6):** generate players *directly* at their class-year target from the §4.2 ladder, needing only the tier table and rung multipliers. This is exactly what the §3.6 fit was validated against.
+- **Final (after the Monte Carlo):** replace it with generate-as-JH-and-simulate-forward, which supersedes the interim form and adds the free model validation described below.
+
+**Stored `position_ratings` are recomputed in this same pass**, not as a separate migration — the 1,794 player and 163 recruit mismatches from §3.5 are corrected wherever they live, including the universal players collection, alongside the attribute and HT/WT updates. Note that recomputing fixes the symptom; if the §3.5 diagnostic shows the cause is RT being computed from fatigue-scaled attributes, the drift will recur and the cause needs fixing too.
+
 This also serves as a live test of the progression model before anything ships. If simulating ~1,920 careers forward produces a league that looks right, the model works. If it produces something odd, that surfaces during pool generation rather than four seasons into a validation run.
 
 **What is fixed in the pool versus rolled per save:**
@@ -484,13 +502,24 @@ Target per-position height distributions (inches, approximate): PG 73.5, SG 76, 
 
 #### Consequence: absolute height thresholds elsewhere must be re-banded
 
-Shifting the median from 72 to 78 re-sorts every system that reads height against fixed inch values. Known consumers:
+Shifting the median from 72 to 78 re-sorts every system that reads height against fixed inch values. The completed sweep found the following — the original four-item list in this section was incomplete:
 
-- **`height_to_block_score`** (`utils/shared.py`) — `≤72 → 0`, then `h − 72`, `≥82 → 10`. Under the current distribution the league mean is **1.68** and **59% of players score zero**. Under the proposed distribution the mean becomes **5.08** with only 11% at zero. Block rates would move sharply.
-- **`opening_tip`** — banded on absolute inches from 73 up through 83+.
-- `franchise_manager` and `position_ratings` also carry absolute height comparisons.
+| Location | What | Thresholds |
+|---|---|---|
+| `utils/shared.py:1445` | `height_to_block_score` | `≤72 → 0`, `h−72`, `≥82 → 10` |
+| `utils/opening_tip.py:44-65` | `get_height_scale_value` (live tip) | `>83 → 10`, `≥81 → 9`, `≥79 → 8`, `78 → 7` … `<73 → 1` |
+| `utils/opening_tip.py:292-306` | `player_tip_score` height dict | `82 → 11` … `73 → 2`; marked legacy — **delete if confirmed dead rather than re-band** |
+| `models/franchise_manager.py:1184-1193` | `_generate_weight`, weight derived from height | bands at `<72` / `72-75` / `76-80` / `>80` |
+| `models/franchise_manager.py:1136-1157` | archetype `height_range` per recruit archetype | replaced by §11.2 generation |
+| `models/franchise_manager.py:174-179` | `WALK_ON_YEAR_PROFILES` height ranges | JH (66,72) … Junior (68,77) |
+| `models/training_execution_v2.py:1149-1160` | training-camp weight-delta gates | `height_after > 75`, `> 72` |
+| `models/shot_manager.py:1197-1228` | block reconciliation, `def_h × 10` scaling | downstream of `height_to_block_score` |
 
-This is the same failure pattern as the `cum_nd` 200/350 cutoffs: absolutes placed against an assumed distribution. Every one of them needs re-banding in the same pass, and a sweep should confirm the list above is complete.
+Under the current distribution `height_to_block_score` yields a league mean of **1.68** with **59% of players at zero**; under the proposed distribution the same function yields **5.08** with 11% at zero. Re-banding must preserve each system's intended *shape* — roughly the same league mean block score and tip-off distribution — not its literal thresholds.
+
+**Missing-height fallback defaults also need attention.** Several literals sit below the new median: `shot_manager.py` (76), `player.py:62` (75), `quick_foul.py:96` (75), `team_builder_roster.py` (72). These are not bands, but a 72-76 inch default now reads as a guard. Replace all of them with a single named constant set to the new league median rather than re-scattering literals.
+
+This is the same failure pattern as the `cum_nd` 200/350 cutoffs: absolutes placed against an assumed distribution. Every one of them needs re-banding in the same pass.
 
 ### 11.3 Migrating the existing universal pool
 

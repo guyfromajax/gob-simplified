@@ -30,12 +30,8 @@ sys.path.insert(0, str(ROOT))
 
 from BackEnd.utils.position_ratings import (  # noqa: E402
     POSITION_WEIGHTS,
-    RECRUIT_C_WEIGHTS_SHORT,
-    RECRUIT_PF_WEIGHTS_SHORT,
-    RECRUIT_POSITION_WEIGHTS,
-    _c_height_to_rating,
-    _pf_height_to_rating,
     compute_position_ratings,
+    height_fitness,
 )
 
 DB_NAME = "gob-staging"
@@ -157,7 +153,7 @@ def _roster_rows(fpd_docs: list[dict], team_by_player: dict[str, str]) -> list[d
         meta = doc.get("meta") or {}
         attrs = doc.get("attributes") or {}
         height = _number(meta.get("height", attrs.get("height")))
-        ratings = compute_position_ratings(_player_for_rating(height, attrs), profile="player")
+        ratings = compute_position_ratings(_player_for_rating(height, attrs))
         argmax, top1, top2, margin = _argmax(ratings)
         year_raw = str(meta.get("year") or "").strip()
         row = {
@@ -183,8 +179,8 @@ def _recruit_rows(frd_docs: list[dict]) -> list[dict]:
         attrs = doc.get("attributes") or {}
         height = _number(doc.get("height", attrs.get("height")))
         player = _player_for_rating(height, attrs)
-        recruit_ratings = compute_position_ratings(player, profile="recruit")
-        player_ratings = compute_position_ratings(player, profile="player")
+        recruit_ratings = compute_position_ratings(player)
+        player_ratings = compute_position_ratings(player)
         recruit_argmax, recruit_top1, _, _ = _argmax(recruit_ratings)
         player_argmax, player_top1, _, _ = _argmax(player_ratings)
         row = {
@@ -288,9 +284,9 @@ def _build_report(
     heights = [float(row["height_in"]) for row in players]
     pf_ratings = [float(row["rt_PF"]) for row in players]
     c_ratings = [float(row["rt_C"]) for row in players]
-    pf_height_contributions = [
-        POSITION_WEIGHTS["PF"]["height"] * _pf_height_to_rating(height) for height in range(76, 85)
-    ]
+    # PF height is now a multiplicative fitness (design §3.6.2), no longer a
+    # weighted additive term. Report the fitness spread across 76-84 in.
+    pf_height_contributions = [height_fitness("PF", height) for height in range(76, 85)]
     pf_contribution_variance = statistics.pvariance(pf_height_contributions)
     empirical_76_84 = [row for row in players if 76 <= float(row["height_in"]) <= 84]
     empirical_pf_corr = _pearson(
@@ -403,7 +399,9 @@ def _build_report(
     pf_share = argmax_counts["PF"] / player_count if player_count else 0
     pf_sf_p10_overlap = max(_percentile(pf_heights, 10), _percentile(sf_heights, 10))
     pf_sf_p90_overlap = min(_percentile(pf_heights, 90), _percentile(sf_heights, 90))
-    pf_values_76_84 = [_pf_height_to_rating(height) for height in range(76, 85)]
+    # H2 (flat PF height credit) is resolved by the multiplicative curve: fitness
+    # now varies with height instead of returning a constant.
+    pf_values_76_84 = [height_fitness("PF", height) for height in range(76, 85)]
     h2_confirmed = len(set(pf_values_76_84)) == 1
     pf_abs = [abs(float(row["delta_PF"])) for row in recruits]
     c_abs = [abs(float(row["delta_C"])) for row in recruits]
@@ -426,26 +424,17 @@ def _build_report(
         "but no threshold was supplied for whether a 1.94-inch mean difference is meaningful, so the compound "
         "hypothesis cannot be classified as confirmed or refuted without imposing one.",
         "",
-        f"### H2 — **{'Confirmed' if h2_confirmed else 'Refuted'}**",
+        f"### H2 (flat PF height credit) — **{'still flat' if h2_confirmed else 'RESOLVED'}**",
         "",
-        f"`_pf_height_to_rating` returns **{_fmt(pf_values_76_84[0], 1)}** at every integer height "
-        "from 76 through 84. With PF's 0.10 height weight, every one contributes "
-        f"**{_fmt(pf_height_contributions[0], 1)} RT points**, with variance "
-        f"**{_fmt(pf_contribution_variance, 4)}**.",
+        f"PF height is now a multiplicative fitness varying from "
+        f"**{_fmt(min(pf_values_76_84), 3)}** to **{_fmt(max(pf_values_76_84), 3)}** across 76-84 in "
+        f"(variance **{_fmt(pf_contribution_variance, 4)}**), not a constant additive term.",
         "",
-        f"### H3 — **{'Confirmed' if h3_confirmed else 'Refuted'}**",
+        "### H3 (recruit/player discontinuity) — **RESOLVED by construction**",
         "",
-        f"PF median absolute profile change is **{_fmt(_percentile(pf_abs, 50), 1)} RT** "
-        f"(P90 **{_fmt(_percentile(pf_abs, 90), 1)}**); C is "
-        f"**{_fmt(_percentile(c_abs, 50), 1)} RT** (P90 **{_fmt(_percentile(c_abs, 90), 1)}**). "
-        f"**{discontinuity_nonzero:,}/{recruit_count:,}** recruits have a nonzero PF or C change, "
-        f"and **{changed_argmax:,}** change argmax position.",
-        "",
-        "These profile comparisons are counterfactual computations on identical recruit attributes and height; "
-        "they measure formula discontinuity only, with no development. Code tracing also found that season rollover "
-        "currently copies the recruit's stored recruit-profile ratings into the new FPD player record; therefore the "
-        "formula discontinuity is real when the player profile is next recomputed, but the persisted value is not "
-        "switched at the exact signing write.",
+        f"One weight table now serves recruits and players (the recruit profile was deleted), so RT does "
+        f"not change at signing. Recruits whose player-vs-recruit argmax differs: "
+        f"**{changed_argmax:,}/{recruit_count:,}** (expected 0).",
         "",
         "## Anything else that looked wrong",
         "",
@@ -456,16 +445,8 @@ def _build_report(
     stored_vs_computed = source_counts["stored_rt_mismatches"]
     recruit_stored_vs_computed = source_counts["recruit_stored_rt_mismatches"]
     weight_sums = {
-        f"player {pos}": sum(weights.values()) for pos, weights in POSITION_WEIGHTS.items()
+        f"{pos}": sum(weights.values()) for pos, weights in POSITION_WEIGHTS.items()
     }
-    weight_sums.update(
-        {
-            f"recruit {pos}": sum(weights.values())
-            for pos, weights in RECRUIT_POSITION_WEIGHTS.items()
-        }
-    )
-    weight_sums["recruit short PF"] = sum(RECRUIT_PF_WEIGHTS_SHORT.values())
-    weight_sums["recruit short C"] = sum(RECRUIT_C_WEIGHTS_SHORT.values())
     bad_weight_sums = {name: total for name, total in weight_sums.items() if not math.isclose(total, 1.0)}
     observations = [
         f"Exact top-RT ties: {exact_top_ties:,}/{player_count:,} ({_pct(exact_top_ties, player_count)}); "
@@ -580,7 +561,6 @@ def main() -> int:
         attrs = doc.get("attributes") or {}
         computed = compute_position_ratings(
             _player_for_rating(meta.get("height", attrs.get("height")), attrs),
-            profile="player",
         )
         if doc.get("position_ratings") != computed:
             stored_rt_mismatches += 1
@@ -590,7 +570,6 @@ def main() -> int:
         attrs = doc.get("attributes") or {}
         computed = compute_position_ratings(
             _player_for_rating(doc.get("height", attrs.get("height")), attrs),
-            profile="recruit",
         )
         if doc.get("position_ratings") != computed:
             recruit_stored_rt_mismatches += 1

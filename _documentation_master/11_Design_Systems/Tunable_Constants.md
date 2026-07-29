@@ -813,3 +813,53 @@ Playback pacing for the **Sim Full Game / Sim Rest of Game** broadcast overlay (
 | `LINEUP_CHANGE_MS` | simGamePresentation.js | `1000` | playback | Extra hold on a frame where the on-court five changed (foul-out swap / sub) so the swap reads. Overrides the normal per-turn hold on those frames, so a quarter with lineup changes runs slightly over `QUARTER_MS` (≈ `LINEUP_CHANGE_MS − normal per-turn hold` per change). |
 
 **Whole game ≈ ~80–85s** (4 × ~18s + three break cards + tip-off + final). Bars ease via a 0.5s CSS `width` transition between emitted values; reduced-motion fast-forwards (live ~40ms, holds ~400ms).
+
+---
+
+## Player Attribute Recalibration (pass 1 — position ratings, generation, height re-band)
+
+Constants landed by the Player Attribute Recalibration merge (design `Player_Attribute_Recalibration_Design.md`). This pass covers the RT formula (§3.6), interim position-intent generation (§11.2), the pool remap (§11.3) and the downstream height re-band (§11.2). Growth-model knobs (peaks, family timing/curves, offseason split, accumulator, RT compression) are **deferred** to the offseason-development task and intentionally NOT implemented here.
+
+### Position rating formula — `BackEnd/utils/position_ratings.py`
+
+`RT_pos = weighted_attribute_mean(pos) × height_fitness(pos, height)`, clamped lower 1, uncapped above.
+
+| Constant | Value | Effect |
+|---|---|---|
+| `POSITION_WEIGHTS` | 5 vectors, §3.6.1 (each sums to 1.0) | attribute mix per position; one table for players+recruits |
+| `HEIGHT_FITNESS` | (ideal, short/in, tall/in): PG 73.5/.020/.050 · SG 76/.030/.045 · SF 78.5/.035/.035 · PF 80.5/.050/.025 · C 82.5/.060/.010 | multiplicative height gate, all 5 positions |
+| `HEIGHT_FITNESS_FLOOR` / `_CAP` | 0.50 / 1.15 | fitness clamp (peak 1.0 at ideal; cap is a guard) |
+
+### Interim generation — `BackEnd/utils/player_generation.py`
+
+| Constant | Value | Effect |
+|---|---|---|
+| `JH_ANCHOR_BY_TIER` | Poor 20 · BelowAverage 25 · Average 30 · Good 35 · Great 40 · Elite 50 | JH-rung RT anchor per tier (§4.1) |
+| `TIER_FREQUENCY` | .07 / .20 / .40 / .20 / .11 / .02 | share of generated players per tier (§4.1). Supersedes the 4-value `TIER_FREQUENCY` in design §12. |
+| `RUNG_MULTIPLIERS` | JH 1.00 · FR 1.17 · SO 1.43 · JR 1.80 · SR 2.00 | class-year ladder; target RT = anchor × rung (§4.2) |
+| `POSITION_INTENT_SHARE` | 0.20 | ~even position intent |
+| `HEIGHT_IDEAL_IN` | = fitness ideals | per-position height mean (§11.2) |
+| `HEIGHT_SD_IN` | 2.1 | per-position height sd (league aggregate ≈ mean 78, sd 3.6) |
+| `PROFILE_FILLER` | 0.45 | unweighted-attr baseline as fraction of signature attr |
+| `PROFILE_ND_BASE` | 0.60 | ND baseline (ND is not in any RT vector) |
+| `ATTR_NOISE_SD` | 0.20 | per-attribute spread → tweener/tie rate |
+
+### Pool remap — `scripts/regenerate_universal_pool.py`
+
+| Constant | Value | Effect |
+|---|---|---|
+| `INTENT_BANDS` | C/PF/SF each 0.20 (tallest→shortest), guards = rest | height-band position-intent assignment (§11.3 step 1) |
+| `IDENTITY_STRENGTH` | 0.35 | how much a player's old attribute shape modulates the new position profile ("a shooter stays a shooter") |
+
+### Height re-band (§11.2 — league median 72 → 78)
+
+| Constant / location | Value | Effect |
+|---|---|---|
+| `LEAGUE_MEDIAN_HEIGHT_IN` (`constants/__init__.py`) | 78 | single home for missing-height fallback (was 72/75/76 scattered) |
+| `height_to_block_score` (`utils/shared.py`) | `≤78→0`, `h−78`, `≥88→10` | +6 shift; preserves ~1.68 league-mean block score (measured 1.69) |
+| `get_height_scale_value` (`utils/opening_tip.py`) | thresholds +3 (centre-fed: 82→8) | preserves the tip-off contest distribution |
+| `WEIGHT_BY_HEIGHT_BANDS` (`player_generation.py`) / walk-on height ranges | +6 shift | weight-from-height and walk-on heights on the new scale |
+| training-camp weight gates (`training_execution_v2.py`) | `>81`, `>78` (were `>75`, `>72`) | +6 shift |
+
+### Deferred to later tasks (documented in design §12, NOT implemented this pass)
+`PEAK_COUNT_DISTRIBUTION`, `PEAK_RUNG_WEIGHTS`, `PEAK_MULTIPLIER`, `CH_PEAK_WEIGHTING`, `FAMILY_TIMING_WEIGHTS`, `FAMILY_CURVES`, `RT_COMPRESSION_THRESHOLD`, `RT_SOFT_CAP`, `NON_CORE_GROWTH_MULTIPLIER`, `WEEKLY_DECAY_BY_YEAR`, `OFFSEASON_INSEASON_SPLIT`, `ACCUMULATOR_WEIGHT`. CH stays flat `randint(1,100)` (§8); `CAMP_BONUS_CH_BANDS` unchanged.

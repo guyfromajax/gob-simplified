@@ -171,11 +171,13 @@ def advance_recruit_year(year: str | None) -> str:
 # Walk-on year roll weights and per-year generation ranges:
 # (attr_max, attr_cap, height_range, weight_range) — at most 3 attributes may exceed attr_cap.
 WALK_ON_YEAR_WEIGHTS = [("JH", 60), ("Freshman", 20), ("Sophomore", 10), ("Junior", 10)]
+# Height ranges re-banded +6 in. for the recalibrated distribution (§11.2):
+# walk-ons sit just below the new league median (78) rather than the old (72).
 WALK_ON_YEAR_PROFILES = {
-    "JH": (32, 29, (66, 72), (155, 179)),
-    "Freshman": (42, 39, (66, 74), (155, 189)),
-    "Sophomore": (52, 44, (67, 75), (165, 199)),
-    "Junior": (62, 49, (68, 77), (175, 209)),
+    "JH": (32, 29, (72, 78), (155, 179)),
+    "Freshman": (42, 39, (72, 80), (155, 189)),
+    "Sophomore": (52, 44, (73, 81), (165, 199)),
+    "Junior": (62, 49, (74, 83), (175, 209)),
 }
 
 
@@ -218,7 +220,6 @@ def generate_walk_on_profile() -> dict:
     weight = random.randint(weight_range[0], weight_range[1])
     position_ratings = compute_position_ratings(
         {"attributes": attrs, "height": height, "name": name},
-        profile="recruit",
     )
     return {
         "recruit_id": None,
@@ -1017,49 +1018,63 @@ class RecruitManager:
         return years
 
     def generate_recruits_list(self, count=40):
-        """Generate and return a list of recruits (does not save to DB)."""
-        from BackEnd.utils.position_ratings import compute_position_ratings
+        """Generate and return a list of recruits (does not save to DB).
+
+        Position-intent-first generation (design §11.2, interim §11.1): draw a
+        position intent (~20% each) and a tier (§4.1), then let the shared
+        generator draw height from that position's distribution and scale
+        attributes so the recruit's RT at his intended position lands on the
+        §4.2 ladder for his class year. RT no longer changes at signing — there
+        is one table for recruits and players (§3.3). Archetype is now a derived
+        display label; the old 20-archetype attribute machinery is replaced.
+        """
+        from BackEnd.utils.player_generation import (
+            draw_position_intent,
+            draw_tier,
+            generate_player,
+        )
 
         years = self._roll_year_distribution(count)
         recruits = []
         for year in years:
             first_name = choose_franchise_first_name(self.first_names, self.first_name_weights)
-            last_name = random.choice(self.last_names)
-            # Format last name to title case (only first letter capitalized)
-            last_name_formatted = last_name.title()
-            name = f"{first_name} {last_name_formatted}"
-            
-            # Select archetype with weighted probabilities
-            archetype = self._select_archetype()
-            
-            # Generate attributes, height, and weight based on archetype + year tiers
-            attributes, height, weight = self._generate_recruit_profile(archetype, year)
-            attributes["CH"] = self._roll_recruit_character(archetype, year)
+            last_name = random.choice(self.last_names).title()
+            name = f"{first_name} {last_name}"
 
-            # Init NG/MO/EM; preserve recruit CH (Intangibles floor or uniform 1-100).
-            from BackEnd.models.player import Player
-            attributes = Player.randomize_game_attributes(attributes, preserve_character=True)
-            
-            # Calculate position ratings for the recruit
-            recruit_for_ratings = {
-                "attributes": attributes,
-                "height": height,
-                "name": name
-            }
-            position_ratings = compute_position_ratings(recruit_for_ratings, profile="recruit")
-            
+            intent = draw_position_intent(random)
+            tier = draw_tier(random)
+            # Shared generator draws height + target-scaled attributes + CH/EM/MO/NG.
+            gp = generate_player(intent, year, tier, random, name=name)
+
             recruits.append({
-                "name": name, 
-                "attributes": attributes,
-                "position_ratings": position_ratings,
-                "height": height,
-                "weight": weight,
-                "archetype": archetype,
+                "name": name,
+                "attributes": gp["attributes"],
+                "position_ratings": gp["position_ratings"],
+                "height": gp["height"],
+                "weight": gp["weight"],
+                "archetype": self._recruit_display_archetype(intent, tier),
                 "year": year,
-                "created_at": datetime.utcnow()
+                "created_at": datetime.utcnow(),
             })
-        
+
         return recruits
+
+    @staticmethod
+    def _recruit_display_archetype(intent: str, tier: str) -> str:
+        """Cosmetic recruit label derived from (position intent, tier).
+
+        Reuses the existing archetype vocabulary so recruiting surfaces keep a
+        familiar string until the display sweep (a later task) revisits them.
+        """
+        if tier == "Elite":
+            return "Five-Star"
+        if tier == "Great":
+            return "Four-Star"
+        if tier == "Poor":
+            return "Below Average"
+        if tier == "BelowAverage":
+            return "Average"
+        return f"Classic {intent}"
     
     def generate_recruits(self, count=40):
         """Legacy method: Generate recruits and save to global recruits collection.
@@ -1070,124 +1085,8 @@ class RecruitManager:
             self.db.recruits.delete_many({})
             self.db.recruits.insert_many(recruits)
     
-    def _select_archetype(self):
-        """Select a recruit archetype with weighted probabilities."""
-        # Define archetypes with their selection weights
-        # Five-Star and Four-Star are rare, others are equally common
-        archetypes_weights = [
-            ("Five-Star", 1),
-            ("Four-Star", 4),
-            ("Defensive Wizard", 3.6),
-            ("All-Around Scorer", 3.6),
-            ("Classic PG", 3.6),
-            ("Classic SG", 3.6),
-            ("Classic SF", 3.6),
-            ("Classic PF", 3.6),
-            ("Classic C", 3.6),
-            ("Pure Shooter", 3.6),
-            ("Intangibles", 3.6),
-            ("Athlete", 3.6),
-            ("Inside Defender", 3.6),
-            ("Outside Defender", 3.6),
-            ("Average", 13.6),
-            ("Below Average", 13.6),
-            ("Outside Dual Threat", 3.6),
-            ("Driver", 3.6),
-            ("Outside C", 3.6),
-            ("Three & D", 3.6),
-        ]
-        
-        archetypes = [a[0] for a in archetypes_weights]
-        weights = [a[1] for a in archetypes_weights]
-        
-        return random.choices(archetypes, weights=weights, k=1)[0]
-    
-    # Attribute tier ranges by recruit year: (STRONG, SECONDARY, STANDARD, WEAK).
-    # Older recruits roll higher floors and ceilings; heights stay archetype-based.
-    YEAR_TIER_RANGES = {
-        "JH": ((20, 80), (10, 60), (1, 40), (1, 20)),
-        "Freshman": ((30, 80), (20, 60), (10, 40), (10, 20)),
-        "Sophomore": ((40, 85), (30, 70), (10, 50), (10, 30)),
-        "Junior": ((60, 95), (40, 80), (10, 60), (10, 50)),
-    }
-
-    @classmethod
-    def _roll_recruit_character(cls, archetype: str, year: str) -> int:
-        """Roll CH for a recruit.
-
-        Intangibles: randint(year STRONG minimum, 100).
-        All other archetypes: randint(1, 100).
-        """
-        if archetype == "Intangibles":
-            strong, _, _, _ = cls.YEAR_TIER_RANGES.get(year, cls.YEAR_TIER_RANGES["JH"])
-            return random.randint(strong[0], 100)
-        return random.randint(1, 100)
-
-    def _generate_recruit_profile(self, archetype, year="JH"):
-        """Generate attributes, height, and weight for a recruit based on archetype and year."""
-        STRONG, SECONDARY, STANDARD, WEAK = self.YEAR_TIER_RANGES.get(
-            year, self.YEAR_TIER_RANGES["JH"]
-        )
-        
-        # Core profile attrs (CH rolled separately in generate_recruits_list).
-        PROFILE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]
-        
-        # Define archetype configurations: (strong_attrs, secondary_attrs, height_range)
-        archetype_configs = {
-            "Five-Star": (PROFILE_ATTRS, [], (69, 80)),
-            "Four-Star": ([], PROFILE_ATTRS, (66, 78)),
-            "Defensive Wizard": (["ID", "OD"], ["ST", "AG"], (66, 75)),
-            "All-Around Scorer": (["SH", "SC"], ["ST", "AG"], (66, 75)),
-            "Classic PG": (["BH", "PS"], ["OD", "IQ"], (66, 72)),
-            "Classic SG": (["SH"], ["OD"], (66, 74)),
-            "Classic SF": (["SC", "OD"], ["AG"], (69, 75)),
-            "Classic PF": (["RB"], ["ST"], (70, 76)),
-            "Classic C": (["ID", "ST"], ["RB", "SC"], (72, 78)),
-            "Pure Shooter": (["SH", "FT"], [], (66, 73)),
-            "Intangibles": (["IQ", "ND"], [], (66, 75)),
-            "Athlete": (["AG", "ST", "ND"], [], (66, 75)),
-            "Inside Defender": (["ST", "ID"], [], (71, 80)),
-            "Outside Defender": (["AG", "OD"], [], (66, 74)),
-            "Average": ([], [], (66, 75)),
-            "Below Average": ([], [], (66, 74)),  # All weak
-            "Outside Dual Threat": (["SH", "AG"], [], (66, 75)),
-            "Driver": (["SC", "AG"], [], (66, 75)),
-            "Outside C": (["ST", "SH"], [], (72, 77)),
-            "Three & D": (["SH"], ["ID", "OD"], (69, 75)),
-        }
-        
-        strong_attrs, secondary_attrs, height_range = archetype_configs[archetype]
-        
-        # Generate height first (needed for weight calculation)
-        height = random.randint(height_range[0], height_range[1])
-        
-        # Generate weight based on height
-        weight = self._generate_weight(height)
-        
-        # Generate attributes
-        attributes = {}
-        for attr in PROFILE_ATTRS:
-            if archetype == "Below Average":
-                # All attributes are weak for Below Average
-                value = random.randint(WEAK[0], WEAK[1])
-            elif attr in strong_attrs:
-                value = random.randint(STRONG[0], STRONG[1])
-            elif attr in secondary_attrs:
-                value = random.randint(SECONDARY[0], SECONDARY[1])
-            else:
-                value = random.randint(STANDARD[0], STANDARD[1])
-            
-            attributes[attr] = value
-        
-        return attributes, height, weight
-    
-    def _generate_weight(self, height):
-        """Generate weight based on height."""
-        if height < 72:
-            return random.randint(150, 181)
-        elif 72 <= height <= 75:
-            return random.randint(170, 194)
-        elif 76 <= height <= 80:
-            return random.randint(195, 231)
-        else:  # > 80
-            return random.randint(209, 260)
+    # Recruit attribute/height/archetype generation is now position-intent-first
+    # via BackEnd.utils.player_generation (design §11.2). The former 20-archetype
+    # attribute machinery (_select_archetype, YEAR_TIER_RANGES,
+    # _roll_recruit_character, _generate_recruit_profile, _generate_weight) has
+    # been replaced. CH is flat randint(1,100) inside the shared generator (§8).

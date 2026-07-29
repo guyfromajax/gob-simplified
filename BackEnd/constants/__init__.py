@@ -15,6 +15,12 @@ ALL_ATTRS = [
     "ND", "IQ", "CH", "EM", "MO"  # static or macro-adjusted
     ]
 
+# League median height (inches) under the recalibrated height distribution
+# (design §11.2, league aggregate ~mean 78, sd 3.6). Single home for the
+# missing-height fallback so this default is not re-scattered as literals across
+# shot_manager / player / quick_foul / team_builder_roster. Was 72-76 pre-recal.
+LEAGUE_MEDIAN_HEIGHT_IN = 78
+
 BOX_SCORE_KEYS = [
     "FGA", "FGM", "3PTA", "3PTM", "FTA", "FTM",
     "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "F", "MIN", "PTS", "PIP", "FB_PTS", "POT",

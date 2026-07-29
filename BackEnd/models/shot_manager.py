@@ -23,7 +23,8 @@ from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
 from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
 from BackEnd.constants.shot_threshold_scale import MAX as SHOT_THRESHOLD_MAX
 from BackEnd.constants import (
-    THREE_POINT_PROBABILITY, 
+    LEAGUE_MEDIAN_HEIGHT_IN,
+    THREE_POINT_PROBABILITY,
     THREE_POINT_SPOTS,
     PAINT_SPOTS,
     PLAYCALL_ATTRIBUTE_WEIGHTS, 
@@ -1195,7 +1196,7 @@ class ShotManager:
                     z3 = random.randint(BLOCK_PLAYER_ROLL_MIN, BLOCK_PLAYER_ROLL_MAX)
                     def_eff = core8_gameplay(def_team.team_attributes.get("defensive_efficiency", 0))
                     def_height_val = height_to_block_score(
-                        getattr(defender, "height", None) or defender.attributes.get("height") or 76
+                        getattr(defender, "height", None) or defender.attributes.get("height") or LEAGUE_MEDIAN_HEIGHT_IN
                     )
                     player_block_threshold = (defender.attributes.get("ID", 0) or 0) + (def_eff * def_height_val)
                     should_attempt_block_reconciliation = z3 <= player_block_threshold
@@ -1208,7 +1209,7 @@ class ShotManager:
                         shooter_coords_recon.get("x"), shooter_coords_recon.get("y"),
                         getattr(shooter, "player_id", None),
                     )
-                    def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or 76
+                    def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or LEAGUE_MEDIAN_HEIGHT_IN
                     def_h = height_to_block_score(def_height_inches)
                     def_scaled_height = (def_h * 10) + random.randint(-9, 9)
                     def_attrs = defender.attributes
@@ -1220,7 +1221,7 @@ class ShotManager:
                         increment_block_funnel(game_state, "foul_band")
                         # Shooting foul from block: shooter_finish_score vs 250
                         # Outcome: AND-1 on make (1 FT), or 2 FTs on miss (shooting foul = 2 FTs on miss).
-                        shoot_h = height_to_block_score(getattr(shooter, "height", None) or shooter.attributes.get("height") or 76)
+                        shoot_h = height_to_block_score(getattr(shooter, "height", None) or shooter.attributes.get("height") or LEAGUE_MEDIAN_HEIGHT_IN)
                         shoot_scaled = (shoot_h * 10) + random.randint(-9, 9)
                         shoot_attrs = shooter.attributes
                         shooter_finish_score = (

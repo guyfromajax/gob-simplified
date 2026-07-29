@@ -1147,14 +1147,16 @@ def _roll_training_camp_height_delta(year: str) -> int:
 
 
 def _roll_training_camp_weight_delta(year: str, height_after: int) -> int:
+    # Height gates re-banded +6 in. for the recalibrated distribution (§11.2):
+    # 75 -> 81, 72 -> 78 (league median moved 72 -> 78).
     if year == "sophomore":
-        if height_after > 75:
+        if height_after > 81:
             return random.randint(0, 10)
         return random.randint(0, 5)
     if year == "freshman":
-        if height_after > 75:
+        if height_after > 81:
             return random.randint(10, 30)
-        if height_after > 72:
+        if height_after > 78:
             return random.randint(5, 15)
         return random.randint(0, 10)
     return 0

@@ -28,6 +28,7 @@ from BackEnd.utils.sim_random import sim_rng as random
 from typing import Any, Dict, List, Optional, Tuple
 
 from BackEnd.constants import (
+    LEAGUE_MEDIAN_HEIGHT_IN,
     HCO_STRING_SPOTS,
     QUICK_FOUL_APPROACH_RADIUS_GRID,
     QUICK_FOUL_RECEIVER_MAX_DIST_GRID,
@@ -93,7 +94,7 @@ def _ft_rating(player) -> float:
 
 def _height(player) -> float:
     try:
-        return float(getattr(player, "height", 75) or 75)
+        return float(getattr(player, "height", LEAGUE_MEDIAN_HEIGHT_IN) or LEAGUE_MEDIAN_HEIGHT_IN)
     except (TypeError, ValueError):
         return 75.0
 

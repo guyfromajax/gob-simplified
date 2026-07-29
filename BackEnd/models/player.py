@@ -1,6 +1,6 @@
 # BackEnd/models/player.py
 
-from BackEnd.constants import ALL_ATTRS, BOX_SCORE_KEYS, MALLEABLE_ATTRS
+from BackEnd.constants import ALL_ATTRS, BOX_SCORE_KEYS, LEAGUE_MEDIAN_HEIGHT_IN, MALLEABLE_ATTRS
 from BackEnd.constants.momentum import (
     MO_CONSECUTIVE_THRESHOLD,
     MO_CONSECUTIVE_DELTA,
@@ -59,7 +59,7 @@ class Player:
         # tests construct lightweight player dictionaries (or patch lineup
         # builders) that omit a dedicated attribute block, so default to a
         # reasonable value when ``height``/``weight`` are missing.
-        self.height = data.get("height", data.get("HT", 75))
+        self.height = data.get("height", data.get("HT", LEAGUE_MEDIAN_HEIGHT_IN))
         self.weight = data.get("weight", data.get("WT", 200))
         self.attributes = self._extract_attributes(data)
         self.jersey = data.get("jersey", 0)

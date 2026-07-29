@@ -9,7 +9,7 @@ from typing import Any, Mapping, Sequence
 
 from bson import ObjectId
 
-from BackEnd.constants import BOX_SCORE_KEYS
+from BackEnd.constants import BOX_SCORE_KEYS, LEAGUE_MEDIAN_HEIGHT_IN
 from BackEnd.constants.team_builder_budget import CORE_12_ATTRS
 from BackEnd.models.franchise_manager import generate_walk_on_profile, get_franchise_name_assets, choose_franchise_first_name
 from BackEnd.models.player import Player
@@ -189,7 +189,7 @@ def slot_band_defaults(
 ) -> dict[str, Any]:
     """Median height/weight/attrs from the slot's current franchise roster."""
     defaults: dict[str, Any] = {
-        "height": 72,
+        "height": LEAGUE_MEDIAN_HEIGHT_IN,
         "weight": 185,
         "attrs": {key: 40 for key in CORE_12_ATTRS},
     }
@@ -263,7 +263,6 @@ def _build_fpd_doc(
     name = f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip()
     position_ratings = compute_position_ratings(
         {"attributes": attributes, "height": meta.get("height"), "name": name},
-        profile="player",
     )
     return {
         "franchise_id": str(franchise_id),
@@ -299,7 +298,7 @@ def normalize_imported_players(
         if not year:
             continue
 
-        height = _safe_int(row.get("height_in"), band_defaults.get("height", 72))
+        height = _safe_int(row.get("height_in"), band_defaults.get("height", LEAGUE_MEDIAN_HEIGHT_IN))
         weight = _safe_int(row.get("weight_lb"), band_defaults.get("weight", 185))
         jersey = _safe_int(row.get("jersey"))
 
@@ -387,7 +386,7 @@ def generate_roster_at_band(
             "last_name": last,
             "team": team_name,
             "team_id": str(team_object_id),
-            "height": meta_template.get("height") or 72,
+            "height": meta_template.get("height") or LEAGUE_MEDIAN_HEIGHT_IN,
             "weight": meta_template.get("weight") or 185,
             "year": meta_template.get("year") or _walk_on_class_year(),
             "jersey": None,

@@ -1,83 +1,83 @@
-from BackEnd.utils.position_ratings import compute_position_ratings
+"""Tests for the recalibrated position-rating model (design §3.6).
+
+RT = attribute weighted mean × multiplicative height fitness. One table for
+everyone (no recruit profile). Lower clamp 1, uncapped above.
+"""
+
+import math
+
+import pytest
+
+from BackEnd.utils.position_ratings import (
+    HEIGHT_FITNESS,
+    HEIGHT_FITNESS_CAP,
+    HEIGHT_FITNESS_FLOOR,
+    POSITION_WEIGHTS,
+    compute_position_ratings,
+    height_fitness,
+)
 
 
-def test_mid_range_ratings():
-    player = {
-        "height": 74,
-        "attributes": {
-            "SC": 65,
-            "SH": 65,
-            "ID": 65,
-            "OD": 65,
-            "PS": 65,
-            "BH": 65,
-            "RB": 65,
-            "AG": 65,
-            "ST": 65,
-            "IQ": 65,
-            "FT": 65,
-        },
-    }
+def test_weight_tables_sum_to_one():
+    for pos, weights in POSITION_WEIGHTS.items():
+        assert math.isclose(sum(weights.values()), 1.0, abs_tol=1e-9), pos
+
+
+def test_no_height_term_in_weight_tables():
+    # Height is a multiplier now, never a weighted attribute.
+    for weights in POSITION_WEIGHTS.values():
+        assert "height" not in weights
+
+
+def test_height_fitness_peaks_at_ideal():
+    for pos, (ideal, _, _) in HEIGHT_FITNESS.items():
+        assert math.isclose(height_fitness(pos, ideal), 1.0)
+
+
+def test_height_fitness_asymmetric_penalty():
+    # C falls off fast when short, barely when tall.
+    assert height_fitness("C", 80) < height_fitness("C", 85)
+    # PG falls off fast when tall, barely when short.
+    assert height_fitness("PG", 84) < height_fitness("PG", 70)
+
+
+def test_height_fitness_floor_and_cap():
+    # A guard-height player is heavily gated out of centre but floored at 0.50.
+    assert height_fitness("C", 66) == HEIGHT_FITNESS_FLOOR
+    # Fitness never exceeds the cap and never drops below the floor.
+    for pos in POSITION_WEIGHTS:
+        for h in range(60, 92):
+            assert HEIGHT_FITNESS_FLOOR <= height_fitness(pos, h) <= HEIGHT_FITNESS_CAP
+
+
+def test_rt_equals_mean_times_fitness():
+    player = {"height": 82, "attributes": {k: 100 for k in
+              ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "IQ", "FT")}}
+    # mean of all-100 weighted attrs is 100; C fitness at 82 = 1 - 0.06*0.5 = 0.97.
+    assert compute_position_ratings(player)["C"] == round(100 * height_fitness("C", 82))
+
+
+def test_rt_is_uncapped_above_100():
+    player = {"height": 82, "attributes": {k: 120 for k in POSITION_WEIGHTS["C"]}}
+    assert compute_position_ratings(player)["C"] > 100
+
+
+def test_rt_lower_clamp_is_one():
+    player = {"height": 60, "attributes": {}}
+    for rating in compute_position_ratings(player).values():
+        assert rating >= 1
+
+
+def test_height_gates_short_center_toward_guard():
+    # Balanced attributes, guard height: PG should out-rate C purely on fitness.
+    player = {"height": 70, "attributes": {k: 60 for k in
+              ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "IQ", "FT")}}
     ratings = compute_position_ratings(player)
-    for pos_rating in ratings.values():
-        assert 35 <= pos_rating <= 80
+    assert ratings["PG"] > ratings["C"]
 
 
-def test_height_clamps():
-    low = {"height": 50, "attributes": {}}
-    high = {"height": 90, "attributes": {}}
-    low_center = compute_position_ratings(low)["C"]
-    high_center = compute_position_ratings(high)["C"]
-    assert low_center == 1
-    # C rating weights height at 40%; max C height rating 100 -> 40 when other attrs are 0
-    assert high_center == 40
-
-
-def test_power_forward_regular_uses_height():
-    player = {"height": 90, "attributes": {}}
-    # PF-specific height caps at 75 and regular PF weights height at 10%.
-    assert compute_position_ratings(player)["PF"] == 8
-
-
-def test_pf_and_c_use_position_specific_height_conversions():
-    attrs = {}
-    assert compute_position_ratings({"height": 71, "attributes": attrs})["PF"] == 1
-    assert compute_position_ratings({"height": 72, "attributes": attrs})["PF"] == 2
-    assert compute_position_ratings({"height": 75, "attributes": attrs})["PF"] == 2
-    assert compute_position_ratings({"height": 76, "attributes": attrs})["PF"] == 8
-
-    assert compute_position_ratings({"height": 75, "attributes": attrs})["C"] == 1
-    assert compute_position_ratings({"height": 76, "attributes": attrs})["C"] == 10
-    assert compute_position_ratings({"height": 77, "attributes": attrs})["C"] == 20
-    assert compute_position_ratings({"height": 78, "attributes": attrs})["C"] == 30
-    assert compute_position_ratings({"height": 79, "attributes": attrs})["C"] == 40
-
-
-def test_recruit_power_forward_weights_reduce_height():
-    player = {"height": 90, "attributes": {"RB": 100, "ST": 100}}
-    ratings = compute_position_ratings(player, profile="recruit")
-    assert ratings["PF"] == 68
-
-
-def test_recruit_center_weights_scoring_and_inside_defense_more_than_height():
-    player = {"height": 90, "attributes": {"SC": 100, "ID": 100}}
-    ratings = compute_position_ratings(player, profile="recruit")
-    assert ratings["C"] == 70
-
-
-def test_short_recruit_pf_and_c_drop_height_weight_from_sum():
-    """Height < 71 in.: PF/C use 0% height; tall recruit still applies 10% height to PF/C."""
-    tall = {"height": 84, "attributes": {}}
-    short = {"height": 70, "attributes": {}}
-    assert compute_position_ratings(tall, profile="recruit")["PF"] == 8
-    assert compute_position_ratings(short, profile="recruit")["PF"] == 1
-    assert compute_position_ratings(tall, profile="recruit")["C"] == 10
-    assert compute_position_ratings(short, profile="recruit")["C"] == 1
-
-
-def test_player_short_height_does_not_use_recruit_short_pf_weights():
-    """Roster players always use POSITION_WEIGHTS (no <71 recruit branch)."""
-    player = {"height": 70, "attributes": {"RB": 100, "ST": 100}}
-    recruit = {"height": 70, "attributes": {"RB": 100, "ST": 100}}
-    assert compute_position_ratings(player)["PF"] == 55
-    assert compute_position_ratings(recruit, profile="recruit")["PF"] == 70
+def test_no_profile_parameter():
+    # The recruit profile is gone: a recruit's RT must not differ from a player's.
+    player = {"height": 78, "attributes": {"SC": 50, "SH": 50, "RB": 50, "ST": 50}}
+    with pytest.raises(TypeError):
+        compute_position_ratings(player, profile="recruit")  # type: ignore[call-arg]

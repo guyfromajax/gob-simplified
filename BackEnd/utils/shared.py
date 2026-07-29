@@ -1445,7 +1445,13 @@ def calculate_screen_score(screen_attrs):
 def height_to_block_score(height_inches):
     """
     Map player height (inches) to 0-10 for block reconciliation.
-    >=82 -> 10, 81 -> 9, ... 73 -> 1, <=72 -> 0.
+    >=88 -> 10, 87 -> 9, ... 79 -> 1, <=78 -> 0.
+
+    Re-banded +6 in. for the recalibrated height distribution (design §11.2).
+    The +6 shift tracks the league median moving 72 -> 78, and reproduces the
+    original league-mean block score of ~1.68 under the new distribution
+    (measured 1.69); the pre-recal bands (<=72 -> 0, >=82 -> 10) would have
+    yielded ~5.08 and moved block rates sharply.
     """
     if height_inches is None:
         return 0
@@ -1453,11 +1459,11 @@ def height_to_block_score(height_inches):
         h = int(height_inches)
     except (TypeError, ValueError):
         return 0
-    if h >= 82:
+    if h >= 88:
         return 10
-    if h <= 72:
+    if h <= 78:
         return 0
-    return h - 72  # 73->1, 74->2, ..., 81->9
+    return h - 78  # 79->1, 80->2, ..., 87->9
 
 
 def calculate_block_spot(shooter_x, shooter_y, is_away_offense):

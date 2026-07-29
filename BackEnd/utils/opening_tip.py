@@ -42,26 +42,34 @@ OPENING_TIP_ENTRANCE_POSITIONS = {
 }
 
 def get_height_scale_value(height):
-    """Convert player height to tip-off scale value"""
-    if height > 83:
+    """Convert player height to tip-off scale value (1-10).
+
+    Re-banded +3 in. for the recalibrated height distribution (design §11.2).
+    The tip is contested by each team's tallest player (a centre), whose median
+    height moved 79 -> 82 under the new distribution — a smaller shift than the
+    +6 league median, because centres were previously undersized. The +3 shift
+    keeps a new centre landing mid-scale (82 -> 8) exactly where the old centre
+    median did (79 -> 8), preserving the tip-off contest.
+    """
+    if height > 86:
         return 10
-    elif height >= 81:
+    elif height >= 84:
         return 9
-    elif height >= 79:
+    elif height >= 82:
         return 8
-    elif height == 78:
+    elif height == 81:
         return 7
-    elif height == 77:
+    elif height == 80:
         return 6
-    elif height == 76:
+    elif height == 79:
         return 5
-    elif height == 75:
+    elif height == 78:
         return 4
-    elif height == 74:
+    elif height == 77:
         return 3
-    elif height == 73:
+    elif height == 76:
         return 2
-    else:  # < 73
+    else:  # < 76
         return 1
 
 def execute_opening_tip(game):
@@ -285,26 +293,3 @@ def get_slight_movement_toward_ball(start_coords, ball_coords):
             "x": start_coords["x"] + random.randint(-1, 1),
             "y": start_coords["y"] + random.randint(-1, 1)
         }
-
-def player_tip_score(player):
-    """Legacy function - kept for compatibility"""
-    tip_score = 0
-    height_score_dict = {
-        82: 11,
-        81: 10,
-        80: 9,
-        79: 8,
-        78: 7,
-        77: 6,
-        76: 5,
-        75: 4,
-        74: 3,
-        73: 2,
-    }
-
-    if player.height in height_score_dict:
-        tip_score += height_score_dict[player.height] * random.randint(1, 6)
-    else:
-        tip_score += random.randint(1, 5)
-
-    return tip_score
