@@ -14709,6 +14709,46 @@ def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players
                     painted, str(franchise_id))
 
 
+# RT jump that reads as a "breakout" in the offseason report. Chosen to surface
+# strong development without exposing peaks — a peak produces a bigger jump, but
+# the flag is on the visible RT delta, not on peak_count (§8: never leak CH).
+_OFFSEASON_BREAKOUT_RT = 8
+
+
+def _build_offseason_report_line(new_doc: dict, prev_doc: dict, dev_result: dict) -> dict:
+    """One offseason-development report row (§7.1 step 7).
+
+    Reports only observable outcomes — RT change, a "broke out" flag on a large
+    visible RT jump, and whether the player's BEST position changed (the HT-driven
+    wing→four moment, ~5% of players). It never exposes peak_count, remaining
+    peaks, ch_seed or anything they can be inferred from (§8)."""
+    def _top(pr):
+        vals = [v for v in (pr or {}).values() if isinstance(v, (int, float))]
+        return max(vals) if vals else 0
+
+    def _argmax(pr):
+        pr = pr or {}
+        return max(pr, key=pr.get) if pr else None
+
+    meta = new_doc.get("meta") or {}
+    before = _top(prev_doc.get("position_ratings"))
+    after = _top(new_doc.get("position_ratings"))
+    prev_best = _argmax(prev_doc.get("position_ratings"))
+    new_best = _argmax(new_doc.get("position_ratings"))
+    return {
+        "player_id": new_doc.get("player_id"),
+        "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip(),
+        "year": meta.get("year"),
+        "training_position": new_doc.get("position_intent"),
+        "rt_before": before,
+        "rt_after": after,
+        "rt_delta": after - before,
+        "broke_out": (after - before) >= _OFFSEASON_BREAKOUT_RT,
+        "best_position_changed": bool(prev_best and new_best and prev_best != new_best),
+        "new_best_position": new_best,
+    }
+
+
 @router.post("/franchise/finish-season")
 def finish_season(req: FinishSeasonRequest):
     """Finish current season and start new season."""
@@ -14766,6 +14806,12 @@ def finish_season(req: FinishSeasonRequest):
     signed_players = list(week_35_results.get("signed_players") or [])
     zero_stats = _zero_stats_block()
 
+    # Offseason development event (§7.1) runs per rolled-over player below. Uses the
+    # global random stream (this endpoint is not seeded); collects a report list.
+    from BackEnd.utils.player_development import develop_rollover
+    _dev_rng = random
+    _offseason_reports: list[dict[str, Any]] = []
+
     def advance_year(year_value: str | None) -> str:
         year = str(year_value or "").strip().lower()
         mapping = {
@@ -14811,7 +14857,25 @@ def finish_season(req: FinishSeasonRequest):
                 "career": (fpd_doc.get("career") or zero_stats.copy()),
                 "attributes": (fpd_doc.get("attributes") or {}).copy(),
                 "position_ratings": (fpd_doc.get("position_ratings") or {}).copy(),
+                # Development pointer carried forward (§10). Without this the growth
+                # profile would vanish at rollover and the league would revert to the
+                # default curve — the highest-risk failure in this task.
+                "development": fpd_doc.get("development"),
+                "entry_tier": fpd_doc.get("entry_tier"),
+                "position_intent": fpd_doc.get("position_intent"),
             }
+            # Offseason development event (§7.1): develop the returning player onto
+            # his new year's rung, then recompute ratings (incl. after HT growth).
+            # Lazy-backfills + persists a missing profile once (existing saves).
+            _dev = develop_rollover(next_doc, meta["year"], _dev_rng)
+            next_doc["attributes"] = _dev["attributes"]
+            next_doc["meta"]["height"] = _dev["height"]
+            next_doc["meta"]["weight"] = _dev["weight"]
+            next_doc["position_ratings"] = _dev["position_ratings"]
+            next_doc["development"] = _dev["development"]
+            next_doc["entry_tier"] = _dev["entry_tier"]
+            next_doc["position_intent"] = _dev["position_intent"]
+            _offseason_reports.append(_build_offseason_report_line(next_doc, fpd_doc, _dev))
             next_fpd_docs.append(next_doc)
             returning_players_by_team[team_id].append(player_id_str)
             if player_id_str in scholarship_players:
@@ -14826,7 +14890,7 @@ def finish_season(req: FinishSeasonRequest):
         name_parts = str(signed_player.get("name") or "").split(" ", 1)
         first_name = name_parts[0] if name_parts else ""
         last_name = name_parts[1] if len(name_parts) > 1 else ""
-        next_fpd_docs.append({
+        signed_doc = {
             "franchise_id": str(franchise_id),
             "player_id": str(signed_player["player_id"]),
             "meta": {
@@ -14852,7 +14916,24 @@ def finish_season(req: FinishSeasonRequest):
                 signed_player.get("attributes") or {}
             ),
             "position_ratings": (signed_player.get("position_ratings") or {}).copy(),
-        })
+            # Development pointer from the recruit/walk-on source (§10); missing
+            # fields lazy-backfill inside develop_rollover.
+            "development": signed_player.get("development"),
+            "entry_tier": signed_player.get("entry_tier"),
+            "position_intent": signed_player.get("position_intent"),
+        }
+        # Signed players enter advanced one year, so they too walk an offseason rung.
+        _prev = {"position_ratings": signed_doc["position_ratings"]}
+        _dev = develop_rollover(signed_doc, signed_doc["meta"]["year"], _dev_rng)
+        signed_doc["attributes"] = _dev["attributes"]
+        signed_doc["meta"]["height"] = _dev["height"]
+        signed_doc["meta"]["weight"] = _dev["weight"]
+        signed_doc["position_ratings"] = _dev["position_ratings"]
+        signed_doc["development"] = _dev["development"]
+        signed_doc["entry_tier"] = _dev["entry_tier"]
+        signed_doc["position_intent"] = _dev["position_intent"]
+        _offseason_reports.append(_build_offseason_report_line(signed_doc, _prev, _dev))
+        next_fpd_docs.append(signed_doc)
 
     next_fpd_map = {doc["player_id"]: doc for doc in next_fpd_docs}
     existing_ftd_by_team_id = {
@@ -15060,8 +15141,22 @@ def finish_season(req: FinishSeasonRequest):
     )
     
     logger.info(f"✅ [FINISH SEASON] Started season {next_season}")
-    
-    return {"status": "success", "season": next_season, "week": 1}
+
+    logger.info(
+        "🌱 [OFFSEASON DEV] %d players developed; %d broke out; %d changed best position",
+        len(_offseason_reports),
+        sum(1 for r in _offseason_reports if r.get("broke_out")),
+        sum(1 for r in _offseason_reports if r.get("best_position_changed")),
+    )
+
+    return {
+        "status": "success",
+        "season": next_season,
+        "week": 1,
+        # Offseason development report data (§7.1 step 7) — feed for the later
+        # report UI. Contains no peak/CH information (§8).
+        "offseason_development": _offseason_reports,
+    }
 
 
 # ============================================================================

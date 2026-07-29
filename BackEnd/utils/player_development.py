@@ -132,7 +132,7 @@ HT_CURVE_BY_TIMING = {
 HT_TOTAL_MEAN = 3.2
 HT_TOTAL_SD = 1.9
 HT_TOTAL_MIN, HT_TOTAL_MAX = 0, 8
-HT_PER_RUNG_CAP = 2  # no more than ~2.5in in one summer; overflow carries forward
+HT_PER_RUNG_CAP = 3  # ~2.5in/summer intent (integer 3); at 2 it clipped p90 career gain to 5in vs the intended 6
 # WT tracks strength: pounds per inch of HT gain, plus muscle with ST growth.
 WT_LBS_PER_INCH = (4, 7)
 WT_LBS_PER_ST = (0, 1)
@@ -148,14 +148,23 @@ def _cat(rng: random.Random, dist) -> int:
     return len(dist) - 1
 
 
-def roll_growth_profile(ch_seed: int, rng: random.Random) -> dict:
-    """Roll the frozen growth profile from a flat CH seed (§5, §8)."""
+def roll_growth_profile(ch_seed: int, rng: random.Random,
+                        eligible_peak_rungs: Optional[List[str]] = None) -> dict:
+    """Roll the frozen growth profile from a flat CH seed (§5, §8).
+
+    ``eligible_peak_rungs`` restricts where a peak may land — used for lazy
+    backfill of a mid-career player so peaks land on his REMAINING rungs only
+    (§11.3 past-fixed/future-varies), never on a rung already behind him.
+    Peak COUNT still uses the full CH-weighted distribution (a backfilled junior
+    is not stunted); only placement is restricted."""
     t = (ch_seed - 1) / 99.0
     peak_dist = [CH_PEAK_LOW[i] + (CH_PEAK_HIGH[i] - CH_PEAK_LOW[i]) * t for i in range(4)]
     peak_count = _cat(rng, peak_dist)
 
-    rungs = list(PEAK_RUNG_WEIGHTS)
+    eligible = list(eligible_peak_rungs) if eligible_peak_rungs is not None else list(PEAK_RUNG_WEIGHTS)
+    rungs = [r for r in PEAK_RUNG_WEIGHTS if r in eligible]
     weights = [PEAK_RUNG_WEIGHTS[r] for r in rungs]
+    peak_count = min(peak_count, len(rungs))  # can't place more peaks than eligible rungs
     peak_rungs: List[str] = []
     for _ in range(peak_count):
         pick = rng.choices(rungs, weights=weights, k=1)[0]
@@ -354,6 +363,73 @@ def simulate_career(position: str, tier: str, ch_seed: int, rng: random.Random,
     return player
 
 
+def _derive_entry_tier_from_rt(position_ratings: dict, rung: str) -> str:
+    """Best-effort entry_tier for a legacy player with no stored tier.
+
+    DOCUMENTED CAVEAT (Tunable_Constants.md): this reads the player's CURRENT top
+    RT, but a legacy old-scale big man's RT has collapsed under height gating, so
+    he reads as a lower tier than he entered and then develops on that lower
+    ladder — compounding the degradation. Consistent with letting existing saves
+    degrade (§14, new-franchises-only); backfilled players are second-class by
+    design. New franchises never hit this path (entry_tier is carried pool→FPD)."""
+    top_rt = max((v for v in (position_ratings or {}).values() if isinstance(v, (int, float))), default=30)
+    cum = 1.0
+    for r in RUNG_TRANSITIONS:
+        cum += STD_RUNG_INCREMENT[r]
+        if r == rung:
+            break
+    est_anchor = top_rt / cum
+    return min(JH_ANCHOR_BY_TIER, key=lambda t: abs(JH_ANCHOR_BY_TIER[t] - est_anchor))
+
+
+def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random) -> dict:
+    """Apply the offseason event to an FPD player rolling onto ``new_year`` (§7.1),
+    handling the FPD document shape and lazy-backfilling a missing profile.
+
+    Returns {attributes, height, weight, position_ratings, development, entry_tier,
+    position_intent, backfilled}. The caller persists all of them. Pure given rng.
+
+    Lazy backfill (existing saves, §11.3 rule): a player with no `development` gets
+    one rolled ONCE here from his live CH frozen as ch_seed, with peaks restricted
+    to his REMAINING rungs, and it is returned for persistence so it never re-rolls.
+    entry_tier / position_intent are derived if absent (see caveat)."""
+    from BackEnd.utils.player_generation import normalize_year as _ny
+    rung = _ny(new_year)
+    if rung not in RUNG_TRANSITIONS:
+        rung = "FR"
+    meta = fpd_doc.get("meta") or {}
+    attrs = dict(fpd_doc.get("attributes") or {})
+    height = meta.get("height", attrs.get("height"))
+    ratings = fpd_doc.get("position_ratings") or {}
+
+    position_intent = fpd_doc.get("position_intent") or (
+        max(ratings, key=ratings.get) if ratings else "SF")
+    entry_tier = fpd_doc.get("entry_tier") or _derive_entry_tier_from_rt(ratings, rung)
+
+    profile = fpd_doc.get("development")
+    backfilled = False
+    if not profile:
+        backfilled = True
+        ch_seed = int(attrs.get("anchor_CH", attrs.get("CH", rng.randint(1, 100))) or rng.randint(1, 100))
+        # remaining rungs = this rung and everything after it
+        remaining = list(RUNG_TRANSITIONS[RUNG_TRANSITIONS.index(rung):])
+        profile = roll_growth_profile(ch_seed, rng, eligible_peak_rungs=remaining)
+
+    player = {
+        "attributes": attrs, "height": height, "weight": meta.get("weight", 0),
+        "position": position_intent, "training_position": position_intent,
+        "jh_anchor": JH_ANCHOR_BY_TIER[entry_tier], "position_ratings": dict(ratings),
+        "_ht_carry": fpd_doc.get("_ht_carry", 0.0),
+    }
+    develop_one_offseason(player, rung, profile, rng)
+    return {
+        "attributes": player["attributes"], "height": player["height"],
+        "weight": player["weight"], "position_ratings": player["position_ratings"],
+        "development": profile, "entry_tier": entry_tier,
+        "position_intent": position_intent, "backfilled": backfilled,
+    }
+
+
 __all__ = [
     "PHYSICAL_ATTRS", "SKILL_ATTRS", "MENTAL_ATTRS", "GROWTH_ATTRS", "FAMILY_OF",
     "RUNG_TRANSITIONS", "STD_RUNG_INCREMENT", "PEAK_BONUS",
@@ -361,5 +437,6 @@ __all__ = [
     "CH_PEAK_LOW", "CH_PEAK_HIGH", "PEAK_RUNG_WEIGHTS", "FAMILY_TIMING_WEIGHTS",
     "FAMILY_CURVES", "OFFSEASON_SPLIT", "NON_CORE_GROWTH_MULTIPLIER",
     "HT_CURVE_BY_TIMING", "HT_TOTAL_MEAN", "HT_TOTAL_SD", "HT_PER_RUNG_CAP",
-    "roll_growth_profile", "develop_one_offseason", "init_career", "simulate_career",
+    "roll_growth_profile", "develop_one_offseason", "develop_rollover",
+    "init_career", "simulate_career",
 ]

@@ -185,6 +185,7 @@ def generate_walk_on_profile() -> dict:
     everyone else (§8) — no walk-on cap, so a high-CH walk-on can still develop.
     """
     from BackEnd.utils.player_generation import draw_position_intent, generate_player
+    from BackEnd.utils.player_development import roll_growth_profile
 
     first_names, last_names, first_name_weights = get_franchise_name_assets()
     year = random.choices(
@@ -198,6 +199,7 @@ def generate_walk_on_profile() -> dict:
 
     intent = draw_position_intent(random)
     gp = generate_player(intent, year, "Poor", random, name=name)
+    development = roll_growth_profile(int(gp["attributes"].get("CH", 50)), random)
     return {
         "recruit_id": None,
         "name": name,
@@ -207,6 +209,9 @@ def generate_walk_on_profile() -> dict:
         "weight": gp["weight"],
         "archetype": "Walk On",
         "year": year,
+        "entry_tier": "Poor",
+        "position_intent": intent,
+        "development": development,
         "Home Region": "",
     }
 
@@ -312,7 +317,7 @@ class FranchiseManager:
         _t0 = time.time()
         # Load all players with their full attributes for franchise-specific storage
         players = self.db.players.find(
-            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1, "height": 1, "weight": 1, "year": 1, "jersey": 1}
+            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1, "height": 1, "weight": 1, "year": 1, "jersey": 1, "entry_tier": 1, "position_intent": 1}
         )
         for p in players:
             from BackEnd.models.player import Player
@@ -342,6 +347,11 @@ class FranchiseManager:
                 "career": career,
                 "attributes": attrs,  # Franchise-specific attributes with randomized EM/CH/MO
                 "position_ratings": p.get("position_ratings", {}).copy(),  # Clone position ratings for this franchise
+                # Carry the development pointer pool -> FPD (§10). The pool holds
+                # entry_tier + position_intent (pass-1 migration) but no development
+                # subdoc; that lazy-backfills at the first offseason event.
+                "entry_tier": p.get("entry_tier"),
+                "position_intent": p.get("position_intent"),
             }
         _perf["players_find_and_loop"] = (time.time() - _t0) * 1000
 
@@ -377,6 +387,9 @@ class FranchiseManager:
                     "career": zero_stats.copy(),
                     "attributes": wo["attributes"],
                     "position_ratings": wo["position_ratings"],
+                    "entry_tier": wo.get("entry_tier"),
+                    "position_intent": wo.get("position_intent"),
+                    "development": wo.get("development"),
                 }
                 walk_on_ids.append(wid)
             team["player_ids"] = [str(pid) for pid in team.get("player_ids", [])] + walk_on_ids
@@ -488,6 +501,12 @@ class FranchiseManager:
                 "career": data["career"],
                 "attributes": data["attributes"],
                 "position_ratings": data["position_ratings"],
+                # Development pointer (§10). entry_tier/position_intent carried from
+                # the pool or the walk-on roll; development present for walk-ons,
+                # else lazy-backfilled at the first offseason event.
+                **({"entry_tier": data["entry_tier"]} if data.get("entry_tier") is not None else {}),
+                **({"position_intent": data["position_intent"]} if data.get("position_intent") is not None else {}),
+                **({"development": data["development"]} if data.get("development") is not None else {}),
             }
             for pid, data in players_map.items()
         ]
@@ -514,6 +533,10 @@ class FranchiseManager:
                 "weight": recruit["weight"],
                 "archetype": recruit["archetype"],
                 "year": recruit["year"],
+                # Development pointer (§10) so it survives signing → FPD.
+                **({"entry_tier": recruit["entry_tier"]} if recruit.get("entry_tier") is not None else {}),
+                **({"position_intent": recruit["position_intent"]} if recruit.get("position_intent") is not None else {}),
+                **({"development": recruit["development"]} if recruit.get("development") is not None else {}),
                 "Home Region": home_region,
                 "Lean": self._build_recruit_lean(home_region, region_team_ids),
                 "created_at": recruit.get("created_at") or datetime.utcnow(),
@@ -1010,6 +1033,7 @@ class RecruitManager:
             draw_tier,
             generate_player,
         )
+        from BackEnd.utils.player_development import roll_growth_profile
 
         years = self._roll_year_distribution(count)
         recruits = []
@@ -1022,6 +1046,9 @@ class RecruitManager:
             tier = draw_tier(random)
             # Shared generator draws height + target-scaled attributes + CH/EM/MO/NG.
             gp = generate_player(intent, year, tier, random, name=name)
+            # Growth profile frozen at generation from the (flat) CH seed (§5, §10).
+            ch_seed = int(gp["attributes"].get("CH", 50))
+            development = roll_growth_profile(ch_seed, random)
 
             recruits.append({
                 "name": name,
@@ -1031,6 +1058,9 @@ class RecruitManager:
                 "weight": gp["weight"],
                 "archetype": self._recruit_display_archetype(intent, tier),
                 "year": year,
+                "entry_tier": tier,
+                "position_intent": intent,
+                "development": development,
                 "created_at": datetime.utcnow(),
             })
 

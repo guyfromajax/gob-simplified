@@ -869,3 +869,35 @@ Constants landed by the Player Attribute Recalibration merge (design `Player_Att
 
 ### Deferred to later tasks (documented in design §12, NOT implemented this pass)
 `PEAK_COUNT_DISTRIBUTION`, `PEAK_RUNG_WEIGHTS`, `PEAK_MULTIPLIER`, `CH_PEAK_WEIGHTING`, `FAMILY_TIMING_WEIGHTS`, `FAMILY_CURVES`, `RT_COMPRESSION_THRESHOLD`, `RT_SOFT_CAP`, `NON_CORE_GROWTH_MULTIPLIER`, `WEEKLY_DECAY_BY_YEAR`, `OFFSEASON_INSEASON_SPLIT`, `ACCUMULATOR_WEIGHT`. CH stays flat `randint(1,100)` (§8); `CAMP_BONUS_CH_BANDS` unchanged.
+
+---
+
+## Player Growth Model (pass 2 — offseason development, wired into finish_season)
+
+Fitted offline against 10k Monte Carlo careers (`scripts/mc_growth_fit.py`) over the real
+module `BackEnd/utils/player_development.py`; wired into `finish_season` (the season
+rollover), which runs `develop_one_offseason` per player after the year bump and before
+Training Camp. Camp's CH bonus, year bonus and FR/SO HT/WT growth were **deleted** — the
+offseason event owns them; camp keeps only its 30-point allocation and decay skip.
+
+### Exposed for tuning
+
+| Constant | Value | Effect |
+|---|---|---|
+| `PEAK_BONUS` | +0.30 × JH anchor (fixed per peak) | career multiple = 1.7 + 0.30·peaks (→ 1.7/2.0/2.3/2.6) |
+| `STD_RUNG_INCREMENT` | FR .17 / SO .20 / JR .15 / SR .18 (Σ .70) | 0-peak ladder shape; no dead rung (min +5 RT) |
+| `CH_PEAK_LOW` / `CH_PEAK_HIGH` | (.38,.52,.10,0) → (.02,.58,.34,.06) | the CH→peak-count spread; midpoint = 20/55/22/3 |
+| `OFFSEASON_SPLIT` | 0.70 | offseason-vs-in-season distribution blend |
+| `FAMILY_CURVES` | FR 3.0/1.0/.30 · SO 2.0/1.2/.60 · JR .60/1.3/2.2 · SR .35/1.2/3.2 | per-rung weight multipliers (phys/skill/mental) → physical-early, mental-late |
+| `HT_TOTAL_MEAN` / `HT_TOTAL_SD` | 3.2 / 1.9 (clamp [0,8]) | career HT gain (p50 ~3in) |
+| `HT_CURVE_BY_TIMING` | early 55/30/12/3 · standard 40/30/20/10 · late 15/25/35/25 | when HT arrives, by physical timing |
+| `HT_PER_RUNG_CAP` | 3 | ≤~2.5in/summer intent; raised from 2 (which clipped p90 to 5in vs 6) |
+
+### Not exposed (fixed / not target-fittable)
+`FAMILY_TIMING_WEIGHTS`, `FAMILY_TIMING_SHIFT`, `INTRA_FAMILY_GAMMA` (0.20), `NON_CORE_GROWTH_MULTIPLIER` (0.06), `PEAK_RUNG_WEIGHTS`, `PEAK_COUNT_DISTRIBUTION`, `RT_COMPRESSION_THRESHOLD`/`RT_SOFT_CAP` (95/130, near-inactive guard). `ACCUMULATOR_WEIGHT` and the precise in-season net share are live-tuning knobs (a 26-week season, not offline).
+
+### Weekly decay (in-season, §7.2)
+`PRE_TRAINING_DECAY_BY_YEAR` reduced to FR/SO (-2,0), JR/SR (-1,0) (was FR (-5,-2) … SR (-2,0)) so in-season is a light drag, not a treadmill. The offseason event owns career growth. The exact ~30% in-season share is a live-tuning follow-up (not offline-verifiable).
+
+### Legacy-player caveat (existing saves, not backfilled) — READ BEFORE DEBUGGING
+A player with no `development` subdoc (a save that predates pass 2) is **lazy-backfilled** at his first rollover: a profile rolled once from his live CH (frozen as `ch_seed`), peaks restricted to his remaining rungs, and persisted so it never re-rolls. His `entry_tier` — if absent — is **derived from his current top RT**, which is *systematically low for old-scale bigs* whose RT collapsed under height gating (§3.6.7): a distorted big reads as a lower tier and develops on a lower ladder, compounding the degradation. This is accepted (recalibration is new-franchises-only, §14); new franchises never hit this path (entry_tier is carried pool→FPD). Do not diagnose a stunted legacy big as a bug.

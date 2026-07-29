@@ -79,11 +79,13 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         self.assertEqual(label, "pt_opp_over")
 
     def test_pre_training_decay_ranges_match_doc(self):
-        self.assertEqual(_pre_training_decay_range_for_year("freshman"), (-5, -2))
-        self.assertEqual(_pre_training_decay_range_for_year("sophomore"), (-4, -1))
-        self.assertEqual(_pre_training_decay_range_for_year("junior"), (-3, -1))
-        self.assertEqual(_pre_training_decay_range_for_year("senior"), (-2, 0))
-        self.assertEqual(_pre_training_decay_range_for_year("unknown"), (-3, -1))
+        # Reduced substantially (design §7.2) — the offseason event owns career
+        # growth, so in-season decay is now a light drag, not a treadmill.
+        self.assertEqual(_pre_training_decay_range_for_year("freshman"), (-2, 0))
+        self.assertEqual(_pre_training_decay_range_for_year("sophomore"), (-2, 0))
+        self.assertEqual(_pre_training_decay_range_for_year("junior"), (-1, 0))
+        self.assertEqual(_pre_training_decay_range_for_year("senior"), (-1, 0))
+        self.assertEqual(_pre_training_decay_range_for_year("unknown"), (-1, 0))
 
     def test_player_training_points_base_and_year_adjustment(self):
         calls = []

@@ -396,18 +396,26 @@ def _scale_install_training_effectiveness_points(
 
 
 # Year-based pre-training decay (min, max) for random decrease per attribute. See Training_System.md.
+# Weekly pre-training decay, reduced substantially (design §7.2). The offseason
+# development event now owns career growth, so in-season must "stop being where
+# careers are made" — decay shrinks to a light drag so weekly numbers stay
+# visible and net slightly positive against the training-point gains rather than
+# fighting a heavy treadmill. Was freshman (-5,-2) … senior (-2,0).
+# NOTE: the precise ~30% in-season share (OFFSEASON_SPLIT) can only be confirmed
+# in a live 26-week season, not offline — this is the directional reduction; the
+# net-share balance against per-point gains is a live-tuning follow-up.
 PRE_TRAINING_DECAY_BY_YEAR = {
-    "freshman": (-5, -2),
-    "sophomore": (-4, -1),
-    "junior": (-3, -1),
-    "senior": (-2, 0),
+    "freshman": (-2, 0),
+    "sophomore": (-2, 0),
+    "junior": (-1, 0),
+    "senior": (-1, 0),
 }
 
 
 def _pre_training_decay_range_for_year(year: str) -> Tuple[int, int]:
     """Return (min, max) for pre-training decay based on player year. Default: junior."""
     key = (year or "").strip().lower()
-    return PRE_TRAINING_DECAY_BY_YEAR.get(key, (-3, -1))
+    return PRE_TRAINING_DECAY_BY_YEAR.get(key, (-1, 0))
 
 
 def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List[dict], dict]:
@@ -775,11 +783,13 @@ def apply_training_points(
     else:
         logger.warning(f"🔋 [TRAINING] No conditioning in normalized_allocations: {list(normalized_allocations.keys())}")
 
-    # Training Camp bonus (first training only): CH/highest-RT cores, then year-based bonus.
+    # Training Camp growth (CH/highest-RT core bonus, year bonus, FR/SO HT/WT) is
+    # GONE — the offseason development event (§7.1) now owns all three, and running
+    # them here too would develop every player twice. Camp keeps only its 30-point
+    # allocation and its pre-training decay skip. The deleted year bonus was signed
+    # (a bad camp could cost points) and every camp delta was halved above baseline
+    # 100; both die with it.
     camp_physique_notes: List[str] = []
-    if is_training_camp:
-        _apply_training_camp_bonus(players, player_baselines)
-        camp_physique_notes = _apply_training_camp_height_weight_bonuses(players)
 
     # Clamp all values
     for player in players:
