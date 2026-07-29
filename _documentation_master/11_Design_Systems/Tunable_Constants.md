@@ -842,14 +842,14 @@ Constants landed by the Player Attribute Recalibration merge (design `Player_Att
 | `HEIGHT_SD_IN` | 2.1 | per-position height sd (league aggregate ≈ mean 78, sd 3.6) |
 | `PROFILE_FILLER` | 0.45 | unweighted-attr baseline as fraction of signature attr |
 | `PROFILE_ND_BASE` | 0.60 | ND baseline (ND is not in any RT vector) |
-| `ATTR_NOISE_SD` | 0.20 | per-attribute spread → tweener/tie rate |
+| `ATTR_NOISE_SD` | 0.13 | per-attribute spread → tweener/tie rate (sharper identities per decision #7; ≥100 ≈ 5.7%) |
 
 ### Pool remap — `scripts/regenerate_universal_pool.py`
 
 | Constant | Value | Effect |
 |---|---|---|
 | `INTENT_BANDS` | C/PF/SF each 0.20 (tallest→shortest), guards = rest | height-band position-intent assignment (§11.3 step 1) |
-| `IDENTITY_STRENGTH` | 0.35 | how much a player's old attribute shape modulates the new position profile ("a shooter stays a shooter") |
+| `IDENTITY_STRENGTH` | 0.15 | how much a player's old attribute shape modulates the new position profile ("a shooter stays a shooter"); 0.35 imported the old SH-spike artifact (≥100 12.6%→6.4% at 0.15) |
 
 ### Height re-band (§11.2 — league median 72 → 78)
 
@@ -858,7 +858,7 @@ Constants landed by the Player Attribute Recalibration merge (design `Player_Att
 | `LEAGUE_MEDIAN_HEIGHT_IN` (`constants/__init__.py`) | 78 | single home for missing-height fallback (was 72/75/76 scattered) |
 | `height_to_block_score` (`utils/shared.py`) | `≤78→0`, `h−78`, `≥88→10` | +6 shift; preserves ~1.68 league-mean block score (measured 1.69) |
 | `get_height_scale_value` (`utils/opening_tip.py`) | thresholds +3 (centre-fed: 82→8) | preserves the tip-off contest distribution |
-| `WEIGHT_BY_HEIGHT_BANDS` (`player_generation.py`) / walk-on height ranges | +6 shift | weight-from-height and walk-on heights on the new scale |
+| `WEIGHT_BY_HEIGHT_BANDS` (`player_generation.py`) | +6 shift | weight-from-height on the new scale (walk-ons now use the generator, Poor tier) |
 | training-camp weight gates (`training_execution_v2.py`) | `>81`, `>78` (were `>75`, `>72`) | +6 shift |
 
 ### Deferred to later tasks (documented in design §12, NOT implemented this pass)
