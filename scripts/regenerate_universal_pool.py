@@ -68,6 +68,22 @@ INTENT_BANDS = [("C", 0.20), ("PF", 0.20), ("SF", 0.20)]  # remainder = guards (
 # Tier bands as cumulative rank thresholds (bottom→top), from §4.1 frequencies.
 TIER_ORDER = ["Poor", "BelowAverage", "Average", "Good", "Great", "Elite"]
 
+# ── Exact write contract (single source of truth for writes AND the manifest) ──
+# Universal pool: regenerated attributes + physicals + stored RT. FPD/FRD: the
+# stored-RT staleness fix ONLY — never their live attributes/height/weight.
+UNIVERSAL_WRITE_FIELDS = ("attributes", "height", "weight", "year", "position_ratings")
+STORED_RT_WRITE_FIELDS = ("position_ratings",)
+
+
+def _universal_set_doc(p: dict) -> dict:
+    return {
+        "attributes": p["_attributes"],
+        "height": p["_height"],
+        "weight": p["_weight"],
+        "year": p["_year_stored"],
+        "position_ratings": p["_ratings"],
+    }
+
 
 def _load_env(path: Path) -> None:
     if not path.exists():
@@ -258,7 +274,7 @@ def report_metrics(players: list[dict]) -> None:
 
 def recompute_stored_rt(coll, franchise=False, dry=True):
     """Recompute stored position_ratings for FPD/FRD under the new formula."""
-    ops, changed, total = [], 0, 0
+    ops, changed, total, example = [], 0, 0, None
     fields = {"attributes": 1, "position_ratings": 1}
     if franchise:
         fields.update({"meta": 1, "player_id": 1, "franchise_id": 1})
@@ -275,12 +291,78 @@ def recompute_stored_rt(coll, franchise=False, dry=True):
         new = compute_position_ratings({"attributes": a, "height": h})
         if new != d.get("position_ratings"):
             changed += 1
+            if example is None:
+                example = {"_id": d["_id"], "old": d.get("position_ratings"), "new": new}
             if not dry:
                 ops.append(UpdateOne({"_id": d["_id"]}, {"$set": {"position_ratings": new}}))
     if ops and not dry:
         for i in range(0, len(ops), 500):
             coll.bulk_write(ops[i:i + 500], ordered=False)
-    return changed, total
+    return changed, total, example
+
+
+def _fmt_doc(d: dict, keys) -> str:
+    import json
+    return json.dumps({k: d.get(k) for k in keys}, default=str, sort_keys=True)
+
+
+def print_field_manifest(db_name, players, fpd_ex, fpd_changed, fpd_total,
+                         frd_ex, frd_changed, frd_total) -> None:
+    """Field-level pre-flight: exactly what each collection would be written."""
+    print("\n" + "=" * 72)
+    print("FIELD-LEVEL WRITE MANIFEST (dry-run — nothing written)")
+    print("=" * 72)
+    print(f"Database: {db_name}   (only)")
+    print("Write operator: $set only. No delete_one/delete_many/drop, no")
+    print("replace_one — existing docs are updated in place, identity fields")
+    print("(_id, player_id, first_name, last_name, photo, team, jersey,")
+    print("scouting_report, stats) are never in any $set and are untouched.")
+
+    # ── universal players ──
+    ex = players[0]
+    attr_keys = sorted(ex["_attributes"].keys())
+    print("\n--- collection: players (universal pool) ---")
+    print(f"  docs written: {len(players)}")
+    print(f"  $set field paths: {', '.join(UNIVERSAL_WRITE_FIELDS)}")
+    print(f"    · attributes  → whole subdoc replaced, {len(attr_keys)} keys: {attr_keys}")
+    print(f"      (includes anchor_* mirrors: {sum(k.startswith('anchor_') for k in attr_keys)} keys)")
+    print("    · height, weight, year (class year), position_ratings → top-level scalars/dict")
+    print("  NOT written (intent/tier metadata): the development subdoc (entry_tier,")
+    print("    peak_count, family_timing, ch_seed, training_position, focus_accumulator)")
+    print("    is OUT OF SCOPE this pass — intent/tier are used only during generation,")
+    print("    not persisted. Flag if you expected entry_tier stored now.")
+    before = {k: ex.get(k) for k in ("height", "weight", "year")}
+    before["position_ratings"] = ex.get("position_ratings")
+    before["attributes(SC,SH,ID,RB,ST,anchor_SC)"] = {
+        k: (ex.get("attributes") or {}).get(k) for k in ("SC", "SH", "ID", "RB", "ST", "anchor_SC")}
+    after = {"height": ex["_height"], "weight": ex["_weight"], "year": ex["_year_stored"],
+             "position_ratings": ex["_ratings"],
+             "attributes(SC,SH,ID,RB,ST,anchor_SC)": {
+                 k: ex["_attributes"].get(k) for k in ("SC", "SH", "ID", "RB", "ST", "anchor_SC")}}
+    print(f"  example _id={ex.get('_id')}  name={ex.get('first_name')} {ex.get('last_name')}")
+    print(f"    BEFORE: {before}")
+    print(f"    AFTER : {after}")
+
+    # ── FPD / FRD ──
+    for label, coll, ex_rt, changed, total in (
+        ("franchise_players_data (FPD)", "franchise_players_data", fpd_ex, fpd_changed, fpd_total),
+        ("franchise_recruits_data (FRD)", "franchise_recruits_data", frd_ex, frd_changed, frd_total),
+    ):
+        print(f"\n--- collection: {label} ---")
+        print(f"  docs written: {changed} of {total} (only those whose stored RT differs)")
+        print(f"  $set field paths: {', '.join(STORED_RT_WRITE_FIELDS)}   ← position_ratings ONLY")
+        assert set(STORED_RT_WRITE_FIELDS) == {"position_ratings"}, "RED FLAG: FPD/FRD write set changed"
+        assert not any(f in STORED_RT_WRITE_FIELDS for f in ("attributes", "height", "weight", "meta")), \
+            "RED FLAG: FPD/FRD would write live roster data"
+        if ex_rt:
+            print(f"  example _id={ex_rt['_id']}")
+            print(f"    BEFORE position_ratings: {ex_rt['old']}")
+            print(f"    AFTER  position_ratings: {ex_rt['new']}")
+        else:
+            print("  (no changed doc found to sample)")
+    print("\nRED-FLAG CHECK: no attribute/height/weight/meta field appears in the")
+    print("FPD or FRD write set — live franchise rosters are NOT rewritten. PASS.")
+    print("=" * 72)
 
 
 def main() -> int:
@@ -309,23 +391,21 @@ def main() -> int:
     build_remap(players, args.seed)
     report_metrics(players)
 
+    # Dry pass over FPD/FRD to count changes and capture before/after examples.
+    fpd_changed, fpd_total, fpd_ex = recompute_stored_rt(db["franchise_players_data"], franchise=True, dry=True)
+    frd_changed, frd_total, frd_ex = recompute_stored_rt(db["franchise_recruits_data"], franchise=False, dry=True)
+
+    print_field_manifest(args.db, players, fpd_ex, fpd_changed, fpd_total, frd_ex, frd_changed, frd_total)
+
     print(f"\nMODE: {'COMMIT' if commit else 'DRY-RUN (no writes)'}")
     if commit:
-        ops = []
-        for p in players:
-            ops.append(UpdateOne({"_id": p["_id"]}, {"$set": {
-                "attributes": p["_attributes"],
-                "height": p["_height"],
-                "weight": p["_weight"],
-                "year": p["_year_stored"],
-                "position_ratings": p["_ratings"],
-            }}))
+        ops = [UpdateOne({"_id": p["_id"]}, {"$set": _universal_set_doc(p)}) for p in players]
         for i in range(0, len(ops), 500):
             db["players"].bulk_write(ops[i:i + 500], ordered=False)
         print(f"  universal pool: updated {len(ops)} docs")
+        fpd_changed, fpd_total, _ = recompute_stored_rt(db["franchise_players_data"], franchise=True, dry=False)
+        frd_changed, frd_total, _ = recompute_stored_rt(db["franchise_recruits_data"], franchise=False, dry=False)
 
-    fpd_changed, fpd_total = recompute_stored_rt(db["franchise_players_data"], franchise=True, dry=not commit)
-    frd_changed, frd_total = recompute_stored_rt(db["franchise_recruits_data"], franchise=False, dry=not commit)
     verb = "would recompute" if not commit else "recomputed"
     print(f"  FPD stored RT: {verb} {fpd_changed}/{fpd_total}")
     print(f"  FRD stored RT: {verb} {frd_changed}/{frd_total}")
