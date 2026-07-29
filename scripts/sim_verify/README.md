@@ -5,8 +5,16 @@ Runnable instruments behind the standing verification rules in
 session scratchpad so future work can *re-run* the checks, not just read about them.
 
 All seeded runs pin `PYTHONHASHSEED=0` (determinism contract). The reference anchor is
-`reports/perf/refstats_postB_20260720_20260720_153720.csv` (seed 20260720). Re-cut the anchor only
-after an intentional RNG-stream change (see standing rule 2).
+`reports/perf/refstats_postrecal_20260729_160503.csv` (seed 20260720, `--mode cpu`, 63 games,
+franchise `6a28436c98dbd04e902eee09` week 7). Re-cut the anchor only after an intentional
+RNG-stream change (see standing rule 2), or after a behavior-changing merge.
+
+**Re-cut 2026-07-29** from merged `develop` after two behavior-changing merges — the distant
+sunset and the player-attribute recalibration (new RT formula + regenerated pool) — invalidated
+the prior anchor `refstats_postB_20260720_20260720_153720.csv`. The new anchor is **CPU-only**:
+the old `--mode both` PS reference franchise `6a5e1f0e517ebcc58d981675` no longer exists in
+gob-staging. To restore PS parity, re-cut `--mode both` against a currently-initialized PS
+franchise (and update this pointer + the invocations below).
 
 | Script / flag | Capstone toolkit row | Use when | Reads |
 |---|---|---|---|
