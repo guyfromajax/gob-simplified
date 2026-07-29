@@ -92,7 +92,7 @@ _YEAR_ALIASES = {
 # second hand-maintained archetype table.
 PROFILE_FILLER = 0.45          # unweighted attr baseline, as a fraction of signature
 PROFILE_ND_BASE = 0.60         # ND is not in any RT vector; give it a moderate level
-ATTR_NOISE_SD = 0.20           # per-attribute multiplicative spread → tweeners
+ATTR_NOISE_SD = 0.13           # per-attribute multiplicative spread → tweeners
 
 # RT-relevant attributes (union of all weight vectors) plus ND (mental, no RT).
 RT_ATTRS = tuple(sorted({a for w in POSITION_WEIGHTS.values() for a in w}))

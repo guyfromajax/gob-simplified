@@ -168,29 +168,23 @@ def advance_recruit_year(year: str | None) -> str:
     return RECRUIT_YEAR_ADVANCE.get(str(year or "").strip().lower(), "Freshman")
 
 
-# Walk-on year roll weights and per-year generation ranges:
-# (attr_max, attr_cap, height_range, weight_range) — at most 3 attributes may exceed attr_cap.
+# Walk-on year roll weights (JH-heavy). Attributes/height/weight now come from the
+# shared position-intent generator at Poor tier — walk-ons are on the same ladder
+# as everyone else (design §4.1/§11.2), not a separate uniform-draw path, so a
+# fifth of the league is no longer off-scale next to ladder-scaled teammates.
 WALK_ON_YEAR_WEIGHTS = [("JH", 60), ("Freshman", 20), ("Sophomore", 10), ("Junior", 10)]
-# Height ranges re-banded +6 in. for the recalibrated distribution (§11.2):
-# walk-ons sit just below the new league median (78) rather than the old (72).
-WALK_ON_YEAR_PROFILES = {
-    "JH": (32, 29, (72, 78), (155, 179)),
-    "Freshman": (42, 39, (72, 80), (155, 189)),
-    "Sophomore": (52, 44, (73, 81), (165, 199)),
-    "Junior": (62, 49, (74, 83), (175, 209)),
-}
 
 
 def generate_walk_on_profile() -> dict:
     """Generate a single walk-on player profile.
 
     Shared by season-1 franchise init (3/team) and the week-35 roster fill.
-    Year rolls JH 60% / Freshman 20% / Sophomore 10% / Junior 10%; attribute,
-    height, and weight ranges scale with the rolled year. At most 3 attributes
-    may exceed the year's cap; archetype "Walk On".
+    Year rolls JH 60% / Freshman 20% / Sophomore 10% / Junior 10%; a position
+    intent is drawn and the shared generator produces a Poor-tier player on the
+    class-year ladder (JH anchor 20 → SR 40). CH is flat randint(1,100) like
+    everyone else (§8) — no walk-on cap, so a high-CH walk-on can still develop.
     """
-    from BackEnd.models.player import Player
-    from BackEnd.utils.position_ratings import compute_position_ratings
+    from BackEnd.utils.player_generation import draw_position_intent, generate_player
 
     first_names, last_names, first_name_weights = get_franchise_name_assets()
     year = random.choices(
@@ -198,36 +192,19 @@ def generate_walk_on_profile() -> dict:
         weights=[w for _, w in WALK_ON_YEAR_WEIGHTS],
         k=1,
     )[0]
-    attr_max, attr_cap, height_range, weight_range = WALK_ON_YEAR_PROFILES[year]
-    attr_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
-    attrs: dict = {}
-    over_cap = 0
-    for key in attr_keys:
-        value = random.randint(1, attr_max)
-        if value > attr_cap and over_cap >= 3:
-            value = random.randint(1, attr_cap)
-        if value > attr_cap:
-            over_cap += 1
-        attrs[key] = value
-    attrs = Player.randomize_game_attributes(attrs)
-    # Walk-ons get a tighter CH init (1–90) than the default 1–100; other ranges unchanged.
-    attrs["CH"] = random.randint(1, 90)
-    attrs["anchor_CH"] = attrs["CH"]
     first_name = choose_franchise_first_name(first_names, first_name_weights)
     last_name = random.choice(last_names).title()
     name = f"{first_name} {last_name}"
-    height = random.randint(height_range[0], height_range[1])
-    weight = random.randint(weight_range[0], weight_range[1])
-    position_ratings = compute_position_ratings(
-        {"attributes": attrs, "height": height, "name": name},
-    )
+
+    intent = draw_position_intent(random)
+    gp = generate_player(intent, year, "Poor", random, name=name)
     return {
         "recruit_id": None,
         "name": name,
-        "attributes": attrs,
-        "position_ratings": position_ratings,
-        "height": height,
-        "weight": weight,
+        "attributes": gp["attributes"],
+        "position_ratings": gp["position_ratings"],
+        "height": gp["height"],
+        "weight": gp["weight"],
         "archetype": "Walk On",
         "year": year,
         "Home Region": "",

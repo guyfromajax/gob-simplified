@@ -170,7 +170,7 @@ def assign_years(players: list[dict], rng: _random.Random) -> None:
 # keeps the intent profile dominant — so argmax follows intent and centre supply
 # actually fills — while a shooter still reads relatively higher on SH than his
 # new positional peers (design §11.3 step 4, "a shooter stays a shooter").
-IDENTITY_STRENGTH = 0.35
+IDENTITY_STRENGTH = 0.15
 
 
 def _blended_profile(intent: str, old: dict) -> dict | None:
