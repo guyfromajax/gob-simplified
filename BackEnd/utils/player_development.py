@@ -44,9 +44,12 @@ RUNG_TRANSITIONS = ("FR", "SO", "JR", "SR")  # four offseason events from JH
 
 # ── Rung increments (§4.2) — fractions of the JH anchor, as RT ────────────────
 # 0-peak path sums to 0.70 (→ 1.7x career). A peak adds a FIXED bonus at whichever
-# rung it lands on (see PEAK_BONUS). The canonical 1-peak-at-SO_JR path then
-# reproduces §4.2 exactly: FR 1.17 / SO 1.43 / JR 1.80 / SR 2.00.
-STD_RUNG_INCREMENT = {"FR": 0.17, "SO": 0.26, "JR": 0.07, "SR": 0.20}
+# rung it lands on (see PEAK_BONUS). Flattened from the original .17/.26/.07/.20
+# (which reproduced §4.2 but left JR nearly dead — a non-peaking junior gained ~2
+# RT, invisible on the offseason report). No rung is now below .15, so every
+# offseason moves the needle. §4.2's SO/JR shape shifts a couple of points; that
+# was a measurement from the old fit (assuming a JR peak), not a design commitment.
+STD_RUNG_INCREMENT = {"FR": 0.17, "SO": 0.20, "JR": 0.15, "SR": 0.18}
 # A peak adds +0.30x the JH anchor. This makes the career multiple 1.7 + 0.30·k
 # (→ 1.7/2.0/2.3/2.6 for k=0..3), independent of WHICH rung peaks — placement is
 # timing, not magnitude. (See FIT NOTES: §12's "PEAK_MULTIPLIER ~1.9x a standard
@@ -87,15 +90,16 @@ FAMILY_TIMING_SHIFT = 0.40
 # near-zero off PG, so hitting the RT ladder then needs a runaway budget that
 # balloons ND. As weight multipliers they shift WHICH RT-relevant attributes
 # grow by age — physical early, mental late — while the budget stays sized to the
-# RT the growth actually carries. Physical is driven to ~0 at JR/SR (§6: physical
-# locked to early rungs; a late peak expresses in skill/mental, not HT).
+# RT the growth actually carries. The "physical" family here is ST/AG only (HT/WT
+# have their own curves below). Physical is front-loaded but keeps a real JR/SR
+# tail so a LATE-physical bloomer grows strength as an upperclassman (bounded by
+# magnitude, not locked out by rung — the earlier rung-lock was rejected).
 FAMILY_CURVES = {
     "FR": {"physical": 3.0, "skill": 1.0, "mental": 0.30},
     "SO": {"physical": 2.0, "skill": 1.2, "mental": 0.60},
-    "JR": {"physical": 0.25, "skill": 1.3, "mental": 2.2},
-    "SR": {"physical": 0.12, "skill": 1.2, "mental": 3.2},
+    "JR": {"physical": 0.60, "skill": 1.3, "mental": 2.2},
+    "SR": {"physical": 0.35, "skill": 1.2, "mental": 3.2},
 }
-PHYSICAL_LOCKED_RUNGS = ("JR", "SR")  # physical multiplier held at its floor here
 
 # ── In-season / accumulator (§7.2-7.3) ────────────────────────────────────────
 # The offseason delivers OFFSEASON_SPLIT of each rung's growth via the family
@@ -113,8 +117,25 @@ NON_CORE_GROWTH_MULTIPLIER = 0.06
 # above-100 target (§3.6.4).
 INTRA_FAMILY_GAMMA = 0.20
 
-# ── HT/WT (§6, physical) ──────────────────────────────────────────────────────
-HT_GROWTH_BY_RUNG = {"FR": (0, 2), "SO": (0, 1), "JR": (0, 0), "SR": (0, 0)}
+# ── HT (§6) — its OWN declining curve, keyed by the PHYSICAL timing group ─────
+# HT is the one attribute whose growth can change a player's best position (a
+# couple of inches moves height fitness enough to flip a wing to a four), so it
+# gets an explicit curve rather than a family average, and it is NEVER zero at
+# JR/SR for anyone — bounded by magnitude, not locked by rung. Shares of career
+# HT gain per rung, per physical-timing group:
+HT_CURVE_BY_TIMING = {
+    "early":    {"FR": 0.55, "SO": 0.30, "JR": 0.12, "SR": 0.03},
+    "standard": {"FR": 0.40, "SO": 0.30, "JR": 0.20, "SR": 0.10},
+    "late":     {"FR": 0.15, "SO": 0.25, "JR": 0.35, "SR": 0.25},
+}
+# Career HT gain (inches) ~ Normal, clamped: median ~3, p10 ~1, p90 ~6.
+HT_TOTAL_MEAN = 3.2
+HT_TOTAL_SD = 1.9
+HT_TOTAL_MIN, HT_TOTAL_MAX = 0, 8
+HT_PER_RUNG_CAP = 2  # no more than ~2.5in in one summer; overflow carries forward
+# WT tracks strength: pounds per inch of HT gain, plus muscle with ST growth.
+WT_LBS_PER_INCH = (4, 7)
+WT_LBS_PER_ST = (0, 1)
 
 
 def _cat(rng: random.Random, dist) -> int:
@@ -147,8 +168,12 @@ def roll_growth_profile(ch_seed: int, rng: random.Random) -> dict:
                                                             for k in ("early", "standard", "late")))]
         for fam in ("physical", "skill", "mental")
     }
+    # Career HT gain rolled once and frozen; distributed per rung by the physical
+    # timing group's HT curve (§6, HT own-curve).
+    ht_total = round(min(HT_TOTAL_MAX, max(HT_TOTAL_MIN, rng.gauss(HT_TOTAL_MEAN, HT_TOTAL_SD))))
     return {"ch_seed": ch_seed, "peak_count": peak_count,
-            "peak_rungs": peak_rungs, "family_timing": family_timing}
+            "peak_rungs": peak_rungs, "family_timing": family_timing,
+            "ht_total": ht_total}
 
 
 def _compress_rt(raw: float) -> float:
@@ -177,8 +202,6 @@ def _family_multipliers_for_player(rung: str, timing: dict) -> Dict[str, float]:
         elif tm == "late":
             factor = 1.0 - FAMILY_TIMING_SHIFT if early_half else 1.0 + FAMILY_TIMING_SHIFT
         out[fam] = max(0.0, mult * factor)
-    if rung in PHYSICAL_LOCKED_RUNGS:  # physical stays locked out of late rungs (§6)
-        out["physical"] = min(out["physical"], FAMILY_CURVES[rung]["physical"])
     return out
 
 
@@ -256,19 +279,34 @@ def develop_one_offseason(player: dict, rung: str, profile: dict,
             break
     target_rt = _compress_rt(anchor * (1.0 + cum))
 
-    # 3-4. distribute across attributes by family curve × timing × weights.
+    # HT first (own declining curve, never rung-locked), magnitude-capped. Each
+    # rung gets its curve share of the career HT gain, integer-rounded
+    # probabilistically so the per-rung shares hold in expectation without a carry
+    # (a fractional carry accumulated into SR and broke the front-loaded shape).
+    # HT is applied BEFORE the budget solve so RT is sized at the final height and
+    # the ladder holds — growing into one's frame does not silently cost RT.
+    # (Ordering note: §7.1 lists HT as step 5; correctness requires it precede the
+    # RT solve.)
+    ht_timing = profile["family_timing"]["physical"]
+    want = profile.get("ht_total", 0) * HT_CURVE_BY_TIMING[ht_timing][rung]
+    dh = min(HT_PER_RUNG_CAP, int(want) + (1 if rng.random() < (want - int(want)) else 0))
+    if dh:
+        player["height"] = player["height"] + dh
+
+    # 3-4. distribute across attributes by family curve × timing × weights,
+    # sized to the rung's RT target at the (post-HT) height.
     fractions = _distribution_fractions(position, rung, profile["family_timing"], accumulator)
     B = _analytic_budget(attrs, player["height"], position, fractions, target_rt)
+    st_gain = 0
     for a in GROWTH_ATTRS:
-        attrs[a] = int(round(attrs.get(a, 0) + B * fractions[a]))
+        delta = B * fractions[a]
+        attrs[a] = int(round(attrs.get(a, 0) + delta))
+        if a == "ST":
+            st_gain = delta
 
-    # 5. HT/WT roll (physical family, early rungs only; never for a late peak).
-    lo, hi = HT_GROWTH_BY_RUNG[rung]
-    if hi > 0 and profile["family_timing"]["physical"] != "late":
-        dh = rng.randint(lo, hi)
-        if dh:
-            player["height"] = player["height"] + dh
-            player["weight"] = player.get("weight", 0) + dh * rng.randint(4, 8)
+    # WT tracks strength: pounds with each inch of HT and with ST muscle gain.
+    player["weight"] = player.get("weight", 0) + dh * rng.randint(*WT_LBS_PER_INCH) \
+        + int(max(0, st_gain) * rng.randint(*WT_LBS_PER_ST))
 
     # 6. recompute all five RTs.
     player["position_ratings"] = compute_position_ratings(
@@ -277,28 +315,42 @@ def develop_one_offseason(player: dict, rung: str, profile: dict,
     return player
 
 
+def init_career(position: str, tier: str, ch_seed: int, rng: random.Random):
+    """Roll the growth profile and generate the JH starting player (§5, §11.1).
+
+    The JH player is generated BELOW his adult frame by his rolled career HT gain,
+    so HT growth over the career brings him up to (roughly) the adult height his
+    position was drawn at — he grows INTO his frame rather than past it. Attributes
+    are sized to the JH anchor at that shorter height. Returns (player, profile)."""
+    from BackEnd.utils.player_generation import draw_height, HEIGHT_MIN_IN
+    profile = roll_growth_profile(ch_seed, rng)
+    adult_height = draw_height(position, rng)
+    jh_height = max(HEIGHT_MIN_IN, adult_height - profile["ht_total"])
+    jh = generate_player(position, "JH", tier, rng, height=jh_height, preserve_ch=ch_seed)
+    player = {
+        "attributes": jh["attributes"], "height": jh["height"], "weight": jh["weight"],
+        "position": position, "training_position": position, "tier": tier,
+        "jh_anchor": JH_ANCHOR_BY_TIER[tier], "position_ratings": jh["position_ratings"],
+        "class_year": "JH", "development": profile, "_ht_carry": 0.0,
+    }
+    return player, profile
+
+
 def simulate_career(position: str, tier: str, ch_seed: int, rng: random.Random,
                     accumulator: Optional[Dict[str, float]] = None) -> dict:
     """Generate a JH player and walk all four offseason rungs to SR (§11.1)."""
-    jh = generate_player(position, "JH", tier, rng, preserve_ch=ch_seed)
-    player = {
-        "attributes": jh["attributes"],
-        "height": jh["height"],
-        "weight": jh["weight"],
-        "position": position,
-        "training_position": position,
-        "tier": tier,
-        "jh_anchor": JH_ANCHOR_BY_TIER[tier],
-        "position_ratings": jh["position_ratings"],
-        "class_year": "JH",
-    }
-    profile = roll_growth_profile(ch_seed, rng)
-    player["development"] = profile
+    player, profile = init_career(position, tier, ch_seed, rng)
     snapshots = {"JH": dict(player["position_ratings"])}
+    attr_snapshots = {"JH": dict(player["attributes"])}
+    height_snapshots = {"JH": player["height"]}
     for rung in RUNG_TRANSITIONS:
         develop_one_offseason(player, rung, profile, rng, accumulator=accumulator)
         snapshots[rung] = dict(player["position_ratings"])
+        attr_snapshots[rung] = dict(player["attributes"])
+        height_snapshots[rung] = player["height"]
     player["snapshots"] = snapshots
+    player["attr_snapshots"] = attr_snapshots
+    player["height_snapshots"] = height_snapshots
     return player
 
 
@@ -308,5 +360,6 @@ __all__ = [
     "RT_COMPRESSION_THRESHOLD", "RT_SOFT_CAP", "PEAK_COUNT_DISTRIBUTION",
     "CH_PEAK_LOW", "CH_PEAK_HIGH", "PEAK_RUNG_WEIGHTS", "FAMILY_TIMING_WEIGHTS",
     "FAMILY_CURVES", "OFFSEASON_SPLIT", "NON_CORE_GROWTH_MULTIPLIER",
-    "roll_growth_profile", "develop_one_offseason", "simulate_career",
+    "HT_CURVE_BY_TIMING", "HT_TOTAL_MEAN", "HT_TOTAL_SD", "HT_PER_RUNG_CAP",
+    "roll_growth_profile", "develop_one_offseason", "init_career", "simulate_career",
 ]

@@ -28,35 +28,40 @@ careers = []
 fam_delta = {r: defaultdict(float) for r in dev.RUNG_TRANSITIONS}
 peak_by_ch_decile = defaultdict(list)
 
+RUNGS = dev.RUNG_TRANSITIONS
 for _ in range(N):
     tier = rng.choices(TIERS, weights=[TIER_FREQUENCY[t] for t in TIERS], k=1)[0]
     pos = draw_position_intent(rng)
     ch = rng.randint(1, 100)
-    # step-by-step (thin driver) so we can capture per-rung attribute deltas
-    jh = generate_player(pos, "JH", tier, rng, preserve_ch=ch)
-    player = {"attributes": jh["attributes"], "height": jh["height"], "weight": jh["weight"],
-              "position": pos, "training_position": pos, "tier": tier,
-              "jh_anchor": JH_ANCHOR_BY_TIER[tier], "position_ratings": jh["position_ratings"],
-              "class_year": "JH"}
-    profile = dev.roll_growth_profile(ch, rng)
-    jh_rt = player["position_ratings"][pos]
-    a100_rung = {}
-    for rung in dev.RUNG_TRANSITIONS:
-        before = dict(player["attributes"])
-        dev.develop_one_offseason(player, rung, profile, rng)
+    pl = dev.simulate_career(pos, tier, ch, rng)  # the real function — no drift
+    snaps, attrs, hts = pl["snapshots"], pl["attr_snapshots"], pl["height_snapshots"]
+    profile = pl["development"]
+    jh_rt, sr_rt = snaps["JH"][pos], snaps["SR"][pos]
+    ht_timing = profile["family_timing"]["physical"]
+    a100_rung, ht_rung = {}, {}
+    prev = "JH"
+    for rung in RUNGS:
         for a in dev.GROWTH_ATTRS:
-            fam_delta[rung][dev.FAMILY_OF[a]] += max(0, player["attributes"][a] - before.get(a, 0))
-        a100_rung[rung] = 1 if max(player["attributes"][a] for a in dev.GROWTH_ATTRS) >= 100 else 0
-    sr_rt = player["position_ratings"][pos]
-    maxattr = max(player["attributes"][a] for a in dev.GROWTH_ATTRS)
+            fam_delta[rung][dev.FAMILY_OF[a]] += max(0, attrs[rung][a] - attrs[prev][a])
+        a100_rung[rung] = 1 if max(attrs[rung][a] for a in dev.GROWTH_ATTRS) >= 100 else 0
+        ht_rung[rung] = hts[rung] - hts[prev]
+        prev = rung
+    # HT changed best position: does the senior's best RT land at a position OTHER
+    # than his training position? Attributes are generated + grown toward intent,
+    # so a senior whose argmax is elsewhere got there on height (draw + growth) —
+    # the designed wing→four flip. (Comparing JH-height vs grown-height argmax
+    # instead just re-counts every player growing into his frame, which is ~all.)
+    ht_flip = max(snaps["SR"], key=snaps["SR"].get) != pos
     careers.append({"tier": tier, "pos": pos, "ch": ch, "peaks": profile["peak_count"],
                     "jh_rt": jh_rt, "sr_rt": sr_rt, "mult": sr_rt/jh_rt if jh_rt else 0,
-                    "maxattr": maxattr, "profile": profile, "a100_rung": a100_rung})
+                    "maxattr": max(attrs["SR"][a] for a in dev.GROWTH_ATTRS), "a100_rung": a100_rung,
+                    "ht_timing": ht_timing, "ht_gain": hts["SR"] - hts["JH"],
+                    "ht_rung": ht_rung, "ht_flip": ht_flip})
     peak_by_ch_decile[min(9, ch//10)].append(profile["peak_count"])
 
-# also capture class-year p50 via re-running Average tier snapshots
+# class-year p50 curve for a tier, from real careers
 def class_rt_curve(tier, k=2000):
-    r = random.Random(99); out = {rr: [] for rr in ("JH",)+dev.RUNG_TRANSITIONS}
+    r = random.Random(99); out = {rr: [] for rr in ("JH",)+RUNGS}
     for _ in range(k):
         pos = draw_position_intent(r); ch = r.randint(1,100)
         pl = dev.simulate_career(pos, tier, ch, r)
@@ -116,3 +121,42 @@ xs=[c["ch"] for c in careers]; ys=[tier_rank[c["tier"]] for c in careers]
 mx=statistics.mean(xs); my=statistics.mean(ys)
 num=sum((a-mx)*(b-my) for a,b in zip(xs,ys)); den=(sum((a-mx)**2 for a in xs)*sum((b-my)**2 for b in ys))**.5
 print(f"\n   ch_seed vs tier-rank corr: {num/den:+.3f} (want ~0 — independence, §5.1 diamond-in-the-rough)")
+
+# 8. HT distribution (career total + per-rung by timing group)
+print("\n8. HT career gain (in): p10 %.0f / p50 %.0f / p90 %.0f  (target ~1 / ~3 / ~6)" % (
+    p([c["ht_gain"] for c in careers],10), p([c["ht_gain"] for c in careers],50), p([c["ht_gain"] for c in careers],90)))
+print("   per-rung HT gain (mean in) by physical timing:")
+print(f"   {'timing':<9}{'FR':>6}{'SO':>6}{'JR':>6}{'SR':>6}{'total':>8}{'n':>7}")
+for tm in ("early","standard","late"):
+    grp=[c for c in careers if c["ht_timing"]==tm]
+    if not grp: continue
+    per={r:statistics.mean([c["ht_rung"][r] for c in grp]) for r in dev.RUNG_TRANSITIONS}
+    tot=statistics.mean([c["ht_gain"] for c in grp])
+    print(f"   {tm:<9}"+"".join(f"{per[r]:>6.2f}" for r in dev.RUNG_TRANSITIONS)+f"{tot:>8.2f}{len(grp):>7}")
+
+# 9. how often HT growth changes best position, by timing group
+print("\n9. HT growth changes best position (argmax flips at grown vs JH height):")
+overall=sum(c["ht_flip"] for c in careers)
+print(f"   overall: {pct(overall,N)}")
+for tm in ("early","standard","late"):
+    grp=[c for c in careers if c["ht_timing"]==tm]
+    if grp: print(f"   {tm:<9} {pct(sum(c['ht_flip'] for c in grp),len(grp))}  (n={len(grp)})")
+
+# 10. dead-rung check: min per-rung RT gain across peak configs, by tier
+print("\n10. dead-rung check — median RT gain per rung (Average tier, by whether the rung peaked):")
+r2=random.Random(555)
+gains={rr:{"std":[], "peak":[]} for rr in dev.RUNG_TRANSITIONS}
+for _ in range(3000):
+    pos=draw_position_intent(r2); ch=r2.randint(1,100)
+    pl=dev.simulate_career(pos,"Average",ch,r2)
+    snaps=pl["snapshots"]; prev=snaps["JH"][pos]
+    for rr in dev.RUNG_TRANSITIONS:
+        cur=snaps[rr][pos]; key="peak" if rr in pl["development"]["peak_rungs"] else "std"
+        gains[rr][key].append(cur-prev); prev=cur
+minstd=99
+for rr in dev.RUNG_TRANSITIONS:
+    s=statistics.median(gains[rr]["std"]) if gains[rr]["std"] else float("nan")
+    pk_=statistics.median(gains[rr]["peak"]) if gains[rr]["peak"] else float("nan")
+    minstd=min(minstd,s)
+    print(f"   {rr}: non-peak +{s:.1f} RT   peak +{pk_:.1f} RT")
+print(f"   smallest non-peak rung gain: +{minstd:.1f} RT (was ~2.1 at old JR .07 → dead; want >~4)")
