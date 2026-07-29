@@ -71,7 +71,13 @@ TIER_ORDER = ["Poor", "BelowAverage", "Average", "Good", "Great", "Elite"]
 # ── Exact write contract (single source of truth for writes AND the manifest) ──
 # Universal pool: regenerated attributes + physicals + stored RT. FPD/FRD: the
 # stored-RT staleness fix ONLY — never their live attributes/height/weight.
-UNIVERSAL_WRITE_FIELDS = ("attributes", "height", "weight", "year", "position_ratings")
+# entry_tier + position_intent are stored TOP-LEVEL (not in a development subdoc):
+# the remap CREATES the tier/intent assignment and then rewrites the attributes it
+# was derived from, so this migration is the only place they can be captured
+# losslessly — post-migration they could only be re-derived approximately from RT
+# (boundary players would re-derive into the wrong tier / ~5% into the wrong intent).
+UNIVERSAL_WRITE_FIELDS = ("attributes", "height", "weight", "year", "position_ratings",
+                          "entry_tier", "position_intent")
 STORED_RT_WRITE_FIELDS = ("position_ratings",)
 
 
@@ -82,6 +88,8 @@ def _universal_set_doc(p: dict) -> dict:
         "weight": p["_weight"],
         "year": p["_year_stored"],
         "position_ratings": p["_ratings"],
+        "entry_tier": p["_tier"],
+        "position_intent": p["_intent"],
     }
 
 
@@ -326,17 +334,18 @@ def print_field_manifest(db_name, players, fpd_ex, fpd_changed, fpd_total,
     print(f"  $set field paths: {', '.join(UNIVERSAL_WRITE_FIELDS)}")
     print(f"    · attributes  → whole subdoc replaced, {len(attr_keys)} keys: {attr_keys}")
     print(f"      (includes anchor_* mirrors: {sum(k.startswith('anchor_') for k in attr_keys)} keys)")
-    print("    · height, weight, year (class year), position_ratings → top-level scalars/dict")
-    print("  NOT written (intent/tier metadata): the development subdoc (entry_tier,")
-    print("    peak_count, family_timing, ch_seed, training_position, focus_accumulator)")
-    print("    is OUT OF SCOPE this pass — intent/tier are used only during generation,")
-    print("    not persisted. Flag if you expected entry_tier stored now.")
+    print("    · height, weight, year (class year), position_ratings → top-level")
+    print("    · entry_tier, position_intent → top-level (captured here — the remap")
+    print("      destroys the evidence they were derived from; not reconstructible later)")
+    print("  NOT written: the rest of the development subdoc (peak_count, family_timing,")
+    print("    ch_seed, training_position, focus_accumulator) — OUT OF SCOPE this pass.")
     before = {k: ex.get(k) for k in ("height", "weight", "year")}
     before["position_ratings"] = ex.get("position_ratings")
     before["attributes(SC,SH,ID,RB,ST,anchor_SC)"] = {
         k: (ex.get("attributes") or {}).get(k) for k in ("SC", "SH", "ID", "RB", "ST", "anchor_SC")}
     after = {"height": ex["_height"], "weight": ex["_weight"], "year": ex["_year_stored"],
              "position_ratings": ex["_ratings"],
+             "entry_tier": ex["_tier"], "position_intent": ex["_intent"],
              "attributes(SC,SH,ID,RB,ST,anchor_SC)": {
                  k: ex["_attributes"].get(k) for k in ("SC", "SH", "ID", "RB", "ST", "anchor_SC")}}
     print(f"  example _id={ex.get('_id')}  name={ex.get('first_name')} {ex.get('last_name')}")
