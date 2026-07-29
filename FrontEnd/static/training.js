@@ -217,7 +217,7 @@ function resetPlayerMaximizerResolvedState() {
 }
 
 /** Distant-training overlay: rotate user-team highlight lines */
-const TRAINING_DISTANT_HIGHLIGHT_MS = 5000;
+const TRAINING_CPU_HIGHLIGHT_MS = 5000;
 const TRAINING_HIGHLIGHT_FALLBACK = 'Finishing league training…';
 
 function shuffleArrayInPlace(arr) {
@@ -1228,22 +1228,22 @@ submitBtn.addEventListener('click', async function() {
                 window.PageLoadOverlay.updatePulseSubtitle(lines[currentIndex]);
               }
             }
-          }, TRAINING_DISTANT_HIGHLIGHT_MS);
+          }, TRAINING_CPU_HIGHLIGHT_MS);
 
-          const distantUrl = API_CONFIG.buildUrl('/franchise/run-training/cpu-train');
+          const cpuTrainingUrl = API_CONFIG.buildUrl('/franchise/run-training/cpu-train');
           do {
-            const distantRes = await fetch(distantUrl, {
+            const cpuTrainingRes = await fetch(cpuTrainingUrl, {
               method: 'POST',
               headers: jsonHeaders,
               body: JSON.stringify({ franchise_id: franchiseId })
             });
             try {
-              result = await distantRes.json();
+              result = await cpuTrainingRes.json();
             } catch (_e) {
               result = null;
             }
-            if (!distantRes.ok) {
-              let detail = `HTTP error! status: ${distantRes.status}`;
+            if (!cpuTrainingRes.ok) {
+              let detail = `HTTP error! status: ${cpuTrainingRes.status}`;
               if (result && result.detail) detail = result.detail;
               throw new Error(detail);
             }
@@ -1338,7 +1338,7 @@ submitBtn.addEventListener('click', async function() {
   }
 });
 
-async function resumeDistantTraining(franchiseId) {
+async function resumeCpuTraining(franchiseId) {
   if (!franchiseId) return;
   const headers = Object.assign(
     { 'Content-Type': 'application/json' },
@@ -1416,11 +1416,11 @@ async function initializeTrainingPoints() {
         if (Array.isArray(data.player_maximizer_ranking_attrs)) {
           customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
         }
-        if (data.distant_training_resume && data.distant_training_resume.required) {
+        if (data.cpu_training_resume && data.cpu_training_resume.required) {
           try {
-            await resumeDistantTraining(franchiseId);
+            await resumeCpuTraining(franchiseId);
           } catch (resumeError) {
-            console.error('Failed to resume distant training:', resumeError);
+            console.error('Failed to resume CPU training:', resumeError);
             if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
               window.PageLoadOverlay.hide();
             }

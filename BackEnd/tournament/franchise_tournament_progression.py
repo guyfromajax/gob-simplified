@@ -278,14 +278,14 @@ def record_tournament_game_result(
     ``skip_games_upsert``: when True, only update the bracket (caller already wrote
     the full ``games`` document, e.g. full CPU sim summary + finalize).
 
-    ``source`` is for logging/traceability: ``user``, ``cpu_full``, ``distant``,
+    ``source`` is for logging/traceability: ``user``, ``cpu_full``,
     ``existing_games`` (sync from a ``games`` row), ``existing_results`` (sync from
     a results row, creating a minimal ``games`` doc).
 
     Idempotent for repeated calls with the same winner and scores; a later call may
     supply ``game_id`` when it was previously missing (legacy lookup path).
 
-    ``cpu_full`` / ``distant`` never overwrite a slot that already has a different
+    ``cpu_full`` never overwrites a slot that already has a different
     winner or scores (prevents double-sim / retry clobber). ``user`` and
     ``existing_*`` may still repair or correct a populated slot.
     """
@@ -380,7 +380,7 @@ def record_tournament_game_result(
                     "duplicate_eos_record": not need_gid_write,
                 }
 
-            if source in ("cpu_full", "distant"):
+            if source == "cpu_full":
                 logger.warning(
                     "[EOS-BRACKET-DEBUG] record_tournament_game_result_skip_locked_slot "
                     "franchise_id=%s source=%s phase=%s conf/region=%s round=%s idx=%s "
@@ -446,10 +446,10 @@ def record_tournament_game_result(
     )
 
     # Championship Announce Moments: queue Variation A/B for the FCC overlay path
-    # (sim-rest, distant sim, sim-championship). The "user" source covers the
+    # (sim-rest and sim-championship). The "user" source covers the
     # live-game path; that flow renders the moment in place of the EOG modal,
     # client-side, so we deliberately skip enqueue here to avoid double-show.
-    if source in ("cpu_full", "distant"):
+    if source == "cpu_full":
         try:
             from BackEnd.utils.franchise_championship_moments import (
                 maybe_enqueue_championship_game_moment,

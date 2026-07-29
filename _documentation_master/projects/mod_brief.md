@@ -152,7 +152,7 @@ Formats: **JSON first** (easier schema/versioning); CSV as a friendlier second e
 | Geek Points | `franchise_geek_points.geek_points_team_key_for_franchise_user` | Explicit product choice (see §8) |
 | Rank / prestige | `franchise_rank_prestige.py` | Mostly FTD-driven already — low risk if prestige seeded carefully |
 
-**Do not touch for v1:** schedule generator topology, EOS bracket constructor, distant-training template shape, dual-slot cap logic.
+**Do not touch for v1:** schedule generator topology, EOS bracket constructor, CPU auto-training payload shape, dual-slot cap logic.
 
 ---
 

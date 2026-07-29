@@ -2,7 +2,9 @@
 
 ## Purpose
 
-This project doc tracks the read-only comparison between **user Auto-Train** and **computer distant training** over a 26-week training window.
+> **Archived historical study:** This comparison predates universal CPU auto-training. The template system and its comparison script were removed on 2026-07-28; none of the described CPU behavior is live.
+
+This project doc tracks the former read-only comparison between **user Auto-Train** and **computer template training** over a 26-week training window.
 
 The immediate reason for this audit is to understand whether user teams can outpace computer teams through the season because the two paths train different systems.
 

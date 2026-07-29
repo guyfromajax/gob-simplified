@@ -5,8 +5,7 @@ eog_band_report.py — parse a season's [EOG-BAND] instrumentation into tables.
 Reads the JSONL file written by calculate_attr_changes when GOB_EOG_BAND_LOG=1
 (see BackEnd/api/franchise_routes.py). Each line is `[EOG-BAND] {json}`.
 
-Emits three tables, each split by is_distant_sim (distant games bypass the usage
-logic for six attributes, so their bands are not comparable to live games):
+Emits three tables for the authoritative full-engine EOG records:
 
   1. Branch frequency — per attribute, share of team-games hitting each band.
   2. Saturation       — per attribute, share of team-games with clamped=true,
@@ -88,25 +87,6 @@ def print_headers(headers: list[dict]) -> None:
         print(f"{tag}utc={h.get('utc')}  git_sha={h.get('git_sha')}")
         print(f"{'    ' if len(headers) > 1 else '  '}flags: "
               f"CPU_SIM_USE_POOL={flags.get('FRANCHISE_CPU_SIM_USE_POOL')}")
-
-
-def check_strict_distant(records: list[dict]) -> list[dict]:
-    """Distant rows in the measured window (weeks 1-26) — these corrupt the six
-    usage-gated attributes (they get randint(-2,1) instead of a real band). Returns
-    the offending records."""
-    return [
-        r for r in records
-        if r.get("is_distant_sim")
-        and isinstance(r.get("week"), int)
-        and 1 <= r["week"] <= REGULAR_SEASON_LAST_WEEK
-    ]
-
-
-def split_by_distant(records: list[dict]) -> dict[bool, list[dict]]:
-    out: dict[bool, list[dict]] = {False: [], True: []}
-    for rec in records:
-        out[bool(rec.get("is_distant_sim"))].append(rec)
-    return out
 
 
 def _pct(n: int, d: int) -> str:
@@ -394,12 +374,6 @@ def main() -> int:
         default=os.environ.get("GOB_EOG_BAND_LOG_FILE", "eog_band_log.jsonl"),
         help="Path to the [EOG-BAND] JSONL file.",
     )
-    parser.add_argument(
-        "--strict",
-        action="store_true",
-        help="Hard-fail (exit 2) if any distant-sim row appears in weeks 1-26 — "
-             "those corrupt the six usage-gated attributes' thresholds.",
-    )
     args = parser.parse_args()
 
     if not os.path.exists(args.path):
@@ -410,21 +384,7 @@ def main() -> int:
     print(f"# Loaded {len(records)} [EOG-BAND] records from {args.path}")
     print_headers(headers)
 
-    offenders = check_strict_distant(records)
-    if offenders:
-        weeks = sorted({r["week"] for r in offenders})
-        games = sorted({r.get("game_id") for r in offenders})
-        msg = (f"{len(offenders)} distant-sim row(s) in weeks 1-26 "
-               f"(weeks={weeks}, {len(games)} game(s)) — the six usage-gated "
-               f"attributes are GARBAGE for those historical games.")
-        if args.strict:
-            print(f"\n❌ STRICT FAIL: {msg}", file=sys.stderr)
-            return 2
-        print(f"\n⚠️  {msg}", file=sys.stderr)
-
-    by_distant = split_by_distant(records)
-    report_section("LIVE GAMES (is_distant_sim=false)", by_distant[False])
-    report_section("DISTANT-SIM GAMES (is_distant_sim=true)", by_distant[True])
+    report_section("FULL-ENGINE GAMES", records)
     return 0
 
 

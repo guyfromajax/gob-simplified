@@ -240,15 +240,14 @@ per-service with no code deploy. Both paths call the same core function and prod
 - [ ] Capture the **authoritative Railway scaling number** (the real 32-vCPU, colocated-Atlas
       figure that local measurement can't give).
 - [ ] Enable in **production** at a conservative worker count.
-- [ ] Progressively **raise the full-sim computer-game count from ~8 toward 63** — today most games
-      use the lightweight "distant" statistical model; the pool's headroom is what makes full
-      turn-by-turn sim affordable for more of the slate.
+- [x] Full turn-by-turn simulation is authoritative for the complete CPU slate. The retired
+      lightweight model and its semantic routing flag have been removed.
 
 ---
 
 ## CPU-week EOG persistence — the post-rollout bottleneck (2026-07-22)
 
-Completing the rollout above (full turn-by-turn for all 63 games, `full_tbt=63 distant=0`) exposed a
+Completing the rollout above (full turn-by-turn for all 63 games) exposed a
 cost the three phases never touched: **per-game end-of-game persistence, not the sim.**
 
 Measured on Railway (colocated Atlas), a 63-game week:

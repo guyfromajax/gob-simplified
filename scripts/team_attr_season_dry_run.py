@@ -508,7 +508,7 @@ def main() -> int:
     print(f"Seed: {args.seed}")
     print(f"Weeks: {args.weeks} (camp week 1 @ 30 pts, then 24 pts; no byes)")
     print(f"Record (random W/L): {wins}-{losses}")
-    print("Model: Auto-Train allocations + random EOG outcome bands (non-distant)")
+    print("Model: Auto-Train allocations + full-engine EOG outcome bands")
 
     _print_table(
         "Season Team Attribute Net",

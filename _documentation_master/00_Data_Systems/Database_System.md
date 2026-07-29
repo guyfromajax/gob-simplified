@@ -4,7 +4,7 @@ Top-level map of the MongoDB layer: every collection, what owns it, and the iden
 
 ## Environment & Connection
 
-- `BackEnd/db.py` defines nearly all collection handles; all code imports them from there. Two exceptions are created at point of use: `feedback_submissions` (`BackEnd/api/feedback_routes.py`) and `distant_training` (read via `db["distant_training"]` in `BackEnd/api/franchise_routes.py`).
+- `BackEnd/db.py` defines nearly all collection handles; point-of-use exceptions are documented beside their callers.
 - `MONGO_URI` selects the cluster; the database name comes from `MONGO_DB_NAME`, else the URI path (e.g. `/gob-staging`), else defaults to `gob` (prod).
 - `.env.local` (if present) overrides `.env` for local dev.
 - If `MONGO_URI` is unset or the client fails to init, `db.py` falls back to **mongomock** (used by tests).
@@ -21,7 +21,6 @@ Top-level map of the MongoDB layer: every collection, what owns it, and the iden
 | `defenses` | Canonical defenses (`defense_id`, `defense_type`, `zone_definitions`, `shift_triggers`) — seeded by `scripts/init_defenses_collection.py` and siblings |
 | `fcp_skeletons` | Fast Court Press setup/animation skeletons |
 | `hct_skeletons` | Half-court transition skeletons |
-| `distant_training` | CPU-team training templates (`training_type`: tc/regular), seeded by `scripts/generate_distant_training_templates.py` |
 
 ### Mode state (created and written at runtime)
 

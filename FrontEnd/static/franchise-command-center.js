@@ -3868,8 +3868,8 @@ function updatePlayButton(data) {
     const trainingCompleted = data.training_completed || false;
     const sessionType = data.session_type || 'in-season';
     if (!trainingCompleted) {
-      const distantResumeRequired = !!data.distant_training_resume?.required;
-      playNowBtn.textContent = distantResumeRequired
+      const cpuResumeRequired = !!data.cpu_training_resume?.required;
+      playNowBtn.textContent = cpuResumeRequired
         ? 'Resume Training'
         : (sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training');
       playNowBtn.dataset.mode = 'training';

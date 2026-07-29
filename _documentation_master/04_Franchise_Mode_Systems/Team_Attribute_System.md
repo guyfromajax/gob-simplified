@@ -1,6 +1,6 @@
 # Team Attribute Management System (**verified 2026-06-13**)
 
-> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise **creation**: attr `(-2,0)`, `team_chemistry` 7-10, `rebound_modifier` 0.2 fixed, `shot_threshold` 80-90; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). **Season rollover** (new season in an existing franchise) does NOT carry team_attributes: non-core fields re-init like creation and the 8 core attrs re-roll on a carryover-scaled range — see § Season Rollover Re-Roll. EOG faucet/sink tables spot-checked in `update_team_attributes_after_game` (`franchise_routes.py`): team-chemistry win +1..+2/+1..+3/+2..+4 & loss −2..−1/−3..−2/−5..−3 (L1383-1398), shot_threshold FG% bands at 50/45 (L1287-1295), discipline +1..+2, rebound-down −0.05..−0.10, distant-sim override (`simulation_engine=="distant"`) — all confirmed. **Fixed:** stale "January 2025" header + badly drifted Key Files line numbers (see below). **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
+> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise **creation**: attr `(-2,0)`, `team_chemistry` 7-10, `rebound_modifier` 0.2 fixed, `shot_threshold` 80-90; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). **Season rollover** (new season in an existing franchise) does NOT carry team_attributes: non-core fields re-init like creation and the 8 core attrs re-roll on a carryover-scaled range — see § Season Rollover Re-Roll. All franchise games now use the full turn-by-turn engine and the normal usage/scouting-driven EOG rules. **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
 
 ## Base Constants
 
@@ -63,7 +63,7 @@ All team attributes are stored in team objects across all game modes:
 - `fb_opp_modifier` - Fast break opponent modifier
 - `pt_opp_modifier` - Press/Trap opponent modifier
 
-**Note:** `momentum_score` is not set in `TeamManager.init_team_attributes()` for single/tournament mode. In **franchise mode**, season init sets it to **0** via `franchise_manager.py`; distant sim updates it after each distant game (see § Momentum below).
+**Note:** `momentum_score` is not set in `TeamManager.init_team_attributes()` for single/tournament mode. In **franchise mode**, season init sets it to **0** via `franchise_manager.py`; the deferred compatibility update after full CPU games is described in § Momentum below.
 
 ### Default Values
 
@@ -156,12 +156,12 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 
 | Attribute | Direction | Rule (after clamp) |
 |-----------|-----------|---------------------|
-| **Offensive efficiency** | **Distant sim:** −2…+1. Else **0…+1** if total offensive **`times_run`** **> 12**; **−1…0** if **> 10**; **−2…−1** if **≤ 10**. |
-| **Defensive efficiency** | **Distant sim:** −2…+1. Else **0…+1** if max HCO defense **`used`** share **≤ 39%**; **−1…0** if **> 39%** and **≤ 49%**; **−2…−1** if **> 49%**. |
-| **Fast break efficiency** | **Distant sim:** **up or down** (−2…+1). Else Non-distant: **0…+1** / **−1…0** / **−2…−1** when top FB play share is **≤ 50%** / **> 50%** / **> 60%** of team FB tries. |
-| **Press/trap (PT) efficiency** | **Distant sim:** −2…+1. Else: **0…+1** if **≤ 16**; **−1…0** if **> 16** and **≤ 20**; **−2…−1** if **> 20**. |
-| **Fast break opp. modifier** | **Distant sim:** −2…+1. Else Non-distant: **0…+1** / **−1…0** / **−2…−1** when opponent FB tries are **≤ 10** / **> 10** / **> 15**. |
-| **PT opp. modifier** | **Distant sim:** −2…+1. Else Non-distant: **0…+1** / **−1…0** / **−2…−1** when opponent **`pt_total_attempts`** is **≤ 12** / **> 12** / **> 16**. |
+| **Offensive efficiency** | Uses offensive-play concentration from the full game snapshot. |
+| **Defensive efficiency** | Uses maximum HCO-defense usage share from the full game snapshot. |
+| **Fast break efficiency** | Uses strategic fast-break play concentration. |
+| **Press/trap (PT) efficiency** | Uses press/trap play concentration. |
+| **Fast break opp. modifier** | Uses opponent strategic fast-break volume. |
+| **PT opp. modifier** | Uses opponent press/trap volume. |
 | **Fight** | **Up** if win (**0…+2**); **flat/down** if lose (**−2…0**) | Margin does not change fight; only W/L. |
 | **Discipline** | **Up** (**+1…+2**) if your **F + TO** is **lower** than opponent **F + TO + 8**. **Down** (**−2…−1**) if yours is **higher**. Else **down or flat** (**−1…0**) | “Lower fouls + turnovers (with buffer)” rewards discipline. |
 | **Team chemistry** | **Rank-relative** | Based on opponent `natl_rank` where lower rank is better. Beat lower-ranked: **0…+1**; beat higher-ranked non-top-10: **+1…+2**; beat top-10: **+2…+4**. Lose to top-10: **−1…0**; lose to higher-ranked non-top-10: **−2…0**; lose to lower-ranked 100-128: **−5…−3**; lose to other lower-ranked: **−3…−2**. |
@@ -207,7 +207,7 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 **Notes**
 - **Initial seed:** Included below for completeness. It sets the franchise starting baseline, but is not a progression faucet/sink after the team already exists.
 - **Training amplifiers:** Matching coaching focus can amplify positive training gains. `breaks` can also multiply positive session gains; it directly adds extra changes to `team_chemistry`, `discipline`, and `fight` at 3+ points.
-- **CPU teams:** When the user runs training, non-user teams use distant-training templates. Those template deltas are database-driven and can be positive or negative for any standard team attribute except `momentum_score`.
+- **CPU teams:** When the user runs training, eligible non-user teams run the shared `execute_training` engine with generated allocations and coaching focus. Per-team retries are guarded by `cpu_autotrain_week`.
 
 ### Shooting (`shot_threshold`) (range: 0 to 200)
 
@@ -274,13 +274,10 @@ This is how well your team executes the Xs & Os of your offense — running play
   Condition: offense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
 - Sink: End Of Game System.
-  Condition: every completed franchise game (non-distant); sum of offensive `times_run` across playbook rows.
+  Condition: every completed franchise game; sum of offensive `times_run` across playbook rows.
   If total > 12: Range: `0 to +1`
   Elif total > 10 (i.e. 11–12): Range: `-1 to 0`
   Else (≤ 10): Range: `-2 to -1`
-- Faucet + Sink: End Of Game System / distant-sim override.
-  Condition: distant-simmed franchise games only.
-  Range: `-2 to +1`.
 
 ### Defense Efficiency (`defensive_efficiency`) (range: -20 to 20)
 This is how well your team executes the Xs & Os of your defense — rotating on time, closing out, communicating switches, and making life difficult for the offense. Raw athleticism only takes you so far; this is what separates a disciplined unit from a collection of individuals. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through diverse play-calling and defense-focused training activities.
@@ -290,13 +287,10 @@ This is how well your team executes the Xs & Os of your defense — rotating on 
   Condition: defense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
 - Sink: End Of Game System.
-  Condition: every completed franchise game (non-distant); max HCO defense `used` share among `man` / `2-3-zone` / `3-2-zone` / `1-3-1-zone`.
+  Condition: every completed franchise game; max HCO defense `used` share among `man` / `2-3-zone` / `3-2-zone` / `1-3-1-zone`.
   If max share ≤ 39%: Range: `0 to +1`
   Elif max share ≤ 49%: Range: `-1 to 0`
   Else (> 49%): Range: `-2 to -1`
-- Faucet + Sink: End Of Game System / distant-sim override.
-  Condition: distant-simmed franchise games only.
-  Range: `-2 to +1`.
 
 ### Fast Break Efficiency (`fb_efficiency`) (range: -20 to 20)
 This is how well your team executes in transition — pushing the pace, hitting the right moments to run, and converting opportunities before the defense can set up. This affects both how often your team generates fast break chances and how effectively they finish them. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed fast break install, a balanced Fast Break playbook and dedicated fast break training activities.
@@ -306,13 +300,10 @@ This is how well your team executes in transition — pushing the pace, hitting 
   Condition: fast-break offense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
 - Sink: End of Game System
-  Condition: every completed franchise game (non-distant)
+  Condition: every completed franchise game
   If any one Fast Break Play > 60% of Fast Break tries: Range: `-2 to -1`
   Elif any one Fast Break Play > 50%: Range: `-1 to 0`
   Else: Range: `0 to +1`
-- Faucet + Sink: End Of Game System / distant-sim override.
-  Condition: distant-simmed franchise games only.
-  Range: `-2 to +1`.
 
 ### Press/Trap Break Efficiency (`pt_efficiency`) (range: -20 to 20)
 This is how well your team executes full court presses and half court traps — timing the traps, cutting off passing lanes, and turning defensive pressure into live ball turnovers. This affects both how often your team disrupts the opponent's offense and how effectively they convert that pressure into scoring opportunities. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed press/trap install, a disciplined approach to how often you deploy it, and dedicated press/trap training activities.
@@ -322,13 +313,10 @@ This is how well your team executes full court presses and half court traps — 
   Condition: press/trap defense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
 - Sink: End of Game System
-  Condition: every completed franchise game (non-distant); team HCT + FCP uses.
+  Condition: every completed franchise game; team HCT + FCP uses.
   If total > 20: Range: `-2 to -1`
   Elif total > 16: Range: `-1 to 0`
   Else: Range: `0 to +1`
-- Faucet + Sink: End Of Game System / distant-sim override.
-  Condition: distant-simmed franchise games only.
-  Range: `-2 to +1`.
 
 ### Fight (`fight`) (range: -20 to 20)
 Represents your team’s competitive edge. High Fight teams have great resilience, they handle adverse situations well, and perform with urgency when trailing. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
@@ -376,12 +364,12 @@ Reflects polish and control. Disciplined teams commit fewer unnecessary fouls an
 ### Momentum (`momentum_score`) (range: -10 to 10)
 
 - Initial seed: Franchise creation **and** season rollover both set **`0`** (rollover reset now implemented in `finish_season` via `init_franchise_rollover_team_attributes`).
-- **Distant sim only (Phase 2):** updated after each persisted distant franchise game via `_distant_sim_persist_momentum_score_updates()` in `franchise_routes.py`.
+- **Deferred compatibility behavior:** regular-season full CPU games update it through `_persist_legacy_season_momentum_updates()` in `franchise_routes.py`; the unchanged calculation lives in `BackEnd/utils/season_momentum.py`.
   - **Win:** `+1.5 × chemistry_scale` (+ `+0.5 × (win_streak − 2)` when streak ≥ 3 after the win).
   - **Loss:** `−0.8 × chemistry_scale` (+ extra **−2.0** when loss ends a win streak ≥ 3).
   - `chemistry_scale = max(1.0, team_chemistry / 10)`.
-  - Contributes to distant win probability as **`momentum_score × 8`** combined-score points (`BackEnd/constants/distant_sim.py`).
-- Companion distant-sim fields (not UI attrs): `distant_win_streak`, `distant_loss_streak` on FTD `team_attributes`; reset to **0** at franchise creation and at season rollover.
+- It is output-only and does not affect the full simulation engine.
+- Companion legacy fields (not UI attrs): `distant_win_streak`, `distant_loss_streak` on FTD `team_attributes`; reset to **0** at franchise creation and at season rollover. Their removal is deliberately deferred until the EOG attribute retune.
 - Training and EOG flows do **not** update `momentum_score`.
 
 ### Team Chemistry (`team_chemistry`) (range: 7 to 25)
@@ -412,13 +400,10 @@ This is how well your team defends fast breaks and transition offenses. Containi
   Condition: fast-break defense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
 - Sink: End of Game System
-  Condition: every completed franchise game (non-distant); opponent fast-break try total.
+  Condition: every completed franchise game; opponent fast-break try total.
   If opponent tries > 15: Range: `-2 to -1`
   Elif opponent tries > 10: Range: `-1 to 0`
   Else: Range: `0 to +1`
-- Faucet + Sink: End Of Game System / distant-sim override.
-  Condition: distant-simmed franchise games only.
-  Range: `-2 to +1`.
 
 ### P/T Opp Modifier (`pt_opp_modifier`) (range: -20 to 20)
 This is how well your team and work through your opponent's presses and traps. Handling the pressure of these disruptive defenses is key to avoiding the many mistakes they can cause. This is a trained attribute. It naturally decays over time as opponents study your game film and adjust to your tendencies, but you can fight that decay — and push it higher — through a committed Press/Trap Offense install and film study of your opponent.
@@ -428,13 +413,10 @@ This is how well your team and work through your opponent's presses and traps. H
   Condition: press/trap offense install slider `0-5`.
   Range: `0 -> -2 to -1`, `1 -> 0 to +1`, `2 -> +1 to +3`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`.
 - Sink: End of Game System
-  Condition: every completed franchise game (non-distant); opponent HCT + FCP uses.
+  Condition: every completed franchise game; opponent HCT + FCP uses.
   If opponent uses > 16: Range: `-2 to -1`
   Elif opponent uses > 12: Range: `-1 to 0`
   Else: Range: `0 to +1`
-- Faucet + Sink: End Of Game System / distant-sim override.
-  Condition: distant-simmed franchise games only.
-  Range: `-2 to +1`.
 
 
 **Team Attribute Impact on Gameplay**

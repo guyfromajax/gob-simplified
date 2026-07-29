@@ -218,7 +218,7 @@ def simulate_cpu_week_pooled(
 
 
 # ---------------------------------------------------------------------------
-# CPU auto-train (parallel per-team training) — sunset of distant training.
+# CPU auto-train (parallel per-team training).
 # ---------------------------------------------------------------------------
 # Each team's training is a pure function of its own DB state + roll, and writes
 # only its own FPD/FTD (disjoint), so it parallelizes like the games. Training is

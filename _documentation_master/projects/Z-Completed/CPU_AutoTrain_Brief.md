@@ -1,5 +1,7 @@
 # CPU Auto-Train — design brief
 
+**Status:** Completed and archived. Implemented as authoritative; template training was removed on 2026-07-28.
+
 **Goal:** replace the CPU **Distant Training System** with real per-team auto-train, so all 128
 teams train the same surfaces the user does. Fixes a documented competitive-balance bug and runs
 in parallel via the existing process pool.

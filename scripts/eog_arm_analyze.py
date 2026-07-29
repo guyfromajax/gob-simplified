@@ -6,12 +6,11 @@ Asserts, per your design:
   1. No garbage       — every raw_delta inside its declared band range; rebound ∈
                         [-0.25,+0.12] @2dp; max_share ∈ [0,1]; clamped values within
                         TEAM_ATTR_CLAMPS (core-8 ±20, rebound 0-1.0).
-  2. No distant leak  — zero is_distant_sim rows in the measured weeks (per arm).
-  3. Band coverage    — COMMON bands (≥3% baseline freq) fire in EVERY arm;
+  2. Band coverage    — COMMON bands (≥3% baseline freq) fire in EVERY arm;
                         RARE bands (<3%) fire in the POOLED total across all 5.
-  4. Cross-arm consistency — per-band frequency mean ± spread across the 5 arms
+  3. Cross-arm consistency — per-band frequency mean ± spread across the 5 arms
                         (a band that swings wildly arm-to-arm is a nondeterministic defect).
-  5. Rebound drift    — reported, NOT asserted: the ladder is designed to net mildly
+  4. Rebound drift    — reported, NOT asserted: the ladder is designed to net mildly
                         positive once training is included; positive here is EXPECTED.
 
 Usage: python scripts/eog_arm_analyze.py arm_1.jsonl arm_2.jsonl ... arm_5.jsonl
@@ -82,7 +81,7 @@ def dominant_band_share(arms, baseline_path):
     pooled = [r for recs in arms for r in recs]
     arms_share = _max_band_share(pooled)
     base = _max_band_share(load(baseline_path)) if os.path.exists(baseline_path) else {}
-    print("\n## 6. DOMINANT-BAND SHARE — did the one-directional runaways die? (HEADLINE)")
+    print("\n## 5. DOMINANT-BAND SHARE — did the one-directional runaways die? (HEADLINE)")
     src = baseline_path if base else "(baseline log not found — arms only)"
     print(f"  baseline source: {src} (OLD bands)  |  arms: NEW bands, pooled across {len(arms)} arms")
     print(f"  {'attr':<24}{'baseline':>10}{'arms':>10}{'delta':>10}")
@@ -109,13 +108,11 @@ def main() -> int:
     arms = [load(f) for f in files]
     fail = 0
 
-    # ---- 1 & 2: per-record value-range + distant leak -----------------------
-    range_viol, distant_leak, clamp_viol = 0, 0, 0
+    # ---- 1: per-record value-range and clamp integrity ----------------------
+    range_viol, clamp_viol = 0, 0
     for recs in arms:
         for r in recs:
             attr, band, rd = r.get("attr"), r.get("band"), r.get("raw_delta")
-            if r.get("is_distant_sim"):
-                distant_leak += 1
             key = (attr, band)
             if key in ranges and isinstance(rd, (int, float)):
                 lo, hi = ranges[key]
@@ -128,19 +125,18 @@ def main() -> int:
                 clo, chi = CLAMPS[attr]
                 if not (clo - 1e-9 <= post <= chi + 1e-9):
                     clamp_viol += 1
-    print("## 1-2. Value integrity")
+    print("## 1. Value integrity")
     for name, n in [("raw_delta outside band range", range_viol),
-                    ("distant-sim rows (must be 0)", distant_leak),
                     ("post outside clamp bounds", clamp_viol)]:
         ok = n == 0
         fail += 0 if ok else 1
         print(f"  {'✅' if ok else '❌'} {name}: {n}")
 
-    # ---- 3: band coverage (common per-arm, rare pooled) ---------------------
+    # ---- 2: band coverage (common per-arm, rare pooled) ---------------------
     per_arm_bands = [set((r["attr"], r["band"]) for r in recs) for recs in arms]
     pooled_bands = set().union(*per_arm_bands)
     all_labels = set(ranges) | {(a, "data_integrity_no_usage") for a in ("offensive_efficiency", "defensive_efficiency")}
-    print("\n## 3. Band coverage")
+    print("\n## 2. Band coverage")
     missing_common, missing_rare = [], []
     for (attr, label) in sorted(ranges):
         if label == "data_integrity_no_usage":
@@ -166,7 +162,7 @@ def main() -> int:
         print("  ✅ all rare bands fire in the pooled total across 5 arms")
 
     # ---- 4: cross-arm frequency consistency ---------------------------------
-    print("\n## 4. Cross-arm branch-frequency (mean ± spread; wild swings = defect)")
+    print("\n## 3. Cross-arm branch-frequency (mean ± spread; wild swings = defect)")
     per_arm_freq = []
     for recs in arms:
         tot = Counter(r["attr"] for r in recs)
@@ -183,7 +179,7 @@ def main() -> int:
         print(f"  {k[0]+'.'+k[1]:<34} mean={statistics.mean(vals)*100:5.1f}%  spread={spread*100:4.1f}pp")
 
     # ---- 5: rebound drift (report, not assert) ------------------------------
-    print("\n## 5. Rebound net drift per arm (EXPECTED mildly positive w/ training — do NOT 'fix')")
+    print("\n## 4. Rebound net drift per arm (EXPECTED mildly positive w/ training — do NOT 'fix')")
     for i, recs in enumerate(arms, 1):
         rd = [r["raw_delta"] for r in recs if r.get("attr") == "rebound_modifier" and isinstance(r.get("raw_delta"), (int, float))]
         if rd:

@@ -121,9 +121,6 @@ CHEM_LOSE_TO_HIGHER_NON_TOP10 = (-2, 0)
 CHEM_LOSE_TO_100_128 = (-5, -3)
 CHEM_LOSE_TO_OTHER_LOWER = (-3, -2)
 
-# Historical distant-sim uniform band (retained until the EOG cleanup phase).
-DISTANT_UNIFORM = (-2, 1)
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Band label vocabulary (single source). {label: (lo, hi)} per attribute — the
 # dry-run harness picks a band from these; eog_attr_rules emits the same labels.
@@ -202,10 +199,3 @@ CHEMISTRY_BANDS = {
         ("lose_to_other_lower", CHEM_LOSE_TO_OTHER_LOWER),
     ],
 }
-
-# The 6 efficiency attributes that use usage/concentration measures (non-distant).
-# In distant games all six draw the single DISTANT_UNIFORM band instead.
-DISTANT_UNIFORM_ATTRS = (
-    "offensive_efficiency", "defensive_efficiency", "fb_efficiency",
-    "fb_opp_modifier", "pt_efficiency", "pt_opp_modifier",
-)

@@ -2,7 +2,7 @@
 
 **Status:** Open  
 **Date filed:** 2026-07-18  
-**Related:** `franchise_cpu_sim_resume_plan.md`, `Press_Conference_System.md`, `End_Of_Game_System.md`
+**Related:** `Z-Completed/franchise_cpu_sim_resume_plan.md`, `Press_Conference_System.md`, `End_Of_Game_System.md`
 
 ## Problem
 
@@ -64,7 +64,7 @@ This is a **reliability / architecture** issue, not a need to buy more CPU capac
 
 ### 1. Reliability architecture (required)
 
-Implement / finish the resumable CPU-sim job model from `franchise_cpu_sim_resume_plan.md`:
+Implement / finish the resumable CPU-sim job model from `Z-Completed/franchise_cpu_sim_resume_plan.md`:
 
 - Durable `cpu_sim_jobs.{week}` with per-matchup status.
 - `start-cpu-sims` and phase B run **only incomplete** matchups.
@@ -119,7 +119,7 @@ Capacity is an optimization, not the primary fix for request-death UX.
 | Phase B client | `FrontEnd/static/js/phaser/utils/franchisePhaseBClient.js` |
 | EOG start of phase B | `FrontEnd/static/js/phaser/utils/gameCompletionPopup.js` |
 | Start-CPU / phase B routes | `BackEnd/api/franchise_routes.py` (`/franchise/complete-week/start-cpu-sims`, `/phase-b`) |
-| Full resume design | `_documentation_master/projects/franchise_cpu_sim_resume_plan.md` |
+| Full resume design | `_documentation_master/projects/Z-Completed/franchise_cpu_sim_resume_plan.md` |
 
 ## Decision log
 

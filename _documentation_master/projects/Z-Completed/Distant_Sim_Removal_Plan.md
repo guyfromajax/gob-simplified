@@ -1,12 +1,14 @@
 # Distant Systems — Final Sunset and Removal Plan
 
-**Status:** Phase 2 implemented on `codex/distant-sunset-phase2`; verification pending prototype.
+**Status:** Complete and archived on 2026-07-28. Deployment smoke/performance validation remains
+the normal release gate.
 **Scope:** Distant franchise game simulation **and** distant/template CPU training.
 **Implementation status:** Full turn-by-turn CPU games and real CPU auto-training are now
 authoritative in source. The two semantic environment flags and their routing branches are gone.
-The old CPU-training URL remains as a hidden compatibility alias. Legacy completion/resume field
-names and distant momentum fields remain deliberately deferred; no distant files or database data
-have been deleted yet.
+The CPU-training compatibility URL and legacy completion/resume names are removed. Legacy momentum
+fields remain deliberately deferred. The distant game engine, fabricated
+stats builder, constants, EOG branch, tests, calibration script, and live system docs are removed.
+No database data has been deleted.
 
 This document supersedes separate game-sim and training removal notes. It is the single execution
 plan for both systems.
@@ -17,8 +19,9 @@ plan for both systems.
   turn-by-turn engine.
 - Every eligible CPU team uses real auto-training through `execute_training`; template training is
   removed.
-- `momentum_score`, `distant_win_streak`, and `distant_loss_streak` are removed. They are distant
-  game-system fields and are unrelated to live player/team momentum.
+- `momentum_score`, `distant_win_streak`, and `distant_loss_streak` remain temporarily as
+  output-only compatibility fields. Their removal is deferred until the EOG attribute retune;
+  they are unrelated to live player/team momentum.
 - Historical game documents are not deleted merely because
   `simulation_engine == "distant"`. Database cleanup is a separate, explicitly authorized
   operation.
@@ -151,9 +154,10 @@ byte-identical across all eight team-stat rows and both arms reported zero globa
 Focused EOS routing and training-state tests pass. Prototype runs verified regular-season CPU
 games, real CPU auto-training, Practice Squad games, and the normal EOS completion path. The
 eliminated-team `sim-rest-of-tournament` run also routed through `cpu_full` and advanced the region
-bracket, but exposed regulation summaries persisted with `is_final=False`; the two direct
+bracket. It exposed regulation summaries persisted with `is_final=False`; the two direct
 `run_simulation` persistence boundaries now explicitly stamp completed summaries final while
-preserving their played quarter. Re-test that path before Phase 3 deletion.
+preserving their played quarter. Prototype re-test confirmed regulation `quarter=4`,
+`is_final=True`, `source=cpu_full`, successful week advancement, and no distant routing.
 
 ### Games
 
@@ -191,6 +195,13 @@ preserving their played quarter. Re-test that path before Phase 3 deletion.
 
 ## Phase 3 — Remove the distant game system
 
+**Implementation checkpoint (2026-07-28):** Complete in source. The live engine, fabricated
+box-score builder, constants, routing/persistence helpers, EOG uniform override, tournament source
+arm, dedicated tests, Monte Carlo artifacts, and live system docs are removed. The output-only
+legacy season-momentum calculation was copied unchanged into `BackEnd/utils/season_momentum.py`
+because removal of its fields and training allocation is explicitly deferred until the EOG
+attribute retune. Historical Mongo game documents are untouched and remain readable.
+
 1. Delete:
    - `BackEnd/distant_sim_engine.py`
    - `BackEnd/models/distant_game_stats.py`
@@ -205,7 +216,8 @@ preserving their played quarter. Re-test that path before Phase 3 deletion.
    - distant counters and observability arms
 3. Remove the distant branch from end-of-game team-attribute updates and EOG band instrumentation.
 4. Remove `"distant"` as a live tournament-progression source.
-5. Remove `momentum_score`, `distant_win_streak`, and `distant_loss_streak` from:
+5. **Deferred until the EOG attribute retune:** remove `momentum_score`,
+   `distant_win_streak`, and `distant_loss_streak` from:
    - constants/clamps
    - team initialization and rollover
    - FTD projections
@@ -224,6 +236,13 @@ preserving their played quarter. Re-test that path before Phase 3 deletion.
 ---
 
 ## Phase 4 — Remove the distant training system
+
+**Implementation checkpoint (2026-07-28):** Complete in source. There was no remaining live
+template branch or collection read after Phase 2. Obsolete template generation/replacement/dry-run
+scripts and the retired system document are deleted. The compatibility URL is removed; frontend
+and backend use `/franchise/run-training/cpu-train`. Week completion/resume state now uses
+`cpu_training_complete_week` / `cpu_training_resume`; per-team idempotency remains
+`cpu_autotrain_week`. No Mongo collection was dropped and no data migration was run.
 
 1. Delete the template-delta branch and all reads from `db["distant_training"]`.
 2. Remove legacy fields after the Phase 2 compatibility method has completed:
@@ -251,6 +270,14 @@ preserving their played quarter. Re-test that path before Phase 3 deletion.
 ---
 
 ## Phase 5 — Tests, scripts, and operational cleanup
+
+**Implementation checkpoint (2026-07-28):** Complete locally. Retired tests, Monte Carlo artifacts,
+template scripts, and comparison tooling are deleted. EOG analyzers now assume one full-engine
+dataset and no longer split or gate on a retired engine marker. Full-sim verification and
+pool/determinism tooling remain. Focused CPU-week, EOS, EOG, training-state, and Practice Squad
+suites pass. The broad suite is currently blocked by unrelated stale imports and pre-existing
+after-steal test drift. Staging full-season and performance measurements remain deployment
+validation, not local code cleanup.
 
 1. Delete distant-only tests and Monte Carlo/tuning scripts:
    - `tests/test_distant_sim.py`
@@ -280,6 +307,12 @@ preserving their played quarter. Re-test that path before Phase 3 deletion.
 ---
 
 ## Phase 6 — Documentation cleanup
+
+**Implementation checkpoint (2026-07-28):** Complete. Retired system documents are deleted; live
+training, EOG, box-score, team-attribute, database, rank/prestige, Practice Squad, tunable, and
+performance docs describe the universal full-engine/CPU-auto-training architecture. Historical
+studies and this plan are archived under `projects/Z-Completed`. The deferred output-only momentum
+fields are explicitly documented and are not confused with live player momentum.
 
 Delete the retired system documents:
 

@@ -1,6 +1,6 @@
 # Distant Sim Tuning — Season Momentum & Record Distribution
 
-> **Status:** Archived (July 2026). Phases 0–6 shipped. **Canonical runtime doc:** [`Distant_Game_Sim_System.md`](../../04_Franchise_Mode_Systems/Distant_Game_Sim_System.md) (calibration targets, playtest checklist, live MC results). This file retains the full tuning history, phase-by-phase MC tables, and decision log.
+> **Status:** Historical archive. The system, runtime documentation, constants, tests, and calibration script described here were removed on 2026-07-28. Links and code paths below intentionally preserve the former implementation record and are not current guidance.
 
 **Date:** 2026-07-04 · **Scope:** Distant (lightweight) franchise CPU game sim — win probability inputs, season record distribution, national rankings skew · **Status:** Phase 6 complete — integration tests + final MC; manual playtest checklist below · **Primary code:** `BackEnd/api/franchise_routes.py`, `BackEnd/distant_sim_engine.py` · **Calibration script:** `scripts/distant_sim_monte_carlo.py` · **Primary doc:** [`Distant_Game_Sim_System.md`](../../04_Franchise_Mode_Systems/Distant_Game_Sim_System.md)
 

@@ -50,13 +50,13 @@ Before deleting any defensive read, prove it's dead with real traffic.
 - Accumulate writes into **one FTD update per team** (team_attributes + `plays.*.effectiveness` + `scouting_data.defense.*.effectiveness`) instead of several separate `update_one`s.
 - Only bypass the Phase-0-proven-dead re-reads; keep every guardrail Phase 0 shows still fires.
 - Preserve exact `random.*` draw order (see RNG note) so Phase 2 can verify by seeded diff.
-- Postseason freeze (weeks 27–34) and distant-sim override branches must be preserved verbatim.
+- Postseason freeze (weeks 27–34) must be preserved verbatim. The retired lightweight-game override no longer exists.
 
 ## Phase 2 — Dual-run byte-identical verification (gate before ship)
 
 - Harness: for many real staging games, run the CURRENT EOG path and the NEW orchestrator on the **same** game doc under a **fixed seed**, and assert the resulting **FPD + FTD + game-doc writes are byte-identical** (same `$set`/`$inc` keys and values). Same residual-style proof used for the ±2 scoring bug (zero residual across games).
 - Because EOG consumes RNG: seed both runs identically **and** confirm identical draw counts. If the orchestrator changes draw order/count, switch that surface to poison-testing (assert the write *shape* + that outputs move together when the RNG output is poisoned), not exact diff.
-- Cover: regular season, EOS weeks (bracket sync), distant-sim override, postseason freeze, and a game whose team plays only once (disjointness assumption for Phase 3).
+- Cover: regular season, EOS weeks (bracket sync), postseason freeze, and a game whose team plays only once (disjointness assumption for Phase 3).
 
 ## Phase 3 — Parallel flush
 

@@ -11,9 +11,9 @@
 
 ## Overview
 
-- Runs **weeks 2–19** through bounded `/franchise/run-training/distant-cpu` polls (after user training + distant CPU training). Each poll advances at most one full PS game; the training page remains on its loading overlay and automatically continues polling.
+- Runs **weeks 2–19** through bounded `/franchise/run-training/cpu-train` polls after user and CPU training. Each poll advances bounded PS work; the training page remains on its loading overlay and continues automatically.
 - **Week 1 end:** after Training Camp cuts **and the user's training squad assignment**, build locked rosters (Teams 1–5), schedule, standings; publish **Practice Squad Rosters Announced** news.
-- **Init timing:** CPU camp cuts run at distant-CPU training; PS init is **deferred** until `POST /franchise/cut-players` succeeds when the user still has `cut_required`. If the user roster is already legal (no assignment needed), init runs at distant-CPU instead.
+- **Init timing:** CPU camp cuts run during CPU training; PS init is **deferred** until `POST /franchise/cut-players` succeeds when the user still has `cut_required`. If the user roster is already legal, init runs during CPU training.
 - **No backfill** for franchises mid-season before this feature shipped.
 - Cleared on **season rollover** (`practice_squad` doc field + `ps_season_stats` on FPD/FRD).
 
@@ -72,19 +72,19 @@
 - If the third full-engine attempt fails, the game becomes `fallback_completed` with a deterministic, non-tied 50–80 score seeded by franchise ID + week + stable game ID. The saved game records the engine, failure reason, attempt count, final error, and that player-stat rollup was intentionally skipped. The fallback advances standings and tournament/championship brackets but never invents player box-score statistics.
 - Full-engine exceptions are reported to Sentry with the PS game ID, week, attempt number, and attempt ID. The job also retains concise error metadata for audit and recovery.
 - Terminal game states are `completed`, `fallback_completed`, `forfeit`, and `skipped`. `practice_squad.trained_week` is set only after every scheduled game reaches one of those states.
-- The distant-training endpoint returns `retry_after_ms`; the training screen honors it instead of tight-loop polling. A refresh resumes the incomplete distant phase, and the FCC labels that state **Resume Training**. Once the terminal job is finalized, weekly training markers are written and the FCC advances to **Play Next Game**.
+- The CPU-training endpoint returns `retry_after_ms`; the training screen honors it instead of tight-loop polling. A refresh resumes the incomplete CPU phase, and the FCC labels that state **Resume Training**. Once finalized, weekly training markers are written and the FCC advances to **Play Next Game**.
 
 ## Known fixes
 
 | Date | Issue | Fix |
 |---|---|---|
-| 2026-06-14 | User training squad players missing from PS rosters | PS init moved from distant-CPU to after user's `cut-players` assignment so `training_squad_players` is populated first |
+| 2026-06-14 | User training squad players missing from PS rosters | PS init moved to after the user's `cut-players` assignment so `training_squad_players` is populated first |
 | 2026-06-14 | Season stats table all zeros on PS roster pages | `apply_ps_game_stats` queried games by ObjectId while PS saves string `_id`; added `_load_game_doc` + one-time `backfill_ps_season_stats` |
 
 ## News (`season_news`)
 
 1. Week N Upset Report (complete-week)  
-2. Week N Practice Squad Game Results (end of distant-CPU training, weeks 2–19; visible when user returns to FCC via training report; links to standings + box scores)  
+2. Week N Practice Squad Game Results (end of CPU training, weeks 2–19; visible when user returns to FCC via training report; links to standings + box scores)
 3. Practice Squad All-Stars (TS attribute gains; complete-week)  
 4. Updated Recruiting Leans (complete-week)  
 

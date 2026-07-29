@@ -1,5 +1,7 @@
 # Franchise CPU Sim Resume Plan
 
+> Archived implementation plan. The resumable full-CPU job model is now live.
+
 ## Purpose
 
 Make franchise computer-game simulation resumable and idempotent across browser refresh, browser close, tab crashes, and backend request interruption.

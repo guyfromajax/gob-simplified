@@ -32,7 +32,10 @@ Cross-cutting engineering and product plans that span multiple systems (not tied
 | [Z-Completed/SFX_Brief.md](./Z-Completed/SFX_Brief.md) | Creative brief archive |
 | [Z-Completed/Unified_State_Persistence_Work_Plan.md](./Z-Completed/Unified_State_Persistence_Work_Plan.md) | State/persistence contract implementation, phases 1–5.7 (Feb-2026 settings entry superseded by April two-stage model) |
 | [Dynamic_HCO_Motion_Implementation_Plan.md](./Dynamic_HCO_Motion_Implementation_Plan.md) | Dynamic HCO motion build plan (phases 1–5 shipped June 2026; see `Dynamic_HCO_System.md`) |
-| [Distant_Sim_Tuning.md](./Distant_Sim_Tuning.md) | Distant sim momentum/record tuning (phases 0–6 shipped July 2026; see `Distant_Game_Sim_System.md`) |
+| [Distant_Sim_Tuning.md](./Distant_Sim_Tuning.md) | Historical tuning record for the lightweight engine removed July 2026 |
+| [Distant_Sim_Removal_Plan.md](./Distant_Sim_Removal_Plan.md) | Completed sunset of lightweight games and template CPU training |
+| [CPU_AutoTrain_Brief.md](./CPU_AutoTrain_Brief.md) | Completed rollout of universal CPU auto-training |
+| [Training_Comparison.md](./Training_Comparison.md) | Historical comparison that motivated CPU auto-training |
 | [Dynamic_HCO_Motion_Brief.md](./Dynamic_HCO_Motion_Brief.md) | Dynamic HCO motion build brief (shipped, flagged; see `Dynamic_HCO_System.md`) |
 | [Dynamic_HCO_SP_Brief.md](./Dynamic_HCO_SP_Brief.md) | Dynamic HCO set-play build brief (shipped, flagged; see `Dynamic_HCO_System.md` § Set plays) |
 | [Dynamic_FCP_Brief.md](./Dynamic_FCP_Brief.md) | Dynamic FCP build brief (shipped; see `FCP_System.md`) |

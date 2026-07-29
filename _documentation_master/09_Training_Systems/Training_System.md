@@ -1,6 +1,6 @@
-## Training System (**verified 2026-06-13**)
+## Training System (**verified 2026-07-28**)
 
-> Verified vs code — **accurate & well-maintained**. Spot-checks all pass: training points `30 if is_first_training else 24` (`get_training_points` franchise_routes L10489/L10516, validation L10637); split endpoints `/franchise/run-training/user` (L10556) + `/franchise/run-training/distant-cpu` (L10580); `parse_coaching_focus` (training_execution_v2 L342); focus multiplier `random.choice([1.5,1.6,1.7,1.8])` (7 sites incl. install execution/teamwork); training-camp CH bonus scale `_training_camp_bonus_range_for_ch` (>80→(4,10) / >60→(3,8) / >40→(2,6) / >20→(1,4)) + per-position core attrs all exact; coaching-focus carryover `int(round(prior*0.25))` (see Season_Init). Coaching-focus per-leaf behavior corroborated by `Coaching_Focus_Implementation_Map.md` (code-truth status matrix). Absorbed the former `Training_Notes_System.md` (play-name display rule folded into Training Notes Section).
+> CPU template training is retired. User and CPU teams now share `execute_training`; CPU teams receive generated allocations/focus and use `cpu_autotrain_week` for per-team idempotency. The split endpoints are `/franchise/run-training/user` and `/franchise/run-training/cpu-train`.
 
 This document should reflect the current franchise training implementation in code. If behavior here conflicts with `BackEnd/models/training_execution_v2.py`, `BackEnd/models/training_notes.py`, or `BackEnd/api/franchise_routes.py`, update this doc to match the live implementation.
 
@@ -15,9 +15,9 @@ This document should reflect the current franchise training implementation in co
 5. **Backend Execution**: `BackEnd/models/training_execution_v2.py`
 6. **API Endpoints (franchise training)**:
    - `GET /franchise/training-points` - Get available training points (30 for training camp, 24 for regular training)
-   - `POST /franchise/run-training/user` - **User phase only**: runs `execute_training` for the user team, persists FPD/FTD + `latest_training`, sets `training_status.user_training_applied_week` and leaves `training_completed` **false** until distant phase completes. Requires auth + franchise ownership. Response includes `training_highlights` (string array) for the loading feed.
-   - `POST /franchise/run-training/distant-cpu` - **Distant phase**: template-based CPU teams, week-1 camp cuts when applicable, then bounded Practice Squad work. During PS weeks it returns `status: "processing"` after at most one PS game plus `retry_after_ms`; the client polls at that interval until the response returns success and a report redirect. A PS game receives three full-engine attempts before an auditable deterministic terminal fallback (standings/brackets only; no fabricated player stats). Body: `{ "franchise_id" }`. Requires auth + ownership.
-   - `POST /franchise/run-training` - **Legacy / full path**: same end state as user + distant in one request; if user phase is already applied for the current week but distant is not, handler runs **distant only** (resume). Does not require auth in the same way as the split routes (existing behavior).
+   - `POST /franchise/run-training/user` - **User phase only**: runs `execute_training` for the user team, persists FPD/FTD + `latest_training`, sets `training_status.user_training_applied_week` and leaves `training_completed` **false** until CPU training completes. Requires auth + franchise ownership. Response includes `training_highlights` for the loading feed.
+   - `POST /franchise/run-training/cpu-train` - **CPU phase**: runs real auto-training for eligible CPU teams, week-1 camp cuts, and bounded Practice Squad work. During PS weeks it may return `status: "processing"` plus progress and `retry_after_ms`; the client polls until success.
+   - `POST /franchise/run-training` - **Legacy/full path**: reaches the same user + CPU end state in one request and resumes the CPU phase when user training is already applied.
    - `GET /franchise/training-report` - Get training report data
 7. **Coaching Focus Archetypes**: Authoritarian, Systems Coach, Player Maximizer, Culture Builder — per-leaf code behavior: `Coaching_Focus_Implementation_Map.md` in this folder
 8. **Rebound Modifier Range**: 0.0-1.0 (clamped)
@@ -29,7 +29,7 @@ This document should reflect the current franchise training implementation in co
 2. **User Allocates Points**: User distributes training points (30 or 24) across 20 sliders (player drills, team drills, general)
 3. **User Selects Focus**: User selects one coaching focus archetype and sub-option
 4. **Recruiting Invites Access (Weeks 20-26 only)**: Training page shows a green `Recruiting Invites` button below `Submit Training` that routes to `recruiting-orders.html`
-5. **Submit Training (Franchise)**: Frontend sends `POST /franchise/run-training/user` then `POST /franchise/run-training/distant-cpu` (see **Training loading feed** below). Tournament/single-game modes still use their existing endpoints.
+5. **Submit Training (Franchise)**: Frontend sends `POST /franchise/run-training/user` then `POST /franchise/run-training/cpu-train` (see **Training loading feed** below).
 6. **Backend Validation**: Backend validates total points match expected (30 for training camp, 24 for regular training)
    - week 20 special case: if no recruiting orders have ever been saved, training is blocked until the user saves recruiting orders
 7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing; `execute_training` merges any legacy `scouting_data.defense` row keys onto canonical `defense_id` keys before baselines (same remap as gameplay). **Defense and offensive play CMD effectiveness decay from game usage share runs at franchise EOG only** (`End_Of_Game_System.md`); not during training.
@@ -39,12 +39,12 @@ This document should reflect the current franchise training implementation in co
 11. **Attribute Clamping**: All values clamped to valid ranges (see **Attribute_Clamp_System.md** for player and team clamp ranges)
 12. **Weeks 20-26 Recruiting Invite Processing**: During recruiting invite season, `Submit Training` also runs that week's recruiting invite processing using the user's saved recruiting orders plus CPU weekly recruiting logic
 13. **User team persisted (phase 1)**: User-team training report stored on FTD and in `latest_training`; franchise doc records `user_training_applied_week`. **`training_completed` stays false** until step 14.
-14. **Computer team training (phase 2)**: All non-user teams run **distant training** (template-based updates). FTDs may record `cpu_distant_trained_week` for idempotent retries. Then franchise doc sets `training_completed` and `cpu_distant_complete_week`.
-15. **Post-Training Camp Cuts**: After week 1 training camp, applied during distant phase for CPU teams; user cut flow from FCC when roster > 12.
+14. **Computer team training (phase 2)**: Eligible non-user teams run real auto-training through `execute_training`. FTDs record `cpu_autotrain_week` for idempotent retries. The franchise then records `training_completed` and `cpu_training_complete_week`.
+15. **Post-Training Camp Cuts**: After week 1 training camp, applied during the CPU phase; user cut flow from FCC when roster > 12.
 
-### Training loading feed (franchise, between user and distant phases)
+### Training loading feed (franchise, between user and CPU phases)
 
-While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`), the training page keeps a full-screen **pulse** overlay and shows a **stream of highlight lines** derived only from **user-team** training (not from CPU teams).
+While CPU training runs (`POST /franchise/run-training/cpu-train`), the training page keeps a full-screen **pulse** overlay and shows a stream of highlight lines derived from user-team training.
 
 **Backend — highlight list**
 
@@ -56,15 +56,15 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 
 - Files: `FrontEnd/static/training.js`, `FrontEnd/static/js/shared/pageLoadOverlay.js`.
 - Phase 1 overlay subtitle: **“Preparing your training…”** (team name as pulse title).
-- After phase 1 succeeds: highlights are **copied, Fisher–Yates shuffled**, and shown **one line at a time** (first line immediately, then every **5 seconds**). When the list is exhausted, the **last line stays** until distant training completes. If there are no highlights, a single fallback line is used: **“Finishing league training…”**.
+- After phase 1 succeeds: highlights are copied, shuffled, and shown one line at a time. The last line remains until CPU training completes.
 - `PageLoadOverlay.updatePulseSubtitle(text)` updates only the subtitle between ticks (avoids re-running full `show()` each time).
 - Phase 1 and phase 2 requests include `API_CONFIG.getAuthHeaders()` (Bearer token).
-- During weeks 2–19, phase 2 is a durable polling workflow. Every response advances at most one full Practice Squad game and reports `completed_games` / `total_games`. Refreshing or revisiting the training page detects an applied user phase with incomplete distant training and resumes polling automatically. Completed PS games are not replayed; an interrupted in-progress game restarts from tip-off.
+- During weeks 2–19, phase 2 is a durable polling workflow. Responses report Practice Squad progress. Refreshing or revisiting detects an applied user phase with incomplete CPU training and resumes automatically.
 
 **Franchise training state helpers**
 
-- `BackEnd/utils/franchise_training_state.py` — `franchise_training_fully_complete_for_week`, `franchise_user_training_applied_for_week` (split-phase vs legacy saves). FCC **`training_completed`** reflects “user + distant done for this week,” not user-only.
-- If user training is applied but the distant PS job is unfinished, training APIs and FCC data expose `distant_training_resume`; the FCC CTA reads **Resume Training**. Completion/fallback of every PS game allows distant finalization to set `training_completed` + `cpu_distant_complete_week`, after which the CTA reads **Play Next Game**.
+- `BackEnd/utils/franchise_training_state.py` — `franchise_training_fully_complete_for_week`, `franchise_user_training_applied_for_week`. FCC `training_completed` reflects user + CPU completion.
+- If user training is applied but CPU/PS work is unfinished, APIs expose `cpu_training_resume`; completion sets `training_completed` + `cpu_training_complete_week`.
 
 ### Post-Training Camp Cut Flow
 
@@ -235,7 +235,7 @@ The training execution system applies pre-training conditions, allocates trainin
 - **Next franchise game (home crowd roll):** sets **`pending_community_engagement`** on that team’s **FTD** (`franchise_team_data`). When a franchise game is started (`/api/init-game` or new-game `simulate-quarter` path), the engine reads pending flags for **both** teams, resolves a single band shift for the **home crowd weight table** (see `Home_Crowd_System.md`), then clears both teams’ flags.
 - **User home:** shift crowd weights **up** one chemistry band vs the user’s current `team_chemistry` for the home team in that game; if already in **21–25**, use the **Upper Bonus Range** row from `Home_Crowd_System.md` instead.
 - **User away:** shift **down** one band vs the **home opponent’s** `team_chemistry`; if opponent chemistry is in **7–10**, no downward effect.
-- **Computer:** distant training templates may set `community_engagement` on the template; when applied, that CPU team gets `pending_community_engagement` on FTD for the same rules (only CE vs no CE: CPU home → shift up from CPU chemistry; CPU away → shift down from user’s home chemistry).
+- **Computer:** CPU auto-training can select Community Engagement inside the shared engine, but its persistence path does not currently set `pending_community_engagement`; this next-game effect is therefore user-team-only today.
 - **Both teams pending CE** in the same matchup: shifts **cancel** (normal roll from actual home `team_chemistry`).
 - **Bye week:** if no game is played after training, the pending flag stays until the **next** game in that season.
 
@@ -681,16 +681,16 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 1. **Training Submission:**
    - User allocates 24 training points (or 30 for first training) and selects coaching focus on `training.html`
    - **Player Maximizer:** `GET /franchise/training-points` includes `custom_focus_roster` (attrs + `position_ratings`) and `player_maximizer_ranking_attrs` for the modal. Submit sends a **resolved** leaf (never bare `player-maximizer-choose-attributes`). Payload includes `coaching_focus_custom_by_player` when `coaching_focus` is `player-maximizer-custom`.
-   - **Franchise:** Frontend sends `POST /franchise/run-training/user` with training data, then `POST /franchise/run-training/distant-cpu` with `{ franchise_id }`, with the loading feed between them (see **Training loading feed**). **Legacy:** `POST /franchise/run-training` still performs a full run or distant-only resume.
+   - **Franchise:** Frontend sends `POST /franchise/run-training/user` with training data, then `POST /franchise/run-training/cpu-train` with `{ franchise_id }`, with the loading feed between them. The legacy combined endpoint still reaches the same final state.
    - **Data Initialization (Auto-Population):**
      - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
      - If `scouting_data` is empty or missing the `defense` structure, backend automatically initializes it using `TeamManager._init_scouting_data()`
      - Initialized data is saved to the database before training execution
      - This ensures training works even if game plan or playbooks haven't been submitted yet
    - Backend executes training for user's team (pre-conditions, point allocation, clamping)
-   - Backend stores training report in FTD `training_reports.{week}` and franchise `latest_training` after user phase; distant phase updates CPU FTDs/FPDs from templates (not full `execute_training`).
-   - **Computer Team Training (Franchise Mode Only):** See **Distant Team Training** — template-based, triggered by `POST /franchise/run-training/distant-cpu` or the second half of `POST /franchise/run-training`.
-   - Distant phase returns redirect URL to the training report page (user's team only)
+   - Backend stores the user report in FTD `training_reports.{week}` and franchise `latest_training`; CPU auto-training stores per-team reports on CPU FTDs.
+   - **Computer Team Training:** Triggered by `POST /franchise/run-training/cpu-train` or the second half of the combined endpoint.
+   - The CPU phase returns the redirect URL to the user's training report.
 
 2. **Training Report Display:**
    - Frontend loads training report data from `/franchise/training-report` endpoint
@@ -720,29 +720,19 @@ For player loading, the system:
 
 ### Computer Team Training (Franchise Mode Only)
 
-In Franchise mode, when the user submits training for their team, all non-user teams are updated in the same overall training step, but they do **not** run the full `execute_training()` path. They use the separate **Distant Team Training System**.
+Eligible non-user teams run the same `execute_training()` engine with generated allocations and a generated coaching focus.
 
-**Current Behavior:**
-- **Automatic Execution**: From the **franchise training page**, distant training runs as soon as the client completes the user phase (second HTTP request). A **legacy** single POST still runs both in one server handler.
-- **Template-Based**: CPU teams pull a random template from the `distant_training` collection for `tc` or `regular` training type
-- **No Full User-Team Logic**: CPU teams do not run the same pre-training **player** conditions, drill-allocation, playbook-training, or report-generation flow as the user team
-- **What Updates**:
-  - team attributes on FTD
-  - player attributes on FPD
-  - player position ratings after attribute changes
-  - optional `pending_community_engagement`
-- **What Does Not Update**:
-  - offensive play effectiveness
-  - defensive set effectiveness
-  - team `plays` data
-  - team `scouting_data`
-  - training reports for CPU teams
-- **EOS Tournament Behavior**: eliminated teams are skipped during EOS tournament weeks
-- **Post-Training Camp Cuts**: after first-training camp, CPU teams still cut down to 12 players if needed
+**Current behavior:**
+- The CPU phase starts after the user phase.
+- `cpu_autotrain_week` claims each FTD before delta writes so retries cannot double-train a team.
+- Player attributes and position ratings, team attributes, plays, scouting data, coaching-focus counters, and `training_reports.{week}` are persisted.
+- EOS-eliminated teams are skipped.
+- Week-1 CPU teams are cut to 12 players after training.
+- CPU auto-training does not currently persist the user-path `pending_community_engagement` next-game flag.
 
 **Franchise Roster Source Of Truth:**
 - User-team training execution and the training report page both use `FTD.players` as the franchise roster membership list
-- CPU distant training also uses `FTD.players` order when available; if absent, it falls back to the core team roster order
+- CPU auto-training uses `FTD.players` as its roster source.
 
 **Note:** Player attributes saved by training are automatically loaded during game initialization — `load_roster(team_name, franchise_id=...)` (`BackEnd/utils/roster_loader.py`) reads FPD and merges trained attributes over the universal player base. See `../01_Game_Mode_Systems/Franchise_Mode_Overview.md` ("How a game consumes franchise state").
 
@@ -764,25 +754,24 @@ In Franchise mode, when the user submits training for their team, all non-user t
 
 **Franchise Document:**
 - `latest_training` - Most recent training report (backward-compatible quick access)
-- `training_status.training_completed` - Boolean; **true** only after user + distant phases complete (split flow)
+- `training_status.training_completed` - Boolean; true only after user + CPU phases complete
 - `training_status.week` - Week number aligned with last training
 - `training_status.user_training_applied_week` - User phase done for that week (split flow)
-- `training_status.cpu_distant_complete_week` - Distant phase done for that week (split flow)
+- `training_status.cpu_training_complete_week` - CPU phase done for that week
 - `training_status.cpu_training_camp_cuts_applied` - Week-1 CPU camp cuts have run (when applicable)
 
 **FCC API (`GET /franchise/command-center/data`):**
 - `last_training_report_week` - Integer week for the current **latest** user training report (`latest_training.week`), used to render the Inbox message and link; omitted or null when no report exists yet
 
 **Computer Team Updates (Franchise Mode Only):**
-- CPU distant training updates FTD team attributes and FPD player attributes / position ratings
-- CPU distant training does **not** store training reports and does **not** update team `plays` or `scouting_data`
+- CPU auto-training updates FPD player attributes/position ratings and FTD team attributes, plays, scouting data, coaching-focus counters, and training reports.
 
 ### Key Files
 
 **Frontend:**
 - `FrontEnd/static/training.html` - Training allocation page
 - `FrontEnd/static/training.css` - Training page styling
-- `FrontEnd/static/training.js` - Training logic; franchise submit uses user + distant endpoints and highlight stream
+- `FrontEnd/static/training.js` - Training logic; franchise submit uses user + CPU endpoints and highlight stream
 - `FrontEnd/static/js/shared/pageLoadOverlay.js` - Loader; `updatePulseSubtitle` for feed ticks
 - `FrontEnd/static/training-report.html` - Training report display page
 - `FrontEnd/static/training-report.css` - Report page styling
@@ -792,7 +781,7 @@ In Franchise mode, when the user submits training for their team, all non-user t
 **Backend:**
 - `BackEnd/models/training_execution_v2.py` - Core training execution logic
 - `BackEnd/models/training_notes.py` - Structured training-notes generation for report sections
-- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/distant-cpu`, distant helper + idempotency); also `GET /franchise/training-report`, `GET /franchise/schedule`. Training report **recruiting strip**: `_training_report_recruiting_display` (+ `_recruit_display_name_for_training_report`, `_recruit_rt`) and persistence on `training_reports.{week}`.
+- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/cpu-train`) and CPU auto-training/idempotency; also `GET /franchise/training-report`, `GET /franchise/schedule`.
 - `BackEnd/utils/training_loading_highlights.py` - `training_highlights` for loading feed
 - `BackEnd/utils/franchise_training_state.py` - Split-phase completion helpers for FCC and cuts
 - `BackEnd/utils/franchise_coaching_focus_counts.py` - FTD `coaching_focus` archetype counters (user team)

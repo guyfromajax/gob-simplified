@@ -60,7 +60,6 @@ from BackEnd.models.training_execution_v2 import (
     build_eog_defensive_effectiveness_decay_ftd_updates,
     build_eog_offensive_play_effectiveness_decay_ftd_updates,
 )
-from BackEnd.models.distant_game_stats import build_distant_game_summary
 from BackEnd.models.player import Player
 from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
@@ -1630,7 +1629,6 @@ def update_team_attributes_after_game(
     away_totals = eog_inputs.get("away", {}).get("totals", {})
     home_scouting = eog_inputs.get("home", {}).get("scouting", {})
     away_scouting = eog_inputs.get("away", {}).get("scouting", {})
-    is_distant_sim = (game_doc.get("simulation_engine") == "distant")
 
     logger.info(
         "🔍 [UPDATE-TEAM-ATTRS] EOG canonical snapshot source=%s home=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s) away=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s)",
@@ -1873,28 +1871,13 @@ def update_team_attributes_after_game(
         _apply_band("fight", _rules.fight_change(is_winner))
         _apply_band("rebound_modifier", _rules.rebound_modifier_change(treb, opp_treb))
 
-        if is_distant_sim:
-            # Historical distant-game override remains until EOG cleanup.
-            for _attr in (
-                "offensive_efficiency", "defensive_efficiency", "fb_efficiency",
-                "fb_opp_modifier", "pt_efficiency", "pt_opp_modifier",
-            ):
-                _apply_band(_attr, _rules.distant_uniform_change())
-            logger.warning(
-                "🧪 [EOG-DISTANT-ATTRS] team=%s off_eff=%s def_eff=%s fb_eff=%s fb_opp=%s pt_eff=%s pt_opp=%s",
-                str(team_id_label),
-                changes.get("offensive_efficiency"), changes.get("defensive_efficiency"),
-                changes.get("fb_efficiency"), changes.get("fb_opp_modifier"),
-                changes.get("pt_efficiency"), changes.get("pt_opp_modifier"),
-            )
-        else:
-            # Own-team efficiency = concentration (offense/fb/pt); opponent modifiers = volume.
-            _apply_band("offensive_efficiency", _rules.offensive_efficiency_change(off_total, off_max_share))
-            _apply_band("defensive_efficiency", _rules.defensive_efficiency_change(def_total, def_max_share))
-            _apply_band("fb_efficiency", _rules.fb_efficiency_change(team_fb_total, team_fb_max_share))
-            _apply_band("fb_opp_modifier", _rules.fb_opp_modifier_change(opponent_fb_total))
-            _apply_band("pt_efficiency", _rules.pt_efficiency_change(pt_total, pt_max_share))
-            _apply_band("pt_opp_modifier", _rules.pt_opp_modifier_change(opponent_pt_total))
+        # Own-team efficiency = concentration (offense/fb/pt); opponent modifiers = volume.
+        _apply_band("offensive_efficiency", _rules.offensive_efficiency_change(off_total, off_max_share))
+        _apply_band("defensive_efficiency", _rules.defensive_efficiency_change(def_total, def_max_share))
+        _apply_band("fb_efficiency", _rules.fb_efficiency_change(team_fb_total, team_fb_max_share))
+        _apply_band("fb_opp_modifier", _rules.fb_opp_modifier_change(opponent_fb_total))
+        _apply_band("pt_efficiency", _rules.pt_efficiency_change(pt_total, pt_max_share))
+        _apply_band("pt_opp_modifier", _rules.pt_opp_modifier_change(opponent_pt_total))
 
         _apply_band("team_chemistry", _rules.team_chemistry_change(is_winner, team_rank, opponent_rank))
 
@@ -2017,7 +2000,6 @@ def update_team_attributes_after_game(
                         "franchise_id": str(franchise_id),
                         "team_id_label": str(team_id_label),
                         "is_winner": bool(is_winner),
-                        "is_distant_sim": bool(is_distant_sim),
                         "attr": attr_name,
                         "inputs": attr_inputs.get(attr_name, {}),
                         "band": _band_labels.get(attr_name),
@@ -2285,10 +2267,9 @@ def auto_train_one_cpu_team(
     ftd_doc: dict | None = None,
     fpd_by_player_id: dict | None = None,
 ) -> dict:
-    """Run REAL auto-train for ONE CPU team — the sunset replacement for distant training.
+    """Run real auto-training for one CPU team using the shared training engine.
 
-    Unlike distant training (canned template deltas, no play/scouting effectiveness), this runs
-    the same ``execute_training`` engine the user's team uses, with a per-team auto-train roll, so
+    This runs the same ``execute_training`` engine the user's team uses, with a per-team auto-train roll, so
     CPU teams train every surface the user does. Pure per-team: reads/writes only this team's FPD +
     FTD (disjoint from every other team), so it parallelizes safely.
 
@@ -2817,174 +2798,15 @@ def _build_franchise_game_inbox_entry(
     }
 
 
-def _distant_sim_home_team_chemistry_bonus(home_ftd: dict) -> int:
-    """Home win-roll bonus: 2 × team_chemistry from FTD team_attributes (Distant_Game_Sim_System.md)."""
-    from BackEnd.distant_sim_engine import distant_sim_home_chemistry_bonus
-
-    raw = (home_ftd.get("team_attributes") or {}).get("team_chemistry")
-    return distant_sim_home_chemistry_bonus(raw)
-
-
-def _distant_sim_regular_season_standings(
-    franchise_doc: dict[str, Any],
-    team_ids_map: dict[str, Any],
-) -> dict[str, dict[str, int]]:
-    """
-    W/L/PF/PA from franchise.results for regular season weeks only (same slice as standings W/L
-    when postseason rows live under higher week keys). Uses calculate_franchise_standings.
-    """
-    from BackEnd.utils.franchise_standings import calculate_franchise_standings
-
-    rs_slice: dict[str, Any] = {}
-    for wk, games in (franchise_doc.get("results") or {}).items():
-        try:
-            wi = int(wk)
-        except (TypeError, ValueError):
-            continue
-        if 1 <= wi <= ScheduleManager.REGULAR_SEASON_WEEKS:
-            rs_slice[str(wk)] = games
-    return calculate_franchise_standings(rs_slice, team_ids_map)
-
-
-def _distant_sim_batch_fpd_map(
-    franchise_id: ObjectId,
-    ftd_by_team_id: dict[str, dict],
-) -> dict[str, dict[str, Any]]:
-    """Batch-load FPD attributes for all active rosters in a distant-sim week."""
-    player_ids: list[str] = []
-    seen: set[str] = set()
-    for doc in ftd_by_team_id.values():
-        for pid in doc.get("players") or []:
-            s = str(pid)
-            if s and s not in seen:
-                seen.add(s)
-                player_ids.append(s)
-    if not player_ids:
-        return {}
-    return _load_fpd_map(franchise_id, player_ids)
-
-
-def _distant_sim_momentum_multiplier(team_chemistry_raw: Any) -> int:
-    """Momentum multiplier from team chemistry. Distant_Game_Sim_System.md."""
-    from BackEnd.distant_sim_engine import distant_sim_momentum_multiplier
-
-    return distant_sim_momentum_multiplier(team_chemistry_raw)
-
-
-def _distant_sim_momentum_term(
-    ftd_doc: dict,
-    season_wins: int,
-    season_losses: int,
-) -> int:
-    """DISTANT_MO_MULT × (regular-season wins − losses). Distant_Game_Sim_System.md."""
-    from BackEnd.distant_sim_engine import distant_sim_record_momentum
-
-    raw = (ftd_doc.get("team_attributes") or {}).get("team_chemistry")
-    return distant_sim_record_momentum(
-        raw,
-        season_wins=season_wins,
-        season_losses=season_losses,
-    )
-
-
-def _distant_sim_team_combined(
-    ftd_doc: dict,
-    team_object_id: Any,
-    *,
-    is_home: bool,
-    rs_standings: dict[str, dict[str, int]],
-    fpd_by_player_id: dict[str, dict] | None = None,
-    current_week: int = 0,
-) -> int:
-    """Base + record momentum + season momentum + tier adj + home bonus. See Distant_Game_Sim_System.md."""
-    from BackEnd.distant_sim_engine import distant_sim_team_combined
-
-    tid = str(team_object_id)
-    row = rs_standings.get(tid) or {}
-    wins = int(row.get("W", 0) or 0)
-    losses = int(row.get("L", 0) or 0)
-    return distant_sim_team_combined(
-        ftd_doc,
-        season_wins=wins,
-        season_losses=losses,
-        is_home=is_home,
-        fpd_by_player_id=fpd_by_player_id,
-        current_week=current_week,
-    )
-
-
-def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, int]:
-    """
-    Lightweight sim for distant (non-user-conference) games.
-    Uses win probability roll, margin from dominance buckets, and clamped final scores.
-    Returns (home_score, away_score).
-    Callers pass home_combined / away_combined after base + momentum + home chemistry bonus.
-    See _documentation_master/06_GMO_Supporting_Systems/Distant_Game_Sim_System.md
-    """
-    combined_total = home_combined + away_combined
-    if combined_total <= 0:
-        combined_total = 1
-    roll = random.randint(1, combined_total)
-    home_won = roll <= home_combined
-    threshold = home_combined
-
-    # Dominance: 0.0 = nail-biter, 1.0 = blowout
-    if home_won:
-        dominance = (threshold - roll) / threshold if threshold > 0 else 0.0
-    else:
-        denom = combined_total - threshold
-        dominance = (roll - threshold) / denom if denom > 0 else 0.0
-    dominance = max(0.0, min(1.0, dominance))
-
-    # Map dominance to margin bucket (D1 distribution)
-    if dominance < 0.18:
-        margin = random.randint(1, 3)
-    elif dominance < 0.45:
-        margin = random.randint(4, 9)
-    elif dominance < 0.77:
-        margin = random.randint(10, 19)
-    else:
-        margin = random.randint(20, 40)
-
-    # Rating gap modifier
-    gap = abs(home_combined - away_combined) / combined_total
-    if gap > 0.35:
-        margin = int(margin * 1.50)
-    elif gap > 0.20:
-        margin = int(margin * 1.25)
-
-    # Final scores: total_points from normal(138, 15) clamped [78, 220]
-    total_points = int(round(max(78, min(220, random.gauss(138, 15)))))
-    winning_score = math.ceil((total_points + margin) / 2)
-    losing_score = winning_score - margin
-
-    # Clamp losing floor
-    if losing_score < 39:
-        losing_score = 39
-        winning_score = losing_score + margin
-    # Clamp winning ceiling
-    if winning_score > 121:
-        winning_score = 121
-        losing_score = winning_score - margin
-    # If both clamps conflict, margin gives way
-    if losing_score < 39:
-        losing_score = 39
-        margin = winning_score - losing_score
-
-    if home_won:
-        return (winning_score, losing_score)
-    return (losing_score, winning_score)
-
-
-def _distant_sim_persist_momentum_score_updates(
+def _persist_legacy_season_momentum_updates(
     franchise_id: ObjectId,
     *,
     winner_team_object_id: ObjectId,
     loser_team_object_id: ObjectId,
     ftd_cache: dict[str, dict] | None = None,
 ) -> None:
-    """Update FTD momentum_score + distant win/loss streaks after a distant game."""
-    from BackEnd.distant_sim_engine import compute_distant_momentum_score_updates
+    """Preserve the deferred season-momentum update after a full CPU game."""
+    from BackEnd.utils.season_momentum import compute_season_momentum_updates
 
     winner_doc = franchise_team_data_collection.find_one(
         {"franchise_id": franchise_id, "team_id": winner_team_object_id},
@@ -2997,7 +2819,7 @@ def _distant_sim_persist_momentum_score_updates(
     if not winner_doc or not loser_doc:
         return
 
-    winner_updates, loser_updates = compute_distant_momentum_score_updates(
+    winner_updates, loser_updates = compute_season_momentum_updates(
         winner_doc.get("team_attributes"),
         loser_doc.get("team_attributes"),
     )
@@ -3016,82 +2838,6 @@ def _distant_sim_persist_momentum_score_updates(
             if cached is not None:
                 team_attrs = cached.setdefault("team_attributes", {})
                 team_attrs.update(partial)
-
-
-def _distant_sim_apply_result_to_standings_cache(
-    rs_standings: dict[str, dict[str, int]],
-    away_id: Any,
-    home_id: Any,
-    away_score: int,
-    home_score: int,
-) -> None:
-    from BackEnd.distant_sim_engine import distant_sim_apply_result_to_standings_cache
-
-    distant_sim_apply_result_to_standings_cache(
-        rs_standings, away_id, home_id, away_score, home_score
-    )
-
-
-def _persist_distant_franchise_game(
-    *,
-    franchise_id: ObjectId,
-    week: int,
-    away_team_object_id: ObjectId,
-    home_team_object_id: ObjectId,
-    away_score: int,
-    home_score: int,
-    ftd_cache: dict[str, dict] | None = None,
-) -> tuple[dict[str, Any], str]:
-    summary = build_distant_game_summary(
-        franchise_id=str(franchise_id),
-        week=week,
-        home_team_object_id=home_team_object_id,
-        away_team_object_id=away_team_object_id,
-        home_score=home_score,
-        away_score=away_score,
-    )
-    game_id = str(summary["_id"])
-    db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
-    stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
-
-    home_team_id = _normalize_team_id_to_string(home_team_object_id) or str(home_team_object_id)
-    away_team_id = _normalize_team_id_to_string(away_team_object_id) or str(away_team_object_id)
-    if home_score > away_score:
-        winner_id, loser_id = home_team_id, away_team_id
-        winner_oid, loser_oid = home_team_object_id, away_team_object_id
-        winner_score, loser_score = home_score, away_score
-    else:
-        winner_id, loser_id = away_team_id, home_team_id
-        winner_oid, loser_oid = away_team_object_id, home_team_object_id
-        winner_score, loser_score = away_score, home_score
-    _finalize_team_attributes_for_game(
-        game_id=game_id,
-        franchise_id=franchise_id,
-        home_team_id=home_team_id,
-        away_team_id=away_team_id,
-        winner_id=winner_id,
-        loser_id=loser_id,
-        winner_score=winner_score,
-        loser_score=loser_score,
-        week=week,
-    )
-    _distant_sim_persist_momentum_score_updates(
-        franchise_id,
-        winner_team_object_id=winner_oid,
-        loser_team_object_id=loser_oid,
-        ftd_cache=ftd_cache,
-    )
-
-    sim_res = _save_game_result(
-        away_team_object_id,
-        home_team_object_id,
-        away_score,
-        home_score,
-        week,
-        franchise_id=str(franchise_id),
-        game_id=game_id,
-    )
-    return sim_res, game_id
 
 
 def _build_user_eos_sim_scope(
@@ -4704,8 +4450,8 @@ def _run_franchise_cpu_full_simulation_core(
     # gates, pass census/lanes, stepstate, playbook diag, dynamic gates, shot-select,
     # etc.). The "Turn N RESULT" print is separately suppressed by the
     # _headless_simulation flag set above (it bypasses this logging filter). Essential
-    # at 63-games/week: full-sim CPU games used to firehose these where distant sims
-    # emitted almost nothing. ERROR-level lines still pass through.
+    # at 63 games/week: full-sim CPU games would otherwise firehose these.
+    # ERROR-level lines still pass through.
     from BackEnd.utils.headless_simulation import quiet_headless_simulation_logs
 
     with quiet_headless_simulation_logs():
@@ -4943,7 +4689,7 @@ def _user_next_regular_season_opponent_id(
 ) -> str | None:
     """
     Return the other team's id (as str) scheduled vs the user in regular-season week current_week + 1.
-    Used to force full step-by-step CPU sim for that opponent's current-week game instead of distant sim.
+    Used to identify that opponent's current-week game.
     """
     if not user_team_id_str:
         return None
@@ -5923,7 +5669,7 @@ def _finalize_franchise_week_after_cpu_games(
             franchise_id_str, week,
         )
     # Weekly news (upset report + practice-squad all-stars + recruiting leans).
-    # PS game-results news publishes at distant-CPU training, not here.
+    # PS game-results news publishes during the CPU-training phase, not here.
     # Must run before the rank update below so the upset criteria use
     # entering-week natl_rank values.
     try:
@@ -6520,7 +6266,6 @@ def _complete_week_finish_cpu_and_persist(
 
     # [CPU-WEEK-TIMING] Quantify the week's CPU-sim cost.
     _cpu_week_t0 = time.time()
-    _cpu_distant_count = 0
 
     # Keep a lightweight FTD cache for the deferred post-game momentum update.
     ftd_docs = list(franchise_team_data_collection.find(
@@ -6666,9 +6411,8 @@ def _complete_week_finish_cpu_and_persist(
         _fj_dedup.append(job)
     full_jobs = _fj_dedup
 
-    # Shot-diagnostic summaries from this week's full-sim CPU games (distant sims
-    # carry no game_state and never reach here). Rolled up with the user's own
-    # game into a single week-aggregate report after the full-sim block.
+    # Shot-diagnostic summaries from this week's full-sim CPU games. Rolled up
+    # with the user's own game into one report after the full-sim block.
     _cpu_week_summaries: list[dict] = []
 
     if full_jobs:
@@ -6735,15 +6479,13 @@ def _complete_week_finish_cpu_and_persist(
                     sim_err[sched_idx] = ex
 
         # [CPU-WEEK-TIMING] Headline: how long the week's CPU sim actually took, and
-        # the current full-TbT vs Distant split. `full_sim_block` is the parallel
-        # sim compute; `total_so_far` also includes the distant sims run inline above
-        # (persistence follows and is not counted here). When Distant is sunset,
-        # full_tbt should climb toward the whole slate and distant toward 0.
+        # `full_sim_block` is the parallel simulation compute; persistence follows
+        # and is not counted here.
         _fullsim_secs = time.time() - _cpu_fullsim_t0
         logger.warning(
-            "[CPU-WEEK-TIMING] franchise=%s week=%s | full_tbt=%s distant=%s | "
+            "[CPU-WEEK-TIMING] franchise=%s week=%s | full_tbt=%s | "
             "engine=%s | full_sim_block=%.1fs (%.2fs/full-game) total_so_far=%.1fs | failures=%s",
-            franchise_id_str, week, len(full_jobs), _cpu_distant_count,
+            franchise_id_str, week, len(full_jobs),
             "pool" if _franchise_cpu_use_pool() else "thread",
             _fullsim_secs, _fullsim_secs / max(1, len(full_jobs)),
             time.time() - _cpu_week_t0, len(sim_err),
@@ -6920,7 +6662,7 @@ def _complete_week_finish_cpu_and_persist(
                 loser_oid = aid if home_score > away_score else hid
                 _s = time.time()
                 try:
-                    _distant_sim_persist_momentum_score_updates(
+                    _persist_legacy_season_momentum_updates(
                         franchise_id,
                         winner_team_object_id=winner_oid,
                         loser_team_object_id=loser_oid,
@@ -7108,8 +6850,8 @@ def _complete_week_finish_cpu_and_persist(
         }
 
     # One macro shot-diagnostics report for the fully-completed week: the user's
-    # own game rolled up with every full-sim CPU game (distant sims carry no
-    # game_state and are excluded). This is the single end-of-week roll-up, fired
+    # own game rolled up with every full-sim CPU game. This is the single
+    # end-of-week roll-up, fired
     # once here regardless of monolithic vs phased flow. CPU diagnostics come from
     # this call's in-memory summaries (monolithic) or the week stash written by
     # start-cpu-sims (phased); the user game is loaded from db.games. It still
@@ -7348,7 +7090,7 @@ def complete_week_phase_a(req: CompleteWeekRequest):
 @router.post("/franchise/complete-week/start-cpu-sims")
 def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
     """
-    Run distant + full CPU sims for all **non-user** week matchups and persist ``results.{week}``
+    Run full CPU sims for all **non-user** week matchups and persist ``results.{week}``
     without advancing the franchise week. Idempotent per matchup (skips rows / games already present).
 
     Call when the user begins their franchise game for this week (e.g. first Play Quarter). After the
@@ -8041,7 +7783,7 @@ def command_center_data(
         ps_training_job = dict(
             ((franchise_doc or {}).get("practice_squad") or {}).get("training_job") or {}
         )
-        response["distant_training_resume"] = (
+        response["cpu_training_resume"] = (
             {
                 "required": True,
                 **ps_training_job,
@@ -10717,10 +10459,10 @@ def _maybe_initialize_practice_squad_week_1(
     """
     Build locked PS rosters after week-1 training camp cuts.
 
-    CPU teams are cut during distant-CPU training; the user assigns their training
+    CPU teams are cut during CPU training; the user assigns their training
     squad via cut-players. Init is deferred until that assignment when
     defer_if_user_cut_pending=True (default). When the user roster is already
-    legal (no cut required), init runs immediately from distant-CPU.
+    legal (no cut required), initialization runs immediately from CPU training.
     """
     week = int(franchise_doc.get("week", 1) or 1)
     if week != 1:
@@ -12980,9 +12722,9 @@ def _run_all_cpu_autotrain(
     is_first_training: bool,
     seed_base: int | None = None,
 ) -> dict:
-    """Sunset replacement for distant training: run REAL per-team auto-train for every CPU team.
+    """Run real per-team auto-training for every eligible CPU team.
 
-    Same team-selection as distant training (skip user team + EOS-eliminated). Each team is
+    Team selection skips the user team and EOS-eliminated teams. Each team is
     idempotency-guarded inside auto_train_one_cpu_team (cpu_autotrain_week), so a partial run is
     resumable and the pool failure-ladder's retries never double-train.
 
@@ -13122,7 +12864,7 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
             detail="User training has not been applied for this week. Complete the training screen first.",
         )
 
-    if int(training_status.get("cpu_distant_complete_week") or 0) == week:
+    if int(training_status.get("cpu_training_complete_week") or 0) == week:
         db.franchises.update_one(
             {"_id": franchise_id},
             {
@@ -13207,18 +12949,18 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
             season_news_prepend.append(ps_results_story)
 
     session_type = training_status.get("session_type", "in-season")
-    distant_update: dict[str, Any] = {
+    cpu_update: dict[str, Any] = {
         "training_status.training_completed": True,
-        "training_status.cpu_distant_complete_week": week,
+        "training_status.cpu_training_complete_week": week,
         "training_status.last_training_date": datetime.now().strftime("%Y-%m-%d"),
     }
     if cuts_ran_this_call:
-        distant_update["training_status.cpu_training_camp_cuts_applied"] = True
-    distant_update.update(ps_fields)
+        cpu_update["training_status.cpu_training_camp_cuts_applied"] = True
+    cpu_update.update(ps_fields)
     if season_news_prepend:
         _prepend_season_news_stories(franchise_doc, season_news_prepend)
-        distant_update["season_news"] = franchise_doc["season_news"]
-    db.franchises.update_one({"_id": franchise_id}, {"$set": distant_update})
+        cpu_update["season_news"] = franchise_doc["season_news"]
+    db.franchises.update_one({"_id": franchise_id}, {"$set": cpu_update})
     return {
         "status": "success",
         "week": week,
@@ -13361,7 +13103,7 @@ def get_training_points(franchise_id: str):
         "user_team_name": franchise_doc.get("user_team_id"),
         "custom_focus_roster": custom_roster,
         "player_maximizer_ranking_attrs": ranking_attrs,
-        "distant_training_resume": (
+        "cpu_training_resume": (
             {
                 "required": True,
                 "week": week,
@@ -13423,7 +13165,6 @@ def run_franchise_training_user(
 
 
 @router.post("/franchise/run-training/cpu-train")
-@router.post("/franchise/run-training/distant-cpu", include_in_schema=False)
 def run_franchise_training_cpu_train(
     req: FranchiseCPUTrainingRequest,
     user: dict = Depends(get_current_user),
@@ -13507,7 +13248,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
                 "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={week}&from=training",
             }
         if franchise_user_training_applied_for_week(training_status, week) and int(
-            training_status.get("cpu_distant_complete_week") or 0
+            training_status.get("cpu_training_complete_week") or 0
         ) != week:
             return _franchise_training_cpu_phase_only(req.franchise_id)
     elif phase == "user_only":
@@ -14001,14 +13742,14 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         _apply_cpu_training_camp_cuts(franchise_id, excluded_team_id=str(team_id))
         cuts_ran_this_call = True
 
-    distant_update: dict[str, Any] = {
+    cpu_update: dict[str, Any] = {
         "training_status.training_completed": True,
-        "training_status.cpu_distant_complete_week": week,
+        "training_status.cpu_training_complete_week": week,
         "training_status.last_training_date": datetime.now().strftime("%Y-%m-%d"),
     }
     if cuts_ran_this_call:
-        distant_update["training_status.cpu_training_camp_cuts_applied"] = True
-    db.franchises.update_one({"_id": franchise_id}, {"$set": distant_update})
+        cpu_update["training_status.cpu_training_camp_cuts_applied"] = True
+    db.franchises.update_one({"_id": franchise_id}, {"$set": cpu_update})
 
     return {
         "status": "success",

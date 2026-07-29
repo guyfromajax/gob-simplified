@@ -2,7 +2,7 @@
 
 Central registry of tunable game-logic constants — the knobs for balancing gameplay. Each entry lists the constant, its current value, and a one-line effect.
 
-**Workflow:** edit values here first → agents implement in code and keep this file in sync. **Scope:** live game + franchise EOG + training; exclude distant sim. **Geometry** and **`USE_*` feature flags** are out of the main console for now. Inventory by turn type: **HCO → HCT → FCP → FB → OREB → DREB** (Sessions 1–6). Inline literals awaiting named constants are tracked in **Promotion Pass** below (status board); per-turn Inline Magic tables keep file/context detail.
+**Workflow:** edit values here first → agents implement in code and keep this file in sync. **Scope:** live game + franchise EOG + training. **Geometry** and **`USE_*` feature flags** are out of the main console for now. Inventory by turn type: **HCO → HCT → FCP → FB → OREB → DREB** (Sessions 1–6). Inline literals awaiting named constants are tracked in **Promotion Pass** below (status board); per-turn Inline Magic tables keep file/context detail.
 
 ## Promotion Pass
 
@@ -733,7 +733,6 @@ Bounce spot / variance, `determine_rebounder` → `select_rebounder_by_score` �
 - Dead: `ReboundManager.handle_rebound`, unused `oreb_shot_attempt()`
 - Tip-out rebound mechanic (does not exist)
 - Zone / inside-distance shot-threshold bonuses — **not applied** on putback path
-- Distant-sim `TEAM_OREB`
 
 ### Unsure / needs judgment (OREB inventory)
 
@@ -789,7 +788,6 @@ Cross-ref: **OREB** shared rebound scoring / bounce / OTB / `OREB_REBOUND_SCORE_
 - Rebounder paint clusters / attemptor jitter (geometry); CR good/bad y-band interiors beyond AG floors
 - Announce suppress / hold_ms / SFX
 - Legacy: `ReboundManager.handle_rebound`, `FB_CUTOFF_*_DREB`, `DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET`
-- Distant-sim `TEAM_DREB`
 
 ### Unsure / needs judgment (DREB inventory)
 

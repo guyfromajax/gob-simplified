@@ -469,9 +469,3 @@ def team_chemistry_change(is_winner, team_rank, opponent_rank, rng=random):
     if _B.CHEM_LOW_RANK_MIN <= opponent_rank <= _B.CHEM_LOW_RANK_MAX:
         return "lose_to_100_128", _roll(rng, _B.CHEM_LOSE_TO_100_128)
     return "lose_to_other_lower", _roll(rng, _B.CHEM_LOSE_TO_OTHER_LOWER)
-
-
-def distant_uniform_change(rng=random):
-    """Distant-sim override for the 6 efficiency attrs — LEAVE (distant is live
-    for historical distant-game documents until the EOG cleanup phase)."""
-    return "distant_uniform", _roll(rng, _B.DISTANT_UNIFORM)

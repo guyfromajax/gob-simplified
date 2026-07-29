@@ -90,7 +90,7 @@ Team attributes will adjust at the end of game based on the notes below. Note th
   - `pt_efficiency` (**concentration** over the 4 press/trap plays = 3 HCT variant `A` counts + `fcp_used`): `≤0.50` → `0..+1`; `≤0.75` → `-1..0`; `>0.75` → `-2..-1`. Zero P/T volume → **atrophy** `-1..0`. NOTE: `fcp_press_plays[*].A` is a **dead counter** (never incremented); `fcp_used` stands in for the single live FCP variant — revisit when FCP variants expand.
   - `fb_opp_modifier` (opponent fast-break **volume**, `after_steal` excluded; healthy `5-10`): `0` → atrophy `-1..0`; `<5` under `-1..0`; `5-10` healthy `0..+1`; `>10` over `-1..0`.
   - `pt_opp_modifier` (opponent press/trap **volume** = `hct_used + fcp_used`; healthy `7-14`): `0` → atrophy `-1..0`; `<7` under `-1..0`; `7-14` healthy `0..+1`; `>14` over `-1..0`.
-  - **Distant-sim override** (`simulation_engine == "distant"` — STILL LIVE, gated behind `FRANCHISE_ALL_GAMES_FULL_SIM`, default OFF): the six efficiency attrs each draw `random.randint(-2, 1)`; all other attrs use the normal rules.
+  - All games use the scouting/usage-driven efficiency rules; the former lightweight-sim override has been removed.
   - `team_chemistry` (**rank-driven** — lower `natl_rank` int is better. `winner_score` / `loser_score` are **DEAD parameters**, a fossil of the old score-margin design; margin is NOT used):
     - winner: opponent worse-ranked → `0..+1`; opponent top-10 → `+2..+4`; else → `+1..+2`.
     - loser: lost to better-ranked top-10 → `-1..0`; lost to better-ranked non-top-10 → `-2..0`; lost to rank 100-128 → `-5..-3`; else → `-3..-2`.
@@ -122,7 +122,7 @@ The End of Game System handles game completion, displays final scores, and provi
 
 ### Player Momentum Reset (June 2026)
 
-When a game is detected final, **every player's MO (momentum) is reset to 0** on both teams (active + bench) before the final save, so no in-game momentum persists past the game. Fires at the live `is_final` detection in `BackEnd/api/api.py` (both the quarter-complete turn path and the already-over early-return). Code: `reset_all_player_momentum()` in `BackEnd/utils/player_momentum.py`. Distant-sim (CPU) games never change MO, so they need no reset. See `projects/Player_Momentum_System.md` for the full momentum system.
+When a game is detected final, **every player's MO (momentum) is reset to 0** on both teams (active + bench) before the final save, so no in-game momentum persists past the game. Fires at the live `is_final` detection in `BackEnd/api/api.py` (both the quarter-complete turn path and the already-over early-return). Code: `reset_all_player_momentum()` in `BackEnd/utils/player_momentum.py`. See `Player_Momentum_System.md` for the full momentum system.
 
 ### Game Completion Flow
 
@@ -302,7 +302,7 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
   - `teams[team_id].scouting` for FB/HCT/FCP rates and attempts
   - `team_totals` for box-score totals (`FGM/FGA`, `TO/STL`, `DREB/OREB`)
   - fallback to aggregated `box_score` only if `team_totals` is missing
-- **Distant-sim note:** Distant franchise games persist `simulation_engine="distant"` on the game doc. EOG uses this as an explicit branch signal so only the four FB/PT attrs switch to the simplified random rule; TBT games keep the normal scouting-based formulas.
+- **CPU games:** Full CPU games persist the same engine-derived totals and scouting inputs used by the normal EOG formulas.
 - **Backend access point:** `BackEnd/api/franchise_routes.py` → `update_team_attributes_after_game()` (FTD `team_attributes` deltas, FTD offensive **`plays.*.effectiveness`** decay when **`4 * usage_int < success_rate_pct`** (see **Offensive play CMD** above), and FTD **`scouting_data.defense.*.effectiveness`** decay from defensive `used` share; see **Defensive scouting effectiveness** above).
 - **Processing rule:** Build and persist `eog_inputs` once, then compute all EOG attribute changes from `eog_inputs` only.
 - **Postgame display rule:** Box Score "Special Situations" (Fast Breaks, HC Traps, FC Presses) should read from `eog_inputs.*.scouting` so displayed rates match EOG calculations exactly.
