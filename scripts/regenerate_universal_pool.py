@@ -45,7 +45,11 @@ from pymongo.operations import UpdateOne
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 
-from BackEnd.utils.position_ratings import compute_position_ratings  # noqa: E402
+from BackEnd.utils.position_ratings import (  # noqa: E402
+    POSITION_WEIGHTS,
+    compute_position_ratings,
+    height_fitness,
+)
 from BackEnd.utils.player_generation import (  # noqa: E402
     CLASS_YEARS,
     CORE_ATTRS,
@@ -63,10 +67,20 @@ from BackEnd.utils.player_generation import (  # noqa: E402
 import random as _random
 
 DB_NAME = "gob-staging"
-# Target position supply from tallest→shortest bands (design §11.3 step 1).
-INTENT_BANDS = [("C", 0.20), ("PF", 0.20), ("SF", 0.20)]  # remainder = guards (PG+SG)
+# Position intent: capacity-constrained fit assignment (not height banding).
+# Soft per-bucket capacities 18-22% of the pool so a player is not bumped off his
+# best fit purely because a bucket hit exactly 20%.
+INTENT_LOWER_SHARE = 0.18
+INTENT_UPPER_SHARE = 0.22
+# League-wide new height aggregate (§11.2), used to break the height↔intent
+# circularity for the fit score before cohort rank-mapping (§11.3 step 2).
+LEAGUE_HEIGHT_MEAN = 78.0
+LEAGUE_HEIGHT_SD = 3.6
 # Tier bands as cumulative rank thresholds (bottom→top), from §4.1 frequencies.
 TIER_ORDER = ["Poor", "BelowAverage", "Average", "Good", "Great", "Elite"]
+
+# Populated by assign_position_intent, read by report_metrics.
+_INTENT_STATS: dict = {}
 
 # ── Exact write contract (single source of truth for writes AND the manifest) ──
 # Universal pool: regenerated attributes + physicals + stored RT. FPD/FRD: the
@@ -116,32 +130,94 @@ def _overall_rt(pr: dict) -> float:
     return max(_num(v) for v in pr.values())
 
 
-def assign_position_intent(players: list[dict]) -> None:
-    """Assign ``_intent`` to each player by height band (§11.3 step 1)."""
-    order = sorted(players, key=lambda p: _num(p.get("height")), reverse=True)
+def _skill_fit(attrs: dict, pos: str) -> float:
+    """NEW position weight vector applied to the player's CURRENT attributes —
+    attributes only, no height term. Deliberately NOT the stored position_ratings:
+    those came from the old formula this migration replaces (PF height saturated
+    at 76in so every athletic wing rated PF; PF/C shared four of five weighted
+    attributes; SF was half AG+ST), so using stored RT as the identity signal
+    would preserve the exact distortions we are removing."""
+    return sum(POSITION_WEIGHTS[pos].get(a, 0.0) * _num(attrs.get(a)) for a in POSITION_WEIGHTS[pos])
+
+
+def _league_mapped_heights(players: list[dict]) -> None:
+    """Rank-map each player's height onto the LEAGUE-WIDE new distribution and
+    store on ``_h_league`` (breaks the height↔intent circularity for the fit
+    score; cohort rank-mapping per §11.3 step 2 still happens after intent)."""
+    nd = NormalDist(LEAGUE_HEIGHT_MEAN, LEAGUE_HEIGHT_SD)
+    order = sorted(players, key=lambda p: _num(p.get("height")))
     n = len(order)
-    idx = 0
-    for pos, share in INTENT_BANDS:
-        end = idx + round(share * n)
-        for p in order[idx:end]:
-            p["_intent"] = pos
-        idx = end
-    # Remaining tallest→shortest are guards; split by ball-handling+passing (PG)
-    # vs shooting+perimeter-defence (SG), balanced within the guard band.
-    guards = order[idx:]
+    for rank, p in enumerate(order):
+        p["_h_league"] = nd.inv_cdf((rank + 0.5) / n)
 
-    def guard_score(p):
-        a = p.get("attributes") or {}
-        pg_lean = _num(a.get("anchor_BH", a.get("BH"))) + _num(a.get("anchor_PS", a.get("PS")))
-        sg_lean = _num(a.get("anchor_SH", a.get("SH"))) + _num(a.get("anchor_OD", a.get("OD")))
-        return pg_lean - sg_lean
 
-    guards_sorted = sorted(guards, key=guard_score, reverse=True)
-    half = len(guards_sorted) // 2
-    for p in guards_sorted[:half]:
-        p["_intent"] = "PG"
-    for p in guards_sorted[half:]:
-        p["_intent"] = "SG"
+def assign_position_intent(players: list[dict]) -> None:
+    """Capacity-constrained fit assignment (replaces height-band assignment).
+
+    Fit(player, pos) = the player's PERCENTILE of attribute-only skill fit at pos
+    (percentiles make positions comparable — different vectors load on attributes
+    with different league means), MODULATED (not gated) by height_fitness at his
+    league-mapped height. Maximize total fit subject to soft per-bucket capacities
+    (18-22%). Method: greedy in descending fit margin (most certain placed first),
+    then a lower-bound repair that pulls the highest-fit movers out of buckets with
+    slack into any under-filled bucket."""
+    n = len(players)
+    _league_mapped_heights(players)
+
+    # 1. attribute-only raw skill fit per position → 2. percentile per position
+    #    (rank/(n-1)) → 3. modulate by height fitness at the league-mapped height.
+    for pos in POSITIONS:
+        raw = [(i, _skill_fit(p.get("attributes") or {}, pos)) for i, p in enumerate(players)]
+        raw.sort(key=lambda t: t[1])
+        for rank, (i, _v) in enumerate(raw):
+            pct = rank / (n - 1) if n > 1 else 1.0
+            players[i].setdefault("_fit", {})[pos] = pct * height_fitness(pos, players[i]["_h_league"])
+    for p in players:
+        p["_fit_rank"] = sorted(POSITIONS, key=lambda pos: -p["_fit"][pos])
+
+    lower = round(INTENT_LOWER_SHARE * n)
+    upper = round(INTENT_UPPER_SHARE * n)
+    counts = {pos: 0 for pos in POSITIONS}
+
+    def margin(p):
+        f = sorted(p["_fit"].values(), reverse=True)
+        return f[0] - f[1]
+
+    for p in sorted(players, key=margin, reverse=True):
+        for pos in p["_fit_rank"]:
+            if counts[pos] < upper:
+                p["_intent"] = pos
+                counts[pos] += 1
+                break
+
+    _repair_lower_bounds(players, counts, lower)
+
+    # Displacement rank (1 = best-fit position, 2 = second, …) and objective.
+    for p in players:
+        p["_disp"] = p["_fit_rank"].index(p["_intent"]) + 1
+    objective = sum(p["_fit"][p["_intent"]] for p in players)
+    unconstrained = sum(max(p["_fit"].values()) for p in players)
+    _INTENT_STATS.clear()
+    _INTENT_STATS.update(method="greedy(desc fit margin)+lower-bound repair",
+                         objective=objective, unconstrained_best=unconstrained,
+                         counts=dict(counts), lower=lower, upper=upper)
+
+
+def _repair_lower_bounds(players: list[dict], counts: dict, lower: int) -> None:
+    """Fill any bucket below ``lower`` by moving the highest-fit-to-that-bucket
+    player out of a bucket that still has slack above ``lower``."""
+    for _ in range(len(players)):  # bounded; each iteration fills ≥1 seat
+        under = [b for b in POSITIONS if counts[b] < lower]
+        if not under:
+            return
+        b = min(under, key=lambda x: counts[x])
+        movers = [p for p in players if p["_intent"] != b and counts[p["_intent"]] > lower]
+        if not movers:
+            return
+        best = max(movers, key=lambda p: p["_fit"][b])
+        counts[best["_intent"]] -= 1
+        best["_intent"] = b
+        counts[b] += 1
 
 
 def assign_heights(players: list[dict]) -> None:
@@ -268,7 +344,6 @@ def report_metrics(players: list[dict]) -> None:
     margins = [p["_margin"] for p in players]
     print(f"margin<3: {_pct(sum(m<3 for m in margins), n)}  (fitted 11.2%)  "
           f"margin<5: {_pct(sum(m<5 for m in margins), n)}  ties: {_pct(sum(m==0 for m in margins), n)} (fitted 2.5%)")
-    print(f"argmax matches intent: {_pct(sum(p['_argmax']==p['_intent'] for p in players), n)} (fitted 95.3%)")
     print("class p50 top1 RT: " + " / ".join(
         f"{y} {statistics.median([p['_top1'] for p in players if p['_year']==y]):.0f}"
         for y in CLASS_YEARS) + "   (designed 35/43/54/60)")
@@ -278,6 +353,32 @@ def report_metrics(players: list[dict]) -> None:
     _core = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "IQ", "FT", "ND")
     a100 = sum(any(p["_attributes"][a] >= 100 for a in _core) for p in players)
     print(f"any attr >=100: {_pct(a100, n)} (accepted 5.5%)")
+
+    # ── remap intent assignment (§11.3 capacity-constrained fit) ──
+    print("\n== position intent assignment (capacity-constrained fit) ==")
+    st = _INTENT_STATS
+    print(f"method: {st.get('method')}   soft caps [{st.get('lower')},{st.get('upper')}] "
+          f"({100*st.get('lower',0)/n:.0f}-{100*st.get('upper',0)/n:.0f}%)")
+    print(f"objective (Σ assigned fit): {st.get('objective',0):.1f}  vs unconstrained-best "
+          f"{st.get('unconstrained_best',0):.1f}  ({100*st.get('objective',0)/max(1e-9,st.get('unconstrained_best',1)):.1f}% of ceiling)")
+    supply = Counter(p["_intent"] for p in players)
+    print("intent supply: " + " / ".join(f"{pos} {supply[pos]} ({_pct(supply[pos], n)})" for pos in POSITIONS))
+    # DISPLACEMENT — the identity-preservation metric for the remap (argmax=intent
+    # is high by construction now that intent is derived from attributes).
+    disp = Counter(p["_disp"] for p in players)
+    print("displacement (assigned = which fit rank): "
+          + "  ".join(f"{'best' if k==1 else '2nd' if k==2 else '3rd' if k==3 else f'{k}th'} {_pct(disp[k], n)}"
+                      for k in sorted(disp)))
+    print("(argmax matches intent, high by construction for the remap: "
+          f"{_pct(sum(p['_argmax']==p['_intent'] for p in players), n)})")
+    # HEIGHT by assigned intent — confirm tall players land at PF/C, not SF.
+    def _p(vals, q):
+        v = sorted(vals); i = (len(v)-1)*q/100; lo=int(i); hi=min(lo+1,len(v)-1)
+        return v[lo] + (v[hi]-v[lo])*(i-lo)
+    print("height by assigned intent (p10 / median / p90):")
+    for pos in POSITIONS:
+        hs = [p["_height"] for p in players if p["_intent"] == pos]
+        print(f"   {pos}: {_p(hs,10):.0f} / {statistics.median(hs):.0f} / {_p(hs,90):.0f}  (n={len(hs)})")
 
 
 def recompute_stored_rt(coll, franchise=False, dry=True):
