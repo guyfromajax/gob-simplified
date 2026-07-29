@@ -856,10 +856,16 @@ Constants landed by the Player Attribute Recalibration merge (design `Player_Att
 | Constant / location | Value | Effect |
 |---|---|---|
 | `LEAGUE_MEDIAN_HEIGHT_IN` (`constants/__init__.py`) | 78 | single home for missing-height fallback (was 72/75/76 scattered) |
-| `height_to_block_score` (`utils/shared.py`) | `≤78→0`, `h−78`, `≥88→10` | +6 shift; preserves ~1.68 league-mean block score (measured 1.69) |
-| `get_height_scale_value` (`utils/opening_tip.py`) | thresholds +3 (centre-fed: 82→8) | preserves the tip-off contest distribution |
-| `WEIGHT_BY_HEIGHT_BANDS` (`player_generation.py`) | +6 shift | weight-from-height on the new scale (walk-ons now use the generator, Poor tier) |
-| training-camp weight gates (`training_execution_v2.py`) | `>81`, `>78` (were `>75`, `>72`) | +6 shift |
+| `height_to_block_score` (`utils/shared.py`) | `≤MED→0`, `h−MED`, `≥MED+10→10` (MED=78) | offsets from `LEAGUE_MEDIAN_HEIGHT_IN`; preserves ~1.68 league-mean block score (measured 1.69) |
+| `get_height_scale_value` (`utils/opening_tip.py`) | thresholds +3 (centre-fed: 82→8) | **left as literals** — anchored to the *centre* median (+3), not the league median; do not re-express against `LEAGUE_MEDIAN_HEIGHT_IN` |
+| `WEIGHT_BY_HEIGHT_BANDS` (`player_generation.py`) | `MED−4 / MED / MED+4` | offsets from `LEAGUE_MEDIAN_HEIGHT_IN`; walk-ons now use the generator (Poor tier) |
+| training-camp weight gates (`training_execution_v2.py`) | `>MED+3`, `>MED` | offsets from `LEAGUE_MEDIAN_HEIGHT_IN` |
+
+> **Pass-2 watch — existing (old-scale) saves lose shot-blocking.** `height_to_block_score` now
+> returns 0 at ≤ median (78), but old-scale rosters top out at **p90 height 78**, so nearly every
+> player on a pre-recalibration franchise scores 0 → blocks collapse toward zero there. **Known and
+> accepted** (recalibration is new-franchises-only; new-pool rosters have the height to block).
+> Recorded so a pass-2 tester report of "no blocks on my existing save" is not misdiagnosed as a bug.
 
 ### Deferred to later tasks (documented in design §12, NOT implemented this pass)
 `PEAK_COUNT_DISTRIBUTION`, `PEAK_RUNG_WEIGHTS`, `PEAK_MULTIPLIER`, `CH_PEAK_WEIGHTING`, `FAMILY_TIMING_WEIGHTS`, `FAMILY_CURVES`, `RT_COMPRESSION_THRESHOLD`, `RT_SOFT_CAP`, `NON_CORE_GROWTH_MULTIPLIER`, `WEEKLY_DECAY_BY_YEAR`, `OFFSEASON_INSEASON_SPLIT`, `ACCUMULATOR_WEIGHT`. CH stays flat `randint(1,100)` (§8); `CAMP_BONUS_CH_BANDS` unchanged.

@@ -12,7 +12,7 @@ import math
 import random
 import logging
 from typing import List, Dict, Tuple, Optional, Any
-from BackEnd.constants import ALL_ATTRS
+from BackEnd.constants import ALL_ATTRS, LEAGUE_MEDIAN_HEIGHT_IN
 from BackEnd.constants.momentum import MO_MIN, MO_MAX
 from BackEnd.utils.playbook_settings_utils import resolve_playbook_percentage
 from BackEnd.utils.defense_identity import (
@@ -1147,16 +1147,19 @@ def _roll_training_camp_height_delta(year: str) -> int:
 
 
 def _roll_training_camp_weight_delta(year: str, height_after: int) -> int:
-    # Height gates re-banded +6 in. for the recalibrated distribution (§11.2):
-    # 75 -> 81, 72 -> 78 (league median moved 72 -> 78).
+    # Height gates expressed as offsets from the league median (§11.2) so the
+    # next distribution shift is a one-line change. At median 78: >81 and >78
+    # (was >75 / >72 pre-recal).
+    tall = LEAGUE_MEDIAN_HEIGHT_IN + 3   # 81 at median 78
+    mid = LEAGUE_MEDIAN_HEIGHT_IN        # 78 at median 78
     if year == "sophomore":
-        if height_after > 81:
+        if height_after > tall:
             return random.randint(0, 10)
         return random.randint(0, 5)
     if year == "freshman":
-        if height_after > 81:
+        if height_after > tall:
             return random.randint(10, 30)
-        if height_after > 78:
+        if height_after > mid:
             return random.randint(5, 15)
         return random.randint(0, 10)
     return 0

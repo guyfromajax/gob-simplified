@@ -16,6 +16,14 @@ the old `--mode both` PS reference franchise `6a5e1f0e517ebcc58d981675` no longe
 gob-staging. To restore PS parity, re-cut `--mode both` against a currently-initialized PS
 franchise (and update this pointer + the invocations below).
 
+> ⚠️ **Do NOT diff `refstats_postB_20260720...` against `refstats_postrecal_20260729...`.**
+> They are **not comparable** — ~18 sim-touching commits landed between them, including several
+> explicit shot/block/foul recalibrations (`7d003157d` "fixed block bug and calibrated for 3pt
+> and FG percentages", `b319bdd89` "recalibrated blocks, fts and close FGs", `74a0206f5`,
+> `1405837cb`). A naive diff shows FG% −24%, 3PT% −40%, BLK +371%, AST −44%, PF +52% — those are
+> the shot-system tuning, NOT the attribute recalibration, and will be misattributed. Exact-diff
+> is only meaningful between two anchors on adjacent, draw-preserving codebases.
+
 | Script / flag | Capstone toolkit row | Use when | Reads |
 |---|---|---|---|
 | **`--seed` + exact diff** (harness) then `diffstats.py` | Seeded exact-diff | change does NOT alter draw count (pure geometry, dead-code) | two refstats CSVs → per-column diff |

@@ -31,6 +31,7 @@ from __future__ import annotations
 import random
 from typing import Dict, Optional
 
+from BackEnd.constants import LEAGUE_MEDIAN_HEIGHT_IN
 from BackEnd.utils.position_ratings import (
     HEIGHT_FITNESS,
     POSITION_WEIGHTS,
@@ -99,13 +100,15 @@ RT_ATTRS = tuple(sorted({a for w in POSITION_WEIGHTS.values() for a in w}))
 CORE_ATTRS = RT_ATTRS + ("ND",)
 
 # ── Weight from height (design §11.2 / Phase 5 re-band) ──────────────────────
-# Re-banded for the new distribution (median ~78). Bands shifted up by ~6 inches
-# from the old <72/72-75/76-80/>80 split so a median player is not "light".
+# Bands expressed as offsets from the league median so the next distribution
+# shift is a one-line change, not another sweep. At median 78: <74 / 74-77 /
+# 78-81 / >=82 (was <72/72-75/76-80/>80 pre-recal).
+_MED = LEAGUE_MEDIAN_HEIGHT_IN
 WEIGHT_BY_HEIGHT_BANDS = (
-    (74, (170, 200)),   # < 74 in
-    (78, (190, 225)),   # 74-77
-    (82, (215, 255)),   # 78-81
-    (999, (240, 290)),  # >= 82
+    (_MED - 4, (170, 200)),   # below median-4
+    (_MED,     (190, 225)),   # median-4 .. median-1
+    (_MED + 4, (215, 255)),   # median .. median+3
+    (10 ** 9,  (240, 290)),   # median+4 and up
 )
 
 

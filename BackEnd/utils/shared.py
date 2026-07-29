@@ -3,6 +3,7 @@ from BackEnd.utils.sim_random import sim_rng as random
 from BackEnd.utils.team_attr_scale import core8_gameplay
 import logging
 
+from BackEnd.constants import LEAGUE_MEDIAN_HEIGHT_IN
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.utils.player_momentum import mo_shot_roll, team_momentum
 from BackEnd.utils.shot_split_tracker import record_shot_split
@@ -1442,16 +1443,19 @@ def calculate_screen_score(screen_attrs):
     return base_score * random.randint(1, 6)
 
 
+BLOCK_SCORE_TOP_OFFSET_IN = 10  # inches above league median that map 0 -> 10 (1 pt/in slope)
+
+
 def height_to_block_score(height_inches):
     """
-    Map player height (inches) to 0-10 for block reconciliation.
-    >=88 -> 10, 87 -> 9, ... 79 -> 1, <=78 -> 0.
+    Map player height (inches) to 0-10 for block reconciliation. At the league
+    median → 0; +BLOCK_SCORE_TOP_OFFSET_IN inches → 10; 1 pt/inch between.
 
-    Re-banded +6 in. for the recalibrated height distribution (design §11.2).
-    The +6 shift tracks the league median moving 72 -> 78, and reproduces the
-    original league-mean block score of ~1.68 under the new distribution
-    (measured 1.69); the pre-recal bands (<=72 -> 0, >=82 -> 10) would have
-    yielded ~5.08 and moved block rates sharply.
+    Expressed as offsets from LEAGUE_MEDIAN_HEIGHT_IN (design §11.2) rather than
+    literals so the next distribution shift is a one-line constant change, not
+    another threshold sweep. At median 78 this is <=78 -> 0, >=88 -> 10, which
+    reproduces the original league-mean block score of ~1.68 (measured 1.69);
+    the pre-recal median-72 bands would have yielded ~5.08.
     """
     if height_inches is None:
         return 0
@@ -1459,11 +1463,11 @@ def height_to_block_score(height_inches):
         h = int(height_inches)
     except (TypeError, ValueError):
         return 0
-    if h >= 88:
+    if h >= LEAGUE_MEDIAN_HEIGHT_IN + BLOCK_SCORE_TOP_OFFSET_IN:
         return 10
-    if h <= 78:
+    if h <= LEAGUE_MEDIAN_HEIGHT_IN:
         return 0
-    return h - 78  # 79->1, 80->2, ..., 87->9
+    return h - LEAGUE_MEDIAN_HEIGHT_IN
 
 
 def calculate_block_spot(shooter_x, shooter_y, is_away_offense):
