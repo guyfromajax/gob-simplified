@@ -2255,6 +2255,69 @@ _AUTOTRAIN_PLAYER_ATTRS = [
     "SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO",
 ]
 
+# ── CPU reference training ────────────────────────────────────────────────────
+# CPU auto-train trains the coaching-quality REFERENCE (was: random allocation +
+# random focus, which nets −9 RT/season and scores well below 1.0 → the league
+# drifts under the ladder once quality is live). CPU base training is team-wide, so
+# a single allocation cannot equal the per-position reference for a PG and a C at
+# once; instead each player's own reference top-3 is amplified via player-maximizer
+# CUSTOM focus (positional-focus is misaligned with the reference for 4/5 positions
+# and amplifies off-position attrs). The team-wide base below is the common
+# substrate; the ~1.65× focus amplifier steers each player to his position.
+#
+# COUPLING (do not change either half alone): the base is FITTED so effective
+# allocation (base × _CPU_FOCUS_AMP_MEAN on each player's reference top-3) scores
+# ~1.0 per position against the FROZEN reference_allocation anchor. Change the
+# reference (weights/cap/breadth) or this base without re-fitting and CPU silently
+# drifts off the ladder — locked by tests/test_cpu_reference_training.py.
+_CPU_FOCUS_AMP_MEAN = 1.65  # season-mean of random.choice([1.5,1.6,1.7,1.8]) in _apply_player_training_points
+_CPU_REFERENCE_BASE = {  # per growth attribute → drill-slider points (0-5)
+    "SC": 1, "SH": 2, "ID": 2, "OD": 2, "PS": 1, "BH": 3,
+    "RB": 3, "ST": 1, "AG": 1, "ND": 1, "FT": 1, "IQ": 1,
+}
+
+
+def _cpu_reference_top3(position: str) -> list[str]:
+    """The player's development-position reference top-3 (the attrs the frozen
+    reference emphasises). Read from reference_allocation so it stays coupled to the
+    anchor — never hardcoded."""
+    from BackEnd.utils.player_development import reference_allocation, COACHING_REFERENCE_PRIMARY_PTS
+    ref = reference_allocation(position or "SF")
+    return [a for a, pts in ref.items() if pts == COACHING_REFERENCE_PRIMARY_PTS]
+
+
+def _cpu_reference_allocation() -> dict:
+    """Team-wide base substrate (drill-slider format), from _CPU_REFERENCE_BASE."""
+    b = _CPU_REFERENCE_BASE
+    return {
+        "player_drills": {
+            "offense": {"inside": b["SC"], "outside": b["SH"]},
+            "defense": {"inside": b["ID"], "outside": b["OD"]},
+            "technical": {"passing": b["PS"], "ball_handling": b["BH"], "rebounding": b["RB"]},
+            "weight_room": {"strength": b["ST"], "agility": b["AG"]},
+        },
+        "general": {"conditioning": b["ND"], "free_throws": b["FT"], "film_study": b["IQ"], "breaks": 1},
+        "team_drills": {
+            "team_offense": {"install": 1}, "team_defense": {"install": 1},
+            "fast_breaks": {"offense_install": 1, "defense_install": 1}, "scrimmages": 1,
+            "presses_traps": {"defense_install": 1, "offense_install": 1},
+        },
+    }
+
+
+def _cpu_reference_custom_focus(players_for_training: list[dict], fpd_by_player_id: dict) -> dict:
+    """Map every roster player → his development-position reference top-3, so
+    player-maximizer-custom amplifies each player toward his own position. Uses
+    position_intent (always present); falls back to the primary RT position."""
+    from BackEnd.models.training_execution_v2 import primary_position_from_position_ratings
+    out: dict[str, list[str]] = {}
+    for p in players_for_training:
+        pid = str(p["_id"])
+        fp = fpd_by_player_id.get(pid) or {}
+        pos = fp.get("position_intent") or primary_position_from_position_ratings(fp.get("position_ratings"))
+        out[pid] = _cpu_reference_top3(pos)
+    return out
+
 
 def auto_train_one_cpu_team(
     franchise_id: ObjectId,
@@ -2334,9 +2397,12 @@ def auto_train_one_cpu_team(
         return {"status": "error", "reason": "no_players", "team_id": str(team_id)}
 
     is_first = is_first_training if is_first_training is not None else (week == 1)
-    points = 30 if is_first else 24
-    allocations = generate_random_training_allocations(points)  # per-team roll
-    coaching_focus = generate_random_coaching_focus()           # per-team roll
+    # CPU trains the coaching-quality reference (was: random allocation + random
+    # focus). Team-wide reference substrate + per-player custom focus steering each
+    # player to his own position's reference top-3. See _cpu_reference_* above.
+    allocations = _cpu_reference_allocation()
+    coaching_focus = "player-maximizer-custom"
+    coaching_focus_custom_by_player = _cpu_reference_custom_focus(players_for_training, fpd_by_player_id)
 
     team_stats = dict(ftd_doc.get("team_attributes") or {})
     plays_data = ftd_doc.get("plays") or {}
@@ -2367,6 +2433,7 @@ def auto_train_one_cpu_team(
             scouting_data=scouting_data,
             playbook_training_mode="current-playbooks",
             skip_pre_training_depreciation=is_first,
+            coaching_focus_custom_by_player=coaching_focus_custom_by_player,
         )
 
     position_ratings_updates: dict[str, dict] = {}
