@@ -376,7 +376,23 @@ Weekly decay shrinks substantially and per-point gains shrink to match; net stay
 
 **Because non-core attributes are not allowed to rot, specialization is expressed as rate, not direction.** Everything grows; focused attributes grow much faster. The trade-off becomes opportunity cost (gains not taken) rather than loss (ground lost). This is a deliberate departure from the team-attribute philosophy, where bleed-without-investment was the goal.
 
-**There is no magnitude split.** An earlier draft specified 70% of career growth from the offseason and 30% in-season. That is architecturally impossible against an absolute-target offseason — see §17.1 — and was replaced. In-season now nets roughly **flat** in aggregate RT (measured mean −0.28 RT/season, p10 −14 / p90 +13), while carrying two other jobs: moving attributes within the season, and feeding the coaching-quality score that modulates the offseason (§17).
+**There is no magnitude split.** An earlier draft specified 70% of career growth from the offseason and 30% in-season. That is architecturally impossible against an absolute-target offseason — see §17.1 — and was replaced.
+
+In-season carries two other jobs instead: moving attributes within the season, and feeding the coaching-quality score that modulates the offseason (§17).
+
+**Every in-season RT figure must be labelled by allocation policy.** An unlabelled "in-season nets X" is meaningless, and the omission has already caused one contradiction — a "reference coaching" figure was quoted against the frozen reference when it came from a much better allocation. At `IN_SEASON_GAIN_SCALE` 0.18, over a 26-week season:
+
+| Allocation policy | coaching quality | in-season RT/season |
+|---|---|---|
+| Random | ~0.5-0.8 | −9.78 |
+| **Frozen reference** (what CPU trains) | **1.00** | **−1.23** |
+| Proportional / good coaching | ~1.20 | +4.76 |
+
+The frozen reference nets slightly negative *by design* — it is a deliberately mediocre baseline (§17.3), and the absolute-target offseason re-anchors it onto the ladder regardless. Good coaching nets positive but stays below the smallest per-rung increment (~+6 RT), so a well-coached player can never outrun his own offseason target and be pulled back at rollover.
+
+The gap between the bottom and top rows is the user's coaching edge: roughly **6 RT per season** against a correctly-trained CPU league. That residual is the designed reward for out-coaching the baseline, not an artifact.
+
+Under good coaching the *per-attribute* net is ≈ 0.000 with a mean absolute movement of 0.52 per week — attributes visibly shift toward the focus while RT, their weighted mean, stays nearly flat. **§7.2's visibility requirement is about attributes, not RT.** Measuring RT delta is the wrong instrument for it.
 
 ### 7.3 The accumulator
 
@@ -796,7 +812,7 @@ Achievable range is normalised affinely per position, so headroom is comparable 
 
 The allocation that scores exactly 1.0 is a **frozen, named constant**: a deliberately mediocre baseline, weight-proportional across the position's top three attributes and neglecting the tail. Test-asserted at all five positions.
 
-Two properties follow. CPU teams train approximately that baseline, so the league sits exactly on the ladder and nothing calibrated against the scale floats. And because the baseline is *mediocre rather than optimal*, good coaching has real upside — which a proportional reference structurally cannot provide, since a concave metric is very nearly maximised by proportional allocation itself.
+Two properties follow. CPU teams train that baseline, so the league sits exactly on the ladder and nothing calibrated against the scale floats. (This was *false* until commit `14e4baee9` — CPU previously allocated randomly, scoring far below 1.0. See §17.6.) And because the baseline is *mediocre rather than optimal*, good coaching has real upside — which a proportional reference structurally cannot provide, since a concave metric is very nearly maximised by proportional allocation itself.
 
 **Which allocation scores 1.0 is a labelling choice, not a property of the metric.** That is what dissolves the apparent trade-off between holding the league on the ladder and giving coaching upside. The only real constraint is that pillar 3 must keep CPU's baseline aligned to the frozen constant — changing the reference re-scales every player's development.
 
@@ -837,5 +853,15 @@ Senior tier targets sit 10 RT apart, so coaching is worth roughly **±1 tier ste
 The mechanic is built and **dormant**. The live path reads coaching quality through a seam that returns `None`, so `f` is 1.0 for every player and the league holds exactly at pass 1.
 
 Activating it requires per-player allocation capture, which is genuinely coupled to the CPU archetype work: user and CPU training run through the same `execute_training` engine with no user/CPU flag inside it, so recording has to be gated at the calling endpoint. It lands with pillar 3 alongside the training-position UI and CPU season-start assignment.
+
+**CPU now trains the reference — this was a live defect, fixed separately.** Until commit `14e4baee9`, CPU auto-train rolled `generate_random_training_allocations` plus `generate_random_coaching_focus`. That produced −9.13 RT/season against a well-coached user's +4.76 — a ~14 RT per-season swing in the user's favour in every franchise — and it would have scored far below 1.0 the moment quality went live, dragging the whole league beneath the ladder.
+
+`auto_train_one_cpu_team` now uses a fixed team-wide reference substrate plus `player-maximizer-custom` focus steering each player to his own position's reference top three. The team-wide/per-position tension is real — one team-wide allocation cannot equal the reference for a point guard and a centre simultaneously — and is resolved by the per-player focus amplifier rather than ignored. Measured per-position quality is 0.984-1.011 with a spread of 0.027; CPU in-season RT moved from −9.13 to −1.23; the user-versus-CPU gap closed from ~13.9 to ~6.0.
+
+`positional-focus` was evaluated and **rejected**: its triple is misaligned with the reference at four of five positions and amplifies off-position attributes at SF (ST) and PF (ID).
+
+**Two coupled calibration constants now exist** — the frozen reference and the CPU base allocation tuned to score 1.0 against it. Neither can be changed alone. `tests/test_cpu_reference_training.py` asserts the relationship so a future change breaks a test rather than silently drifting the league.
+
+Worth recording for future training-side work: training runs on the global `random` module while the engine uses an isolated `sim_random`, so the streams are independent and training changes cannot perturb sim determinism.
 
 **One property is temporary.** Base training points are team-wide, with only the focus amplifier applied per player, so `f` is currently near-identical across a roster — a program-level multiplier rather than per-player coaching. That expires when the planned per-player training focus ships, at which point `f` becomes genuinely per-player. The metric already reads points, so no metric change is needed then — only the capture.
