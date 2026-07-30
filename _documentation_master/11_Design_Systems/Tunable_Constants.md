@@ -887,17 +887,26 @@ offseason event owns them; camp keeps only its 30-point allocation and decay ski
 | `PEAK_BONUS` | +0.30 × JH anchor (fixed per peak) | career multiple = 1.7 + 0.30·peaks (→ 1.7/2.0/2.3/2.6) |
 | `STD_RUNG_INCREMENT` | FR .17 / SO .20 / JR .15 / SR .18 (Σ .70) | 0-peak ladder shape; no dead rung (min +5 RT) |
 | `CH_PEAK_LOW` / `CH_PEAK_HIGH` | (.38,.52,.10,0) → (.02,.58,.34,.06) | the CH→peak-count spread; midpoint = 20/55/22/3 |
-| `OFFSEASON_SPLIT` | 0.70 | offseason-vs-in-season distribution blend |
+| `OFFSEASON_DISTRIBUTION_BLEND` | 0.70 | **distribution** blend only (offseason budget lands 70% age-shaped / 30% position-shaped). **NOT a magnitude split — no offseason/in-season magnitude split exists.** Renamed from `OFFSEASON_SPLIT`, which misread as one. |
 | `FAMILY_CURVES` | FR 3.0/1.0/.30 · SO 2.0/1.2/.60 · JR .60/1.3/2.2 · SR .35/1.2/3.2 | per-rung weight multipliers (phys/skill/mental) → physical-early, mental-late |
-| `HT_TOTAL_MEAN` / `HT_TOTAL_SD` | 3.2 / 1.9 (clamp [0,8]) | career HT gain (p50 ~3in) |
+| `HT_TOTAL_MEAN` / `HT_TOTAL_SD` | 3.2 / 1.9 (clamp [0,8]) | career HT gain (p10/p50/p90 ≈ 0/3/6 in) |
 | `HT_CURVE_BY_TIMING` | early 55/30/12/3 · standard 40/30/20/10 · late 15/25/35/25 | when HT arrives, by physical timing |
-| `HT_PER_RUNG_CAP` | 3 | ≤~2.5in/summer intent; raised from 2 (which clipped p90 to 5in vs 6) |
+| `HT_PER_RUNG_CAP` | 2.5 | cap the real-valued per-rung HT want at 2.5in then round → dh ∈ {0..3}, restoring the p90≈6in tail |
+| `COACHING_F_MIN` / `COACHING_F_MAX` | 0.85 / 1.20 | band on the offseason coaching-quality modifier `f`; ±spread of one to a few display buckets at SR |
+| `COACHING_F_SENSITIVITY` | 0.40 | how strongly cumulative coaching quality moves `f` within the band |
+
+### Coaching quality → offseason modifier `f` (Option 3)
+The offseason target is `jh_anchor × ladder_value × f`. `f` is a bounded function of the player's **cumulative** coaching quality (career average of per-season scores). A season's score compares the training allocation against the development-position weight vector.
+
+> **`reference_allocation` is a CALIBRATION ANCHOR — do not change casually.** It is defined explicitly as "train each attribute in proportion to the development-position's weight vector," and it scores exactly **1.0** for every position by construction. It is deliberately **not** "whatever the CPU auto-train policy produces" (that will fragment when the CPU-archetype rework lands and would silently re-anchor the whole growth model). A reference-coached player (f = 1.0) lands exactly on the validated ladder, so with today's CPU ≈ reference the league stays exactly where pass 1 put it; the user's edge comes from out-coaching the reference, which structurally caps user-vs-CPU divergence. **Changing this anchor re-scales every player's development.**
+
+Live wiring: `finish_season` passes `season_quality=None` for now → `f = 1.0` (reference), so nothing drifts. Real per-player season allocations feed `f` when the CPU-archetype training rework (pillar 3) plumbs them. Distribution (which attrs the budget lands on) and quality (feeds `f`) are computed from the same allocation but kept **separate in code** so they stay independently tunable.
+
+### Weekly in-season (§7.2, Option 3): nets ~FLAT, does not carry career growth
+`PRE_TRAINING_DECAY_BY_YEAR` reduced to FR/SO (-2,0), JR/SR (-1,0) (was FR (-5,-2) … SR (-2,0)); `IN_SEASON_GAIN_SCALE` (0.26) scales positive weekly gains so a season nets ~0 RT (measured mean −0.3/season, ±~13 season noise). In-season now only (a) moves attributes within the season and (b) feeds the coaching-quality score — the offseason event owns career magnitude. There is **no** in-season magnitude share.
 
 ### Not exposed (fixed / not target-fittable)
-`FAMILY_TIMING_WEIGHTS`, `FAMILY_TIMING_SHIFT`, `INTRA_FAMILY_GAMMA` (0.20), `NON_CORE_GROWTH_MULTIPLIER` (0.06), `PEAK_RUNG_WEIGHTS`, `PEAK_COUNT_DISTRIBUTION`, `RT_COMPRESSION_THRESHOLD`/`RT_SOFT_CAP` (95/130, near-inactive guard). `ACCUMULATOR_WEIGHT` and the precise in-season net share are live-tuning knobs (a 26-week season, not offline).
-
-### Weekly decay (in-season, §7.2)
-`PRE_TRAINING_DECAY_BY_YEAR` reduced to FR/SO (-2,0), JR/SR (-1,0) (was FR (-5,-2) … SR (-2,0)) so in-season is a light drag, not a treadmill. The offseason event owns career growth. The exact ~30% in-season share is a live-tuning follow-up (not offline-verifiable).
+`FAMILY_TIMING_WEIGHTS`, `FAMILY_TIMING_SHIFT`, `INTRA_FAMILY_GAMMA` (0.20), `NON_CORE_GROWTH_MULTIPLIER` (0.06), `PEAK_RUNG_WEIGHTS`, `PEAK_COUNT_DISTRIBUTION`, `RT_COMPRESSION_THRESHOLD`/`RT_SOFT_CAP` (95/130, near-inactive guard), `IN_SEASON_GAIN_SCALE` (fit to net-flat).
 
 ### Legacy-player caveat (existing saves, not backfilled) — READ BEFORE DEBUGGING
 A player with no `development` subdoc (a save that predates pass 2) is **lazy-backfilled** at his first rollover: a profile rolled once from his live CH (frozen as `ch_seed`), peaks restricted to his remaining rungs, and persisted so it never re-rolls. His `entry_tier` — if absent — is **derived from his current top RT**, which is *systematically low for old-scale bigs* whose RT collapsed under height gating (§3.6.7): a distorted big reads as a lower tier and develops on a lower ladder, compounding the degradation. This is accepted (recalibration is new-franchises-only, §14); new franchises never hit this path (entry_tier is carried pool→FPD). Do not diagnose a stunted legacy big as a bug.

@@ -100,3 +100,40 @@ def test_weekly_decay_reduced():
     for year, (lo, hi) in PRE_TRAINING_DECAY_BY_YEAR.items():
         assert lo >= -2, year
         assert hi <= 0, year
+
+
+def test_reference_allocation_scores_one_and_band_bounds():
+    """The calibration anchor (train ∝ position weights) scores 1.0 → f 1.0 for
+    every position, so a reference-coached player lands on the validated ladder.
+    Extreme allocations are clamped into [0.85, 1.20]."""
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        q = dev.season_coaching_quality(dev.reference_allocation(pos), pos)
+        assert abs(q - 1.0) < 1e-9, pos
+        assert dev.coaching_f(q) == 1.0, pos
+    # concentrating on the top-weight attr → above reference (SG's .42 SH pins the
+    # cap; C's .32 ID lands ~1.16), always within the band
+    for pos in ("SG", "C"):
+        top = max(dev.POSITION_WEIGHTS[pos], key=dev.POSITION_WEIGHTS[pos].get)
+        f = dev.coaching_f(dev.season_coaching_quality({top: 1.0}, pos))
+        assert 1.0 < f <= dev.COACHING_F_MAX
+    # spraying uniformly → low quality → f pinned at the floor
+    uniform = {a: 1 / len(dev.GROWTH_ATTRS) for a in dev.GROWTH_ATTRS}
+    assert dev.coaching_f(dev.season_coaching_quality(uniform, "SG")) == dev.COACHING_F_MIN
+
+
+def test_coaching_f_modulates_offseason_and_no_history_is_reference():
+    """f scales the offseason target: f>1 lands above the ladder, f<1 below; a doc
+    with no coaching history develops at f=1.0 (reference)."""
+    base = {"player_id": "q", "meta": {"height": 76, "weight": 190, "year": "sophomore"},
+            "attributes": {f"anchor_{a}": 40 for a in dev.GROWTH_ATTRS}
+                          | {a: 40 for a in dev.GROWTH_ATTRS} | {"CH": 50, "anchor_CH": 50},
+            "position_ratings": {"PG": 30, "SG": 44, "SF": 35, "PF": 30, "C": 28},
+            "position_intent": "SG", "entry_tier": "Average",
+            "development": {"peak_count": 0, "peak_rungs": [], "ch_seed": 50,
+                            "family_timing": {"physical": "standard", "skill": "standard", "mental": "standard"},
+                            "ht_total": 3}}
+    import copy
+    hi = dev.develop_rollover(copy.deepcopy(base) | {"coaching_quality": {"avg": 1.20, "n": 4}}, "sophomore", random.Random(1))
+    lo = dev.develop_rollover(copy.deepcopy(base) | {"coaching_quality": {"avg": 0.80, "n": 4}}, "sophomore", random.Random(1))
+    none = dev.develop_rollover(copy.deepcopy(base), "sophomore", random.Random(1))  # no history
+    assert hi["position_ratings"]["SG"] > none["position_ratings"]["SG"] > lo["position_ratings"]["SG"]

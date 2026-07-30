@@ -14863,11 +14863,16 @@ def finish_season(req: FinishSeasonRequest):
                 "development": fpd_doc.get("development"),
                 "entry_tier": fpd_doc.get("entry_tier"),
                 "position_intent": fpd_doc.get("position_intent"),
+                "coaching_quality": fpd_doc.get("coaching_quality"),
             }
             # Offseason development event (§7.1): develop the returning player onto
             # his new year's rung, then recompute ratings (incl. after HT growth).
             # Lazy-backfills + persists a missing profile once (existing saves).
-            _dev = develop_rollover(next_doc, meta["year"], _dev_rng)
+            # season_quality is None for now → coaching factor f stays 1.0 (the
+            # reference-coached ladder). Real per-player season allocations feed f
+            # once the CPU-archetype training rework plumbs them (pillar 3); until
+            # then CPU == reference, so the league holds exactly at pass-1.
+            _dev = develop_rollover(next_doc, meta["year"], _dev_rng, season_quality=None)
             next_doc["attributes"] = _dev["attributes"]
             next_doc["meta"]["height"] = _dev["height"]
             next_doc["meta"]["weight"] = _dev["weight"]
@@ -14875,6 +14880,7 @@ def finish_season(req: FinishSeasonRequest):
             next_doc["development"] = _dev["development"]
             next_doc["entry_tier"] = _dev["entry_tier"]
             next_doc["position_intent"] = _dev["position_intent"]
+            next_doc["coaching_quality"] = _dev["coaching_quality"]
             _offseason_reports.append(_build_offseason_report_line(next_doc, fpd_doc, _dev))
             next_fpd_docs.append(next_doc)
             returning_players_by_team[team_id].append(player_id_str)
@@ -14921,10 +14927,11 @@ def finish_season(req: FinishSeasonRequest):
             "development": signed_player.get("development"),
             "entry_tier": signed_player.get("entry_tier"),
             "position_intent": signed_player.get("position_intent"),
+            "coaching_quality": signed_player.get("coaching_quality"),
         }
         # Signed players enter advanced one year, so they too walk an offseason rung.
         _prev = {"position_ratings": signed_doc["position_ratings"]}
-        _dev = develop_rollover(signed_doc, signed_doc["meta"]["year"], _dev_rng)
+        _dev = develop_rollover(signed_doc, signed_doc["meta"]["year"], _dev_rng, season_quality=None)
         signed_doc["attributes"] = _dev["attributes"]
         signed_doc["meta"]["height"] = _dev["height"]
         signed_doc["meta"]["weight"] = _dev["weight"]
@@ -14932,6 +14939,7 @@ def finish_season(req: FinishSeasonRequest):
         signed_doc["development"] = _dev["development"]
         signed_doc["entry_tier"] = _dev["entry_tier"]
         signed_doc["position_intent"] = _dev["position_intent"]
+        signed_doc["coaching_quality"] = _dev["coaching_quality"]
         _offseason_reports.append(_build_offseason_report_line(signed_doc, _prev, _dev))
         next_fpd_docs.append(signed_doc)
 

@@ -43,13 +43,13 @@ FAMILY_OF = ({a: "physical" for a in PHYSICAL_ATTRS}
 RUNG_TRANSITIONS = ("FR", "SO", "JR", "SR")  # four offseason events from JH
 
 # ── Rung increments (§4.2) — fractions of the JH anchor, as RT ────────────────
-# 0-peak path sums to 0.70 (→ 1.7x career). A peak adds a FIXED bonus at whichever
-# rung it lands on (see PEAK_BONUS). Flattened from the original .17/.26/.07/.20
-# (which reproduced §4.2 but left JR nearly dead — a non-peaking junior gained ~2
-# RT, invisible on the offseason report). No rung is now below .15, so every
-# offseason moves the needle. §4.2's SO/JR shape shifts a couple of points; that
-# was a measurement from the old fit (assuming a JR peak), not a design commitment.
-STD_RUNG_INCREMENT = {"FR": 0.17, "SO": 0.20, "JR": 0.15, "SR": 0.18}
+# Flattened from the original .17/.26/.07/.20 (Σ .70) so no rung is dead (JR was
+# .07 → a non-peaking junior gained ~2 RT, invisible). §4.2's SO/JR shape shifts a
+# couple of points, accepted. The offseason event delivers the FULL ladder
+# (Σ .70 → 1.7x at 0 peaks); career growth is modulated by the bounded
+# coaching-quality factor f (below), NOT split with in-season. A reference-coached
+# player (f = 1.0) lands exactly on this ladder.
+STD_RUNG_INCREMENT = {"FR": 0.17, "SO": 0.20, "JR": 0.15, "SR": 0.18}  # Σ .70
 # A peak adds +0.30x the JH anchor. This makes the career multiple 1.7 + 0.30·k
 # (→ 1.7/2.0/2.3/2.6 for k=0..3), independent of WHICH rung peaks — placement is
 # timing, not magnitude. (See FIT NOTES: §12's "PEAK_MULTIPLIER ~1.9x a standard
@@ -101,11 +101,14 @@ FAMILY_CURVES = {
     "SR": {"physical": 0.35, "skill": 1.2, "mental": 3.2},
 }
 
-# ── In-season / accumulator (§7.2-7.3) ────────────────────────────────────────
-# The offseason delivers OFFSEASON_SPLIT of each rung's growth via the family
-# curve (age-shaped); in-season delivers the rest via the accumulator, which in
-# the default policy aims at the training-position weights (position-shaped).
-OFFSEASON_SPLIT = 0.70
+# ── Offseason distribution blend (§7.2-7.3) ───────────────────────────────────
+# NOT a magnitude split — there is no offseason/in-season magnitude split; the
+# offseason delivers the whole ladder (modulated by coaching-quality f) and
+# in-season nets ~zero. This is purely the DISTRIBUTION blend it was fitted as:
+# the offseason budget lands 70% by the age-shaped family curve and 30% by the
+# position-shaped accumulator. (Renamed from OFFSEASON_SPLIT, which misread as a
+# magnitude split.)
+OFFSEASON_DISTRIBUTION_BLEND = 0.70
 # Non-core attributes grow at a low but never-zero rate (§7.1) — a floor on the
 # per-attribute weight used for within-family distribution.
 NON_CORE_GROWTH_MULTIPLIER = 0.06
@@ -132,10 +135,57 @@ HT_CURVE_BY_TIMING = {
 HT_TOTAL_MEAN = 3.2
 HT_TOTAL_SD = 1.9
 HT_TOTAL_MIN, HT_TOTAL_MAX = 0, 8
-HT_PER_RUNG_CAP = 3  # ~2.5in/summer intent (integer 3); at 2 it clipped p90 career gain to 5in vs the intended 6
+HT_PER_RUNG_CAP = 2.5  # cap the real-valued per-rung want at 2.5in, then round → dh ∈ {0,1,2,3} with 3 only on the biggest rungs (restores the p90≈6in tail without a systematic +3)
 # WT tracks strength: pounds per inch of HT gain, plus muscle with ST growth.
 WT_LBS_PER_INCH = (4, 7)
 WT_LBS_PER_ST = (0, 1)
+
+# ── Coaching quality → offseason modifier f (Option 3) ────────────────────────
+# The offseason target is  jh_anchor × ladder_value × f(coaching_quality).  f is
+# bounded; a reference-coached player (f = 1.0) lands exactly on the validated
+# ladder, so the league stays where pass 1 put it and the user's edge comes from
+# OUT-coaching the reference (which structurally caps user-vs-CPU divergence).
+#
+# REFERENCE ALLOCATION — a CALIBRATION ANCHOR, do not change casually. It is
+# defined explicitly (NOT "whatever auto-train does", which will fragment when the
+# CPU-archetype rework lands): the reference is "train each attribute in proportion
+# to the development-position's weight vector." A season allocation is scored by
+# how its emphasis aligns with that vector, normalised so the reference == 1.0 for
+# every position. Concentrating on high-weight attributes scores >1.0; spraying
+# points on off-position attributes scores <1.0. Changing this anchor re-scales
+# every player's development, so it is frozen.
+COACHING_F_MIN = 0.85
+COACHING_F_MAX = 1.20
+# How strongly cumulative coaching quality moves f within the band (fitted so
+# realistic allocation variation spans the band; the band is then clamped).
+COACHING_F_SENSITIVITY = 0.40
+
+
+def reference_allocation(position: str) -> Dict[str, float]:
+    """The calibration-anchor allocation: proportional to the position's weight
+    vector, normalised to sum 1. Scores exactly 1.0 by construction."""
+    w = POSITION_WEIGHTS[position]
+    tot = sum(w.values()) or 1.0
+    return {a: v / tot for a, v in w.items()}
+
+
+def season_coaching_quality(allocation: Dict[str, float], position: str) -> float:
+    """Score a season's training allocation (attr→fraction) for a player developed
+    at ``position``. Reference (allocation == reference_allocation) → 1.0."""
+    w = POSITION_WEIGHTS[position]
+    ref = reference_allocation(position)
+    dot_ref = sum(ref.get(a, 0.0) * wt for a, wt in w.items())
+    if dot_ref <= 0:
+        return 1.0
+    dot_alloc = sum(allocation.get(a, 0.0) * wt for a, wt in w.items())
+    return dot_alloc / dot_ref
+
+
+def coaching_f(cumulative_quality: float) -> float:
+    """Bounded offseason modifier from cumulative career coaching quality (1.0 =
+    reference → f 1.0)."""
+    raw = 1.0 + COACHING_F_SENSITIVITY * (cumulative_quality - 1.0)
+    return max(COACHING_F_MIN, min(COACHING_F_MAX, raw))
 
 
 def _cat(rng: random.Random, dist) -> int:
@@ -236,8 +286,8 @@ def _distribution_fractions(position: str, rung: str, timing: dict,
     acc_denom = sum(acc.get(a, 0.0) for a in GROWTH_ATTRS) or 1.0
     inseason = {a: acc.get(a, 0.0) / acc_denom for a in GROWTH_ATTRS}
 
-    blend = {a: OFFSEASON_SPLIT * offseason.get(a, 0.0)
-                + (1 - OFFSEASON_SPLIT) * inseason.get(a, 0.0) for a in GROWTH_ATTRS}
+    blend = {a: OFFSEASON_DISTRIBUTION_BLEND * offseason.get(a, 0.0)
+                + (1 - OFFSEASON_DISTRIBUTION_BLEND) * inseason.get(a, 0.0) for a in GROWTH_ATTRS}
     tot = sum(blend.values()) or 1.0
     return {a: v / tot for a, v in blend.items()}
 
@@ -270,23 +320,27 @@ def _analytic_budget(attrs: dict, height: float, position: str,
 
 def develop_one_offseason(player: dict, rung: str, profile: dict,
                           rng: random.Random,
-                          accumulator: Optional[Dict[str, float]] = None) -> dict:
+                          accumulator: Optional[Dict[str, float]] = None,
+                          coaching_f_value: float = 1.0) -> dict:
     """Apply one offseason development event, moving the player onto ``rung`` (§7.1).
 
-    Mutates and returns ``player`` (dict with 'attributes', 'height', 'weight',
+    ``coaching_f_value`` is the bounded coaching-quality modifier on the target
+    (1.0 = reference-coached → lands on the validated ladder). Mutates and returns
+    ``player`` (dict with 'attributes', 'height', 'weight',
     'position'/'training_position', 'jh_anchor'). Pure given ``rng``.
     """
     attrs = player["attributes"]
     position = player.get("training_position") or player["position"]
     anchor = player["jh_anchor"]
 
-    # 1-2. budget from the rung + CH-seeded peak check → target RT for this rung.
+    # 1-2. budget from the rung + CH-seeded peak check → target RT for this rung,
+    # scaled by the bounded coaching-quality modifier (Option 3).
     cum = 0.0
     for r in RUNG_TRANSITIONS:
         cum += STD_RUNG_INCREMENT[r] + (PEAK_BONUS if r in profile["peak_rungs"] else 0.0)
         if r == rung:
             break
-    target_rt = _compress_rt(anchor * (1.0 + cum))
+    target_rt = _compress_rt(anchor * (1.0 + cum) * coaching_f_value)
 
     # HT first (own declining curve, never rung-locked), magnitude-capped. Each
     # rung gets its curve share of the career HT gain, integer-rounded
@@ -297,8 +351,8 @@ def develop_one_offseason(player: dict, rung: str, profile: dict,
     # (Ordering note: §7.1 lists HT as step 5; correctness requires it precede the
     # RT solve.)
     ht_timing = profile["family_timing"]["physical"]
-    want = profile.get("ht_total", 0) * HT_CURVE_BY_TIMING[ht_timing][rung]
-    dh = min(HT_PER_RUNG_CAP, int(want) + (1 if rng.random() < (want - int(want)) else 0))
+    want = min(HT_PER_RUNG_CAP, profile.get("ht_total", 0) * HT_CURVE_BY_TIMING[ht_timing][rung])
+    dh = int(want) + (1 if rng.random() < (want - int(want)) else 0)
     if dh:
         player["height"] = player["height"] + dh
 
@@ -382,12 +436,17 @@ def _derive_entry_tier_from_rt(position_ratings: dict, rung: str) -> str:
     return min(JH_ANCHOR_BY_TIER, key=lambda t: abs(JH_ANCHOR_BY_TIER[t] - est_anchor))
 
 
-def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random) -> dict:
+def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
+                     season_quality: Optional[float] = None) -> dict:
     """Apply the offseason event to an FPD player rolling onto ``new_year`` (§7.1),
     handling the FPD document shape and lazy-backfilling a missing profile.
 
-    Returns {attributes, height, weight, position_ratings, development, entry_tier,
-    position_intent, backfilled}. The caller persists all of them. Pure given rng.
+    ``season_quality`` is the just-finished season's coaching-quality score (1.0 =
+    reference; None → 1.0, e.g. a player with no season of history). It updates the
+    player's cumulative quality (simple career average), which drives the bounded
+    offseason modifier f. Returns {attributes, height, weight, position_ratings,
+    development, entry_tier, position_intent, coaching_quality, backfilled}. The
+    caller persists all of them. Pure given rng.
 
     Lazy backfill (existing saves, §11.3 rule): a player with no `development` gets
     one rolled ONCE here from his live CH frozen as ch_seed, with peaks restricted
@@ -415,18 +474,26 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random) -> dict:
         remaining = list(RUNG_TRANSITIONS[RUNG_TRANSITIONS.index(rung):])
         profile = roll_growth_profile(ch_seed, rng, eligible_peak_rungs=remaining)
 
+    # Cumulative coaching quality (career average) → bounded offseason modifier f.
+    # No history and no season score → stays 1.0 → f 1.0 → lands on the ladder.
+    cq = fpd_doc.get("coaching_quality") or {"avg": 1.0, "n": 0}
+    if season_quality is not None:
+        n2 = cq["n"] + 1
+        cq = {"avg": (cq["avg"] * cq["n"] + season_quality) / n2, "n": n2}
+    f = coaching_f(cq["avg"])
+
     player = {
         "attributes": attrs, "height": height, "weight": meta.get("weight", 0),
         "position": position_intent, "training_position": position_intent,
         "jh_anchor": JH_ANCHOR_BY_TIER[entry_tier], "position_ratings": dict(ratings),
         "_ht_carry": fpd_doc.get("_ht_carry", 0.0),
     }
-    develop_one_offseason(player, rung, profile, rng)
+    develop_one_offseason(player, rung, profile, rng, coaching_f_value=f)
     return {
         "attributes": player["attributes"], "height": player["height"],
         "weight": player["weight"], "position_ratings": player["position_ratings"],
         "development": profile, "entry_tier": entry_tier,
-        "position_intent": position_intent, "backfilled": backfilled,
+        "position_intent": position_intent, "coaching_quality": cq, "backfilled": backfilled,
     }
 
 
@@ -435,8 +502,10 @@ __all__ = [
     "RUNG_TRANSITIONS", "STD_RUNG_INCREMENT", "PEAK_BONUS",
     "RT_COMPRESSION_THRESHOLD", "RT_SOFT_CAP", "PEAK_COUNT_DISTRIBUTION",
     "CH_PEAK_LOW", "CH_PEAK_HIGH", "PEAK_RUNG_WEIGHTS", "FAMILY_TIMING_WEIGHTS",
-    "FAMILY_CURVES", "OFFSEASON_SPLIT", "NON_CORE_GROWTH_MULTIPLIER",
+    "FAMILY_CURVES", "OFFSEASON_DISTRIBUTION_BLEND", "NON_CORE_GROWTH_MULTIPLIER",
     "HT_CURVE_BY_TIMING", "HT_TOTAL_MEAN", "HT_TOTAL_SD", "HT_PER_RUNG_CAP",
+    "COACHING_F_MIN", "COACHING_F_MAX", "COACHING_F_SENSITIVITY",
+    "reference_allocation", "season_coaching_quality", "coaching_f",
     "roll_growth_profile", "develop_one_offseason", "develop_rollover",
     "init_career", "simulate_career",
 ]

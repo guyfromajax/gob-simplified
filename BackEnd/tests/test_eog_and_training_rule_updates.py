@@ -4,7 +4,6 @@ from unittest.mock import patch
 
 from BackEnd.models.training_execution_v2 import (
     _apply_player_training_points,
-    _apply_training_camp_bonus,
     _pre_training_decay_range_for_year,
 )
 # Task 7: the drifted standalone band funcs were deleted. These tests now exercise
@@ -102,73 +101,19 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         with patch.object(random, "randint", side_effect=fake_randint):
             _apply_player_training_points(player, "SC", points=2, archetype=None, sub_option=None, multiplier=1.0)
 
+        # Base range (2,3) + senior max-adjustment (+1) → (2,4); fake_randint returns 4.
         self.assertEqual(calls[-1], (2, 4))
-        self.assertEqual(player["attributes"]["anchor_SC"], 54)
-        self.assertEqual(player["attributes"]["SC"], 54)
+        # Positive weekly gains are scaled down by IN_SEASON_GAIN_SCALE (§7.2,
+        # Option 3: in-season nets ~flat, offseason owns career growth).
+        from BackEnd.models.training_execution_v2 import IN_SEASON_GAIN_SCALE
+        expected = 50 + int(round(4 * IN_SEASON_GAIN_SCALE))
+        self.assertEqual(player["attributes"]["anchor_SC"], expected)
+        self.assertEqual(player["attributes"]["SC"], expected)
 
-    def test_training_camp_bonus_applies_for_high_ch_pg(self):
-        player = {
-            "_id": "camp_pg",
-            "position_ratings": {"PG": 90, "SG": 80, "SF": 70, "PF": 60, "C": 50},
-            "attributes": {
-                "anchor_CH": 85,
-                "CH": 85,
-                "anchor_PS": 50, "PS": 50,
-                "anchor_BH": 50, "BH": 50,
-                "anchor_IQ": 50, "IQ": 50,
-            },
-        }
-        baselines = {
-            "camp_pg": {
-                "PS": 50,
-                "BH": 50,
-                "IQ": 50,
-                "CH": 85,
-            }
-        }
-        with patch.object(random, "randint", return_value=4) as fake_randint:
-            _apply_training_camp_bonus([player], baselines)
-
-        self.assertEqual(player["attributes"]["anchor_PS"], 54)
-        self.assertEqual(player["attributes"]["anchor_BH"], 54)
-        self.assertEqual(player["attributes"]["anchor_IQ"], 54)
-        self.assertEqual(fake_randint.call_count, 3)
-        for call in fake_randint.call_args_list:
-            self.assertEqual(call.args, (4, 10))
-
-    def test_training_camp_bonus_sf_uses_ag_plus_two_random_attrs(self):
-        player = {
-            "_id": "camp_sf",
-            "position_ratings": {"PG": 70, "SG": 75, "SF": 90, "PF": 60, "C": 55},
-            "attributes": {
-                "anchor_CH": 65,
-                "CH": 65,
-                "anchor_AG": 40, "AG": 40,
-                "anchor_SC": 40, "SC": 40,
-                "anchor_SH": 40, "SH": 40,
-                "anchor_ID": 40, "ID": 40,
-                "anchor_OD": 40, "OD": 40,
-            },
-        }
-        baselines = {
-            "camp_sf": {
-                "AG": 40,
-                "SC": 40,
-                "ID": 40,
-                "CH": 65,
-            }
-        }
-        with patch.object(random, "sample", return_value=["SC", "ID"]), patch.object(random, "randint", return_value=3) as fake_randint:
-            _apply_training_camp_bonus([player], baselines)
-
-        self.assertEqual(player["attributes"]["anchor_AG"], 43)
-        self.assertEqual(player["attributes"]["anchor_SC"], 43)
-        self.assertEqual(player["attributes"]["anchor_ID"], 43)
-        self.assertEqual(player["attributes"]["anchor_SH"], 40)
-        self.assertEqual(player["attributes"]["anchor_OD"], 40)
-        self.assertEqual(fake_randint.call_count, 3)
-        for call in fake_randint.call_args_list:
-            self.assertEqual(call.args, (3, 8))
+    # Training-camp CH/year growth bonuses were deleted in pass 2 step 2 — the
+    # offseason development event (finish_season → develop_one_offseason) owns that
+    # growth now, so camp no longer applies it. The rollover-level behavior is
+    # covered by tests/test_growth_wiring.py.
 
     def test_eog_totals_source_prefers_team_totals_over_box_score(self):
         team_totals_obj = {
