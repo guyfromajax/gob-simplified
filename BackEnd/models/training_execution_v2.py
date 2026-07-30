@@ -405,15 +405,25 @@ def _scale_install_training_effectiveness_points(
 # in a live 26-week season, not offline — this is the directional reduction; the
 # net-share balance against per-point gains is a live-tuning follow-up.
 # Scales weekly positive training gains so a full season nets ~FLAT in aggregate
-# RT (design §7.2, Option 3): career growth is owned by the offseason event, so
-# in-season no longer carries magnitude — it moves attributes within the season
-# (Training Report still shows movement) and feeds the coaching-quality score,
-# but nets ~zero so nothing is clawed back at rollover and it cannot leak career
-# RT past the ladder. Fitted against the default full-allocation policy in
-# scripts/mc_growth_fit.py. The base gain table is large (a trained attr gained
-# +2-5/week) because the old system leaned on a heavy decay treadmill to wash it
-# out; decay is now light, so the gains shrink to match instead.
-IN_SEASON_GAIN_SCALE = 0.26
+# RT (design §7.2, Option 3): career growth is owned by the offseason event; the
+# offseason target is ABSOLUTE (jh_anchor × ladder × f), so in-season gains only
+# help REACH it — they must not OUTRUN it, or a well-coached player strands himself
+# above the ladder mid-season and the offseason event has no budget left (claw-back
+# hitting exactly the users who coached best). This scale is fitted so a full season
+# of REFERENCE / normal coaching (positional-focus, development allocation) lands at
+# ~+4-5 RT/season — well inside the coaching-f band headroom (~+12 at Average) and
+# below even the smallest per-rung ladder increment (~+6), so the offseason always
+# has room to top up to target and the ladder holds. (Measured 2026-07-30 on the
+# regenerated pool: scale 0.18 → reference +4.76 RT/season.) NOTE: the net is
+# ALLOCATION-DEPENDENT, not universally flat — thin/random CPU allocation nets
+# NEGATIVE (~-10 RT/season here), restored by the absolute-target offseason event;
+# pillar 3 must move CPU auto-train onto the reference so CPU lands ~+4 too (see the
+# CPU-must-train-the-reference hard requirement by reference_allocation).
+# §7.2's visibility claim is about ATTRIBUTES, not RT: even at reference (RT ~flat
+# net of the ladder), per-attribute movement is visible (~0.5/week |Δ|) because the
+# allocation reallocates toward the high-weight core attrs (RT is their weighted
+# mean, so reallocation moves the player page while barely moving RT).
+IN_SEASON_GAIN_SCALE = 0.18
 
 PRE_TRAINING_DECAY_BY_YEAR = {
     "freshman": (-2, 0),
