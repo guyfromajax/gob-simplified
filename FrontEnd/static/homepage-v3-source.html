@@ -639,6 +639,7 @@
       background: var(--bg); border-top: 1px solid var(--border);
       padding: 18px 48px; display: flex; align-items: center; justify-content: space-between;
     }
+    .site-footer-links { display: flex; flex-wrap: wrap; gap: 12px 24px; }
     .site-footer a { font-size: 13px; color: var(--w45); transition: color 0.2s; }
     .site-footer a:hover { color: var(--orange); }
     .site-footer-copy { font-size: 12px; color: rgba(255,255,255,0.20); }
@@ -646,33 +647,6 @@
     /* ══════════════════════════════════ SCROLL ANIMATIONS ══════════════════════════════════ */
     .anim { opacity: 0; transform: translateY(22px); transition: opacity 0.65s ease, transform 0.65s ease; }
     .anim.in { opacity: 1; transform: none; }
-
-    /* ══════════════════════════════════ TWEAKS PANEL ══════════════════════════════════ */
-    .tweaks-panel {
-      display: none; position: fixed; bottom: 24px; right: 24px; z-index: 999;
-      background: rgba(13,13,26,0.97); border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 14px; padding: 20px; width: 248px;
-      box-shadow: 0 20px 48px rgba(0,0,0,0.6);
-    }
-    .tweaks-panel.open { display: block; }
-    .tweaks-title {
-      font-family: var(--bebas); font-size: 13px; letter-spacing: 0.12em; color: var(--w);
-      margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;
-    }
-    .tweaks-close { background: none; border: none; color: var(--w45); cursor: pointer; font-size: 16px; padding: 2px 4px; }
-    .tweaks-close:hover { color: var(--w); }
-    .tweak-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
-    .tweak-label { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--w45); }
-    .tweak-options { display: flex; gap: 6px; }
-    .tweak-btn {
-      flex: 1; padding: 6px 8px; font-size: 12px; font-weight: 600;
-      background: rgba(255,255,255,0.05); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--w70); cursor: pointer;
-      transition: background 0.15s, border-color 0.15s, color 0.15s; text-align: center;
-    }
-    .tweak-btn.active, .tweak-btn:hover {
-      background: rgba(52,236,39,0.10); border-color: rgba(52,236,39,0.35); color: var(--green);
-    }
 
     /* ══════════════════════════════════ RESPONSIVE ══════════════════════════════════ */
     @media (max-width: 1024px) {
@@ -961,93 +935,15 @@
 
   <!-- SITE FOOTER -->
   <footer class="site-footer">
-    <a href="/faqs.html">FAQs</a>
+    <div class="site-footer-links">
+      <a href="/faqs.html">FAQs</a>
+      <a href="/privacy">Privacy Policy</a>
+      <a href="/terms">Terms of Service</a>
+    </div>
     <span class="site-footer-copy">© Geeked-Out Basketball</span>
   </footer>
 
-  <!-- TWEAKS PANEL -->
-  <div class="tweaks-panel" id="tweaks-panel">
-    <div class="tweaks-title">
-      Tweaks
-      <button class="tweaks-close" id="tweaks-close">✕</button>
-    </div>
-    <div class="tweak-row">
-      <span class="tweak-label">Hero Overlay</span>
-      <div class="tweak-options">
-        <button class="tweak-btn active" data-tweak="heroOverlay" data-val="cinematic">Cinematic</button>
-        <button class="tweak-btn" data-tweak="heroOverlay" data-val="light">Light</button>
-        <button class="tweak-btn" data-tweak="heroOverlay" data-val="heavy">Heavy</button>
-      </div>
-    </div>
-    <div class="tweak-row">
-      <span class="tweak-label">Stats Strip</span>
-      <div class="tweak-options">
-        <button class="tweak-btn" data-tweak="statsStrip" data-val="show">Show</button>
-        <button class="tweak-btn active" data-tweak="statsStrip" data-val="hide">Hide</button>
-      </div>
-    </div>
-    <div class="tweak-row">
-      <span class="tweak-label">Footer CTA</span>
-      <div class="tweak-options">
-        <button class="tweak-btn" data-tweak="footerCta" data-val="show">Show</button>
-        <button class="tweak-btn active" data-tweak="footerCta" data-val="hide">Hide</button>
-      </div>
-    </div>
-  </div>
-
   <script>
-    const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
-      "heroOverlay": "cinematic",
-      "statsStrip": "hide",
-      "footerCta": "hide"
-    }/*EDITMODE-END*/;
-
-    let tweaks = { ...TWEAK_DEFAULTS };
-
-    const overlays = {
-      cinematic: `radial-gradient(ellipse 52% 56% at 50% 52%, rgba(8,8,15,0.82) 0%, rgba(8,8,15,0.55) 45%, rgba(8,8,15,0.0) 78%), linear-gradient(to bottom, rgba(8,8,15,0.45) 0%, rgba(8,8,15,0.30) 30%, rgba(8,8,15,0.45) 62%, rgba(8,8,15,0.97) 100%)`,
-      light:     `radial-gradient(ellipse 52% 56% at 50% 52%, rgba(8,8,15,0.65) 0%, rgba(8,8,15,0.40) 45%, rgba(8,8,15,0.0) 78%), linear-gradient(to bottom, rgba(8,8,15,0.30) 0%, rgba(8,8,15,0.18) 30%, rgba(8,8,15,0.30) 62%, rgba(8,8,15,0.90) 100%)`,
-      heavy:     `radial-gradient(ellipse 52% 56% at 50% 52%, rgba(8,8,15,0.92) 0%, rgba(8,8,15,0.70) 45%, rgba(8,8,15,0.0) 78%), linear-gradient(to bottom, rgba(8,8,15,0.60) 0%, rgba(8,8,15,0.45) 30%, rgba(8,8,15,0.60) 62%, rgba(8,8,15,0.98) 100%)`
-    };
-
-    function applyTweaks() {
-      document.querySelector('.hero-overlay').style.background = overlays[tweaks.heroOverlay];
-      document.getElementById('stats-strip').style.display = tweaks.statsStrip === 'show' ? '' : 'none';
-      document.getElementById('footer-cta').style.display = tweaks.footerCta === 'show' ? '' : 'none';
-
-      document.querySelectorAll('[data-tweak="statsStrip"]').forEach(b => {
-        b.classList.toggle('active', b.dataset.val === tweaks.statsStrip);
-      });
-      document.querySelectorAll('[data-tweak="footerCta"]').forEach(b => {
-        b.classList.toggle('active', b.dataset.val === tweaks.footerCta);
-      });
-      document.querySelectorAll('[data-tweak="heroOverlay"]').forEach(b => {
-        b.classList.toggle('active', b.dataset.val === tweaks.heroOverlay);
-      });
-    }
-
-    window.addEventListener('message', e => {
-      if (e.data?.type === '__activate_edit_mode') document.getElementById('tweaks-panel').classList.add('open');
-      if (e.data?.type === '__deactivate_edit_mode') document.getElementById('tweaks-panel').classList.remove('open');
-    });
-    window.parent.postMessage({ type: '__edit_mode_available' }, '*');
-
-    document.getElementById('tweaks-close').addEventListener('click', () => {
-      document.getElementById('tweaks-panel').classList.remove('open');
-      window.parent.postMessage({ type: '__edit_mode_dismissed' }, '*');
-    });
-
-    document.querySelectorAll('[data-tweak]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const key = btn.dataset.tweak, val = btn.dataset.val;
-        tweaks[key] = val;
-        applyTweaks();
-        window.parent.postMessage({ type: '__edit_mode_set_keys', edits: { [key]: val } }, '*');
-      });
-    });
-
-    applyTweaks();
-
     /* RTGP interactive caption */
     (function initGpCaption() {
       const GP_FEATURES = {

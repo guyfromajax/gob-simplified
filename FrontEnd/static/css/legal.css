@@ -1,0 +1,127 @@
+:root {
+  --legal-bg: #090a12;
+  --legal-panel: #11131f;
+  --legal-text: rgba(255, 255, 255, 0.82);
+  --legal-muted: rgba(255, 255, 255, 0.58);
+  --legal-border: rgba(255, 255, 255, 0.11);
+  --legal-orange: #ff7a00;
+}
+
+body.legal-page {
+  min-height: 100vh;
+  margin: 0;
+  background: var(--legal-bg);
+  color: var(--legal-text);
+  font-family: "Inter", sans-serif;
+}
+
+.legal-shell {
+  width: min(100% - 40px, 880px);
+  margin: 0 auto;
+  padding: 52px 0 72px;
+}
+
+.legal-back-link {
+  display: inline-block;
+  margin-bottom: 24px;
+  color: var(--legal-orange);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.legal-back-link:hover {
+  text-decoration: underline;
+}
+
+.legal-document {
+  padding: clamp(28px, 5vw, 56px);
+  border: 1px solid var(--legal-border);
+  border-radius: 16px;
+  background: var(--legal-panel);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+.legal-document h1,
+.legal-document h2 {
+  margin: 0;
+  color: #fff;
+  font-family: "Bebas Neue", sans-serif;
+  font-weight: 400;
+  letter-spacing: 0.025em;
+}
+
+.legal-document h1 {
+  font-size: clamp(42px, 7vw, 64px);
+  line-height: 0.98;
+}
+
+.legal-document h2 {
+  margin-top: 38px;
+  font-size: clamp(27px, 4vw, 34px);
+  line-height: 1.1;
+}
+
+.legal-document p,
+.legal-document li {
+  font-size: 16px;
+  line-height: 1.75;
+}
+
+.legal-document p {
+  margin: 18px 0 0;
+}
+
+.legal-document ul {
+  margin: 14px 0 0;
+  padding-left: 24px;
+}
+
+.legal-document li + li {
+  margin-top: 8px;
+}
+
+.legal-document strong {
+  color: #fff;
+  font-weight: 700;
+}
+
+.legal-document a {
+  color: var(--legal-orange);
+  overflow-wrap: anywhere;
+}
+
+.legal-document hr {
+  margin: 34px 0 0;
+  border: 0;
+  border-top: 1px solid var(--legal-border);
+}
+
+.legal-meta {
+  color: var(--legal-muted);
+}
+
+.legal-page .site-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 22px;
+}
+
+@media (max-width: 600px) {
+  .legal-shell {
+    width: min(100% - 24px, 880px);
+    padding: 28px 0 48px;
+  }
+
+  .legal-document {
+    padding: 26px 20px 32px;
+    border-radius: 12px;
+  }
+
+  .legal-document p,
+  .legal-document li {
+    font-size: 15px;
+    line-height: 1.68;
+  }
+}

@@ -380,6 +380,18 @@ try:
             if path.startswith("/static/") or path.startswith("/api/") or path.startswith("/health"):
                 return await call_next(request)
 
+            static_page_aliases = {
+                "/privacy": "/privacy.html",
+                "/terms": "/terms.html",
+            }
+            aliased_path = static_page_aliases.get(path)
+            if aliased_path:
+                query = request.url.query
+                target = f"/static{aliased_path}"
+                if query:
+                    target = f"{target}?{query}"
+                return RedirectResponse(url=target, status_code=307)
+
             static_dirs = (
                 "/js/",
                 "/images/",

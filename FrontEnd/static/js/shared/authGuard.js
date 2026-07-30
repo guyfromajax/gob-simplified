@@ -59,7 +59,11 @@
     "/reset-password.html",
     "/reset-password",
     "/faqs.html",
-    "/faqs"
+    "/faqs",
+    "/privacy.html",
+    "/privacy",
+    "/terms.html",
+    "/terms"
   ];
 
   var path = window.location.pathname;
