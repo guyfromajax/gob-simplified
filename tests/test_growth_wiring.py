@@ -102,39 +102,43 @@ def test_weekly_decay_reduced():
         assert hi <= 0, year
 
 
-def _norm(d):
-    tot = sum(d.values()) or 1.0
-    return {a: v / tot for a, v in d.items()}
+def _ranked(pos):
+    w = dev.POSITION_WEIGHTS[pos]
+    return sorted((a for a in w if w[a] > 0), key=lambda a: -w[a])
 
 
-def test_reference_allocation_scores_one_and_band_bounds():
-    """The frozen mediocre reference (top-3 weighted focus = what CPU trains) scores
-    exactly 1.0 → f 1.0 at every position, so a reference-coached player lands on
-    the validated ladder. Under the saturating-coverage metric all-in / off-position
-    fall to the floor, and broader on-position coverage earns real upside."""
+def test_reference_scores_one_and_points_band_bounds():
+    """Points-based saturating-coverage metric. The frozen mediocre reference (~what
+    CPU trains) scores exactly 1.0 → f 1.0 at every position, so a reference-coached
+    player lands on the validated ladder. Focus and broad coverage beat it; all-in,
+    off-position, and uniform-across-all-12 fall below; headroom is equal across
+    positions. Allocations are POINTS/week (0-5 per attribute), not shares."""
+    smax, budget = dev.COACHING_SLIDER_MAX, dev.COACHING_STANDARD_BUDGET
     for pos in ("PG", "SG", "SF", "PF", "C"):
-        q = dev.season_coaching_quality(dev.reference_allocation(pos), pos)
-        assert abs(q - 1.0) < 1e-9, pos
-        assert dev.coaching_f(q) == 1.0, pos
-    # all-in on the top attribute wastes its cap overflow and covers nothing else →
-    # clearly below the reference, clamped to the floor. The exploit is dead.
-    for pos in ("PG", "SG", "SF", "PF", "C"):
-        top = max(dev.POSITION_WEIGHTS[pos], key=dev.POSITION_WEIGHTS[pos].get)
-        assert dev.season_coaching_quality({top: 1.0}, pos) < 1.0
-        assert dev.coaching_f(dev.season_coaching_quality({top: 1.0}, pos)) == dev.COACHING_F_MIN
-    # off-position (all points on zero-weight attributes) scores 0 → f floor.
-    off = {a: 1.0 for a in ("EM",)}  # not in any weight vector
+        assert abs(dev.season_coaching_quality(dev.reference_allocation(pos), pos) - 1.0) < 1e-9, pos
+        assert dev.coaching_f(1.0) == 1.0, pos
+        r = _ranked(pos)
+        # all-in: the single top attribute maxed, nothing else → below reference, floor.
+        allin = dev.season_coaching_quality({r[0]: smax}, pos)
+        assert allin < 1.0, pos
+        assert dev.coaching_f(allin) == dev.COACHING_F_MIN, pos
+        # focus is VIABLE now (not floored): 3 relevant attrs maxed + baseline → above 1.0.
+        focus3 = {a: (smax if a in r[:3] else 1.0) for a in r}
+        assert dev.season_coaching_quality(focus3, pos) > 1.0, pos
+        # a 2-point smaller budget saturates fewer attributes → strictly lower quality
+        # (the customization tax prices itself; no special-casing).
+        ref = dev.reference_allocation(pos)
+        cut = dict(ref); cut[r[-1]] = max(0.0, cut[r[-1]] - 2.0)
+        assert dev.season_coaching_quality(cut, pos) < 1.0, pos
+    # off-position (points only on zero-weight attributes) → 0 coverage → floor.
+    off = {a: dev.COACHING_SLIDER_MAX for a in ("EM",)}  # not in any weight vector
     assert dev.coaching_f(dev.season_coaching_quality(off, "SG")) == dev.COACHING_F_MIN
-    # PLATEAU / upside: covering the top four attributes evenly beats the reference
-    # at every position (broad on-position coverage is the reward), and SF — the
-    # flattest weight vector, which had zero headroom under the old metric — clears
-    # its reference with margin.
+    # HEADROOM EQUALIZED: the budget optimum reaches ~the band max at every position,
+    # so coaching matters equally at SF (flattest) and SG (most concentrated).
     for pos in ("PG", "SG", "SF", "PF", "C"):
-        ranked = sorted(dev.POSITION_WEIGHTS[pos], key=dev.POSITION_WEIGHTS[pos].get, reverse=True)
-        spread4 = _norm({a: 1.0 for a in ranked[:4]})
-        assert dev.season_coaching_quality(spread4, pos) > 1.0, pos
-    sf_prop = _norm(dict(dev.POSITION_WEIGHTS["SF"]))
-    assert dev.season_coaching_quality(sf_prop, "SF") > 1.10
+        r = _ranked(pos)
+        opt = {a: smax for a in r[:4]} | {a: 1.0 for a in r[4:]}
+        assert dev.coaching_f(dev.season_coaching_quality(opt, pos)) >= 1.15, pos
 
 
 def test_season_allocation_scored_against_training_position():

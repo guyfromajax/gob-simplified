@@ -14751,7 +14751,7 @@ def _build_offseason_report_line(new_doc: dict, prev_doc: dict, dev_result: dict
 
 def _coaching_accumulator_for_player(player_id: str) -> Optional[Dict[str, float]]:
     """Read the just-finished season's per-player training accumulator (attr →
-    fraction of points trained), the QUALITY-half input to develop_rollover.
+    points/week, 0-5 per the drill sliders), the QUALITY-half input to develop_rollover.
 
     SEAM (pillar 3): the in-season capture that populates this is wired with the
     CPU archetype-training rework. Until then this returns None for every player,
@@ -14883,7 +14883,7 @@ def finish_season(req: FinishSeasonRequest):
             # his new year's rung, then recompute ratings (incl. after HT growth).
             # Lazy-backfills + persists a missing profile once (existing saves).
             # season_allocation is the season's per-player training accumulator
-            # (attr → fraction); coaching quality is scored against training_position.
+            # (attr → points/week); coaching quality is scored against training_position.
             # None → f 1.0 (frozen reference). CPU teams record no allocation until
             # the archetype-training rework (pillar 3), so the league holds exactly
             # at pass-1; the exact-diff baseline is CPU-only and stays byte-identical.

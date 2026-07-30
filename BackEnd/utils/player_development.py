@@ -146,67 +146,91 @@ WT_LBS_PER_ST = (0, 1)
 # ladder, so the league stays where pass 1 put it and the user's edge comes from
 # OUT-coaching the reference (which structurally caps user-vs-CPU divergence).
 #
-# REFERENCE ALLOCATION — a CALIBRATION ANCHOR, do not change casually. It is
-# defined explicitly (NOT "whatever auto-train does", which will fragment when the
-# CPU-archetype rework lands): the reference is "train each attribute in proportion
-# to the development-position's weight vector." A season allocation is scored by
-# how its emphasis aligns with that vector, normalised so the reference == 1.0 for
-# every position. Concentrating on high-weight attributes scores >1.0; spraying
-# points on off-position attributes scores <1.0. Changing this anchor re-scales
-# every player's development, so it is frozen.
+# SATURATING-COVERAGE metric, in POINTS (§9.1). An allocation is per-attribute
+# TRAINING POINTS PER WEEK (0-5 per the drill sliders), NOT a share of the budget.
+# Each attribute contributes  w_a × min(points_a / COACHING_SATURATION_CAP, 1) —
+# it stops benefiting past the cap. Because the cap is high in points, saturation
+# is EXPENSIVE: spreading a fixed budget thin fails to saturate anything, while
+# concentrating points saturates the important attributes. So both FOCUS (spike a
+# few attributes) and BROAD coverage are valid, priced against a fixed budget:
+#   - fewer total points  → fewer attributes saturated → lower quality. This is why
+#     a 2-point customization tax prices itself with no special-casing.
+#   - all-in one attribute → covers nothing else → floor.
+#   - spraying across all 12 (incl. off-position) → the on-position attributes are
+#     starved → below reference.
+# Coverage is normalised affinely PER POSITION (reference → 1.0, the budget optimum
+# → 1.0 + COACHING_HEADROOM), so coaching matters equally at every position rather
+# than 2× at SF vs SG.
+#
+# REFERENCE — a CALIBRATION ANCHOR, do not change casually. A deliberately MEDIOCRE
+# baseline in points: the position's top-COACHING_REFERENCE_BREADTH attributes at
+# COACHING_REFERENCE_PRIMARY_PTS/week, every other on-position attribute at
+# COACHING_REFERENCE_BASELINE_PTS (token maintenance), off-position at 0 — a coach
+# who nudges the primaries and neglects the rest. It scores exactly 1.0 by
+# construction; both focused and broad coaching beat it. It is ~what CPU trains, so
+# CPU lands on the ladder (f = 1.0); pillar 3 keeps CPU aligned to this constant.
+# Changing it (or the cap/budget) re-scales every player's development.
 COACHING_F_MIN = 0.85
 COACHING_F_MAX = 1.20
-# Maps quality onto the band. sens=1.0 makes f == clamp(quality) — the band edges
-# COACHING_F_MIN/MAX are the real controllers: the reference (q 1.0) → f 1.0, a
-# competent broad on-position allocation (q ≳ 1.20) → f 1.20, and a genuinely bad
-# one (all-in / off-position, q ≲ 0.55) → f 0.85. See the named-strategy table.
+# sens=1.0 → f == clamp(quality); the band edges are the real controllers.
 COACHING_F_SENSITIVITY = 1.00
-# SATURATING-COVERAGE quality metric (not a power law). Each attribute contributes
-#   w_a × min(alloc_a / COACHING_SATURATION_CAP, 1)
-# so points past the cap on any one attribute are wasted. This makes COVERAGE of a
-# position's important attributes the goal, with a broad PLATEAU of good
-# allocations rather than a single sharp peak: strategic depth lives in the
-# distribution half of the accumulator (which has no optimum — a shooter and a
-# lockdown wing are both valid), so quality is deliberately forgiving and only
-# punishes neglect (narrowness wastes the cap overflow and leaves attributes
-# uncovered) and nonsense (off-position points contribute nothing). The flat cap
-# gives high-weight attributes a steeper marginal, so they are covered first.
-COACHING_SATURATION_CAP = 0.16
-# The frozen calibration-anchor reference: a deliberately MEDIOCRE coach who trains
-# the position's top-N attributes in weight proportion and neglects the tail. It
-# scores 1.0 by construction; broader on-position coverage beats it, all-in /
-# narrow focus falls below it. This is ~what CPU trains, so CPU lands on the ladder
-# (f = 1.0); pillar 3 keeps CPU's baseline aligned to this constant.
-COACHING_REFERENCE_BREADTH = 3
+COACHING_SATURATION_CAP = 4.0        # points/week past which an attribute stops benefiting
+COACHING_SLIDER_MAX = 5.0            # UI cap on a single attribute's weekly points
+COACHING_STANDARD_BUDGET = 24.0      # representative weekly growth-point budget (sets the optimum)
+COACHING_HEADROOM = 0.25             # quality the budget optimum reaches above reference; >F_MAX-1
+                                     # on purpose, so the best few strategies PLATEAU at f 1.20
+COACHING_REFERENCE_BREADTH = 3       # reference trains this many primaries
+COACHING_REFERENCE_PRIMARY_PTS = 3.0
+COACHING_REFERENCE_BASELINE_PTS = 1.0
+
+
+def _positive_attrs_desc(position: str):
+    w = POSITION_WEIGHTS[position]
+    return sorted((a for a in w if w[a] > 0), key=lambda a: -w[a])
 
 
 def reference_allocation(position: str) -> Dict[str, float]:
-    """The frozen mediocre baseline: weight-proportional over the position's top
-    ``COACHING_REFERENCE_BREADTH`` attributes, zero on the rest. Scores exactly 1.0
-    by construction (it is the normalisation denominator)."""
-    w = POSITION_WEIGHTS[position]
-    top = sorted((a for a in w if w[a] > 0), key=lambda a: -w[a])[:COACHING_REFERENCE_BREADTH]
-    tot = sum(w[a] for a in top) or 1.0
-    return {a: w[a] / tot for a in top}
+    """The frozen mediocre baseline in POINTS/week: top-``COACHING_REFERENCE_BREADTH``
+    attributes at the primary level, other on-position attributes at the baseline
+    level, off-position 0. Scores exactly 1.0 by construction."""
+    ranked = _positive_attrs_desc(position)
+    top = set(ranked[:COACHING_REFERENCE_BREADTH])
+    return {a: (COACHING_REFERENCE_PRIMARY_PTS if a in top else COACHING_REFERENCE_BASELINE_PTS)
+            for a in ranked}
 
 
-def _coverage_numerator(allocation: Dict[str, float], position: str) -> float:
+def _coverage(allocation: Dict[str, float], position: str) -> float:
+    """Saturating weighted coverage of a points allocation (Σ w_a·min(pts_a/cap,1))."""
     w = POSITION_WEIGHTS[position]
     return sum(wt * min(allocation.get(a, 0.0) / COACHING_SATURATION_CAP, 1.0)
                for a, wt in w.items() if wt > 0)
 
 
+def _optimum_coverage(position: str) -> float:
+    """Best coverage a standard budget can buy: saturate top-weight attributes to
+    the cap first (each attribute capped at the slider max)."""
+    w = POSITION_WEIGHTS[position]
+    rem, cov = COACHING_STANDARD_BUDGET, 0.0
+    for a in _positive_attrs_desc(position):
+        if rem <= 0:
+            break
+        spend = min(COACHING_SATURATION_CAP, COACHING_SLIDER_MAX, rem)
+        cov += w[a] * min(spend / COACHING_SATURATION_CAP, 1.0)
+        rem -= spend
+    return cov
+
+
 def season_coaching_quality(allocation: Dict[str, float], position: str) -> float:
-    """Score a season's training allocation (attr→fraction) for a player developed
-    at ``position``, as saturating coverage of the position's weighted attributes
-    normalised to the reference. Reference → 1.0; all-in on one attribute wastes
-    its cap overflow and covers nothing else → below 1.0; broad adequate coverage
-    of the top attributes → above 1.0 (near the band max); off-position points
-    contribute 0."""
-    den = _coverage_numerator(reference_allocation(position), position)
-    if den <= 0:
+    """Score a season's training allocation (attr → POINTS/week) at ``position``,
+    as saturating coverage normalised affinely so the reference → 1.0 and the budget
+    optimum → 1.0 + COACHING_HEADROOM (equal headroom at every position). Focused
+    and broad on-position coverage beat the reference; all-in and off-position fall
+    toward the floor; a smaller total budget saturates fewer attributes → lower."""
+    cov_ref = _coverage(reference_allocation(position), position)
+    cov_opt = _optimum_coverage(position)
+    if cov_opt <= cov_ref:
         return 1.0
-    return _coverage_numerator(allocation, position) / den
+    return 1.0 + (_coverage(allocation, position) - cov_ref) * (COACHING_HEADROOM / (cov_opt - cov_ref))
 
 
 def coaching_f(cumulative_quality: float) -> float:
@@ -470,10 +494,10 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
     handling the FPD document shape and lazy-backfilling a missing profile.
 
     ``season_allocation`` is the just-finished season's per-attribute training
-    accumulator (attr → fraction of points trained). None means "no recorded
-    season" (CPU teams until pillar 3, or a player with no season) → the frozen
-    reference → f 1.0 → lands on the validated ladder. It drives BOTH accumulator
-    jobs, kept separate in code:
+    accumulator (attr → points/week, 0-5 per the drill sliders). None means "no
+    recorded season" (CPU teams until pillar 3, or a player with no season) → the
+    frozen reference → f 1.0 → lands on the validated ladder. It drives BOTH
+    accumulator jobs, kept separate in code:
 
       • QUALITY: scored against ``training_position`` (§9.2 — a designed conversion
         is priced by the weight tables, so a natural SF trained toward PG must not
@@ -557,7 +581,9 @@ __all__ = [
     "FAMILY_CURVES", "OFFSEASON_DISTRIBUTION_BLEND", "NON_CORE_GROWTH_MULTIPLIER",
     "HT_CURVE_BY_TIMING", "HT_TOTAL_MEAN", "HT_TOTAL_SD", "HT_PER_RUNG_CAP",
     "COACHING_F_MIN", "COACHING_F_MAX", "COACHING_F_SENSITIVITY",
-    "COACHING_SATURATION_CAP", "COACHING_REFERENCE_BREADTH",
+    "COACHING_SATURATION_CAP", "COACHING_SLIDER_MAX", "COACHING_STANDARD_BUDGET",
+    "COACHING_HEADROOM", "COACHING_REFERENCE_BREADTH",
+    "COACHING_REFERENCE_PRIMARY_PTS", "COACHING_REFERENCE_BASELINE_PTS",
     "reference_allocation", "season_coaching_quality", "coaching_f",
     "roll_growth_profile", "develop_one_offseason", "develop_rollover",
     "init_career", "simulate_career",
