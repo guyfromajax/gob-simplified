@@ -1,9 +1,9 @@
 # Player Attribute Recalibration — Design
 
-**Status:** Approved, 2026-07-29
+**Status:** Approved — pass 1 implemented and migrated to `gob-staging`, 2026-07-29
 **Scope:** New franchises only. In-flight alpha saves are not migrated.
 **Repo path:** `_documentation_master/projects/Player_Attribute_Recalibration_Design.md`
-**Companion to:** the project brief at `_documentation_master/projects/Player_Attribute_Recalibration.md` and the audit at `_documentation_master/projects/rt_sanity_audit/`
+**Companion to:** the project brief at `_documentation_master/projects/Player_Attribute_Recalibration_Brief.md` and the audit at `_documentation_master/projects/rt_sanity_audit/`
 
 ---
 
@@ -17,7 +17,7 @@ What exists today is three forces fighting with no designed outcome —
 - a concentrated weekly training spend (24 points, with untrained attributes taking a further `(-2,-1)`),
 - a Week 1 Training Camp bonus (30 points, CH-tiered bonus, year-bonus roll, HT/WT growth for FR/SO only),
 
-and **no offseason step at all** — `complete_season_transition` copies `attributes` and `position_ratings` forward verbatim and bumps `meta.year`.
+and **no offseason step at all** — `finish_season` (`franchise_routes.py:14713`) copies `attributes` and `position_ratings` forward verbatim and bumps `meta.year`. Note the function is `finish_season`, not `complete_season_transition`; earlier drafts of this document used the wrong name.
 
 Career growth is an emergent side effect of that collision. This document specifies a growth model to replace it.
 
@@ -140,7 +140,7 @@ Fitted jointly with the §11.2 generator against a synthesized 1,920-player popu
 
 #### 3.6.2 Height fitness
 
-Multiplicative, piecewise-linear, floor 0.50, cap 1.15. Penalty per inch away from ideal, asymmetric:
+Multiplicative, piecewise-linear, floor 0.50, cap 1.15. Penalty per inch away from ideal, asymmetric. **The apex is 1.0, not 1.15** — fitness is `1.0 − penalty`, so the cap never binds and exists only as a guard; a 1.15 apex does not reproduce §3.6.4:
 
 | | ideal | short penalty /in | tall penalty /in |
 |---|---|---|---|
@@ -185,7 +185,65 @@ Senior RT by tier — fitted vs designed: Poor 39/40, Below Average 49/50, Avera
 
 **Above-100 rate accepted at 5.5%.** Players with any attribute ≥ 100 come out at 5.5% rather than the original 3% target. Accepted as-is — no recalibration of the spike constants required. The 3% figure in §12 is superseded by this measurement.
 
+#### 3.6.5 As-landed values (implementation pass 1)
+
+Implemented on branch `player-attr-recalibration-pass1`. Final tuned constants: `ATTR_NOISE_SD = 0.13`, `IDENTITY_STRENGTH = 0.15`, `PROFILE_FILLER = 0.45` (unchanged).
+
+| Metric | Fresh generator | Pool remap (as migrated) | Walk-ons |
+|---|---|---|---|
+| argmax PG/SG/SF/PF/C | 19.7 / 22.8 / 18.1 / 20.6 / 18.8 | 22.0 / 22.8 / 16.1 / 17.9 / 21.2 | 18.5 / 24.2 / 16.4 / 21.5 / 19.4 |
+| median height by argmax | 73 / 76 / 79 / 80 / 83 | 74 / 76 / 79 / 80 / 83 | — |
+| margin < 3 | 8.0% | 5.3% | — |
+| exact ties | 1.9% | 1.4% | — |
+| argmax matches intent | 95.9% | 97.7% (high by construction) | — |
+| class p50 RT | 35 / 43 / 54 / 60 | 35 / 43 / 54 / 60 | 20 / 23 / 29 / 36 (Poor) |
+| any attribute ≥ 100 | 5.7% | 6.2% | 0.0% |
+
+The remap column reflects the final attribute-fit intent assignment of §11.3, not the earlier height-banding version.
+
+League height lands at mean 78.2, sd 3.80. Centre supply moves from 10.9% to 19.9%. Class sizes balance at 384 each.
+
+**Two deltas from §3.6.4, both deliberate.** `margin<3` lands near 8% rather than 11.2% — the 11.2% figure was a measurement from the fit, not a target, and §14's decision to sharpen position identity makes fewer tweeners the goal. Raising `PROFILE_FILLER` to recover them was explicitly rejected. And the remap's 6.4% above-100 sits 0.9pp over the accepted 5.5%, which is the price of keeping `IDENTITY_STRENGTH` at 0.15 rather than driving it to zero.
+
+**Walk-ons run through the same generator at Poor tier** with a drawn position intent, rather than the old uniform draw. They are 3 of 15 per roster — 384 players, 20% of everyone on a court — so leaving them off the ladder would have put a fifth of the league on the old scale. Their CH cap of `randint(1,90)` was removed in favour of the flat 1-100 in §8; the cap would otherwise have structurally foreclosed the high-CH walk-on who develops into a star.
+
 **Elite seniors land at p50 105 before peaks are applied.** With peak stacking to 2.6x on top, this confirms the §4.3 compression above RT 95 is required rather than optional.
+
+#### 3.6.6 Migration record
+
+Migrated to `gob-staging` on 2026-07-29 and verified by read-back. Merged to `develop` (`1eb31ddc5` … `e1ab95839`).
+
+| | |
+|---|---|
+| Universal pool | 1,536 docs remapped — `attributes`, `height`, `weight`, `year`, `position_ratings`, `entry_tier`, `position_intent` |
+| Franchise player docs | 30,718 — `position_ratings` only |
+| Franchise recruit docs | 7,900 — `position_ratings` only |
+| Pool median height | 72 → 78 |
+| Centre supply | 10.9% → 21.2% |
+| Spearman(old height, new height) | **0.9370** |
+
+**Displacement** — the honest identity metric for an attribute-derived assignment: 95.8% of pool players received their best-fit position, 3.4% their second, 0.8% their third, none worse. The assignment reached 99.8% of the unconstrained objective ceiling, so the soft capacity bands cost almost nothing.
+
+**Supply per bucket:** PG 338 (22.0%), SG 318 (20.7%), SF 276 (18.0%), PF 276 (18.0%), C 328 (21.4%). SF and PF sit exactly at the 18% floor — the in-between positions are rarely anyone's top fit, since they overlap with neighbours on both sides.
+
+**Height by assigned intent** (p10 / median / p90): PG 71/74/76, SG 73/76/79, SF 76/78/81, PF 78/80/83, C 80/82/85. Monotonic, with C's p10 above SF's median.
+
+**Rollback.** The migration is **non-idempotent** — rank-mapping an already-remapped pool produces garbage. Restore before any re-tune; never re-run against migrated data.
+
+```
+db["players_backup_prerecal_20260729"].aggregate([{"$match": {}}, {"$out": "players"}])
+```
+
+The pre-migration snapshot `players_backup_prerecal_20260729` (1,536 docs, whole-document verified, restore rehearsed into a scratch collection) is retained, as is the older `players_backup` from 2026-07-08 as a second recovery point. FPD and FRD `position_ratings` need no backup — they are derived and recomputable from attributes and height, which the migration never modifies on those documents.
+
+#### 3.6.7 Known consequences for existing saves
+
+Existing franchises are deliberately not remapped (§14). Two effects follow, both accepted:
+
+- **Distorted RT for bigs.** Old-scale rosters keep short players while gaining height-gated PF and C ratings, so their interior players' RTs collapse.
+- **Shot-blocking effectively disappears.** `height_to_block_score` returns 0 at or below the league median of 78, and an old-scale roster's p90 height *is* 78. This is a gameplay change rather than a cosmetic one, and it is written into `Tunable_Constants.md` so that a "nobody blocks shots on my save" report is not misdiagnosed as a bug.
+
+**The 2026-07-20 reference anchor is not comparable to the post-recalibration one.** Roughly eighteen sim-touching commits landed between them, several explicit shot, block and foul recalibrations, so the large aggregate deltas belong to that tuning rather than to this project. The recalibration's own sim-outcome effect is unmeasured by design and will come from pass 2's four-season validation franchise, the first one initialised off the regenerated pool. A warning to this effect is recorded in `scripts/sim_verify/README.md`.
 
 ---
 
@@ -318,7 +376,7 @@ Weekly decay shrinks substantially and per-point gains shrink to match; net stay
 
 **Because non-core attributes are not allowed to rot, specialization is expressed as rate, not direction.** Everything grows; focused attributes grow much faster. The trade-off becomes opportunity cost (gains not taken) rather than loss (ground lost). This is a deliberate departure from the team-attribute philosophy, where bleed-without-investment was the goal.
 
-**Split: 70% of total career growth from the offseason, 30% in-season.**
+**There is no magnitude split.** An earlier draft specified 70% of career growth from the offseason and 30% in-season. That is architecturally impossible against an absolute-target offseason — see §17.1 — and was replaced. In-season now nets roughly **flat** in aggregate RT (measured mean −0.28 RT/season, p10 −14 / p90 +13), while carrying two other jobs: moving attributes within the season, and feeding the coaching-quality score that modulates the offseason (§17).
 
 ### 7.3 The accumulator
 
@@ -326,10 +384,10 @@ In-season allocation *aims* the offseason budget. Attributes trained most across
 
 **This is additive on top of §7.2, not a replacement for it.** In-season training does two jobs:
 
-1. **Direct** — trained attributes rise now, at the reduced in-season rate.
-2. **Aiming** — what was trained determines where the offseason's 70% lands.
+1. **Distribution** — what was trained determines where the offseason budget lands.
+2. **Quality** — the same allocation is scored to produce the coaching multiplier of §17.
 
-A season spent hammering SH yields some SH immediately and points the large offseason bump at SH. Switching focus in week 20 does not erase the direct gains already banked; it scrambles the aim.
+These are two independent signals computed from one input, and they are kept separate in code so neither can silently stop working. A season spent hammering SH points the offseason bump at SH *and* scores as focused coaching; switching focus in week 20 scrambles the aim without erasing the attribute movement already banked.
 
 This is load-bearing — it is also the mid-season switch penalty (§9.4).
 
@@ -408,25 +466,32 @@ Optional sharpener if playtesting says it's too soft: a few weeks of reduced tra
 One nested subdocument on the player rather than scattered fields:
 
 ```
+entry_tier            // top-level, written by pass 1
+position_intent       // top-level, written by pass 1
+
 development: {
-  entry_tier,           // average | good | great | elite
-  peak_count,           // 0-3, rolled at generation
-  peak_rungs,           // e.g. ["SO_JR", "JR_SR"]
+  peak_count,         // 0-3, rolled at generation
+  peak_rungs,         // e.g. ["SO_JR", "JR_SR"]
   family_timing: {
-    physical,           // early | standard | late
+    physical,         // early | standard | late
     skill,
     mental
   },
-  ch_seed,              // frozen career CH, hidden
-  training_position,
-  focus_accumulator     // in-season aiming → offseason budget
+  ch_seed,            // frozen career CH, hidden
+  focus_accumulator   // in-season aiming → offseason budget
 }
 ```
 
-**Two implementation notes that matter more than they look:**
+`entry_tier` and `position_intent` sit **top-level, not inside the subdoc** — pass 1's migration put them there. `training_position` is deliberately absent: the growth model uses `position_intent` as its development pointer, which decouples going live from the whole focus-position system (§9).
 
-1. It must be written at **both** generation points — the universal pool and recruit generation — or half the league develops and half does not.
-2. **Season rollover copies a fixed field list forward.** If `development` is not added to that list, every profile silently vanishes at the first rollover and everyone reverts to the default curve. That failure presents as a tuning problem for weeks.
+**Four implementation notes that matter more than they look:**
+
+1. There are **four** creation points, not two: universal pool generation, FPD construction at franchise init, recruit generation, and walk-on generation. Miss any and part of the league does not develop.
+2. **`position_intent` currently dies pool→FPD.** `_build_fpd_doc` copies only `meta`, `attributes` and `position_ratings`, so franchise init drops both `entry_tier` and `position_intent`. Since `finish_season` develops FPD players, they must be carried across explicitly.
+3. **`finish_season` copies a fixed field list forward** — `franchise_id`, `player_id`, `meta`, `season`, `career`, `attributes`, `position_ratings`. If `development`, `entry_tier` and `position_intent` are not added to it, every profile silently vanishes at the first rollover and the league reverts to the default curve. That failure presents as a tuning problem for weeks. A test must survive a rollover and assert the profile is intact.
+4. `develop_one_offseason` needs a `jh_anchor`, which FPD docs do not carry. It is derived from `entry_tier` via `JH_ANCHOR_BY_TIER` — another reason `entry_tier` has to reach FPD.
+
+**Players with no profile (existing saves, never backfilled)** get one rolled on first encounter and **persisted** — a lazy backfill, not an on-the-fly roll, since re-rolling each season would give a player a different profile every year. The roll uses the normal CH-weighted peak mapping, freezes the live CH value as `ch_seed`, and assigns peaks to **remaining rungs only**, per the past-fixed/future-varies rule in §11.3. Caveat to document rather than solve: deriving `entry_tier` from a legacy player's current RT misclassifies those whose RT collapsed under height gating — a distorted big man reads as Poor and then develops on a Poor ladder, compounding the degradation §3.6.7 already accepts.
 
 ---
 
@@ -434,7 +499,7 @@ development: {
 
 These are not progression concerns, but the progression model cannot hit its targets without them.
 
-- **Balanced class sizes.** ~480 per class. Current SR 621 / SO 364 skew guarantees a talent cliff at every rollover regardless of progression tuning.
+- **Balanced class sizes.** ~480 per class. Current SR 621 / SO 364 skew guarantees a talent cliff at every rollover regardless of progression tuning. This is enforced in *pool* generation (§11.3), not recruit generation — recruits are correctly JH-dominant entrants.
 - **Unimodal freshman distribution.** The current p50 24 / p75 57 gap is two populations stapled together.
 - **Position supply.** Roughly even natural-position distribution; C is currently 10.9%, or 1.6 per roster.
 - **Regenerate the universal pool from a parameterized generator** driven by the tier table in §4.1, rather than patching it further. The pool has been hand-edited repeatedly (`decap_player_attr_hundreds_*`, `apply_tsv_attrs_*`). Regeneration is the only way it stays reproducible when tiers are re-tuned, and it removes the SH bimodality at the source instead of decapping after the fact.
@@ -450,7 +515,7 @@ Every new franchise init draws its entire 128-team league from the universal pla
 **Sequencing caveat — an interim form is needed first.** Simulate-forward depends on the offseason development event, which depends on the growth constants fitted in the Monte Carlo (§15). But the RT formula in §3.6 cannot merge without the new height distribution, which requires the generator. To break the cycle, generation splits in two:
 
 - **Interim (unblocks §3.6):** generate players *directly* at their class-year target from the §4.2 ladder, needing only the tier table and rung multipliers. This is exactly what the §3.6 fit was validated against.
-- **Final (after the Monte Carlo):** replace it with generate-as-JH-and-simulate-forward, which supersedes the interim form and adds the free model validation described below.
+- **Final (after the Monte Carlo):** ~~replace it with generate-as-JH-and-simulate-forward~~ — **CLOSED, not needed.** The interim generator already reproduces the ladder exactly (class p50 RT 35/41/54/60, senior p50 by tier 40/50/60/70/80/100), and the 10k-career Monte Carlo in §16 is a far better model check than 1,920 simulated pool careers. Simulate-forward would add coherent development *history*, which nothing reads and nothing plans to, at the cost of a full pool re-migration. Removed from the queue.
 
 **Stored `position_ratings` are recomputed in this same pass**, not as a separate migration — the 1,794 player and 163 recruit mismatches from §3.5 are corrected wherever they live, including the universal players collection, alongside the attribute and HT/WT updates. Note that recomputing fixes the symptom; if the §3.5 diagnostic shows the cause is RT being computed from fatigue-scaled attributes, the drift will recur and the cause needs fixing too.
 
@@ -517,6 +582,8 @@ Shifting the median from 72 to 78 re-sorts every system that reads height agains
 
 Under the current distribution `height_to_block_score` yields a league mean of **1.68** with **59% of players at zero**; under the proposed distribution the same function yields **5.08** with 11% at zero. Re-banding must preserve each system's intended *shape* — roughly the same league mean block score and tip-off distribution — not its literal thresholds.
 
+**Each consumer needs its own shift, not one global offset.** Block score is fed by the whole league, whose median moves 72 → 78, so it shifts +6. The opening tip is contested by centres, whose median moves 79 → 82, so it shifts +3. The feeding population determines the shift.
+
 **Missing-height fallback defaults also need attention.** Several literals sit below the new median: `shot_manager.py` (76), `player.py:62` (75), `quick_foul.py:96` (75), `team_builder_roster.py` (72). These are not bands, but a 72-76 inch default now reads as a guard. Replace all of them with a single named constant set to the new league median rather than re-scattering literals.
 
 This is the same failure pattern as the `cum_nd` 200/350 cutoffs: absolutes placed against an assumed distribution. Every one of them needs re-banding in the same pass.
@@ -529,10 +596,20 @@ Tall players should stay relatively tall on the new scale, and a player's talent
 
 The mechanism is a **rank-preserving remap** rather than a value transform:
 
-1. **Position intent** — sort the pool by height and assign intent in bands matching the target supply (tallest ~20% become centre intent, and so on), splitting the guard band by ball-handling and passing versus shooting and perimeter defence. This respects relative height while filling the centre shortage by construction.
+1. **Position intent** — a capacity-constrained assignment, not a height banding. Each player receives a fit score for all five positions, and the assignment maximises total fit subject to per-position capacity.
+
+   - **Fit** is the new weight vector for each position applied to the player's *current attributes*, with no height term. Stored `position_ratings` are deliberately **not** used: they come from the formula being replaced, so they carry the PF height saturation, the PF/C attribute overlap and the athleticism-weighted SF that this pass exists to remove. Using them would faithfully reproduce the 10.9% centre supply.
+   - **Normalised per position** before comparison — each raw fit is converted to the player's percentile among all players at that position, since different vectors load on attributes with different league means and would otherwise not be comparable.
+   - **Height modulates rather than decides**, via the same fitness curve, so an interior-skilled short player does not become a centre while height still informs the choice.
+   - **Soft capacities** of 18-22% per position rather than a hard 20%. Fresh generation still draws evenly, so the league converges to 20% as the pool turns over.
+   - Circularity is broken with two passes: fit uses height rank-mapped against the *league-wide* new distribution; once intent is assigned, step 2 rank-maps within cohort.
+
+   **The metric changes with the method.** Once intent is derived from attributes, "argmax matches intent" is high by construction and is no longer an independent check for the remap — it remains meaningful only for fresh generation, where intent is drawn before attributes exist. The honest measure here is **displacement**: what share of players receive their best-fit position.
 2. **Height** — rank-map each player within his new position cohort onto that position's target height distribution. A player at the 80th percentile of height stays at the 80th percentile.
 3. **Talent** — rank-map overall RT percentile onto the new tier bands from §4.1. Because the mapping is by rank, tier frequencies match the target **exactly**, which is what makes overabundance resolve itself automatically.
 4. **Attributes** — preserve each player's relative attribute ordering (a shooter stays a shooter) while redrawing magnitudes to hit his new tier's target RT at his class year.
+
+**Step 4 needs care.** Taken literally — scaling the old raw attribute vector to hit the target at the newly assigned position — it explodes RT for players whose old shape does not match their new position, producing above-100 attributes in over 40% of the pool. It only works as a *blend* of the intended-position profile with the player's relative ordering, implemented as `IDENTITY_STRENGTH`. Higher values preserve more shape and import more of the old artifacts; the workable knee is 0.10-0.15.
 
 **One deliberate exception.** Raw attribute *values* are not preserved, because the current pool carries known generation artifacts — the SH bimodality at 88-105 being the clearest. Preserving shape at the level of "who is a shooter" keeps player identity; preserving exact values would carry the artifacts forward. Names, portraits, heights and tiers are what a returning user would recognise; a specific SH value is not.
 
@@ -545,11 +622,11 @@ All of the following belong in `_documentation_master/11_Design_Systems/Tunable_
 | Constant | Starting value | Notes |
 |---|---|---|
 | `JH_ANCHOR_BY_TIER` | 30 / 35 / 40 / 50 | Average / Good / Great / Elite |
-| `TIER_FREQUENCY` | .62 / .25 / .115 / .015 | Sums to 1.0 |
+| `TIER_FREQUENCY` | .07 / .20 / .40 / .20 / .11 / .02 | Poor → Elite, per the six-tier table in §4.1. An earlier four-value row here was superseded |
 | `RUNG_MULTIPLIERS` | 1.00 / 1.17 / 1.43 / 1.80 / 2.00 | JH → SR, one-peak path |
 | `PEAK_COUNT_DISTRIBUTION` | .20 / .55 / .22 / .03 | 0-3 peaks, before CH weighting |
 | `PEAK_RUNG_WEIGHTS` | SO_JR > FR_SO > JR_SR > JH_FR | Where a single peak lands |
-| `PEAK_MULTIPLIER` | ~1.9x a standard rung | Tune against career-multiple targets |
+| `PEAK_BONUS` | +0.30 × JH anchor, fixed per peak | Replaces `PEAK_MULTIPLIER`. A rung *multiplier* is unimplementable: it cannot simultaneously reproduce the linear career multiples and the §4.2 one-peak path. A fixed per-peak bonus reproduces both exactly |
 | `CH_PEAK_WEIGHTING` | TBD | How ch_seed shifts peak distribution |
 | `FAMILY_TIMING_WEIGHTS` | See §5.2 | Per family, early/standard/late |
 | `FAMILY_CURVES` | See §6 | Per-family share of each rung's budget |
@@ -557,8 +634,9 @@ All of the following belong in `_documentation_master/11_Design_Systems/Tunable_
 | `RT_SOFT_CAP` | 130 | Practical ceiling |
 | `NON_CORE_GROWTH_MULTIPLIER` | Low, non-zero | Per position per attribute |
 | `WEEKLY_DECAY_BY_YEAR` | Much reduced from current | Currently FR (-5,-2) … SR (-2,0) |
-| `OFFSEASON_INSEASON_SPLIT` | ~70/30 | Share of total career growth |
-| `ACCUMULATOR_WEIGHT` | TBD | How strongly in-season aims the offseason |
+| `OFFSEASON_DISTRIBUTION_BLEND` | 0.70 | A distribution blend, **not** a magnitude split — no magnitude split exists (§7.2, §17.1) |
+| `QUALITY_CAP` | 4 points per attribute per week | Saturation point of the coaching-quality metric (§17.2) |
+| `COACHING_F_MIN` / `COACHING_F_MAX` | 0.85 / 1.20 | Bounds on the coaching multiplier (§17) |
 | `PF_HEIGHT_FITNESS` | Peak 78-81, non-monotonic | §3.3 |
 | `C_HEIGHT_FITNESS` | Monotonic to ~84 | §3.3 |
 | `SF_WEIGHTS` | ST dropped, SH/SC/ID/OD raised | §3.3 rebuild |
@@ -612,7 +690,7 @@ This is a broad sweep and every frontend surface must be audited for alignment �
 **Targets to hit in the Monte Carlo:**
 
 - Median career multiple ≈ 2.0x, with 0-peak careers near 1.7x and 3-peak near 2.6x.
-- ~3% of all players with at least one attribute ≥ 100.
+- Above-100 rate as measured and accepted, not the ~3% figure earlier drafts carried. See §16.2 — it lands at 7.5% of the pool and 19.0% of seniors, locked.
 - RT ceiling near 130; no player materially above it.
 - Class-year p50 RT tracking the §4.2 ladder within a few points.
 - Tier outcomes landing where §4.1 says they should.
@@ -620,3 +698,144 @@ This is a broad sweep and every frontend surface must be audited for alignment �
 **Then one live four-season validation run**, after the distant-sunset branch merges. Running it against a moving codebase produces a dataset that cannot be trusted.
 
 **Sequencing note:** the distant sunset and the RT formula fix are both behavior-changing. Land both, then re-cut the reference anchor once. Cutting between them wastes the run.
+
+---
+
+## 16. Pass 2 — the fitted growth model
+
+Fitted offline against 10,000 synthetic careers. Module: `BackEnd/utils/player_development.py` — `develop_one_offseason`, `roll_growth_profile`, `simulate_career` — pure and RNG-injectable, reusing `player_generation` for the JH start and `position_ratings` for RT. Driver: `scripts/mc_growth_fit.py`. Branch `attr-recalibration-pass2-growth`.
+
+### 16.1 Fitted constants
+
+| Constant | Value | Expose? |
+|---|---|---|
+| `STD_RUNG_INCREMENT` (× JH anchor) | FR .17 / SO .20 / JR .15 / SR .18 (Σ .70 → 1.7x at zero peaks) | yes |
+| `PEAK_BONUS` | +0.30 × JH anchor, fixed per peak | yes |
+| `PEAK_RUNG_WEIGHTS` | JR .42 / SO .28 / SR .20 / FR .10 | — |
+| `CH_PEAK_WEIGHTING` | linear interp, low (.38,.52,.10,0) → high (.02,.58,.34,.06) | spread only |
+| `FAMILY_CURVES` (weight multipliers per rung, phys/skill/mental) | FR 3.0/1.0/.30 · SO 2.0/1.2/.60 · JR .60/1.3/2.2 · SR .35/1.2/3.2 | yes |
+| `HT_CURVE_BY_TIMING` (share of career HT gain) | early 55/30/12/3 · standard 40/30/20/10 · late 15/25/35/25 | yes |
+| `HT_TOTAL` | Normal(3.2, 1.9) clamped [0,8]; per-rung cap 2.5 in | yes |
+| `FAMILY_TIMING_WEIGHTS` | §5.2 as-is; `FAMILY_TIMING_SHIFT` 0.40 | no |
+| `OFFSEASON_DISTRIBUTION_BLEND` | 0.70 | yes |
+| `INTRA_FAMILY_GAMMA` | 0.20 | no |
+| `NON_CORE_GROWTH_MULTIPLIER` | 0.06 (never zero) | no |
+| `RT_COMPRESSION_THRESHOLD` / `RT_SOFT_CAP` | 95 / 130 | no |
+| `WEEKLY_DECAY_BY_YEAR` | defaults only — not target-fittable | n/a |
+| `QUALITY_CAP` | 4 points/attribute/week | yes |
+| `COACHING_F_MIN` / `COACHING_F_MAX` | 0.85 / 1.20 | yes |
+
+`PEAK_BONUS` and `STD_RUNG_INCREMENT` are effectively pinned by the targets rather than free. The `CH_PEAK` endpoint spread is mean-constrained — it does not move the aggregate peak distribution, only how strongly CH predicts peaks, so it is a feel knob for diamond-in-the-rough strength. `HT_TOTAL` and the HT curves set the position-flip rate.
+
+### 16.2 Measured against targets
+
+| Target | Measured | |
+|---|---|---|
+| peak counts 20 / 55 / 22 / 3 | 20.1 / 54.3 / 22.8 / 2.8 | ✓ |
+| career multiples 1.7 / 2.0 / 2.3 / 2.6 | 1.70 / 2.00 / 2.30 / 2.60 | ✓ exact |
+| Average ladder 35 / 43 / 54 / 60 | 35 / 41 / 54 / 60 | SO −2, accepted |
+| senior p50 by tier 40/50/60/70/80/100 | 40/50/60/70/80/100 | ✓ exact |
+| RT ceiling ~130 | max 131, p99 100, none above 132 | ✓ |
+| `ch_seed` ⊥ `entry_tier` | −0.010 | ✓ diamond in the rough intact |
+| any attribute ≥ 100 | 7.5% of pool, 19.0% of seniors | **locked** |
+
+The SO ladder point moved from 43 to 41 when the rung increments were flattened. That was deliberate: the original JR increment of .07 left roughly 55-60% of players — those with no peak, plus everyone whose peak landed elsewhere — gaining about 2 RT in their junior offseason, invisible on a 1-10 display. After flattening, every non-peak rung yields +5 to +6 RT and a peak lands +14 to +15. No dead rungs in any peak configuration. §4.2's ladder was a measurement from the original fit rather than a design commitment, and it assumed a JR peak that only 42% of single-peak players have.
+
+The above-100 rate is accepted as structural and locked. Reaching Elite senior RT 100 through a weighted mean carrying a concentrated weight — SG's SH at .42 — forces high-tier seniors to hold a 100+ attribute; the pool floors near 7.5% even under fully uniform growth. To be judged in gameplay rather than tuned.
+
+### 16.3 Family shares and height
+
+Share of each rung's growth by family (physical / skill / mental): FR 35/58/7 · SO 26/65/9 · JR 11/66/23 · SR 9/61/30. Physical takes 61% of its career growth in FR and SO; mental climbs from 7% to 30%. Mental share is position-weighted, so a PG gains more RT credit for IQ than an SF does — correct, since a senior wing gains feel without it showing up in his rating.
+
+**HT has its own curve, separate from the physical family.** It is the only attribute whose growth can change a player's best position, and it is already handled in its own block in the training-camp code. ST and AG follow the family curve; WT tracks strength and keeps growing throughout.
+
+Mean HT gain in inches by rung: early timing 1.44 / 0.96 / 0.39 / 0.09, standard 1.23 / 0.97 / 0.65 / 0.33, late 0.49 / 0.81 / 1.10 / 0.81. Career gain p10 0 / p50 3 / p90 5-6 inches; roughly 8% of players gain no height at all.
+
+The earlier guidance that physical growth is "locked to early rungs" was the wrong instrument — it bounded by rung when the real requirement is bounding by **magnitude**. Very few players stop growing after their sophomore year. Everyone keeps gaining height at JR and SR; late bloomers gain most of theirs there.
+
+**HT growth changes a player's best position 5.3% of the time**, and this is timing-independent (early 5.9% / standard 5.1% / late 4.9%). Generation works grow-into-frame — JH height is the adult draw minus career gain — so with equal career totals across timing groups every player converges on the same adult height, and his senior best position is set by that draw rather than by when he grew. Concentrating flips in late bloomers would require late timing to correlate with a *taller* adult outcome, which would erode the position-supply balance §11.2 exists to guarantee. Deliberately not done.
+
+### 16.4 Not fittable offline
+
+`WEEKLY_DECAY_BY_YEAR` and the in-season gain scale cannot be fitted against career-outcome targets. Under a no-user-focus policy only the *net* in-season contribution matters, and that net is specified as roughly flat (§7.2) rather than as a target fraction.
+
+They are mechanism and UX knobs. The two things they govern — the mid-season switch penalty (§9.4) and the requirement that weekly movement stay visibly positive (§7.2) — remain **unvalidated**, and both need a live season with a real user-focus policy. This belongs in the validation run as an explicit item rather than something discovered in alpha.
+
+---
+
+## 17. The coaching-quality multiplier
+
+The offseason event targets `jh_anchor × ladder_value × f(coaching_quality)`. `f` is bounded to **[0.85, 1.20]**, so coaching moves a player meaningfully above or below the designed ladder without displacing recruiting as the dominant lever.
+
+### 17.1 Why not a magnitude split
+
+§7.2 originally specified 70% of career growth from the offseason and 30% in-season. That is incompatible with an absolute-target offseason, and the incompatibility is structural rather than a tuning problem.
+
+The offseason event *solves* an attribute budget so RT lands on a fixed ladder value. Anything in-season therefore either gets erased at the next re-anchor, or ratchets past it and compounds without bound. Measured: at an in-season gain scale of 0.25 career multiples blew out to 3.2x with seniors at 86-117; at 0.05 the model collapsed to the RT floor. There is no stable basin between them, because the weekly treadmill makes the net a large-minus-large.
+
+Three routes were considered. Making the offseason **relative/additive** would deliver a true split, but surrenders the fixed class-year scale — the distributions become emergent rather than designed, and user-versus-CPU divergence compounds across a franchise's lifetime with nothing to correct it. Treating the ladder as a **ceiling** training fills toward makes coaching pure downside avoidance: you train well to avoid falling behind, never to build something exceptional.
+
+The chosen route keeps the offseason absolute and multiplies its target by a bounded coaching factor. The ladder survives as the designed centre, coaching moves players in both directions, and each offseason re-anchors so nothing drifts.
+
+### 17.2 The metric
+
+Coaching quality scores a season's training allocation, expressed in **points per attribute per week**, not shares:
+
+```
+contribution_a = weight_a × min(points_a / QUALITY_CAP, 1)
+quality        = Σ contribution / Σ contribution(reference)
+```
+
+`QUALITY_CAP` is 4 points. Because the cap is high in points, saturation is expensive — spreading a fixed budget thin saturates nothing, and concentrating it saturates the attributes that matter.
+
+**Points rather than shares is deliberate.** Shares sum to 1 regardless of budget size, so a smaller budget would score identically to a larger one with the same proportions. In points, a smaller budget saturates fewer attributes and scores lower automatically. This matters for the planned per-player training focus feature, where customising costs roughly 2 points against blanket team-wide training: that efficiency cost prices itself through the same mechanism with no special-casing.
+
+Achievable range is normalised affinely per position, so headroom is comparable everywhere — an earlier fit gave SF 1.52 and SG 1.07, which made coaching matter twice as much at one position as another for no design reason.
+
+### 17.3 The reference anchor
+
+The allocation that scores exactly 1.0 is a **frozen, named constant**: a deliberately mediocre baseline, weight-proportional across the position's top three attributes and neglecting the tail. Test-asserted at all five positions.
+
+Two properties follow. CPU teams train approximately that baseline, so the league sits exactly on the ladder and nothing calibrated against the scale floats. And because the baseline is *mediocre rather than optimal*, good coaching has real upside — which a proportional reference structurally cannot provide, since a concave metric is very nearly maximised by proportional allocation itself.
+
+**Which allocation scores 1.0 is a labelling choice, not a property of the metric.** That is what dissolves the apparent trade-off between holding the league on the ladder and giving coaching upside. The only real constraint is that pillar 3 must keep CPU's baseline aligned to the frozen constant — changing the reference re-scales every player's development.
+
+### 17.4 Strategy shape
+
+| Strategy | quality → f |
+|---|---|
+| reference (≈ CPU) | 1.00 → 1.00 |
+| all-in on the top attribute | 0.79-0.82 → 0.85 |
+| off-position | 0.48-0.66 → 0.85 |
+| uniform across all 12 | 0.89-0.97 |
+| 2-attribute focus | 1.01-1.09 |
+| 3-attribute focus | 1.09-1.16 |
+| 4-attribute spread | 1.17-1.20 |
+| broad / proportional | 1.18-1.20 |
+
+A monotone climb through the sensible strategies with only genuine waste at the floor — deliberately a **plateau, not a peak**. Any scalar quality metric has exactly one optimal allocation, so strategic depth cannot live there; it lives in the distribution half of the accumulator, which has no optimum at all because a shooter and a lockdown defender are both valid outcomes. Quality answers "did you coach this player competently," rewarding a broad range of sensible allocations and punishing only neglect.
+
+The residual gradient is intended: **breadth buys magnitude, focus buys a spike.** A broadly trained player finishes higher overall; a focused one finishes roughly 10 RT lower at Average tier with an attribute above 100. That is the trade the above-100 system is built on.
+
+Uniform-across-twelve sits at 0.89-0.97 rather than the floor. A coverage metric should rate "half-covered everything important" as mediocre rather than as waste, and forcing it lower would require an off-position penalty that fights the points-budget mechanic.
+
+### 17.5 What it is worth
+
+Senior p50 RT at f = 0.85 / 1.00 / 1.20:
+
+| Tier | 0.85 | 1.00 | 1.20 | spread |
+|---|---|---|---|---|
+| Average | 51 | 60 | 72 | 21 RT (~2.1 buckets) |
+| Good | 60 | 70 | 84 | 24 RT |
+| Great | 68 | 80 | 96 | 28 RT |
+| Elite | 85 | 100 | 120 | 35 RT (~3.5 buckets) |
+
+Senior tier targets sit 10 RT apart, so coaching is worth roughly **±1 tier step**, against a recruiting span of 60 RT from Poor to Elite. Recruiting stays about twice the lever coaching is. The multiplicative form makes coaching matter more at higher tiers, which is intended — elite talent responds most to good coaching.
+
+### 17.6 Current state and the pillar 3 dependency
+
+The mechanic is built and **dormant**. The live path reads coaching quality through a seam that returns `None`, so `f` is 1.0 for every player and the league holds exactly at pass 1.
+
+Activating it requires per-player allocation capture, which is genuinely coupled to the CPU archetype work: user and CPU training run through the same `execute_training` engine with no user/CPU flag inside it, so recording has to be gated at the calling endpoint. It lands with pillar 3 alongside the training-position UI and CPU season-start assignment.
+
+**One property is temporary.** Base training points are team-wide, with only the focus amplifier applied per player, so `f` is currently near-identical across a roster — a program-level multiplier rather than per-player coaching. That expires when the planned per-player training focus ships, at which point `f` becomes genuinely per-player. The metric already reads points, so no metric change is needed then — only the capture.
