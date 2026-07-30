@@ -893,14 +893,37 @@ offseason event owns them; camp keeps only its 30-point allocation and decay ski
 | `HT_CURVE_BY_TIMING` | early 55/30/12/3 · standard 40/30/20/10 · late 15/25/35/25 | when HT arrives, by physical timing |
 | `HT_PER_RUNG_CAP` | 2.5 | cap the real-valued per-rung HT want at 2.5in then round → dh ∈ {0..3}, restoring the p90≈6in tail |
 | `COACHING_F_MIN` / `COACHING_F_MAX` | 0.85 / 1.20 | band on the offseason coaching-quality modifier `f`; ±spread of one to a few display buckets at SR |
-| `COACHING_F_SENSITIVITY` | 0.40 | how strongly cumulative coaching quality moves `f` within the band |
+| `COACHING_F_SENSITIVITY` | 1.00 | maps quality → `f` within the band. At 1.0, `f == clamp(quality)`; the band edges are the real controllers |
+| `COACHING_SATURATION_CAP` | 0.16 | per-attribute saturation share: `contribution_a = w_a × min(alloc_a/cap, 1)`. Flat cap → high-weight attrs have the steeper marginal, so coverage of the important attrs is the goal; overflow past the cap is wasted |
+| `COACHING_REFERENCE_BREADTH` | 3 | the frozen reference trains the position's **top-3** weighted attrs (weight-proportional), neglecting the tail — a deliberately mediocre baseline that broader coverage beats |
 
 ### Coaching quality → offseason modifier `f` (Option 3)
-The offseason target is `jh_anchor × ladder_value × f`. `f` is a bounded function of the player's **cumulative** coaching quality (career average of per-season scores). A season's score compares the training allocation against the development-position weight vector.
+The offseason target is `jh_anchor × ladder_value × f`. `f` is a bounded function of the player's **cumulative** coaching quality (career average of per-season scores).
 
-> **`reference_allocation` is a CALIBRATION ANCHOR — do not change casually.** It is defined explicitly as "train each attribute in proportion to the development-position's weight vector," and it scores exactly **1.0** for every position by construction. It is deliberately **not** "whatever the CPU auto-train policy produces" (that will fragment when the CPU-archetype rework lands and would silently re-anchor the whole growth model). A reference-coached player (f = 1.0) lands exactly on the validated ladder, so with today's CPU ≈ reference the league stays exactly where pass 1 put it; the user's edge comes from out-coaching the reference, which structurally caps user-vs-CPU divergence. **Changing this anchor re-scales every player's development.**
+**Metric shape — saturating coverage, not a power law (§9.1).** A season's score is
+`quality = Σ_a w_a·min(alloc_a/cap, 1) / Σ_a w_a·min(ref_a/cap, 1)`.
+Each attribute contributes up to its weight `w_a`, saturating once its allocation share reaches `cap`; points past the cap are wasted. This rewards **coverage** of a position's important attributes and gives a broad **plateau** of good allocations rather than a sharp peak — deliberately forgiving, punishing only neglect (all-in wastes the overflow and covers nothing else → below reference) and nonsense (off-position points contribute 0). Strategic depth is intended to live in the **distribution** half (which has no optimum — shooter vs. lockdown wing are both valid), not in this scalar.
 
-Live wiring: `finish_season` passes `season_quality=None` for now → `f = 1.0` (reference), so nothing drifts. Real per-player season allocations feed `f` when the CPU-archetype training rework (pillar 3) plumbs them. Distribution (which attrs the budget lands on) and quality (feeds `f`) are computed from the same allocation but kept **separate in code** so they stay independently tunable.
+> **The reference is a CALIBRATION ANCHOR — a frozen, deliberately MEDIOCRE baseline; do not change casually.** It is defined as "train the position's top-`COACHING_REFERENCE_BREADTH` weighted attributes in weight proportion, neglect the rest" and scores exactly **1.0** at every position by construction (it is the normalisation denominator). Which allocation scores 1.0 is a *labelling* choice: the reference is ~what CPU trains, so CPU lands on the validated ladder (f = 1.0) and the league holds at pass 1, while a competent broader on-position allocation beats it (up to f 1.20). Pillar 3 must keep CPU's baseline aligned to this constant. **Changing the anchor (breadth or cap) re-scales every player's development.**
+
+**Named-strategy band (q / f), fitted (cap 0.16, ref top-3, sens 1.0):**
+
+| strategy | PG | SG | SF | PF | C |
+|---|---|---|---|---|---|
+| reference (top-3, ≈CPU) | 1.00/1.00 | 1.00/1.00 | 1.00/1.00 | 1.00/1.00 | 1.00/1.00 |
+| all-in top | 0.43/0.85 | 0.55/0.85 | 0.37/0.85 | 0.44/0.85 | 0.43/0.85 |
+| uniform (all attrs) | 0.74/0.85 | 0.68/0.85 | 0.87/0.87 | 0.77/0.85 | 0.70/0.85 |
+| off-position | 0.00/0.85 | 0.00/0.85 | 0.00/0.85 | 0.00/0.85 | 0.00/0.85 |
+| 2-attr focus | 0.79/0.85 | 0.87/0.87 | 0.70/0.85 | 0.76/0.85 | 0.73/0.85 |
+| 3-attr focus | 1.00/1.00 | 1.02/1.02 | 1.00/1.00 | 1.00/1.00 | 1.00/1.00 |
+| 4-attr spread | 1.14/1.14 | 1.11/1.11 | 1.27/1.20 | 1.21/1.20 | 1.24/1.20 |
+| proportional (all wts) | 1.21/1.20 | 1.07/1.07 | 1.52/1.20 | 1.28/1.20 | 1.27/1.20 |
+
+Several sensible strategies (4-attr spread, full-proportional) cluster near the top of the band; narrowness and off-position spray fall to the floor. SG has the least headroom (its weight is concentrated in SH+OD, so top-3 already captures most of it); SF has the most.
+
+**`training_position` (§9.2).** Coaching quality is scored against a player's `training_position` (persisted FPD field, defaults to `position_intent`, forward-copied at rollover), **not** `position_intent`. A user converting a natural SF toward PG is executing a designed strategy the weight tables already price — scoring against `position_intent` would double-charge it with a quality penalty.
+
+**Live wiring.** `develop_rollover` takes a `season_allocation` (per-attr fraction); `finish_season` reads it via the `_coaching_accumulator_for_player` seam, which returns `None` until the in-season capture lands with the CPU archetype-training rework (pillar 3). `None` → `f = 1.0` (frozen reference), so CPU and the exact-diff baseline stay byte-identical at pass 1. The **distribution** half (which attrs the budget lands on) and the **quality** half (feeds `f`) are computed from the same allocation but kept **separate in code** so they stay independently tunable.
 
 ### Weekly in-season (§7.2, Option 3): nets ~FLAT, does not carry career growth
 `PRE_TRAINING_DECAY_BY_YEAR` reduced to FR/SO (-2,0), JR/SR (-1,0) (was FR (-5,-2) … SR (-2,0)); `IN_SEASON_GAIN_SCALE` (0.26) scales positive weekly gains so a season nets ~0 RT (measured mean −0.3/season, ±~13 season noise). In-season now only (a) moves attributes within the season and (b) feeds the coaching-quality score — the offseason event owns career magnitude. There is **no** in-season magnitude share.

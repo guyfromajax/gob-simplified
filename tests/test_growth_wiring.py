@@ -102,23 +102,70 @@ def test_weekly_decay_reduced():
         assert hi <= 0, year
 
 
+def _norm(d):
+    tot = sum(d.values()) or 1.0
+    return {a: v / tot for a, v in d.items()}
+
+
 def test_reference_allocation_scores_one_and_band_bounds():
-    """The calibration anchor (train ∝ position weights) scores 1.0 → f 1.0 for
-    every position, so a reference-coached player lands on the validated ladder.
-    Extreme allocations are clamped into [0.85, 1.20]."""
+    """The frozen mediocre reference (top-3 weighted focus = what CPU trains) scores
+    exactly 1.0 → f 1.0 at every position, so a reference-coached player lands on
+    the validated ladder. Under the saturating-coverage metric all-in / off-position
+    fall to the floor, and broader on-position coverage earns real upside."""
     for pos in ("PG", "SG", "SF", "PF", "C"):
         q = dev.season_coaching_quality(dev.reference_allocation(pos), pos)
         assert abs(q - 1.0) < 1e-9, pos
         assert dev.coaching_f(q) == 1.0, pos
-    # concentrating on the top-weight attr → above reference (SG's .42 SH pins the
-    # cap; C's .32 ID lands ~1.16), always within the band
-    for pos in ("SG", "C"):
+    # all-in on the top attribute wastes its cap overflow and covers nothing else →
+    # clearly below the reference, clamped to the floor. The exploit is dead.
+    for pos in ("PG", "SG", "SF", "PF", "C"):
         top = max(dev.POSITION_WEIGHTS[pos], key=dev.POSITION_WEIGHTS[pos].get)
-        f = dev.coaching_f(dev.season_coaching_quality({top: 1.0}, pos))
-        assert 1.0 < f <= dev.COACHING_F_MAX
-    # spraying uniformly → low quality → f pinned at the floor
-    uniform = {a: 1 / len(dev.GROWTH_ATTRS) for a in dev.GROWTH_ATTRS}
-    assert dev.coaching_f(dev.season_coaching_quality(uniform, "SG")) == dev.COACHING_F_MIN
+        assert dev.season_coaching_quality({top: 1.0}, pos) < 1.0
+        assert dev.coaching_f(dev.season_coaching_quality({top: 1.0}, pos)) == dev.COACHING_F_MIN
+    # off-position (all points on zero-weight attributes) scores 0 → f floor.
+    off = {a: 1.0 for a in ("EM",)}  # not in any weight vector
+    assert dev.coaching_f(dev.season_coaching_quality(off, "SG")) == dev.COACHING_F_MIN
+    # PLATEAU / upside: covering the top four attributes evenly beats the reference
+    # at every position (broad on-position coverage is the reward), and SF — the
+    # flattest weight vector, which had zero headroom under the old metric — clears
+    # its reference with margin.
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        ranked = sorted(dev.POSITION_WEIGHTS[pos], key=dev.POSITION_WEIGHTS[pos].get, reverse=True)
+        spread4 = _norm({a: 1.0 for a in ranked[:4]})
+        assert dev.season_coaching_quality(spread4, pos) > 1.0, pos
+    sf_prop = _norm(dict(dev.POSITION_WEIGHTS["SF"]))
+    assert dev.season_coaching_quality(sf_prop, "SF") > 1.10
+
+
+def test_season_allocation_scored_against_training_position():
+    """§9.2: a player converted toward a new position (training_position != natural
+    position_intent) is scored against training_position, so executing the designed
+    conversion is not double-charged as low coaching quality. training_position
+    defaults to position_intent and is forward-copied."""
+    base = {"player_id": "conv", "meta": {"height": 79, "weight": 210, "year": "sophomore"},
+            "attributes": {f"anchor_{a}": 45 for a in dev.GROWTH_ATTRS}
+                          | {a: 45 for a in dev.GROWTH_ATTRS} | {"CH": 55, "anchor_CH": 55},
+            "position_ratings": {"PG": 40, "SG": 35, "SF": 50, "PF": 45, "C": 30},
+            "position_intent": "SF", "training_position": "PG", "entry_tier": "Average",
+            "development": {"peak_count": 0, "peak_rungs": [], "ch_seed": 55,
+                            "family_timing": {"physical": "standard", "skill": "standard", "mental": "standard"},
+                            "ht_total": 3}}
+    # Train the PG reference exactly: scored against training_position (PG) this is
+    # 1.0. Scored against position_intent (SF) it would NOT be 1.0 → the penalty the
+    # weight tables already price. n was 0, so cumulative avg == this season's score.
+    import copy
+    pg_ref = dev.reference_allocation("PG")
+    out = dev.develop_rollover(copy.deepcopy(base), "sophomore", random.Random(1), season_allocation=pg_ref)
+    assert out["training_position"] == "PG"  # forward-copied
+    assert abs(out["coaching_quality"]["avg"] - 1.0) < 1e-9
+    assert out["coaching_quality"]["n"] == 1
+    # sanity: the same allocation scored against SF (the natural fit) is NOT 1.0,
+    # which is exactly the double-charge we avoid by scoring against training_position.
+    assert abs(dev.season_coaching_quality(pg_ref, "SF") - 1.0) > 0.05
+    # training_position defaults to position_intent when the field is absent.
+    no_tp = copy.deepcopy(base); no_tp.pop("training_position")
+    out2 = dev.develop_rollover(no_tp, "sophomore", random.Random(1), season_allocation=None)
+    assert out2["training_position"] == "SF"
 
 
 def test_coaching_f_modulates_offseason_and_no_history_is_reference():

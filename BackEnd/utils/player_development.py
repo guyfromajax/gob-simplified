@@ -156,29 +156,57 @@ WT_LBS_PER_ST = (0, 1)
 # every player's development, so it is frozen.
 COACHING_F_MIN = 0.85
 COACHING_F_MAX = 1.20
-# How strongly cumulative coaching quality moves f within the band (fitted so
-# realistic allocation variation spans the band; the band is then clamped).
-COACHING_F_SENSITIVITY = 0.40
+# Maps quality onto the band. sens=1.0 makes f == clamp(quality) — the band edges
+# COACHING_F_MIN/MAX are the real controllers: the reference (q 1.0) → f 1.0, a
+# competent broad on-position allocation (q ≳ 1.20) → f 1.20, and a genuinely bad
+# one (all-in / off-position, q ≲ 0.55) → f 0.85. See the named-strategy table.
+COACHING_F_SENSITIVITY = 1.00
+# SATURATING-COVERAGE quality metric (not a power law). Each attribute contributes
+#   w_a × min(alloc_a / COACHING_SATURATION_CAP, 1)
+# so points past the cap on any one attribute are wasted. This makes COVERAGE of a
+# position's important attributes the goal, with a broad PLATEAU of good
+# allocations rather than a single sharp peak: strategic depth lives in the
+# distribution half of the accumulator (which has no optimum — a shooter and a
+# lockdown wing are both valid), so quality is deliberately forgiving and only
+# punishes neglect (narrowness wastes the cap overflow and leaves attributes
+# uncovered) and nonsense (off-position points contribute nothing). The flat cap
+# gives high-weight attributes a steeper marginal, so they are covered first.
+COACHING_SATURATION_CAP = 0.16
+# The frozen calibration-anchor reference: a deliberately MEDIOCRE coach who trains
+# the position's top-N attributes in weight proportion and neglects the tail. It
+# scores 1.0 by construction; broader on-position coverage beats it, all-in /
+# narrow focus falls below it. This is ~what CPU trains, so CPU lands on the ladder
+# (f = 1.0); pillar 3 keeps CPU's baseline aligned to this constant.
+COACHING_REFERENCE_BREADTH = 3
 
 
 def reference_allocation(position: str) -> Dict[str, float]:
-    """The calibration-anchor allocation: proportional to the position's weight
-    vector, normalised to sum 1. Scores exactly 1.0 by construction."""
+    """The frozen mediocre baseline: weight-proportional over the position's top
+    ``COACHING_REFERENCE_BREADTH`` attributes, zero on the rest. Scores exactly 1.0
+    by construction (it is the normalisation denominator)."""
     w = POSITION_WEIGHTS[position]
-    tot = sum(w.values()) or 1.0
-    return {a: v / tot for a, v in w.items()}
+    top = sorted((a for a in w if w[a] > 0), key=lambda a: -w[a])[:COACHING_REFERENCE_BREADTH]
+    tot = sum(w[a] for a in top) or 1.0
+    return {a: w[a] / tot for a in top}
+
+
+def _coverage_numerator(allocation: Dict[str, float], position: str) -> float:
+    w = POSITION_WEIGHTS[position]
+    return sum(wt * min(allocation.get(a, 0.0) / COACHING_SATURATION_CAP, 1.0)
+               for a, wt in w.items() if wt > 0)
 
 
 def season_coaching_quality(allocation: Dict[str, float], position: str) -> float:
     """Score a season's training allocation (attr→fraction) for a player developed
-    at ``position``. Reference (allocation == reference_allocation) → 1.0."""
-    w = POSITION_WEIGHTS[position]
-    ref = reference_allocation(position)
-    dot_ref = sum(ref.get(a, 0.0) * wt for a, wt in w.items())
-    if dot_ref <= 0:
+    at ``position``, as saturating coverage of the position's weighted attributes
+    normalised to the reference. Reference → 1.0; all-in on one attribute wastes
+    its cap overflow and covers nothing else → below 1.0; broad adequate coverage
+    of the top attributes → above 1.0 (near the band max); off-position points
+    contribute 0."""
+    den = _coverage_numerator(reference_allocation(position), position)
+    if den <= 0:
         return 1.0
-    dot_alloc = sum(allocation.get(a, 0.0) * wt for a, wt in w.items())
-    return dot_alloc / dot_ref
+    return _coverage_numerator(allocation, position) / den
 
 
 def coaching_f(cumulative_quality: float) -> float:
@@ -437,21 +465,32 @@ def _derive_entry_tier_from_rt(position_ratings: dict, rung: str) -> str:
 
 
 def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
-                     season_quality: Optional[float] = None) -> dict:
+                     season_allocation: Optional[Dict[str, float]] = None) -> dict:
     """Apply the offseason event to an FPD player rolling onto ``new_year`` (§7.1),
     handling the FPD document shape and lazy-backfilling a missing profile.
 
-    ``season_quality`` is the just-finished season's coaching-quality score (1.0 =
-    reference; None → 1.0, e.g. a player with no season of history). It updates the
-    player's cumulative quality (simple career average), which drives the bounded
-    offseason modifier f. Returns {attributes, height, weight, position_ratings,
-    development, entry_tier, position_intent, coaching_quality, backfilled}. The
-    caller persists all of them. Pure given rng.
+    ``season_allocation`` is the just-finished season's per-attribute training
+    accumulator (attr → fraction of points trained). None means "no recorded
+    season" (CPU teams until pillar 3, or a player with no season) → the frozen
+    reference → f 1.0 → lands on the validated ladder. It drives BOTH accumulator
+    jobs, kept separate in code:
+
+      • QUALITY: scored against ``training_position`` (§9.2 — a designed conversion
+        is priced by the weight tables, so a natural SF trained toward PG must not
+        also eat a coaching-quality penalty) → cumulative career average → the
+        bounded modifier f on the offseason RT target.
+      • DISTRIBUTION (§7.3): the same allocation shapes WHERE the offseason budget
+        lands (blended in _distribution_fractions), so what was trained aims growth.
+
+    ``training_position`` is a persisted field defaulting to ``position_intent`` and
+    forward-copied here. Returns {attributes, height, weight, position_ratings,
+    development, entry_tier, position_intent, training_position, coaching_quality,
+    backfilled}. The caller persists all of them. Pure given rng.
 
     Lazy backfill (existing saves, §11.3 rule): a player with no `development` gets
     one rolled ONCE here from his live CH frozen as ch_seed, with peaks restricted
     to his REMAINING rungs, and it is returned for persistence so it never re-rolls.
-    entry_tier / position_intent are derived if absent (see caveat)."""
+    entry_tier / position_intent / training_position are derived if absent."""
     from BackEnd.utils.player_generation import normalize_year as _ny
     rung = _ny(new_year)
     if rung not in RUNG_TRANSITIONS:
@@ -463,6 +502,10 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
 
     position_intent = fpd_doc.get("position_intent") or (
         max(ratings, key=ratings.get) if ratings else "SF")
+    # training_position: where the player is being coached this cycle. Defaults to
+    # position_intent (natural fit) and is forward-copied; a user converting a
+    # player sets it explicitly (UI deferred to a later pass).
+    training_position = fpd_doc.get("training_position") or position_intent
     entry_tier = fpd_doc.get("entry_tier") or _derive_entry_tier_from_rt(ratings, rung)
 
     profile = fpd_doc.get("development")
@@ -474,26 +517,35 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
         remaining = list(RUNG_TRANSITIONS[RUNG_TRANSITIONS.index(rung):])
         profile = roll_growth_profile(ch_seed, rng, eligible_peak_rungs=remaining)
 
-    # Cumulative coaching quality (career average) → bounded offseason modifier f.
-    # No history and no season score → stays 1.0 → f 1.0 → lands on the ladder.
+    # --- QUALITY half of the accumulator -------------------------------------
+    # Score the season's allocation against training_position, fold into the career
+    # average, and map to f. No recorded allocation → stays 1.0 → f 1.0 (reference).
     cq = fpd_doc.get("coaching_quality") or {"avg": 1.0, "n": 0}
-    if season_quality is not None:
+    if season_allocation:
+        season_quality = season_coaching_quality(season_allocation, training_position)
         n2 = cq["n"] + 1
         cq = {"avg": (cq["avg"] * cq["n"] + season_quality) / n2, "n": n2}
     f = coaching_f(cq["avg"])
 
+    # --- DISTRIBUTION half of the accumulator (§7.3) -------------------------
+    # The same allocation aims the offseason budget (blended with the age curve in
+    # _distribution_fractions). None → the default position-weighted aim.
+    distribution_accumulator = season_allocation or None
+
     player = {
         "attributes": attrs, "height": height, "weight": meta.get("weight", 0),
-        "position": position_intent, "training_position": position_intent,
+        "position": position_intent, "training_position": training_position,
         "jh_anchor": JH_ANCHOR_BY_TIER[entry_tier], "position_ratings": dict(ratings),
         "_ht_carry": fpd_doc.get("_ht_carry", 0.0),
     }
-    develop_one_offseason(player, rung, profile, rng, coaching_f_value=f)
+    develop_one_offseason(player, rung, profile, rng,
+                          accumulator=distribution_accumulator, coaching_f_value=f)
     return {
         "attributes": player["attributes"], "height": player["height"],
         "weight": player["weight"], "position_ratings": player["position_ratings"],
         "development": profile, "entry_tier": entry_tier,
-        "position_intent": position_intent, "coaching_quality": cq, "backfilled": backfilled,
+        "position_intent": position_intent, "training_position": training_position,
+        "coaching_quality": cq, "backfilled": backfilled,
     }
 
 
@@ -505,6 +557,7 @@ __all__ = [
     "FAMILY_CURVES", "OFFSEASON_DISTRIBUTION_BLEND", "NON_CORE_GROWTH_MULTIPLIER",
     "HT_CURVE_BY_TIMING", "HT_TOTAL_MEAN", "HT_TOTAL_SD", "HT_PER_RUNG_CAP",
     "COACHING_F_MIN", "COACHING_F_MAX", "COACHING_F_SENSITIVITY",
+    "COACHING_SATURATION_CAP", "COACHING_REFERENCE_BREADTH",
     "reference_allocation", "season_coaching_quality", "coaching_f",
     "roll_growth_profile", "develop_one_offseason", "develop_rollover",
     "init_career", "simulate_career",
