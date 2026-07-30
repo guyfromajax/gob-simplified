@@ -101,12 +101,13 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         with patch.object(random, "randint", side_effect=fake_randint):
             _apply_player_training_points(player, "SC", points=2, archetype=None, sub_option=None, multiplier=1.0)
 
-        # Base range (2,3) + senior max-adjustment (+1) → (2,4); fake_randint returns 4.
-        self.assertEqual(calls[-1], (2, 4))
+        # Base range (2,4) [reference band 1-3 share it so the reference holds flat] +
+        # senior max-adjustment (+1) → (2,5); fake_randint returns 5.
+        self.assertEqual(calls[-1], (2, 5))
         # Positive weekly gains are scaled down by IN_SEASON_GAIN_SCALE (§7.2,
         # Option 3: in-season nets ~flat, offseason owns career growth).
         from BackEnd.models.training_execution_v2 import IN_SEASON_GAIN_SCALE
-        expected = 50 + int(round(4 * IN_SEASON_GAIN_SCALE))
+        expected = 50 + int(round(5 * IN_SEASON_GAIN_SCALE))
         self.assertEqual(player["attributes"]["anchor_SC"], expected)
         self.assertEqual(player["attributes"]["SC"], expected)
 

@@ -923,13 +923,23 @@ def _apply_player_training_points(
     year = player.get("year", "").lower() if player.get("year") else ""
     max_adjustment = {"freshman": 5, "sophomore": 3, "junior": 2, "senior": 1}.get(year, 2)
     
-    # Base range (min, max) by points. Doc: 0→(-2,-1), 1→(0,1), 2→(2,3), 3→(2,4), 4→(3,5), 5→(3,6)
+    # Base range (min, max) by points. 0→(-2,-1), 1→(2,4), 2→(2,4), 3→(2,4), 4→(3,5), 5→(3,6).
+    # THE REFERENCE BAND (points 1-3) all share one range so a reference-allocated attribute
+    # holds ~flat in-season (measured net ≈ -0.7/season, restored by the offseason). base-1 was
+    # (0,1) — far too small to offset in-season decay at IN_SEASON_GAIN_SCALE, so the reference's
+    # baseline (base-1) attributes rotted ~-10 RT/season while the ladder (RT-weighted, leaning on
+    # the core) masked it; the offseason (RT-targeted) never restored it, so it compounded
+    # (SC -8.33 over a full cycle) → league FG% degraded 37.5%→26.5%. A global decay/scale change
+    # would over-inflate the mid band and reopen claw-back, so the fix is local to the low band.
+    # Structure: NEGLECT (base-0) declines, REFERENCE (1-3) holds, FOCUS (4-5) gains — an INVARIANT
+    # pinned by tests/test_in_season_invariants.py (in-season AND full-cycle). Any future change to
+    # decay or gain that erodes the reference breaks a test. See §7.2 / Tunable_Constants.
     if points == 0:
         base_min, base_max = -2, -1
     elif points == 1:
-        base_min, base_max = 0, 1
+        base_min, base_max = 2, 4
     elif points == 2:
-        base_min, base_max = 2, 3
+        base_min, base_max = 2, 4
     elif points == 3:
         base_min, base_max = 2, 4
     elif points == 4:
