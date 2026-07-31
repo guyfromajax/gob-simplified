@@ -888,3 +888,9 @@ body.has-auth-bar {
 .site-footer a:hover {
   text-decoration: underline;
 }
+.site-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px 22px;
+}
