@@ -284,7 +284,17 @@ def main():
                     help="max drift (percentage points) of each race from the 60/30/10 base")
     ap.add_argument("--selftest", action="store_true",
                     help="build from synthetic recruits (validates proj/classify, writes nothing)")
+    ap.add_argument("--append-to", default=None, metavar="EXISTING_SET.json",
+                    help="ADD-ON mode: generate --count NEW recruits as a standalone add-on file "
+                         "(<set_id>_add<count>.json + .manifest.json) to be merged into the existing "
+                         "set later. Collision-checks recruit_ids against the existing set and NEVER "
+                         "regenerates it. Feed the add-on to build_recruit_images.py, then merge with "
+                         "merge_recruits_into_set.py.")
     args = ap.parse_args()
+
+    if args.append_to:
+        _append_mode(args)
+        return
 
     if args.selftest:
         recruits = synthetic_recruits(max(args.count, 60) if args.count != 300 else 60)
@@ -317,6 +327,51 @@ def main():
         print(f"[ok] wrote {man_path}")
 
     print_summary(records, manifests, args.selftest, eth_target)
+
+
+def _append_mode(args):
+    """Generate --count NEW recruits as an add-on for an existing set. Writes only
+    the new recruits (never touches the existing set). Output is a normal set+manifest
+    pair so build_recruit_images.py can build kits for JUST these, and
+    merge_recruits_into_set.py can fold them into the base set + DB afterward."""
+    existing = json.load(open(args.append_to))
+    set_id = existing.get("set_id", args.set_id)
+    existing_ids = {r["recruit_id"] for r in existing.get("recruits", []) if r.get("recruit_id")}
+    print(f"[append] base set {set_id}: {len(existing_ids)} existing recruits; generating {args.count} new")
+
+    recruits = generate_recruits(args.count, args.seed)
+    # Balance the add-on's own race mix; seed off (set_id + count) so a given add-on
+    # is reproducible but distinct from the base set's balance draw.
+    eth_seed = args.seed if args.seed is not None else f"{set_id}+add{args.count}"
+    random_weights, eth_target = bounded_race_weights(recruits, eth_seed, args.eth_cap_pp)
+
+    records, manifests = [], []
+    for rc in recruits:
+        rec, man = build_one(rc, random_weights=random_weights)
+        # recruit_id is a fresh uuid4; a clash with the existing 300 (or within the
+        # add-on) is astronomically unlikely, but assert rather than silently ship a dup.
+        if rec["recruit_id"] in existing_ids:
+            raise SystemExit(f"recruit_id collision with existing set: {rec['recruit_id']}")
+        existing_ids.add(rec["recruit_id"])
+        records.append(rec)
+        manifests.append(man)
+
+    add_doc = {"set_id": set_id, "version": 1, "recruit_count": len(records),
+               "add_on_for": set_id, "recruits": records}
+    add_manifest = {"set_id": set_id, "entries": manifests}
+    validate(add_doc)
+    print_summary(records, manifests, is_selftest=False, eth_target=eth_target)
+
+    os.makedirs(args.out_dir, exist_ok=True)
+    base = f"{set_id}_add{args.count}"
+    set_path = os.path.join(args.out_dir, f"{base}.json")
+    man_path = os.path.join(args.out_dir, f"{base}.manifest.json")
+    json.dump(add_doc, open(set_path, "w"), indent=2)
+    json.dump(add_manifest, open(man_path, "w"), indent=2)
+    print(f"[ok] wrote add-on {set_path}")
+    print(f"[ok] wrote add-on {man_path}")
+    print(f"[next] build kits:  python scripts/recruit_sets/build_recruit_images.py --set {set_path} --limit 15")
+    print(f"[next] then merge:  python scripts/recruit_sets/merge_recruits_into_set.py --addon {set_path}")
 
 
 if __name__ == "__main__":
