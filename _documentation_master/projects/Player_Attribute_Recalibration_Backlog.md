@@ -127,3 +127,12 @@ Team-identity thresholds were explicitly parked pending recalibrated attributes 
 
 **EOG attribute retune.** *Trigger: after pillar 3.* **OPEN.**
 Parked behind this project. Note `momentum_score` removal was deliberately deferred out of the distant-sunset cleanup to avoid changing training draw counts mid-flight.
+
+---
+
+## Found during validation (separate from recalibration)
+
+**Recruit-supply / walk-on-floor calibration.** *Trigger: standalone.* **OPEN — HIGH PRIORITY.**
+Surfaced by the 4-season live run: the season recruit pool is `count=300` (`load_unused_set_or_generate`), but graduation is **~440/season** (measured: 429, 455), so **~150 spots/season are backfilled by Poor-tier walk-ons**. Walk-on league share climbs **26% → 29% → 33%** (s1–s3) toward a ~40% steady state — vs the designed **~20%** (3 of 15 = the Poor floor). Degrades **every** franchise progressively (≈40% walk-ons by ~season 10). Departure basis (measured, year-normalized): graduation ~429–455/yr; extra departures (128, 43) are young **walk-on cuts**, not a hidden non-walk-on drain — so the pool target is driven by graduation, not inflated by attrition. Fix: size the season pool to **~450–500** (≈400–445 to meet demand + an unsigned surplus so recruiting stays **contested** — do NOT size exactly to demand: that drives walk-ons to zero, deletes the designed floor, and makes recruiting uncontested). **Recruit-generation change only** — does NOT touch the in-season or CPU-training model (both validated). Do not fix mid-run; it would invalidate the trend the current run is measuring.
+
+**Verify the fix against STARTER SC/SH and box scores — NOT RT.** The 4-season run showed starter RT **flat** (61.5/62.8/63.5/62.3) while starter SC fell 30%, SH 33%, OD 27%, FT 49%. This is structural: tier-scaled attributes are distributed by the position weight vector, so RT (a weighted mean dominated by core attrs) holds by construction while non-core attrs collapse — FT is weighted .04–.05 everywhere, which is exactly why it falls hardest. Also: **whole-roster mean is the wrong statistic** (bench walk-ons dilute it — roster SC moved −0.4 in the last cycle while starter SC moved −2.2 to −8.5 in the erosion cycles). Acceptance for this fix = starter SC/SH recover and box-score FG%/3PT% recover; if measured against RT it will read "fixed" whether or not it is.
