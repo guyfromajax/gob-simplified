@@ -64,7 +64,7 @@ def assign_image_ids(recruits, db, base_set_id=BASE_IMAGE_SET_ID):
     return recruits
 
 
-def load_unused_set_or_generate(db, recruit_manager, used_set_ids, count=300):
+def load_unused_set_or_generate(db, recruit_manager, used_set_ids, count=400):
     """Return (recruits, used_set_id), each recruit stamped with an image_id.
 
     Pick a random set from `recruit_sets` whose set_id is not in used_set_ids and

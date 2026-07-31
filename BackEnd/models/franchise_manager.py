@@ -428,7 +428,7 @@ class FranchiseManager:
         from BackEnd.models.recruit_sets import load_unused_set_or_generate
         # Draw a pre-built image-backed set if any are loaded; else generate dynamically.
         recruits, used_recruit_set_id = load_unused_set_or_generate(
-            self.db, self.recruit_manager, [], count=300)
+            self.db, self.recruit_manager, [], count=400)
         _perf["generate_recruits"] = (time.time() - _t0) * 1000
 
         # ✅ FPD/FRD: Store players and recruits in standalone collections; keep franchise doc lean

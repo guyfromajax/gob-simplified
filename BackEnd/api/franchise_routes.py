@@ -15162,7 +15162,7 @@ def finish_season(req: FinishSeasonRequest):
     _prev_used = (db.franchises.find_one({"_id": franchise_id}, {"used_recruit_set_ids": 1})
                   or {}).get("used_recruit_set_ids") or []
     recruits, used_recruit_set_id = load_unused_set_or_generate(
-        db, fm.recruit_manager, _prev_used, count=300)
+        db, fm.recruit_manager, _prev_used, count=400)
     region_team_ids = fm._build_region_team_map()
 
     franchise_recruits_data_collection.delete_many({"franchise_id": str(franchise_id)})
