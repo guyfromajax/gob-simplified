@@ -214,10 +214,30 @@ def advance_postseason_week(fr, db, fid):
 
 
 def run_week_35(fr, db, fid, fdoc, user_team_oid):
+    from BackEnd.db import (franchise_team_data_collection as _FTD,
+                            franchise_recruits_data_collection as _FRD)
+    # Seed CPU recruiting orders — the real run_week_35_recruiting route builds these per
+    # team via _build_cpu_week_35_orders before signing; the auth-bypass signings path skips
+    # it, so without this CPU teams sign NO recruits and fill rosters with Poor walk-ons,
+    # draining the league ~-5 RT/attr/season (a harness artifact, not a real dropoff).
+    ftd_docs = list(_FTD.find({"franchise_id": fid}, {"team_id": 1, fr.RECRUITING_ORDERS_WEEK_35_FIELD: 1}))
+    team_ids = [d["team_id"] for d in ftd_docs if d.get("team_id")]
+    team_docs = {str(t["_id"]): t for t in db.teams.find({"_id": {"$in": team_ids}})}
+    recruits = list(_FRD.find({"franchise_id": str(fid)}))
+    for d in ftd_docs:
+        tid = d["team_id"]
+        if str(tid) == str(user_team_oid) or d.get(fr.RECRUITING_ORDERS_WEEK_35_FIELD):
+            continue
+        td = team_docs.get(str(tid))
+        if td is None:
+            continue
+        _FTD.update_one({"franchise_id": fid, "team_id": tid},
+                        {"$set": {fr.RECRUITING_ORDERS_WEEK_35_FIELD: fr._build_cpu_week_35_orders(td, recruits)}})
     try:
         fr._apply_cpu_week_35_cuts(fid, excluded_team_id=str(user_team_oid))
     except Exception as e:  # noqa: BLE001
         print(f"    week 35: cpu cuts skipped ({type(e).__name__}: {e})")
+    fdoc = db.franchises.find_one({"_id": fid})  # re-read after order writes
     results = fr._run_week_35_signings(fdoc)
     token = fr._mint_season_transition_token()
     db.franchises.update_one({"_id": fid}, {"$set": {
