@@ -21,6 +21,7 @@ generated position intent.
 
 from __future__ import annotations
 
+import logging
 import random
 from typing import Dict, List, Optional
 
@@ -28,8 +29,11 @@ from BackEnd.utils.position_ratings import POSITION_WEIGHTS, compute_position_ra
 from BackEnd.utils.player_generation import (
     JH_ANCHOR_BY_TIER,
     RT_ATTRS,
+    RUNG_MULTIPLIERS,
     generate_player,
 )
+
+logger = logging.getLogger(__name__)
 
 # ── Families (§6) — an axis independent of the malleable/static fatigue split ──
 PHYSICAL_ATTRS = ("ST", "AG")            # + HT/WT, rolled separately
@@ -469,22 +473,30 @@ def simulate_career(position: str, tier: str, ch_seed: int, rng: random.Random,
     return player
 
 
-def _derive_entry_tier_from_rt(position_ratings: dict, rung: str) -> str:
-    """Best-effort entry_tier for a legacy player with no stored tier.
+# JH → SR ladder in order. A player rolled ONTO `rung` has ratings that still
+# reflect the PRECEDING year (develop_one_offseason has not run yet), so his RT must
+# be divided by that preceding year's ladder multiplier to recover the JH anchor.
+_RATINGS_LADDER = ("JH", "FR", "SO", "JR", "SR")
 
-    DOCUMENTED CAVEAT (Tunable_Constants.md): this reads the player's CURRENT top
-    RT, but a legacy old-scale big man's RT has collapsed under height gating, so
-    he reads as a lower tier than he entered and then develops on that lower
-    ladder — compounding the degradation. Consistent with letting existing saves
-    degrade (§14, new-franchises-only); backfilled players are second-class by
-    design. New franchises never hit this path (entry_tier is carried pool→FPD)."""
+
+def _derive_entry_tier_from_rt(position_ratings: dict, rung: str) -> str:
+    """Best-effort entry_tier for a player with no stored tier (legacy / edge only).
+
+    YEAR-AWARE (fixed 2026-08-01). Tier anchors are JH-scale (Poor 20 … Elite 50)
+    while the ladder multiplies by rung (SR 2.0×), so RT must be divided by the
+    multiplier of the year the ratings reflect — the year BEFORE `rung`, since the
+    caller rolls the player onto `rung` and has not developed him yet. The prior
+    version divided by the cumulative dev increment to `rung` instead, which
+    over-divided and down-classified every non-senior by ~1.5 tiers (an Average FR
+    at RT 35 read Poor; only seniors derived correctly, by coincidence) — the same
+    distortion that, once entry_tier stopped being persisted, silently degraded the
+    whole league. This remains a FALLBACK: new recruits carry entry_tier pool→FPD
+    and never reach here; a legacy old-scale big whose RT collapsed under height
+    gating still misclassifies (documented caveat, new-franchises-only)."""
     top_rt = max((v for v in (position_ratings or {}).values() if isinstance(v, (int, float))), default=30)
-    cum = 1.0
-    for r in RUNG_TRANSITIONS:
-        cum += STD_RUNG_INCREMENT[r]
-        if r == rung:
-            break
-    est_anchor = top_rt / cum
+    idx = _RATINGS_LADDER.index(rung) if rung in _RATINGS_LADDER else 1  # unknown → assume FR
+    ratings_year = _RATINGS_LADDER[max(0, idx - 1)]
+    est_anchor = top_rt / RUNG_MULTIPLIERS[ratings_year]
     return min(JH_ANCHOR_BY_TIER, key=lambda t: abs(JH_ANCHOR_BY_TIER[t] - est_anchor))
 
 
@@ -530,7 +542,19 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
     # position_intent (natural fit) and is forward-copied; a user converting a
     # player sets it explicitly (UI deferred to a later pass).
     training_position = fpd_doc.get("training_position") or position_intent
-    entry_tier = fpd_doc.get("entry_tier") or _derive_entry_tier_from_rt(ratings, rung)
+    entry_tier = fpd_doc.get("entry_tier")
+    if not entry_tier:
+        # FALLBACK — should fire ONLY for legacy docs. It fired for every new recruit
+        # for four seasons (FRD dropped entry_tier) and nobody noticed, so it is loud
+        # now: a warning per firing lets a dropped-field regression surface immediately
+        # instead of silently down-classifying the league.
+        entry_tier = _derive_entry_tier_from_rt(ratings, rung)
+        logger.warning(
+            "entry_tier missing for player %s (year=%s) — derived %r from RT. This "
+            "fallback is for legacy docs only; if it fires for a signed recruit, a "
+            "write path is dropping entry_tier.",
+            fpd_doc.get("player_id"), new_year, entry_tier,
+        )
 
     profile = fpd_doc.get("development")
     backfilled = False

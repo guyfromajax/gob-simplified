@@ -15181,6 +15181,16 @@ def finish_season(req: FinishSeasonRequest):
             "weight": recruit["weight"],
             "archetype": recruit["archetype"],
             "year": recruit["year"],
+            # entry_tier / position_intent / development MUST persist here. Dropping
+            # them (the pre-2026-08-01 bug) forced develop_rollover to re-derive
+            # entry_tier from the recruit's undeveloped JH RT at signing, which
+            # down-classified every recruit ~1.5 tiers permanently and collapsed the
+            # league's shooting on turnover. franchise_manager.py:537 forwards these
+            # to FPD if present; the creation FRD write (franchise_manager.py:538)
+            # already carries them — this recurring season write had diverged.
+            **({"entry_tier": recruit["entry_tier"]} if recruit.get("entry_tier") is not None else {}),
+            **({"position_intent": recruit["position_intent"]} if recruit.get("position_intent") is not None else {}),
+            **({"development": recruit["development"]} if recruit.get("development") is not None else {}),
             "Home Region": home_region,
             "Lean": fm._build_recruit_lean(home_region, region_team_ids),
             "created_at": recruit.get("created_at") or datetime.utcnow(),
