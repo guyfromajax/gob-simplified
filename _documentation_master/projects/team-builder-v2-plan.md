@@ -3,7 +3,7 @@
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
 **Spec version:** 2.0 — draft for alignment
-**Status:** Phase 0 implemented, acceptance pending a live play-through. Phases 1–3 not started.
+**Status:** Phase 0 **closed** — all six acceptance criteria pass. Phase 1 §4.3 measurement complete, rule confirmed. Phases 1–3 not started.
 **Last updated:** 1 August 2026
 
 ---
@@ -151,7 +151,25 @@ The 5-per-attribute minimum implies a per-player floor of **60** (5 × 12). But 
 
 Consequence, stated plainly: a capped roster's total will exceed the replaced program's by the sum of those shortfalls. Capped is therefore *near*-inherited, not literally inherited.
 
-**Measure before building:** report how many of the 1,536 players sit below 60, and the total top-up across the league. If it's a handful of players and tens of points, ship it. If it's hundreds of points, raise it before proceeding.
+**Measured, 1 August 2026 — rule confirmed, ship as written.**
+
+Source: `teams/all_players_with_team_names.txt`, core-12 across all 1,536 players.
+
+| Metric | Value |
+|---|---|
+| Players below 60 | **13** (0.85%) |
+| Teams with ≥1 below-60 player | **12 / 128** — 116 programs untouched |
+| Median team top-up | **0** |
+| Max single-team top-up | **36** (Concord) — ~0.6% of a median team total |
+| League-wide top-up | 136 points |
+| Position on roster | All 13 in the bottom 3 of a 12-man roster; 12 are last |
+
+**The league-wide figure is not the decision metric and should not be cited as one.** A user replaces one program, so the number that governs is the worst single-team top-up: 36 points, roughly 0.6% of team total, concentrated in the 12th man. Capped remains *near*-inherited with a deviation too small to carry competitive meaning.
+
+**Two consequences, both binding:**
+
+1. **The top-up is surfaced, never silent.** Where an inherited total is raised, the editor states it: *"Topped up from 24 — every player needs at least 5 in each attribute."* A budget that reads 60 against an inherited 24 with no explanation is indistinguishable from a bug, and silent adjustment is the pattern v1.3 §8.6 forbids.
+2. **`roster_shape_at_creation` (§4.7) records post-top-up values.** It exists so a future eligibility rule can be applied retroactively; storing the pre-top-up shape would have that rule evaluate a roster that never shipped.
 
 ### 4.4 Per-player ceilings
 
@@ -179,7 +197,7 @@ Step 3 of the wizard gains a fourth path and the existing three are re-framed:
 - Every attribute input clamps to 5–99.
 - **Reset per player** and **reset all**, returning to inherited values.
 
-**Mode is chosen once, at the top of the editor, and is visible throughout.** Switching modes after editing must warn that allocations will be re-based.
+**Mode is chosen once, at Step 3 before the four roster paths, and is visible throughout.** Switching modes after editing must warn that allocations will be re-based.
 
 ### 4.6 CSV changes
 
@@ -210,6 +228,7 @@ Still **unread in v1 and v2**. It exists so a future eligibility rule can be app
 8. `CH`, `EM`, `MO` appear nowhere in the editor or the CSV template.
 9. Reset-per-player and reset-all return inherited values exactly.
 10. No top-5 cap logic remains anywhere in the codebase.
+11. A capped franchise on a team with a below-60 player shows the top-up notice, and `roster_shape_at_creation` reflects the topped-up totals. Test with Concord — it carries the largest top-up in the league at 36 points.
 
 ---
 
@@ -401,7 +420,7 @@ This requires publishing a **filtered subset** of the baking manifest into the g
 
 | # | Item | Owner |
 |---|---|---|
-| 1 | Count of players below 60 and total league-wide top-up (§4.3) | Grok, before Phase 1 |
+| 1 | ~~Count of players below 60 and total league-wide top-up (§4.3)~~ — **closed 1 Aug 2026, rule ships as written** | Grok, before Phase 1 |
 | 2 | Original court source file — findable outside the repo? (§6.3) | Jamie |
 | 3 | Banner design direction — one or two review rounds (§6.2) | Jamie + Claude |
 | 4 | Trademark clearance on "Team Builder" before any marketing surface | Jamie — carried from v1.3 |
@@ -416,7 +435,9 @@ This requires publishing a **filtered subset** of the baking manifest into the g
 | 1 | Capped/uncapped modes replace the four-condition budget | User-chosen mode is simpler than computed compliance, and capped makes stacking structurally impossible |
 | 2 | Top-5 cap retired entirely | Redundant under capped (points can't move between players); unnecessary under uncapped (ineligible by definition) |
 | 3 | Capped reallocation is **within a player**, uncapped is **across the roster** | The distinction is what makes capped safe for competitive play |
-| 4 | Players below 60 are topped up to 60 in capped mode | Clean rule; the alternative is an unsatisfiable minimum. Accepts that capped is near-inherited, not literally inherited. |
+| 4 | Players below 60 are topped up to 60 in capped mode | Clean rule; the alternative is an unsatisfiable minimum. Accepts that capped is near-inherited, not literally inherited. **Confirmed by measurement (§4.3): 13 players, 12 teams affected, worst case 36 points (~0.6% of team total), median team unaffected.** |
+| 19 | The top-up is surfaced in the editor, not applied silently | A budget reading 60 against an inherited 24 with no explanation is indistinguishable from a bug — and silent adjustment is the pattern v1.3 §8.6 forbids everywhere else |
+| 20 | The §4.3 gate metric is **worst single-team top-up**, not the league-wide sum | A user replaces one program; no franchise ever experiences the league total. The original gate wording asked for the wrong number. |
 | 5 | Uncapped budget = largest team total in the league (7,027) | Reads as "the best program's worth of talent" |
 | 6 | Eligibility is determined by mode, not computed | Substantial simplification; the meter becomes an allocation aid |
 | 7 | Inline roster editor is required, not optional | Capped mode is not expressible through CSV |

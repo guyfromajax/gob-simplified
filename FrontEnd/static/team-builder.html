@@ -99,10 +99,28 @@
 
     <section id="tb-step-3" class="tb-panel" hidden>
       <h2 class="tb-panel-title">Roster</h2>
+      <div class="tb-mode-chooser" id="tb-mode-chooser" role="group" aria-label="Attribute mode">
+        <p class="tb-mode-chooser-label">Attribute mode <span class="tb-mode-pill" id="tb-mode-pill">Capped · online eligible</span></p>
+        <div class="tb-mode-cards">
+          <button type="button" class="tb-mode-card is-selected" data-attr-mode="capped" id="tb-mode-capped">
+            <strong>Capped</strong>
+            <span>Each player keeps his inherited total. Points stay within that player. Eligible for online play.</span>
+          </button>
+          <button type="button" class="tb-mode-card" data-attr-mode="uncapped" id="tb-mode-uncapped">
+            <strong>Uncapped</strong>
+            <span>One team pool of 7,027 points, free across the roster. Not eligible for online play.</span>
+          </button>
+        </div>
+        <p class="tb-optional-note" id="tb-mode-switch-note" hidden>Switching modes re-bases allocations from the inherited roster.</p>
+      </div>
       <div class="tb-roster-cards" id="tb-roster-cards">
         <button type="button" class="tb-roster-card is-selected" data-mode="keep">
           <strong id="tb-keep-label">Keep this program's roster</strong>
-          <span>Fastest, zero risk. This is the default.</span>
+          <span>Fastest, zero risk. This is the default. No attribute top-up.</span>
+        </button>
+        <button type="button" class="tb-roster-card" data-mode="edit">
+          <strong>Edit this roster</strong>
+          <span>Inherited 15 in a table — redistribute within the chosen mode.</span>
         </button>
         <button type="button" class="tb-roster-card" data-mode="generate">
           <strong>Generate a new roster</strong>
@@ -113,9 +131,16 @@
           <span>CSV upload — optional columns left blank are generated.</span>
         </button>
       </div>
+      <div id="tb-editor-panel" class="tb-editor-panel" hidden>
+        <div class="tb-editor-toolbar">
+          <button type="button" class="tb-btn tb-btn-secondary" id="tb-editor-reset-all">Reset all to inherited</button>
+        </div>
+        <div id="tb-editor-host" class="tb-editor-host"></div>
+      </div>
       <div id="tb-import-panel" class="tb-import-panel" hidden>
         <p>Required: <code>first_name</code>, <code>last_name</code>, <code>class_year</code> (FR, SO, JR, or SR)</p>
         <p>Optional: everything else — see the template. Anything we don't recognize is ignored. Anything you leave blank, we generate.</p>
+        <p class="tb-optional-note">Chemistry, emotion and morale are set by the game.</p>
         <div class="tb-import-actions">
           <button type="button" class="tb-btn tb-btn-secondary" id="tb-dl-blank">Download blank template (CSV)</button>
           <button type="button" class="tb-btn tb-btn-secondary" id="tb-dl-slot">Download current roster</button>
@@ -144,30 +169,17 @@
         </div>
       </div>
       <div id="tb-budget-meter" class="tb-budget-meter">
-        <div class="tb-budget-track" data-bar="team">
+        <div class="tb-budget-track" data-bar="team" id="tb-budget-track-team">
           <div class="tb-budget-bar" id="tb-budget-bar-team">
             <span id="tb-budget-fill"></span>
             <i class="tb-budget-marker" id="tb-team-marker-median" style="left:0%" title="Median program"></i>
             <i class="tb-budget-marker is-best" id="tb-team-marker-best" style="left:0%" title="Best program"></i>
           </div>
-          <div id="tb-budget-label">Team total: — / 6,400</div>
+          <div id="tb-budget-label">Team pool: — / 7,027</div>
           <div id="tb-budget-context" class="tb-budget-context">median program 5,567 · best program 7,027</div>
         </div>
-        <div class="tb-budget-track" data-bar="top5">
-          <div class="tb-budget-bar" id="tb-budget-bar-top5">
-            <span id="tb-top5-fill"></span>
-            <i class="tb-budget-marker" id="tb-top5-marker-median" style="left:0%" title="Median program"></i>
-            <i class="tb-budget-marker is-best" id="tb-top5-marker-best" style="left:0%" title="Best program"></i>
-          </div>
-          <div id="tb-top5-label">Top-5: — / 3,950</div>
-          <div id="tb-top5-context" class="tb-budget-context">median program 3,148 · best program 3,954</div>
-        </div>
-        <div id="tb-ceiling-line" class="tb-ceiling-line">Per-player ceiling: pass</div>
-        <div id="tb-floor-line" class="tb-floor-line">Per-player floor (top 12): pass</div>
         <div id="tb-budget-warn" class="tb-budget-warn" hidden></div>
         <div id="tb-elig-badge" class="tb-elig is-yes">Eligible for online competitions</div>
-        <button type="button" class="tb-budget-details-toggle" id="tb-budget-details-toggle" hidden>Show details</button>
-        <div id="tb-budget-details" class="tb-budget-details" hidden></div>
       </div>
       <div class="tb-actions">
         <button type="button" class="tb-btn tb-btn-secondary" data-nav="2">Back</button>

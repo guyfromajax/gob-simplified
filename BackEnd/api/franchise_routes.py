@@ -2596,8 +2596,10 @@ class TeamBuilderApplyRequest(BaseModel):
     secondary_color: str
     # 1 = SOLID, 2 = SOLID WITH TRIM (maps to uniforms body / body+trim)
     jersey_preset: int | None = 1
-    # keep | generate | import
+    # keep | edit | generate | import
     roster_mode: str = "keep"
+    # capped | uncapped — determines online eligibility (v2 §4)
+    attribute_mode: str = "capped"
     imported_players: list[dict[str, Any]] | None = None
 
 
@@ -3513,11 +3515,16 @@ def team_builder_apply(
     Create a franchise with a Team Builder overlay for one replaced slot.
     Franchise creation begins here — not when the wizard opens.
     """
-    from BackEnd.constants.team_builder_budget import evaluate_roster_budget
+    from BackEnd.constants.team_builder_budget import (
+        evaluate_mode_roster,
+        normalize_attribute_mode,
+        online_eligible_for_mode,
+    )
     from BackEnd.utils.franchise_team_display import (
         TEAM_BUILDER_FIELD,
         normalize_jersey_preset,
     )
+    from BackEnd.utils.team_builder_roster import collect_budget_attrs
 
     existing_franchises = db.franchises.count_documents({"user_id": user.get("user_id")})
     if existing_franchises >= MAX_FRANCHISES_PER_USER:
@@ -3561,6 +3568,12 @@ def team_builder_apply(
     _ensure_home_slots_for_user(user.get("user_id"))
     home_slot = _allocate_home_slot(user.get("user_id"), body.home_slot)
 
+    roster_mode = (body.roster_mode or "keep").strip().lower()
+    attribute_mode = normalize_attribute_mode(body.attribute_mode)
+    # Keep path: byte-identical inherited roster; still capped-eligible by mode default,
+    # but eligibility follows the chosen mode (keep never applies top-up).
+    online_eligible = online_eligible_for_mode(attribute_mode)
+
     replaced_name = team_doc.get("name") or ""
     overlay = {
         "replaced_object_id": str(replaced_oid),
@@ -3572,7 +3585,8 @@ def team_builder_apply(
         "secondary_color": body.secondary_color,
         "jersey_preset": normalize_jersey_preset(body.jersey_preset),
         "asset_strategy": "generated",
-        "roster_mode": body.roster_mode or "keep",
+        "roster_mode": roster_mode,
+        "attribute_mode": attribute_mode,
     }
 
     manager = FranchiseManager(db)
@@ -3584,9 +3598,8 @@ def team_builder_apply(
     )
     franchise_id = manager.franchise_id
 
-    roster_mode = (body.roster_mode or "keep").strip().lower()
-    if roster_mode in ("import", "generate"):
-        from BackEnd.utils.team_builder_roster import collect_budget_attrs, replace_slot_roster
+    if roster_mode in ("import", "generate", "edit"):
+        from BackEnd.utils.team_builder_roster import replace_slot_roster
 
         try:
             replace_slot_roster(
@@ -3597,6 +3610,7 @@ def team_builder_apply(
                 imported_players=body.imported_players,
                 franchise_team_data_collection=franchise_team_data_collection,
                 franchise_players_data_collection=franchise_players_data_collection,
+                attribute_mode=attribute_mode,
             )
         except Exception:
             logger.exception(
@@ -3606,10 +3620,12 @@ def team_builder_apply(
             )
             raise HTTPException(status_code=500, detail="Unable to apply roster changes")
 
-    # Soft budget metadata (forward-looking). Re-evaluate after import/generate.
+    # Mode metadata (forward-looking). Shape is post-top-up for paths that top up;
+    # keep path records the as-shipped (byte-identical) inherited shape.
     budget_meta: dict[str, Any] = {
-        "eligible_for_online": True,
-        "hasEverExceededBudget": False,
+        "attribute_mode": attribute_mode,
+        "online_eligible": online_eligible,
+        "hasEverExceededBudget": not online_eligible,
         "roster_shape_at_creation": None,
     }
     try:
@@ -3624,9 +3640,13 @@ def team_builder_apply(
             pids,
         )
         if attrs_list:
-            evaluation = evaluate_roster_budget(attrs_list)
+            evaluation = evaluate_mode_roster(
+                attribute_mode=attribute_mode,
+                player_attrs=attrs_list,
+            )
             budget_meta = {
-                "eligible_for_online": bool(evaluation["eligible_for_online"]),
+                "attribute_mode": evaluation["attribute_mode"],
+                "online_eligible": bool(evaluation["online_eligible"]),
                 "hasEverExceededBudget": bool(evaluation["has_ever_exceeded_budget"]),
                 "roster_shape_at_creation": evaluation["roster_shape"],
             }
@@ -3640,7 +3660,10 @@ def team_builder_apply(
                 "home_slot": home_slot,
                 TEAM_BUILDER_FIELD: overlay,
                 "user_team_id": custom_name,
-                "online_eligibility": budget_meta["eligible_for_online"],
+                "attribute_mode": budget_meta["attribute_mode"],
+                # Spec name (v2 §4.7) plus legacy alias read by FCC today.
+                "online_eligible": budget_meta["online_eligible"],
+                "online_eligibility": budget_meta["online_eligible"],
                 "hasEverExceededBudget": budget_meta["hasEverExceededBudget"],
                 "roster_shape_at_creation": budget_meta["roster_shape_at_creation"],
             }
@@ -3687,7 +3710,10 @@ def team_builder_apply(
         "franchise_id": str(franchise_id),
         "home_slot": home_slot,
         "team_builder": overlay,
-        "online_eligibility": budget_meta["eligible_for_online"],
+        "attribute_mode": budget_meta["attribute_mode"],
+        "online_eligible": budget_meta["online_eligible"],
+        "online_eligibility": budget_meta["online_eligible"],
+        "roster_shape_at_creation": budget_meta["roster_shape_at_creation"],
     }
 
 
@@ -7768,10 +7794,17 @@ def command_center_data(
                     response["jersey_preset"] = display.get("jersey_preset")
                 response["user_team_object_id"] = str(team_id)
                 # Frozen at Apply (§9.4) — surface as franchise metadata only.
-                if "online_eligibility" in franchise_doc:
+                if "online_eligible" in franchise_doc:
+                    response["online_eligible"] = bool(franchise_doc.get("online_eligible"))
+                    response["online_eligibility"] = response["online_eligible"]
+                elif "online_eligibility" in franchise_doc:
                     response["online_eligibility"] = bool(franchise_doc.get("online_eligibility"))
+                    response["online_eligible"] = response["online_eligibility"]
                 else:
                     response["online_eligibility"] = True
+                    response["online_eligible"] = True
+                if "attribute_mode" in franchise_doc:
+                    response["attribute_mode"] = franchise_doc.get("attribute_mode")
                 if "hasEverExceededBudget" in franchise_doc:
                     response["hasEverExceededBudget"] = bool(
                         franchise_doc.get("hasEverExceededBudget")
@@ -9287,8 +9320,18 @@ def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
             by_id = results.get("signed_by_recruit_id") or {}
             signed_info = by_id.get(str(recruit_id)) if isinstance(by_id, dict) else None
             if isinstance(signed_info, dict):
-                team_name = str(signed_info.get("team_name") or "").strip()
+                # Persist may store core team_name; resolve display at the edge by team_id.
+                from BackEnd.utils.franchise_team_display import resolve_team_display
+
                 walk_on = bool(signed_info.get("walk_on"))
+                signed_tid = signed_info.get("team_id")
+                team_name = ""
+                if signed_tid:
+                    team_name = str(
+                        resolve_team_display(franchise_oid, signed_tid).get("name") or ""
+                    ).strip()
+                if not team_name:
+                    team_name = str(signed_info.get("team_name") or "").strip()
                 doc["is_signed"] = True
                 doc["signed_team_name"] = team_name or None
                 if team_name:
@@ -11784,10 +11827,10 @@ def get_recruiting_data(
             {"_id": 0, "franchise_id": 0},
         )
     )
-    team_name_map = {
-        str(team["_id"]): team.get("name", str(team["_id"]))
-        for team in db.teams.find({}, {"name": 1})
-    }
+    # Chrome labels: overlay-aware map (not core teams.name). Same dual-field rule as schedule.
+    from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+    team_name_map = resolve_team_name_map(franchise_doc)
 
     # Recruiting Hub passive "story strip" + row "New" badge: the recruits that recently
     # added the user's team to their lean list. Mirrors the FCC-card computation

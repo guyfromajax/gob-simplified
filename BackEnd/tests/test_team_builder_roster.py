@@ -1,19 +1,24 @@
 import unittest
 
 from BackEnd.utils.team_builder_roster import (
+    ROSTER_CSV_HEADERS,
     class_year_for_export,
     parse_import_class_year,
-    ROSTER_CSV_HEADERS,
 )
 
 
 class TestTeamBuilderRosterHelpers(unittest.TestCase):
-    def test_csv_headers_match_spec(self):
+    def test_csv_headers_drop_intangibles(self):
         self.assertEqual(
             ROSTER_CSV_HEADERS[:3],
             ("first_name", "last_name", "class_year"),
         )
-        self.assertEqual(ROSTER_CSV_HEADERS[-3:], ("CH", "EM", "MO"))
+        self.assertEqual(
+            ROSTER_CSV_HEADERS[-3:],
+            ("ND", "IQ", "FT"),
+        )
+        for banned in ("CH", "EM", "MO"):
+            self.assertNotIn(banned, ROSTER_CSV_HEADERS)
 
     def test_parse_import_class_year(self):
         self.assertEqual(parse_import_class_year("FR"), "Freshman")

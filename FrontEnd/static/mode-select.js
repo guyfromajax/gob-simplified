@@ -1197,9 +1197,10 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
   if (activeGameResume) {
     enterLabel = 'Resume Game →';
     const resumeIsAway = String(activeGameResume.user_team_side || 'home').toLowerCase() === 'away';
+    // Payload keeps core *_team_name for URL/score keys; chrome uses *_display_name.
     const resumeOpponent = resumeIsAway
-      ? (activeGameResume.home_team_name || 'Opponent')
-      : (activeGameResume.away_team_name || 'Opponent');
+      ? (activeGameResume.home_display_name || activeGameResume.home_team_name || 'Opponent')
+      : (activeGameResume.away_display_name || activeGameResume.away_team_name || 'Opponent');
     resumeHtml =
       '<div class="franchise-resume-card">' +
         '<div>' +

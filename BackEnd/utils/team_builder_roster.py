@@ -10,7 +10,13 @@ from typing import Any, Mapping, Sequence
 from bson import ObjectId
 
 from BackEnd.constants import BOX_SCORE_KEYS, LEAGUE_MEDIAN_HEIGHT_IN
-from BackEnd.constants.team_builder_budget import CORE_12_ATTRS
+from BackEnd.constants.team_builder_budget import (
+    ATTR_MAX,
+    ATTR_MIN,
+    CORE_12_ATTRS,
+    apply_capped_topup,
+    normalize_attribute_mode,
+)
 from BackEnd.models.franchise_manager import generate_walk_on_profile, get_franchise_name_assets, choose_franchise_first_name
 from BackEnd.models.player import Player
 from BackEnd.utils.franchise_rank_prestige import core_total_player_attrs
@@ -26,9 +32,6 @@ ROSTER_CSV_HEADERS: tuple[str, ...] = (
     "weight_lb",
     "jersey",
     *CORE_12_ATTRS,
-    "CH",
-    "EM",
-    "MO",
 )
 
 MAX_ROSTER_SIZE = 15
@@ -102,8 +105,6 @@ def _player_row_for_csv(player: Mapping[str, Any]) -> dict[str, Any]:
     for key in CORE_12_ATTRS:
         val = attrs.get(key)
         row[key] = val if val is not None and val != "" else ""
-    for key in ("CH", "EM", "MO"):
-        row[key] = ""
     return row
 
 
@@ -231,20 +232,46 @@ def slot_band_defaults(
     return defaults
 
 
+def _merge_row_core_attrs(row: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Accept top-level core-12 keys or nested attributes{} from the editor."""
+    raw = dict(row or {})
+    nested = raw.get("attributes") if isinstance(raw.get("attributes"), Mapping) else {}
+    merged: dict[str, Any] = {}
+    for key in CORE_12_ATTRS:
+        if key in raw and raw[key] not in (None, ""):
+            merged[key] = raw[key]
+        elif key in nested and nested[key] not in (None, ""):
+            merged[key] = nested[key]
+    return merged
+
+
 def _normalize_import_core_attrs(
     raw: Mapping[str, Any] | None,
     band_defaults: Mapping[str, Any],
+    *,
+    attribute_mode: str = "capped",
+    apply_topup: bool = False,
 ) -> dict[str, int]:
-    """Build core-12 attrs, filling blanks from slot medians."""
+    """Build core-12 attrs in [5, 99], filling blanks from slot medians."""
     band_attrs = band_defaults.get("attrs") or {}
+    merged = _merge_row_core_attrs(raw)
     attrs: dict[str, int] = {}
     for key in CORE_12_ATTRS:
-        val = _safe_int((raw or {}).get(key))
+        val = _safe_int(merged.get(key))
         if val is None:
-            val = _safe_int(band_attrs.get(key), 1)
-        attrs[key] = max(1, val or 1)
-        attrs[f"anchor_{key}"] = attrs[key]
-    return attrs
+            val = _safe_int(band_attrs.get(key), ATTR_MIN)
+        attrs[key] = max(ATTR_MIN, min(ATTR_MAX, val if val is not None else ATTR_MIN))
+
+    mode = normalize_attribute_mode(attribute_mode)
+    if apply_topup and mode == "capped":
+        topped = apply_capped_topup(attrs)
+        attrs = {key: int(topped["attrs"][key]) for key in CORE_12_ATTRS}
+
+    out: dict[str, int] = {}
+    for key in CORE_12_ATTRS:
+        out[key] = attrs[key]
+        out[f"anchor_{key}"] = attrs[key]
+    return out
 
 
 def _finalize_franchise_attributes(raw_core: dict[str, int]) -> dict[str, Any]:
@@ -299,8 +326,10 @@ def normalize_imported_players(
     band_defaults: Mapping[str, Any],
     team_name: str,
     team_object_id: ObjectId,
+    attribute_mode: str = "capped",
+    apply_topup: bool = False,
 ) -> list[dict[str, Any]]:
-    """Validate import rows; return normalized player payloads (max 15)."""
+    """Validate import/edit rows; return normalized player payloads (max 15)."""
     if not imported_players:
         return []
 
@@ -308,19 +337,33 @@ def normalize_imported_players(
     for row in imported_players:
         if len(normalized) >= MAX_ROSTER_SIZE:
             break
-        first = str(row.get("first_name") or "").strip()
-        last = str(row.get("last_name") or "").strip()
+        meta_in = row.get("meta") if isinstance(row.get("meta"), Mapping) else {}
+        first = str(row.get("first_name") or meta_in.get("first_name") or "").strip()
+        last = str(row.get("last_name") or meta_in.get("last_name") or "").strip()
         if not first or not last:
             continue
-        year = parse_import_class_year(row.get("class_year"))
+        year = parse_import_class_year(
+            row.get("class_year") or meta_in.get("year") or row.get("year")
+        )
         if not year:
             continue
 
-        height = _safe_int(row.get("height_in"), band_defaults.get("height", LEAGUE_MEDIAN_HEIGHT_IN))
-        weight = _safe_int(row.get("weight_lb"), band_defaults.get("weight", 185))
-        jersey = _safe_int(row.get("jersey"))
+        height = _safe_int(
+            row.get("height_in"),
+            _safe_int(row.get("height"), _safe_int(meta_in.get("height"), band_defaults.get("height", LEAGUE_MEDIAN_HEIGHT_IN))),
+        )
+        weight = _safe_int(
+            row.get("weight_lb"),
+            _safe_int(row.get("weight"), _safe_int(meta_in.get("weight"), band_defaults.get("weight", 185))),
+        )
+        jersey = _safe_int(row.get("jersey"), _safe_int(meta_in.get("jersey")))
 
-        core_attrs = _normalize_import_core_attrs(row, band_defaults)
+        core_attrs = _normalize_import_core_attrs(
+            row,
+            band_defaults,
+            attribute_mode=attribute_mode,
+            apply_topup=apply_topup,
+        )
         attributes = _finalize_franchise_attributes(core_attrs)
 
         normalized.append(
@@ -359,6 +402,8 @@ def generate_roster_at_band(
     team_name: str,
     team_object_id: ObjectId,
     roster_size: int = MAX_ROSTER_SIZE,
+    attribute_mode: str = "capped",
+    apply_topup: bool = False,
 ) -> list[dict[str, Any]]:
     """
     Resample random names while preserving the slot's core-12 totals distribution.
@@ -396,6 +441,8 @@ def generate_roster_at_band(
         core = _normalize_import_core_attrs(
             {key: attrs_template.get(key) for key in CORE_12_ATTRS},
             band,
+            attribute_mode=attribute_mode,
+            apply_topup=apply_topup,
         )
         attrs = _finalize_franchise_attributes(core)
 
@@ -448,9 +495,13 @@ def replace_slot_roster(
     imported_players: Sequence[Mapping[str, Any]] | None,
     franchise_team_data_collection: Any,
     franchise_players_data_collection: Any,
+    attribute_mode: str = "capped",
 ) -> tuple[list[str], list[dict[str, Any]]]:
     """
     Replace the replaced slot's franchise roster after season init.
+
+    Path 1 keep is handled by the caller (no call / no rewrite). Paths 2–4
+    (edit / generate / import) apply capped top-up when attribute_mode is capped.
 
     Returns (new_player_ids, fpd_docs).
     """
@@ -477,12 +528,18 @@ def replace_slot_roster(
     ) if old_player_ids else []
 
     mode = (roster_mode or "keep").strip().lower()
-    if mode == "import":
+    attr_mode = normalize_attribute_mode(attribute_mode)
+    # Keep path never reaches here; top-up applies to edit/generate/import in capped only.
+    apply_topup = attr_mode == "capped" and mode != "keep"
+
+    if mode in ("import", "edit"):
         players = normalize_imported_players(
             imported_players,
             band_defaults=band_defaults,
             team_name=team_name,
             team_object_id=team_object_id,
+            attribute_mode=attr_mode,
+            apply_topup=apply_topup,
         )
         if not players:
             return old_player_ids, []
@@ -492,6 +549,8 @@ def replace_slot_roster(
             team_name=team_name,
             team_object_id=team_object_id,
             roster_size=MAX_ROSTER_SIZE,
+            attribute_mode=attr_mode,
+            apply_topup=apply_topup,
         )
     else:
         return old_player_ids, []

@@ -8,20 +8,16 @@
   })();
 
   const BUDGET = {
-    TEAM: 6400,
-    TOP5: 3950,
-    CEILING: 1035,
-    FLOOR: 24,
-    FLOOR_TOP_N: 12,
-    MAX_PLAYERS: 15,
+    ATTR_MIN: 5,
+    ATTR_MAX: 99,
+    TOPUP_FLOOR: 60,
+    UNCAPPED_TEAM_POOL: 7027,
     LEAGUE_TEAM_MEDIAN: 5567,
     LEAGUE_TEAM_BEST: 7027,
-    LEAGUE_TOP5_MEDIAN: 3148,
-    LEAGUE_TOP5_BEST: 3954,
+    MAX_PLAYERS: 15,
   };
 
   const CORE_12 = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'];
-  const INTANGIBLES = ['CH', 'EM', 'MO'];
 
   const FIELD_ALIASES = {
     first_name: ['first_name', 'firstname', 'first', 'fname', 'given_name'],
@@ -40,9 +36,6 @@
   CORE_12.forEach(function (a) {
     FIELD_ALIASES[a] = [a.toLowerCase(), a];
   });
-  INTANGIBLES.forEach(function (a) {
-    FIELD_ALIASES[a] = [a.toLowerCase(), a];
-  });
 
   const MAP_TARGETS = [
     'first_name',
@@ -56,7 +49,14 @@
     'mascot',
     'primary_color',
     'secondary_color',
-  ].concat(CORE_12, INTANGIBLES);
+  ].concat(CORE_12);
+
+  const YEAR_TO_CLASS = {
+    freshman: 'FR',
+    sophomore: 'SO',
+    junior: 'JR',
+    senior: 'SR',
+  };
 
   const CLASS_YEAR_MAP = {
     FR: 'FR',
@@ -106,6 +106,9 @@
       jersey_preset: 1,
     },
     roster_mode: 'keep',
+    attribute_mode: 'capped',
+    slotPlayers: null,
+    editor: { players: [], inherited: [], loaded: false },
     abbrConflict: null,
     allTeams: [],
     import: {
@@ -376,43 +379,398 @@
     return total;
   }
 
-  function evaluateRosterBudget(playerAttrsList) {
-    const totals = (playerAttrsList || []).map(core12Total);
-    const sorted = totals.slice().sort(function (a, b) {
-      return b - a;
+  function clampAttr(value) {
+    const n = parseInt(value, 10);
+    if (isNaN(n)) return BUDGET.ATTR_MIN;
+    return Math.max(BUDGET.ATTR_MIN, Math.min(BUDGET.ATTR_MAX, n));
+  }
+
+  function lowestCore12Key(attrs) {
+    let best = CORE_12[0];
+    CORE_12.forEach(function (k) {
+      if (attrs[k] < attrs[best] || (attrs[k] === attrs[best] && k < best)) best = k;
     });
+    return best;
+  }
+
+  function highestCore12Key(attrs) {
+    let best = CORE_12[0];
+    CORE_12.forEach(function (k) {
+      if (attrs[k] > attrs[best] || (attrs[k] === attrs[best] && k > best)) best = k;
+    });
+    return best;
+  }
+
+  function applyCappedTopup(rawAttrs) {
+    const raw = rawAttrs || {};
+    const rawTotal = core12Total(raw);
+    const toppedUp = rawTotal < BUDGET.TOPUP_FLOOR;
+    const budget = toppedUp ? BUDGET.TOPUP_FLOOR : Math.max(0, rawTotal);
+    const attrs = {};
+    CORE_12.forEach(function (key) {
+      attrs[key] = clampAttr(raw[key]);
+    });
+    let total = core12Total(attrs);
+    let guard = 0;
+    while (total < budget && guard < 2000) {
+      guard += 1;
+      const key = lowestCore12Key(attrs);
+      if (attrs[key] >= BUDGET.ATTR_MAX) break;
+      attrs[key] += 1;
+      total += 1;
+    }
+    guard = 0;
+    while (total > budget && guard < 2000) {
+      guard += 1;
+      const key = highestCore12Key(attrs);
+      if (attrs[key] <= BUDGET.ATTR_MIN) break;
+      attrs[key] -= 1;
+      total -= 1;
+    }
+    return {
+      attrs: attrs,
+      raw_total: rawTotal,
+      budget: budget,
+      topped_up: toppedUp,
+    };
+  }
+
+  function attrsWithModeTopup(attrs) {
+    if (state.attribute_mode === 'capped') {
+      return applyCappedTopup(attrs).attrs;
+    }
+    const out = {};
+    CORE_12.forEach(function (k) {
+      out[k] = clampAttr(attrs[k]);
+    });
+    return out;
+  }
+
+  function evaluateModeRoster(attributeMode, playerAttrsList, perPlayerBudgets) {
+    const mode = attributeMode === 'uncapped' ? 'uncapped' : 'capped';
+    const eligible = mode === 'capped';
+    const totals = (playerAttrsList || []).map(core12Total);
     const teamTotal = totals.reduce(function (s, t) {
       return s + t;
     }, 0);
-    const maxPlayer = sorted.length ? sorted[0] : 0;
-    const top5 = sorted.slice(0, 5).reduce(function (s, t) {
-      return s + t;
-    }, 0);
-    const overBudget = Math.max(0, teamTotal - BUDGET.TEAM);
-    const overTop5 = Math.max(0, top5 - BUDGET.TOP5);
-    const ceilingViolations = totals.filter(function (t) {
-      return t > BUDGET.CEILING;
-    }).length;
-    const floorPool = sorted.slice(0, BUDGET.FLOOR_TOP_N);
-    const floorViolations = floorPool.filter(function (t) {
-      return t < BUDGET.FLOOR;
-    }).length;
-    const eligible =
-      overBudget === 0 && overTop5 === 0 && ceilingViolations === 0 && floorViolations === 0;
+    const overPool =
+      mode === 'uncapped' ? Math.max(0, teamTotal - BUDGET.UNCAPPED_TEAM_POOL) : 0;
+    let perPlayerOver = 0;
+    if (mode === 'capped' && perPlayerBudgets) {
+      for (let i = 0; i < playerAttrsList.length; i++) {
+        const spent = core12Total(playerAttrsList[i]);
+        const cap = parseInt(perPlayerBudgets[i], 10) || 0;
+        if (spent > cap) perPlayerOver += spent - cap;
+      }
+    }
     return {
+      attribute_mode: mode,
+      online_eligible: eligible,
       team_total: teamTotal,
-      team_budget: BUDGET.TEAM,
-      over_budget_by: overBudget,
-      top5_total: top5,
-      top5_cap: BUDGET.TOP5,
-      over_top5_by: overTop5,
-      max_player: maxPlayer,
-      player_ceiling: BUDGET.CEILING,
-      ceiling_violations: ceilingViolations,
-      floor: BUDGET.FLOOR,
-      floor_violations: floorViolations,
-      eligible_for_online: eligible,
+      team_pool: BUDGET.UNCAPPED_TEAM_POOL,
+      over_pool_by: overPool,
+      per_player_over_by: perPlayerOver,
     };
+  }
+
+  function extractCore12FromPlayer(p) {
+    const a = (p && p.attributes) || p || {};
+    const out = {};
+    CORE_12.forEach(function (k) {
+      const v = a[k] != null ? a[k] : a[k.toLowerCase()];
+      if (v != null) out[k] = v;
+    });
+    return out;
+  }
+
+  function classYearFromPlayer(p) {
+    if (p.class_year) return normalizeClassYear(p.class_year);
+    const y = String(p.year || '').toLowerCase();
+    return YEAR_TO_CLASS[y] || null;
+  }
+
+  function buildEditorPlayerFromApi(p, attributeMode) {
+    const rawAttrs = extractCore12FromPlayer(p);
+    let attrs;
+    let rawTotal;
+    let budget;
+    let toppedUp;
+    if (attributeMode === 'capped') {
+      const topup = applyCappedTopup(rawAttrs);
+      attrs = Object.assign({}, topup.attrs);
+      rawTotal = topup.raw_total;
+      budget = topup.budget;
+      toppedUp = topup.topped_up;
+    } else {
+      attrs = {};
+      CORE_12.forEach(function (k) {
+        attrs[k] = clampAttr(rawAttrs[k]);
+      });
+      rawTotal = core12Total(rawAttrs);
+      budget = null;
+      toppedUp = false;
+    }
+    return {
+      first_name: p.first_name || '',
+      last_name: p.last_name || '',
+      class_year: classYearFromPlayer(p) || 'FR',
+      height_in: p.height_in != null ? p.height_in : p.height != null ? p.height : '',
+      weight_lb: p.weight_lb != null ? p.weight_lb : p.weight != null ? p.weight : '',
+      jersey: p.jersey != null ? p.jersey : '',
+      attrs: attrs,
+      raw_total: rawTotal,
+      budget: budget,
+      topped_up: toppedUp,
+      inheritedAttrs: Object.assign({}, attrs),
+    };
+  }
+
+  function cloneEditorPlayers(list) {
+    return (list || []).map(function (p) {
+      return JSON.parse(JSON.stringify(p));
+    });
+  }
+
+  function editorPlayersToImportPayload() {
+    return state.editor.players.map(function (p) {
+      const out = {
+        first_name: String(p.first_name || '').trim(),
+        last_name: String(p.last_name || '').trim(),
+        class_year: p.class_year,
+        attributes: Object.assign({}, p.attrs),
+      };
+      const h = parseInt(p.height_in, 10);
+      if (!isNaN(h)) out.height_in = h;
+      const w = parseInt(p.weight_lb, 10);
+      if (!isNaN(w)) out.weight_lb = w;
+      const j = parseInt(p.jersey, 10);
+      if (!isNaN(j)) out.jersey = j;
+      return out;
+    });
+  }
+
+  function updateModePill() {
+    const pill = document.getElementById('tb-mode-pill');
+    if (!pill) return;
+    pill.textContent =
+      state.attribute_mode === 'capped'
+        ? 'Capped · online eligible'
+        : 'Uncapped · not eligible for online';
+  }
+
+  function hasModeSensitiveEdits() {
+    if (state.roster_mode === 'edit' && state.editor.loaded) {
+      return JSON.stringify(state.editor.players) !== JSON.stringify(state.editor.inherited);
+    }
+    if (state.roster_mode === 'import' && state.import.committed) return true;
+    return false;
+  }
+
+  function setAttributeMode(mode, force) {
+    const next = mode === 'uncapped' ? 'uncapped' : 'capped';
+    if (next === state.attribute_mode) return true;
+    if (!force && hasModeSensitiveEdits()) {
+      const ok = window.confirm(
+        'Switching modes re-bases allocations from the inherited roster. Continue?'
+      );
+      if (!ok) return false;
+    }
+    state.attribute_mode = next;
+    document.querySelectorAll('.tb-mode-card').forEach(function (card) {
+      card.classList.toggle('is-selected', card.dataset.attrMode === next);
+    });
+    updateModePill();
+    const note = document.getElementById('tb-mode-switch-note');
+    if (note) note.hidden = !hasModeSensitiveEdits();
+    if (state.slotPlayers && state.roster_mode === 'edit') {
+      initEditorFromSlot(true);
+    }
+    if (state.roster_mode === 'import' && state.import.validPlayers.length) {
+      runValidation(false);
+    }
+    updateBudgetFromCurrentRoster();
+    return true;
+  }
+
+  function initEditorFromSlot(rebase) {
+    if (!state.slotPlayers || !state.slotPlayers.length) return;
+    const built = state.slotPlayers.map(function (p) {
+      return buildEditorPlayerFromApi(p, state.attribute_mode);
+    });
+    if (rebase || !state.editor.loaded) {
+      state.editor.players = cloneEditorPlayers(built);
+      state.editor.inherited = cloneEditorPlayers(built);
+      state.editor.loaded = true;
+    }
+    renderEditor();
+  }
+
+  function resetEditorPlayer(idx) {
+    if (!state.editor.inherited[idx]) return;
+    state.editor.players[idx] = JSON.parse(JSON.stringify(state.editor.inherited[idx]));
+    renderEditor();
+    updateBudgetFromCurrentRoster();
+  }
+
+  function resetAllEditor() {
+    state.editor.players = cloneEditorPlayers(state.editor.inherited);
+    renderEditor();
+    updateBudgetFromCurrentRoster();
+  }
+
+  function refreshEditorPlayerBudgetChrome(idx) {
+    const article = document.querySelector(
+      '#tb-editor-host .tb-editor-player[data-player-idx="' + idx + '"]'
+    );
+    const p = state.editor.players[idx];
+    if (!article || !p) return;
+    const capped = state.attribute_mode === 'capped';
+    const spent = core12Total(p.attrs);
+    const over = capped && spent > (p.budget || 0);
+    article.classList.toggle('is-over-budget', over);
+    const badge = article.querySelector('.tb-player-budget');
+    if (badge && capped) {
+      badge.textContent = spent + ' / ' + p.budget;
+      badge.classList.toggle('is-over', over);
+    }
+  }
+
+  function renderEditor() {
+    const host = document.getElementById('tb-editor-host');
+    if (!host) return;
+    if (!state.editor.players.length) {
+      host.innerHTML = '<p class="tb-panel-copy">Loading inherited roster…</p>';
+      return;
+    }
+    const capped = state.attribute_mode === 'capped';
+    let html = '';
+    state.editor.players.forEach(function (p, idx) {
+      const spent = core12Total(p.attrs);
+      const over = capped && spent > (p.budget || 0);
+      html +=
+        '<article class="tb-editor-player' +
+        (over ? ' is-over-budget' : '') +
+        '" data-player-idx="' +
+        idx +
+        '">';
+      html += '<div class="tb-editor-player-head">';
+      html +=
+        '<input type="text" class="tb-editor-name" data-field="first_name" data-idx="' +
+        idx +
+        '" value="' +
+        escapeHtml(p.first_name) +
+        '" placeholder="First" maxlength="32">';
+      html +=
+        '<input type="text" class="tb-editor-name" data-field="last_name" data-idx="' +
+        idx +
+        '" value="' +
+        escapeHtml(p.last_name) +
+        '" placeholder="Last" maxlength="32">';
+      html += '<select class="tb-editor-class" data-field="class_year" data-idx="' + idx + '">';
+      ['FR', 'SO', 'JR', 'SR'].forEach(function (cy) {
+        html +=
+          '<option value="' +
+          cy +
+          '"' +
+          (p.class_year === cy ? ' selected' : '') +
+          '>' +
+          cy +
+          '</option>';
+      });
+      html += '</select>';
+      html +=
+        '<label class="tb-editor-meta">Ht<input type="number" data-field="height_in" data-idx="' +
+        idx +
+        '" value="' +
+        escapeHtml(String(p.height_in)) +
+        '" min="60" max="90"></label>';
+      html +=
+        '<label class="tb-editor-meta">Wt<input type="number" data-field="weight_lb" data-idx="' +
+        idx +
+        '" value="' +
+        escapeHtml(String(p.weight_lb)) +
+        '" min="120" max="350"></label>';
+      html +=
+        '<label class="tb-editor-meta">#<input type="number" data-field="jersey" data-idx="' +
+        idx +
+        '" value="' +
+        escapeHtml(String(p.jersey)) +
+        '" min="0" max="99"></label>';
+      if (capped) {
+        html +=
+          '<span class="tb-player-budget' +
+          (over ? ' is-over' : '') +
+          '">' +
+          spent +
+          ' / ' +
+          p.budget +
+          '</span>';
+      }
+      html +=
+        '<button type="button" class="tb-btn tb-btn-secondary tb-editor-reset-one" data-reset-idx="' +
+        idx +
+        '">Reset</button>';
+      html += '</div>';
+      if (capped && p.topped_up) {
+        html +=
+          '<p class="tb-topup-notice">Topped up from ' +
+          p.raw_total +
+          ' — every player needs at least 5 in each attribute.</p>';
+      }
+      html += '<div class="tb-editor-attrs">';
+      CORE_12.forEach(function (key) {
+        html +=
+          '<label class="tb-editor-attr"><span>' +
+          key +
+          '</span><input type="number" data-attr="' +
+          key +
+          '" data-idx="' +
+          idx +
+          '" value="' +
+          (p.attrs[key] != null ? p.attrs[key] : BUDGET.ATTR_MIN) +
+          '" min="' +
+          BUDGET.ATTR_MIN +
+          '" max="' +
+          BUDGET.ATTR_MAX +
+          '"></label>';
+      });
+      html += '</div></article>';
+    });
+    host.innerHTML = html;
+  }
+
+  function onEditorHostChange(e) {
+    const t = e.target;
+    if (!t || !t.dataset) return;
+    const idx = parseInt(t.dataset.idx, 10);
+    if (isNaN(idx) || !state.editor.players[idx]) return;
+
+    if (t.dataset.attr) {
+      const key = t.dataset.attr;
+      state.editor.players[idx].attrs[key] = clampAttr(t.value);
+      t.value = state.editor.players[idx].attrs[key];
+      refreshEditorPlayerBudgetChrome(idx);
+      updateBudgetFromCurrentRoster();
+      return;
+    }
+
+    if (t.dataset.field) {
+      const field = t.dataset.field;
+      if (field === 'class_year') {
+        state.editor.players[idx].class_year = t.value;
+      } else if (field === 'height_in' || field === 'weight_lb' || field === 'jersey') {
+        state.editor.players[idx][field] = t.value;
+      } else {
+        state.editor.players[idx][field] = t.value;
+      }
+    }
+  }
+
+  function onEditorHostClick(e) {
+    const btn = e.target.closest('[data-reset-idx]');
+    if (!btn) return;
+    const idx = parseInt(btn.dataset.resetIdx, 10);
+    if (!isNaN(idx)) resetEditorPlayer(idx);
   }
 
   function setBarFill(fillEl, barEl, value, cap) {
@@ -427,12 +785,10 @@
     el.style.left = pct + '%';
   }
 
-  function placeLeagueMarkers() {
-    // Markers share each bar's cap scale; values past the cap clamp to 100%.
-    setMarker(document.getElementById('tb-team-marker-median'), BUDGET.LEAGUE_TEAM_MEDIAN, BUDGET.TEAM);
-    setMarker(document.getElementById('tb-team-marker-best'), BUDGET.LEAGUE_TEAM_BEST, BUDGET.TEAM);
-    setMarker(document.getElementById('tb-top5-marker-median'), BUDGET.LEAGUE_TOP5_MEDIAN, BUDGET.TOP5);
-    setMarker(document.getElementById('tb-top5-marker-best'), BUDGET.LEAGUE_TOP5_BEST, BUDGET.TOP5);
+  function placeLeagueMarkers(scaleMax) {
+    const cap = scaleMax || BUDGET.UNCAPPED_TEAM_POOL;
+    setMarker(document.getElementById('tb-team-marker-median'), BUDGET.LEAGUE_TEAM_MEDIAN, cap);
+    setMarker(document.getElementById('tb-team-marker-best'), BUDGET.LEAGUE_TEAM_BEST, cap);
   }
 
   function normalizeClassYear(raw) {
@@ -732,37 +1088,27 @@
     renderMessageList('tb-import-warnings', state.import.rowWarnings);
 
     const attrsList = state.import.validPlayers.map(function (p) {
-      return p.attributes || {};
+      return attrsWithModeTopup(p.attributes || {});
     });
-    const budgetEval = evaluateRosterBudget(attrsList);
-    if (budgetEval.over_budget_by > 0) {
+    let budgets = null;
+    if (state.attribute_mode === 'capped') {
+      budgets = state.import.validPlayers.map(function (p) {
+        return applyCappedTopup(p.attributes || {}).budget;
+      });
+    }
+    const budgetEval = evaluateModeRoster(state.attribute_mode, attrsList, budgets);
+    if (state.attribute_mode === 'uncapped' && budgetEval.over_pool_by > 0) {
       state.import.budgetWarnings.push(
-        'Over budget by ' +
-          budgetEval.over_budget_by +
-          ' points. This franchise won\'t be eligible for online competitions. Everything else works normally — you can keep playing, and you can trim attributes now if you want to stay eligible.'
+        'Team pool is ' +
+          budgetEval.over_pool_by +
+          ' over 7,027. Uncapped franchises are not eligible for online play.'
       );
     }
-    if (budgetEval.ceiling_violations > 0) {
+    if (state.attribute_mode === 'capped' && budgetEval.per_player_over_by > 0) {
       state.import.budgetWarnings.push(
-        budgetEval.ceiling_violations +
-          ' player' +
-          (budgetEval.ceiling_violations === 1 ? ' exceeds' : 's exceed') +
-          ' the per-player ceiling. This franchise won\'t be eligible for online competitions. Everything else works normally.'
-      );
-    }
-    if (budgetEval.floor_violations > 0) {
-      state.import.budgetWarnings.push(
-        budgetEval.floor_violations +
-          ' player' +
-          (budgetEval.floor_violations === 1 ? ' is' : 's are') +
-          ' below the minimum. This franchise won\'t be eligible for online competitions. Everything else works normally.'
-      );
-    }
-    if (budgetEval.over_top5_by > 0) {
-      state.import.budgetWarnings.push(
-        'Your top five is ' +
-          budgetEval.over_top5_by +
-          ' over the cap. The best starting five in the league totals 3,954. This franchise won\'t be eligible for online competitions; everything else works normally.'
+        'One or more players exceed their per-player budget by ' +
+          budgetEval.per_player_over_by +
+          ' total points. Trim attributes to stay within each player\'s cap.'
       );
     }
     if (state.import.budgetWarnings.length) {
@@ -931,7 +1277,7 @@
     if (skipped) {
       html += '<p>' + skipped + ' row' + (skipped === 1 ? '' : 's') + ' will be skipped (see below).</p>';
     }
-    if (state.roster_mode === 'import' || state.roster_mode === 'generate') {
+    if (state.roster_mode === 'import' || state.roster_mode === 'generate' || state.roster_mode === 'edit') {
       html += '<p>' + escapeHtml(replaced) + "'s current players won't be part of this franchise.</p>";
     }
     if (identityOn) {
@@ -1006,185 +1352,174 @@
     return s;
   }
 
-  function currentRosterAttrsForBudget() {
-    if (state.roster_mode === 'import' && state.import.importedPlayers && state.import.importedPlayers.length) {
-      return state.import.importedPlayers.map(function (p) {
-        return p.attributes || {};
-      });
+  function currentRosterBudgetInput() {
+    if (state.roster_mode === 'edit' && state.editor.loaded && state.editor.players.length) {
+      return {
+        attrsList: state.editor.players.map(function (p) {
+          return p.attrs;
+        }),
+        budgets:
+          state.attribute_mode === 'capped'
+            ? state.editor.players.map(function (p) {
+                return p.budget;
+              })
+            : null,
+      };
+    }
+    if (
+      state.roster_mode === 'import' &&
+      state.import.importedPlayers &&
+      state.import.importedPlayers.length
+    ) {
+      return {
+        attrsList: state.import.importedPlayers.map(function (p) {
+          return attrsWithModeTopup(p.attributes || {});
+        }),
+        budgets:
+          state.attribute_mode === 'capped'
+            ? state.import.importedPlayers.map(function (p) {
+                return applyCappedTopup(p.attributes || {}).budget;
+              })
+            : null,
+      };
     }
     if (state.roster_mode === 'keep' && state.slotRosterAttrs) {
-      return state.slotRosterAttrs;
+      return { attrsList: state.slotRosterAttrs, budgets: null };
     }
     return null;
   }
 
   function updateBudgetFromCurrentRoster() {
-    const attrsList = currentRosterAttrsForBudget();
-    if (!attrsList || !attrsList.length) {
+    const input = currentRosterBudgetInput();
+    if (!input || !input.attrsList.length) {
       state.budget = null;
       renderBudgetMeter(null);
       return;
     }
-    state.budget = evaluateRosterBudget(attrsList);
+    state.budget = evaluateModeRoster(
+      state.attribute_mode,
+      input.attrsList,
+      input.budgets
+    );
     renderBudgetMeter(state.budget);
   }
 
   function renderBudgetMeter(evalResult) {
     const fill = document.getElementById('tb-budget-fill');
-    const top5Fill = document.getElementById('tb-top5-fill');
     const teamBar = document.getElementById('tb-budget-bar-team');
-    const top5Bar = document.getElementById('tb-budget-bar-top5');
     const label = document.getElementById('tb-budget-label');
-    const top5Label = document.getElementById('tb-top5-label');
-    const ceiling = document.getElementById('tb-ceiling-line');
-    const floor = document.getElementById('tb-floor-line');
+    const context = document.getElementById('tb-budget-context');
     const badge = document.getElementById('tb-elig-badge');
     const warn = document.getElementById('tb-budget-warn');
-    const details = document.getElementById('tb-budget-details');
-    const toggle = document.getElementById('tb-budget-details-toggle');
+    const uncapped = state.attribute_mode === 'uncapped';
+    const poolCap = BUDGET.UNCAPPED_TEAM_POOL;
 
-    placeLeagueMarkers();
+    placeLeagueMarkers(poolCap);
+
+    if (context) {
+      context.textContent =
+        'median program ' +
+        BUDGET.LEAGUE_TEAM_MEDIAN.toLocaleString() +
+        ' · best program ' +
+        BUDGET.LEAGUE_TEAM_BEST.toLocaleString();
+      context.hidden = !uncapped;
+    }
 
     if (!evalResult) {
-      setBarFill(fill, teamBar, 0, BUDGET.TEAM);
-      setBarFill(top5Fill, top5Bar, 0, BUDGET.TOP5);
+      setBarFill(fill, teamBar, 0, poolCap);
       if (state.roster_mode === 'generate') {
-        if (label) {
-          label.textContent = 'Team total: estimated until Apply (band resampling)';
-        }
-        if (top5Label) {
-          top5Label.textContent = 'Top-5: estimated until Apply';
-        }
-        if (ceiling) {
-          ceiling.textContent = 'Per-player ceiling: estimated until Apply';
-          ceiling.className = 'tb-ceiling-line';
-        }
-        if (floor) {
-          floor.textContent = 'Per-player floor (top 12): estimated until Apply';
-          floor.className = 'tb-floor-line';
-        }
+        if (label) label.textContent = 'Team pool: estimated until Apply';
         if (badge) {
-          badge.textContent = 'Eligibility estimated — confirmed at Apply';
-          badge.className = 'tb-elig is-yes';
+          badge.textContent = uncapped
+            ? 'Not eligible for online play (uncapped)'
+            : 'Eligible for online play (capped)';
+          badge.className = uncapped ? 'tb-elig is-no' : 'tb-elig is-yes';
         }
-        if (warn) warn.hidden = true;
-        if (details) details.hidden = true;
-        if (toggle) toggle.hidden = true;
       } else if (state.roster_mode === 'keep') {
         if (label) {
           label.textContent = state.slotRosterLoading
             ? 'Team total: loading slot roster…'
-            : 'Team total: estimated within 6,400 (keep)';
-        }
-        if (top5Label) {
-          top5Label.textContent = state.slotRosterLoading
-            ? 'Top-5: loading…'
-            : 'Top-5: estimated within 3,950 (keep)';
-        }
-        if (ceiling) {
-          ceiling.textContent = 'Per-player ceiling: —';
-          ceiling.className = 'tb-ceiling-line';
-        }
-        if (floor) {
-          floor.textContent = 'Per-player floor (top 12): —';
-          floor.className = 'tb-floor-line';
+            : uncapped
+              ? 'Team pool: inherited roster (keep)'
+              : 'Team total: inherited roster (keep, no top-up)';
         }
         if (badge) {
-          badge.textContent = 'Eligible for online competitions';
-          badge.className = 'tb-elig is-yes';
+          badge.textContent = uncapped
+            ? 'Not eligible for online play (uncapped)'
+            : 'Eligible for online play (capped)';
+          badge.className = uncapped ? 'tb-elig is-no' : 'tb-elig is-yes';
         }
-        if (warn) warn.hidden = true;
-        if (details) details.hidden = true;
-        if (toggle) toggle.hidden = true;
+      } else if (state.roster_mode === 'edit') {
+        if (label) {
+          label.textContent = state.slotRosterLoading
+            ? 'Loading inherited roster…'
+            : uncapped
+              ? 'Team pool: — / 7,027'
+              : 'Per-player budgets enforced in editor';
+        }
+        if (badge) {
+          badge.textContent = uncapped
+            ? 'Not eligible for online play (uncapped)'
+            : 'Eligible for online play (capped)';
+          badge.className = uncapped ? 'tb-elig is-no' : 'tb-elig is-yes';
+        }
       } else {
-        if (label) label.textContent = 'Team total: — / 6,400';
-        if (top5Label) top5Label.textContent = 'Top-5: — / 3,950';
-        if (ceiling) {
-          ceiling.textContent = 'Per-player ceiling: —';
-          ceiling.className = 'tb-ceiling-line';
-        }
-        if (floor) {
-          floor.textContent = 'Per-player floor (top 12): —';
-          floor.className = 'tb-floor-line';
+        if (label) {
+          label.textContent = uncapped ? 'Team pool: — / 7,027' : 'Per-player budgets apply when editing';
         }
         if (badge) {
-          badge.textContent = 'Eligible for online competitions';
-          badge.className = 'tb-elig is-yes';
+          badge.textContent = uncapped
+            ? 'Not eligible for online play (uncapped)'
+            : 'Eligible for online play (capped)';
+          badge.className = uncapped ? 'tb-elig is-no' : 'tb-elig is-yes';
         }
-        if (warn) warn.hidden = true;
       }
+      if (warn) warn.hidden = true;
       return;
     }
 
-    setBarFill(fill, teamBar, evalResult.team_total, BUDGET.TEAM);
-    setBarFill(top5Fill, top5Bar, evalResult.top5_total, BUDGET.TOP5);
-    if (label) {
-      label.textContent =
-        'Team total: ' +
-        evalResult.team_total.toLocaleString() +
-        ' / ' +
-        BUDGET.TEAM.toLocaleString();
+    const teamTotal = evalResult.team_total;
+    if (uncapped) {
+      setBarFill(fill, teamBar, teamTotal, poolCap);
+      if (label) {
+        label.textContent =
+          'Team pool: ' +
+          teamTotal.toLocaleString() +
+          ' / ' +
+          poolCap.toLocaleString();
+      }
+    } else {
+      setBarFill(fill, teamBar, teamTotal, Math.max(teamTotal, poolCap));
+      if (label) {
+        label.textContent = 'Team total: ' + teamTotal.toLocaleString();
+      }
+      if (teamBar) teamBar.classList.toggle('is-over', evalResult.per_player_over_by > 0);
     }
-    if (top5Label) {
-      top5Label.textContent =
-        'Top-5: ' +
-        evalResult.top5_total.toLocaleString() +
-        ' / ' +
-        BUDGET.TOP5.toLocaleString();
-    }
-    if (ceiling) {
-      const pass = evalResult.ceiling_violations === 0;
-      ceiling.textContent =
-        'Per-player ceiling: ' +
-        (pass ? 'pass' : 'fail (' + evalResult.ceiling_violations + ' over ' + BUDGET.CEILING + ')');
-      ceiling.className = 'tb-ceiling-line ' + (pass ? 'is-pass' : 'is-fail');
-    }
-    if (floor) {
-      const pass = evalResult.floor_violations === 0;
-      floor.textContent =
-        'Per-player floor (top 12): ' +
-        (pass ? 'pass' : 'fail (' + evalResult.floor_violations + ' below ' + BUDGET.FLOOR + ')');
-      floor.className = 'tb-floor-line ' + (pass ? 'is-pass' : 'is-fail');
-    }
+
     if (badge) {
-      if (evalResult.eligible_for_online) {
-        badge.textContent = 'Eligible for online competitions';
+      if (evalResult.online_eligible) {
+        badge.textContent = 'Eligible for online play (capped)';
         badge.className = 'tb-elig is-yes';
       } else {
-        badge.textContent = 'Not eligible for online competitions';
+        badge.textContent = 'Not eligible for online play (uncapped)';
         badge.className = 'tb-elig is-no';
       }
     }
+
     if (warn) {
       const msgs = [];
-      if (evalResult.over_budget_by > 0) {
+      if (evalResult.over_pool_by > 0) {
         msgs.push(
-          'Over budget by ' +
-            evalResult.over_budget_by +
-            ' points. This franchise won\'t be eligible for online competitions. Everything else works normally — you can keep playing, and you can trim attributes now if you want to stay eligible.'
+          'Team pool is ' +
+            evalResult.over_pool_by +
+            ' over 7,027. Uncapped franchises are not eligible for online play.'
         );
       }
-      if (evalResult.over_top5_by > 0) {
+      if (evalResult.per_player_over_by > 0) {
         msgs.push(
-          'Your top five is ' +
-            evalResult.over_top5_by +
-            ' over the cap. The best starting five in the league totals 3,954. This franchise won\'t be eligible for online competitions; everything else works normally.'
-        );
-      }
-      if (evalResult.floor_violations > 0) {
-        msgs.push(
-          evalResult.floor_violations +
-            ' player' +
-            (evalResult.floor_violations === 1 ? ' is' : 's are') +
-            ' below the minimum. This franchise won\'t be eligible for online competitions. Everything else works normally.'
-        );
-      }
-      if (evalResult.ceiling_violations > 0) {
-        msgs.push(
-          evalResult.ceiling_violations +
-            ' player' +
-            (evalResult.ceiling_violations === 1 ? ' exceeds' : 's exceed') +
-            ' the per-player ceiling. This franchise won\'t be eligible for online competitions. Everything else works normally.'
+          'One or more players exceed their per-player budget by ' +
+            evalResult.per_player_over_by +
+            ' total points. Points cannot move between players — trim within each player.'
         );
       }
       if (msgs.length) {
@@ -1197,50 +1532,33 @@
         warn.textContent = '';
       }
     }
-    if (details && toggle) {
-      toggle.hidden = false;
-      details.textContent =
-        'Team total ' +
-        evalResult.team_total +
-        ', top-5 ' +
-        evalResult.top5_total +
-        ' (cap ' +
-        BUDGET.TOP5 +
-        '), max player ' +
-        evalResult.max_player +
-        ', ceiling ' +
-        BUDGET.CEILING +
-        ', floor ' +
-        BUDGET.FLOOR +
-        ' (top ' +
-        BUDGET.FLOOR_TOP_N +
-        ').';
-    }
   }
 
-  async function fetchSlotRosterBudget() {
+  async function fetchSlotRoster() {
     if (!state.slot) return;
     state.slotRosterLoading = true;
-    if (state.roster_mode === 'keep') renderBudgetMeter(null);
+    if (state.roster_mode === 'keep' || state.roster_mode === 'edit') renderBudgetMeter(null);
     try {
       const url = API_CONFIG.buildUrl('/roster/' + encodeURIComponent(state.slot.name));
       const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
       if (!res.ok) throw new Error('roster fetch failed');
       const data = await res.json();
-      state.slotRosterAttrs = (data.players || []).map(function (p) {
-        const a = p.attributes || {};
-        const out = {};
-        CORE_12.forEach(function (k) {
-          if (a[k] != null) out[k] = a[k];
-        });
-        return out;
+      state.slotPlayers = data.players || [];
+      state.slotRosterAttrs = state.slotPlayers.map(function (p) {
+        return extractCore12FromPlayer(p);
       });
+      if (state.roster_mode === 'edit' && state.editor.loaded) {
+        initEditorFromSlot(true);
+      }
       if (state.roster_mode === 'keep') updateBudgetFromCurrentRoster();
     } catch (_) {
+      state.slotPlayers = null;
       state.slotRosterAttrs = null;
     } finally {
       state.slotRosterLoading = false;
-      if (state.roster_mode === 'keep') renderBudgetMeter(state.budget);
+      if (state.roster_mode === 'keep' || state.roster_mode === 'edit') {
+        renderBudgetMeter(state.budget);
+      }
     }
   }
 
@@ -1262,10 +1580,12 @@
         onConfirm: function (team) {
           state.slot = team;
           state.slotRosterAttrs = null;
+          state.slotPlayers = null;
+          state.editor = { players: [], inherited: [], loaded: false };
           document.getElementById('tb-keep-label').textContent = "Keep " + team.name + "'s roster";
           const dl = document.getElementById('tb-dl-slot');
           if (dl) dl.textContent = "Download " + team.name + "'s current roster";
-          fetchSlotRosterBudget();
+          fetchSlotRoster();
           setStep(1);
         },
       },
@@ -1357,39 +1677,54 @@
   }
 
   function refreshRosterStep() {
+    updateModePill();
     const importPanel = document.getElementById('tb-import-panel');
+    const editorPanel = document.getElementById('tb-editor-panel');
     if (importPanel) importPanel.hidden = state.roster_mode !== 'import';
-    updateBudgetFromCurrentRoster();
-    if (state.roster_mode === 'keep' && !state.slotRosterAttrs && state.slot) {
-      fetchSlotRosterBudget();
+    if (editorPanel) editorPanel.hidden = state.roster_mode !== 'edit';
+
+    const needsRoster =
+      (state.roster_mode === 'keep' || state.roster_mode === 'edit') &&
+      !state.slotPlayers &&
+      state.slot;
+
+    if (needsRoster) {
+      fetchSlotRoster().then(function () {
+        if (state.roster_mode === 'edit' && state.slotPlayers) {
+          initEditorFromSlot(true);
+        }
+        updateBudgetFromCurrentRoster();
+      });
+      return;
     }
+
+    if (state.roster_mode === 'edit' && state.slotPlayers) {
+      initEditorFromSlot(false);
+    }
+    updateBudgetFromCurrentRoster();
   }
 
-  function budgetReviewLine() {
+  function modeReviewLine() {
+    const modeLabel = state.attribute_mode === 'uncapped' ? 'Uncapped' : 'Capped';
+    const elig =
+      state.attribute_mode === 'capped'
+        ? 'eligible for online play'
+        : 'not eligible for online play';
+    let line = 'Attribute mode: ' + modeLabel + ' — ' + elig;
     if (state.budget) {
-      const elig = state.budget.eligible_for_online
-        ? 'eligible for online competitions'
-        : 'not eligible for online competitions';
-      return (
-        'Attribute budget: ' +
-        state.budget.team_total.toLocaleString() +
-        ' / ' +
-        BUDGET.TEAM.toLocaleString() +
-        ' · top-5 ' +
-        state.budget.top5_total.toLocaleString() +
-        ' / ' +
-        BUDGET.TOP5.toLocaleString() +
-        ' — ' +
-        elig
-      );
+      if (state.attribute_mode === 'uncapped') {
+        line +=
+          ' · team pool ' +
+          state.budget.team_total.toLocaleString() +
+          ' / ' +
+          BUDGET.UNCAPPED_TEAM_POOL.toLocaleString();
+      } else {
+        line += ' · team total ' + state.budget.team_total.toLocaleString();
+      }
+    } else if (state.roster_mode === 'generate') {
+      line += ' · roster estimated at Apply';
     }
-    if (state.roster_mode === 'generate') {
-      return 'Attribute budget: estimated until Apply (band resampling) — eligibility confirmed at Apply';
-    }
-    if (state.roster_mode === 'keep') {
-      return 'Attribute budget: estimated within 6,400 / top-5 3,950 — eligible for online competitions when under caps';
-    }
-    return 'Attribute budget: — / 6,400 · top-5 — / 3,950';
+    return line;
   }
 
   function renderReview() {
@@ -1400,7 +1735,9 @@
     const conf = confLabel(state.slot);
     let rosterLine;
     if (state.roster_mode === 'keep') {
-      rosterLine = "Roster: keeping " + state.slot.name + "'s players";
+      rosterLine = "Roster: keeping " + state.slot.name + "'s players (no top-up)";
+    } else if (state.roster_mode === 'edit') {
+      rosterLine = 'Roster: editing inherited ' + state.slot.name + ' players';
     } else if (state.roster_mode === 'generate') {
       rosterLine = 'Roster: generate new players at slot talent band';
     } else if (state.import.importSummary) {
@@ -1425,7 +1762,7 @@
       escapeHtml(rosterLine) +
       '</p>' +
       '<p>' +
-      escapeHtml(budgetReviewLine()) +
+      escapeHtml(modeReviewLine()) +
       '</p>' +
       '<p>Unchanged: schedule, conference, opponents</p>';
   }
@@ -1506,6 +1843,7 @@
         secondary_color: state.colors.secondary,
         jersey_preset: state.colors.jersey_preset,
         roster_mode: state.roster_mode,
+        attribute_mode: state.attribute_mode,
       };
       if (
         state.roster_mode === 'import' &&
@@ -1513,6 +1851,9 @@
         state.import.importedPlayers.length
       ) {
         payload.imported_players = state.import.importedPlayers;
+      }
+      if (state.roster_mode === 'edit' && state.editor.loaded && state.editor.players.length) {
+        payload.imported_players = editorPlayersToImportPayload();
       }
       const res = await fetch(API_CONFIG.buildUrl('/franchise/team-builder/apply'), {
         method: 'POST',
@@ -1712,6 +2053,23 @@
       el.addEventListener('change', refreshColorPreviews);
     });
 
+    document.querySelectorAll('.tb-mode-card').forEach(function (card) {
+      card.addEventListener('click', function () {
+        setAttributeMode(card.dataset.attrMode);
+      });
+    });
+
+    const editorHost = document.getElementById('tb-editor-host');
+    if (editorHost) {
+      editorHost.addEventListener('input', onEditorHostChange);
+      editorHost.addEventListener('change', onEditorHostChange);
+      editorHost.addEventListener('click', onEditorHostClick);
+    }
+    const editorResetAll = document.getElementById('tb-editor-reset-all');
+    if (editorResetAll) {
+      editorResetAll.addEventListener('click', resetAllEditor);
+    }
+
     document.querySelectorAll('.tb-roster-card').forEach(function (card) {
       card.addEventListener('click', function () {
         document.querySelectorAll('.tb-roster-card').forEach(function (c) {
@@ -1753,17 +2111,6 @@
     document.getElementById('tb-preview-commit').addEventListener('click', commitImport);
     document.getElementById('tb-preview-dl-errors').addEventListener('click', downloadSkippedRowsCsv);
 
-    const budgetToggle = document.getElementById('tb-budget-details-toggle');
-    if (budgetToggle) {
-      budgetToggle.addEventListener('click', function () {
-        const details = document.getElementById('tb-budget-details');
-        if (!details) return;
-        const show = details.hidden;
-        details.hidden = !show;
-        budgetToggle.textContent = show ? 'Hide details' : 'Show details';
-      });
-    }
-
     document.getElementById('tb-apply').addEventListener('click', function () {
       readIdentity();
       readColors();
@@ -1787,6 +2134,11 @@
           nearApply: true,
         });
       }
+      if (state.roster_mode === 'edit' && (!state.editor.loaded || !state.editor.players.length)) {
+        return showError('Wait for the inherited roster to load, or choose another roster option.', {
+          nearApply: true,
+        });
+      }
       openConfirmModal();
     });
     document.getElementById('tb-confirm-cancel').addEventListener('click', function () {
@@ -1795,6 +2147,7 @@
     document.getElementById('tb-confirm-apply').addEventListener('click', applyFranchise);
 
     setStep(0);
+    updateModePill();
     updateApplyButtonState();
   });
 })();

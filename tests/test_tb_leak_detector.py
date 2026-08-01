@@ -1,10 +1,9 @@
 """
 Team Builder replaced-name leak detector — unit scan + franchise route sweep.
 
-Invariant: replaced core name appears nowhere as *rendered* text in franchise-
-scoped JSON except allowlisted metadata / orientation copy. Dict keys and
-lookup identifiers (score maps, possession, home_team/away_team) are identity
-and are not leaks.
+Invariant: replaced core name must not appear in display-bound JSON fields
+(e.g. display_name). Dict keys and identity leaves (score maps, *_id, name,
+possession, team_name, …) are not leaks. Middleware is observe-only.
 
 Run (prefer unittest to avoid conftest DB block-list when .env points at gob):
   TB_LEAK_DETECTOR=0 .venv/bin/python -m unittest tests.test_tb_leak_detector -v
@@ -60,12 +59,42 @@ class TestScanAllowlist(unittest.TestCase):
         hits = det.scan_json_for_replaced_name(
             {
                 "standings": [{"name": "Providence", "display_name": "Providence"}],
-                "rankings": [{"team_name": "Providence"}],
+                "rankings": [{"team_name": "Providence", "label": "vs Providence"}],
             },
             "Providence",
         )
         self.assertIn("standings[0].display_name", hits)
-        self.assertIn("rankings[0].team_name", hits)
+        # team_name is identity-bound on the server scan; display chrome still flags.
+        self.assertNotIn("rankings[0].team_name", hits)
+        self.assertIn("rankings[0].label", hits)
+
+    def test_turn_identity_fields_are_not_leaks(self):
+        hits = det.scan_json_for_replaced_name(
+            {
+                "turns": [
+                    {
+                        "offense_team_id": "Crickstown",
+                        "possession_team_id": "Crickstown",
+                        "scoring_team": "Crickstown",
+                        "position_snapshots": [
+                            {"possession_team_id": "Crickstown"},
+                        ],
+                        "deltas": {"pid": {"team": "Crickstown"}},
+                    }
+                ],
+                "teams": {
+                    "x": {"name": "Crickstown", "display_name": "Mediallin"},
+                },
+            },
+            "Crickstown",
+        )
+        self.assertEqual(hits, [])
+
+    def test_path_id_suffix_is_identity(self):
+        self.assertTrue(det.path_is_lookup_identifier("turns[0].offense_team_id"))
+        self.assertTrue(det.path_is_lookup_identifier("possession_team_id"))
+        self.assertTrue(det.path_is_lookup_identifier("team_name"))
+        self.assertFalse(det.path_is_lookup_identifier("display_name"))
 
     def test_score_keys_and_possession_are_not_leaks(self):
         payload = {

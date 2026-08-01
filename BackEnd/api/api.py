@@ -299,7 +299,7 @@ try:
     logging.info(f"🌐 CORS configured with origins: {cors_origins}")
 
     # Team Builder replaced-name leak detector (dev/staging). Scans franchise-scoped
-    # JSON responses; throws in local/dev. See team_builder_leak_detector.py.
+    # JSON responses; observe-only (header + log, never fails). See team_builder_leak_detector.py.
     try:
         from BackEnd.utils.team_builder_leak_detector import install_team_builder_leak_middleware
 

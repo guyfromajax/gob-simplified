@@ -243,9 +243,8 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     console.warn('[gameCompletionPopup] Failed to calculate POTG:', err);
   }
 
-  const homeTeamName = finalScore?.homeTeam || 'Home';
-  const awayTeamName = finalScore?.awayTeam || 'Away';
-  // Banner + box-score `banner_team`: use game-document names when loaded so paths match box-score `getTeamContext()`.
+  // §3.1a: finalScore.homeTeam / teams[].name = core (score keys). Labels = display_name.
+  // Same split as box-score.js teamDisplayLabel / gameScene logHome.
   const teamsFromDoc = resolvedGameDoc?.teams || {};
   const docHomeId = resolvedGameDoc?.home_team_id;
   const docAwayId = resolvedGameDoc?.away_team_id;
@@ -253,14 +252,48 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     if (id == null || !teamsFromDoc || typeof teamsFromDoc !== 'object') return null;
     return teamsFromDoc[id] || teamsFromDoc[String(id)] || null;
   };
-  const canonicalHomeName =
-    teamRec(docHomeId)?.name ||
-    (resolvedGameDoc?.home_team && typeof resolvedGameDoc.home_team === 'object' ? resolvedGameDoc.home_team.name : null) ||
-    homeTeamName;
-  const canonicalAwayName =
-    teamRec(docAwayId)?.name ||
-    (resolvedGameDoc?.away_team && typeof resolvedGameDoc.away_team === 'object' ? resolvedGameDoc.away_team.name : null) ||
-    awayTeamName;
+  const homeTeamData = finalScore?.homeTeamData || teamRec(docHomeId);
+  const awayTeamData = finalScore?.awayTeamData || teamRec(docAwayId);
+  const legacyHome =
+    resolvedGameDoc?.home_team && typeof resolvedGameDoc.home_team === 'object'
+      ? resolvedGameDoc.home_team
+      : null;
+  const legacyAway =
+    resolvedGameDoc?.away_team && typeof resolvedGameDoc.away_team === 'object'
+      ? resolvedGameDoc.away_team
+      : null;
+
+  let urlHomeDisplay = null;
+  let urlAwayDisplay = null;
+  try {
+    const sp = new URLSearchParams(window.location.search);
+    urlHomeDisplay = sp.get('home_display');
+    urlAwayDisplay = sp.get('away_display');
+  } catch (_) {}
+
+  const homeCore =
+    homeTeamData?.name ||
+    legacyHome?.name ||
+    finalScore?.homeTeam ||
+    homeTeam ||
+    'Home';
+  const awayCore =
+    awayTeamData?.name ||
+    legacyAway?.name ||
+    finalScore?.awayTeam ||
+    awayTeam ||
+    'Away';
+  const homeLabel =
+    homeTeamData?.display_name ||
+    legacyHome?.display_name ||
+    urlHomeDisplay ||
+    homeCore;
+  const awayLabel =
+    awayTeamData?.display_name ||
+    legacyAway?.display_name ||
+    urlAwayDisplay ||
+    awayCore;
+
   const homeScore = Number(finalScore?.homeScore || 0);
   const awayScore = Number(finalScore?.awayScore || 0);
   const homeWon = homeScore > awayScore;
@@ -275,25 +308,20 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   } else if (!resolvedUserTeamSide && currentTeamId && awayTeamId && currentTeamId === awayTeamId) {
     resolvedUserTeamSide = 'away';
   }
+  // Chrome label for banner / pulse / PGPC / score line user side.
   const userTeamName = resolvedUserTeamSide === 'away'
-    ? canonicalAwayName
+    ? awayLabel
     : resolvedUserTeamSide === 'home'
-    ? canonicalHomeName
+    ? homeLabel
     : null;
 
   let userTeamPrimaryColor = '#F79420';
-  if (resolvedUserTeamSide === 'home' && docHomeId) {
-    const ub = teamRec(docHomeId);
-    if (ub && typeof ub === 'object') {
-      const col = ub.colors?.primary_color || ub.colors?.primary;
-      if (col && typeof col === 'string') userTeamPrimaryColor = col;
-    }
-  } else if (resolvedUserTeamSide === 'away' && docAwayId) {
-    const ub = teamRec(docAwayId);
-    if (ub && typeof ub === 'object') {
-      const col = ub.colors?.primary_color || ub.colors?.primary;
-      if (col && typeof col === 'string') userTeamPrimaryColor = col;
-    }
+  if (resolvedUserTeamSide === 'home' && homeTeamData && typeof homeTeamData === 'object') {
+    const col = homeTeamData.colors?.primary_color || homeTeamData.colors?.primary;
+    if (col && typeof col === 'string') userTeamPrimaryColor = col;
+  } else if (resolvedUserTeamSide === 'away' && awayTeamData && typeof awayTeamData === 'object') {
+    const col = awayTeamData.colors?.primary_color || awayTeamData.colors?.primary;
+    if (col && typeof col === 'string') userTeamPrimaryColor = col;
   }
   const bannerUrl = userTeamName && typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(userTeamName, 'banner_primary')
@@ -304,8 +332,8 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     : null;
   const outcomeLabel = !outcomeKnown ? 'FINAL' : (userWon ? 'WIN' : 'LOSS');
   const outcomeBadgeClass = !outcomeKnown ? 'is-final' : (userWon ? 'is-win' : 'is-loss');
-  const winnerName = homeWon ? homeTeamName : awayTeamName;
-  const loserName = homeWon ? awayTeamName : homeTeamName;
+  const winnerName = homeWon ? homeLabel : awayLabel;
+  const loserName = homeWon ? awayLabel : homeLabel;
   const winnerScore = homeWon ? homeScore : awayScore;
   const loserScore = homeWon ? awayScore : homeScore;
   const potgStatsLine = potg
@@ -330,8 +358,11 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
   // post_game_phase_b=1: opened from EOG while phase B is pending; box-score shows "Sim Computer Games" when localStorage matches.
   const boxScoreParams = new URLSearchParams();
   if (gameId) boxScoreParams.set('game_id', gameId);
-  if (homeTeam) boxScoreParams.set('home', homeTeam);
-  if (awayTeam) boxScoreParams.set('away', awayTeam);
+  // Identity URL params stay core (never display_name).
+  const homeParam = homeTeam || homeCore;
+  const awayParam = awayTeam || awayCore;
+  if (homeParam) boxScoreParams.set('home', homeParam);
+  if (awayParam) boxScoreParams.set('away', awayParam);
   if (mode) boxScoreParams.set('mode', mode);
   if (tournamentId) boxScoreParams.set('tournament_id', tournamentId);
   if (franchiseId) boxScoreParams.set('franchise_id', franchiseId);
@@ -967,7 +998,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
       const headers = { 'Content-Type': 'application/json', ...(haveApi ? API_CONFIG.getAuthHeaders() : {}) };
 
       if (haveApi && outcomeKnown && userTeamName) {
-        const opponentName = resolvedUserTeamSide === 'home' ? canonicalAwayName : canonicalHomeName;
+        const opponentName = resolvedUserTeamSide === 'home' ? awayLabel : homeLabel;
         const userScore = resolvedUserTeamSide === 'home' ? homeScore : awayScore;
         const opponentScore = resolvedUserTeamSide === 'home' ? awayScore : homeScore;
         try {

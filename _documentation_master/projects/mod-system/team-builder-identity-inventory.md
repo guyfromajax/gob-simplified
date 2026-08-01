@@ -36,7 +36,7 @@ This document replaces `team-builder-resolver-enumeration.md`. It covers derived
 | `TeamManager.__init__` | `.name`=core; display/colors/mascot/abbrev from resolver | both | yes |
 | `GameManager` score / possession | keyed by core `.name` | identity | no |
 | `summarize_game_state` | `name`=core; `display_name`; `abbreviation`; colors; score by core | both | yes |
-| play-next / mode-resume | core `home`/`away`; `*_display` chrome | both | yes / partial |
+| play-next / mode-resume | core `home`/`away`; `*_display` chrome | both | yes |
 
 ### C. Franchise API chrome edges (selected)
 
@@ -49,10 +49,10 @@ This document replaces `team-builder-resolver-enumeration.md`. It covers derived
 | schedule / news name maps | ObjectId → display | chrome | yes |
 | `/recruit` lean_display | display name | chrome | yes |
 | training-report `recruiting_team_name_map` | display names | chrome | yes |
-| `/franchise/recruiting-data` `team_name_map` | **core** names | chrome | no |
+| `/franchise/recruiting-data` `team_name_map` | `resolve_team_name_map` (display) | chrome | yes |
 | championship moments `_team_view` | name + primary via resolver | chrome | yes |
 | player-image paint | colors/mascot via resolver | chrome | yes |
-| leaders `meta.team` | baked FPD name | chrome | partial |
+| leaders `meta.team` | baked FPD name at Apply (not live-resolved) | chrome | partial (bake, not dual-use) |
 
 ### D. BE identity helpers
 
@@ -69,6 +69,9 @@ This document replaces `team-builder-resolver-enumeration.md`. It covers derived
 | Location | Form(s) | Role | Overlay |
 |---|---|---|---|
 | court / box-score / potg / sim timeline | `display_name\|\|name` chrome; core for score | both | yes |
+| `gameCompletionPopup` | score line / chrome via `display_name`; core stays on score keys | both | yes |
+| mode-select resume card | opponent via `*_display_name` (URL params still core) | both | yes |
+| `player-detail` LEAN / SIGNED | `lean_display` / signed resolve at edge | chrome | yes |
 | FCC standings / schedule maps / play-next | display labels; ids for keys | both | yes |
 | standings.html / rankings.html (standalone) | single field as provided | chrome | producer-dependent |
 | recruiting lean tokens | abbreviation via `resolveTeamAbbreviation` | chrome | yes |

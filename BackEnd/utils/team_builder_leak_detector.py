@@ -1,16 +1,16 @@
 """
 Team Builder replaced-name leak detector.
 
-Invariant: in a Team Builder franchise, the replaced program's core name must
-never appear as *rendered* text in response payloads or DOM (except allowlisted
-metadata / orientation). Dict keys and lookup identifiers (score maps,
-possession, home_team/away_team) are identity — not leaks.
+Server invariant (overlay franchises): the replaced program's **core** name must
+not appear in **display-bound** response fields (e.g. ``display_name``). Identity
+fields and score/lookup map keys are supposed to carry core names (§3.1a) — not
+leaks. Inverse bug (display name in an identity field) is also a leak; this
+scanner flags core-in-display. The DOM detector stays the loud user channel.
 
-Server: optional middleware scans outgoing JSON on franchise-scoped requests.
+Server middleware **never** fails a request: on a hit it logs and sets
+``X-TB-Leak-Suspect``, leaving status and body unchanged.
+
 Client: ``FrontEnd/static/js/shared/teamBuilderLeakDetector.js`` scans the DOM.
-
-This module is the shared scanner + middleware factory. Fixes belong elsewhere —
-use reports from this detector to drive sweeps.
 """
 from __future__ import annotations
 
@@ -49,27 +49,42 @@ COLOR_CHROME_LEAVES: frozenset[str] = frozenset(
     }
 )
 
-# Leaf field names that hold matchup / score *lookup identifiers*, not chrome.
-# Core team names here are deliberate (Phase 0); flagging them is a false positive.
+# Exact leaf names that hold identity / lookup values (core name expected).
+# Also see ``path_is_lookup_identifier`` for ``*_id`` / ``*_team_id`` patterns.
 LOOKUP_IDENTIFIER_LEAVES: frozenset[str] = frozenset(
     {
         "possession",
         "opening_tip_winner",
-        "timeout_offense_team_id",
         "home_team",  # identity in sim/init bodies
         "away_team",
         "home",  # play-next identity
         "away",
-        # Wire identity field (§3.1a): core name for score/matchup lookup.
-        # Chrome is additive on display_name / team_name / labels — never ``name``.
+        # Wire identity (§3.1a): core for score/matchup; chrome is display_name.
         "name",
-        # Canonical slugs / ObjectId keys — identity, not chrome. Casefold can
-        # match replaced_name (e.g. PROVIDENCE ≈ Providence); still not a leak.
+        "team_name",  # identity / schedule keys — not chrome on the server scan
+        "team",  # turn deltas / player_energy side or core name
+        "scoring_team",
         "team_id",
         "home_team_id",
         "away_team_id",
         "opponent_team_id",
         "user_team_object_id",
+    }
+)
+
+# Dicts whose *keys* are core team names (score / tracking maps). Values are
+# still walked; keys are never treated as chrome (see scan loop).
+IDENTITY_KEY_CONTAINERS: frozenset[str] = frozenset(
+    {
+        "score",
+        "computer_timeouts",
+        "team_attribute_changes",
+        "altered_action_tracking",
+        "opening_lineup",
+        "points_by_quarter",
+        "box_score",
+        "team_totals",
+        "team_stats",
     }
 )
 
@@ -123,19 +138,8 @@ def detector_enabled() -> bool:
 
 
 def detector_throws() -> bool:
-    """Throw on leak only in local/dev (staging logs)."""
-    flag = (os.getenv("TB_LEAK_DETECTOR_THROW") or "").strip().lower()
-    if flag in ("0", "false", "off", "no"):
-        return False
-    if flag in ("1", "true", "on", "yes"):
-        return True
-    env = (
-        os.getenv("ENVIRONMENT")
-        or os.getenv("ENV")
-        or os.getenv("RAILWAY_ENVIRONMENT")
-        or ""
-    ).lower()
-    return env in ("", "development", "dev", "local", "test")
+    """Deprecated: middleware never fails the request. Always False."""
+    return False
 
 
 def _path_leaf(path: str) -> str:
@@ -152,8 +156,20 @@ def path_is_allowlisted(path: str) -> bool:
 
 
 def path_is_lookup_identifier(path: str) -> bool:
-    """True when the leaf is a matchup/score lookup field, not rendered chrome."""
-    return _path_leaf(path) in LOOKUP_IDENTIFIER_LEAVES
+    """
+    True when the leaf is identity-bound (core name expected), not display chrome.
+
+    Exact leaves in ``LOOKUP_IDENTIFIER_LEAVES``, plus any key matching ``*_id``
+    or ``*_team_id`` (offense_team_id, possession_team_id, …).
+    """
+    leaf = _path_leaf(path)
+    if not leaf:
+        return False
+    if leaf in LOOKUP_IDENTIFIER_LEAVES:
+        return True
+    if leaf.endswith("_team_id") or leaf.endswith("_id"):
+        return True
+    return False
 
 
 def short_derived_needles_for_replaced_name(replaced_name: str) -> frozenset[str]:
@@ -221,42 +237,50 @@ def leak_needles_for_replaced_name(replaced_name: str) -> tuple[str, ...]:
     return tuple(out)
 
 
+def _first_matching_needle(
+    value: str,
+    needles: Iterable[str],
+    short_needles: frozenset[str] | None = None,
+) -> Optional[str]:
+    if not value:
+        return None
+    short = short_needles or frozenset()
+    for needle in needles:
+        if _string_contains_needle(value, needle, short=needle in short):
+            return needle
+    return None
+
+
 def _string_contains_any_needle(
     value: str,
     needles: Iterable[str],
     short_needles: frozenset[str] | None = None,
 ) -> bool:
-    if not value:
-        return False
-    short = short_needles or frozenset()
-    for needle in needles:
-        if _string_contains_needle(value, needle, short=needle in short):
-            return True
-    return False
+    return _first_matching_needle(value, needles, short_needles) is not None
 
 
 def _orientation_allowlisted_text(value: str) -> bool:
     return bool(_ORIENTATION_COPY_RE.search(value or ""))
 
 
-def scan_json_for_replaced_name(
+def scan_json_for_replaced_name_detailed(
     payload: Any,
     replaced_name: str,
     *,
     path: str = "",
     needles: tuple[str, ...] | None = None,
     short_needles: frozenset[str] | None = None,
-) -> list[str]:
+) -> list[tuple[str, str]]:
     """
-    Return dotted field paths where ``replaced_name`` (or a derived form)
-    appears as *rendered* text.
+    Return ``(field_path, matched_needle)`` for core-name hits in display-bound
+    string values only.
 
-    Not a leak (Phase 0 identity):
-      - dict keys (score / points_by_quarter / box_score lookup maps)
-      - lookup-identifier leaves (possession, home_team, away_team, …)
+    Not a leak (§3.1a identity):
+      - dict keys of score / timeout / lineup / tracking maps
+      - identity leaves (``name``, ``*_id``, ``possession``, ``team_name``, …)
       - allowlisted metadata (replaced_name) and orientation copy
     """
-    hits: list[str] = []
+    hits: list[tuple[str, str]] = []
     if not replaced_name:
         return hits
     active = needles if needles is not None else leak_needles_for_replaced_name(replaced_name)
@@ -269,14 +293,14 @@ def scan_json_for_replaced_name(
     )
 
     if isinstance(payload, dict):
+        # Keys of identity maps (score{}, …) are core names by design — never
+        # flag the key string; always recurse into values only.
         for key, value in payload.items():
             child = f"{path}.{key}" if path else str(key)
             if path_is_allowlisted(child):
-                # Leaf value is intentional metadata; skip the whole node.
                 continue
-            # Keys are lookup identifiers — never chrome. Recurse into values only.
             hits.extend(
-                scan_json_for_replaced_name(
+                scan_json_for_replaced_name_detailed(
                     value,
                     replaced_name,
                     path=child,
@@ -290,7 +314,7 @@ def scan_json_for_replaced_name(
         for i, value in enumerate(payload):
             child = f"{path}[{i}]"
             hits.extend(
-                scan_json_for_replaced_name(
+                scan_json_for_replaced_name_detailed(
                     value,
                     replaced_name,
                     path=child,
@@ -307,11 +331,33 @@ def scan_json_for_replaced_name(
             return hits
         if _orientation_allowlisted_text(payload):
             return hits
-        if _string_contains_any_needle(payload, active, short):
-            hits.append(path or "<root>")
+        needle = _first_matching_needle(payload, active, short)
+        if needle:
+            hits.append((path or "<root>", needle))
         return hits
 
     return hits
+
+
+def scan_json_for_replaced_name(
+    payload: Any,
+    replaced_name: str,
+    *,
+    path: str = "",
+    needles: tuple[str, ...] | None = None,
+    short_needles: frozenset[str] | None = None,
+) -> list[str]:
+    """Return dotted field paths (see ``scan_json_for_replaced_name_detailed``)."""
+    return [
+        p
+        for p, _n in scan_json_for_replaced_name_detailed(
+            payload,
+            replaced_name,
+            path=path,
+            needles=needles,
+            short_needles=short_needles,
+        )
+    ]
 
 
 def extract_franchise_id_from_request(
@@ -550,11 +596,11 @@ async def _read_json_body(request: Request) -> Any:
 
 class TeamBuilderLeakMiddleware(BaseHTTPMiddleware):
     """
-    Scan JSON responses on franchise-scoped requests for the replaced core name.
+    Scan JSON responses on franchise-scoped requests for the replaced core name
+    in display-bound fields.
 
-    - Logs route + offending field paths always (when enabled).
-    - In development (``detector_throws()``), replaces the response with HTTP 500
-      detailing ``tb_leak_paths`` so clients/tests fail closed.
+    On a hit: log route + path + needle and set ``X-TB-Leak-Suspect``. Never
+    changes status code or body (DOM banner is the user-visible channel).
     """
 
     async def dispatch(self, request: Request, call_next):
@@ -581,15 +627,25 @@ class TeamBuilderLeakMiddleware(BaseHTTPMiddleware):
         except Exception:
             return response
 
-        try:
-            payload = json.loads(body.decode("utf-8"))
-        except Exception:
+        def _passthrough(*, suspect: bool = False) -> Response:
+            headers = {
+                k: v
+                for k, v in response.headers.items()
+                if k.lower() not in ("content-length", "content-encoding")
+            }
+            if suspect:
+                headers["X-TB-Leak-Suspect"] = "1"
             return Response(
                 content=body,
                 status_code=response.status_code,
-                headers=dict(response.headers),
+                headers=headers,
                 media_type=response.media_type,
             )
+
+        try:
+            payload = json.loads(body.decode("utf-8"))
+        except Exception:
+            return _passthrough()
 
         franchise_id = resolve_franchise_id_for_leak_scan(
             request,
@@ -597,74 +653,42 @@ class TeamBuilderLeakMiddleware(BaseHTTPMiddleware):
             response_payload=payload,
         )
         if not franchise_id:
-            headers = {
-                k: v
-                for k, v in response.headers.items()
-                if k.lower() not in ("content-length", "content-encoding")
-            }
-            return Response(
-                content=body,
-                status_code=response.status_code,
-                headers=headers,
-                media_type=response.media_type,
-            )
+            return _passthrough()
 
         replaced = overlay_replaced_name(franchise_id)
         core_only = replaced_core_only_palette(franchise_id)
         if not replaced and not core_only:
-            headers = {
-                k: v
-                for k, v in response.headers.items()
-                if k.lower() not in ("content-length", "content-encoding")
-            }
-            return Response(
-                content=body,
-                status_code=response.status_code,
-                headers=headers,
-                media_type=response.media_type,
-            )
+            return _passthrough()
 
         route = f"{request.method} {request.url.path}"
-        hits: list[str] = []
+        name_hits: list[tuple[str, str]] = []
+        color_paths: list[str] = []
         if replaced:
-            hits.extend(scan_json_for_replaced_name(payload, replaced))
+            name_hits = scan_json_for_replaced_name_detailed(payload, replaced)
         if core_only:
-            hits.extend(scan_json_for_replaced_colors(payload, core_only))
-        if hits:
-            logger.error(
-                "[TB-LEAK] franchise_id=%s replaced_name=%r route=%s paths=%s",
-                franchise_id,
-                replaced,
-                route,
-                hits,
-            )
-            if detector_throws():
-                from starlette.responses import JSONResponse
+            color_paths = scan_json_for_replaced_colors(payload, core_only)
 
-                return JSONResponse(
-                    status_code=500,
-                    content={
-                        "detail": (
-                            f"Team Builder leak: {replaced!r} in {route} "
-                            f"at {', '.join(hits)}"
-                        ),
-                        "tb_leak_route": route,
-                        "tb_leak_replaced_name": replaced,
-                        "tb_leak_paths": hits,
-                    },
+        if name_hits or color_paths:
+            for field_path, needle in name_hits:
+                logger.error(
+                    "[TB-LEAK] franchise_id=%s replaced_name=%r route=%s path=%s needle=%r",
+                    franchise_id,
+                    replaced,
+                    route,
+                    field_path,
+                    needle,
                 )
+            for field_path in color_paths:
+                logger.error(
+                    "[TB-LEAK] franchise_id=%s replaced_name=%r route=%s path=%s needle=<core-palette>",
+                    franchise_id,
+                    replaced,
+                    route,
+                    field_path,
+                )
+            return _passthrough(suspect=True)
 
-        headers = {
-            k: v
-            for k, v in response.headers.items()
-            if k.lower() not in ("content-length", "content-encoding")
-        }
-        return Response(
-            content=body,
-            status_code=response.status_code,
-            headers=headers,
-            media_type=response.media_type,
-        )
+        return _passthrough()
 
 
 def install_team_builder_leak_middleware(app) -> bool:
@@ -673,10 +697,7 @@ def install_team_builder_leak_middleware(app) -> bool:
         logger.info("[TB-LEAK] detector disabled")
         return False
     app.add_middleware(TeamBuilderLeakMiddleware)
-    logger.warning(
-        "[TB-LEAK] detector enabled (throw=%s)",
-        detector_throws(),
-    )
+    logger.warning("[TB-LEAK] detector enabled (observe-only; never fails request)")
     return True
 
 
