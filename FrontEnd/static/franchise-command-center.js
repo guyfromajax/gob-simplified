@@ -414,41 +414,6 @@ function populateTop(data) {
   }
   const logoSrc = resolveFccTeamBanner(data);
   document.getElementById('team-logo').src = logoSrc;
-  const orient = document.getElementById('tb-orientation');
-  if (orient) {
-    if (data.is_custom_team && data.team_builder_replaced_name) {
-      const conf =
-        data.user_conference != null && data.user_conference !== ''
-          ? 'Conference ' + data.user_conference
-          : 'your conference';
-      orient.hidden = false;
-      orient.textContent =
-        (data.team || 'Your program') +
-        ' · ' +
-        conf +
-        ' · replacing ' +
-        data.team_builder_replaced_name +
-        ' in this franchise';
-    } else {
-      orient.hidden = true;
-      orient.textContent = '';
-    }
-  }
-  const eligEl = document.getElementById('tb-eligibility');
-  if (eligEl) {
-    if (data.is_custom_team || data.asset_strategy === 'generated') {
-      const eligible = data.online_eligibility !== false;
-      eligEl.hidden = false;
-      eligEl.className = 'tb-eligibility ' + (eligible ? 'is-yes' : 'is-no');
-      eligEl.textContent = eligible
-        ? 'Eligible for online competitions'
-        : "Not eligible for online competitions — everything else works normally";
-    } else {
-      eligEl.hidden = true;
-      eligEl.textContent = '';
-      eligEl.className = 'tb-eligibility';
-    }
-  }
   renderFccHeaderEmblem(data);
   const seasonLabelEl = document.getElementById('fcc-season-label');
   const rankLabelEl = document.getElementById('fcc-rank-label');

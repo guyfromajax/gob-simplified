@@ -637,3 +637,13 @@ function renderShotWeights(container, shotWeights, compact = false) {
     ${renderGroup('PLAYCALL CENTER', shotWeights.playcall_center)}
   `;
 }
+
+// Team Builder replaced-name DOM leak detector (dev/staging). See teamBuilderLeakDetector.js.
+(function loadTeamBuilderLeakDetector() {
+  if (typeof document === 'undefined') return;
+  if (window.TeamBuilderLeakDetector) return;
+  var s = document.createElement('script');
+  s.src = '/js/shared/teamBuilderLeakDetector.js';
+  s.async = true;
+  document.head.appendChild(s);
+})();

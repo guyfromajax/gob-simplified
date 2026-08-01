@@ -297,7 +297,17 @@ try:
     
     print(f"🌐 [CORS] Configured with origins: {cors_origins}")
     logging.info(f"🌐 CORS configured with origins: {cors_origins}")
-    
+
+    # Team Builder replaced-name leak detector (dev/staging). Scans franchise-scoped
+    # JSON responses; throws in local/dev. See team_builder_leak_detector.py.
+    try:
+        from BackEnd.utils.team_builder_leak_detector import install_team_builder_leak_middleware
+
+        if install_team_builder_leak_middleware(app):
+            print("🛡️ [TB-LEAK] Replaced-name response scanner enabled", file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f"⚠️ [TB-LEAK] Failed to enable leak detector: {e}", file=sys.stderr, flush=True)
+
     # ============================================================================
     # RATE LIMITING (Step 6)
     # ============================================================================

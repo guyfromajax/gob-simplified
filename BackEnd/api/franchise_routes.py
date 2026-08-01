@@ -7503,6 +7503,8 @@ def _ensure_home_slots_for_user(user_id: str) -> list[dict]:
                 "eos_tournament": 1,
                 "eos_tournament_active": 1,
                 "home_slot": 1,
+                # Required for Team Builder resolve_team_display on list cards.
+                "team_builder": 1,
             },
         ).sort("_id", 1)
     )
@@ -7964,10 +7966,10 @@ def command_center_data(
                         {"_id": 0, "franchise_id": 0},
                     )
                 )
-                response["team_name_map"] = {
-                    str(team["_id"]): team.get("name", str(team["_id"]))
-                    for team in db.teams.find({}, {"name": 1})
-                }
+                # Display names at the edge (Team Builder overlay); never raw core names.
+                from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+                response["team_name_map"] = resolve_team_name_map(franchise_doc)
                 week_35_results = franchise_doc.get(WEEK_35_RECRUITING_RESULTS_FIELD) or {}
                 response["week_35_user_recruits"] = [
                     player

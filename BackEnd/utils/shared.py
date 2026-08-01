@@ -2604,12 +2604,20 @@ def summarize_game_state(
     # print(f"Away team primary color: {game.away_team.primary_color}")
     # print(f"Away team secondary color: {game.away_team.secondary_color}")
 
+    # Core identity for score lookups; chrome name resolved below when this
+    # summary is an API response (exclude_animations=False). Persist keeps core.
+    _home_core_name = game.home_team.name
+    _away_core_name = game.away_team.name
+    _home_display_name = getattr(game.home_team, "display_name", None) or _home_core_name
+    _away_display_name = getattr(game.away_team, "display_name", None) or _away_core_name
+    _home_chrome_name = _home_display_name if not exclude_animations else _home_core_name
+    _away_chrome_name = _away_display_name if not exclude_animations else _away_core_name
+
     home_team_obj = {
-        # Identity (.name) = core; chrome (.display_name) = overlay when present.
-        "name": game.home_team.name,
-        "display_name": getattr(game.home_team, "display_name", None) or game.home_team.name,
+        "name": _home_chrome_name,
+        "display_name": _home_display_name,
         "team_id": game.home_team.team_id,
-        "score": game.score.get(game.home_team.name, 0),
+        "score": game.score.get(_home_core_name, 0),
         # Derived Team Momentum (sum of 5 active MO, −50..+50) for the court bar.
         "team_momentum": team_momentum(game.home_team),
         "colors": {
@@ -2619,10 +2627,10 @@ def summarize_game_state(
     }
 
     away_team_obj = {
-        "name": game.away_team.name,
-        "display_name": getattr(game.away_team, "display_name", None) or game.away_team.name,
+        "name": _away_chrome_name,
+        "display_name": _away_display_name,
         "team_id": game.away_team.team_id,
-        "score": game.score.get(game.away_team.name, 0),
+        "score": game.score.get(_away_core_name, 0),
         "team_momentum": team_momentum(game.away_team),
         "colors": {
             "primary_color": game.away_team.primary_color,
@@ -2924,30 +2932,32 @@ def summarize_game_state(
         pass
     
     # ✅ UNIFIED STRUCTURE: All team data in one place (eliminates home_team/away_team duplication)
+    # Chrome: API responses (exclude_animations=False) put overlay on ``name`` + ``display_name``.
+    # Persist (exclude_animations=True): ``name`` stays core; ``display_name`` still carries overlay.
+    # Score / totals / points_by_quarter lookups always use core names.
     teams_obj = {
         home_key: {
-            # Identity (.name) = core; chrome (.display_name) for UI serializers only
-            "name": game.home_team.name,
-            "display_name": getattr(game.home_team, "display_name", None) or game.home_team.name,
+            "name": _home_chrome_name,
+            "display_name": _home_display_name,
             "team_id": game.home_team.team_id,
             "mascot": game.home_team.mascot,
             "colors": {
                 "primary_color": game.home_team.primary_color,
                 "secondary_color": game.home_team.secondary_color,
             },
-            # Game state fields (score keys = core .name)
-            "score": game.score.get(game.home_team.name, 0),
+            # Game state fields (lookups = core .name)
+            "score": game.score.get(_home_core_name, 0),
             "points_by_quarter": list(
                 getattr(game.home_team, "points_by_quarter", [])
-                or game.game_state.get("points_by_quarter", {}).get(game.home_team.name, [0, 0, 0, 0])
+                or game.game_state.get("points_by_quarter", {}).get(_home_core_name, [0, 0, 0, 0])
             ),
             "team_fouls": game.home_team.team_fouls,
             "timeouts": getattr(game.home_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
             # Data fields (single source of truth)
             "attributes": getattr(game.home_team, 'team_attributes', {}),
             # ✅ SS&S: Use team_id to look up box_score (cumulative_box now uses team_id keys)
-            "box_score": cumulative_box.get(game.home_team.team_id, cumulative_box.get(game.home_team.name, {})),
-            "totals": game.team_totals.get(game.home_team.name, {}),
+            "box_score": cumulative_box.get(game.home_team.team_id, cumulative_box.get(_home_core_name, {})),
+            "totals": game.team_totals.get(_home_core_name, {}),
             # Persistence fields
             "strategy_settings": home_strategy,
             "strategy_calls": getattr(game.home_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
@@ -2956,27 +2966,27 @@ def summarize_game_state(
             "playbook_settings": home_playbook_settings  # ✅ Preserve from database
         },
         away_key: {
-            "name": game.away_team.name,
-            "display_name": getattr(game.away_team, "display_name", None) or game.away_team.name,
+            "name": _away_chrome_name,
+            "display_name": _away_display_name,
             "team_id": game.away_team.team_id,
             "mascot": game.away_team.mascot,
             "colors": {
                 "primary_color": game.away_team.primary_color,
                 "secondary_color": game.away_team.secondary_color,
             },
-            # Game state fields (score keys = core .name)
-            "score": game.score.get(game.away_team.name, 0),
+            # Game state fields (lookups = core .name)
+            "score": game.score.get(_away_core_name, 0),
             "points_by_quarter": list(
                 getattr(game.away_team, "points_by_quarter", [])
-                or game.game_state.get("points_by_quarter", {}).get(game.away_team.name, [0, 0, 0, 0])
+                or game.game_state.get("points_by_quarter", {}).get(_away_core_name, [0, 0, 0, 0])
             ),
             "team_fouls": game.away_team.team_fouls,
             "timeouts": getattr(game.away_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
             # Data fields (single source of truth)
             "attributes": getattr(game.away_team, 'team_attributes', {}),
             # ✅ SS&S: Use team_id to look up box_score (cumulative_box now uses team_id keys)
-            "box_score": cumulative_box.get(game.away_team.team_id, cumulative_box.get(game.away_team.name, {})),
-            "totals": game.team_totals.get(game.away_team.name, {}),
+            "box_score": cumulative_box.get(game.away_team.team_id, cumulative_box.get(_away_core_name, {})),
+            "totals": game.team_totals.get(_away_core_name, {}),
             # Persistence fields
             "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
             "strategy_calls": getattr(game.away_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
@@ -3041,7 +3051,7 @@ def summarize_game_state(
         # Game metadata
         "game_id": str(game.game_id) if hasattr(game, 'game_id') else None,
         "quarter": game.quarter,
-        "is_final": game.quarter > 4 and game.score.get(game.home_team.name, 0) != game.score.get(game.away_team.name, 0),
+        "is_final": game.quarter > 4 and game.score.get(_home_core_name, 0) != game.score.get(_away_core_name, 0),
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
         "opening_lineup": deepcopy(game.game_state["opening_lineup"])
         if isinstance(game.game_state.get("opening_lineup"), dict)
@@ -3086,11 +3096,10 @@ def summarize_game_state(
         "home_team_id": home_key,
         "away_team_id": away_key,
         
-        # Top-level score map for backward compatibility (some code expects summary["score"])
-        # Build from teams object to ensure consistency
+        # Top-level score map: keys are always core identity (never display chrome).
         "score": {
-            teams_obj[home_key]["name"]: teams_obj[home_key]["score"],
-            teams_obj[away_key]["name"]: teams_obj[away_key]["score"]
+            _home_core_name: teams_obj[home_key]["score"],
+            _away_core_name: teams_obj[away_key]["score"],
         },
         
         # ✅ UNIFIED TEAMS OBJECT: Single source of truth for all team data
