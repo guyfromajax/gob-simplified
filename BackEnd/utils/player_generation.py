@@ -52,6 +52,17 @@ HEIGHT_SD_IN = 2.1
 HEIGHT_MIN_IN = 64
 HEIGHT_MAX_IN = 92
 
+# ── Career height gain (§16.3) — single source of truth, imported by player_development ──
+# HEIGHT_IDEAL_IN are MATURE heights (the fitness peaks). A player is generated BELOW his
+# adult frame by the REMAINING share of his career HT gain (grow-into-frame, §11.2), so HT
+# growth over the career brings him to his adult draw. JH carries the full gain; a senior
+# none. Shares are the §16.3 curve: JH→FR 40 / FR→SO 30 / SO→JR 20 / JR→SR 10, so the
+# cumulative gain BY a year gives the remaining below.
+HT_TOTAL_MEAN = 3.2
+HT_TOTAL_SD = 1.9
+HT_TOTAL_MIN, HT_TOTAL_MAX = 0, 8
+HT_REMAINING_SHARE_BY_YEAR = {"JH": 1.0, "FR": 0.6, "SO": 0.3, "JR": 0.1, "SR": 0.0}
+
 # ── Entry tiers (design §4.1) ────────────────────────────────────────────────
 # Six tiers. JH RT anchor and share-of-generated-players. (Supersedes the
 # four-value TIER_FREQUENCY in design §12, which predates the six-tier table.)
@@ -128,10 +139,19 @@ def draw_position_intent(rng: random.Random) -> str:
     return rng.choice(POSITIONS)
 
 
-def draw_height(position: str, rng: random.Random) -> int:
-    ideal = HEIGHT_IDEAL_IN[position]
-    h = round(rng.gauss(ideal, HEIGHT_SD_IN))
-    return max(HEIGHT_MIN_IN, min(HEIGHT_MAX_IN, h))
+def draw_height(position: str, rng: random.Random, year: Optional[str] = None) -> int:
+    """Draw a height for ``position``. With ``year`` given, apply GROW-INTO-FRAME: the
+    adult draw minus the remaining share of a drawn career HT gain (§11.2/§16.3), so a JH
+    lands ~3.2in below his frame and a senior at it. Without ``year`` the raw adult draw is
+    returned (init_career takes that path and subtracts its own rolled ht_total — passing a
+    year here too would double-count the gain)."""
+    h = rng.gauss(HEIGHT_IDEAL_IN[position], HEIGHT_SD_IN)
+    if year is not None:
+        remaining = HT_REMAINING_SHARE_BY_YEAR.get(normalize_year(year), 0.0)
+        if remaining:
+            gain = max(HT_TOTAL_MIN, min(HT_TOTAL_MAX, rng.gauss(HT_TOTAL_MEAN, HT_TOTAL_SD)))
+            h -= remaining * gain
+    return max(HEIGHT_MIN_IN, min(HEIGHT_MAX_IN, round(h)))
 
 
 def weight_from_height(height: float, rng: random.Random) -> int:
@@ -202,7 +222,7 @@ def generate_player(
     ``tier`` and ``year``. Identity fields (name) are pass-through.
     """
     if height is None:
-        height = draw_height(position, rng)
+        height = draw_height(position, rng, year)     # grow-into-frame by class year
     target = target_rt(tier, year)
     core = generate_core_attributes(position, height, target, rng, relative_order=relative_order)
 

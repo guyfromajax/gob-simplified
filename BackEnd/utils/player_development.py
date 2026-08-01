@@ -32,6 +32,10 @@ from BackEnd.utils.player_generation import (
     RUNG_MULTIPLIERS,
     generate_player,
     position_profile,
+    HT_TOTAL_MEAN,
+    HT_TOTAL_SD,
+    HT_TOTAL_MIN,
+    HT_TOTAL_MAX,
 )
 
 logger = logging.getLogger(__name__)
@@ -146,9 +150,8 @@ HT_CURVE_BY_TIMING = {
     "late":     {"FR": 0.15, "SO": 0.25, "JR": 0.35, "SR": 0.25},
 }
 # Career HT gain (inches) ~ Normal, clamped: median ~3, p10 ~1, p90 ~6.
-HT_TOTAL_MEAN = 3.2
-HT_TOTAL_SD = 1.9
-HT_TOTAL_MIN, HT_TOTAL_MAX = 0, 8
+# HT_TOTAL_MEAN/SD/MIN/MAX now live in player_generation (single source of truth, shared with
+# grow-into-frame generation) and are imported above.
 HT_PER_RUNG_CAP = 2.5  # cap the real-valued per-rung want at 2.5in, then round → dh ∈ {0,1,2,3} with 3 only on the biggest rungs (restores the p90≈6in tail without a systematic +3)
 # WT tracks strength: pounds per inch of HT gain, plus muscle with ST growth.
 WT_LBS_PER_INCH = (4, 7)
