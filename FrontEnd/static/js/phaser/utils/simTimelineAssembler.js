@@ -69,7 +69,13 @@ function abbrFromName(name) {
   return words.map((w) => w[0]).join('').slice(0, 3).toUpperCase();
 }
 
-/** Build the `T` team object (away/home meta) from a summary + rosters. */
+/**
+ * Build presentation team meta + core identity for score sampling.
+ *
+ * Dual-use (§3.1a): score{} / box keys stay on core ``name``; chrome fields
+ * (teamName, name, abbr) use display_name || name. Core is returned separately
+ * so it is not mistaken for a render label.
+ */
 function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName) {
   const teamsObj = (summary && summary.teams) || {};
   const homeId = nid(summary && summary.home_team_id);
@@ -77,7 +83,8 @@ function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName)
   const homeT = teamsObj[homeId] || {};
   const awayT = teamsObj[awayId] || {};
 
-  const nameOf = (t, fallback) => t.name || fallback || 'Team';
+  const coreOf = (t, fallback) => t.name || fallback || 'Team';
+  const labelOf = (t, fallback) => t.display_name || t.name || fallback || 'Team';
   const colorOf = (t, roster, fallback) =>
     (t.colors && t.colors.primary_color) ||
     t.primary_color ||
@@ -89,26 +96,35 @@ function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName)
     const l = num(t.losses ?? (roster && roster.losses) ?? 0);
     return `${w}–${l}`;
   };
+  const abbrOf = (t, label) =>
+    t.abbreviation || t.abbr || abbrFromName(label);
 
-  const hName = nameOf(homeT, homeTeamName);
-  const aName = nameOf(awayT, awayTeamName);
+  const hCore = coreOf(homeT, homeTeamName);
+  const aCore = coreOf(awayT, awayTeamName);
+  const hLabel = labelOf(homeT, homeTeamName);
+  const aLabel = labelOf(awayT, awayTeamName);
+
   return {
-    home: {
-      teamName: hName,
-      name: hName,
-      abbr: homeT.abbr || abbrFromName(hName),
-      color: colorOf(homeT, homeRoster, '#1F8A5B'),
-      rank: rankOf(homeT, homeRoster),
-      rec: recOf(homeT, homeRoster),
+    teams: {
+      home: {
+        teamName: hLabel,
+        name: hLabel,
+        abbr: abbrOf(homeT, hLabel),
+        color: colorOf(homeT, homeRoster, '#1F8A5B'),
+        rank: rankOf(homeT, homeRoster),
+        rec: recOf(homeT, homeRoster),
+      },
+      away: {
+        teamName: aLabel,
+        name: aLabel,
+        abbr: abbrOf(awayT, aLabel),
+        color: colorOf(awayT, awayRoster, '#9E1B32'),
+        rank: rankOf(awayT, awayRoster),
+        rec: recOf(awayT, awayRoster),
+      },
     },
-    away: {
-      teamName: aName,
-      name: aName,
-      abbr: awayT.abbr || abbrFromName(aName),
-      color: colorOf(awayT, awayRoster, '#9E1B32'),
-      rank: rankOf(awayT, awayRoster),
-      rec: recOf(awayT, awayRoster),
-    },
+    homeCore: hCore,
+    awayCore: aCore,
   };
 }
 
@@ -136,20 +152,22 @@ function defPct(stats) {
 export function buildSimTimeline(quarterSummaries, ctx = {}) {
   const summaries = (quarterSummaries || []).filter((s) => s && typeof s === 'object');
   const last = summaries[summaries.length - 1] || {};
-  const teams = buildTeams(
+  const built = buildTeams(
     last,
     ctx.homeRoster,
     ctx.awayRoster,
     ctx.homeTeamName,
     ctx.awayTeamName
   );
+  const teams = built.teams;
   // Directory grows across quarters (bench players appear as they check in).
   // RT rides on each player entry (payload `rt`, backend Chunk 0).
   const directory = {};
   summaries.forEach((s) => Object.assign(directory, buildDirectory(s)));
 
-  const homeName = teams.home.teamName;
-  const awayName = teams.away.teamName;
+  // Core identity for score{} sampling only — never render these.
+  const homeName = built.homeCore;
+  const awayName = built.awayCore;
 
   // Running, DISPLAY-ONLY cumulative per player: { playerId: { STAT: value } }.
   const cum = {};
