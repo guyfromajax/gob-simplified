@@ -265,3 +265,64 @@ Formats: **JSON first** (easier schema/versioning); CSV as a friendlier second e
 ## 12. One-line summary
 
 **v1 = franchise-scoped “reskin + optional roster replace” of an existing 128-slot ObjectId — not a new league structure.**
+
+
+
+##Jamie's Updated Brief Notes
+
+**Team Select Screen**
+- Display each conference's geogrpahy (detailed below)
+- Display each team's total player attributes and prestige
+- Filter options
+  - By talent level
+  - By prestige
+  - By geography
+- Geography sort options
+  - each of the 50 US States, Europe, Canada, Asia, Central America
+- Conference Geography
+  - 1: Pennsylvania, New Jersey, Delaware (3)
+  - 2: West Virginia, North Carolina, Virginia, Maryland (4)
+  - 3: Massachusetts, Rhode Island, Vermont, Maine, NH, Connecticut (6)
+  - 4: New York, East Canada, Europe (1)
+  - 5: Michigan, Ohio, Indiana (3)
+  - 6: Illinois, Minnesota, Wisconsin (3)
+  - 7: Mississippi, Tennessee, Kentucky, South Carolina, Alabama (5)
+  - 8: Florida, Georgia (2)
+  - 9: Iowa, Kansas, Missouri (3)
+  - 10: Nebraska, South Dakota, North Dakota, Wyoming, Montana, Central Canada (5)
+  - 11: Oklahoma, Texas, Arkansas (2)
+  - 12: Texas, Louisiana (2)
+  - 13: Arizona, New Mexico, Nevada, Colorado, Utah (5)
+  - 14: Idaho, Washington, Oregon, West Canada (3)
+  - 15: California (1)
+  - 16: California, Hawaii, Alaska, Asia, Australia (2)
+
+  When a user does a filter by talent, prestige, or geography, it keeps the filtered team buttons active and full color, and the unfiltered team buttons become dead buttons with reduced opacity.
+
+  Filters can stack, so a user can filter by talent, prestige, and/or geography.
+
+  **Images**
+  - Core image assets per team
+    - Horizontal logo
+    - Court image
+    - Player images (including uniform)
+  - Team colors
+    - User will need to define primary and secondary colors
+  - User defaults
+    - We need a better design for the default horizontal image that what we currenlty have. Let's talk about how we can upscale this a bit.
+    - Uniforms: letls' keep defualt uniform design simple: core color + trim only, -- no other options.
+  -User upload options
+    - If a user wants to upload their own team logo and player images is is better to tell them exact dimenstions and format? Or give them approximate then we have a tool to reformat and size exactly?
+    - For court image, I think we may need to create the court image per the user's team colors because placing of rims, free throw lanes, OOB lines, center court line and others need to be precise. We should give the user the ability to customize court design.
+      - Hardwood style, OOB + free throw lane colors + center court colors, and free throw half arc fill color. If you can find the script or brief that we used to devleop all CPU team court images, we should use the same template
+    - For uniform design, if the user uploads bespoke images for the original 12 players, we'll use those images. For all subsequent playaers added to the team via reruiting and walk-ons, we'll use our standard uniform painting that we use for every other team
+    - If the user does not upload player images for teh original 12, we'll give them the option to choose specific headshots (they can choose from the recruit set 0001 recruiting class headshots -- we'll need to offer a filtering tool for this, filtering by skin color, build, and anything else that is appropriate -- does this mean we need metadata for each image?) -- or the user can have 12 headshots randoml assigned, and they can re-roll if they don't like the random assingment. We should make sure that the random fits height, weight, build, etc that have been input by the user.
+
+  **Player Attributes**
+  - Users will have two options to assign attributes to their players: capped or uncapped
+  - Capped
+    - The user is assigned the total attribute points to each player that already exist for each player on the team that they're replacing. The user can choose to reallocate those pointas as they see fit, with no attribute going below 5 and no attribute going above 99. Or they can leave the attribute allocaiton exactly how it is.
+    - If the user chooses capped, they will be eligible for all online play modes against other users.
+  - Uncapped
+    - The user is assigned the number of points as the pre-existing team with the highest player attriburte value has and they can assing points as they see fit across all players, sticking to teh 5 min and 99 max
+    - Uncapped teams are not eligible for online comopetitive PvP play.
