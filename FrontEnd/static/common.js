@@ -229,13 +229,14 @@ function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
     return null;
   }
   var name = data.team || data.user_team_id || data.name || '';
+  var jerseyPreset = Number(data.jersey_preset);
+  if (jerseyPreset !== 2) jerseyPreset = 1;
   var visual = {
     name: name,
     abbreviation: data.abbreviation,
     primary_color: data.primary_color || data.primary,
     secondary_color: data.secondary_color || data.secondary,
-    accent_color: data.accent_color || data.accent || data.primary_color || data.primary,
-    jersey_preset: data.jersey_preset,
+    jersey_preset: jerseyPreset,
     asset_strategy: 'generated',
     is_custom: true,
     replaced_name: data.team_builder_replaced_name || data.replaced_name,
@@ -322,13 +323,14 @@ function teamBuilderVisualMatchesName(visual, teamNameOrSlug) {
 }
 
 function generatedTeamAssetDataUrl(visual, assetKey) {
+  var jerseyPreset = Number(visual.jersey_preset);
+  if (jerseyPreset !== 2) jerseyPreset = 1;
   var opts = {
     name: visual.name || 'Custom Program',
     abbreviation: visual.abbreviation,
     primary: visual.primary_color || visual.primary || '#27408E',
     secondary: visual.secondary_color || visual.secondary || '#15181f',
-    accent: visual.accent_color || visual.accent || visual.primary_color || '#F79420',
-    jerseyPreset: visual.jersey_preset || 1,
+    jerseyPreset: jerseyPreset,
     asset_strategy: 'generated',
     is_custom: true,
   };

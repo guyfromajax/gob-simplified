@@ -156,7 +156,7 @@
   function coreOnlyPaletteFromVisual(visual) {
     if (!visual) return {};
     var overlaySet = {};
-    [visual.primary_color, visual.secondary_color, visual.accent_color].forEach(function (c) {
+    [visual.primary_color, visual.secondary_color].forEach(function (c) {
       var n = normalizeHexColor(c);
       if (n) overlaySet[n] = true;
     });

@@ -5,6 +5,9 @@
  *  - SVG mark from initials + primary/secondary
  *  - Card-sized banner data URL (~400×141, matches banner_card convention)
  *  - Simple jersey / court preview data URLs for the Colors step
+ *
+ * Third tones are derived from primary + secondary (no stored accent).
+ * Jersey presets: 1 = SOLID (body only), 2 = SOLID WITH TRIM (body + trim).
  */
 (function (global) {
   'use strict';
@@ -27,6 +30,52 @@
     if (!parts.length) return 'TB';
     if (parts.length === 1) return parts[0].slice(0, 3).toUpperCase();
     return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+  }
+
+  function parseHex(hex) {
+    var h = String(hex || '').trim().replace(/^#/, '');
+    if (h.length === 3 && /^[0-9a-fA-F]{3}$/.test(h)) {
+      h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    }
+    if (h.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(h)) return null;
+    return {
+      r: parseInt(h.slice(0, 2), 16),
+      g: parseInt(h.slice(2, 4), 16),
+      b: parseInt(h.slice(4, 6), 16),
+    };
+  }
+
+  function toHex(r, g, b) {
+    return (
+      '#' +
+      [r, g, b]
+        .map(function (n) {
+          var v = Math.max(0, Math.min(255, Math.round(n)));
+          var s = v.toString(16);
+          return s.length === 1 ? '0' + s : s;
+        })
+        .join('')
+    );
+  }
+
+  /** Third tone from the two chosen colors — used for banner stripe / court lines. */
+  function deriveThirdTone(primary, secondary) {
+    var a = parseHex(primary);
+    var b = parseHex(secondary);
+    if (!a && !b) return '#F79420';
+    if (!a) return secondary;
+    if (!b) return primary;
+    // Mix secondary with a lightened primary so the highlight differs from both.
+    var lr = a.r + (255 - a.r) * 0.35;
+    var lg = a.g + (255 - a.g) * 0.35;
+    var lb = a.b + (255 - a.b) * 0.35;
+    return toHex(b.r * 0.55 + lr * 0.45, b.g * 0.55 + lg * 0.45, b.b * 0.55 + lb * 0.45);
+  }
+
+  /** 1 = SOLID, 2 = SOLID WITH TRIM. Anything else → SOLID. */
+  function normalizeJerseyPreset(value) {
+    var n = Number(value);
+    return n === 2 ? 2 : 1;
   }
 
   function svgMark(opts) {
@@ -70,7 +119,7 @@
     opts = opts || {};
     var primary = opts.primary || '#27408E';
     var secondary = opts.secondary || '#15181f';
-    var accent = opts.accent || '#F79420';
+    var accent = deriveThirdTone(primary, secondary);
     var text = initialsFromName(opts.name, opts.abbreviation, opts.teamId || opts.object_id);
     var label = String(opts.name || 'Custom Program');
     var svg =
@@ -116,13 +165,11 @@
     opts = opts || {};
     var primary = opts.primary || '#27408E';
     var secondary = opts.secondary || '#ffffff';
-    var accent = opts.accent || '#F79420';
-    var preset = Number(opts.jerseyPreset || 1);
+    var preset = normalizeJerseyPreset(opts.jerseyPreset);
     var number = String(opts.number != null ? opts.number : 23);
-    // 5 simple presets: solid, side panels, yoke, hoops, split
+    // 1 SOLID = body only; 2 SOLID WITH TRIM = body + trim (manifest body/trim).
     var body = primary;
-    var trim = secondary;
-    if (preset === 2) trim = accent;
+    var trim = preset === 2 ? secondary : primary;
     var svg =
       '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="200" viewBox="0 0 160 200">' +
       '<rect width="160" height="200" fill="#0b0d14"/>' +
@@ -130,20 +177,9 @@
       body +
       '" stroke="' +
       trim +
-      '" stroke-width="4"/>' +
-      (preset >= 3
-        ? '<rect x="40" y="30" width="80" height="28" fill="' + trim + '" opacity="0.85"/>'
-        : '') +
-      (preset === 4
-        ? '<rect x="40" y="90" width="80" height="10" fill="' +
-          accent +
-          '"/><rect x="40" y="110" width="80" height="10" fill="' +
-          accent +
-          '"/>'
-        : '') +
-      (preset === 5
-        ? '<rect x="80" y="30" width="40" height="150" fill="' + trim + '" opacity="0.55"/>'
-        : '') +
+      '" stroke-width="' +
+      (preset === 2 ? '8' : '2') +
+      '"/>' +
       '<text x="80" y="120" text-anchor="middle" font-family="Bebas Neue, sans-serif" font-size="48" fill="#fff">' +
       number +
       '</text></svg>';
@@ -154,7 +190,7 @@
     opts = opts || {};
     var primary = opts.primary || '#27408E';
     var secondary = opts.secondary || '#1a1f2e';
-    var accent = opts.accent || '#F79420';
+    var accent = deriveThirdTone(primary, secondary);
     var svg =
       '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="140" viewBox="0 0 240 140">' +
       '<rect width="240" height="140" fill="' +
@@ -193,8 +229,7 @@
           abbreviation: team.abbreviation,
           primary_color: team.primary || team.primary_color,
           secondary_color: team.secondary || team.secondary_color,
-          accent_color: team.accent || team.accent_color,
-          jersey_preset: team.jerseyPreset || team.jersey_preset,
+          jersey_preset: normalizeJerseyPreset(team.jerseyPreset || team.jersey_preset),
           asset_strategy: 'generated',
           is_custom: true,
           replaced_name: team.replaced_name,
@@ -218,6 +253,8 @@
     CARD_W: CARD_W,
     CARD_H: CARD_H,
     initialsFromName: initialsFromName,
+    deriveThirdTone: deriveThirdTone,
+    normalizeJerseyPreset: normalizeJerseyPreset,
     svgMark: svgMark,
     markDataUrl: markDataUrl,
     bannerCardDataUrl: bannerCardDataUrl,

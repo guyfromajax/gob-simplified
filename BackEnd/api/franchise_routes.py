@@ -2592,10 +2592,9 @@ class TeamBuilderApplyRequest(BaseModel):
     name: str
     abbreviation: str
     mascot: str | None = None
-    city_state: str | None = None
     primary_color: str
     secondary_color: str
-    accent_color: str | None = None
+    # 1 = SOLID, 2 = SOLID WITH TRIM (maps to uniforms body / body+trim)
     jersey_preset: int | None = 1
     # keep | generate | import
     roster_mode: str = "keep"
@@ -3515,7 +3514,10 @@ def team_builder_apply(
     Franchise creation begins here — not when the wizard opens.
     """
     from BackEnd.constants.team_builder_budget import evaluate_roster_budget
-    from BackEnd.utils.franchise_team_display import TEAM_BUILDER_FIELD
+    from BackEnd.utils.franchise_team_display import (
+        TEAM_BUILDER_FIELD,
+        normalize_jersey_preset,
+    )
 
     existing_franchises = db.franchises.count_documents({"user_id": user.get("user_id")})
     if existing_franchises >= MAX_FRANCHISES_PER_USER:
@@ -3566,11 +3568,9 @@ def team_builder_apply(
         "name": custom_name,
         "abbreviation": abbreviation,
         "mascot": (body.mascot or "").strip(),
-        "city_state": (body.city_state or "").strip(),
         "primary_color": body.primary_color,
         "secondary_color": body.secondary_color,
-        "accent_color": body.accent_color or body.primary_color,
-        "jersey_preset": int(body.jersey_preset or 1),
+        "jersey_preset": normalize_jersey_preset(body.jersey_preset),
         "asset_strategy": "generated",
         "roster_mode": body.roster_mode or "keep",
     }
@@ -7754,7 +7754,6 @@ def command_center_data(
                 response["team"] = display.get("name") or response.get("team")
                 response["primary_color"] = display.get("primary_color") or response["primary_color"]
                 response["secondary_color"] = display.get("secondary_color")
-                response["accent_color"] = display.get("accent_color")
                 response["mascot"] = display.get("mascot")
                 response["abbreviation"] = display.get("abbreviation")
                 response["asset_strategy"] = display.get("asset_strategy") or "core"
@@ -7766,7 +7765,7 @@ def command_center_data(
                     response["team_builder_replaced_secondary_color"] = team_doc.get(
                         "secondary_color"
                     )
-                response["jersey_preset"] = display.get("jersey_preset")
+                    response["jersey_preset"] = display.get("jersey_preset")
                 response["user_team_object_id"] = str(team_id)
                 # Frozen at Apply (§9.4) — surface as franchise metadata only.
                 if "online_eligibility" in franchise_doc:

@@ -44,7 +44,6 @@ COLOR_CHROME_LEAVES: frozenset[str] = frozenset(
     {
         "primary_color",
         "secondary_color",
-        "accent_color",
         "winner_primary_color",
         "loser_primary_color",
     }
@@ -472,7 +471,6 @@ def replaced_core_only_palette(franchise_id: str) -> frozenset[str]:
         for c in (
             normalize_hex_color(overlay.get("primary_color")),
             normalize_hex_color(overlay.get("secondary_color")),
-            normalize_hex_color(overlay.get("accent_color")),
         )
         if c
     }

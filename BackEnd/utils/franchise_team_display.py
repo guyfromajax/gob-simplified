@@ -91,6 +91,19 @@ def abbr_from_name(name: str) -> str:
 # Back-compat alias used by older call sites / tests.
 _abbr_from_name = abbr_from_name
 
+# Jersey presets that map to teams_uniforms body/trim (§6.4).
+JERSEY_PRESET_SOLID = 1
+JERSEY_PRESET_SOLID_WITH_TRIM = 2
+
+
+def normalize_jersey_preset(value: Any) -> int:
+    """1 = SOLID, 2 = SOLID WITH TRIM. Anything else → SOLID."""
+    try:
+        n = int(value)
+    except (TypeError, ValueError):
+        return JERSEY_PRESET_SOLID
+    return JERSEY_PRESET_SOLID_WITH_TRIM if n == JERSEY_PRESET_SOLID_WITH_TRIM else JERSEY_PRESET_SOLID
+
 
 def resolve_team_abbreviation(
     franchise: Any,
@@ -123,15 +136,16 @@ def resolve_team_display(
 
     Returns a stable dict:
       object_id, team_id (slug), name, abbreviation, mascot,
-      primary_color, secondary_color, accent_color,
+      primary_color, secondary_color,
       asset_strategy ("core" | "generated"),
-      is_custom (bool), replaced_name (optional)
+      is_custom (bool), replaced_name (optional),
+      jersey_preset (custom only: 1 SOLID | 2 SOLID WITH TRIM)
 
     When the franchise has no overlay, or the ObjectId is not the replaced
     slot, values come from core ``teams`` unchanged.
 
-    Note: legacy overlays may still carry a stale ``short_name`` key; it is
-    ignored (no consumer, no migration).
+    Note: legacy overlays may still carry stale ``short_name``, ``accent_color``,
+    or ``city_state`` keys; they are ignored (no consumer, no migration).
     """
     oid = _as_object_id_str(team_object_id)
     core = dict(core_doc) if core_doc is not None else (_core_team_doc(oid) if oid else {})
@@ -149,7 +163,6 @@ def resolve_team_display(
         "mascot": core_mascot,
         "primary_color": core_primary,
         "secondary_color": core_secondary,
-        "accent_color": core_primary,
         "asset_strategy": "core",
         "is_custom": False,
         "replaced_name": None,
@@ -170,7 +183,6 @@ def resolve_team_display(
     mascot = str(overlay.get("mascot") if overlay.get("mascot") is not None else core_mascot)
     primary = overlay.get("primary_color") or core_primary
     secondary = overlay.get("secondary_color") or core_secondary
-    accent = overlay.get("accent_color") or primary
 
     return {
         "object_id": oid,
@@ -180,14 +192,12 @@ def resolve_team_display(
         "mascot": mascot,
         "primary_color": primary,
         "secondary_color": secondary,
-        "accent_color": accent,
         "asset_strategy": str(overlay.get("asset_strategy") or "generated"),
         "is_custom": True,
         "replaced_name": overlay.get("replaced_name") or core_name or None,
         "conference": core.get("conference"),
         "region": core.get("region"),
-        "jersey_preset": overlay.get("jersey_preset"),
-        "city_state": overlay.get("city_state"),
+        "jersey_preset": normalize_jersey_preset(overlay.get("jersey_preset")),
     }
 
 

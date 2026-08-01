@@ -65,6 +65,24 @@ body {
   border-radius: 12px;
   border-left: 3px solid #F79420;
   background: rgba(28,33,43,0.95);
+  color: #fff;
+  white-space: pre-wrap;
+}
+.tb-error a {
+  color: #F79420;
+  font-weight: 600;
+}
+.tb-cap-block {
+  margin: 0 0 20px;
+  padding: 20px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(247, 148, 32, 0.45);
+  background: rgba(28, 33, 43, 0.95);
+}
+.tb-btn:disabled,
+.tb-btn[disabled] {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .tb-panel[hidden] { display: none !important; }

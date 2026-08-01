@@ -98,15 +98,14 @@ Written **once** at Apply. Shape (authoritative writer: `team_builder_apply`):
   "name": "Hanson",                        # display name
   "abbreviation": "HAN",                   # 3 chars
   "mascot": "...",
-  "city_state": "...",
   "primary_color": "#...",
   "secondary_color": "#...",
-  "accent_color": "#...",
-  "jersey_preset": 1,                      # 1–5
+  "jersey_preset": 1,                      # 1 SOLID | 2 SOLID WITH TRIM (→ uniforms body/trim)
   "asset_strategy": "generated",
   "roster_mode": "keep" | "generate" | "import",
   # plus budget snapshot fields on the franchise root (see §7)
 }
+# Legacy overlays may still carry accent_color / city_state; ignored.
 ```
 
 Also set on the franchise at init/Apply:

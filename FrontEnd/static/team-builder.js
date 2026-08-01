@@ -34,7 +34,6 @@
     mascot: ['mascot'],
     primary_color: ['primary_color', 'primary', 'color_primary'],
     secondary_color: ['secondary_color', 'secondary', 'color_secondary'],
-    accent_color: ['accent_color', 'accent', 'color_accent'],
     position: ['position', 'pos'],
   };
 
@@ -57,7 +56,6 @@
     'mascot',
     'primary_color',
     'secondary_color',
-    'accent_color',
   ].concat(CORE_12, INTANGIBLES);
 
   const CLASS_YEAR_MAP = {
@@ -86,19 +84,25 @@
     SR: 'senior',
   };
 
+  const FRANCHISE_CAP_DEFAULT = 2;
+
   const state = {
     step: 0,
+    franchiseCap: {
+      blocked: false,
+      max: FRANCHISE_CAP_DEFAULT,
+      count: 0,
+      message: '',
+    },
     slot: null,
     identity: {
       name: '',
       abbreviation: '',
       mascot: '',
-      city_state: '',
     },
     colors: {
       primary: '#27408E',
       secondary: '#15181f',
-      accent: '#F79420',
       jersey_preset: 1,
     },
     roster_mode: 'keep',
@@ -127,6 +131,7 @@
   };
 
   const errorHost = document.getElementById('tb-error');
+  const applyErrorHost = document.getElementById('tb-apply-error');
   const panels = {
     0: document.getElementById('tb-step-0'),
     1: document.getElementById('tb-step-1'),
@@ -135,15 +140,107 @@
     4: document.getElementById('tb-step-4'),
   };
 
-  function showError(msg) {
-    if (!errorHost) return;
+  function franchiseCapMessage(count, max) {
+    const n = Number(max) || FRANCHISE_CAP_DEFAULT;
+    const have = Number(count) || n;
+    return (
+      'You already have ' +
+      have +
+      ' active franchise' +
+      (have === 1 ? '' : 's') +
+      ' (limit ' +
+      n +
+      '). Delete one on Mode Select, then come back to Team Builder.'
+    );
+  }
+
+  function setErrorHost(host, msg, asHtml) {
+    if (!host) return;
     if (!msg) {
-      errorHost.hidden = true;
-      errorHost.textContent = '';
+      host.hidden = true;
+      host.textContent = '';
+      host.innerHTML = '';
       return;
     }
-    errorHost.hidden = false;
-    errorHost.textContent = msg;
+    host.hidden = false;
+    if (asHtml) host.innerHTML = msg;
+    else host.textContent = msg;
+  }
+
+  function showError(msg, options) {
+    options = options || {};
+    const asHtml = !!options.html;
+    const nearApply = !!options.nearApply || state.step === 4;
+    setErrorHost(errorHost, nearApply ? '' : msg, asHtml);
+    setErrorHost(applyErrorHost, nearApply ? msg : '', asHtml);
+    if (!msg) return;
+    const target = nearApply && applyErrorHost ? applyErrorHost : errorHost;
+    if (target && typeof target.scrollIntoView === 'function') {
+      try {
+        target.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      } catch (_) {
+        target.scrollIntoView();
+      }
+    }
+  }
+
+  function updateApplyButtonState() {
+    const reason = state.franchiseCap.blocked ? state.franchiseCap.message : '';
+    ['tb-apply', 'tb-confirm-apply'].forEach(function (id) {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      btn.disabled = !!state.franchiseCap.blocked;
+      if (reason) {
+        btn.title = reason;
+        btn.setAttribute('aria-disabled', 'true');
+      } else {
+        btn.removeAttribute('title');
+        btn.removeAttribute('aria-disabled');
+      }
+    });
+  }
+
+  function applyFranchiseCapBlock() {
+    const block = document.getElementById('tb-cap-block');
+    const copy = document.getElementById('tb-cap-block-copy');
+    const stepsNav = document.querySelector('.tb-steps');
+    if (copy) copy.textContent = state.franchiseCap.message;
+    if (block) block.hidden = false;
+    if (stepsNav) stepsNav.hidden = true;
+    Object.keys(panels).forEach(function (k) {
+      const el = panels[k];
+      if (el) el.hidden = true;
+    });
+    updateApplyButtonState();
+  }
+
+  async function checkFranchiseCapAtEntry() {
+    try {
+      const res = await fetch(API_CONFIG.buildUrl('/franchise/list'), {
+        headers: API_CONFIG.getAuthHeaders(),
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      const list = Array.isArray(data && data.franchises)
+        ? data.franchises
+        : Array.isArray(data)
+          ? data
+          : [];
+      const max = Number(data && data.max) || FRANCHISE_CAP_DEFAULT;
+      const count = list.length;
+      state.franchiseCap.max = max;
+      state.franchiseCap.count = count;
+      if (count >= max) {
+        state.franchiseCap.blocked = true;
+        state.franchiseCap.message = franchiseCapMessage(count, max);
+        applyFranchiseCapBlock();
+        return true;
+      }
+    } catch (_) {
+      /* Cap check is best-effort; Apply still enforces server-side. */
+    }
+    updateApplyButtonState();
+    return false;
   }
 
   function userProgramName() {
@@ -680,7 +777,7 @@
       }
     }
 
-    const hasIdentityCols = used.team_name || used.mascot || used.primary_color || used.secondary_color || used.accent_color;
+    const hasIdentityCols = used.team_name || used.mascot || used.primary_color || used.secondary_color;
     const identityCb = document.getElementById('tb-part-identity');
     const rosterCb = document.getElementById('tb-part-roster');
     if (identityCb) {
@@ -786,10 +883,6 @@
     if (firstRowObj.secondary_color) {
       state.colors.secondary = normalizeColor(firstRowObj.secondary_color);
       document.getElementById('tb-secondary').value = state.colors.secondary;
-    }
-    if (firstRowObj.accent_color) {
-      state.colors.accent = normalizeColor(firstRowObj.accent_color);
-      document.getElementById('tb-accent').value = state.colors.accent;
     }
     updateIdentityPreview();
     refreshColorPreviews();
@@ -1179,12 +1272,15 @@
     });
   }
 
+  function normalizeJerseyPreset(value) {
+    return Number(value) === 2 ? 2 : 1;
+  }
+
   function readIdentity() {
     state.identity = {
       name: (document.getElementById('tb-name').value || '').trim(),
       abbreviation: (document.getElementById('tb-abbr').value || '').trim().toUpperCase(),
       mascot: (document.getElementById('tb-mascot').value || '').trim(),
-      city_state: (document.getElementById('tb-city').value || '').trim(),
     };
   }
 
@@ -1236,9 +1332,8 @@
   function readColors() {
     state.colors.primary = document.getElementById('tb-primary').value;
     state.colors.secondary = document.getElementById('tb-secondary').value;
-    state.colors.accent = document.getElementById('tb-accent').value;
     const preset = document.querySelector('input[name="jersey"]:checked');
-    state.colors.jersey_preset = preset ? Number(preset.value) : 1;
+    state.colors.jersey_preset = normalizeJerseyPreset(preset ? preset.value : 1);
   }
 
   function refreshColorPreviews() {
@@ -1250,7 +1345,6 @@
       abbreviation: state.identity.abbreviation,
       primary: state.colors.primary,
       secondary: state.colors.secondary,
-      accent: state.colors.accent,
       jerseyPreset: state.colors.jersey_preset,
     };
     const mark = document.getElementById('tb-mark-preview');
@@ -1355,11 +1449,52 @@
     modal.hidden = false;
   }
 
+  function formatApplyFailureMessage(detail) {
+    let msg =
+      typeof detail === 'string'
+        ? detail
+        : detail
+          ? JSON.stringify(detail)
+          : 'Unable to apply Team Builder.';
+    const isCap =
+      /active franchise/i.test(msg) ||
+      /delete one before starting/i.test(msg) ||
+      state.franchiseCap.blocked;
+    if (isCap) {
+      state.franchiseCap.blocked = true;
+      if (!state.franchiseCap.message) {
+        state.franchiseCap.message = franchiseCapMessage(
+          state.franchiseCap.count || state.franchiseCap.max,
+          state.franchiseCap.max
+        );
+      }
+      updateApplyButtonState();
+      return (
+        escapeHtml(state.franchiseCap.message) +
+        ' <a href="/mode-select.html">Open Mode Select</a>'
+      );
+    }
+    if (!/try again|delete|fix|required|already/i.test(msg)) {
+      msg += ' Fix the issue above, then try Apply again.';
+    }
+    return escapeHtml(msg);
+  }
+
   async function applyFranchise() {
     const loading = document.getElementById('tb-loading');
     const modal = document.getElementById('tb-confirm-modal');
+    if (state.franchiseCap.blocked) {
+      if (modal) modal.hidden = true;
+      showError(
+        escapeHtml(state.franchiseCap.message) +
+          ' <a href="/mode-select.html">Open Mode Select</a>',
+        { nearApply: true, html: true }
+      );
+      return;
+    }
     modal.hidden = true;
     loading.hidden = false;
+    showError('');
     try {
       const payload = {
         replaced_object_id: state.slot.object_id,
@@ -1367,10 +1502,8 @@
         name: state.identity.name,
         abbreviation: state.identity.abbreviation,
         mascot: state.identity.mascot,
-        city_state: state.identity.city_state,
         primary_color: state.colors.primary,
         secondary_color: state.colors.secondary,
-        accent_color: state.colors.accent,
         jersey_preset: state.colors.jersey_preset,
         roster_mode: state.roster_mode,
       };
@@ -1387,12 +1520,17 @@
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
-        let msg = 'Unable to apply Team Builder';
+        let detail = null;
         try {
           const err = await res.json();
-          if (err.detail) msg = typeof err.detail === 'string' ? err.detail : JSON.stringify(err.detail);
+          detail = err.detail;
         } catch (_) {}
-        throw new Error(msg);
+        loading.hidden = true;
+        showError(formatApplyFailureMessage(detail || 'Unable to apply Team Builder.'), {
+          nearApply: true,
+          html: true,
+        });
+        return;
       }
       const data = await res.json();
       if (data.franchise_id) {
@@ -1403,7 +1541,6 @@
               abbreviation: state.identity.abbreviation,
               primary_color: state.colors.primary,
               secondary_color: state.colors.secondary,
-              accent_color: state.colors.accent,
               jersey_preset: state.colors.jersey_preset,
               asset_strategy: 'generated',
               is_custom_team: true,
@@ -1426,7 +1563,11 @@
         './franchise-command-center.html?franchise_id=' + encodeURIComponent(data.franchise_id);
     } catch (err) {
       loading.hidden = true;
-      showError(err.message || 'Unable to apply Team Builder');
+      showError(
+        escapeHtml((err && err.message) || 'Unable to apply Team Builder.') +
+          ' Check your connection and try Apply again.',
+        { nearApply: true, html: true }
+      );
     }
   }
 
@@ -1521,6 +1662,12 @@
       back.href = '/franchise-select-team.html' + q;
     }
 
+    const capped = await checkFranchiseCapAtEntry();
+    if (capped) {
+      if (back) back.href = '/mode-select.html';
+      return;
+    }
+
     try {
       state.allTeams = await TeamPicker.fetchTeams();
     } catch (_) {
@@ -1531,6 +1678,13 @@
 
     document.querySelectorAll('[data-nav]').forEach(function (btn) {
       btn.addEventListener('click', function () {
+        if (state.franchiseCap.blocked) {
+          return showError(
+            escapeHtml(state.franchiseCap.message) +
+              ' <a href="/mode-select.html">Open Mode Select</a>',
+            { html: true }
+          );
+        }
         const next = Number(btn.dataset.nav);
         if (btn.dataset.skipRoster) state.roster_mode = 'generate';
         if (state.step === 1 && next > 1) {
@@ -1543,14 +1697,14 @@
       });
     });
 
-    ['tb-name', 'tb-abbr', 'tb-mascot', 'tb-city'].forEach(function (id) {
+    ['tb-name', 'tb-abbr', 'tb-mascot'].forEach(function (id) {
       const el = document.getElementById(id);
       if (!el) return;
       el.addEventListener('input', updateIdentityPreview);
       if (id === 'tb-abbr') el.addEventListener('blur', validateAbbr);
     });
 
-    ['tb-primary', 'tb-secondary', 'tb-accent'].forEach(function (id) {
+    ['tb-primary', 'tb-secondary'].forEach(function (id) {
       const el = document.getElementById(id);
       if (el) el.addEventListener('input', refreshColorPreviews);
     });
@@ -1613,14 +1767,25 @@
     document.getElementById('tb-apply').addEventListener('click', function () {
       readIdentity();
       readColors();
-      if (!state.slot) return showError('Choose a slot first.');
-      if (!state.identity.name || !validateAbbr()) return showError('Finish identity before applying.');
+      if (state.franchiseCap.blocked) {
+        return showError(
+          escapeHtml(state.franchiseCap.message) +
+            ' <a href="/mode-select.html">Open Mode Select</a>',
+          { nearApply: true, html: true }
+        );
+      }
+      if (!state.slot) return showError('Choose a slot first.', { nearApply: true });
+      if (!state.identity.name || !validateAbbr()) {
+        return showError('Finish identity before applying.', { nearApply: true });
+      }
       if (
         state.roster_mode === 'import' &&
         state.import.headers.length &&
         !state.import.committed
       ) {
-        return showError('Finish your CSV import or choose another roster option.');
+        return showError('Finish your CSV import or choose another roster option.', {
+          nearApply: true,
+        });
       }
       openConfirmModal();
     });
@@ -1630,5 +1795,6 @@
     document.getElementById('tb-confirm-apply').addEventListener('click', applyFranchise);
 
     setStep(0);
+    updateApplyButtonState();
   });
 })();

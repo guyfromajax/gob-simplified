@@ -34,7 +34,15 @@
       <button type="button" class="tb-step" data-step="4">Review</button>
     </nav>
 
-    <div id="tb-error" class="tb-error" hidden></div>
+    <div id="tb-error" class="tb-error" hidden role="alert"></div>
+
+    <div id="tb-cap-block" class="tb-cap-block" hidden role="alert">
+      <h2 class="tb-panel-title">Franchise slots full</h2>
+      <p id="tb-cap-block-copy" class="tb-panel-copy"></p>
+      <p class="tb-actions">
+        <a class="tb-btn tb-btn-primary" href="/mode-select.html">Go to Mode Select</a>
+      </p>
+    </div>
 
     <section id="tb-step-0" class="tb-panel is-active">
       <h2 class="tb-panel-title">Choose the slot</h2>
@@ -51,7 +59,6 @@
             <span id="tb-abbr-hint" class="tb-field-hint" hidden></span>
           </label>
           <label>Mascot<input id="tb-mascot" name="mascot" maxlength="48"></label>
-          <label>City/State<input id="tb-city" name="city_state" maxlength="48"></label>
         </form>
         <aside class="tb-preview" id="tb-identity-preview">
           <div class="tb-preview-bug" id="tb-scorebug">HOME</div>
@@ -70,14 +77,10 @@
         <form class="tb-form">
           <label>Primary<input type="color" id="tb-primary" value="#27408E"></label>
           <label>Secondary<input type="color" id="tb-secondary" value="#15181f"></label>
-          <label>Accent<input type="color" id="tb-accent" value="#F79420"></label>
           <fieldset class="tb-jersey-presets">
             <legend>Jersey style</legend>
             <label><input type="radio" name="jersey" value="1" checked> Solid</label>
-            <label><input type="radio" name="jersey" value="2"> Accent trim</label>
-            <label><input type="radio" name="jersey" value="3"> Yoke</label>
-            <label><input type="radio" name="jersey" value="4"> Hoops</label>
-            <label><input type="radio" name="jersey" value="5"> Split</label>
+            <label><input type="radio" name="jersey" value="2"> Solid with trim</label>
           </fieldset>
           <p class="tb-optional-note">Logo is optional — a generated mark from your colors and initials is used by default.</p>
         </form>
@@ -175,6 +178,7 @@
     <section id="tb-step-4" class="tb-panel" hidden>
       <h2 class="tb-panel-title">Review &amp; apply</h2>
       <div id="tb-review" class="tb-review"></div>
+      <div id="tb-apply-error" class="tb-error" hidden role="alert"></div>
       <div class="tb-actions">
         <button type="button" class="tb-btn tb-btn-secondary" data-nav="3">Back</button>
         <button type="button" class="tb-btn tb-btn-primary" id="tb-apply">Apply and start franchise</button>

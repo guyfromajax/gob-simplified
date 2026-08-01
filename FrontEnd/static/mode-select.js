@@ -69,7 +69,7 @@ function resolveFranchiseSlotBanner(franchiseData) {
       abbreviation: franchiseData.abbreviation,
       primary_color: franchiseData.primary_color,
       secondary_color: franchiseData.secondary_color,
-      accent_color: franchiseData.primary_color,
+      jersey_preset: franchiseData.jersey_preset,
       asset_strategy: 'generated',
       is_custom: true,
       replaced_name: franchiseData.team_builder_replaced_name,
