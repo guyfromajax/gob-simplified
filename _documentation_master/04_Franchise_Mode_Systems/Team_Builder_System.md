@@ -47,35 +47,39 @@ Three layers. Conflating them is how Team Builder franchises break sim.
 
 ```
 Structural (never custom names)
-  object_id / user_team_object_id  →  schedule pairs, FTD.team_id, standings, matchup equality
+  object_id / user_team_object_id  →  schedule pairs, FTD.team_id, standings, load paths
   team_id slug (e.g. HARDWOOD_FIELDS)  →  game-doc teams{} keys, some box-score paths
 
-Display only
-  overlay name (e.g. Hanson)  →  UI, GM.name after resolve, scorebug, news, play-next home/away strings
+Identity / keys (always core)
+  teams.name (e.g. Hardwood Fields)  →  TeamManager.name, score{}, matchup gate, init/sim home_team/away_team
+
+Display only (resolver at the edge — response serializers / chrome)
+  overlay name (e.g. Hanson)  →  TeamManager.display_name, summary teams[*].display_name,
+                                  play-next home_display/away_display, rankings labels
 ```
 
 | Identifier | Example | Used for |
 |---|---|---|
 | `object_id` | `69a6fcb6…` | Slot key = `str(teams._id)`. Schedule `(away_id, home_id)`, FTD `team_id`, `user_team_object_id`, resolver key |
 | `team_id` (slug) | `HARDWOOD_FIELDS` | Core `teams.team_id`; game document map keys |
-| Display name | `Hanson` / `Hardwood Fields` | Chrome and in-game name-keyed maps **after** init chooses one stable name per game |
+| Core name | `Hardwood Fields` | `TeamManager.name`, `score{}` keys, simulate-quarter matchup gate, URL `home`/`away` |
+| Display name | `Hanson` | Chrome only — never construction, persistence keys, or matchup equality |
 | Player IDs | UUIDs | Unrelated layer — do not use as team keys |
 
-**One rule:** join / match / load by ObjectId (slug only where game docs already require it). Show overlay name via shared producers. **Never** use `home_team` / `away_team` strings as the sole franchise matchup equality check.
+**The rule:** resolve at the edge, on the way out. The display resolver belongs in response serialization only — never in object construction, persistence, or anything used as a key. Join / load by ObjectId. Matchup gate stays **strict** core-name equality.
 
 ### Why this matters (known failure mode)
 
-Court/sim sent `home_team: "Hardwood Fields"` while cached `GameManager.home_team.name` was already **Hanson** (overlay). Old gate: `body.home_team != gm.home_team.name` → `400 game_id belongs to a different matchup`.
+v1 leak: resolver fed construction (`TeamManager.name` = Hanson) and init-game rewrote request names to display. Court then sent core `Hardwood Fields` while GM held display → strict gate `400 game_id belongs to a different matchup`. A tolerant gate would have hidden the leak and allowed display-keyed game docs.
 
-**Fix:** matchup gate uses ObjectId/slug via `teams_match_for_franchise` / `_request_matchup_matches_gm`; FE always carries `home_id`/`away_id`; init-game loads FTD by ObjectId and sets score keys from `gm.*.name` after overlay.
+**Phase 0 fix:** `.name` = core; `.display_name` = overlay; play-next emits core `home`/`away` + ObjectIds + `*_display` for chrome; init-game never rewrites via resolver; simulate-quarter gate is strict again.
 
-Helpers:
+Helpers (structural matching — not the matchup gate):
 
 - `teams_match_for_franchise(a, b)` — `BackEnd/utils/franchise_geek_points.py`
-- `gm_team_matches_ref(gm_team, ref)` — same module; display name **or** ObjectId/slug vs `gm.team_id`
-- `_request_matchup_matches_gm` — nested in `BackEnd/api/api.py` (simulate-quarter)
+- `gm_team_matches_ref(gm_team, ref)` — playbook / team-pick helpers
 
-Regression: `tests/test_tb_matchup_identity.py`.
+Regression: `tests/test_tb_matchup_identity.py`. Score-dict consumers: `../projects/mod-system/team-builder-score-dict-consumers.md`.
 
 ---
 
@@ -308,7 +312,7 @@ Live `score[team.name]`, box maps, etc. stay keyed by the GM’s chosen display 
 
 | Test | Covers |
 |---|---|
-| `tests/test_tb_matchup_identity.py` | Hanson-style gate: core-name payload vs overlay GM name + ObjectIds |
+| `tests/test_tb_matchup_identity.py` | Strict core-name gate; display payload rejected; ObjectId helpers for FTD/schedule |
 | `tests/test_franchise_geek_points.py` (`gm_team_matches_ref_…`) | Display rename vs ObjectId/slug |
 | `BackEnd/tests/test_team_builder_budget.py` | Soft eligibility math |
 | `BackEnd/tests/test_team_builder_roster.py` | Roster replace / import helpers |

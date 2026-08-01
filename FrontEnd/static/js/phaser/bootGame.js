@@ -131,6 +131,9 @@ const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
 const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
+// Chrome labels (overlay). Score keys / init-sim payloads use home/away (core).
+const homeDisplay = urlParams.get('home_display') || homeTeam;
+const awayDisplay = urlParams.get('away_display') || awayTeam;
 // ✅ PHASE 1.1: Remove localStorage fallback - franchise_id must come from URL params only
 const queryFranchiseId = urlParams.get('franchise_id');
 const urlMode = urlParams.get('mode');
@@ -2724,6 +2727,8 @@ async function handleSimQuarter() {
       const params = new URLSearchParams();
       params.set('home', homeTeam);
       params.set('away', awayTeam);
+      if (homeDisplay) params.set('home_display', homeDisplay);
+      if (awayDisplay) params.set('away_display', awayDisplay);
       if (urlParams.get('home_id') || homeId) params.set('home_id', urlParams.get('home_id') || homeId);
       if (urlParams.get('away_id') || awayId) params.set('away_id', urlParams.get('away_id') || awayId);
       params.set('mode', mode);

@@ -94,14 +94,8 @@ Existing franchises keep old-scale short players while gaining height-gated PF a
 **Shot-blocking effectively gone.** **ACCEPTED — documented so it is not misdiagnosed.**
 `height_to_block_score` returns 0 at or below the league median of 78, and an old-scale roster's p90 height *is* 78. A "nobody blocks shots on my save" report is this, not a bug.
 
-**Legacy `entry_tier` derivation.** **PARTIALLY FIXED 2026-08-01.**
-The derive-from-RT fallback was *year-blind* — it divided by the cumulative dev increment to the target rung, down-classifying every non-senior ~1.5 tiers (not just RT-collapsed bigs). Now year-aware (`entry_tier_at_year`, divides by `RUNG_MULTIPLIERS` of the year the ratings reflect) and **loud** (warns with player id on every firing). Residual accepted caveat: a legacy *old-scale big* whose RT genuinely collapsed under height gating still reads low — but that is a true low RT, not a formula error.
-
-**Recruit `entry_tier` down-classification in already-rolled saves.** **ACCEPTED — unrecoverable.**
-Any franchise that ran ≥1 rollover before the 2026-08-01 fix permanently down-classified its recruit intake (FRD dropped `entry_tier` → derived from undeveloped JH RT → developed on the wrong ladder). The true tier is **gone** — not in FRD (overwritten), not in the frozen set (0/300 carry it), not in FPD (holds only the wrong derived value, no `recruit_id` link), and not reconstructable from attributes (they developed on the wrong ladder). No repair is possible without inventing values, so — consistent with the old-scale-roster call — **existing saves degrade**; they partially self-heal over ~4 seasons as mis-developed players graduate and correctly-tiered recruits (post-fix) replace them. New franchises are correct from creation.
-
-**SEQUENCING FLAG — height defect re-migration invalidates current-pool franchises.** *No action here; plan dependency.*
-The open height defect (generation draws at adult height; the pool has no class-year stagger — 0.34in spread across four years) can only be fixed by restoring `players_backup_prerecal_20260729` and re-migrating, which regenerates the universal pool and **invalidates every franchise built from the current pool — including `postrecal-validation` (`6a6b670e1d522b498e60fed2`)**, the reserved pillar-3 keeper. Plan to **recreate that keeper after the re-migration**, not protect it through it. The entry_tier fix above does not depend on the re-migration and ships independently.
+**Legacy `entry_tier` derivation.** **ACCEPTED.**
+A legacy player with no `entry_tier` has it derived from current RT, which misclassifies players whose RT collapsed under height gating — a distorted big reads as Poor and then develops on a Poor ladder, compounding the degradation above.
 
 ---
 
@@ -133,28 +127,3 @@ Team-identity thresholds were explicitly parked pending recalibrated attributes 
 
 **EOG attribute retune.** *Trigger: after pillar 3.* **OPEN.**
 Parked behind this project. Note `momentum_score` removal was deliberately deferred out of the distant-sunset cleanup to avoid changing training draw counts mid-flight.
-
----
-
-## Found during validation (separate from recalibration)
-
-**Recruit-supply / walk-on-floor calibration.** *Trigger: standalone.* **OPEN — HIGH PRIORITY.**
-Surfaced by the 4-season live run: the season recruit pool is `count=300` (`load_unused_set_or_generate`), but graduation is **~440/season** (measured: 429, 455), so **~150 spots/season are backfilled by Poor-tier walk-ons**. Walk-on league share climbs **26% → 29% → 33%** (s1–s3) toward a ~40% steady state — vs the designed **~20%** (3 of 15 = the Poor floor). Degrades **every** franchise progressively (≈40% walk-ons by ~season 10). Departure basis (measured, year-normalized): graduation ~429–455/yr; extra departures (128, 43) are young **walk-on cuts**, not a hidden non-walk-on drain — so the pool target is driven by graduation, not inflated by attrition. Fix: size the season pool to **~450–500** (≈400–445 to meet demand + an unsigned surplus so recruiting stays **contested** — do NOT size exactly to demand: that drives walk-ons to zero, deletes the designed floor, and makes recruiting uncontested). **Recruit-generation change only** — does NOT touch the in-season or CPU-training model (both validated). Do not fix mid-run; it would invalidate the trend the current run is measuring.
-
-**Recruit `entry_tier` down-classification (turnover regression).** *Trigger: standalone.* **OPEN — HIGH PRIORITY, root cause confirmed 2026-08-01.**
-The box-score decline (found FG% 30→23, 3PT% 21→14 across a turnover; starter SC 54.5→37.7, SH ~33% over a franchise's first four seasons) is a **level/tier collapse**, not walk-on supply and not a growth-model shape problem. Confirmed root cause, proven end-to-end:
-- **`generate_recruits_list` is correct** — tiers Poor 7 / BelowAvg 21 / Avg 39 / Good 20 / Great 11 / Elite 2, `entry_tier` stamped on each recruit.
-- **The FRD write drops it.** `franchise_routes.py:15169–15187` persists `attributes/year/archetype/...` but **omits `entry_tier`** (also `position_intent`, `development`). So a signed recruit reaches FPD with no `entry_tier`.
-- **`develop_rollover` (`player_development.py:533`) then re-derives it** — `entry_tier = fpd.get("entry_tier") or _derive_entry_tier_from_rt(ratings, rung)` — from the recruit's **undeveloped JH RT (~31)**. The derivation back-solves an anchor assuming the player is *at* his final rung, so a JH's low RT reads as a low tier. Every recruit is shifted down ~1.5 tiers, `jh_anchor` is set low, and he develops on the wrong ladder **permanently** (the derived tier is then persisted, so it compounds).
-- **Proof** — derive-from-RT applied to freshly generated recruits reproduces the live roster almost exactly:
-
-  |            | Poor | BelowAvg | Avg | Good | Great | Elite |
-  |---|---|---|---|---|---|---|
-  | TRUE (generated) | 7 | 21 | 39 | 20 | 11 | 2 |
-  | DERIVED (the bug) | 27 | 39 | 21 | 11 | 2 | 0 |
-  | LIVE non-walk-on freshmen | 26 | 40 | 22 | 9 | 3 | 0 |
-
-This is why RT held while shooting fell (level effect, shape preserved → the generation-vs-development *shape* hypothesis was tested and **refuted**: normalized vectors match, weight↔shape-gap corr +0.69/−0.27/+0.20; `NON_CORE_GROWTH_MULTIPLIER` is not the lever), and why the `400` supply fix did nothing for box scores (more recruits, all still down-classified). The initial franchise pool carries correct `entry_tier` (created directly in FPD), so a franchise looks healthy at s1 and regresses as that pool graduates and down-classified recruits take over.
-**Fix:** persist `entry_tier` (and `position_intent`, `development`) in the FRD write so signing carries it to FPD (`franchise_manager.py:537` already forwards it *if present*). New-franchise-facing; needs a fresh multi-season run to confirm box-score/starter recovery. **Secondary, separate:** the generation ladder (`RUNG_MULTIPLIERS`, SR = 2.0×anchor) and the development ladder (`STD_RUNG_INCREMENT` sum = 1.70×anchor + `PEAK_BONUS` 0.3/peak) disagree on level — real but makes development *higher*, so not the regression cause; revisit only after the entry_tier fix.
-
-**Acceptance criterion = walk-on share, NOT box scores.** *(Corrected 2026-08-01.)* The `300→400` fix (shipped `423c320ee`) was validated on a fresh 4-season scratch: live walk-on share fell **42.4% → 27.3%** (trending to ~20% at full saturation), and recruiting counts rose. **That is the fix's real and only criterion.** An earlier version of this item claimed the supply fix would also recover starter SC/SH and box FG%/3PT% — **that was wrong.** The acceptance run's starter SC (34.6) and box FG% (22.9) were superimposable on the pre-fix baseline: the box-score collapse is owned by a *separate* bug (see "Recruit entry_tier down-classification" below), because starters are never walk-ons, so restoring the walk-on floor cannot touch them. Whole-roster attribute means remain the wrong statistic for anything (bench dilution); RT remains a targeting signal, not a health signal.

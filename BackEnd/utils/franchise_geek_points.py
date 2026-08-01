@@ -68,14 +68,17 @@ def teams_match_for_franchise(team_a: Any, team_b: Any) -> bool:
 
 
 def gm_team_matches_ref(gm_team: Any, team_ref: Any) -> bool:
-    """True if ``team_ref`` (ObjectId, slug, or display name) identifies ``gm_team``.
+    """True if ``team_ref`` (ObjectId, slug, core name, or display name) identifies ``gm_team``.
 
-    Handles Team Builder: GM may hold overlay display name while ``team_ref`` is
-    the slot ObjectId / core name / slug.
+    ``TeamManager.name`` is always core; ``display_name`` may be the overlay.
+    Used for playbook / team-pick helpers — not the simulate-quarter matchup gate.
     """
     if gm_team is None or team_ref is None:
         return False
-    if str(getattr(gm_team, "name", None) or "") == str(team_ref):
+    ref = str(team_ref)
+    if str(getattr(gm_team, "name", None) or "") == ref:
+        return True
+    if str(getattr(gm_team, "display_name", None) or "") == ref:
         return True
     return teams_match_for_franchise(team_ref, getattr(gm_team, "team_id", None))
 

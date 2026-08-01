@@ -20,6 +20,9 @@ const homeTeam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('home'
 const awayTeam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('away', urlParams.get('away')) : urlParams.get('away');
 const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
+// Chrome labels (Team Builder overlay). Identity for init/sim remains home/away (core).
+const homeDisplay = urlParams.get('home_display') || homeTeam;
+const awayDisplay = urlParams.get('away_display') || awayTeam;
 let myTeamSide = urlParams.get('my_team');
 
 /** Attach structural ObjectIds when present (Team Builder franchise matchup identity). */
@@ -1930,8 +1933,11 @@ async function setHeader() {
   const playBtn = document.getElementById('play-now');
   if (!quarterValueEl || !timeValueEl) return;
 
+  // Score dict keys = core URL names; chrome labels = display (overlay when present).
   const userTeamName = teamName;
   const opponentTeamName = myTeamSide === 'home' ? awayTeam : homeTeam;
+  const userTeamLabel = myTeamSide === 'home' ? homeDisplay : (myTeamSide === 'away' ? awayDisplay : userTeamName);
+  const opponentTeamLabel = myTeamSide === 'home' ? awayDisplay : homeDisplay;
 
   let userTeamScore = 0;
   let opponentTeamScore = 0;
@@ -2004,11 +2010,11 @@ async function setHeader() {
   }
 
   const bannerSrc = typeof getTeamAssetPath === 'function'
-    ? getTeamAssetPath(teamName, 'banner_primary')
+    ? getTeamAssetPath(userTeamLabel || teamName, 'banner_primary')
     : '/images/teams/general/general_banner_primary.jpg';
   if (banner && bannerFallback) {
     banner.src = bannerSrc;
-    banner.alt = `${teamName} banner`;
+    banner.alt = `${userTeamLabel || teamName} banner`;
     banner.hidden = false;
     bannerFallback.hidden = true;
     banner.onerror = () => {
@@ -2019,8 +2025,8 @@ async function setHeader() {
 
   const isPregame = !(gameId && (resumeFromTimeout || currentQuarter > 1 || userTeamScore > 0 || opponentTeamScore > 0));
   scoreboardEl?.classList.toggle('is-pregame', isPregame);
-  const displayUserTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(userTeamName || 'Home') : (userTeamName || 'Home')).toUpperCase();
-  const displayOpponentTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(opponentTeamName || 'Away') : (opponentTeamName || 'Away')).toUpperCase();
+  const displayUserTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(userTeamLabel || 'Home') : (userTeamLabel || 'Home')).toUpperCase();
+  const displayOpponentTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(opponentTeamLabel || 'Away') : (opponentTeamLabel || 'Away')).toUpperCase();
   if (scoreHomeTeamEl) scoreHomeTeamEl.textContent = displayUserTeamName;
   if (scoreAwayTeamEl) scoreAwayTeamEl.textContent = displayOpponentTeamName;
   if (scoreHomeValueEl) scoreHomeValueEl.textContent = `${userTeamScore}`;

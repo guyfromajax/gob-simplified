@@ -1360,9 +1360,9 @@ export function createGameScene(Phaser) {
         });
       }
       
-      // Extract team names (unified structure preferred, fallback to old structure)
-      const logHome = homeTeamObj?.name || simData.home_team || simData.homeTeam?.name;
-      const logAway = awayTeamObj?.name || simData.away_team || simData.awayTeam?.name;
+      // Chrome labels prefer display_name (TB overlay); score keys stay on .name / URL core names.
+      const logHome = homeTeamObj?.display_name || homeTeamObj?.name || simData.home_team || simData.homeTeam?.name;
+      const logAway = awayTeamObj?.display_name || awayTeamObj?.name || simData.away_team || simData.awayTeam?.name;
       
       // Extract team IDs
       const homeId = homeTeamId || homeTeamObj?.team_id || simData.home_team_id || simData.homeTeam?.team_id;

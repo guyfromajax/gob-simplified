@@ -2605,7 +2605,9 @@ def summarize_game_state(
     # print(f"Away team secondary color: {game.away_team.secondary_color}")
 
     home_team_obj = {
+        # Identity (.name) = core; chrome (.display_name) = overlay when present.
         "name": game.home_team.name,
+        "display_name": getattr(game.home_team, "display_name", None) or game.home_team.name,
         "team_id": game.home_team.team_id,
         "score": game.score.get(game.home_team.name, 0),
         # Derived Team Momentum (sum of 5 active MO, −50..+50) for the court bar.
@@ -2618,6 +2620,7 @@ def summarize_game_state(
 
     away_team_obj = {
         "name": game.away_team.name,
+        "display_name": getattr(game.away_team, "display_name", None) or game.away_team.name,
         "team_id": game.away_team.team_id,
         "score": game.score.get(game.away_team.name, 0),
         "team_momentum": team_momentum(game.away_team),
@@ -2923,15 +2926,16 @@ def summarize_game_state(
     # ✅ UNIFIED STRUCTURE: All team data in one place (eliminates home_team/away_team duplication)
     teams_obj = {
         home_key: {
-            # Display fields
+            # Identity (.name) = core; chrome (.display_name) for UI serializers only
             "name": game.home_team.name,
+            "display_name": getattr(game.home_team, "display_name", None) or game.home_team.name,
             "team_id": game.home_team.team_id,
             "mascot": game.home_team.mascot,
             "colors": {
                 "primary_color": game.home_team.primary_color,
                 "secondary_color": game.home_team.secondary_color,
             },
-            # Game state fields
+            # Game state fields (score keys = core .name)
             "score": game.score.get(game.home_team.name, 0),
             "points_by_quarter": list(
                 getattr(game.home_team, "points_by_quarter", [])
@@ -2952,15 +2956,15 @@ def summarize_game_state(
             "playbook_settings": home_playbook_settings  # ✅ Preserve from database
         },
         away_key: {
-            # Display fields
             "name": game.away_team.name,
+            "display_name": getattr(game.away_team, "display_name", None) or game.away_team.name,
             "team_id": game.away_team.team_id,
             "mascot": game.away_team.mascot,
             "colors": {
                 "primary_color": game.away_team.primary_color,
                 "secondary_color": game.away_team.secondary_color,
             },
-            # Game state fields
+            # Game state fields (score keys = core .name)
             "score": game.score.get(game.away_team.name, 0),
             "points_by_quarter": list(
                 getattr(game.away_team, "points_by_quarter", [])

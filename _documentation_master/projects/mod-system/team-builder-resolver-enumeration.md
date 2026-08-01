@@ -32,7 +32,7 @@ User slot must show overlay name (e.g. Hanson); opponents stay core names. Struc
 
 | Surface | Status |
 |---|---|
-| play-next `home`/`away` | Resolved via `resolve_team_display` (ids still ObjectIds) |
+| play-next `home`/`away` | **Core** names (identity). `home_display`/`away_display` = resolved chrome. ObjectIds always present. |
 | `_format_team_name_map` / schedule / standings | Already resolver-backed |
 | `_franchise_summary_for_list` / FCC | Already resolver-backed |
 | `GET /roster` + `franchise_id` | Overlay identity fields |

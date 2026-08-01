@@ -1,6 +1,6 @@
 # Player Attribute Recalibration — Design
 
-**Status:** Approved — pass 1 implemented and migrated to `gob-staging`, 2026-07-29
+**Status:** Passes 1 and 2 shipped and merged; live-validated over four seasons. Two defects open — height generation (§11.2) and the pending re-migration. 2026-07-30
 **Scope:** New franchises only. In-flight alpha saves are not migrated.
 **Repo path:** `_documentation_master/projects/Player_Attribute_Recalibration_Design.md`
 **Companion to:** the project brief at `_documentation_master/projects/Player_Attribute_Recalibration_Brief.md` and the audit at `_documentation_master/projects/rt_sanity_audit/`
@@ -581,6 +581,18 @@ Argmax balance then follows by construction. The weight vectors only need to be 
 
 Target per-position height distributions (inches, approximate): PG 73.5, SG 76, SF 78.5, PF 80.5, C 82.5, each with sd ≈ 2.0-2.2, giving a league aggregate near mean 78, sd 3.6.
 
+> **⚠️ DEFECT — this section as written produces adult heights for every class year. Open, fix pending.**
+>
+> Those per-position figures are **mature** heights: they mirror the height-fitness peaks in §3.6.2, the values at which a player's rating is maximised at that position. `player_generation.draw_height()` implements them literally — `gauss(HEIGHT_IDEAL_IN[position], 2.1)` with **no class-year term** — so a JH recruit is generated at the same height as a senior. `weight_from_height` then derives weight from that inflated height, so the weight error is downstream of the same cause.
+>
+> **Grow-into-frame is missing.** The Monte Carlo model in §16.3 assumes JH height = the adult draw minus expected career gain. The production generator never received it. A JH recruit should be roughly **adult − 3.2 inches** (≈74.8 against a league mean of 78), and pool players should be staggered by class year using the remaining share of the HT curve: JH→FR 40%, FR→SO 30%, SO→JR 20%, JR→SR 10%.
+>
+> **Measured scope — both generation and the migrated pool.** The pool is flat by class year: FR 78.31 / SO 77.97 / JR 78.08 / SR 78.02, a total spread of **0.34 inches**, every class at a 78-inch median. §11.3's rank-mapping carried no year term. In a live franchise, freshmen sit **above** their own position ideal at every position — PG +1.42, SG +1.46, SF +1.99, PF +1.33, C +1.56 — with 73-87% at or beyond the fitness peak before any college growth, and league mean height climbing roughly +1.4 inches over four seasons as entrants grow past a frame they already occupy.
+>
+> **Fixing it requires a pool re-migration** — restore `players_backup_prerecal_20260729`, correct the generator, re-run. The migration is non-idempotent, and the re-run invalidates every franchise built from the current pool.
+>
+> The silver lining is that the fix gives HT growth its intended meaning: young players start undersized, are correctly penalised by height fitness, and grow *into* their position rather than past it.
+
 #### Consequence: absolute height thresholds elsewhere must be re-banded
 
 Shifting the median from 72 to 78 re-sorts every system that reads height against fixed inch values. The completed sweep found the following — the original four-item list in this section was incomplete:
@@ -865,3 +877,87 @@ Activating it requires per-player allocation capture, which is genuinely coupled
 Worth recording for future training-side work: training runs on the global `random` module while the engine uses an isolated `sim_random`, so the streams are independent and training changes cannot perturb sim determinism.
 
 **One property is temporary.** Base training points are team-wide, with only the focus amplifier applied per player, so `f` is currently near-identical across a roster — a program-level multiplier rather than per-player coaching. That expires when the planned per-player training focus ships, at which point `f` becomes genuinely per-player. The metric already reads points, so no metric change is needed then — only the capture.
+
+---
+
+## 18. Live validation — what four seasons found
+
+Run on a scratch franchise, five boundaries (season 1 week 1 through season 5 week 1), roughly 2.5 hours per season. The harness (`scripts/season_advance_harness.py`) drives regular weeks 1-26, postseason 27-34 via the bracket driver, week-35 recruiting, and `finish_season`. It is parameterised for N seasons and resumable from the database's current position.
+
+### 18.1 The growth model passed
+
+The failure criterion — compounding erosion of returning players — never triggered. Returning-player attribute nets stayed positive and *grew* every cycle: SC +1.5 → +3.0 → +3.8, SH +0.0 → +1.3 → +2.1. The class-year ladder held, with JR pinned at 54 across all four boundaries. `development` profiles survived the forward copy with writes at 1920/1920, the lazy backfill persisted once per player, and the JH→FR rung executed live for the first time outside Monte Carlo with 326 signed recruits.
+
+### 18.2 The methodology finding
+
+This is the durable output of the run, and it generalises past this project.
+
+| Boundary | Box FG% | Starter SC | Starter SH | Starter FT | Starter RT | Team talent |
+|---|---|---|---|---|---|---|
+| s1 | 30.4 | 51.9 | 52.0 | 38.5 | 61.5 | 448 |
+| s2 | 28.6 | 46.8 | 45.1 | 31.9 | 62.8 | 458 |
+| s3 | 23.9 | 38.3 | 37.0 | 22.3 | 63.5 | 455 |
+| s4 | 23.0 | 36.1 | 34.9 | 19.5 | 62.3 | 439 |
+| s5 | — | 34.0 | 34.9 | 18.8 | 54.7 | 392 |
+| total | **−24%** | **−34%** | **−33%** | **−51%** | −11% | −13% |
+
+**RT was the last metric to move, by nearly two seasons.** Box scores degraded from season 1, starter shooting fell steeply from season 2, team talent bent at season 3 — and starter RT held near 62 through four straight boundaries, breaking only once the league had fully turned over. Validating on RT would have read the league as healthy through season 4 while the games had already lost a quarter of their scoring and half their free-throw skill.
+
+The mechanism is structural rather than incidental. **RT is the quantity the growth, ladder and coaching systems all optimise**, so it holds by construction while the attributes that actually produce basketball degrade underneath. It is a weighted mean dominated by core attributes, so the damage sorts by weight: FT, weighted .04-.05 at every position, fell hardest at −51%.
+
+The same failure has a second form one level up. The ladder held perfectly at 35/41/54/60 throughout — because it measures whoever is *labelled* Average, and a mis-tiered player develops correctly on the wrong ladder. **A metric computed against the system's own labels cannot detect the labels being wrong.**
+
+Both are the same rule: **a control variable can never detect its own controller failing.** Every acceptance check therefore needs metrics the system does not optimise — starter or minutes-weighted attribute means and box-score aggregates, never RT, and never whole-roster means, which bench composition dilutes.
+
+### 18.3 What the run isolated
+
+Three defects, none of which unit tests or the Monte Carlo could see:
+
+- **CPU auto-train allocated randomly** (`generate_random_training_allocations` + `generate_random_coaching_focus`), producing −9.13 RT/season against a well-coached user's +4.76 — a ~14 RT per-season swing in every franchise, and a normalisation that would have dragged the league beneath the ladder the moment coaching quality went live. Fixed at `14e4baee9`; see §17.6.
+- **In-season attribute rot.** Every attribute trained at base-1 lost 7-9 points per season, and the offseason — being RT-targeted and core-weighted — regrew only the core, so the erosion compounded. Fixed at `af7c784ee`; see §18.4.
+- **Recruit supply.** The recruit pool was capped at 300 against ~440 graduations, so walk-ons absorbed the difference every year and climbed toward a ~40% share against a designed 20%. Pool raised to 400. This restores the walk-on floor; it does **not** own the box-score decline, an earlier conclusion that the acceptance run disproved — starters are the top five by rating and are never walk-ons, so bench composition cannot move them.
+
+### 18.4 In-season rot — diagnosis and the invariants
+
+The rot was localised to base-1 allocations rather than global. League-average net per attribute per season by allocation level: base-0 −34.9, base-1 −10.7, base-2 −1.4, base-3 +1.0, base-4 +5.7, base-5 +8.0. Base-2 and base-3 were already flat, so a global decay or gain-scale rebalance would have over-inflated them and reopened the claw-back constraint. The fix was surgical — unify the reference band's gain range at points 1 through 3 — which leaves base-0 declining at −34.9 so the cost of neglect survives.
+
+**The invariant, stated properly, is not "nothing rots."** It is: *a player trained at the reference allocation holds steady across all attributes; deviation from the reference is what causes decline.* Reference holds flat, neglect costs, focus gains.
+
+This was the third in-season retune. The model is now pinned by assertions rather than by tuned constants that drift:
+
+1. reference allocation → each on-position attribute nets ≈ 0 over a season (|Δ| < 3)
+2. reference allocation → RT/season stays below the smallest rung increment
+3. a base-0 attribute declines (< −5 over a season)
+4. **the full cycle** — season plus rollover — holds, with no attribute eroding
+
+Invariant 4 exists because this defect survived a complete validation pass: the season eroded and the offseason failed to restore, while RT held throughout. Any invariant a top-line metric can mask needs its own assertion.
+
+Acceptance was a trained-versus-untrained comparison on the same instrument and seed: FG% 33.1 (broken) → 36.97 (fixed) against 37.5 untrained.
+
+### 18.5 Entry-tier down-classification
+
+The largest defect the run surfaced, and it is a dropped field rather than a model error.
+
+`generate_recruits_list` stamps `entry_tier` correctly (Poor 7 / Average 39 / Great 11). The season FRD write dropped it, along with `position_intent` and `development`. A signed recruit therefore reached FPD with no tier, and `develop_rollover` re-derived one from the recruit's *undeveloped JH* rating of ~31 — reading a JH's low rating as a low tier and shifting every recruit down roughly 1.5 tiers. The derived value then persisted and compounded.
+
+| | Poor | BelowAvg | Average | Good | Great | Elite |
+|---|---|---|---|---|---|---|
+| True (generated) | 7 | 21 | 39 | 20 | 11 | 2 |
+| Derived (the bug) | 27 | 39 | 21 | 11 | 2 | 0 |
+| Live freshmen | 26 | 40 | 22 | 9 | 3 | 0 |
+
+The derived and live distributions match almost exactly, which is the proof. It explains why rating held while shooting fell — a level effect with shape preserved — why the recruit-pool increase did nothing for box scores, and why a franchise looks healthy in season 1 and regresses as the correctly-tiered initial pool graduates.
+
+**A second bug lived inside the first.** `_derive_entry_tier_from_rt` was **year-blind**. Tier anchors are JH-scale (Poor 20 … Elite 50) while the ladder multiplies by rung, up to 2.0× at senior, so mapping a raw rating to a tier without dividing by the rung multiplier misclassifies *every non-senior*: an Average freshman at 35 reads Poor, an Average junior at 54 reads Below Average. Only seniors derived correctly, by coincidence — which also means the legacy-backfill path described in §10 had been down-classifying far more broadly than the RT-collapsed bigs noted there.
+
+Fixed at `ae98d9a59` and `f3f02bab4` in three parts: persist the three fields on the FRD write; make the derivation year-aware via a shared `entry_tier_at_year(ratings, current_year)` helper; and make the fallback log loudly, with a test asserting a generated recruit round-trips FRD → FPD → rollover with its tier unchanged. Two further paths that dropped the fields — the roster-editor builder and the `stat_updater` safety-net — now carry them explicitly rather than relying on the derive.
+
+**Why explicit carry rather than trusting the derive:** derive-from-rating is correct today only because the coaching multiplier is dormant at `f` = 1.0. Once §17 activates, ratings diverge from the ladder by up to ±20% — a well-coached Average senior at 72, a neglected one at 51 — against senior tier bands 10 apart. That is more than a full tier step, so the derive would silently misclassify again.
+
+**Existing saves are not repairable.** The true tier is gone from every source: the FRD document is overwritten and never stored it, the frozen recruit set carries no tier, and rolled documents hold only the wrong derived value with no link back. Consistent with §14, they degrade and partially self-heal over roughly four seasons as mis-developed players graduate; new franchises are correct from creation.
+
+### 18.6 Process notes
+
+- The run's per-boundary snapshots were written to a local temporary directory and not retained, so the height trend could not be reconstructed afterwards from ten hours of runtime. Measurement output belongs somewhere durable.
+- The postseason weeks require the bracket driver rather than the weekly advance, which returns a conflict once the user's team is eliminated.
+- Season 1 of every fresh franchise seeds from a frozen 300-recruit set rather than the dynamic count, so a new franchise carries a one-time supply gap of ~130 spots. `set_0001` is a designed first class and expanding it to 400 requires bespoke imagery for the additional recruits.

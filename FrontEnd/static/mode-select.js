@@ -177,22 +177,32 @@ function derivePrestige(teamDoc, commandCenterData) {
   return '-';
 }
 
-function deriveRecord(commandCenterData, teamName) {
+function findRankingsEntry(commandCenterData, franchiseData, teamName) {
   const rankings = (commandCenterData && Array.isArray(commandCenterData.rankings)) ? commandCenterData.rankings : [];
-  const teamEntry = rankings.find(function (entry) {
+  const objectId = franchiseData && franchiseData.user_team_object_id
+    ? String(franchiseData.user_team_object_id)
+    : '';
+  if (objectId) {
+    const byId = rankings.find(function (entry) {
+      return entry && String(entry.team_id) === objectId;
+    });
+    if (byId) return byId;
+  }
+  return rankings.find(function (entry) {
     return entry && entry.team_name === teamName;
-  });
+  }) || null;
+}
+
+function deriveRecord(commandCenterData, teamName, franchiseData) {
+  const teamEntry = findRankingsEntry(commandCenterData, franchiseData, teamName);
   if (!teamEntry) return '0-0';
   const wins = Number.isFinite(teamEntry.W) ? teamEntry.W : parseInt(teamEntry.W || 0, 10) || 0;
   const losses = Number.isFinite(teamEntry.L) ? teamEntry.L : parseInt(teamEntry.L || 0, 10) || 0;
   return wins + '-' + losses;
 }
 
-function deriveNextOpponent(commandCenterData, teamName) {
-  const rankings = (commandCenterData && Array.isArray(commandCenterData.rankings)) ? commandCenterData.rankings : [];
-  const teamEntry = rankings.find(function (entry) {
-    return entry && entry.team_name === teamName;
-  });
+function deriveNextOpponent(commandCenterData, teamName, franchiseData) {
+  const teamEntry = findRankingsEntry(commandCenterData, franchiseData, teamName);
   if (!teamEntry) return 'TBD';
   return safeText(teamEntry.next, 'TBD');
 }
@@ -1070,11 +1080,14 @@ function buildActiveGameCourtUrl(franchiseData, resume) {
   params.set('active_resume', 'true');
   params.set('franchise_id', franchiseData.franchise_id);
   params.set('game_id', resume.game_id);
+  // home/away = core identity names from the game doc; display params are chrome-only.
   params.set('home', resume.home_team_name || 'Home');
   params.set('away', resume.away_team_name || 'Away');
+  if (resume.home_display_name) params.set('home_display', resume.home_display_name);
+  if (resume.away_display_name) params.set('away_display', resume.away_display_name);
   params.set('home_id', resume.home_team_id || resume.home_team_name || 'Home');
   params.set('away_id', resume.away_team_id || resume.away_team_name || 'Away');
-  params.set('team_id', franchiseData.user_team_id || '');
+  params.set('team_id', franchiseData.user_team_object_id || franchiseData.user_team_id || '');
   params.set('my_team', resume.user_team_side || 'home');
   params.set('quarter', String(Number(resume.quarter) || 1));
   params.set('period', formatResumePeriod(resume));
@@ -1162,8 +1175,8 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
   const teamName = safeText(franchiseData.user_team_id, 'Program');
   const bannerUrl = resolveFranchiseSlotBanner(franchiseData);
   const seasonProgress = deriveSeasonProgress(commandCenterData, franchiseData);
-  const record = deriveRecord(commandCenterData, teamName);
-  const nextOpponent = deriveNextOpponent(commandCenterData, teamName);
+  const record = deriveRecord(commandCenterData, teamName, franchiseData);
+  const nextOpponent = deriveNextOpponent(commandCenterData, teamName, franchiseData);
 
   const activeGameResume = commandCenterData && commandCenterData.active_game_resume
     && commandCenterData.active_game_resume.status === 'stoppage_anchor'
@@ -1274,7 +1287,7 @@ function assignFranchisesToSlots(franchises) {
   return bySlot;
 }
 
-function renderFranchiseSlots(franchises, teamsByName, commandCenterById) {
+function renderFranchiseSlots(franchises, teamsById, teamsByName, commandCenterById) {
   if (!franchiseHomeSlots) return;
   Object.keys(slotRuntimeById).forEach(function (k) { delete slotRuntimeById[k]; });
 
@@ -1283,8 +1296,16 @@ function renderFranchiseSlots(franchises, teamsByName, commandCenterById) {
   for (let slot = 1; slot <= maxFranchiseSlots; slot++) {
     const franchiseData = bySlot[slot];
     if (franchiseData) {
+      // Join by ObjectId first (Team Builder: user_team_id is display name, not core).
+      const objectId = franchiseData.user_team_object_id
+        ? String(franchiseData.user_team_object_id)
+        : '';
       const teamName = safeText(franchiseData.user_team_id, '');
-      const teamDoc = teamsByName[teamName] || null;
+      const replacedName = safeText(franchiseData.team_builder_replaced_name, '');
+      const teamDoc = (objectId && teamsById[objectId])
+        || teamsByName[replacedName]
+        || teamsByName[teamName]
+        || null;
       const commandCenterData = commandCenterById[String(franchiseData.franchise_id)] || null;
       html += buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slot);
     } else {
@@ -1607,8 +1628,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   const teamsData = await safeJsonFetch(API_CONFIG.buildUrl('/teams'), { headers: headers }) || [];
   const teamsByName = {};
+  const teamsById = {};
   teamsData.forEach(function (team) {
-    if (team && team.name) teamsByName[team.name] = team;
+    if (!team) return;
+    if (team.name) teamsByName[team.name] = team;
+    const tid = team.object_id || team._id || team.id || team.team_object_id;
+    if (tid) teamsById[String(tid)] = team;
   });
 
   const commandCenterById = {};
@@ -1627,6 +1652,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }));
 
-  renderFranchiseSlots(franchisesList, teamsByName, commandCenterById);
+  renderFranchiseSlots(franchisesList, teamsById, teamsByName, commandCenterById);
   revealModeSelect();
 });

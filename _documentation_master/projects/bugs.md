@@ -4,25 +4,26 @@
 
 
 ##Full Product Readiness
-2. Stripe
-3. PvP sim
-4. Tunable Constants file
-5. Downloadable game vs Live game dynamics
-7. Comprehensive Blowout Governor
-8. HCO Roles Audit & Fixes
-9. Better timing on shots, most should be more immediate, those that are not should have pre-shot movement
+1. Downloadable game vs Live game dynamics
+2. College and Pro setup
+
+##Playtest Launch / In Progress
+1. Stripe
+2. Balance Player Attribute Progression from season to season
+3. Balance Team attributes
+4. Team mod system
+-----
+5. PvP sim -- playtest post-launch / immediate parallel task
 
 
 ##Full Product Perfection
 1. Training Camp News Report
 2. Week 20 Recruiting Report to Inbox
 3. Recruiting Round Up Results
+4. Comprehensive Blowout Governor
 6. Add a new hire news story for user team
-25. Fast Break and P/T callouts in the Scouting Report of opponent
-26. Add tournament design magic to the UX -- court screen, modals, FCC, etc
 102. Team court images
 108. Message board
-110. Strategic Geek Points system
 113. Bring logic to screens
 114. Better individual player defense stat tracking
 116. User account -- link X & Facebook?
@@ -32,10 +33,9 @@
 128. Add a badass design appraoch to New Stories
 129: Loose Balls!
 131. Centralized Turn Transition Helper / System
-132. Players as Characters
-135. Better simming of computer training
-136. Need to better calibrate season to season player attribute progression
 137. Watermark free version of player headshots
+138. College & Pro game system
+139. Mod system for uploading custom teams
 
 199. Mobile
 200. PvP live
@@ -45,6 +45,7 @@
 2. Advanced Topics tutorials
 3. Steam Strategy
 4. Monetization plan
+5. Players as Characters
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

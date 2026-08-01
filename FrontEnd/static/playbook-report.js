@@ -291,12 +291,13 @@ async function resolveOpponentName() {
           : '') || ''
       );
       const myTeamId = reportState.teamId;
-      const home = formatTeamName(data.home || '');
-      const away = formatTeamName(data.away || '');
+      // Chrome labels prefer *_display; ObjectId decides which side is the opponent.
+      const home = formatTeamName(data.home_display || data.home || '');
+      const away = formatTeamName(data.away_display || data.away || '');
       if (myTeamId && data.home_id && String(data.home_id) === String(myTeamId)) return away;
       if (myTeamId && data.away_id && String(data.away_id) === String(myTeamId)) return home;
-      if (myTeamName && home === myTeamName) return away;
-      if (myTeamName && away === myTeamName) return home;
+      if (myTeamName && (home === myTeamName || formatTeamName(data.home || '') === myTeamName)) return away;
+      if (myTeamName && (away === myTeamName || formatTeamName(data.away || '') === myTeamName)) return home;
       return away || home || 'Opponent';
     }
   }

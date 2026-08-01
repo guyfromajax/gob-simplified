@@ -84,7 +84,11 @@ if (isGameIdRequired && !gameId) {
     alert(`Error: ${errorMsg}\n\nPlease return to the lineup screen and try again.`);
     // Redirect to lineup screen if possible
     if (homeTeam && awayTeam) {
-      const lineupUrl = `/set-lineup.html?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}&home_id=${encodeURIComponent(homeId || '')}&away_id=${encodeURIComponent(awayId || '')}&my_team=${encodeURIComponent(myTeamSide || 'home')}&mode=${encodeURIComponent(modeParam || 'single')}`;
+      let lineupUrl = `/set-lineup.html?home=${encodeURIComponent(homeTeam)}&away=${encodeURIComponent(awayTeam)}&home_id=${encodeURIComponent(homeId || '')}&away_id=${encodeURIComponent(awayId || '')}&my_team=${encodeURIComponent(myTeamSide || 'home')}&mode=${encodeURIComponent(modeParam || 'single')}`;
+      const homeDisplayParam = urlParams.get('home_display');
+      const awayDisplayParam = urlParams.get('away_display');
+      if (homeDisplayParam) lineupUrl += `&home_display=${encodeURIComponent(homeDisplayParam)}`;
+      if (awayDisplayParam) lineupUrl += `&away_display=${encodeURIComponent(awayDisplayParam)}`;
       if (franchiseId) lineupUrl += `&franchise_id=${encodeURIComponent(franchiseId)}`;
       if (tournamentId) lineupUrl += `&tournament_id=${encodeURIComponent(tournamentId)}`;
       window.location.href = lineupUrl;

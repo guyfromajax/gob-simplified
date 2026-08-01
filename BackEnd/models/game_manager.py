@@ -44,7 +44,7 @@ class GameManager:
 
         # Recalculate position ratings for all players (attributes may have changed)
         self._update_position_ratings()
-        # Use TeamManager.name after overlay resolve (TB custom display), not constructor args.
+        # Score keys = core TeamManager.name (never overlay display_name).
         self.score = {self.home_team.name: 0, self.away_team.name: 0}
         self.quarter = 1
         self.turns = []

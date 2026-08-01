@@ -264,7 +264,10 @@ class TeamManager:
     def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, strategy_calls=None, mode="single", is_user_team=False, franchise_id=None, roster_override=None, synthetic_team_id=None):
         import time
         import logging
+        # Identity: .name is always the core teams.name (score keys, matchup gate, persistence).
+        # Display: .display_name holds Team Builder overlay name for response serializers only.
         self.name = name
+        self.display_name = name
         self.is_home_team = is_home_team
         self.is_user_team = is_user_team  # ✅ SS&S: Track if this is the user's team for override logic
         self.mode = mode  # Store mode for use in _init_scouting_data() and other methods
@@ -288,13 +291,11 @@ class TeamManager:
         # Load BASE team data from universal teams collection (name, team_id, colors, mascot)
         team_doc_start = time.time()
         team_doc = teams_collection.find_one({"name": name}) if roster_override is None else None
-        # Team Builder: custom display name won't match core teams.name — resolve via overlay.
+        # Team Builder: if a caller still passes the overlay display name, locate the slot
+        # ObjectId — but identity (.name) remains the core name from that doc.
         if not team_doc and franchise_id and roster_override is None:
             try:
-                from BackEnd.utils.franchise_team_display import (
-                    get_team_builder_overlay,
-                    resolve_team_display,
-                )
+                from BackEnd.utils.franchise_team_display import get_team_builder_overlay
 
                 overlay = get_team_builder_overlay(franchise_id)
                 if overlay and str(overlay.get("name") or "").strip() == str(name or "").strip():
@@ -320,8 +321,12 @@ class TeamManager:
         self.secondary_color = team_doc.get("secondary_color", "#ffffff") if team_doc else "#ffffff"
         self.mascot = team_doc.get("mascot", "") if team_doc else ""
 
-        # Team Builder overlay: pass-through when absent. Prefer ObjectId from the
-        # core team doc so custom renames still resolve the replaced slot.
+        # Core identity from the team document (never the overlay string).
+        if team_doc and team_doc.get("name"):
+            self.name = team_doc.get("name")
+            self.display_name = self.name
+
+        # Team Builder overlay: colors/mascot/abbrev + display_name only. Never mutate .name.
         self.abbreviation = None
         self.asset_strategy = "core"
         if franchise_id and team_doc and team_doc.get("_id") is not None:
@@ -330,7 +335,7 @@ class TeamManager:
 
                 display = resolve_team_display(franchise_id, team_doc.get("_id"), core_doc=team_doc)
                 if display.get("is_custom"):
-                    self.name = display.get("name") or self.name
+                    self.display_name = display.get("name") or self.name
                     self.primary_color = display.get("primary_color") or self.primary_color
                     self.secondary_color = display.get("secondary_color") or self.secondary_color
                     self.mascot = display.get("mascot") if display.get("mascot") is not None else self.mascot

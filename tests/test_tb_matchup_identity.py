@@ -1,4 +1,8 @@
-"""Team Builder identity: simulate-quarter matchup must not require display-name equality."""
+"""Team Builder Phase 0: identity is core; display stays at the response edge.
+
+Matchup gate is strict name equality on TeamManager.name (core). Display names
+must never be used as request home_team/away_team or score keys.
+"""
 from types import SimpleNamespace
 from unittest import TestCase
 
@@ -8,19 +12,9 @@ from bson import ObjectId
 import BackEnd.utils.franchise_geek_points as fgp
 
 
-def _request_side_matches_gm_team(request_name, request_id, gm_team) -> bool:
-    """Mirror of api._request_side_matches_gm_team (kept local so we don't boot FastAPI)."""
-    gm_tid = getattr(gm_team, "team_id", None)
-    gm_name = getattr(gm_team, "name", None)
-    if request_id and gm_tid and fgp.teams_match_for_franchise(request_id, gm_tid):
-        return True
-    if request_name and gm_name and request_name == gm_name:
-        return True
-    if request_name and gm_tid and fgp.teams_match_for_franchise(request_name, gm_tid):
-        return True
-    if request_id and gm_name and fgp.teams_match_for_franchise(request_id, gm_name):
-        return True
-    return False
+def _strict_matchup_matches(body, gm) -> bool:
+    """Mirror of simulate-quarter strict gate (core names only)."""
+    return body.home_team == gm.home_team.name and body.away_team == gm.away_team.name
 
 
 class TestTbMatchupIdentity(TestCase):
@@ -41,30 +35,44 @@ class TestTbMatchupIdentity(TestCase):
     def tearDown(self):
         fgp.db = self._orig_db
 
-    def test_hanson_overlay_core_name_payload_matches_via_object_id(self):
-        """Exact staging failure: body sends Hardwood Fields; GM.name is Hanson."""
-        gm_home = SimpleNamespace(name="Hanson", team_id="HARDWOOD_FIELDS")
-        gm_away = SimpleNamespace(name="River City", team_id="RIVER_CITY")
-
-        # Name-only equality would fail (the old gate)
-        self.assertNotEqual("Hardwood Fields", gm_home.name)
-
-        self.assertTrue(
-            _request_side_matches_gm_team(
-                "Hardwood Fields", str(self.home_oid), gm_home
-            )
+    def test_strict_gate_accepts_core_names(self):
+        """Payload and GM both use core names — gate passes (TB overlay on display_name only)."""
+        gm = SimpleNamespace(
+            home_team=SimpleNamespace(name="Hardwood Fields", display_name="Hanson", team_id="HARDWOOD_FIELDS"),
+            away_team=SimpleNamespace(name="River City", display_name="River City", team_id="RIVER_CITY"),
         )
-        self.assertTrue(
-            _request_side_matches_gm_team("River City", str(self.away_oid), gm_away)
+        body = SimpleNamespace(
+            home_team="Hardwood Fields",
+            away_team="River City",
+            home_id=str(self.home_oid),
+            away_id=str(self.away_oid),
         )
+        self.assertTrue(_strict_matchup_matches(body, gm))
 
-    def test_hanson_display_name_payload_also_matches(self):
-        gm_home = SimpleNamespace(name="Hanson", team_id="HARDWOOD_FIELDS")
-        self.assertTrue(_request_side_matches_gm_team("Hanson", str(self.home_oid), gm_home))
-        self.assertTrue(_request_side_matches_gm_team("Hanson", None, gm_home))
-
-    def test_wrong_matchup_rejected(self):
-        gm_home = SimpleNamespace(name="Hanson", team_id="HARDWOOD_FIELDS")
-        self.assertFalse(
-            _request_side_matches_gm_team("River City", str(self.away_oid), gm_home)
+    def test_strict_gate_rejects_display_name_payload(self):
+        """Display name in home_team must fail — that is the leak this phase closes."""
+        gm = SimpleNamespace(
+            home_team=SimpleNamespace(name="Hardwood Fields", display_name="Hanson", team_id="HARDWOOD_FIELDS"),
+            away_team=SimpleNamespace(name="River City", display_name="River City", team_id="RIVER_CITY"),
         )
+        body = SimpleNamespace(
+            home_team="Hanson",
+            away_team="River City",
+            home_id=str(self.home_oid),
+            away_id=str(self.away_oid),
+        )
+        self.assertFalse(_strict_matchup_matches(body, gm))
+
+    def test_strict_gate_rejects_wrong_matchup(self):
+        gm = SimpleNamespace(
+            home_team=SimpleNamespace(name="Hardwood Fields", team_id="HARDWOOD_FIELDS"),
+            away_team=SimpleNamespace(name="River City", team_id="RIVER_CITY"),
+        )
+        body = SimpleNamespace(home_team="River City", away_team="Hardwood Fields")
+        self.assertFalse(_strict_matchup_matches(body, gm))
+
+    def test_object_id_helpers_still_resolve_slot(self):
+        """ObjectId/slug helpers remain for FTD/schedule — not a substitute for the gate."""
+        self.assertTrue(fgp.teams_match_for_franchise(str(self.home_oid), "HARDWOOD_FIELDS"))
+        self.assertTrue(fgp.teams_match_for_franchise("Hardwood Fields", "HARDWOOD_FIELDS"))
+        self.assertFalse(fgp.teams_match_for_franchise("Hanson", "HARDWOOD_FIELDS"))

@@ -4156,20 +4156,25 @@ playNowBtn.addEventListener('click', async () => {
       body: JSON.stringify({ franchise_id: franchiseId })
     });
     if (!res.ok) throw new Error('Simulation failed');
-    const { home, away, week, home_id, away_id } = await res.json();
+    const { home, away, week, home_id, away_id, home_display, away_display } = await res.json();
     if (!home || !away) throw new Error('Matchup not found');
     try {
       if (franchiseId && window.FranchiseLS) {
         window.FranchiseLS.setWeek(franchiseId, week);
       }
     } catch {}
-    // Same approach as tournament: prefer API-sourced team name (userTeamNameForLeaders from topData), then derive from userTeamId vs home_id/away_id. Avoids reliance on localStorage franchise_user_team which may be missing or stale.
-    let resolvedSide = (userTeamNameForLeaders === home ? 'home' : (userTeamNameForLeaders === away ? 'away' : ''));
-    if (!resolvedSide && userTeamId && home_id != null && away_id != null) {
+    // Prefer ObjectId for side (display names must not drive identity). Core names stay on home/away.
+    let resolvedSide = '';
+    if (userTeamId && home_id != null && away_id != null) {
       if (String(userTeamId) === String(home_id)) resolvedSide = 'home';
       else if (String(userTeamId) === String(away_id)) resolvedSide = 'away';
     }
+    if (!resolvedSide) {
+      resolvedSide = (userTeamNameForLeaders === home ? 'home' : (userTeamNameForLeaders === away ? 'away' : ''));
+    }
     let url = `/set-lineup.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
+    if (home_display) url += `&home_display=${encodeURIComponent(home_display)}`;
+    if (away_display) url += `&away_display=${encodeURIComponent(away_display)}`;
     // ✅ SS&S: Use ObjectId for consistent navigation
     if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}&user_team_id=${encodeURIComponent(userTeamId)}`;
     if (resolvedSide) url += `&my_team=${resolvedSide}`;
@@ -5232,18 +5237,24 @@ async function resolveUpcomingOpponentFromMatchup(data) {
     upcomingOpponent = null;
     upcomingOpponentId = null;
     if (matchup && matchup.home && matchup.away) {
-      if (resolvedUserTeamName === matchup.home) {
-        upcomingOpponent = matchup.away;
-        upcomingOpponentId = matchup.away_id;
-      } else if (resolvedUserTeamName === matchup.away) {
-        upcomingOpponent = matchup.home;
-        upcomingOpponentId = matchup.home_id;
-      } else if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
+      const awayLabel = matchup.away_display || matchup.away;
+      const homeLabel = matchup.home_display || matchup.home;
+      // Prefer ObjectId (display name ≠ core name under Team Builder).
+      if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
         if (String(userTeamId) === String(matchup.home_id)) {
-          upcomingOpponent = matchup.away;
+          upcomingOpponent = awayLabel;
           upcomingOpponentId = matchup.away_id;
         } else if (String(userTeamId) === String(matchup.away_id)) {
-          upcomingOpponent = matchup.home;
+          upcomingOpponent = homeLabel;
+          upcomingOpponentId = matchup.home_id;
+        }
+      }
+      if (!upcomingOpponent) {
+        if (resolvedUserTeamName === matchup.home || resolvedUserTeamName === homeLabel) {
+          upcomingOpponent = awayLabel;
+          upcomingOpponentId = matchup.away_id;
+        } else if (resolvedUserTeamName === matchup.away || resolvedUserTeamName === awayLabel) {
+          upcomingOpponent = homeLabel;
           upcomingOpponentId = matchup.home_id;
         }
       }

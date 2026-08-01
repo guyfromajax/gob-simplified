@@ -1101,6 +1101,16 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     }
     home_name = home_row.get("name") or home_team.get("name") or source_doc.get("home_team_name") or team_docs.get(source_home_id, team_docs.get(home_id, home_id))
     away_name = away_row.get("name") or away_team.get("name") or source_doc.get("away_team_name") or team_docs.get(source_away_id, team_docs.get(away_id, away_id))
+    home_display = (
+        home_row.get("display_name")
+        or home_team.get("display_name")
+        or home_name
+    )
+    away_display = (
+        away_row.get("display_name")
+        or away_team.get("display_name")
+        or away_name
+    )
     home_score = _score_from_source(home_row, home_team, score_map, [home_name, source_home_id, home_id], "home_score")
     away_score = _score_from_source(away_row, away_team, score_map, [away_name, source_away_id, away_id], "away_score")
     resume_from_timeout = bool(
@@ -1139,8 +1149,11 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         "time_remaining": time_remaining,
         "home_team_id": home_id,
         "away_team_id": away_id,
+        # Core names for identity URL params / score keys; display for chrome only.
         "home_team_name": home_name,
         "away_team_name": away_name,
+        "home_display_name": home_display,
+        "away_display_name": away_display,
         "home_score": home_score,
         "away_score": away_score,
         "user_team_side": "home" if user_team_id_str == home_id else "away",
@@ -3725,13 +3738,19 @@ def play_next_game(
                 eos_meta["conference"] = g.get("conference")
             if g.get("region") is not None:
                 eos_meta["region"] = g.get("region")
+            # Identity fields (home/away) = core names for sim/init payloads + matchup gate.
+            # Display fields are chrome-only (resolver at the edge).
             from BackEnd.utils.franchise_team_display import resolve_team_display
 
+            home_core = home_doc.get("name", "") if home_doc else ""
+            away_core = away_doc.get("name", "") if away_doc else ""
             home_disp = resolve_team_display(franchise_doc, home_id, core_doc=home_doc)
             away_disp = resolve_team_display(franchise_doc, away_id, core_doc=away_doc)
             matchup = {
-                "home": home_disp.get("name") or (home_doc.get("name", "") if home_doc else ""),
-                "away": away_disp.get("name") or (away_doc.get("name", "") if away_doc else ""),
+                "home": home_core,
+                "away": away_core,
+                "home_display": home_disp.get("name") or home_core,
+                "away_display": away_disp.get("name") or away_core,
                 "home_id": str(home_id),
                 "away_id": str(away_id),
                 "week": manager.week,
@@ -3747,11 +3766,15 @@ def play_next_game(
                     home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
                     from BackEnd.utils.franchise_team_display import resolve_team_display
 
+                    home_core = home_doc.get("name", "") if home_doc else ""
+                    away_core = away_doc.get("name", "") if away_doc else ""
                     home_disp = resolve_team_display(franchise_doc, home_id, core_doc=home_doc)
                     away_disp = resolve_team_display(franchise_doc, away_id, core_doc=away_doc)
                     matchup = {
-                        "home": home_disp.get("name") or (home_doc.get("name", "") if home_doc else ""),
-                        "away": away_disp.get("name") or (away_doc.get("name", "") if away_doc else ""),
+                        "home": home_core,
+                        "away": away_core,
+                        "home_display": home_disp.get("name") or home_core,
+                        "away_display": away_disp.get("name") or away_core,
                         "home_id": str(home_id),
                         "away_id": str(away_id),
                         "week": manager.week,
@@ -7745,22 +7768,33 @@ def command_center_data(
                         for d in ftd_rank_docs
                         if d.get("team_id") is not None
                     }
+                    # Core names for identity joins; overlay display names applied at this edge only.
+                    from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
                     team_name_by_id = {
                         str(team_id): teams_docs.get(str(team_id), {}).get("name", str(team_id))
                         for team_id in team_ids
                     }
+                    display_name_by_id = resolve_team_name_map(franchise_doc, team_ids)
                     team_list = _ftd_team_list_for_franchise(franchise_id)
                     standings_data = calculate_franchise_standings(
                         franchise_doc.get("results", {}),
                         team_list,
                     )
-                    next_matchup_map = _build_next_matchup_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
-                    previous_week_result_map = _build_previous_week_result_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
+                    next_matchup_map = _build_next_matchup_map(
+                        franchise_doc, display_name_by_id, natl_rank_by_team_id
+                    )
+                    previous_week_result_map = _build_previous_week_result_map(
+                        franchise_doc, display_name_by_id, natl_rank_by_team_id
+                    )
                     rankings = [
                         {
                             "team_id": str(d["team_id"]),
                             "natl_rank": d.get("natl_rank", 128),
-                            "team_name": teams_docs.get(str(d["team_id"]), {}).get("name", "?"),
+                            "team_name": display_name_by_id.get(
+                                str(d["team_id"]),
+                                teams_docs.get(str(d["team_id"]), {}).get("name", "?"),
+                            ),
                             "primary_color": teams_docs.get(str(d["team_id"]), {}).get("primary_color") or "#000000",
                             "conference": teams_docs.get(str(d["team_id"]), {}).get("conference"),
                             "W": int((standings_data.get(str(d["team_id"]), {}) or {}).get("W", 0) or 0),
@@ -7788,7 +7822,10 @@ def command_center_data(
                                 "week": next_game.get("week"),
                                 "matchup_label": "vs" if str(next_game.get("home_team_id")) == str(team_id) else "@",
                                 "opponent_team_id": opponent_id,
-                                "opponent_team_name": teams_docs.get(opponent_id, {}).get("name", team_name_by_id.get(opponent_id, "Opponent")),
+                                "opponent_team_name": display_name_by_id.get(
+                                    opponent_id,
+                                    teams_docs.get(opponent_id, {}).get("name", team_name_by_id.get(opponent_id, "Opponent")),
+                                ),
                                 "opponent_team_mascot": teams_docs.get(opponent_id, {}).get("mascot", ""),
                                 "opponent_team_region": teams_docs.get(opponent_id, {}).get("region", ""),
                                 "opponent_team_conference": teams_docs.get(opponent_id, {}).get("conference"),
@@ -7814,13 +7851,23 @@ def command_center_data(
                             away_id = str(last_game.get("away_team_id") or "")
                             home_id = str(last_game.get("home_team_id") or "")
                             game_doc = last_game.get("game_doc") or {}
+                            opp_id = away_id if home_id == str(team_id) else home_id
                             response["last_game_summary"] = {
                                 "week": last_game.get("week"),
                                 "matchup_label": "vs" if home_id == str(team_id) else "@",
-                                "opponent_team_id": away_id if home_id == str(team_id) else home_id,
-                                "opponent_team_name": teams_docs.get(away_id if home_id == str(team_id) else home_id, {}).get("name", team_name_by_id.get(away_id if home_id == str(team_id) else home_id, "Opponent")),
-                                "away_team_name": teams_docs.get(away_id, {}).get("name", team_name_by_id.get(away_id, away_id)),
-                                "home_team_name": teams_docs.get(home_id, {}).get("name", team_name_by_id.get(home_id, home_id)),
+                                "opponent_team_id": opp_id,
+                                "opponent_team_name": display_name_by_id.get(
+                                    opp_id,
+                                    teams_docs.get(opp_id, {}).get("name", team_name_by_id.get(opp_id, "Opponent")),
+                                ),
+                                "away_team_name": display_name_by_id.get(
+                                    away_id,
+                                    teams_docs.get(away_id, {}).get("name", team_name_by_id.get(away_id, away_id)),
+                                ),
+                                "home_team_name": display_name_by_id.get(
+                                    home_id,
+                                    teams_docs.get(home_id, {}).get("name", team_name_by_id.get(home_id, home_id)),
+                                ),
                                 "away_score": int(last_game.get("away_score", 0) or 0),
                                 "home_score": int(last_game.get("home_score", 0) or 0),
                                 "game_id": last_game.get("game_id"),

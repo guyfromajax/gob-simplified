@@ -68,6 +68,10 @@
     
     if (home) params.set('home', home);
     if (away) params.set('away', away);
+    const homeDisplay = overrides.home_display || sourceParams.get('home_display');
+    const awayDisplay = overrides.away_display || sourceParams.get('away_display');
+    if (homeDisplay) params.set('home_display', homeDisplay);
+    if (awayDisplay) params.set('away_display', awayDisplay);
     if (homeId) params.set('home_id', homeId);
     if (awayId) params.set('away_id', awayId);
     if (myTeam) params.set('my_team', myTeam);
