@@ -8535,9 +8535,12 @@ def standings(
             pa = team_standings.get("PA", 0)
             differential = pf - pa
             natl_rank = natl_rank_by_team_id.get(team_id_str, 999)
+            core_name = t.get("name", "")
             output.append({
                 "team_id": team_id_str,
-                "name": display_name_by_id.get(team_id_str, t.get("name", "")),
+                # Identity = core; chrome = display_name (never overwrite name).
+                "name": core_name,
+                "display_name": display_name_by_id.get(team_id_str, core_name),
                 "region": t.get("region") or "",
                 "conference": t.get("conference"),
                 "W": wins,

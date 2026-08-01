@@ -1360,19 +1360,29 @@ export function createGameScene(Phaser) {
         });
       }
       
-      // Chrome labels prefer display_name (TB overlay); score keys stay on .name / URL core names.
-      const logHome = homeTeamObj?.display_name || homeTeamObj?.name || simData.home_team || simData.homeTeam?.name;
-      const logAway = awayTeamObj?.display_name || awayTeamObj?.name || simData.away_team || simData.awayTeam?.name;
+      // §3.1a: lookup/score by core ``name``; render ``display_name``.
+      const homeCore =
+        homeTeamObj?.name ||
+        (typeof homeTeam === 'string' ? homeTeam : null) ||
+        simData.home_team?.name ||
+        simData.home_team;
+      const awayCore =
+        awayTeamObj?.name ||
+        (typeof awayTeam === 'string' ? awayTeam : null) ||
+        simData.away_team?.name ||
+        simData.away_team;
+      const logHome = homeTeamObj?.display_name || homeCore || simData.homeTeam?.name;
+      const logAway = awayTeamObj?.display_name || awayCore || simData.awayTeam?.name;
       
       // Extract team IDs
       const homeId = homeTeamId || homeTeamObj?.team_id || simData.home_team_id || simData.homeTeam?.team_id;
       const awayId = awayTeamId || awayTeamObj?.team_id || simData.away_team_id || simData.awayTeam?.team_id;
       
-      // Scene chrome labels (display). Identity for nav/sim stays URL home/away + gameStore.
+      // Scene chrome labels (display). Score / sim identity = core.
       this.homeTeam = logHome;
       this.awayTeam = logAway;
-      this.homeTeamCore = homeTeamObj?.name || (typeof homeTeam === 'string' ? homeTeam : null);
-      this.awayTeamCore = awayTeamObj?.name || (typeof awayTeam === 'string' ? awayTeam : null);
+      this.homeTeamCore = homeCore;
+      this.awayTeamCore = awayCore;
       
       // Extract team colors (unified structure preferred)
       const homeColors = homeTeamObj?.colors || simData.home_team_colors;
@@ -2459,9 +2469,9 @@ export function createGameScene(Phaser) {
         if (turn.team) {
           const teamName =
             turn.team === 'home'
-              ? homeTeam
+              ? logHome
               : turn.team === 'away'
-              ? awayTeam
+              ? logAway
               : turn.team;
           parts.push(teamName);
         }
@@ -2471,12 +2481,14 @@ export function createGameScene(Phaser) {
 
       // Live scoreboard state - force to 0 for new games
       // Only use persisted scores if continuing an existing game
-      // ✅ TIMEOUT RESUME: Check team objects first (same pattern as timeouts) for consistency
-      const homeScoreFromData = homeTeamObj?.score ?? simData.score?.[homeTeam];
-      const awayScoreFromData = awayTeamObj?.score ?? simData.score?.[awayTeam];
+      // Score map keys are always core identity (URL / teams[].name), never display_name.
+      const homeScoreKey = homeCore || homeTeam;
+      const awayScoreKey = awayCore || awayTeam;
+      const homeScoreFromData = homeTeamObj?.score ?? simData.score?.[homeScoreKey];
+      const awayScoreFromData = awayTeamObj?.score ?? simData.score?.[awayScoreKey];
       const liveScore = {
-        [homeTeam]: isNewGame ? 0 : (homeScoreFromData ?? 0),
-        [awayTeam]: isNewGame ? 0 : (awayScoreFromData ?? 0),
+        [homeScoreKey]: isNewGame ? 0 : (homeScoreFromData ?? 0),
+        [awayScoreKey]: isNewGame ? 0 : (awayScoreFromData ?? 0),
       };
       
         // Explicitly reset scoreboard UI for new games
@@ -2502,18 +2514,18 @@ export function createGameScene(Phaser) {
       const isNoImpactShotClockTurn = (turn = {}) => noImpactShotClockTypes.has(turn?.result_type);
 
       const updateScoreboard = (turn = {}) => {
-        const prevHome = liveScore[homeTeam];
-        const prevAway = liveScore[awayTeam];
+        const prevHome = liveScore[homeScoreKey];
+        const prevAway = liveScore[awayScoreKey];
         
         // ✅ TIMEOUT: Track if we're updating from initial values (not a turn)
         const isInitialUpdate = turn.score && !turn.index && !turn.result_type;
 
         // ``turn.score`` is authoritative. ``turn.points`` may appear in the
         // payload for context but must **not** be re-applied here to avoid
-        // double counting.
+        // double counting. Keys = core names.
         if (turn.score) {
-          if (typeof turn.score[homeTeam] === 'number') liveScore[homeTeam] = turn.score[homeTeam];
-          if (typeof turn.score[awayTeam] === 'number') liveScore[awayTeam] = turn.score[awayTeam];
+          if (typeof turn.score[homeScoreKey] === 'number') liveScore[homeScoreKey] = turn.score[homeScoreKey];
+          if (typeof turn.score[awayScoreKey] === 'number') liveScore[awayScoreKey] = turn.score[awayScoreKey];
         }
 
         // ✅ TIMEOUT: Update fouls from turn data (exact same pattern as scores)
@@ -2641,14 +2653,14 @@ export function createGameScene(Phaser) {
           evaluateGameplayTrack({
             quarter: liveQuarter,
             clock: this.gameClock?.getState?.()?.timeRemaining,
-            homeScore: liveScore[homeTeam],
-            awayScore: liveScore[awayTeam],
+            homeScore: liveScore[homeScoreKey],
+            awayScore: liveScore[awayScoreKey],
           });
         }
 
         // ✅ REFACTOR: Direct DOM updates for all scoreboard items (consistent pattern)
-        if (homeScoreEl) homeScoreEl.textContent = liveScore[homeTeam];
-        if (awayScoreEl) awayScoreEl.textContent = liveScore[awayTeam];
+        if (homeScoreEl) homeScoreEl.textContent = liveScore[homeScoreKey];
+        if (awayScoreEl) awayScoreEl.textContent = liveScore[awayScoreKey];
         if (homeFoulsEl) homeFoulsEl.textContent = `F: ${liveHomeFouls}`;
         if (awayFoulsEl) awayFoulsEl.textContent = `F: ${liveAwayFouls}`;
         if (homeTolEl) homeTolEl.textContent = `TOL: ${liveHomeTimeouts}`;

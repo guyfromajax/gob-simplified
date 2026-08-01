@@ -43,11 +43,29 @@ class TestScanAllowlist(unittest.TestCase):
         }
         self.assertEqual(det.scan_json_for_replaced_name(payload, "Providence"), [])
 
-    def test_catches_standings_name(self):
+    def test_identity_name_is_not_a_leak(self):
+        # §3.1a: wire ``name`` is core identity; chrome is display_name.
         hits = det.scan_json_for_replaced_name(
-            {"standings": [{"name": "Providence", "W": 1}]}, "Providence"
+            {
+                "standings": [
+                    {"name": "Providence", "display_name": "Hanson", "W": 1}
+                ],
+                "teams": {"home": {"name": "Providence", "display_name": "Hanson"}},
+            },
+            "Providence",
         )
-        self.assertEqual(hits, ["standings[0].name"])
+        self.assertEqual(hits, [])
+
+    def test_catches_chrome_display_fields(self):
+        hits = det.scan_json_for_replaced_name(
+            {
+                "standings": [{"name": "Providence", "display_name": "Providence"}],
+                "rankings": [{"team_name": "Providence"}],
+            },
+            "Providence",
+        )
+        self.assertIn("standings[0].display_name", hits)
+        self.assertIn("rankings[0].team_name", hits)
 
     def test_score_keys_and_possession_are_not_leaks(self):
         payload = {
@@ -59,7 +77,7 @@ class TestScanAllowlist(unittest.TestCase):
             "teams": {"home": {"name": "Providence", "display_name": "Hanson"}},
         }
         hits = det.scan_json_for_replaced_name(payload, "Providence")
-        self.assertEqual(hits, ["teams.home.name"])
+        self.assertEqual(hits, [])
         self.assertFalse(any("#key" in h for h in hits))
         self.assertNotIn("possession", hits)
 
@@ -346,11 +364,12 @@ class TestTbLeakRouteSweep(unittest.TestCase):
                 "producer:summarize_game_state(exclude_animations=False)",
                 api_payload,
             )
-            # Chrome name must be display; score keys stay core.
+            # name = core identity; display_name = overlay; score keys = core.
             home_row = next(iter((api_payload.get("teams") or {}).values()), {})
-            self.assertEqual(home_row.get("name"), self.custom_name)
+            self.assertEqual(home_row.get("name"), self.replaced_name)
             self.assertEqual(home_row.get("display_name"), self.custom_name)
             self.assertIn(self.replaced_name, api_payload.get("score") or {})
+            self.assertNotIn(self.custom_name, api_payload.get("score") or {})
         except Exception as e:
             self.walk_errors.append(f"summarize_api: {e}")
             findings.append(
@@ -362,12 +381,10 @@ class TestTbLeakRouteSweep(unittest.TestCase):
 
         try:
             persist_payload = summarize_game_state(game, exclude_animations=True)
-            # Persist keeps core on name — not scanned as a response leak.
             self._record(
                 findings,
                 "producer:summarize_game_state(exclude_animations=True)",
                 persist_payload,
-                scan_for_leaks=False,
             )
             home_row = next(iter((persist_payload.get("teams") or {}).values()), {})
             self.assertEqual(home_row.get("name"), self.replaced_name)
@@ -452,8 +469,9 @@ class TestTbLeakRouteSweep(unittest.TestCase):
 
         # Explicit: box-score data route is NOT walked (no seeded game_id).
         print(
-            "\n[TB-LEAK] BOX-SCORE: GET /api/game/{game_id} was NOT walked "
-            "(requires a seeded game document). box-score.html is static.\n"
+            "\n[TB-LEAK] BOX-SCORE: GET /api/game/{game_id} not walked in this "
+            "sweep (needs seeded game). Middleware now resolves franchise_id "
+            "from the game doc so live box-score responses are scannable.\n"
         )
 
         deduped: list[dict] = []

@@ -8,17 +8,15 @@
  *   localStorage.TB_LEAK_DETECTOR = '1'
  * Disable: localStorage.TB_LEAK_DETECTOR = '0'
  *
- * Source of replaced_name (first hit wins):
- *   1. options.replacedName
- *   2. getActiveTeamBuilderVisual().replaced_name
- *   3. FranchiseLS.getTeamBuilderVisual().replaced_name
- *   4. data-tb-replaced-name on <body>
+ * On hit: paints a fixed on-screen banner listing offending elements (console
+ * alone is invisible during play).
  */
 (function (global) {
   'use strict';
 
-  var ALLOWLISTED_SELECTORS = ['#tb-orientation'];
+  var ALLOWLISTED_SELECTORS = ['#tb-orientation', '#tb-leak-banner'];
   var ORIENTATION_RE = /replacing\s+.+\s+in\s+this\s+franchise/i;
+  var BANNER_ID = 'tb-leak-banner';
 
   function envEnabled() {
     try {
@@ -90,8 +88,85 @@
     return hits;
   }
 
-  function report(hits, replacedName) {
+  function clearBanner() {
+    var existing = global.document && global.document.getElementById(BANNER_ID);
+    if (existing && existing.parentNode) existing.parentNode.removeChild(existing);
+  }
+
+  function paintBanner(hits, replacedName) {
+    if (!global.document || !global.document.body) return;
+    clearBanner();
     if (!hits.length) return;
+
+    var banner = global.document.createElement('div');
+    banner.id = BANNER_ID;
+    banner.setAttribute('role', 'alert');
+    banner.style.cssText = [
+      'position:fixed',
+      'top:0',
+      'left:0',
+      'right:0',
+      'z-index:2147483647',
+      'background:#8b1a1a',
+      'color:#fff',
+      'font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace',
+      'padding:10px 14px',
+      'box-shadow:0 4px 16px rgba(0,0,0,0.45)',
+      'max-height:40vh',
+      'overflow:auto',
+    ].join(';');
+
+    var title = global.document.createElement('div');
+    title.style.cssText = 'font-weight:700;margin-bottom:6px;';
+    title.textContent =
+      '[TB-LEAK] replaced_name=' + JSON.stringify(replacedName) +
+      ' in ' + hits.length + ' DOM node(s) — dismiss to continue';
+    banner.appendChild(title);
+
+    var list = global.document.createElement('ul');
+    list.style.cssText = 'margin:0 0 8px 18px;padding:0;';
+    var max = Math.min(hits.length, 12);
+    for (var i = 0; i < max; i++) {
+      var h = hits[i];
+      var li = global.document.createElement('li');
+      li.textContent =
+        '<' + (h.tag || '?') +
+        (h.id ? '#' + h.id : '') +
+        (h.className ? '.' + String(h.className).split(/\s+/).slice(0, 2).join('.') : '') +
+        '> ' + h.text;
+      list.appendChild(li);
+    }
+    if (hits.length > max) {
+      var more = global.document.createElement('li');
+      more.textContent = '… +' + (hits.length - max) + ' more (see console)';
+      list.appendChild(more);
+    }
+    banner.appendChild(list);
+
+    var dismiss = global.document.createElement('button');
+    dismiss.type = 'button';
+    dismiss.textContent = 'Dismiss';
+    dismiss.style.cssText =
+      'background:#fff;color:#8b1a1a;border:0;padding:4px 10px;font:inherit;cursor:pointer;';
+    dismiss.onclick = function () { clearBanner(); };
+    banner.appendChild(dismiss);
+
+    global.document.body.appendChild(banner);
+
+    // Highlight first few offenders briefly.
+    for (var j = 0; j < Math.min(hits.length, 5); j++) {
+      var el = hits[j].element;
+      if (!el || !el.style) continue;
+      el.style.outline = '3px solid #ff4444';
+      el.style.outlineOffset = '2px';
+    }
+  }
+
+  function report(hits, replacedName) {
+    if (!hits.length) {
+      clearBanner();
+      return;
+    }
     for (var i = 0; i < hits.length; i++) {
       var h = hits[i];
       console.error(
@@ -100,10 +175,11 @@
         h.element
       );
     }
+    paintBanner(hits, replacedName);
   }
 
   /**
-   * Scan after paint. Returns hit list (also logs).
+   * Scan after paint. Returns hit list (also logs + banner).
    * @param {{replacedName?: string, root?: Element, throwOnHit?: boolean}} [options]
    */
   function runTeamBuilderLeakScan(options) {
@@ -133,7 +209,6 @@
     }
   }
 
-  // Auto-run on franchise-scoped pages after load.
   function autoArm() {
     if (!envEnabled()) return;
     try {
@@ -147,12 +222,20 @@
     } else if (global.addEventListener) {
       global.addEventListener('load', function () { scheduleScan(); });
     }
+    // Re-scan after SPA-ish DOM updates during play.
+    if (global.setInterval) {
+      global.setInterval(function () {
+        if (!envEnabled()) return;
+        runTeamBuilderLeakScan();
+      }, 8000);
+    }
   }
 
   global.TeamBuilderLeakDetector = {
     run: runTeamBuilderLeakScan,
     schedule: scheduleScan,
     scanDom: scanDom,
+    clearBanner: clearBanner,
     ALLOWLISTED_SELECTORS: ALLOWLISTED_SELECTORS,
   };
 

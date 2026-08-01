@@ -46,6 +46,9 @@ LOOKUP_IDENTIFIER_LEAVES: frozenset[str] = frozenset(
         "away_team",
         "home",  # play-next identity
         "away",
+        # Wire identity field (§3.1a): core name for score/matchup lookup.
+        # Chrome is additive on display_name / team_name / labels — never ``name``.
+        "name",
         # Canonical slugs / ObjectId keys — identity, not chrome. Casefold can
         # match replaced_name (e.g. PROVIDENCE ≈ Providence); still not a leak.
         "team_id",
@@ -212,6 +215,78 @@ def extract_franchise_id_from_request(
     return None
 
 
+def franchise_id_from_game_doc(game_id: str) -> Optional[str]:
+    """Load franchise_id from a games collection document (box-score /api/game path)."""
+    if not game_id:
+        return None
+    try:
+        from BackEnd.db import games_collection
+        from BackEnd.utils.game_id_utils import normalize_game_id
+
+        gid = normalize_game_id(game_id)
+        doc = games_collection.find_one({"_id": gid}, {"franchise_id": 1})
+        if not doc:
+            try:
+                from bson import ObjectId
+
+                doc = games_collection.find_one({"_id": ObjectId(str(game_id))}, {"franchise_id": 1})
+            except Exception:
+                doc = None
+        if not doc:
+            return None
+        raw = doc.get("franchise_id")
+        return str(raw) if raw else None
+    except Exception as e:
+        logger.debug("[TB-LEAK] franchise_id_from_game_doc failed: %s", e)
+        return None
+
+
+def resolve_franchise_id_for_leak_scan(
+    request: Request,
+    *,
+    body_json: Any = None,
+    response_payload: Any = None,
+) -> Optional[str]:
+    """
+    Franchise scope for leak scanning.
+
+    Prefer explicit franchise_id on the request; else response payload; else
+    resolve from the game document for ``/api/game/{game_id}``.
+    """
+    path_params = getattr(request, "path_params", None) or {}
+    if not path_params and getattr(request, "scope", None):
+        path_params = request.scope.get("path_params") or {}
+
+    fid = extract_franchise_id_from_request(
+        query=dict(request.query_params),
+        body=body_json,
+        path_params=path_params,
+    )
+    if fid:
+        return fid
+
+    if isinstance(response_payload, dict):
+        raw = response_payload.get("franchise_id")
+        if raw:
+            return str(raw)
+
+    path = request.url.path or ""
+    if "/api/game/" in path:
+        game_id = path_params.get("game_id") if isinstance(path_params, dict) else None
+        if not game_id:
+            # /api/game/<id> or /api/game/<id>/...
+            parts = [p for p in path.split("/") if p]
+            try:
+                idx = parts.index("game")
+                if idx + 1 < len(parts):
+                    game_id = parts[idx + 1]
+            except ValueError:
+                game_id = None
+        if game_id:
+            return franchise_id_from_game_doc(str(game_id))
+    return None
+
+
 def overlay_replaced_name(franchise_id: str) -> Optional[str]:
     """Return overlay.replaced_name for a TB franchise, else None."""
     try:
@@ -271,18 +346,6 @@ class TeamBuilderLeakMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        franchise_id = extract_franchise_id_from_request(
-            query=dict(request.query_params),
-            body=body_json,
-            path_params=getattr(request, "path_params", None) or {},
-        )
-        if not franchise_id:
-            return response
-
-        replaced = overlay_replaced_name(franchise_id)
-        if not replaced:
-            return response
-
         # Only inspect JSON bodies.
         resp_ct = (response.headers.get("content-type") or "").lower()
         if "application/json" not in resp_ct:
@@ -302,6 +365,38 @@ class TeamBuilderLeakMiddleware(BaseHTTPMiddleware):
                 content=body,
                 status_code=response.status_code,
                 headers=dict(response.headers),
+                media_type=response.media_type,
+            )
+
+        franchise_id = resolve_franchise_id_for_leak_scan(
+            request,
+            body_json=body_json,
+            response_payload=payload,
+        )
+        if not franchise_id:
+            headers = {
+                k: v
+                for k, v in response.headers.items()
+                if k.lower() not in ("content-length", "content-encoding")
+            }
+            return Response(
+                content=body,
+                status_code=response.status_code,
+                headers=headers,
+                media_type=response.media_type,
+            )
+
+        replaced = overlay_replaced_name(franchise_id)
+        if not replaced:
+            headers = {
+                k: v
+                for k, v in response.headers.items()
+                if k.lower() not in ("content-length", "content-encoding")
+            }
+            return Response(
+                content=body,
+                status_code=response.status_code,
+                headers=headers,
                 media_type=response.media_type,
             )
 
@@ -381,13 +476,13 @@ FRANCHISE_LEAK_SWEEP_PRODUCERS: tuple[str, ...] = (
 # Known franchise / live-play surfaces NOT in the automated sweep yet.
 # Box-score loads via GET /api/game/{game_id} — requires a seeded game doc.
 FRANCHISE_LEAK_SWEEP_NOT_WALKED: tuple[str, ...] = (
-    "GET /api/game/{game_id}  (box-score.html data source — needs seeded game)",
+    "GET /api/game/{game_id}  (box-score data — middleware resolves franchise from game doc; sweep needs seeded game)",
     "POST /api/simulate-quarter",
     "POST /api/init-game",
     "POST /franchise/play-next-game",
     "GET /franchise/lineup-for-matchups",
-    "GET /box-score.html (static; DOM detector only)",
-    "court.html / set-lineup.html (DOM detector only)",
+    "GET /box-score.html (static; DOM detector + banner)",
+    "court.html / set-lineup.html (DOM detector + banner)",
 )
 
 

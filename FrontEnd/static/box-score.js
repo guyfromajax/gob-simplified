@@ -77,8 +77,10 @@ function resolveBannerTeamNameFromParams(bannerParam, homeName, awayName) {
 function resolveUserTeamNameForPhaseBPulse(urlParams) {
   if (!gameData || !urlParams) return '';
   const { homeTeam, awayTeam, homeTeamId, awayTeamId } = getTeamContext();
-  const homeName = homeTeam.name || 'Home Team';
-  const awayName = awayTeam.name || 'Away Team';
+  const homeCore = teamCoreName(homeTeam, 'Home Team');
+  const awayCore = teamCoreName(awayTeam, 'Away Team');
+  const homeLabel = teamDisplayLabel(homeTeam, 'Home Team');
+  const awayLabel = teamDisplayLabel(awayTeam, 'Away Team');
   const bannerTeamParam = (urlParams.get('banner_team') || '').trim();
   const myTeamParam = urlParams.get('my_team');
   const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
@@ -86,7 +88,7 @@ function resolveUserTeamNameForPhaseBPulse(urlParams) {
   if (myTeamParam === 'home' || myTeamParam === 'away') {
     userTeamSide = myTeamParam;
   } else if (teamIdParam) {
-    userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeName, awayName, homeTeamId, awayTeamId);
+    userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeCore, awayCore, homeTeamId, awayTeamId);
   }
   if (userTeamSide == null && !teamIdParam && !myTeamParam && typeof localStorage !== 'undefined') {
     const fid = urlParams.get('franchise_id');
@@ -97,22 +99,24 @@ function resolveUserTeamNameForPhaseBPulse(urlParams) {
     if (stored === 'home' || stored === 'away') userTeamSide = stored;
   }
   if (bannerTeamParam) {
-    return resolveBannerTeamNameFromParams(bannerTeamParam, homeName, awayName) || '';
+    return resolveBannerTeamNameFromParams(bannerTeamParam, homeLabel, awayLabel)
+      || resolveBannerTeamNameFromParams(bannerTeamParam, homeCore, awayCore)
+      || '';
   }
-  if (userTeamSide === 'away') return awayName;
-  if (userTeamSide === 'home') return homeName;
+  if (userTeamSide === 'away') return awayLabel;
+  if (userTeamSide === 'home') return homeLabel;
   return '';
 }
 
 function resolveUserTeamSideForPhaseBPulse(urlParams) {
   if (!gameData || !urlParams) return null;
   const { homeTeam, awayTeam, homeTeamId, awayTeamId } = getTeamContext();
-  const homeName = homeTeam.name || 'Home Team';
-  const awayName = awayTeam.name || 'Away Team';
+  const homeCore = teamCoreName(homeTeam, 'Home Team');
+  const awayCore = teamCoreName(awayTeam, 'Away Team');
   const myTeamParam = urlParams.get('my_team');
   const teamIdParam = urlParams.get('team_id') || urlParams.get('user_team_id');
   if (myTeamParam === 'home' || myTeamParam === 'away') return myTeamParam;
-  if (teamIdParam) return mapTeamIdToSide(teamIdParam, gameData, homeName, awayName, homeTeamId, awayTeamId);
+  if (teamIdParam) return mapTeamIdToSide(teamIdParam, gameData, homeCore, awayCore, homeTeamId, awayTeamId);
   if (typeof localStorage !== 'undefined') {
     const fid = urlParams.get('franchise_id');
     const stored =
@@ -649,19 +653,30 @@ async function loadPreGameData({ homeTeamName, awayTeamName, franchiseId, tourna
   };
 }
 
+/** Core identity for score{} lookup; overlay for labels. */
+function teamCoreName(teamObj, fallback) {
+  return (teamObj && teamObj.name) || fallback || 'Team';
+}
+function teamDisplayLabel(teamObj, fallback) {
+  if (!teamObj) return fallback || 'Team';
+  return teamObj.display_name || teamObj.name || fallback || 'Team';
+}
+
 // Render header with team names and scores
 function renderHeader() {
   const { homeTeam: homeTeamObj, awayTeam: awayTeamObj } = getTeamContext();
   const score = gameData.score || {};
-  const homeName = homeTeamObj.name || 'Home Team';
-  const awayName = awayTeamObj.name || 'Away Team';
-  const homeScore = score[homeName] || homeTeamObj.score || 0;
-  const awayScore = score[awayName] || awayTeamObj.score || 0;
+  const homeCore = teamCoreName(homeTeamObj, 'Home Team');
+  const awayCore = teamCoreName(awayTeamObj, 'Away Team');
+  const homeLabel = teamDisplayLabel(homeTeamObj, 'Home Team');
+  const awayLabel = teamDisplayLabel(awayTeamObj, 'Away Team');
+  const homeScore = score[homeCore] || homeTeamObj.score || 0;
+  const awayScore = score[awayCore] || awayTeamObj.score || 0;
   const homeTeamId = gameData?.home_team_id;
   const awayTeamId = gameData?.away_team_id;
 
-  document.getElementById('home-team-name').textContent = homeName;
-  document.getElementById('away-team-name').textContent = awayName;
+  document.getElementById('home-team-name').textContent = homeLabel;
+  document.getElementById('away-team-name').textContent = awayLabel;
   document.getElementById('home-score').textContent = homeScore;
   document.getElementById('away-score').textContent = awayScore;
 
@@ -695,7 +710,7 @@ function renderHeader() {
   if (myTeamParam === 'home' || myTeamParam === 'away') {
     userTeamSide = myTeamParam;
   } else if (teamIdParam) {
-    userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeName, awayName, homeTeamId, awayTeamId);
+    userTeamSide = mapTeamIdToSide(teamIdParam, gameData, homeCore, awayCore, homeTeamId, awayTeamId);
   }
   if (userTeamSide == null && !teamIdParam && !myTeamParam && typeof localStorage !== 'undefined') {
     const fid = urlParams.get('franchise_id');
@@ -706,12 +721,14 @@ function renderHeader() {
     if (stored === 'home' || stored === 'away') userTeamSide = stored;
   }
 
+  // Banner / assets use display labels; side mapping uses core identity.
   const userTeamNameForBanner = bannerTeamParam
-    ? resolveBannerTeamNameFromParams(bannerTeamParam, homeName, awayName)
+    ? resolveBannerTeamNameFromParams(bannerTeamParam, homeLabel, awayLabel)
+      || resolveBannerTeamNameFromParams(bannerTeamParam, homeCore, awayCore)
     : userTeamSide === 'away'
-    ? awayName
+    ? awayLabel
     : userTeamSide === 'home'
-    ? homeName
+    ? homeLabel
     : null;
 
   console.log('[box-score renderHeader] getTeamAssetPath scope', typeof getTeamAssetPath, typeof window !== 'undefined' ? typeof window.getTeamAssetPath : 'n/a');
@@ -752,12 +769,12 @@ function renderHeader() {
   }
 
   if (homeTabButton) {
-    homeTabButton.textContent = homeName;
+    homeTabButton.textContent = homeLabel;
     homeTabButton.style.setProperty('--tab-color', homePrimaryColor);
     homeTabButton.style.setProperty('--tab-color-rgb', hexToRgbString(homePrimaryColor));
   }
   if (awayTabButton) {
-    awayTabButton.textContent = awayName;
+    awayTabButton.textContent = awayLabel;
     awayTabButton.style.setProperty('--tab-color', awayPrimaryColor);
     awayTabButton.style.setProperty('--tab-color-rgb', hexToRgbString(awayPrimaryColor));
   }
@@ -775,10 +792,12 @@ function renderQuarterScoring() {
   const pointsByQuarter = gameData.points_by_quarter || {};
   const score = gameData.score || {};
 
-  const homeName = homeTeam.name || 'Home Team';
-  const awayName = awayTeam.name || 'Away Team';
-  const homePoints = pointsByQuarter[homeName] || [0, 0, 0, 0];
-  const awayPoints = pointsByQuarter[awayName] || [0, 0, 0, 0];
+  const homeCore = teamCoreName(homeTeam, 'Home Team');
+  const awayCore = teamCoreName(awayTeam, 'Away Team');
+  const homeLabel = teamDisplayLabel(homeTeam, 'Home Team');
+  const awayLabel = teamDisplayLabel(awayTeam, 'Away Team');
+  const homePoints = pointsByQuarter[homeCore] || [0, 0, 0, 0];
+  const awayPoints = pointsByQuarter[awayCore] || [0, 0, 0, 0];
 
   // Check for overtime
   const hasOT = homePoints.length > 4 || awayPoints.length > 4;
@@ -803,14 +822,14 @@ function renderQuarterScoring() {
   }
 
   // Render final scores
-  const homeFinal = score[homeName] || homeTeam.score || homePoints.reduce((a, b) => a + b, 0);
-  const awayFinal = score[awayName] || awayTeam.score || awayPoints.reduce((a, b) => a + b, 0);
+  const homeFinal = score[homeCore] || homeTeam.score || homePoints.reduce((a, b) => a + b, 0);
+  const awayFinal = score[awayCore] || awayTeam.score || awayPoints.reduce((a, b) => a + b, 0);
   document.getElementById('home-final-score').textContent = homeFinal;
   document.getElementById('away-final-score').textContent = awayFinal;
 
-  // Update team names in table
-  document.getElementById('home-quarter-team-name').textContent = homeName;
-  document.getElementById('away-quarter-team-name').textContent = awayName;
+  // Update team names in table (chrome)
+  document.getElementById('home-quarter-team-name').textContent = homeLabel;
+  document.getElementById('away-quarter-team-name').textContent = awayLabel;
 }
 
 // Render player stats for both teams

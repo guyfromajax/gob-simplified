@@ -2312,6 +2312,7 @@ try:
                         # TODO: Remove these after frontend is updated to use teams[home_team_id]/teams[away_team_id]
                         "home_team": {
                             "name": home_team_name,
+                            "display_name": home_team_data.get("display_name") or home_team_name,
                             "team_fouls": home_team_data.get("team_fouls", 0),
                             "attributes": home_team_data.get("attributes", {}),  # Team attributes for S3 tab
                             "natl_rank": home_natl,
@@ -2328,6 +2329,7 @@ try:
                         },
                         "away_team": {
                             "name": away_team_name,
+                            "display_name": away_team_data.get("display_name") or away_team_name,
                             "team_fouls": away_team_data.get("team_fouls", 0),
                             "attributes": away_team_data.get("attributes", {}),  # Team attributes for S3 tab
                             "natl_rank": away_natl,

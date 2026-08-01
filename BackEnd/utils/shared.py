@@ -2604,17 +2604,15 @@ def summarize_game_state(
     # print(f"Away team primary color: {game.away_team.primary_color}")
     # print(f"Away team secondary color: {game.away_team.secondary_color}")
 
-    # Core identity for score lookups; chrome name resolved below when this
-    # summary is an API response (exclude_animations=False). Persist keeps core.
+    # §3.1a: ``name`` is always core identity (score / matchup lookup).
+    # Overlay is additive on ``display_name`` — never overwrite ``name``.
     _home_core_name = game.home_team.name
     _away_core_name = game.away_team.name
     _home_display_name = getattr(game.home_team, "display_name", None) or _home_core_name
     _away_display_name = getattr(game.away_team, "display_name", None) or _away_core_name
-    _home_chrome_name = _home_display_name if not exclude_animations else _home_core_name
-    _away_chrome_name = _away_display_name if not exclude_animations else _away_core_name
 
     home_team_obj = {
-        "name": _home_chrome_name,
+        "name": _home_core_name,
         "display_name": _home_display_name,
         "team_id": game.home_team.team_id,
         "score": game.score.get(_home_core_name, 0),
@@ -2627,7 +2625,7 @@ def summarize_game_state(
     }
 
     away_team_obj = {
-        "name": _away_chrome_name,
+        "name": _away_core_name,
         "display_name": _away_display_name,
         "team_id": game.away_team.team_id,
         "score": game.score.get(_away_core_name, 0),
@@ -2932,12 +2930,10 @@ def summarize_game_state(
         pass
     
     # ✅ UNIFIED STRUCTURE: All team data in one place (eliminates home_team/away_team duplication)
-    # Chrome: API responses (exclude_animations=False) put overlay on ``name`` + ``display_name``.
-    # Persist (exclude_animations=True): ``name`` stays core; ``display_name`` still carries overlay.
-    # Score / totals / points_by_quarter lookups always use core names.
+    # ``name`` = core identity; ``display_name`` = overlay chrome (additive). Score keys = core.
     teams_obj = {
         home_key: {
-            "name": _home_chrome_name,
+            "name": _home_core_name,
             "display_name": _home_display_name,
             "team_id": game.home_team.team_id,
             "mascot": game.home_team.mascot,
@@ -2966,7 +2962,7 @@ def summarize_game_state(
             "playbook_settings": home_playbook_settings  # ✅ Preserve from database
         },
         away_key: {
-            "name": _away_chrome_name,
+            "name": _away_core_name,
             "display_name": _away_display_name,
             "team_id": game.away_team.team_id,
             "mascot": game.away_team.mascot,

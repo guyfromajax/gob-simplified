@@ -704,9 +704,20 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
     const awayTeamId = scene.simData?.away_team_id;
     const teamsObj = scene.simData?.teams || {};
 
+    // Render display_name; scene.homeTeam/awayTeam are already chrome labels.
     const userTeamName = myTeamSide === 'home'
-        ? ((homeTeamId && teamsObj[homeTeamId]?.name) || scene.simData?.home_team?.name || scene.homeTeam?.name || 'Your Team')
-        : ((awayTeamId && teamsObj[awayTeamId]?.name) || scene.simData?.away_team?.name || scene.awayTeam?.name || 'Your Team');
+        ? (scene.homeTeam
+            || (homeTeamId && teamsObj[homeTeamId]?.display_name)
+            || (homeTeamId && teamsObj[homeTeamId]?.name)
+            || scene.simData?.home_team?.display_name
+            || scene.simData?.home_team?.name
+            || 'Your Team')
+        : (scene.awayTeam
+            || (awayTeamId && teamsObj[awayTeamId]?.display_name)
+            || (awayTeamId && teamsObj[awayTeamId]?.name)
+            || scene.simData?.away_team?.display_name
+            || scene.simData?.away_team?.name
+            || 'Your Team');
 
     const popup = document.createElement('div');
     popup.className = 'user-timeout-popup';

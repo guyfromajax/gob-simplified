@@ -649,6 +649,11 @@ window.addEventListener('gob:account-settings-updated', (event) => {
 
 let standingsDataCache = null;
 
+function standingsTeamLabel(t) {
+  // Render chrome; identity stays on t.name / t.team_id.
+  return (t && (t.display_name || t.name)) || '';
+}
+
 function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
   const returnUrl = encodeURIComponent(getCurrentRelativeUrl());
   return `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId)}&team_name=${encodeURIComponent(teamName)}&return_tab=${returnTab}&return_url=${returnUrl}`;
@@ -656,10 +661,11 @@ function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
 
 function buildTeamLink(t) {
   const teamLink = document.createElement('a');
-  teamLink.href = buildFranchiseTeamPageUrl(t.team_id, t.name, 'standings-tab');
+  const label = standingsTeamLabel(t);
+  teamLink.href = buildFranchiseTeamPageUrl(t.team_id, label, 'standings-tab');
   const rank = Number(t?.natl_rank);
   const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
-  teamLink.textContent = `${rankPrefix}${t.name}`;
+  teamLink.textContent = `${rankPrefix}${label}`;
   teamLink.style.color = '#4a90e2';
   teamLink.style.textDecoration = 'none';
   teamLink.style.cursor = 'pointer';
@@ -737,7 +743,7 @@ function renderStandings(data, selectedRegion) {
   if (!data) return;
   const list = data.standings || [];
   updateTopRecordLabel();
-  list.forEach(t => { teamIdNameMap[t.team_id] = t.name; });
+  list.forEach(t => { teamIdNameMap[t.team_id] = standingsTeamLabel(t); });
 
   const container = document.getElementById('standings-by-region');
   if (!container) return;
@@ -977,7 +983,7 @@ function renderHomeStandingsCard() {
 
   const rows = teams.map((team) => `
     <div class="fcc-home-standings-row">
-      <span class="fcc-home-standings-team">${escapeHomeHtml(team.name || '')}</span>
+      <span class="fcc-home-standings-team">${escapeHomeHtml(standingsTeamLabel(team))}</span>
       <span class="fcc-home-standings-stat">${escapeHomeHtml(team.W ?? 0)}</span>
       <span class="fcc-home-standings-stat">${escapeHomeHtml(team.L ?? 0)}</span>
       <span class="fcc-home-standings-stat">${escapeHomeHtml(team.PF ?? 0)}</span>
