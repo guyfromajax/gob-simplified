@@ -31,6 +31,7 @@ from BackEnd.utils.player_generation import (
     RT_ATTRS,
     RUNG_MULTIPLIERS,
     generate_player,
+    position_profile,
 )
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,15 @@ OFFSEASON_DISTRIBUTION_BLEND = 0.70
 # Non-core attributes grow at a low but never-zero rate (§7.1) — a floor on the
 # per-attribute weight used for within-family distribution.
 NON_CORE_GROWTH_MULTIPLIER = 0.06
+
+# Part B (Direction 1): per-rollover strength of the offseason shape-and-level attractor.
+# The offseason pulls each attribute this fraction of the way toward its tier/year/position
+# PROFILE value scaled to the ladder RT. α<1 ⇒ attractor, not clamp: in-season focus
+# survives as a spike (α=1 would erase all deviation). Tuned against the faithful in-season
+# +offseason career: reference-developed Average C SC → ~52 (near the honest generation
+# value 58.5, below it because development is partial by design), with a visible focus spike
+# (+8). Raising it trades spike for shape; see the α frontier in the design notes.
+OFFSEASON_ATTRACTOR_ALPHA = 0.55
 # Intra-family concentration exponent on the position weights. 1.0 puts almost
 # all of a family's growth on its highest-weight attribute (which then must
 # exceed 100 to carry a high RT — an above-100 rate of ~30%). The DEFAULT policy
@@ -412,16 +422,46 @@ def develop_one_offseason(player: dict, rung: str, profile: dict,
     if dh:
         player["height"] = player["height"] + dh
 
-    # 3-4. distribute across attributes by family curve × timing × weights,
-    # sized to the rung's RT target at the (post-HT) height.
-    fractions = _distribution_fractions(position, rung, profile["family_timing"], accumulator)
-    B = _analytic_budget(attrs, player["height"], position, fractions, target_rt)
+    # 3-4. grow attributes toward the rung's profile and RT target (post-HT height).
+    #
+    # PART A (desync fix): develop from the UN-FATIGUED anchor and write BOTH anchor
+    # and live. `execute_training` treats anchor_ as authoritative and resets
+    # live = anchor at week 1, so writing only live (the pre-2026-08 behaviour) let
+    # every season's first training WIPE the offseason's growth on any attribute it
+    # did not itself train — a big's scoring, a wing's shooting. And live may be
+    # fatigue-scaled at rollover (_rescale_attributes sets live = anchor × NG), so
+    # reading live as the base would bake fatigue permanently into the anchor. The
+    # un-fatigued anchor is the input; both fields are written.
+    for a in GROWTH_ATTRS:
+        av = attrs.get(f"anchor_{a}")
+        if av is not None:
+            attrs[a] = av
+    # PART B (Direction 1): the offseason is an ATTRACTOR toward the tier/year/position
+    # PROFILE scaled to the ladder target RT — it targets BOTH a level (target_rt) and a
+    # shape (the profile). It replaces the old additive budget (B≥0), which could only add,
+    # so in-season growth ratcheted RT above the ladder and the leftover budget starved
+    # non-signature attributes (a big's scoring, a wing's shooting). The attractor is
+    # bidirectional and NOT budget-gated: it pulls RT down to the ladder when in-season
+    # overshot, and fills the starved attributes even at RT-target. α<1 keeps it an
+    # attractor, not a clamp — a user's in-season focus survives as a spike he pays for
+    # elsewhere. RT lands on the ladder by construction (the target the profile is scaled
+    # to), so generation and development describe one league. (`accumulator` no longer
+    # shapes the offseason distribution — focus is expressed in-season now; it still drives
+    # the QUALITY half → coaching_f → target_rt in develop_rollover.)
+    prof = position_profile(position)
+    weights = POSITION_WEIGHTS[position]
+    fit = height_fitness(position, player["height"]) or 1.0
+    denom = sum(weights.get(a, 0.0) * prof.get(a, 0.0) for a in GROWTH_ATTRS) or 1.0
+    k = (target_rt / fit) / denom
     st_gain = 0
     for a in GROWTH_ATTRS:
-        delta = B * fractions[a]
-        attrs[a] = int(round(attrs.get(a, 0) + delta))
+        target_a = prof.get(a, 0.0) * k
+        before = attrs.get(a, 0)
+        moved = max(1, int(round(before + OFFSEASON_ATTRACTOR_ALPHA * (target_a - before))))
         if a == "ST":
-            st_gain = delta
+            st_gain = moved - before
+        attrs[a] = moved
+        attrs[f"anchor_{a}"] = moved           # write both — survives next in-season
 
     # WT tracks strength: pounds with each inch of HT and with ST muscle gain.
     player["weight"] = player.get("weight", 0) + dh * rng.randint(*WT_LBS_PER_INCH) \
@@ -617,6 +657,7 @@ __all__ = [
     "RT_COMPRESSION_THRESHOLD", "RT_SOFT_CAP", "PEAK_COUNT_DISTRIBUTION",
     "CH_PEAK_LOW", "CH_PEAK_HIGH", "PEAK_RUNG_WEIGHTS", "FAMILY_TIMING_WEIGHTS",
     "FAMILY_CURVES", "OFFSEASON_DISTRIBUTION_BLEND", "NON_CORE_GROWTH_MULTIPLIER",
+    "OFFSEASON_ATTRACTOR_ALPHA",
     "HT_CURVE_BY_TIMING", "HT_TOTAL_MEAN", "HT_TOTAL_SD", "HT_PER_RUNG_CAP",
     "COACHING_F_MIN", "COACHING_F_MAX", "COACHING_F_SENSITIVITY",
     "COACHING_SATURATION_CAP", "COACHING_SLIDER_MAX", "COACHING_STANDARD_BUDGET",
