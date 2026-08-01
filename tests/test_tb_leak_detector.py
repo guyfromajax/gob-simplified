@@ -112,6 +112,33 @@ class TestScanAllowlist(unittest.TestCase):
         self.assertIn("leans[0].tok", hits)
         self.assertIn("badge", hits)
 
+    def test_short_abbr_ignores_title_case_substrings(self):
+        """Concord's CON must not flag Conference / Content (token + case rules)."""
+        hits = det.scan_json_for_replaced_name(
+            {
+                "label": "Conference B1",
+                "label2": "Conference B2",
+                "tab": "Content",
+                "title_token": "Con",
+                "real_badge": "CON",
+                "embedded": "Top CON squad",
+            },
+            "Concord",
+        )
+        self.assertNotIn("label", hits)
+        self.assertNotIn("label2", hits)
+        self.assertNotIn("tab", hits)
+        self.assertNotIn("title_token", hits)
+        self.assertIn("real_badge", hits)
+        self.assertIn("embedded", hits)
+
+    def test_full_name_still_case_insensitive_substring(self):
+        hits = det.scan_json_for_replaced_name(
+            {"note": "vs concord tonight"},
+            "Concord",
+        )
+        self.assertIn("note", hits)
+
     def test_catches_replaced_core_palette_in_chrome(self):
         core_only = frozenset({det.normalize_hex_color("#111111")})
         hits = det.scan_json_for_replaced_colors(

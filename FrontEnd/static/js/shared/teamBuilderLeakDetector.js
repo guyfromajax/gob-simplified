@@ -17,9 +17,9 @@
   var ALLOWLISTED_SELECTORS = ['#tb-orientation', '#tb-leak-banner'];
   var ORIENTATION_RE = /replacing\s+.+\s+in\s+this\s+franchise/i;
   var BANNER_ID = 'tb-leak-banner';
-  // Short derived needles that are known false positives. Prefer adding here
-  // over narrowing match rules — over-flagging is the right default.
+  // Escape hatch only — prefer tightening match rules over growing this set.
   var ALLOWLISTED_DERIVED_NEEDLES = {};
+  var TOKEN_SPLIT_RE = /[^A-Za-z0-9]+/;
 
   function envEnabled() {
     try {
@@ -65,19 +65,33 @@
     return false;
   }
 
+  function shortDerivedNeedlesForReplacedName(replacedName) {
+    // 3-char abbr + multi-word initials — whole-token, case-sensitive match only.
+    var raw = String(replacedName || '').trim();
+    var out = {};
+    if (!raw) return out;
+    var alnum = raw.replace(/[^A-Za-z0-9]/g, '');
+    if (alnum.length >= 2) {
+      var abbr = alnum.slice(0, 3).toUpperCase();
+      if (!ALLOWLISTED_DERIVED_NEEDLES[abbr]) out[abbr] = true;
+    }
+    var words = raw.split(/[\s\-_]+/).filter(Boolean);
+    if (words.length >= 2) {
+      var initials = words.map(function (w) { return w.charAt(0); }).join('').toUpperCase();
+      if (initials && !ALLOWLISTED_DERIVED_NEEDLES[initials]) out[initials] = true;
+    }
+    return out;
+  }
+
   function leakNeedlesForReplacedName(replacedName) {
     var raw = String(replacedName || '').trim();
     if (!raw) return [];
     var needles = [raw];
-    var alnum = raw.replace(/[^A-Za-z0-9]/g, '');
-    if (alnum.length >= 2) needles.push(alnum.slice(0, 3).toUpperCase());
+    var short = shortDerivedNeedlesForReplacedName(raw);
+    Object.keys(short).forEach(function (n) { needles.push(n); });
     var slug = raw.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
     if (slug) {
       needles.push(slug, slug.toUpperCase(), slug.toLowerCase());
-    }
-    var words = raw.split(/[\s\-_]+/).filter(Boolean);
-    if (words.length >= 2) {
-      needles.push(words.map(function (w) { return w.charAt(0); }).join('').toUpperCase());
     }
     var out = [];
     var seen = {};
@@ -91,13 +105,26 @@
     return out;
   }
 
-  function textContainsAnyNeedle(text, needles) {
+  function textContainsNeedle(text, needle, isShort) {
+    if (!text || !needle) return false;
+    if (isShort) {
+      // Whole-token, case-sensitive: "CON" badge is a leak; "Conference" is not.
+      var parts = String(text).split(TOKEN_SPLIT_RE);
+      for (var i = 0; i < parts.length; i++) {
+        if (parts[i] === needle) return true;
+      }
+      return false;
+    }
+    return String(text).toLowerCase().indexOf(String(needle).toLowerCase()) !== -1;
+  }
+
+  function textContainsAnyNeedle(text, needles, shortNeedles) {
     if (!text) return false;
-    var lower = text.toLowerCase();
+    shortNeedles = shortNeedles || {};
     for (var i = 0; i < needles.length; i++) {
       var n = needles[i];
       if (!n) continue;
-      if (lower.indexOf(String(n).toLowerCase()) !== -1) return true;
+      if (textContainsNeedle(text, n, !!shortNeedles[n])) return true;
     }
     return false;
   }
@@ -189,6 +216,7 @@
   function scanDom(replacedName, root) {
     var needle = String(replacedName || '').trim();
     var needles = needle ? leakNeedlesForReplacedName(needle) : [];
+    var shortNeedles = needle ? shortDerivedNeedlesForReplacedName(needle) : {};
     var doc = root || (global.document && global.document.body);
     if (!doc) return [];
     var hits = [];
@@ -197,7 +225,7 @@
       var node;
       while ((node = walker.nextNode())) {
         var text = node.nodeValue || '';
-        if (!text || !textContainsAnyNeedle(text, needles)) continue;
+        if (!text || !textContainsAnyNeedle(text, needles, shortNeedles)) continue;
         if (ORIENTATION_RE.test(text)) continue;
         var el = node.parentElement;
         if (isAllowlistedElement(el)) continue;
@@ -208,7 +236,7 @@
           id: el && el.id ? el.id : null,
           className: el && el.className ? String(el.className).slice(0, 80) : null,
           matchedNeedles: needles.filter(function (n) {
-            return text.toLowerCase().indexOf(String(n).toLowerCase()) !== -1;
+            return textContainsNeedle(text, n, !!shortNeedles[n]);
           }),
           kind: 'name',
         });
@@ -375,6 +403,7 @@
     scanDomColors: scanDomColors,
     clearBanner: clearBanner,
     leakNeedlesForReplacedName: leakNeedlesForReplacedName,
+    shortDerivedNeedlesForReplacedName: shortDerivedNeedlesForReplacedName,
     normalizeHexColor: normalizeHexColor,
     ALLOWLISTED_SELECTORS: ALLOWLISTED_SELECTORS,
     ALLOWLISTED_DERIVED_NEEDLES: ALLOWLISTED_DERIVED_NEEDLES,

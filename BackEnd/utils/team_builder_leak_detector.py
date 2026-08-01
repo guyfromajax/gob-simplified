@@ -85,9 +85,11 @@ _ORIENTATION_COPY_RE = re.compile(
     re.IGNORECASE,
 )
 
-# Short derived needles (slice/initials) that are known false positives in chrome.
-# Prefer adding here over narrowing match rules — over-flagging is the right default.
+# Escape hatch only — prefer tightening match rules over growing this set.
 ALLOWLISTED_DERIVED_NEEDLES: frozenset[str] = frozenset()
+
+# Non-alnum split for whole-token short-needle matching (abbr / initials).
+_TOKEN_SPLIT_RE = re.compile(r"[^A-Za-z0-9]+")
 
 
 class TeamBuilderNameLeak(Exception):
@@ -155,9 +157,39 @@ def path_is_lookup_identifier(path: str) -> bool:
     return _path_leaf(path) in LOOKUP_IDENTIFIER_LEAVES
 
 
-def _string_contains_needle(value: str, needle: str) -> bool:
+def short_derived_needles_for_replaced_name(replaced_name: str) -> frozenset[str]:
+    """
+    3-char abbreviation and multi-word initials (uppercase).
+
+    These match whole-token + case-sensitive only — substring would flag
+    ``Conference`` / ``Content`` for Concord's ``CON``.
+    """
+    raw = (replaced_name or "").strip()
+    if not raw:
+        return frozenset()
+    out: set[str] = set()
+    alnum = re.sub(r"[^A-Za-z0-9]", "", raw)
+    if len(alnum) >= 2:
+        out.add(alnum[:3].upper())
+    words = [w for w in re.split(r"[\s\-_]+", raw) if w]
+    if len(words) >= 2:
+        initials = "".join(w[0] for w in words).upper()
+        if initials:
+            out.add(initials)
+    return frozenset(n for n in out if n and n not in ALLOWLISTED_DERIVED_NEEDLES)
+
+
+def _string_contains_needle(
+    value: str,
+    needle: str,
+    *,
+    short: bool = False,
+) -> bool:
     if not value or not needle:
         return False
+    if short:
+        # Whole-token, case-sensitive: "CON" badge is a leak; "Conference" is not.
+        return any(part == needle for part in _TOKEN_SPLIT_RE.split(value) if part)
     return needle.casefold() in value.casefold()
 
 
@@ -165,24 +197,18 @@ def leak_needles_for_replaced_name(replaced_name: str) -> tuple[str, ...]:
     """
     Literal replaced_name plus derived chrome forms (slice / slug / initials).
 
-    Short forms over-flag by design; add false positives to
-    ``ALLOWLISTED_DERIVED_NEEDLES`` as they appear.
+    Short derived needles (abbr / initials) are included here but matched with
+    whole-token case-sensitive rules via ``short_derived_needles_for_replaced_name``.
+    Full name and slug variants stay case-insensitive substring.
     """
     raw = (replaced_name or "").strip()
     if not raw:
         return ()
     needles: list[str] = [raw]
-    alnum = re.sub(r"[^A-Za-z0-9]", "", raw)
-    if len(alnum) >= 2:
-        needles.append(alnum[:3].upper())
+    needles.extend(sorted(short_derived_needles_for_replaced_name(raw)))
     slug = re.sub(r"[^A-Za-z0-9]+", "_", raw).strip("_")
     if slug:
         needles.extend((slug, slug.upper(), slug.lower()))
-    words = [w for w in re.split(r"[\s\-_]+", raw) if w]
-    if len(words) >= 2:
-        initials = "".join(w[0] for w in words).upper()
-        if initials:
-            needles.append(initials)
     # Exact-string dedupe only — keep case/slug variants (PROVIDENCE vs providence).
     out: list[str] = []
     seen: set[str] = set()
@@ -196,11 +222,16 @@ def leak_needles_for_replaced_name(replaced_name: str) -> tuple[str, ...]:
     return tuple(out)
 
 
-def _string_contains_any_needle(value: str, needles: Iterable[str]) -> bool:
+def _string_contains_any_needle(
+    value: str,
+    needles: Iterable[str],
+    short_needles: frozenset[str] | None = None,
+) -> bool:
     if not value:
         return False
+    short = short_needles or frozenset()
     for needle in needles:
-        if _string_contains_needle(value, needle):
+        if _string_contains_needle(value, needle, short=needle in short):
             return True
     return False
 
@@ -215,6 +246,7 @@ def scan_json_for_replaced_name(
     *,
     path: str = "",
     needles: tuple[str, ...] | None = None,
+    short_needles: frozenset[str] | None = None,
 ) -> list[str]:
     """
     Return dotted field paths where ``replaced_name`` (or a derived form)
@@ -231,6 +263,11 @@ def scan_json_for_replaced_name(
     active = needles if needles is not None else leak_needles_for_replaced_name(replaced_name)
     if not active:
         return hits
+    short = (
+        short_needles
+        if short_needles is not None
+        else short_derived_needles_for_replaced_name(replaced_name)
+    )
 
     if isinstance(payload, dict):
         for key, value in payload.items():
@@ -241,7 +278,11 @@ def scan_json_for_replaced_name(
             # Keys are lookup identifiers — never chrome. Recurse into values only.
             hits.extend(
                 scan_json_for_replaced_name(
-                    value, replaced_name, path=child, needles=active
+                    value,
+                    replaced_name,
+                    path=child,
+                    needles=active,
+                    short_needles=short,
                 )
             )
         return hits
@@ -251,7 +292,11 @@ def scan_json_for_replaced_name(
             child = f"{path}[{i}]"
             hits.extend(
                 scan_json_for_replaced_name(
-                    value, replaced_name, path=child, needles=active
+                    value,
+                    replaced_name,
+                    path=child,
+                    needles=active,
+                    short_needles=short,
                 )
             )
         return hits
@@ -263,7 +308,7 @@ def scan_json_for_replaced_name(
             return hits
         if _orientation_allowlisted_text(payload):
             return hits
-        if _string_contains_any_needle(payload, active):
+        if _string_contains_any_needle(payload, active, short):
             hits.append(path or "<root>")
         return hits
 
