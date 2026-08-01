@@ -326,3 +326,7 @@ Formats: **JSON first** (easier schema/versioning); CSV as a friendlier second e
   - Uncapped
     - The user is assigned the number of points as the pre-existing team with the highest player attriburte value has and they can assing points as they see fit across all players, sticking to teh 5 min and 99 max
     - Uncapped teams are not eligible for online comopetitive PvP play.
+
+  **Full UX/UI Sweep**
+  - We need to do a sweep to ensure that we display the user's team name and team logo instead of the team name and logo of the team they replaced -- the latter of whicch is currenlty happening.
+  - Related -- we also need to do a code sweep to ensure we're wiring all backend wiht the user's mod team data instead of the replaced team data. We should do a read only audit first. Ideally, this is a simple modular replacement, but honestly, I'm not sure we've built the code to be that efficient.
