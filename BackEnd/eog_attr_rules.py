@@ -120,6 +120,15 @@ def calculate_team_totals_from_sources(
         from_box = _aggregate_from_box((box_score_obj or {}).get(team_name, {}))
     if not from_box.get("FGA"):
         from_box = _aggregate_from_box((box_score_obj or {}).get(_normalize_team_name_key(team_name), {}))
+    if not from_box.get("FGA") and team_name:
+        # Display→stored team_id at this boundary (lookup, not derive).
+        # Do not change _normalize_team_name_key to strip punctuation.
+        from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
+        for slug in identity_slugs_for_display_name(team_name):
+            from_box = _aggregate_from_box((box_score_obj or {}).get(slug, {}))
+            if from_box.get("FGA"):
+                break
     return from_box
 
 

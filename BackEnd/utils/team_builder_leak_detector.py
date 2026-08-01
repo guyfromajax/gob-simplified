@@ -29,10 +29,25 @@ from BackEnd.utils.franchise_team_display import TEAM_BUILDER_FIELD, get_team_bu
 
 logger = logging.getLogger(__name__)
 
-# Field-path suffixes that intentionally carry the replaced core name.
+# Field-path suffixes that intentionally carry the replaced core name / palette.
 ALLOWLISTED_PATH_SUFFIXES: tuple[str, ...] = (
     "replaced_name",
     "team_builder_replaced_name",
+    "team_builder_replaced_primary_color",
+    "team_builder_replaced_secondary_color",
+    "replaced_primary_color",
+    "replaced_secondary_color",
+)
+
+# Chrome color leaves — core replaced palette here is a leak when overlay differs.
+COLOR_CHROME_LEAVES: frozenset[str] = frozenset(
+    {
+        "primary_color",
+        "secondary_color",
+        "accent_color",
+        "winner_primary_color",
+        "loser_primary_color",
+    }
 )
 
 # Leaf field names that hold matchup / score *lookup identifiers*, not chrome.
@@ -69,6 +84,10 @@ _ORIENTATION_COPY_RE = re.compile(
     r"replacing\s+.+\s+in\s+this\s+franchise",
     re.IGNORECASE,
 )
+
+# Short derived needles (slice/initials) that are known false positives in chrome.
+# Prefer adding here over narrowing match rules — over-flagging is the right default.
+ALLOWLISTED_DERIVED_NEEDLES: frozenset[str] = frozenset()
 
 
 class TeamBuilderNameLeak(Exception):
@@ -142,6 +161,50 @@ def _string_contains_needle(value: str, needle: str) -> bool:
     return needle.casefold() in value.casefold()
 
 
+def leak_needles_for_replaced_name(replaced_name: str) -> tuple[str, ...]:
+    """
+    Literal replaced_name plus derived chrome forms (slice / slug / initials).
+
+    Short forms over-flag by design; add false positives to
+    ``ALLOWLISTED_DERIVED_NEEDLES`` as they appear.
+    """
+    raw = (replaced_name or "").strip()
+    if not raw:
+        return ()
+    needles: list[str] = [raw]
+    alnum = re.sub(r"[^A-Za-z0-9]", "", raw)
+    if len(alnum) >= 2:
+        needles.append(alnum[:3].upper())
+    slug = re.sub(r"[^A-Za-z0-9]+", "_", raw).strip("_")
+    if slug:
+        needles.extend((slug, slug.upper(), slug.lower()))
+    words = [w for w in re.split(r"[\s\-_]+", raw) if w]
+    if len(words) >= 2:
+        initials = "".join(w[0] for w in words).upper()
+        if initials:
+            needles.append(initials)
+    # Exact-string dedupe only — keep case/slug variants (PROVIDENCE vs providence).
+    out: list[str] = []
+    seen: set[str] = set()
+    for n in needles:
+        if not n or n in ALLOWLISTED_DERIVED_NEEDLES:
+            continue
+        if n in seen:
+            continue
+        seen.add(n)
+        out.append(n)
+    return tuple(out)
+
+
+def _string_contains_any_needle(value: str, needles: Iterable[str]) -> bool:
+    if not value:
+        return False
+    for needle in needles:
+        if _string_contains_needle(value, needle):
+            return True
+    return False
+
+
 def _orientation_allowlisted_text(value: str) -> bool:
     return bool(_ORIENTATION_COPY_RE.search(value or ""))
 
@@ -151,9 +214,11 @@ def scan_json_for_replaced_name(
     replaced_name: str,
     *,
     path: str = "",
+    needles: tuple[str, ...] | None = None,
 ) -> list[str]:
     """
-    Return dotted field paths where ``replaced_name`` appears as *rendered* text.
+    Return dotted field paths where ``replaced_name`` (or a derived form)
+    appears as *rendered* text.
 
     Not a leak (Phase 0 identity):
       - dict keys (score / points_by_quarter / box_score lookup maps)
@@ -163,6 +228,9 @@ def scan_json_for_replaced_name(
     hits: list[str] = []
     if not replaced_name:
         return hits
+    active = needles if needles is not None else leak_needles_for_replaced_name(replaced_name)
+    if not active:
+        return hits
 
     if isinstance(payload, dict):
         for key, value in payload.items():
@@ -171,13 +239,21 @@ def scan_json_for_replaced_name(
                 # Leaf value is intentional metadata; skip the whole node.
                 continue
             # Keys are lookup identifiers — never chrome. Recurse into values only.
-            hits.extend(scan_json_for_replaced_name(value, replaced_name, path=child))
+            hits.extend(
+                scan_json_for_replaced_name(
+                    value, replaced_name, path=child, needles=active
+                )
+            )
         return hits
 
     if isinstance(payload, list):
         for i, value in enumerate(payload):
             child = f"{path}[{i}]"
-            hits.extend(scan_json_for_replaced_name(value, replaced_name, path=child))
+            hits.extend(
+                scan_json_for_replaced_name(
+                    value, replaced_name, path=child, needles=active
+                )
+            )
         return hits
 
     if isinstance(payload, str):
@@ -187,7 +263,7 @@ def scan_json_for_replaced_name(
             return hits
         if _orientation_allowlisted_text(payload):
             return hits
-        if _string_contains_needle(payload, replaced_name):
+        if _string_contains_any_needle(payload, active):
             hits.append(path or "<root>")
         return hits
 
@@ -299,17 +375,121 @@ def overlay_replaced_name(franchise_id: str) -> Optional[str]:
     return name or None
 
 
+def normalize_hex_color(value: Any) -> Optional[str]:
+    """Normalize #RGB / #RRGGBB (and bare hex) to lowercase #rrggbb."""
+    if value is None:
+        return None
+    raw = str(value).strip()
+    if not raw:
+        return None
+    if raw.startswith("#"):
+        raw = raw[1:]
+    if len(raw) == 3 and all(c in "0123456789abcdefABCDEF" for c in raw):
+        raw = "".join(ch * 2 for ch in raw)
+    if len(raw) != 6 or any(c not in "0123456789abcdefABCDEF" for c in raw):
+        return None
+    return "#" + raw.lower()
+
+
+def replaced_core_only_palette(franchise_id: str) -> frozenset[str]:
+    """
+    Core primary/secondary of the replaced slot, minus any colors the overlay
+    also uses (same color on purpose is not a leak).
+    """
+    try:
+        overlay = get_team_builder_overlay(franchise_id)
+    except Exception:
+        return frozenset()
+    if not overlay:
+        return frozenset()
+    replaced = overlay.get("replaced_object_id") or overlay.get("object_id")
+    if not replaced:
+        return frozenset()
+    try:
+        from BackEnd.db import teams_collection
+
+        core = teams_collection.find_one(
+            {"_id": ObjectId(str(replaced))},
+            {"primary_color": 1, "secondary_color": 1},
+        ) or {}
+    except Exception:
+        return frozenset()
+    core_set = {
+        c
+        for c in (
+            normalize_hex_color(core.get("primary_color")),
+            normalize_hex_color(core.get("secondary_color")),
+        )
+        if c
+    }
+    overlay_set = {
+        c
+        for c in (
+            normalize_hex_color(overlay.get("primary_color")),
+            normalize_hex_color(overlay.get("secondary_color")),
+            normalize_hex_color(overlay.get("accent_color")),
+        )
+        if c
+    }
+    return frozenset(core_set - overlay_set)
+
+
+def scan_json_for_replaced_colors(
+    payload: Any,
+    core_only_palette: frozenset[str],
+    *,
+    path: str = "",
+) -> list[str]:
+    """Flag chrome color leaves whose value is the replaced team's core palette."""
+    hits: list[str] = []
+    if not core_only_palette:
+        return hits
+
+    if isinstance(payload, dict):
+        for key, value in payload.items():
+            child = f"{path}.{key}" if path else str(key)
+            if path_is_allowlisted(child):
+                continue
+            leaf = _path_leaf(child)
+            if leaf in COLOR_CHROME_LEAVES and isinstance(value, str):
+                norm = normalize_hex_color(value)
+                if norm and norm in core_only_palette:
+                    hits.append(child)
+            hits.extend(
+                scan_json_for_replaced_colors(
+                    value, core_only_palette, path=child
+                )
+            )
+        return hits
+
+    if isinstance(payload, list):
+        for i, value in enumerate(payload):
+            child = f"{path}[{i}]"
+            hits.extend(
+                scan_json_for_replaced_colors(
+                    value, core_only_palette, path=child
+                )
+            )
+        return hits
+
+    return hits
+
+
 def check_payload_for_leaks(
     payload: Any,
     franchise_id: str,
     *,
     route: str = "",
 ) -> list[str]:
-    """Scan a payload for the franchise's replaced_name. Empty = clean."""
+    """Scan a payload for replaced_name / derived forms and core-palette colors."""
+    hits: list[str] = []
     replaced = overlay_replaced_name(franchise_id)
-    if not replaced:
-        return []
-    return scan_json_for_replaced_name(payload, replaced)
+    if replaced:
+        hits.extend(scan_json_for_replaced_name(payload, replaced))
+    core_only = replaced_core_only_palette(franchise_id)
+    if core_only:
+        hits.extend(scan_json_for_replaced_colors(payload, core_only))
+    return hits
 
 
 async def _read_json_body(request: Request) -> Any:
@@ -387,7 +567,8 @@ class TeamBuilderLeakMiddleware(BaseHTTPMiddleware):
             )
 
         replaced = overlay_replaced_name(franchise_id)
-        if not replaced:
+        core_only = replaced_core_only_palette(franchise_id)
+        if not replaced and not core_only:
             headers = {
                 k: v
                 for k, v in response.headers.items()
@@ -401,7 +582,11 @@ class TeamBuilderLeakMiddleware(BaseHTTPMiddleware):
             )
 
         route = f"{request.method} {request.url.path}"
-        hits = scan_json_for_replaced_name(payload, replaced)
+        hits: list[str] = []
+        if replaced:
+            hits.extend(scan_json_for_replaced_name(payload, replaced))
+        if core_only:
+            hits.extend(scan_json_for_replaced_colors(payload, core_only))
         if hits:
             logger.error(
                 "[TB-LEAK] franchise_id=%s replaced_name=%r route=%s paths=%s",

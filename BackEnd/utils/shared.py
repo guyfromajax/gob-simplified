@@ -2611,10 +2611,14 @@ def summarize_game_state(
     _home_display_name = getattr(game.home_team, "display_name", None) or _home_core_name
     _away_display_name = getattr(game.away_team, "display_name", None) or _away_core_name
 
+    _home_abbr = getattr(game.home_team, "abbreviation", None)
+    _away_abbr = getattr(game.away_team, "abbreviation", None)
+
     home_team_obj = {
         "name": _home_core_name,
         "display_name": _home_display_name,
         "team_id": game.home_team.team_id,
+        "abbreviation": _home_abbr,
         "score": game.score.get(_home_core_name, 0),
         # Derived Team Momentum (sum of 5 active MO, −50..+50) for the court bar.
         "team_momentum": team_momentum(game.home_team),
@@ -2628,6 +2632,7 @@ def summarize_game_state(
         "name": _away_core_name,
         "display_name": _away_display_name,
         "team_id": game.away_team.team_id,
+        "abbreviation": _away_abbr,
         "score": game.score.get(_away_core_name, 0),
         "team_momentum": team_momentum(game.away_team),
         "colors": {
@@ -2936,6 +2941,7 @@ def summarize_game_state(
             "name": _home_core_name,
             "display_name": _home_display_name,
             "team_id": game.home_team.team_id,
+            "abbreviation": _home_abbr,
             "mascot": game.home_team.mascot,
             "colors": {
                 "primary_color": game.home_team.primary_color,
@@ -2965,6 +2971,7 @@ def summarize_game_state(
             "name": _away_core_name,
             "display_name": _away_display_name,
             "team_id": game.away_team.team_id,
+            "abbreviation": _away_abbr,
             "mascot": game.away_team.mascot,
             "colors": {
                 "primary_color": game.away_team.primary_color,

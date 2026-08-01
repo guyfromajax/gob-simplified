@@ -8,8 +8,10 @@ function formatTeamName(name) {
 }
 
 /**
- * Derive team_slug from team name for asset paths. Matches backend rules:
- * lowercase, spaces → underscores, remove punctuation, hyphens → underscores.
+ * Derive team_slug from a display name for asset paths.
+ * Must match BackEnd.utils.team_slug.slug_from_display_name:
+ * lowercase, strip apostrophes/periods, hyphens → spaces, spaces → underscores.
+ * Not an identity normalizer — ObjectId / teams.team_id stay the keys.
  */
 function nameToTeamSlug(teamName) {
   if (!teamName || typeof teamName !== 'string') return 'general';
@@ -229,7 +231,6 @@ function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
   var name = data.team || data.user_team_id || data.name || '';
   var visual = {
     name: name,
-    short_name: data.short_name || name,
     abbreviation: data.abbreviation,
     primary_color: data.primary_color || data.primary,
     secondary_color: data.secondary_color || data.secondary,
@@ -239,6 +240,10 @@ function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
     is_custom: true,
     replaced_name: data.team_builder_replaced_name || data.replaced_name,
     replaced_object_id: data.user_team_object_id || data.replaced_object_id || data.team_object_id,
+    replaced_primary_color:
+      data.team_builder_replaced_primary_color || data.replaced_primary_color || null,
+    replaced_secondary_color:
+      data.team_builder_replaced_secondary_color || data.replaced_secondary_color || null,
   };
   setActiveTeamBuilderVisual(visual);
   if (franchiseId && typeof window !== 'undefined' && window.FranchiseLS) {
@@ -257,6 +262,41 @@ function normalizeTeamNameKey(name) {
     .replace(/\s+/g, ' ');
 }
 
+/** Shared empty token when a name yields no alnum chars (must match BE ABBR_EMPTY). */
+var ABBR_EMPTY = '???';
+
+/**
+ * Fallback 3-letter token from a team name (alnum → slice(0,3) upper).
+ * Same algorithm as BackEnd abbr_from_name — validation and rendering share this.
+ * Prefer resolveTeamAbbreviation when a franchise overlay may apply.
+ */
+function deriveTeamAbbreviationFromName(name) {
+  var clean = String(name || '').replace(/[^A-Za-z0-9]/g, '');
+  return (clean.slice(0, 3) || ABBR_EMPTY).toUpperCase();
+}
+
+/**
+ * Single abbreviation resolver (Team Builder chrome).
+ * Overlay abbreviation when the franchise has one for this team; else slice(0,3).
+ *
+ * @param {string} name - display or core team name
+ * @param {string} [teamId] - team ObjectId string when known
+ */
+function resolveTeamAbbreviation(name, teamId) {
+  var visual = typeof getActiveTeamBuilderVisual === 'function' ? getActiveTeamBuilderVisual() : null;
+  if (visual && visual.abbreviation) {
+    var abbr = String(visual.abbreviation).trim().toUpperCase().slice(0, 3);
+    if (abbr) {
+      var oid = visual.replaced_object_id || visual.object_id;
+      if (teamId != null && oid && String(teamId) === String(oid)) return abbr;
+      if (typeof teamBuilderVisualMatchesName === 'function' && teamBuilderVisualMatchesName(visual, name)) {
+        return abbr;
+      }
+    }
+  }
+  return deriveTeamAbbreviationFromName(name);
+}
+
 function teamBuilderVisualMatchesName(visual, teamNameOrSlug) {
   if (!visual || !teamNameOrSlug) return false;
   if (visual.asset_strategy && visual.asset_strategy !== 'generated' && !visual.is_custom) {
@@ -265,8 +305,9 @@ function teamBuilderVisualMatchesName(visual, teamNameOrSlug) {
   if (!(visual.asset_strategy === 'generated' || visual.is_custom)) return false;
   var needle = normalizeTeamNameKey(teamNameOrSlug);
   if (!needle || needle === 'general') return false;
-  // Match display name OR replaced core name — court URL may pass either for chrome.
-  var candidates = [visual.name, visual.short_name, visual.abbreviation, visual.replaced_name];
+  // Match display name, abbrev, or replaced core name — court URL may pass any for chrome.
+  // (short_name removed: never used as a lookup key; callers pass name / replaced_name / slug.)
+  var candidates = [visual.name, visual.abbreviation, visual.replaced_name];
   for (var i = 0; i < candidates.length; i++) {
     if (candidates[i] && normalizeTeamNameKey(candidates[i]) === needle) return true;
   }
@@ -300,18 +341,12 @@ function generatedTeamAssetDataUrl(visual, assetKey) {
     if (assetKey === 'jersey') return window.TeamGeneratedArt.jerseyPreviewDataUrl(opts);
   }
   // Inline fallback so pages that only load common.js never emit a broken custom slug.
-  var initials = String(opts.abbreviation || opts.name || 'TB')
-    .trim()
-    .toUpperCase()
-    .slice(0, 3);
-  if (!opts.abbreviation) {
-    var parts = String(opts.name || '')
-      .trim()
-      .split(/[\s\-]+/)
-      .filter(Boolean);
-    if (parts.length === 1) initials = parts[0].slice(0, 3).toUpperCase();
-    else if (parts.length > 1) initials = (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-  }
+  var initials = opts.abbreviation
+    ? String(opts.abbreviation).trim().toUpperCase().slice(0, 3)
+    : (typeof resolveTeamAbbreviation === 'function'
+        ? resolveTeamAbbreviation(opts.name, opts.teamId || opts.object_id)
+        : deriveTeamAbbreviationFromName(opts.name || 'TB'));
+  if (!initials || initials === ABBR_EMPTY) initials = 'TB';
   var w = assetKey === 'logo_square' || assetKey === 'mark' ? 128 : 400;
   var h = assetKey === 'logo_square' || assetKey === 'mark' ? 128 : 141;
   var svg =

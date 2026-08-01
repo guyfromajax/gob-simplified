@@ -43,8 +43,9 @@ FrontEnd/static/images/teams/
 
 ## How paths are built in code
 
-- **Shared helper:** `FrontEnd/static/common.js`
-  - **`nameToTeamSlug(teamName)`** — Derives slug from display name (e.g. `"Ocean City"` → `ocean_city`).
+- **Shared helpers:**
+  - **FE `nameToTeamSlug(teamName)`** (`FrontEnd/static/common.js`) — Derives path slug from display name (e.g. `"Queen's Guard"` → `queens_guard`).
+  - **BE `slug_from_display_name`** (`BackEnd/utils/team_slug.py`) — Same rules; use at display→path / display→stored-slug boundaries. Not an identity normalizer.
   - **`getTeamAssetPath(teamNameOrSlug, assetKey)`** — Returns path like `/images/teams/{slug}/{slug}_{asset}.{ext}`. If `teamNameOrSlug` is missing/invalid, uses **general** folder.
 - **Asset keys:** `court`, `logo_square`, `background`, `banner_primary` (see `TEAM_ASSET_SPEC` in common.js).
 - **Loading:** Pages that use team images load **common.js** so `getTeamAssetPath` is available; fallbacks point at **general** assets.

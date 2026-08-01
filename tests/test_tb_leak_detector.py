@@ -93,6 +93,42 @@ class TestScanAllowlist(unittest.TestCase):
         self.assertTrue(det.path_is_lookup_identifier("possession"))
         self.assertFalse(det.path_is_allowlisted("standings[0].name"))
 
+    def test_derived_needles_include_slice_slug_initials(self):
+        needles = det.leak_needles_for_replaced_name("Providence")
+        self.assertIn("Providence", needles)
+        self.assertIn("PRO", needles)
+        self.assertIn("PROVIDENCE", needles)
+        self.assertIn("providence", needles)
+        needles_multi = det.leak_needles_for_replaced_name("Four Corners")
+        self.assertIn("FOU", needles_multi)
+        self.assertIn("FC", needles_multi)
+        self.assertIn("four_corners", needles_multi)
+
+    def test_catches_derived_abbr_in_chrome(self):
+        hits = det.scan_json_for_replaced_name(
+            {"leans": [{"tok": "PRO"}], "badge": "Top: PRO"},
+            "Providence",
+        )
+        self.assertIn("leans[0].tok", hits)
+        self.assertIn("badge", hits)
+
+    def test_catches_replaced_core_palette_in_chrome(self):
+        core_only = frozenset({det.normalize_hex_color("#111111")})
+        hits = det.scan_json_for_replaced_colors(
+            {
+                "rankings": [{"team_name": "Hanson", "primary_color": "#111111"}],
+                "team_builder_replaced_primary_color": "#111111",
+            },
+            core_only,
+        )
+        self.assertIn("rankings[0].primary_color", hits)
+        self.assertNotIn("team_builder_replaced_primary_color", hits)
+
+    def test_normalize_hex_color(self):
+        self.assertEqual(det.normalize_hex_color("#Abc"), "#aabbcc")
+        self.assertEqual(det.normalize_hex_color("112233"), "#112233")
+        self.assertIsNone(det.normalize_hex_color("not-a-color"))
+
 
 class TestTbLeakRouteSweep(unittest.TestCase):
     """Seed a TB franchise and walk franchise-scoped JSON producers."""

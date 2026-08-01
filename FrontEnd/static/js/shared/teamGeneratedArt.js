@@ -12,9 +12,13 @@
   var CARD_W = 400;
   var CARD_H = 141; // 400 * (679/1920) ≈ 141 — matches primary banner aspect
 
-  function initialsFromName(name, abbreviation) {
+  function initialsFromName(name, abbreviation, teamId) {
     if (abbreviation && String(abbreviation).trim()) {
       return String(abbreviation).trim().toUpperCase().slice(0, 3);
+    }
+    if (typeof global.resolveTeamAbbreviation === 'function') {
+      var resolved = global.resolveTeamAbbreviation(name, teamId);
+      if (resolved && resolved !== '—' && resolved !== '???') return resolved;
     }
     var parts = String(name || '')
       .trim()
@@ -29,7 +33,7 @@
     opts = opts || {};
     var primary = opts.primary || '#27408E';
     var secondary = opts.secondary || '#F79420';
-    var text = initialsFromName(opts.name, opts.abbreviation);
+    var text = initialsFromName(opts.name, opts.abbreviation, opts.teamId || opts.object_id);
     var size = opts.size || 128;
     return (
       '<svg xmlns="http://www.w3.org/2000/svg" width="' +
@@ -67,7 +71,7 @@
     var primary = opts.primary || '#27408E';
     var secondary = opts.secondary || '#15181f';
     var accent = opts.accent || '#F79420';
-    var text = initialsFromName(opts.name, opts.abbreviation);
+    var text = initialsFromName(opts.name, opts.abbreviation, opts.teamId || opts.object_id);
     var label = String(opts.name || 'Custom Program');
     var svg =
       '<svg xmlns="http://www.w3.org/2000/svg" width="' +
@@ -186,7 +190,6 @@
       if (typeof global.getTeamAssetPath === 'function') {
         return global.getTeamAssetPath(team.name || team.slug, assetKey, {
           name: team.name,
-          short_name: team.short_name,
           abbreviation: team.abbreviation,
           primary_color: team.primary || team.primary_color,
           secondary_color: team.secondary || team.secondary_color,

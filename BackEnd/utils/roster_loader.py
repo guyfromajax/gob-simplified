@@ -176,7 +176,11 @@ def _team_file_path(team_name: str) -> Path:
     roster file and fall back to the project root if necessary.
     """
 
-    snake = team_name.lower().replace(" ", "_").replace("-", "_")
+    # Core: stored teams.team_id. Custom: derive. Do not derive core slugs —
+    # apostrophe conventions in the 128 are not uniform.
+    from BackEnd.utils.team_slug import path_slug_for_display_name
+
+    snake = path_slug_for_display_name(team_name)
     filename = f"{snake}.json"
     current = Path(__file__).resolve()
 

@@ -164,7 +164,7 @@ Names, colors and mascots were re-read from core `teams` almost everywhere. With
 
 **Required safety property: the resolver is a pass-through no-op when a franchise carries no Team Builder overlay.** Every existing franchise and every future franchise where the user simply picks a team hits byte-identical behavior. This is what makes touching shared producers low-risk rather than high-risk, and it is not optional.
 
-Full enumeration retained at `team-builder-resolver-enumeration.md`. It is the checklist for acceptance criterion 5.
+Full identity inventory retained at `team-builder-identity-inventory.md`. It is the checklist for acceptance criterion 5.
 
 ### 3.3 Task B, second build item — generated placeholder art
 

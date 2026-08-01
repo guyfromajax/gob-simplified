@@ -17,6 +17,9 @@
   var ALLOWLISTED_SELECTORS = ['#tb-orientation', '#tb-leak-banner'];
   var ORIENTATION_RE = /replacing\s+.+\s+in\s+this\s+franchise/i;
   var BANNER_ID = 'tb-leak-banner';
+  // Short derived needles that are known false positives. Prefer adding here
+  // over narrowing match rules — over-flagging is the right default.
+  var ALLOWLISTED_DERIVED_NEEDLES = {};
 
   function envEnabled() {
     try {
@@ -62,29 +65,156 @@
     return false;
   }
 
+  function leakNeedlesForReplacedName(replacedName) {
+    var raw = String(replacedName || '').trim();
+    if (!raw) return [];
+    var needles = [raw];
+    var alnum = raw.replace(/[^A-Za-z0-9]/g, '');
+    if (alnum.length >= 2) needles.push(alnum.slice(0, 3).toUpperCase());
+    var slug = raw.replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+    if (slug) {
+      needles.push(slug, slug.toUpperCase(), slug.toLowerCase());
+    }
+    var words = raw.split(/[\s\-_]+/).filter(Boolean);
+    if (words.length >= 2) {
+      needles.push(words.map(function (w) { return w.charAt(0); }).join('').toUpperCase());
+    }
+    var out = [];
+    var seen = {};
+    for (var i = 0; i < needles.length; i++) {
+      var n = needles[i];
+      if (!n || ALLOWLISTED_DERIVED_NEEDLES[n]) continue;
+      if (seen[n]) continue;
+      seen[n] = true;
+      out.push(n);
+    }
+    return out;
+  }
+
+  function textContainsAnyNeedle(text, needles) {
+    if (!text) return false;
+    var lower = text.toLowerCase();
+    for (var i = 0; i < needles.length; i++) {
+      var n = needles[i];
+      if (!n) continue;
+      if (lower.indexOf(String(n).toLowerCase()) !== -1) return true;
+    }
+    return false;
+  }
+
+  function normalizeHexColor(value) {
+    if (value == null) return '';
+    var raw = String(value).trim();
+    if (!raw || raw === 'transparent' || raw === 'rgba(0, 0, 0, 0)') return '';
+    var rgb = raw.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i);
+    if (rgb) {
+      return (
+        '#' +
+        [rgb[1], rgb[2], rgb[3]]
+          .map(function (n) {
+            var h = Number(n).toString(16);
+            return h.length === 1 ? '0' + h : h;
+          })
+          .join('')
+      );
+    }
+    if (raw.charAt(0) === '#') raw = raw.slice(1);
+    if (raw.length === 3 && /^[0-9a-fA-F]{3}$/.test(raw)) {
+      raw = raw[0] + raw[0] + raw[1] + raw[1] + raw[2] + raw[2];
+    }
+    if (raw.length !== 6 || !/^[0-9a-fA-F]{6}$/.test(raw)) return '';
+    return '#' + raw.toLowerCase();
+  }
+
+  function coreOnlyPaletteFromVisual(visual) {
+    if (!visual) return {};
+    var overlaySet = {};
+    [visual.primary_color, visual.secondary_color, visual.accent_color].forEach(function (c) {
+      var n = normalizeHexColor(c);
+      if (n) overlaySet[n] = true;
+    });
+    var out = {};
+    [visual.replaced_primary_color, visual.replaced_secondary_color].forEach(function (c) {
+      var n = normalizeHexColor(c);
+      if (n && !overlaySet[n]) out[n] = true;
+    });
+    return out;
+  }
+
+  function scanDomColors(root) {
+    var visual = null;
+    try {
+      if (typeof global.getActiveTeamBuilderVisual === 'function') {
+        visual = global.getActiveTeamBuilderVisual();
+      }
+    } catch (e) { /* ignore */ }
+    var coreOnly = coreOnlyPaletteFromVisual(visual);
+    var keys = Object.keys(coreOnly);
+    if (!keys.length) return [];
+    var doc = root || (global.document && global.document.body);
+    if (!doc || !global.getComputedStyle) return [];
+    var hits = [];
+    var els = doc.querySelectorAll('*');
+    var maxScan = Math.min(els.length, 2500);
+    for (var i = 0; i < maxScan; i++) {
+      var el = els[i];
+      if (isAllowlistedElement(el)) continue;
+      var style;
+      try {
+        style = global.getComputedStyle(el);
+      } catch (e2) {
+        continue;
+      }
+      if (!style) continue;
+      var props = ['color', 'backgroundColor', 'borderTopColor', 'outlineColor'];
+      var matched = [];
+      for (var p = 0; p < props.length; p++) {
+        var norm = normalizeHexColor(style[props[p]]);
+        if (norm && coreOnly[norm]) matched.push(props[p] + '=' + norm);
+      }
+      if (!matched.length) continue;
+      hits.push({
+        text: '[color] ' + matched.join(' '),
+        element: el,
+        tag: el.tagName,
+        id: el.id || null,
+        className: el.className ? String(el.className).slice(0, 80) : null,
+        kind: 'color',
+      });
+      if (hits.length >= 40) break;
+    }
+    return hits;
+  }
+
   function scanDom(replacedName, root) {
     var needle = String(replacedName || '').trim();
-    if (!needle) return [];
+    var needles = needle ? leakNeedlesForReplacedName(needle) : [];
     var doc = root || (global.document && global.document.body);
     if (!doc) return [];
     var hits = [];
-    var needleLower = needle.toLowerCase();
-    var walker = global.document.createTreeWalker(doc, NodeFilter.SHOW_TEXT, null);
-    var node;
-    while ((node = walker.nextNode())) {
-      var text = node.nodeValue || '';
-      if (!text || text.toLowerCase().indexOf(needleLower) === -1) continue;
-      if (ORIENTATION_RE.test(text)) continue;
-      var el = node.parentElement;
-      if (isAllowlistedElement(el)) continue;
-      hits.push({
-        text: text.trim().slice(0, 160),
-        element: el,
-        tag: el ? el.tagName : null,
-        id: el && el.id ? el.id : null,
-        className: el && el.className ? String(el.className).slice(0, 80) : null,
-      });
+    if (needles.length) {
+      var walker = global.document.createTreeWalker(doc, NodeFilter.SHOW_TEXT, null);
+      var node;
+      while ((node = walker.nextNode())) {
+        var text = node.nodeValue || '';
+        if (!text || !textContainsAnyNeedle(text, needles)) continue;
+        if (ORIENTATION_RE.test(text)) continue;
+        var el = node.parentElement;
+        if (isAllowlistedElement(el)) continue;
+        hits.push({
+          text: text.trim().slice(0, 160),
+          element: el,
+          tag: el ? el.tagName : null,
+          id: el && el.id ? el.id : null,
+          className: el && el.className ? String(el.className).slice(0, 80) : null,
+          matchedNeedles: needles.filter(function (n) {
+            return text.toLowerCase().indexOf(String(n).toLowerCase()) !== -1;
+          }),
+          kind: 'name',
+        });
+      }
     }
+    hits = hits.concat(scanDomColors(root));
     return hits;
   }
 
@@ -186,12 +316,19 @@
     options = options || {};
     if (!envEnabled()) return [];
     var replaced = resolveReplacedName(options);
-    if (!replaced) return [];
+    var visual = null;
+    try {
+      if (typeof global.getActiveTeamBuilderVisual === 'function') {
+        visual = global.getActiveTeamBuilderVisual();
+      }
+    } catch (e) { /* ignore */ }
+    var hasColorProbe = !!(visual && (visual.replaced_primary_color || visual.replaced_secondary_color));
+    if (!replaced && !hasColorProbe) return [];
     var hits = scanDom(replaced, options.root);
-    report(hits, replaced);
+    report(hits, replaced || '(color-only)');
     if (hits.length && options.throwOnHit) {
       throw new Error(
-        '[TB-LEAK] DOM leak of ' + JSON.stringify(replaced) + ' (' + hits.length + ' hit(s))'
+        '[TB-LEAK] DOM leak of ' + JSON.stringify(replaced || 'colors') + ' (' + hits.length + ' hit(s))'
       );
     }
     return hits;
@@ -235,8 +372,12 @@
     run: runTeamBuilderLeakScan,
     schedule: scheduleScan,
     scanDom: scanDom,
+    scanDomColors: scanDomColors,
     clearBanner: clearBanner,
+    leakNeedlesForReplacedName: leakNeedlesForReplacedName,
+    normalizeHexColor: normalizeHexColor,
     ALLOWLISTED_SELECTORS: ALLOWLISTED_SELECTORS,
+    ALLOWLISTED_DERIVED_NEEDLES: ALLOWLISTED_DERIVED_NEEDLES,
   };
 
   autoArm();

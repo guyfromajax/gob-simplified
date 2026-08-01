@@ -91,7 +91,6 @@
     slot: null,
     identity: {
       name: '',
-      short_name: '',
       abbreviation: '',
       mascot: '',
       city_state: '',
@@ -775,10 +774,6 @@
     if (firstRowObj.team_name) {
       state.identity.name = firstRowObj.team_name;
       document.getElementById('tb-name').value = firstRowObj.team_name;
-      if (!state.identity.short_name) {
-        state.identity.short_name = firstRowObj.team_name;
-        document.getElementById('tb-short').value = firstRowObj.team_name;
-      }
     }
     if (firstRowObj.mascot) {
       state.identity.mascot = firstRowObj.mascot;
@@ -1187,12 +1182,10 @@
   function readIdentity() {
     state.identity = {
       name: (document.getElementById('tb-name').value || '').trim(),
-      short_name: (document.getElementById('tb-short').value || '').trim(),
       abbreviation: (document.getElementById('tb-abbr').value || '').trim().toUpperCase(),
       mascot: (document.getElementById('tb-mascot').value || '').trim(),
       city_state: (document.getElementById('tb-city').value || '').trim(),
     };
-    if (!state.identity.short_name) state.identity.short_name = state.identity.name;
   }
 
   function validateAbbr() {
@@ -1205,7 +1198,14 @@
     }
     const conflict = (state.allTeams || []).find(function (t) {
       if (state.slot && String(t.object_id) === String(state.slot.object_id)) return false;
-      return String(t.name || '').slice(0, 3).toUpperCase() === abbr;
+      var otherAbbr =
+        typeof deriveTeamAbbreviationFromName === 'function'
+          ? deriveTeamAbbreviationFromName(t.name)
+          : String(t.name || '')
+              .replace(/[^A-Za-z0-9]/g, '')
+              .slice(0, 3)
+              .toUpperCase();
+      return otherAbbr === abbr;
     });
     if (conflict) {
       state.abbrConflict = conflict.name;
@@ -1219,16 +1219,17 @@
 
   function updateIdentityPreview() {
     readIdentity();
-    const short = state.identity.short_name || state.identity.name || 'HOME';
+    // Match live chrome: scorebug → abbreviation; standings row → full name.
+    const name = state.identity.name || '—';
     const abbr = state.identity.abbreviation || '—';
     const bug = document.getElementById('tb-scorebug');
     const row = document.getElementById('tb-standings-row');
     if (bug) {
-      bug.textContent = abbr || short;
+      bug.textContent = abbr;
       bug.style.background = state.colors.primary;
     }
     if (row) {
-      row.textContent = '1 · ' + (short || '—') + ' · 0–0';
+      row.textContent = '1 · ' + name + ' · 0–0';
     }
   }
 
@@ -1364,7 +1365,6 @@
         replaced_object_id: state.slot.object_id,
         home_slot: HOME_SLOT,
         name: state.identity.name,
-        short_name: state.identity.short_name,
         abbreviation: state.identity.abbreviation,
         mascot: state.identity.mascot,
         city_state: state.identity.city_state,
@@ -1400,7 +1400,6 @@
           hydrateTeamBuilderVisualFromFranchisePayload(
             {
               team: state.identity.name,
-              short_name: state.identity.short_name,
               abbreviation: state.identity.abbreviation,
               primary_color: state.colors.primary,
               secondary_color: state.colors.secondary,
@@ -1544,7 +1543,7 @@
       });
     });
 
-    ['tb-name', 'tb-short', 'tb-abbr', 'tb-mascot', 'tb-city'].forEach(function (id) {
+    ['tb-name', 'tb-abbr', 'tb-mascot', 'tb-city'].forEach(function (id) {
       const el = document.getElementById(id);
       if (!el) return;
       el.addEventListener('input', updateIdentityPreview);

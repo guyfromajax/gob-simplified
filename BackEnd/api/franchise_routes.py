@@ -544,22 +544,27 @@ def _extract_game_box_score(game_doc: dict[str, Any]) -> dict[str, Any]:
 
 
 def _infer_box_score_team_side(team_key: str, home_team_id: str, away_team_id: str, home_team_name: str, away_team_name: str) -> Optional[str]:
-    home_names = {
-        str(home_team_id or ""),
-        str(home_team_name or ""),
-        _canonical_team_name(home_team_name),
-        _normalize_team_name(home_team_name),
-    }
-    away_names = {
-        str(away_team_id or ""),
-        str(away_team_name or ""),
-        _canonical_team_name(away_team_name),
-        _normalize_team_name(away_team_name),
-    }
+    from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
+    def _name_tokens(team_id: str, team_name: str) -> set[str]:
+        tokens = {
+            str(team_id or ""),
+            str(team_name or ""),
+            _canonical_team_name(team_name),
+            _normalize_team_name(team_name),
+        }
+        # Stored team_id variants (lookup, not derive).
+        for slug in identity_slugs_for_display_name(team_name):
+            tokens.add(slug)
+        return tokens
+
+    home_names = _name_tokens(home_team_id, home_team_name)
+    away_names = _name_tokens(away_team_id, away_team_name)
     key_normalized = _normalize_team_name(team_key)
-    if team_key in home_names or key_normalized in home_names:
+    key_slugs = set(identity_slugs_for_display_name(team_key))
+    if team_key in home_names or key_normalized in home_names or (key_slugs & home_names):
         return "home"
-    if team_key in away_names or key_normalized in away_names:
+    if team_key in away_names or key_normalized in away_names or (key_slugs & away_names):
         return "away"
     return None
 
@@ -832,6 +837,8 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     team_docs_by_id = {str(team.get("_id")): team for team in team_docs_raw}
 
     def _identifier_tokens(*values: Any) -> set[str]:
+        from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
         tokens: set[str] = set()
         for value in values:
             if value is None:
@@ -842,6 +849,9 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
             tokens.add(raw.casefold())
             tokens.add(raw.replace(" ", "_").casefold())
             tokens.add(raw.replace("_", " ").casefold())
+            # Stored team_id (lookup) or derived custom slug.
+            for slug in identity_slugs_for_display_name(raw):
+                tokens.add(slug.casefold())
         return tokens
 
     def _team_tokens(canonical_id: str) -> set[str]:
@@ -1035,11 +1045,25 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     def _norm_key(value) -> str:
         return str(value or "").strip().lower().replace(" ", "_").replace("-", "_")
 
+    def _norm_keys_with_display_slug(value) -> set[str]:
+        """Identity _norm_key plus stored team_id / custom derive tokens."""
+        from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
+        out = {_norm_key(value)}
+        if value is None or value == "":
+            return out
+        for slug in identity_slugs_for_display_name(str(value)):
+            out.add(slug)
+            out.add(_norm_key(slug))
+        return out
+
     def _find_team_row(teams: dict, *candidates):
         if not isinstance(teams, dict):
             return {}
         raw_candidates = [str(c) for c in candidates if c is not None and str(c) != ""]
-        normalized = {_norm_key(c) for c in raw_candidates}
+        normalized: set[str] = set()
+        for c in raw_candidates:
+            normalized |= _norm_keys_with_display_slug(c)
         for candidate in raw_candidates:
             row = teams.get(candidate)
             if isinstance(row, dict):
@@ -1047,14 +1071,11 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         for key, row in teams.items():
             if not isinstance(row, dict):
                 continue
-            if _norm_key(key) in normalized:
+            if _norm_keys_with_display_slug(key) & normalized:
                 return row
-            row_candidates = {
-                _norm_key(row.get("team_id")),
-                _norm_key(row.get("_id")),
-                _norm_key(row.get("name")),
-                _norm_key(row.get("slug")),
-            }
+            row_candidates: set[str] = set()
+            for field in ("team_id", "_id", "name", "slug"):
+                row_candidates |= _norm_keys_with_display_slug(row.get(field))
             if normalized.intersection(row_candidates):
                 return row
         return {}
@@ -1674,10 +1695,13 @@ def update_team_attributes_after_game(
     def _resolve_game_team_obj(team_id_label: str, team_name: str) -> dict:
         if not isinstance(teams_obj, dict):
             return {}
+        from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
         candidates = [
             team_id_label,
             team_name,
             str(team_name).replace("-", "_").replace(" ", "_").upper() if team_name else None,
+            *identity_slugs_for_display_name(team_name),
         ]
         for key in candidates:
             if key and isinstance(teams_obj.get(key), dict):
@@ -2566,7 +2590,6 @@ class TeamBuilderApplyRequest(BaseModel):
     replaced_object_id: str
     home_slot: int | None = None
     name: str
-    short_name: str | None = None
     abbreviation: str
     mascot: str | None = None
     city_state: str | None = None
@@ -3520,12 +3543,14 @@ def team_builder_apply(
     if len(abbreviation) != 3:
         raise HTTPException(status_code=400, detail="Abbreviation must be 3 characters")
 
-    # Abbreviation uniqueness vs slice(0,3) of all 128 names (§6 Step 1)
+    # Abbreviation uniqueness vs abbr_from_name of all 128 names (same derive as chrome).
+    from BackEnd.utils.franchise_team_display import abbr_from_name
+
     for t in db.teams.find({}, {"name": 1}):
         other = str(t.get("name") or "")
         if str(t.get("_id")) == str(replaced_oid):
             continue
-        if other[:3].upper() == abbreviation:
+        if abbr_from_name(other) == abbreviation:
             raise HTTPException(
                 status_code=400,
                 detail=f"{abbreviation} is already used by {other}. Try another abbreviation.",
@@ -3539,7 +3564,6 @@ def team_builder_apply(
         "replaced_object_id": str(replaced_oid),
         "replaced_name": replaced_name,
         "name": custom_name,
-        "short_name": (body.short_name or custom_name).strip() or custom_name,
         "abbreviation": abbreviation,
         "mascot": (body.mascot or "").strip(),
         "city_state": (body.city_state or "").strip(),
@@ -7733,10 +7757,15 @@ def command_center_data(
                 response["accent_color"] = display.get("accent_color")
                 response["mascot"] = display.get("mascot")
                 response["abbreviation"] = display.get("abbreviation")
-                response["short_name"] = display.get("short_name")
                 response["asset_strategy"] = display.get("asset_strategy") or "core"
                 response["is_custom_team"] = bool(display.get("is_custom"))
                 response["team_builder_replaced_name"] = display.get("replaced_name")
+                # Core palette of the replaced slot — color-leak detector / FE hydrate.
+                if display.get("is_custom"):
+                    response["team_builder_replaced_primary_color"] = team_doc.get("primary_color")
+                    response["team_builder_replaced_secondary_color"] = team_doc.get(
+                        "secondary_color"
+                    )
                 response["jersey_preset"] = display.get("jersey_preset")
                 response["user_team_object_id"] = str(team_id)
                 # Frozen at Apply (§9.4) — surface as franchise metadata only.
@@ -7789,24 +7818,33 @@ def command_center_data(
                     previous_week_result_map = _build_previous_week_result_map(
                         franchise_doc, display_name_by_id, natl_rank_by_team_id
                     )
-                    rankings = [
-                        {
-                            "team_id": str(d["team_id"]),
-                            "natl_rank": d.get("natl_rank", 128),
-                            "team_name": display_name_by_id.get(
-                                str(d["team_id"]),
-                                teams_docs.get(str(d["team_id"]), {}).get("name", "?"),
-                            ),
-                            "primary_color": teams_docs.get(str(d["team_id"]), {}).get("primary_color") or "#000000",
-                            "conference": teams_docs.get(str(d["team_id"]), {}).get("conference"),
-                            "W": int((standings_data.get(str(d["team_id"]), {}) or {}).get("W", 0) or 0),
-                            "L": int((standings_data.get(str(d["team_id"]), {}) or {}).get("L", 0) or 0),
-                            "last_week": (previous_week_result_map.get(str(d["team_id"])) or {}).get("text", ""),
-                            "last_week_result": (previous_week_result_map.get(str(d["team_id"])) or {}).get("result", ""),
-                            "next": next_matchup_map.get(str(d["team_id"]), ""),
-                        }
-                        for d in ftd_rank_docs
-                    ]
+                    from BackEnd.utils.franchise_team_display import resolve_team_display
+
+                    rankings = []
+                    for d in ftd_rank_docs:
+                        tid = str(d["team_id"])
+                        core_row = teams_docs.get(tid, {})
+                        disp = resolve_team_display(franchise_doc, tid, core_doc=core_row)
+                        rankings.append(
+                            {
+                                "team_id": tid,
+                                "natl_rank": d.get("natl_rank", 128),
+                                "team_name": display_name_by_id.get(
+                                    tid, core_row.get("name", "?")
+                                ),
+                                "primary_color": disp.get("primary_color")
+                                or core_row.get("primary_color")
+                                or "#000000",
+                                "conference": core_row.get("conference"),
+                                "W": int((standings_data.get(tid, {}) or {}).get("W", 0) or 0),
+                                "L": int((standings_data.get(tid, {}) or {}).get("L", 0) or 0),
+                                "last_week": (previous_week_result_map.get(tid) or {}).get("text", ""),
+                                "last_week_result": (previous_week_result_map.get(tid) or {}).get(
+                                    "result", ""
+                                ),
+                                "next": next_matchup_map.get(tid, ""),
+                            }
+                        )
                     rankings.sort(key=lambda x: x["natl_rank"])
                     response["rankings"] = rankings
 
@@ -8815,7 +8853,12 @@ def team_stats(franchise_id: str, scope: str = "national"):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"results": 1, "user_team_id": 1, "user_team_object_id": 1})
+    from BackEnd.utils.franchise_team_display import TEAM_BUILDER_FIELD, resolve_team_display
+
+    franchise_doc = db.franchises.find_one(
+        {"_id": fid},
+        {"results": 1, "user_team_id": 1, "user_team_object_id": 1, TEAM_BUILDER_FIELD: 1},
+    )
     db_query_time = time.time() - db_query_start
     # logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
     if not franchise_doc:
@@ -8886,6 +8929,12 @@ def team_stats(franchise_id: str, scope: str = "national"):
         for t in output:
             t["natl_rank"] = natl_rank_by_team_id.get(t.get("team_id", ""), 999)
 
+    # Chrome team label: overlay display name when TB replaced this slot.
+    for t in output:
+        tid = t.get("team_id")
+        if tid:
+            t["team"] = resolve_team_display(franchise_doc, tid).get("name") or t.get("team")
+
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")
     return {"teams": output}
@@ -8907,7 +8956,12 @@ def team_traits(franchise_id: str, scope: str = "national"):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"_id": 1})
+    from BackEnd.utils.franchise_team_display import TEAM_BUILDER_FIELD, resolve_team_display
+
+    franchise_doc = db.franchises.find_one(
+        {"_id": fid},
+        {"_id": 1, "user_team_id": 1, "user_team_object_id": 1, TEAM_BUILDER_FIELD: 1},
+    )
     db_query_time = time.time() - db_query_start
     # logger.info(f"⏱️ [PERF] /franchise/team-traits DB query: {db_query_time:.3f}s")
     if not franchise_doc:
@@ -8917,7 +8971,7 @@ def team_traits(franchise_id: str, scope: str = "national"):
     team_list = _ftd_team_list_for_franchise(fid)
     user_team_scope = None
     if scope in {"conference", "region"}:
-        user_team_id, user_team_object_id = get_user_team_from_franchise(db.franchises.find_one({"_id": fid}, {"user_team_id": 1, "user_team_object_id": 1}))
+        user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
         if user_team_object_id and ObjectId.is_valid(user_team_object_id):
             user_team_scope = db.teams.find_one({"_id": ObjectId(user_team_object_id)}, {"conference": 1, "region": 1})
     
@@ -8929,17 +8983,21 @@ def team_traits(franchise_id: str, scope: str = "national"):
     
     for team_id_str in team_list.keys():
         try:
-            team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1, "primary_color": 1, "conference": 1, "region": 1})
+            team_doc = db.teams.find_one(
+                {"_id": ObjectId(team_id_str)},
+                {"name": 1, "primary_color": 1, "secondary_color": 1, "conference": 1, "region": 1, "mascot": 1, "team_id": 1},
+            )
             if team_doc:
                 if user_team_scope and scope == "conference" and team_doc.get("conference") != user_team_scope.get("conference"):
                     continue
                 if user_team_scope and scope == "region" and team_doc.get("region", "") != user_team_scope.get("region", ""):
                     continue
-                team_name = team_doc.get("name", team_id_str)
+                disp = resolve_team_display(franchise_doc, team_id_str, core_doc=team_doc)
+                team_name = disp.get("name") or team_doc.get("name", team_id_str)
                 team_names[team_id_str] = team_name
                 team_totals[team_id_str] = {
                     "team_name": team_name,
-                    "primary_color": team_doc.get("primary_color", "#000000"),
+                    "primary_color": disp.get("primary_color") or team_doc.get("primary_color", "#000000"),
                     "conference": team_doc.get("conference"),
                     "region": team_doc.get("region", ""),
                     "attributes": {attr: 0 for attr in attributes}
@@ -9198,9 +9256,13 @@ def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
     # Lean maps rank -> team_id (the STRING form of teams._id, which is an
     # ObjectId — a plain {"_id": <str>} lookup silently misses). The page has no
     # team-name map of its own, so resolve the top choice here. "open" = no lean.
+    # Display name must go through the franchise overlay resolver (§3.1a).
     top_lean = (doc.get("Lean") or {}).get("1")
     if top_lean and top_lean != "open":
-        name = _resolve_team_name_from_any(top_lean)
+        from BackEnd.utils.franchise_team_display import resolve_team_display
+
+        display = resolve_team_display(franchise_id, top_lean)
+        name = str(display.get("name") or "").strip() or _resolve_team_name_from_any(top_lean)
         # The shared resolver echoes the raw ref back when it can't find a team;
         # never surface an id to the UI — that reads as a bug to the player.
         doc["lean_display"] = "--" if not name or name == str(top_lean) else name
@@ -14324,10 +14386,9 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 rec_recruits = rec_struct.get("recruits") or []
                 rec_total = int(rec_struct.get("total") or 0)
                 if rec_recruits:
-                    rec_team_name_map = {
-                        str(team["_id"]): team.get("name", str(team["_id"]))
-                        for team in db.teams.find({}, {"name": 1})
-                    }
+                    from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+                    rec_team_name_map = resolve_team_name_map(doc)
 
         return {
             "status": "success",

@@ -487,7 +487,12 @@
     return state.recruits.filter(function (r) { return signed[r.recruitId]; }).map(function (r) {
       var info = signed[r.recruitId] || {};
       var withYou = String(info.team_id) === String(state.userTeamId);
-      return { r: r, team: info.team_name || info.team_id || '—', withYou: withYou };
+      return {
+        r: r,
+        team: info.team_name || info.team_id || '—',
+        team_id: info.team_id,
+        withYou: withYou,
+      };
     }).sort(function (a, b) { return (b.withYou - a.withYou) || ((b.r.rt || 0) - (a.r.rt || 0)); });
   }
   function finalSigningsHtml() {
@@ -499,7 +504,7 @@
       : state.signFilter === 'targets' ? all.filter(function (s) { return s.r.leansToUser; }) : all;
     var chip = function (k, l) { return '<button class="chip' + (state.signFilter === k ? ' on' : '') + '" data-sfilter="' + k + '">' + l + '</button>'; };
     var rowsHtml = rows.map(function (s) {
-      var r = s.r, ab = Spine.Lean.deriveAbbr(s.team);
+      var r = s.r, ab = Spine.Lean.deriveAbbr(s.team, s.teamId || s.team_id);
       return '<div class="srow' + (s.withYou ? ' win' : '') + '">' +
         '<div class="sname"><span class="nm">' + Common.escapeHtml(r.name) + '</span></div>' +
         '<span class="scol spos">' + Common.escapeHtml(r.pos) + '</span>' +
@@ -568,9 +573,9 @@
     var regionHtml = regionsShown.map(function (rg) {
       var visits = byRegion[rg].slice(0, 6).map(function (x) {
         var rivalPart = x.rival
-          ? '<span class="team">' + Common.escapeHtml(Spine.Lean.deriveAbbr(x.rival.team_name)) + '</span><span class="note threat">also visited — contested</span>'
+          ? '<span class="team">' + Common.escapeHtml(Spine.Lean.deriveAbbr(x.rival.team_name, x.rival.team_id)) + '</span><span class="note threat">also visited — contested</span>'
           : '<span class="note">no rival visits — clear lane</span>';
-        return '<div class="wvrow"><span class="team you">' + Common.escapeHtml(Spine.Lean.deriveAbbr(state.teamName || 'You')) + '</span>' +
+        return '<div class="wvrow"><span class="team you">' + Common.escapeHtml(Spine.Lean.deriveAbbr(state.teamName || 'You', state.userTeamId)) + '</span>' +
           '<span class="who">' + Common.escapeHtml(x.r.name) + '</span><span class="arrow">·</span>' + rivalPart + '</div>';
       }).join('');
       return '<div class="wregion-row"><span class="wregion-tag">' + rg + '</span><div class="wregion-visits">' + visits + '</div></div>';

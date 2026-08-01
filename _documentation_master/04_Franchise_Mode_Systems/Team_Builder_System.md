@@ -10,7 +10,7 @@
 |---|---|---|
 | **`../projects/mod-system/team-builder-v1-spec.md`** | Product behavior, UX flow, user-facing copy, acceptance criteria, v1 scope cuts | Data models, file paths, how overlay/resolver/sim identity are wired |
 | **This file (`Team_Builder_System.md`)** | Implementation: identity rules, overlay schema, Apply/endpoints, shared producers, gameplay path, file map, tests | Product copy strings and “should we build X?” decisions — those stay in the spec |
-| **`../projects/mod-system/team-builder-resolver-enumeration.md`** | Display-surface / identity-plumbing checklist for producers | Narrative product or full system architecture |
+| **`../projects/mod-system/team-builder-identity-inventory.md`** | Team identity / chrome inventory (derived forms, overlay awareness) | Narrative product or full system architecture |
 
 When product intent and code disagree, treat the **spec** as the statement of intent and this file as the map of current wiring — raise a finding; do not silently rewrite the spec from the codebase (see spec §0).
 
@@ -96,7 +96,6 @@ Written **once** at Apply. Shape (authoritative writer: `team_builder_apply`):
   "replaced_object_id": "<ObjectId str>",  # slot key — never changes
   "replaced_name": "Hardwood Fields",      # core name at Apply time (orientation copy)
   "name": "Hanson",                        # display name
-  "short_name": "...",
   "abbreviation": "HAN",                   # 3 chars
   "mascot": "...",
   "city_state": "...",
@@ -160,7 +159,7 @@ Also set on the franchise at init/Apply:
 | 7 | Practice Squad parent labels | `_format_team_name_map(franchise_doc)` |
 | 8 | `POST /franchise/play-next-game` | `home`/`away` strings via `resolve_team_display`; **ids remain ObjectIds** |
 
-Coverage checklist: `team-builder-resolver-enumeration.md`.
+Identity / chrome inventory: `team-builder-identity-inventory.md`.
 
 ### 5.2 Asset producer
 

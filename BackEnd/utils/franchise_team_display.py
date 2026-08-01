@@ -11,6 +11,7 @@ instead of reading core ``teams`` identity directly.
 """
 from __future__ import annotations
 
+import re
 from typing import Any, Mapping, MutableMapping, Optional
 
 from bson import ObjectId
@@ -73,11 +74,42 @@ def _core_team_doc(team_object_id: str) -> dict[str, Any]:
     return teams_collection.find_one({"_id": oid}) or {}
 
 
-def _abbr_from_name(name: str) -> str:
-    raw = (name or "").strip()
-    if not raw:
-        return "???"
-    return raw[:3].upper()
+# Shared empty token when a name yields no alnum chars (BE + FE must match).
+ABBR_EMPTY = "???"
+
+
+def abbr_from_name(name: str) -> str:
+    """
+    Single abbreviation derivation: alnum chars of ``name``, uppercased, first 3.
+
+    Used by rendering fallbacks and Apply/wizard uniqueness checks alike.
+    """
+    clean = re.sub(r"[^A-Za-z0-9]", "", (name or "").strip())
+    return (clean[:3] or ABBR_EMPTY).upper()
+
+
+# Back-compat alias used by older call sites / tests.
+_abbr_from_name = abbr_from_name
+
+
+def resolve_team_abbreviation(
+    franchise: Any,
+    team_object_id: Any,
+    *,
+    core_doc: Mapping[str, Any] | None = None,
+    name: str | None = None,
+) -> str:
+    """
+    Single abbreviation resolver (Team Builder §3.1a chrome).
+
+    Overlay abbreviation when this ObjectId is the franchise's replaced slot;
+    otherwise ``abbr_from_name`` on the display/core name.
+    """
+    display = resolve_team_display(franchise, team_object_id, core_doc=core_doc)
+    abbr = str(display.get("abbreviation") or "").strip().upper()[:3]
+    if abbr and abbr != ABBR_EMPTY:
+        return abbr
+    return abbr_from_name(name or display.get("name") or "")
 
 
 def resolve_team_display(
@@ -90,13 +122,16 @@ def resolve_team_display(
     Resolve display identity for one team in one franchise.
 
     Returns a stable dict:
-      object_id, team_id (slug), name, short_name, abbreviation, mascot,
+      object_id, team_id (slug), name, abbreviation, mascot,
       primary_color, secondary_color, accent_color,
       asset_strategy ("core" | "generated"),
       is_custom (bool), replaced_name (optional)
 
     When the franchise has no overlay, or the ObjectId is not the replaced
     slot, values come from core ``teams`` unchanged.
+
+    Note: legacy overlays may still carry a stale ``short_name`` key; it is
+    ignored (no consumer, no migration).
     """
     oid = _as_object_id_str(team_object_id)
     core = dict(core_doc) if core_doc is not None else (_core_team_doc(oid) if oid else {})
@@ -110,8 +145,7 @@ def resolve_team_display(
         "object_id": oid,
         "team_id": core_slug,
         "name": core_name or (oid or "?"),
-        "short_name": core_name or (oid or "?"),
-        "abbreviation": _abbr_from_name(core_name),
+        "abbreviation": abbr_from_name(core_name),
         "mascot": core_mascot,
         "primary_color": core_primary,
         "secondary_color": core_secondary,
@@ -132,8 +166,7 @@ def resolve_team_display(
         return base
 
     name = str(overlay.get("name") or core_name or "?").strip() or base["name"]
-    short_name = str(overlay.get("short_name") or name).strip() or name
-    abbreviation = str(overlay.get("abbreviation") or _abbr_from_name(name)).strip().upper()[:3]
+    abbreviation = str(overlay.get("abbreviation") or abbr_from_name(name)).strip().upper()[:3]
     mascot = str(overlay.get("mascot") if overlay.get("mascot") is not None else core_mascot)
     primary = overlay.get("primary_color") or core_primary
     secondary = overlay.get("secondary_color") or core_secondary
@@ -143,8 +176,7 @@ def resolve_team_display(
         "object_id": oid,
         "team_id": core_slug,  # slug stays the slot's canonical code
         "name": name,
-        "short_name": short_name,
-        "abbreviation": abbreviation or _abbr_from_name(name),
+        "abbreviation": abbreviation or abbr_from_name(name),
         "mascot": mascot,
         "primary_color": primary,
         "secondary_color": secondary,

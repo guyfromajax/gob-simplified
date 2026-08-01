@@ -1739,41 +1739,60 @@ try:
     # We don't need an explicit OPTIONS handler - the middleware does this
     
     @app.get("/teams")
-    def get_team_names():
+    def get_team_names(franchise_id: str | None = None):
         # conference + region are required by the franchise team-select / Team Builder
         # picker (search, conference grouping, region filter). Additive fields only —
         # existing consumers that ignore unknown keys keep working.
         #
         # object_id = str(Mongo _id). Canonical franchise/schedule/FTD key.
         # team_id   = slug (e.g. BENTLEY_TRUMAN). Game-doc / TeamManager key.
-        teams = teams_collection.find(
-            {},
-            {
-                "name": 1,
-                "primary_color": 1,
-                "secondary_color": 1,
-                "mascot": 1,
-                "conference": 1,
-                "region": 1,
-                "team_id": 1,
-            },
-        )
-        return sorted(
-            [
+        #
+        # Optional franchise_id: chrome colors (and display_name) for the TB
+        # replaced slot via resolve_team_display. Core ``name`` stays identity.
+        from BackEnd.utils.franchise_team_display import resolve_team_display
+
+        teams = list(
+            teams_collection.find(
+                {},
                 {
-                    "object_id": str(team["_id"]) if team.get("_id") is not None else None,
-                    "name": team.get("name"),
-                    "team_id": team.get("team_id"),
-                    "primary_color": team.get("primary_color"),
-                    "secondary_color": team.get("secondary_color"),
-                    "mascot": team.get("mascot"),
-                    "conference": team.get("conference"),
-                    "region": team.get("region"),
-                }
-                for team in teams
-            ],
-            key=lambda t: (t["name"] or ""),
+                    "name": 1,
+                    "primary_color": 1,
+                    "secondary_color": 1,
+                    "mascot": 1,
+                    "conference": 1,
+                    "region": 1,
+                    "team_id": 1,
+                },
+            )
         )
+        rows = []
+        for team in teams:
+            oid = str(team["_id"]) if team.get("_id") is not None else None
+            entry = {
+                "object_id": oid,
+                "name": team.get("name"),
+                "team_id": team.get("team_id"),
+                "primary_color": team.get("primary_color"),
+                "secondary_color": team.get("secondary_color"),
+                "mascot": team.get("mascot"),
+                "conference": team.get("conference"),
+                "region": team.get("region"),
+            }
+            if franchise_id and oid:
+                try:
+                    disp = resolve_team_display(franchise_id, oid, core_doc=team)
+                    entry["primary_color"] = disp.get("primary_color") or entry["primary_color"]
+                    entry["secondary_color"] = disp.get("secondary_color") or entry["secondary_color"]
+                    entry["mascot"] = (
+                        disp.get("mascot") if disp.get("mascot") is not None else entry["mascot"]
+                    )
+                    if disp.get("is_custom"):
+                        entry["display_name"] = disp.get("name")
+                        entry["abbreviation"] = disp.get("abbreviation")
+                except Exception:
+                    pass
+            rows.append(entry)
+        return sorted(rows, key=lambda t: (t["name"] or ""))
     
     
     @app.post("/api/simulate")
@@ -2501,11 +2520,25 @@ try:
         def _norm_key(value) -> str:
             return str(value or "").strip().lower().replace(" ", "_").replace("-", "_")
 
+        def _norm_keys_with_display_slug(value) -> set[str]:
+            """Identity _norm_key plus stored team_id / custom derive tokens."""
+            from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
+            out = {_norm_key(value)}
+            if value is None or value == "":
+                return out
+            for slug in identity_slugs_for_display_name(str(value)):
+                out.add(slug)
+                out.add(_norm_key(slug))
+            return out
+
         def _find_team_row(teams: dict, *candidates):
             if not isinstance(teams, dict):
                 return {}
             raw_candidates = [str(c) for c in candidates if c is not None and str(c) != ""]
-            normalized = {_norm_key(c) for c in raw_candidates}
+            normalized: set[str] = set()
+            for c in raw_candidates:
+                normalized |= _norm_keys_with_display_slug(c)
             for candidate in raw_candidates:
                 row = teams.get(candidate)
                 if isinstance(row, dict):
@@ -2513,14 +2546,11 @@ try:
             for key, row in teams.items():
                 if not isinstance(row, dict):
                     continue
-                if _norm_key(key) in normalized:
+                if _norm_keys_with_display_slug(key) & normalized:
                     return row
-                row_candidates = {
-                    _norm_key(row.get("team_id")),
-                    _norm_key(row.get("_id")),
-                    _norm_key(row.get("name")),
-                    _norm_key(row.get("slug")),
-                }
+                row_candidates: set[str] = set()
+                for field in ("team_id", "_id", "name", "slug"):
+                    row_candidates |= _norm_keys_with_display_slug(row.get(field))
                 if normalized.intersection(row_candidates):
                     return row
             return {}
@@ -6871,7 +6901,6 @@ try:
                 response_data["secondary_color"] = display.get("secondary_color") or response_data["secondary_color"]
                 response_data["mascot"] = display.get("mascot")
                 response_data["abbreviation"] = display.get("abbreviation")
-                response_data["short_name"] = display.get("short_name")
                 response_data["asset_strategy"] = display.get("asset_strategy") or "core"
                 response_data["is_custom_team"] = bool(display.get("is_custom"))
             except Exception:

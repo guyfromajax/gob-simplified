@@ -26,11 +26,17 @@
     });
   }
 
-  // Derive a stable 3-letter team token from a team name (fallback when no
-  // canonical abbreviation is available). Your own team is detected by id, not name.
-  function deriveAbbr(name) {
+  // 3-letter team token: overlay abbrev when the franchise has one for this team,
+  // else alnum slice(0,3). Routes through Common.resolveTeamAbbreviation.
+  function deriveAbbr(name, teamId) {
+    if (typeof global.resolveTeamAbbreviation === 'function') {
+      return global.resolveTeamAbbreviation(name, teamId);
+    }
+    if (typeof global.deriveTeamAbbreviationFromName === 'function') {
+      return global.deriveTeamAbbreviationFromName(name);
+    }
     var clean = String(name || '').replace(/[^A-Za-z0-9]/g, '');
-    return (clean.slice(0, 3) || '—').toUpperCase();
+    return (clean.slice(0, 3) || '???').toUpperCase();
   }
 
   // RT color class, honoring the year-aware recruit/player switch (decision: keep the
@@ -74,7 +80,7 @@
       var raw = (recruit && (recruit.Lean || recruit.lean)) || {};
       var teamNameMap = opts.teamNameMap || {};
       var userId = opts.userTeamId != null ? String(opts.userTeamId) : null;
-      var abbrOf = opts.abbrOf || function (name /*, id */) { return deriveAbbr(name); };
+      var abbrOf = opts.abbrOf || function (name, id) { return deriveAbbr(name, id); };
       var leans = [];
       ['1', '2', '3'].forEach(function (rank) {
         var v = raw[rank];

@@ -61,12 +61,16 @@ function buildDirectory(summary) {
   return dir;
 }
 
-/** Short abbreviation fallback from a team name ("Four Corners" → "FC"). */
-function abbrFromName(name) {
-  const words = String(name || '').trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return '';
-  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
-  return words.map((w) => w[0]).join('').slice(0, 3).toUpperCase();
+/** Short abbreviation fallback — overlay-aware via resolveTeamAbbreviation. */
+function abbrFromName(name, teamId) {
+  if (typeof resolveTeamAbbreviation === 'function') {
+    return resolveTeamAbbreviation(name, teamId);
+  }
+  if (typeof deriveTeamAbbreviationFromName === 'function') {
+    return deriveTeamAbbreviationFromName(name);
+  }
+  const clean = String(name || '').replace(/[^A-Za-z0-9]/g, '');
+  return (clean.slice(0, 3) || '???').toUpperCase();
 }
 
 /**
@@ -96,8 +100,8 @@ function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName)
     const l = num(t.losses ?? (roster && roster.losses) ?? 0);
     return `${w}–${l}`;
   };
-  const abbrOf = (t, label) =>
-    t.abbreviation || t.abbr || abbrFromName(label);
+  const abbrOf = (t, label, tid) =>
+    t.abbreviation || t.abbr || abbrFromName(label, tid || t.object_id || t.team_object_id);
 
   const hCore = coreOf(homeT, homeTeamName);
   const aCore = coreOf(awayT, awayTeamName);
@@ -109,7 +113,7 @@ function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName)
       home: {
         teamName: hLabel,
         name: hLabel,
-        abbr: abbrOf(homeT, hLabel),
+        abbr: abbrOf(homeT, hLabel, homeId),
         color: colorOf(homeT, homeRoster, '#1F8A5B'),
         rank: rankOf(homeT, homeRoster),
         rec: recOf(homeT, homeRoster),
@@ -117,7 +121,7 @@ function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName)
       away: {
         teamName: aLabel,
         name: aLabel,
-        abbr: abbrOf(awayT, aLabel),
+        abbr: abbrOf(awayT, aLabel, awayId),
         color: colorOf(awayT, awayRoster, '#9E1B32'),
         rank: rankOf(awayT, awayRoster),
         rec: recOf(awayT, awayRoster),

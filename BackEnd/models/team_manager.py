@@ -331,15 +331,20 @@ class TeamManager:
         self.asset_strategy = "core"
         if franchise_id and team_doc and team_doc.get("_id") is not None:
             try:
-                from BackEnd.utils.franchise_team_display import resolve_team_display
+                from BackEnd.utils.franchise_team_display import (
+                    resolve_team_abbreviation,
+                    resolve_team_display,
+                )
 
                 display = resolve_team_display(franchise_id, team_doc.get("_id"), core_doc=team_doc)
+                self.abbreviation = resolve_team_abbreviation(
+                    franchise_id, team_doc.get("_id"), core_doc=team_doc
+                )
                 if display.get("is_custom"):
                     self.display_name = display.get("name") or self.name
                     self.primary_color = display.get("primary_color") or self.primary_color
                     self.secondary_color = display.get("secondary_color") or self.secondary_color
                     self.mascot = display.get("mascot") if display.get("mascot") is not None else self.mascot
-                    self.abbreviation = display.get("abbreviation")
                     self.asset_strategy = display.get("asset_strategy") or "generated"
             except Exception:
                 pass

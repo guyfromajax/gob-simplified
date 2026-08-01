@@ -2246,17 +2246,42 @@ async function initializeTeamColorCache() {
   if (teamColorCache) return; // Already initialized
   
   try {
-    const res = await fetch(API_CONFIG.buildUrl('/teams'));
+    const fid =
+      (typeof franchiseId !== 'undefined' && franchiseId) ||
+      new URLSearchParams(window.location.search || '').get('franchise_id') ||
+      '';
+    const teamsUrl = fid
+      ? `${API_CONFIG.buildUrl('/teams')}?franchise_id=${encodeURIComponent(fid)}`
+      : API_CONFIG.buildUrl('/teams');
+    const res = await fetch(teamsUrl);
     const teamData = await res.json();
     teamColorCache = {};
     teamMetaByNameCache = {};
     teamData.forEach(t => {
-      teamColorCache[t.name] = t.primary_color;
-      teamMetaByNameCache[t.name] = {
-        mascot: t.mascot || '',
-        primary_color: t.primary_color || null,
-      };
+      const color = t.primary_color;
+      if (t.name) {
+        teamColorCache[t.name] = color;
+        teamMetaByNameCache[t.name] = {
+          mascot: t.mascot || '',
+          primary_color: color || null,
+        };
+      }
+      // TB overlay: also index by display_name so custom program lookups hit overlay colors.
+      if (t.display_name && t.display_name !== t.name) {
+        teamColorCache[t.display_name] = color;
+        teamMetaByNameCache[t.display_name] = {
+          mascot: t.mascot || '',
+          primary_color: color || null,
+        };
+      }
     });
+    if (typeof getActiveTeamBuilderVisual === 'function') {
+      const visual = getActiveTeamBuilderVisual();
+      if (visual && visual.primary_color) {
+        if (visual.name) teamColorCache[visual.name] = visual.primary_color;
+        if (visual.replaced_name) teamColorCache[visual.replaced_name] = visual.primary_color;
+      }
+    }
   } catch (err) {
     console.warn('Failed to load team colors:', err);
     teamColorCache = {};
