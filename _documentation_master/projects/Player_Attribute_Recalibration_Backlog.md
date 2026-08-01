@@ -94,8 +94,14 @@ Existing franchises keep old-scale short players while gaining height-gated PF a
 **Shot-blocking effectively gone.** **ACCEPTED — documented so it is not misdiagnosed.**
 `height_to_block_score` returns 0 at or below the league median of 78, and an old-scale roster's p90 height *is* 78. A "nobody blocks shots on my save" report is this, not a bug.
 
-**Legacy `entry_tier` derivation.** **ACCEPTED.**
-A legacy player with no `entry_tier` has it derived from current RT, which misclassifies players whose RT collapsed under height gating — a distorted big reads as Poor and then develops on a Poor ladder, compounding the degradation above.
+**Legacy `entry_tier` derivation.** **PARTIALLY FIXED 2026-08-01.**
+The derive-from-RT fallback was *year-blind* — it divided by the cumulative dev increment to the target rung, down-classifying every non-senior ~1.5 tiers (not just RT-collapsed bigs). Now year-aware (`entry_tier_at_year`, divides by `RUNG_MULTIPLIERS` of the year the ratings reflect) and **loud** (warns with player id on every firing). Residual accepted caveat: a legacy *old-scale big* whose RT genuinely collapsed under height gating still reads low — but that is a true low RT, not a formula error.
+
+**Recruit `entry_tier` down-classification in already-rolled saves.** **ACCEPTED — unrecoverable.**
+Any franchise that ran ≥1 rollover before the 2026-08-01 fix permanently down-classified its recruit intake (FRD dropped `entry_tier` → derived from undeveloped JH RT → developed on the wrong ladder). The true tier is **gone** — not in FRD (overwritten), not in the frozen set (0/300 carry it), not in FPD (holds only the wrong derived value, no `recruit_id` link), and not reconstructable from attributes (they developed on the wrong ladder). No repair is possible without inventing values, so — consistent with the old-scale-roster call — **existing saves degrade**; they partially self-heal over ~4 seasons as mis-developed players graduate and correctly-tiered recruits (post-fix) replace them. New franchises are correct from creation.
+
+**SEQUENCING FLAG — height defect re-migration invalidates current-pool franchises.** *No action here; plan dependency.*
+The open height defect (generation draws at adult height; the pool has no class-year stagger — 0.34in spread across four years) can only be fixed by restoring `players_backup_prerecal_20260729` and re-migrating, which regenerates the universal pool and **invalidates every franchise built from the current pool — including `postrecal-validation` (`6a6b670e1d522b498e60fed2`)**, the reserved pillar-3 keeper. Plan to **recreate that keeper after the re-migration**, not protect it through it. The entry_tier fix above does not depend on the re-migration and ships independently.
 
 ---
 
