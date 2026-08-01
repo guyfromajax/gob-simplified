@@ -16,6 +16,7 @@ from BackEnd.models.player import Player
 from BackEnd.utils.franchise_rank_prestige import core_total_player_attrs
 from BackEnd.utils.player_year import format_player_year_abbrev, normalize_player_year
 from BackEnd.utils.position_ratings import compute_position_ratings
+from BackEnd.utils.player_development import entry_tier_at_year
 
 ROSTER_CSV_HEADERS: tuple[str, ...] = (
     "first_name",
@@ -258,13 +259,25 @@ def _build_fpd_doc(
     player_id: str,
     meta: dict[str, Any],
     attributes: dict[str, Any],
+    entry_tier: str | None = None,
+    position_intent: str | None = None,
+    development: Any = None,
 ) -> dict[str, Any]:
     zero = _zero_stats_block()
     name = f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip()
     position_ratings = compute_position_ratings(
         {"attributes": attributes, "height": meta.get("height"), "name": name},
     )
-    return {
+    if not position_intent:
+        position_intent = (max(position_ratings, key=position_ratings.get)
+                           if position_ratings else "SF")
+    if not entry_tier:
+        # Derive-and-STORE now (year-aware, from the player's current-year ratings) so a
+        # later rollover never re-derives from RT — which misclassifies once pillar-3
+        # coaching quality has pushed RT off the ladder. Imported/band rosters carry no
+        # tier, so this is the explicit-carry point for them.
+        entry_tier = entry_tier_at_year(position_ratings, meta.get("year") or "FR")
+    doc = {
         "franchise_id": str(franchise_id),
         "player_id": player_id,
         "meta": meta,
@@ -272,7 +285,12 @@ def _build_fpd_doc(
         "career": zero.copy(),
         "attributes": attributes,
         "position_ratings": position_ratings,
+        "entry_tier": entry_tier,
+        "position_intent": position_intent,
     }
+    if development is not None:
+        doc["development"] = development
+    return doc
 
 
 def normalize_imported_players(
@@ -413,6 +431,9 @@ def build_fpd_docs_from_players(
                 player_id=pid,
                 meta=dict(player.get("meta") or {}),
                 attributes=dict(player.get("attributes") or {}),
+                entry_tier=player.get("entry_tier"),
+                position_intent=player.get("position_intent"),
+                development=player.get("development"),
             )
         )
     return player_ids, docs

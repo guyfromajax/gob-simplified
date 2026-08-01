@@ -493,10 +493,24 @@ def _derive_entry_tier_from_rt(position_ratings: dict, rung: str) -> str:
     whole league. This remains a FALLBACK: new recruits carry entry_tier pool→FPD
     and never reach here; a legacy old-scale big whose RT collapsed under height
     gating still misclassifies (documented caveat, new-franchises-only)."""
-    top_rt = max((v for v in (position_ratings or {}).values() if isinstance(v, (int, float))), default=30)
     idx = _RATINGS_LADDER.index(rung) if rung in _RATINGS_LADDER else 1  # unknown → assume FR
-    ratings_year = _RATINGS_LADDER[max(0, idx - 1)]
-    est_anchor = top_rt / RUNG_MULTIPLIERS[ratings_year]
+    return entry_tier_at_year(position_ratings, _RATINGS_LADDER[max(0, idx - 1)])
+
+
+def entry_tier_at_year(position_ratings: dict, current_year: str) -> str:
+    """Best-effort entry_tier from ratings that reflect ``current_year`` (year-aware).
+
+    Divides top RT by that year's ladder multiplier to recover the JH anchor, then
+    maps to the nearest tier. PREFER computing-and-STORING this at write time over
+    leaving ``develop_rollover`` to re-derive at rollover: once coaching quality
+    (pillar 3) drives f ≠ 1.0, RT diverges from the ladder by more than a full senior
+    tier-step (a well-coached Average SR ~72 vs a neglected one ~51, against bands
+    ~10 RT apart), so a DEFERRED derive silently misclassifies. Any path that writes a
+    player doc without an entry_tier should call this and persist the result."""
+    from BackEnd.utils.player_generation import normalize_year as _ny
+    top_rt = max((v for v in (position_ratings or {}).values() if isinstance(v, (int, float))), default=30)
+    mult = RUNG_MULTIPLIERS.get(current_year) or RUNG_MULTIPLIERS.get(_ny(current_year)) or RUNG_MULTIPLIERS["FR"]
+    est_anchor = top_rt / mult
     return min(JH_ANCHOR_BY_TIER, key=lambda t: abs(JH_ANCHOR_BY_TIER[t] - est_anchor))
 
 
@@ -610,5 +624,5 @@ __all__ = [
     "COACHING_REFERENCE_PRIMARY_PTS", "COACHING_REFERENCE_BASELINE_PTS",
     "reference_allocation", "season_coaching_quality", "coaching_f",
     "roll_growth_profile", "develop_one_offseason", "develop_rollover",
-    "init_career", "simulate_career",
+    "init_career", "simulate_career", "entry_tier_at_year",
 ]
