@@ -57,6 +57,11 @@ from BackEnd.utils.player_generation import (  # noqa: E402
     HEIGHT_MAX_IN,
     HEIGHT_MIN_IN,
     HEIGHT_SD_IN,
+    HT_REMAINING_SHARE_BY_YEAR,
+    HT_TOTAL_MEAN,
+    HT_TOTAL_SD,
+    HT_TOTAL_MIN,
+    HT_TOTAL_MAX,
     POSITIONS,
     TIER_FREQUENCY,
     generate_core_attributes,
@@ -311,12 +316,30 @@ def remap_attributes(players: list[dict], rng: _random.Random) -> None:
         p["_ratings"] = compute_position_ratings({"attributes": attrs, "height": p["_height"]})
 
 
+def apply_class_year_stagger(players: list[dict], rng: _random.Random) -> None:
+    """§11.3 grow-into-frame. assign_heights maps each player onto his position's ADULT
+    height distribution (the fitness peak); stagger it DOWN by the remaining share of a
+    drawn career HT gain for his class year (§16.3 curve, via HT_REMAINING_SHARE_BY_YEAR),
+    so the migrated pool has a real height gradient — FR below frame, SR at it — instead of
+    the flat ~0.34in it carried. Mirrors generation's draw_height() grow-into-frame, so a
+    pool player and a freshly generated recruit of the same year/position are comparable.
+    Runs AFTER assign_years and BEFORE remap_attributes, so attributes (and weight) are
+    generated at the staggered height — a shorter FR gets the fitness-appropriate attribute
+    mass, exactly as fresh generation does."""
+    for p in players:
+        remaining = HT_REMAINING_SHARE_BY_YEAR.get(p["_year"], 0.0)
+        if remaining:
+            gain = max(HT_TOTAL_MIN, min(HT_TOTAL_MAX, rng.gauss(HT_TOTAL_MEAN, HT_TOTAL_SD)))
+            p["_height"] = max(HEIGHT_MIN_IN, round(p["_height"] - remaining * gain))
+
+
 def build_remap(players: list[dict], seed: int) -> None:
     rng = _random.Random(seed)
     assign_position_intent(players)
     assign_heights(players)
     assign_tiers(players)
     assign_years(players, rng)
+    apply_class_year_stagger(players, rng)
     remap_attributes(players, rng)
 
 
