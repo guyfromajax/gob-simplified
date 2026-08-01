@@ -186,6 +186,10 @@
     return svgToDataUrl(svg);
   }
 
+  /**
+   * Colors-step preview swatch only — not the gameplay court.
+   * Gameplay uses general_court.jpg via getTeamAssetPath until §6.3.
+   */
   function courtPreviewDataUrl(opts) {
     opts = opts || {};
     var primary = opts.primary || '#27408E';
@@ -238,7 +242,12 @@
       if (assetKey === 'logo_square' || assetKey === 'mark') return markDataUrl(team);
       if (assetKey === 'banner_card' || assetKey === 'banner_primary') return bannerCardDataUrl(team);
       if (assetKey === 'jersey') return jerseyPreviewDataUrl(team);
-      if (assetKey === 'court') return courtPreviewDataUrl(team);
+      // Court: filesystem until §6.3 (same policy as getTeamAssetPath).
+      if (assetKey === 'court') {
+        return typeof global.filesystemTeamAssetPath === 'function'
+          ? global.filesystemTeamAssetPath(null, 'court')
+          : '/images/teams/general/general_court.jpg';
+      }
     }
     if (typeof global.filesystemTeamAssetPath === 'function') {
       return global.filesystemTeamAssetPath(team.name || team.slug, assetKey === 'mark' ? 'logo_square' : assetKey);

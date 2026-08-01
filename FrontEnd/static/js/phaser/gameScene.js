@@ -619,7 +619,13 @@ function resolveCourtImagePath(teamNameOrSlug) {
     ? getTeamAssetPath(teamNameOrSlug, 'court')
     : fallbackPath;
 
-  if (!preferredPath || preferredPath === fallbackPath) {
+  // Phaser Loader.image rejects data:/blob: ("Local data URIs are not supported").
+  // Matching the consumer beats validating with new Image(), which accepts those.
+  if (
+    !preferredPath ||
+    preferredPath === fallbackPath ||
+    /^(data|blob):/i.test(String(preferredPath))
+  ) {
     return Promise.resolve(fallbackPath);
   }
 

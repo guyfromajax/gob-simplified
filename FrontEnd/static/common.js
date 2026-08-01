@@ -334,12 +334,13 @@ function generatedTeamAssetDataUrl(visual, assetKey) {
     asset_strategy: 'generated',
     is_custom: true,
   };
+  // Note: `court` is not generated here for gameplay — see getTeamAssetPath.
+  // Wizard Colors preview calls TeamGeneratedArt.courtPreviewDataUrl directly.
   if (typeof window !== 'undefined' && window.TeamGeneratedArt) {
     if (assetKey === 'logo_square' || assetKey === 'mark') return window.TeamGeneratedArt.markDataUrl(opts);
     if (assetKey === 'banner_card' || assetKey === 'banner_primary' || assetKey === 'background') {
       return window.TeamGeneratedArt.bannerCardDataUrl(opts);
     }
-    if (assetKey === 'court') return window.TeamGeneratedArt.courtPreviewDataUrl(opts);
     if (assetKey === 'jersey') return window.TeamGeneratedArt.jerseyPreviewDataUrl(opts);
   }
   // Inline fallback so pages that only load common.js never emit a broken custom slug.
@@ -402,10 +403,16 @@ function filesystemTeamAssetPath(teamNameOrSlug, assetKey) {
 }
 
 /**
- * Build path for a team asset. Franchise-aware shared producer (§3.3 / Task B #8):
- * when the active franchise has a Team Builder overlay and the requested name is
- * that custom program, return generated art. Otherwise identical to the former
- * filesystem behavior (mandatory no-op for non-overlay franchises / other teams).
+ * Build path for a team asset. Franchise-aware shared producer (§3.3 / Task B #8).
+ *
+ * Asset strategy is **per-key**, not per-team:
+ *  - banner / logo / background → generated data URL for the custom program
+ *  - court → always filesystem ``general_court.jpg`` for custom programs until
+ *    Team Builder §6.3 ships a real court generator (3333×2083 + marking geometry).
+ *    Phaser's loader rejects data URIs; the Colors-step SVG is a preview swatch
+ *    only and must not become the gameplay surface.
+ *
+ * Non-overlay franchises / other teams: filesystem path (mandatory no-op).
  *
  * @param {string} teamNameOrSlug
  * @param {string} assetKey - court | logo_square | background | banner_primary | banner_card
@@ -414,6 +421,11 @@ function filesystemTeamAssetPath(teamNameOrSlug, assetKey) {
 function getTeamAssetPath(teamNameOrSlug, assetKey, visualOverride) {
   var visual = visualOverride || getActiveTeamBuilderVisual();
   if (teamBuilderVisualMatchesName(visual, teamNameOrSlug)) {
+    // Temporary: §6.3 court generator replaces this — its canvas output can
+    // feed Phaser directly. Until then, never hand a data URI to load.image.
+    if (assetKey === 'court') {
+      return filesystemTeamAssetPath(null, 'court');
+    }
     return generatedTeamAssetDataUrl(visual, assetKey);
   }
   return filesystemTeamAssetPath(teamNameOrSlug, assetKey);
