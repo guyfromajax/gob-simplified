@@ -6711,6 +6711,15 @@
     const urlParams = new URLSearchParams(window.location.search);
     const homeTeam = urlParams.get('home');
     const awayTeam = urlParams.get('away');
+    // Chrome labels (Team Builder overlay); home/away remain core for identity/sim.
+    const homeDisplay = urlParams.get('home_display') || homeTeam;
+    const awayDisplay = urlParams.get('away_display') || awayTeam;
+    // Warm TB visual cache so getTeamAssetPath resolves generated banners.
+    try {
+      if (urlParams.get('franchise_id') && typeof getActiveTeamBuilderVisual === 'function') {
+        getActiveTeamBuilderVisual();
+      }
+    } catch (e) { /* non-fatal */ }
 
     window.addEventListener('pageshow', (event) => {
       if (event.persisted) {
@@ -6720,14 +6729,14 @@
 
     const redirected = await redirectIfFranchiseGameplayAlreadyCommitted(urlParams);
     if (!redirected) {
-      // Update Player Box Score headers with actual team names
-      if (homeTeam) {
+      // Update Player Box Score headers with display names
+      if (homeDisplay) {
         const homePlayersHeader = document.getElementById('home-players-header');
-        if (homePlayersHeader) homePlayersHeader.textContent = homeTeam;
+        if (homePlayersHeader) homePlayersHeader.textContent = homeDisplay;
       }
-      if (awayTeam) {
+      if (awayDisplay) {
         const awayPlayersHeader = document.getElementById('away-players-header');
-        if (awayPlayersHeader) awayPlayersHeader.textContent = awayTeam;
+        if (awayPlayersHeader) awayPlayersHeader.textContent = awayDisplay;
       }
 
       if (homeTeam && awayTeam) {

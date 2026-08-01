@@ -1368,9 +1368,11 @@ export function createGameScene(Phaser) {
       const homeId = homeTeamId || homeTeamObj?.team_id || simData.home_team_id || simData.homeTeam?.team_id;
       const awayId = awayTeamId || awayTeamObj?.team_id || simData.away_team_id || simData.awayTeam?.team_id;
       
-      // ✅ TIMEOUT: Store team names in scene for timeout button manager
+      // Scene chrome labels (display). Identity for nav/sim stays URL home/away + gameStore.
       this.homeTeam = logHome;
       this.awayTeam = logAway;
+      this.homeTeamCore = homeTeamObj?.name || (typeof homeTeam === 'string' ? homeTeam : null);
+      this.awayTeamCore = awayTeamObj?.name || (typeof awayTeam === 'string' ? awayTeam : null);
       
       // Extract team colors (unified structure preferred)
       const homeColors = homeTeamObj?.colors || simData.home_team_colors;
@@ -1454,8 +1456,18 @@ export function createGameScene(Phaser) {
 
       const homeLogoEl = document.getElementById('home-logo');
       const awayLogoEl = document.getElementById('away-logo');
-      if (homeLogoEl) homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
-      if (awayLogoEl) awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+      // Chrome art: prefer display_name / URL *_display over core identity names.
+      let urlHomeDisplay = null;
+      let urlAwayDisplay = null;
+      try {
+        const spLogo = new URLSearchParams(window.location.search);
+        urlHomeDisplay = spLogo.get('home_display');
+        urlAwayDisplay = spLogo.get('away_display');
+      } catch (e) { /* ignore */ }
+      const homeChrome = homeTeamObj?.display_name || urlHomeDisplay || logHome || homeTeam;
+      const awayChrome = awayTeamObj?.display_name || urlAwayDisplay || logAway || awayTeam;
+      if (homeLogoEl) homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeChrome, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+      if (awayLogoEl) awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayChrome, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
 
       const homeScoreEl = document.getElementById('home-score');
       const awayScoreEl = document.getElementById('away-score');

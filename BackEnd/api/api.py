@@ -6339,8 +6339,12 @@ try:
                 player_data = build_player_data(team, pos)
                 if player_data:
                     players.append(player_data)
+            # team_name stays core (identity); display_name is chrome for pre-game title etc.
+            core_name = team.name
+            display = getattr(team, "display_name", None) or core_name
             return {
-                "team_name": team.name,
+                "team_name": core_name,
+                "display_name": display,
                 "team_id": getattr(team, "team_id", None) or getattr(team, "id", None),
                 "players": players,
                 "primary_color": getattr(team, "primary_color", "#000000"),

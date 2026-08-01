@@ -8490,6 +8490,7 @@ def standings(
                 "region_tournaments": 1,
                 "national_tournament": 1,
                 "results": 1,
+                "team_builder": 1,
                 "_id": 1,
             }
         )
@@ -8510,12 +8511,12 @@ def standings(
             {"team_id": 1, "natl_rank": 1},
         ))
         natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_rank_docs if d.get("team_id")}
-        team_name_by_id = {
-            str(t["_id"]): t.get("name", "")
-            for t in db.teams.find({}, {"name": 1})
-        }
-        matchup_map = _build_next_matchup_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
+        # Display names at the edge (Team Builder overlay); standings join keys stay ObjectIds.
+        from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
         team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
+        display_name_by_id = resolve_team_name_map(franchise_doc, team_ids_list)
+        matchup_map = _build_next_matchup_map(franchise_doc, display_name_by_id, natl_rank_by_team_id)
         teams = list(db.teams.find(
             {"_id": {"$in": team_ids_list}},
             {"name": 1, "_id": 1, "region": 1, "conference": 1}
@@ -8534,7 +8535,7 @@ def standings(
             natl_rank = natl_rank_by_team_id.get(team_id_str, 999)
             output.append({
                 "team_id": team_id_str,
-                "name": t.get("name", ""),
+                "name": display_name_by_id.get(team_id_str, t.get("name", "")),
                 "region": t.get("region") or "",
                 "conference": t.get("conference"),
                 "W": wins,

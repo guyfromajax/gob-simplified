@@ -265,12 +265,16 @@ function teamBuilderVisualMatchesName(visual, teamNameOrSlug) {
   if (!(visual.asset_strategy === 'generated' || visual.is_custom)) return false;
   var needle = normalizeTeamNameKey(teamNameOrSlug);
   if (!needle || needle === 'general') return false;
-  var candidates = [visual.name, visual.short_name, visual.abbreviation];
+  // Match display name OR replaced core name — court URL may pass either for chrome.
+  var candidates = [visual.name, visual.short_name, visual.abbreviation, visual.replaced_name];
   for (var i = 0; i < candidates.length; i++) {
     if (candidates[i] && normalizeTeamNameKey(candidates[i]) === needle) return true;
   }
   // Slug form of the custom name (spaces → underscores)
   if (visual.name && nameToTeamSlug(visual.name) === String(teamNameOrSlug).trim().toLowerCase()) {
+    return true;
+  }
+  if (visual.replaced_name && nameToTeamSlug(visual.replaced_name) === String(teamNameOrSlug).trim().toLowerCase()) {
     return true;
   }
   return false;

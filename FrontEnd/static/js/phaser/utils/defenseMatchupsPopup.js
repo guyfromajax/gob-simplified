@@ -224,9 +224,9 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
   popup.innerHTML = `
     <div class="defense-matchups-content" role="dialog" aria-label="Defense Matchups">
       <div class="dm-m-heads">
-        <div class="dm-m-head" style="--head-underline:${awayPrimary}">${awayTeam.team_name || "Away"}</div>
+        <div class="dm-m-head" style="--head-underline:${awayPrimary}">${awayTeam.display_name || awayTeam.team_name || "Away"}</div>
         <div></div>
-        <div class="dm-m-head" style="--head-underline:${homePrimary}">${homeTeam.team_name || "Home"}</div>
+        <div class="dm-m-head" style="--head-underline:${homePrimary}">${homeTeam.display_name || homeTeam.team_name || "Home"}</div>
       </div>
       <div class="dm-rows"></div>
       <div class="dm-m-foot">

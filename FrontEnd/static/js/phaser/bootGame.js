@@ -139,10 +139,22 @@ const queryFranchiseId = urlParams.get('franchise_id');
 const urlMode = urlParams.get('mode');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', queryFranchiseId || null) : (queryFranchiseId || null);
 
+// Ensure Team Builder generated art is available for scoreboard banners (cache → session).
+try {
+  if (franchiseId && typeof getActiveTeamBuilderVisual === 'function') {
+    getActiveTeamBuilderVisual();
+  }
+} catch (e) { /* non-fatal */ }
+
 function attachMatchupTeamIds(payload) {
   if (homeId) payload.home_id = homeId;
   if (awayId) payload.away_id = awayId;
   return payload;
+}
+
+/** Chrome asset/label name for a side — display when present, else core. */
+function courtChromeName(side) {
+  return side === 'away' ? (awayDisplay || awayTeam) : (homeDisplay || homeTeam);
 }
 
 // ✅ PHASE 1.1: Fail loudly if franchise_id is required but missing
@@ -625,14 +637,17 @@ function getPublishedCourtResumeState() {
 async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   console.log('🔍 [SIM QUARTER] showSimQuarterResults called', { quarter, homeTeam, awayTeam });
   
-  // Set scoreboard logos (GameScene doesn't start during Sim Quarter, so set them here)
+  // Set scoreboard logos (GameScene doesn't start during Sim Quarter, so set them here).
+  // Use *_display for chrome so Team Builder generated banners resolve.
   const homeLogoEl = document.getElementById('home-logo');
   const awayLogoEl = document.getElementById('away-logo');
-  if (homeLogoEl && homeTeam) {
-    homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+  const homeChrome = courtChromeName('home');
+  const awayChrome = courtChromeName('away');
+  if (homeLogoEl && homeChrome) {
+    homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeChrome, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   }
-  if (awayLogoEl && awayTeam) {
-    awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+  if (awayLogoEl && awayChrome) {
+    awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayChrome, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   }
   
   // Hide pre-game container
