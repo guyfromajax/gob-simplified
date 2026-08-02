@@ -239,12 +239,6 @@
     var secondaryAction = options.secondaryAction || null;
     var confirmation = options.confirmation || null;
     var confirmationEnabled = !!(confirmation && confirmation.enabled);
-    var getSubtitle =
-      typeof options.getSubtitle === 'function'
-        ? options.getSubtitle
-        : function (team) {
-            return formatConferenceMeta(team);
-          };
 
     var state = {
       teams: Array.isArray(options.teams) ? options.teams.slice() : [],
@@ -579,8 +573,7 @@
         card.setAttribute('aria-disabled', 'true');
       }
 
-      var subtitle = getSubtitle(team) || formatConferenceMeta(team) || '';
-      var geoLine = formatGeographyList(team.conference);
+      // Conference / region / geography live on the group header — cards keep attrs + prestige.
       var statsLine =
         'Attrs ' +
         formatInt(numericField(team, 'total_player_attrs')) +
@@ -612,12 +605,6 @@
         '  <div class="team-card-caption">' +
         '    <div class="team-card-name">' +
         escapeHtml(team.name) +
-        '</div>' +
-        (subtitle
-          ? '<div class="team-card-meta">' + escapeHtml(subtitle) + '</div>'
-          : '') +
-        '    <div class="team-card-geography">' +
-        escapeHtml(geoLine) +
         '</div>' +
         '    <div class="team-card-stats">' +
         escapeHtml(statsLine) +
@@ -683,9 +670,7 @@
           section.innerHTML =
             '<h2 class="team-picker-group-title">' +
             escapeHtml(group.title) +
-            '<span class="team-picker-group-count">' +
-            group.teams.length +
-            '</span></h2>' +
+            '</h2>' +
             '<div class="team-picker-grid"></div>';
           var grid = section.querySelector('.team-picker-grid');
           group.teams.forEach(function (team) {
