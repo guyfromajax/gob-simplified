@@ -254,6 +254,14 @@ middle band falls back to ordinary shot resolution. The two outcome thresholds a
 foul/fallback/block bands, actual blocks, and foul-owned block contacts in both end-of-game and
 week-aggregate shot reports.
 
+## Height distribution — LEAGUE_MEDIAN_HEIGHT_IN vs the live rostered league
+
+| Constant | File | Value | Effect |
+|---|---|---|---|
+| `LEAGUE_MEDIAN_HEIGHT_IN` | constants/__init__.py | `78` | Base for height bands / block height-rating and team-builder band defaults. |
+
+**Caveat (2026-08-01, grow-into-frame):** `78` describes the **adult** height distribution (the §11.2 fitness peaks). Since three of four class years have not finished growing (§16.3 grow-into-frame, §11.3 pool stagger), the **live rostered league sits at ~77.3** (measured on the re-migrated pool: FR 76.0 / SO 77.0 / JR 78.0 / SR 78.5). Any band expressed as an offset from `78` is therefore ~0.7in high relative to the actual population — small and probably invisible, but it is the absolutes-against-an-assumed-distribution pattern in miniature. Documented so it is not rediscovered; not currently worth re-tuning.
+
 ## Dynamic HCO Defense (Pass Interception)
 
 The HCO pass-contest funnel runs on every HCO pass: **Gate 1** geometry (defender in the lane) → **Gate 2** attempt (aggression) → **Gate 3a** passer safety (clean pass?) → **Gate 3b** deflection threshold (`intercept_score > tier_mid` → DEFLECTED, else the pass completes) → **Gate 3c** deflection KIND (a `CH+IQ` vs d`PASS_DEFLECT_KIND_D` roll splits INTERCEPT vs BAT_OOB). HCO uses its own base/tier (below); the composite weights, d6 roll, and the split live in `pass_contest.py` and are **shared with HCT/FCP**. Feature flag: `GOB_DYNAMIC_HCO_DEFENSE` (falsy = off).

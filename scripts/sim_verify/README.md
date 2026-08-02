@@ -24,6 +24,20 @@ franchise (and update this pointer + the invocations below).
 > the shot-system tuning, NOT the attribute recalibration, and will be misattributed. Exact-diff
 > is only meaningful between two anchors on adjacent, draw-preserving codebases.
 
+**Re-cut 2026-08-01** (recal **pass 2** — offseason development fix + height grow-into-frame +
+pool re-migration). New anchor: `reports/perf/refstats_20260801_195528.csv/.json` (same
+franchise `6a28436c98dbd04e902eee09`, seed 20260720, `--mode cpu`, week 7; re-run at settled
+HEAD is byte-identical — pass-2 commits are provably sim-neutral, see below).
+
+> ⚠️ **Do NOT diff `refstats_postrecal_20260729...` against `refstats_20260801...`.**
+> Second non-comparability span. The **team-mod** commits (phase-1 team mod + team-builder
+> fixes) landed between the two anchors and change the sim; a naive diff attributes their drift
+> to pass 2. Pass 2 itself (offseason `develop_*`, generation `draw_height`/`generate_player`,
+> the migration) touches **neither the game-sim path nor its imports** — verified by dependency
+> analysis (zero calls, zero imports into `BackEnd/engine` + `BackEnd/practice_squad`) — so it
+> is sim-neutral; the span's drift is entirely the team-mod work. Same treatment as the
+> 2026-07-20→2026-07-29 span above.
+
 | Script / flag | Capstone toolkit row | Use when | Reads |
 |---|---|---|---|
 | **`--seed` + exact diff** (harness) then `diffstats.py` | Seeded exact-diff | change does NOT alter draw count (pure geometry, dead-code) | two refstats CSVs → per-column diff |
