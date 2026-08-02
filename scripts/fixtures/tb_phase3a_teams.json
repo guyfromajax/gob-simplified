@@ -1,0 +1,898 @@
+[
+  {
+    "name": "Abilene",
+    "abbreviation": "ABI",
+    "mascot": "Scorpions",
+    "primary": "#0f3d2e",
+    "secondary": "#c5a642"
+  },
+  {
+    "name": "Ada",
+    "abbreviation": "ADA",
+    "mascot": "Falcons",
+    "primary": "#264653",
+    "secondary": "#e76f51"
+  },
+  {
+    "name": "Amariabi International",
+    "abbreviation": "AMA",
+    "mascot": "Collective",
+    "primary": "#65308e",
+    "secondary": "#f2d045"
+  },
+  {
+    "name": "Amarillo Tech",
+    "abbreviation": "AMA",
+    "mascot": "Armadillos",
+    "primary": "#6a1f2b",
+    "secondary": "#f3e6d0"
+  },
+  {
+    "name": "Ann Arbor",
+    "abbreviation": "ANN",
+    "mascot": "Coyotes",
+    "primary": "#4066b2",
+    "secondary": "#d4af37"
+  },
+  {
+    "name": "Appalachia",
+    "abbreviation": "APP",
+    "mascot": "Rams",
+    "primary": "#0f3d2e",
+    "secondary": "#c5a642"
+  },
+  {
+    "name": "Archbishop McClellan",
+    "abbreviation": "ARC",
+    "mascot": "Cardinals",
+    "primary": "#ff6f61",
+    "secondary": "#1c1c1e"
+  },
+  {
+    "name": "Austin",
+    "abbreviation": "AUS",
+    "mascot": "Wolves",
+    "primary": "#6d6e71",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "Austin West",
+    "abbreviation": "AUS",
+    "mascot": "Defenders",
+    "primary": "#ff6f61",
+    "secondary": "#1c1c1e"
+  },
+  {
+    "name": "Barton Lutheran",
+    "abbreviation": "BAR",
+    "mascot": "Panthers",
+    "primary": "#ec1d28",
+    "secondary": "#cccccc"
+  },
+  {
+    "name": "Bayou District",
+    "abbreviation": "BAY",
+    "mascot": "Airboats",
+    "primary": "#0b1f3a",
+    "secondary": "#a9c6e8"
+  },
+  {
+    "name": "Bentley-Truman",
+    "abbreviation": "BEN",
+    "mascot": "Sterling Knights",
+    "primary": "#4066b2",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "Berkley",
+    "abbreviation": "BER",
+    "mascot": "Wasps",
+    "primary": "#8d99ae",
+    "secondary": "#2b2d42"
+  },
+  {
+    "name": "Biloxi",
+    "abbreviation": "BIL",
+    "mascot": "Diesel",
+    "primary": "#f4c300",
+    "secondary": "#111111"
+  },
+  {
+    "name": "Boise",
+    "abbreviation": "BOI",
+    "mascot": "Mountaineers",
+    "primary": "#ff6f61",
+    "secondary": "#1c1c1e"
+  },
+  {
+    "name": "Border Academy",
+    "abbreviation": "BOR",
+    "mascot": "Swordsmen",
+    "primary": "#264653",
+    "secondary": "#e76f51"
+  },
+  {
+    "name": "Burroughs",
+    "abbreviation": "BUR",
+    "mascot": "Bears",
+    "primary": "#3d348b",
+    "secondary": "#f7b801"
+  },
+  {
+    "name": "Cagers World",
+    "abbreviation": "CAG",
+    "mascot": "Mustangs",
+    "primary": "#5a3a1b",
+    "secondary": "#c5c5c5"
+  },
+  {
+    "name": "Cardinal Conor",
+    "abbreviation": "CAR",
+    "mascot": "Monarchs",
+    "primary": "#3b3b3b",
+    "secondary": "#c0976a"
+  },
+  {
+    "name": "Casino Row",
+    "abbreviation": "CAS",
+    "mascot": "Blackjacks",
+    "primary": "#111111",
+    "secondary": "#d4af37"
+  },
+  {
+    "name": "Chambless Global",
+    "abbreviation": "CHA",
+    "mascot": "Raiders",
+    "primary": "#65308e",
+    "secondary": "#f2d045"
+  },
+  {
+    "name": "Chapel Hill",
+    "abbreviation": "CHA",
+    "mascot": "Sky",
+    "primary": "#87b5e6",
+    "secondary": "#1e2f5b"
+  },
+  {
+    "name": "Circus Circus",
+    "abbreviation": "CIR",
+    "mascot": "Ringmasters",
+    "primary": "#ff6f61",
+    "secondary": "#1c1c1e"
+  },
+  {
+    "name": "Cleveland-Carlysle",
+    "abbreviation": "CLE",
+    "mascot": "Kings",
+    "primary": "#0f3d2e",
+    "secondary": "#c5a642"
+  },
+  {
+    "name": "Columbus",
+    "abbreviation": "COL",
+    "mascot": "Beavers",
+    "primary": "#264653",
+    "secondary": "#e76f51"
+  },
+  {
+    "name": "Concord",
+    "abbreviation": "CON",
+    "mascot": "Rams",
+    "primary": "#ec1d28",
+    "secondary": "#cccccc"
+  },
+  {
+    "name": "Couer d'Alene",
+    "abbreviation": "COU",
+    "mascot": "Grizzlies",
+    "primary": "#f4c300",
+    "secondary": "#111111"
+  },
+  {
+    "name": "Crickstown",
+    "abbreviation": "CRI",
+    "mascot": "Caribou",
+    "primary": "#6a1f2b",
+    "secondary": "#f3e6d0"
+  },
+  {
+    "name": "Crimson County",
+    "abbreviation": "CRI",
+    "mascot": "Gamblers",
+    "primary": "#1c2a44",
+    "secondary": "#c8a951"
+  },
+  {
+    "name": "Crofton",
+    "abbreviation": "CRO",
+    "mascot": "Cardinals",
+    "primary": "#6d6e71",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "Cupertino",
+    "abbreviation": "CUP",
+    "mascot": "Diamondbacks",
+    "primary": "#0b1f3a",
+    "secondary": "#a9c6e8"
+  },
+  {
+    "name": "D1 Institute",
+    "abbreviation": "D1I",
+    "mascot": "Orioles",
+    "primary": "#008b8f",
+    "secondary": "#2a2a2a"
+  },
+  {
+    "name": "Dade Academy",
+    "abbreviation": "DAD",
+    "mascot": "Captains",
+    "primary": "#6d6e71",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "DeCatur Dei",
+    "abbreviation": "DEC",
+    "mascot": "Pelicans",
+    "primary": "#1f4fb2",
+    "secondary": "#f2f2f2"
+  },
+  {
+    "name": "DeLand",
+    "abbreviation": "DEL",
+    "mascot": "Lions",
+    "primary": "#2e3a46",
+    "secondary": "#4fd1c5"
+  },
+  {
+    "name": "Desert Regional",
+    "abbreviation": "DES",
+    "mascot": "Mesas",
+    "primary": "#f4c300",
+    "secondary": "#111111"
+  },
+  {
+    "name": "Dillinger",
+    "abbreviation": "DIL",
+    "mascot": "Wolves",
+    "primary": "#0b1f3a",
+    "secondary": "#a9c6e8"
+  },
+  {
+    "name": "Durham",
+    "abbreviation": "DUR",
+    "mascot": "Generals",
+    "primary": "#1c2a44",
+    "secondary": "#c8a951"
+  },
+  {
+    "name": "East Rockies",
+    "abbreviation": "EAS",
+    "mascot": "Mountain Lions",
+    "primary": "#2a2168",
+    "secondary": "#f2d045"
+  },
+  {
+    "name": "Empire City",
+    "abbreviation": "EMP",
+    "mascot": "Hawks",
+    "primary": "#7c2b24",
+    "secondary": "#f1c40f"
+  },
+  {
+    "name": "Evanston",
+    "abbreviation": "EVA",
+    "mascot": "Wildcats",
+    "primary": "#6d6e71",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "Falls Academy",
+    "abbreviation": "FAL",
+    "mascot": "Sailors",
+    "primary": "#8d99ae",
+    "secondary": "#2b2d42"
+  },
+  {
+    "name": "Fielding",
+    "abbreviation": "FIE",
+    "mascot": "Force",
+    "primary": "#006847",
+    "secondary": "#c0c0c0"
+  },
+  {
+    "name": "Four Corners",
+    "abbreviation": "FOU",
+    "mascot": "Harvest",
+    "primary": "#c0976a",
+    "secondary": "#00954b"
+  },
+  {
+    "name": "GP Prep School",
+    "abbreviation": "GPP",
+    "mascot": "Elites",
+    "primary": "#2e3a46",
+    "secondary": "#4fd1c5"
+  },
+  {
+    "name": "Gainesville",
+    "abbreviation": "GAI",
+    "mascot": "Swamp Creatures",
+    "primary": "#8d99ae",
+    "secondary": "#2b2d42"
+  },
+  {
+    "name": "Garden Elites",
+    "abbreviation": "GAR",
+    "mascot": "Legion",
+    "primary": "#0b1f3a",
+    "secondary": "#a9c6e8"
+  },
+  {
+    "name": "Grayson Ranch",
+    "abbreviation": "GRA",
+    "mascot": "Warriors",
+    "primary": "#2a2168",
+    "secondary": "#f2d045"
+  },
+  {
+    "name": "Grizzly Academy",
+    "abbreviation": "GRI",
+    "mascot": "Patriots",
+    "primary": "#2e3a46",
+    "secondary": "#4fd1c5"
+  },
+  {
+    "name": "Grupenberg",
+    "abbreviation": "GRU",
+    "mascot": "Generals",
+    "primary": "#4066b2",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "HA Rushmore",
+    "abbreviation": "HAR",
+    "mascot": "Saloon",
+    "primary": "#2a2168",
+    "secondary": "#f2d045"
+  },
+  {
+    "name": "Hana Road",
+    "abbreviation": "HAN",
+    "mascot": "Waterfalls",
+    "primary": "#9b1b30",
+    "secondary": "#f2f2f2"
+  },
+  {
+    "name": "Harding Central",
+    "abbreviation": "HAR",
+    "mascot": "Spartans",
+    "primary": "#111111",
+    "secondary": "#d4af37"
+  },
+  {
+    "name": "Hardwood Fields",
+    "abbreviation": "HAR",
+    "mascot": "Rams",
+    "primary": "#b11226",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "Hollywood Prep",
+    "abbreviation": "HOL",
+    "mascot": "Cavalry",
+    "primary": "#6d6e71",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "Houston Jesuit",
+    "abbreviation": "HOU",
+    "mascot": "Cowboys",
+    "primary": "#7c2b24",
+    "secondary": "#f1c40f"
+  },
+  {
+    "name": "Huntington Canyon",
+    "abbreviation": "HUN",
+    "mascot": "Rangers",
+    "primary": "#3d348b",
+    "secondary": "#f7b801"
+  },
+  {
+    "name": "Hyde Methodist",
+    "abbreviation": "HYD",
+    "mascot": "Raiders",
+    "primary": "#f4c300",
+    "secondary": "#111111"
+  },
+  {
+    "name": "IDA",
+    "abbreviation": "IDA",
+    "mascot": "Academy",
+    "primary": "#f2f2f2",
+    "secondary": "#1f4fb2"
+  },
+  {
+    "name": "Independence",
+    "abbreviation": "IND",
+    "mascot": "Spartans",
+    "primary": "#3b3b3b",
+    "secondary": "#c0976a"
+  },
+  {
+    "name": "Iowa Academy",
+    "abbreviation": "IOW",
+    "mascot": "Capitals",
+    "primary": "#1f4fb2",
+    "secondary": "#f2f2f2"
+  },
+  {
+    "name": "Ivy Prep",
+    "abbreviation": "IVY",
+    "mascot": "Regents",
+    "primary": "#ff6f61",
+    "secondary": "#1c1c1e"
+  },
+  {
+    "name": "Juneau-Nome",
+    "abbreviation": "JUN",
+    "mascot": "Fishermen",
+    "primary": "#2a2168",
+    "secondary": "#f2d045"
+  },
+  {
+    "name": "Kenton",
+    "abbreviation": "KEN",
+    "mascot": "Eagles",
+    "primary": "#3d348b",
+    "secondary": "#f7b801"
+  },
+  {
+    "name": "Keys High",
+    "abbreviation": "KEY",
+    "mascot": "Dolphins",
+    "primary": "#1f4fb2",
+    "secondary": "#f2f2f2"
+  },
+  {
+    "name": "Knoxville",
+    "abbreviation": "KNO",
+    "mascot": "Ninjas",
+    "primary": "#6a1f2b",
+    "secondary": "#f3e6d0"
+  },
+  {
+    "name": "Lancaster",
+    "abbreviation": "LAN",
+    "mascot": "Johnnies",
+    "primary": "#d24a1b",
+    "secondary": "#000000"
+  },
+  {
+    "name": "Lawrence",
+    "abbreviation": "LAW",
+    "mascot": "Eagles",
+    "primary": "#6a1f2b",
+    "secondary": "#f3e6d0"
+  },
+  {
+    "name": "Lewis Catholic",
+    "abbreviation": "LEW",
+    "mascot": "Saints",
+    "primary": "#0f3d2e",
+    "secondary": "#c5a642"
+  },
+  {
+    "name": "Lexington",
+    "abbreviation": "LEX",
+    "mascot": "Thunder",
+    "primary": "#8d99ae",
+    "secondary": "#2b2d42"
+  },
+  {
+    "name": "Little York",
+    "abbreviation": "LIT",
+    "mascot": "Minutemen",
+    "primary": "#65308e",
+    "secondary": "#f6af38"
+  },
+  {
+    "name": "Long Island Methodist",
+    "abbreviation": "LON",
+    "mascot": "Comets",
+    "primary": "#005f73",
+    "secondary": "#e9d8a6"
+  },
+  {
+    "name": "Mahala Alou",
+    "abbreviation": "MAH",
+    "mascot": "Sharks",
+    "primary": "#ec1d28",
+    "secondary": "#cccccc"
+  },
+  {
+    "name": "Melbourne Americas",
+    "abbreviation": "MEL",
+    "mascot": "Breakers",
+    "primary": "#005f73",
+    "secondary": "#e9d8a6"
+  },
+  {
+    "name": "MiddleTEX",
+    "abbreviation": "MID",
+    "mascot": "Bucking Broncos",
+    "primary": "#264653",
+    "secondary": "#e76f51"
+  },
+  {
+    "name": "Minot",
+    "abbreviation": "MIN",
+    "mascot": "Engineers",
+    "primary": "#ec1d28",
+    "secondary": "#cccccc"
+  },
+  {
+    "name": "Mobile",
+    "abbreviation": "MOB",
+    "mascot": "Red Wave",
+    "primary": "#9b1b30",
+    "secondary": "#f2f2f2"
+  },
+  {
+    "name": "Monroe-Hayes",
+    "abbreviation": "MON",
+    "mascot": "Hawks",
+    "primary": "#264653",
+    "secondary": "#e76f51"
+  },
+  {
+    "name": "Montpeiler",
+    "abbreviation": "MON",
+    "mascot": "Maples",
+    "primary": "#264653",
+    "secondary": "#e76f51"
+  },
+  {
+    "name": "Morristown",
+    "abbreviation": "MOR",
+    "mascot": "Pirates",
+    "primary": "#ec1d28",
+    "secondary": "#cccccc"
+  },
+  {
+    "name": "Mt Simmons",
+    "abbreviation": "MTS",
+    "mascot": "Cobras",
+    "primary": "#1c2a44",
+    "secondary": "#c8a951"
+  },
+  {
+    "name": "Mynsk",
+    "abbreviation": "MYN",
+    "mascot": "Cougars",
+    "primary": "#0b1f3a",
+    "secondary": "#a9c6e8"
+  },
+  {
+    "name": "Myrtle Private",
+    "abbreviation": "MYR",
+    "mascot": "Carriers",
+    "primary": "#111111",
+    "secondary": "#d4af37"
+  },
+  {
+    "name": "Nickel Beach",
+    "abbreviation": "NIC",
+    "mascot": "Sea Turtles",
+    "primary": "#008b8f",
+    "secondary": "#2a2a2a"
+  },
+  {
+    "name": "Norman",
+    "abbreviation": "NOR",
+    "mascot": "Tornados",
+    "primary": "#005f73",
+    "secondary": "#e9d8a6"
+  },
+  {
+    "name": "North Columbus",
+    "abbreviation": "NOR",
+    "mascot": "Falcons",
+    "primary": "#008b8f",
+    "secondary": "#2a2a2a"
+  },
+  {
+    "name": "Ocean City",
+    "abbreviation": "OCE",
+    "mascot": "Admirals",
+    "primary": "#00a89d",
+    "secondary": "#2a2168"
+  },
+  {
+    "name": "Ozark Centre",
+    "abbreviation": "OZA",
+    "mascot": "Devils",
+    "primary": "#6d6e71",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "Pacific All-Stars",
+    "abbreviation": "PAC",
+    "mascot": "Squad",
+    "primary": "#ff6f61",
+    "secondary": "#1c1c1e"
+  },
+  {
+    "name": "Pan Handle Limited",
+    "abbreviation": "PAN",
+    "mascot": "Steeds",
+    "primary": "#3b3b3b",
+    "secondary": "#c0976a"
+  },
+  {
+    "name": "Pike's Prep",
+    "abbreviation": "PIK",
+    "mascot": "Climbers",
+    "primary": "#006847",
+    "secondary": "#c0c0c0"
+  },
+  {
+    "name": "Providence",
+    "abbreviation": "PRO",
+    "mascot": "Chill",
+    "primary": "#2a2168",
+    "secondary": "#f2d045"
+  },
+  {
+    "name": "Queen's Guard",
+    "abbreviation": "QUE",
+    "mascot": "Sentinels",
+    "primary": "#111111",
+    "secondary": "#d4af37"
+  },
+  {
+    "name": "Quigley Catholic",
+    "abbreviation": "QUI",
+    "mascot": "Knights",
+    "primary": "#2a2168",
+    "secondary": "#f2d045"
+  },
+  {
+    "name": "Rainier Central",
+    "abbreviation": "RAI",
+    "mascot": "Patrol",
+    "primary": "#9b1b30",
+    "secondary": "#f2f2f2"
+  },
+  {
+    "name": "Rancho Estrada",
+    "abbreviation": "RAN",
+    "mascot": "Miners",
+    "primary": "#006847",
+    "secondary": "#c0c0c0"
+  },
+  {
+    "name": "Reardon-Mayes",
+    "abbreviation": "REA",
+    "mascot": "Golden Eagles",
+    "primary": "#f4c300",
+    "secondary": "#111111"
+  },
+  {
+    "name": "Redwood High",
+    "abbreviation": "RED",
+    "mascot": "Owls",
+    "primary": "#d24a1b",
+    "secondary": "#000000"
+  },
+  {
+    "name": "Reyes-Santiago",
+    "abbreviation": "REY",
+    "mascot": "Cacti",
+    "primary": "#4066b2",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "River's Edge",
+    "abbreviation": "RIV",
+    "mascot": "Catfish",
+    "primary": "#1c2a44",
+    "secondary": "#c8a951"
+  },
+  {
+    "name": "Rodeo Circuit",
+    "abbreviation": "ROD",
+    "mascot": "Clowns",
+    "primary": "#d24a1b",
+    "secondary": "#000000"
+  },
+  {
+    "name": "Sacred Heart",
+    "abbreviation": "SAC",
+    "mascot": "Leopards",
+    "primary": "#2e3a46",
+    "secondary": "#4fd1c5"
+  },
+  {
+    "name": "Salem",
+    "abbreviation": "SAL",
+    "mascot": "Woodchucks",
+    "primary": "#1c2a44",
+    "secondary": "#c8a951"
+  },
+  {
+    "name": "San Jose",
+    "abbreviation": "SAN",
+    "mascot": "Kings",
+    "primary": "#264653",
+    "secondary": "#e76f51"
+  },
+  {
+    "name": "Seattle AAA",
+    "abbreviation": "SEA",
+    "mascot": "Sound",
+    "primary": "#006847",
+    "secondary": "#c0c0c0"
+  },
+  {
+    "name": "South Lancaster",
+    "abbreviation": "SOU",
+    "mascot": "Bulldogs",
+    "primary": "#7c2b24",
+    "secondary": "#e39649"
+  },
+  {
+    "name": "Southwest Miner",
+    "abbreviation": "SOU",
+    "mascot": "Cowboys",
+    "primary": "#1f4fb2",
+    "secondary": "#f2f2f2"
+  },
+  {
+    "name": "St Peters",
+    "abbreviation": "STP",
+    "mascot": "Titans",
+    "primary": "#3d348b",
+    "secondary": "#f7b801"
+  },
+  {
+    "name": "Stormwood",
+    "abbreviation": "STO",
+    "mascot": "Tigers",
+    "primary": "#65308e",
+    "secondary": "#f2d045"
+  },
+  {
+    "name": "Swoosh",
+    "abbreviation": "SWO",
+    "mascot": "Knights",
+    "primary": "#005f73",
+    "secondary": "#e9d8a6"
+  },
+  {
+    "name": "Syracuse",
+    "abbreviation": "SYR",
+    "mascot": "Tigers",
+    "primary": "#2e3a46",
+    "secondary": "#4fd1c5"
+  },
+  {
+    "name": "Tallahassee",
+    "abbreviation": "TAL",
+    "mascot": "Ratsnakes",
+    "primary": "#006847",
+    "secondary": "#c0c0c0"
+  },
+  {
+    "name": "Templeton-Wesley",
+    "abbreviation": "TEM",
+    "mascot": "Fitzgeralds",
+    "primary": "#7c2b24",
+    "secondary": "#f1c40f"
+  },
+  {
+    "name": "Toronto Limited",
+    "abbreviation": "TOR",
+    "mascot": "Lions",
+    "primary": "#3b3b3b",
+    "secondary": "#c0976a"
+  },
+  {
+    "name": "Tower Academy",
+    "abbreviation": "TOW",
+    "mascot": "Royals",
+    "primary": "#1f4fb2",
+    "secondary": "#f2f2f2"
+  },
+  {
+    "name": "Tri-Cities Prep",
+    "abbreviation": "TRI",
+    "mascot": "Sorcerers",
+    "primary": "#7c2b24",
+    "secondary": "#f1c40f"
+  },
+  {
+    "name": "Tucson",
+    "abbreviation": "TUC",
+    "mascot": "Rattlesnakes",
+    "primary": "#d24a1b",
+    "secondary": "#000000"
+  },
+  {
+    "name": "Two Rivers",
+    "abbreviation": "TWO",
+    "mascot": "Pointers",
+    "primary": "#4066b2",
+    "secondary": "#ffffff"
+  },
+  {
+    "name": "Upper Peninsula",
+    "abbreviation": "UPP",
+    "mascot": "Huskies",
+    "primary": "#6a1f2b",
+    "secondary": "#f3e6d0"
+  },
+  {
+    "name": "Upstate",
+    "abbreviation": "UPS",
+    "mascot": "Wolverines",
+    "primary": "#006847",
+    "secondary": "#c0c0c0"
+  },
+  {
+    "name": "Valdosta Valley",
+    "abbreviation": "VAL",
+    "mascot": "Falcons",
+    "primary": "#7c2b24",
+    "secondary": "#f1c40f"
+  },
+  {
+    "name": "Valley High",
+    "abbreviation": "VAL",
+    "mascot": "Orcas",
+    "primary": "#ec1d28",
+    "secondary": "#cccccc"
+  },
+  {
+    "name": "Vancouver",
+    "abbreviation": "VAN",
+    "mascot": "Bears",
+    "primary": "#d24a1b",
+    "secondary": "#000000"
+  },
+  {
+    "name": "Wacker West",
+    "abbreviation": "WAC",
+    "mascot": "Hitmen",
+    "primary": "#9b1b30",
+    "secondary": "#f2f2f2"
+  },
+  {
+    "name": "Wash U Prep",
+    "abbreviation": "WAS",
+    "mascot": "Knights",
+    "primary": "#2a2168",
+    "secondary": "#f2d045"
+  },
+  {
+    "name": "Washington Carver",
+    "abbreviation": "WAS",
+    "mascot": "Cougars",
+    "primary": "#7c2b24",
+    "secondary": "#f1c40f"
+  },
+  {
+    "name": "West Ocean City",
+    "abbreviation": "WES",
+    "mascot": "Mariners",
+    "primary": "#ff6f61",
+    "secondary": "#1c1c1e"
+  },
+  {
+    "name": "Xavien",
+    "abbreviation": "XAV",
+    "mascot": "Elm Trees",
+    "primary": "#016837",
+    "secondary": "#999999"
+  }
+]

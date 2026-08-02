@@ -3,7 +3,7 @@
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
 **Spec version:** 2.0 — draft for alignment
-**Status:** Phase 0 **closed** (6/6). Phase 1 — 20/20 plus a live play-through; **reopened on §4.5b** (inherited fields discarded at Apply), criteria 21–24 outstanding. Phase 2 in progress, unaffected. Phase 3 not started.
+**Status:** Phases 0, 1 and 2 **closed**. Phase 1 ran to 25 criteria including §4.5b and the ordering defect, confirmed by a live play-through on the fixed build. Phase 3 next — 3a and 3b need design sign-off before build.
 **Last updated:** 1 August 2026
 
 ---
@@ -442,19 +442,30 @@ This applies to the banner generator, the court generator, and upload re-encodin
 
 **The reference is the `general` fallback**, which is a cropped mascot illustration zoomed so the subject bleeds off both edges. It reads as designed because **scale and crop create interest without detail** — a lesson a generated banner can borrow without any illustration.
 
-**Direction:**
+**Approved 2 August 2026 — "Chevron."** Selected from three rendered directions (Chevron, Band, Blade), reviewed at 1× and 2× across `IDA`, `Hanson` and `South Lancaster`, and across four palettes including a deliberately unflattering one. **This is a locked design, not direction.**
 
-- **Oversized ghost initials.** 3–4× current size, bleeding off the left and bottom edges, ~12% opacity in the secondary colour. Depth from typography alone.
-- **The full school name, centred, as the subject.** Bebas at real size. Initials read as placeholder; a wordmark reads as design.
-- **Mascot name beneath**, small caps, wide letter-spacing, ~60% opacity.
-- **An angled colour split** replacing the linear gradient — diagonal from primary to a darkened primary, with the secondary as a chevron edge.
-- **Accent bar tied to the diagonal**, not sitting flat.
+#### Composition, back to front
 
-Output must match the §2 card convention (400 × 141) and the primary aspect ratio (2.83:1).
+1. **Background** — flat primary across the full card.
+2. **Angled split** — a darkened primary (**primary at −16% lightness**) filling the region right of a diagonal running from roughly 38% width at the bottom edge to 75% width at the top edge. Replaces the v1 linear gradient entirely.
+3. **Chevron edge** — two parallel strips in the secondary colour tracking that diagonal: a solid one at ~90% opacity, and a thinner outrider at ~35%. This is the accent, and **it follows the diagonal rather than sitting flat** — no horizontal accent bar survives from v1.
+4. **Ghost initials** — the **three-letter abbreviation**, Bebas, at roughly 3.5× the v1 initials, anchored past the left edge and below the baseline so it bleeds off both. Secondary colour at **12% opacity**. Depth from typography alone; no illustration required. **Decorative — exempt from the 4.5:1 contrast floor.**
+5. **Wordmark** — the **full school name**, uppercase Bebas, horizontally centred, sitting above the vertical midline. The subject of the composition. Solid ink; must clear the contrast floor on its surface.
+6. **Mascot name** — beneath the wordmark, Oswald light, uppercase, wide letter-spacing. Target opacity **60%**, raised per program when needed so the **composited** colour clears 4.5:1 against its surface. Not exempt.
 
-**Also fix:** `general_banner_primary.jpg` is 600 × 300 while every team banner is 1,920 × 679. The fallback is the wrong shape and will letterbox or crop wherever it appears.
+#### Rules the composition depends on
 
-> This section is direction, not a final design. Expect one or two rounds before build.
+- **The wordmark shrinks to fit.** Starting size steps down until the name fits its box, floor around 40% of the starting size. This is what lets `IDA` and `South Lancaster` occupy the same frame. Long names render smaller — accepted.
+- **Text colour is derived by contrast, not by a luminance threshold.** For each surface (flat primary and the −16% darkened primary), compute the WCAG contrast ratio of **both** dark (`#000000`) and light (`#ffffff`) ink against that surface and **take the higher**. Never threshold on luminance. Apply per surface — the two backgrounds may select different ink. Near-black substitutes undercut the 4.58 tie floor and are not used.
+
+> **Corrected 2 August 2026.** The first build thresholded at luminance 0.42 and put 27 of 129 programs under 4.5:1 — worst case 2.73:1 on `#ff6f61`, where black would have given 7.6:1. The threshold was selecting the *worse* ink for every mid-luminance colour. The true crossover is `(L + 0.05)² = 0.0525`, i.e. L ≈ 0.179 — but the implementation uses best-of-two rather than moving the constant, so the guarantee holds by construction.
+>
+> **Best-of-two is provably safe.** The worst possible background is one where both inks tie, and that tie occurs at **4.58:1** — above the 4.5 floor. Choosing by contrast makes the requirement unfailable for any colour, rather than something to be tuned per palette.
+
+- **Contrast is measured on composited pixels, not on ink values.** Opaque wordmark ink is checked directly. The mascot line is checked as the colour that reaches the screen after its opacity is applied over its background; opacity starts at 60% and is raised until that composited contrast clears 4.5:1. **Ghost initials at 12% are decorative and exempt** — stated here so they are not left unmeasured by accident.
+- **The abbreviation is the ghost, and it is a reliable input** — Team Builder validates it for uniqueness and length, so it is always exactly three characters. The wordmark and the ghost are therefore always different strings.
+
+Output must match the §2 card convention (400 × 141) and the primary aspect ratio (2.83:1 at 1,920 × 679) — the same composition scaled, not re-laid-out. `general_banner_primary.jpg` is corrected to that shape.
 
 ### 6.3 — 3b. Court generator
 
@@ -474,7 +485,9 @@ Parametric renderer, canvas, output exactly **3,333 × 2,083**.
 - Output dimensions are non-negotiable.
 - Defaults derive from the program's primary and secondary colours, so a user who changes nothing still gets a coherent court.
 
-**Open:** the original court source (PSD/SVG/layer file) is not in the repo. If it can be found, the generator should reproduce that geometry exactly. If not, geometry must be derived by measuring an existing court — Morristown is the agreed proxy.
+**Resolved 2 August 2026: the original court source does not exist.** No PSD, AI, SVG or FIG anywhere in-tree or under the home directory. **Geometry is derived by measuring an existing court, with Morristown as the agreed proxy.** `extract_court_template_masks.mjs` and `build_neutral_court_master.mjs` already do measurement work keyed off Bentley-Truman and Morristown — start from those rather than measuring afresh.
+
+Because geometry is measured rather than authored, **the acceptance bar is pixel agreement with the source court**, not visual similarity. §2 records that the animation system depends on exact marking placement; a court that looks right and is two pixels off is a failure.
 
 ### 6.4 — 3c. User uploads
 
@@ -541,8 +554,8 @@ This requires publishing a **filtered subset** of the baking manifest into the g
 | # | Item | Owner |
 |---|---|---|
 | 1 | ~~Count of players below 60 and total league-wide top-up (§4.3)~~ — **closed 1 Aug 2026, rule ships as written** | Grok, before Phase 1 |
-| 2 | Original court source file — findable outside the repo? (§6.3) | Jamie |
-| 3 | Banner design direction — one or two review rounds (§6.2) | Jamie + Claude |
+| 2 | ~~Original court source file (§6.3)~~ — **closed 2 Aug: does not exist.** No PSD / AI / SVG / FIG in-tree or under the home directory. 3b proceeds from measured Morristown geometry. | Jamie |
+| 3 | ~~Banner design direction (§6.2)~~ — **closed 2 Aug: "Chevron" approved, single round** | Jamie + Claude |
 | 4 | Trademark clearance on "Team Builder" before any marketing surface | Jamie — carried from v1.3 |
 | 5 | ~~Whether Phases 1 and 2 run concurrently or in sequence~~ — **closed: sequential, same agent** | Jamie |
 | 6 | **Franchise `6a6de652…` (South Lancaster) carries ~+1,600 over a clean week-1 init.** Not walk-ons, not recalibration. Affects franchise creation generally, not Team Builder. | Jamie — new, 1 Aug |

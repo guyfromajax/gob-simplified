@@ -131,10 +131,11 @@ Resolver B description (§ the two-resolver seam). The step-0 A-vs-B seam there 
 bootstrap still uses B's PG-first rule.
 
 ## Cross-links
-- [StepState.md](StepState.md) — the offense-walk unification (done); this audit is the **non-shot
+- [StepState.md](Z-Completed/StepState.md) — the offense-walk unification (done); this audit is the **non-shot
   finalization** counterpart that was never unified.
-- [stepState_gaps.md](stepState_gaps.md) — the broader UESS-compliance gaps; this is a new one in the
-  same family (multi-source re-derivation of a game-relevant value).
+- [UESS System §12.3](../05_UESS_System/UESS_System.md#123-stepstate-upstream-ownership-gap) — the broader
+  upstream-ownership gap; this audit is in the same family (multi-source re-derivation of a
+  game-relevant value).
 - bugs.md #1 (HCO entry-step DB-turnover teleport), #5 (DB turnover ball snaps back — fixed).
 
 ## Related shot-frame finding (2026-07-22)

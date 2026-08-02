@@ -426,3 +426,36 @@ Full audit: [`Coord_Consumer_UESS_Audit.md`](../projects/UESS%20Audits/Coord_Con
 **Accepted gaps (second-order, deferred):**
 - **Zone matchup / double-team** — reads `zone_defender_assignments_by_step`, built from animator coords (animator.py:1912). Rebuilding from render coords risks the function's home/away orientation handling. Impact is second-order: zone contest ~95% stable + coarse zones → primary defender rarely flips; residual is double-team/attribution. Revisit if a zone-FG% anomaly appears.
 - **OREB putback defender / over-the-back foul / zone `defense_score`** — attribution / margin-only effects. Deferred with the above.
+
+### 12.3 StepState upstream-ownership gap
+
+**Open, medium priority.** HCO's shipped StepState work unified the resolution
+walk and defender-grid authority, but StepState is not yet the upstream owner of
+all game-relevant per-step facts. The emitter/animator still calculates some
+pass meet-points, step durations, clock progression, advance gates, and
+interrupt positions. The resolution engine can separately estimate or consume
+the same facts, leaving more than one derivation capable of drifting.
+
+The remediation target is:
+
+1. Calculate each game-relevant per-step value once in the resolution engine.
+2. Freeze it into StepState before projection.
+3. Make emitters project those frozen values without recalculating them.
+4. Keep only outcome-inert styling—such as tween interpolation or cosmetic SFX
+   selection—outside StepState.
+
+Start with pass meet-points and `_estimate_step_game_seconds()`, then inventory
+advance-gate and interrupt-position derivations. Preserve RNG topology and use
+schema exact-diff/parity tests so this remains a behavior-preserving ownership
+change.
+
+This is the actionable residue from the completed HCO StepState refactor. Two
+related implementation details are not backlog items:
+
+- The pre-emit contest grid and eventual render grid cannot literally be one
+  physical calculation because the contest can truncate the skeleton before
+  emission. They use the same engine-owned placement contract and have measured
+  effectively zero divergence.
+- Batted-OOB contact and exit positions are backend-owned. The frontend's
+  imperative OOB bounce path controls cosmetic trajectory shape only; moving
+  that shape into schema is optional cleanup, not a gameplay-correctness task.

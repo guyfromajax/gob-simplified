@@ -1910,16 +1910,25 @@
     const opts = {
       name: state.identity.name || 'Custom Program',
       abbreviation: state.identity.abbreviation,
+      mascot: state.identity.mascot,
       primary: state.colors.primary,
       secondary: state.colors.secondary,
       jerseyPreset: state.colors.jersey_preset,
     };
-    const mark = document.getElementById('tb-mark-preview');
-    const jersey = document.getElementById('tb-jersey-preview');
-    const court = document.getElementById('tb-court-preview');
-    if (mark) mark.src = TeamGeneratedArt.markDataUrl(opts);
-    if (jersey) jersey.src = TeamGeneratedArt.jerseyPreviewDataUrl(opts);
-    if (court) court.src = TeamGeneratedArt.courtPreviewDataUrl(opts);
+    function paint() {
+      const banner = document.getElementById('tb-banner-preview');
+      const mark = document.getElementById('tb-mark-preview');
+      const jersey = document.getElementById('tb-jersey-preview');
+      const court = document.getElementById('tb-court-preview');
+      if (banner) banner.src = TeamGeneratedArt.bannerCardDataUrl(opts);
+      if (mark) mark.src = TeamGeneratedArt.markDataUrl(opts);
+      if (jersey) jersey.src = TeamGeneratedArt.jerseyPreviewDataUrl(opts);
+      if (court) court.src = TeamGeneratedArt.courtPreviewDataUrl(opts);
+    }
+    paint();
+    if (typeof TeamGeneratedArt.ensureBannerFonts === 'function') {
+      TeamGeneratedArt.ensureBannerFonts().then(paint);
+    }
     updateIdentityPreview();
   }
 

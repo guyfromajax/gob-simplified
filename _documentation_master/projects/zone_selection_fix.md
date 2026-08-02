@@ -127,5 +127,5 @@ per-step → a real per-step cost — avoid). Prefer (a).
 
 ## Cross-links
 - [hco_roles_audit.md](hco_roles_audit.md) — parent; finalization done, this is the residual root cause.
-- [StepState.md](StepState.md) / [project_emitter_as_god] — the defender-grid / emitter-as-god law this fix should follow.
+- [StepState.md](Z-Completed/StepState.md) / [UESS System §12.3](../05_UESS_System/UESS_System.md#123-stepstate-upstream-ownership-gap) — the defender-grid / emitter-as-god law this fix should follow.
 - [Sim_Perf_Capstone.md](Sim_Perf_Capstone.md) — the perf contract this must not disrupt + the verification toolkit.

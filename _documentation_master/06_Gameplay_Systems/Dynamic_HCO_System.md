@@ -13,8 +13,9 @@ motion's machinery**; only the deltas in **§ Set plays** are new. This file is 
 > resolve inside **one per-step walk** — `_resolve_hco_offense_shot_dynamic(…, is_setplay=)`. The moment
 > is **fused** into that walk (was a separate `_resolve_hco_moment_walk` pass); the interception contest
 > judges against the **rendered** defender grid (resolve-once → freeze → draw). See **§ StepState: one
-> walk, one grid** and the refactor history in [projects/StepState.md](../projects/StepState.md)
-> (historical) + remaining UESS gaps in [projects/stepState_gaps.md](../projects/stepState_gaps.md).
+> walk, one grid** and the archived refactor history in
+> [projects/Z-Completed/StepState.md](../projects/Z-Completed/StepState.md). Remaining upstream
+> StepState ownership work is tracked in [UESS System §12.3](../05_UESS_System/UESS_System.md#123-stepstate-upstream-ownership-gap).
 > Archived build briefs: [Dynamic_HCO_Motion_Brief.md](../projects/Z-Completed/Dynamic_HCO_Motion_Brief.md),
 > [Dynamic_HCO_SP_Brief.md](../projects/Z-Completed/Dynamic_HCO_SP_Brief.md).
 
@@ -363,10 +364,12 @@ only draws. The unification pulled the HCO turn toward this. Fully-met pieces:
   step-based trajectory was removed (it double-fired with the imperative send — "ball → OOB then bounced
   off the defender").
 
-**Remaining full-UESS gaps** (twice-drawn grid — agree to ~0%; imperative bat-OOB shape; emitter/animator
-still re-derive meet-points + timing) are catalogued in
-[projects/stepState_gaps.md](../projects/stepState_gaps.md). The blow-by-blow refactor history is in
-[projects/StepState.md](../projects/StepState.md) (now a historical record).
+**Remaining actionable UESS work:** StepState is not yet the upstream owner of every game-relevant
+per-step value; emitters still derive some meet-points, timing, advance gates, and interrupts. The
+canonical scope is [UESS System §12.3](../05_UESS_System/UESS_System.md#123-stepstate-upstream-ownership-gap).
+The two-grid ordering constraint and imperative cosmetic bat-OOB shape above are documented behavior,
+not active correctness gaps. The blow-by-blow refactor history is archived in
+[projects/Z-Completed/StepState.md](../projects/Z-Completed/StepState.md).
 
 ---
 
@@ -478,7 +481,7 @@ MONGO_URI="" MONGO_DB_NAME="gob-test" python3 dynamic_setplay_prototype.py
 - [projects/Z-Completed/Dynamic_HCO_Motion_Brief.md](../projects/Z-Completed/Dynamic_HCO_Motion_Brief.md) — archived motion build brief
 - [projects/Z-Completed/Dynamic_HCO_SP_Brief.md](../projects/Z-Completed/Dynamic_HCO_SP_Brief.md) — archived set-play build brief
 - [ENV_VARIABLES.md](../ENV_VARIABLES.md) — `GOB_DYNAMIC_HCO_DEFENSE` (motion/set-play flags retired)
-- [projects/StepState.md](../projects/StepState.md) (historical refactor record) · [projects/stepState_gaps.md](../projects/stepState_gaps.md) (remaining UESS gaps)
+- [projects/Z-Completed/StepState.md](../projects/Z-Completed/StepState.md) (historical refactor record) · [UESS System §12.3](../05_UESS_System/UESS_System.md#123-stepstate-upstream-ownership-gap) (remaining upstream-ownership work)
 - [Shot_Micro_Movements_System.md](Shot_Micro_Movements_System.md) — shot-time micros (pump fake, dunk, etc.) — separate from mid-HCO subtle movement
 - [HCO_Turn_Resolution_System.md](HCO_Turn_Resolution_System.md) · [Motion_Offense_Shot_System.md](Motion_Offense_Shot_System.md) · [HCT_System.md](HCT_System.md) · [FCP_System.md](FCP_System.md) · [Stopper_System.md](Stopper_System.md) · [Steal_System.md](Steal_System.md) · [SFX_System.md](../11_Design_Systems/SFX_System.md)
 

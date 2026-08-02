@@ -234,6 +234,7 @@ function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
   var visual = {
     name: name,
     abbreviation: data.abbreviation,
+    mascot: data.mascot || '',
     primary_color: data.primary_color || data.primary,
     secondary_color: data.secondary_color || data.secondary,
     jersey_preset: jerseyPreset,
@@ -328,6 +329,7 @@ function generatedTeamAssetDataUrl(visual, assetKey) {
   var opts = {
     name: visual.name || 'Custom Program',
     abbreviation: visual.abbreviation,
+    mascot: visual.mascot,
     primary: visual.primary_color || visual.primary || '#27408E',
     secondary: visual.secondary_color || visual.secondary || '#15181f',
     jerseyPreset: jerseyPreset,
@@ -338,12 +340,13 @@ function generatedTeamAssetDataUrl(visual, assetKey) {
   // Wizard Colors preview calls TeamGeneratedArt.courtPreviewDataUrl directly.
   if (typeof window !== 'undefined' && window.TeamGeneratedArt) {
     if (assetKey === 'logo_square' || assetKey === 'mark') return window.TeamGeneratedArt.markDataUrl(opts);
-    if (assetKey === 'banner_card' || assetKey === 'banner_primary' || assetKey === 'background') {
-      return window.TeamGeneratedArt.bannerCardDataUrl(opts);
+    if (assetKey === 'banner_card') return window.TeamGeneratedArt.bannerCardDataUrl(opts);
+    if (assetKey === 'banner_primary' || assetKey === 'background') {
+      return window.TeamGeneratedArt.bannerPrimaryDataUrl(opts);
     }
     if (assetKey === 'jersey') return window.TeamGeneratedArt.jerseyPreviewDataUrl(opts);
   }
-  // Inline fallback so pages that only load common.js never emit a broken custom slug.
+  // Inline fallback when TeamGeneratedArt is not loaded — flat primary, no gradient bar.
   var initials = opts.abbreviation
     ? String(opts.abbreviation).trim().toUpperCase().slice(0, 3)
     : (typeof resolveTeamAbbreviation === 'function'
@@ -362,25 +365,25 @@ function generatedTeamAssetDataUrl(visual, assetKey) {
     ' ' +
     h +
     '">' +
-    '<defs><linearGradient id="tb" x1="0" y1="0" x2="1" y2="1">' +
-    '<stop offset="0%" stop-color="' +
-    opts.primary +
-    '"/><stop offset="100%" stop-color="' +
-    opts.secondary +
-    '"/></linearGradient></defs>' +
     '<rect width="' +
     w +
     '" height="' +
     h +
-    '" fill="url(#tb)"/>' +
+    '" fill="' +
+    opts.primary +
+    '"/>' +
     '<text x="' +
     w / 2 +
     '" y="' +
     (h / 2 + 8) +
-    '" text-anchor="middle" fill="#ffffff" font-family="Bebas Neue, sans-serif" font-size="' +
-    (h > 100 ? 42 : 36) +
+    '" text-anchor="middle" fill="#ffffff" font-family="Bebas Neue Pro, Bebas Neue, sans-serif" font-size="' +
+    (h > 100 ? 42 : 28) +
     '">' +
-    initials +
+    (assetKey === 'logo_square' || assetKey === 'mark'
+      ? initials
+      : String(opts.name || 'Custom Program')
+          .toUpperCase()
+          .replace(/[<>&]/g, '')) +
     '</text></svg>';
   return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
 }

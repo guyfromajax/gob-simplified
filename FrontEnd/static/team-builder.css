@@ -160,6 +160,12 @@ body {
   font-size: 14px;
 }
 .tb-preview-colors { display: grid; gap: 12px; justify-items: center; }
+.tb-banner-preview {
+  width: min(400px, 100%);
+  height: auto;
+  border-radius: 4px;
+  display: block;
+}
 
 .tb-jersey-presets {
   border: none;

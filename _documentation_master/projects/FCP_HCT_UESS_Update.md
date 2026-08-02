@@ -3,7 +3,7 @@
 **Status:** Steps 1-7 implemented; Step 8 first + terminal slices implemented  
 **Scope:** Dynamic Full-Court Press (FCP) and Half-Court Trap (HCT) turns  
 **Primary code paths:** `BackEnd/engine/dynamic_hct.py`, `dynamic_hct_step_emitter.py`, `dynamic_fcp.py`, `dynamic_fcp_step_emitter.py`, `BackEnd/models/turn_manager.py`, `FrontEnd/static/js/phaser/animation/animationPlayback.js`  
-**Related docs:** `projects/FCPHCT_UESS_Audit.md`, `projects/StepState.md`, `05_UESS_System/UESS_System.md`, `06_Gameplay_Systems/HCT_System.md`, `06_Gameplay_Systems/Dynamic_HCO_System.md`
+**Related docs:** `projects/FCPHCT_UESS_Audit.md`, `projects/Z-Completed/StepState.md`, `05_UESS_System/UESS_System.md`, `06_Gameplay_Systems/HCT_System.md`, `06_Gameplay_Systems/Dynamic_HCO_System.md`
 
 ---
 
@@ -526,7 +526,7 @@ Update these docs after implementation:
 - `06_Gameplay_Systems/HCT_System.md`
   - document shared HCT/FCP pressure StepState path
   - document pass interception and batted-OOB schema behavior
-- `projects/StepState.md`
+- `projects/Z-Completed/StepState.md`
   - add note that HCT/FCP pressure turns now follow the same resolve/freeze/project principle
 - any FCP-specific doc that still implies FCP has a separate animation model
 

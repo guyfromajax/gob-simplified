@@ -1,9 +1,9 @@
 # StepState — Dynamic HCO Turn Engine (working doc)
 
 **Status: ✅ COMPLETE / HISTORICAL RECORD (2026-07-13).** The refactor shipped; the **authoritative
-runtime doc is now [Dynamic_HCO_System.md](../06_Gameplay_Systems/Dynamic_HCO_System.md)** (comprehensively
+runtime doc is now [Dynamic_HCO_System.md](../../06_Gameplay_Systems/Dynamic_HCO_System.md)** (comprehensively
 overhauled to the shipped architecture — one walk, fused moment, shared grid, coverage patch, bat-OOB).
-Remaining full-UESS gaps live in [stepState_gaps.md](stepState_gaps.md). This file is kept as the
+Remaining upstream-ownership work lives in [UESS System §12.3](../../05_UESS_System/UESS_System.md#123-stepstate-upstream-ownership-gap). This file is kept as the
 blow-by-blow decision/checkpoint log of *how* it was built — not the reference for *what* runs today.
 
 ---

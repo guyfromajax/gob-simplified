@@ -140,7 +140,7 @@ Three separate signals drive the defense, each from a different source:
 > | stats | STEAL + TO (`is_interception`) | none — offense retains |
 > | transition | standard steal (fast-break chance → else HCO) | **SIP, clocks pinned** (`next_play_type=SIDE_INBOUND`, `bat_oob=True`, no flip) |
 >
-> **UESS status:** INTERCEPT is fully backend-emitted. BAT_OOB is UESS-*compliant on the data* (all game-relevant positions engine-owned; bounce shape is cosmetic) but flown imperatively — a documented residual (see [stepState_gaps.md](stepState_gaps.md) gap #2). **Fixes the random-step bug:** interception no longer routes through `apply_stopper_system_to_skeleton("STEAL")`'s random mid-step — it pins to the actual pass step. HCO/HCT/FCP now all source the OOB exit from the backend. BAT_OOB is NOT a turnover (defender last to touch); same batted-OOB SFX as FCP/HCT, **no secondary announce**.
+> **UESS status:** INTERCEPT is fully backend-emitted. BAT_OOB is UESS-*compliant on the data* (all game-relevant positions engine-owned; bounce shape is cosmetic) but flown imperatively; this is documented behavior, not an active correctness gap. **Fixes the random-step bug:** interception no longer routes through `apply_stopper_system_to_skeleton("STEAL")`'s random mid-step — it pins to the actual pass step. HCO/HCT/FCP now all source the OOB exit from the backend. BAT_OOB is NOT a turnover (defender last to touch); same batted-OOB SFX as FCP/HCT, **no secondary announce**.
 
 **D. `freeze` = failed reactive read (ability).** Not a chosen action — the outcome when a defender is beaten or misreads. Generalizes today's SM freeze to every step type; driven by the defender's `player_read_raw + def_eff` roll.
 

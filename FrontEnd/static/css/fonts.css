@@ -31,3 +31,12 @@
   font-style: normal;
   font-display: swap;
 }
+/* Oswald Light — Team Builder generated banner mascot line (§6.2). Local so
+   canvas generation works offline without the Google Fonts network hop. */
+@font-face {
+  font-family: 'Oswald';
+  src: url('/fonts/Oswald-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
