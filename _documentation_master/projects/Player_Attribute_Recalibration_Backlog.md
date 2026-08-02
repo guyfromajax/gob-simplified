@@ -151,3 +151,13 @@ Junior class-year p50 RT lands **49 vs 54 designed**; senior is on target (60), 
 
 **In-season training is imperceptible on the 1–10 display.** *Trigger: training-report UX (in progress).* **OPEN — being addressed in UX, not gains.**
 At the reference in-season rate it takes **87–180 weeks to move one display unit** (÷10): SC ~87, SH/ID/IQ ~180. A user watching the weekly training report sees nothing move within a season; visible progression is offseason-only (+0.79 display/season on signature attrs). Being addressed via **directional arrows** in the training report rather than by inflating in-season gains (which would break the 70/30 offseason/in-season split and the reference-holds-flat invariant).
+
+---
+
+## Documentation debt (pre-existing — surfaced during this project, not caused by it)
+
+**Distant-sim doc debt.** *Trigger: any work touching tournaments or the practice squad.* **OPEN.**
+`Franchise_Tournament_System.md`, `Practice_Squad_Games_System.md`, `Rank_Prestige_System.md`, `Championship_Announce_Moments.md`, and `Tournament_Execution_System.md` still describe the **removed** distant-sim engine and template training (`_apply_franchise_distant_cpu_training`) as live behaviour. The distant-sunset project replaced both with full turn-by-turn CPU sims + real `execute_training` auto-training, but these docs were never updated. **Stale system docs are what agents (and people) get briefed from — this exact class of staleness produced real errors during the recalibration** (the old position-rating formula was "verified"-stamped and wrong). Fix before building on tournaments / practice squad. The recalibration's own stale docs are already fixed; these are the adjacent debt.
+
+**MO range discrepancy.** *Trigger: any work touching momentum.* **OPEN.**
+`Player_Attribute_System.md` documents player MO as **−10/+10**; the canonical range is **−5/+5** (`MO_MIN = -5` / `MO_MAX = 5` in `BackEnd/constants/momentum.py`, the single source of truth imported by `player.clamp_mo`; team MO is the derived 5× sum = ±25). **The code is authoritative — the doc's −10/+10 is wrong.** Correct the doc the next time momentum work touches it (left unfixed here to keep the recalibration close-out scoped).
