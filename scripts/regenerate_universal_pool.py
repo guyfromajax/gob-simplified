@@ -371,6 +371,9 @@ def report_metrics(players: list[dict]) -> None:
         f"{y} {statistics.median([p['_top1'] for p in players if p['_year']==y]):.0f}"
         for y in CLASS_YEARS) + "   (designed 35/43/54/60)")
     print("class sizes: " + " / ".join(f"{y} {sum(p['_year']==y for p in players)}" for y in CLASS_YEARS))
+    print("height p50 by class year: " + " / ".join(
+        f"{y} {statistics.median([p['_height'] for p in players if p['_year']==y]):.1f}"
+        for y in CLASS_YEARS) + "   (§11.3 stagger: FR below frame → SR at it; was flat ~0.34in)")
     allh = [p["_height"] for p in players]
     print(f"league height mean {statistics.mean(allh):.1f} sd {statistics.pstdev(allh):.2f} (target ~78/3.6)")
     _core = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "IQ", "FT", "ND")
