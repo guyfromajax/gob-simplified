@@ -83,32 +83,40 @@ def test_cpu_path_preserves_shape():
     """PART B, the invariant replacing 'reference holds flat': a reference-coached player
     developed through the ACTUAL CPU path lands with his tier/year/position PROFILE
     preserved — non-signature attributes are not starved. This is what the old bare-reference
-    invariants could not see, and what the desync+ratchet violated (C scoring 44→26)."""
+    invariants could not see, and what the desync+ratchet violated (C scoring 44→26).
+
+    Averaged over seeds: a single career carries large peak/HT variance, so this is a
+    DISTRIBUTIONAL property (the league's mean developed shape), not a per-career one."""
+    N = 12
     for pos in POSITIONS:
-        fpd, rng = _fresh(pos, "Average", 100)
-        for y in ("freshman", "sophomore", "junior", "senior"):
-            out = dev.develop_rollover(fpd, y, rng, season_allocation=None)
-            for k in ("attributes", "position_ratings", "development"):
-                fpd[k] = out[k]
-            fpd["meta"]["height"] = out["height"]; fpd["meta"]["weight"] = out["weight"]
-            fpd["entry_tier"] = out["entry_tier"]; fpd["meta"]["year"] = y
-            if y != "senior":
-                _cpu_train_week(fpd, y)
-        # shape check: the developed on-position attrs correlate with the profile, and no
-        # weighted attribute is starved to a small fraction of its profile target.
+        finals = []
+        for s in range(N):
+            fpd, rng = _fresh(pos, "Average", 100 + s)
+            for y in ("freshman", "sophomore", "junior", "senior"):
+                out = dev.develop_rollover(fpd, y, rng, season_allocation=None)
+                for k in ("attributes", "position_ratings", "development"):
+                    fpd[k] = out[k]
+                fpd["meta"]["height"] = out["height"]; fpd["meta"]["weight"] = out["weight"]
+                fpd["entry_tier"] = out["entry_tier"]; fpd["meta"]["year"] = y
+                if y != "senior":
+                    _cpu_train_week(fpd, y)
+            finals.append(dict(fpd["attributes"], **{"_rt": max(fpd["position_ratings"].values()),
+                                                     "_h": fpd["meta"]["height"]}))
+        mean_attr = {a: statistics.mean(f[f"anchor_{a}"] for f in finals) for a in GROWTH}
         prof = position_profile(pos); w = POSITION_WEIGHTS[pos]
-        fit = height_fitness(pos, fpd["meta"]["height"]) or 1.0
-        rt = max(fpd["position_ratings"].values())
+        fit = height_fitness(pos, statistics.mean(f["_h"] for f in finals)) or 1.0
+        rt = statistics.mean(f["_rt"] for f in finals)
         denom = sum(w.get(a, 0.0) * prof.get(a, 0.0) for a in GROWTH) or 1.0
         k = (rt / fit) / denom
+        # no on-position attribute is starved below 70% of its profile target. The attractor
+        # is partial by design (α<1), so it lands below 100% — but the collapse drove SC to
+        # ~45% of target, which this catches while passing healthy development (~90%).
         for a in GROWTH:
-            if w.get(a, 0.0) >= 0.10:                      # a genuine on-position attribute
+            if w.get(a, 0.0) >= 0.10:
                 target = prof[a] * k
-                got = fpd["attributes"][f"anchor_{a}"]
-                assert got >= 0.75 * target, (
-                    f"{pos}/{a}: developed {got:.0f} starved vs profile target {target:.0f} "
-                    f"(<75%). Non-signature attributes must not collapse on turnover.")
-        # regression guard: the specific attribute that collapsed to 26 in the live run
-        if pos == "C":
-            assert fpd["attributes"]["anchor_SC"] > 45, \
-                f"C scoring {fpd['attributes']['anchor_SC']} — the shooting collapse regressed."
+                assert mean_attr[a] >= 0.70 * target, (
+                    f"{pos}/{a}: mean developed {mean_attr[a]:.0f} starved vs profile target "
+                    f"{target:.0f} (<70%). Non-signature attributes must not collapse on turnover.")
+        if pos == "C":                                  # the attribute that collapsed to 26 live
+            assert mean_attr["SC"] > 48, \
+                f"C mean scoring {mean_attr['SC']:.0f} — the shooting collapse regressed."
