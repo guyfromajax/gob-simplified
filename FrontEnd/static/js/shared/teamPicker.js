@@ -47,12 +47,13 @@
   };
 
   // Rank positions → band (sizes 26/25/26/25/26). Descending value, ties by team_id.
+  // Rank cutoffs (descending): sizes 26/25/26/25/26 across 128 teams.
   var BAND_CUTOFFS = [
-    { maxRank: 26, band: 1, label: '81–100' },
-    { maxRank: 51, band: 2, label: '61–80' },
-    { maxRank: 77, band: 3, label: '41–60' },
-    { maxRank: 102, band: 4, label: '21–40' },
-    { maxRank: 128, band: 5, label: '1–20' },
+    { maxRank: 26, band: 1 },
+    { maxRank: 51, band: 2 },
+    { maxRank: 77, band: 3 },
+    { maxRank: 102, band: 4 },
+    { maxRank: 128, band: 5 },
   ];
 
   function escapeHtml(value) {
@@ -322,15 +323,7 @@
       var bandOptions =
         '<option value="all">All tiers</option>' +
         BAND_CUTOFFS.map(function (b) {
-          return (
-            '<option value="' +
-            b.band +
-            '">Tier ' +
-            b.band +
-            ' · ' +
-            b.label +
-            '</option>'
-          );
+          return '<option value="' + b.band + '">Tier ' + b.band + '</option>';
         }).join('');
       talentSelect.innerHTML = bandOptions;
       prestigeSelect.innerHTML = bandOptions;
