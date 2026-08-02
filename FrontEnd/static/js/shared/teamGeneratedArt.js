@@ -4,7 +4,7 @@
  * Custom programs bypass getTeamAssetPath filesystem paths. Produce:
  *  - SVG mark from initials + primary/secondary
  *  - Chevron banner on canvas (card 400×141, primary 1920×679) — offline-capable
- *  - Simple jersey / court preview data URLs for the Colors step
+ *  - Canvas court preview + blob URL (TeamCourtGenerator) for Colors step / Phaser
  *
  * Third tones are derived from primary + secondary (no stored accent).
  * Jersey presets: 1 = SOLID (body only), 2 = SOLID WITH TRIM (body + trim).
@@ -457,37 +457,62 @@
     return svgToDataUrl(svg);
   }
 
-  /**
-   * Colors-step preview swatch only — not the gameplay court.
-   * Gameplay uses general_court.jpg via getTeamAssetPath until §6.3.
-   */
-  function courtPreviewDataUrl(opts) {
+  function courtOptsFromTeam(opts) {
     opts = opts || {};
-    var primary = opts.primary || '#27408E';
-    var secondary = opts.secondary || '#1a1f2e';
-    var accent = deriveThirdTone(primary, secondary);
-    var svg =
-      '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="140" viewBox="0 0 240 140">' +
-      '<rect width="240" height="140" fill="' +
-      secondary +
-      '"/>' +
-      '<rect x="8" y="8" width="224" height="124" fill="none" stroke="' +
-      primary +
-      '" stroke-width="3"/>' +
-      '<circle cx="120" cy="70" r="22" fill="none" stroke="' +
-      accent +
-      '" stroke-width="2"/>' +
-      '<line x1="120" y1="8" x2="120" y2="132" stroke="' +
-      primary +
-      '" stroke-width="2"/>' +
-      '<rect x="8" y="40" width="36" height="60" fill="none" stroke="' +
-      accent +
-      '" stroke-width="2"/>' +
-      '<rect x="196" y="40" width="36" height="60" fill="none" stroke="' +
-      accent +
-      '" stroke-width="2"/>' +
-      '</svg>';
-    return svgToDataUrl(svg);
+    var primary = opts.primary || opts.primary_color || '#27408E';
+    var secondary = opts.secondary || opts.secondary_color || '#15181f';
+    var court = opts.court || {};
+    var defaults =
+      global.TeamCourtGenerator && global.TeamCourtGenerator.defaultsFromTeamColors
+        ? global.TeamCourtGenerator.defaultsFromTeamColors(primary, secondary)
+        : {
+            hardwoodStyle: 'medium_medium',
+            oobColor: primary,
+            laneColor: primary,
+            centreCourtColor: '#DBB891',
+            halfArcFillColor: secondary,
+          };
+    return {
+      primary: primary,
+      secondary: secondary,
+      hardwoodStyle: court.hardwoodStyle || opts.hardwoodStyle || defaults.hardwoodStyle,
+      oobColor: court.oobColor || opts.oobColor || defaults.oobColor,
+      laneColor: court.laneColor || opts.laneColor || defaults.laneColor,
+      centreCourtColor: court.centreCourtColor || opts.centreCourtColor || defaults.centreCourtColor,
+      halfArcFillColor: court.halfArcFillColor || opts.halfArcFillColor || defaults.halfArcFillColor,
+      lineColor: court.lineColor || opts.lineColor,
+      // Preview: sync strokes only. Phaser path sets useOverlays true via courtObjectUrl.
+      useOverlays: opts.useOverlays === true,
+    };
+  }
+
+  function courtPreviewDataUrl(opts) {
+    if (global.TeamCourtGenerator && global.TeamCourtGenerator.courtPreviewDataUrl) {
+      return global.TeamCourtGenerator.courtPreviewDataUrl(courtOptsFromTeam(opts));
+    }
+    throw new Error('TeamCourtGenerator must be loaded before courtPreviewDataUrl');
+  }
+
+  function courtObjectUrl(opts) {
+    if (global.TeamCourtGenerator && global.TeamCourtGenerator.courtObjectUrl) {
+      var o = courtOptsFromTeam(opts);
+      o.useOverlays = opts && opts.useOverlays === false ? false : true;
+      return global.TeamCourtGenerator.courtObjectUrl(o);
+    }
+    return Promise.reject(new Error('TeamCourtGenerator must be loaded before courtObjectUrl'));
+  }
+
+  function defaultsFromTeamColors(primary, secondary) {
+    if (global.TeamCourtGenerator && global.TeamCourtGenerator.defaultsFromTeamColors) {
+      return global.TeamCourtGenerator.defaultsFromTeamColors(primary, secondary);
+    }
+    return {
+      hardwoodStyle: 'medium_medium',
+      oobColor: primary || '#2a2a2a',
+      laneColor: primary || '#2a2a2a',
+      centreCourtColor: '#DBB891',
+      halfArcFillColor: secondary || '#f2f2f2',
+    };
   }
 
   /**
@@ -561,6 +586,9 @@
     bannerPrimaryDataUrl: bannerPrimaryDataUrl,
     jerseyPreviewDataUrl: jerseyPreviewDataUrl,
     courtPreviewDataUrl: courtPreviewDataUrl,
+    courtObjectUrl: courtObjectUrl,
+    defaultsFromTeamColors: defaultsFromTeamColors,
+    courtOptsFromTeam: courtOptsFromTeam,
     resolveTeamVisual: resolveTeamVisual,
   };
 })(typeof window !== 'undefined' ? window : globalThis);

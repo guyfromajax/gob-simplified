@@ -101,6 +101,13 @@
       primary: '#27408E',
       secondary: '#15181f',
       jersey_preset: 1,
+      court: {
+        hardwoodStyle: 'medium_medium',
+        oobColor: '#1a1a1a',
+        laneColor: '#27408E',
+        centreCourtColor: '#DBB891',
+        halfArcFillColor: '#15181f',
+      },
     },
     roster_mode: 'keep',
     attribute_mode: 'capped',
@@ -1896,11 +1903,41 @@
     }
   }
 
+  function syncCourtDefaultsFromTeamColors() {
+    if (!window.TeamGeneratedArt || typeof TeamGeneratedArt.defaultsFromTeamColors !== 'function') {
+      return;
+    }
+    const d = TeamGeneratedArt.defaultsFromTeamColors(state.colors.primary, state.colors.secondary);
+    state.colors.court = Object.assign({}, state.colors.court, d);
+    const hw = document.getElementById('tb-court-hardwood');
+    const oob = document.getElementById('tb-court-oob');
+    const lane = document.getElementById('tb-court-lane');
+    const centre = document.getElementById('tb-court-centre');
+    const half = document.getElementById('tb-court-halfarc');
+    if (hw) hw.value = state.colors.court.hardwoodStyle;
+    if (oob) oob.value = state.colors.court.oobColor;
+    if (lane) lane.value = state.colors.court.laneColor;
+    if (centre) centre.value = state.colors.court.centreCourtColor;
+    if (half) half.value = state.colors.court.halfArcFillColor;
+  }
+
   function readColors() {
     state.colors.primary = document.getElementById('tb-primary').value;
     state.colors.secondary = document.getElementById('tb-secondary').value;
     const preset = document.querySelector('input[name="jersey"]:checked');
     state.colors.jersey_preset = normalizeJerseyPreset(preset ? preset.value : 1);
+    const hw = document.getElementById('tb-court-hardwood');
+    const oob = document.getElementById('tb-court-oob');
+    const lane = document.getElementById('tb-court-lane');
+    const centre = document.getElementById('tb-court-centre');
+    const half = document.getElementById('tb-court-halfarc');
+    state.colors.court = {
+      hardwoodStyle: hw ? hw.value : state.colors.court.hardwoodStyle,
+      oobColor: oob ? oob.value : state.colors.court.oobColor,
+      laneColor: lane ? lane.value : state.colors.court.laneColor,
+      centreCourtColor: centre ? centre.value : state.colors.court.centreCourtColor,
+      halfArcFillColor: half ? half.value : state.colors.court.halfArcFillColor,
+    };
   }
 
   function refreshColorPreviews() {
@@ -1914,6 +1951,7 @@
       primary: state.colors.primary,
       secondary: state.colors.secondary,
       jerseyPreset: state.colors.jersey_preset,
+      court: state.colors.court,
     };
     function paint() {
       const banner = document.getElementById('tb-banner-preview');
@@ -2110,6 +2148,7 @@
         primary_color: state.colors.primary,
         secondary_color: state.colors.secondary,
         jersey_preset: state.colors.jersey_preset,
+        court: state.colors.court,
         roster_mode: state.roster_mode,
         attribute_mode: state.attribute_mode,
         draft_id: ensureDraftId(),
@@ -2165,6 +2204,7 @@
               primary_color: state.colors.primary,
               secondary_color: state.colors.secondary,
               jersey_preset: state.colors.jersey_preset,
+              court: state.colors.court,
               asset_strategy: 'generated',
               is_custom_team: true,
               team_builder_replaced_name: state.slot.name,
@@ -2383,11 +2423,24 @@
 
     ['tb-primary', 'tb-secondary'].forEach(function (id) {
       const el = document.getElementById(id);
-      if (el) el.addEventListener('input', refreshColorPreviews);
+      if (!el) return;
+      el.addEventListener('input', function () {
+        readColors();
+        // Primary/secondary drive court defaults until the user edits court fields.
+        syncCourtDefaultsFromTeamColors();
+        refreshColorPreviews();
+      });
     });
     document.querySelectorAll('input[name="jersey"]').forEach(function (el) {
       el.addEventListener('change', refreshColorPreviews);
     });
+    ['tb-court-hardwood', 'tb-court-oob', 'tb-court-lane', 'tb-court-centre', 'tb-court-halfarc'].forEach(
+      function (id) {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('input', refreshColorPreviews);
+        if (el && el.tagName === 'SELECT') el.addEventListener('change', refreshColorPreviews);
+      }
+    );
 
     document.querySelectorAll('.tb-mode-card').forEach(function (card) {
       card.addEventListener('click', function () {
@@ -2487,6 +2540,7 @@
     });
     document.getElementById('tb-confirm-apply').addEventListener('click', applyFranchise);
 
+    syncCourtDefaultsFromTeamColors();
     setStep(0);
     updateModePill();
     updateApplyButtonState();

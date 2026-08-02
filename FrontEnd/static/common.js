@@ -238,6 +238,7 @@ function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
     primary_color: data.primary_color || data.primary,
     secondary_color: data.secondary_color || data.secondary,
     jersey_preset: jerseyPreset,
+    court: data.court || null,
     asset_strategy: 'generated',
     is_custom: true,
     replaced_name: data.team_builder_replaced_name || data.replaced_name,
@@ -410,10 +411,10 @@ function filesystemTeamAssetPath(teamNameOrSlug, assetKey) {
  *
  * Asset strategy is **per-key**, not per-team:
  *  - banner / logo / background → generated data URL for the custom program
- *  - court → always filesystem ``general_court.jpg`` for custom programs until
- *    Team Builder §6.3 ships a real court generator (3333×2083 + marking geometry).
- *    Phaser's loader rejects data URIs; the Colors-step SVG is a preview swatch
- *    only and must not become the gameplay surface.
+ *  - court → sync fallback to ``general_court.jpg`` for custom programs.
+ *    Authoritative gameplay court is ``resolveCourtImagePath`` in gameScene.js,
+ *    which async-generates a blob URL via TeamCourtGenerator / TeamGeneratedArt
+ *    (3333×2083 canvas). Phaser's loader rejects data: URIs; use blob: only.
  *
  * Non-overlay franchises / other teams: filesystem path (mandatory no-op).
  *
@@ -424,8 +425,8 @@ function filesystemTeamAssetPath(teamNameOrSlug, assetKey) {
 function getTeamAssetPath(teamNameOrSlug, assetKey, visualOverride) {
   var visual = visualOverride || getActiveTeamBuilderVisual();
   if (teamBuilderVisualMatchesName(visual, teamNameOrSlug)) {
-    // Temporary: §6.3 court generator replaces this — its canvas output can
-    // feed Phaser directly. Until then, never hand a data URI to load.image.
+    // Sync fallback only — Phaser loads custom courts via resolveCourtImagePath
+    // (async blob URL from TeamCourtGenerator). Never return data: here.
     if (assetKey === 'court') {
       return filesystemTeamAssetPath(null, 'court');
     }

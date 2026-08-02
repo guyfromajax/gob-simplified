@@ -3,7 +3,7 @@
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
 **Spec version:** 2.0 — draft for alignment
-**Status:** Phases 0, 1 and 2 **closed**. Phase 3a (banner) **closed** — "Chevron" approved and shipped. 3b (court) unblocked: no source file exists, geometry is measured from Morristown. 3c and 3d not started.
+**Status:** Phases 0, 1 and 2 **closed**. Phase 3a (banner) **closed**. Phase 3b (court) — ported and passing 5 of 6; **criterion 6 pending a live check** that a generated court renders as the playing surface. 3c and 3d not started.
 **Last updated:** 1 August 2026
 
 ---
@@ -51,7 +51,12 @@ Verified in the repo, 1 August 2026. Treat as constraints.
 | **Uniform system** | `teams/teams_uniforms.json` — per team: `base`, `zones`, `variants[]` with `body`, `trim`, `wordmark`. `Recruit_Image_System.md` locks the decision that *"a uniform is a recipe, not an image"* with templated recolor across all 128. **A custom program needs only a manifest entry.** |
 | **Portrait metadata** | Exists in the recruit **baking manifest** (Artifact B): `build.frame` ∈ {Slight, Lean, Normal, Broad, Doughy}, `build.definition`, `portrait.race`, `portrait.skin`, `portrait.hair`. `SCHEMA.md` states the manifest is *"Never loaded into the game."* Phase 3 changes that for a filtered subset. |
 | **Generated banner today** | `FrontEnd/static/js/shared/teamGeneratedArt.js` — 400 × 141 SVG, horizontal gradient primary→secondary, 8px accent bar, initials at 48px pinned to `x=24`, school name at 14px below. |
-| **No court generator exists** | Courts are hand-authored JPEGs. `apply_team_uniforms.py` and `build_teams_uniforms.py` exist for uniforms; there is no court equivalent in the repo. |
+| **A court generator already exists** | `scripts/generate_non_a1_courts.mjs` — **it produced 120 of the 129 courts.** Canvas 3,333 × 2,083; floor `(75,60)`→`(3258,2023)`; OOB bounds `(150,84)`→`(3183,1998)`; horizontal OOB at `y=158` / `y=1924`; centre `(1666,1042)`; lane, FT circle, three-point arc, hash, backboard, rim and overlay coordinates; JPEG quality 92. Flags: `--force`, `--team <slug>`. |
+| **The 8 Conference 1 / A1 teams are excluded from it** | `bentley_truman`, `lancaster`, `four_corners`, `morristown`, `ocean_city`, `little_york`, `xavien`, `south_lancaster`. Their courts are **hand-authored reference art**, not generated. The remaining 120 were rendered from the constants above. |
+| **The 120 generated courts are bit-identical to a fresh render** | Verified 2 August 2026 against `ada`: MAE 0, all 12 features Δ0. The shipped JPEGs have not drifted from the script that produced them. |
+| **The constants are authoritative, not the art** | `_documentation_master/11_Design_Systems/Court_Template_Implementation_Spec.md` documents **gameplay-to-pixel anchors** — the mapping between the sim's coordinate system and the image — plus fixed court geometry, hardwood and colour distributions, logo and wordmark placement boxes, and export requirements. `docs/To Do/courts_brief.md` holds the batch design and distribution rules. |
+
+> **Correction, 2 August 2026.** This table previously asserted *"No court generator exists — courts are hand-authored JPEGs."* That was wrong, and it was labelled verified. It sent §6.3 down a measure-and-reproduce path and cost a full Step 0 cycle aimed at the wrong artefact. `Team_Images_System.md` carries the same staleness, stating dimensions are undefined; both should be corrected.
 
 ---
 
@@ -481,7 +486,13 @@ Output must match the §2 card convention (400 × 141) and the primary aspect ra
 
 ### 6.3 — 3b. Court generator
 
-Parametric renderer, canvas, output exactly **3,333 × 2,083**.
+**The renderer exists.** `generate_non_a1_courts.mjs` is a working parametric court generator producing exactly **3,333 × 2,083**. 3b is a **port and a parameterisation**, not a build:
+
+1. Expose the five colour parameters below as inputs (they are currently distribution-driven).
+2. Port the drawing from Node to **browser canvas** per §6.1 — one code path for web and a downloadable build.
+3. Deliver the result to Phaser as a **blob/object URL**, never a data URI (see the constraint below).
+
+Geometry is copied verbatim from the existing constants. Nothing is re-measured.
 
 **User-exposed parameters:**
 
@@ -497,9 +508,37 @@ Parametric renderer, canvas, output exactly **3,333 × 2,083**.
 - Output dimensions are non-negotiable.
 - Defaults derive from the program's primary and secondary colours, so a user who changes nothing still gets a coherent court.
 
-**Resolved 2 August 2026: the original court source does not exist.** No PSD, AI, SVG or FIG anywhere in-tree or under the home directory. **Geometry is derived by measuring an existing court, with Morristown as the agreed proxy.** `extract_court_template_masks.mjs` and `build_neutral_court_master.mjs` already do measurement work keyed off Bentley-Truman and Morristown — start from those rather than measuring afresh.
+**Resolved 2 August 2026 — and then re-resolved.** No layered source (PSD/AI/SVG/FIG) exists. But a **parametric generator does**: `scripts/generate_non_a1_courts.mjs` rendered 120 of the 129 courts from explicit constants, and `Court_Template_Implementation_Spec.md` documents the gameplay-to-pixel anchors. **Geometry does not need measuring. It needs porting.**
 
-Because geometry is measured rather than authored, **the acceptance bar is pixel agreement with the source court**, not visual similarity. §2 records that the animation system depends on exact marking placement; a court that looks right and is two pixels off is a failure.
+**The acceptance bar is pixel agreement with a generated court** — one of the 120, not one of the 8 references. A port that reproduces the constants exactly will match by construction.
+
+#### 6.3a Step 0 failed against the wrong artefact
+
+**Result, 2 August 2026:** rendering Morristown from the `generate_non_a1_courts.mjs` constants and diffing against `morristown_court.jpg` gives **1 of 12 features** inside the ≤2px bar (the left free-throw line). Means run 5–18px.
+
+| Feature | Expected | Measured | Δ |
+|---|---|---|---|
+| Centre line x | 1666 | 1666 | **0** |
+| Left FT line x | 872 | 873 | 1 |
+| Left lane y1 / y2 | 806 / 1271 | 807 / 1270 | 1 |
+| OOB top y | 158 | 163 | 5 |
+| Right FT line x | 2452 | 2459 | 7 |
+| OOB bottom y | 1924 | 1914 | 10 |
+| Centre circle r | 527 | 507 | 20 |
+| OOB left x | 150 | 177 | 27 |
+| 3pt right control x | 2213 | 2173 | 40 |
+| 3pt left control x | 1112 | 1159 | 47 |
+| OOB right x | 3183 | 3131 | 52 |
+
+**The error is not noise.** Every failing feature moved **inward toward centre** while the centre line is exact — a scale mismatch about the midpoint. Layered on that, **left-side features are consistently more accurate than right-side ones** (left FT Δ1 vs right FT Δ7; left OOB Δ27 vs right OOB Δ52), the signature of geometry authored by measuring one half and mirroring it against a source that is not truly symmetric.
+
+**Resolved: Morristown was the wrong proxy.** It is one of the **eight Conference 1 / A1 reference courts that `generate_non_a1_courts.mjs` deliberately excludes** — hand-authored art, not generated output. Step 0 diffed the constants against one of the nine courts those constants never produced.
+
+The deltas are therefore not drift or measurement error. They are **the gap between hand-drawn reference art and the machine geometry later derived from it**, which is exactly what the inward-scaling and the left-accurate/right-inaccurate asymmetry describe.
+
+**The constants are authoritative and the art is derived** — `Court_Template_Implementation_Spec.md` records gameplay-to-pixel anchors mapping the sim's coordinate system onto the image. Re-run Step 0 against any of the 120 generated courts; it should agree at or near zero, because those courts were rendered from the constants under test.
+
+> **The lesson is the proxy, not the measurement.** Morristown was chosen as the reference while §2 asserted no generator existed. A wrong "established fact" produced a correct measurement of the wrong thing — and the measurement's own error pattern was what exposed it.
 
 ### 6.4 — 3c. User uploads
 

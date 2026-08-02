@@ -615,17 +615,44 @@ function isHcoTurnContext(turn) {
 
 function resolveCourtImagePath(teamNameOrSlug) {
   const fallbackPath = '/images/teams/general/general_court.jpg';
-  const preferredPath = typeof getTeamAssetPath === 'function'
-    ? getTeamAssetPath(teamNameOrSlug, 'court')
-    : fallbackPath;
+  const visual =
+    typeof getActiveTeamBuilderVisual === 'function' ? getActiveTeamBuilderVisual() : null;
+  const isCustomCourt =
+    visual &&
+    typeof teamBuilderVisualMatchesName === 'function' &&
+    teamBuilderVisualMatchesName(visual, teamNameOrSlug);
 
-  // Phaser Loader.image rejects data:/blob: ("Local data URIs are not supported").
-  // Matching the consumer beats validating with new Image(), which accepts those.
-  if (
-    !preferredPath ||
-    preferredPath === fallbackPath ||
-    /^(data|blob):/i.test(String(preferredPath))
-  ) {
+  if (isCustomCourt) {
+    const courtUrlFn =
+      (typeof window !== 'undefined' &&
+        window.TeamGeneratedArt &&
+        typeof window.TeamGeneratedArt.courtObjectUrl === 'function' &&
+        window.TeamGeneratedArt.courtObjectUrl) ||
+      (typeof window !== 'undefined' &&
+        window.TeamCourtGenerator &&
+        typeof window.TeamCourtGenerator.courtObjectUrl === 'function' &&
+        window.TeamCourtGenerator.courtObjectUrl);
+    if (courtUrlFn) {
+      const primary = visual.primary_color || visual.primary || '#27408E';
+      const secondary = visual.secondary_color || visual.secondary || '#15181f';
+      const courtOpts = Object.assign(
+        {
+          primary,
+          secondary,
+          court: visual.court || null,
+        },
+        visual.court || {}
+      );
+      return courtUrlFn(courtOpts).catch(() => fallbackPath);
+    }
+  }
+
+  const preferredPath =
+    typeof getTeamAssetPath === 'function'
+      ? getTeamAssetPath(teamNameOrSlug, 'court')
+      : fallbackPath;
+
+  if (!preferredPath || preferredPath === fallbackPath || /^data:/i.test(String(preferredPath))) {
     return Promise.resolve(fallbackPath);
   }
 
@@ -945,7 +972,27 @@ export function createGameScene(Phaser) {
         this.load.image("ball", "/images/ball.png");
         const { home } = gameStore.getTeams();
         const courtPath = await resolveCourtImagePath(home);
-        this.load.image("court-bg", courtPath);
+        // Phaser Loader historically rejects data: URIs. Blob/object URLs are the
+        // Team Builder path — load via Image + textures.addImage so court-bg is
+        // never silently swapped for general_court.jpg.
+        if (/^blob:/i.test(String(courtPath))) {
+          await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+              try {
+                if (this.textures.exists("court-bg")) this.textures.remove("court-bg");
+                this.textures.addImage("court-bg", img);
+                resolve();
+              } catch (err) {
+                reject(err);
+              }
+            };
+            img.onerror = () => reject(new Error("blob court image failed to decode"));
+            img.src = courtPath;
+          });
+        } else {
+          this.load.image("court-bg", courtPath);
+        }
       }
 
     }

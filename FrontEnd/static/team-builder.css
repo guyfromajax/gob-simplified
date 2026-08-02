@@ -166,6 +166,29 @@ body {
   border-radius: 4px;
   display: block;
 }
+.tb-court-params {
+  margin: 14px 0 0;
+  padding: 12px 0 0;
+  border: none;
+  border-top: 1px solid rgba(255,255,255,0.12);
+  display: grid;
+  gap: 10px;
+}
+.tb-court-params legend {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.04em;
+  padding: 0;
+}
+.tb-court-params select {
+  width: 100%;
+  margin-top: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.18);
+  background: #141922;
+  color: #f7f9ff;
+}
 
 .tb-jersey-presets {
   border: none;

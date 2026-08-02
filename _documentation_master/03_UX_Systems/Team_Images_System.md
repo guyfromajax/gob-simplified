@@ -34,10 +34,12 @@ FrontEnd/static/images/teams/
 |-----------------|--------|--------|
 | banner_primary  | JPG    | Wide/hero banner; used in brackets, scoreboard, team-select buttons. |
 | logo_square     | PNG    | Square logo; transparent background. Used in FCC header, game plan, set-lineup, tournament top bar. |
-| court           | JPG    | Court image for gameplay. **Do not resize or re-encode**—animation system depends on exact dimensions. |
+| court           | JPG    | Court image for gameplay. **Exactly 3,333 × 2,083.** **Do not resize or re-encode**—animation system depends on exact dimensions and marking placement. |
 | background      | PNG    | Headshot container background on roster, player-detail, set-lineup. |
 
-**File specs** (dimensions, DPI, etc.) are not defined here; measure from reference assets or document separately for accuracy.
+**Court dimensions:** every team court (all 129, including `general`) is **3,333 × 2,083**.
+
+**Court generator:** `scripts/generate_non_a1_courts.mjs` produced 120 of 129 courts from fixed geometry constants. The eight Conference 1 / A1 reference courts are excluded and hand-authored: `bentley_truman`, `lancaster`, `four_corners`, `morristown`, `ocean_city`, `little_york`, `xavien`, `south_lancaster`. Team Builder custom programs use the browser canvas port `FrontEnd/static/js/shared/teamCourtGenerator.js` (same geometry); Phaser loads the result as a **blob/object URL**, never a data URI.
 
 ---
 

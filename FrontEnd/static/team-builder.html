@@ -82,7 +82,27 @@
             <label><input type="radio" name="jersey" value="1" checked> Solid</label>
             <label><input type="radio" name="jersey" value="2"> Solid with trim</label>
           </fieldset>
-          <p class="tb-optional-note">Logo is optional — a generated mark from your colors and initials is used by default.</p>
+          <fieldset class="tb-court-params">
+            <legend>Court</legend>
+            <label>Hardwood style
+              <select id="tb-court-hardwood">
+                <option value="medium_medium">Medium / medium</option>
+                <option value="medium_light">Medium / light</option>
+                <option value="medium_dark">Medium / dark</option>
+                <option value="light_light">Light / light</option>
+                <option value="light_medium">Light / medium</option>
+                <option value="light_dark">Light / dark</option>
+                <option value="dark_dark">Dark / dark</option>
+                <option value="dark_medium">Dark / medium</option>
+                <option value="dark_light">Dark / light</option>
+              </select>
+            </label>
+            <label>Out of bounds<input type="color" id="tb-court-oob" value="#1a1a1a"></label>
+            <label>Free-throw lane<input type="color" id="tb-court-lane" value="#27408E"></label>
+            <label>Centre court<input type="color" id="tb-court-centre" value="#DBB891"></label>
+            <label>FT half-arc fill<input type="color" id="tb-court-halfarc" value="#15181f"></label>
+          </fieldset>
+          <p class="tb-optional-note">Logo is optional — a generated mark from your colors and initials is used by default. Court markings are fixed; only colours change.</p>
         </form>
         <aside class="tb-preview tb-preview-colors">
           <img id="tb-banner-preview" class="tb-banner-preview" alt="Generated banner" width="400" height="141">
@@ -239,6 +259,7 @@
   <script src="/js/shared/franchiseLocalStorage.js"></script>
   <script src="/common.js"></script>
   <script src="/js/shared/teamPicker.js"></script>
+  <script src="/js/shared/teamCourtGenerator.js"></script>
   <script src="/js/shared/teamGeneratedArt.js"></script>
   <script src="/team-builder.js"></script>
 </body>
