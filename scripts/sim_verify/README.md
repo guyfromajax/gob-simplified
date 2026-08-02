@@ -25,7 +25,7 @@ franchise (and update this pointer + the invocations below).
 > is only meaningful between two anchors on adjacent, draw-preserving codebases.
 
 **Re-cut 2026-08-01** (recal **pass 2** — offseason development fix + height grow-into-frame +
-pool re-migration). New anchor: `reports/perf/refstats_20260801_195528.csv/.json` (same
+pool re-migration). New anchor: `reports/perf/refstats_20260801_203626.csv/.json` (same
 franchise `6a28436c98dbd04e902eee09`, seed 20260720, `--mode cpu`, week 7; re-run at settled
 HEAD is byte-identical — pass-2 commits are provably sim-neutral, see below).
 
