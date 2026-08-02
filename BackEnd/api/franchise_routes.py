@@ -3669,7 +3669,23 @@ def team_builder_apply(
     franchise_id = manager.franchise_id
 
     if roster_mode in ("import", "generate", "edit"):
-        from BackEnd.utils.team_builder_roster import replace_slot_roster
+        from BackEnd.utils.team_builder_roster import (
+            get_or_create_wizard_walk_ons,
+            replace_slot_roster,
+        )
+
+        wizard_walk_ons = None
+        draft_key = str(body.draft_id or "").strip()
+        if roster_mode in ("edit", "import") and draft_key:
+            try:
+                wizard_walk_ons = get_or_create_wizard_walk_ons(
+                    db,
+                    user_id=str(user.get("user_id") or ""),
+                    replaced_object_id=str(replaced_oid),
+                    draft_id=draft_key,
+                )
+            except ValueError:
+                wizard_walk_ons = None
 
         try:
             replace_slot_roster(
@@ -3683,6 +3699,8 @@ def team_builder_apply(
                 attribute_mode=attribute_mode,
                 team_pool=team_pool,
                 per_player_budgets=body.per_player_budgets,
+                players_collection=db.players,
+                wizard_walk_ons=wizard_walk_ons,
             )
         except ValueError as exc:
             msg = str(exc)

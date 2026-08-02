@@ -604,7 +604,10 @@
   }
 
   function classYearFromPlayer(p) {
+    // /roster returns abbreviations (FR/SO/JR/SR); full names also appear on drafts.
     if (p.class_year) return normalizeClassYear(p.class_year);
+    const fromAbbrev = normalizeClassYear(p.year);
+    if (fromAbbrev) return fromAbbrev;
     const y = String(p.year || '').toLowerCase();
     return YEAR_TO_CLASS[y] || null;
   }

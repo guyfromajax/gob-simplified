@@ -1762,12 +1762,23 @@ try:
                     "conference": 1,
                     "region": 1,
                     "team_id": 1,
+                    # Team Builder / franchise select card stats (§5.2).
+                    "total_player_attrs": 1,
+                    "prestige": 1,
                 },
             )
         )
         rows = []
         for team in teams:
             oid = str(team["_id"]) if team.get("_id") is not None else None
+            try:
+                total_attrs = int(team.get("total_player_attrs") or 0)
+            except (TypeError, ValueError):
+                total_attrs = 0
+            try:
+                prestige = int(team.get("prestige") or 0)
+            except (TypeError, ValueError):
+                prestige = 0
             entry = {
                 "object_id": oid,
                 "name": team.get("name"),
@@ -1777,6 +1788,8 @@ try:
                 "mascot": team.get("mascot"),
                 "conference": team.get("conference"),
                 "region": team.get("region"),
+                "total_player_attrs": total_attrs,
+                "prestige": prestige,
             }
             if franchise_id and oid:
                 try:

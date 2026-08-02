@@ -5,6 +5,7 @@ import csv
 import io
 import random
 import uuid
+from copy import deepcopy
 from typing import Any, Mapping, Sequence
 
 from bson import ObjectId
@@ -17,6 +18,7 @@ from BackEnd.constants.team_builder_budget import (
     TOPUP_FLOOR,
     apply_capped_topup,
     capped_budget_for_inherited,
+    clamp_attr,
     core12_total,
     force_core12_to_budget,
     normalize_attribute_mode,
@@ -32,6 +34,17 @@ from BackEnd.utils.franchise_rank_prestige import core_total_player_attrs
 from BackEnd.utils.player_year import format_player_year_abbrev, normalize_player_year
 from BackEnd.utils.position_ratings import compute_position_ratings
 from BackEnd.utils.player_development import entry_tier_at_year
+
+# Intangibles and non-editor identity — never overwritten from an edit/import row.
+_PRESERVE_ATTR_KEYS = ("CH", "EM", "MO", "NG")
+_META_INHERIT_KEYS = (
+    "archetype",
+    "Home Region",
+    "photo",
+    "scouting_report",
+    "image_id",
+    "portrait",
+)
 
 ROSTER_CSV_HEADERS: tuple[str, ...] = (
     "first_name",
@@ -256,6 +269,229 @@ def _merge_row_core_attrs(row: Mapping[str, Any] | None) -> dict[str, Any]:
     return merged
 
 
+def _row_has_core_attr_edits(row: Mapping[str, Any] | None) -> bool:
+    return bool(_merge_row_core_attrs(row))
+
+
+def _payload_from_fpd_doc(doc: Mapping[str, Any]) -> dict[str, Any]:
+    """FPD → editable player payload (clone source for §4.5b)."""
+    meta = dict(doc.get("meta") or {})
+    payload: dict[str, Any] = {
+        "meta": meta,
+        "attributes": dict(doc.get("attributes") or {}),
+        "position_ratings": dict(doc.get("position_ratings") or {}),
+    }
+    for key in ("entry_tier", "position_intent", "development", "photo", "season", "career"):
+        if doc.get(key) is not None:
+            payload[key] = deepcopy(doc[key]) if key in ("season", "career", "development") else doc[key]
+    # Core sometimes stores photo/archetype at top level; mirror into meta when absent.
+    if doc.get("archetype") and not meta.get("archetype"):
+        meta["archetype"] = doc["archetype"]
+    if doc.get("Home Region") not in (None, "") and not meta.get("Home Region"):
+        meta["Home Region"] = doc["Home Region"]
+    if doc.get("photo") and not payload.get("photo"):
+        payload["photo"] = doc["photo"]
+    return payload
+
+
+def _enrich_payload_from_core(payload: dict[str, Any], core: Mapping[str, Any] | None) -> dict[str, Any]:
+    """Fill fields init drops (archetype, photo, …) from the core player doc."""
+    if not core:
+        return payload
+    meta = payload.setdefault("meta", {})
+    for key in _META_INHERIT_KEYS:
+        if key == "photo":
+            continue
+        if meta.get(key) in (None, "") and core.get(key) not in (None, ""):
+            meta[key] = core[key]
+    if not payload.get("photo") and core.get("photo"):
+        payload["photo"] = core["photo"]
+    if payload.get("entry_tier") is None and core.get("entry_tier") is not None:
+        payload["entry_tier"] = core["entry_tier"]
+    if payload.get("position_intent") is None and core.get("position_intent") is not None:
+        payload["position_intent"] = core["position_intent"]
+    if payload.get("development") is None and core.get("development") is not None:
+        payload["development"] = deepcopy(core["development"])
+    if not payload.get("position_ratings") and core.get("position_ratings"):
+        payload["position_ratings"] = dict(core["position_ratings"])
+    return payload
+
+
+def _payload_from_wizard_walk_on(
+    wo: Mapping[str, Any],
+    *,
+    team_name: str,
+    team_object_id: ObjectId,
+) -> dict[str, Any]:
+    """Wizard draft walk-on → inherited payload (their generated values are inherited)."""
+    attrs = dict(wo.get("attributes") or {})
+    # Ensure anchors for core-12.
+    for key in CORE_12_ATTRS:
+        if key in attrs and f"anchor_{key}" not in attrs:
+            attrs[f"anchor_{key}"] = attrs[key]
+    meta: dict[str, Any] = {
+        "first_name": str(wo.get("first_name") or "").strip() or "Walk",
+        "last_name": str(wo.get("last_name") or "").strip() or "On",
+        "team": team_name,
+        "team_id": str(team_object_id),
+        "height": wo.get("height") if wo.get("height") is not None else LEAGUE_MEDIAN_HEIGHT_IN,
+        "weight": wo.get("weight") if wo.get("weight") is not None else 185,
+        "year": wo.get("year") or "Freshman",
+        "jersey": wo.get("jersey"),
+        "archetype": "Walk On",
+    }
+    if wo.get("Home Region") not in (None,):
+        meta["Home Region"] = wo.get("Home Region")
+    payload: dict[str, Any] = {
+        "meta": meta,
+        "attributes": attrs,
+        "position_ratings": dict(wo.get("position_ratings") or {}),
+        "entry_tier": wo.get("entry_tier") or "Poor",
+        "position_intent": wo.get("position_intent"),
+        "development": wo.get("development"),
+    }
+    if wo.get("photo"):
+        payload["photo"] = wo["photo"]
+    return payload
+
+
+def _lookup_core_player(players_collection: Any, player_id: str) -> dict[str, Any] | None:
+    if players_collection is None or not player_id:
+        return None
+    pid = str(player_id)
+    # Franchise rosters key core players by stable player_id (UUID), not Mongo _id.
+    doc = players_collection.find_one({"player_id": pid})
+    if doc:
+        return doc
+    try:
+        return players_collection.find_one({"_id": ObjectId(pid)})
+    except Exception:
+        return None
+
+
+def apply_row_diff_to_inherited(
+    inherited: Mapping[str, Any],
+    row: Mapping[str, Any] | None,
+    *,
+    team_name: str,
+    team_object_id: ObjectId,
+    attribute_mode: str = "capped",
+    budget: int | None = None,
+    apply_topup: bool = False,
+) -> dict[str, Any]:
+    """
+    §4.5b: clone inherited player, overwrite only fields the editor/CSV sends.
+
+    Blank optional CSV cells mean inherit. CH/EM/MO and non-editor meta are never
+    taken from the row.
+    """
+    out = deepcopy(dict(inherited))
+    meta = dict(out.get("meta") or {})
+    meta["team"] = team_name
+    meta["team_id"] = str(team_object_id)
+    row = row or {}
+    meta_in = row.get("meta") if isinstance(row.get("meta"), Mapping) else {}
+
+    first = str(row.get("first_name") or meta_in.get("first_name") or "").strip()
+    last = str(row.get("last_name") or meta_in.get("last_name") or "").strip()
+    if first:
+        meta["first_name"] = first
+    if last:
+        meta["last_name"] = last
+
+    height = _safe_int(row.get("height_in"), _safe_int(row.get("height"), _safe_int(meta_in.get("height"))))
+    weight = _safe_int(row.get("weight_lb"), _safe_int(row.get("weight"), _safe_int(meta_in.get("weight"))))
+    jersey = _safe_int(row.get("jersey"), _safe_int(meta_in.get("jersey")))
+    height_changed = False
+    if height is not None and height != meta.get("height"):
+        meta["height"] = height
+        height_changed = True
+    elif height is not None:
+        meta["height"] = height
+    if weight is not None:
+        meta["weight"] = weight
+    if jersey is not None:
+        meta["jersey"] = jersey
+
+    # class_year blank → inherit. Same class as inherited → keep exact source string.
+    year_raw = row.get("class_year")
+    if year_raw is None or str(year_raw).strip() == "":
+        year_raw = row.get("year") if row.get("year") not in (None, "") else meta_in.get("year")
+    parsed_year = parse_import_class_year(year_raw) if year_raw not in (None, "") else None
+    if parsed_year:
+        if format_player_year_abbrev(meta.get("year")) != format_player_year_abbrev(parsed_year):
+            meta["year"] = parsed_year
+
+    attrs = dict(out.get("attributes") or {})
+    preserved = {key: attrs[key] for key in _PRESERVE_ATTR_KEYS if key in attrs}
+    for key in list(attrs):
+        if key.startswith("anchor_") and key[7:] in _PRESERVE_ATTR_KEYS:
+            preserved[key] = attrs[key]
+
+    merged_core = _merge_row_core_attrs(row)
+    core_changed = False
+    if merged_core:
+        mode = normalize_attribute_mode(attribute_mode)
+        # If the row restates inherited core-12 exactly, leave attrs untouched
+        # (no clamp/top-up/force reshuffle).
+        restates_inherited = all(
+            _safe_int(merged_core[key]) == _safe_int(attrs.get(key))
+            for key in CORE_12_ATTRS
+            if key in merged_core
+        ) and all(key in merged_core for key in CORE_12_ATTRS)
+        if not restates_inherited:
+            pre_clamp: dict[str, int] = {}
+            for key in CORE_12_ATTRS:
+                if key in merged_core:
+                    pre_clamp[key] = int(_safe_int(merged_core[key], ATTR_MIN) or ATTR_MIN)
+                else:
+                    pre_clamp[key] = int(_safe_int(attrs.get(key), ATTR_MIN) or ATTR_MIN)
+
+            if apply_topup and mode == "capped":
+                topped = apply_capped_topup(pre_clamp)
+                core_vals = {key: int(topped["attrs"][key]) for key in CORE_12_ATTRS}
+            else:
+                core_vals = {key: clamp_attr(pre_clamp[key]) for key in CORE_12_ATTRS}
+
+            if mode == "capped" and budget is not None:
+                core_vals = force_core12_to_budget(core_vals, int(budget))
+
+            for key in CORE_12_ATTRS:
+                new_v = int(core_vals[key])
+                old_v = _safe_int(attrs.get(key))
+                if old_v != new_v:
+                    core_changed = True
+                attrs[key] = new_v
+                attrs[f"anchor_{key}"] = new_v
+            attrs.update(preserved)
+
+    is_walk_on = bool(row.get("walk_on")) or str(
+        meta_in.get("archetype") or row.get("archetype") or meta.get("archetype") or ""
+    ) == "Walk On"
+    if is_walk_on:
+        meta["archetype"] = "Walk On"
+
+    out["meta"] = meta
+    out["attributes"] = attrs
+
+    # Recompute ratings only when editor-visible inputs actually changed.
+    if core_changed or height_changed:
+        name = f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip()
+        out["position_ratings"] = compute_position_ratings(
+            {"attributes": attrs, "height": meta.get("height"), "name": name},
+        )
+
+    # Walk-on wizard may re-send these; blank/absent means keep inherited.
+    if row.get("entry_tier") not in (None, ""):
+        out["entry_tier"] = row.get("entry_tier")
+    if row.get("position_intent") not in (None, ""):
+        out["position_intent"] = row.get("position_intent")
+    if "development" in row and row.get("development") is not None:
+        out["development"] = row.get("development")
+
+    return out
+
+
 def _normalize_import_core_attrs(
     raw: Mapping[str, Any] | None,
     band_defaults: Mapping[str, Any],
@@ -308,34 +544,41 @@ def _build_fpd_doc(
     entry_tier: str | None = None,
     position_intent: str | None = None,
     development: Any = None,
+    position_ratings: Mapping[str, Any] | None = None,
+    photo: Any = None,
+    season: Mapping[str, Any] | None = None,
+    career: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     zero = _zero_stats_block()
     name = f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip()
-    position_ratings = compute_position_ratings(
-        {"attributes": attributes, "height": meta.get("height"), "name": name},
-    )
+    ratings = dict(position_ratings or {})
+    if not ratings:
+        ratings = compute_position_ratings(
+            {"attributes": attributes, "height": meta.get("height"), "name": name},
+        )
     if not position_intent:
-        position_intent = (max(position_ratings, key=position_ratings.get)
-                           if position_ratings else "SF")
+        position_intent = (max(ratings, key=ratings.get) if ratings else "SF")
     if not entry_tier:
         # Derive-and-STORE now (year-aware, from the player's current-year ratings) so a
         # later rollover never re-derives from RT — which misclassifies once pillar-3
         # coaching quality has pushed RT off the ladder. Imported/band rosters carry no
         # tier, so this is the explicit-carry point for them.
-        entry_tier = entry_tier_at_year(position_ratings, meta.get("year") or "FR")
+        entry_tier = entry_tier_at_year(ratings, meta.get("year") or "FR")
     doc = {
         "franchise_id": str(franchise_id),
         "player_id": player_id,
         "meta": meta,
-        "season": zero.copy(),
-        "career": zero.copy(),
+        "season": dict(season) if season is not None else zero.copy(),
+        "career": dict(career) if career is not None else zero.copy(),
         "attributes": attributes,
-        "position_ratings": position_ratings,
+        "position_ratings": ratings,
         "entry_tier": entry_tier,
         "position_intent": position_intent,
     }
     if development is not None:
         doc["development"] = development
+    if photo not in (None, ""):
+        doc["photo"] = photo
     return doc
 
 
@@ -448,7 +691,7 @@ def slot_per_player_budgets(
 def count_importable_players(
     imported_players: Sequence[Mapping[str, Any]] | None,
 ) -> int:
-    """Count rows that would normalize (name + class year), uncapped by roster max."""
+    """Count rows with a name. Class year may be blank (inherit — §4.5b)."""
     if not imported_players:
         return 0
     count = 0
@@ -457,11 +700,6 @@ def count_importable_players(
         first = str(row.get("first_name") or meta_in.get("first_name") or "").strip()
         last = str(row.get("last_name") or meta_in.get("last_name") or "").strip()
         if not first or not last:
-            continue
-        year = parse_import_class_year(
-            row.get("class_year") or meta_in.get("year") or row.get("year")
-        )
-        if not year:
             continue
         count += 1
     return count
@@ -720,25 +958,32 @@ def _budgets_for_authored_roster(
     imported_players: Sequence[Mapping[str, Any]] | None,
     explicit_budgets: Sequence[int] | None,
     generated_players: Sequence[Mapping[str, Any]] | None = None,
+    ordered_fpd: Sequence[Mapping[str, Any]] | None = None,
 ) -> list[int]:
     if attr_mode != "capped":
         return []
     if explicit_budgets is not None and len(explicit_budgets) >= AUTHORED_ROSTER_SIZE:
         return [int(b) for b in explicit_budgets[:AUTHORED_ROSTER_SIZE]]
 
+    # Prefer roster-order FPD (FTD players[]) — Mongo find() order is not stable.
+    bases = list(ordered_fpd) if ordered_fpd is not None else []
+    if len(bases) < SCHOLARSHIP_SIZE:
+        scholarship_fpd = [d for d in source_fpd if not _is_walk_on_doc(d)]
+        if not scholarship_fpd:
+            scholarship_fpd = list(source_fpd[:SCHOLARSHIP_SIZE])
+        bases = list(scholarship_fpd[:SCHOLARSHIP_SIZE])
+
     budgets: list[int] = []
-    scholarship_fpd = [d for d in source_fpd if not _is_walk_on_doc(d)]
-    if not scholarship_fpd:
-        scholarship_fpd = list(source_fpd[:SCHOLARSHIP_SIZE])
     for i in range(SCHOLARSHIP_SIZE):
-        if i < len(scholarship_fpd):
-            raw = core12_total(scholarship_fpd[i].get("attributes") or {})
+        if i < len(bases):
+            raw = core12_total(bases[i].get("attributes") or {})
         else:
             raw = TOPUP_FLOOR
         budgets.append(capped_budget_for_inherited(raw))
 
     walk_rows = list(imported_players or [])[SCHOLARSHIP_SIZE:AUTHORED_ROSTER_SIZE]
     gen_walk = list(generated_players or [])[SCHOLARSHIP_SIZE:AUTHORED_ROSTER_SIZE]
+    ordered_walk = list(ordered_fpd or [])[SCHOLARSHIP_SIZE:AUTHORED_ROSTER_SIZE]
     for i in range(WALK_ON_COUNT):
         row = walk_rows[i] if i < len(walk_rows) else None
         if row is not None and row.get("budget") is not None:
@@ -755,6 +1000,13 @@ def _budgets_for_authored_roster(
         if i < len(gen_walk):
             budgets.append(
                 capped_budget_for_inherited(core12_total(gen_walk[i].get("attributes") or {}))
+            )
+            continue
+        if i < len(ordered_walk):
+            budgets.append(
+                capped_budget_for_inherited(
+                    core12_total(ordered_walk[i].get("attributes") or {})
+                )
             )
             continue
         budgets.append(TOPUP_FLOOR)
@@ -780,9 +1032,135 @@ def build_fpd_docs_from_players(
                 entry_tier=player.get("entry_tier"),
                 position_intent=player.get("position_intent"),
                 development=player.get("development"),
+                position_ratings=player.get("position_ratings"),
+                photo=player.get("photo"),
+                season=player.get("season"),
+                career=player.get("career"),
             )
         )
     return player_ids, docs
+
+
+def _fpd_by_player_id(
+    source_fpd: Sequence[Mapping[str, Any]],
+) -> dict[str, Mapping[str, Any]]:
+    """Index FPD docs by player_id. Query result order is never used as a key."""
+    return {str(d.get("player_id")): d for d in source_fpd if d.get("player_id")}
+
+
+def _ordered_source_fpd(
+    source_fpd: Sequence[Mapping[str, Any]],
+    old_player_ids: Sequence[str],
+) -> list[dict[str, Any]]:
+    """
+    Bind FPD docs to FTD roster slots by player_id identity (§4.5b / Decision #29).
+
+    Never trust find() ordinal order. Never sort the query to "match" — look up
+    each FTD player_id in a map built from the result set.
+    """
+    by_id = _fpd_by_player_id(source_fpd)
+    ordered = [dict(by_id[pid]) for pid in old_player_ids if pid in by_id]
+    if len(ordered) >= AUTHORED_ROSTER_SIZE:
+        return list(ordered[:AUTHORED_ROSTER_SIZE])
+    # Incomplete identity map — fill remaining slots without using find() order
+    # as a positional key (prefer walk-on flag, then leftover ids).
+    seen = {str(d.get("player_id")) for d in ordered}
+    leftovers = [dict(d) for d in source_fpd if str(d.get("player_id")) not in seen]
+    scholarship = [d for d in leftovers if not _is_walk_on_doc(d)]
+    walk = [d for d in leftovers if _is_walk_on_doc(d)]
+    while len(ordered) < SCHOLARSHIP_SIZE and scholarship:
+        ordered.append(scholarship.pop(0))
+    while len(ordered) < AUTHORED_ROSTER_SIZE and walk:
+        ordered.append(walk.pop(0))
+    while len(ordered) < AUTHORED_ROSTER_SIZE and leftovers:
+        cand = leftovers.pop(0)
+        if str(cand.get("player_id")) not in {str(d.get("player_id")) for d in ordered}:
+            ordered.append(cand)
+    return list(ordered[:AUTHORED_ROSTER_SIZE])
+
+
+def _build_inherited_roster_payloads(
+    *,
+    ordered_fpd: Sequence[Mapping[str, Any]],
+    old_player_ids: Sequence[str],
+    team_name: str,
+    team_object_id: ObjectId,
+    players_collection: Any = None,
+    wizard_walk_ons: Sequence[Mapping[str, Any]] | None = None,
+) -> list[dict[str, Any]]:
+    """Clone bases for all 15 slots — core/FPD for 0–11, wizard walk-ons for 12–14."""
+    inherited: list[dict[str, Any]] = []
+    for i in range(SCHOLARSHIP_SIZE):
+        fpd = ordered_fpd[i] if i < len(ordered_fpd) else {}
+        payload = _payload_from_fpd_doc(fpd) if fpd else {"meta": {}, "attributes": {}}
+        core_id = old_player_ids[i] if i < len(old_player_ids) else ""
+        core = _lookup_core_player(players_collection, core_id)
+        inherited.append(_enrich_payload_from_core(payload, core))
+
+    for i in range(WALK_ON_COUNT):
+        if wizard_walk_ons and i < len(wizard_walk_ons):
+            inherited.append(
+                _payload_from_wizard_walk_on(
+                    wizard_walk_ons[i],
+                    team_name=team_name,
+                    team_object_id=team_object_id,
+                )
+            )
+            continue
+        fpd_i = SCHOLARSHIP_SIZE + i
+        fpd = ordered_fpd[fpd_i] if fpd_i < len(ordered_fpd) else {}
+        if fpd:
+            inherited.append(_payload_from_fpd_doc(fpd))
+        else:
+            inherited.append(
+                {
+                    "meta": {
+                        "first_name": "Walk",
+                        "last_name": "On",
+                        "team": team_name,
+                        "team_id": str(team_object_id),
+                        "archetype": "Walk On",
+                        "year": "Freshman",
+                    },
+                    "attributes": {},
+                    "entry_tier": "Poor",
+                }
+            )
+    return inherited
+
+
+def apply_diffs_to_inherited_roster(
+    *,
+    inherited: Sequence[Mapping[str, Any]],
+    imported_players: Sequence[Mapping[str, Any]],
+    team_name: str,
+    team_object_id: ObjectId,
+    attribute_mode: str,
+    apply_topup: bool,
+    budgets: Sequence[int] | None,
+) -> list[dict[str, Any]]:
+    """§4.5b edit/import: diff each row onto its inherited clone."""
+    mode = normalize_attribute_mode(attribute_mode)
+    out: list[dict[str, Any]] = []
+    rows = list(imported_players or [])
+    for i in range(AUTHORED_ROSTER_SIZE):
+        base = inherited[i] if i < len(inherited) else {"meta": {}, "attributes": {}}
+        row = rows[i] if i < len(rows) else {}
+        budget = None
+        if mode == "capped" and budgets is not None and i < len(budgets):
+            budget = int(budgets[i])
+        out.append(
+            apply_row_diff_to_inherited(
+                base,
+                row,
+                team_name=team_name,
+                team_object_id=team_object_id,
+                attribute_mode=mode,
+                budget=budget,
+                apply_topup=apply_topup,
+            )
+        )
+    return out
 
 
 def replace_slot_roster(
@@ -797,6 +1175,8 @@ def replace_slot_roster(
     attribute_mode: str = "capped",
     team_pool: int | None = None,
     per_player_budgets: Sequence[int] | None = None,
+    players_collection: Any = None,
+    wizard_walk_ons: Sequence[Mapping[str, Any]] | None = None,
 ) -> tuple[list[str], list[dict[str, Any]]]:
     """
     Replace the replaced slot's franchise roster after season init.
@@ -804,6 +1184,9 @@ def replace_slot_roster(
     Path 1 keep is handled by the caller (no call / no rewrite). Paths 2–4
     author exactly 15 players (§4.5a): edit/import supply 15; generate builds
     12 band + 3 walk-ons. Init's 15 FPD ids are deleted so orphans do not remain.
+
+    Edit/import (§4.5b): clone each inherited player and overwrite only fields
+    the row sends. Generate still authors full players.
 
     Returns (new_player_ids, fpd_docs).
     """
@@ -813,13 +1196,6 @@ def replace_slot_roster(
     ) or {}
     old_player_ids = [str(pid) for pid in (ftd.get("players") or []) if pid]
 
-    band_defaults = slot_band_defaults(
-        franchise_players_data_collection,
-        franchise_id,
-        team_object_id,
-        old_player_ids,
-    )
-
     source_fpd = list(
         franchise_players_data_collection.find(
             {
@@ -828,6 +1204,7 @@ def replace_slot_roster(
             }
         )
     ) if old_player_ids else []
+    ordered_fpd = _ordered_source_fpd(source_fpd, old_player_ids)
 
     mode = (roster_mode or "keep").strip().lower()
     attr_mode = normalize_attribute_mode(attribute_mode)
@@ -843,15 +1220,24 @@ def replace_slot_roster(
             source_fpd=source_fpd,
             imported_players=imported_players,
             explicit_budgets=per_player_budgets,
+            ordered_fpd=ordered_fpd,
         )
-        players = normalize_imported_players(
-            imported_players,
-            band_defaults=band_defaults,
+        inherited = _build_inherited_roster_payloads(
+            ordered_fpd=ordered_fpd,
+            old_player_ids=old_player_ids,
+            team_name=team_name,
+            team_object_id=team_object_id,
+            players_collection=players_collection,
+            wizard_walk_ons=wizard_walk_ons,
+        )
+        players = apply_diffs_to_inherited_roster(
+            inherited=inherited,
+            imported_players=imported_players or [],
             team_name=team_name,
             team_object_id=team_object_id,
             attribute_mode=attr_mode,
             apply_topup=apply_topup,
-            per_player_budgets=budgets if attr_mode == "capped" else None,
+            budgets=budgets if attr_mode == "capped" else None,
         )
         if len(players) != AUTHORED_ROSTER_SIZE:
             raise ValueError(
@@ -955,6 +1341,8 @@ __all__ = [
     "AUTHORED_ROSTER_SIZE",
     "SCHOLARSHIP_SIZE",
     "WALK_ON_COUNT",
+    "apply_row_diff_to_inherited",
+    "apply_diffs_to_inherited_roster",
     "build_slot_roster_csv",
     "build_wizard_walk_on_players",
     "get_or_create_wizard_walk_ons",

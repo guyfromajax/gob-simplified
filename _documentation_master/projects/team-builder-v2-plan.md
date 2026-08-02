@@ -3,7 +3,7 @@
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
 **Spec version:** 2.0 — draft for alignment
-**Status:** Phase 0 **closed** (6/6). Phase 1 **closed** (20/20). Phase 2 ready to start. Phase 3 not started.
+**Status:** Phase 0 **closed** (6/6). Phase 1 — 20/20 plus a live play-through; **reopened on §4.5b** (inherited fields discarded at Apply), criteria 21–24 outstanding. Phase 2 in progress, unaffected. Phase 3 not started.
 **Last updated:** 1 August 2026
 
 ---
@@ -272,6 +272,39 @@ Step 3 of the wizard gains a fourth path and the existing three are re-framed:
 - **Every slot now has a real inherited total**, including 13–15. The undefined-budget problem is closed by giving those slots a budget, not by removing them from user input.
 - **v1.3's floor carve-out is retired** — the rule that applied the attribute floor to the top 12 but not the bottom 3. All 15 are authored on the same terms.
 
+### 4.5b The editor is a diff, not a form
+
+> **Any field the user does not edit keeps its inherited value. Without exception.**
+
+**Observed 2 August 2026:** a custom program created with no year changes came back with all 15 players as `FR`. The inherited years were discarded.
+
+**This is not a year bug.** Year is simply the field visible enough to catch. The apply path constructs new player documents from the wizard payload instead of cloning the inherited player and overwriting only what changed — so **every field the editor does not send is reset to a default**.
+
+The editor exposes name, height, weight, jersey number and the twelve core attributes. Everything else on a player document is therefore at risk: year, archetype, portrait and appearance data, `Home Region`, development curve, recruiting metadata, `CH` / `EM` / `MO`.
+
+**`Home Region` is the dangerous one.** §2 records it as load-bearing for recruiting lean. Reset to a default, it would skew a custom program's recruiting for seasons before anyone connected the two.
+
+**Rule:**
+
+- **Apply clones the inherited player document and overwrites only the fields the editor sends.** It does not construct a player from the payload.
+- **This applies to every path.** Generate and import author full players by definition; edit and keep must preserve.
+- **For an imported CSV, a blank optional column means inherit** — not "use a default." v1.3 §8.6's no-silent-substitution rule already implies this; it is now stated.
+- **Walk-ons are exempt only in that they have no inherited counterpart** — their wizard-generated values *are* their inherited values, and every field of them must survive Apply identically.
+
+**Why this was missed:** every Phase 1 acceptance criterion tested a field the editor writes. None tested a field it doesn't. A form that silently defaults everything outside its own inputs looks correct from inside its own test suite.
+
+#### The ordering defect found alongside it
+
+The zero-edit diff surfaced **36 differing field paths**, and one was not a defaulting problem at all:
+
+> **Capped budgets were aligned to players by position in a Mongo `find()` result rather than by identity.** `find()` order ≠ roster order, so budgets — and therefore the attributes written under them — could land on the wrong players.
+
+**This silently violated §4.1's guarantee that points never move between players.** Not by user action, but by the system assigning a player's inherited budget to a different player. Criterion 2 passed because its tests and the live walkthrough both happened to hit aligned orderings; `find()` guarantees no such thing, and the order can change when documents are rewritten.
+
+**Rule: budgets, edits and inherited values bind to players by identity, never by ordinal position in a query result.** This is §3.1a's lesson in another costume — an ordinal is a positional key, and positional keys are as fragile as display-name keys.
+
+**Verification must use a deliberately shuffled order.** A test whose fixture happens to match roster order proves nothing about this class of defect.
+
 ### 4.6 CSV changes
 
 - **Remove `CH`, `EM` and `MO` from the template and the optional-field list.** They are currently offered and then silently discarded — the exact silent-failure pattern v1.3 §8.6 forbids everywhere else.
@@ -310,6 +343,11 @@ Still **unread in v1 and v2**. It exists so a future eligibility rule can be app
 18. **Walk-ons are stable across wizard navigation and are not re-rollable** — leaving Roster and returning yields the same three players with the same attributes.
 19. **Import of any row count other than 15 is rejected with a stated reason** — not truncated, not padded.
 20. The uncapped pool and league markers are computed on **15-player franchise totals**, matching what a custom program is now authoring.
+21. **A custom program created with no edits at all is field-for-field identical to the program it replaced**, except identity and colours — verified by diffing every field of all 12 inherited players, not by spot-checking.
+22. **Editing one attribute on one player changes only that value.** Every other field on that player, and every field on the other 14, is unchanged.
+23. **`Home Region`, archetype, year, portrait data and development metadata survive all four paths.**
+24. A blank optional column in an imported CSV **inherits** rather than defaulting.
+25. **Criterion 2 re-run against a deliberately shuffled query order.** Budgets and edits bind to the correct players when `find()` order does not match roster order.
 14. The uncapped pool meter is hidden in capped mode, and an over-budget state is visible at the point of editing — not only on Apply.
 
 ---
@@ -529,6 +567,8 @@ This requires publishing a **filtered subset** of the baking manifest into the g
 | 25 | Walk-ons are not re-rollable, **enforced server-side** | In capped mode an as-generated total becomes a budget. Frontend convention is not enforcement — a reload was enough to re-roll. |
 | 26 | Budget comparisons use 15-player totals on both sides | A custom program must be measured against CPU programs on the same basis as what it authors |
 | 27 | The league-context basis is **pinned to week-1 as-initialized**, seeded per `team_id` | Reading live franchise data made the pool depend on which save was newest and how far it had progressed — 6,894 to 9,078 across the same staging DB |
+| 28 | **The editor is a diff, not a form** (§4.5b) | Apply must clone the inherited player and overwrite only edited fields. Constructing from the payload silently defaults every field the editor doesn't expose — 36 field paths on a zero-edit Apply. |
+| 29 | **Bind by identity, never by ordinal position in a query result** (§4.5b) | Capped budgets aligned to `find()` order landed on the wrong players, silently breaking §4.1's no-points-between-players guarantee. An ordinal is a positional key; §3.1a's lesson in another costume. |
 | 5 | Uncapped budget = largest team total in the league, **computed at runtime** | Reads as "the best program's worth of talent." Stored as a definition, never a literal — see §4.4a |
 | 6 | Eligibility is determined by mode, not computed | Substantial simplification; the meter becomes an allocation aid |
 | 7 | Inline roster editor is required, not optional | Capped mode is not expressible through CSV |
