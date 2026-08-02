@@ -85,6 +85,10 @@ def _snapshot_fpd(FPD, fid, path: Path):
             "entry_tier": d.get("entry_tier"), "position_intent": d.get("position_intent"),
             "position_ratings": d.get("position_ratings") or {},
             "has_dev": bool(d.get("development")),
+            # height/weight for the LONGITUDINAL height check (§16.3 grow-into-frame): the same
+            # player_id tracked across boundaries must show real HT growth, not just a static
+            # class-year cross-section (a cross-section can look right while nobody grows).
+            "height": meta.get("height"), "weight": meta.get("weight"),
             "attributes": {a: (d.get("attributes") or {}).get(a)
                            for a in (d.get("attributes") or {}) if str(a).startswith("anchor_")},
             "team_id": str(meta.get("team_id") or ""),
