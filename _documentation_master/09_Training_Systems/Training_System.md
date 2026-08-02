@@ -113,6 +113,7 @@ While CPU training runs (`POST /franchise/run-training/cpu-train`), the training
 - [Data Flow](#data-flow)
 - [Team ID Resolution](#team-id-resolution)
 - [Computer Team Training (Franchise Mode Only)](#computer-team-training-franchise-mode-only)
+- [Player Development & Coaching Quality](#player-development--coaching-quality)
 - [Data Storage](#data-storage)
 - [Key Files](#key-files)
 - [Current Play / Report Identity Notes](#current-play--report-identity-notes)
@@ -720,7 +721,7 @@ For player loading, the system:
 
 ### Computer Team Training (Franchise Mode Only)
 
-Eligible non-user teams run the same `execute_training()` engine with generated allocations and a generated coaching focus.
+Eligible non-user teams run the same `execute_training()` engine. CPU allocation is **not random**: `auto_train_one_cpu_team` applies a fixed team-wide **base allocation** plus per-player `player-maximizer-custom` focus steering each player toward his own position's reference top-3, tuned so the team scores ≈1.0 against the frozen coaching reference (see **Player Development & Coaching Quality**).
 
 **Current behavior:**
 - The CPU phase starts after the user phase.
@@ -735,6 +736,51 @@ Eligible non-user teams run the same `execute_training()` engine with generated 
 - CPU auto-training uses `FTD.players` as its roster source.
 
 **Note:** Player attributes saved by training are automatically loaded during game initialization — `load_roster(team_name, franchise_id=...)` (`BackEnd/utils/roster_loader.py`) reads FPD and merges trained attributes over the universal player base. See `../01_Game_Mode_Systems/Franchise_Mode_Overview.md` ("How a game consumes franchise state").
+
+### Player Development & Coaching Quality
+
+> Career growth lives in the **offseason development event** (`BackEnd/utils/player_development.py`), not in weekly training. Full derivation and reasoning archived at `../projects/Z-Completed/Player_Attribute_Recalibration_Design.md`.
+
+**Where career growth happens.** The offseason development event (season rollover, before Training Camp) owns career growth. It targets an **absolute RT**: `jh_anchor × ladder_value × f(coaching_quality)`, re-anchoring each player onto the class-year ladder every rollover. Weekly training **shapes, does not earn**.
+
+**In-season model.** Weekly gains are scaled by `IN_SEASON_GAIN_SCALE` (0.18) so movement stays visible on the Training Report but small. Invariant: **reference allocation holds flat; neglect costs; focus gains.**
+
+| Weekly allocation (per attribute) | Net over a 26-week season |
+|---|---|
+| 0 points (neglect) | declines |
+| reference band (points 1-3) | ≈ flat |
+| focused | gains |
+
+The offseason distribution is the **shape attractor** (`OFFSEASON_ATTRACTOR_ALPHA` = 0.55): it pulls each attribute toward the tier/year/position profile scaled to the target RT (see `10_Players_Systems/Player_Development_System.md`). This **replaced** the older additive-budget aim (`OFFSEASON_DISTRIBUTION_BLEND`, now vestigial). Pre-training decay by year is unchanged (see **Year-Based Pre-Training Decay** above).
+
+**Coaching-quality metric.** A season's allocation is scored in **points per attribute per week, not shares**:
+
+```
+contribution_a = weight_a × min(points_a / COACHING_SATURATION_CAP, 1)
+quality        = Σ contribution / Σ contribution(reference)
+```
+
+- Points (not shares): a smaller budget saturates fewer attributes and scores lower automatically — spreading thin saturates nothing; concentrating saturates what matters.
+- Normalized **affinely per position** so the frozen reference scores exactly **1.0** and a budget optimum scores **1.0 + COACHING_HEADROOM**; headroom is comparable across all five positions.
+
+**The frozen reference.** The allocation that scores 1.0 is a **frozen, named constant**: a deliberately-mediocre, top-3-weighted baseline per position (primary attrs at a higher points value, other on-position attrs at a baseline points value; the tail neglected). It is the calibration anchor — reference-coached development lands exactly on the validated ladder (`f = 1.0`). Test-asserted at all five positions.
+
+**Coaching factor `f`.** Quality maps to a bounded multiplier `f ∈ [COACHING_F_MIN, COACHING_F_MAX]` (≈ 0.85–1.20) on the offseason RT target. Reference → `f = 1.0`; neglect / off-position floors at ~0.85; broad or multi-attribute focus tops out near 1.20. Worth roughly **±1 tier step**; recruiting stays ~2× the lever.
+
+**CPU trains the reference.** `auto_train_one_cpu_team` uses a fixed team-wide base allocation plus per-player `player-maximizer-custom` focus toward each player's position reference top-3, tuned so CPU scores ≈1.0 (measured 0.98–1.01). This holds the CPU league exactly on the ladder. The base allocation and the frozen reference are **coupled** — neither can change alone; `tests/test_cpu_reference_training.py` asserts the relationship.
+
+**STATUS — dormant until pillar 3.** The per-player coaching-quality **capture is not wired up**. `_coaching_accumulator_for_player` returns `None`, so `f = 1.0` for **every** player and the coaching-quality multiplier currently does nothing in gameplay — the league holds exactly at the recalibration pass-1 ladder. Activation requires per-player allocation capture (gated at the calling endpoint, since user and CPU share `execute_training`) and ships with **pillar 3**, alongside the training-position UI and CPU season-start assignment.
+
+**Constants** (values in `../11_Design_Systems/Tunable_Constants.md`):
+
+| Constant | Role |
+|---|---|
+| `COACHING_SATURATION_CAP` | points/attr/week at which a contribution saturates (4) |
+| `COACHING_STANDARD_BUDGET` | reference weekly budget the affine per-position normalization anchors to |
+| `COACHING_HEADROOM` | how far a budget optimum scores above 1.0 |
+| `COACHING_F_MIN` / `COACHING_F_MAX` | offseason multiplier bounds (0.85 / 1.20) |
+| `IN_SEASON_GAIN_SCALE` | weekly-gain scale (0.18) |
+| `OFFSEASON_ATTRACTOR_ALPHA` | offseason shape-attractor strength (0.55) — replaced `OFFSEASON_DISTRIBUTION_BLEND` (now vestigial) |
 
 ### Data Storage
 

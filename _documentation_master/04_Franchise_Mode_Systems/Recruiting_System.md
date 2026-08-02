@@ -1,6 +1,8 @@
 # Recruiting System (**verified 2026-06-13**)
 
-> Hybrid spec + implemented-system doc. Core generation/lean/RT logic verified against code: `RecruitManager` (`_select_archetype`, `_generate_recruit_profile`, `_generate_weight`, `generate_recruits_list`) and `FranchiseManager._build_recruit_lean` in `BackEnd/models/franchise_manager.py`; complete-week lean updates in `BackEnd/api/franchise_routes.py` (`_apply_performance_based_recruiting_lean_updates`, `_apply_complete_week_recruiting_lean_updates`); RT buckets in `FrontEnd/static/js/shared/rtBucket.js`; archetype/tier expectations in `tests/test_recruit_archetypes.py`. All archetype weights, year-tier ranges, archetype configs, weight-by-height bands, and both RT scales below match code exactly as of this date. Some UI/flow bullets are written in build-spec voice; treat code-cited items as authoritative.
+> Hybrid spec + implemented-system doc. Core generation/lean/RT logic verified against code: `RecruitManager` (`_select_archetype`, `_generate_recruit_profile`, `_generate_weight`, `generate_recruits_list`) and `FranchiseManager._build_recruit_lean` in `BackEnd/models/franchise_manager.py`; complete-week lean updates in `BackEnd/api/franchise_routes.py` (`_apply_performance_based_recruiting_lean_updates`, `_apply_complete_week_recruiting_lean_updates`); RT buckets in `FrontEnd/static/js/shared/rtBucket.js`. Some UI/flow bullets are written in build-spec voice; treat code-cited items as authoritative.
+>
+> **⚠️ Recruit *generation* was rewritten by the Player Attribute Recalibration (2026-07).** The "Recruit Init Attribute Logic" section below is SUPERSEDED — the 20-archetype machinery (`_select_archetype`, `YEAR_TIER_RANGES`, archetype configs, weight-by-height bands) was **removed**. Generation is now position-intent-first; see that section's current-flow note and `10_Players_Systems/Player_Attribute_System.md`. The lean/flow/RT-bucket content elsewhere in this doc is unaffected.
 
 **Franchise Init**
 0. Add a new "Recruits" field to the FTD docs (this will be a dict with 1-10 key/value pairs wiht the keys being "1", "2", "3", an so on, values will init as None, and will hold FRD string ids in the future)
@@ -358,6 +360,19 @@ Note, this does not determine updates to recruits leans (we'll udpate those duri
 - `Run Recruiting` is the catalyst that advances week `35` -> `36`
 
 **Recruit Init Attribute Logic**
+
+> **SUPERSEDED by the Player Attribute Recalibration (2026-07).** The 20-archetype attribute machinery below (`_select_archetype`, `_generate_recruit_profile`, `YEAR_TIER_RANGES`, per-archetype strong/secondary/height tables, `_generate_weight`) was **removed**. It is retained below only as **historical reference**; do not treat it as current. The tier→RT frequencies, position profiles, and grow-into-frame height now live in `10_Players_Systems/Player_Attribute_System.md` (generation) and `Position_Ratings_System.md` (RT).
+
+**Current generation (`RecruitManager.generate_recruits_list` → `BackEnd/utils/player_generation.py`):** position-intent-first.
+1. **Tier** — `draw_tier()` from `TIER_FREQUENCY` (Poor 7 / BelowAverage 20 / Average 40 / Good 20 / Great 11 / Elite 2) → sets the JH RT anchor (`JH_ANCHOR_BY_TIER` 20/25/30/35/40/50).
+2. **Position intent** — `draw_position_intent()` (~20% each of PG/SG/SF/PF/C).
+3. **Height** — `draw_height(intent, year)` grows-into-frame: adult draw minus the remaining share of the career HT gain (a JH lands ~3.2in below frame).
+4. **Attributes** — `generate_player` draws the position's profile (`position_profile`) scaled to hit `target_rt(tier, year)`, writes both `anchor_` and live, CH = flat `randint(1,100)`.
+5. **Stamped:** `entry_tier`, `position_intent`, `development` — and these are **persisted through signing → FPD** (the pass-2 fix; a dropped `entry_tier` previously down-classified recruits). **Archetype is now a cosmetic derived label** (`_recruit_display_archetype` from intent+tier), NOT a generation input.
+
+---
+
+**HISTORICAL (removed code — do not use):**
 
 - **Code:** `RecruitManager` in `BackEnd/models/franchise_manager.py` — `_select_archetype()`, `_generate_recruit_profile(archetype, year="JH")`, `_generate_weight(height)`, with post-processing in `generate_recruits_list()`. Year-tier ranges live in the `YEAR_TIER_RANGES` class constant. Expected ranges are encoded in `tests/test_recruit_archetypes.py`.
 

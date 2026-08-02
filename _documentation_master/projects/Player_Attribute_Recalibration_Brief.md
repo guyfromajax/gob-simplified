@@ -1,36 +1,28 @@
+# Player Attribute Recalibration — Brief (entry point)
 
-**Task Objective**
-We need to recalibrate players' starting attribute values and their growth/regression levels during in-season training and offseason transitions in order to bring a level of steadiness to this.
+**Status: complete and validated (four-season live run).** This is the map; the detail lives in the evergreen system docs and the archived design doc.
 
-Right now I get the sense that we have starting attyriburtes for the universal players colleciton too high, and growth of players coming up in the sytem too low as I'm antecdotally noticing steep team telent dropoffs from season 1 to season 2 (note this is antecdotal though, we should measure it)
+## What it set out to do
+Recalibrate players' starting attributes and their in-season / offseason progression to bring **steadiness** to the league. The original suspicion: universal-pool starting attributes were **too high** and young-player growth **too low**, from an anecdotal "steep team-talent dropoff from season 1 to season 2."
 
+## What it actually found and shipped
+The suspicion was mostly **wrong about the cause** — starting attributes weren't the problem. Measurement found and fixed a chain of real defects:
 
-**#General Rule**
-Player attributres should roughly double over the course of a player entering the leage to the end of his final season. 
+- **New position-rating formula** — five per-position weight vectors + **multiplicative** height fitness, which separates PF/C (the old additive-height formula collapsed interior positions). → `Position_Ratings_System.md`
+- **Six-tier entry ladder + class-year rungs** (JH→SR ~doubles by construction); regenerated the universal pool via a rank-preserving migration. → `Player_Attribute_System.md`
+- **Offseason development event** — absolute RT target × coaching factor; replaced the additive budget with a **shape attractor (α=0.55)** that targets both a level and a profile; fixed an **anchor/live desync** where in-season training silently wiped offseason growth; added **HT grow-into-frame**. This stopped the real defect — **shooting collapsing on turnover** (a big's scoring, a wing's shooting were being starved to ~half). → `Player_Development_System.md`
+- **`entry_tier` persistence fix** — the season recruit write dropped `entry_tier`, so signed recruits were re-derived from undeveloped RT and **down-classified ~1.5 tiers**; the derive was also year-blind. → `Player_Development_System.md` / `Training_System.md`
+- **Coaching quality** — saturating-coverage metric (points, not shares), a frozen reference, CPU trains it. **Dormant until pillar 3** wires per-player capture. → `Training_System.md`
 
-This will encompass 4 seasons and 4 offseasons.
+**The s1→s2 dropoff is real but it's a *persistence* problem, not high starting attributes:** team strength rotates hard (≈3 of 13 top teams persist over four seasons), and recruiting outweighs development ~26:4 in season-over-season change. The lever is the prestige→recruiting link, not the starting scale. (See the backlog.)
 
-JH <=offseason=> FR <=offseason=>  SO <=offseason=>  JR <=offseason=> SR => GR
-
-
-**Need To Calibrate**
--In Season Attribute Changes
-    - Training
-- Offseason Attribute Changes
-- Starting Attriburtes of current players in the universal players collection (these are teh players every new franchise init starts with)
-- Recruit Class starting Attributes
-- Walkon starting Attributes
-
-**Notes**
-- While we want the general rule of thumb to be that players will double over the course of their career from JH to SR, this will not be an absolute. We need variability and edge cases in both ways.
-- General rules: 
-    - Some players will have one offseason that is their "coming of age" offsesaon, where they gain an above-average amount of gains
-    - Some players will not meet the 2x progression, some will exceed it, and some will fall in line with it. We need to determien what the band of the middle range is and what determines falling short, exceeding, and do we hae falling short and exceeding by 2x in eahc direciton? i.e. standard deviations from the mean?
-    - a player's CH will be the main variable to determine the likelihood of them over-evolving, under-evolving, or mean-evolving
-    - we need to layer the player's HT and WT progression into this logic as well (right now things are pretty random, based on year, we need to evolve beyond that)
-
-**My Suggested Tasks (in no particulary order)**
-- Knowing we have a 1-100 scale (but some players can push attribures above 100, these are rare-ish but we want them to be present), what is the ideal median anchors for players at each year (JH/FR/SO/JR/SR)?
-- Note the main attribute to track is RT -- which is derived from various combinations of the other attriburtes.
-    - this means we need our calbiration levels to be more nuanced than just tracking all 12 core attributes across the board. A player who is progressing as a C will have one set of attributes be important while a player progressing as a PG will have another set.
-- Do we evolve (up or down) a player's CH during the season or offseason? or is this set as random.randint(1,100) at player init and static throughout his entire career?
+## Where the detail now lives
+| Topic | Doc |
+|---|---|
+| tiers, rungs, families, peaks, growth profile, ≥100 rate | `10_Players_Systems/Player_Attribute_System.md` |
+| RT formula, weight vectors, height fitness, PF/C separation | `10_Players_Systems/Position_Ratings_System.md` |
+| offseason event, shape attractor, anchor/live, grow-into-frame, invariants | `10_Players_Systems/Player_Development_System.md` |
+| coaching quality, frozen reference, in-season model, CPU training | `09_Training_Systems/Training_System.md` |
+| every tunable knob (levers vs calibration anchors, live vs dormant) | `11_Design_Systems/Tunable_Constants.md` |
+| **the reasoning, rejected paths, and full project history** | `projects/Z-Completed/Player_Attribute_Recalibration_Design.md` |
+| open items + Phase-4 tuning findings | `projects/Player_Attribute_Recalibration_Backlog.md` |

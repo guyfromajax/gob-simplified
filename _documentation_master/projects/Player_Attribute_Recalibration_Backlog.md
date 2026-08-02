@@ -127,3 +127,27 @@ Team-identity thresholds were explicitly parked pending recalibrated attributes 
 
 **EOG attribute retune.** *Trigger: after pillar 3.* **OPEN.**
 Parked behind this project. Note `momentum_score` removal was deliberately deferred out of the distant-sunset cleanup to avoid changing training draw counts mid-flight.
+
+---
+
+## Tuning findings from Phase-4 validation (waiting for the tuning pass)
+
+Measured on the four-season pass-2 validation run (fresh scratch off the re-migrated pool). Numbers included so the tuning pass argues against measurements, not impressions.
+
+**Program range is a PERSISTENCE problem, not an init-spread one.** *Trigger: tuning pass.* **OPEN.**
+Only **3 of 13** top-10% teams stay top-10% across four seasons — strength rotates hard. Added init spread would wash out in ~2 seasons. The lever for durable "good programs stay good" is the **prestige→recruiting link** (make high-prestige teams recruit better), NOT wider starting rosters. Note: prestige and talent are deliberately INDEPENDENT axes at init (the four-quadrant difficulty selector); do not couple them at allocation — couple prestige to *recruiting outcomes* over time instead.
+
+**Recruiting outweighs development ~26:4 in season-over-season team strength.** *Trigger: tuning pass.* **OPEN.**
+Decomposition of the s1→s2 starter-strength change (per 5 starters): graduation **−31 RT**, recruiting **+26**, development **+4**, net −1.4. Design intent was roughly **2:1** recruiting:development. Development is currently a minor factor; if the intent is for player development to matter more to a team's arc, this is the gap to close.
+
+**JR ladder runs ~5 RT low.** *Trigger: tuning pass.* **OPEN.**
+Junior class-year p50 RT lands **49 vs 54 designed**; senior is on target (60), FR/SO close. Mid-career RT slightly undershoots — likely the attractor pulling toward the profile at α=0.55 not fully reaching the JR rung target. Minor.
+
+**The ≥100-attribute rate has two bases; the lock is ambiguous.** *Trigger: tuning pass.* **OPEN.**
+**5.5% on the pool**, **4.4% on the roster** — walk-ons (all Poor, no 100s) dilute the rostered rate below the pool's. Decide which base the 5.5% lock refers to. Roster is what users actually see; hitting 5.5% *there* requires ~**6.9%** on the pool.
+
+**Walk-on year weights open the league FR-heavy.** *Trigger: tuning pass (or with the recruit-supply fix).* **OPEN.**
+`WALK_ON_YEAR_WEIGHTS` = JH 60 / FR 20 / SO 10 / JR 10, and every walk-on advances one step on arrival, so **~60% become freshmen**. A fresh franchise opens at **~32% FR** vs ~23% for the other three years (median 5 FR/team, max 9). Not a correctness bug (rosters are still 15), but it skews the class-year cross-section; adjust the weights if a balanced opening class is wanted.
+
+**In-season training is imperceptible on the 1–10 display.** *Trigger: training-report UX (in progress).* **OPEN — being addressed in UX, not gains.**
+At the reference in-season rate it takes **87–180 weeks to move one display unit** (÷10): SC ~87, SH/ID/IQ ~180. A user watching the weekly training report sees nothing move within a season; visible progression is offseason-only (+0.79 display/season on signature attrs). Being addressed via **directional arrows** in the training report rather than by inflating in-season gains (which would break the 70/30 offseason/in-season split and the reference-holds-flat invariant).

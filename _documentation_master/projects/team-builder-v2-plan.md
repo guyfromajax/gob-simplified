@@ -3,7 +3,7 @@
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
 **Spec version:** 2.0 — draft for alignment
-**Status:** Phases 0, 1 and 2 **closed**. Phase 1 ran to 25 criteria including §4.5b and the ordering defect, confirmed by a live play-through on the fixed build. Phase 3 next — 3a and 3b need design sign-off before build.
+**Status:** Phases 0, 1 and 2 **closed**. Phase 3a (banner) **closed** — "Chevron" approved and shipped. 3b (court) unblocked: no source file exists, geometry is measured from Morristown. 3c and 3d not started.
 **Last updated:** 1 August 2026
 
 ---
@@ -449,23 +449,35 @@ This applies to the banner generator, the court generator, and upload re-encodin
 1. **Background** — flat primary across the full card.
 2. **Angled split** — a darkened primary (**primary at −16% lightness**) filling the region right of a diagonal running from roughly 38% width at the bottom edge to 75% width at the top edge. Replaces the v1 linear gradient entirely.
 3. **Chevron edge** — two parallel strips in the secondary colour tracking that diagonal: a solid one at ~90% opacity, and a thinner outrider at ~35%. This is the accent, and **it follows the diagonal rather than sitting flat** — no horizontal accent bar survives from v1.
-4. **Ghost initials** — the **three-letter abbreviation**, Bebas, at roughly 3.5× the v1 initials, anchored past the left edge and below the baseline so it bleeds off both. Secondary colour at **12% opacity**. Depth from typography alone; no illustration required. **Decorative — exempt from the 4.5:1 contrast floor.**
-5. **Wordmark** — the **full school name**, uppercase Bebas, horizontally centred, sitting above the vertical midline. The subject of the composition. Solid ink; must clear the contrast floor on its surface.
-6. **Mascot name** — beneath the wordmark, Oswald light, uppercase, wide letter-spacing. Target opacity **60%**, raised per program when needed so the **composited** colour clears 4.5:1 against its surface. Not exempt.
+4. **Ghost initials** — the **three-letter abbreviation**, Bebas, at roughly 3.5× the v1 initials, anchored past the left edge and below the baseline so it bleeds off both. Secondary colour at **12% opacity**. Depth from typography alone; no illustration required.
+5. **Wordmark** — the **full school name**, uppercase Bebas, horizontally centred, sitting above the vertical midline. The subject of the composition.
+6. **Mascot name** — beneath the wordmark, Oswald light, uppercase, wide letter-spacing, ~60% opacity.
 
 #### Rules the composition depends on
 
 - **The wordmark shrinks to fit.** Starting size steps down until the name fits its box, floor around 40% of the starting size. This is what lets `IDA` and `South Lancaster` occupy the same frame. Long names render smaller — accepted.
-- **Text colour is derived by contrast, not by a luminance threshold.** For each surface (flat primary and the −16% darkened primary), compute the WCAG contrast ratio of **both** dark (`#000000`) and light (`#ffffff`) ink against that surface and **take the higher**. Never threshold on luminance. Apply per surface — the two backgrounds may select different ink. Near-black substitutes undercut the 4.58 tie floor and are not used.
+- **Text colour is derived by contrast, not by a luminance threshold.** For each surface, compute the WCAG contrast ratio of **both** dark and light ink against that surface and **take the higher**. Never threshold on luminance.
 
-> **Corrected 2 August 2026.** The first build thresholded at luminance 0.42 and put 27 of 129 programs under 4.5:1 — worst case 2.73:1 on `#ff6f61`, where black would have given 7.6:1. The threshold was selecting the *worse* ink for every mid-luminance colour. The true crossover is `(L + 0.05)² = 0.0525`, i.e. L ≈ 0.179 — but the implementation uses best-of-two rather than moving the constant, so the guarantee holds by construction.
+> **Corrected 2 August 2026.** The first build thresholded at luminance 0.42 and put 27 of 129 programs under 4.5:1 — worst case 2.73:1 on `#ff6f61`, where black would have given 7.6:1. The threshold was selecting the *worse* ink for every mid-luminance colour. The true crossover is `(L + 0.05)² = 0.0525`, i.e. L ≈ 0.179.
 >
 > **Best-of-two is provably safe.** The worst possible background is one where both inks tie, and that tie occurs at **4.58:1** — above the 4.5 floor. Choosing by contrast makes the requirement unfailable for any colour, rather than something to be tuned per palette.
+>
+> **The guarantee requires pure `#000` and `#fff`.** A near-black such as `#14181f` carries enough luminance to erode the floor below 4.58. The ink candidates are the true extremes, not brand-tinted approximations.
 
-- **Contrast is measured on composited pixels, not on ink values.** Opaque wordmark ink is checked directly. The mascot line is checked as the colour that reaches the screen after its opacity is applied over its background; opacity starts at 60% and is raised until that composited contrast clears 4.5:1. **Ghost initials at 12% are decorative and exempt** — stated here so they are not left unmeasured by accident.
+**Measured result, 2 August 2026, across 128 palettes plus a pale custom program:** minimum wordmark contrast **4.736:1** (Lancaster `#d24a1b`), minimum composited mascot contrast **4.504:1** (Ocean City), zero programs under 4.5:1. Coral `#ff6f61` moved from 2.73:1 to **7.70:1** on dark ink.
+
+> The 128 existing programs are a **test corpus, not a shipping target** — they keep their hand-authored banners. Their palettes are swept because they represent the range of colours a user can choose in the Colors step, and 27 of them would previously have produced an unreadable custom banner.
+
+- **Contrast is measured on composited pixels, not on ink values.** The mascot line targets ~60% opacity and **rises per program until its composited contrast clears 4.5:1** (0.92 observed as the maximum). The ghost initials at 12% are **decorative and exempt**; the mascot line is **not exempt**.
+
+> **Open, minor:** on programs pushed toward 0.92 the mascot approaches the wordmark in strength, which may flatten the type hierarchy Chevron depends on. If it reads badly, hold opacity at 60% and buy legibility with size or weight instead.
 - **The abbreviation is the ghost, and it is a reliable input** — Team Builder validates it for uniqueness and length, so it is always exactly three characters. The wordmark and the ghost are therefore always different strings.
 
-Output must match the §2 card convention (400 × 141) and the primary aspect ratio (2.83:1 at 1,920 × 679) — the same composition scaled, not re-laid-out. `general_banner_primary.jpg` is corrected to that shape.
+#### Still to fix
+
+`general_banner_primary.jpg` is 600 × 300 while every team banner is 1,920 × 679. The fallback is the wrong shape and will letterbox or crop wherever it appears.
+
+Output must match the §2 card convention (400 × 141) and the primary aspect ratio (2.83:1 at 1,920 × 679) — the same composition scaled, not re-laid-out.
 
 ### 6.3 — 3b. Court generator
 
