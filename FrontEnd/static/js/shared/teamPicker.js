@@ -223,6 +223,9 @@
     if (ca != null && cb != null && ca !== cb) return ca - cb;
     if (ca != null && cb == null) return -1;
     if (ca == null && cb != null) return 1;
+    // Within a conference: talent high → low (grid fills L→R, top→bottom).
+    var talentDiff = numericField(b, 'total_player_attrs') - numericField(a, 'total_player_attrs');
+    if (talentDiff) return talentDiff;
     return String(a.name || '').localeCompare(String(b.name || ''), undefined, { sensitivity: 'base' });
   }
 
