@@ -34,8 +34,6 @@
 }
 
 .team-picker-search-input,
-.team-picker-region-select,
-.team-picker-conference-select,
 .team-picker-talent-select,
 .team-picker-prestige-select,
 .team-picker-geography-select {
@@ -51,8 +49,6 @@
 }
 
 .team-picker-search-input:focus,
-.team-picker-region-select:focus,
-.team-picker-conference-select:focus,
 .team-picker-talent-select:focus,
 .team-picker-prestige-select:focus,
 .team-picker-geography-select:focus {

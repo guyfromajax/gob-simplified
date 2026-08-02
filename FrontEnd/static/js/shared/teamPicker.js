@@ -11,8 +11,6 @@
 (function (global) {
   'use strict';
 
-  var REGION_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
-
   // Verbatim from team-builder-v2-plan.md §5.1 — conference-level geography.
   // Does not replace or overload region A–H.
   var CONFERENCE_GEOGRAPHY = {
@@ -243,8 +241,6 @@
     var state = {
       teams: Array.isArray(options.teams) ? options.teams.slice() : [],
       search: '',
-      region: 'all',
-      conference: 'all',
       talentBand: 'all',
       prestigeBand: 'all',
       geography: 'all',
@@ -263,14 +259,6 @@
       '    <input type="search" class="team-picker-search-input" placeholder="Search programs…" autocomplete="off" spellcheck="false">' +
       '  </label>' +
       '  <div class="team-picker-filters">' +
-      '    <label class="team-picker-filter">' +
-      '      <span class="team-picker-filter-label">Region</span>' +
-      '      <select class="team-picker-region-select"></select>' +
-      '    </label>' +
-      '    <label class="team-picker-filter">' +
-      '      <span class="team-picker-filter-label">Conference</span>' +
-      '      <select class="team-picker-conference-select"></select>' +
-      '    </label>' +
       '    <label class="team-picker-filter">' +
       '      <span class="team-picker-filter-label">Talent</span>' +
       '      <select class="team-picker-talent-select"></select>' +
@@ -297,8 +285,6 @@
       '<div class="team-picker-list"></div>';
 
     var searchInput = rootEl.querySelector('.team-picker-search-input');
-    var regionSelect = rootEl.querySelector('.team-picker-region-select');
-    var conferenceSelect = rootEl.querySelector('.team-picker-conference-select');
     var talentSelect = rootEl.querySelector('.team-picker-talent-select');
     var prestigeSelect = rootEl.querySelector('.team-picker-prestige-select');
     var geographySelect = rootEl.querySelector('.team-picker-geography-select');
@@ -333,64 +319,6 @@
     }
 
     function rebuildFilterOptions() {
-      var regions = {};
-      var conferences = {};
-      state.teams.forEach(function (team) {
-        var conf = normalizeConference(team.conference);
-        var region = normalizeRegion(team.region) || regionFromConference(conf);
-        if (region) regions[region] = true;
-        if (conf != null) conferences[conf] = true;
-      });
-
-      var regionKeys = REGION_ORDER.filter(function (r) {
-        return regions[r];
-      });
-      Object.keys(regions)
-        .sort()
-        .forEach(function (r) {
-          if (regionKeys.indexOf(r) === -1) regionKeys.push(r);
-        });
-
-      regionSelect.innerHTML =
-        '<option value="all">All regions</option>' +
-        regionKeys
-          .map(function (r) {
-            return '<option value="' + escapeHtml(r) + '">Region ' + escapeHtml(r) + '</option>';
-          })
-          .join('');
-      regionSelect.value = state.region === 'all' || regions[state.region] ? state.region : 'all';
-      if (regionSelect.value !== state.region) state.region = regionSelect.value;
-
-      var confKeys = Object.keys(conferences)
-        .map(Number)
-        .sort(function (a, b) {
-          return a - b;
-        });
-      var visibleConfKeys = confKeys.filter(function (c) {
-        if (state.region === 'all') return true;
-        return regionFromConference(c) === state.region;
-      });
-
-      conferenceSelect.innerHTML =
-        '<option value="all">All conferences</option>' +
-        visibleConfKeys
-          .map(function (c) {
-            return (
-              '<option value="' +
-              c +
-              '">' +
-              escapeHtml(formatConferenceLabel(c)) +
-              '</option>'
-            );
-          })
-          .join('');
-
-      if (state.conference !== 'all') {
-        var stillVisible = visibleConfKeys.indexOf(Number(state.conference)) !== -1;
-        if (!stillVisible) state.conference = 'all';
-      }
-      conferenceSelect.value = state.conference;
-
       var bandOptions =
         '<option value="all">All tiers</option>' +
         BAND_CUTOFFS.map(function (b) {
@@ -427,9 +355,6 @@
       var conf = normalizeConference(team.conference);
       var region = normalizeRegion(team.region) || regionFromConference(conf);
       var oid = teamObjectId(team);
-
-      if (state.region !== 'all' && region !== state.region) return false;
-      if (state.conference !== 'all' && conf !== Number(state.conference)) return false;
 
       if (state.talentBand !== 'all') {
         if (Number(state.talentBands[oid]) !== Number(state.talentBand)) return false;
@@ -704,17 +629,6 @@
       render();
     }
 
-    function onRegionChange() {
-      state.region = regionSelect.value || 'all';
-      rebuildFilterOptions();
-      render();
-    }
-
-    function onConferenceChange() {
-      state.conference = conferenceSelect.value || 'all';
-      render();
-    }
-
     function onTalentChange() {
       state.talentBand = talentSelect.value || 'all';
       render();
@@ -731,8 +645,6 @@
     }
 
     searchInput.addEventListener('input', onSearchInput);
-    regionSelect.addEventListener('change', onRegionChange);
-    conferenceSelect.addEventListener('change', onConferenceChange);
     talentSelect.addEventListener('change', onTalentChange);
     prestigeSelect.addEventListener('change', onPrestigeChange);
     geographySelect.addEventListener('change', onGeographyChange);
@@ -767,8 +679,6 @@
     function destroy() {
       state.destroyed = true;
       searchInput.removeEventListener('input', onSearchInput);
-      regionSelect.removeEventListener('change', onRegionChange);
-      conferenceSelect.removeEventListener('change', onConferenceChange);
       talentSelect.removeEventListener('change', onTalentChange);
       prestigeSelect.removeEventListener('change', onPrestigeChange);
       geographySelect.removeEventListener('change', onGeographyChange);
