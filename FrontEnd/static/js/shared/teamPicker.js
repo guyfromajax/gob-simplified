@@ -493,7 +493,7 @@
 
       // Conference / region / geography live on the group header — cards keep attrs + prestige.
       var statsLine =
-        'Attrs ' +
+        'Talent: ' +
         formatInt(numericField(team, 'total_player_attrs')) +
         ' · Prestige ' +
         formatInt(numericField(team, 'prestige'));
