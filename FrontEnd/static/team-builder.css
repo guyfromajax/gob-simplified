@@ -596,6 +596,13 @@ body {
 .tb-editor-meta input {
   width: 52px;
 }
+.tb-walk-on-tag {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+}
 .tb-player-budget {
   margin-left: auto;
   font-size: 13px;
@@ -637,6 +644,31 @@ body {
   min-height: 32px !important;
   padding: 0 10px !important;
   font-size: 16px !important;
+}
+.tb-actions-dock {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin-top: 16px;
+  padding: 12px 0 4px;
+  background: linear-gradient(180deg, rgba(11, 13, 20, 0) 0%, #0b0d14 28%, #0b0d14 100%);
+}
+.tb-budget-refuse {
+  margin: 0 0 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border-left: 3px solid #F79420;
+  background: rgba(40, 28, 16, 0.96);
+  color: #ffe6c8;
+  font-size: 14px;
+  line-height: 1.45;
+}
+.tb-budget-refuse[hidden] {
+  display: none !important;
+}
+.tb-btn.is-blocked-budget {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 @media (max-width: 720px) {
   .tb-mode-cards,

@@ -108,7 +108,7 @@
           </button>
           <button type="button" class="tb-mode-card" data-attr-mode="uncapped" id="tb-mode-uncapped">
             <strong>Uncapped</strong>
-            <span>One team pool of 7,027 points, free across the roster. Not eligible for online play.</span>
+            <span id="tb-uncapped-mode-copy">One team pool equal to the best program in the league, free across the roster. Not eligible for online play.</span>
           </button>
         </div>
         <p class="tb-optional-note" id="tb-mode-switch-note" hidden>Switching modes re-bases allocations from the inherited roster.</p>
@@ -116,11 +116,11 @@
       <div class="tb-roster-cards" id="tb-roster-cards">
         <button type="button" class="tb-roster-card is-selected" data-mode="keep">
           <strong id="tb-keep-label">Keep this program's roster</strong>
-          <span>Fastest, zero risk. This is the default. No attribute top-up.</span>
+          <span id="tb-keep-detail">This program's roster exactly as-is.</span>
         </button>
         <button type="button" class="tb-roster-card" data-mode="edit">
           <strong>Edit this roster</strong>
-          <span>Inherited 15 in a table — redistribute within the chosen mode.</span>
+          <span id="tb-edit-detail">The inherited roster in a table — redistribute within the chosen mode.</span>
         </button>
         <button type="button" class="tb-roster-card" data-mode="generate">
           <strong>Generate a new roster</strong>
@@ -175,25 +175,30 @@
             <i class="tb-budget-marker" id="tb-team-marker-median" style="left:0%" title="Median program"></i>
             <i class="tb-budget-marker is-best" id="tb-team-marker-best" style="left:0%" title="Best program"></i>
           </div>
-          <div id="tb-budget-label">Team pool: — / 7,027</div>
-          <div id="tb-budget-context" class="tb-budget-context">median program 5,567 · best program 7,027</div>
+          <div id="tb-budget-label">Team pool: —</div>
+          <div id="tb-budget-context" class="tb-budget-context" hidden>median program — · best program —</div>
         </div>
-        <div id="tb-budget-warn" class="tb-budget-warn" hidden></div>
         <div id="tb-elig-badge" class="tb-elig is-yes">Eligible for online competitions</div>
       </div>
-      <div class="tb-actions">
-        <button type="button" class="tb-btn tb-btn-secondary" data-nav="2">Back</button>
-        <button type="button" class="tb-btn tb-btn-primary" data-nav="4">Next: Review →</button>
+      <div class="tb-actions-dock" id="tb-step3-dock">
+        <div id="tb-budget-refuse" class="tb-budget-refuse" hidden role="alert"></div>
+        <div class="tb-actions">
+          <button type="button" class="tb-btn tb-btn-secondary" data-nav="2">Back</button>
+          <button type="button" class="tb-btn tb-btn-primary" id="tb-next-review" data-nav="4">Next: Review →</button>
+        </div>
       </div>
     </section>
 
     <section id="tb-step-4" class="tb-panel" hidden>
       <h2 class="tb-panel-title">Review &amp; apply</h2>
       <div id="tb-review" class="tb-review"></div>
-      <div id="tb-apply-error" class="tb-error" hidden role="alert"></div>
-      <div class="tb-actions">
-        <button type="button" class="tb-btn tb-btn-secondary" data-nav="3">Back</button>
-        <button type="button" class="tb-btn tb-btn-primary" id="tb-apply">Apply and start franchise</button>
+      <div class="tb-actions-dock" id="tb-step4-dock">
+        <div id="tb-apply-error" class="tb-error" hidden role="alert"></div>
+        <div id="tb-budget-refuse-apply" class="tb-budget-refuse" hidden role="alert"></div>
+        <div class="tb-actions">
+          <button type="button" class="tb-btn tb-btn-secondary" data-nav="3">Back</button>
+          <button type="button" class="tb-btn tb-btn-primary" id="tb-apply">Apply and start franchise</button>
+        </div>
       </div>
     </section>
   </div>

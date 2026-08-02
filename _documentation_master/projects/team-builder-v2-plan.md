@@ -3,7 +3,7 @@
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
 **Spec version:** 2.0 — draft for alignment
-**Status:** Phase 0 **closed** — all six acceptance criteria pass. Phase 1 §4.3 measurement complete, rule confirmed. Phases 1–3 not started.
+**Status:** Phase 0 **closed** (6/6). Phase 1 **closed** (20/20). Phase 2 ready to start. Phase 3 not started.
 **Last updated:** 1 August 2026
 
 ---
@@ -127,7 +127,7 @@ Replaces v1.3 §9 entirely.
 | Mode | Budget | Reallocation | Online eligibility |
 |---|---|---|---|
 | **Capped** | Each player keeps **the inherited total of the player he replaces** | **Within that player only.** Points never move between players. | **Eligible** |
-| **Uncapped** | One team-wide pool equal to **the largest team total in the league (7,027)** | **Freely across the whole roster** | **Not eligible** |
+| **Uncapped** | One team-wide pool equal to **the largest team total in the league**, computed at runtime | **Freely across the whole roster** | **Not eligible** |
 
 Both modes: every attribute is bounded **5 minimum, 99 maximum**.
 
@@ -173,8 +173,37 @@ Source: `teams/all_players_with_team_names.txt`, core-12 across all 1,536 player
 
 ### 4.4 Per-player ceilings
 
-- **Capped: 1,035.** Retained as a belt-and-braces bound. It can never bind, since the highest inherited total is 1,034 and reallocation cannot create points.
+- **Capped: no explicit ceiling.** Dropped 1 August 2026 — reallocation cannot create points, so a ceiling can never bind. The former literal 1,035 was derived from a pre-recalibration snapshot and is exactly the class of hardcoded constant §4.4a forbids.
 - **Uncapped: 1,188 implicit** (99 × 12). No separate explicit ceiling.
+
+### 4.4a No hardcoded league constants
+
+> **Any number derived from roster data is computed at runtime, never stored as a literal.**
+
+The uncapped pool, the median and best league markers, and any per-player ceiling are all functions of live roster data. Attribute recalibration is an ongoing parallel workstream; a literal is a snapshot that goes silently wrong the moment that data moves — no error, just a budget that no longer means what this document says it means.
+
+Served by `GET /franchise/team-builder/league-context` → `compute_league_attr_context(db)`, supplying `team_pool` (max), `team_median`, `team_best`.
+
+**Decision #5 defines the pool as "the largest team total in the league." That is the definition. It is not a number.**
+
+#### The basis is pinned to week-1 as-initialized
+
+**Computed as:** universal-pool scholarship 12 (core-12) **+** 3 × `generate_walk_on_profile()` under `seed(team_id)`. No franchise FPD is read.
+
+This is `max(scholarship_12 + walk_on_pad_3)` across the 128 — the maximum of the sum, not the sum of the maxima.
+
+**Why pinned.** The first implementation read "the newest franchise with ≥64 teams at `players` ≥ 15," which made the pool depend on which save happened to be newest and how far it had progressed:
+
+| Basis | Pool | Median |
+|---|---|---|
+| Newest-save pick (corrupt franchise) | 9,078 | 6,027 |
+| Healthy week-1 live | 7,262 | 6,033 |
+| Mid-season live (wk 19) | 6,894 | 5,753 |
+| **Pinned week-1 as-initialized** | **7,485** | **6,193** |
+
+A budget that moves with somebody else's save state is not a league constant. Seeding per `team_id` makes the walk-on component deterministic, so every user computing the pool gets the same number.
+
+> **Separate finding, not a Team Builder defect.** The 9,078 came from franchise `6a6de652…` (South Lancaster) carrying roughly **+1,600** over a clean initialization — not walk-ons, not recalibration. Other week-1 saves scanned 7,054–7,645. Whatever produced it affects franchise creation generally and warrants its own investigation.
 
 ### 4.5 The roster editor
 
@@ -183,21 +212,65 @@ Source: `teams/all_players_with_team_names.txt`, core-12 across all 1,536 player
 Step 3 of the wizard gains a fourth path and the existing three are re-framed:
 
 1. **Keep [replaced]'s roster** — unchanged, default, zero risk
-2. **Edit this roster** — *new.* The inherited 15 in a table, editable
+2. **Edit this roster** — *new.* The inherited roster in a table, editable
 3. **Generate a new roster** — unchanged
 4. **Import my roster (CSV)** — unchanged; retained for users who genuinely have data
 
 **Editor requirements:**
 
-- Opens **pre-populated with the inherited 15**. Never a blank canvas.
+- Opens **pre-populated with all 15** — the inherited 12 plus 3 wizard-generated walk-ons (§4.5a). Never a blank canvas.
 - Editable per player: name, height, weight, jersey number, and the twelve core attributes.
 - **`CH`, `EM` and `MO` are not editable and are not shown as inputs.** They are set by the game at init (v1.3 §8.8, §2.1). Do not offer fields the game ignores.
 - **A live per-player budget** in capped mode: points spent / inherited total, with over/under state.
-- **A live team pool** in uncapped mode, against 7,027, with league context markers (*median program 5,567 · best program 7,027*).
+- **A live team pool** in uncapped mode, against the runtime-computed pool, with league context markers (median and best program, both computed — see §4.4a).
+- **The pool meter and its markers are hidden in capped mode.** Capped has no team budget; a partially-filled bar reads as unspent headroom the user cannot actually spend.
+- **An over-budget state must be visible where the user is editing**, not only on Apply. A roster editor is a dozen player cards tall; an error surfaced at the top while the user is at the bottom is the failure mode that made the franchise cap look like an infinite loop. Anchor it to the control that refuses.
 - Every attribute input clamps to 5–99.
 - **Reset per player** and **reset all**, returning to inherited values.
 
-**Mode is chosen once, at Step 3 before the four roster paths, and is visible throughout.** Switching modes after editing must warn that allocations will be re-based.
+**Mode is chosen once, at the top of the editor, and is visible throughout.** Switching modes after editing must warn that allocations will be re-based.
+
+### 4.5a Roster size and walk-ons
+
+> **The user authors all 15 — the inherited 12 plus 3 walk-ons generated when the editor opens.**
+
+**Established, 1 August 2026:**
+
+| Fact | Detail |
+|---|---|
+| Core team document | **12 players.** All 128 verified; the universal pool contains zero `Walk On` archetypes. |
+| Walk-ons | **Generated at franchise init**, not stored in core. `FranchiseManager.initialize_season` calls `generate_walk_on_profile()` three times per team after cloning core FPDs. |
+| Generation | `draw_position_intent` + `generate_player(tier="Poor")`; year weights JH 60 / FR 20 / SO 10 / JR 10, advanced one year; `archetype: "Walk On"`, `entry_tier: "Poor"` |
+| Season-1 shape | `players` = 15, `scholarship_players` = `players[:12]`, `training_squad_players` = `[]` |
+| After Training Camp | 3 move to `training_squad_players`, leaving `players` = 12. **The user chooses which three**; it is not positional. |
+
+**The defect this exposed.** `team_builder_apply` runs `initialize_season` first — every team reaches 15 — then `replace_slot_roster` issues `$set players: new_ids` for the edit, import and generate paths. That **deletes the init walk-ons and never regenerates them.** Only *keep* retains all 15. A user who edits a single attribute plays the season 12-deep while all 127 CPU programs carry 15. Observed live in a week-9 franchise: 127 teams at `players=12 + training_squad=3`, the custom team at `players=15` with no walk-ons ever to move.
+
+#### The rule
+
+- **The authored roster is 15 in both modes.** The editor opens with the inherited 12 plus 3 walk-ons and every one of the 15 is editable on the same terms.
+- **The three walk-ons are generated when the editor opens**, by calling the existing `generate_walk_on_profile()` — not a parallel generator. They live in wizard state and are persisted only at Apply.
+- **They are generated once and are not re-rollable.** In capped mode a walk-on's as-generated total becomes his budget; re-rolling would let a user shop for a larger one.
+- **Idempotency is enforced server-side, not by frontend convention.** `POST /franchise/team-builder/wizard-walk-ons` takes `{ replaced_object_id, draft_id }`, persists to `team_builder_wizard_drafts`, and returns the same three on every call. A page refresh, a network retry or a component remount is therefore harmless.
+
+> An earlier build satisfied this only because the client didn't re-call the endpoint. That is a convention, not a guarantee — a reload was enough to re-roll three budgets. The rule belongs where it cannot be bypassed, exactly as with the strict matchup gate in §3.1a.
+- **`initialize_season` is unchanged.** It runs as it does today and gives all 128 teams their walk-ons. Apply then writes the authored 15 over that slot, replacing init's three along with the rest, and **deletes the three superseded FPD documents** so no orphans accumulate.
+- **Import must supply exactly 15 rows**; anything else is rejected with a stated reason, never truncated or padded.
+- **Both sides of every budget comparison are 15-player totals.** The uncapped pool, the league markers and any league context are computed on full franchise rosters, so a custom program is measured against CPU programs on the same basis.
+
+#### Why this timing, and not the alternatives
+
+**Not reordering `initialize_season`.** It sits on the shared path for every franchise, custom or not. Phase 0's sim failure came from altering a shared producer to serve the custom case and breaking the common one. Moving the franchise lifecycle to suit the wizard puts all franchise creation at risk to serve a minority path.
+
+**Not excluding the slot from init generation.** A conditional inside a shared loop, with a bad failure mode: if Apply doesn't complete, that team has zero walk-ons and nothing says so — the same silent-depth class this section exists to fix.
+
+**Generating in the wizard and overwriting at Apply** needs no lifecycle change, no exclusion flag, and no conditional in shared code. Abandoning the wizard leaves nothing behind and no team short. The cost is three throwaway player documents per custom franchise, cleaned up at Apply.
+
+#### Consequences
+
+- **Capped mode gains nothing exploitable.** Walk-ons are Poor-tier with low totals, points still cannot cross a player boundary, and their budgets are fixed at generation.
+- **Every slot now has a real inherited total**, including 13–15. The undefined-budget problem is closed by giving those slots a budget, not by removing them from user input.
+- **v1.3's floor carve-out is retired** — the rule that applied the attribute floor to the top 12 but not the bottom 3. All 15 are authored on the same terms.
 
 ### 4.6 CSV changes
 
@@ -228,7 +301,16 @@ Still **unread in v1 and v2**. It exists so a future eligibility rule can be app
 8. `CH`, `EM`, `MO` appear nowhere in the editor or the CSV template.
 9. Reset-per-player and reset-all return inherited values exactly.
 10. No top-5 cap logic remains anywhere in the codebase.
-11. A capped franchise on a team with a below-60 player shows the top-up notice, and `roster_shape_at_creation` reflects the topped-up totals. Test with Concord — it carries the largest top-up in the league at 36 points.
+11. The §4.3 top-up is proven by unit test (synthetic 24 → 60), not by a live walkthrough — recalibrated data may contain no player below 60.
+12. **No league constant is a hardcoded literal** (§4.4a). The uncapped pool and league markers come from `league-context` at runtime.
+13. **The editor opens with 15** — the inherited 12 plus 3 wizard-generated walk-ons — and all 15 are editable on the same terms in both modes.
+15. **Every path ends at `players` = 15**, `scholarship_players` = 12, with 3 `archetype: "Walk On"` FPDs. Verified after keep, edit, import **and** generate — not only keep.
+16. A custom program and a CPU program in the same franchise hold identical `players` / `scholarship_players` / `training_squad_players` counts at week 1 **and** after Training Camp.
+17. **No orphaned FPD documents remain after Apply.** Init's three superseded walk-ons are deleted, and staging is checked for orphans left by the previous `$set` behaviour.
+18. **Walk-ons are stable across wizard navigation and are not re-rollable** — leaving Roster and returning yields the same three players with the same attributes.
+19. **Import of any row count other than 15 is rejected with a stated reason** — not truncated, not padded.
+20. The uncapped pool and league markers are computed on **15-player franchise totals**, matching what a custom program is now authoring.
+14. The uncapped pool meter is hidden in capped mode, and an over-budget state is visible at the point of editing — not only on Apply.
 
 ---
 
@@ -424,7 +506,9 @@ This requires publishing a **filtered subset** of the baking manifest into the g
 | 2 | Original court source file — findable outside the repo? (§6.3) | Jamie |
 | 3 | Banner design direction — one or two review rounds (§6.2) | Jamie + Claude |
 | 4 | Trademark clearance on "Team Builder" before any marketing surface | Jamie — carried from v1.3 |
-| 5 | Whether Phases 1 and 2 run concurrently or in sequence | Jamie |
+| 5 | ~~Whether Phases 1 and 2 run concurrently or in sequence~~ — **closed: sequential, same agent** | Jamie |
+| 6 | **Franchise `6a6de652…` (South Lancaster) carries ~+1,600 over a clean week-1 init.** Not walk-ons, not recalibration. Affects franchise creation generally, not Team Builder. | Jamie — new, 1 Aug |
+| 7 | Re-run the §4.3 top-up measurement once attribute recalibration settles — informational, not a gate | Grok, after recalibration |
 
 ---
 
@@ -438,7 +522,14 @@ This requires publishing a **filtered subset** of the baking manifest into the g
 | 4 | Players below 60 are topped up to 60 in capped mode | Clean rule; the alternative is an unsatisfiable minimum. Accepts that capped is near-inherited, not literally inherited. **Confirmed by measurement (§4.3): 13 players, 12 teams affected, worst case 36 points (~0.6% of team total), median team unaffected.** |
 | 19 | The top-up is surfaced in the editor, not applied silently | A budget reading 60 against an inherited 24 with no explanation is indistinguishable from a bug — and silent adjustment is the pattern v1.3 §8.6 forbids everywhere else |
 | 20 | The §4.3 gate metric is **worst single-team top-up**, not the league-wide sum | A user replaces one program; no franchise ever experiences the league total. The original gate wording asked for the wrong number. |
-| 5 | Uncapped budget = largest team total in the league (7,027) | Reads as "the best program's worth of talent" |
+| 21 | **No league constant is stored as a literal** (§4.4a) | Attribute recalibration runs as a parallel workstream. A snapshot literal goes wrong silently — no error, just a budget that stops meaning what the spec says. |
+| 22 | The capped per-player ceiling is dropped, not recalculated | Reallocation cannot create points, so it can never bind. A bound that cannot fire is a literal waiting to go stale. |
+| 23 | **The user authors all 15**, including the 3 walk-ons (§4.5a) | Restores parity with all 127 CPU programs and gives slots 13–15 a real inherited total, closing the undefined-budget problem by defining it rather than by excluding those slots |
+| 24 | Walk-ons are generated **in the wizard**, not by reordering `initialize_season` or excluding the slot from it | No franchise-lifecycle change, no conditional in a shared loop, and abandoning the wizard leaves no team short. Phase 0's failure came from altering a shared producer for the custom case. |
+| 25 | Walk-ons are not re-rollable, **enforced server-side** | In capped mode an as-generated total becomes a budget. Frontend convention is not enforcement — a reload was enough to re-roll. |
+| 26 | Budget comparisons use 15-player totals on both sides | A custom program must be measured against CPU programs on the same basis as what it authors |
+| 27 | The league-context basis is **pinned to week-1 as-initialized**, seeded per `team_id` | Reading live franchise data made the pool depend on which save was newest and how far it had progressed — 6,894 to 9,078 across the same staging DB |
+| 5 | Uncapped budget = largest team total in the league, **computed at runtime** | Reads as "the best program's worth of talent." Stored as a definition, never a literal — see §4.4a |
 | 6 | Eligibility is determined by mode, not computed | Substantial simplification; the meter becomes an allocation aid |
 | 7 | Inline roster editor is required, not optional | Capped mode is not expressible through CSV |
 | 8 | State geography sits **alongside** region A–H | Region is load-bearing for tournaments and recruiting and must not be repurposed |

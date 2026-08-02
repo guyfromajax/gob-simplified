@@ -11,9 +11,6 @@
     ATTR_MIN: 5,
     ATTR_MAX: 99,
     TOPUP_FLOOR: 60,
-    UNCAPPED_TEAM_POOL: 7027,
-    LEAGUE_TEAM_MEDIAN: 5567,
-    LEAGUE_TEAM_BEST: 7027,
     MAX_PLAYERS: 15,
   };
 
@@ -108,6 +105,10 @@
     roster_mode: 'keep',
     attribute_mode: 'capped',
     slotPlayers: null,
+    // §4.5a: three walk-ons from generate_walk_on_profile(), idempotent per draft+slot.
+    draftId: null,
+    wizardWalkOns: null,
+    wizardWalkOnsLoading: false,
     editor: { players: [], inherited: [], loaded: false },
     abbrConflict: null,
     allTeams: [],
@@ -125,13 +126,132 @@
       committed: false,
       parts: { identity: true, roster: true },
       tooManyRows: 0,
-      limitToFirst15: false,
+      wrongSize: false,
       budgetWarnings: [],
+      cappedTooLong: false,
     },
     budget: null,
     slotRosterAttrs: null,
     slotRosterLoading: false,
+    // Runtime league context (Decision #5) — never hardcoded.
+    league: {
+      team_pool: 0,
+      team_median: 0,
+      team_best: 0,
+      loaded: false,
+    },
   };
+
+  function leaguePool() {
+    return state.league.team_pool || 0;
+  }
+
+  function leagueMedian() {
+    return state.league.team_median || 0;
+  }
+
+  function formatPool(n) {
+    return (Number(n) || 0).toLocaleString();
+  }
+
+  function inheritedRosterCount() {
+    // Authored roster is always 15 once the slot + wizard walk-ons are ready.
+    if (state.slotPlayers && state.slotPlayers.length) return state.slotPlayers.length;
+    if (state.slotRosterAttrs && state.slotRosterAttrs.length) return state.slotRosterAttrs.length;
+    return BUDGET.MAX_PLAYERS;
+  }
+
+  function rosterSizeInvalidMessage(offered, required) {
+    return (
+      'A roster holds ' +
+      required +
+      ' players. Your file has ' +
+      offered +
+      '. Supply exactly ' +
+      required +
+      ' — not truncated, not padded.'
+    );
+  }
+
+  function currentBudgetBlockReason() {
+    if (state.import.wrongSize || state.import.cappedTooLong) {
+      return rosterSizeInvalidMessage(
+        state.import.validPlayers.length,
+        BUDGET.MAX_PLAYERS
+      );
+    }
+    if (!state.budget) return '';
+    if (state.attribute_mode === 'uncapped' && state.budget.over_pool_by > 0) {
+      return (
+        'Team pool is ' +
+        state.budget.over_pool_by +
+        ' over the league maximum (' +
+        formatPool(leaguePool()) +
+        '). Trim attributes — Apply is blocked until you\'re within the pool.'
+      );
+    }
+    if (state.attribute_mode === 'capped' && state.budget.per_player_over_by > 0) {
+      return (
+        'One or more players exceed their inherited budget by ' +
+        state.budget.per_player_over_by +
+        ' total points. Points cannot move between players — trim within each player.'
+      );
+    }
+    return '';
+  }
+
+  function syncBudgetRefuseUI() {
+    const reason = currentBudgetBlockReason();
+    const blocked = !!reason;
+    ['tb-budget-refuse', 'tb-budget-refuse-apply'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      if (blocked) {
+        el.hidden = false;
+        el.textContent = reason;
+      } else {
+        el.hidden = true;
+        el.textContent = '';
+      }
+    });
+    ['tb-next-review', 'tb-apply', 'tb-confirm-apply'].forEach(function (id) {
+      const btn = document.getElementById(id);
+      if (!btn) return;
+      if (state.franchiseCap.blocked) return;
+      btn.classList.toggle('is-blocked-budget', blocked);
+      if (blocked) {
+        btn.setAttribute('aria-disabled', 'true');
+        btn.title = reason;
+      } else if (!state.franchiseCap.blocked) {
+        btn.removeAttribute('aria-disabled');
+        if (btn.id !== 'tb-apply' && btn.id !== 'tb-confirm-apply') btn.removeAttribute('title');
+      }
+    });
+  }
+
+  async function fetchLeagueContext() {
+    try {
+      const res = await fetch(API_CONFIG.buildUrl('/franchise/team-builder/league-context'), {
+        headers: API_CONFIG.getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error('league-context failed');
+      const data = await res.json();
+      state.league.team_pool = Number(data.team_pool) || 0;
+      state.league.team_median = Number(data.team_median) || 0;
+      state.league.team_best = Number(data.team_best) || state.league.team_pool;
+      state.league.loaded = true;
+      const uncappedCopy = document.getElementById('tb-uncapped-mode-copy');
+      if (uncappedCopy && state.league.team_pool) {
+        uncappedCopy.textContent =
+          'One team pool of ' +
+          formatPool(state.league.team_pool) +
+          ' points (best program in the league), free across the roster. Not eligible for online play.';
+      }
+      updateBudgetFromCurrentRoster();
+    } catch (_) {
+      state.league.loaded = false;
+    }
+  }
 
   const errorHost = document.getElementById('tb-error');
   const applyErrorHost = document.getElementById('tb-apply-error');
@@ -453,8 +573,8 @@
     const teamTotal = totals.reduce(function (s, t) {
       return s + t;
     }, 0);
-    const overPool =
-      mode === 'uncapped' ? Math.max(0, teamTotal - BUDGET.UNCAPPED_TEAM_POOL) : 0;
+    const pool = leaguePool();
+    const overPool = mode === 'uncapped' && pool > 0 ? Math.max(0, teamTotal - pool) : 0;
     let perPlayerOver = 0;
     if (mode === 'capped' && perPlayerBudgets) {
       for (let i = 0; i < playerAttrsList.length; i++) {
@@ -467,7 +587,7 @@
       attribute_mode: mode,
       online_eligible: eligible,
       team_total: teamTotal,
-      team_pool: BUDGET.UNCAPPED_TEAM_POOL,
+      team_pool: pool,
       over_pool_by: overPool,
       per_player_over_by: perPlayerOver,
     };
@@ -522,6 +642,10 @@
       budget: budget,
       topped_up: toppedUp,
       inheritedAttrs: Object.assign({}, attrs),
+      walk_on: !!p.walk_on || p.archetype === 'Walk On',
+      entry_tier: p.entry_tier || null,
+      position_intent: p.position_intent || null,
+      development: p.development != null ? p.development : null,
     };
   }
 
@@ -545,7 +669,30 @@
       if (!isNaN(w)) out.weight_lb = w;
       const j = parseInt(p.jersey, 10);
       if (!isNaN(j)) out.jersey = j;
+      if (p.walk_on) {
+        out.walk_on = true;
+        out.archetype = 'Walk On';
+        out.entry_tier = p.entry_tier || 'Poor';
+        if (p.position_intent) out.position_intent = p.position_intent;
+        if (p.development != null) out.development = p.development;
+      }
+      if (p.budget != null) out.budget = p.budget;
       return out;
+    });
+  }
+
+  function editorPerPlayerBudgets() {
+    if (!state.editor.loaded || !state.editor.inherited.length) return null;
+    return state.editor.inherited.map(function (p) {
+      if (p.budget != null) return p.budget;
+      return applyCappedTopup(p.attrs || p.inheritedAttrs || {}).budget;
+    });
+  }
+
+  function slotPerPlayerBudgets() {
+    if (!state.slotRosterAttrs || !state.slotRosterAttrs.length) return null;
+    return state.slotRosterAttrs.map(function (a) {
+      return applyCappedTopup(a).budget;
     });
   }
 
@@ -706,6 +853,9 @@
           p.budget +
           '</span>';
       }
+      if (p.walk_on) {
+        html += '<span class="tb-walk-on-tag">Walk-on</span>';
+      }
       html +=
         '<button type="button" class="tb-btn tb-btn-secondary tb-editor-reset-one" data-reset-idx="' +
         idx +
@@ -747,8 +897,16 @@
 
     if (t.dataset.attr) {
       const key = t.dataset.attr;
-      state.editor.players[idx].attrs[key] = clampAttr(t.value);
-      t.value = state.editor.players[idx].attrs[key];
+      const player = state.editor.players[idx];
+      const prev = player.attrs[key];
+      player.attrs[key] = clampAttr(t.value);
+      // Capped: refuse any change that pushes the player past his inherited budget.
+      if (state.attribute_mode === 'capped' && player.budget != null) {
+        if (core12Total(player.attrs) > player.budget) {
+          player.attrs[key] = prev;
+        }
+      }
+      t.value = player.attrs[key];
       refreshEditorPlayerBudgetChrome(idx);
       updateBudgetFromCurrentRoster();
       return;
@@ -786,9 +944,9 @@
   }
 
   function placeLeagueMarkers(scaleMax) {
-    const cap = scaleMax || BUDGET.UNCAPPED_TEAM_POOL;
-    setMarker(document.getElementById('tb-team-marker-median'), BUDGET.LEAGUE_TEAM_MEDIAN, cap);
-    setMarker(document.getElementById('tb-team-marker-best'), BUDGET.LEAGUE_TEAM_BEST, cap);
+    const cap = scaleMax || leaguePool();
+    setMarker(document.getElementById('tb-team-marker-median'), leagueMedian(), cap);
+    setMarker(document.getElementById('tb-team-marker-best'), leaguePool(), cap);
   }
 
   function normalizeClassYear(raw) {
@@ -840,8 +998,9 @@
     state.import.importSummary = null;
     state.import.committed = false;
     state.import.tooManyRows = 0;
-    state.import.limitToFirst15 = false;
+    state.import.wrongSize = false;
     state.import.budgetWarnings = [];
+    state.import.cappedTooLong = false;
 
     ['tb-import-blocking', 'tb-import-progress', 'tb-column-map-wrap', 'tb-import-errors', 'tb-import-warnings', 'tb-too-many-rows', 'tb-parts-picker'].forEach(function (id) {
       const el = document.getElementById(id);
@@ -1025,12 +1184,8 @@
       return;
     }
 
-    let dataRows = state.import.rawRows.slice();
-    if (state.import.tooManyRows > BUDGET.MAX_PLAYERS && !state.import.limitToFirst15) {
-      // Validate all rows for error reporting, but commit path requires limit or trim.
-    } else if (state.import.limitToFirst15 && dataRows.length > BUDGET.MAX_PLAYERS) {
-      dataRows = dataRows.slice(0, BUDGET.MAX_PLAYERS);
-    }
+    // §4.5a: never truncate or pad — validate every row; size checked after.
+    const dataRows = state.import.rawRows.slice();
 
     const total = dataRows.length;
     if (showProgress && progressHost) {
@@ -1092,25 +1247,54 @@
     });
     let budgets = null;
     if (state.attribute_mode === 'capped') {
-      budgets = state.import.validPlayers.map(function (p) {
-        return applyCappedTopup(p.attributes || {}).budget;
-      });
+      // Slot inherited budgets (by index) — not the import row's own total.
+      if (state.slotRosterAttrs && state.slotRosterAttrs.length) {
+        budgets = state.slotRosterAttrs.map(function (a) {
+          return applyCappedTopup(a).budget;
+        });
+      } else {
+        budgets = state.import.validPlayers.map(function (p) {
+          return applyCappedTopup(p.attributes || {}).budget;
+        });
+      }
     }
     const budgetEval = evaluateModeRoster(state.attribute_mode, attrsList, budgets);
+    state.import.cappedTooLong = false;
+    state.import.wrongSize = state.import.validPlayers.length !== BUDGET.MAX_PLAYERS;
+    if (state.import.wrongSize) {
+      state.import.cappedTooLong = true;
+      const sizeMsg = rosterSizeInvalidMessage(
+        state.import.validPlayers.length,
+        BUDGET.MAX_PLAYERS
+      );
+      state.import.budgetWarnings.push(sizeMsg);
+      const sizeBlocking = document.getElementById('tb-import-blocking');
+      if (sizeBlocking) {
+        sizeBlocking.hidden = false;
+        sizeBlocking.textContent = sizeMsg;
+      }
+    }
     if (state.attribute_mode === 'uncapped' && budgetEval.over_pool_by > 0) {
       state.import.budgetWarnings.push(
         'Team pool is ' +
           budgetEval.over_pool_by +
-          ' over 7,027. Uncapped franchises are not eligible for online play.'
+          ' over the league maximum (' +
+          formatPool(leaguePool()) +
+          '). Trim attributes before Apply.'
       );
     }
-    if (state.attribute_mode === 'capped' && budgetEval.per_player_over_by > 0) {
+    if (
+      state.attribute_mode === 'capped' &&
+      !state.import.cappedTooLong &&
+      budgetEval.per_player_over_by > 0
+    ) {
       state.import.budgetWarnings.push(
-        'One or more players exceed their per-player budget by ' +
+        'Imported per-player totals differ from this program\'s inherited budgets by ' +
           budgetEval.per_player_over_by +
-          ' total points. Trim attributes to stay within each player\'s cap.'
+          ' points. On Apply, each player is forced back to his inherited total.'
       );
     }
+    syncBudgetRefuseUI();
     if (state.import.budgetWarnings.length) {
       const warnHost = document.getElementById('tb-import-warnings');
       if (warnHost) {
@@ -1139,21 +1323,12 @@
       partsHost.hidden = true;
     }
 
-    if (tooManyHost && state.import.tooManyRows > BUDGET.MAX_PLAYERS && !state.import.limitToFirst15) {
+    if (tooManyHost && state.import.wrongSize) {
       tooManyHost.hidden = false;
-      tooManyHost.innerHTML =
-        'That file has ' +
-        state.import.tooManyRows +
-        ' players. A roster holds 15. Trim the file, or import the first 15. ' +
-        '<button type="button" class="tb-btn tb-btn-secondary" id="tb-import-first-15">Import the first 15</button>';
-      const btn = document.getElementById('tb-import-first-15');
-      if (btn) {
-        btn.onclick = function () {
-          state.import.limitToFirst15 = true;
-          tooManyHost.hidden = true;
-          runValidation(true);
-        };
-      }
+      tooManyHost.textContent = rosterSizeInvalidMessage(
+        state.import.validPlayers.length || state.import.tooManyRows,
+        BUDGET.MAX_PLAYERS
+      );
     } else if (tooManyHost) {
       tooManyHost.hidden = true;
     }
@@ -1251,12 +1426,10 @@
       return;
     }
 
-    if (
-      rosterOn &&
-      state.import.tooManyRows > BUDGET.MAX_PLAYERS &&
-      !state.import.limitToFirst15
-    ) {
-      showError('That file has too many players. Trim the file or import the first 15.');
+    if (rosterOn && (state.import.wrongSize || state.import.cappedTooLong)) {
+      showError(
+        rosterSizeInvalidMessage(state.import.validPlayers.length, BUDGET.MAX_PLAYERS)
+      );
       return;
     }
 
@@ -1307,6 +1480,12 @@
   }
 
   function commitImport() {
+    if (state.import.wrongSize || state.import.cappedTooLong) {
+      showError(
+        rosterSizeInvalidMessage(state.import.validPlayers.length, BUDGET.MAX_PLAYERS)
+      );
+      return;
+    }
     const identityOn = state.import.parts.identity;
     const rosterOn = state.import.parts.roster;
 
@@ -1316,7 +1495,8 @@
     }
 
     if (rosterOn) {
-      state.import.importedPlayers = state.import.validPlayers.slice(0, BUDGET.MAX_PLAYERS);
+      // Exact 15 — no truncate / pad (§4.5a).
+      state.import.importedPlayers = state.import.validPlayers.slice();
       state.import.importSummary = {
         imported: state.import.importedPlayers.length,
         skipped: state.import.rowErrors.length,
@@ -1402,136 +1582,188 @@
       input.budgets
     );
     renderBudgetMeter(state.budget);
+    syncBudgetRefuseUI();
   }
 
   function renderBudgetMeter(evalResult) {
     const fill = document.getElementById('tb-budget-fill');
     const teamBar = document.getElementById('tb-budget-bar-team');
+    const track = document.getElementById('tb-budget-track-team');
     const label = document.getElementById('tb-budget-label');
     const context = document.getElementById('tb-budget-context');
     const badge = document.getElementById('tb-elig-badge');
-    const warn = document.getElementById('tb-budget-warn');
     const uncapped = state.attribute_mode === 'uncapped';
-    const poolCap = BUDGET.UNCAPPED_TEAM_POOL;
+    const poolCap = leaguePool();
+    const markers = [
+      document.getElementById('tb-team-marker-median'),
+      document.getElementById('tb-team-marker-best'),
+    ];
 
-    placeLeagueMarkers(poolCap);
+    // Capped: no uncapped pool bar — per-player budgets are the allocation truth.
+    if (track) track.hidden = !uncapped;
+    markers.forEach(function (el) {
+      if (el) el.hidden = !uncapped;
+    });
 
-    if (context) {
-      context.textContent =
-        'median program ' +
-        BUDGET.LEAGUE_TEAM_MEDIAN.toLocaleString() +
-        ' · best program ' +
-        BUDGET.LEAGUE_TEAM_BEST.toLocaleString();
-      context.hidden = !uncapped;
+    if (uncapped) {
+      placeLeagueMarkers(poolCap);
+      if (context) {
+        context.hidden = !poolCap;
+        context.textContent =
+          'median program ' +
+          formatPool(leagueMedian()) +
+          ' · best program ' +
+          formatPool(poolCap);
+      }
+    } else if (context) {
+      context.hidden = true;
+    }
+
+    function setEligBadge() {
+      if (!badge) return;
+      badge.textContent = uncapped
+        ? 'Not eligible for online play (uncapped)'
+        : 'Eligible for online play (capped)';
+      badge.className = uncapped ? 'tb-elig is-no' : 'tb-elig is-yes';
     }
 
     if (!evalResult) {
-      setBarFill(fill, teamBar, 0, poolCap);
-      if (state.roster_mode === 'generate') {
-        if (label) label.textContent = 'Team pool: estimated until Apply';
-        if (badge) {
-          badge.textContent = uncapped
-            ? 'Not eligible for online play (uncapped)'
-            : 'Eligible for online play (capped)';
-          badge.className = uncapped ? 'tb-elig is-no' : 'tb-elig is-yes';
-        }
-      } else if (state.roster_mode === 'keep') {
-        if (label) {
-          label.textContent = state.slotRosterLoading
-            ? 'Team total: loading slot roster…'
-            : uncapped
-              ? 'Team pool: inherited roster (keep)'
-              : 'Team total: inherited roster (keep, no top-up)';
-        }
-        if (badge) {
-          badge.textContent = uncapped
-            ? 'Not eligible for online play (uncapped)'
-            : 'Eligible for online play (capped)';
-          badge.className = uncapped ? 'tb-elig is-no' : 'tb-elig is-yes';
-        }
-      } else if (state.roster_mode === 'edit') {
-        if (label) {
+      if (uncapped) setBarFill(fill, teamBar, 0, poolCap || 1);
+      if (label) {
+        if (!uncapped) {
           label.textContent = state.slotRosterLoading
             ? 'Loading inherited roster…'
-            : uncapped
-              ? 'Team pool: — / 7,027'
-              : 'Per-player budgets enforced in editor';
-        }
-        if (badge) {
-          badge.textContent = uncapped
-            ? 'Not eligible for online play (uncapped)'
-            : 'Eligible for online play (capped)';
-          badge.className = uncapped ? 'tb-elig is-no' : 'tb-elig is-yes';
-        }
-      } else {
-        if (label) {
-          label.textContent = uncapped ? 'Team pool: — / 7,027' : 'Per-player budgets apply when editing';
-        }
-        if (badge) {
-          badge.textContent = uncapped
-            ? 'Not eligible for online play (uncapped)'
-            : 'Eligible for online play (capped)';
-          badge.className = uncapped ? 'tb-elig is-no' : 'tb-elig is-yes';
+            : 'Per-player budgets — points stay within each player';
+        } else if (state.roster_mode === 'generate') {
+          label.textContent = poolCap
+            ? 'Team pool: estimated until Apply / ' + formatPool(poolCap)
+            : 'Team pool: estimated until Apply';
+        } else {
+          label.textContent = poolCap ? 'Team pool: — / ' + formatPool(poolCap) : 'Team pool: —';
         }
       }
-      if (warn) warn.hidden = true;
+      setEligBadge();
+      syncBudgetRefuseUI();
       return;
     }
 
     const teamTotal = evalResult.team_total;
     if (uncapped) {
-      setBarFill(fill, teamBar, teamTotal, poolCap);
+      setBarFill(fill, teamBar, teamTotal, poolCap || Math.max(teamTotal, 1));
       if (label) {
         label.textContent =
-          'Team pool: ' +
-          teamTotal.toLocaleString() +
-          ' / ' +
-          poolCap.toLocaleString();
+          'Team pool: ' + formatPool(teamTotal) + ' / ' + formatPool(poolCap);
       }
-    } else {
-      setBarFill(fill, teamBar, teamTotal, Math.max(teamTotal, poolCap));
-      if (label) {
-        label.textContent = 'Team total: ' + teamTotal.toLocaleString();
-      }
-      if (teamBar) teamBar.classList.toggle('is-over', evalResult.per_player_over_by > 0);
+    } else if (label) {
+      const n = state.editor.loaded ? state.editor.players.length : (state.slotPlayers || []).length;
+      label.textContent =
+        'Inherited shape: ' +
+        formatPool(teamTotal) +
+        ' total across ' +
+        n +
+        ' player' +
+        (n === 1 ? '' : 's') +
+        ' — redistribute within each player only';
     }
 
-    if (badge) {
-      if (evalResult.online_eligible) {
-        badge.textContent = 'Eligible for online play (capped)';
-        badge.className = 'tb-elig is-yes';
-      } else {
-        badge.textContent = 'Not eligible for online play (uncapped)';
-        badge.className = 'tb-elig is-no';
-      }
-    }
+    setEligBadge();
+    syncBudgetRefuseUI();
+  }
 
-    if (warn) {
-      const msgs = [];
-      if (evalResult.over_pool_by > 0) {
-        msgs.push(
-          'Team pool is ' +
-            evalResult.over_pool_by +
-            ' over 7,027. Uncapped franchises are not eligible for online play.'
-        );
-      }
-      if (evalResult.per_player_over_by > 0) {
-        msgs.push(
-          'One or more players exceed their per-player budget by ' +
-            evalResult.per_player_over_by +
-            ' total points. Points cannot move between players — trim within each player.'
-        );
-      }
-      if (msgs.length) {
-        warn.hidden = false;
-        warn.innerHTML = msgs.map(function (m) {
-          return '<p>' + escapeHtml(m) + '</p>';
-        }).join('');
-      } else {
-        warn.hidden = true;
-        warn.textContent = '';
-      }
+  function ensureDraftId() {
+    if (state.draftId) return state.draftId;
+    var existing = null;
+    try {
+      existing = window.localStorage.getItem('tb-draft-id');
+    } catch (_) {}
+    if (existing && existing.length >= 8) {
+      state.draftId = existing;
+      return state.draftId;
     }
+    var id =
+      typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'tb-' + String(Date.now()) + '-' + Math.random().toString(16).slice(2);
+    state.draftId = id;
+    try {
+      window.localStorage.setItem('tb-draft-id', id);
+    } catch (_) {}
+    return state.draftId;
+  }
+
+  function clearDraftId() {
+    state.draftId = null;
+    try {
+      window.localStorage.removeItem('tb-draft-id');
+    } catch (_) {}
+  }
+
+  async function ensureWizardWalkOns() {
+    // Server-keyed on draft+slot — reload-safe; not re-rollable (Decision #25).
+    if (!state.slot || !state.slot.object_id) {
+      throw new Error('slot required for walk-ons');
+    }
+    var slotKey = String(state.slot.object_id);
+    if (
+      state.wizardWalkOns &&
+      state.wizardWalkOns.length === 3 &&
+      state._wizardWalkOnsSlotKey === slotKey
+    ) {
+      return state.wizardWalkOns;
+    }
+    if (state.wizardWalkOnsLoading && state._wizardWalkOnsPromise) {
+      return state._wizardWalkOnsPromise;
+    }
+    state.wizardWalkOnsLoading = true;
+    state._wizardWalkOnsPromise = (async function () {
+      var draftId = ensureDraftId();
+      const res = await fetch(API_CONFIG.buildUrl('/franchise/team-builder/wizard-walk-ons'), {
+        method: 'POST',
+        headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          replaced_object_id: slotKey,
+          draft_id: draftId,
+        }),
+      });
+      if (!res.ok) throw new Error('walk-on generation failed');
+      const data = await res.json();
+      const walkOns = data.walk_ons || [];
+      if (walkOns.length !== 3) throw new Error('expected 3 walk-ons');
+      state.wizardWalkOns = walkOns;
+      state._wizardWalkOnsSlotKey = slotKey;
+      return walkOns;
+    })();
+    try {
+      return await state._wizardWalkOnsPromise;
+    } finally {
+      state.wizardWalkOnsLoading = false;
+    }
+  }
+
+  function mergeSlotWithWizardWalkOns(corePlayers, walkOns) {
+    const core = (corePlayers || []).slice(0, 12).map(function (p) {
+      const copy = Object.assign({}, p);
+      copy.walk_on = false;
+      return copy;
+    });
+    const extras = (walkOns || []).map(function (wo) {
+      return {
+        wizard_player_id: wo.wizard_player_id || null,
+        first_name: wo.first_name || '',
+        last_name: wo.last_name || '',
+        year: wo.year || 'Freshman',
+        height: wo.height,
+        weight: wo.weight,
+        jersey: wo.jersey,
+        attributes: Object.assign({}, wo.attributes || {}),
+        walk_on: true,
+        archetype: 'Walk On',
+        entry_tier: wo.entry_tier || 'Poor',
+        position_intent: wo.position_intent || null,
+        development: wo.development != null ? wo.development : null,
+      };
+    });
+    return core.concat(extras);
   }
 
   async function fetchSlotRoster() {
@@ -1543,12 +1775,13 @@
       const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
       if (!res.ok) throw new Error('roster fetch failed');
       const data = await res.json();
-      state.slotPlayers = data.players || [];
+      const walkOns = await ensureWizardWalkOns();
+      state.slotPlayers = mergeSlotWithWizardWalkOns(data.players || [], walkOns);
       state.slotRosterAttrs = state.slotPlayers.map(function (p) {
         return extractCore12FromPlayer(p);
       });
-      if (state.roster_mode === 'edit' && state.editor.loaded) {
-        initEditorFromSlot(true);
+      if (state.roster_mode === 'edit') {
+        initEditorFromSlot(!state.editor.loaded);
       }
       if (state.roster_mode === 'keep') updateBudgetFromCurrentRoster();
     } catch (_) {
@@ -1581,8 +1814,19 @@
           state.slot = team;
           state.slotRosterAttrs = null;
           state.slotPlayers = null;
+          // Slot change keeps draft_id but clears cached walk-ons — server key includes slot.
+          state.wizardWalkOns = null;
+          state._wizardWalkOnsSlotKey = null;
+          state._wizardWalkOnsPromise = null;
           state.editor = { players: [], inherited: [], loaded: false };
           document.getElementById('tb-keep-label').textContent = "Keep " + team.name + "'s roster";
+          const keepDetail = document.getElementById('tb-keep-detail');
+          if (keepDetail) keepDetail.textContent = team.name + "'s roster exactly as-is.";
+          const editDetail = document.getElementById('tb-edit-detail');
+          if (editDetail) {
+            editDetail.textContent =
+              team.name + "'s roster in a table — redistribute within the chosen mode.";
+          }
           const dl = document.getElementById('tb-dl-slot');
           if (dl) dl.textContent = "Download " + team.name + "'s current roster";
           fetchSlotRoster();
@@ -1715,11 +1959,11 @@
       if (state.attribute_mode === 'uncapped') {
         line +=
           ' · team pool ' +
-          state.budget.team_total.toLocaleString() +
+          formatPool(state.budget.team_total) +
           ' / ' +
-          BUDGET.UNCAPPED_TEAM_POOL.toLocaleString();
+          formatPool(leaguePool());
       } else {
-        line += ' · team total ' + state.budget.team_total.toLocaleString();
+        line += ' · team total ' + formatPool(state.budget.team_total);
       }
     } else if (state.roster_mode === 'generate') {
       line += ' · roster estimated at Apply';
@@ -1733,11 +1977,23 @@
     const host = document.getElementById('tb-review');
     if (!host || !state.slot) return;
     const conf = confLabel(state.slot);
+    const rosterCount =
+      state.roster_mode === 'edit' && state.editor.loaded
+        ? state.editor.players.length
+        : (state.slotPlayers || []).length;
     let rosterLine;
     if (state.roster_mode === 'keep') {
-      rosterLine = "Roster: keeping " + state.slot.name + "'s players (no top-up)";
+      rosterLine =
+        "Roster: " +
+        state.slot.name +
+        "'s roster exactly as-is" +
+        (rosterCount ? ' (' + rosterCount + ' players)' : '');
     } else if (state.roster_mode === 'edit') {
-      rosterLine = 'Roster: editing inherited ' + state.slot.name + ' players';
+      rosterLine =
+        'Roster: editing inherited ' +
+        state.slot.name +
+        ' players' +
+        (rosterCount ? ' (' + rosterCount + ')' : '');
     } else if (state.roster_mode === 'generate') {
       rosterLine = 'Roster: generate new players at slot talent band';
     } else if (state.import.importSummary) {
@@ -1844,16 +2100,29 @@
         jersey_preset: state.colors.jersey_preset,
         roster_mode: state.roster_mode,
         attribute_mode: state.attribute_mode,
+        draft_id: ensureDraftId(),
       };
       if (
         state.roster_mode === 'import' &&
         state.import.importedPlayers &&
         state.import.importedPlayers.length
       ) {
-        payload.imported_players = state.import.importedPlayers;
+        payload.imported_players = state.import.importedPlayers.map(function (p, idx) {
+          const row = Object.assign({}, p);
+          if (idx >= 12) {
+            row.walk_on = true;
+            row.archetype = 'Walk On';
+            row.entry_tier = row.entry_tier || 'Poor';
+          }
+          return row;
+        });
+        const budgets = slotPerPlayerBudgets();
+        if (budgets && budgets.length === 15) payload.per_player_budgets = budgets;
       }
       if (state.roster_mode === 'edit' && state.editor.loaded && state.editor.players.length) {
         payload.imported_players = editorPlayersToImportPayload();
+        const budgets = editorPerPlayerBudgets();
+        if (budgets && budgets.length === 15) payload.per_player_budgets = budgets;
       }
       const res = await fetch(API_CONFIG.buildUrl('/franchise/team-builder/apply'), {
         method: 'POST',
@@ -1875,6 +2144,7 @@
       }
       const data = await res.json();
       if (data.franchise_id) {
+        clearDraftId();
         if (typeof hydrateTeamBuilderVisualFromFranchisePayload === 'function') {
           hydrateTeamBuilderVisualFromFranchisePayload(
             {
@@ -1887,7 +2157,8 @@
               is_custom_team: true,
               team_builder_replaced_name: state.slot.name,
               user_team_object_id: state.slot.object_id,
-              online_eligibility: data.online_eligibility,
+              online_eligible:
+                data.online_eligible != null ? data.online_eligible : data.online_eligibility,
             },
             data.franchise_id
           );
@@ -1913,11 +2184,13 @@
   }
 
   function blankTemplateCsv() {
-    return (
-      'first_name,last_name,class_year,height_in,weight_lb,jersey,SC,SH,ID,OD,PS,BH,RB,ST,AG,ND,IQ,FT\n' +
-      'Jamie,Example,FR,,,,,,,,,,,\n' +
-      'Alex,Sample,SO,,,,,,,,,,,\n'
-    );
+    const header =
+      'first_name,last_name,class_year,height_in,weight_lb,jersey,SC,SH,ID,OD,PS,BH,RB,ST,AG,ND,IQ,FT\n';
+    const years = ['FR', 'SO', 'JR', 'SR', 'FR', 'SO', 'JR', 'SR', 'FR', 'SO', 'JR', 'SR', 'FR', 'FR', 'SO'];
+    const rows = years.map(function (cy, i) {
+      return 'Player' + (i + 1) + ',Example,' + cy + ',,,,,,,,,,,,';
+    });
+    return header + rows.join('\n') + '\n';
   }
 
   function downloadText(filename, text) {
@@ -1934,11 +2207,50 @@
     URL.revokeObjectURL(url);
   }
 
+  function authoredRosterCsvFromSlotPlayers() {
+    const header = [
+      'first_name',
+      'last_name',
+      'class_year',
+      'height_in',
+      'weight_lb',
+      'jersey',
+    ].concat(CORE_12);
+    const lines = [header.map(csvEscape).join(',')];
+    (state.slotPlayers || []).forEach(function (p) {
+      const cy = classYearFromPlayer(p) || 'FR';
+      const attrs = extractCore12FromPlayer(p);
+      const row = [
+        p.first_name || '',
+        p.last_name || '',
+        cy,
+        p.height != null ? p.height : '',
+        p.weight != null ? p.weight : '',
+        p.jersey != null ? p.jersey : '',
+      ].concat(
+        CORE_12.map(function (k) {
+          return attrs[k] != null ? attrs[k] : '';
+        })
+      );
+      lines.push(row.map(csvEscape).join(','));
+    });
+    return lines.join('\n') + '\n';
+  }
+
   async function downloadSlotRoster() {
     const status = document.getElementById('tb-import-status');
     if (!state.slot) return;
     const slug = state.slot.name.replace(/\s+/g, '-').toLowerCase();
     try {
+      // Prefer authored 15 (core 12 + wizard walk-ons) so the CSV matches Apply.
+      if (!state.slotPlayers || state.slotPlayers.length !== 15) {
+        await fetchSlotRoster();
+      }
+      if (state.slotPlayers && state.slotPlayers.length === 15) {
+        downloadText(slug + '-roster.csv', authoredRosterCsvFromSlotPlayers());
+        if (status) status.textContent = '';
+        return;
+      }
       const url = API_CONFIG.buildUrl(
         '/franchise/team-builder/slot-roster.csv?object_id=' + encodeURIComponent(state.slot.object_id)
       );
@@ -1997,6 +2309,7 @@
   }
 
   document.addEventListener('DOMContentLoaded', async function () {
+    ensureDraftId();
     const back = document.getElementById('tb-back');
     if (back) {
       const q = HOME_SLOT ? ('?home_slot=' + HOME_SLOT) : '';
@@ -2015,7 +2328,9 @@
       state.allTeams = [];
     }
 
+    await fetchLeagueContext();
     mountPicker();
+    updateModePill();
 
     document.querySelectorAll('[data-nav]').forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -2034,6 +2349,15 @@
           if (!validateAbbr()) return showError(document.getElementById('tb-abbr-hint').textContent);
         }
         if (!state.slot && next > 0) return showError('Choose a slot first.');
+        // Budget refuse is sticky on the dock — block leaving roster while over.
+        if (next === 4 && currentBudgetBlockReason()) {
+          syncBudgetRefuseUI();
+          const refuse = document.getElementById('tb-budget-refuse');
+          if (refuse && typeof refuse.scrollIntoView === 'function') {
+            refuse.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+          }
+          return;
+        }
         setStep(next);
       });
     });
@@ -2138,6 +2462,11 @@
         return showError('Wait for the inherited roster to load, or choose another roster option.', {
           nearApply: true,
         });
+      }
+      const blockReason = currentBudgetBlockReason();
+      if (blockReason) {
+        syncBudgetRefuseUI();
+        return showError(blockReason, { nearApply: true });
       }
       openConfirmModal();
     });

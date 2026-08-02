@@ -2601,6 +2601,10 @@ class TeamBuilderApplyRequest(BaseModel):
     # capped | uncapped — determines online eligibility (v2 §4)
     attribute_mode: str = "capped"
     imported_players: list[dict[str, Any]] | None = None
+    # Optional capped budgets for the authored 15 (wizard walk-on totals included).
+    per_player_budgets: list[int] | None = None
+    # Wizard draft key — used to clear idempotent walk-on storage after Apply.
+    draft_id: str | None = None
 
 
 class PlayGameRequest(BaseModel):
@@ -3506,6 +3510,68 @@ def team_builder_slot_roster_csv(
     )
 
 
+@router.get("/franchise/team-builder/league-context")
+def team_builder_league_context(user: dict = Depends(get_current_user)):
+    """
+    Runtime league attribute context for the wizard (Decision #5 / §4.5a).
+
+    Uncapped pool and markers are 15-player franchise totals when available.
+    """
+    _ = user
+    from BackEnd.utils.team_builder_league_context import compute_league_attr_context
+
+    return compute_league_attr_context(db)
+
+
+class TeamBuilderWizardWalkOnsRequest(BaseModel):
+    """Idempotent walk-on draw keyed on draft + replaced slot (§4.5a / Decision #25)."""
+
+    replaced_object_id: str
+    draft_id: str
+
+
+@router.post("/franchise/team-builder/wizard-walk-ons")
+def team_builder_wizard_walk_ons(
+    body: TeamBuilderWizardWalkOnsRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Return three walk-ons for the Team Builder wizard (§4.5a).
+
+    Uses generate_walk_on_profile() on first draw for (user, draft_id, slot).
+    Repeat calls with the same key return the same three players (same ids and
+    attributes) so a reload or retry cannot shop for a larger capped budget.
+    """
+    from BackEnd.utils.team_builder_roster import get_or_create_wizard_walk_ons
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    draft_id = str(body.draft_id or "").strip()
+    if len(draft_id) < 8 or len(draft_id) > 80:
+        raise HTTPException(status_code=400, detail="draft_id is required")
+
+    if not db.teams.find_one({"_id": replaced_oid}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Replaced program not found")
+
+    try:
+        walk_ons = get_or_create_wizard_walk_ons(
+            db,
+            user_id=str(user.get("user_id") or ""),
+            replaced_object_id=str(replaced_oid),
+            draft_id=draft_id,
+        )
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Unable to resolve wizard walk-ons key")
+
+    return {
+        "walk_ons": walk_ons,
+        "draft_id": draft_id,
+        "replaced_object_id": str(replaced_oid),
+    }
+
+
 @router.post("/franchise/team-builder/apply")
 def team_builder_apply(
     body: TeamBuilderApplyRequest,
@@ -3524,6 +3590,7 @@ def team_builder_apply(
         TEAM_BUILDER_FIELD,
         normalize_jersey_preset,
     )
+    from BackEnd.utils.team_builder_league_context import compute_league_attr_context
     from BackEnd.utils.team_builder_roster import collect_budget_attrs
 
     existing_franchises = db.franchises.count_documents({"user_id": user.get("user_id")})
@@ -3570,9 +3637,12 @@ def team_builder_apply(
 
     roster_mode = (body.roster_mode or "keep").strip().lower()
     attribute_mode = normalize_attribute_mode(body.attribute_mode)
-    # Keep path: byte-identical inherited roster; still capped-eligible by mode default,
-    # but eligibility follows the chosen mode (keep never applies top-up).
+    # Keep path: byte-identical inherited roster; eligibility follows the chosen mode
+    # (keep never applies top-up).
     online_eligible = online_eligible_for_mode(attribute_mode)
+    league_ctx = compute_league_attr_context(db)
+    team_pool = int(league_ctx.get("team_pool") or 0)
+    team_median = int(league_ctx.get("team_median") or 0)
 
     replaced_name = team_doc.get("name") or ""
     overlay = {
@@ -3611,7 +3681,50 @@ def team_builder_apply(
                 franchise_team_data_collection=franchise_team_data_collection,
                 franchise_players_data_collection=franchise_players_data_collection,
                 attribute_mode=attribute_mode,
+                team_pool=team_pool,
+                per_player_budgets=body.per_player_budgets,
             )
+        except ValueError as exc:
+            msg = str(exc)
+            if msg.startswith("uncapped_pool_exceeded:"):
+                parts = msg.split(":")
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"Team total {parts[1]} exceeds the league pool "
+                        f"({parts[2]}). Trim attributes or switch modes."
+                    ),
+                )
+            if msg.startswith("roster_size_invalid:"):
+                parts = msg.split(":")
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"A roster holds {parts[2]} players. Your roster has "
+                        f"{parts[1]}. Supply exactly {parts[2]} — not truncated, "
+                        f"not padded."
+                    ),
+                )
+            if msg.startswith("capped_roster_too_long:"):
+                parts = msg.split(":")
+                raise HTTPException(
+                    status_code=400,
+                    detail=(
+                        f"A roster holds {parts[2]} players. Your roster has "
+                        f"{parts[1]}. Supply exactly {parts[2]}."
+                    ),
+                )
+            if msg == "capped_roster_empty_slot":
+                raise HTTPException(
+                    status_code=400,
+                    detail="This program has no roster to generate from.",
+                )
+            logger.exception(
+                "[TEAM-BUILDER] roster replace rejected franchise_id=%s mode=%s",
+                franchise_id,
+                roster_mode,
+            )
+            raise HTTPException(status_code=400, detail="Unable to apply roster changes")
         except Exception:
             logger.exception(
                 "[TEAM-BUILDER] roster replace failed franchise_id=%s mode=%s",
@@ -3643,6 +3756,8 @@ def team_builder_apply(
             evaluation = evaluate_mode_roster(
                 attribute_mode=attribute_mode,
                 player_attrs=attrs_list,
+                team_pool=team_pool,
+                team_median=team_median,
             )
             budget_meta = {
                 "attribute_mode": evaluation["attribute_mode"],
@@ -3661,12 +3776,13 @@ def team_builder_apply(
                 TEAM_BUILDER_FIELD: overlay,
                 "user_team_id": custom_name,
                 "attribute_mode": budget_meta["attribute_mode"],
-                # Spec name (v2 §4.7) plus legacy alias read by FCC today.
+                # Spec field only. Legacy `online_eligibility` is derived at read edges.
                 "online_eligible": budget_meta["online_eligible"],
-                "online_eligibility": budget_meta["online_eligible"],
                 "hasEverExceededBudget": budget_meta["hasEverExceededBudget"],
                 "roster_shape_at_creation": budget_meta["roster_shape_at_creation"],
-            }
+            },
+            # Drop the v1 twin so the two names cannot drift in storage.
+            "$unset": {"online_eligibility": ""},
         },
     )
 
@@ -3705,14 +3821,27 @@ def team_builder_apply(
     except Exception:
         logger.exception("[TEAM-BUILDER] FTD overlay write failed")
 
+    try:
+        from BackEnd.utils.team_builder_roster import clear_wizard_walk_ons_for_user
+
+        # Drop all drafts for this user — Apply completed; budgets are frozen on FPD.
+        clear_wizard_walk_ons_for_user(
+            db,
+            user_id=str(user.get("user_id") or ""),
+        )
+    except Exception:
+        logger.exception("[TEAM-BUILDER] wizard walk-on draft cleanup failed")
+
+    eligible = bool(budget_meta["online_eligible"])
     return {
         "status": "ok",
         "franchise_id": str(franchise_id),
         "home_slot": home_slot,
         "team_builder": overlay,
         "attribute_mode": budget_meta["attribute_mode"],
-        "online_eligible": budget_meta["online_eligible"],
-        "online_eligibility": budget_meta["online_eligible"],
+        "online_eligible": eligible,
+        # Derived alias for v1 readers — never assigned independently.
+        "online_eligibility": eligible,
         "roster_shape_at_creation": budget_meta["roster_shape_at_creation"],
     }
 
@@ -7794,15 +7923,11 @@ def command_center_data(
                     response["jersey_preset"] = display.get("jersey_preset")
                 response["user_team_object_id"] = str(team_id)
                 # Frozen at Apply (§9.4) — surface as franchise metadata only.
-                if "online_eligible" in franchise_doc:
-                    response["online_eligible"] = bool(franchise_doc.get("online_eligible"))
-                    response["online_eligibility"] = response["online_eligible"]
-                elif "online_eligibility" in franchise_doc:
-                    response["online_eligibility"] = bool(franchise_doc.get("online_eligibility"))
-                    response["online_eligible"] = response["online_eligibility"]
-                else:
-                    response["online_eligibility"] = True
-                    response["online_eligible"] = True
+                from BackEnd.constants.team_builder_budget import resolve_online_eligible
+
+                eligible = resolve_online_eligible(franchise_doc)
+                response["online_eligible"] = eligible
+                response["online_eligibility"] = eligible  # derived alias
                 if "attribute_mode" in franchise_doc:
                     response["attribute_mode"] = franchise_doc.get("attribute_mode")
                 if "hasEverExceededBudget" in franchise_doc:
