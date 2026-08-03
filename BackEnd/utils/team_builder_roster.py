@@ -1,4 +1,4 @@
-"""Team Builder roster export, import, and generate helpers (§8, §8.8)."""
+"""Team Builder roster export, import, and edit helpers (§8, §8.8, §4.5c)."""
 from __future__ import annotations
 
 import csv
@@ -40,8 +40,9 @@ _PRESERVE_ATTR_KEYS = ("CH", "EM", "MO", "NG")
 _META_INHERIT_KEYS = (
     "archetype",
     "Home Region",
-    "photo",
     "scouting_report",
+    # Portrait kit reference (recruit_set / builder_set / upload key). Not a
+    # flat base-league photo path — those are stripped at Apply (§4.5c).
     "image_id",
     "portrait",
 )
@@ -281,7 +282,7 @@ def _payload_from_fpd_doc(doc: Mapping[str, Any]) -> dict[str, Any]:
         "attributes": dict(doc.get("attributes") or {}),
         "position_ratings": dict(doc.get("position_ratings") or {}),
     }
-    for key in ("entry_tier", "position_intent", "development", "photo", "season", "career"):
+    for key in ("entry_tier", "position_intent", "potential_factor", "development", "photo", "season", "career"):
         if doc.get(key) is not None:
             payload[key] = deepcopy(doc[key]) if key in ("season", "career", "development") else doc[key]
     # Core sometimes stores photo/archetype at top level; mirror into meta when absent.
@@ -295,21 +296,23 @@ def _payload_from_fpd_doc(doc: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def _enrich_payload_from_core(payload: dict[str, Any], core: Mapping[str, Any] | None) -> dict[str, Any]:
-    """Fill fields init drops (archetype, photo, …) from the core player doc."""
+    """Fill fields init drops (archetype, image_id, …) from the core player doc."""
     if not core:
         return payload
     meta = payload.setdefault("meta", {})
     for key in _META_INHERIT_KEYS:
-        if key == "photo":
-            continue
         if meta.get(key) in (None, "") and core.get(key) not in (None, ""):
             meta[key] = core[key]
-    if not payload.get("photo") and core.get("photo"):
-        payload["photo"] = core["photo"]
+    # Never copy unrecolourable base-league photo paths (§4.5c).
+    # Kit reference is meta.image_id (assigned in Phase 3d).
+    payload.pop("photo", None)
+    meta.pop("photo", None)
     if payload.get("entry_tier") is None and core.get("entry_tier") is not None:
         payload["entry_tier"] = core["entry_tier"]
     if payload.get("position_intent") is None and core.get("position_intent") is not None:
         payload["position_intent"] = core["position_intent"]
+    if payload.get("potential_factor") is None and core.get("potential_factor") is not None:
+        payload["potential_factor"] = core["potential_factor"]
     if payload.get("development") is None and core.get("development") is not None:
         payload["development"] = deepcopy(core["development"])
     if not payload.get("position_ratings") and core.get("position_ratings"):
@@ -349,6 +352,7 @@ def _payload_from_wizard_walk_on(
         "entry_tier": wo.get("entry_tier") or "Poor",
         "position_intent": wo.get("position_intent"),
         "development": wo.get("development"),
+        "potential_factor": wo.get("potential_factor"),
     }
     if wo.get("photo"):
         payload["photo"] = wo["photo"]
@@ -439,6 +443,14 @@ def apply_row_diff_to_inherited(
             for key in CORE_12_ATTRS
             if key in merged_core
         ) and all(key in merged_core for key in CORE_12_ATTRS)
+        # §4.5c: capped top-up / budget force still apply on a zero-edit restatement
+        # (Keep exemption retired — below-floor players must rise to 60).
+        if restates_inherited and apply_topup and mode == "capped":
+            raw_total = core12_total(attrs)
+            if raw_total < TOPUP_FLOOR or (
+                budget is not None and raw_total != int(budget)
+            ):
+                restates_inherited = False
         if not restates_inherited:
             pre_clamp: dict[str, int] = {}
             for key in CORE_12_ATTRS:
@@ -548,6 +560,7 @@ def _build_fpd_doc(
     photo: Any = None,
     season: Mapping[str, Any] | None = None,
     career: Mapping[str, Any] | None = None,
+    potential_factor: float | None = None,
 ) -> dict[str, Any]:
     zero = _zero_stats_block()
     name = f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip()
@@ -564,6 +577,11 @@ def _build_fpd_doc(
         # coaching quality has pushed RT off the ladder. Imported/band rosters carry no
         # tier, so this is the explicit-carry point for them.
         entry_tier = entry_tier_at_year(ratings, meta.get("year") or "FR")
+    # Resolve-and-STORE the potential scalar the same way as entry_tier: carry a
+    # genuine stored value, else derive a stable one from player_id (imported/band
+    # rosters carry none). resolve_potential_factor logs the legacy fallback.
+    from BackEnd.utils.player_generation import resolve_potential_factor
+    potential_factor = resolve_potential_factor(player_id, potential_factor)
     doc = {
         "franchise_id": str(franchise_id),
         "player_id": player_id,
@@ -574,6 +592,7 @@ def _build_fpd_doc(
         "position_ratings": ratings,
         "entry_tier": entry_tier,
         "position_intent": position_intent,
+        "potential_factor": potential_factor,
     }
     if development is not None:
         doc["development"] = development
@@ -737,6 +756,7 @@ def build_wizard_walk_on_players() -> list[dict[str, Any]]:
                 "entry_tier": wo.get("entry_tier") or "Poor",
                 "position_intent": wo.get("position_intent"),
                 "development": wo.get("development"),
+                "potential_factor": wo.get("potential_factor"),
             }
         )
     return players
@@ -843,6 +863,7 @@ def _player_from_walk_on_profile(
         "entry_tier": wo.get("entry_tier") or "Poor",
         "position_intent": wo.get("position_intent"),
         "development": wo.get("development"),
+        "potential_factor": wo.get("potential_factor"),
     }
 
 
@@ -1021,21 +1042,34 @@ def build_fpd_docs_from_players(
     player_ids: list[str] = []
     docs: list[dict[str, Any]] = []
     for player in players:
-        pid = str(uuid.uuid4())
+        meta = dict(player.get("meta") or {})
+        # §6.5 seed stability: wizard-minted player_id carries through Apply.
+        pid = str(
+            player.get("player_id")
+            or meta.get("player_id")
+            or ""
+        ).strip() or str(uuid.uuid4())
+        meta.pop("player_id", None)
+        image_id = player.get("image_id") or meta.get("image_id")
+        if image_id:
+            meta["image_id"] = str(image_id).strip()
+        else:
+            meta.pop("image_id", None)
         player_ids.append(pid)
         docs.append(
             _build_fpd_doc(
                 franchise_id=franchise_id,
                 player_id=pid,
-                meta=dict(player.get("meta") or {}),
+                meta=meta,
                 attributes=dict(player.get("attributes") or {}),
                 entry_tier=player.get("entry_tier"),
                 position_intent=player.get("position_intent"),
                 development=player.get("development"),
                 position_ratings=player.get("position_ratings"),
-                photo=player.get("photo"),
+                photo=None,  # §4.5c / §6.5 — kit via meta.image_id only
                 season=player.get("season"),
                 career=player.get("career"),
+                potential_factor=player.get("potential_factor"),
             )
         )
     return player_ids, docs
@@ -1181,12 +1215,16 @@ def replace_slot_roster(
     """
     Replace the replaced slot's franchise roster after season init.
 
-    Path 1 keep is handled by the caller (no call / no rewrite). Paths 2–4
-    author exactly 15 players (§4.5a): edit/import supply 15; generate builds
-    12 band + 3 walk-ons. Init's 15 FPD ids are deleted so orphans do not remain.
+    §4.5c: only edit and import. Both author exactly 15 players, mint fresh
+    player_ids, and apply capped top-up universally. Init's 15 FPD ids are
+    deleted so orphans do not remain.
 
     Edit/import (§4.5b): clone each inherited player and overwrite only fields
-    the row sends. Generate still authors full players.
+    the row sends.
+
+    Portrait kit reference is ``meta.image_id`` — a recruit_set id, builder_set
+    id, or later an upload key. Flat base-league ``photo`` paths are stripped
+    (unrecolourable masters). Assignment is Phase 3d.
 
     Returns (new_player_ids, fpd_docs).
     """
@@ -1206,74 +1244,65 @@ def replace_slot_roster(
     ) if old_player_ids else []
     ordered_fpd = _ordered_source_fpd(source_fpd, old_player_ids)
 
-    mode = (roster_mode or "keep").strip().lower()
+    mode = (roster_mode or "edit").strip().lower()
+    if mode not in ("edit", "import"):
+        raise ValueError(f"roster_mode_invalid:{mode}")
     attr_mode = normalize_attribute_mode(attribute_mode)
-    apply_topup = attr_mode == "capped" and mode != "keep"
+    # §4.5c: Keep retired — capped top-up on every rewrite path.
+    apply_topup = attr_mode == "capped"
     players: list[dict[str, Any]]
 
-    if mode in ("import", "edit"):
-        offered = count_importable_players(imported_players)
-        if offered != AUTHORED_ROSTER_SIZE:
-            raise ValueError(f"roster_size_invalid:{offered}:{AUTHORED_ROSTER_SIZE}")
-        budgets = _budgets_for_authored_roster(
-            attr_mode=attr_mode,
-            source_fpd=source_fpd,
-            imported_players=imported_players,
-            explicit_budgets=per_player_budgets,
-            ordered_fpd=ordered_fpd,
+    offered = count_importable_players(imported_players)
+    if offered != AUTHORED_ROSTER_SIZE:
+        raise ValueError(f"roster_size_invalid:{offered}:{AUTHORED_ROSTER_SIZE}")
+    budgets = _budgets_for_authored_roster(
+        attr_mode=attr_mode,
+        source_fpd=source_fpd,
+        imported_players=imported_players,
+        explicit_budgets=per_player_budgets,
+        ordered_fpd=ordered_fpd,
+    )
+    inherited = _build_inherited_roster_payloads(
+        ordered_fpd=ordered_fpd,
+        old_player_ids=old_player_ids,
+        team_name=team_name,
+        team_object_id=team_object_id,
+        players_collection=players_collection,
+        wizard_walk_ons=wizard_walk_ons,
+    )
+    players = apply_diffs_to_inherited_roster(
+        inherited=inherited,
+        imported_players=imported_players or [],
+        team_name=team_name,
+        team_object_id=team_object_id,
+        attribute_mode=attr_mode,
+        apply_topup=apply_topup,
+        budgets=budgets if attr_mode == "capped" else None,
+    )
+    if len(players) != AUTHORED_ROSTER_SIZE:
+        raise ValueError(
+            f"roster_size_invalid:{len(players)}:{AUTHORED_ROSTER_SIZE}"
         )
-        inherited = _build_inherited_roster_payloads(
-            ordered_fpd=ordered_fpd,
-            old_player_ids=old_player_ids,
-            team_name=team_name,
-            team_object_id=team_object_id,
-            players_collection=players_collection,
-            wizard_walk_ons=wizard_walk_ons,
-        )
-        players = apply_diffs_to_inherited_roster(
-            inherited=inherited,
-            imported_players=imported_players or [],
-            team_name=team_name,
-            team_object_id=team_object_id,
-            attribute_mode=attr_mode,
-            apply_topup=apply_topup,
-            budgets=budgets if attr_mode == "capped" else None,
-        )
-        if len(players) != AUTHORED_ROSTER_SIZE:
-            raise ValueError(
-                f"roster_size_invalid:{len(players)}:{AUTHORED_ROSTER_SIZE}"
-            )
-        _stamp_walk_on_slots(players)
-    elif mode == "generate":
-        if not source_fpd:
-            raise ValueError("capped_roster_empty_slot")
-        players = generate_roster_at_band(
-            source_fpd_docs=source_fpd,
-            team_name=team_name,
-            team_object_id=team_object_id,
-            roster_size=AUTHORED_ROSTER_SIZE,
-            attribute_mode=attr_mode,
-            apply_topup=apply_topup,
-        )
-        _stamp_walk_on_slots(players)
-        budgets = _budgets_for_authored_roster(
-            attr_mode=attr_mode,
-            source_fpd=source_fpd,
-            imported_players=None,
-            explicit_budgets=per_player_budgets,
-            generated_players=players,
-        )
-        if attr_mode == "capped" and budgets:
-            for i, player in enumerate(players):
-                if i >= len(budgets):
-                    break
-                forced = force_core12_to_budget(player.get("attributes") or {}, budgets[i])
-                core = {key: forced[key] for key in CORE_12_ATTRS}
-                for key in CORE_12_ATTRS:
-                    core[f"anchor_{key}"] = core[key]
-                player["attributes"] = _finalize_franchise_attributes(core)
-    else:
-        return old_player_ids, []
+    _stamp_walk_on_slots(players)
+
+    # §6.5: stamp wizard-minted player_id + meta.image_id from authored rows.
+    rows = list(imported_players or [])
+    for i, player in enumerate(players):
+        row = rows[i] if i < len(rows) else {}
+        meta = dict(player.get("meta") or {})
+        meta.pop("photo", None)
+        image_id = row.get("image_id") or meta.get("image_id")
+        if image_id:
+            meta["image_id"] = str(image_id).strip()
+            player["image_id"] = meta["image_id"]
+        else:
+            meta.pop("image_id", None)
+            player.pop("image_id", None)
+        player_id = row.get("player_id") or player.get("player_id")
+        if player_id:
+            player["player_id"] = str(player_id).strip()
+        player["meta"] = meta
+        player.pop("photo", None)
 
     if len(players) != AUTHORED_ROSTER_SIZE:
         raise ValueError(f"roster_size_invalid:{len(players)}:{AUTHORED_ROSTER_SIZE}")

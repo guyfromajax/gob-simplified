@@ -2610,8 +2610,8 @@ class TeamBuilderApplyRequest(BaseModel):
     # Court recipe — nested on franchises.team_builder with primary/secondary.
     # Never a rendered image; never written to FTD.
     court: TeamBuilderCourtParams | None = None
-    # keep | edit | generate | import
-    roster_mode: str = "keep"
+    # edit | import — Keep and Generate retired (§4.5c)
+    roster_mode: str = "edit"
     # capped | uncapped — determines online eligibility (v2 §4)
     attribute_mode: str = "capped"
     imported_players: list[dict[str, Any]] | None = None
@@ -3544,6 +3544,42 @@ class TeamBuilderWizardWalkOnsRequest(BaseModel):
     draft_id: str
 
 
+class TeamBuilderPortraitPlayer(BaseModel):
+    """Classifier inputs for one wizard roster slot (§6.5)."""
+
+    first_name: str = ""
+    last_name: str = ""
+    class_year: str | None = None
+    height_in: int | None = None
+    weight_lb: int | None = None
+    attributes: dict[str, Any] | None = None
+    player_id: str | None = None
+    image_id: str | None = None
+    position_ratings: dict[str, Any] | None = None
+
+
+class TeamBuilderPortraitsAssignRequest(BaseModel):
+    replaced_object_id: str
+    draft_id: str
+    players: list[TeamBuilderPortraitPlayer]
+    force_reassign: bool = False
+
+
+class TeamBuilderPortraitRerollRequest(BaseModel):
+    replaced_object_id: str
+    draft_id: str
+    slot: int
+    players: list[TeamBuilderPortraitPlayer]
+
+
+class TeamBuilderPortraitPickRequest(BaseModel):
+    replaced_object_id: str
+    draft_id: str
+    slot: int
+    image_id: str
+    players: list[TeamBuilderPortraitPlayer]
+
+
 @router.post("/franchise/team-builder/wizard-walk-ons")
 def team_builder_wizard_walk_ons(
     body: TeamBuilderWizardWalkOnsRequest,
@@ -3584,6 +3620,175 @@ def team_builder_wizard_walk_ons(
         "draft_id": draft_id,
         "replaced_object_id": str(replaced_oid),
     }
+
+
+def _tb_portrait_players_payload(
+    rows: list[TeamBuilderPortraitPlayer],
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        out.append(
+            {
+                "first_name": row.first_name,
+                "last_name": row.last_name,
+                "class_year": row.class_year,
+                "height_in": row.height_in,
+                "weight_lb": row.weight_lb,
+                "attributes": dict(row.attributes or {}),
+                "player_id": row.player_id,
+                "image_id": row.image_id,
+                "position_ratings": dict(row.position_ratings or {}) or None,
+            }
+        )
+    return out
+
+
+@router.post("/franchise/team-builder/portraits/assign")
+def team_builder_portraits_assign(
+    body: TeamBuilderPortraitsAssignRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Auto-assign all 15 portraits via the existing classifier (§6.5). Idempotent per draft."""
+    from BackEnd.utils.team_builder_portraits import get_or_create_wizard_portraits
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    draft_id = str(body.draft_id or "").strip()
+    if len(draft_id) < 8 or len(draft_id) > 80:
+        raise HTTPException(status_code=400, detail="draft_id is required")
+    if len(body.players) != 15:
+        raise HTTPException(status_code=400, detail="Portrait assignment requires exactly 15 players")
+    if not db.teams.find_one({"_id": replaced_oid}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Replaced program not found")
+
+    try:
+        portraits = get_or_create_wizard_portraits(
+            db,
+            user_id=str(user.get("user_id") or ""),
+            replaced_object_id=str(replaced_oid),
+            draft_id=draft_id,
+            players=_tb_portrait_players_payload(body.players),
+            force_reassign=bool(body.force_reassign),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "portraits": portraits,
+        "draft_id": draft_id,
+        "replaced_object_id": str(replaced_oid),
+        "seed_strategy": "mint_player_id_on_first_assign",
+    }
+
+
+@router.post("/franchise/team-builder/portraits/reroll")
+def team_builder_portraits_reroll(
+    body: TeamBuilderPortraitRerollRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Re-roll one slot; skips the current image_id and prefers unused kits."""
+    from BackEnd.utils.team_builder_portraits import (
+        get_or_create_wizard_portraits,
+        reroll_slot_portrait,
+        update_wizard_portrait_slot,
+    )
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    draft_id = str(body.draft_id or "").strip()
+    if len(body.players) != 15:
+        raise HTTPException(status_code=400, detail="Portrait re-roll requires exactly 15 players")
+    players = _tb_portrait_players_payload(body.players)
+    current = get_or_create_wizard_portraits(
+        db,
+        user_id=str(user.get("user_id") or ""),
+        replaced_object_id=str(replaced_oid),
+        draft_id=draft_id,
+        players=players,
+    )
+    try:
+        assignment = reroll_slot_portrait(
+            players, slot=int(body.slot), current_assignments=current
+        )
+        portraits = update_wizard_portrait_slot(
+            db,
+            user_id=str(user.get("user_id") or ""),
+            replaced_object_id=str(replaced_oid),
+            draft_id=draft_id,
+            assignment=assignment,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"portrait": assignment, "portraits": portraits}
+
+
+@router.post("/franchise/team-builder/portraits/pick")
+def team_builder_portraits_pick(
+    body: TeamBuilderPortraitPickRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Optional picker override for one slot — stores meta.image_id only."""
+    from BackEnd.utils.team_builder_portraits import (
+        get_or_create_wizard_portraits,
+        pick_slot_portrait,
+        update_wizard_portrait_slot,
+    )
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    draft_id = str(body.draft_id or "").strip()
+    if len(body.players) != 15:
+        raise HTTPException(status_code=400, detail="Portrait pick requires exactly 15 players")
+    players = _tb_portrait_players_payload(body.players)
+    current = get_or_create_wizard_portraits(
+        db,
+        user_id=str(user.get("user_id") or ""),
+        replaced_object_id=str(replaced_oid),
+        draft_id=draft_id,
+        players=players,
+    )
+    pid = ""
+    if 0 <= int(body.slot) < len(current):
+        pid = str(current[int(body.slot)].get("player_id") or "")
+    if not pid and 0 <= int(body.slot) < len(players):
+        pid = str(players[int(body.slot)].get("player_id") or "")
+    try:
+        assignment = pick_slot_portrait(
+            slot=int(body.slot),
+            image_id=str(body.image_id).strip(),
+            player_id=pid,
+            players=players,
+        )
+        portraits = update_wizard_portrait_slot(
+            db,
+            user_id=str(user.get("user_id") or ""),
+            replaced_object_id=str(replaced_oid),
+            draft_id=draft_id,
+            assignment=assignment,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"portrait": assignment, "portraits": portraits}
+
+
+@router.get("/franchise/team-builder/portraits/catalog")
+def team_builder_portraits_catalog(
+    skin: str | None = None,
+    frame: str | None = None,
+    definition: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Picker catalog — filter chips carry counts before a filter is applied."""
+    from BackEnd.utils.team_builder_portraits import catalog_for_picker
+
+    _ = user
+    return catalog_for_picker(skin=skin, frame=frame, definition=definition)
 
 
 @router.post("/franchise/team-builder/apply")
@@ -3650,10 +3855,17 @@ def team_builder_apply(
     _ensure_home_slots_for_user(user.get("user_id"))
     home_slot = _allocate_home_slot(user.get("user_id"), body.home_slot)
 
-    roster_mode = (body.roster_mode or "keep").strip().lower()
+    roster_mode = (body.roster_mode or "edit").strip().lower()
+    if roster_mode not in ("edit", "import"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Roster path must be edit or import. Keep and Generate are retired — "
+                "play a program as-is in normal mode, or author all 15 in the editor."
+            ),
+        )
     attribute_mode = normalize_attribute_mode(body.attribute_mode)
-    # Keep path: byte-identical inherited roster; eligibility follows the chosen mode
-    # (keep never applies top-up).
+    # §4.5c: top-up applies on every path; Keep's exemption retired with the path.
     online_eligible = online_eligible_for_mode(attribute_mode)
     league_ctx = compute_league_attr_context(db)
     team_pool = int(league_ctx.get("team_pool") or 0)
@@ -3690,91 +3902,90 @@ def team_builder_apply(
     )
     franchise_id = manager.franchise_id
 
-    if roster_mode in ("import", "generate", "edit"):
-        from BackEnd.utils.team_builder_roster import (
-            get_or_create_wizard_walk_ons,
-            replace_slot_roster,
-        )
+    # §4.5c: every TB Apply rewrites the slot with minted player_ids (edit + import).
+    from BackEnd.utils.team_builder_roster import (
+        get_or_create_wizard_walk_ons,
+        replace_slot_roster,
+    )
 
-        wizard_walk_ons = None
-        draft_key = str(body.draft_id or "").strip()
-        if roster_mode in ("edit", "import") and draft_key:
-            try:
-                wizard_walk_ons = get_or_create_wizard_walk_ons(
-                    db,
-                    user_id=str(user.get("user_id") or ""),
-                    replaced_object_id=str(replaced_oid),
-                    draft_id=draft_key,
-                )
-            except ValueError:
-                wizard_walk_ons = None
-
+    wizard_walk_ons = None
+    draft_key = str(body.draft_id or "").strip()
+    if draft_key:
         try:
-            replace_slot_roster(
-                franchise_id=franchise_id,
-                team_object_id=replaced_oid,
-                team_name=custom_name,
-                roster_mode=roster_mode,
-                imported_players=body.imported_players,
-                franchise_team_data_collection=franchise_team_data_collection,
-                franchise_players_data_collection=franchise_players_data_collection,
-                attribute_mode=attribute_mode,
-                team_pool=team_pool,
-                per_player_budgets=body.per_player_budgets,
-                players_collection=db.players,
-                wizard_walk_ons=wizard_walk_ons,
+            wizard_walk_ons = get_or_create_wizard_walk_ons(
+                db,
+                user_id=str(user.get("user_id") or ""),
+                replaced_object_id=str(replaced_oid),
+                draft_id=draft_key,
             )
-        except ValueError as exc:
-            msg = str(exc)
-            if msg.startswith("uncapped_pool_exceeded:"):
-                parts = msg.split(":")
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"Team total {parts[1]} exceeds the league pool "
-                        f"({parts[2]}). Trim attributes or switch modes."
-                    ),
-                )
-            if msg.startswith("roster_size_invalid:"):
-                parts = msg.split(":")
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"A roster holds {parts[2]} players. Your roster has "
-                        f"{parts[1]}. Supply exactly {parts[2]} — not truncated, "
-                        f"not padded."
-                    ),
-                )
-            if msg.startswith("capped_roster_too_long:"):
-                parts = msg.split(":")
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f"A roster holds {parts[2]} players. Your roster has "
-                        f"{parts[1]}. Supply exactly {parts[2]}."
-                    ),
-                )
-            if msg == "capped_roster_empty_slot":
-                raise HTTPException(
-                    status_code=400,
-                    detail="This program has no roster to generate from.",
-                )
-            logger.exception(
-                "[TEAM-BUILDER] roster replace rejected franchise_id=%s mode=%s",
-                franchise_id,
-                roster_mode,
-            )
-            raise HTTPException(status_code=400, detail="Unable to apply roster changes")
-        except Exception:
-            logger.exception(
-                "[TEAM-BUILDER] roster replace failed franchise_id=%s mode=%s",
-                franchise_id,
-                roster_mode,
-            )
-            raise HTTPException(status_code=500, detail="Unable to apply roster changes")
+        except ValueError:
+            wizard_walk_ons = None
 
-    # Mode metadata (forward-looking). Shape is post-top-up for paths that top up;
-    # keep path records the as-shipped (byte-identical) inherited shape.
+    try:
+        replace_slot_roster(
+            franchise_id=franchise_id,
+            team_object_id=replaced_oid,
+            team_name=custom_name,
+            roster_mode=roster_mode,
+            imported_players=body.imported_players,
+            franchise_team_data_collection=franchise_team_data_collection,
+            franchise_players_data_collection=franchise_players_data_collection,
+            attribute_mode=attribute_mode,
+            team_pool=team_pool,
+            per_player_budgets=body.per_player_budgets,
+            players_collection=db.players,
+            wizard_walk_ons=wizard_walk_ons,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if msg.startswith("uncapped_pool_exceeded:"):
+            parts = msg.split(":")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Team total {parts[1]} exceeds the league pool "
+                    f"({parts[2]}). Trim attributes or switch modes."
+                ),
+            )
+        if msg.startswith("roster_size_invalid:"):
+            parts = msg.split(":")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"A roster holds {parts[2]} players. Your roster has "
+                    f"{parts[1]}. Supply exactly {parts[2]} — not truncated, "
+                    f"not padded."
+                ),
+            )
+        if msg.startswith("capped_roster_too_long:"):
+            parts = msg.split(":")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"A roster holds {parts[2]} players. Your roster has "
+                    f"{parts[1]}. Supply exactly {parts[2]}."
+                ),
+            )
+        if msg == "capped_roster_empty_slot":
+            raise HTTPException(
+                status_code=400,
+                detail="This program has no roster to edit from.",
+            )
+        logger.exception(
+            "[TEAM-BUILDER] roster replace rejected franchise_id=%s mode=%s",
+            franchise_id,
+            roster_mode,
+        )
+        raise HTTPException(status_code=400, detail="Unable to apply roster changes")
+    except Exception:
+        logger.exception(
+            "[TEAM-BUILDER] roster replace failed franchise_id=%s mode=%s",
+            franchise_id,
+            roster_mode,
+        )
+        raise HTTPException(status_code=500, detail="Unable to apply roster changes")
+
+    # Mode metadata. Shape is post-top-up (universal under §4.5c).
     budget_meta: dict[str, Any] = {
         "attribute_mode": attribute_mode,
         "online_eligible": online_eligible,
@@ -3845,6 +4056,18 @@ def team_builder_apply(
         )
     except Exception:
         logger.exception("[TEAM-BUILDER] FPD meta.team rewrite failed")
+
+    # §6.5 / criterion 28: eager-paint uniformed masters in custom colours + mascot.
+    try:
+        _warm_team_builder_roster_masters(
+            franchise_id=franchise_id,
+            team_object_id=replaced_oid,
+            primary_color=body.primary_color,
+            secondary_color=body.secondary_color,
+            mascot=(body.mascot or "").strip(),
+        )
+    except Exception:
+        logger.exception("[TEAM-BUILDER] portrait warm-paint failed")
 
     try:
         from BackEnd.utils.team_builder_roster import clear_wizard_walk_ons_for_user
@@ -15035,6 +15258,74 @@ def sim_championship(req: SimChampionshipRequest):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+def _warm_team_builder_roster_masters(
+    *,
+    franchise_id,
+    team_object_id,
+    primary_color: str,
+    secondary_color: str,
+    mascot: str,
+) -> int:
+    """Paint all TB roster kits into players/master/<player_id>.png at Apply (§6.5)."""
+    from BackEnd.services import recruit_image, r2_images
+    from BackEnd.utils.team_builder_portraits import resolve_kit_keys
+
+    if not r2_images.is_configured():
+        return 0
+    ftd = franchise_team_data_collection.find_one(
+        {"franchise_id": franchise_id, "team_id": team_object_id},
+        {"players": 1},
+    ) or {}
+    pids = [str(pid) for pid in (ftd.get("players") or []) if pid]
+    if not pids:
+        return 0
+    painted = 0
+    for fpd in franchise_players_data_collection.find(
+        {"franchise_id": str(franchise_id), "player_id": {"$in": pids}},
+        {"player_id": 1, "meta.image_id": 1},
+    ):
+        player_id = str(fpd.get("player_id") or "")
+        image_id = str((fpd.get("meta") or {}).get("image_id") or "").strip()
+        if not player_id or not image_id:
+            continue
+        master_key = f"players/master/{player_id}.png"
+        try:
+            if r2_images.exists(master_key):
+                continue
+            keys = resolve_kit_keys(image_id)
+            if not keys:
+                continue
+            kit_key, mask_key = keys
+            if not (r2_images.exists(kit_key) and r2_images.exists(mask_key)):
+                continue
+            master = recruit_image.make_signed_master(
+                r2_images.get(kit_key),
+                r2_images.get(mask_key),
+                primary_color,
+                secondary_color,
+                mascot,
+            )
+            r2_images.put(master_key, master)
+            franchise_players_data_collection.update_one(
+                {"franchise_id": str(franchise_id), "player_id": player_id},
+                {"$set": {"meta.image_painted": True}},
+            )
+            painted += 1
+        except Exception:
+            logger.exception(
+                "[TB-PORTRAIT-WARM] paint failed franchise_id=%s player_id=%s",
+                str(franchise_id),
+                player_id,
+            )
+    if painted:
+        logger.info(
+            "[TB-PORTRAIT-WARM] pre-painted %s TB masters franchise_id=%s",
+            painted,
+            str(franchise_id),
+        )
+    return painted
+
+
 def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players):
     """Eager-paint the USER team's freshly-signed players' uniform masters at
     rollover, so their portraits are already in R2 the instant they open their
@@ -15073,8 +15364,18 @@ def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players
         try:
             if r2_images.exists(master_key):
                 continue
-            kit_key = f"recruits/kit/{image_id}.png"
-            mask_key = f"recruits/kit/{image_id}.mask.png"
+            kit_keys = None
+            try:
+                from BackEnd.utils.team_builder_portraits import resolve_kit_keys
+
+                kit_keys = resolve_kit_keys(image_id)
+            except Exception:
+                kit_keys = None
+            if kit_keys:
+                kit_key, mask_key = kit_keys
+            else:
+                kit_key = f"recruits/kit/{image_id}.png"
+                mask_key = f"recruits/kit/{image_id}.mask.png"
             if not (r2_images.exists(kit_key) and r2_images.exists(mask_key)):
                 continue
             master = recruit_image.make_signed_master(
@@ -15256,6 +15557,7 @@ def finish_season(req: FinishSeasonRequest):
                 "development": fpd_doc.get("development"),
                 "entry_tier": fpd_doc.get("entry_tier"),
                 "position_intent": fpd_doc.get("position_intent"),
+                "potential_factor": fpd_doc.get("potential_factor"),
                 "training_position": fpd_doc.get("training_position"),
                 "coaching_quality": fpd_doc.get("coaching_quality"),
             }
@@ -15276,6 +15578,7 @@ def finish_season(req: FinishSeasonRequest):
             next_doc["development"] = _dev["development"]
             next_doc["entry_tier"] = _dev["entry_tier"]
             next_doc["position_intent"] = _dev["position_intent"]
+            next_doc["potential_factor"] = _dev["potential_factor"]
             next_doc["training_position"] = _dev["training_position"]
             next_doc["coaching_quality"] = _dev["coaching_quality"]
             _offseason_reports.append(_build_offseason_report_line(next_doc, fpd_doc, _dev))
@@ -15324,6 +15627,7 @@ def finish_season(req: FinishSeasonRequest):
             "development": signed_player.get("development"),
             "entry_tier": signed_player.get("entry_tier"),
             "position_intent": signed_player.get("position_intent"),
+            "potential_factor": signed_player.get("potential_factor"),
             "training_position": signed_player.get("training_position"),
             "coaching_quality": signed_player.get("coaching_quality"),
         }
@@ -15338,6 +15642,7 @@ def finish_season(req: FinishSeasonRequest):
         signed_doc["development"] = _dev["development"]
         signed_doc["entry_tier"] = _dev["entry_tier"]
         signed_doc["position_intent"] = _dev["position_intent"]
+        signed_doc["potential_factor"] = _dev["potential_factor"]
         signed_doc["training_position"] = _dev["training_position"]
         signed_doc["coaching_quality"] = _dev["coaching_quality"]
         _offseason_reports.append(_build_offseason_report_line(signed_doc, _prev, _dev))
@@ -15504,6 +15809,7 @@ def finish_season(req: FinishSeasonRequest):
             **({"entry_tier": recruit["entry_tier"]} if recruit.get("entry_tier") is not None else {}),
             **({"position_intent": recruit["position_intent"]} if recruit.get("position_intent") is not None else {}),
             **({"development": recruit["development"]} if recruit.get("development") is not None else {}),
+            **({"potential_factor": recruit["potential_factor"]} if recruit.get("potential_factor") is not None else {}),
             "Home Region": home_region,
             "Lean": fm._build_recruit_lean(home_region, region_team_ids),
             "created_at": recruit.get("created_at") or datetime.utcnow(),
