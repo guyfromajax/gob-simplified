@@ -101,7 +101,14 @@ Front-end layout and styling are out of scope for this work — wire the data an
 
 **Known behaviour worth expecting:** a 3-peak player will exceed his projection, so the ratchet engages and his display converges toward `A+/A+`. That reads correctly — he has met his ceiling — but it means high performers show no headroom late in their careers. Confirm that is the intended feel before shipping.
 
-## Phase 5 — Retroactive pool write
+## Phase 5 — Retroactive pool write ✅ SHIPPED (gob-staging)
+
+`scripts/backfill_pool_potential_factor.py --commit` — modified **1,536/1,536** pool players; the
+post-write equality check confirmed **1536/1536 stored values equal the pre-write displayed value**
+(projections stable across the backfill, by construction). Values uniform + in-band (min 0.8501,
+p50 0.9966, max 1.1499). Idempotent (re-run: 0 to backfill). **Alarm re-armed** — `potential_rt_for_player`
+dropped its `warn=False`; a read-path fallback now warns (deploy the backfill per environment before
+this code ships there — see the module docstring).
 
 Write `potential_factor` to the 1,536 migrated pool players.
 

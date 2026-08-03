@@ -64,14 +64,15 @@ def test_for_player_ratchets_to_current():
     assert potential_rt_for_player("p2", "Average", 1.0, {"C": 105}) == 105
 
 
-def test_for_player_fallback_is_stable_and_quiet(caplog):
-    # pool player, no stored pf → deterministic hash, and NO warning on the read path
+def test_for_player_fallback_is_stable_and_rearmed(caplog):
+    # deterministic hash → stable value; and post-Phase-5 the alarm is RE-ARMED, so a
+    # read-path fallback (a genuinely missing field) now surfaces instead of failing silently.
     with caplog.at_level(logging.WARNING):
         a = potential_rt_for_player("pool-xyz", "Good", None, {"SF": 64})
         b = potential_rt_for_player("pool-xyz", "Good", None, {"SF": 64})
     assert a == b and a is not None
-    assert not any("potential_factor missing" in r.message for r in caplog.records), \
-        "read path must not warn on the expected pool fallback"
+    assert any("potential_factor missing" in r.message for r in caplog.records), \
+        "re-armed: a missing potential_factor on a read must warn (dropped-field alarm)"
 
 
 def test_for_player_no_tier_returns_none_but_valid_basis_stands():

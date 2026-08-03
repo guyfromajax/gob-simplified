@@ -74,22 +74,25 @@ def potential_rt_for_player(
 ) -> Optional[int]:
     """Payload-ready ``potential_rt_ratcheted`` for one player, from RAW stored fields.
 
-    The single call the display endpoints use: it resolves ``potential_factor`` quietly
-    (stored value, else the deterministic player_id hash — warn=False because a pre-Phase-5
-    pool roster legitimately hits the fallback for every player), takes best-position RT as
-    the current rating, applies the ratchet, and rounds to an int for display. Returns
-    ``None`` when there is no basis, so the caller shows the current rating alone.
+    The single call the display endpoints use: it resolves ``potential_factor`` (stored value,
+    else the deterministic player_id hash), takes best-position RT as the current rating,
+    applies the ratchet, and rounds to an int for display. Returns ``None`` when there is no
+    basis, so the caller shows the current rating alone.
 
-    ⚠️ TEMPORARY suppression: ``warn=False`` here is a pre-Phase-5 accommodation for the
-    un-backfilled pool. Phase 5 (Retroactive pool write) MUST re-arm this — restore warn=True
-    or a narrowed once-per-id warning — else a genuinely dropped potential_factor on a future
-    write path fails silently forever. Tracked as a required step in the work plan's Phase 5.
+    Alarm RE-ARMED (Phase 5 complete, 2026-08): the pool now carries potential_factor, so a
+    fallback on a read is no longer an expected legacy row — it means a genuinely dropped field
+    on some write path, and it warns (as entry_tier's does). The blanket warn=False suppression
+    that pre-Phase-5 reads needed (the un-backfilled pool would have logged per player per page
+    load) is gone. DEPLOY ORDER: run scripts/backfill_pool_potential_factor.py --commit in an
+    environment BEFORE this code ships there, or that env's pool reads will warn until it does.
+    A transient legacy *franchise* save may still warn on display until it lazy-backfills at
+    rollover — expected, low volume.
     """
     from BackEnd.utils.player_generation import resolve_potential_factor
 
     ratings = position_ratings if isinstance(position_ratings, dict) else {}
     current = max(ratings.values()) if ratings else None
-    pf = resolve_potential_factor(player_id, stored_potential_factor, warn=False)
+    pf = resolve_potential_factor(player_id, stored_potential_factor)
     value = ratcheted_potential_rt(entry_tier, pf, current)
     return int(round(value)) if value is not None else None
 
