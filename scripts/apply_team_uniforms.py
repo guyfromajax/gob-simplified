@@ -114,11 +114,17 @@ def _tank(a, person, np, ndimage):
     """White tank = the largest bright, NEUTRAL region inside the person, below
     the neck. Neutral-hue + not-warm excludes pale skin (which is bright/low-sat
     but warm), so the recolor can't spill onto light-skinned players. The mask
-    is eroded slightly so the paint never bleeds past the fabric onto skin."""
-    H = a.shape[0]
-    r, g, b = a[..., 0], a[..., 1], a[..., 2]
-    bright = a.min(2) > 172
-    neutral = (a.max(2) - a.min(2)) < 22          # white fabric is neutral gray
+    is eroded slightly so the paint never bleeds past the fabric onto skin.
+
+    ``a`` must be RGB (H×W×3). If an RGBA array is passed, only the first three
+    channels are used — otherwise alpha=255 inflates max−min and empties the
+    mask on any shaded white fabric (builder_set_0001 blank-mask bug).
+    """
+    rgb = a[..., :3]
+    H = rgb.shape[0]
+    r, g, b = rgb[..., 0], rgb[..., 1], rgb[..., 2]
+    bright = rgb.min(2) > 172
+    neutral = (rgb.max(2) - rgb.min(2)) < 22       # white fabric is neutral gray
     warm = (r - b) > 14                            # skin (even pale) is warmer
     tank = bright & neutral & (~warm) & person
     tank[:int(0.42 * H)] = False

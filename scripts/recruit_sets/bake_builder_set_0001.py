@@ -35,6 +35,7 @@ from collections import Counter, defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.dirname(HERE)
 ROOT = os.path.dirname(SCRIPTS)
+sys.path.insert(0, HERE)
 sys.path.insert(0, SCRIPTS)
 
 import generate_player_portraits as gen  # noqa: E402
@@ -242,24 +243,30 @@ def kit_complete(rid, root=KIT_DIR):
 
 
 def ensure_sidecars_from_png(rid, frame, root=KIT_DIR):
-    """Rebuild mask/json from an existing RGBA kit png (kept teen pilots)."""
+    """Rebuild mask/json from an existing RGBA kit png (kept teen pilots).
+
+    Never writes a blank mask. Two bugs produced the eight identical all-black
+    builder_set_0001 masks:
+
+    1. ``_tank`` was called on RGBA. Channel min/max then included alpha=255,
+       so shaded white fabric failed the neutrality gate and tank came back empty.
+    2. When tank was empty, bbox fell back to the person silhouette — but the
+       empty tank array was still written to ``.mask.png``.
+    """
     from PIL import Image
     import numpy as np
     from scipy import ndimage
+    from mask_validation import assert_tank_mask_usable
 
     p = kit_paths(rid, root)
     src = Image.open(p["png"]).convert("RGBA")
     a = np.asarray(src).astype(np.float32)
-    rgb = Image.fromarray(np.clip(a[..., :3], 0, 255).astype("uint8"), "RGB")
     alpha = a[..., 3]
     person = alpha > 128
-    tank = uni._tank(a, person, np, ndimage)
+    # RGB only — alpha must not participate in bright/neutral/warm stats.
+    tank = uni._tank(a[..., :3], person, np, ndimage)
+    assert_tank_mask_usable(tank, source=p["png"])
     ys, xs = np.where(tank)
-    if len(ys) == 0:
-        # fall back: any opaque person pixels
-        ys, xs = np.where(person)
-    if len(ys) == 0:
-        raise RuntimeError(f"no person/tank in {p['png']}")
     bbox = [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]
     center = int((xs.min() + xs.max()) / 2)
     Image.fromarray((tank * 255).astype("uint8"), "L").save(p["mask"])
@@ -287,6 +294,7 @@ def bake_one(slot, client, ref_cache, force=False):
     from PIL import Image
     import numpy as np
     from scipy import ndimage
+    from mask_validation import assert_tank_mask_usable
 
     rid = slot["image_id"]
     paths = kit_paths(rid)
@@ -325,12 +333,14 @@ def bake_one(slot, client, ref_cache, force=False):
             alpha = uni.person_alpha(src, np, ndimage)
             person = alpha > 128
             tank = uni._tank(a, person, np, ndimage)
-            ys, xs = np.where(tank)
-            if len(ys) == 0:
-                last_err = "no tank"
+            try:
+                assert_tank_mask_usable(tank, source=rid)
+            except RuntimeError as exc:
+                last_err = str(exc)
                 os.remove(raw_tmp)
                 time.sleep(min(60, 2 ** attempt))
                 continue
+            ys, xs = np.where(tank)
             bbox = [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]
             center = int((xs.min() + xs.max()) / 2)
             rgba = np.dstack([a, alpha]).astype("uint8")
@@ -355,25 +365,99 @@ def stage_to_assets(plan):
     """Copy finished kits into assets_staging/portrait-kits/builder_set_0001/ AFTER collision check.
     R2 keys: portrait-kits/builder_set_0001/<uuid>.png (+ .mask.png, .json)."""
     import shutil
+    from PIL import Image
+    import numpy as np
+    from mask_validation import assert_tank_mask_usable
+
     set0001 = load_recruit_set_ids()
     os.makedirs(STAGING_KIT, exist_ok=True)
-    # Verify none of our ids collide with set_0001 before any write
-    for s in plan:
-        if s["image_id"] in set0001:
-            raise SystemExit(f"ABORT staging: {s['image_id']} in set_0001")
-        # Existing file in staging with same name belonging to set_0001 would be fatal;
-        # our own re-stage is fine.
     n = 0
     for s in plan:
-        if not kit_complete(s["image_id"]):
+        rid = s["image_id"]
+        if rid in set0001:
+            raise RuntimeError(f"collision with recruit_set_0001 id {rid}")
+        src = kit_paths(rid)
+        if not kit_complete(rid):
             continue
-        for ext in (".png", ".mask.png", ".json"):
-            src = os.path.join(KIT_DIR, f"{s['image_id']}{ext}")
-            dst = os.path.join(STAGING_KIT, f"{s['image_id']}{ext}")
-            if os.path.exists(src):
-                shutil.copy2(src, dst)
+        mask_arr = np.asarray(Image.open(src["mask"]).convert("L"))
+        assert_tank_mask_usable(mask_arr, source=src["mask"])
+        for key in ("png", "mask", "json"):
+            shutil.copy2(src[key], os.path.join(STAGING_KIT, os.path.basename(src[key])))
         n += 1
     return n
+
+
+def rebuild_bad_masks(plan, image_ids=None):
+    """Regenerate masks from existing kit PNGs for the given ids (or all incomplete/bad)."""
+    from PIL import Image
+    import numpy as np
+    from mask_validation import tank_pixel_count, MIN_TANK_PIXELS
+
+    wanted = set(image_ids) if image_ids else None
+    rebuilt = failed = skipped = 0
+    for s in plan:
+        rid = s["image_id"]
+        if wanted is not None and rid not in wanted:
+            continue
+        png = kit_paths(rid, STAGING_KIT)["png"]
+        root = STAGING_KIT if os.path.exists(png) else KIT_DIR
+        paths = kit_paths(rid, root)
+        if not os.path.exists(paths["png"]):
+            print(f"[skip] {rid}: no kit png")
+            skipped += 1
+            continue
+        # Always rebuild when explicitly listed; otherwise only if mask is bad/missing.
+        if wanted is None and os.path.exists(paths["mask"]):
+            count = tank_pixel_count(
+                np.asarray(Image.open(paths["mask"]).convert("L"))
+            )
+            if count >= MIN_TANK_PIXELS:
+                skipped += 1
+                continue
+        try:
+            ensure_sidecars_from_png(rid, s["frame"], root=root)
+            # Keep pilot kit tree in sync when staging was the source.
+            kit_png = kit_paths(rid, KIT_DIR)["png"]
+            if root == STAGING_KIT and os.path.exists(kit_png):
+                ensure_sidecars_from_png(rid, s["frame"], root=KIT_DIR)
+            count = tank_pixel_count(
+                np.asarray(Image.open(paths["mask"]).convert("L"))
+            )
+            print(f"[rebuilt] {rid}  tank_px={count}  ({s['frame']}-{s['definition']}/{s['skin']})")
+            rebuilt += 1
+        except Exception as exc:
+            print(f"[fail] {rid}: {exc}")
+            failed += 1
+    print(f"[rebuild-masks] rebuilt={rebuilt} failed={failed} skipped={skipped}")
+    return rebuilt, failed
+
+
+def validate_masks(plan, roots=None):
+    """Fail loudly if any planned kit mask is below the tank-pixel floor."""
+    from PIL import Image
+    import numpy as np
+    from mask_validation import tank_pixel_count, MIN_TANK_PIXELS
+
+    roots = roots or (STAGING_KIT, KIT_DIR)
+    bad = []
+    checked = 0
+    for s in plan:
+        rid = s["image_id"]
+        for root in roots:
+            mask = kit_paths(rid, root)["mask"]
+            if not os.path.exists(mask):
+                continue
+            checked += 1
+            count = tank_pixel_count(np.asarray(Image.open(mask).convert("L")))
+            if count < MIN_TANK_PIXELS:
+                bad.append((rid, root, count, f"{s['frame']}-{s['definition']}/{s['skin']}"))
+            break
+    print(f"[validate-masks] checked={checked} bad={len(bad)} floor={MIN_TANK_PIXELS}")
+    for rid, root, count, cell in bad:
+        print(f"  BAD {rid}  tank_px={count}  {cell}  ({root})")
+    if bad:
+        raise SystemExit(1)
+    return checked
 
 
 def write_manifests(plan):
@@ -501,6 +585,12 @@ def main():
     ap.add_argument("--write-manifests", action="store_true")
     ap.add_argument("--contact-sheet", action="store_true")
     ap.add_argument("--stage", action="store_true", help="copy finished kits to assets_staging")
+    ap.add_argument("--rebuild-masks", action="store_true",
+                    help="regenerate mask/json from existing kit PNGs (bad/missing by default)")
+    ap.add_argument("--validate-masks", action="store_true",
+                    help="exit 1 if any staged/kit mask is below the tank-pixel floor")
+    ap.add_argument("--image-id", action="append", default=[],
+                    help="limit --rebuild-masks to these image_ids (repeatable)")
     ap.add_argument("--sheet-tag", default="progress")
     ap.add_argument("--rebuild-plan", action="store_true",
                     help="ignore persisted bake_plan.json and rebuild from allocation")
@@ -522,6 +612,17 @@ def main():
     print(f"  collision check vs recruit_set_0001: PASS ({len(load_recruit_set_ids())} reserved)")
 
     if args.plan_only:
+        return
+
+    if args.validate_masks:
+        validate_masks(plan)
+        return
+
+    if args.rebuild_masks:
+        _rebuilt, failed = rebuild_bad_masks(plan, image_ids=args.image_id or None)
+        if failed:
+            raise SystemExit(1)
+        validate_masks(plan)
         return
 
     if args.write_manifests:

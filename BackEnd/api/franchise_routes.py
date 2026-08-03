@@ -4058,8 +4058,17 @@ def team_builder_apply(
         logger.exception("[TEAM-BUILDER] FPD meta.team rewrite failed")
 
     # §6.5 / criterion 28: eager-paint uniformed masters in custom colours + mascot.
+    portrait_paint: dict[str, Any] = {
+        "attempted": 0,
+        "painted": 0,
+        "already_existed": 0,
+        "skipped_no_image_id": 0,
+        "skipped_no_kit": [],
+        "failed": [],
+        "r2_configured": False,
+    }
     try:
-        _warm_team_builder_roster_masters(
+        portrait_paint = _warm_team_builder_roster_masters(
             franchise_id=franchise_id,
             team_object_id=replaced_oid,
             primary_color=body.primary_color,
@@ -4068,6 +4077,7 @@ def team_builder_apply(
         )
     except Exception:
         logger.exception("[TEAM-BUILDER] portrait warm-paint failed")
+        portrait_paint["failed"].append({"error": "warm_paint_aborted"})
 
     try:
         from BackEnd.utils.team_builder_roster import clear_wizard_walk_ons_for_user
@@ -4091,6 +4101,17 @@ def team_builder_apply(
         # Derived alias for v1 readers — never assigned independently.
         "online_eligibility": eligible,
         "roster_shape_at_creation": budget_meta["roster_shape_at_creation"],
+        "portrait_paint": {
+            "painted": int(portrait_paint.get("painted") or 0),
+            "already_existed": int(portrait_paint.get("already_existed") or 0),
+            "attempted": int(portrait_paint.get("attempted") or 0),
+            "skipped_no_image_id": int(portrait_paint.get("skipped_no_image_id") or 0),
+            "skipped_no_kit_count": len(portrait_paint.get("skipped_no_kit") or []),
+            "failed_count": len(portrait_paint.get("failed") or []),
+            "failed": portrait_paint.get("failed") or [],
+            "skipped_no_kit": portrait_paint.get("skipped_no_kit") or [],
+            "r2_configured": bool(portrait_paint.get("r2_configured")),
+        },
     }
 
 
@@ -15273,38 +15294,89 @@ def _warm_team_builder_roster_masters(
     primary_color: str,
     secondary_color: str,
     mascot: str,
-) -> int:
-    """Paint all TB roster kits into players/master/<player_id>.png at Apply (§6.5)."""
+) -> dict[str, Any]:
+    """Paint all TB roster kits into players/master/<player_id>.png at Apply (§6.5).
+
+    Returns a summary so Apply can surface partial failures instead of only
+    leaving meta.image_painted unset.
+    """
     from BackEnd.services import recruit_image, r2_images
     from BackEnd.utils.team_builder_portraits import resolve_kit_keys
 
+    summary: dict[str, Any] = {
+        "attempted": 0,
+        "painted": 0,
+        "already_existed": 0,
+        "skipped_no_image_id": 0,
+        "skipped_no_kit": [],
+        "failed": [],
+        "r2_configured": r2_images.is_configured(),
+    }
     if not r2_images.is_configured():
-        return 0
+        logger.warning(
+            "[TB-PORTRAIT-WARM] R2 not configured — skipped painting franchise_id=%s",
+            str(franchise_id),
+        )
+        return summary
     ftd = franchise_team_data_collection.find_one(
         {"franchise_id": franchise_id, "team_id": team_object_id},
         {"players": 1},
     ) or {}
     pids = [str(pid) for pid in (ftd.get("players") or []) if pid]
     if not pids:
-        return 0
-    painted = 0
+        return summary
     for fpd in franchise_players_data_collection.find(
         {"franchise_id": str(franchise_id), "player_id": {"$in": pids}},
         {"player_id": 1, "meta.image_id": 1},
     ):
         player_id = str(fpd.get("player_id") or "")
         image_id = str((fpd.get("meta") or {}).get("image_id") or "").strip()
-        if not player_id or not image_id:
+        if not player_id:
+            continue
+        summary["attempted"] += 1
+        if not image_id:
+            summary["skipped_no_image_id"] += 1
+            logger.warning(
+                "[TB-PORTRAIT-WARM] no image_id franchise_id=%s player_id=%s",
+                str(franchise_id),
+                player_id,
+            )
             continue
         master_key = f"players/master/{player_id}.png"
         try:
             if r2_images.exists(master_key):
+                summary["already_existed"] += 1
                 continue
             keys = resolve_kit_keys(image_id)
             if not keys:
+                summary["skipped_no_kit"].append(
+                    {"player_id": player_id, "image_id": image_id, "reason": "unresolved"}
+                )
+                logger.warning(
+                    "[TB-PORTRAIT-WARM] unresolved kit franchise_id=%s player_id=%s image_id=%s",
+                    str(franchise_id),
+                    player_id,
+                    image_id,
+                )
                 continue
             kit_key, mask_key = keys
             if not (r2_images.exists(kit_key) and r2_images.exists(mask_key)):
+                summary["skipped_no_kit"].append(
+                    {
+                        "player_id": player_id,
+                        "image_id": image_id,
+                        "reason": "missing_object",
+                        "kit_key": kit_key,
+                        "mask_key": mask_key,
+                    }
+                )
+                logger.warning(
+                    "[TB-PORTRAIT-WARM] missing kit/mask franchise_id=%s player_id=%s kit=%s mask=%s",
+                    str(franchise_id),
+                    player_id,
+                    kit_key,
+                    mask_key,
+                )
                 continue
             master = recruit_image.make_signed_master(
                 r2_images.get(kit_key),
@@ -15318,20 +15390,41 @@ def _warm_team_builder_roster_masters(
                 {"franchise_id": str(franchise_id), "player_id": player_id},
                 {"$set": {"meta.image_painted": True}},
             )
-            painted += 1
-        except Exception:
+            summary["painted"] += 1
+        except Exception as exc:
+            summary["failed"].append(
+                {
+                    "player_id": player_id,
+                    "image_id": image_id,
+                    "error": f"{type(exc).__name__}: {str(exc)[:160]}",
+                }
+            )
             logger.exception(
                 "[TB-PORTRAIT-WARM] paint failed franchise_id=%s player_id=%s",
                 str(franchise_id),
                 player_id,
             )
-    if painted:
-        logger.info(
-            "[TB-PORTRAIT-WARM] pre-painted %s TB masters franchise_id=%s",
-            painted,
+    ok = summary["painted"] + summary["already_existed"]
+    logger.info(
+        "[TB-PORTRAIT-WARM] franchise_id=%s painted=%s/%s already=%s no_kit=%s failed=%s no_image_id=%s",
+        str(franchise_id),
+        summary["painted"],
+        summary["attempted"],
+        summary["already_existed"],
+        len(summary["skipped_no_kit"]),
+        len(summary["failed"]),
+        summary["skipped_no_image_id"],
+    )
+    if summary["failed"] or summary["skipped_no_kit"] or summary["skipped_no_image_id"]:
+        logger.warning(
+            "[TB-PORTRAIT-WARM] partial failure franchise_id=%s ok=%s/%s failed=%s no_kit=%s",
             str(franchise_id),
+            ok,
+            summary["attempted"],
+            summary["failed"],
+            summary["skipped_no_kit"],
         )
-    return painted
+    return summary
 
 
 def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players):

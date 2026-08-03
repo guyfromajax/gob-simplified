@@ -40,6 +40,7 @@ import argparse
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.dirname(HERE)
 ROOT = os.path.dirname(SCRIPTS)
+sys.path.insert(0, HERE)
 sys.path.insert(0, SCRIPTS)
 
 import generate_player_portraits as gen         # noqa: E402  (PROMPT, build_prompt, load_env, MODEL)
@@ -175,12 +176,15 @@ def main():
             alpha = uni.person_alpha(src, np, ndimage)          # 0-255
             person = alpha > 128
             tank = uni._tank(a, person, np, ndimage)            # bool
-            ys, xs = np.where(tank)
-            if len(ys) == 0:
-                print(f"[fail] {rec['name']} ({rid}): no tank found (bad bust) — re-run to re-roll")
+            from mask_validation import assert_tank_mask_usable
+            try:
+                assert_tank_mask_usable(tank, source=rid)
+            except RuntimeError as exc:
+                print(f"[fail] {rec['name']} ({rid}): {exc} — re-run to re-roll")
                 failed += 1
                 os.remove(raw_tmp)
                 continue
+            ys, xs = np.where(tank)
             bbox = [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]
             center = int((xs.min() + xs.max()) / 2)
 
