@@ -206,7 +206,7 @@
       hardwoodStyle: 'medium_medium',
       oobColor: oob,
       laneColor: p,
-      centreCourtColor: outsideTone,
+      outsideWoodColor: outsideTone,
       halfArcFillColor: s,
     };
   }
@@ -234,15 +234,80 @@
     };
   }
 
+  function _courtGenStrictEnv() {
+    try {
+      if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.isCaptureEnv === 'function') {
+        return !!API_CONFIG.isCaptureEnv();
+      }
+    } catch (e) { /* ignore */ }
+    try {
+      var host =
+        (typeof global !== 'undefined' && global.location && global.location.hostname) ||
+        (typeof window !== 'undefined' && window.location && window.location.hostname) ||
+        '';
+      return host === 'localhost' || host === '127.0.0.1';
+    } catch (e2) {
+      return false;
+    }
+  }
+
+  function _loudCourtParam(message, fallback) {
+    var msg = '[TeamCourtGenerator] ' + message;
+    if (_courtGenStrictEnv()) {
+      throw new Error(msg);
+    }
+    try {
+      console.error(msg + ' — using ' + JSON.stringify(fallback));
+    } catch (e) { /* ignore */ }
+    return fallback;
+  }
+
+  /**
+   * Hardwood style key is ``{inside}_{outside}`` (9 keys, same as generate_non_a1_courts.mjs).
+   *
+   * Region map (Node drawWoodBase):
+   *   outsideWood — full in-bounds floor fill first (midcourt + area outside the
+   *                 3PT lobes). This is what `outsideWoodColor` paints.
+   *   insideWood  — left/right 3PT lobes ("key" corners), from the style key only;
+   *                 not exposed as a separate colour picker.
+   *
+   * `outsideWoodColor` overrides outside wood when provided; when omitted, outside
+   * comes from the style key. Not a centre-circle fill and not inside wood.
+   */
+  function resolveHardwoodStyleKey(styleKey) {
+    var key = styleKey || 'medium_medium';
+    if (HARDWOOD_VARIANTS[key]) return key;
+    return _loudCourtParam(
+      'unknown hardwoodStyle ' + JSON.stringify(styleKey) + '; expected one of ' +
+        Object.keys(HARDWOOD_VARIANTS).join(', '),
+      'medium_medium'
+    );
+  }
+
   function resolveWoodColors(opts) {
-    var styleKey = opts.hardwoodStyle || 'medium_medium';
-    var variant = HARDWOOD_VARIANTS[styleKey] || HARDWOOD_VARIANTS.medium_medium;
+    opts = opts || {};
+    var styleKey = resolveHardwoodStyleKey(opts.hardwoodStyle);
+    var variant = HARDWOOD_VARIANTS[styleKey];
     var insideWood = HARDWOOD_TONES[variant.inside];
-    var outsideWood =
-      opts.centreCourtColor != null && String(opts.centreCourtColor).trim()
-        ? parseHex(opts.centreCourtColor) || HARDWOOD_TONES[variant.outside]
-        : HARDWOOD_TONES[variant.outside];
-    return { insideWood: insideWood, outsideWood: outsideWood };
+    var outsideWood = HARDWOOD_TONES[variant.outside];
+    if (opts.outsideWoodColor != null && String(opts.outsideWoodColor).trim()) {
+      var parsed = parseHex(opts.outsideWoodColor);
+      if (parsed) {
+        outsideWood = parsed;
+      } else {
+        outsideWood = _loudCourtParam(
+          'unresolvable outsideWoodColor ' + JSON.stringify(opts.outsideWoodColor),
+          HARDWOOD_TONES[variant.outside]
+        );
+      }
+    }
+    return {
+      styleKey: styleKey,
+      insideWood: insideWood,
+      outsideWood: outsideWood,
+      insideTone: variant.inside,
+      outsideTone: variant.outside,
+    };
   }
 
   function resolveRenderParams(opts) {
@@ -250,16 +315,38 @@
     var primary = parseHex(opts.primary) || '#2a2a2a';
     var secondary = parseHex(opts.secondary) || '#f2f2f2';
     var defaults = defaultsFromTeamColors(primary, secondary);
+    var styleKey = resolveHardwoodStyleKey(opts.hardwoodStyle || defaults.hardwoodStyle);
+    // When caller omits outsideWoodColor, use the style's outside tone (Node oracle).
+    // When provided, hex overrides outside — custom outside colours have no Node token.
+    var outsideOpt =
+      opts.outsideWoodColor != null && String(opts.outsideWoodColor).trim()
+        ? opts.outsideWoodColor
+        : HARDWOOD_TONES[HARDWOOD_VARIANTS[styleKey].outside];
     var wood = resolveWoodColors({
-      hardwoodStyle: opts.hardwoodStyle || defaults.hardwoodStyle,
-      centreCourtColor: opts.centreCourtColor != null ? opts.centreCourtColor : defaults.centreCourtColor,
+      hardwoodStyle: styleKey,
+      outsideWoodColor: outsideOpt,
     });
+    var oob = parseHex(opts.oobColor);
+    if (opts.oobColor != null && String(opts.oobColor).trim() && !oob) {
+      oob = _loudCourtParam('unresolvable oobColor ' + JSON.stringify(opts.oobColor), defaults.oobColor);
+    }
+    var lane = parseHex(opts.laneColor);
+    if (opts.laneColor != null && String(opts.laneColor).trim() && !lane) {
+      lane = _loudCourtParam('unresolvable laneColor ' + JSON.stringify(opts.laneColor), defaults.laneColor);
+    }
+    var half = parseHex(opts.halfArcFillColor);
+    if (opts.halfArcFillColor != null && String(opts.halfArcFillColor).trim() && !half) {
+      half = _loudCourtParam(
+        'unresolvable halfArcFillColor ' + JSON.stringify(opts.halfArcFillColor),
+        defaults.halfArcFillColor
+      );
+    }
     return {
-      hardwoodStyle: opts.hardwoodStyle || defaults.hardwoodStyle,
-      oobColor: parseHex(opts.oobColor) || defaults.oobColor,
-      laneColor: parseHex(opts.laneColor) || defaults.laneColor,
-      centreCourtColor: wood.outsideWood,
-      halfArcFillColor: parseHex(opts.halfArcFillColor) || defaults.halfArcFillColor,
+      hardwoodStyle: wood.styleKey,
+      oobColor: oob || defaults.oobColor,
+      laneColor: lane || defaults.laneColor,
+      outsideWoodColor: wood.outsideWood,
+      halfArcFillColor: half || defaults.halfArcFillColor,
       lineColor: parseHex(opts.lineColor) || COLORS.line,
       insideWood: wood.insideWood,
       outsideWood: wood.outsideWood,
@@ -369,8 +456,10 @@
   function fillHalfEllipseCap(ctx, bbox, startDeg, endDeg) {
     var hc = halfCircleCenter(bbox);
     ctx.beginPath();
-    // ImageMagick ellipse angles are CCW from east — match with counterclockwise=true.
-    ctx.ellipse(hc.cx, hc.cy, hc.rx, hc.ry, 0, degToRad(startDeg), degToRad(endDeg), true);
+    // ImageMagick `-draw ellipse … start,end` measures angles clockwise from east.
+    // Canvas defaults to counterclockwise; pass counterclockwise=false to match the oracle.
+    // (ccw=true filled the lane-side half, which drawLaneRects then overpainted — fill looked like a no-op.)
+    ctx.ellipse(hc.cx, hc.cy, hc.rx, hc.ry, 0, degToRad(startDeg), degToRad(endDeg), false);
     ctx.lineTo(hc.cx, hc.cy);
     ctx.closePath();
     ctx.fill();
@@ -401,7 +490,8 @@
   function strokeArcBBox(ctx, bbox, startDeg, endDeg) {
     var hc = halfCircleCenter(bbox);
     ctx.beginPath();
-    ctx.ellipse(hc.cx, hc.cy, hc.rx, hc.ry, 0, degToRad(startDeg), degToRad(endDeg), true);
+    // Clockwise — same ImageMagick angle convention as fillHalfEllipseCap.
+    ctx.ellipse(hc.cx, hc.cy, hc.rx, hc.ry, 0, degToRad(startDeg), degToRad(endDeg), false);
     ctx.stroke();
   }
 
@@ -758,6 +848,9 @@
     A1_REFERENCE_SLUGS: A1_REFERENCE_SLUGS,
     COLORS: COLORS,
     defaultsFromTeamColors: defaultsFromTeamColors,
+    resolveHardwoodStyleKey: resolveHardwoodStyleKey,
+    resolveWoodColors: resolveWoodColors,
+    resolveRenderParams: resolveRenderParams,
     renderCourtCanvas: renderCourtCanvas,
     courtObjectUrl: courtObjectUrl,
     courtPreviewDataUrl: courtPreviewDataUrl,

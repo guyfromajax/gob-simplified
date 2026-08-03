@@ -469,7 +469,7 @@
             hardwoodStyle: 'medium_medium',
             oobColor: primary,
             laneColor: primary,
-            centreCourtColor: '#DBB891',
+            outsideWoodColor: '#DBB891',
             halfArcFillColor: secondary,
           };
     return {
@@ -478,7 +478,7 @@
       hardwoodStyle: court.hardwoodStyle || opts.hardwoodStyle || defaults.hardwoodStyle,
       oobColor: court.oobColor || opts.oobColor || defaults.oobColor,
       laneColor: court.laneColor || opts.laneColor || defaults.laneColor,
-      centreCourtColor: court.centreCourtColor || opts.centreCourtColor || defaults.centreCourtColor,
+      outsideWoodColor: court.outsideWoodColor || opts.outsideWoodColor || defaults.outsideWoodColor,
       halfArcFillColor: court.halfArcFillColor || opts.halfArcFillColor || defaults.halfArcFillColor,
       lineColor: court.lineColor || opts.lineColor,
       // Preview: sync strokes only. Phaser path sets useOverlays true via courtObjectUrl.
@@ -510,7 +510,7 @@
       hardwoodStyle: 'medium_medium',
       oobColor: primary || '#2a2a2a',
       laneColor: primary || '#2a2a2a',
-      centreCourtColor: '#DBB891',
+      outsideWoodColor: '#DBB891',
       halfArcFillColor: secondary || '#f2f2f2',
     };
   }

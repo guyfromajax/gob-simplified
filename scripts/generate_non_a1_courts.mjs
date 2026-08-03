@@ -57,6 +57,8 @@ const LANE_LEFT_RECT = { x1: 150, y1: 806, x2: 872, y2: 1271 };
 const LANE_RIGHT_RECT = { x1: 2452, y1: 806, x2: 3183, y2: 1271 };
 const LEFT_HALF_CIRCLE = { x1: 641, y1: 808, x2: 1103, y2: 1269 };
 const RIGHT_HALF_CIRCLE = { x1: 2221, y1: 808, x2: 2683, y2: 1269 };
+const RIM_LEFT = { x: 300, y: 1042 };
+const RIM_RIGHT = { x: 3033, y: 1042 };
 const LANE_OUTSIDE_HASHES_LEFT_X = [458, 558, 658, 758];
 const LANE_OUTSIDE_HASHES_RIGHT_X = [2575, 2675, 2775, 2875];
 const LANE_OUTSIDE_HASH_TOP = { y1: 782, y2: LANE_LEFT_RECT.y1 };
@@ -527,6 +529,7 @@ function renderTeamCourt({
   outputOverride = null,
   workStem = null,
   disableAbileneMapleOverride = false,
+  disableOverlays = false,
 }) {
   const teamDir = path.join(TEAM_IMAGE_DIR, team.slug);
   if (!outputOverride) ensureDir(teamDir);
@@ -589,7 +592,11 @@ function renderTeamCourt({
   drawCourtLinework({ base: withPaintOutlines, lineColor, outfile: withLinework });
   drawBackboardHeightExtensions({ base: withLinework, outfile: withBoardExtensions });
 
-  if (existsSync(LEFT_BASKET_ALPHA) && existsSync(RIGHT_BASKET_ALPHA)) {
+  if (
+    !disableOverlays &&
+    existsSync(LEFT_BASKET_ALPHA) &&
+    existsSync(RIGHT_BASKET_ALPHA)
+  ) {
     const args = [
       withBoardExtensions,
       LEFT_BASKET_ALPHA, "-geometry", "+126+922", "-compose", "over", "-composite",
@@ -610,8 +617,10 @@ function renderTeamCourt({
     args.push("-quality", "92", output);
     run(args);
   } else {
-    run([
-      withLinework,
+    // Fallback rim/board strokes (no PNG overlays). Start from withBoardExtensions
+    // so height extensions match the port's useOverlays:false path.
+    const fallbackArgs = [
+      withBoardExtensions,
       "-stroke", COLORS.support,
       "-strokewidth", "10",
       "-draw", `line 118,${RIM_LEFT.y} 72,${RIM_LEFT.y}`,
@@ -630,9 +639,13 @@ function renderTeamCourt({
       "-strokewidth", "8",
       "-draw", `circle ${RIM_LEFT.x},${RIM_LEFT.y} ${RIM_LEFT.x + 46},${RIM_LEFT.y}`,
       "-draw", `circle ${RIM_RIGHT.x},${RIM_RIGHT.y} ${RIM_RIGHT.x + 46},${RIM_RIGHT.y}`,
-      "-quality", "92",
-      output,
-    ]);
+    ];
+    if (String(output).toLowerCase().endsWith(".png")) {
+      fallbackArgs.push(output);
+    } else {
+      fallbackArgs.push("-quality", "92", output);
+    }
+    run(fallbackArgs);
   }
 
   return {
@@ -645,7 +658,53 @@ function renderTeamCourt({
     oob_fill: oobKey,
     line_fill: effectiveLineToken,
     output,
+    resolved: {
+      primary,
+      secondary,
+      inside_wood: insideWood,
+      outside_wood: outsideWood,
+      lane_color: laneColor,
+      half_circle_color: halfCircleColor,
+      oob_color: oobColor,
+      line_color: lineColor,
+    },
   };
+}
+
+/**
+ * Fixture render for port↔oracle sweeps. Uses a synthetic team so tokens resolve
+ * against the supplied primary/secondary; overlays disabled for fair compare.
+ */
+function renderOracleFixture({
+  hardwoodKey,
+  laneKey = "primary",
+  halfCircleKey = "secondary",
+  oobKey = "black",
+  lineKey = "dark_grey",
+  primary = "#27408E",
+  secondary = "#FF00FF",
+  outPath,
+}) {
+  if (!HARDWOOD_VARIANTS[hardwoodKey]) {
+    throw new Error(`Unknown hardwoodKey: ${hardwoodKey}`);
+  }
+  const team = {
+    slug: "oracle_fixture",
+    primary_color: primary,
+    secondary_color: secondary,
+  };
+  return renderTeamCourt({
+    team,
+    hardwoodKey,
+    laneKey,
+    halfCircleKey,
+    oobKey,
+    lineKey,
+    outputOverride: outPath,
+    workStem: `oracle_${hardwoodKey}_${laneKey}_${halfCircleKey}_${oobKey}`,
+    disableAbileneMapleOverride: true,
+    disableOverlays: true,
+  });
 }
 
 function main() {
@@ -654,6 +713,27 @@ function main() {
   const force = process.argv.includes("--force");
   const teamFilter = getArgValue("--team");
   const renderTemplateVariants = process.argv.includes("--render-template-variants");
+  const oracleRender = process.argv.includes("--oracle-render");
+
+  if (oracleRender) {
+    const hardwoodKey = getArgValue("--hardwood");
+    const outPath = getArgValue("--out");
+    if (!hardwoodKey || !outPath) {
+      throw new Error("--oracle-render requires --hardwood <key> and --out <path>");
+    }
+    const report = renderOracleFixture({
+      hardwoodKey,
+      laneKey: getArgValue("--lane") || "primary",
+      halfCircleKey: getArgValue("--half") || "secondary",
+      oobKey: getArgValue("--oob") || "black",
+      lineKey: getArgValue("--line") || "dark_grey",
+      primary: getArgValue("--primary") || "#27408E",
+      secondary: getArgValue("--secondary") || "#FF00FF",
+      outPath,
+    });
+    process.stdout.write(JSON.stringify(report) + "\n");
+    return;
+  }
 
   if (renderTemplateVariants) {
     const abilene = parseTeams().find((team) => team.slug === "abilene");

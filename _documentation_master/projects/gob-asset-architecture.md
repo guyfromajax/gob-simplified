@@ -222,7 +222,9 @@ None of this blocks Team Builder. Suggested order:
 
 1. **Make court parameters round-trip** (v2 plan §6.3b) — already a live defect, already scoped
 2. **Static assets to R2** — self-contained, no feature dependency
-3. **Upload storage + cascade delete + sweeper** — with v2 plan §6.4 (3c), which needs it, and only once web or online play requires it
+3. **Upload storage + cascade delete + sweeper** — immediately before v2 plan §6.4 (3c), which is the only workstream that needs it, and only once web or online play requires it
+
+> **Player imagery splits across two classes and must not be scheduled as one.** Headshots chosen from `set_0001` (3d) store a **selection id** — derivable, no storage. User-uploaded player images (3c) store **bytes** — the full path. Treating them as a single requirement drags infrastructure into a phase that doesn't need it, which is why 3d now runs ahead of 3c.
 4. **Downloadable build packaging** — when a download build actually exists
 
 Steps 1 and 2 are independent and can run in either order. **Nothing in §6 is on this list** — it is a rule to hold, not work to schedule, until a mode exists that needs a second backend.

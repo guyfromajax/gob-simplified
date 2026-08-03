@@ -105,7 +105,7 @@
         hardwoodStyle: 'medium_medium',
         oobColor: '#1a1a1a',
         laneColor: '#27408E',
-        centreCourtColor: '#DBB891',
+        outsideWoodColor: '#DBB891',
         halfArcFillColor: '#15181f',
       },
     },
@@ -148,6 +148,9 @@
       loaded: false,
     },
   };
+
+  /** Set once court colour controls are bound — re-arms hardwood→outside sync. */
+  let armOutsideWoodAutoSyncFromDom = function () {};
 
   function leaguePool() {
     return state.league.team_pool || 0;
@@ -1912,13 +1915,15 @@
     const hw = document.getElementById('tb-court-hardwood');
     const oob = document.getElementById('tb-court-oob');
     const lane = document.getElementById('tb-court-lane');
-    const centre = document.getElementById('tb-court-centre');
+    const outside = document.getElementById('tb-court-outside');
     const half = document.getElementById('tb-court-halfarc');
     if (hw) hw.value = state.colors.court.hardwoodStyle;
     if (oob) oob.value = state.colors.court.oobColor;
     if (lane) lane.value = state.colors.court.laneColor;
-    if (centre) centre.value = state.colors.court.centreCourtColor;
+    if (outside) outside.value = state.colors.court.outsideWoodColor;
     if (half) half.value = state.colors.court.halfArcFillColor;
+    // Re-arm hardwood→outside sync after programmatic defaults (linked again).
+    armOutsideWoodAutoSyncFromDom();
   }
 
   function readColors() {
@@ -1929,13 +1934,13 @@
     const hw = document.getElementById('tb-court-hardwood');
     const oob = document.getElementById('tb-court-oob');
     const lane = document.getElementById('tb-court-lane');
-    const centre = document.getElementById('tb-court-centre');
+    const outside = document.getElementById('tb-court-outside');
     const half = document.getElementById('tb-court-halfarc');
     state.colors.court = {
       hardwoodStyle: hw ? hw.value : state.colors.court.hardwoodStyle,
       oobColor: oob ? oob.value : state.colors.court.oobColor,
       laneColor: lane ? lane.value : state.colors.court.laneColor,
-      centreCourtColor: centre ? centre.value : state.colors.court.centreCourtColor,
+      outsideWoodColor: outside ? outside.value : state.colors.court.outsideWoodColor,
       halfArcFillColor: half ? half.value : state.colors.court.halfArcFillColor,
     };
   }
@@ -2434,13 +2439,82 @@
     document.querySelectorAll('input[name="jersey"]').forEach(function (el) {
       el.addEventListener('change', refreshColorPreviews);
     });
-    ['tb-court-hardwood', 'tb-court-oob', 'tb-court-lane', 'tb-court-centre', 'tb-court-halfarc'].forEach(
-      function (id) {
-        const el = document.getElementById(id);
-        if (el) el.addEventListener('input', refreshColorPreviews);
-        if (el && el.tagName === 'SELECT') el.addEventListener('change', refreshColorPreviews);
+    // Hardwood style is inside_outside (Node HARDWOOD_VARIANTS). outsideWoodColor
+    // paints the main floor. Sync that picker to the style's outside tone only while
+    // it still matches the last auto value — never overwrite a deliberate custom choice.
+    const hwSelect = document.getElementById('tb-court-hardwood');
+    const outsideInput = document.getElementById('tb-court-outside');
+    const outsideSyncNote = document.getElementById('tb-court-outside-sync-note');
+    let lastAutoOutsideTone = null;
+
+    function _normHex(v) {
+      const s = String(v || '').trim().toLowerCase();
+      if (/^#[0-9a-f]{6}$/.test(s)) return s;
+      if (/^#[0-9a-f]{3}$/.test(s)) {
+        return '#' + s[1] + s[1] + s[2] + s[2] + s[3] + s[3];
       }
-    );
+      return s;
+    }
+
+    function outsideToneForHardwood(styleKey) {
+      const variants =
+        window.TeamCourtGenerator && window.TeamCourtGenerator.HARDWOOD_VARIANTS;
+      const tones = window.TeamCourtGenerator && window.TeamCourtGenerator.HARDWOOD_TONES;
+      const variant = variants && variants[styleKey];
+      return variant && tones ? tones[variant.outside] : null;
+    }
+
+    function setOutsideSyncNote(msg) {
+      if (outsideSyncNote) outsideSyncNote.textContent = msg || '';
+    }
+
+    armOutsideWoodAutoSyncFromDom = function () {
+      if (!hwSelect || !outsideInput) return;
+      const tone = outsideToneForHardwood(hwSelect.value);
+      if (tone && _normHex(outsideInput.value) === _normHex(tone)) {
+        lastAutoOutsideTone = _normHex(tone);
+        setOutsideSyncNote('');
+      } else {
+        lastAutoOutsideTone = null;
+      }
+    };
+
+    if (hwSelect) {
+      hwSelect.addEventListener('change', function () {
+        const tone = outsideToneForHardwood(hwSelect.value);
+        if (
+          outsideInput &&
+          tone &&
+          lastAutoOutsideTone &&
+          _normHex(outsideInput.value) === lastAutoOutsideTone
+        ) {
+          outsideInput.value = tone;
+          lastAutoOutsideTone = _normHex(tone);
+          setOutsideSyncNote('');
+        } else if (outsideInput && tone) {
+          setOutsideSyncNote('Custom outside-wood colour kept');
+        }
+        refreshColorPreviews();
+      });
+    }
+    if (outsideInput) {
+      outsideInput.addEventListener('input', function () {
+        const tone = outsideToneForHardwood(hwSelect ? hwSelect.value : '');
+        if (tone && _normHex(outsideInput.value) === _normHex(tone)) {
+          lastAutoOutsideTone = _normHex(tone);
+          setOutsideSyncNote('');
+        } else {
+          lastAutoOutsideTone = null;
+          setOutsideSyncNote('');
+        }
+        refreshColorPreviews();
+      });
+    }
+    armOutsideWoodAutoSyncFromDom();
+    ['tb-court-oob', 'tb-court-lane', 'tb-court-halfarc'].forEach(function (id) {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('input', refreshColorPreviews);
+    });
 
     document.querySelectorAll('.tb-mode-card').forEach(function (card) {
       card.addEventListener('click', function () {

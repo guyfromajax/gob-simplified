@@ -103,7 +103,7 @@ const report = await page.evaluate(async () => {
     hardwoodStyle: 'dark_dark',
     oobColor: '#111111',
     laneColor: '#ff0000',
-    centreCourtColor: '#00ff00',
+    outsideWoodColor: '#00ff00',
     halfArcFillColor: '#0000ff',
   });
   const b = G.renderCourtCanvas({
@@ -111,7 +111,7 @@ const report = await page.evaluate(async () => {
     hardwoodStyle: 'light_light',
     oobColor: '#eeeeee',
     laneColor: '#0000aa',
-    centreCourtColor: '#aaaa00',
+    outsideWoodColor: '#aaaa00',
     halfArcFillColor: '#aa00aa',
   });
 
@@ -120,7 +120,7 @@ const report = await page.evaluate(async () => {
     hardwoodStyle: 'dark_dark',
     oobColor: '#111111',
     laneColor: '#ff0000',
-    centreCourtColor: '#00ff00',
+    outsideWoodColor: '#00ff00',
     halfArcFillColor: '#0000ff',
     lineColor: '#ffffff',
   });
@@ -207,7 +207,7 @@ assert.ok(report.artWired);
 assert.ok(report.defaults.hardwoodStyle);
 assert.ok(report.defaults.oobColor);
 assert.ok(report.defaults.laneColor);
-assert.ok(report.defaults.centreCourtColor);
+assert.ok(report.defaults.outsideWoodColor);
 assert.ok(report.defaults.halfArcFillColor);
 
 console.log('dims:', report.dimsA);

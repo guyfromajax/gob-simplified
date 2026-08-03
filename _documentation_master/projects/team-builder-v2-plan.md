@@ -121,7 +121,20 @@ Observed in live play: a game entered normally rendered clean, then was closed m
 
 **The lesson is about entry points, not surfaces.** The §3.2 sweep played a full week and passed. It never closed a game mid-stream and resumed, so an entire second entry path — one that constructs UI from persisted state rather than from a hydrated franchise payload — was never exercised. **Any path that reconstructs the game view from stored state is a distinct entry point and needs its own verification**, including resume, deep links, and a browser refresh mid-game.
 
-**Detector note:** the DOM scanner re-fires on every mutation, so a single leak produced repeated banners in one session. It should dedupe by node plus needle per session — a real leak should be reported once, not made to feel like many.
+**Detector note:** the DOM scanner re-fires on every mutation, so a single leak produced repeated banners in one session. It dedupes by stable node plus needle per session — a real leak is reported once, not made to feel like many.
+
+**The leak set was never the real set.** Two nodes on a plain resume; five once an event card mounted. The extra three were player-card chrome that only exists in the DOM while a moment card is on screen. Because transient UI is only scanned while alive, **the true surface count is unknowable and node-by-node patching could never converge.**
+
+#### 3.2b The hydration gate
+
+Fixed by making hydration a **precondition of chrome resolution**, not a responsibility of callers:
+
+- Resolvers own `ensureTeamBuilderVisualReady()`; first access lazily starts the payload fetch. **A warm `FranchiseLS` alone does not settle the gate** — the same localStorage-masking trap found in §6.3b, closed here before it could repeat.
+- Labels and colours resolve through **one producer**. `resolveTeamBuilderDisplayName(core, urlFallback)` makes the hydrated `visual.name` authoritative and the URL a fallback only — a query parameter is user-editable and must never be an identity source.
+- The sync painter has **no production call sites**. It is reachable only through async wrappers that await the gate, so a new entry point cannot render chrome without hydrating.
+- The assertion is **environment-scoped**: throw in development and staging, `console.error` in production with paint proceeding. A gate that crashes a live game to prevent a cosmetic leak is the trade already rejected when the server-side detector was rescoped to observe-only.
+
+> **The general rule: a guarantee that depends on every caller remembering is a convention, not a guarantee.** This is the third time in the project — the walk-on endpoint held only because the client didn't re-call it, and capped-mode budgets held only because tests happened to use aligned ordering. In each case the repair was to make the correct behaviour structural and the incorrect one unreachable or loud.
 
 ### 3.3 Phase 0 acceptance
 
@@ -513,7 +526,7 @@ Geometry is copied verbatim from the existing constants. Nothing is re-measured.
 
 Storing the rendered image is wrong on every axis: a 3,333 × 2,083 JPEG is 1–2 MB per franchise, a data URI is the one form Phaser rejects (§6.3c), and object storage would break the offline premise §6.1 exists to protect.
 
-**Defect found 2 August 2026.** The wizard sends `court: { hardwoodStyle, oobColor, laneColor, centreCourtColor, halfArcFillColor }`, but **the Apply request model has no `court` field, so FastAPI drops it silently.** The `team_builder` overlay persists identity and colours but not the court parameters. Regeneration then falls back to `visual.court` in **localStorage**, which survives only the creating session on the creating browser.
+**Defect found 2 August 2026.** The wizard sends `court: { hardwoodStyle, oobColor, laneColor, outsideWoodColor, halfArcFillColor }`, but **the Apply request model has no `court` field, so FastAPI drops it silently.** The `team_builder` overlay persists identity and colours but not the court parameters. Regeneration then falls back to `visual.court` in **localStorage**, which survives only the creating session on the creating browser.
 
 Two failures in one:
 
@@ -528,11 +541,17 @@ No error is raised at any point — the preview looks right, Apply succeeds, and
 
 **User-exposed parameters:**
 
-- Hardwood style
+- Hardwood style — selects the `{inside}_{outside}` variant pair
 - Out-of-bounds colour
 - Free-throw lane colour
-- Centre-court colour
+- **Outside-wood colour** — see the correction below
 - Free-throw half-arc fill colour
+
+> **Naming correction, 3 August 2026.** This section originally said *"centre-court colour,"* which was wrong. **There is no centre-circle fill.** The control paints the Node generator's `outsideWood` region — the full in-bounds floor first fill, covering midcourt and everything outside the three-point lobes. The `insideWood` region is the two three-point key lobes, set by the hardwood style and not separately exposed.
+>
+> Every sweep test passed while this was mislabelled, because the tests asserted *that a colour changed*, not *that the correct region changed*. Region-identity probes now check midcourt against outside wood and the left lobe against inside wood, and assert the lobe does **not** match outside when tones differ.
+
+**Persisted key renamed 3 August 2026:** `centreCourtColor` → `outsideWoodColor`. Done while free — Apply still drops the `court` field (§6.3b), so nothing was stored under the old name. The round-trip must write `outsideWoodColor`; do not reintroduce the misnamed key.
 
 **Constraints:**
 
@@ -626,12 +645,28 @@ This requires publishing a **filtered subset** of the baking manifest into the g
 | **0 — Repair** | — | Immediately. Blocks everything. |
 | **1 — Attributes + editor** | Phase 0 | After Phase 0 |
 | **2 — Team select** | Phase 0 | Parallel with Phase 1 — independent surfaces |
-| **3a — Banner** | Design sign-off | Design can begin now |
-| **3b — Court** | Design sign-off; court source located or geometry measured | After 3a decision on client-side rendering |
-| **3c — Uploads** | 3a, 3b | After both |
-| **3d — Headshots** | Manifest subset published | Parallel with 3c |
+| **3a — Banner** | — | **Closed** |
+| **3b — Court** | — | **In progress** |
+| **3d — Headshots** | Manifest subset published | **Next — moved ahead of 3c.** Stores a *selection*, not an image, so it needs no storage infrastructure at all |
+| **3c — Uploads** | 3b, 3d, **and R2 upload storage** | Last. The only workstream that requires infrastructure |
+
+**Asset storage is governed by `gob-asset-architecture.md`,** not by this plan. Its rule — *store bytes only for what a computer cannot recreate* — already applies to 3a and 3b, which persist recipes rather than renders.
+
+**Why 3d moves ahead of 3c.** Headshot selection from `set_0001` stores an id; fitted random assignment stores a choice. Neither is an upload, so neither needs storage, normalization, cascade delete or a sweeper. 3c is the sole workstream that genuinely requires object storage, so it should be last and its prerequisite is explicit rather than implied.
 
 **Phases 1 and 2 are genuinely independent** and can run concurrently if you want two threads. Phase 3 is one thread with internal ordering.
+
+### 7.1 Where the asset architecture fits
+
+`gob-asset-architecture.md` is a **standing rule plus three work items**, not a phase. The items have unrelated dependencies and should not be scheduled as a block:
+
+| Item | Depends on | When |
+|---|---|---|
+| Court parameters round-trip (§6.3b) | — | **Now** — a live defect, already scoped |
+| Static league assets → R2 | — | Anytime. Independent of every feature. |
+| Upload storage, cascade delete, orphan sweeper | Web or online play existing | **Immediately before 3c**, and not before |
+
+**Player imagery splits across two of these.** Headshots chosen from `set_0001` (3d) store an id and need nothing. User-uploaded player images (3c) need the full storage path. Treating "player images" as one requirement would drag infrastructure forward into a phase that doesn't need it.
 
 ---
 

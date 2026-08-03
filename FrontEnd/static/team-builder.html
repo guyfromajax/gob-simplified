@@ -84,7 +84,7 @@
           </fieldset>
           <fieldset class="tb-court-params">
             <legend>Court</legend>
-            <label>Hardwood style
+            <label>Hardwood style <span class="tb-optional-note">(inside key / outside floor)</span>
               <select id="tb-court-hardwood">
                 <option value="medium_medium">Medium / medium</option>
                 <option value="medium_light">Medium / light</option>
@@ -99,7 +99,10 @@
             </label>
             <label>Out of bounds<input type="color" id="tb-court-oob" value="#1a1a1a"></label>
             <label>Free-throw lane<input type="color" id="tb-court-lane" value="#27408E"></label>
-            <label>Centre court<input type="color" id="tb-court-centre" value="#DBB891"></label>
+            <label>Outside wood <span class="tb-optional-note">(main floor · centre — not the key lobes)</span>
+              <input type="color" id="tb-court-outside" value="#DBB891" title="Paints Node outsideWood: midcourt and floor outside the 3PT lobes">
+              <span id="tb-court-outside-sync-note" class="tb-optional-note" aria-live="polite"></span>
+            </label>
             <label>FT half-arc fill<input type="color" id="tb-court-halfarc" value="#15181f"></label>
           </fieldset>
           <p class="tb-optional-note">Logo is optional — a generated mark from your colors and initials is used by default. Court markings are fixed; only colours change.</p>
