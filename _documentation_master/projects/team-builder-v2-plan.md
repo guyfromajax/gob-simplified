@@ -526,11 +526,7 @@ Geometry is copied verbatim from the existing constants. Nothing is re-measured.
 
 Storing the rendered image is wrong on every axis: a 3,333 × 2,083 JPEG is 1–2 MB per franchise, a data URI is the one form Phaser rejects (§6.3c), and object storage would break the offline premise §6.1 exists to protect.
 
-**Defect found 2 August 2026 — fixed 3 August 2026.** The wizard sent `court: { hardwoodStyle, oobColor, laneColor, outsideWoodColor, halfArcFillColor }`, but the Apply request model had no `court` field, so FastAPI discarded it silently. The `team_builder` overlay persisted identity and colours but not the court parameters. Regeneration fell back to `visual.court` in **localStorage**, which survived only the creating session on the creating browser.
-
-**Fix:** `TeamBuilderApplyRequest.court` + `normalize_court_params` write the five parameters onto **`franchises.team_builder.court`** — the same franchise-document object that already holds `primary_color` and `secondary_color`. `resolve_team_display`, FCC `/command-center/data`, and `/franchise/list` surface them. Hydrate reads the server payload; localStorage may cache only after that. Legacy overlays without `court` omit the key — FE derives defaults from primary/secondary (no backfill). No image is stored.
-
-> **Storage location (recorded 3 August 2026).** The Team Builder visual identity is **one object on the franchise document**: `franchises.team_builder`. It is **not** on FTD. Apply also stamps `team_name` / `primary_color` / `secondary_color` onto the FTD row as a **disposable cache** for roster joins (gob-asset-architecture §3.2) — rebuildable from the overlay. On read, a missing FTD cache falls back to the overlay and writes the mirror back (`ensure_ftd_identity_cache`). Court is written only to `franchises.team_builder`, never to FTD, GridFS, or disk.
+**Defect found 2 August 2026.** The wizard sends `court: { hardwoodStyle, oobColor, laneColor, centreCourtColor, halfArcFillColor }`, but **the Apply request model has no `court` field, so FastAPI drops it silently.** The `team_builder` overlay persists identity and colours but not the court parameters. Regeneration then falls back to `visual.court` in **localStorage**, which survives only the creating session on the creating browser.
 
 Two failures in one:
 
@@ -540,6 +536,14 @@ Two failures in one:
 No error is raised at any point — the preview looks right, Apply succeeds, and the loss appears only after a reload. This is the silent-substitution pattern v1.3 §8.6 forbids, and the same shape as every other defect this phase: **the client sends something the server does not read.**
 
 **Rule: the five court parameters are part of the Team Builder overlay and are written at Apply, exactly like the colours.** localStorage may cache; it may never be the source of truth.
+
+**One object, one place.** The overlay lives on the franchise document (`franchises.team_builder`) and holds `primary_color`, `secondary_color`, `jersey_preset` and `court`. `resolve_team_display` reads only that field. A team's visual identity is a single object; splitting it across documents creates a second source of truth for one concept.
+
+> **The FTD identity mirror was deleted, not repaired.** Apply also wrote `team_name` / `primary_color` / `secondary_color` onto the FTD as a denormalization for roster joins. Investigation found **nothing read them** — no query projected those fields, and the join map used core `teams.name`. The mirror was write-only, non-atomic with the overlay write, and could therefore be silently *missing* after a partial Apply, causing joins keyed on the custom name to miss while core-name joins succeeded.
+>
+> The first fix made it an explicit cache with overlay fallback and self-heal. The better fix was to establish what it saved: **one O(1) franchise-document read.** Nothing. So the mirror, its `$set`, its cache helper and its heal path were removed, and joins resolve the custom name directly from the overlay.
+>
+> **A cache earns its place by avoiding expensive work.** Reading one document is not expensive, and a cache kept because it was already there is pure surface area. Deleting the mirror removed the partial-Apply failure mode entirely rather than defending against it.
 
 > **Testing note.** Criterion 6 cannot be judged in the creating session — localStorage masks the defect. **Reload, or open the franchise on another browser, before assessing.**
 
@@ -555,7 +559,7 @@ No error is raised at any point — the preview looks right, Apply succeeds, and
 >
 > Every sweep test passed while this was mislabelled, because the tests asserted *that a colour changed*, not *that the correct region changed*. Region-identity probes now check midcourt against outside wood and the left lobe against inside wood, and assert the lobe does **not** match outside when tones differ.
 
-**Persisted key renamed 3 August 2026:** `centreCourtColor` → `outsideWoodColor`. Round-trip writes `outsideWoodColor` only.
+**Rename the persisted key while it is free.** The implementation carries `centreCourtColor`, retained "for the overlay contract" — but per §6.3b no such contract exists: Apply drops the `court` field, nothing persists server-side, and the only consumer is localStorage in the creating session. **No franchise has this key stored**, so renaming costs nothing today and requires a migration the moment the round-trip ships. `user_team_id` — a field carrying a display name despite its suffix — is the deferred example of what happens when this window is missed.
 
 **Constraints:**
 

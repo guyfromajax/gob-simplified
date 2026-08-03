@@ -11,28 +11,20 @@ name, abbreviation, mascot, ``primary_color``, ``secondary_color``,
 ``jersey_preset``, ``asset_strategy``, and ``court`` (five colour parameters).
 Written only at Apply. Not FTD.
 
-FTD ``team_name`` / ``primary_color`` / ``secondary_color`` are a **disposable
-cache** for roster joins (gob-asset-architecture §3.2) — rebuildable from
-``franchises.team_builder``. ``resolve_team_display`` always reads the overlay.
-A missing FTD cache must fall back to the overlay and self-heal on read.
+Roster joins that need the custom display name read ``franchises.team_builder``
+directly (one franchise-document read). FTD does not mirror identity fields.
 """
 from __future__ import annotations
 
-import logging
 import re
 from typing import Any, Mapping, MutableMapping, Optional
 
 from bson import ObjectId
 
-from BackEnd.db import franchise_team_data_collection, franchises_collection, teams_collection
-
-logger = logging.getLogger(__name__)
+from BackEnd.db import franchises_collection, teams_collection
 
 # Franchise-doc field holding the per-save Team Builder overlay.
 TEAM_BUILDER_FIELD = "team_builder"
-
-# FTD denormalized identity fields (cache only — never authoritative).
-FTD_IDENTITY_CACHE_KEYS = ("team_name", "primary_color", "secondary_color")
 
 
 def _as_object_id_str(value: Any) -> Optional[str]:
@@ -305,81 +297,6 @@ def resolve_team_display(
     if court is not None:
         out["court"] = court
     return out
-
-
-def _ftd_identity_cache_complete(ftd_doc: Mapping[str, Any] | None) -> bool:
-    if not isinstance(ftd_doc, Mapping):
-        return False
-    for key in FTD_IDENTITY_CACHE_KEYS:
-        val = ftd_doc.get(key)
-        if val is None or (isinstance(val, str) and not str(val).strip()):
-            return False
-    return True
-
-
-def ensure_ftd_identity_cache(
-    franchise: Any,
-    team_object_id: Any,
-    *,
-    ftd_doc: Mapping[str, Any] | None = None,
-    write_back: bool = True,
-) -> dict[str, str]:
-    """
-    Read FTD identity cache; rebuild from ``franchises.team_builder`` when absent.
-
-    Returns ``{team_name, primary_color, secondary_color}`` always populated from
-    the authoritative overlay/core display. When the FTD row is missing any of
-    those fields, optionally writes them back so a partial Apply self-heals.
-    """
-    oid = _as_object_id_str(team_object_id)
-    display = resolve_team_display(franchise, oid)
-    authoritative = {
-        "team_name": str(display.get("name") or "").strip() or "?",
-        "primary_color": str(display.get("primary_color") or "#27408E"),
-        "secondary_color": str(display.get("secondary_color") or "#15181f"),
-    }
-
-    fid = None
-    doc = _load_franchise_doc(franchise, projection={"_id": 1, TEAM_BUILDER_FIELD: 1})
-    if doc and doc.get("_id") is not None:
-        fid = doc["_id"]
-    elif franchise is not None and not isinstance(franchise, Mapping):
-        try:
-            fid = ObjectId(str(franchise))
-        except Exception:
-            fid = None
-
-    cached = ftd_doc
-    if cached is None and fid is not None and oid:
-        try:
-            cached = franchise_team_data_collection.find_one(
-                {"franchise_id": fid, "team_id": ObjectId(oid)},
-                {k: 1 for k in FTD_IDENTITY_CACHE_KEYS},
-            )
-        except Exception:
-            cached = None
-
-    # Overlay/core display is always authoritative. Heal FTD when the cache is
-    # missing or incomplete so a partial Apply becomes invisible on first access.
-    if (
-        write_back
-        and fid is not None
-        and oid
-        and display.get("is_custom")
-        and not _ftd_identity_cache_complete(cached)
-    ):
-        try:
-            franchise_team_data_collection.update_one(
-                {"franchise_id": fid, "team_id": ObjectId(oid)},
-                {"$set": dict(authoritative)},
-            )
-        except Exception:
-            logger.exception(
-                "[TEAM-BUILDER] FTD identity cache heal failed franchise_id=%s team_id=%s",
-                fid,
-                oid,
-            )
-    return authoritative
 
 
 def resolve_team_name_map(

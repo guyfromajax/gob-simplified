@@ -111,98 +111,83 @@ class TestResolveTeamDisplayCourt(unittest.TestCase):
         self.assertNotIn("court", display)
 
 
-class TestEnsureFtdIdentityCache(unittest.TestCase):
-    def test_heals_missing_ftd_fields_from_overlay(self):
-        from BackEnd.utils import franchise_team_display as ftdisp
+class TestCustomNameJoinMap(unittest.TestCase):
+    """
+    Roster join path: custom display name must resolve even when FTD has no
+    identity mirror (the pre-fix miss — core-name joins worked, custom missed).
+    """
 
-        oid = "507f1f77bcf86cd799439011"
-        fid = "507f1f77bcf86cd799439099"
-        franchise = {
-            "_id": ObjectId(fid),
-            "team_builder": {
-                "replaced_object_id": oid,
+    def test_custom_name_joins_without_ftd_identity_fields(self):
+        from BackEnd.utils import franchise_team_display as ftdisp
+        from BackEnd.utils import stat_updater as su
+
+        fid = ObjectId("507f1f77bcf86cd799439099")
+        replaced = ObjectId("507f1f77bcf86cd799439011")
+        other = ObjectId("507f1f77bcf86cd799439012")
+
+        ftd_rows = [
+            {"team_id": replaced},  # no team_name / colours — mirror absent
+            {"team_id": other},
+        ]
+        team_rows = [
+            {"_id": replaced, "name": "Concord", "team_id": "concord"},
+            {"_id": other, "name": "Ada", "team_id": "ada"},
+        ]
+
+        class FakeFtd:
+            def find(self, *a, **k):
+                return list(ftd_rows)
+
+        class FakeTeams:
+            def find(self, *a, **k):
+                return list(team_rows)
+
+        with mock.patch("BackEnd.db.franchise_team_data_collection", FakeFtd()), mock.patch(
+            "BackEnd.db.teams_collection", FakeTeams()
+        ), mock.patch.object(
+            ftdisp,
+            "get_team_builder_overlay",
+            return_value={
+                "replaced_object_id": str(replaced),
                 "name": "Hanson",
-                "abbreviation": "HAN",
                 "primary_color": "#ec1d28",
-                "secondary_color": "#00ff00",
+                "secondary_color": "#15181f",
                 "asset_strategy": "generated",
             },
-        }
-        core = {
-            "_id": ObjectId(oid),
-            "name": "Concord",
-            "primary_color": "#111111",
-            "secondary_color": "#222222",
-            "team_id": "concord",
-        }
-        writes = []
-
-        class FakeCol:
-            def find_one(self, *a, **k):
-                return None
-
-            def update_one(self, filt, update):
-                writes.append((filt, update))
-                return None
-
-        with mock.patch.object(ftdisp, "franchise_team_data_collection", FakeCol()), mock.patch.object(
-            ftdisp, "_core_team_doc", return_value=core
         ):
-            out = ftdisp.ensure_ftd_identity_cache(
-                franchise,
-                oid,
-                ftd_doc={},  # present row, empty identity cache
-                write_back=True,
-            )
-        self.assertEqual(out["team_name"], "Hanson")
-        self.assertEqual(out["primary_color"], "#ec1d28")
-        self.assertEqual(out["secondary_color"], "#00ff00")
-        self.assertEqual(len(writes), 1)
-        self.assertEqual(writes[0][1]["$set"]["team_name"], "Hanson")
+            name_to_id, _canon = su._build_franchise_team_maps_from_ftd(fid)
 
-    def test_complete_cache_skips_write(self):
+        self.assertEqual(name_to_id["Concord"], str(replaced))
+        self.assertEqual(name_to_id["Ada"], str(other))
+        self.assertEqual(
+            name_to_id["Hanson"],
+            str(replaced),
+            "custom name must join even with no FTD identity mirror",
+        )
+
+    def test_without_overlay_custom_name_absent(self):
+        """Documents the old miss: core names only when overlay is not consulted."""
         from BackEnd.utils import franchise_team_display as ftdisp
+        from BackEnd.utils import stat_updater as su
 
-        oid = "507f1f77bcf86cd799439011"
-        franchise = {
-            "_id": ObjectId("507f1f77bcf86cd799439099"),
-            "team_builder": {
-                "replaced_object_id": oid,
-                "name": "Hanson",
-                "abbreviation": "HAN",
-                "primary_color": "#ec1d28",
-                "secondary_color": "#00ff00",
-                "asset_strategy": "generated",
-            },
-        }
-        core = {
-            "_id": ObjectId(oid),
-            "name": "Concord",
-            "primary_color": "#111111",
-            "secondary_color": "#222222",
-            "team_id": "concord",
-        }
-        writes = []
+        fid = ObjectId("507f1f77bcf86cd799439099")
+        replaced = ObjectId("507f1f77bcf86cd799439011")
 
-        class FakeCol:
-            def update_one(self, *a, **k):
-                writes.append(True)
+        class FakeFtd:
+            def find(self, *a, **k):
+                return [{"team_id": replaced}]
 
-        with mock.patch.object(ftdisp, "franchise_team_data_collection", FakeCol()), mock.patch.object(
-            ftdisp, "_core_team_doc", return_value=core
-        ):
-            out = ftdisp.ensure_ftd_identity_cache(
-                franchise,
-                oid,
-                ftd_doc={
-                    "team_name": "Hanson",
-                    "primary_color": "#ec1d28",
-                    "secondary_color": "#00ff00",
-                },
-                write_back=True,
-            )
-        self.assertEqual(out["team_name"], "Hanson")
-        self.assertEqual(writes, [])
+        class FakeTeams:
+            def find(self, *a, **k):
+                return [{"_id": replaced, "name": "Concord", "team_id": "concord"}]
+
+        with mock.patch("BackEnd.db.franchise_team_data_collection", FakeFtd()), mock.patch(
+            "BackEnd.db.teams_collection", FakeTeams()
+        ), mock.patch.object(ftdisp, "get_team_builder_overlay", return_value=None):
+            name_to_id, _ = su._build_franchise_team_maps_from_ftd(fid)
+
+        self.assertEqual(name_to_id.get("Concord"), str(replaced))
+        self.assertNotIn("Hanson", name_to_id)
 
 
 class TestApplyRequestDeclaresCourt(unittest.TestCase):

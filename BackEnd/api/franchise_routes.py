@@ -3846,23 +3846,6 @@ def team_builder_apply(
     except Exception:
         logger.exception("[TEAM-BUILDER] FPD meta.team rewrite failed")
 
-    # FTD identity fields are a disposable cache of franchises.team_builder
-    # (gob-asset-architecture §3.2). Written at Apply; healed on read if absent.
-    # Do not treat FTD as a second identity store.
-    try:
-        franchise_team_data_collection.update_one(
-            {"franchise_id": franchise_id, "team_id": replaced_oid},
-            {
-                "$set": {
-                    "team_name": custom_name,
-                    "primary_color": body.primary_color,
-                    "secondary_color": body.secondary_color,
-                }
-            },
-        )
-    except Exception:
-        logger.exception("[TEAM-BUILDER] FTD identity cache write failed")
-
     try:
         from BackEnd.utils.team_builder_roster import clear_wizard_walk_ons_for_user
 
