@@ -139,22 +139,12 @@ const queryFranchiseId = urlParams.get('franchise_id');
 const urlMode = urlParams.get('mode');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', queryFranchiseId || null) : (queryFranchiseId || null);
 
-// Hydrate TB visual from franchise payload (same as FCC) before chrome/court paint.
-// Resume / deep-link entry skips FCC; must not rely on FranchiseLS warm alone.
+// Resolver-owned hydrate gate (ensureTeamBuilderVisualReady). Kick early so
+// court/banner paint does not race the first chrome apply.
 const teamBuilderVisualHydratePromise =
-  franchiseId && typeof ensureTeamBuilderVisualHydratedFromFranchise === 'function'
-    ? ensureTeamBuilderVisualHydratedFromFranchise(franchiseId).catch(() => {
-        try {
-          return typeof getActiveTeamBuilderVisual === 'function' ? getActiveTeamBuilderVisual() : null;
-        } catch (e) {
-          return null;
-        }
-      })
-    : Promise.resolve(
-        franchiseId && typeof getActiveTeamBuilderVisual === 'function'
-          ? getActiveTeamBuilderVisual()
-          : null
-      );
+  typeof ensureTeamBuilderVisualReady === 'function'
+    ? ensureTeamBuilderVisualReady(franchiseId)
+    : Promise.resolve(null);
 
 function attachMatchupTeamIds(payload) {
   if (homeId) payload.home_id = homeId;
@@ -162,9 +152,14 @@ function attachMatchupTeamIds(payload) {
   return payload;
 }
 
-/** Chrome asset/label name for a side — display when present, else core. */
+/** Chrome asset/label name — hydrated visual authority, URL display fallback. */
 function courtChromeName(side) {
-  return side === 'away' ? (awayDisplay || awayTeam) : (homeDisplay || homeTeam);
+  const core = side === 'away' ? awayTeam : homeTeam;
+  const urlDisp = side === 'away' ? awayDisplay : homeDisplay;
+  if (typeof resolveTeamBuilderDisplayName === 'function') {
+    return resolveTeamBuilderDisplayName(core, urlDisp || core);
+  }
+  return urlDisp || core;
 }
 
 // ✅ PHASE 1.1: Fail loudly if franchise_id is required but missing
@@ -739,7 +734,12 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   const awayColor = awayColors?.primary_color || '#ff6200';
   try {
     if (typeof applyTeamVibrantDocumentVars === 'function') {
-      applyTeamVibrantDocumentVars(courtChromeName('home'), courtChromeName('away'), homeColorsRaw, awayColorsRaw);
+      await applyTeamVibrantDocumentVars(
+        courtChromeName('home'),
+        courtChromeName('away'),
+        homeColorsRaw,
+        awayColorsRaw
+      );
     }
   } catch (e) { /* ignore */ }
   
@@ -2270,7 +2270,7 @@ async function startGame({ homeRoster, awayRoster, animate = true, resumeActive 
   // Court chrome CSS vars — same hydrated visual as resolveCourtImagePath.
   try {
     if (typeof applyTeamVibrantDocumentVars === 'function') {
-      applyTeamVibrantDocumentVars(homeChromeBoot, awayChromeBoot, homeRoster, awayRoster);
+      await applyTeamVibrantDocumentVars(homeChromeBoot, awayChromeBoot, homeRoster, awayRoster);
     } else if (typeof document !== 'undefined' && document.documentElement) {
       document.documentElement.style.setProperty('--home-vibrant-color', homePalette.primary_color || '#ff6200');
       document.documentElement.style.setProperty('--away-vibrant-color', awayPalette.primary_color || '#ff6200');

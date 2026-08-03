@@ -149,11 +149,11 @@ function hexToRgbTripletString(hex) {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
-function applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors, homeName, awayName) {
+async function applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors, homeName, awayName) {
   if (typeof document === 'undefined') return;
   // Prefer the shared hydrated palette (same source as resolveCourtImagePath).
   if (typeof applyTeamVibrantDocumentVars === 'function' && (homeName || awayName)) {
-    applyTeamVibrantDocumentVars(homeName || '', awayName || '', homeColors, awayColors);
+    await applyTeamVibrantDocumentVars(homeName || '', awayName || '', homeColors, awayColors);
     return;
   }
   const hh = hexToRgbTripletString(resolvePrimaryHexFromTeamColors(homeColors));
@@ -1436,7 +1436,7 @@ export function createGameScene(Phaser) {
       const homeId = homeTeamId || homeTeamObj?.team_id || simData.home_team_id || simData.homeTeam?.team_id;
       const awayId = awayTeamId || awayTeamObj?.team_id || simData.away_team_id || simData.awayTeam?.team_id;
       
-      // Chrome art/labels: prefer display_name / URL *_display over core identity names.
+      // Chrome: hydrated visual is authority; URL *_display / sim display are fallbacks.
       let urlHomeDisplay = null;
       let urlAwayDisplay = null;
       try {
@@ -1444,26 +1444,54 @@ export function createGameScene(Phaser) {
         urlHomeDisplay = spChrome.get('home_display');
         urlAwayDisplay = spChrome.get('away_display');
       } catch (e) { /* ignore */ }
-      const homeChromeLabel = homeTeamObj?.display_name || urlHomeDisplay || logHome || homeCore;
-      const awayChromeLabel = awayTeamObj?.display_name || urlAwayDisplay || logAway || awayCore;
+      const homeFallbackDisplay = urlHomeDisplay || homeTeamObj?.display_name || logHome || homeCore;
+      const awayFallbackDisplay = urlAwayDisplay || awayTeamObj?.display_name || logAway || awayCore;
+      const homeColors = homeTeamObj?.colors || simData.home_team_colors;
+      const awayColors = awayTeamObj?.colors || simData.away_team_colors;
+      const homePlayersHeaderEl = document.getElementById('home-players-header');
+      const awayPlayersHeaderEl = document.getElementById('away-players-header');
+      let homeChromeLabel = homeFallbackDisplay;
+      let awayChromeLabel = awayFallbackDisplay;
+      if (typeof applyTeamBuilderMatchupChrome === 'function') {
+        const chrome = await applyTeamBuilderMatchupChrome({
+          homeCore,
+          awayCore,
+          homeUrlDisplay: homeFallbackDisplay,
+          awayUrlDisplay: awayFallbackDisplay,
+          homeColors,
+          awayColors,
+          homeLabelEl: homePlayersHeaderEl,
+          awayLabelEl: awayPlayersHeaderEl,
+        });
+        homeChromeLabel = chrome.homeLabel;
+        awayChromeLabel = chrome.awayLabel;
+      } else {
+        if (typeof ensureTeamBuilderVisualReady === 'function') {
+          await ensureTeamBuilderVisualReady();
+        }
+        homeChromeLabel =
+          typeof resolveTeamBuilderDisplayName === 'function'
+            ? resolveTeamBuilderDisplayName(homeCore, homeFallbackDisplay)
+            : homeFallbackDisplay;
+        awayChromeLabel =
+          typeof resolveTeamBuilderDisplayName === 'function'
+            ? resolveTeamBuilderDisplayName(awayCore, awayFallbackDisplay)
+            : awayFallbackDisplay;
+        if (homePlayersHeaderEl) homePlayersHeaderEl.textContent = homeChromeLabel || '';
+        if (awayPlayersHeaderEl) awayPlayersHeaderEl.textContent = awayChromeLabel || '';
+        await applyVibrantRgbDocumentVarsFromTeamColors(
+          homeColors,
+          awayColors,
+          homeChromeLabel,
+          awayChromeLabel
+        );
+      }
 
       // Scene chrome labels (display). Score / sim identity = core.
       this.homeTeam = homeChromeLabel;
       this.awayTeam = awayChromeLabel;
       this.homeTeamCore = homeCore;
       this.awayTeamCore = awayCore;
-      
-      // Extract team colors (unified structure preferred); CSS vars use hydrated visual.
-      const homeColors = homeTeamObj?.colors || simData.home_team_colors;
-      const awayColors = awayTeamObj?.colors || simData.away_team_colors;
-      const homePlayersHeaderEl = document.getElementById('home-players-header');
-      const awayPlayersHeaderEl = document.getElementById('away-players-header');
-      if (homePlayersHeaderEl) {
-        homePlayersHeaderEl.textContent = homeChromeLabel || '';
-      }
-      if (awayPlayersHeaderEl) {
-        awayPlayersHeaderEl.textContent = awayChromeLabel || '';
-      }
       
       if (DEBUG_TEAMS) {
         console.log('Resolved team IDs:', { home_team_id: homeId, away_team_id: awayId });
@@ -1488,17 +1516,16 @@ export function createGameScene(Phaser) {
       this.awayTeamId = awayId;
       const homePalette =
         typeof resolveTeamBuilderPaletteColors === 'function'
-          ? resolveTeamBuilderPaletteColors(homeChromeLabel, homeColors)
+          ? resolveTeamBuilderPaletteColors(homeCore, homeColors)
           : homeColors;
       const awayPalette =
         typeof resolveTeamBuilderPaletteColors === 'function'
-          ? resolveTeamBuilderPaletteColors(awayChromeLabel, awayColors)
+          ? resolveTeamBuilderPaletteColors(awayCore, awayColors)
           : awayColors;
       gameStore.setColors({
         home: homePalette,
         away: awayPalette,
       });
-      applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors, homeChromeLabel, awayChromeLabel);
       this.isFinal = simData.is_final;
       
       // ⏸️ TABLED: Resume Last Game feature - Exact game state restoration

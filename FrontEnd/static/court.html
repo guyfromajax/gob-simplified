@@ -6592,22 +6592,33 @@
           eosUserConference = (userRoster.conference === 0 || userRoster.conference) ? userRoster.conference : null;
           eosUserRegion = userRoster.region || null;
         }
-        const homeChrome = urlParams.get('home_display') || homeTeamName;
-        const awayChrome = urlParams.get('away_display') || awayTeamName;
+        const homeUrlDisplay = urlParams.get('home_display') || homeTeamName;
+        const awayUrlDisplay = urlParams.get('away_display') || awayTeamName;
+        if (typeof ensureTeamBuilderVisualReady === 'function') {
+          await ensureTeamBuilderVisualReady(urlParams.get('franchise_id'));
+        }
+        const homeChrome =
+          typeof resolveTeamBuilderDisplayName === 'function'
+            ? resolveTeamBuilderDisplayName(homeTeamName, homeUrlDisplay)
+            : homeUrlDisplay;
+        const awayChrome =
+          typeof resolveTeamBuilderDisplayName === 'function'
+            ? resolveTeamBuilderDisplayName(awayTeamName, awayUrlDisplay)
+            : awayUrlDisplay;
         const homePal =
           typeof resolveTeamBuilderPaletteColors === 'function'
-            ? resolveTeamBuilderPaletteColors(homeChrome, homeRoster)
+            ? resolveTeamBuilderPaletteColors(homeTeamName, homeRoster)
             : homeRoster;
         const awayPal =
           typeof resolveTeamBuilderPaletteColors === 'function'
-            ? resolveTeamBuilderPaletteColors(awayChrome, awayRoster)
+            ? resolveTeamBuilderPaletteColors(awayTeamName, awayRoster)
             : awayRoster;
         const homeColor = homePal?.primary_color;
         const awayColor = awayPal?.primary_color;
         if (!homeColor || !awayColor) return false;
 
         if (typeof applyTeamVibrantDocumentVars === 'function') {
-          applyTeamVibrantDocumentVars(homeChrome, awayChrome, homeRoster, awayRoster);
+          await applyTeamVibrantDocumentVars(homeChrome, awayChrome, homeRoster, awayRoster);
         } else {
           document.documentElement.style.setProperty('--home-vibrant-color', homeColor);
           document.documentElement.style.setProperty('--away-vibrant-color', awayColor);
@@ -6727,18 +6738,9 @@
     const urlParams = new URLSearchParams(window.location.search);
     const homeTeam = urlParams.get('home');
     const awayTeam = urlParams.get('away');
-    // Chrome labels (Team Builder overlay); home/away remain core for identity/sim.
+    // URL *_display is chrome fallback only — hydrated visual is authority.
     const homeDisplay = urlParams.get('home_display') || homeTeam;
     const awayDisplay = urlParams.get('away_display') || awayTeam;
-    // Same hydrate producer as FCC — required for mid-game resume / deep-link court entry.
-    try {
-      const fid = urlParams.get('franchise_id');
-      if (fid && typeof ensureTeamBuilderVisualHydratedFromFranchise === 'function') {
-        await ensureTeamBuilderVisualHydratedFromFranchise(fid);
-      } else if (fid && typeof getActiveTeamBuilderVisual === 'function') {
-        getActiveTeamBuilderVisual();
-      }
-    } catch (e) { /* non-fatal */ }
 
     window.addEventListener('pageshow', (event) => {
       if (event.persisted) {
@@ -6748,16 +6750,6 @@
 
     const redirected = await redirectIfFranchiseGameplayAlreadyCommitted(urlParams);
     if (!redirected) {
-      // Update Player Box Score headers with display names
-      if (homeDisplay) {
-        const homePlayersHeader = document.getElementById('home-players-header');
-        if (homePlayersHeader) homePlayersHeader.textContent = homeDisplay;
-      }
-      if (awayDisplay) {
-        const awayPlayersHeader = document.getElementById('away-players-header');
-        if (awayPlayersHeader) awayPlayersHeader.textContent = awayDisplay;
-      }
-
       if (homeTeam && awayTeam) {
         const appliedRealColors = await hydrateCourtColorsFromRoster(homeTeam, awayTeam);
         if (!appliedRealColors) {
@@ -6770,15 +6762,20 @@
             if (tri) document.documentElement.style.setProperty('--team-rgb', tri);
           } catch (e) { /* ignore */ }
         }
-        // Bind CSS vars to the same hydrated visual the court generator uses.
+        // Labels + colours through one producer after hydrate settles.
         try {
-          if (typeof applyTeamVibrantDocumentVars === 'function') {
-            applyTeamVibrantDocumentVars(
-              homeDisplay || homeTeam,
-              awayDisplay || awayTeam,
-              null,
-              null
-            );
+          if (typeof applyTeamBuilderMatchupChrome === 'function') {
+            await applyTeamBuilderMatchupChrome({
+              homeCore: homeTeam,
+              awayCore: awayTeam,
+              homeUrlDisplay: homeDisplay,
+              awayUrlDisplay: awayDisplay,
+              homeLabelEl: document.getElementById('home-players-header'),
+              awayLabelEl: document.getElementById('away-players-header'),
+              franchiseId: urlParams.get('franchise_id'),
+            });
+          } else if (typeof applyTeamVibrantDocumentVars === 'function') {
+            await applyTeamVibrantDocumentVars(homeDisplay || homeTeam, awayDisplay || awayTeam, null, null);
           }
         } catch (e) { /* ignore */ }
       } else {

@@ -180,6 +180,12 @@ var GENERIC_TEAM_SAMMY = '/images/sammy_tutorial.png';
 
 /** In-memory Team Builder visual for this page session (hydrated from franchise payload). */
 var _activeTeamBuilderVisual = null;
+/**
+ * Payload/network hydrate gate. FranchiseLS warm alone does NOT settle this —
+ * chrome apply must await ensureTeamBuilderVisualReady().
+ */
+var _tbVisualReady = false;
+var _tbVisualReadyPromise = null;
 
 /**
  * Set the session Team Builder visual. FranchiseLS is an optional warm cache only.
@@ -188,12 +194,34 @@ function setActiveTeamBuilderVisual(visual) {
   _activeTeamBuilderVisual = visual || null;
 }
 
+function _franchiseIdFromLocation() {
+  try {
+    if (typeof window === 'undefined' || !window.location) return null;
+    var sp = new URLSearchParams(window.location.search || '');
+    return sp.get('franchise_id') || null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function isTeamBuilderVisualReady() {
+  var fid = _franchiseIdFromLocation();
+  if (!fid) return true;
+  return !!_tbVisualReady;
+}
+
 /**
  * Active Team Builder visual overlay for the franchise in the URL (or null).
  * Prefers in-memory hydrate from franchise payload; localStorage is cache only.
+ * Kicks lazy network hydrate when a franchise_id is present (does not await).
  * Pass-through no-op when absent — same property as the §3.2 name resolver.
  */
 function getActiveTeamBuilderVisual() {
+  if (!_tbVisualReady) {
+    try {
+      ensureTeamBuilderVisualReady();
+    } catch (e) { /* ignore */ }
+  }
   if (_activeTeamBuilderVisual) return _activeTeamBuilderVisual;
   if (typeof window === 'undefined' || !window.FranchiseLS) return null;
   try {
@@ -209,6 +237,7 @@ function getActiveTeamBuilderVisual() {
 /**
  * Build + hydrate Team Builder visual from a franchise API payload.
  * Writes memory (source of truth for this page) and optionally caches to FranchiseLS.
+ * Settles the ready gate — this is the hydrate producer (FCC, Apply, ensure-fetch).
  * @param {object} data - FCC /me, mode-select card, Apply response, etc.
  * @param {string} [franchiseId]
  * @returns {object|null} visual or null when not a custom program
@@ -216,6 +245,7 @@ function getActiveTeamBuilderVisual() {
 function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
   if (!data) {
     setActiveTeamBuilderVisual(null);
+    _tbVisualReady = true;
     return null;
   }
   var isCustom = !!(data.is_custom_team || data.is_custom || data.asset_strategy === 'generated');
@@ -226,6 +256,7 @@ function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
         window.FranchiseLS.setTeamBuilderVisual(franchiseId, null);
       } catch (e) {}
     }
+    _tbVisualReady = true;
     return null;
   }
   var name = data.team || data.user_team_id || data.name || '';
@@ -254,13 +285,13 @@ function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
       window.FranchiseLS.setTeamBuilderVisual(franchiseId, visual);
     } catch (e) {}
   }
+  _tbVisualReady = true;
   return visual;
 }
 
 /**
  * Ensure session visual is hydrated from the franchise API payload (same producer
- * as FCC populateTop). Resume / deep-link court entry must call this — warming
- * from FranchiseLS alone is not the hydrate path.
+ * as FCC populateTop). Warming from FranchiseLS alone is not the hydrate path.
  * @param {string} franchiseId
  * @returns {Promise<object|null>}
  */
@@ -277,27 +308,99 @@ async function ensureTeamBuilderVisualHydratedFromFranchise(franchiseId) {
         ? API_CONFIG.getAuthHeaders()
         : {};
     var res = await fetch(url, { headers: headers });
-    if (!res.ok) return getActiveTeamBuilderVisual();
+    if (!res.ok) {
+      _tbVisualReady = true;
+      return getActiveTeamBuilderVisual();
+    }
     var data = await res.json();
     return hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId);
   } catch (e) {
+    _tbVisualReady = true;
     return getActiveTeamBuilderVisual();
   }
 }
 
 /**
- * UI palette for a side — same hydrated visual the court generator reads
- * (getActiveTeamBuilderVisual + teamBuilderVisualMatchesName). Fallback is
- * roster/sim colors when the side is not the custom program.
+ * Resolver-owned hydrate gate. Lazy-starts the FCC payload fetch when a
+ * franchise_id is on the URL. Chrome apply awaits this — callers need not.
+ *
+ * Sync network hydrate is not feasible (fetch is async); this is the async
+ * precondition that makes paint-without-hydrate impossible.
+ *
+ * @param {string} [franchiseId]
+ * @returns {Promise<object|null>}
+ */
+function ensureTeamBuilderVisualReady(franchiseId) {
+  if (_tbVisualReady) {
+    return Promise.resolve(_activeTeamBuilderVisual);
+  }
+  var fid = franchiseId || _franchiseIdFromLocation();
+  if (!fid) {
+    _tbVisualReady = true;
+    return Promise.resolve(null);
+  }
+  if (_tbVisualReadyPromise) return _tbVisualReadyPromise;
+  _tbVisualReadyPromise = ensureTeamBuilderVisualHydratedFromFranchise(fid).then(
+    function (v) {
+      _tbVisualReady = true;
+      return v;
+    },
+    function () {
+      _tbVisualReady = true;
+      return _activeTeamBuilderVisual;
+    }
+  );
+  return _tbVisualReadyPromise;
+}
+
+/**
+ * Display label for a side. Hydrated visual.name is authority; URL/sim fallbacks
+ * are not identity sources — only used when the overlay does not match.
+ * @param {string} teamNameOrSlug - core identity, display, or slug
+ * @param {string} [fallbackDisplay] - URL *_display or sim display_name
+ * @returns {string}
+ */
+function resolveTeamBuilderDisplayName(teamNameOrSlug, fallbackDisplay) {
+  if (!_tbVisualReady) {
+    try {
+      ensureTeamBuilderVisualReady();
+    } catch (e) { /* ignore */ }
+  }
+  var visual = _activeTeamBuilderVisual;
+  if (!visual && typeof window !== 'undefined' && window.FranchiseLS) {
+    try {
+      visual = window.FranchiseLS.getTeamBuilderVisual() || null;
+    } catch (e2) { /* ignore */ }
+  }
+  if (visual && teamBuilderVisualMatchesName(visual, teamNameOrSlug)) {
+    return String(visual.name || fallbackDisplay || teamNameOrSlug || '');
+  }
+  if (visual && fallbackDisplay && teamBuilderVisualMatchesName(visual, fallbackDisplay)) {
+    return String(visual.name || fallbackDisplay);
+  }
+  return String(fallbackDisplay || teamNameOrSlug || '');
+}
+
+/**
+ * UI palette for a side — same hydrated visual the court generator reads.
+ * Fallback is roster/sim colors when the side is not the custom program.
  * @param {string} teamNameOrSlug
  * @param {object|string} [fallbackColors]
  * @returns {{ primary_color: string|null, secondary_color: string|null }}
  */
 function resolveTeamBuilderPaletteColors(teamNameOrSlug, fallbackColors) {
+  if (!_tbVisualReady) {
+    try {
+      ensureTeamBuilderVisualReady();
+    } catch (e) { /* ignore */ }
+  }
   var fb = fallbackColors;
   if (typeof fb === 'string') fb = { primary_color: fb };
   fb = fb || {};
-  var visual = getActiveTeamBuilderVisual();
+  var visual = _activeTeamBuilderVisual;
+  if (!visual && typeof getActiveTeamBuilderVisual === 'function') {
+    visual = getActiveTeamBuilderVisual();
+  }
   if (visual && teamBuilderVisualMatchesName(visual, teamNameOrSlug)) {
     return {
       primary_color: visual.primary_color || visual.primary || fb.primary_color || fb.primary || null,
@@ -324,11 +427,50 @@ function _tbHexToRgbTriplet(hex) {
   return ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255);
 }
 
+function _tbChromeGateIsStrictEnv() {
+  try {
+    if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.isCaptureEnv === 'function') {
+      return !!API_CONFIG.isCaptureEnv();
+    }
+  } catch (e) { /* ignore */ }
+  try {
+    var host =
+      (typeof window !== 'undefined' && window.location && window.location.hostname) || '';
+    return host === 'localhost' || host === '127.0.0.1';
+  } catch (e2) {
+    return false;
+  }
+}
+
 /**
- * Apply court chrome CSS vars from the hydrated palette (hex + rgb).
- * Callers pass identity or display names; matching uses the same resolver as court art.
+ * Hydrate gate for chrome paint. Dev/staging: throw so a new entry point fails
+ * immediately. Production: log only — same observe-only trade as the server
+ * detector; the DOM leak detector reports the cosmetic miss.
+ * @returns {boolean} true when paint may proceed
  */
-function applyTeamVibrantDocumentVars(homeName, awayName, homeColors, awayColors) {
+function _assertTeamBuilderVisualReadyForChrome() {
+  var fid = _franchiseIdFromLocation();
+  if (!fid) return true;
+  if (_tbVisualReady) return true;
+  var msg =
+    '[TB] game chrome applied before Team Builder visual hydration settled ' +
+    '(franchise_id present). Await ensureTeamBuilderVisualReady() / applyTeamVibrantDocumentVars().';
+  if (_tbChromeGateIsStrictEnv()) {
+    throw new Error(msg);
+  }
+  try {
+    console.error(msg);
+  } catch (e) { /* ignore */ }
+  return false;
+}
+
+/**
+ * Sync chrome paint — requires hydrate already settled.
+ * Dev/staging: throws if the gate is unset. Production: logs and paints best-effort.
+ * Prefer applyTeamVibrantDocumentVars() (async) at call sites.
+ */
+function applyTeamVibrantDocumentVarsNow(homeName, awayName, homeColors, awayColors) {
+  _assertTeamBuilderVisualReadyForChrome();
   if (typeof document === 'undefined' || !document.documentElement) return;
   var homePal = resolveTeamBuilderPaletteColors(homeName, homeColors);
   var awayPal = resolveTeamBuilderPaletteColors(awayName, awayColors);
@@ -342,6 +484,39 @@ function applyTeamVibrantDocumentVars(homeName, awayName, homeColors, awayColors
     var ar = _tbHexToRgbTriplet(awayPal.primary_color);
     if (ar) document.documentElement.style.setProperty('--away-vibrant-rgb', ar);
   }
+}
+
+/**
+ * Apply court chrome CSS vars from the hydrated palette (hex + rgb).
+ * Awaits resolver-owned hydration when franchise_id is present, then paints.
+ */
+async function applyTeamVibrantDocumentVars(homeName, awayName, homeColors, awayColors) {
+  await ensureTeamBuilderVisualReady();
+  applyTeamVibrantDocumentVarsNow(homeName, awayName, homeColors, awayColors);
+}
+
+/**
+ * Labels + colours for a matchup — one producer after hydrate settles.
+ * @param {{
+ *   homeCore: string, awayCore: string,
+ *   homeUrlDisplay?: string, awayUrlDisplay?: string,
+ *   homeColors?: object, awayColors?: object,
+ *   homeLabelEl?: Element|null, awayLabelEl?: Element|null,
+ *   franchiseId?: string,
+ * }} opts
+ */
+async function applyTeamBuilderMatchupChrome(opts) {
+  opts = opts || {};
+  await ensureTeamBuilderVisualReady(opts.franchiseId);
+  // Gate settled by await above; assert is a dev/staging belt for regressions.
+  _assertTeamBuilderVisualReadyForChrome();
+  var homeLabel = resolveTeamBuilderDisplayName(opts.homeCore, opts.homeUrlDisplay || opts.homeCore);
+  var awayLabel = resolveTeamBuilderDisplayName(opts.awayCore, opts.awayUrlDisplay || opts.awayCore);
+  if (opts.homeLabelEl) opts.homeLabelEl.textContent = homeLabel || '';
+  if (opts.awayLabelEl) opts.awayLabelEl.textContent = awayLabel || '';
+  // applyTeamVibrantDocumentVars awaits the same gate again, then sync-paints.
+  await applyTeamVibrantDocumentVars(homeLabel, awayLabel, opts.homeColors, opts.awayColors);
+  return { homeLabel: homeLabel, awayLabel: awayLabel };
 }
 
 function normalizeTeamNameKey(name) {
