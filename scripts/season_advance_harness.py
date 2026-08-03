@@ -21,6 +21,17 @@ the week-1 timing split (sim / persistence / CPU-training). Idempotent + resume-
 
 ⚠️  MUTATES the target franchise. Guarded to gob-staging only. Postseason weeks 27-34
 have never been driven headless outside this harness.
+
+⚠️  LOCAL RUNS (laptop → remote Atlas): export FRANCHISE_CPU_SIM_USE_POOL=0 first.
+    This harness setdefault's POOL=1, which selects the spawn ProcessPool in
+    BackEnd/utils/cpu_week_pool.py — 8 workers, each a fresh interpreter that builds its
+    OWN MongoClient to Atlas. That pool is tuned for the 32-vCPU Railway service sitting
+    next to Atlas; from a laptop over the public internet the 8 concurrent connections +
+    a per-week spawn re-import STALL the run on season 1 week 1 (workers idle at ~3% CPU
+    waiting on the network). The default thread engine (POOL=0) uses one shared connection
+    and completes — a 4-season run is ~148 min. On Railway, leave the pool on. Because the
+    harness uses os.environ.setdefault, you MUST set POOL=0 in the shell BEFORE running:
+        FRANCHISE_CPU_SIM_USE_POOL=0 python scripts/season_advance_harness.py --franchise ...
 """
 from __future__ import annotations
 import argparse, json, os, sys, time

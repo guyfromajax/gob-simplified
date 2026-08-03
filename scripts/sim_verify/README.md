@@ -4,6 +4,14 @@ Runnable instruments behind the standing verification rules in
 `_documentation_master/projects/Sim_Perf_Capstone.md` → **Verification toolkit**. Promoted from
 session scratchpad so future work can *re-run* the checks, not just read about them.
 
+> ⚙️ **Local runs (laptop → remote Atlas): set `FRANCHISE_CPU_SIM_USE_POOL=0`.** The spawn
+> ProcessPool (`cpu_week_pool.py`, 8 workers each with its own MongoClient) is tuned for the
+> 32-vCPU Railway service next to Atlas; from a laptop the concurrent connections + per-week
+> spawn re-import **stall a multi-season run on season 1 week 1** (workers idle ~3% CPU on the
+> network). The thread engine (`POOL=0`, one shared connection) completes — ~148 min for a
+> 4-season `season_advance_harness.py` run. `season_advance_harness.py` `setdefault`s POOL=1,
+> so you must export POOL=0 explicitly. On Railway, leave the pool on.
+
 All seeded runs pin `PYTHONHASHSEED=0` (determinism contract). The reference anchor is
 `reports/perf/refstats_postrecal_20260729_160503.csv` (seed 20260720, `--mode cpu`, 63 games,
 franchise `6a28436c98dbd04e902eee09` week 7). Re-cut the anchor only after an intentional

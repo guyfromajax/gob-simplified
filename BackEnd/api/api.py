@@ -46,6 +46,7 @@ try:
         franchise_recruits_data_collection,
     )
     from BackEnd.utils.roster_loader import load_roster
+    from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD, potential_rt_for_player
     from BackEnd.utils.game_summary_builder import build_game_summary
     from BackEnd.utils.shared import (
         clean_mongo_ids,
@@ -6685,6 +6686,11 @@ try:
                 "weight": p.get("weight"),
                 "jersey": p.get("jersey"),
                 "position_ratings": position_ratings,
+                # Projected ceiling for display (§Phase 4) — already ratcheted; the view
+                # formats current/potential. Feeds team-roster-view.html AND the FCC roster
+                # tab (shared endpoint). None → view shows the current rating alone.
+                POTENTIAL_RT_FIELD: potential_rt_for_player(
+                    player_id_str, p.get("entry_tier"), p.get("potential_factor"), position_ratings),
                 "attributes": final_attrs,  # Return merged attributes (franchise overrides core)
                 "has_playing_time_promise": player_id_str in pt_promise_ids,
                 "is_graduating": bool(franchise_week == 36 and str(p.get("year") or "").strip().lower() in {"senior", "graduate"}),
@@ -7600,6 +7606,13 @@ try:
                     "position_ratings": p.get("position_ratings", {}),
                     "rt": rt,
                     "rt_value": rt_val if rt_val is not None else -1,
+                    # Projected ceiling for the per-team base-roster pages (§Phase 4). These
+                    # read the pool, where potential_factor is not persisted until Phase 5 —
+                    # resolve_potential_factor derives the stable hash value, and Phase 5
+                    # backfills exactly that value, so the displayed ceiling never changes.
+                    POTENTIAL_RT_FIELD: potential_rt_for_player(
+                        str(p.get("_id")), p.get("entry_tier"),
+                        p.get("potential_factor"), p.get("position_ratings", {})),
                 }
             )
     

@@ -83,22 +83,30 @@ def draw_potential_factor(rng: random.Random) -> float:
     return round(rng.uniform(1.0 - POTENTIAL_FACTOR_BAND, 1.0 + POTENTIAL_FACTOR_BAND), 4)
 
 
-def resolve_potential_factor(player_id, stored=None) -> float:
+def resolve_potential_factor(player_id, stored=None, *, warn=True) -> float:
     """Return ``stored`` when it is a usable number; otherwise DETERMINISTICALLY derive one
     from a hash of ``player_id`` so a legacy player (generated before this field existed)
-    yields the SAME value on every read rather than re-rolling per session. Logs on fallback.
-    This is the persistence-side safety net — new players carry a drawn value; only pre-Phase-1
-    docs reach the hash branch."""
+    yields the SAME value on every read rather than re-rolling per session. This is the
+    persistence-side safety net — new players carry a drawn value; only pre-Phase-1 docs
+    reach the hash branch.
+
+    ``warn`` gates the fallback log. WRITE/backfill paths (develop_rollover, _build_fpd_doc)
+    keep it True so a dropped-field regression surfaces loudly, as entry_tier's does. READ/
+    display paths pass warn=False: for a pre-Phase-5 pool roster EVERY player legitimately
+    hits the fallback, and one warning per player per page-load would be noise, not signal.
+    The Phase-5 backfill persists exactly this hash-derived value, so the displayed ceiling
+    does not change when the field lands."""
     if isinstance(stored, (int, float)) and stored > 0:
         return float(stored)
     h = int(hashlib.sha256(str(player_id).encode("utf-8")).hexdigest()[:12], 16)
     u = h / float(16 ** 12)  # deterministic uniform in [0, 1)
     pf = round(1.0 - POTENTIAL_FACTOR_BAND + u * 2.0 * POTENTIAL_FACTOR_BAND, 4)
-    logger.warning(
-        "potential_factor missing for player %s — derived %.4f deterministically from "
-        "player_id (legacy fallback; a generated player should carry a drawn value).",
-        player_id, pf,
-    )
+    if warn:
+        logger.warning(
+            "potential_factor missing for player %s — derived %.4f deterministically from "
+            "player_id (legacy fallback; a generated player should carry a drawn value).",
+            player_id, pf,
+        )
     return pf
 
 # ── Entry tiers (design §4.1) ────────────────────────────────────────────────

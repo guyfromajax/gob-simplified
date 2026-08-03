@@ -699,8 +699,16 @@ function renderRosterInto(data, tbodyId) {
       addCell(formatAttrForDisplay(attrs, attr));
     });
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
+    // Potential Rating (§Phase 4): show current/potential (e.g. C/B) when the backend
+    // supplied a projected ceiling; header stays "RT", color stays by current rating.
+    const _potRt = p.potential_rt_ratcheted;
+    const _rtText = p.highestRT === null
+      ? '-'
+      : (_potRt != null
+          ? formatRtDisplay(p.highestRT) + '/' + formatRtDisplay(_potRt)
+          : formatRtDisplay(p.highestRT));
     addCell(
-      p.highestRT !== null ? formatRtDisplay(p.highestRT) : '-',
+      _rtText,
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.highestRT) : ''
     );
     

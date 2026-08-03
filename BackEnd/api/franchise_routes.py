@@ -12207,6 +12207,14 @@ def get_recruiting_data(
             {"_id": 0, "franchise_id": 0},
         )
     )
+    # Projected ceiling per recruit (§Phase 4) — already ratcheted; the Recruiting Hub
+    # formats current/potential. Recruits carry entry_tier + potential_factor (FRD); a
+    # legacy recruit resolves the stable hash value off recruit_id.
+    from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD, potential_rt_for_player
+    for _rec in recruits:
+        _rec[POTENTIAL_RT_FIELD] = potential_rt_for_player(
+            str(_rec.get("recruit_id")), _rec.get("entry_tier"),
+            _rec.get("potential_factor"), _rec.get("position_ratings", {}))
     # Chrome labels: overlay-aware map (not core teams.name). Same dual-field rule as schedule.
     from BackEnd.utils.franchise_team_display import resolve_team_name_map
 

@@ -64,7 +64,11 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                     pid_list = [str(pid) for pid in team_player_ids]
                     fpd_docs = list(franchise_players_data_collection.find(
                         {"franchise_id": str(franchise_id), "player_id": {"$in": pid_list}},
-                        {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1}
+                        # entry_tier + potential_factor feed the Potential Rating display
+                        # projection (§Phase 4). A narrow projection here silently dropped
+                        # them before — see the Mongo-projection audit note in the dev docs.
+                        {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1,
+                         "entry_tier": 1, "potential_factor": 1}
                     ))
                     franchise_query_time = (time.time() - franchise_query_start) * 1000
                     # logger.warning(f"⏱️ [DB TIMING] franchise_players_data find (franchise_id={franchise_id}): {franchise_query_time:.2f}ms, found {len(fpd_docs)} FPD docs")
@@ -106,6 +110,10 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                             franchise_position_ratings = franchise_player_data.get("position_ratings", {})
                             if franchise_position_ratings:
                                 base_player["position_ratings"] = franchise_position_ratings
+                            # Carry the Potential Rating fields onto the roster object so the
+                            # /roster payload can compute the projected ceiling (§Phase 4).
+                            base_player["entry_tier"] = franchise_player_data.get("entry_tier")
+                            base_player["potential_factor"] = franchise_player_data.get("potential_factor")
                             if meta.get("height") is not None:
                                 base_player["height"] = meta.get("height")
                             if meta.get("weight") is not None:

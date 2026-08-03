@@ -104,6 +104,7 @@
     <div class="players-grid"></div>
   </div>
 
+  <script src="/js/shared/rtBucket.js"></script>
   <script src="/common.js"></script>
   <script>
     let currentView = sessionStorage.getItem('rosterView') || 'grid';
@@ -209,7 +210,7 @@
       // Toggle button - shows highest rated position
       const toggle = document.createElement('button');
       toggle.className = 'ratings-dropdown-toggle';
-      toggle.innerHTML = `${topPos}: ${formatRtDisplay(topRating)} <span style="font-size: 10px;">▼</span>`;
+      toggle.innerHTML = `${topPos}: ${formatRtDisplay(topRating)}${player.potential_rt_ratcheted != null ? '/' + formatRtDisplay(player.potential_rt_ratcheted) : ''} <span style="font-size: 10px;">▼</span>`;
       toggle.addEventListener('click', (e) => {
         e.stopPropagation();
         dropdown.classList.toggle('open');

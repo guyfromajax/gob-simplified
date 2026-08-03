@@ -55,6 +55,10 @@ Development **reads the un-fatigued `anchor_X`** as input and **writes both `anc
 | Read `anchor_X`, not live `X` | live may be fatigue-scaled (`live = anchor × NG`); reading it would bake fatigue into the anchor |
 | Write **both** `anchor_X` and live `X` | `execute_training` treats `anchor_` as authoritative and resets `live = anchor` at week 1 — writing only live would let the next season's first training wipe the offseason growth |
 
+### Mongo projection discipline (read-path counterpart)
+
+**When you add a persisted player field, audit the Mongo `find(..., projection)` calls that load players — the read paths — the same way write paths are audited for a dropped carry.** A narrow projection silently drops a field just as a fixed copy-list does, and it fails quietly: the field is present in the DB but absent from the object the code sees. This has caused **three** silent losses on this codebase — the latest was `entry_tier`/`potential_factor` stripped by `roster_loader._load_from_db`'s four-field projection, which starved the Potential Rating display until the projection was widened (§Phase 4). Write paths already carry this discipline (the `entry_tier` persistence audit); read-side projections did not. Grep for `find(` projections touching `franchise_players_data` / `players` whenever a new persisted field must reach a surface.
+
 ## HT Grow-Into-Frame
 
 Players are generated **below** their adult frame and grow into it over their college career. HT has its own curve, separate from the physical family, because it is the only attribute whose growth can change a player's best position.

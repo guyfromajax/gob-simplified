@@ -103,9 +103,13 @@ Front-end layout and styling are out of scope for this work — wire the data an
 
 ## Phase 5 — Retroactive pool write
 
-Write `potential_factor` to the 1,536 migrated pool players. Uniform draw, same as generation.
+Write `potential_factor` to the 1,536 migrated pool players.
 
-**This is a small additive `$set`, not a re-migration.** It does not touch attributes, height, weight, year, or ratings, and it is idempotent — do not restore the backup or re-run `regenerate_universal_pool.py`. Dry-run and report the manifest before committing, same discipline as before.
+**Persist the value each player is ALREADY displaying — `resolve_potential_factor(player_id, None)` — NOT a fresh uniform draw.** Phase 4 ships the projected ceiling on the base-team roster pages (surface 1b), which read the pool; with no stored `potential_factor` those pages already resolve the deterministic player_id-hash value. If Phase 5 drew a *new* random factor, every pool player's displayed ceiling would silently change at backfill, and a user who scouted a team pre-franchise would see different numbers afterward. The hash fallback is verified uniform and in-band across 20,000 ids ([potential_factor tests]), so persisting it loses nothing versus a fresh draw — and it keeps the display stable across the backfill. Same `warn=False` path the read side uses.
+
+**This is a small additive `$set`, not a re-migration.** It does not touch attributes, height, weight, year, or ratings, and it is idempotent — do not restore the backup or re-run `regenerate_universal_pool.py`. Dry-run and report the manifest before committing, same discipline as before. Verify post-write that the stored value equals what the page showed pre-write (they must be identical by construction).
+
+**RE-ARM THE ALARM (required step, not optional).** The Phase-4 display read paths resolve `potential_factor` with `warn=False` — correct *only while the pool is un-backfilled*, when every pool row legitimately hits the fallback and a per-player warning would flood the log. Once this backfill lands, the pool carries the field, so a fallback on a pool read no longer means "expected legacy row" — it means a genuine dropped-field regression on some write path, i.e. the `entry_tier` failure with the alarm switched off. As part of this phase, **flip the display-side resolution back to warning** — either restore `warn=True` on `potential_rt_for_player`'s resolve, or narrow it to a rate-limited / once-per-id warning so a real gap surfaces without flooding. Do NOT leave `warn=False` as a permanent suppression. (Legacy *franchise* saves that predate the field may still warn on display until they lazy-backfill at rollover — acceptable, or covered by the narrowed form.) Track this as a checklist item so the suppression is provably temporary.
 
 ## Phase 6 — Validation
 

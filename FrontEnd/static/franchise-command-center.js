@@ -2816,8 +2816,12 @@ function renderTeam(data) {
       addCell(displayVal);
     });
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
+    // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
+    // projected ceiling; header stays "RT", color stays by current rating. This runs in both
+    // Roster-tab render paths (initial renderTeam + post-sort re-render).
+    const _potRt = p.potential_rt_ratcheted;
     addCell(
-      formatRtDisplay(p.rt),
+      _potRt != null ? formatRtDisplay(p.rt) + '/' + formatRtDisplay(_potRt) : formatRtDisplay(p.rt),
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
     );
 
@@ -3105,8 +3109,12 @@ function sortRosterTable(columnName, direction) {
       addCell(displayVal);
     });
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
+    // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
+    // projected ceiling; header stays "RT", color stays by current rating. This runs in both
+    // Roster-tab render paths (initial renderTeam + post-sort re-render).
+    const _potRt = p.potential_rt_ratcheted;
     addCell(
-      formatRtDisplay(p.rt),
+      _potRt != null ? formatRtDisplay(p.rt) + '/' + formatRtDisplay(_potRt) : formatRtDisplay(p.rt),
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
     );
 
