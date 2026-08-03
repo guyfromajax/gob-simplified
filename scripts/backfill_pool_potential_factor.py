@@ -23,8 +23,21 @@ os.chdir(REPO)
 from dotenv import load_dotenv
 load_dotenv(str(REPO / ".env.local"))
 
-if "gob-staging" not in os.environ.get("MONGO_URI", "").lower():
-    print("ABORT: MONGO_URI is not gob-staging.", file=sys.stderr); sys.exit(1)
+# Parse + guard BEFORE importing BackEnd (that import connects to Mongo). The guard
+# requires --allow-db's value to appear in the connected MONGO_URI, so the tool can never
+# write to a DB you did not explicitly name. Default gob-staging keeps prior behavior;
+# pass --allow-db <prod-db-name> (with MONGO_URI pointed at prod) to backfill prod.
+_ap = argparse.ArgumentParser(description=__doc__)
+_ap.add_argument("--commit", action="store_true", help="write the $set (default: dry-run)")
+_ap.add_argument("--allow-db", default="gob-staging",
+                 help="DB-name substring that MUST appear in MONGO_URI (safety guard). "
+                      "Default gob-staging; pass your prod DB name to run there.")
+_args = _ap.parse_args()
+if _args.allow_db.lower() not in os.environ.get("MONGO_URI", "").lower():
+    print(f"ABORT: MONGO_URI does not contain '{_args.allow_db}' — refusing to write to an "
+          f"unnamed DB. Point MONGO_URI at the target and pass --allow-db <its name>.",
+          file=sys.stderr)
+    sys.exit(1)
 
 from BackEnd.db import players_collection
 from BackEnd.utils.player_generation import resolve_potential_factor, POTENTIAL_FACTOR_BAND
@@ -32,9 +45,7 @@ from pymongo import UpdateOne
 
 
 def main():
-    ap = argparse.ArgumentParser()
-    ap.add_argument("--commit", action="store_true", help="write the $set (default: dry-run)")
-    args = ap.parse_args()
+    args = _args
 
     total = players_collection.count_documents({})
     have = players_collection.count_documents({"potential_factor": {"$exists": True}})
