@@ -6592,13 +6592,27 @@
           eosUserConference = (userRoster.conference === 0 || userRoster.conference) ? userRoster.conference : null;
           eosUserRegion = userRoster.region || null;
         }
-        const homeColor = homeRoster?.primary_color;
-        const awayColor = awayRoster?.primary_color;
+        const homeChrome = urlParams.get('home_display') || homeTeamName;
+        const awayChrome = urlParams.get('away_display') || awayTeamName;
+        const homePal =
+          typeof resolveTeamBuilderPaletteColors === 'function'
+            ? resolveTeamBuilderPaletteColors(homeChrome, homeRoster)
+            : homeRoster;
+        const awayPal =
+          typeof resolveTeamBuilderPaletteColors === 'function'
+            ? resolveTeamBuilderPaletteColors(awayChrome, awayRoster)
+            : awayRoster;
+        const homeColor = homePal?.primary_color;
+        const awayColor = awayPal?.primary_color;
         if (!homeColor || !awayColor) return false;
 
-        document.documentElement.style.setProperty('--home-vibrant-color', homeColor);
-        document.documentElement.style.setProperty('--away-vibrant-color', awayColor);
-        applyVibrantRgbCssVarsFromHex(homeColor, awayColor);
+        if (typeof applyTeamVibrantDocumentVars === 'function') {
+          applyTeamVibrantDocumentVars(homeChrome, awayChrome, homeRoster, awayRoster);
+        } else {
+          document.documentElement.style.setProperty('--home-vibrant-color', homeColor);
+          document.documentElement.style.setProperty('--away-vibrant-color', awayColor);
+          applyVibrantRgbCssVarsFromHex(homeColor, awayColor);
+        }
         try {
           const mt = new URLSearchParams(window.location.search).get('my_team');
           const tri =
@@ -6716,9 +6730,12 @@
     // Chrome labels (Team Builder overlay); home/away remain core for identity/sim.
     const homeDisplay = urlParams.get('home_display') || homeTeam;
     const awayDisplay = urlParams.get('away_display') || awayTeam;
-    // Warm TB visual cache so getTeamAssetPath resolves generated banners.
+    // Same hydrate producer as FCC — required for mid-game resume / deep-link court entry.
     try {
-      if (urlParams.get('franchise_id') && typeof getActiveTeamBuilderVisual === 'function') {
+      const fid = urlParams.get('franchise_id');
+      if (fid && typeof ensureTeamBuilderVisualHydratedFromFranchise === 'function') {
+        await ensureTeamBuilderVisualHydratedFromFranchise(fid);
+      } else if (fid && typeof getActiveTeamBuilderVisual === 'function') {
         getActiveTeamBuilderVisual();
       }
     } catch (e) { /* non-fatal */ }
@@ -6753,6 +6770,17 @@
             if (tri) document.documentElement.style.setProperty('--team-rgb', tri);
           } catch (e) { /* ignore */ }
         }
+        // Bind CSS vars to the same hydrated visual the court generator uses.
+        try {
+          if (typeof applyTeamVibrantDocumentVars === 'function') {
+            applyTeamVibrantDocumentVars(
+              homeDisplay || homeTeam,
+              awayDisplay || awayTeam,
+              null,
+              null
+            );
+          }
+        } catch (e) { /* ignore */ }
       } else {
         console.warn('⚠️ No teams found in URL, using default vibrant colors');
       }

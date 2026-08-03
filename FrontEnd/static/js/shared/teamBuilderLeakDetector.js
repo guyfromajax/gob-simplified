@@ -20,6 +20,9 @@
   // Escape hatch only — prefer tightening match rules over growing this set.
   var ALLOWLISTED_DERIVED_NEEDLES = {};
   var TOKEN_SPLIT_RE = /[^A-Za-z0-9]+/;
+  // Session dedupe: one report per (node identity + needle) so mutation re-scans
+  // and transient event cards don't spam the same leak as many banners.
+  var reportedLeakKeys = Object.create(null);
 
   function envEnabled() {
     try {
@@ -320,20 +323,55 @@
     }
   }
 
+  function hitDedupeKey(hit, replacedName) {
+    // Stable node identity: id when present, else tag + leading classes.
+    // Transient mounts (moment cards) share class signatures, so the same
+    // color/name needle on remounted UI reports once per session.
+    var tag = String((hit && hit.tag) || '');
+    var id = String((hit && hit.id) || '');
+    var cls = String((hit && hit.className) || '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 3)
+      .join('.');
+    var nodeKey = id ? tag + '#' + id : tag + (cls ? '.' + cls : '');
+    var needlePart = '';
+    if (hit && hit.kind === 'color') {
+      needlePart = String(hit.text || '').slice(0, 80);
+    } else if (hit && hit.matchedNeedles && hit.matchedNeedles.length) {
+      needlePart = hit.matchedNeedles.slice().sort().join('|');
+    } else {
+      needlePart = String(replacedName || '') + '|' + String((hit && hit.text) || '').slice(0, 40);
+    }
+    return nodeKey + '::' + needlePart;
+  }
+
+  function filterNewHits(hits, replacedName) {
+    var fresh = [];
+    for (var i = 0; i < hits.length; i++) {
+      var key = hitDedupeKey(hits[i], replacedName);
+      if (reportedLeakKeys[key]) continue;
+      reportedLeakKeys[key] = true;
+      fresh.push(hits[i]);
+    }
+    return fresh;
+  }
+
   function report(hits, replacedName) {
-    if (!hits.length) {
-      clearBanner();
+    var fresh = filterNewHits(hits, replacedName);
+    if (!fresh.length) {
+      // Keep an existing banner if still relevant; do not re-paint noise.
       return;
     }
-    for (var i = 0; i < hits.length; i++) {
-      var h = hits[i];
+    for (var i = 0; i < fresh.length; i++) {
+      var h = fresh[i];
       console.error(
         '[TB-LEAK] DOM contains replaced_name=' + JSON.stringify(replacedName) +
           ' in <' + h.tag + ' id=' + h.id + ' class=' + h.className + '>: ' + h.text,
         h.element
       );
     }
-    paintBanner(hits, replacedName);
+    paintBanner(fresh, replacedName);
   }
 
   /**
@@ -402,6 +440,7 @@
     scanDom: scanDom,
     scanDomColors: scanDomColors,
     clearBanner: clearBanner,
+    resetDedupe: function () { reportedLeakKeys = Object.create(null); },
     leakNeedlesForReplacedName: leakNeedlesForReplacedName,
     shortDerivedNeedlesForReplacedName: shortDerivedNeedlesForReplacedName,
     normalizeHexColor: normalizeHexColor,

@@ -139,12 +139,22 @@ const queryFranchiseId = urlParams.get('franchise_id');
 const urlMode = urlParams.get('mode');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', queryFranchiseId || null) : (queryFranchiseId || null);
 
-// Ensure Team Builder generated art is available for scoreboard banners (cache → session).
-try {
-  if (franchiseId && typeof getActiveTeamBuilderVisual === 'function') {
-    getActiveTeamBuilderVisual();
-  }
-} catch (e) { /* non-fatal */ }
+// Hydrate TB visual from franchise payload (same as FCC) before chrome/court paint.
+// Resume / deep-link entry skips FCC; must not rely on FranchiseLS warm alone.
+const teamBuilderVisualHydratePromise =
+  franchiseId && typeof ensureTeamBuilderVisualHydratedFromFranchise === 'function'
+    ? ensureTeamBuilderVisualHydratedFromFranchise(franchiseId).catch(() => {
+        try {
+          return typeof getActiveTeamBuilderVisual === 'function' ? getActiveTeamBuilderVisual() : null;
+        } catch (e) {
+          return null;
+        }
+      })
+    : Promise.resolve(
+        franchiseId && typeof getActiveTeamBuilderVisual === 'function'
+          ? getActiveTeamBuilderVisual()
+          : null
+      );
 
 function attachMatchupTeamIds(payload) {
   if (homeId) payload.home_id = homeId;
@@ -713,12 +723,25 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     awayTeamObj = typeof lastSummary.away_team === 'object' ? lastSummary.away_team : null;
   }
   
-  // Extract colors (same pattern as gameScene.js line 375-376)
-  const homeColors = homeTeamObj?.colors || lastSummary.home_team_colors;
-  const awayColors = awayTeamObj?.colors || lastSummary.away_team_colors;
-  
+  // Extract colors; prefer hydrated TB visual (same source as court generator).
+  const homeColorsRaw = homeTeamObj?.colors || lastSummary.home_team_colors;
+  const awayColorsRaw = awayTeamObj?.colors || lastSummary.away_team_colors;
+  const homeColors =
+    typeof resolveTeamBuilderPaletteColors === 'function'
+      ? resolveTeamBuilderPaletteColors(courtChromeName('home'), homeColorsRaw)
+      : homeColorsRaw;
+  const awayColors =
+    typeof resolveTeamBuilderPaletteColors === 'function'
+      ? resolveTeamBuilderPaletteColors(courtChromeName('away'), awayColorsRaw)
+      : awayColorsRaw;
+
   const homeColor = homeColors?.primary_color || '#ff6200';
   const awayColor = awayColors?.primary_color || '#ff6200';
+  try {
+    if (typeof applyTeamVibrantDocumentVars === 'function') {
+      applyTeamVibrantDocumentVars(courtChromeName('home'), courtChromeName('away'), homeColorsRaw, awayColorsRaw);
+    }
+  } catch (e) { /* ignore */ }
   
   console.log('🔍 [SIM QUARTER] Team colors resolved:', {
     homeTeamId,
@@ -2218,23 +2241,39 @@ async function startGame({ homeRoster, awayRoster, animate = true, resumeActive 
   
   gameStore.setTeams({ home: homeTeam, away: awayTeam });
   gameStore.setRosters({ home: homeRoster, away: awayRoster });
+  try {
+    await teamBuilderVisualHydratePromise;
+  } catch (e) { /* non-fatal */ }
+
+  const homeChromeBoot = courtChromeName('home');
+  const awayChromeBoot = courtChromeName('away');
+  const homePalette =
+    typeof resolveTeamBuilderPaletteColors === 'function'
+      ? resolveTeamBuilderPaletteColors(homeChromeBoot, homeRoster)
+      : homeRoster;
+  const awayPalette =
+    typeof resolveTeamBuilderPaletteColors === 'function'
+      ? resolveTeamBuilderPaletteColors(awayChromeBoot, awayRoster)
+      : awayRoster;
+
   gameStore.setColors({
     home: {
-      primary_color: homeRoster.primary_color,
-      secondary_color: homeRoster.secondary_color,
+      primary_color: homePalette.primary_color,
+      secondary_color: homePalette.secondary_color,
     },
     away: {
-      primary_color: awayRoster.primary_color,
-      secondary_color: awayRoster.secondary_color,
+      primary_color: awayPalette.primary_color,
+      secondary_color: awayPalette.secondary_color,
     },
   });
 
-  // Keep court-level UI (player/team box score headers, borders, pills) synced to real team colors.
-  // This overrides the legacy 8-team vibrant-color fallback used before roster data is available.
+  // Court chrome CSS vars — same hydrated visual as resolveCourtImagePath.
   try {
-    if (typeof document !== 'undefined' && document.documentElement) {
-      document.documentElement.style.setProperty('--home-vibrant-color', homeRoster.primary_color || '#ff6200');
-      document.documentElement.style.setProperty('--away-vibrant-color', awayRoster.primary_color || '#ff6200');
+    if (typeof applyTeamVibrantDocumentVars === 'function') {
+      applyTeamVibrantDocumentVars(homeChromeBoot, awayChromeBoot, homeRoster, awayRoster);
+    } else if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.style.setProperty('--home-vibrant-color', homePalette.primary_color || '#ff6200');
+      document.documentElement.style.setProperty('--away-vibrant-color', awayPalette.primary_color || '#ff6200');
     }
   } catch (err) {
     console.warn('⚠️ [bootGame] Failed to apply real team colors to court UI:', err);

@@ -149,8 +149,13 @@ function hexToRgbTripletString(hex) {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
-function applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors) {
+function applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors, homeName, awayName) {
   if (typeof document === 'undefined') return;
+  // Prefer the shared hydrated palette (same source as resolveCourtImagePath).
+  if (typeof applyTeamVibrantDocumentVars === 'function' && (homeName || awayName)) {
+    applyTeamVibrantDocumentVars(homeName || '', awayName || '', homeColors, awayColors);
+    return;
+  }
   const hh = hexToRgbTripletString(resolvePrimaryHexFromTeamColors(homeColors));
   const ah = hexToRgbTripletString(resolvePrimaryHexFromTeamColors(awayColors));
   if (hh) {
@@ -1431,22 +1436,33 @@ export function createGameScene(Phaser) {
       const homeId = homeTeamId || homeTeamObj?.team_id || simData.home_team_id || simData.homeTeam?.team_id;
       const awayId = awayTeamId || awayTeamObj?.team_id || simData.away_team_id || simData.awayTeam?.team_id;
       
+      // Chrome art/labels: prefer display_name / URL *_display over core identity names.
+      let urlHomeDisplay = null;
+      let urlAwayDisplay = null;
+      try {
+        const spChrome = new URLSearchParams(window.location.search);
+        urlHomeDisplay = spChrome.get('home_display');
+        urlAwayDisplay = spChrome.get('away_display');
+      } catch (e) { /* ignore */ }
+      const homeChromeLabel = homeTeamObj?.display_name || urlHomeDisplay || logHome || homeCore;
+      const awayChromeLabel = awayTeamObj?.display_name || urlAwayDisplay || logAway || awayCore;
+
       // Scene chrome labels (display). Score / sim identity = core.
-      this.homeTeam = logHome;
-      this.awayTeam = logAway;
+      this.homeTeam = homeChromeLabel;
+      this.awayTeam = awayChromeLabel;
       this.homeTeamCore = homeCore;
       this.awayTeamCore = awayCore;
       
-      // Extract team colors (unified structure preferred)
+      // Extract team colors (unified structure preferred); CSS vars use hydrated visual.
       const homeColors = homeTeamObj?.colors || simData.home_team_colors;
       const awayColors = awayTeamObj?.colors || simData.away_team_colors;
       const homePlayersHeaderEl = document.getElementById('home-players-header');
       const awayPlayersHeaderEl = document.getElementById('away-players-header');
       if (homePlayersHeaderEl) {
-        homePlayersHeaderEl.textContent = logHome || '';
+        homePlayersHeaderEl.textContent = homeChromeLabel || '';
       }
       if (awayPlayersHeaderEl) {
-        awayPlayersHeaderEl.textContent = logAway || '';
+        awayPlayersHeaderEl.textContent = awayChromeLabel || '';
       }
       
       if (DEBUG_TEAMS) {
@@ -1470,11 +1486,19 @@ export function createGameScene(Phaser) {
       // Set team IDs on scene for animation systems
       this.homeTeamId = homeId;
       this.awayTeamId = awayId;
+      const homePalette =
+        typeof resolveTeamBuilderPaletteColors === 'function'
+          ? resolveTeamBuilderPaletteColors(homeChromeLabel, homeColors)
+          : homeColors;
+      const awayPalette =
+        typeof resolveTeamBuilderPaletteColors === 'function'
+          ? resolveTeamBuilderPaletteColors(awayChromeLabel, awayColors)
+          : awayColors;
       gameStore.setColors({
-        home: homeColors,
-        away: awayColors,
+        home: homePalette,
+        away: awayPalette,
       });
-      applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors);
+      applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors, homeChromeLabel, awayChromeLabel);
       this.isFinal = simData.is_final;
       
       // ⏸️ TABLED: Resume Last Game feature - Exact game state restoration
@@ -1519,16 +1543,8 @@ export function createGameScene(Phaser) {
 
       const homeLogoEl = document.getElementById('home-logo');
       const awayLogoEl = document.getElementById('away-logo');
-      // Chrome art: prefer display_name / URL *_display over core identity names.
-      let urlHomeDisplay = null;
-      let urlAwayDisplay = null;
-      try {
-        const spLogo = new URLSearchParams(window.location.search);
-        urlHomeDisplay = spLogo.get('home_display');
-        urlAwayDisplay = spLogo.get('away_display');
-      } catch (e) { /* ignore */ }
-      const homeChrome = homeTeamObj?.display_name || urlHomeDisplay || logHome || homeTeam;
-      const awayChrome = awayTeamObj?.display_name || urlAwayDisplay || logAway || awayTeam;
+      const homeChrome = homeChromeLabel;
+      const awayChrome = awayChromeLabel;
       if (homeLogoEl) homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeChrome, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
       if (awayLogoEl) awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayChrome, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
 

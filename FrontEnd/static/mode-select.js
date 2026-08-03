@@ -1188,6 +1188,7 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
 
   slotRuntimeById[franchiseId] = {
     franchise: franchiseData,
+    commandCenter: commandCenterData || null,
     activeGameResume: activeGameResume,
     cpuSimResume: cpuSimResume,
   };
@@ -1336,6 +1337,15 @@ function goToFranchiseCommandCenter(franchiseId) {
   if (franchiseData && franchiseData.franchise_id) {
     const resumeUrl = buildActiveGameCourtUrl(franchiseData, runtime.activeGameResume);
     if (resumeUrl) {
+      // Same hydrate producer as FCC — before court reconstructs chrome from URL/sim.
+      try {
+        if (typeof hydrateTeamBuilderVisualFromFranchisePayload === 'function') {
+          hydrateTeamBuilderVisualFromFranchisePayload(
+            runtime.commandCenter || franchiseData,
+            franchiseData.franchise_id
+          );
+        }
+      } catch (e) { /* court will re-fetch */ }
       console.warn('[MODE-RESUME-CLIENT] route resume', {
         franchise_id: franchiseData.franchise_id,
         game_id: runtime.activeGameResume && runtime.activeGameResume.game_id,

@@ -110,6 +110,19 @@ The v1 §3.2 enumeration covered 58 surfaces and all were verified — but every
 
 **Scope:** re-walk the enumeration in a live franchise that plays through at least one full week, including a completed game and box score.
 
+#### 3.2a Mid-game resume is a separate entry point — leak found 3 August 2026
+
+Observed in live play: a game entered normally rendered clean, then was closed mid-stream and reopened through the **mid-game resume** system. The detector then fired on two nodes:
+
+- `<H3#home-players-header>` rendering `Concord` instead of `Alexandria`
+- `<BUTTON.toggle-btn.active>` with `backgroundColor: #ec1d28` — the replaced program's core primary
+
+**The overlay was present and unread.** The URL carried `home=Concord&home_display=Alexandria`. Identity and chrome were both on the wire exactly as §3.1a requires; the resume renderer simply built its header from `home` and never applied the overlay, and took colours from core rather than the custom palette.
+
+**The lesson is about entry points, not surfaces.** The §3.2 sweep played a full week and passed. It never closed a game mid-stream and resumed, so an entire second entry path — one that constructs UI from persisted state rather than from a hydrated franchise payload — was never exercised. **Any path that reconstructs the game view from stored state is a distinct entry point and needs its own verification**, including resume, deep links, and a browser refresh mid-game.
+
+**Detector note:** the DOM scanner re-fires on every mutation, so a single leak produced repeated banners in one session. It should dedupe by node plus needle per session — a real leak should be reported once, not made to feel like many.
+
 ### 3.3 Phase 0 acceptance
 
 1. A Team Builder franchise can sim a full game and a full week without error.
@@ -494,6 +507,25 @@ Output must match the §2 card convention (400 × 141) and the primary aspect ra
 
 Geometry is copied verbatim from the existing constants. Nothing is re-measured.
 
+#### 6.3b Persistence — parameters only, and they must actually persist
+
+> **A generated court is stored as its five parameters, never as an image.** Generation is deterministic, so the parameters are the artefact. Regeneration happens client-side on each load.
+
+Storing the rendered image is wrong on every axis: a 3,333 × 2,083 JPEG is 1–2 MB per franchise, a data URI is the one form Phaser rejects (§6.3c), and object storage would break the offline premise §6.1 exists to protect.
+
+**Defect found 2 August 2026.** The wizard sends `court: { hardwoodStyle, oobColor, laneColor, centreCourtColor, halfArcFillColor }`, but **the Apply request model has no `court` field, so FastAPI drops it silently.** The `team_builder` overlay persists identity and colours but not the court parameters. Regeneration then falls back to `visual.court` in **localStorage**, which survives only the creating session on the creating browser.
+
+Two failures in one:
+
+1. **The parameters never reach the server**, so they cannot round-trip. A reload restores defaults derived from primary and secondary.
+2. **localStorage is acting as the store**, making the court per-browser rather than per-franchise. The same franchise renders differently on another device.
+
+No error is raised at any point — the preview looks right, Apply succeeds, and the loss appears only after a reload. This is the silent-substitution pattern v1.3 §8.6 forbids, and the same shape as every other defect this phase: **the client sends something the server does not read.**
+
+**Rule: the five court parameters are part of the Team Builder overlay and are written at Apply, exactly like the colours.** localStorage may cache; it may never be the source of truth.
+
+> **Testing note.** Criterion 6 cannot be judged in the creating session — localStorage masks the defect. **Reload, or open the franchise on another browser, before assessing.**
+
 **User-exposed parameters:**
 
 - Hardwood style
@@ -581,6 +613,9 @@ This requires publishing a **filtered subset** of the baking manifest into the g
 8. The headshot picker filters on skin tone and build.
 9. Random assignment fits the user's typed height, weight and build, and can be re-rolled.
 10. `SCHEMA.md` is updated to document the published subset.
+11. **A generated court renders as the live playing surface in a real game** — not a preview, not a file check.
+12. **The five court parameters round-trip through the server** (§6.3b). Verified by creating a franchise, **reloading**, and confirming the chosen colours survive — then by opening the same franchise in a different browser.
+13. **No court image is persisted anywhere** — not Mongo, not GridFS, not disk. Parameters only.
 
 ---
 

@@ -98,6 +98,10 @@ async function redirectIfFranchiseGameplayAlreadyCommitted() {
     if (abortIfAccessDenied(response)) return false;
     if (!response.ok) return false;
     const data = await response.json();
+    // Mid-game resume often lands here before court — hydrate same as FCC.
+    if (typeof hydrateTeamBuilderVisualFromFranchisePayload === 'function') {
+      hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId);
+    }
     const currentWeek = Number(data.week || 1);
     const pageWeek = Number(weekParam || 0);
     if (pageWeek && currentWeek > pageWeek) {
@@ -3369,7 +3373,15 @@ window.addEventListener('pageshow', (event) => {
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const redirected = await redirectIfFranchiseGameplayAlreadyCommitted();
+  // Resume often lands here before court. Hydrate once via FCC payload when possible.
+  let redirected = false;
+  if (franchiseId && weekParam) {
+    redirected = await redirectIfFranchiseGameplayAlreadyCommitted(); // hydrates from FCC fetch
+  } else if (franchiseId && typeof ensureTeamBuilderVisualHydratedFromFranchise === 'function') {
+    try {
+      await ensureTeamBuilderVisualHydratedFromFranchise(franchiseId);
+    } catch (e) { /* non-fatal */ }
+  }
   if (redirected) return;
   init();
   

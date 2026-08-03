@@ -257,6 +257,93 @@ function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
   return visual;
 }
 
+/**
+ * Ensure session visual is hydrated from the franchise API payload (same producer
+ * as FCC populateTop). Resume / deep-link court entry must call this — warming
+ * from FranchiseLS alone is not the hydrate path.
+ * @param {string} franchiseId
+ * @returns {Promise<object|null>}
+ */
+async function ensureTeamBuilderVisualHydratedFromFranchise(franchiseId) {
+  if (!franchiseId) return getActiveTeamBuilderVisual();
+  try {
+    var base =
+      typeof API_CONFIG !== 'undefined' && API_CONFIG.buildUrl
+        ? API_CONFIG.buildUrl('/franchise/command-center/data')
+        : '/franchise/command-center/data';
+    var url = base + '?franchise_id=' + encodeURIComponent(franchiseId) + '&profile=1';
+    var headers =
+      typeof API_CONFIG !== 'undefined' && API_CONFIG.getAuthHeaders
+        ? API_CONFIG.getAuthHeaders()
+        : {};
+    var res = await fetch(url, { headers: headers });
+    if (!res.ok) return getActiveTeamBuilderVisual();
+    var data = await res.json();
+    return hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId);
+  } catch (e) {
+    return getActiveTeamBuilderVisual();
+  }
+}
+
+/**
+ * UI palette for a side — same hydrated visual the court generator reads
+ * (getActiveTeamBuilderVisual + teamBuilderVisualMatchesName). Fallback is
+ * roster/sim colors when the side is not the custom program.
+ * @param {string} teamNameOrSlug
+ * @param {object|string} [fallbackColors]
+ * @returns {{ primary_color: string|null, secondary_color: string|null }}
+ */
+function resolveTeamBuilderPaletteColors(teamNameOrSlug, fallbackColors) {
+  var fb = fallbackColors;
+  if (typeof fb === 'string') fb = { primary_color: fb };
+  fb = fb || {};
+  var visual = getActiveTeamBuilderVisual();
+  if (visual && teamBuilderVisualMatchesName(visual, teamNameOrSlug)) {
+    return {
+      primary_color: visual.primary_color || visual.primary || fb.primary_color || fb.primary || null,
+      secondary_color:
+        visual.secondary_color || visual.secondary || fb.secondary_color || fb.secondary || null,
+    };
+  }
+  return {
+    primary_color: fb.primary_color || fb.primary || null,
+    secondary_color: fb.secondary_color || fb.secondary || null,
+  };
+}
+
+function _tbHexToRgbTriplet(hex) {
+  if (!hex || typeof hex !== 'string') return null;
+  var h = hex.trim();
+  if (h.charAt(0) === '#') h = h.slice(1);
+  if (h.length === 3) {
+    h = h.split('').map(function (c) { return c + c; }).join('');
+  }
+  if (h.length !== 6) return null;
+  var n = parseInt(h, 16);
+  if (!Number.isFinite(n)) return null;
+  return ((n >> 16) & 255) + ', ' + ((n >> 8) & 255) + ', ' + (n & 255);
+}
+
+/**
+ * Apply court chrome CSS vars from the hydrated palette (hex + rgb).
+ * Callers pass identity or display names; matching uses the same resolver as court art.
+ */
+function applyTeamVibrantDocumentVars(homeName, awayName, homeColors, awayColors) {
+  if (typeof document === 'undefined' || !document.documentElement) return;
+  var homePal = resolveTeamBuilderPaletteColors(homeName, homeColors);
+  var awayPal = resolveTeamBuilderPaletteColors(awayName, awayColors);
+  if (homePal.primary_color) {
+    document.documentElement.style.setProperty('--home-vibrant-color', homePal.primary_color);
+    var hr = _tbHexToRgbTriplet(homePal.primary_color);
+    if (hr) document.documentElement.style.setProperty('--home-vibrant-rgb', hr);
+  }
+  if (awayPal.primary_color) {
+    document.documentElement.style.setProperty('--away-vibrant-color', awayPal.primary_color);
+    var ar = _tbHexToRgbTriplet(awayPal.primary_color);
+    if (ar) document.documentElement.style.setProperty('--away-vibrant-rgb', ar);
+  }
+}
+
 function normalizeTeamNameKey(name) {
   return String(name || '')
     .trim()
