@@ -155,6 +155,20 @@ def get_franchise_name_assets() -> tuple[tuple[str, ...], tuple[str, ...], tuple
 
 # Recruit/walk-on year progression. JH never appears on an active roster:
 # signed recruits and walk-ons advance one step when they enter a roster.
+# Fields copied verbatim from a pool player into the franchise player doc (FPD) at
+# franchise init. POOL_TO_FPD_PROJECTION is BUILT from this list, so a field can never be
+# in the carry but missing from the projection — the Mongo-projection silent-loss trap that
+# has bitten this codebase three times (see Player_Development_System.md). The read-side
+# resolver masks a dropped field on screen, so the guarantee is structural + tested
+# (test_franchise_manager_pool_carry.py), not visual.
+POOL_TO_FPD_CARRY_FIELDS = ("entry_tier", "position_intent", "potential_factor")
+POOL_TO_FPD_PROJECTION = {
+    "first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1,
+    "position_ratings": 1, "height": 1, "weight": 1, "year": 1, "jersey": 1,
+    **{_f: 1 for _f in POOL_TO_FPD_CARRY_FIELDS},
+}
+
+
 RECRUIT_YEAR_ADVANCE = {
     "jh": "Freshman",
     "freshman": "Sophomore",
@@ -317,12 +331,9 @@ class FranchiseManager:
 
         _t0 = time.time()
         # Load all players with their full attributes for franchise-specific storage
-        players = self.db.players.find(
-            # potential_factor MUST be in this projection or the pool→FPD carry below
-            # silently receives None (Mongo-projection audit — the 3rd such silent loss;
-            # see Player_Development_System.md). entry_tier was here; potential_factor was not.
-            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1, "height": 1, "weight": 1, "year": 1, "jersey": 1, "entry_tier": 1, "position_intent": 1, "potential_factor": 1}
-        )
+        # Projection is BUILT from POOL_TO_FPD_CARRY_FIELDS (module top), so it can never
+        # drop a field the carry below reads — the fix for the 3rd Mongo-projection loss.
+        players = self.db.players.find({}, POOL_TO_FPD_PROJECTION)
         for p in players:
             from BackEnd.models.player import Player
             pid = str(p.get("_id"))
@@ -351,15 +362,11 @@ class FranchiseManager:
                 "career": career,
                 "attributes": attrs,  # Franchise-specific attributes with randomized EM/CH/MO
                 "position_ratings": p.get("position_ratings", {}).copy(),  # Clone position ratings for this franchise
-                # Carry the development pointer pool -> FPD (§10). The pool holds
-                # entry_tier + position_intent (pass-1 migration) but no development
-                # subdoc; that lazy-backfills at the first offseason event.
-                "entry_tier": p.get("entry_tier"),
-                "position_intent": p.get("position_intent"),
-                # Career-static potential scalar (Potential Rating §Phase 2). Carried
-                # directly like entry_tier; None for pre-Phase-5 pool players resolves
-                # deterministically from player_id at the first offseason rollover.
-                "potential_factor": p.get("potential_factor"),
+                # Carry the pool→FPD identity/development fields (§10) from the SAME list the
+                # projection is built from: entry_tier + position_intent (pass-1 migration) and
+                # potential_factor (Potential Rating §Phase 2). Pre-Phase-5 pool rows without a
+                # value resolve deterministically from player_id at the first offseason rollover.
+                **{_f: p.get(_f) for _f in POOL_TO_FPD_CARRY_FIELDS},
             }
         _perf["players_find_and_loop"] = (time.time() - _t0) * 1000
 
