@@ -270,12 +270,7 @@
     if (typeof getRecruitRtBucketClass === 'function') {
       return getRecruitRtBucketClass(rt);
     }
-    var v = Number(rt);
-    if (!isFinite(v)) return '';
-    if (v <= 29) return 'rt-low';
-    if (v <= 39) return 'rt-mid';
-    if (v <= 49) return 'rt-high';
-    return 'rt-elite';
+    return 'rt-unknown';
   }
 
   function formatHt(raw) {

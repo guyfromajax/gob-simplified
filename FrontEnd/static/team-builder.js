@@ -109,7 +109,7 @@
         halfArcFillColor: '#15181f',
       },
     },
-    roster_mode: 'keep',
+    roster_mode: 'edit',
     attribute_mode: 'capped',
     slotPlayers: null,
     // §4.5a: three walk-ons from generate_walk_on_profile(), idempotent per draft+slot.
@@ -117,6 +117,11 @@
     wizardWalkOns: null,
     wizardWalkOnsLoading: false,
     editor: { players: [], inherited: [], loaded: false },
+    // §6.5: wizard-minted player_id + image_id; portrait shown must ship.
+    portraits: [],
+    portraitPicker: { slot: null, skin: null, frame: null, definition: null, catalog: null },
+    _portraitSyncTimer: null,
+    _portraitSyncPromise: null,
     abbrConflict: null,
     allTeams: [],
     import: {
@@ -682,6 +687,8 @@
       if (!isNaN(w)) out.weight_lb = w;
       const j = parseInt(p.jersey, 10);
       if (!isNaN(j)) out.jersey = j;
+      if (p.player_id) out.player_id = p.player_id;
+      if (p.image_id) out.image_id = p.image_id;
       if (p.walk_on) {
         out.walk_on = true;
         out.archetype = 'Walk On';
@@ -692,6 +699,258 @@
       if (p.budget != null) out.budget = p.budget;
       return out;
     });
+  }
+
+  function portraitPlayersPayload() {
+    const source =
+      state.roster_mode === 'import' && state.import.importedPlayers && state.import.importedPlayers.length
+        ? state.import.importedPlayers
+        : state.editor.players;
+    return (source || []).map(function (p) {
+      const attrs = p.attrs || p.attributes || {};
+      return {
+        first_name: String(p.first_name || '').trim(),
+        last_name: String(p.last_name || '').trim(),
+        class_year: p.class_year || null,
+        height_in: parseInt(p.height_in != null ? p.height_in : p.height, 10) || null,
+        weight_lb: parseInt(p.weight_lb != null ? p.weight_lb : p.weight, 10) || null,
+        attributes: Object.assign({}, attrs),
+        player_id: p.player_id || null,
+        image_id: p.image_id || null,
+      };
+    });
+  }
+
+  function applyPortraitsToRoster(portraits) {
+    state.portraits = portraits || [];
+    const applyTo = function (list) {
+      if (!list || !list.length) return;
+      state.portraits.forEach(function (row) {
+        const idx = row.slot != null ? row.slot : state.portraits.indexOf(row);
+        if (!list[idx]) return;
+        list[idx].player_id = row.player_id;
+        list[idx].image_id = row.image_id;
+        list[idx].portrait_meta = {
+          frame: row.frame,
+          definition: row.definition,
+          skin: row.skin,
+          match_stage: row.match_stage,
+          source: row.source,
+        };
+      });
+    };
+    applyTo(state.editor.players);
+    applyTo(state.import.importedPlayers);
+  }
+
+  function portraitThumbUrl(imageId) {
+    if (!imageId || !window.API_CONFIG || !API_CONFIG.getRecruitImageUrl) {
+      return window.API_CONFIG && API_CONFIG.getGenericHeadshotUrl
+        ? API_CONFIG.getGenericHeadshotUrl({ size: 'thumb' })
+        : '';
+    }
+    return API_CONFIG.getRecruitImageUrl(imageId, { size: 'thumb' });
+  }
+
+  function bindPortraitImg(img, imageId) {
+    if (!img || !imageId) return;
+    img.src = portraitThumbUrl(imageId);
+    img.onerror = function () {
+      if (!window.API_CONFIG || !API_CONFIG.ensureRecruitImage) {
+        img.src = API_CONFIG.getGenericHeadshotUrl({ size: 'thumb' });
+        return;
+      }
+      API_CONFIG.ensureRecruitImage(imageId).then(function () {
+        img.src = portraitThumbUrl(imageId) + '?r=1';
+        img.onerror = function () {
+          img.src = API_CONFIG.getGenericHeadshotUrl({ size: 'thumb' });
+        };
+      });
+    };
+  }
+
+  async function syncPortraits(opts) {
+    opts = opts || {};
+    if (!state.slot) return null;
+    const players = portraitPlayersPayload();
+    if (players.length !== 15) return null;
+    const incomplete = players.some(function (p) {
+      return !p.height_in || !p.weight_lb || !p.first_name || !p.last_name;
+    });
+    if (incomplete && !opts.force) return null;
+
+    const body = {
+      replaced_object_id: state.slot.object_id,
+      draft_id: ensureDraftId(),
+      players: players,
+      force_reassign: !!opts.force,
+    };
+    const res = await fetch(API_CONFIG.buildUrl('/franchise/team-builder/portraits/assign'), {
+      method: 'POST',
+      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    applyPortraitsToRoster(data.portraits || []);
+    if (state.roster_mode === 'edit') renderEditor();
+    return data.portraits;
+  }
+
+  function schedulePortraitSync() {
+    if (state._portraitSyncTimer) clearTimeout(state._portraitSyncTimer);
+    state._portraitSyncTimer = setTimeout(function () {
+      state._portraitSyncTimer = null;
+      syncPortraits();
+    }, 450);
+  }
+
+  async function rerollPortrait(slot) {
+    const players = portraitPlayersPayload();
+    if (players.length !== 15) return;
+    const res = await fetch(API_CONFIG.buildUrl('/franchise/team-builder/portraits/reroll'), {
+      method: 'POST',
+      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        replaced_object_id: state.slot.object_id,
+        draft_id: ensureDraftId(),
+        slot: slot,
+        players: players,
+      }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    applyPortraitsToRoster(data.portraits || []);
+    renderEditor();
+  }
+
+  async function openPortraitPicker(slot) {
+    state.portraitPicker = {
+      slot: slot,
+      skin: null,
+      frame: null,
+      definition: null,
+      catalog: null,
+    };
+    const modal = document.getElementById('tb-portrait-modal');
+    const title = document.getElementById('tb-portrait-modal-title');
+    const p = state.editor.players[slot];
+    if (title) {
+      title.textContent = p
+        ? 'Portrait for ' + (p.first_name || '') + ' ' + (p.last_name || '')
+        : 'Choose a portrait';
+    }
+    if (modal) modal.hidden = false;
+    await refreshPortraitCatalog();
+  }
+
+  async function refreshPortraitCatalog() {
+    const pp = state.portraitPicker;
+    const params = new URLSearchParams();
+    if (pp.skin) params.set('skin', pp.skin);
+    if (pp.frame) params.set('frame', pp.frame);
+    if (pp.definition) params.set('definition', pp.definition);
+    const url =
+      API_CONFIG.buildUrl('/franchise/team-builder/portraits/catalog') +
+      (params.toString() ? '?' + params.toString() : '');
+    const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
+    if (!res.ok) return;
+    const catalog = await res.json();
+    state.portraitPicker.catalog = catalog;
+    renderPortraitPicker(catalog);
+  }
+
+  function renderPortraitPicker(catalog) {
+    const filters = document.getElementById('tb-portrait-filters');
+    const grid = document.getElementById('tb-portrait-grid');
+    const empty = document.getElementById('tb-portrait-empty');
+    if (!filters || !grid || !empty) return;
+    const pp = state.portraitPicker;
+    const counts = (catalog && catalog.counts) || { skin: {}, frame: {}, definition: {} };
+
+    function chips(axis, selected, countMap) {
+      let html =
+        '<div class="tb-portrait-filter-row"><strong>' +
+        axis +
+        '</strong>';
+      html +=
+        '<button type="button" class="tb-portrait-chip' +
+        (!selected ? ' is-selected' : '') +
+        '" data-filter-axis="' +
+        axis +
+        '" data-filter-value="">All</button>';
+      Object.keys(countMap)
+        .sort()
+        .forEach(function (key) {
+          html +=
+            '<button type="button" class="tb-portrait-chip' +
+            (selected === key ? ' is-selected' : '') +
+            '" data-filter-axis="' +
+            axis +
+            '" data-filter-value="' +
+            escapeHtml(key) +
+            '">' +
+            escapeHtml(key) +
+            ' (' +
+            countMap[key] +
+            ')</button>';
+        });
+      html += '</div>';
+      return html;
+    }
+
+    filters.innerHTML =
+      chips('skin', pp.skin, counts.skin || {}) +
+      chips('frame', pp.frame, counts.frame || {}) +
+      chips('definition', pp.definition, counts.definition || {});
+
+    if (!catalog.filtered_count) {
+      empty.hidden = false;
+      empty.textContent =
+        catalog.empty_reason ||
+        'No portraits match these filters. Clear a filter or pick another combination.';
+      grid.innerHTML = '';
+      return;
+    }
+    empty.hidden = true;
+    grid.innerHTML = (catalog.entries || [])
+      .map(function (e) {
+        return (
+          '<button type="button" class="tb-portrait-pick" data-pick-image="' +
+          escapeHtml(e.image_id) +
+          '"><img alt="" data-image-id="' +
+          escapeHtml(e.image_id) +
+          '"><span>' +
+          escapeHtml(e.frame + ' · ' + e.definition + ' · ' + e.skin) +
+          '</span></button>'
+        );
+      })
+      .join('');
+    grid.querySelectorAll('img[data-image-id]').forEach(function (img) {
+      bindPortraitImg(img, img.dataset.imageId);
+    });
+  }
+
+  async function pickPortrait(imageId) {
+    const slot = state.portraitPicker.slot;
+    if (slot == null) return;
+    const players = portraitPlayersPayload();
+    const res = await fetch(API_CONFIG.buildUrl('/franchise/team-builder/portraits/pick'), {
+      method: 'POST',
+      headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        replaced_object_id: state.slot.object_id,
+        draft_id: ensureDraftId(),
+        slot: slot,
+        image_id: imageId,
+        players: players,
+      }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    applyPortraitsToRoster(data.portraits || []);
+    document.getElementById('tb-portrait-modal').hidden = true;
+    renderEditor();
   }
 
   function editorPerPlayerBudgets() {
@@ -763,6 +1022,7 @@
       state.editor.loaded = true;
     }
     renderEditor();
+    syncPortraits();
   }
 
   function resetEditorPlayer(idx) {
@@ -770,12 +1030,14 @@
     state.editor.players[idx] = JSON.parse(JSON.stringify(state.editor.inherited[idx]));
     renderEditor();
     updateBudgetFromCurrentRoster();
+    schedulePortraitSync();
   }
 
   function resetAllEditor() {
     state.editor.players = cloneEditorPlayers(state.editor.inherited);
     renderEditor();
     updateBudgetFromCurrentRoster();
+    schedulePortraitSync();
   }
 
   function refreshEditorPlayerBudgetChrome(idx) {
@@ -814,6 +1076,35 @@
         idx +
         '">';
       html += '<div class="tb-editor-player-head">';
+      html += '<div class="tb-portrait-slot">';
+      html +=
+        '<img class="tb-portrait-thumb" alt="" data-portrait-img="' +
+        idx +
+        '"' +
+        (p.image_id ? ' data-image-id="' + escapeHtml(p.image_id) + '"' : '') +
+        '>';
+      html += '<div class="tb-portrait-actions">';
+      html +=
+        '<button type="button" class="tb-btn tb-btn-secondary" data-portrait-reroll="' +
+        idx +
+        '">Re-roll</button>';
+      html +=
+        '<button type="button" class="tb-btn tb-btn-secondary" data-portrait-pick="' +
+        idx +
+        '">Pick…</button>';
+      if (p.portrait_meta) {
+        html +=
+          '<span class="tb-portrait-meta">' +
+          escapeHtml(
+            (p.portrait_meta.frame || '') +
+              ' · ' +
+              (p.portrait_meta.definition || '') +
+              ' · ' +
+              (p.portrait_meta.skin || '')
+          ) +
+          '</span>';
+      }
+      html += '</div></div>';
       html +=
         '<input type="text" class="tb-editor-name" data-field="first_name" data-idx="' +
         idx +
@@ -900,6 +1191,9 @@
       html += '</div></article>';
     });
     host.innerHTML = html;
+    host.querySelectorAll('img[data-image-id]').forEach(function (img) {
+      bindPortraitImg(img, img.dataset.imageId);
+    });
   }
 
   function onEditorHostChange(e) {
@@ -922,6 +1216,7 @@
       t.value = player.attrs[key];
       refreshEditorPlayerBudgetChrome(idx);
       updateBudgetFromCurrentRoster();
+      schedulePortraitSync();
       return;
     }
 
@@ -934,10 +1229,30 @@
       } else {
         state.editor.players[idx][field] = t.value;
       }
+      if (
+        field === 'first_name' ||
+        field === 'last_name' ||
+        field === 'height_in' ||
+        field === 'weight_lb'
+      ) {
+        schedulePortraitSync();
+      }
     }
   }
 
   function onEditorHostClick(e) {
+    const reroll = e.target.closest('[data-portrait-reroll]');
+    if (reroll) {
+      const idx = parseInt(reroll.dataset.portraitReroll, 10);
+      if (!isNaN(idx)) rerollPortrait(idx);
+      return;
+    }
+    const pick = e.target.closest('[data-portrait-pick]');
+    if (pick) {
+      const idx = parseInt(pick.dataset.portraitPick, 10);
+      if (!isNaN(idx)) openPortraitPicker(idx);
+      return;
+    }
     const btn = e.target.closest('[data-reset-idx]');
     if (!btn) return;
     const idx = parseInt(btn.dataset.resetIdx, 10);
@@ -1236,13 +1551,13 @@
 
       if (!skip) {
         if (!rowObj.height_in) {
-          state.import.rowWarnings.push(rowFieldWarning(rowObj._rowNum, 'height_in', rowObj.height_in, "We'll generate a height."));
+          state.import.rowWarnings.push(rowFieldWarning(rowObj._rowNum, 'height_in', rowObj.height_in, 'Blank — inherits from the replaced program.'));
         }
         if (!rowObj.weight_lb) {
-          state.import.rowWarnings.push(rowFieldWarning(rowObj._rowNum, 'weight_lb', rowObj.weight_lb, "We'll generate a weight."));
+          state.import.rowWarnings.push(rowFieldWarning(rowObj._rowNum, 'weight_lb', rowObj.weight_lb, 'Blank — inherits from the replaced program.'));
         }
         if (!rowObj.jersey) {
-          state.import.rowWarnings.push(rowFieldWarning(rowObj._rowNum, 'jersey', rowObj.jersey, "We'll generate a jersey number."));
+          state.import.rowWarnings.push(rowFieldWarning(rowObj._rowNum, 'jersey', rowObj.jersey, 'Blank — inherits from the replaced program.'));
         }
         state.import.validPlayers.push(normalizeImportedPlayer(rowObj));
       } else {
@@ -1463,7 +1778,7 @@
     if (skipped) {
       html += '<p>' + skipped + ' row' + (skipped === 1 ? '' : 's') + ' will be skipped (see below).</p>';
     }
-    if (state.roster_mode === 'import' || state.roster_mode === 'generate' || state.roster_mode === 'edit') {
+    if (state.roster_mode === 'import' || state.roster_mode === 'edit') {
       html += '<p>' + escapeHtml(replaced) + "'s current players won't be part of this franchise.</p>";
     }
     if (identityOn) {
@@ -1527,6 +1842,7 @@
     state.import.committed = true;
     updateBudgetFromCurrentRoster();
     renderReview();
+    if (rosterOn) syncPortraits();
   }
 
   function downloadSkippedRowsCsv() {
@@ -1575,9 +1891,6 @@
               })
             : null,
       };
-    }
-    if (state.roster_mode === 'keep' && state.slotRosterAttrs) {
-      return { attrsList: state.slotRosterAttrs, budgets: null };
     }
     return null;
   }
@@ -1647,10 +1960,6 @@
           label.textContent = state.slotRosterLoading
             ? 'Loading inherited roster…'
             : 'Per-player budgets — points stay within each player';
-        } else if (state.roster_mode === 'generate') {
-          label.textContent = poolCap
-            ? 'Team pool: estimated until Apply / ' + formatPool(poolCap)
-            : 'Team pool: estimated until Apply';
         } else {
           label.textContent = poolCap ? 'Team pool: — / ' + formatPool(poolCap) : 'Team pool: —';
         }
@@ -1782,7 +2091,7 @@
   async function fetchSlotRoster() {
     if (!state.slot) return;
     state.slotRosterLoading = true;
-    if (state.roster_mode === 'keep' || state.roster_mode === 'edit') renderBudgetMeter(null);
+    if (state.roster_mode === 'edit') renderBudgetMeter(null);
     try {
       const url = API_CONFIG.buildUrl('/roster/' + encodeURIComponent(state.slot.name));
       const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
@@ -1796,13 +2105,12 @@
       if (state.roster_mode === 'edit') {
         initEditorFromSlot(!state.editor.loaded);
       }
-      if (state.roster_mode === 'keep') updateBudgetFromCurrentRoster();
     } catch (_) {
       state.slotPlayers = null;
       state.slotRosterAttrs = null;
     } finally {
       state.slotRosterLoading = false;
-      if (state.roster_mode === 'keep' || state.roster_mode === 'edit') {
+      if (state.roster_mode === 'edit') {
         renderBudgetMeter(state.budget);
       }
     }
@@ -1832,9 +2140,6 @@
           state._wizardWalkOnsSlotKey = null;
           state._wizardWalkOnsPromise = null;
           state.editor = { players: [], inherited: [], loaded: false };
-          document.getElementById('tb-keep-label').textContent = "Keep " + team.name + "'s roster";
-          const keepDetail = document.getElementById('tb-keep-detail');
-          if (keepDetail) keepDetail.textContent = team.name + "'s roster exactly as-is.";
           const editDetail = document.getElementById('tb-edit-detail');
           if (editDetail) {
             editDetail.textContent =
@@ -1982,10 +2287,7 @@
     if (importPanel) importPanel.hidden = state.roster_mode !== 'import';
     if (editorPanel) editorPanel.hidden = state.roster_mode !== 'edit';
 
-    const needsRoster =
-      (state.roster_mode === 'keep' || state.roster_mode === 'edit') &&
-      !state.slotPlayers &&
-      state.slot;
+    const needsRoster = state.roster_mode === 'edit' && !state.slotPlayers && state.slot;
 
     if (needsRoster) {
       fetchSlotRoster().then(function () {
@@ -2020,8 +2322,6 @@
       } else {
         line += ' · team total ' + formatPool(state.budget.team_total);
       }
-    } else if (state.roster_mode === 'generate') {
-      line += ' · roster estimated at Apply';
     }
     return line;
   }
@@ -2035,22 +2335,16 @@
     const rosterCount =
       state.roster_mode === 'edit' && state.editor.loaded
         ? state.editor.players.length
-        : (state.slotPlayers || []).length;
+        : state.roster_mode === 'import' && state.import.importedPlayers
+          ? state.import.importedPlayers.length
+          : (state.slotPlayers || []).length;
     let rosterLine;
-    if (state.roster_mode === 'keep') {
-      rosterLine =
-        "Roster: " +
-        state.slot.name +
-        "'s roster exactly as-is" +
-        (rosterCount ? ' (' + rosterCount + ' players)' : '');
-    } else if (state.roster_mode === 'edit') {
+    if (state.roster_mode === 'edit') {
       rosterLine =
         'Roster: editing inherited ' +
         state.slot.name +
         ' players' +
         (rosterCount ? ' (' + rosterCount + ')' : '');
-    } else if (state.roster_mode === 'generate') {
-      rosterLine = 'Roster: generate new players at slot talent band';
     } else if (state.import.importSummary) {
       rosterLine =
         'Roster: ' +
@@ -2170,12 +2464,36 @@
             row.archetype = 'Walk On';
             row.entry_tier = row.entry_tier || 'Poor';
           }
+          if (p.player_id) row.player_id = p.player_id;
+          if (p.image_id) row.image_id = p.image_id;
           return row;
         });
+        const missingImport = payload.imported_players.some(function (p) {
+          return !p.player_id || !p.image_id;
+        });
+        if (missingImport) {
+          await syncPortraits();
+          payload.imported_players = state.import.importedPlayers.map(function (p, idx) {
+            const row = Object.assign({}, p);
+            if (idx >= 12) {
+              row.walk_on = true;
+              row.archetype = 'Walk On';
+              row.entry_tier = row.entry_tier || 'Poor';
+            }
+            if (p.player_id) row.player_id = p.player_id;
+            if (p.image_id) row.image_id = p.image_id;
+            return row;
+          });
+        }
         const budgets = slotPerPlayerBudgets();
         if (budgets && budgets.length === 15) payload.per_player_budgets = budgets;
       }
       if (state.roster_mode === 'edit' && state.editor.loaded && state.editor.players.length) {
+        // Ensure wizard-minted ids are present before Apply (seed stability).
+        const missing = state.editor.players.some(function (p) {
+          return !p.player_id || !p.image_id;
+        });
+        if (missing) await syncPortraits({ force: false });
         payload.imported_players = editorPlayersToImportPayload();
         const budgets = editorPerPlayerBudgets();
         if (budgets && budgets.length === 15) payload.per_player_budgets = budgets;
@@ -2401,7 +2719,6 @@
           );
         }
         const next = Number(btn.dataset.nav);
-        if (btn.dataset.skipRoster) state.roster_mode = 'generate';
         if (state.step === 1 && next > 1) {
           readIdentity();
           if (!state.identity.name) return showError('School name is required.');
@@ -2615,6 +2932,34 @@
       document.getElementById('tb-confirm-modal').hidden = true;
     });
     document.getElementById('tb-confirm-apply').addEventListener('click', applyFranchise);
+
+    const portraitCancel = document.getElementById('tb-portrait-cancel');
+    if (portraitCancel) {
+      portraitCancel.addEventListener('click', function () {
+        document.getElementById('tb-portrait-modal').hidden = true;
+      });
+    }
+    const portraitFilters = document.getElementById('tb-portrait-filters');
+    if (portraitFilters) {
+      portraitFilters.addEventListener('click', function (e) {
+        const chip = e.target.closest('[data-filter-axis]');
+        if (!chip) return;
+        const axis = chip.dataset.filterAxis;
+        const value = chip.dataset.filterValue || null;
+        if (axis === 'skin') state.portraitPicker.skin = value;
+        if (axis === 'frame') state.portraitPicker.frame = value;
+        if (axis === 'definition') state.portraitPicker.definition = value;
+        refreshPortraitCatalog();
+      });
+    }
+    const portraitGrid = document.getElementById('tb-portrait-grid');
+    if (portraitGrid) {
+      portraitGrid.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-pick-image]');
+        if (!btn) return;
+        pickPortrait(btn.dataset.pickImage);
+      });
+    }
 
     syncCourtDefaultsFromTeamColors();
     setStep(0);

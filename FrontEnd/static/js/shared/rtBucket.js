@@ -2,13 +2,29 @@
  * Canonical, reversible RT display experiment.
  *
  * RT stays numeric in data and logic. Only final display formatting changes.
- * The canonical switch lives in common.js; this fallback covers pages that
- * load the helper first or do not load common.js.
+ * This file owns the canonical bands, colors, and letter/number switch.
  *
  * Loaded as a classic script (no module export) for ES modules and IIFE pages.
  */
 (function (global) {
-  if (!global.RT_DISPLAY_MODE) global.RT_DISPLAY_MODE = 'letter';
+  global.RT_DISPLAY_MODE = 'letter';
+  var RT_BANDS = Object.freeze([
+    Object.freeze({ minimum: 100, grade: 'A++', className: 'rt-elite', color: '#4A90D9' }),
+    Object.freeze({ minimum: 90, grade: 'A+', className: 'rt-elite', color: '#4A90D9' }),
+    Object.freeze({ minimum: 80, grade: 'A', className: 'rt-elite', color: '#4A90D9' }),
+    Object.freeze({ minimum: 70, grade: 'B+', className: 'rt-high', color: '#34EC27' }),
+    Object.freeze({ minimum: 60, grade: 'B', className: 'rt-high', color: '#34EC27' }),
+    Object.freeze({ minimum: 50, grade: 'C+', className: 'rt-mid', color: '#FFD700' }),
+    Object.freeze({ minimum: 40, grade: 'C', className: 'rt-mid', color: '#FFD700' }),
+    Object.freeze({ minimum: 30, grade: 'D', className: 'rt-low', color: '#ff6d6d' }),
+    Object.freeze({ minimum: -Infinity, grade: 'F', className: 'rt-low', color: '#ff6d6d' })
+  ]);
+
+  if (global.document && global.document.documentElement) {
+    RT_BANDS.forEach(function (band) {
+      global.document.documentElement.style.setProperty('--' + band.className + '-color', band.color);
+    });
+  }
 
   function numericRt(rt) {
     if (rt === null || rt === undefined || rt === '') return null;
@@ -16,17 +32,16 @@
     return isFinite(v) ? v : null;
   }
 
-  function getRtLetterGrade(rt) {
+  function getRtPresentation(rt) {
     var v = numericRt(rt);
-    if (v === null) return '--';
-    if (v >= 100) return 'A++';
-    if (v >= 90) return 'A+';
-    if (v >= 80) return 'A';
-    if (v >= 70) return 'B+';
-    if (v >= 60) return 'B';
-    if (v >= 50) return 'C+';
-    if (v >= 40) return 'C';
-    return 'F';
+    if (v === null) {
+      return { grade: '--', className: 'rt-unknown', color: 'rgba(255, 255, 255, 0.4)' };
+    }
+    return RT_BANDS.find(function (band) { return v >= band.minimum; });
+  }
+
+  function getRtLetterGrade(rt) {
+    return getRtPresentation(rt).grade;
   }
 
   function formatRtDisplay(rt) {
@@ -36,12 +51,7 @@
   }
 
   function getRtBucketClass(rt) {
-    var v = numericRt(rt);
-    if (v === null) return 'rt-unknown';
-    if (v < 40) return 'rt-low';
-    if (v < 60) return 'rt-mid';
-    if (v < 80) return 'rt-high';
-    return 'rt-elite';
+    return getRtPresentation(rt).className;
   }
 
   function getRecruitRtBucketClass(rt) {
@@ -53,14 +63,10 @@
   }
 
   function getRtColor(rt) {
-    var cls = getRtBucketClass(rt);
-    if (cls === 'rt-elite') return '#4A90D9';
-    if (cls === 'rt-high') return '#34EC27';
-    if (cls === 'rt-mid') return '#FFD700';
-    if (cls === 'rt-low') return '#ff6d6d';
-    return 'rgba(255, 255, 255, 0.4)';
+    return getRtPresentation(rt).color;
   }
 
+  global.getRtPresentation = getRtPresentation;
   global.getRtLetterGrade = getRtLetterGrade;
   global.formatRtDisplay = formatRtDisplay;
   global.getRtBucketClass = getRtBucketClass;

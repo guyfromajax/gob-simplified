@@ -44,14 +44,7 @@
     if (typeof global.getRecruitRtBucketClassForYear === 'function') {
       return global.getRecruitRtBucketClassForYear(rt, year);
     }
-    // Fallback (helper absent): shared player/recruit scale.
-    if (rt === null || rt === undefined || rt === '') return 'rt-unknown';
-    var v = Number(rt);
-    if (!isFinite(v)) return 'rt-unknown';
-    if (v < 40) return 'rt-low';
-    if (v < 60) return 'rt-mid';
-    if (v < 80) return 'rt-high';
-    return 'rt-elite';
+    return 'rt-unknown';
   }
 
   // =========================================================================

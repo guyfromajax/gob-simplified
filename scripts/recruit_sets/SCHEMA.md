@@ -1,21 +1,45 @@
 # Recruit Set Schema
 
-The frozen data contract for pre-built recruit sets. See the design doc
+The frozen data contract for pre-built recruit sets **and** Team Builder portrait
+extension sets. See the design doc
 [`_documentation_master/00_Operations/Recruit_Image_System.md`](../../_documentation_master/00_Operations/Recruit_Image_System.md)
 for the full architecture; this file is the exact field-level spec the **baker** writes and the
 **loader** reads.
 
-A "set" is 300 pre-built recruits shipped as a unit. Each recruit carries a **stable
-`recruit_id`** that keys its pre-generated uniform kit in R2 (`recruits/kit/<recruit_id>.png`).
-At signing the player gets a fresh unique `player_id` (not the recruit_id — set recruits share
-one recruit_id across franchises, which would collide); the portrait follows via `image_id`.
+## Two sequences (by purpose)
 
-There are **two artifacts**:
+| Sequence | Purpose | Who draws from it | Current |
+|---|---|---|---|
+| **`recruit_set_NNNN`** | Pre-built recruit classes (stats + kits) | Recruit assignment **only** | `recruit_set_0001` (300) |
+| **`builder_set_NNNN`** | Portrait kits for Team Builder body/skin coverage | Team Builder picker + fitted assignment | `builder_set_0001` (150) |
+
+**Team Builder pool** = `recruit_set_0001` ∪ `builder_set_0001`.  
+**Recruit assignment** = `recruit_set_0001` alone — never add a builder set to the recruit pool.
+
+### Legacy aliases (do not migrate)
+
+| Logical name | On-disk / Mongo `set_id` | Kit R2 prefix |
+|---|---|---|
+| `recruit_set_0001` | `set_0001` (file `set_0001.json`, collection `recruit_sets`) | **`recruits/kit/<uuid>.png`** — leave the existing 300 objects here; do not move them |
+| `builder_set_0001` | `builder_set_0001` | **`portrait-kits/builder_set_0001/<uuid>.png`** (+ `.mask.png`, `.json`) |
+
+Future recruit classes continue `recruit_set_0002`, `0003`, … (new prefix optional at cutover).  
+Future builder extensions continue `builder_set_0002`, `0003`, ….
+
+A recruit set is 300 pre-built recruits shipped as a unit. Each recruit carries a **stable
+`recruit_id`** that keys its pre-generated uniform kit. At signing the player gets a fresh
+unique `player_id` (not the recruit_id — set recruits share one recruit_id across franchises,
+which would collide); the portrait follows via `image_id`.
+
+There are **two artifacts** for recruit sets:
 
 | Artifact | Consumed by | Contains |
 |---|---|---|
 | **A. Set document** | the game (loaded into FRD) | identity + stats only — lean |
 | **B. Baking manifest** | the baker / QC only (sidecar) | projected build + portrait genes |
+
+Builder sets ship a **baking manifest** plus a **published filtered subset** (below) — no
+recruit stats document.
 
 ---
 
@@ -112,23 +136,50 @@ and `portrait` drive the reference-body pick + NB face-swap, exactly like the 12
 
 ---
 
+## C. Published filtered subset (game-facing — deliberate exception)
+
+`SCHEMA` historically said Artifact B is never loaded into the game. **Exception:** Team Builder
+needs portrait metadata for filtering and fitted assignment. Both `recruit_set_0001` and
+`builder_set_0001` publish a **filtered** view:
+
+| Published | Not published |
+|---|---|
+| `image_id` (or `recruit_id` for recruit kits) | `portrait.race` |
+| `build.frame` | hair / face / expression genes |
+| `build.definition` | projected ST/AG/RT, accessories |
+| `portrait.skin` | |
+
+Files:
+- Recruit legacy: baking manifest `set_0001.manifest.json` (full genes); filtered publish is the
+  same field subset when wired into TB (do not rewrite the baking sidecar).
+- Builder: `builder_set_0001.manifest.json` (full genes, baker/QC) and
+  `builder_set_0001.published.json` (filtered subset above).
+
+---
+
 ## ID & file conventions
 
 | Thing | Convention |
 |---|---|
-| `set_id` | `set_NNNN` zero-padded, human-readable, unique (`set_0001`, `set_0002`, …) |
-| `recruit_id` | UUIDv4 string |
-| Uniform kit (R2) | `recruits/kit/<recruit_id>.png` (+ `.mask.png`, `.json` sidecars) |
-| Uniformed master (post-sign, R2) | `players/master/<recruit_id>.png` |
-| Set file (offline pack) | `set_NNNN.json` (Artifact A) |
-| Baking manifest (repo/build) | `set_NNNN.manifest.json` (Artifact B) |
+| Recruit sequence | `recruit_set_NNNN` (logical). Legacy on-disk/Mongo id for the first class: `set_0001` |
+| Builder sequence | `builder_set_NNNN` |
+| `recruit_id` / `image_id` | UUIDv4 string — globally unique across **both** sequences (collision at kit path overwrites art) |
+| Recruit kit (R2) — **legacy** | `recruits/kit/<uuid>.png` (+ `.mask.png`, `.json`) — `recruit_set_0001` stays here |
+| Builder kit (R2) | `portrait-kits/builder_set_0001/<uuid>.png` (+ `.mask.png`, `.json`) |
+| Uniformed master (post-sign, R2) | `players/master/<uuid>.png` |
+| Recruit set file | `set_0001.json` (legacy name) / future `recruit_set_NNNN.json` |
+| Builder allocation / manifests | `builder_set_NNNN.allocation.json`, `.manifest.json`, `.published.json` |
 
 ---
 
 ## Validation rules (baker must enforce)
 
-1. `recruits` length == `recruit_count` == 300.
-2. All `recruit_id`s unique **within the set** (and, for online, globally across `recruit_sets`).
-3. Every recruit has a kit (bust + mask + geometry) at its R2 keys before the set is published.
-4. Frames span all five (`Slight, Lean, Normal, Broad, Doughy`) so builds match faces.
-5. `year` ∈ the four-value enum; `attributes` contains the core 13 codes.
+1. Recruit sets: `recruits` length == `recruit_count` == 300.
+2. All ids unique **within the set** and disjoint from every other published kit UUID
+   (recruit + builder). Before writing any kit to a flat or prefixed path, verify no collision.
+3. Every kit has bust + mask + geometry at its R2 keys before the set is published.
+4. Frames span all five (`Slight, Lean, Normal, Broad, Doughy`) so builds match faces
+   (recruit sets). Builder sets follow their allocation — coverage-driven, not uniform.
+5. Recruit `year` ∈ the four-value enum; `attributes` contains the core 13 codes.
+6. Builder published subset must not include `portrait.race`.
+7. Recruit assignment loaders must not read `builder_set_*`.

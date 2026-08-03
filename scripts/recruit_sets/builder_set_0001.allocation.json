@@ -1,0 +1,644 @@
+{
+  "set_id": "builder_set_0001",
+  "title": "Team Builder portrait extension (builder_set_0001)",
+  "purpose": "Complement Lean-heavy recruit_set_0001 for Team Builder fitted assignment. NOT in the recruit pool \u2014 recruits draw recruit_set_0001 only. TB draws from recruit_set_0001 \u222a builder_set_0001.",
+  "budget": 150,
+  "method": {
+    "meaningful_league_demand_min": 3,
+    "combined_floor_images": 3,
+    "negligible_policy": "zero extension (L<3); ~10 images that would open those cells go to Broad-Toned instead",
+    "surplus_policy": "all post-floor surplus \u2192 Broad-Toned, d'Hondt within that body",
+    "phases": [
+      "Open every empty meaningful cell (L>=3) with 1",
+      "Raise every meaningful cell to combined floor of 3",
+      "All remaining surplus \u2192 Broad-Toned proportional to league demand"
+    ]
+  },
+  "projection": {
+    "league_players": 1536,
+    "exact_match_before": {
+      "players": 1177,
+      "rate": 0.7663
+    },
+    "exact_match_after": {
+      "players": 1523,
+      "rate": 0.9915
+    },
+    "zero_image_cell_players_before": 359,
+    "zero_image_cell_players_after": 13
+  },
+  "summary_by_frame": {
+    "Broad": 43,
+    "Slight": 43,
+    "Normal": 39,
+    "Doughy": 20,
+    "Lean": 5
+  },
+  "summary_by_body": {
+    "Broad-Toned": 31,
+    "Doughy-Soft": 20,
+    "Slight-Soft": 20,
+    "Normal-Soft": 19,
+    "Normal-Toned": 12,
+    "Slight-Cut": 12,
+    "Broad-Cut": 12,
+    "Slight-Toned": 11,
+    "Normal-Cut": 8,
+    "Lean-Soft": 3,
+    "Lean-Cut": 2,
+    "Lean-Toned": 0
+  },
+  "targets": [
+    {
+      "frame": "Broad",
+      "definition": "Toned",
+      "skin": "black-normal",
+      "extension_count": 5,
+      "set_0001_count": 2,
+      "combined_after": 7,
+      "league_demand": 71
+    },
+    {
+      "frame": "Broad",
+      "definition": "Toned",
+      "skin": "black-light",
+      "extension_count": 5,
+      "set_0001_count": 1,
+      "combined_after": 6,
+      "league_demand": 62
+    },
+    {
+      "frame": "Broad",
+      "definition": "Toned",
+      "skin": "white-normal",
+      "extension_count": 5,
+      "set_0001_count": 0,
+      "combined_after": 5,
+      "league_demand": 48
+    },
+    {
+      "frame": "Broad",
+      "definition": "Toned",
+      "skin": "hispanic",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 29
+    },
+    {
+      "frame": "Doughy",
+      "definition": "Soft",
+      "skin": "black-normal",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 29
+    },
+    {
+      "frame": "Slight",
+      "definition": "Soft",
+      "skin": "white-normal",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 23
+    },
+    {
+      "frame": "Broad",
+      "definition": "Toned",
+      "skin": "black-dark",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 22
+    },
+    {
+      "frame": "Slight",
+      "definition": "Toned",
+      "skin": "white-tan",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 21
+    },
+    {
+      "frame": "Normal",
+      "definition": "Toned",
+      "skin": "black-dark",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 19
+    },
+    {
+      "frame": "Normal",
+      "definition": "Toned",
+      "skin": "asian",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 15
+    },
+    {
+      "frame": "Slight",
+      "definition": "Soft",
+      "skin": "white-tan",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 14
+    },
+    {
+      "frame": "Doughy",
+      "definition": "Soft",
+      "skin": "black-dark",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 13
+    },
+    {
+      "frame": "Doughy",
+      "definition": "Soft",
+      "skin": "black-light",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 13
+    },
+    {
+      "frame": "Doughy",
+      "definition": "Soft",
+      "skin": "white-tan",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 13
+    },
+    {
+      "frame": "Broad",
+      "definition": "Toned",
+      "skin": "white-pale",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 9
+    },
+    {
+      "frame": "Normal",
+      "definition": "Soft",
+      "skin": "white-tan",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 9
+    },
+    {
+      "frame": "Normal",
+      "definition": "Toned",
+      "skin": "white-pale",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 8
+    },
+    {
+      "frame": "Slight",
+      "definition": "Soft",
+      "skin": "black-dark",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 7
+    },
+    {
+      "frame": "Doughy",
+      "definition": "Soft",
+      "skin": "white-pale",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 6
+    },
+    {
+      "frame": "Slight",
+      "definition": "Soft",
+      "skin": "hispanic",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 6
+    },
+    {
+      "frame": "Broad",
+      "definition": "Toned",
+      "skin": "ambiguous",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 5
+    },
+    {
+      "frame": "Normal",
+      "definition": "Soft",
+      "skin": "ambiguous",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 5
+    },
+    {
+      "frame": "Normal",
+      "definition": "Soft",
+      "skin": "black-dark",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 5
+    },
+    {
+      "frame": "Slight",
+      "definition": "Cut",
+      "skin": "black-dark",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 5
+    },
+    {
+      "frame": "Slight",
+      "definition": "Cut",
+      "skin": "black-light",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 5
+    },
+    {
+      "frame": "Normal",
+      "definition": "Cut",
+      "skin": "white-pale",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 4
+    },
+    {
+      "frame": "Normal",
+      "definition": "Soft",
+      "skin": "white-pale",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 4
+    },
+    {
+      "frame": "Broad",
+      "definition": "Cut",
+      "skin": "white-pale",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 3
+    },
+    {
+      "frame": "Doughy",
+      "definition": "Soft",
+      "skin": "asian",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 3
+    },
+    {
+      "frame": "Slight",
+      "definition": "Soft",
+      "skin": "white-pale",
+      "extension_count": 3,
+      "set_0001_count": 0,
+      "combined_after": 3,
+      "league_demand": 3
+    },
+    {
+      "frame": "Broad",
+      "definition": "Toned",
+      "skin": "white-tan",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 33
+    },
+    {
+      "frame": "Slight",
+      "definition": "Soft",
+      "skin": "black-light",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 28
+    },
+    {
+      "frame": "Broad",
+      "definition": "Cut",
+      "skin": "white-normal",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 21
+    },
+    {
+      "frame": "Slight",
+      "definition": "Toned",
+      "skin": "black-dark",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 13
+    },
+    {
+      "frame": "Broad",
+      "definition": "Toned",
+      "skin": "asian",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 12
+    },
+    {
+      "frame": "Normal",
+      "definition": "Cut",
+      "skin": "white-normal",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 12
+    },
+    {
+      "frame": "Broad",
+      "definition": "Cut",
+      "skin": "asian",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 11
+    },
+    {
+      "frame": "Normal",
+      "definition": "Soft",
+      "skin": "hispanic",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 11
+    },
+    {
+      "frame": "Broad",
+      "definition": "Cut",
+      "skin": "black-dark",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 9
+    },
+    {
+      "frame": "Normal",
+      "definition": "Toned",
+      "skin": "ambiguous",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 9
+    },
+    {
+      "frame": "Slight",
+      "definition": "Soft",
+      "skin": "asian",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 8
+    },
+    {
+      "frame": "Slight",
+      "definition": "Cut",
+      "skin": "black-normal",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 7
+    },
+    {
+      "frame": "Slight",
+      "definition": "Toned",
+      "skin": "asian",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 7
+    },
+    {
+      "frame": "Slight",
+      "definition": "Cut",
+      "skin": "hispanic",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 6
+    },
+    {
+      "frame": "Normal",
+      "definition": "Cut",
+      "skin": "asian",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 5
+    },
+    {
+      "frame": "Lean",
+      "definition": "Soft",
+      "skin": "asian",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 4
+    },
+    {
+      "frame": "Normal",
+      "definition": "Soft",
+      "skin": "asian",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 4
+    },
+    {
+      "frame": "Lean",
+      "definition": "Cut",
+      "skin": "asian",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 3
+    },
+    {
+      "frame": "Slight",
+      "definition": "Cut",
+      "skin": "white-normal",
+      "extension_count": 2,
+      "set_0001_count": 1,
+      "combined_after": 3,
+      "league_demand": 3
+    },
+    {
+      "frame": "Normal",
+      "definition": "Toned",
+      "skin": "white-normal",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 37
+    },
+    {
+      "frame": "Slight",
+      "definition": "Soft",
+      "skin": "black-normal",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 31
+    },
+    {
+      "frame": "Broad",
+      "definition": "Cut",
+      "skin": "black-normal",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 28
+    },
+    {
+      "frame": "Normal",
+      "definition": "Soft",
+      "skin": "black-normal",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 28
+    },
+    {
+      "frame": "Doughy",
+      "definition": "Soft",
+      "skin": "white-normal",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 26
+    },
+    {
+      "frame": "Slight",
+      "definition": "Toned",
+      "skin": "white-normal",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 23
+    },
+    {
+      "frame": "Slight",
+      "definition": "Toned",
+      "skin": "black-light",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 18
+    },
+    {
+      "frame": "Normal",
+      "definition": "Soft",
+      "skin": "black-light",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 17
+    },
+    {
+      "frame": "Normal",
+      "definition": "Soft",
+      "skin": "white-normal",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 14
+    },
+    {
+      "frame": "Broad",
+      "definition": "Cut",
+      "skin": "white-tan",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 13
+    },
+    {
+      "frame": "Broad",
+      "definition": "Cut",
+      "skin": "hispanic",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 11
+    },
+    {
+      "frame": "Slight",
+      "definition": "Toned",
+      "skin": "hispanic",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 11
+    },
+    {
+      "frame": "Doughy",
+      "definition": "Soft",
+      "skin": "hispanic",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 8
+    },
+    {
+      "frame": "Normal",
+      "definition": "Cut",
+      "skin": "white-tan",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 8
+    },
+    {
+      "frame": "Slight",
+      "definition": "Toned",
+      "skin": "white-pale",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 6
+    },
+    {
+      "frame": "Lean",
+      "definition": "Soft",
+      "skin": "black-dark",
+      "extension_count": 1,
+      "set_0001_count": 2,
+      "combined_after": 3,
+      "league_demand": 3
+    }
+  ],
+  "naming": {
+    "sequence": "builder_set_NNNN",
+    "r2_prefix": "portrait-kits/builder_set_0001/",
+    "recruit_sequence": "recruit_set_NNNN (file/Mongo id set_0001 is legacy alias for recruit_set_0001)",
+    "recruit_kit_r2_legacy": "recruits/kit/<uuid>.png \u2014 do not migrate"
+  }
+}

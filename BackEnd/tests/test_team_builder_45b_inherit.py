@@ -231,13 +231,142 @@ class TestEditorIsADiff(unittest.TestCase):
             self.assertEqual(new_docs[i]["meta"]["archetype"], source[i]["meta"]["archetype"])
             self.assertEqual(new_docs[i]["meta"]["year"], source[i]["meta"]["year"])
             self.assertEqual(new_docs[i]["attributes"]["CH"], source[i]["attributes"]["CH"])
-            self.assertEqual(new_docs[i]["photo"], source[i]["photo"])
+            # §4.5c: flat base-league photo paths are stripped (masters unrecolourable).
+            self.assertNotIn("photo", new_docs[i])
+            self.assertNotIn("photo", new_docs[i].get("meta") or {})
+            # Minted ids — never the inherited base-league / init UUID.
+            self.assertNotEqual(new_ids[i], old_ids[i])
         for i in range(12, 15):
             self.assertEqual(new_docs[i]["meta"]["archetype"], "Walk On")
             self.assertEqual(new_docs[i]["development"], wizard[i - 12]["development"])
             self.assertEqual(new_docs[i]["meta"]["Home Region"], wizard[i - 12]["Home Region"])
         self.assertEqual(len(new_ids), 15)
+        self.assertEqual(len(set(new_ids)), 15)
+        self.assertTrue(set(new_ids).isdisjoint(set(old_ids)))
 
+    def test_replace_slot_roster_rejects_keep_and_generate(self):
+        franchise_id = ObjectId()
+        team_oid = ObjectId()
+        ftd_coll = MagicMock()
+        ftd_coll.find_one.return_value = {"players": [f"old-{i}" for i in range(15)]}
+        fpd_coll = MagicMock()
+        fpd_coll.find.return_value = []
+        for mode in ("keep", "generate", "KEEP", "Generate"):
+            with self.assertRaises(ValueError) as ctx:
+                replace_slot_roster(
+                    franchise_id=franchise_id,
+                    team_object_id=team_oid,
+                    team_name="Custom U",
+                    roster_mode=mode,
+                    imported_players=None,
+                    franchise_team_data_collection=ftd_coll,
+                    franchise_players_data_collection=fpd_coll,
+                    attribute_mode="capped",
+                )
+            self.assertTrue(str(ctx.exception).startswith("roster_mode_invalid:"))
+            fpd_coll.insert_many.assert_not_called()
+
+    def test_edit_capped_topup_applies_universally(self):
+        """§4.5c: capped top-up is not exempted — below-floor attrs rise to 60."""
+        franchise_id = ObjectId()
+        team_oid = ObjectId()
+        old_ids = [f"old-{i}" for i in range(15)]
+        source = [_fpd(i, walk_on=(i >= 12)) for i in range(15)]
+        for key in CORE_12_ATTRS:
+            source[0]["attributes"][key] = 1
+            source[0]["attributes"][f"anchor_{key}"] = 1
+        for i, doc in enumerate(source):
+            doc["player_id"] = old_ids[i]
+            doc["franchise_id"] = str(franchise_id)
+
+        ftd_coll = MagicMock()
+        ftd_coll.find_one.return_value = {"players": old_ids}
+        fpd_coll = MagicMock()
+        fpd_coll.find.return_value = source
+        players_coll = MagicMock()
+        players_coll.find_one.return_value = None
+
+        rows = []
+        for i, doc in enumerate(source):
+            row = {
+                "first_name": doc["meta"]["first_name"],
+                "last_name": doc["meta"]["last_name"],
+                "class_year": ["FR", "SO", "JR", "SR"][i % 4],
+                "height_in": doc["meta"]["height"],
+                "weight_lb": doc["meta"]["weight"],
+                "jersey": doc["meta"]["jersey"],
+                "attributes": {k: doc["attributes"][k] for k in CORE_12_ATTRS},
+            }
+            if i >= 12:
+                row["walk_on"] = True
+            rows.append(row)
+
+        _new_ids, new_docs = replace_slot_roster(
+            franchise_id=franchise_id,
+            team_object_id=team_oid,
+            team_name="Custom U",
+            roster_mode="edit",
+            imported_players=rows,
+            franchise_team_data_collection=ftd_coll,
+            franchise_players_data_collection=fpd_coll,
+            attribute_mode="capped",
+            team_pool=99999,
+            players_collection=players_coll,
+            wizard_walk_ons=None,
+        )
+        self.assertGreaterEqual(core12_total(new_docs[0]["attributes"]), 60)
+
+    def test_portrait_ref_image_id_survives_strip(self):
+        """meta.image_id is the kit key; flat photo is dropped (§4.5c / Decision #34)."""
+        franchise_id = ObjectId()
+        team_oid = ObjectId()
+        old_ids = [f"old-{i}" for i in range(15)]
+        source = [_fpd(i, walk_on=(i >= 12)) for i in range(15)]
+        kit_id = "builder_set_0001/aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+        for i, doc in enumerate(source):
+            doc["player_id"] = old_ids[i]
+            doc["franchise_id"] = str(franchise_id)
+            if i == 0:
+                doc["meta"]["image_id"] = kit_id
+
+        ftd_coll = MagicMock()
+        ftd_coll.find_one.return_value = {"players": old_ids}
+        fpd_coll = MagicMock()
+        fpd_coll.find.return_value = source
+        players_coll = MagicMock()
+        players_coll.find_one.return_value = None
+
+        rows = []
+        for i, doc in enumerate(source):
+            row = {
+                "first_name": doc["meta"]["first_name"],
+                "last_name": doc["meta"]["last_name"],
+                "class_year": ["FR", "SO", "JR", "SR"][i % 4],
+                "height_in": doc["meta"]["height"],
+                "weight_lb": doc["meta"]["weight"],
+                "jersey": doc["meta"]["jersey"],
+                "attributes": {k: doc["attributes"][k] for k in CORE_12_ATTRS},
+            }
+            if i >= 12:
+                row["walk_on"] = True
+            rows.append(row)
+
+        _new_ids, new_docs = replace_slot_roster(
+            franchise_id=franchise_id,
+            team_object_id=team_oid,
+            team_name="Custom U",
+            roster_mode="edit",
+            imported_players=rows,
+            franchise_team_data_collection=ftd_coll,
+            franchise_players_data_collection=fpd_coll,
+            attribute_mode="capped",
+            team_pool=99999,
+            players_collection=players_coll,
+            wizard_walk_ons=None,
+        )
+        self.assertEqual(new_docs[0]["meta"].get("image_id"), kit_id)
+        self.assertNotIn("photo", new_docs[0])
+        self.assertNotIn("photo", new_docs[0].get("meta") or {})
 
 
 class TestCriterion25ShuffledFindOrder(unittest.TestCase):

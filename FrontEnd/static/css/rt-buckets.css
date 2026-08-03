@@ -10,8 +10,8 @@
  * override the canonical scale on elements bearing these classes.
  */
 
-.rt-low      { color: #ff6d6d !important; }
-.rt-mid      { color: #FFD700 !important; }
-.rt-high     { color: #34EC27 !important; }
-.rt-elite    { color: #4A90D9 !important; }
+.rt-low      { color: var(--rt-low-color) !important; }
+.rt-mid      { color: var(--rt-mid-color) !important; }
+.rt-high     { color: var(--rt-high-color) !important; }
+.rt-elite    { color: var(--rt-elite-color) !important; }
 .rt-unknown  { color: rgba(255, 255, 255, 0.4) !important; }

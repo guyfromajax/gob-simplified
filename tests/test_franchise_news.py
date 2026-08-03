@@ -112,7 +112,7 @@ def test_ps_all_stars_qualification_and_line_format():
         "He's now rated C+ at PF.",
         "Al Smith of Morristown increased by 8 attribute points this week. "
         "His strongest gains were in Scoring. "
-        "He's now rated F at SG.",
+        "He's now rated D at SG.",
     ]
 
 
@@ -256,7 +256,7 @@ def test_recruiting_leans_conference_only_runs_without_top_rated_section():
     assert story["lines"] == [
         "Conference 5 Lean Announcements",
         "Alpha",
-        "Al Low (F)",
+        "Al Low (D)",
     ]
 
 
@@ -334,7 +334,7 @@ def test_append_week_news_resolves_user_conference_from_string_team_id(monkeypat
     assert leans_story["lines"] == [
         "Conference 4 Lean Announcements",
         "Rival U",
-        "Al Low (F)",
+        "Al Low (D)",
     ]
 
 

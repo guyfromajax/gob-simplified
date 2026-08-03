@@ -33,6 +33,8 @@ def rt_letter_grade(value: Any) -> str:
         return "C+"
     if rating >= 40:
         return "C"
+    if rating >= 30:
+        return "D"
     return "F"
 
 

@@ -318,7 +318,7 @@
         <div class="pd-pos-rating-row" style="opacity:${opacity};">
           <div class="pd-pos-pill" style="background:${posConfig.background};color:${posConfig.color};">${position}</div>
           <div class="pd-pos-bar-track">
-            <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${getRtDisplayColor(safeRating)};width:0;"></div>
+            <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${getRtColor(safeRating)};width:0;"></div>
           </div>
           <div class="pd-pos-rating-value ${isPrimary ? 'is-primary' : ''}">${Number.isFinite(rating) ? formatRtDisplay(rating) : '--'}</div>
         </div>

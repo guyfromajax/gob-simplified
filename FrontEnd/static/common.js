@@ -856,35 +856,6 @@ function getAttrColor(scaledValue) {
   return '#ff6d6d';
 }
 
-// Canonical frontend switch for the RT display experiment. Raw RT remains
-// numeric for every calculation; change this one value to revert all pages.
-window.RT_DISPLAY_MODE = 'letter';
-
-function formatRtDisplay(rt) {
-  if (rt === null || rt === undefined || rt === '') return '--';
-  const v = Number(rt);
-  if (!Number.isFinite(v)) return '--';
-  if ((window.RT_DISPLAY_MODE || 'letter') === 'number') return String(rt);
-  if (v >= 100) return 'A++';
-  if (v >= 90) return 'A+';
-  if (v >= 80) return 'A';
-  if (v >= 70) return 'B+';
-  if (v >= 60) return 'B';
-  if (v >= 50) return 'C+';
-  if (v >= 40) return 'C';
-  return 'F';
-}
-
-function getRtDisplayColor(rt) {
-  if (rt === null || rt === undefined || rt === '') return 'rgba(255, 255, 255, 0.4)';
-  const v = Number(rt);
-  if (!Number.isFinite(v)) return 'rgba(255, 255, 255, 0.4)';
-  if (v >= 80) return '#4A90D9';
-  if (v >= 60) return '#34EC27';
-  if (v >= 40) return '#FFD700';
-  return '#ff6d6d';
-}
-
 // Canonical position shot weights color scale — see Styleguide.md
 function getPswColor(pct) {
   if (pct > 35) return '#4A90D9';

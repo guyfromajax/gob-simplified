@@ -20,7 +20,6 @@
 import { fadeOutPregameBed } from './gameSfx.js';
 
 const POSC = { PG: '#4A90D9', SG: '#7B5EA7', SF: '#3A8C4A', PF: '#C0392B', C: '#D4A017' };
-const RT_HEX = { 'rt-elite': '#4A90D9', 'rt-high': '#34EC27', 'rt-mid': '#FFD700', 'rt-low': '#ff6d6d' };
 const GREEN = '#34EC27', BLUE = '#4A90D9', ORANGE = '#F79420', RED = '#ff6d6d';
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 
@@ -39,25 +38,15 @@ const SNOW = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-
 
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
-/** RT → hex via the canonical 4-band rtBucket.js (reuse, don't fork). null → no badge. */
+/** RT → hex via canonical rtBucket.js. null → no badge. */
 function rtColor(rt) {
   if (rt == null) return null;
-  const cls = (typeof window !== 'undefined' && window.getRtBucketClass) ? window.getRtBucketClass(rt) : null;
-  return (cls && RT_HEX[cls]) || null;
+  return (typeof window !== 'undefined' && window.getRtColor) ? window.getRtColor(rt) : null;
 }
 
 function rtDisplay(rt) {
   if (typeof window !== 'undefined' && typeof window.formatRtDisplay === 'function') return window.formatRtDisplay(rt);
-  const v = Number(rt);
-  if (!Number.isFinite(v)) return '--';
-  if (v >= 100) return 'A++';
-  if (v >= 90) return 'A+';
-  if (v >= 80) return 'A';
-  if (v >= 70) return 'B+';
-  if (v >= 60) return 'B';
-  if (v >= 50) return 'C+';
-  if (v >= 40) return 'C';
-  return 'F';
+  return '--';
 }
 
 /** Real headshot via the same resolver Act 1 uses; silhouette is fallback only. */

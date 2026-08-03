@@ -32,7 +32,8 @@ The requested scale is:
 | 60–69 | B | Green `#34EC27` |
 | 50–59 | C+ | Yellow `#FFD700` |
 | 40–49 | C | Yellow `#FFD700` |
-| Below 40 | F | Red `#ff6d6d` |
+| 30–39 | D | Red `#ff6d6d` |
+| Below 30 | F | Red `#ff6d6d` |
 
 The same scale will apply to players and recruits of every year. The current
 JH-specific recruit color thresholds will be retired for RT display if this
@@ -43,7 +44,7 @@ experiment ships.
 Use the shared frontend display formatter anywhere RT is rendered:
 
 ```js
-RT_DISPLAY_MODE = "letter" // in common.js; one-line frontend rollback: "number"
+RT_DISPLAY_MODE = "letter" // in rtBucket.js; one-line frontend rollback: "number"
 
 formatRtDisplay(rawRt)      // "B+" in letter mode; "84" in number mode
 getRtDisplayClass(rawRt)    // class/color always derived from raw numeric RT
@@ -180,7 +181,7 @@ When implementation ships:
 
 ## 10. Verification checklist
 
-- Boundary tests for 39/40, 49/50, 59/60, 69/70, 79/80, 89/90, 99/100,
+- Boundary tests for 29/30, 39/40, 49/50, 59/60, 69/70, 79/80, 89/90, 99/100,
   null, negative, decimal, and 100+ values.
 - Same raw RT produces the same grade and color on player and recruit surfaces.
 - Numeric sorting remains correct within the same grade (for example 89 before

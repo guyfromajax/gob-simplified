@@ -3,7 +3,7 @@
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
 **Spec version:** 2.0 — draft for alignment
-**Status:** Phases 0, 1 and 2 **closed**. Phase 3a (banner) **closed**. Phase 3b (court) — ported and passing 5 of 6; **criterion 6 pending a live check** that a generated court renders as the playing surface. 3c and 3d not started.
+**Status:** Phases 0, 1 and 2 **closed**. Phase 3a (banner), 3b (court) **closed**. Rescope (§4.5c) implemented. Phase 3d — `builder_set_0001` delivered, assignment and picker built at **99.2% exact match**; **pending the live uniform check** (§4.5c acceptance 28). 3c (uploads) is a post-launch fast follow.
 **Last updated:** 1 August 2026
 
 ---
@@ -240,12 +240,12 @@ A budget that moves with somebody else's save state is not a league constant. Se
 
 **Capped mode requires an inline editor.** "Redistribute this player's points as you see fit" is not expressible through a CSV round-trip in any usable way. This is no longer an optional convenience — the attribute model depends on it.
 
-Step 3 of the wizard gains a fourth path and the existing three are re-framed:
+**Step 3 offers two paths.** Rescoped 3 August 2026 — see §4.5c.
 
-1. **Keep [replaced]'s roster** — unchanged, default, zero risk
-2. **Edit this roster** — *new.* The inherited roster in a table, editable
-3. **Generate a new roster** — unchanged
-4. **Import my roster (CSV)** — unchanged; retained for users who genuinely have data
+1. **Edit this roster** — default. All 15 pre-populated from the replaced program and editable.
+2. **Import my roster (CSV)** — for users who genuinely have data.
+
+*Keep* and *Generate* are retired.
 
 **Editor requirements:**
 
@@ -260,6 +260,43 @@ Step 3 of the wizard gains a fourth path and the existing three are re-framed:
 - **Reset per player** and **reset all**, returning to inherited values.
 
 **Mode is chosen once, at the top of the editor, and is visible throughout.** Switching modes after editing must warn that allocations will be re-based.
+
+### 4.5c Rescope — two paths, minted identities, universal portraits
+
+**Rescoped 3 August 2026.** Driven by a finding in Phase 3d: portrait art comes in two incompatible forms, and that constraint reshapes the feature.
+
+#### What forced it
+
+The 1,536 base-league players have **flat portraits** — face and jersey painted into one finished PNG, with no mask. Recruits have **layered portraits** — a kit plus a mask, so the jersey can be recoloured for whichever program signs them.
+
+A custom program that inherited its roster therefore inherited **unrecolourable** portraits, and its players appeared in **the replaced program's jersey and mascot wordmark**. That is a Phase-0-class identity leak in the one medium the detector cannot inspect: pixels inside an image.
+
+Keeping the inherited faces *and* wearing the custom uniform is impossible without authoring masks for all 1,536 base players — an offline art project, not a code change.
+
+#### The rescope
+
+| | Before | After |
+|---|---|---|
+| Step 3 paths | Keep · Edit · Generate · Import | **Edit · Import** |
+| A user wanting the team as-is | *Keep* path | **Play that team in normal mode** — not a mod |
+| Portraits | Optional, inherited where present | **Every player gets a recolourable portrait** — assigned or picked |
+| `player_id` | Inherited base-league UUID | **Minted fresh at Apply**, as signed recruits already do |
+| Image sources | — | **Our assets** at launch; **uploads** as a fast follow (3c) |
+
+#### Why this simplifies rather than shrinks
+
+- **The shared-master corruption problem disappears.** Painting a recoloured portrait to `players/master/<player_id>.png` was unsafe because inherited players carried base-league UUIDs shared across every save. With no *Keep* path, nothing needs the shared master, so minting fresh ids removes the hazard entirely — no franchise-scoped keys, no fallback logic, no cleanup.
+- **The mascot wordmark resolves for free.** Recolourable kits paint through `resolve_team_display`, so jerseys carry the custom program's colours *and* mascot.
+- **Walk-ons stop being a special case.** All 15 receive portraits; none is left on the generic headshot.
+- **Retiring *Keep* costs nothing real.** A user who wants a program exactly as it ships can select it in normal play. A mod that changes nothing was never the point.
+
+#### Consequences to carry through
+
+- **The §4.3 top-up applies universally.** Decision #4's carve-out — *Keep* is byte-identical and exempt — is retired with the path.
+- **§4.5b still governs.** *Edit* seeds from the replaced program's names, height, weight, jersey and attributes; anything the user does not change is inherited. The editor remains a diff, not a form.
+- **Generate is retired**, so a wholly new roster means hand-editing 15 players or importing a CSV. A real trade, accepted for fewer paths.
+- **Clicking through the editor unchanged no longer reproduces the replaced program.** Attributes and names carry over, but portraits and identities are new. That is correct — the user is building a new program, not adopting an old one.
+- **Verify before minting:** confirm nothing outside the franchise depends on a player's `player_id` matching the base-league UUID.
 
 ### 4.5a Roster size and walk-ons
 
@@ -318,7 +355,7 @@ The editor exposes name, height, weight, jersey number and the twelve core attri
 **Rule:**
 
 - **Apply clones the inherited player document and overwrites only the fields the editor sends.** It does not construct a player from the payload.
-- **This applies to every path.** Generate and import author full players by definition; edit and keep must preserve.
+- **This applies to both paths.** Import authors full players by definition; edit must preserve.
 - **For an imported CSV, a blank optional column means inherit** — not "use a default." v1.3 §8.6's no-silent-substitution rule already implies this; it is now stated.
 - **Walk-ons are exempt only in that they have no inherited counterpart** — their wizard-generated values *are* their inherited values, and every field of them must survive Apply identically.
 
@@ -368,15 +405,18 @@ Still **unread in v1 and v2**. It exists so a future eligibility rule can be app
 11. The §4.3 top-up is proven by unit test (synthetic 24 → 60), not by a live walkthrough — recalibrated data may contain no player below 60.
 12. **No league constant is a hardcoded literal** (§4.4a). The uncapped pool and league markers come from `league-context` at runtime.
 13. **The editor opens with 15** — the inherited 12 plus 3 wizard-generated walk-ons — and all 15 are editable on the same terms in both modes.
-15. **Every path ends at `players` = 15**, `scholarship_players` = 12, with 3 `archetype: "Walk On"` FPDs. Verified after keep, edit, import **and** generate — not only keep.
+15. **Both paths end at `players` = 15**, `scholarship_players` = 12, with 3 `archetype: "Walk On"` FPDs. Verified after edit **and** import.
 16. A custom program and a CPU program in the same franchise hold identical `players` / `scholarship_players` / `training_squad_players` counts at week 1 **and** after Training Camp.
 17. **No orphaned FPD documents remain after Apply.** Init's three superseded walk-ons are deleted, and staging is checked for orphans left by the previous `$set` behaviour.
 18. **Walk-ons are stable across wizard navigation and are not re-rollable** — leaving Roster and returning yields the same three players with the same attributes.
 19. **Import of any row count other than 15 is rejected with a stated reason** — not truncated, not padded.
 20. The uncapped pool and league markers are computed on **15-player franchise totals**, matching what a custom program is now authoring.
-21. **A custom program created with no edits at all is field-for-field identical to the program it replaced**, except identity and colours — verified by diffing every field of all 12 inherited players, not by spot-checking.
+21. **A custom program created with no edits carries every inherited field forward** — names, height, weight, jersey, attributes, year, `Home Region`, development metadata — differing only in identity, colours, minted `player_id`s and portraits. Verified by diffing every field of all 15, not by spot-checking.
 22. **Editing one attribute on one player changes only that value.** Every other field on that player, and every field on the other 14, is unchanged.
-23. **`Home Region`, archetype, year, portrait data and development metadata survive all four paths.**
+23. **`Home Region`, archetype, year and development metadata survive both paths.**
+26. **Step 3 offers exactly two paths** (§4.5c). No *Keep* or *Generate* affordance remains in the UI or the API.
+27. **Every Team Builder player has a minted `player_id`**, distinct from the base-league UUID, and **no base-league master is ever overwritten** — verified by checking `players/master/` for modifications after Apply.
+28. **All 15 players render in the custom program's uniform and mascot wordmark** — verified in a live game, not in the picker preview.
 24. A blank optional column in an imported CSV **inherits** rather than defaulting.
 25. **Criterion 2 re-run against a deliberately shuffled query order.** Budgets and edits bind to the correct players when `find()` order does not match roster order.
 14. The uncapped pool meter is hidden in capped mode, and an over-budget state is visible at the point of editing — not only on Apply.
@@ -624,9 +664,91 @@ For users who do **not** upload player images, two paths:
 
 This requires publishing a **filtered subset** of the baking manifest into the game-facing artifact: `build.frame`, `build.definition`, `portrait.skin`. `SCHEMA.md` currently states the manifest is never loaded into the game — that line needs updating to reflect the deliberate exception, not quietly contradicting.
 
-**Or: fitted random assignment**, with re-roll.
+**Or: fitted assignment**, with re-roll. **This is the default** — every player is assigned automatically and the picker is an optional override.
 
-**The random assignment must fit the player's typed height, weight and build** — matching against the **as-generated** values the user entered, not the manifest's projected mature values.
+**Assignment reuses the existing CPU portrait pipeline. Do not write a new fitting heuristic.**
+
+| Script | Role |
+|---|---|
+| `scripts/classify_player_archetypes.py` | frame (Slight / Lean / Normal / Broad / Doughy), definition (Cut / Toned / Soft), skin, hair, expression — from height, weight, ST, AG and best-position RT |
+| `scripts/player_ethnicity.py` | name-based race with a deterministic UUID-seeded weighted fallback |
+| `scripts/players_archetypes.csv` | the committed classification of all 1,536 base players — the distribution any custom roster should resemble |
+
+The Team Builder editor already collects every input the classifier needs, so a user-typed player is classified exactly as a CPU player was.
+
+#### Coverage, measured 3 August 2026
+
+The classifier produces **117** `(frame × definition × skin)` cells. `set_0001`'s 300 images cover **69**; **48 are empty**, and 21 hold a single image.
+
+| Axis | `set_0001` | League |
+|---|---|---|
+| Black / white / other | 56.0 / 27.7 / 16.3 | 52.4 / 31.4 / 16.2 |
+| Lean | **65.0%** | **19.3%** |
+| Normal | 20.3% | 27.9% |
+| Slight | 7.7% | 18.9% |
+| Broad | **5.7%** | **26.7%** |
+| Doughy | **1.3%** | **7.3%** |
+
+**Skin is well covered. Frame is inverted.** Broad-Toned holds 5 images against 291 league players; Doughy-Soft holds 4 against 112; Broad-Soft holds none. **23.4% of league players sit on a zero-image triple** and can never match exactly.
+
+**Why:** `set_0001` is a *recruit* set — seventeen and eighteen year olds, who genuinely are lean. The league is developed players who have filled out. The shortfall is structural, not a defect in either artefact, and **no relaxation rule fixes it — relaxation only redistributes scarcity.**
+
+#### Relaxation order — corrected
+
+> **Hold `frame`. Relax `skin` within race family first, then `definition`, and relax `frame` last.** Never fall back to a uniform random pick.
+
+An earlier draft of this section had the opposite order — hold skin, relax frame. **The measurement disproved it.** Skin coverage tracks the league closely while frame is the scarce axis, and holding frame while relaxing skin within race family lifts coverage from 76.6% to **93.7%**. A 7'1" 264 lb player with a lean face is a more visible error than one with a neighbouring skin tone.
+
+#### Uniqueness collides with scarcity
+
+Blocking duplicate portraits within a roster is unenforceable in sparse cells: a roster with four Broad-Toned players faces five such images across every skin tone. **Where a cell cannot supply a unique image, frame relaxation takes precedence over the uniqueness rule** — and the fix for the underlying scarcity is §6.5a, not a cleverer matcher.
+
+#### 6.5a Targeted extension set
+
+**A separate set of ~150 portraits, baked into the under-served cells.** Kept separate from `set_0001` deliberately: a Lean-heavy pool is *correct* for recruits, and folding developed-player bodies into it would make incoming classes look wrong.
+
+- **Recruit assignment continues to draw from `set_0001` only.**
+- **Team Builder draws from `set_0001` ∪ the extension set.**
+- Built with the existing pipeline — `generate_player_portraits.py` → `finish_portraits.py` — not a new one.
+- The extension publishes the same filtered manifest subset: `build.frame`, `build.definition`, `portrait.skin`.
+
+**Allocation, approved 3 August 2026.** Every cell with league demand ≥ 3 raised to a combined floor of 3; remainder allocated proportionally; cells below 3 league players skipped and their budget redirected to Broad-Toned. Result: exact match **76.6% → 99.2%**, with 13 league players (0.8%) left on zero-image cells — all on cells of ≤ 2 players, mostly `ambiguous` skin, where relaxation is visually harmless.
+
+**Pilot outcome — 20 images, 12 Broad-Toned and 8 Doughy-Soft.**
+
+- **Style coherence: passes.** On a blind unlabelled sheet mixed with `set_0001`, the new images were not distinguishable — same lighting, tank, framing and paint quality. **Restoring the original anchors rather than regenerating them is what made this possible**; they were recovered from `~/gob-portraits/` and git history at `3c11f78a1`.
+- **Anatomy: partial, and anchor-limited.** Body-lock to the Broad and Doughy anchors does move neck and shoulder mass relative to Lean. But the Doughy anchor is a soft teenager, and **age language changes the face, not the mass** — prompts cannot invent bulk the anchor doesn't hold.
+
+**Decision: teen age language across all 150.** The entire league reads late-teen and the game is college basketball — a developed-senior register would be the outlier against 1,536 existing portraits, not an improvement. The frame benefit comes from the body anchors, which apply in either register.
+
+> **Recorded, unresolved:** frame reads weakly at a head-neck-shoulders crop, and portraits render at roughly 60–80px in the matchup popup and event cards. It is possible that Broad versus Lean is imperceptible at deployed size, in which case frame-matched assignment optimises something users cannot see and skin/hair matching matters more. A four-image comparison at render size would settle it. Not blocking; worth knowing.
+
+Expected effect: exact match rises from **76.6%** to **99.2%**, and the collision problem in sparse cells disappears.
+
+#### Delivered 3 August 2026
+
+**150 / 150 baked, reconciled and published.** Frames: Broad 43 · Slight 43 · Normal 39 · Doughy 20 · Lean 5. Every cell matches the allocation exactly; zero UUID collisions with `recruit_set_0001`.
+
+**Naming — two sequences by purpose, not one counter.**
+
+| Logical | On disk / R2 |
+|---|---|
+| `recruit_set_0001` (300) | legacy `set_0001.json`; kits remain at `recruits/kit/<uuid>.png`, not migrated |
+| `builder_set_0001` (150) | `builder_set_0001.allocation.json`; kits at `portrait-kits/builder_set_0001/<uuid>.png` |
+
+Team Builder's pool is **`recruit_set_0001` ∪ `builder_set_0001`**. Recruit assignment remains `recruit_set_0001` alone (`BASE_IMAGE_SET_ID`). A single global counter was rejected: recruits would skip 0001 → 0003 with no explanation visible in the name.
+
+**Within-cell variety needed two rebake rounds.** The first pass produced near-twins — body-lock plus similar genes — fixed with fresh genes on 15 high-similarity pairs and forced divergent hair and expression on 8 more.
+
+> **Cosine similarity is the wrong metric here and should not be trusted as a gate.** Shared body-lock dominates it, so it keeps flagging pairs that hair and expression clearly separate on a roster. The eye is the authority; the metric is a search tool for candidates.
+
+**Artifacts:** `builder_set_0001.manifest.json` (full genes), `builder_set_0001.published.json` (filtered subset — `build.frame`, `build.definition`, `portrait.skin` only), 450 R2 objects, `SCHEMA.md` updated for both sets.
+
+**Seed stability.** The classifier's rerolls are UUID-seeded and Team Builder `player_id`s are minted (§4.5c). **The portrait shown in the wizard must be the portrait that ships** — either mint the id when the wizard opens, or seed from something stable at that moment and carry it through Apply. This is the walk-on idempotency problem in another form: a value the user sees, then silently regenerated.
+
+**Duplicates are blocked within a roster where the pool allows it**, and re-roll skips ids already used. Where a cell cannot supply enough distinct images, matching quality wins over uniqueness.
+
+**Documented drift:** the decision log states a 55/35/10 race split while `RACE_WEIGHTS` in code is 60/30/10; the committed result is 52.4 / 31.4 / 16.2 after name overrides. **The code is authoritative** — correct the doc.
 
 ### 6.6 Phase 3 acceptance
 
@@ -699,7 +821,7 @@ This requires publishing a **filtered subset** of the baking manifest into the g
 | 1 | Capped/uncapped modes replace the four-condition budget | User-chosen mode is simpler than computed compliance, and capped makes stacking structurally impossible |
 | 2 | Top-5 cap retired entirely | Redundant under capped (points can't move between players); unnecessary under uncapped (ineligible by definition) |
 | 3 | Capped reallocation is **within a player**, uncapped is **across the roster** | The distinction is what makes capped safe for competitive play |
-| 4 | Players below 60 are topped up to 60 in capped mode | Clean rule; the alternative is an unsatisfiable minimum. Accepts that capped is near-inherited, not literally inherited. **Confirmed by measurement (§4.3): 13 players, 12 teams affected, worst case 36 points (~0.6% of team total), median team unaffected.** |
+| 4 | Players below 60 are topped up to 60 in capped mode, **on every path** | Clean rule; the alternative is an unsatisfiable minimum. Accepts that capped is near-inherited, not literally inherited. The *Keep*-path exemption was retired with the path itself (§4.5c). |
 | 19 | The top-up is surfaced in the editor, not applied silently | A budget reading 60 against an inherited 24 with no explanation is indistinguishable from a bug — and silent adjustment is the pattern v1.3 §8.6 forbids everywhere else |
 | 20 | The §4.3 gate metric is **worst single-team top-up**, not the league-wide sum | A user replaces one program; no franchise ever experiences the league total. The original gate wording asked for the wrong number. |
 | 21 | **No league constant is stored as a literal** (§4.4a) | Attribute recalibration runs as a parallel workstream. A snapshot literal goes wrong silently — no error, just a budget that stops meaning what the spec says. |
@@ -711,6 +833,14 @@ This requires publishing a **filtered subset** of the baking manifest into the g
 | 27 | The league-context basis is **pinned to week-1 as-initialized**, seeded per `team_id` | Reading live franchise data made the pool depend on which save was newest and how far it had progressed — 6,894 to 9,078 across the same staging DB |
 | 28 | **The editor is a diff, not a form** (§4.5b) | Apply must clone the inherited player and overwrite only edited fields. Constructing from the payload silently defaults every field the editor doesn't expose — 36 field paths on a zero-edit Apply. |
 | 29 | **Bind by identity, never by ordinal position in a query result** (§4.5b) | Capped budgets aligned to `find()` order landed on the wrong players, silently breaking §4.1's no-points-between-players guarantee. An ordinal is a positional key; §3.1a's lesson in another costume. |
+| 30 | **Step 3 rescoped to Edit and Import** (§4.5c) | Base-league portraits are flat and unrecolourable, so an inherited roster wore the replaced program's jersey and mascot. A user wanting a program as-is can play it in normal mode; a mod that changes nothing was never the point. |
+| 31 | **Team Builder players get minted `player_id`s** | With no *Keep* path nothing needs the shared base-league master, so minting removes the overwrite hazard entirely — no franchise-scoped keys, no fallback, no cleanup. Signed recruits already do this. |
+| 32 | **Every player gets a recolourable portrait** | The only faces that can wear a custom uniform are recruit-style kits. This also retires the generic-headshot walk-on case and makes the mascot wordmark correct for free. |
+| 33 | **Uploads are a fast follow, not a launch requirement** | Uploads are the sole part of the feature needing infrastructure. Building R2, cascade delete and a sweeper before any real usage means guessing at requirements that usage would answer. |
+| 34 | **Portraits resolve through one reference that can hold either source** | A `set_0001` id today, an uploaded object key later. Keeps uploads an added backend rather than a hunt for every place that assumed the old shape. |
+| 35 | **Hold frame, relax skin first** (§6.5) | Measurement inverted the earlier assumption: skin coverage tracks the league, frame is the scarce axis. Holding frame lifts coverage 76.6% → 93.7%. |
+| 36 | **Bake a ~150-image extension set rather than relax harder** (§6.5a) | 23.4% of league players sit on a zero-image cell. Relaxation redistributes scarcity; only more images remove it. The pipeline already exists. |
+| 37 | **The extension set is separate from `set_0001`** | A Lean-heavy pool is correct for seventeen-year-old recruits. Folding developed-player bodies in would make incoming classes look wrong. Recruits keep drawing from `set_0001` alone. |
 | 5 | Uncapped budget = largest team total in the league, **computed at runtime** | Reads as "the best program's worth of talent." Stored as a definition, never a literal — see §4.4a |
 | 6 | Eligibility is determined by mode, not computed | Substantial simplification; the meter becomes an allocation aid |
 | 7 | Inline roster editor is required, not optional | Capped mode is not expressible through CSV |

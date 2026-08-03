@@ -69,7 +69,8 @@ year; there is no JH-specific display scale.
 | 60–69 | **B** | `#34EC27` green | `.rt-high` |
 | 50–59 | **C+** | `#FFD700` yellow | `.rt-mid` |
 | 40–49 | **C** | `#FFD700` yellow | `.rt-mid` |
-| Below 40 | **F** | `#ff6d6d` red | `.rt-low` |
+| 30–39 | **D** | `#ff6d6d` red | `.rt-low` |
+| Below 30 | **F** | `#ff6d6d` red | `.rt-low` |
 
 RT remains numeric in persistence, API fields, calculations, sorting, filters,
 and simulation. Convert it only at the final display boundary with
@@ -79,7 +80,7 @@ remain numeric. Recruiting minimum-RT controls show the exact threshold and its
 grade together (for example `75 (B+)`).
 
 The frontend experiment is globally reversible: change `RT_DISPLAY_MODE` from
-`letter` to `number` in `/common.js`. Backend-authored prose has the matching
+`letter` to `number` in `/js/shared/rtBucket.js`. Backend-authored prose has the matching
 `RT_DISPLAY_MODE` in `BackEnd/utils/rt_display.py`. Do not implement page-local
 bands.
 

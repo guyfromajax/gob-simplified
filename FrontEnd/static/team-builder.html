@@ -116,7 +116,6 @@
       </div>
       <div class="tb-actions">
         <button type="button" class="tb-btn tb-btn-secondary" data-nav="1">Back</button>
-        <button type="button" class="tb-btn tb-btn-secondary" data-nav="4" data-skip-roster="1">Skip roster — use generated players</button>
         <button type="button" class="tb-btn tb-btn-primary" data-nav="3">Next: Roster →</button>
       </div>
     </section>
@@ -138,21 +137,13 @@
         <p class="tb-optional-note" id="tb-mode-switch-note" hidden>Switching modes re-bases allocations from the inherited roster.</p>
       </div>
       <div class="tb-roster-cards" id="tb-roster-cards">
-        <button type="button" class="tb-roster-card is-selected" data-mode="keep">
-          <strong id="tb-keep-label">Keep this program's roster</strong>
-          <span id="tb-keep-detail">This program's roster exactly as-is.</span>
-        </button>
-        <button type="button" class="tb-roster-card" data-mode="edit">
+        <button type="button" class="tb-roster-card is-selected" data-mode="edit">
           <strong>Edit this roster</strong>
           <span id="tb-edit-detail">The inherited roster in a table — redistribute within the chosen mode.</span>
         </button>
-        <button type="button" class="tb-roster-card" data-mode="generate">
-          <strong>Generate a new roster</strong>
-          <span>Fresh fictional players at the slot's talent band.</span>
-        </button>
         <button type="button" class="tb-roster-card" data-mode="import">
           <strong>Import my roster</strong>
-          <span>CSV upload — optional columns left blank are generated.</span>
+          <span>CSV upload — optional columns left blank inherit from the replaced program.</span>
         </button>
       </div>
       <div id="tb-editor-panel" class="tb-editor-panel" hidden>
@@ -163,7 +154,7 @@
       </div>
       <div id="tb-import-panel" class="tb-import-panel" hidden>
         <p>Required: <code>first_name</code>, <code>last_name</code>, <code>class_year</code> (FR, SO, JR, or SR)</p>
-        <p>Optional: everything else — see the template. Anything we don't recognize is ignored. Anything you leave blank, we generate.</p>
+        <p>Optional: everything else — see the template. Anything we don't recognize is ignored. Blank optional fields inherit from the replaced program.</p>
         <p class="tb-optional-note">Chemistry, emotion and morale are set by the game.</p>
         <div class="tb-import-actions">
           <button type="button" class="tb-btn tb-btn-secondary" id="tb-dl-blank">Download blank template (CSV)</button>
@@ -171,7 +162,7 @@
         </div>
         <input type="file" id="tb-csv" accept=".csv,text/csv">
         <label class="tb-toggle-row"><input type="checkbox" id="tb-first-row-headers" checked> First row is headers</label>
-        <p class="tb-optional-note">or skip this — we'll generate a roster.</p>
+        <p class="tb-optional-note">Blank optional fields inherit from the replaced program (Edit path), not a generated roster.</p>
         <div id="tb-import-status" class="tb-field-hint"></div>
         <div id="tb-import-blocking" class="tb-import-blocking" hidden></div>
         <div id="tb-import-progress" class="tb-import-progress" hidden></div>
@@ -247,6 +238,19 @@
       <div class="tb-actions">
         <button type="button" class="tb-btn tb-btn-secondary" id="tb-confirm-cancel">Cancel</button>
         <button type="button" class="tb-btn tb-btn-primary" id="tb-confirm-apply">Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="tb-portrait-modal" class="tb-modal" hidden>
+    <div class="tb-modal-card tb-portrait-modal-card">
+      <h3 id="tb-portrait-modal-title">Choose a portrait</h3>
+      <p class="tb-panel-copy">Filters show how many portraits match before you apply them.</p>
+      <div id="tb-portrait-filters" class="tb-portrait-filters"></div>
+      <div id="tb-portrait-empty" class="tb-portrait-empty" hidden></div>
+      <div id="tb-portrait-grid" class="tb-portrait-grid"></div>
+      <div class="tb-actions">
+        <button type="button" class="tb-btn tb-btn-secondary" id="tb-portrait-cancel">Close</button>
       </div>
     </div>
   </div>

@@ -209,7 +209,7 @@ body {
 
 .tb-roster-cards {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
   margin-bottom: 16px;
 }
@@ -699,9 +699,111 @@ body {
   opacity: 0.55;
   cursor: not-allowed;
 }
+
+.tb-editor-player-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.tb-portrait-slot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  margin-bottom: 4px;
+}
+.tb-portrait-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: #171d2c;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+.tb-portrait-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.tb-portrait-meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.45);
+}
+.tb-portrait-modal-card {
+  max-width: 720px;
+  max-height: 90vh;
+  overflow: auto;
+}
+.tb-portrait-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0;
+}
+.tb-portrait-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.tb-portrait-filter-row strong {
+  min-width: 72px;
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.tb-portrait-chip {
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(23, 29, 44, 0.9);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.tb-portrait-chip.is-selected {
+  border-color: #F79420;
+  color: #F79420;
+}
+.tb-portrait-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+.tb-portrait-pick {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0b0d14;
+  border-radius: 10px;
+  padding: 4px;
+  cursor: pointer;
+}
+.tb-portrait-pick img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  display: block;
+}
+.tb-portrait-pick span {
+  display: block;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 4px;
+  line-height: 1.2;
+}
+.tb-portrait-empty {
+  padding: 16px;
+  border-radius: 10px;
+  background: rgba(40, 28, 16, 0.9);
+  color: #ffe6c8;
+  font-size: 14px;
+}
+
 @media (max-width: 720px) {
   .tb-mode-cards,
-  .tb-editor-attrs {
+  .tb-editor-attrs,
+  .tb-roster-cards {
     grid-template-columns: 1fr;
   }
 }

@@ -120,8 +120,18 @@ def ensure_player_image(req: EnsurePlayerImageRequest, user: dict = Depends(get_
         image_id, team_id = _resolve_signed(req.franchise_id, req.player_id)
         if not image_id:
             return {"status": "generic"}          # walk-on / dynamic with no library
-        kit_key = f"recruits/kit/{image_id}.png"
-        mask_key = f"recruits/kit/{image_id}.mask.png"
+        kit_keys = None
+        try:
+            from BackEnd.utils.team_builder_portraits import resolve_kit_keys
+
+            kit_keys = resolve_kit_keys(image_id)
+        except Exception:
+            kit_keys = None
+        if kit_keys:
+            kit_key, mask_key = kit_keys
+        else:
+            kit_key = f"recruits/kit/{image_id}.png"
+            mask_key = f"recruits/kit/{image_id}.mask.png"
         if not (r2_images.exists(kit_key) and r2_images.exists(mask_key)):
             return {"status": "no_kit"}
         team = db.teams.find_one({"_id": _maybe_objid(team_id)}) if team_id else None
@@ -155,7 +165,14 @@ def ensure_recruit_image(req: EnsureRecruitImageRequest, user: dict = Depends(ge
     try:
         if r2_images.exists(white_key):
             return {"status": "exists"}
-        kit_key = f"recruits/kit/{req.image_id}.png"
+        kit_keys = None
+        try:
+            from BackEnd.utils.team_builder_portraits import resolve_kit_keys
+
+            kit_keys = resolve_kit_keys(req.image_id)
+        except Exception:
+            kit_keys = None
+        kit_key = kit_keys[0] if kit_keys else f"recruits/kit/{req.image_id}.png"
         if not r2_images.exists(kit_key):
             return {"status": "no_kit"}
         r2_images.put(white_key, recruit_image.make_white_master(r2_images.get(kit_key)))

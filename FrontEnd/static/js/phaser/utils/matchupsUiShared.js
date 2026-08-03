@@ -12,30 +12,18 @@ export const POSITION_COLORS = Object.freeze({
   C: "#D4A017",
 });
 
-/** Attribute Bar Scale for RT (badge bg / edge text). */
+/** RT color from the shared grade presentation. */
 export function rtBadgeBg(rt) {
-  const v = Number(rt);
-  if (!Number.isFinite(v)) return "#c8ccd6";
-  if (v < 40) return "#ff6d6d";
-  if (v < 60) return "#FFD700";
-  if (v < 80) return "#34EC27";
-  return "#4A90D9";
+  return typeof window !== "undefined" && typeof window.getRtColor === "function"
+    ? window.getRtColor(rt)
+    : "#c8ccd6";
 }
 
 export function formatRtDisplay(rt) {
   if (typeof window !== "undefined" && typeof window.formatRtDisplay === "function") {
     return window.formatRtDisplay(rt);
   }
-  const v = Number(rt);
-  if (!Number.isFinite(v)) return "--";
-  if (v >= 100) return "A++";
-  if (v >= 90) return "A+";
-  if (v >= 80) return "A";
-  if (v >= 70) return "B+";
-  if (v >= 60) return "B";
-  if (v >= 50) return "C+";
-  if (v >= 40) return "C";
-  return "F";
+  return "--";
 }
 
 export function hexToRgb(hex) {
