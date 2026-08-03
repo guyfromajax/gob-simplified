@@ -390,26 +390,34 @@ def _analytic_budget(attrs: dict, height: float, position: str,
 def develop_one_offseason(player: dict, rung: str, profile: dict,
                           rng: random.Random,
                           accumulator: Optional[Dict[str, float]] = None,
-                          coaching_f_value: float = 1.0) -> dict:
+                          coaching_f_value: float = 1.0,
+                          potential_factor: float = 1.0) -> dict:
     """Apply one offseason development event, moving the player onto ``rung`` (§7.1).
 
     ``coaching_f_value`` is the bounded coaching-quality modifier on the target
-    (1.0 = reference-coached → lands on the validated ladder). Mutates and returns
-    ``player`` (dict with 'attributes', 'height', 'weight',
-    'position'/'training_position', 'jh_anchor'). Pure given ``rng``.
+    (1.0 = reference-coached → lands on the validated ladder). ``potential_factor``
+    is the career-static ±15% ceiling scalar (Potential Rating §Phase 3): it scales
+    the RT target the same way as f, so a 1.15 player reaches a higher level with the
+    SAME shape (it only scales the scalar `k`, never the profile ratios). Default 1.0
+    keeps the JH-init/CPU-sim harness pf-neutral. Mutates and returns ``player``
+    (dict with 'attributes', 'height', 'weight', 'position'/'training_position',
+    'jh_anchor'). Pure given ``rng``.
     """
     attrs = player["attributes"]
     position = player.get("training_position") or player["position"]
     anchor = player["jh_anchor"]
 
     # 1-2. budget from the rung + CH-seeded peak check → target RT for this rung,
-    # scaled by the bounded coaching-quality modifier (Option 3).
+    # scaled by the bounded coaching-quality modifier (Option 3) and the career-static
+    # potential_factor (Potential Rating §Phase 3). Both are pure multipliers on the
+    # scalar target, so they change the level, not the profile shape; _compress_rt then
+    # soft-caps the very top (Elite × 3-peak × 1.15 = 149.5 → 137.3).
     cum = 0.0
     for r in RUNG_TRANSITIONS:
         cum += STD_RUNG_INCREMENT[r] + (PEAK_BONUS if r in profile["peak_rungs"] else 0.0)
         if r == rung:
             break
-    target_rt = _compress_rt(anchor * (1.0 + cum) * coaching_f_value)
+    target_rt = _compress_rt(anchor * (1.0 + cum) * coaching_f_value * potential_factor)
 
     # HT first (own declining curve, never rung-locked), magnitude-capped. Each
     # rung gets its curve share of the career HT gain, integer-rounded
@@ -443,26 +451,44 @@ def develop_one_offseason(player: dict, rung: str, profile: dict,
     # PROFILE scaled to the ladder target RT — it targets BOTH a level (target_rt) and a
     # shape (the profile). It replaces the old additive budget (B≥0), which could only add,
     # so in-season growth ratcheted RT above the ladder and the leftover budget starved
-    # non-signature attributes (a big's scoring, a wing's shooting). The attractor is
-    # bidirectional and NOT budget-gated: it pulls RT down to the ladder when in-season
-    # overshot, and fills the starved attributes even at RT-target. α<1 keeps it an
-    # attractor, not a clamp — a user's in-season focus survives as a spike he pays for
-    # elsewhere. RT lands on the ladder by construction (the target the profile is scaled
-    # to), so generation and development describe one league. (`accumulator` no longer
-    # shapes the offseason distribution — focus is expressed in-season now; it still drives
-    # the QUALITY half → coaching_f → target_rt in develop_rollover.)
+    # non-signature attributes (a big's scoring, a wing's shooting).
+    #
+    # LEVEL and SHAPE are separated (2026-08 attractor-level fix). The earlier form moved
+    # every attribute α toward `profile × k` in one step with no renormalisation, which let
+    # α govern the LEVEL as well as the shape: a 55% step toward a target that RISES every
+    # rung leaves a gap that compounds, so developed RT landed at ~0.91× the ladder (Elite
+    # seniors 91, not 100) while GENERATION hit the anchors exactly — the drift was masked
+    # for years because the seeded pool holds the anchors and only cohort turnover exposes
+    # it. The old "RT lands on the ladder by construction" comment was measurably false.
+    #
+    # Now: SHAPE moves α (the blended vector keeps the player's in-season focus as a spike
+    # in the RATIOS, so training still biases the profile), then LEVEL closes FULLY — a
+    # single closed-form rescale to hit target_rt exactly. RT = weighted_mean × fit is
+    # linear in the (all-growth) weighted attributes, so one rescale is exact. This makes
+    # the offseason a true absolute-target event: it lands developed players on the ladder
+    # and CLAWS BACK an in-season overshoot completely (the bidirectional job the old form
+    # only did 55% of), while α<1 preserves shape so focus survives as a spike paid for
+    # elsewhere. (`accumulator` no longer shapes the offseason distribution — focus is
+    # expressed in-season now; it still drives the QUALITY half → coaching_f → target_rt.)
     prof = position_profile(position)
     weights = POSITION_WEIGHTS[position]
     fit = height_fitness(position, player["height"]) or 1.0
     denom = sum(weights.get(a, 0.0) * prof.get(a, 0.0) for a in GROWTH_ATTRS) or 1.0
     k = (target_rt / fit) / denom
+    # SHAPE: α-blend each attribute toward its profile-scaled target (training bias in the
+    # pre-offseason `attrs` survives in the resulting ratios).
+    blended = {a: attrs.get(a, 0) + OFFSEASON_ATTRACTOR_ALPHA * (prof.get(a, 0.0) * k - attrs.get(a, 0))
+               for a in GROWTH_ATTRS}
+    # LEVEL: close fully. RT(v) = fit · Σ weights·v over the growth attributes, so scaling
+    # the blended vector by s = target_rt / RT(blended) lands the dev-position RT exactly on
+    # target in one step (all weighted attrs are growth attrs — verified).
+    rt_blended = fit * sum(weights.get(a, 0.0) * blended[a] for a in GROWTH_ATTRS)
+    s = (target_rt / rt_blended) if rt_blended > 0 else 1.0
     st_gain = 0
     for a in GROWTH_ATTRS:
-        target_a = prof.get(a, 0.0) * k
-        before = attrs.get(a, 0)
-        moved = max(1, int(round(before + OFFSEASON_ATTRACTOR_ALPHA * (target_a - before))))
+        moved = max(1, int(round(blended[a] * s)))
         if a == "ST":
-            st_gain = moved - before
+            st_gain = moved - attrs.get(a, 0)
         attrs[a] = moved
         attrs[f"anchor_{a}"] = moved           # write both — survives next in-season
 
@@ -585,6 +611,7 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
     to his REMAINING rungs, and it is returned for persistence so it never re-rolls.
     entry_tier / position_intent / training_position are derived if absent."""
     from BackEnd.utils.player_generation import normalize_year as _ny
+    from BackEnd.utils.player_generation import resolve_potential_factor
     rung = _ny(new_year)
     if rung not in RUNG_TRANSITIONS:
         rung = "FR"
@@ -612,6 +639,13 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
             "write path is dropping entry_tier.",
             fpd_doc.get("player_id"), new_year, entry_tier,
         )
+
+    # Career-static potential scalar. resolve_potential_factor returns the stored
+    # value when present, else derives a stable value from player_id (and logs the
+    # legacy fallback). Returned below so rollover persists it — the once-per-career
+    # backfill point for pre-Phase-5 players, mirroring entry_tier's lazy backfill.
+    potential_factor = resolve_potential_factor(
+        fpd_doc.get("player_id"), fpd_doc.get("potential_factor"))
 
     profile = fpd_doc.get("development")
     backfilled = False
@@ -644,12 +678,14 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
         "_ht_carry": fpd_doc.get("_ht_carry", 0.0),
     }
     develop_one_offseason(player, rung, profile, rng,
-                          accumulator=distribution_accumulator, coaching_f_value=f)
+                          accumulator=distribution_accumulator, coaching_f_value=f,
+                          potential_factor=potential_factor)
     return {
         "attributes": player["attributes"], "height": player["height"],
         "weight": player["weight"], "position_ratings": player["position_ratings"],
         "development": profile, "entry_tier": entry_tier,
         "position_intent": position_intent, "training_position": training_position,
+        "potential_factor": potential_factor,
         "coaching_quality": cq, "backfilled": backfilled,
     }
 

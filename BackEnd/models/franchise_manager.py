@@ -212,6 +212,7 @@ def generate_walk_on_profile() -> dict:
         "entry_tier": "Poor",
         "position_intent": intent,
         "development": development,
+        "potential_factor": gp["potential_factor"],
         "Home Region": "",
     }
 
@@ -352,6 +353,10 @@ class FranchiseManager:
                 # subdoc; that lazy-backfills at the first offseason event.
                 "entry_tier": p.get("entry_tier"),
                 "position_intent": p.get("position_intent"),
+                # Career-static potential scalar (Potential Rating §Phase 2). Carried
+                # directly like entry_tier; None for pre-Phase-5 pool players resolves
+                # deterministically from player_id at the first offseason rollover.
+                "potential_factor": p.get("potential_factor"),
             }
         _perf["players_find_and_loop"] = (time.time() - _t0) * 1000
 
@@ -390,6 +395,7 @@ class FranchiseManager:
                     "entry_tier": wo.get("entry_tier"),
                     "position_intent": wo.get("position_intent"),
                     "development": wo.get("development"),
+                    "potential_factor": wo.get("potential_factor"),
                 }
                 walk_on_ids.append(wid)
             team["player_ids"] = [str(pid) for pid in team.get("player_ids", [])] + walk_on_ids
@@ -507,6 +513,7 @@ class FranchiseManager:
                 **({"entry_tier": data["entry_tier"]} if data.get("entry_tier") is not None else {}),
                 **({"position_intent": data["position_intent"]} if data.get("position_intent") is not None else {}),
                 **({"development": data["development"]} if data.get("development") is not None else {}),
+                **({"potential_factor": data["potential_factor"]} if data.get("potential_factor") is not None else {}),
             }
             for pid, data in players_map.items()
         ]
@@ -537,6 +544,7 @@ class FranchiseManager:
                 **({"entry_tier": recruit["entry_tier"]} if recruit.get("entry_tier") is not None else {}),
                 **({"position_intent": recruit["position_intent"]} if recruit.get("position_intent") is not None else {}),
                 **({"development": recruit["development"]} if recruit.get("development") is not None else {}),
+                **({"potential_factor": recruit["potential_factor"]} if recruit.get("potential_factor") is not None else {}),
                 "Home Region": home_region,
                 "Lean": self._build_recruit_lean(home_region, region_team_ids),
                 "created_at": recruit.get("created_at") or datetime.utcnow(),
@@ -1061,6 +1069,7 @@ class RecruitManager:
                 "entry_tier": tier,
                 "position_intent": intent,
                 "development": development,
+                "potential_factor": gp["potential_factor"],
                 "created_at": datetime.utcnow(),
             })
 

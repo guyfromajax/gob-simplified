@@ -28,8 +28,12 @@ development event and the persisted development profile are later tasks.
 
 from __future__ import annotations
 
+import hashlib
+import logging
 import random
 from typing import Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 from BackEnd.constants import LEAGUE_MEDIAN_HEIGHT_IN
 from BackEnd.utils.position_ratings import (
@@ -62,6 +66,40 @@ HT_TOTAL_MEAN = 3.2
 HT_TOTAL_SD = 1.9
 HT_TOTAL_MIN, HT_TOTAL_MAX = 0, 8
 HT_REMAINING_SHARE_BY_YEAR = {"JH": 1.0, "FR": 0.6, "SO": 0.3, "JR": 0.1, "SR": 0.0}
+
+# ── Potential factor (Player Potential Rating, Phase 1) ──────────────────────
+# A career-static scalar, uniform in ±POTENTIAL_FACTOR_BAND, drawn independently of entry
+# tier and of ch_seed. It scales the RT target the offseason event solves for (wired in a
+# later phase), so it is a real development mechanic, and is displayed as a projected letter
+# grade alongside the current one. Uniform (not bell-curved) — busts and gems are as common
+# as median players. Single source of the draw + the legacy fallback; every generation and
+# persistence path calls these two helpers rather than re-implementing the band.
+POTENTIAL_FACTOR_BAND = 0.15
+
+
+def draw_potential_factor(rng: random.Random) -> float:
+    """Uniform draw in [1 − BAND, 1 + BAND] from the caller's rng. Independent of tier and
+    ch_seed by construction (a separate draw that reads neither)."""
+    return round(rng.uniform(1.0 - POTENTIAL_FACTOR_BAND, 1.0 + POTENTIAL_FACTOR_BAND), 4)
+
+
+def resolve_potential_factor(player_id, stored=None) -> float:
+    """Return ``stored`` when it is a usable number; otherwise DETERMINISTICALLY derive one
+    from a hash of ``player_id`` so a legacy player (generated before this field existed)
+    yields the SAME value on every read rather than re-rolling per session. Logs on fallback.
+    This is the persistence-side safety net — new players carry a drawn value; only pre-Phase-1
+    docs reach the hash branch."""
+    if isinstance(stored, (int, float)) and stored > 0:
+        return float(stored)
+    h = int(hashlib.sha256(str(player_id).encode("utf-8")).hexdigest()[:12], 16)
+    u = h / float(16 ** 12)  # deterministic uniform in [0, 1)
+    pf = round(1.0 - POTENTIAL_FACTOR_BAND + u * 2.0 * POTENTIAL_FACTOR_BAND, 4)
+    logger.warning(
+        "potential_factor missing for player %s — derived %.4f deterministically from "
+        "player_id (legacy fallback; a generated player should carry a drawn value).",
+        player_id, pf,
+    )
+    return pf
 
 # ── Entry tiers (design §4.1) ────────────────────────────────────────────────
 # Six tiers. JH RT anchor and share-of-generated-players. (Supersedes the
@@ -243,6 +281,9 @@ def generate_player(
 
     weight = weight_from_height(height, rng)
     ratings = compute_position_ratings({"attributes": attributes, "height": height, "name": name})
+    # Drawn LAST so every prior draw (core/CH/EM/weight) keeps its stream position — only this
+    # new trailing field is appended. Independent of tier and ch_seed.
+    potential_factor = draw_potential_factor(rng)
     return {
         "name": name,
         "attributes": attributes,
@@ -252,6 +293,7 @@ def generate_player(
         "tier": tier,
         "year": normalize_year(year),
         "position_ratings": ratings,
+        "potential_factor": potential_factor,
     }
 
 

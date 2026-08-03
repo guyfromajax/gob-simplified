@@ -2160,6 +2160,7 @@ def finalize_game(
                             # is absent there and lazy-backfills at rollover.
                             **({"entry_tier": player_doc["entry_tier"]} if player_doc.get("entry_tier") is not None else {}),
                             **({"position_intent": player_doc["position_intent"]} if player_doc.get("position_intent") is not None else {}),
+                            **({"potential_factor": player_doc["potential_factor"]} if player_doc.get("potential_factor") is not None else {}),
                         })
                         logger.debug(f"🔍 [FINALIZE_GAME] Inserted new FPD doc for player {pid_str}")
                 except Exception as e:

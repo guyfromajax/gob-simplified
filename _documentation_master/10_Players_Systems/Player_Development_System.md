@@ -9,29 +9,42 @@
 Fires **once per player per rollover** (the offseason between seasons), before Training Camp. It targets an **absolute** rating, not an incremental budget:
 
 ```
-target_RT = jh_anchor × ladder_multiplier(rung) × coaching_factor f
+target_RT = _compress_rt( jh_anchor × ladder_multiplier(rung) × coaching_factor f × potential_factor )
 ```
 
 - `jh_anchor` — the player's JH-scale anchor, derived from `entry_tier` via `JH_ANCHOR_BY_TIER`.
 - `ladder_multiplier(rung)` — the class-year rung on the ladder. **Includes the player's peak bonuses** (peaks stack on top of the standard rung increments).
 - `f` — coaching-quality multiplier, bounded `[0.85, 1.20]`. **Currently dormant at 1.0** for every player (the live coaching-quality seam returns `None`), so the league holds exactly on the ladder until per-player allocation capture ships.
+- `potential_factor` — career-static ±15% ceiling scalar (`POTENTIAL_FACTOR_BAND = 0.15`), drawn once at generation, independent of `entry_tier` and `ch_seed`. **LIVE** (Potential Rating Phase 3). A pure scalar on the target, so it lifts the *level* with the *same profile shape* — a shooter stays a shooter. Legacy players with no stored value resolve deterministically from `player_id` (`resolve_potential_factor`).
+- `_compress_rt` — soft cap near `RT_SOFT_CAP = 130`, asymptote ≈ 138. Below the cap it is identity; it only bends the very top. The extreme cohort Elite × 3-peak × 1.15 targets `50 × 2.6 × 1.15 = 149.5`, compressed to **137.3**. (Achieved RT, recomputed from attributes, can overshoot the compressed target for a <0.1% tail — a pre-existing property of recompute-from-attributes, not introduced by `potential_factor`.)
 
 Because the target is absolute and re-anchored every rollover, nothing drifts: in-season movement is either re-absorbed or, under good coaching, kept as a bounded residual below the smallest rung increment.
+
+**Developed players land on the ladder (2026-08 attractor-level fix).** The offseason now closes the LEVEL fully (see Shape Attractor), so a developed senior's median RT sits **exactly on his tier anchor** — pinned by `test_developed_seniors_land_on_tier_anchors`. Before the fix the α-step undershot a rising target and developed seniors landed at ~0.91× the anchor (Elite 91, not 100); it was masked for a long time because **generation** hits the anchors by construction and only cohort turnover exposes the drift. Career multiple by peak count is now exact: 0/1/2/3 peaks → 1.70/2.00/2.30/2.60×.
+
+**Senior RT spread by tier (measured, p10/p50/p90, positions pooled).** With `f` dormant and `potential_factor` live: Poor 34/40/48 · BelowAvg 42/50/60 · Average 51/60/72 · Good 59/70/84 · Great 68/80/96 · Elite 85/100/120. **Medians land on the anchors** (40/50/60/70/80/100); `potential_factor` widens each adjacent-tier tail overlap by only ~2–3 RT on top of the peak-driven baseline (peaks are the dominant spread source). This blur is the design intent — it stops the projected-potential display from leaking `entry_tier`.
+
+**RNG note (precise).** `potential_factor` is drawn **last** inside `generate_player`, so every *prior* draw for that same player (core attributes, CH, EM, weight) keeps its exact stream position — those fields are byte-identical to before the feature. However, the generator's `rng` is **shared across a generation run**, so consuming one extra value per player shifts the stream for every *subsequent* player in that run: **any seeded regeneration now yields a different downstream population than it did pre-feature.** This is harmless here — the retroactive pool write (Phase 5) and the projection read (Phase 4) both read stored state and never invoke generation — but a test that pins an exact seeded population across the whole run will differ.
 
 ## Shape Attractor
 
 Constant: `OFFSEASON_ATTRACTOR_ALPHA = 0.55`.
 
-Rather than distributing an additive budget, the offseason **pulls each attribute a fraction α of the way** toward the tier/year/position **profile scaled to the target RT**:
+Rather than distributing an additive budget, the offseason targets **both a level** (the ladder RT) **and a shape** (the position/tier/year profile), and it separates them (2026-08 attractor-level fix):
 
 ```
-moved = round(before + α × (target_attr − before))
+# SHAPE — α-blend each attribute toward its profile-scaled target (training bias survives in the ratios)
+blended[a] = before[a] + α × (profile[a]·k − before[a])
+# LEVEL — close fully: one closed-form rescale so RT lands on the ladder exactly
+s = target_RT / (fit · Σ weights·blended)          # RT = weighted_mean × fit is linear in the (all-growth) weights
+moved[a] = round(blended[a] × s)
 ```
 
-It targets **both a level** (the ladder RT) **and a shape** (the position/tier/year profile). Consequences:
+The earlier form applied only the SHAPE step (`before + α·(target−before)`) with **no** level close, which let α govern the level as well as the shape — a 55% step toward a target that rises every rung left a compounding ~9% gap. Consequences of the separated form:
 
-- **Bidirectional, not budget-gated.** Pulls RT *down* to the ladder if the season overshot; fills non-signature attributes that the old additive budget starved — the target profile floors them (at `PROFILE_FILLER`), so a center's scoring keeps growing.
-- **α < 1 makes it an attractor, not a clamp.** A user's in-season focus survives as a spike he pays for elsewhere — it is pulled toward the profile, never snapped onto it.
+- **Lands on the ladder by construction — now actually true.** The level close is exact, so developed RT hits the tier anchor; the old "by construction" claim was measurably false and is now pinned by a test.
+- **Bidirectional and complete.** Pulls RT *fully* down to the ladder if the season overshot (the old form only clawed back 55% of an overshoot, leaving a permanent ratchet); fills non-signature attributes the old additive budget starved, so a center's scoring keeps growing.
+- **α < 1 still makes it an attractor for SHAPE, not a clamp.** A user's in-season focus survives as a proportional spike in the ratios (paid for elsewhere, since the level is fixed to the ladder) — pulled toward the profile, never snapped onto it.
 
 ## Anchor / Live Write Discipline
 

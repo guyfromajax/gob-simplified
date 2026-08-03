@@ -64,6 +64,7 @@ from BackEnd.utils.player_generation import (  # noqa: E402
     HT_TOTAL_MAX,
     POSITIONS,
     TIER_FREQUENCY,
+    draw_potential_factor,
     generate_core_attributes,
     position_profile,
     target_rt,
@@ -96,7 +97,7 @@ _INTENT_STATS: dict = {}
 # losslessly — post-migration they could only be re-derived approximately from RT
 # (boundary players would re-derive into the wrong tier / ~5% into the wrong intent).
 UNIVERSAL_WRITE_FIELDS = ("attributes", "height", "weight", "year", "position_ratings",
-                          "entry_tier", "position_intent")
+                          "entry_tier", "position_intent", "potential_factor")
 STORED_RT_WRITE_FIELDS = ("position_ratings",)
 
 
@@ -109,6 +110,7 @@ def _universal_set_doc(p: dict) -> dict:
         "position_ratings": p["_ratings"],
         "entry_tier": p["_tier"],
         "position_intent": p["_intent"],
+        "potential_factor": p["_potential_factor"],
     }
 
 
@@ -314,6 +316,7 @@ def remap_attributes(players: list[dict], rng: _random.Random) -> None:
         p["_attributes"] = attrs
         p["_weight"] = weight_from_height(p["_height"], rng)
         p["_ratings"] = compute_position_ratings({"attributes": attrs, "height": p["_height"]})
+        p["_potential_factor"] = draw_potential_factor(rng)   # Phase 1 (behaviour-neutral until re-run)
 
 
 def apply_class_year_stagger(players: list[dict], rng: _random.Random) -> None:

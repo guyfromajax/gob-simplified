@@ -79,6 +79,34 @@ def test_partA_writes_both_and_full_cycle_preserves_growth():
         f"develop must write anchor_ (Part A), and in-season must build on it.")
 
 
+def test_developed_seniors_land_on_tier_anchors():
+    """LEVEL invariant (2026-08 attractor-level fix). The offseason claimed 'RT lands on
+    the ladder by construction'; for years it did not — the α-step undershot a rising
+    target and developed seniors landed at ~0.91× the anchor (Elite 91, not 100), masked
+    because GENERATION held the anchors and only cohort turnover exposed the drift. This
+    pins the claim: a developed senior's median dev-position RT lands on his tier anchor.
+
+    Distributional (peak/HT variance per career) — the MEDIAN career (1 peak → exactly
+    2.0×) must sit on the anchor; a regression to the α-governed-level bug reappears as a
+    uniform ~9% shortfall, far outside tolerance."""
+    anchors = {"Poor": 40, "BelowAverage": 50, "Average": 60,
+               "Good": 70, "Great": 80, "Elite": 100}
+    TOL = 2.5
+    for tier, anchor in anchors.items():
+        rng = random.Random(4242)
+        srs = []
+        for _ in range(4000):
+            ch = rng.randint(1, 100)
+            pos = POSITIONS[rng.randrange(len(POSITIONS))]
+            pl = dev.simulate_career(pos, tier, ch, rng)
+            srs.append(pl["snapshots"]["SR"][pos])
+        med = statistics.median(srs)
+        assert abs(med - anchor) <= TOL, (
+            f"{tier}: developed senior median RT {med:.1f} off anchor {anchor} "
+            f"(>|{TOL}|). The offseason is not landing on the ladder — the α-governed-level "
+            f"undershoot has regressed.")
+
+
 def test_cpu_path_preserves_shape():
     """PART B, the invariant replacing 'reference holds flat': a reference-coached player
     developed through the ACTUAL CPU path lands with his tier/year/position PROFILE
