@@ -318,7 +318,10 @@ class FranchiseManager:
         _t0 = time.time()
         # Load all players with their full attributes for franchise-specific storage
         players = self.db.players.find(
-            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1, "height": 1, "weight": 1, "year": 1, "jersey": 1, "entry_tier": 1, "position_intent": 1}
+            # potential_factor MUST be in this projection or the pool→FPD carry below
+            # silently receives None (Mongo-projection audit — the 3rd such silent loss;
+            # see Player_Development_System.md). entry_tier was here; potential_factor was not.
+            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1, "height": 1, "weight": 1, "year": 1, "jersey": 1, "entry_tier": 1, "position_intent": 1, "potential_factor": 1}
         )
         for p in players:
             from BackEnd.models.player import Player
