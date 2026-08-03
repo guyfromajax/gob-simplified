@@ -38,6 +38,7 @@ from BackEnd.constants.multi_franchise import MAX_FRANCHISES_PER_USER
 # Multi-franchise slots (see _documentation_master/projects/multi_franchises_brief.md).
 # Cap constant lives in BackEnd.constants.multi_franchise.
 from BackEnd.utils.shared import format_height, summarize_game_state
+from BackEnd.utils.rt_display import format_rt_display
 from BackEnd.utils.player_year import format_player_year_display
 from BackEnd.utils import stat_updater
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
@@ -2584,6 +2585,16 @@ class TeamSelection(BaseModel):
     home_slot: int | None = None
 
 
+class TeamBuilderCourtParams(BaseModel):
+    """Five court colour parameters — recipe only, never a rendered image (§6.3b)."""
+
+    hardwoodStyle: str = "medium_medium"
+    oobColor: str
+    laneColor: str
+    outsideWoodColor: str
+    halfArcFillColor: str
+
+
 class TeamBuilderApplyRequest(BaseModel):
     """Apply Team Builder at franchise creation. Franchise is created only on Apply."""
 
@@ -2596,6 +2607,9 @@ class TeamBuilderApplyRequest(BaseModel):
     secondary_color: str
     # 1 = SOLID, 2 = SOLID WITH TRIM (maps to uniforms body / body+trim)
     jersey_preset: int | None = 1
+    # Court recipe — nested on franchises.team_builder with primary/secondary.
+    # Never a rendered image; never written to FTD.
+    court: TeamBuilderCourtParams | None = None
     # keep | edit | generate | import
     roster_mode: str = "keep"
     # capped | uncapped — determines online eligibility (v2 §4)
@@ -3588,6 +3602,7 @@ def team_builder_apply(
     )
     from BackEnd.utils.franchise_team_display import (
         TEAM_BUILDER_FIELD,
+        normalize_court_params,
         normalize_jersey_preset,
     )
     from BackEnd.utils.team_builder_league_context import compute_league_attr_context
@@ -3658,6 +3673,13 @@ def team_builder_apply(
         "roster_mode": roster_mode,
         "attribute_mode": attribute_mode,
     }
+    court = normalize_court_params(
+        body.court,
+        primary_color=body.primary_color,
+        secondary_color=body.secondary_color,
+    )
+    if court is not None:
+        overlay["court"] = court
 
     manager = FranchiseManager(db)
     # Bake custom name into franchise.user_team_id at write time (no news/game docs yet).
@@ -3824,7 +3846,9 @@ def team_builder_apply(
     except Exception:
         logger.exception("[TEAM-BUILDER] FPD meta.team rewrite failed")
 
-    # Persist display fields on FTD (partial overlay precedent).
+    # FTD identity fields are a disposable cache of franchises.team_builder
+    # (gob-asset-architecture §3.2). Written at Apply; healed on read if absent.
+    # Do not treat FTD as a second identity store.
     try:
         franchise_team_data_collection.update_one(
             {"franchise_id": franchise_id, "team_id": replaced_oid},
@@ -3837,7 +3861,7 @@ def team_builder_apply(
             },
         )
     except Exception:
-        logger.exception("[TEAM-BUILDER] FTD overlay write failed")
+        logger.exception("[TEAM-BUILDER] FTD identity cache write failed")
 
     try:
         from BackEnd.utils.team_builder_roster import clear_wizard_walk_ons_for_user
@@ -7652,6 +7676,8 @@ def _franchise_summary_for_list(doc: dict) -> dict:
         "abbreviation": display.get("abbreviation"),
         "mascot": display.get("mascot"),
         "asset_strategy": display.get("asset_strategy") or "core",
+        "jersey_preset": display.get("jersey_preset") if display.get("is_custom") else None,
+        "court": display.get("court") if display.get("is_custom") else None,
     }
 
 
@@ -7939,6 +7965,9 @@ def command_center_data(
                         "secondary_color"
                     )
                     response["jersey_preset"] = display.get("jersey_preset")
+                    # Court recipe (§6.3b) — parameters only; FE regenerates the surface.
+                    if display.get("court"):
+                        response["court"] = display["court"]
                 response["user_team_object_id"] = str(team_id)
                 # Frozen at Apply (§9.4) — surface as franchise metadata only.
                 from BackEnd.constants.team_builder_budget import resolve_online_eligible
@@ -9660,7 +9689,7 @@ def _training_report_recruiting_display(
             return {"header": "Recruiting Visit", "meta_line": None, "recruits": [], "total": 0}
         nm = _recruit_display_name_for_training_report(recruit)
         rt = _recruit_rt(recruit)
-        return {"header": "Recruiting Visit", "meta_line": f"{nm} - RT: {rt}",
+        return {"header": "Recruiting Visit", "meta_line": f"{nm} - RT: {format_rt_display(rt)}",
                 "recruits": [_rec_item(recruit)], "total": 1}
 
     if (1 <= w <= 19) or (27 <= w <= 34):
@@ -9692,7 +9721,7 @@ def _training_report_recruiting_display(
         rt = _recruit_rt(top)
         return {
             "header": "Top Recruit Leaning Your Way",
-            "meta_line": f"{nm} - RT: {rt}",
+            "meta_line": f"{nm} - RT: {format_rt_display(rt)}",
             "recruits": [_rec_item(top)],
             "total": 1,
         }
@@ -11212,7 +11241,7 @@ def _build_ps_all_stars_story(
         lines.append(
             f"{g.get('name')}{of_team} increased by {int(g.get('total_gain') or 0)} attribute points this week. "
             f"His strongest gains were in {_join_with_and(top_attrs)}. "
-            f"He's now a {rt if rt is not None else '--'} rated {g.get('pos', '--')}."
+            f"He's now rated {format_rt_display(rt)} at {g.get('pos', '--')}."
         )
     return {
         "story_id": f"w{week}-ps-all-stars",
@@ -11276,7 +11305,7 @@ def _build_recruiting_leans_story(
     for rt, recruit_doc, team_ids in top_entries:
         team_names = _join_with_and([team_name_map.get(tid, tid) for tid in team_ids])
         top_lines.append(
-            f"{recruit_doc.get('name')} who is a {rt} rated {recruit_doc.get('archetype')} "
+            f"{recruit_doc.get('name')}, a {recruit_doc.get('archetype')} rated {format_rt_display(rt)}, "
             f"has announced a lean toward {team_names}."
         )
 
@@ -11287,7 +11316,9 @@ def _build_recruiting_leans_story(
     ):
         entries = sorted(conference_recruits_by_team[team_id], key=lambda e: e[0], reverse=True)
         conference_lines.append(team_name_map.get(team_id, team_id))
-        conference_lines.append(", ".join(f"{name} ({rt})" for rt, name in entries))
+        conference_lines.append(", ".join(
+            f"{name} ({format_rt_display(rt)})" for rt, name in entries
+        ))
 
     if not top_lines and not conference_lines:
         return None

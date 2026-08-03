@@ -46,6 +46,20 @@ function rtColor(rt) {
   return (cls && RT_HEX[cls]) || null;
 }
 
+function rtDisplay(rt) {
+  if (typeof window !== 'undefined' && typeof window.formatRtDisplay === 'function') return window.formatRtDisplay(rt);
+  const v = Number(rt);
+  if (!Number.isFinite(v)) return '--';
+  if (v >= 100) return 'A++';
+  if (v >= 90) return 'A+';
+  if (v >= 80) return 'A';
+  if (v >= 70) return 'B+';
+  if (v >= 60) return 'B';
+  if (v >= 50) return 'C+';
+  if (v >= 40) return 'C';
+  return 'F';
+}
+
 /** Real headshot via the same resolver Act 1 uses; silhouette is fallback only. */
 function portraitSrc(id) {
   if (id && typeof window !== 'undefined' && window.API_CONFIG && window.API_CONFIG.getPlayerImageUrl) {
@@ -279,7 +293,7 @@ function updatePlayerRow(rowEl, p, side, teamColor) {
   if (p.rt != null && rc) {
     rtb.style.display = '';
     rtb.style.background = rc;
-    rtb.textContent = p.rt;
+    rtb.textContent = rtDisplay(p.rt);
   } else {
     rtb.style.display = 'none';
     rtb.textContent = '';

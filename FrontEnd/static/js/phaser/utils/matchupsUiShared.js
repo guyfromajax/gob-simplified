@@ -16,10 +16,26 @@ export const POSITION_COLORS = Object.freeze({
 export function rtBadgeBg(rt) {
   const v = Number(rt);
   if (!Number.isFinite(v)) return "#c8ccd6";
-  if (v <= 40) return "#ff6d6d";
-  if (v <= 60) return "#FFD700";
-  if (v <= 80) return "#34EC27";
+  if (v < 40) return "#ff6d6d";
+  if (v < 60) return "#FFD700";
+  if (v < 80) return "#34EC27";
   return "#4A90D9";
+}
+
+export function formatRtDisplay(rt) {
+  if (typeof window !== "undefined" && typeof window.formatRtDisplay === "function") {
+    return window.formatRtDisplay(rt);
+  }
+  const v = Number(rt);
+  if (!Number.isFinite(v)) return "--";
+  if (v >= 100) return "A++";
+  if (v >= 90) return "A+";
+  if (v >= 80) return "A";
+  if (v >= 70) return "B+";
+  if (v >= 60) return "B";
+  if (v >= 50) return "C+";
+  if (v >= 40) return "C";
+  return "F";
 }
 
 export function hexToRgb(hex) {
@@ -90,7 +106,6 @@ export function buildPlayerTileHtml(player, {
   slotIndex = null,
 } = {}) {
   const rt = Number(player?.rt ?? 0);
-  const rtRounded = Math.round(rt);
   const jersey = player?.jersey != null && player.jersey !== "" ? String(player.jersey) : "—";
   const height = player?.height || "—";
   const weight = player?.weight != null && player.weight !== "" ? `${player.weight} lb` : "—";
@@ -106,7 +121,7 @@ export function buildPlayerTileHtml(player, {
 
   const gutterHtml =
     rtMode === "edge"
-      ? `<div class="dm-rtgutter" aria-hidden="true"><div class="dm-rtedge" style="color:${rtBadgeBg(rt)}">${escapeHtml(String(rtRounded))}</div></div>`
+      ? `<div class="dm-rtgutter"><div class="dm-rtedge" style="color:${rtBadgeBg(rt)}" aria-label="RT ${escapeHtml(formatRtDisplay(rt))}">${escapeHtml(formatRtDisplay(rt))}</div></div>`
       : `<div class="dm-rtgutter" aria-hidden="true"></div>`;
 
   return `

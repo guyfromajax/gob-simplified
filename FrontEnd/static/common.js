@@ -262,6 +262,10 @@ function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
   var name = data.team || data.user_team_id || data.name || '';
   var jerseyPreset = Number(data.jersey_preset);
   if (jerseyPreset !== 2) jerseyPreset = 1;
+  var court =
+    data.court ||
+    (data.team_builder && data.team_builder.court) ||
+    null;
   var visual = {
     name: name,
     abbreviation: data.abbreviation,
@@ -269,7 +273,8 @@ function hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId) {
     primary_color: data.primary_color || data.primary,
     secondary_color: data.secondary_color || data.secondary,
     jersey_preset: jerseyPreset,
-    court: data.court || null,
+    // Server overlay is source of truth; LS only caches after hydrate.
+    court: court,
     asset_strategy: 'generated',
     is_custom: true,
     replaced_name: data.team_builder_replaced_name || data.replaced_name,
@@ -848,6 +853,35 @@ function getAttrColor(scaledValue) {
   if (s >= 9) return '#4A90D9';
   if (s >= 7) return '#34EC27';
   if (s >= 5) return '#FFD700';
+  return '#ff6d6d';
+}
+
+// Canonical frontend switch for the RT display experiment. Raw RT remains
+// numeric for every calculation; change this one value to revert all pages.
+window.RT_DISPLAY_MODE = 'letter';
+
+function formatRtDisplay(rt) {
+  if (rt === null || rt === undefined || rt === '') return '--';
+  const v = Number(rt);
+  if (!Number.isFinite(v)) return '--';
+  if ((window.RT_DISPLAY_MODE || 'letter') === 'number') return String(rt);
+  if (v >= 100) return 'A++';
+  if (v >= 90) return 'A+';
+  if (v >= 80) return 'A';
+  if (v >= 70) return 'B+';
+  if (v >= 60) return 'B';
+  if (v >= 50) return 'C+';
+  if (v >= 40) return 'C';
+  return 'F';
+}
+
+function getRtDisplayColor(rt) {
+  if (rt === null || rt === undefined || rt === '') return 'rgba(255, 255, 255, 0.4)';
+  const v = Number(rt);
+  if (!Number.isFinite(v)) return 'rgba(255, 255, 255, 0.4)';
+  if (v >= 80) return '#4A90D9';
+  if (v >= 60) return '#34EC27';
+  if (v >= 40) return '#FFD700';
   return '#ff6d6d';
 }
 

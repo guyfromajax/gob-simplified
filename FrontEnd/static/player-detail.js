@@ -318,9 +318,9 @@
         <div class="pd-pos-rating-row" style="opacity:${opacity};">
           <div class="pd-pos-pill" style="background:${posConfig.background};color:${posConfig.color};">${position}</div>
           <div class="pd-pos-bar-track">
-            <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${getAttrColor(Math.ceil(safeRating / 10))};width:0;"></div>
+            <div class="pd-pos-bar-fill" data-width="${Math.min(100, safeRating)}" style="background:${getRtDisplayColor(safeRating)};width:0;"></div>
           </div>
-          <div class="pd-pos-rating-value ${isPrimary ? 'is-primary' : ''}">${Number.isFinite(rating) ? rating : '--'}</div>
+          <div class="pd-pos-rating-value ${isPrimary ? 'is-primary' : ''}">${Number.isFinite(rating) ? formatRtDisplay(rating) : '--'}</div>
         </div>
       `;
     }).join('');
@@ -499,7 +499,7 @@
           <div class="pd-pos-line">${heightWeightLine}</div>
           <div class="pd-overall">
             <div class="pd-overall-label">OVERALL</div>
-            <div class="pd-overall-value">${rtValue}</div>
+            <div class="pd-overall-value">${formatRtDisplay(rtValue)}</div>
           </div>
           ${positionRatingsBlock}
           ${isRecruit ? buildRecruitingBlock(player) : `

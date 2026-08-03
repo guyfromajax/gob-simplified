@@ -30,19 +30,13 @@ JH = 300 - (junior + sophomore + freshman)
     - Exception to the rule: the recruiting-orders **top grids** (weeks 20-26 and week 35) also get a Year column even though they don't show full attributes (the user is committing roster spots, so year matters).
     - Column position: Year sits **after `POS`**, before the attribute columns (mirrors roster tables). In top grids it sits after `POS`/`RT` equivalent position.
 
-**Recruit RT color scale (UI display)**
-Note this scale applies to JH recruits only. Freshamn, sophomore and junior recruits will use the standard color scale.
+**Recruit RT display**
 
-Recruit RT text uses `/js/shared/rtBucket.js` → `getRecruitRtBucketClass(rt)` with `/css/rt-buckets.css` (same class names and hex colors as the player Attribute Bar Scale, recruit-specific breakpoints). The year switch (JH → recruit scale; FR/SO/JR → player scale) is handled by the wrapper `getRecruitRtBucketClassForYear(rt, year)`:
-
-| RT range | Color | Class |
-|----------|-------|-------|
-| 0–29 | `#ff6d6d` red | `.rt-low` |
-| 30–39 | `#FFD700` yellow | `.rt-mid` |
-| 40–49 | `#34EC27` green | `.rt-high` |
-| 50+ | `#4A90D9` light blue | `.rt-elite` |
-
-Applied on: FCC Recruits tab (and home-card RT column), `recruiting.html`, `recruiting-orders.html`, `recruiting-results.html`, training-report recruiting meta line (`{Name} - RT: n`). **Player** roster/lineup RT continues to use `getRtBucketClass` (0–40 / 41–60 / 61–80 / 81+).
+Recruit RT is numeric internally but displays as a letter grade at the final UI
+boundary. JH, freshman, sophomore, and junior recruits all use the same scale as
+active players. Use `/js/shared/rtBucket.js` (`formatRtDisplay` plus the shared
+bucket helpers); do not add year-specific bands. The canonical grade mapping,
+colors, and rollback rule live in `Styleguide.md` §RT Letter-Grade Scale.
 
 **FCC Recruiting Tab**
 -Place copy at the top of the Recruiting tab in the FCC, in smaller copy than the recurits list below.

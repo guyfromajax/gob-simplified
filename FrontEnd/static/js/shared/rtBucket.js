@@ -1,42 +1,70 @@
 /**
- * Canonical RT color buckets — pair with /css/rt-buckets.css (.rt-low / .rt-mid / .rt-high / .rt-elite).
+ * Canonical, reversible RT display experiment.
  *
- * Player RT (set-lineup, roster, team-roster-view): getRtBucketClass
- *   0–40  red, 41–60 yellow, 61–80 green, 81+ blue
- *
- * Recruit RT (recruiting surfaces): getRecruitRtBucketClass
- *   0–29  red, 30–39 yellow, 40–49 green, 50+ blue
- *   Applies to JH recruits only — FR/SO/JR recruits use the player scale
- *   (getRecruitRtBucketClassForYear handles the year switch).
+ * RT stays numeric in data and logic. Only final display formatting changes.
+ * The canonical switch lives in common.js; this fallback covers pages that
+ * load the helper first or do not load common.js.
  *
  * Loaded as a classic script (no module export) for ES modules and IIFE pages.
  */
 (function (global) {
-  function getRtBucketClass(rt) {
+  if (!global.RT_DISPLAY_MODE) global.RT_DISPLAY_MODE = 'letter';
+
+  function numericRt(rt) {
+    if (rt === null || rt === undefined || rt === '') return null;
     var v = Number(rt);
-    if (!isFinite(v)) return 'rt-unknown';
-    if (v <= 40) return 'rt-low';
-    if (v <= 60) return 'rt-mid';
-    if (v <= 80) return 'rt-high';
+    return isFinite(v) ? v : null;
+  }
+
+  function getRtLetterGrade(rt) {
+    var v = numericRt(rt);
+    if (v === null) return '--';
+    if (v >= 100) return 'A++';
+    if (v >= 90) return 'A+';
+    if (v >= 80) return 'A';
+    if (v >= 70) return 'B+';
+    if (v >= 60) return 'B';
+    if (v >= 50) return 'C+';
+    if (v >= 40) return 'C';
+    return 'F';
+  }
+
+  function formatRtDisplay(rt) {
+    var v = numericRt(rt);
+    if (v === null) return '--';
+    return global.RT_DISPLAY_MODE === 'letter' ? getRtLetterGrade(v) : String(rt);
+  }
+
+  function getRtBucketClass(rt) {
+    var v = numericRt(rt);
+    if (v === null) return 'rt-unknown';
+    if (v < 40) return 'rt-low';
+    if (v < 60) return 'rt-mid';
+    if (v < 80) return 'rt-high';
     return 'rt-elite';
   }
 
   function getRecruitRtBucketClass(rt) {
-    var v = Number(rt);
-    if (!isFinite(v)) return 'rt-unknown';
-    if (v <= 29) return 'rt-low';
-    if (v <= 39) return 'rt-mid';
-    if (v <= 49) return 'rt-high';
-    return 'rt-elite';
-  }
-
-  function getRecruitRtBucketClassForYear(rt, year) {
-    var normalized = String(year || 'JH').trim().toUpperCase();
-    if (normalized === 'JH') return getRecruitRtBucketClass(rt);
     return getRtBucketClass(rt);
   }
 
+  function getRecruitRtBucketClassForYear(rt, year) {
+    return getRtBucketClass(rt);
+  }
+
+  function getRtColor(rt) {
+    var cls = getRtBucketClass(rt);
+    if (cls === 'rt-elite') return '#4A90D9';
+    if (cls === 'rt-high') return '#34EC27';
+    if (cls === 'rt-mid') return '#FFD700';
+    if (cls === 'rt-low') return '#ff6d6d';
+    return 'rgba(255, 255, 255, 0.4)';
+  }
+
+  global.getRtLetterGrade = getRtLetterGrade;
+  global.formatRtDisplay = formatRtDisplay;
   global.getRtBucketClass = getRtBucketClass;
   global.getRecruitRtBucketClass = getRecruitRtBucketClass;
   global.getRecruitRtBucketClassForYear = getRecruitRtBucketClassForYear;
+  global.getRtColor = getRtColor;
 })(typeof window !== 'undefined' ? window : this);

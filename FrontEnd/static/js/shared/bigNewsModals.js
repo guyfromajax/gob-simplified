@@ -313,7 +313,9 @@
       rtWrap.className = 'rc__rt';
       var rtNum = document.createElement('div');
       rtNum.className = 'rc__rtnum ' + rtClass(r.rt, r.year);
-      rtNum.textContent = r.rt != null ? String(r.rt) : '--';
+      rtNum.textContent = typeof global.formatRtDisplay === 'function'
+        ? global.formatRtDisplay(r.rt)
+        : (r.rt != null ? String(r.rt) : '--');
       var rtLabel = document.createElement('div');
       rtLabel.className = 'rc__rtlabel';
       rtLabel.textContent = 'RT';

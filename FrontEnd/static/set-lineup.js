@@ -1275,7 +1275,7 @@ function renderRosterAttributes() {
         nameText.className = 'player-name-link';
         const rtSpan = document.createElement('span');
         rtSpan.className = `inline-rt ${rtBucketClassOrEmpty(rt)}`;
-        rtSpan.textContent = rt ?? '--';
+        rtSpan.textContent = formatRtDisplay(rt);
         wrap.appendChild(nameText);
         wrap.appendChild(rtSpan);
         td.appendChild(wrap);
@@ -1704,7 +1704,7 @@ function updateSlotDisplay(slot) {
       <div class="slot-info">
         <div class="slot-row-1">
           <div class="player-name">${slotDisplayName}</div>
-          <div class="player-rating ${rtBucketClassOrEmpty(rating)}">RT: ${rating}</div>
+          <div class="player-rating ${rtBucketClassOrEmpty(rating)}">RT: ${formatRtDisplay(rating)}</div>
         </div>
         <div class="slot-row-2">
           <div class="slot-stat slot-stat-momentum">
@@ -2975,12 +2975,12 @@ function createPositionRatingCircle(player) {
   const topRating = player.highestRating ?? entries[0][1];
   
   // Display only the highest rating integer value
-  circle.textContent = topRating;
+  circle.textContent = formatRtDisplay(topRating);
   circle.setAttribute('aria-label', 'Position rating');
   
   // Create tooltip content with all 5 position ratings in descending order
   const tooltipContent = entries
-    .map(([pos, rating]) => `${pos}: ${rating}`)
+    .map(([pos, rating]) => `${pos}: ${formatRtDisplay(rating)}`)
     .join('\n');
   
   // Setup tooltip on hover

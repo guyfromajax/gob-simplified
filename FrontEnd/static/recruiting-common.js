@@ -311,7 +311,7 @@
         '<td>' + recruit.attrs.ND + '</td>',
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
-        '<td class="' + recruitRtClass(recruit.rt, recruit.year) + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>',
+        '<td class="' + recruitRtClass(recruit.rt, recruit.year) + '">' + (recruit.rt != null ? global.formatRtDisplay(recruit.rt) : '--') + '</td>',
         useLadder
           ? '<td class="lean-ladder-cell">' + global.RecruitingSpine.Lean.ladderHtml(
               global.RecruitingSpine.Lean.fromBackend({ Lean: recruit.lean }, { userTeamId: userTeamId, teamNameMap: teamNameMap })

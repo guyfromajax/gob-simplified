@@ -526,7 +526,11 @@ Geometry is copied verbatim from the existing constants. Nothing is re-measured.
 
 Storing the rendered image is wrong on every axis: a 3,333 × 2,083 JPEG is 1–2 MB per franchise, a data URI is the one form Phaser rejects (§6.3c), and object storage would break the offline premise §6.1 exists to protect.
 
-**Defect found 2 August 2026.** The wizard sends `court: { hardwoodStyle, oobColor, laneColor, outsideWoodColor, halfArcFillColor }`, but **the Apply request model has no `court` field, so FastAPI drops it silently.** The `team_builder` overlay persists identity and colours but not the court parameters. Regeneration then falls back to `visual.court` in **localStorage**, which survives only the creating session on the creating browser.
+**Defect found 2 August 2026 — fixed 3 August 2026.** The wizard sent `court: { hardwoodStyle, oobColor, laneColor, outsideWoodColor, halfArcFillColor }`, but the Apply request model had no `court` field, so FastAPI discarded it silently. The `team_builder` overlay persisted identity and colours but not the court parameters. Regeneration fell back to `visual.court` in **localStorage**, which survived only the creating session on the creating browser.
+
+**Fix:** `TeamBuilderApplyRequest.court` + `normalize_court_params` write the five parameters onto **`franchises.team_builder.court`** — the same franchise-document object that already holds `primary_color` and `secondary_color`. `resolve_team_display`, FCC `/command-center/data`, and `/franchise/list` surface them. Hydrate reads the server payload; localStorage may cache only after that. Legacy overlays without `court` omit the key — FE derives defaults from primary/secondary (no backfill). No image is stored.
+
+> **Storage location (recorded 3 August 2026).** The Team Builder visual identity is **one object on the franchise document**: `franchises.team_builder`. It is **not** on FTD. Apply also stamps `team_name` / `primary_color` / `secondary_color` onto the FTD row as a **disposable cache** for roster joins (gob-asset-architecture §3.2) — rebuildable from the overlay. On read, a missing FTD cache falls back to the overlay and writes the mirror back (`ensure_ftd_identity_cache`). Court is written only to `franchises.team_builder`, never to FTD, GridFS, or disk.
 
 Two failures in one:
 
@@ -551,7 +555,7 @@ No error is raised at any point — the preview looks right, Apply succeeds, and
 >
 > Every sweep test passed while this was mislabelled, because the tests asserted *that a colour changed*, not *that the correct region changed*. Region-identity probes now check midcourt against outside wood and the left lobe against inside wood, and assert the lobe does **not** match outside when tones differ.
 
-**Persisted key renamed 3 August 2026:** `centreCourtColor` → `outsideWoodColor`. Done while free — Apply still drops the `court` field (§6.3b), so nothing was stored under the old name. The round-trip must write `outsideWoodColor`; do not reintroduce the misnamed key.
+**Persisted key renamed 3 August 2026:** `centreCourtColor` → `outsideWoodColor`. Round-trip writes `outsideWoodColor` only.
 
 **Constraints:**
 

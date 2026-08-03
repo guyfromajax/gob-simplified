@@ -1319,7 +1319,7 @@ function buildHomeRecruitRowHtml(recruit) {
       <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
-      <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : ''}">${escapeHomeHtml(recruit.rt ?? '--')}</span>
+      <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : ''}">${escapeHomeHtml(formatRtDisplay(recruit.rt))}</span>
     </div>
   `;
   if (!isNewLeanRecruit(recruit)) return rowHtml;
@@ -1339,7 +1339,7 @@ function buildFccInviteBlockHtml(recruit, week, wide) {
     : '';
   const weightDisplay = recruit.weight != null ? recruit.weight : '--';
   const meta = `${recruit.archetype || '--'} · ${recruit.height || '--'} / ${weightDisplay}`;
-  const rtDisplay = recruit.rt != null ? recruit.rt : '--';
+  const rtDisplay = formatRtDisplay(recruit.rt);
   const eyebrow = isAssigned ? 'Recruiting Visit' : `Week ${Number(week)} Invite`;
   const statusHtml = isAssigned
     ? ''
@@ -2136,7 +2136,7 @@ function renderFccRecruits() {
         '<td>' + recruit.attrs.ND + '</td>',
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
-        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>'
+        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + formatRtDisplay(recruit.rt) + '</td>'
       ].join('');
       tbody.appendChild(tr);
     });
@@ -2483,7 +2483,7 @@ function renderRecruits(data) {
       return Math.floor(value / 10);
     };
     
-    tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${formatAttr(a.SC)}</td><td>${formatAttr(a.SH)}</td><td>${formatAttr(a.ID)}</td><td>${formatAttr(a.OD)}</td><td>${formatAttr(a.PS)}</td><td>${formatAttr(a.BH)}</td><td>${formatAttr(a.RB)}</td><td>${formatAttr(a.AG)}</td><td>${formatAttr(a.ST)}</td><td>${formatAttr(a.ND)}</td><td>${formatAttr(a.IQ)}</td><td>${formatAttr(a.FT)}</td><td>${r.rt ?? '-'}</td>`;
+    tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${formatAttr(a.SC)}</td><td>${formatAttr(a.SH)}</td><td>${formatAttr(a.ID)}</td><td>${formatAttr(a.OD)}</td><td>${formatAttr(a.PS)}</td><td>${formatAttr(a.BH)}</td><td>${formatAttr(a.RB)}</td><td>${formatAttr(a.AG)}</td><td>${formatAttr(a.ST)}</td><td>${formatAttr(a.ND)}</td><td>${formatAttr(a.IQ)}</td><td>${formatAttr(a.FT)}</td><td>${formatRtDisplay(r.rt)}</td>`;
     tbody.appendChild(tr);
   });
   
@@ -2817,7 +2817,7 @@ function renderTeam(data) {
     });
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
     addCell(
-      p.rt ?? '-',
+      formatRtDisplay(p.rt),
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
     );
 
@@ -3106,7 +3106,7 @@ function sortRosterTable(columnName, direction) {
     });
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
     addCell(
-      p.rt ?? '-',
+      formatRtDisplay(p.rt),
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
     );
 

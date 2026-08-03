@@ -104,8 +104,16 @@ def _build_franchise_team_maps_from_ftd(
 
     Used for finalize_game, play stats, and defense stats. Replaces former
     FTD-based mapping. Returns (team_name_to_id, team_id_to_object_id).
+
+    Core ``teams.name`` seeds the name map. Team Builder custom names come from
+    the authoritative overlay (with FTD identity cache healed on miss) so a
+    partial Apply cannot leave custom-name joins broken.
     """
     from BackEnd.db import franchise_team_data_collection, teams_collection
+    from BackEnd.utils.franchise_team_display import (
+        ensure_ftd_identity_cache,
+        get_team_builder_overlay,
+    )
 
     doc_id = ObjectId(franchise_id) if isinstance(franchise_id, str) else franchise_id
     team_name_to_id: Dict[str, str] = {}
@@ -114,7 +122,7 @@ def _build_franchise_team_maps_from_ftd(
         ftd_docs = list(
             franchise_team_data_collection.find(
                 {"franchise_id": doc_id},
-                {"team_id": 1},
+                {"team_id": 1, "team_name": 1, "primary_color": 1, "secondary_color": 1},
             )
         )
     except Exception as e:
@@ -144,6 +152,31 @@ def _build_franchise_team_maps_from_ftd(
                 team_name_to_id[name] = team_id_str
             if canonical:
                 team_id_to_object_id[canonical] = team_id_str
+
+    # Custom display name + FTD identity cache heal (disposable mirror of overlay).
+    try:
+        overlay = get_team_builder_overlay(doc_id)
+        if overlay:
+            replaced = overlay.get("replaced_object_id")
+            if replaced:
+                ftd_for_slot = next(
+                    (d for d in ftd_docs if str(d.get("team_id")) == str(replaced)),
+                    None,
+                )
+                identity = ensure_ftd_identity_cache(
+                    doc_id,
+                    replaced,
+                    ftd_doc=ftd_for_slot,
+                    write_back=True,
+                )
+                custom_name = identity.get("team_name")
+                if custom_name and custom_name != "?":
+                    team_name_to_id[custom_name] = str(replaced)
+    except Exception as e:
+        logger.warning(
+            "⚠️ [_build_franchise_team_maps_from_ftd] overlay/cache heal failed: %s",
+            e,
+        )
 
     return team_name_to_id, team_id_to_object_id
 

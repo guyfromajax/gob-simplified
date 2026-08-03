@@ -54,10 +54,34 @@ The canonical color scale for player attribute bar fills throughout the product.
 - **61–80:** `#34EC27` — green (solid)
 - **81+:** `#4A90D9` — light blue (elite, including 100+)
 
-### Recruit RT Scale
-Recruit RT text (recruiting surfaces only): **0–29** red, **30–39** yellow, **40–49** green, **50+** blue — same hex values and `.rt-*` classes as above. Helpers live in `/js/shared/rtBucket.js`.
+### RT Letter-Grade Scale
 
-Since recruits gained year values (JH/FR/SO/JR), the recruit-specific breakpoints apply to **JH recruits only**; FR/SO/JR recruits use the standard player Attribute Bar Scale. Use `getRecruitRtBucketClassForYear(rt, year)`, which handles the switch (`getRecruitRtBucketClass` is the JH-only bucket function).
+All overall/best RT and individual PG/SG/SF/PF/C position ratings display as
+letter grades. This scale is identical for active players and recruits of every
+year; there is no JH-specific display scale.
+
+| Numeric RT | Display | Color | Class |
+|---:|:---:|---|---|
+| 100+ | **A++** | `#4A90D9` light blue | `.rt-elite` |
+| 90–99 | **A+** | `#4A90D9` light blue | `.rt-elite` |
+| 80–89 | **A** | `#4A90D9` light blue | `.rt-elite` |
+| 70–79 | **B+** | `#34EC27` green | `.rt-high` |
+| 60–69 | **B** | `#34EC27` green | `.rt-high` |
+| 50–59 | **C+** | `#FFD700` yellow | `.rt-mid` |
+| 40–49 | **C** | `#FFD700` yellow | `.rt-mid` |
+| Below 40 | **F** | `#ff6d6d` red | `.rt-low` |
+
+RT remains numeric in persistence, API fields, calculations, sorting, filters,
+and simulation. Convert it only at the final display boundary with
+`formatRtDisplay()` from `/js/shared/rtBucket.js`; backend-authored copy uses
+`BackEnd/utils/rt_display.py`. Numeric development deltas such as `+6 RT`
+remain numeric. Recruiting minimum-RT controls show the exact threshold and its
+grade together (for example `75 (B+)`).
+
+The frontend experiment is globally reversible: change `RT_DISPLAY_MODE` from
+`letter` to `number` in `/common.js`. Backend-authored prose has the matching
+`RT_DISPLAY_MODE` in `BackEnd/utils/rt_display.py`. Do not implement page-local
+bands.
 
 ### Class Year Display
 Player class year is **always shown as a two-letter abbreviation** in UI/UX — never spelled out (e.g. never "Senior" or "Freshman" in tables, cards, modals, or detail views).
@@ -83,8 +107,9 @@ Player class year is **always shown as a two-letter abbreviation** in UI/UX — 
 - Green (`#34EC27`) is reserved exclusively for gating actions and positive semantic data states. It must never appear as a decorative, atmospheric, or brand color.
 - Orange is the key action color of the product and the standard for all non-gating primary actions.
 - Team-color theming should affect franchise card atmosphere and community highlight rows only — not core readability surfaces, tabs, or panels.
-- The Attribute Bar Scale must be applied consistently for **player** RT display.
-- **Recruit RT** uses the recruit breakpoints for JH recruits only (0–29 / 30–39 / 40–49 / 50+; same hex colors and CSS classes); FR/SO/JR recruits use the player scale via `getRecruitRtBucketClassForYear`. See §Recruit RT Scale.
+- The Attribute Bar Scale applies to actual player attributes; RT values use the
+  unified RT Letter-Grade Scale.
+- Player and recruit RT use the same grade and color bands regardless of year.
 - Semantic colors must never be used for buttons, navigation, or interactive controls.
 - Dark Blue (`#27408E`) must never be used as a stat fill, attribute bar color, pill color, or any data visualization color.
 

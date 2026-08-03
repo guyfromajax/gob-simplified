@@ -700,7 +700,7 @@ function renderRosterInto(data, tbodyId) {
     });
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
     addCell(
-      p.highestRT !== null ? p.highestRT : '-',
+      p.highestRT !== null ? formatRtDisplay(p.highestRT) : '-',
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.highestRT) : ''
     );
     

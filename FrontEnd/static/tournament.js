@@ -509,7 +509,7 @@ function renderRoster() {
         : (rawVal != null ? Math.floor(rawVal / 10) : '--');
       addCell(displayVal);
     });
-    addCell(p.rt ?? '-');
+    addCell(p.rt != null ? formatRtDisplay(p.rt) : '-');
     
     tbody.appendChild(tr);
   });

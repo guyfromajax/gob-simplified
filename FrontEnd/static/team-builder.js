@@ -2209,7 +2209,9 @@
               primary_color: state.colors.primary,
               secondary_color: state.colors.secondary,
               jersey_preset: state.colors.jersey_preset,
-              court: state.colors.court,
+              // Prefer server-persisted court from Apply response (source of truth).
+              court:
+                (data.team_builder && data.team_builder.court) || state.colors.court,
               asset_strategy: 'generated',
               is_custom_team: true,
               team_builder_replaced_name: state.slot.name,

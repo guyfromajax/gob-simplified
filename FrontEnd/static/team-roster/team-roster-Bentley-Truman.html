@@ -208,7 +208,7 @@
       // Toggle button - shows highest rated position
       const toggle = document.createElement('button');
       toggle.className = 'ratings-dropdown-toggle';
-      toggle.innerHTML = `${topPos}: ${topRating} <span style="font-size: 10px;">▼</span>`;
+      toggle.innerHTML = `${topPos}: ${formatRtDisplay(topRating)} <span style="font-size: 10px;">▼</span>`;
       toggle.addEventListener('click', (e) => {
         e.stopPropagation();
         dropdown.classList.toggle('open');
@@ -223,7 +223,7 @@
       entries.forEach(([pos, rating]) => {
         const item = document.createElement('div');
         item.className = 'ratings-dropdown-item';
-        item.innerHTML = `<span>${pos}</span><span>${rating}</span>`;
+        item.innerHTML = `<span>${pos}</span><span>${formatRtDisplay(rating)}</span>`;
         list.appendChild(item);
       });
       
@@ -420,5 +420,4 @@
   <script src="/js/shared/attributeTooltips.js"></script>
 </body>
 </html>
-
 

@@ -91,9 +91,13 @@ Persisted DB field is `position_ratings` (written by `game_manager._update_posit
 - `add_position_ratings(player)` — returns a copy with ratings under key `ratings`.
 - `_clamp(value, lower=1, upper=100)` — `compute_position_ratings` passes `upper=None`, so RT is only floored at 1.
 
-## Recruit RT display (UI)
+## RT display (UI)
 
-On recruiting surfaces, displayed **RT** is the recruit's **best position rating** (max of `PG`–`C`). Colored RT text uses `getRecruitRtBucketClass` in `/js/shared/rtBucket.js` with breakpoints **0–29 / 30–39 / 40–49 / 50+** (see `Recruiting_System.md` and Styleguide §Recruit RT Scale). Player roster/lineup RT uses the separate player scale via `getRtBucketClass`.
+RT remains numeric internally. Overall/best RT and each PG/SG/SF/PF/C rating
+are converted to the unified letter-grade display only at the UI or prose
+boundary. Players and recruits of every year use the same bands. See
+`Styleguide.md` §RT Letter-Grade Scale for the canonical mapping, colors,
+formatter, and rollback switch.
 
 ## Tunable Constants
 

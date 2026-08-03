@@ -580,7 +580,7 @@
         '<td>' + escapeHtml(recruit.attrs.ND) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.IQ) + '</td>',
         '<td>' + escapeHtml(recruit.attrs.FT) + '</td>',
-        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</td>',
+        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit.rt != null ? escapeHtml(formatRtDisplay(recruit.rt)) : '--') + '</td>',
         '<td>' + getLeanCellHtml(recruit) + '</td>',
         '<td>' + (rank
           ? '<button class="picked-rank-badge" type="button" data-action="scroll-to-pick" data-recruit-id="' + escapeHtml(recruit.recruitId) + '">' + rank + '</button>'
@@ -678,7 +678,7 @@
       '<td>' + (recruit && recruit.weight != null ? recruit.weight : '--') + '</td>',
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
       '<td>' + (recruit ? recruit.yearDisplay : '--') + '</td>',
-      '<td class="' + (recruit && typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
+      '<td class="' + (recruit && typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit && recruit.rt != null ? formatRtDisplay(recruit.rt) : '--') + '</td>',
       '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
       '<td class="points-cell"><div class="points-stepper">' +
         '<button type="button" class="points-step points-step-dec" data-action="points-dec" data-index="' + index + '"' + (recruit ? '' : ' disabled') + ' aria-label="Decrease points">−</button>' +
@@ -699,7 +699,7 @@
       '<td>' + (recruit ? recruit.archetype : '--') + '</td>',
       '<td>' + (recruit ? recruit.pos : '--') + '</td>',
       '<td>' + (recruit ? recruit.yearDisplay : '--') + '</td>',
-      '<td class="' + (recruit && typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit && recruit.rt != null ? recruit.rt : '--') + '</td>',
+      '<td class="' + (recruit && typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit && recruit.rt != null ? formatRtDisplay(recruit.rt) : '--') + '</td>',
       '<td>' + (recruit ? getLeanCellHtml(recruit) : '--') + '</td>',
       '<td>' + buildAdjustButtons(index, !!recruit) + '</td>',
       '<td><button class="recruiting-remove-btn" type="button" data-action="remove" data-index="' + index + '"' + (recruit ? '' : ' disabled') + '>x</button></td>'
@@ -781,7 +781,7 @@
       '<div class="slot-grip" aria-hidden="true">' + buildGripHtml() + '</div>',
       '<div class="slot-body">',
       '<div class="slot-name" title="' + escapeHtml(recruit.name) + '">' + formatInviteListNameDisplay(recruit.name) + '</div>',
-      '<div class="slot-meta"><span class="slot-rank">' + (index + 1) + '</span><span class="slot-pos-badge">' + escapeHtml(recruit.pos) + '</span><span>' + escapeHtml(recruit.yearDisplay) + '</span><span>' + escapeHtml(recruit.homeRegion) + '</span><span class="slot-rt ' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">RT ' + (recruit.rt != null ? escapeHtml(recruit.rt) : '--') + '</span></div>',
+      '<div class="slot-meta"><span class="slot-rank">' + (index + 1) + '</span><span class="slot-pos-badge">' + escapeHtml(recruit.pos) + '</span><span>' + escapeHtml(recruit.yearDisplay) + '</span><span>' + escapeHtml(recruit.homeRegion) + '</span><span class="slot-rt ' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">RT ' + (recruit.rt != null ? escapeHtml(formatRtDisplay(recruit.rt)) : '--') + '</span></div>',
       '</div>',
       isUserInLeanTopThree(recruit) ? '<span class="lean-dot is-solid" aria-label="Your team is on this recruit\u2019s lean list"></span>' : '<span></span>',
       '<button class="slot-remove" type="button" data-action="remove" data-index="' + index + '" aria-label="Remove ' + escapeHtml(recruit.name) + '">×</button>'
@@ -854,7 +854,7 @@
     if (recruit && Number(recruit.rt || 0) >= 60 && !isWeek35Mode()) {
       showModal({
         title: 'Remove Recruit?',
-        message: 'This recruit is rated ' + recruit.rt + '. Remove ' + recruit.name + ' from your invite list?',
+        message: 'This recruit is rated ' + formatRtDisplay(recruit.rt) + '. Remove ' + recruit.name + ' from your invite list?',
         accent: 'is-red',
         actions: [
           { label: 'Keep', variant: 'secondary' },
@@ -1084,7 +1084,10 @@
     var picksToggle = document.getElementById('show-only-picks-toggle');
     if (search) search.value = poolFilters.search || '';
     if (slider) slider.value = String(poolFilters.rtMin || 0);
-    if (sliderValue) sliderValue.textContent = String(poolFilters.rtMin || 0);
+    if (sliderValue) {
+      var minimumRt = Number(poolFilters.rtMin || 0);
+      sliderValue.textContent = minimumRt + ' (' + formatRtDisplay(minimumRt) + ')';
+    }
     if (leansOnly) leansOnly.checked = !!poolFilters.leansOnly;
     if (picksToggle) {
       picksToggle.classList.toggle('is-active', showOnlyMine);
@@ -1134,7 +1137,9 @@
       slider.addEventListener('input', function () {
         poolFilters.rtMin = Number(slider.value || 0);
         var sliderValue = document.getElementById('rt-min-value');
-        if (sliderValue) sliderValue.textContent = String(poolFilters.rtMin);
+        if (sliderValue) {
+          sliderValue.textContent = poolFilters.rtMin + ' (' + formatRtDisplay(poolFilters.rtMin) + ')';
+        }
         saveVisitPreferences();
         renderRecruitList();
       });

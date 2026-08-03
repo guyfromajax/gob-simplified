@@ -39,18 +39,18 @@
     return (clean.slice(0, 3) || '???').toUpperCase();
   }
 
-  // RT color class, honoring the year-aware recruit/player switch (decision: keep the
-  // existing switch — recruit scale for JH, player scale for FR/SO/JR).
+  // Unified RT color class; the year argument remains for call-site compatibility.
   function rtClassForYear(rt, year) {
     if (typeof global.getRecruitRtBucketClassForYear === 'function') {
       return global.getRecruitRtBucketClassForYear(rt, year);
     }
-    // Fallback (helper absent): recruit scale.
+    // Fallback (helper absent): shared player/recruit scale.
+    if (rt === null || rt === undefined || rt === '') return 'rt-unknown';
     var v = Number(rt);
     if (!isFinite(v)) return 'rt-unknown';
-    if (v <= 29) return 'rt-low';
-    if (v <= 39) return 'rt-mid';
-    if (v <= 49) return 'rt-high';
+    if (v < 40) return 'rt-low';
+    if (v < 60) return 'rt-mid';
+    if (v < 80) return 'rt-high';
     return 'rt-elite';
   }
 

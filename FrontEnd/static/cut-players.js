@@ -166,7 +166,7 @@
       ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'].forEach(function (key) {
         addCell(formatAttr(attrs, key));
       });
-      addCell(player.highestRT != null ? player.highestRT : '-');
+      addCell(player.highestRT != null ? formatRtDisplay(player.highestRT) : '-');
 
       var checkTd = document.createElement('td');
       checkTd.className = 'cut-player-checkbox-cell';

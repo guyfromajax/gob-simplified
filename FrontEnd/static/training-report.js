@@ -592,7 +592,7 @@ function renderTrainingReportRecruitingBanner() {
       row.innerHTML =
         '<span class="trr-lean-name">' + Spine.esc(rec.name) + '</span>' +
         '<span class="trr-lean-pos">' + Spine.esc(rec.pos) + '</span>' +
-        '<span class="trr-lean-rt ' + rtCls + '">' + (rec.rt != null ? rec.rt : '--') + '</span>' +
+        '<span class="trr-lean-rt ' + rtCls + '">' + formatRtDisplay(rec.rt) + '</span>' +
         Spine.Lean.ladderHtml(model);
       list.appendChild(row);
     });
@@ -622,7 +622,7 @@ function renderTrainingReportRecruitingBanner() {
     metaLineEl.appendChild(document.createTextNode('RT: '));
     const span = document.createElement('span');
     span.className = window.getRecruitRtBucketClass(match[1]);
-    span.textContent = match[1];
+    span.textContent = formatRtDisplay(match[1]);
     metaLineEl.appendChild(span);
     last = match.index + match[0].length;
   }
@@ -1020,7 +1020,7 @@ function renderPlayersTable() {
       });
     }
 
-    row.appendChild(createCell(getPlayerHighestRt(player)));
+    row.appendChild(createCell(formatRtDisplay(getPlayerHighestRt(player))));
     
     tbody.appendChild(row);
   });

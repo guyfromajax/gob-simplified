@@ -86,7 +86,7 @@ function renderProjectedStartingFive(rows, containerOrOpts) {
       const av = r.attributes && r.attributes[k] != null ? r.attributes[k] : '—';
       cells.push(String(av));
     });
-    cells.push(r.rt != null ? String(r.rt) : '—');
+    cells.push(typeof formatRtDisplay === 'function' ? formatRtDisplay(r.rt) : (r.rt != null ? String(r.rt) : '—'));
     cells.forEach((text) => {
       const td = document.createElement('td');
       td.textContent = text;
@@ -161,7 +161,7 @@ function renderProjectedStartingFiveCards(rows, opts) {
         : pid && window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function'
           ? window.API_CONFIG.getPlayerImageUrl(pid, { size: 'card' })
         : genericUrl;
-    const rt = r.rt != null ? r.rt : '—';
+    const rt = typeof formatRtDisplay === 'function' ? formatRtDisplay(r.rt) : (r.rt != null ? r.rt : '—');
     const rtClass =
       typeof getRtBucketClass === 'function' ? getRtBucketClass(r.rt) : 'rt-unknown';
     const jersey =
