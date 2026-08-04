@@ -161,9 +161,11 @@ function renderProjectedStartingFiveCards(rows, opts) {
         : pid && window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function'
           ? window.API_CONFIG.getPlayerImageUrl(pid, { size: 'card' })
         : genericUrl;
-    const rt = typeof formatRtWithPotentialDisplay === 'function'
-      ? formatRtWithPotentialDisplay(r.rt, r.potential_rt_ratcheted)
-      : (typeof formatRtDisplay === 'function' ? formatRtDisplay(r.rt) : (r.rt != null ? r.rt : '—'));
+    // Starting-five cards show the CURRENT rating only; the current/potential pair
+    // stays in the attribute grid (roster + scouting tables).
+    const rt = typeof formatRtDisplay === 'function'
+      ? formatRtDisplay(r.rt)
+      : (r.rt != null ? r.rt : '—');
     const rtClass =
       typeof getRtBucketClass === 'function' ? getRtBucketClass(r.rt) : 'rt-unknown';
     const jersey =
@@ -179,7 +181,7 @@ function renderProjectedStartingFiveCards(rows, opts) {
     article.innerHTML = `
       <div class="p5-photo">
         <span class="p5-pos">${scoutingEscapeHtml(r.position || '—')}</span>
-        <span class="p5-rt-badge ${scoutingEscapeHtml(rtClass)}" data-tooltip="current/potential" title="current/potential">${scoutingEscapeHtml(rt)}</span>
+        <span class="p5-rt-badge ${scoutingEscapeHtml(rtClass)}">${scoutingEscapeHtml(rt)}</span>
         <img loading="lazy" width="240" height="240" src="${scoutingEscapeHtml(imgSrc)}" alt="${scoutingEscapeHtml(name)}">
       </div>
       <div class="p5-body">

@@ -19,8 +19,6 @@ let rosterSortColumn = 'RT';
 let rosterSortDirection = 'desc';
 let statsSortColumn = 'PTS';
 let statsSortDirection = 'desc';
-/** @type {'single' | 'full'} */
-let attrDisplayMode = 'single';
 // True once Week 35 Recruiting Day has run — recruits join the Practice Squad section.
 let practiceSquadRecruitingDone = false;
 
@@ -127,7 +125,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup sorting
   setupRosterSorting();
   setupStatsSorting();
-  setupAttrDisplayToggle();
 });
 
 function setupBackButton() {
@@ -501,36 +498,13 @@ function getRawAttrValue(attrs, attr) {
 function formatAttrForDisplay(attrs, attr) {
   const rawVal = getRawAttrValue(attrs, attr);
   if (rawVal == null) return '--';
-  if (attrDisplayMode === 'full') {
-    return String(Math.round(rawVal));
-  }
   return Math.floor(rawVal / 10);
 }
 
 function getAttrSortValue(attrs, attr) {
   const rawVal = getRawAttrValue(attrs, attr);
   if (rawVal == null) return -Infinity;
-  if (attrDisplayMode === 'full') {
-    return rawVal;
-  }
   return Math.floor(rawVal / 10);
-}
-
-function setupAttrDisplayToggle() {
-  const singleBtn = document.getElementById('attr-display-single');
-  const fullBtn = document.getElementById('attr-display-full');
-  if (!singleBtn || !fullBtn) return;
-
-  const setMode = (mode) => {
-    attrDisplayMode = mode;
-    singleBtn.classList.toggle('active', mode === 'single');
-    fullBtn.classList.toggle('active', mode === 'full');
-    renderRoster();
-    renderTrainingSquadView();
-  };
-
-  singleBtn.addEventListener('click', () => setMode('single'));
-  fullBtn.addEventListener('click', () => setMode('full'));
 }
 
 function renderStartingFive() {
