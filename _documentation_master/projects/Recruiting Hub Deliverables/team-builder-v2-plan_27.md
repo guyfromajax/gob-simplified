@@ -3,7 +3,7 @@
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
 **Spec version:** 2.0 — draft for alignment
-**Status:** **Phases 0–3 closed**, verified by a clean played week including a mid-game resume and a non-mod control. 3a (banner), 3b (court) and 3d (portraits, 99.2% exact match) shipped; the §4.5c rescope is implemented. **3c (uploads) is the committed fast follow** — deferred deliberately as the only workstream requiring infrastructure. A UX and design overhaul runs next, briefed that uploads are coming.
+**Status:** Phases 0, 1 and 2 **closed**. Phase 3a (banner), 3b (court) **closed**. Rescope (§4.5c) implemented. Phase 3d — `builder_set_0001` delivered, assignment and picker built at **99.2% exact match**; **pending the live uniform check** (§4.5c acceptance 28). 3c (uploads) is a post-launch fast follow.
 **Last updated:** 1 August 2026
 
 ---

@@ -1319,7 +1319,7 @@ function buildHomeRecruitRowHtml(recruit) {
       <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
-      <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : ''}">${escapeHomeHtml(formatRtDisplay(recruit.rt))}</span>
+      <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : ''}">${escapeHomeHtml(formatRtWithPotentialDisplay(recruit.rt, recruit.potentialRt))}</span>
     </div>
   `;
   if (!isNewLeanRecruit(recruit)) return rowHtml;
@@ -1339,7 +1339,7 @@ function buildFccInviteBlockHtml(recruit, week, wide) {
     : '';
   const weightDisplay = recruit.weight != null ? recruit.weight : '--';
   const meta = `${recruit.archetype || '--'} · ${recruit.height || '--'} / ${weightDisplay}`;
-  const rtDisplay = formatRtDisplay(recruit.rt);
+  const rtDisplay = formatRtWithPotentialDisplay(recruit.rt, recruit.potential_rt_ratcheted);
   const eyebrow = isAssigned ? 'Recruiting Visit' : `Week ${Number(week)} Invite`;
   const statusHtml = isAssigned
     ? ''
@@ -2136,7 +2136,7 @@ function renderFccRecruits() {
         '<td>' + recruit.attrs.ND + '</td>',
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
-        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + formatRtDisplay(recruit.rt) + '</td>'
+        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + formatRtWithPotentialDisplay(recruit.rt, recruit.potentialRt) + '</td>'
       ].join('');
       tbody.appendChild(tr);
     });
@@ -2186,6 +2186,7 @@ function initFccRecruits(topData) {
       year: player.year || 'JH',
       yearDisplay: RecruitingCommon.formatYearAbbrev(player.year || 'JH'),
       rt: player.rt != null ? Number(player.rt) : null,
+      potentialRt: player.potential_rt_ratcheted != null ? Number(player.potential_rt_ratcheted) : null,
       leanDisplay: '',
       leanSortValue: '',
       attrs: {

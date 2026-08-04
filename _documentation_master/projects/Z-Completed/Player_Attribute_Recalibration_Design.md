@@ -174,6 +174,21 @@ C's intent match went from 77.6% to 100% on this change alone.
 | exact ties | 8.1% | **2.5%** | well below 8% |
 | argmax matches intent | n/a | 95.3% | — |
 
+> **Acceptance criterion corrected — 2026-08-04.** The `argmax within 5 of 20` gauge above was fitted against a **mature-height** population and does **not** describe the grow-into-frame league that shipped. Under grow-into-frame a young frontcourt player sits ~2in below his adult frame, so he reads one slot **toward the perimeter** until he grows in; at any snapshot the aggregate argmax therefore skews toward the guards. Measured on the post-recal pool: argmax **SG 25.1% / SF 14.4%** against intent **SG 20.5% / SF 18.0%**. This is correct behaviour, not drift.
+>
+> **The correct gauge is INTENT supply** (`position_intent`, ~20% each by construction — a fresh league at uniform intent reproduces the same argmax skew, confirming it is a generator property). **SR-only argmax** is the secondary check: by SR the frame is grown in and argmax converges on intent. Evidence — SF-intent players' argmax landing by class year (freshly generated, 200/yr):
+>
+> | year | argmax SG | argmax SF |
+> |---|---|---|
+> | FR | 41.5% | 58.0% |
+> | SO | 23.5% | 76.0% |
+> | JR | 21.0% | 79.0% |
+> | SR | 12.5% | **87.0%** |
+>
+> A freshman SF reads 41.5% SG; by SR **87%** read SF. The skew concentrates in FR/SO and self-corrects with maturity.
+>
+> **Display interaction.** The locked decision sets **display position = training position (`position_intent`)**, not argmax — so once the display sweep lands, this skew is **invisible to users**. It surfaces today only because OVERALL is still max-RT (argmax).
+
 Ladder alignment on the same population:
 
 | | FR | SO | JR | SR |

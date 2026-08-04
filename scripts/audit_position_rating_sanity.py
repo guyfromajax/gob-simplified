@@ -250,6 +250,16 @@ def _build_report(
         ("Position", "Count", "%"),
         ((pos, argmax_counts[pos], _pct(argmax_counts[pos], player_count)) for pos in POSITIONS),
     )
+    lines += [
+        "",
+        "> **Gauge note (grow-into-frame).** Argmax vs a 20%-per-position balance is "
+        "**descriptive only, not an acceptance gate.** This is a grow-into-frame league: a young "
+        "frontcourt player sits ~2in below his adult frame and reads one slot toward the perimeter "
+        "until he grows in, so aggregate argmax skews toward the guards (SG high, SF/C low in FR/SO, "
+        "converging by SR). The acceptance gauge is **INTENT supply** (`position_intent`, ~20% each), "
+        "with **SR-only argmax** as the secondary check. See "
+        "`Player_Attribute_Recalibration_Design` §3.6.4 for the mechanism and SF-intent-by-year evidence.",
+    ]
 
     lines += ["", "## B. Height by argmax position", ""]
     lines += _markdown_table(

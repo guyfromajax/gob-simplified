@@ -8435,6 +8435,14 @@ def command_center_data(
                         {"_id": 0, "franchise_id": 0},
                     )
                 )
+                # Projected ceiling per recruit (§Phase 4) — already ratcheted; the FCC
+                # recruit surfaces format current/potential. Recruits with no entry_tier
+                # (season-1 set_0001) resolve to None → the view shows the current grade alone.
+                from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD, potential_rt_for_player
+                for _rec in response["lean_recruits"]:
+                    _rec[POTENTIAL_RT_FIELD] = potential_rt_for_player(
+                        str(_rec.get("recruit_id")), _rec.get("entry_tier"),
+                        _rec.get("potential_factor"), _rec.get("position_ratings") or {})
                 # Display names at the edge (Team Builder overlay); never raw core names.
                 from BackEnd.utils.franchise_team_display import resolve_team_name_map
 
@@ -8445,6 +8453,11 @@ def command_center_data(
                     for player in (week_35_results.get("signed_players") or [])
                     if str(player.get("team_id") or "") == str(team_id)
                 ]
+                for _sp in response["week_35_user_recruits"]:
+                    _sp[POTENTIAL_RT_FIELD] = potential_rt_for_player(
+                        str(_sp.get("player_id") or _sp.get("recruit_id")),
+                        _sp.get("entry_tier"), _sp.get("potential_factor"),
+                        _sp.get("position_ratings") or {})
                 response["current_week_invite_recruit"] = _fcc_current_week_invite_recruit(
                     franchise_doc,
                     str(team_id),
@@ -9782,6 +9795,7 @@ def _fcc_recruit_invite_payload(
     status: str,
 ) -> dict[str, Any]:
     weight = recruit_doc.get("weight")
+    from BackEnd.utils.rt_projection import potential_rt_for_player
     return {
         "recruit_id": recruit_id,
         "name": _recruit_display_name_for_training_report(recruit_doc),
@@ -9790,6 +9804,11 @@ def _fcc_recruit_invite_payload(
         "weight": int(weight) if isinstance(weight, (int, float)) else None,
         "year": recruit_doc.get("year") or "JH",
         "rt": _recruit_rt(recruit_doc),
+        # Ratcheted projected ceiling; None (→ current-only) when there is no basis,
+        # e.g. season-1 set_0001 recruits that carry no entry_tier.
+        "potential_rt_ratcheted": potential_rt_for_player(
+            str(recruit_id), recruit_doc.get("entry_tier"),
+            recruit_doc.get("potential_factor"), recruit_doc.get("position_ratings") or {}),
         "status": status,
     }
 
