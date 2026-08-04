@@ -176,15 +176,6 @@ def classify_team_builder_player(player: Mapping[str, Any]) -> dict[str, Any] | 
         weight_i = int(weight) if weight is not None else None
     except (TypeError, ValueError):
         return None
-    if not height_i or not weight_i:
-        return None
-
-    attrs = player.get("attributes") or player.get("attrs") or {}
-    st = attrs.get("ST") if isinstance(attrs, Mapping) else None
-    ag = attrs.get("AG") if isinstance(attrs, Mapping) else None
-    rt = player.get("rt")
-    if rt is None:
-        rt = _best_position_rt(player, attrs)
 
     meta = player.get("meta") if isinstance(player.get("meta"), Mapping) else {}
     first = str(
@@ -199,6 +190,22 @@ def classify_team_builder_player(player: Mapping[str, Any]) -> dict[str, Any] | 
     ).strip()
     if not pid:
         return None
+
+    # §10.3b — weight is not previewed on the client. When the wizard omits it
+    # (height edited → "Set at creation"), derive here for frame classification only.
+    if height_i and not weight_i:
+        from BackEnd.utils.player_generation import weight_from_height
+
+        weight_i = weight_from_height(height_i, player_id=pid)
+    if not height_i or not weight_i:
+        return None
+
+    attrs = player.get("attributes") or player.get("attrs") or {}
+    st = attrs.get("ST") if isinstance(attrs, Mapping) else None
+    ag = attrs.get("AG") if isinstance(attrs, Mapping) else None
+    rt = player.get("rt")
+    if rt is None:
+        rt = _best_position_rt(player, attrs)
 
     payload = {
         "_id": pid,
@@ -618,6 +625,7 @@ def get_or_create_wizard_portraits(
     draft_id: str,
     players: Sequence[Mapping[str, Any]],
     force_reassign: bool = False,
+    force_reassign_slots: Sequence[int] | None = None,
 ) -> list[dict[str, Any]]:
     """
     Idempotent portrait map keyed on (user_id, draft_id, replaced_object_id).
@@ -643,10 +651,21 @@ def get_or_create_wizard_portraits(
     }
     existing = col.find_one(query, {"portraits": 1}) or {}
     stored = existing.get("portraits") if not force_reassign else None
+    reassign_set = {
+        int(i) for i in (force_reassign_slots or []) if isinstance(i, (int, float)) or str(i).isdigit()
+    }
     preserve: dict[int, dict[str, Any]] = {}
     if isinstance(stored, list) and len(stored) == 15:
         for i, row in enumerate(stored):
-            if isinstance(row, Mapping) and row.get("image_id") and row.get("player_id"):
+            if not isinstance(row, Mapping):
+                continue
+            pid = str(row.get("player_id") or "").strip()
+            if i in reassign_set:
+                # Drop image so classification re-runs; keep player_id for §6.5 / §10.3b.
+                if pid:
+                    preserve[i] = {"player_id": pid, "source": "auto"}
+                continue
+            if row.get("image_id") and pid:
                 preserve[i] = dict(row)
 
     assignments = assign_roster_portraits(players, preserve=preserve)

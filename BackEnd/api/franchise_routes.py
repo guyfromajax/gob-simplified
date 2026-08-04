@@ -3563,6 +3563,8 @@ class TeamBuilderPortraitsAssignRequest(BaseModel):
     draft_id: str
     players: list[TeamBuilderPortraitPlayer]
     force_reassign: bool = False
+    # §10.4 — re-run assignment for these slots only (height edit); locked picks omitted by FE.
+    force_reassign_slots: list[int] | None = None
 
 
 class TeamBuilderPortraitRerollRequest(BaseModel):
@@ -3592,7 +3594,11 @@ def team_builder_wizard_walk_ons(
     Repeat calls with the same key return the same three players (same ids and
     attributes) so a reload or retry cannot shop for a larger capped budget.
     """
-    from BackEnd.utils.team_builder_roster import get_or_create_wizard_walk_ons
+    from BackEnd.utils.team_builder_roster import (
+        compute_inherited_shape_budgets,
+        get_or_create_wizard_walk_ons,
+        load_core_roster_rows_for_slot,
+    )
 
     try:
         replaced_oid = ObjectId(str(body.replaced_object_id).strip())
@@ -3615,10 +3621,19 @@ def team_builder_wizard_walk_ons(
     except ValueError:
         raise HTTPException(status_code=400, detail="Unable to resolve wizard walk-ons key")
 
+    core_rows = load_core_roster_rows_for_slot(db, replaced_oid)
+    shape = compute_inherited_shape_budgets(core_rows, walk_ons)
+
     return {
         "walk_ons": walk_ons,
         "draft_id": draft_id,
         "replaced_object_id": str(replaced_oid),
+        # §10 — domain shipped as data; FE must not derive budgets or class ranks.
+        "height_budget": shape["height_budget"],
+        "class_budget": shape["class_budget"],
+        "class_rank": shape["class_rank"],
+        "height_min_in": shape["height_min_in"],
+        "height_max_in": shape["height_max_in"],
     }
 
 
@@ -3671,6 +3686,7 @@ def team_builder_portraits_assign(
             draft_id=draft_id,
             players=_tb_portrait_players_payload(body.players),
             force_reassign=bool(body.force_reassign),
+            force_reassign_slots=body.force_reassign_slots,
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -3811,7 +3827,7 @@ def team_builder_apply(
         normalize_jersey_preset,
     )
     from BackEnd.utils.team_builder_league_context import compute_league_attr_context
-    from BackEnd.utils.team_builder_roster import collect_budget_attrs
+    from BackEnd.utils.team_builder_roster import collect_roster_shape_fields
 
     existing_franchises = db.franchises.count_documents({"user_id": user.get("user_id")})
     if existing_franchises >= MAX_FRANCHISES_PER_USER:
@@ -3947,6 +3963,44 @@ def team_builder_apply(
                     f"({parts[2]}). Trim attributes or switch modes."
                 ),
             )
+        if msg.startswith("height_budget_exceeded:"):
+            parts = msg.split(":")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Team height {parts[1]}\" exceeds the inherited total "
+                    f"({parts[2]}\"). Shorten players — under is allowed; over is not."
+                ),
+            )
+        if msg.startswith("class_budget_mismatch:"):
+            parts = msg.split(":")
+            spent = int(parts[1])
+            budget = int(parts[2])
+            delta = spent - budget
+            if delta > 0:
+                detail = (
+                    f"Class total is {delta} over the inherited spend "
+                    f"({spent} vs {budget}). Drop seniority until it matches exactly."
+                )
+            else:
+                detail = (
+                    f"Class total is {-delta} under the inherited spend "
+                    f"({spent} vs {budget}). Add seniority until it matches exactly."
+                )
+            raise HTTPException(status_code=400, detail=detail)
+        if msg.startswith("height_out_of_range:"):
+            parts = msg.split(":")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Height {parts[1]}\" is outside {parts[2]}–{parts[3]} inches."
+                ),
+            )
+        if msg == "class_year_jh_forbidden":
+            raise HTTPException(
+                status_code=400,
+                detail="Junior-high (JH) is not available in Team Builder. Use FR, SO, JR, or SR.",
+            )
         if msg.startswith("roster_size_invalid:"):
             parts = msg.split(":")
             raise HTTPException(
@@ -3998,17 +4052,19 @@ def team_builder_apply(
             {"players": 1},
         ) or {}
         pids = [str(pid) for pid in (ftd.get("players") or []) if pid]
-        attrs_list = collect_budget_attrs(
+        shape_fields = collect_roster_shape_fields(
             franchise_players_data_collection,
             franchise_id,
             pids,
         )
-        if attrs_list:
+        if shape_fields["attrs"]:
             evaluation = evaluate_mode_roster(
                 attribute_mode=attribute_mode,
-                player_attrs=attrs_list,
+                player_attrs=shape_fields["attrs"],
                 team_pool=team_pool,
                 team_median=team_median,
+                heights=shape_fields["heights"],
+                class_years=shape_fields["class_years"],
             )
             budget_meta = {
                 "attribute_mode": evaluation["attribute_mode"],

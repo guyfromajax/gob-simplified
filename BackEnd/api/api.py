@@ -1761,6 +1761,10 @@ try:
         #
         # Optional franchise_id: chrome colors (and display_name) for the TB
         # replaced slot via resolve_team_display. Core ``name`` stays identity.
+        #
+        # height_total / class_total: core-12 sums for team-select rank filters
+        # (§10.5). Deliberately not the franchise-15 inherited budget basis.
+        from BackEnd.constants.team_builder_budget import class_rank_from_year
         from BackEnd.utils.franchise_team_display import resolve_team_display
 
         teams = list(
@@ -1774,14 +1778,42 @@ try:
                     "conference": 1,
                     "region": 1,
                     "team_id": 1,
+                    "player_ids": 1,
                     # Team Builder / franchise select card stats (§5.2).
                     "total_player_attrs": 1,
                     "prestige": 1,
                 },
             )
         )
-        rows = []
+
+        # One players scan for all core-12 height/class filter fields.
+        all_pid_variants = []
+        team_pid_keys = []
         for team in teams:
+            raw_ids = team.get("player_ids") or []
+            keys = []
+            for pid in raw_ids:
+                keys.append(str(pid))
+                all_pid_variants.append(pid)
+                try:
+                    from bson import ObjectId
+
+                    all_pid_variants.append(ObjectId(str(pid)))
+                except Exception:
+                    pass
+                all_pid_variants.append(str(pid))
+            team_pid_keys.append(keys)
+
+        by_id = {}
+        if all_pid_variants:
+            for doc in players_collection.find(
+                {"_id": {"$in": all_pid_variants}},
+                {"height": 1, "year": 1},
+            ):
+                by_id[str(doc.get("_id"))] = doc
+
+        rows = []
+        for team, pid_keys in zip(teams, team_pid_keys):
             oid = str(team["_id"]) if team.get("_id") is not None else None
             try:
                 total_attrs = int(team.get("total_player_attrs") or 0)
@@ -1791,6 +1823,15 @@ try:
                 prestige = int(team.get("prestige") or 0)
             except (TypeError, ValueError):
                 prestige = 0
+            height_total = 0
+            class_total = 0
+            for key in pid_keys:
+                pdoc = by_id.get(key) or {}
+                try:
+                    height_total += int(pdoc.get("height") or 0)
+                except (TypeError, ValueError):
+                    pass
+                class_total += class_rank_from_year(pdoc.get("year"))
             entry = {
                 "object_id": oid,
                 "name": team.get("name"),
@@ -1802,6 +1843,8 @@ try:
                 "region": team.get("region"),
                 "total_player_attrs": total_attrs,
                 "prestige": prestige,
+                "height_total": height_total,
+                "class_total": class_total,
             }
             if franchise_id and oid:
                 try:
@@ -1817,6 +1860,28 @@ try:
                 except Exception:
                     pass
             rows.append(entry)
+
+        # §10.5 — rank bands are domain data shipped with each team. FE only filters.
+        def _assign_rank_bands(entries, value_key, band_key):
+            cutoffs = ((26, 1), (51, 2), (77, 3), (102, 4), (128, 5))
+            ordered = sorted(
+                entries,
+                key=lambda e: (
+                    -int(e.get(value_key) or 0),
+                    str(e.get("team_id") or e.get("object_id") or e.get("name") or ""),
+                ),
+            )
+            for idx, e in enumerate(ordered):
+                rank = idx + 1
+                band = 5
+                for max_rank, b in cutoffs:
+                    if rank <= max_rank:
+                        band = b
+                        break
+                e[band_key] = band
+
+        _assign_rank_bands(rows, "height_total", "height_band")
+        _assign_rank_bands(rows, "class_total", "class_band")
         return sorted(rows, key=lambda t: (t["name"] or ""))
     
     

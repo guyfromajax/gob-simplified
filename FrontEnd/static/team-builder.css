@@ -641,6 +641,48 @@ body {
 .tb-player-budget.is-over {
   color: #F79420;
 }
+.tb-weight-note {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: rgba(255, 255, 255, 0.55);
+}
+.tb-height-ftin {
+  margin-left: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  white-space: nowrap;
+}
+.tb-weight-readonly .tb-weight-value {
+  display: inline-block;
+  min-width: 2.5rem;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 13px;
+}
+.tb-weight-readonly .tb-weight-value.is-pending {
+  color: rgba(255, 255, 255, 0.55);
+  font-style: italic;
+  font-weight: 500;
+  min-width: 7rem;
+}
+.tb-height-class-meters {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+.tb-shape-budget {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+}
+.tb-shape-budget.is-over {
+  color: #F79420;
+}
 .tb-topup-notice {
   margin: 0 0 8px;
   font-size: 12px;

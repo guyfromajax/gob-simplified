@@ -3,7 +3,7 @@
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
 **Spec version:** 2.0 — draft for alignment
-**Status:** **Phases 0–3 closed**, verified by a clean played week including a mid-game resume and a non-mod control. 3a (banner), 3b (court) and 3d (portraits, 99.2% exact match) shipped; the §4.5c rescope is implemented. **3c (uploads) is the committed fast follow** — deferred deliberately as the only workstream requiring infrastructure. A UX and design overhaul runs next, briefed that uploads are coming.
+**Status:** **Phases 0–3 closed**, verified by a clean played week including a mid-game resume and a non-mod control. **Phase 4 (height and class budgets, §10) specced, not started.** 3c (uploads) is the committed fast follow — deferred deliberately as the only workstream requiring infrastructure. A UX and design overhaul runs alongside, briefed that both are coming.
 **Last updated:** 1 August 2026
 
 ---
@@ -904,3 +904,138 @@ Team Builder's pool is **`recruit_set_0001` ∪ `builder_set_0001`**. Recruit as
 | 16 | **Resolve at the edge, on the way out** | The resolver belongs in response serialization only. Applying it to constructors and persistence put display names on the identity path and broke the sim. |
 | 17 | **Identity comparisons stay strict** | The strict matchup gate is what surfaced the leak. A tolerant comparator would have hidden it until statistics were wrong. |
 | 18 | **`.name` is core, `.display_name` is the overlay** | Removing the overlay from `.name` without giving display a home just moves the leak somewhere worse. |
+
+---
+
+## 10. Phase 4 — Height and class budgets
+
+**Added 4 August 2026.** Two new capped-mode levers, each following the same shape as the attribute budget: a team total inherited from the replaced program, spent by the user across the roster.
+
+### 10.1 Scope
+
+| | Capped | Uncapped |
+|---|---|---|
+| Attribute budget | Per player, inherited | Team pool, computed |
+| **Height budget** | **Team total, inherited** | **None — unconstrained 66–84** |
+| **Class budget** | **Team total, inherited, spent exactly** | **None** |
+
+Uncapped remains deliberately unconstrained. Both budgets cover **all 15 players, walk-ons included**, consistent with §4.5a.
+
+### 10.2 Height
+
+- **Per-player range: 66–84 inches**, displayed as feet and inches (`6'2"`).
+- **Team total may not exceed the inherited team's total height.** It **may** be under — a shorter team is never an advantage.
+- **Concentration is permitted.** A user may build five tall starters and ten short bench players within the same total.
+
+> **Decision, taken knowingly:** a team budget allows concentration, unlike the per-player attribute budget which makes it structurally impossible (§4.2). Height in the starting five is worth more than height on the bench, so the optimal build concentrates. This is legible and thematic rather than degenerate, and ships as-is under observation.
+
+**Weight is derived and read-only.** The system ties weight to height, so an editable weight would permit a 66" 280 lb player.
+
+- Rendered **greyed out**, clearly not an input
+- **Shows the player's inherited weight while his height is unchanged**
+- **The moment height is edited, the number is replaced by a short label** — *"Set at creation"* — rather than a recalculated figure
+- Weight is computed **once, at Apply**, by the backend, and persisted
+
+> **No weight preview, deliberately (revised 4 August 2026).** An earlier draft had weight updating live as height changed. That requires `weight_from_height` on the client, which puts business logic in the frontend and **violates the UESS rule that the frontend is a pure renderer**. A parity test between the two implementations would only have made the violation stable.
+>
+> Replacing the number with a label removes the duplicated formula, the drift risk, the parity test and the need for seeded jitter — weight is computed once and persisted. It is also more honest: a live figure that was always approximate invited users to treat it as final.
+
+### 10.3 Class
+
+**Values: SR = 4, JR = 3, SO = 2, FR = 1. No JH** — junior-high is a recruiting concept and not a Team Builder one.
+
+- **The team total must equal the inherited total exactly.** Unlike height, underspending is not permitted.
+
+> **Why exact.** In capped mode, attributes are inherited per player and independent of class, so seniority confers no talent — only graduation timing and development runway. Without an exact-spend rule, every roster would go all-freshman for maximum runway at zero cost. Exact spend makes class a distribution problem rather than a one-way optimisation.
+>
+> **The dominant line, stated for the record:** veteran bench, freshman starters — spend seniority where it doesn't matter, keep development where it does. Ships as-is; the same reasoning as height concentration.
+
+**Graduation churn is the intended cost.** A senior-heavy roster is stronger sooner and empties at once; a young roster develops. That trade is the point.
+
+### 10.3a Height is a second currency — stated deliberately
+
+**Established 4 August 2026:** `height_fitness → compute_position_ratings` makes height an **RT multiplier**, and Apply already recomputes position ratings on height edits.
+
+> **Therefore a capped roster can raise its ratings without spending attribute points, by spending height instead.**
+
+§4.2's guarantee — points cannot move between players, so stacking is structurally impossible — covers **attributes only**. Height sits outside it and is bounded by its own team budget.
+
+This ships knowingly. Height is a real, bounded lever, and concentration in the starting five is permitted by §10.2. But "capped" no longer means "team strength is determined by the attribute budget alone," and that should be a written decision rather than an emergent property.
+
+**Consequence for §4.7:** `roster_shape_at_creation` must record **height total and class total** alongside the attribute shape. That field exists so a future eligibility rule can be applied retroactively; recording attributes alone would preserve an incomplete picture of what made a roster strong.
+
+Height also feeds the block score, opening tip, dunk eligibility, quick-foul defender preference, the portrait frame classifier, and headshot radius. Rebounding is **not** direct — height reaches the boards only through RT and position fitness.
+
+### 10.3b Weight is computed once, on the server
+
+`weight_from_height` applies `U(−12, +12)` lb of noise and lives in `BackEnd/utils/player_generation.py`. It runs **once, at Apply**, and the result is persisted.
+
+**It is not reimplemented on the client, and weight is not previewed.** The frontend is a pure renderer under the UESS rules; deriving weight there would be business logic in the render layer.
+
+> **The general rule this exposed:** when a pure renderer needs to show a derived value, either **precompute the domain and ship it as data**, or **don't show it until the server has computed it**. Reimplementing the formula client-side is neither, and a parity test only stabilises the violation rather than removing it.
+>
+> Here the second option is correct — weight has no decision value during editing, so a label is sufficient.
+
+#### The audit this triggered
+
+Removing the weight mirror prompted a sweep of the rest of Phase 4. **Three further violations were found**, all introduced for responsiveness:
+
+| Surface | Was | Now |
+|---|---|---|
+| Height / class budget meters | Client-summed budgets, **hardcoded `SR=4…` mapping** | Renders server-shipped `height_budget` / `class_budget` / `class_rank`; the client only totals form values against that data |
+| Exact-spend / over-budget refusal | Same client-side domain | Compares form totals to shipped caps; Apply still enforces server-side |
+| Filter tier bands | `assignRankBands` computed on the client | Renders `height_band` / `class_band` precomputed on `/teams` |
+
+`formatHeightFtIn` stays — formatting a known inch value is display, not domain.
+
+> **Known debt, outside Phase 4: attribute budget evaluation still mirrors its rules client-side** (Phase 1, §4). Same violation, older, and untouched here. It matters more than the others because those are the rules gating **online eligibility** — the server is authoritative at Apply, so drift yields *"the wizard said eligible and online says no"* rather than an exploit, but that is still a bad failure.
+>
+> **Convert it during the UX overhaul**, which will be inside the roster editor regardless. Phase 4 establishes the pattern: the server ships the caps, the client totals form values against shipped data. Fixing it then is far cheaper than a separate pass, and prevents a new design being built on top of the violation.
+
+### 10.4 Ordering — height precedes portrait assignment
+
+Portrait auto-assignment classifies **height, weight, ST, AG and best-position RT** into a frame (§6.5), and it is the **default path** for every modded player. So **height must be final before assignment runs**, or a 66" guard can be handed a Broad face.
+
+The wizard's step order must reflect this. A later height edit must **re-run assignment** for the affected player unless the user has explicitly picked or uploaded a portrait, in which case their choice is preserved.
+
+### 10.5 Team-select filters
+
+Two new filters join talent, prestige and geography (§5.3) — **five filters, all stacking**, same dead-button behaviour, grid never reflows or empties.
+
+| Height tier | Class tier |
+|---|---|
+| Tier 1: Tallest | Tier 1: Experience |
+| Tier 2 | Tier 2 |
+| Tier 3: Balanced | Tier 3: Balanced |
+| Tier 4 | Tier 4 |
+| Tier 5: Quickest | Tier 5: Youthful |
+
+**Rank-based, exactly as §5.3** — ranks across the 128, ties broken by `team_id`, band sizes 26/25/26/25/26. Not value thresholds: heights cluster tightly and class values are small integers, so ties are certain and a threshold split would leave teams unbanded.
+
+> **Filter basis and budget basis differ, deliberately.** Filters run at team select, where no franchise exists, so they can only see the **core 12**. Budgets inherit from the franchise's **15**. A team in "Tier 1: Tallest" has a 12-player total near 951 while its inherited budget is a 15-player figure in the 1,100s. These are different numbers measuring different things and must not be conflated.
+
+**Measured league distributions (core 12, 4 August 2026)** — the tiers are viable:
+
+| | Height total (in) | Class total |
+|---|---|---|
+| min–max | 880–951 | 20–38 |
+| mean / median | 915.7 / 913.5 | 30 / 30 |
+| p10 / p90 | 899 / 935 | 25 / 35 |
+| distinct values | 53 | **18** |
+
+Height separates cleanly across five rank bands. **Class has only 18 distinct integers**, which confirms rank-based banding is required — a value-threshold split would leave teams unbanded or double-banded. Class years across the pool are perfectly balanced at 384 each.
+
+### 10.6 Phase 4 acceptance
+
+1. Height is editable per player within 66–84, displayed as feet and inches.
+2. The team height total cannot exceed the inherited total; under is permitted and stated as such.
+3. Weight is visibly read-only, updates live with height, and carries the calibration note.
+4. Class is editable per player among FR/SO/JR/SR; **JH is offered nowhere**.
+5. The class total must equal the inherited total exactly — Apply is refused otherwise, with the shortfall or surplus stated.
+6. Both budgets cover all 15 including walk-ons.
+7. Neither budget applies in uncapped mode.
+8. **Height is final before portrait assignment**, and a later height edit re-runs assignment unless the user picked or uploaded a portrait.
+9. Two new team-select filters, rank-based, five tiers, stacking with the existing three; every team falls in exactly one band of each.
+10. Over-budget and exact-spend states are visible **at the point of editing**, not only at Apply (§4.5).
+11. **Weight is never computed on the client.** It shows the inherited value until height is edited, then a short label; the figure is computed once at Apply by the backend. No `weight_from_height` implementation exists in frontend code.
+12. **`roster_shape_at_creation` records height and class totals** alongside the attribute shape (§10.3a).

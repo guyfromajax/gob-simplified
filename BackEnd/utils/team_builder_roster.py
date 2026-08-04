@@ -15,14 +15,19 @@ from BackEnd.constants.team_builder_budget import (
     ATTR_MAX,
     ATTR_MIN,
     CORE_12_ATTRS,
+    TB_HEIGHT_MAX_IN,
+    TB_HEIGHT_MIN_IN,
     TOPUP_FLOOR,
     apply_capped_topup,
     capped_budget_for_inherited,
+    class_rank_from_year,
     clamp_attr,
+    clamp_tb_height,
     core12_total,
     force_core12_to_budget,
     normalize_attribute_mode,
 )
+from BackEnd.utils.player_generation import weight_from_height
 from BackEnd.models.franchise_manager import (
     advance_recruit_year,
     choose_franchise_first_name,
@@ -93,6 +98,80 @@ def _safe_int(value: Any, default: int | None = None) -> int | None:
         return int(value)
     except (TypeError, ValueError):
         return default
+
+
+def _tb_class_rank_for_budget(year: Any) -> int:
+    """Class spend rank for TB budgets. JH is not a TB value — count as FR."""
+    if format_player_year_abbrev(year) == "JH":
+        return 1
+    return class_rank_from_year(year)
+
+
+def tb_class_rank_table() -> dict[str, int]:
+    """Domain data for the renderer — FR/SO/JR/SR spend ranks (§10.3)."""
+    return {"FR": 1, "SO": 2, "JR": 3, "SR": 4}
+
+
+def compute_inherited_shape_budgets(
+    scholarship_players: Sequence[Mapping[str, Any]],
+    walk_ons: Sequence[Mapping[str, Any]],
+) -> dict[str, Any]:
+    """
+    Height/class team budgets for the authored 15 (core 12 + wizard walk-ons).
+
+    Shipped to the FE as data — the renderer must not derive these totals.
+    """
+    height_budget = 0
+    class_budget = 0
+    for row in list(scholarship_players or [])[:SCHOLARSHIP_SIZE]:
+        height_budget += int(
+            _safe_int(row.get("height_in"), _safe_int(row.get("height"), 0)) or 0
+        )
+        class_budget += _tb_class_rank_for_budget(
+            row.get("class_year") or row.get("year")
+        )
+    for row in list(walk_ons or [])[:WALK_ON_COUNT]:
+        height_budget += int(
+            _safe_int(row.get("height_in"), _safe_int(row.get("height"), 0)) or 0
+        )
+        class_budget += _tb_class_rank_for_budget(
+            row.get("class_year") or row.get("year")
+        )
+    return {
+        "height_budget": height_budget,
+        "class_budget": class_budget,
+        "class_rank": tb_class_rank_table(),
+        "height_min_in": TB_HEIGHT_MIN_IN,
+        "height_max_in": TB_HEIGHT_MAX_IN,
+    }
+
+
+def load_core_roster_rows_for_slot(db: Any, team_object_id: ObjectId) -> list[dict[str, Any]]:
+    """Core scholarship rows (height/year) for inherited shape budgets."""
+    team_doc = db.teams.find_one({"_id": team_object_id}, {"player_ids": 1}) or {}
+    raw_ids = team_doc.get("player_ids") or []
+    id_variants: list[Any] = []
+    keys: list[str] = []
+    for pid in raw_ids:
+        keys.append(str(pid))
+        id_variants.append(pid)
+        try:
+            id_variants.append(ObjectId(str(pid)))
+        except Exception:
+            pass
+        id_variants.append(str(pid))
+    by_id: dict[str, dict[str, Any]] = {}
+    if id_variants:
+        for doc in db.players.find(
+            {"_id": {"$in": id_variants}},
+            {"height": 1, "year": 1},
+        ):
+            by_id[str(doc.get("_id"))] = doc
+    rows: list[dict[str, Any]] = []
+    for key in keys[:SCHOLARSHIP_SIZE]:
+        doc = by_id.get(key) or {}
+        rows.append({"height": doc.get("height"), "year": doc.get("year")})
+    return rows
 
 
 def class_year_for_export(year: Any) -> str:
@@ -403,8 +482,18 @@ def apply_row_diff_to_inherited(
     if last:
         meta["last_name"] = last
 
-    height = _safe_int(row.get("height_in"), _safe_int(row.get("height"), _safe_int(meta_in.get("height"))))
-    weight = _safe_int(row.get("weight_lb"), _safe_int(row.get("weight"), _safe_int(meta_in.get("weight"))))
+    height_raw = _safe_int(
+        row.get("height_in"),
+        _safe_int(row.get("height"), _safe_int(meta_in.get("height"))),
+    )
+    if height_raw is not None and (
+        height_raw < TB_HEIGHT_MIN_IN or height_raw > TB_HEIGHT_MAX_IN
+    ):
+        raise ValueError(
+            f"height_out_of_range:{height_raw}:{TB_HEIGHT_MIN_IN}:{TB_HEIGHT_MAX_IN}"
+        )
+    height = clamp_tb_height(height_raw) if height_raw is not None else None
+    # §10.2: weight is derived at stamp time from player_id — ignore authored weight.
     jersey = _safe_int(row.get("jersey"), _safe_int(meta_in.get("jersey")))
     height_changed = False
     if height is not None and height != meta.get("height"):
@@ -412,15 +501,18 @@ def apply_row_diff_to_inherited(
         height_changed = True
     elif height is not None:
         meta["height"] = height
-    if weight is not None:
-        meta["weight"] = weight
     if jersey is not None:
         meta["jersey"] = jersey
 
     # class_year blank → inherit. Same class as inherited → keep exact source string.
+    # JH is not a Team Builder value (§10.3) — rejected when the row sends it.
     year_raw = row.get("class_year")
     if year_raw is None or str(year_raw).strip() == "":
         year_raw = row.get("year") if row.get("year") not in (None, "") else meta_in.get("year")
+    if year_raw not in (None, ""):
+        yr_text = str(year_raw).strip().lower()
+        if yr_text in {"jh", "junior high", "junior-high", "juniorhigh"}:
+            raise ValueError("class_year_jh_forbidden")
     parsed_year = parse_import_class_year(year_raw) if year_raw not in (None, "") else None
     if parsed_year:
         if format_player_year_abbrev(meta.get("year")) != format_player_year_abbrev(parsed_year):
@@ -1286,6 +1378,7 @@ def replace_slot_roster(
     _stamp_walk_on_slots(players)
 
     # §6.5: stamp wizard-minted player_id + meta.image_id from authored rows.
+    # §10.3b: derive weight from height + player_id after the id is known.
     rows = list(imported_players or [])
     for i, player in enumerate(players):
         row = rows[i] if i < len(rows) else {}
@@ -1301,11 +1394,40 @@ def replace_slot_roster(
         player_id = row.get("player_id") or player.get("player_id")
         if player_id:
             player["player_id"] = str(player_id).strip()
+        else:
+            player["player_id"] = str(uuid.uuid4())
+        pid = str(player.get("player_id") or "").strip()
+        height_val = _safe_int(meta.get("height"))
+        if height_val is not None and pid:
+            meta["weight"] = weight_from_height(height_val, player_id=pid)
         player["meta"] = meta
         player.pop("photo", None)
 
     if len(players) != AUTHORED_ROSTER_SIZE:
         raise ValueError(f"roster_size_invalid:{len(players)}:{AUTHORED_ROSTER_SIZE}")
+
+    # §10: capped height (≤ inherited) + class (exact spend) over all 15.
+    if attr_mode == "capped":
+        height_budget = sum(
+            int(_safe_int((p.get("meta") or {}).get("height"), 0) or 0) for p in inherited
+        )
+        class_budget = sum(
+            _tb_class_rank_for_budget((p.get("meta") or {}).get("year")) for p in inherited
+        )
+        height_total = sum(
+            int(_safe_int((p.get("meta") or {}).get("height"), 0) or 0) for p in players
+        )
+        class_total = sum(
+            _tb_class_rank_for_budget((p.get("meta") or {}).get("year")) for p in players
+        )
+        if height_total > height_budget:
+            raise ValueError(
+                f"height_budget_exceeded:{height_total}:{height_budget}"
+            )
+        if class_total != class_budget:
+            raise ValueError(
+                f"class_budget_mismatch:{class_total}:{class_budget}"
+            )
 
     if attr_mode == "uncapped" and team_pool is not None:
         team_total = sum(core12_total(p.get("attributes") or {}) for p in players)
@@ -1364,6 +1486,35 @@ def collect_budget_attrs(
     return attrs_list
 
 
+def collect_roster_shape_fields(
+    franchise_players_data_collection: Any,
+    franchise_id: Any,
+    player_ids: Sequence[str],
+) -> dict[str, list[Any]]:
+    """Attribute + height + class inputs for roster_shape_at_creation (§10.3a)."""
+    if not player_ids:
+        return {"attrs": [], "heights": [], "class_years": []}
+    by_id: dict[str, dict[str, Any]] = {}
+    for fpd in franchise_players_data_collection.find(
+        {
+            "franchise_id": str(franchise_id),
+            "player_id": {"$in": [str(pid) for pid in player_ids]},
+        },
+        {"player_id": 1, "attributes": 1, "meta.height": 1, "meta.year": 1},
+    ):
+        by_id[str(fpd.get("player_id"))] = fpd
+    attrs: list[dict[str, Any]] = []
+    heights: list[int] = []
+    class_years: list[Any] = []
+    for pid in player_ids:
+        doc = by_id.get(str(pid)) or {}
+        meta = doc.get("meta") or {}
+        attrs.append(doc.get("attributes") or {})
+        heights.append(int(_safe_int(meta.get("height"), 0) or 0))
+        class_years.append(meta.get("year"))
+    return {"attrs": attrs, "heights": heights, "class_years": class_years}
+
+
 __all__ = [
     "ROSTER_CSV_HEADERS",
     "MAX_ROSTER_SIZE",
@@ -1378,9 +1529,13 @@ __all__ = [
     "clear_wizard_walk_ons_for_user",
     "class_year_for_export",
     "collect_budget_attrs",
+    "collect_roster_shape_fields",
+    "compute_inherited_shape_budgets",
+    "load_core_roster_rows_for_slot",
     "normalize_imported_players",
     "parse_import_class_year",
     "replace_slot_roster",
     "slot_per_player_budgets",
+    "tb_class_rank_table",
     "count_importable_players",
 ]

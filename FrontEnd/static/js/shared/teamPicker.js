@@ -56,6 +56,22 @@
     { maxRank: 128, band: 5 },
   ];
 
+  // §10.5 — named end-bands for height / class filters.
+  var HEIGHT_BAND_LABELS = {
+    1: 'Tier 1: Tallest',
+    2: 'Tier 2',
+    3: 'Tier 3: Balanced',
+    4: 'Tier 4',
+    5: 'Tier 5: Quickest',
+  };
+  var CLASS_BAND_LABELS = {
+    1: 'Tier 1: Experience',
+    2: 'Tier 2',
+    3: 'Tier 3: Balanced',
+    4: 'Tier 4',
+    5: 'Tier 5: Youthful',
+  };
+
   function escapeHtml(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;')
@@ -247,9 +263,13 @@
       search: '',
       talentBand: 'all',
       prestigeBand: 'all',
+      heightBand: 'all',
+      classBand: 'all',
       geography: 'all',
       talentBands: {},
       prestigeBands: {},
+      heightBands: {},
+      classBands: {},
       // Canonical selection key = Mongo ObjectId string (team.object_id).
       selectedObjectId: options.initiallySelectedObjectId || null,
       destroyed: false,
@@ -271,6 +291,14 @@
       '      <span class="team-picker-filter-label">Prestige</span>' +
       '      <select class="team-picker-prestige-select"></select>' +
       '    </label>' +
+      '    <label class="team-picker-filter">' +
+      '      <span class="team-picker-filter-label">Height</span>' +
+      '      <select class="team-picker-height-select"></select>' +
+      '    </label>' +
+      '    <label class="team-picker-filter">' +
+      '      <span class="team-picker-filter-label">Class</span>' +
+      '      <select class="team-picker-class-select"></select>' +
+      '    </label>' +
       '    <label class="team-picker-filter team-picker-filter-geography">' +
       '      <span class="team-picker-filter-label">Geography</span>' +
       '      <select class="team-picker-geography-select"></select>' +
@@ -291,6 +319,8 @@
     var searchInput = rootEl.querySelector('.team-picker-search-input');
     var talentSelect = rootEl.querySelector('.team-picker-talent-select');
     var prestigeSelect = rootEl.querySelector('.team-picker-prestige-select');
+    var heightSelect = rootEl.querySelector('.team-picker-height-select');
+    var classSelect = rootEl.querySelector('.team-picker-class-select');
     var geographySelect = rootEl.querySelector('.team-picker-geography-select');
     var countEl = rootEl.querySelector('.team-picker-count');
     var statusEl = rootEl.querySelector('.team-picker-status');
@@ -320,18 +350,37 @@
     function recomputeBands() {
       state.talentBands = assignRankBands(state.teams, 'total_player_attrs');
       state.prestigeBands = assignRankBands(state.teams, 'prestige');
+      // §10.5 — height/class bands are precomputed on /teams (pure renderer).
+      state.heightBands = {};
+      state.classBands = {};
+      (state.teams || []).forEach(function (team) {
+        var oid = teamObjectId(team);
+        if (!oid) return;
+        if (team.height_band != null) state.heightBands[oid] = Number(team.height_band);
+        if (team.class_band != null) state.classBands[oid] = Number(team.class_band);
+      });
+    }
+
+    function bandOptionsHtml(labels) {
+      return (
+        '<option value="all">All tiers</option>' +
+        BAND_CUTOFFS.map(function (b) {
+          var label =
+            (labels && labels[b.band]) || ('Tier ' + b.band);
+          return '<option value="' + b.band + '">' + escapeHtml(label) + '</option>';
+        }).join('')
+      );
     }
 
     function rebuildFilterOptions() {
-      var bandOptions =
-        '<option value="all">All tiers</option>' +
-        BAND_CUTOFFS.map(function (b) {
-          return '<option value="' + b.band + '">Tier ' + b.band + '</option>';
-        }).join('');
-      talentSelect.innerHTML = bandOptions;
-      prestigeSelect.innerHTML = bandOptions;
+      talentSelect.innerHTML = bandOptionsHtml(null);
+      prestigeSelect.innerHTML = bandOptionsHtml(null);
+      heightSelect.innerHTML = bandOptionsHtml(HEIGHT_BAND_LABELS);
+      classSelect.innerHTML = bandOptionsHtml(CLASS_BAND_LABELS);
       talentSelect.value = state.talentBand;
       prestigeSelect.value = state.prestigeBand;
+      heightSelect.value = state.heightBand;
+      classSelect.value = state.classBand;
 
       var geos = distinctGeographies();
       geographySelect.innerHTML =
@@ -357,6 +406,12 @@
       }
       if (state.prestigeBand !== 'all') {
         if (Number(state.prestigeBands[oid]) !== Number(state.prestigeBand)) return false;
+      }
+      if (state.heightBand !== 'all') {
+        if (Number(state.heightBands[oid]) !== Number(state.heightBand)) return false;
+      }
+      if (state.classBand !== 'all') {
+        if (Number(state.classBands[oid]) !== Number(state.classBand)) return false;
       }
       if (state.geography !== 'all') {
         var geos = geographyForConference(conf);
@@ -635,6 +690,16 @@
       render();
     }
 
+    function onHeightChange() {
+      state.heightBand = heightSelect.value || 'all';
+      render();
+    }
+
+    function onClassChange() {
+      state.classBand = classSelect.value || 'all';
+      render();
+    }
+
     function onGeographyChange() {
       state.geography = geographySelect.value || 'all';
       render();
@@ -643,6 +708,8 @@
     searchInput.addEventListener('input', onSearchInput);
     talentSelect.addEventListener('change', onTalentChange);
     prestigeSelect.addEventListener('change', onPrestigeChange);
+    heightSelect.addEventListener('change', onHeightChange);
+    classSelect.addEventListener('change', onClassChange);
     geographySelect.addEventListener('change', onGeographyChange);
 
     if (confirmCancel) {
@@ -677,6 +744,8 @@
       searchInput.removeEventListener('input', onSearchInput);
       talentSelect.removeEventListener('change', onTalentChange);
       prestigeSelect.removeEventListener('change', onPrestigeChange);
+      heightSelect.removeEventListener('change', onHeightChange);
+      classSelect.removeEventListener('change', onClassChange);
       geographySelect.removeEventListener('change', onGeographyChange);
       rootEl.classList.remove('team-picker');
       rootEl.innerHTML = '';

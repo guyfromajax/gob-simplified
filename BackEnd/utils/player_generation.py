@@ -201,15 +201,51 @@ def draw_height(position: str, rng: random.Random, year: Optional[str] = None) -
     return max(HEIGHT_MIN_IN, min(HEIGHT_MAX_IN, round(h)))
 
 
-def weight_from_height(height: float, rng: random.Random) -> int:
+def _weight_noise_from_player_id(player_id: str) -> float:
+    """Deterministic U(−WEIGHT_NOISE_LB, +WEIGHT_NOISE_LB) from minted player_id.
+
+    Team Builder §10.3b: preview and Apply must share the identical jitter. Uses the
+    UUID integer when ``player_id`` is a UUID; otherwise a stable sha256 fall-back.
+    Cross-language: FE mirrors ``(n % 2**32) / 2**32`` → affine map into ±noise.
+    """
+    import hashlib
+    import uuid as _uuid
+
+    text = str(player_id or "").strip()
+    if not text:
+        return 0.0
+    try:
+        n = _uuid.UUID(text).int
+    except (ValueError, AttributeError, TypeError):
+        n = int(hashlib.sha256(f"tb-weight-jitter-v1:{text}".encode("utf-8")).hexdigest()[:16], 16)
+    u = (n % (1 << 32)) / float(1 << 32)  # [0, 1)
+    return -WEIGHT_NOISE_LB + (2.0 * WEIGHT_NOISE_LB) * u
+
+
+def weight_from_height(
+    height: float,
+    rng: random.Random | None = None,
+    *,
+    player_id: str | None = None,
+) -> int:
     """Body weight from height: a continuous line anchored at the league median plus
     ±WEIGHT_NOISE_LB uniform jitter (design §11.2). Display/flavor only — RT ignores
-    weight. One rng draw (matching the prior banded draw), so downstream is unchanged.
+    weight.
 
         weight = WEIGHT_AT_MEDIAN + WEIGHT_LB_PER_INCH·(height − median) ± noise
+
+    When ``player_id`` is set (Team Builder §10.3b), noise is seeded from that id so
+    editor preview equals the shipped value. Otherwise ``rng`` supplies one uniform
+    draw (generation path — stream position unchanged vs prior banded draw).
     """
     base = WEIGHT_AT_MEDIAN + WEIGHT_LB_PER_INCH * (float(height) - LEAGUE_MEDIAN_HEIGHT_IN)
-    return max(1, round(base + rng.uniform(-WEIGHT_NOISE_LB, WEIGHT_NOISE_LB)))
+    if player_id is not None and str(player_id).strip():
+        noise = _weight_noise_from_player_id(str(player_id).strip())
+    elif rng is not None:
+        noise = rng.uniform(-WEIGHT_NOISE_LB, WEIGHT_NOISE_LB)
+    else:
+        noise = 0.0
+    return max(1, round(base + noise))
 
 
 def target_rt(tier: str, year: str) -> float:

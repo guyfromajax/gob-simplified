@@ -12,7 +12,11 @@
     ATTR_MAX: 99,
     TOPUP_FLOOR: 60,
     MAX_PLAYERS: 15,
+    // Height range filled from server shape payload (§10) — not hardcoded domain.
+    HEIGHT_MIN: 66,
+    HEIGHT_MAX: 84,
   };
+
 
   const CORE_12 = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'];
 
@@ -81,6 +85,45 @@
     SR: 'senior',
   };
 
+  function formatHeightFtIn(inches) {
+    const n = parseInt(inches, 10);
+    if (isNaN(n)) return '—';
+    const ft = Math.floor(n / 12);
+    const inch = n % 12;
+    return ft + "'" + inch + '"';
+  }
+
+  function classRankFromYear(year) {
+    // Rank table is server-shipped domain data (state.shape.class_rank).
+    const cy = normalizeClassYear(year);
+    const ranks = (state.shape && state.shape.class_rank) || {};
+    return cy && ranks[cy] != null ? Number(ranks[cy]) : 0;
+  }
+
+  function weightLabelForPlayer(player) {
+    if (!player) return '—';
+    if (player.height_edited) return 'Set at creation';
+    const w =
+      player.inherited_weight_lb != null && player.inherited_weight_lb !== ''
+        ? player.inherited_weight_lb
+        : player.weight_lb;
+    return w != null && w !== '' ? String(w) : '—';
+  }
+
+  function currentHeightClassTotals(players) {
+    // Aggregate form values for meter display against server-shipped budgets.
+    const list = players || [];
+    let heightTotal = 0;
+    let classTotal = 0;
+    list.forEach(function (p) {
+      const h = parseInt(p.height_in, 10);
+      if (!isNaN(h)) heightTotal += h;
+      classTotal += classRankFromYear(p.class_year);
+    });
+    return { heightTotal: heightTotal, classTotal: classTotal };
+  }
+
+
   const FRANCHISE_CAP_DEFAULT = 2;
 
   const state = {
@@ -117,6 +160,13 @@
     wizardWalkOns: null,
     wizardWalkOnsLoading: false,
     editor: { players: [], inherited: [], loaded: false },
+    // §10 — height/class budgets + class_rank table shipped from the server.
+    shape: {
+      height_budget: null,
+      class_budget: null,
+      class_rank: null,
+      loaded: false,
+    },
     // §6.5: wizard-minted player_id + image_id; portrait shown must ship.
     portraits: [],
     portraitPicker: { slot: null, skin: null, frame: null, definition: null, catalog: null },
@@ -211,6 +261,42 @@
         state.budget.per_player_over_by +
         ' total points. Points cannot move between players — trim within each player.'
       );
+    }
+    if (state.attribute_mode === 'capped') {
+      if (state.budget.height_over_by > 0) {
+        return (
+          'Team height is ' +
+          state.budget.height_over_by +
+          '" over the inherited total (' +
+          state.budget.height_total +
+          '" / ' +
+          state.budget.height_budget +
+          '"). Shorten players — under is allowed; over is not.'
+        );
+      }
+      if (state.budget.class_delta !== 0 && state.budget.class_budget != null) {
+        const d = state.budget.class_delta;
+        if (d > 0) {
+          return (
+            'Class total is ' +
+            d +
+            ' over the inherited spend (' +
+            state.budget.class_total +
+            ' vs ' +
+            state.budget.class_budget +
+            '). Drop seniority until it matches exactly.'
+          );
+        }
+        return (
+          'Class total is ' +
+          -d +
+          ' under the inherited spend (' +
+          state.budget.class_total +
+          ' vs ' +
+          state.budget.class_budget +
+          '). Add seniority until it matches exactly.'
+        );
+      }
     }
     return '';
   }
@@ -581,7 +667,7 @@
     return out;
   }
 
-  function evaluateModeRoster(attributeMode, playerAttrsList, perPlayerBudgets) {
+  function evaluateModeRoster(attributeMode, playerAttrsList, perPlayerBudgets, playersForShape) {
     const mode = attributeMode === 'uncapped' ? 'uncapped' : 'capped';
     const eligible = mode === 'capped';
     const totals = (playerAttrsList || []).map(core12Total);
@@ -598,6 +684,20 @@
         if (spent > cap) perPlayerOver += spent - cap;
       }
     }
+    const shapePlayers = playersForShape || [];
+    const hc = currentHeightClassTotals(shapePlayers);
+    const heightBudget =
+      mode === 'capped' && state.shape.height_budget != null
+        ? Number(state.shape.height_budget)
+        : null;
+    const classBudget =
+      mode === 'capped' && state.shape.class_budget != null
+        ? Number(state.shape.class_budget)
+        : null;
+    const heightOver =
+      heightBudget != null ? Math.max(0, hc.heightTotal - heightBudget) : 0;
+    const classDelta =
+      classBudget != null ? hc.classTotal - classBudget : 0;
     return {
       attribute_mode: mode,
       online_eligible: eligible,
@@ -605,6 +705,12 @@
       team_pool: pool,
       over_pool_by: overPool,
       per_player_over_by: perPlayerOver,
+      height_total: hc.heightTotal,
+      class_total: hc.classTotal,
+      height_budget: heightBudget,
+      class_budget: classBudget,
+      height_over_by: heightOver,
+      class_delta: classDelta,
     };
   }
 
@@ -648,12 +754,22 @@
       budget = null;
       toppedUp = false;
     }
+    const rawHeight = p.height_in != null ? p.height_in : p.height != null ? p.height : '';
+    const heightClamped = (function () {
+      const n = parseInt(rawHeight, 10);
+      if (isNaN(n)) return '';
+      return Math.max(BUDGET.HEIGHT_MIN, Math.min(BUDGET.HEIGHT_MAX, n));
+    })();
+    const rawWeight = p.weight_lb != null ? p.weight_lb : p.weight != null ? p.weight : '';
     return {
       first_name: p.first_name || '',
       last_name: p.last_name || '',
       class_year: classYearFromPlayer(p) || 'FR',
-      height_in: p.height_in != null ? p.height_in : p.height != null ? p.height : '',
-      weight_lb: p.weight_lb != null ? p.weight_lb : p.weight != null ? p.weight : '',
+      height_in: heightClamped,
+      inherited_height_in: heightClamped,
+      weight_lb: rawWeight,
+      inherited_weight_lb: rawWeight,
+      height_edited: false,
       jersey: p.jersey != null ? p.jersey : '',
       attrs: attrs,
       raw_total: rawTotal,
@@ -664,6 +780,9 @@
       entry_tier: p.entry_tier || null,
       position_intent: p.position_intent || null,
       development: p.development != null ? p.development : null,
+      player_id: p.player_id || p.wizard_player_id || null,
+      image_id: p.image_id || null,
+      portrait_locked: false,
     };
   }
 
@@ -683,8 +802,11 @@
       };
       const h = parseInt(p.height_in, 10);
       if (!isNaN(h)) out.height_in = h;
-      const w = parseInt(p.weight_lb, 10);
-      if (!isNaN(w)) out.weight_lb = w;
+      // §10.3b — weight is server-derived at Apply; never ship a client figure after height edit.
+      if (!p.height_edited) {
+        const w = parseInt(p.weight_lb, 10);
+        if (!isNaN(w)) out.weight_lb = w;
+      }
       const j = parseInt(p.jersey, 10);
       if (!isNaN(j)) out.jersey = j;
       if (p.player_id) out.player_id = p.player_id;
@@ -713,7 +835,10 @@
         last_name: String(p.last_name || '').trim(),
         class_year: p.class_year || null,
         height_in: parseInt(p.height_in != null ? p.height_in : p.height, 10) || null,
-        weight_lb: parseInt(p.weight_lb != null ? p.weight_lb : p.weight, 10) || null,
+        // §10.3b — never send a client-derived weight; omit when height was edited.
+        weight_lb: p.height_edited
+          ? null
+          : parseInt(p.weight_lb != null ? p.weight_lb : p.weight, 10) || null,
         attributes: Object.assign({}, attrs),
         player_id: p.player_id || null,
         image_id: p.image_id || null,
@@ -730,6 +855,9 @@
         if (!list[idx]) return;
         list[idx].player_id = row.player_id;
         list[idx].image_id = row.image_id;
+        if (row.source === 'picker' || row.source === 'upload') {
+          list[idx].portrait_locked = true;
+        }
         list[idx].portrait_meta = {
           frame: row.frame,
           definition: row.definition,
@@ -775,7 +903,9 @@
     const players = portraitPlayersPayload();
     if (players.length !== 15) return null;
     const incomplete = players.some(function (p) {
-      return !p.height_in || !p.weight_lb || !p.first_name || !p.last_name;
+      if (!p.height_in || !p.first_name || !p.last_name) return true;
+      // Weight may be omitted after a height edit (§10.3b) — server derives for classify.
+      return false;
     });
     if (incomplete && !opts.force) return null;
 
@@ -785,6 +915,9 @@
       players: players,
       force_reassign: !!opts.force,
     };
+    if (opts.reassignSlots && opts.reassignSlots.length) {
+      body.force_reassign_slots = opts.reassignSlots.slice();
+    }
     const res = await fetch(API_CONFIG.buildUrl('/franchise/team-builder/portraits/assign'), {
       method: 'POST',
       headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -797,11 +930,11 @@
     return data.portraits;
   }
 
-  function schedulePortraitSync() {
+  function schedulePortraitSync(opts) {
     if (state._portraitSyncTimer) clearTimeout(state._portraitSyncTimer);
     state._portraitSyncTimer = setTimeout(function () {
       state._portraitSyncTimer = null;
-      syncPortraits();
+      syncPortraits(opts || {});
     }, 450);
   }
 
@@ -1065,7 +1198,8 @@
       return;
     }
     const capped = state.attribute_mode === 'capped';
-    let html = '';
+    let html =
+      '<p class="tb-weight-note">Weight is set from height when the franchise is created.</p>';
     state.editor.players.forEach(function (p, idx) {
       const spent = core12Total(p.attrs);
       const over = capped && spent > (p.budget || 0);
@@ -1134,13 +1268,23 @@
         idx +
         '" value="' +
         escapeHtml(String(p.height_in)) +
-        '" min="60" max="90"></label>';
-      html +=
-        '<label class="tb-editor-meta">Wt<input type="number" data-field="weight_lb" data-idx="' +
+        '" min="' +
+        BUDGET.HEIGHT_MIN +
+        '" max="' +
+        BUDGET.HEIGHT_MAX +
+        '"><span class="tb-height-ftin" data-height-label="' +
         idx +
-        '" value="' +
-        escapeHtml(String(p.weight_lb)) +
-        '" min="120" max="350"></label>';
+        '">' +
+        escapeHtml(formatHeightFtIn(p.height_in)) +
+        '</span></label>';
+      html +=
+        '<label class="tb-editor-meta tb-weight-readonly">Wt<span class="tb-weight-value' +
+        (p.height_edited ? ' is-pending' : '') +
+        '" data-weight-label="' +
+        idx +
+        '" aria-readonly="true">' +
+        escapeHtml(weightLabelForPlayer(p)) +
+        '</span></label>';
       html +=
         '<label class="tb-editor-meta">#<input type="number" data-field="jersey" data-idx="' +
         idx +
@@ -1222,19 +1366,56 @@
 
     if (t.dataset.field) {
       const field = t.dataset.field;
+      const player = state.editor.players[idx];
       if (field === 'class_year') {
-        state.editor.players[idx].class_year = t.value;
-      } else if (field === 'height_in' || field === 'weight_lb' || field === 'jersey') {
-        state.editor.players[idx][field] = t.value;
-      } else {
-        state.editor.players[idx][field] = t.value;
+        player.class_year = t.value;
+        updateBudgetFromCurrentRoster();
+        return;
       }
-      if (
-        field === 'first_name' ||
-        field === 'last_name' ||
-        field === 'height_in' ||
-        field === 'weight_lb'
-      ) {
+      if (field === 'height_in') {
+        let h = parseInt(t.value, 10);
+        if (isNaN(h)) {
+          player.height_in = '';
+          player.height_edited = true;
+        } else {
+          h = Math.max(BUDGET.HEIGHT_MIN, Math.min(BUDGET.HEIGHT_MAX, h));
+          player.height_in = h;
+          t.value = String(h);
+          const inheritedH = parseInt(player.inherited_height_in, 10);
+          player.height_edited = isNaN(inheritedH) || h !== inheritedH;
+        }
+        if (!player.height_edited) {
+          player.weight_lb = player.inherited_weight_lb;
+        }
+        const ftEl = document.querySelector('[data-height-label="' + idx + '"]');
+        if (ftEl) ftEl.textContent = formatHeightFtIn(player.height_in);
+        const wtEl = document.querySelector('[data-weight-label="' + idx + '"]');
+        if (wtEl) {
+          wtEl.textContent = weightLabelForPlayer(player);
+          wtEl.classList.toggle('is-pending', !!player.height_edited);
+        }
+        // §10.4: height edit re-runs portrait assignment unless user picked/uploaded.
+        if (!player.portrait_locked) {
+          player.image_id = null;
+          player.portrait_meta = null;
+          updateBudgetFromCurrentRoster();
+          schedulePortraitSync({ reassignSlots: [idx] });
+        } else {
+          updateBudgetFromCurrentRoster();
+          schedulePortraitSync();
+        }
+        return;
+      }
+      if (field === 'jersey') {
+        player.jersey = t.value;
+        return;
+      }
+      if (field === 'weight_lb') {
+        // Read-only — ignore.
+        return;
+      }
+      player[field] = t.value;
+      if (field === 'first_name' || field === 'last_name') {
         schedulePortraitSync();
       }
     }
@@ -1552,14 +1733,38 @@
       if (!skip) {
         if (!rowObj.height_in) {
           state.import.rowWarnings.push(rowFieldWarning(rowObj._rowNum, 'height_in', rowObj.height_in, 'Blank — inherits from the replaced program.'));
+        } else {
+          const h = parseInt(rowObj.height_in, 10);
+          if (isNaN(h) || h < BUDGET.HEIGHT_MIN || h > BUDGET.HEIGHT_MAX) {
+            state.import.rowErrors.push(
+              rowFieldError(
+                rowObj._rowNum,
+                'height_in',
+                rowObj.height_in,
+                'Use ' + BUDGET.HEIGHT_MIN + '–' + BUDGET.HEIGHT_MAX + ' inches.'
+              )
+            );
+            skip = true;
+          }
         }
         if (!rowObj.weight_lb) {
-          state.import.rowWarnings.push(rowFieldWarning(rowObj._rowNum, 'weight_lb', rowObj.weight_lb, 'Blank — inherits from the replaced program.'));
+          state.import.rowWarnings.push(
+            rowFieldWarning(
+              rowObj._rowNum,
+              'weight_lb',
+              rowObj.weight_lb,
+              'Weight is derived from height — blank is fine.'
+            )
+          );
         }
         if (!rowObj.jersey) {
           state.import.rowWarnings.push(rowFieldWarning(rowObj._rowNum, 'jersey', rowObj.jersey, 'Blank — inherits from the replaced program.'));
         }
-        state.import.validPlayers.push(normalizeImportedPlayer(rowObj));
+        if (!skip) {
+          state.import.validPlayers.push(normalizeImportedPlayer(rowObj));
+        } else {
+          state.import.skippedRows.push(rowObj);
+        }
       } else {
         state.import.skippedRows.push(rowObj);
       }
@@ -1902,13 +2107,53 @@
       renderBudgetMeter(null);
       return;
     }
+    const shapePlayers =
+      state.roster_mode === 'edit' && state.editor.loaded
+        ? state.editor.players
+        : state.import.importedPlayers || [];
     state.budget = evaluateModeRoster(
       state.attribute_mode,
       input.attrsList,
-      input.budgets
+      input.budgets,
+      shapePlayers
     );
     renderBudgetMeter(state.budget);
     syncBudgetRefuseUI();
+  }
+
+  function renderHeightClassMeters(evalResult) {
+    const heightEl = document.getElementById('tb-height-budget-label');
+    const classEl = document.getElementById('tb-class-budget-label');
+    const wrap = document.getElementById('tb-height-class-meters');
+    const uncapped = state.attribute_mode === 'uncapped';
+    if (wrap) wrap.hidden = uncapped;
+    if (uncapped) return;
+    if (!evalResult || evalResult.height_budget == null) {
+      if (heightEl) heightEl.textContent = 'Height: —';
+      if (classEl) classEl.textContent = 'Class: —';
+      return;
+    }
+    if (heightEl) {
+      heightEl.textContent =
+        'Height: ' +
+        evalResult.height_total +
+        '" / ' +
+        evalResult.height_budget +
+        '"' +
+        (evalResult.height_over_by > 0
+          ? ' — over by ' + evalResult.height_over_by + '"'
+          : ' — under permitted');
+      heightEl.classList.toggle('is-over', evalResult.height_over_by > 0);
+    }
+    if (classEl) {
+      const delta = evalResult.class_delta || 0;
+      let note = ' — exact spend required';
+      if (delta > 0) note = ' — over by ' + delta;
+      else if (delta < 0) note = ' — short by ' + -delta;
+      classEl.textContent =
+        'Class: ' + evalResult.class_total + ' / ' + evalResult.class_budget + note;
+      classEl.classList.toggle('is-over', delta !== 0);
+    }
   }
 
   function renderBudgetMeter(evalResult) {
@@ -1964,6 +2209,7 @@
           label.textContent = poolCap ? 'Team pool: — / ' + formatPool(poolCap) : 'Team pool: —';
         }
       }
+      renderHeightClassMeters(null);
       setEligBadge();
       syncBudgetRefuseUI();
       return;
@@ -1988,6 +2234,7 @@
         ' — redistribute within each player only';
     }
 
+    renderHeightClassMeters(evalResult);
     setEligBadge();
     syncBudgetRefuseUI();
   }
@@ -2053,6 +2300,15 @@
       if (walkOns.length !== 3) throw new Error('expected 3 walk-ons');
       state.wizardWalkOns = walkOns;
       state._wizardWalkOnsSlotKey = slotKey;
+      // §10 — budgets + class_rank table are server domain data.
+      if (data.height_min_in != null) BUDGET.HEIGHT_MIN = Number(data.height_min_in) || BUDGET.HEIGHT_MIN;
+      if (data.height_max_in != null) BUDGET.HEIGHT_MAX = Number(data.height_max_in) || BUDGET.HEIGHT_MAX;
+      state.shape = {
+        height_budget: data.height_budget != null ? Number(data.height_budget) : null,
+        class_budget: data.class_budget != null ? Number(data.class_budget) : null,
+        class_rank: data.class_rank || null,
+        loaded: true,
+      };
       return walkOns;
     })();
     try {
@@ -2071,6 +2327,7 @@
     const extras = (walkOns || []).map(function (wo) {
       return {
         wizard_player_id: wo.wizard_player_id || null,
+        player_id: wo.wizard_player_id || null,
         first_name: wo.first_name || '',
         last_name: wo.last_name || '',
         year: wo.year || 'Freshman',

@@ -36,6 +36,8 @@
 .team-picker-search-input,
 .team-picker-talent-select,
 .team-picker-prestige-select,
+.team-picker-height-select,
+.team-picker-class-select,
 .team-picker-geography-select {
   width: 100%;
   height: 42px;
