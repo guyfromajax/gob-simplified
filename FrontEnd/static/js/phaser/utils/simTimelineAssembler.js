@@ -77,8 +77,8 @@ function abbrFromName(name, teamId) {
  * Build presentation team meta + core identity for score sampling.
  *
  * Dual-use (§3.1a): score{} / box keys stay on core ``name``; chrome fields
- * (teamName, name, abbr) use display_name || name. Core is returned separately
- * so it is not mistaken for a render label.
+ * (teamName, name, abbr, color) come from the total chrome snapshot
+ * (lookupTeamChrome) — never summary.teams[].colors / roster.primary_color.
  */
 function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName) {
   const teamsObj = (summary && summary.teams) || {};
@@ -88,41 +88,64 @@ function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName)
   const awayT = teamsObj[awayId] || {};
 
   const coreOf = (t, fallback) => t.name || fallback || 'Team';
-  const labelOf = (t, fallback) => t.display_name || t.name || fallback || 'Team';
-  const colorOf = (t, roster, fallback) =>
-    (t.colors && t.colors.primary_color) ||
-    t.primary_color ||
-    (roster && roster.primary_color) ||
-    fallback;
+  const hCore = coreOf(homeT, homeTeamName);
+  const aCore = coreOf(awayT, awayTeamName);
+
+  const chromeOf = (core, teamRec, roster) => {
+    const fb = {
+      label: teamRec.display_name || core,
+      primary_color:
+        (roster && (roster.primary_color || roster.primary)) ||
+        (teamRec.colors && teamRec.colors.primary_color) ||
+        teamRec.primary_color,
+      secondary_color:
+        (roster && (roster.secondary_color || roster.secondary)) ||
+        (teamRec.colors && teamRec.colors.secondary_color) ||
+        teamRec.secondary_color,
+      abbreviation: teamRec.abbreviation || teamRec.abbr,
+      team_id: teamRec.team_id,
+      object_id: teamRec.object_id || teamRec.team_object_id,
+    };
+    if (typeof lookupTeamChrome === 'function') {
+      return lookupTeamChrome(core, fb);
+    }
+    return {
+      core_name: core,
+      label: fb.label || core,
+      abbreviation:
+        fb.abbreviation ||
+        (typeof abbrFromName === 'function' ? abbrFromName(fb.label || core) : '???'),
+      primary_color: fb.primary_color || null,
+      secondary_color: fb.secondary_color || null,
+      is_overlay: false,
+    };
+  };
+
+  const hChrome = chromeOf(hCore, homeT, homeRoster);
+  const aChrome = chromeOf(aCore, awayT, awayRoster);
+
   const rankOf = (t, roster) => num(t.natl_rank ?? (roster && roster.natl_rank) ?? 0);
   const recOf = (t, roster) => {
     const w = num(t.wins ?? (roster && roster.wins) ?? 0);
     const l = num(t.losses ?? (roster && roster.losses) ?? 0);
     return `${w}–${l}`;
   };
-  const abbrOf = (t, label, tid) =>
-    t.abbreviation || t.abbr || abbrFromName(label, tid || t.object_id || t.team_object_id);
-
-  const hCore = coreOf(homeT, homeTeamName);
-  const aCore = coreOf(awayT, awayTeamName);
-  const hLabel = labelOf(homeT, homeTeamName);
-  const aLabel = labelOf(awayT, awayTeamName);
 
   return {
     teams: {
       home: {
-        teamName: hLabel,
-        name: hLabel,
-        abbr: abbrOf(homeT, hLabel, homeId),
-        color: colorOf(homeT, homeRoster, '#1F8A5B'),
+        teamName: hChrome.label,
+        name: hChrome.label,
+        abbr: hChrome.abbreviation,
+        color: hChrome.primary_color || '#1F8A5B',
         rank: rankOf(homeT, homeRoster),
         rec: recOf(homeT, homeRoster),
       },
       away: {
-        teamName: aLabel,
-        name: aLabel,
-        abbr: abbrOf(awayT, aLabel, awayId),
-        color: colorOf(awayT, awayRoster, '#9E1B32'),
+        teamName: aChrome.label,
+        name: aChrome.label,
+        abbr: aChrome.abbreviation,
+        color: aChrome.primary_color || '#9E1B32',
         rank: rankOf(awayT, awayRoster),
         rec: recOf(awayT, awayRoster),
       },

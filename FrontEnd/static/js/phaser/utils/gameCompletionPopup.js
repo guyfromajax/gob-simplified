@@ -243,8 +243,7 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     console.warn('[gameCompletionPopup] Failed to calculate POTG:', err);
   }
 
-  // §3.1a: finalScore.homeTeam / teams[].name = core (score keys). Labels = display_name.
-  // Same split as box-score.js teamDisplayLabel / gameScene logHome.
+  // §3.1a + total chrome snapshot: score keys stay core; labels/colours from lookupTeamChrome.
   const teamsFromDoc = resolvedGameDoc?.teams || {};
   const docHomeId = resolvedGameDoc?.home_team_id;
   const docAwayId = resolvedGameDoc?.away_team_id;
@@ -283,16 +282,54 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     finalScore?.awayTeam ||
     awayTeam ||
     'Away';
-  const homeLabel =
-    homeTeamData?.display_name ||
-    legacyHome?.display_name ||
-    urlHomeDisplay ||
-    homeCore;
-  const awayLabel =
-    awayTeamData?.display_name ||
-    legacyAway?.display_name ||
-    urlAwayDisplay ||
-    awayCore;
+
+  if (typeof ensureTeamBuilderChromeSnapshot === 'function') {
+    try {
+      await ensureTeamBuilderChromeSnapshot(franchiseId);
+    } catch (e) {
+      console.warn('[gameCompletionPopup] chrome snapshot failed:', e);
+    }
+  }
+
+  const homeChrome =
+    typeof lookupTeamChrome === 'function'
+      ? lookupTeamChrome(homeCore, {
+          label: homeTeamData?.display_name || legacyHome?.display_name || urlHomeDisplay || homeCore,
+          primary_color:
+            homeTeamData?.colors?.primary_color ||
+            homeTeamData?.primary_color ||
+            legacyHome?.colors?.primary_color,
+          secondary_color:
+            homeTeamData?.colors?.secondary_color ||
+            homeTeamData?.secondary_color ||
+            legacyHome?.colors?.secondary_color,
+        })
+      : {
+          label: homeTeamData?.display_name || urlHomeDisplay || homeCore,
+          primary_color: homeTeamData?.colors?.primary_color || '#F79420',
+          secondary_color: homeTeamData?.colors?.secondary_color,
+        };
+  const awayChrome =
+    typeof lookupTeamChrome === 'function'
+      ? lookupTeamChrome(awayCore, {
+          label: awayTeamData?.display_name || legacyAway?.display_name || urlAwayDisplay || awayCore,
+          primary_color:
+            awayTeamData?.colors?.primary_color ||
+            awayTeamData?.primary_color ||
+            legacyAway?.colors?.primary_color,
+          secondary_color:
+            awayTeamData?.colors?.secondary_color ||
+            awayTeamData?.secondary_color ||
+            legacyAway?.colors?.secondary_color,
+        })
+      : {
+          label: awayTeamData?.display_name || urlAwayDisplay || awayCore,
+          primary_color: awayTeamData?.colors?.primary_color || '#4065AF',
+          secondary_color: awayTeamData?.colors?.secondary_color,
+        };
+
+  const homeLabel = homeChrome.label || homeCore;
+  const awayLabel = awayChrome.label || awayCore;
 
   const homeScore = Number(finalScore?.homeScore || 0);
   const awayScore = Number(finalScore?.awayScore || 0);
@@ -316,13 +353,18 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     : null;
 
   let userTeamPrimaryColor = '#F79420';
-  if (resolvedUserTeamSide === 'home' && homeTeamData && typeof homeTeamData === 'object') {
+  if (resolvedUserTeamSide === 'home' && homeChrome?.primary_color) {
+    userTeamPrimaryColor = homeChrome.primary_color;
+  } else if (resolvedUserTeamSide === 'away' && awayChrome?.primary_color) {
+    userTeamPrimaryColor = awayChrome.primary_color;
+  } else if (resolvedUserTeamSide === 'home' && homeTeamData && typeof homeTeamData === 'object') {
     const col = homeTeamData.colors?.primary_color || homeTeamData.colors?.primary;
     if (col && typeof col === 'string') userTeamPrimaryColor = col;
   } else if (resolvedUserTeamSide === 'away' && awayTeamData && typeof awayTeamData === 'object') {
     const col = awayTeamData.colors?.primary_color || awayTeamData.colors?.primary;
     if (col && typeof col === 'string') userTeamPrimaryColor = col;
   }
+  // Banner key = chrome label (snapshot) so watermark agrees with .team-name.
   const bannerUrl = userTeamName && typeof getTeamAssetPath === 'function'
     ? getTeamAssetPath(userTeamName, 'banner_primary')
     : '/images/teams/general/general_banner_primary.jpg';

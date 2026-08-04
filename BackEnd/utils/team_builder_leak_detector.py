@@ -616,6 +616,12 @@ class TeamBuilderLeakMiddleware(BaseHTTPMiddleware):
         if request.method in ("POST", "PUT", "PATCH") and "application/json" in content_type:
             body_json = await _read_json_body(request)
 
+        # Capstone: diagnostics OFF for full-sim / bulk. Sim Quarter / Sim Full Game
+        # responses include turns[] (~MB) — deep-scanning them (~2s/Q + log storms)
+        # distorts staging measurement. Play-quarter (full_sim false/absent) still scanned.
+        if isinstance(body_json, dict) and body_json.get("full_sim"):
+            return await call_next(request)
+
         response = await call_next(request)
 
         # Only inspect JSON bodies.

@@ -264,11 +264,19 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
   const displayOnly = !!(options && options.displayOnly);
 
   const { userTeamSide, homeTeam, awayTeam, currentMatchups, franchiseWeek } = normalized;
-  const homePrimary = homeTeam.primary_color || "#1F8A5B";
-  const awayPrimary = awayTeam.primary_color || "#9E1B32";
-  // Chrome labels: display_name (TB overlay) when present; team_name remains core identity.
-  const homeName = homeTeam.display_name || homeTeam.team_name || "Home";
-  const awayName = awayTeam.display_name || awayTeam.team_name || "Away";
+  const homeChrome =
+    typeof lookupTeamChrome === "function"
+      ? lookupTeamChrome(homeTeam?.team_name || homeTeam?.name || homeTeam?.display_name, homeTeam)
+      : null;
+  const awayChrome =
+    typeof lookupTeamChrome === "function"
+      ? lookupTeamChrome(awayTeam?.team_name || awayTeam?.name || awayTeam?.display_name, awayTeam)
+      : null;
+  const homePrimary = homeChrome?.primary_color || homeTeam.primary_color || "#1F8A5B";
+  const awayPrimary = awayChrome?.primary_color || awayTeam.primary_color || "#9E1B32";
+  // Chrome labels: snapshot / display_name (TB overlay) when present; team_name remains core identity.
+  const homeName = homeChrome?.label || homeTeam.display_name || homeTeam.team_name || "Home";
+  const awayName = awayChrome?.label || awayTeam.display_name || awayTeam.team_name || "Away";
   const userIsHome = userTeamSide === "home";
   const userNatlRank = userIsHome ? homeTeam.natl_rank : awayTeam.natl_rank;
   const opponentNatlRank = userIsHome ? awayTeam.natl_rank : homeTeam.natl_rank;

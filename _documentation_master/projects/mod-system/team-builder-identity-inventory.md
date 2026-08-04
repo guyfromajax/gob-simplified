@@ -69,7 +69,8 @@ This document replaces `team-builder-resolver-enumeration.md`. It covers derived
 | Location | Form(s) | Role | Overlay |
 |---|---|---|---|
 | court / box-score / potg / sim timeline | `display_name\|\|name` chrome; core for score | both | yes |
-| `gameCompletionPopup` | score line / chrome via `display_name`; core stays on score keys | both | yes |
+| **`ensureTeamBuilderChromeSnapshot` / `lookupTeamChrome`** | total 128-program label/abbr/palette map | chrome | yes (gate) |
+| `gameCompletionPopup` | score line / chrome via snapshot; core stays on score keys | both | yes |
 | mode-select resume card | opponent via `*_display_name` (URL params still core) | both | yes |
 | `player-detail` LEAN / SIGNED | `lean_display` / signed resolve at edge | chrome | yes |
 | FCC standings / schedule maps / play-next | display labels; ids for keys | both | yes |
@@ -160,3 +161,35 @@ Identity boundaries must look up the stored id; asset paths must keep using the 
 ## Pass-through
 
 `resolve_team_display` / `resolve_team_name_map` return core values unchanged when `franchise.team_builder` is absent.
+
+---
+
+## Total chrome snapshot (court / Sim Exp / completion)
+
+**Exists:** `ensureTeamBuilderChromeSnapshot(franchiseId)` in `FrontEnd/static/common.js`, built **only after** `ensureTeamBuilderVisualReady()`. Fetches `/teams?franchise_id=` (or `/teams`) and builds a **total** map of all ~128 programs — non-overlaid teams map to their own core label / abbreviation / palette; the replaced slot maps to overlay chrome. Indexed by core name, display label, `team_id`, `object_id`, abbr, and path slug. Empty `/teams` responses are refused (no empty snapshot install).
+
+**Read path:** `lookupTeamChrome(nameOrId, fallback)` — the only correct colour/label read for court chrome. `resolveTeamBuilderDisplayName` / `resolveTeamBuilderPaletteColors` prefer the snapshot when ready.
+
+**Must not read directly for summary/roster paint:**
+
+- `summary.teams[].colors` / `summary.teams[].primary_color`
+- roster `primary_color` / `secondary_color` as the sole source
+- `players[].primary_color` stamped at summarize (can retain core palette)
+
+Use the snapshot (or gated resolvers that already prefer it). Transient UI is only scanned while mounted, so the leak detector cannot enumerate these for us.
+
+### Seven surfaces (resume class)
+
+| # | Surface | Status |
+|---|---|---|
+| 1 | `simTimelineAssembler.buildTeams` (Sim Exp `.wl-team`, worm, row chrome) | **Converted** — `lookupTeamChrome` |
+| 2 | Completion popup `.team-name` | **Converted** — awaits snapshot; labels/colours from `lookupTeamChrome` |
+| 3 | `getTeamAssetPath` agreement with labels | **Converted** — overlay entry from snapshot drives generated art |
+| 4 | Sprite colour chrome (`gameStore` → Phaser markers) | **Converted** — `startGame` / `gameScene` set colours from snapshot before sprites |
+| 5 | Per-player `primary_color` consumers | **Converted** — sprites ignore `player.primary_color` (gameStore only); `potg.js` uses `lookupTeamChrome` |
+| 6 | Playcall headshot IDs (URL starters vs live five) | **Deliberately exempt** from chrome snapshot — fixed separately via live `scene.currentLineup` / turn lineup in `populatePlayHeadshots` |
+| 7 | Resume entry painting before settle | **Converted** — boot kicks snapshot early; `startGame`, Sim Full Game presentation, and completion await `ensureTeamBuilderChromeSnapshot` |
+
+Related (same read path, not in the original seven): defense matchups / pre-game experience headers, court vibrant CSS vars.
+
+**Perf:** snapshot is built once per franchise page load (`[TB] chrome snapshot ready N programs Xms`). No per-turn / per-frame work; no `getComputedStyle` in the render loop.

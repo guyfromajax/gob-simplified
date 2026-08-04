@@ -7,6 +7,8 @@
  * Enable: localhost / staging hosts (API_CONFIG.isCaptureEnv), or
  *   localStorage.TB_LEAK_DETECTOR = '1'
  * Disable: localStorage.TB_LEAK_DETECTOR = '0'
+ * Bulk-sim pause: TeamBuilderLeakDetector.setBulkSimPaused(true) during
+ *   Sim Full/Rest Game (bootGame) — Capstone: diagnostics off for full-sim.
  *
  * On hit: paints a fixed on-screen banner listing offending elements (console
  * alone is invisible during play).
@@ -23,6 +25,9 @@
   // Session dedupe: one report per (node identity + needle) so mutation re-scans
   // and transient event cards don't spam the same leak as many banners.
   var reportedLeakKeys = Object.create(null);
+  // Capstone: pause during Sim Full/Rest Game + presentation so getComputedStyle
+  // scans do not force layout on the playback path (staging measurement).
+  var bulkSimPaused = false;
 
   function envEnabled() {
     try {
@@ -35,6 +40,14 @@
     }
     var host = (global.location && global.location.hostname) || '';
     return host === 'localhost' || host === '127.0.0.1';
+  }
+
+  function setBulkSimPaused(paused) {
+    bulkSimPaused = !!paused;
+  }
+
+  function isBulkSimPaused() {
+    return bulkSimPaused;
   }
 
   function resolveReplacedName(options) {
@@ -428,7 +441,7 @@
    */
   function runTeamBuilderLeakScan(options) {
     options = options || {};
-    if (!envEnabled()) return [];
+    if (!envEnabled() || bulkSimPaused) return [];
     var replaced = resolveReplacedName(options);
     var visual = null;
     try {
@@ -449,7 +462,7 @@
   }
 
   function scheduleScan(options) {
-    if (!envEnabled()) return;
+    if (!envEnabled() || bulkSimPaused) return;
     var run = function () { runTeamBuilderLeakScan(options); };
     if (global.requestAnimationFrame) {
       global.requestAnimationFrame(function () {
@@ -476,7 +489,7 @@
     // Re-scan after SPA-ish DOM updates during play.
     if (global.setInterval) {
       global.setInterval(function () {
-        if (!envEnabled()) return;
+        if (!envEnabled() || bulkSimPaused) return;
         runTeamBuilderLeakScan();
       }, 8000);
     }
@@ -485,6 +498,8 @@
   global.TeamBuilderLeakDetector = {
     run: runTeamBuilderLeakScan,
     schedule: scheduleScan,
+    setBulkSimPaused: setBulkSimPaused,
+    isBulkSimPaused: isBulkSimPaused,
     scanDom: scanDom,
     scanDomColors: scanDomColors,
     clearBanner: clearBanner,

@@ -4,7 +4,12 @@ import { attachMovementAttributeAnchor } from "../utils/syncPlayerSpriteAttribut
 
 /**
  * Creates Phaser player containers for all players and stores them by ID.
- * 
+ *
+ * Team-colour chrome (backdrop/chip/border) comes from gameStore colours,
+ * which boot sets from the total chrome snapshot — never from
+ * player.primary_color on summary players[] (those can retain core palette
+ * from summarize even when Team Builder overlay is active).
+ *
  * @param {Phaser.Scene} scene - The active Phaser scene
  * @param {Array} allPlayers - Array of player objects from simData
  * @param {Object} [teamInfo] - Optional colors; defaults to gameStore values

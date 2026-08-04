@@ -1514,12 +1514,22 @@ export function createGameScene(Phaser) {
       // Set team IDs on scene for animation systems
       this.homeTeamId = homeId;
       this.awayTeamId = awayId;
-      const homePalette =
-        typeof resolveTeamBuilderPaletteColors === 'function'
+      const homeSnap =
+        typeof lookupTeamChrome === 'function'
+          ? lookupTeamChrome(homeCore || homeChromeLabel, homeColors)
+          : null;
+      const awaySnap =
+        typeof lookupTeamChrome === 'function'
+          ? lookupTeamChrome(awayCore || awayChromeLabel, awayColors)
+          : null;
+      const homePalette = homeSnap
+        ? { primary_color: homeSnap.primary_color, secondary_color: homeSnap.secondary_color }
+        : typeof resolveTeamBuilderPaletteColors === 'function'
           ? resolveTeamBuilderPaletteColors(homeCore, homeColors)
           : homeColors;
-      const awayPalette =
-        typeof resolveTeamBuilderPaletteColors === 'function'
+      const awayPalette = awaySnap
+        ? { primary_color: awaySnap.primary_color, secondary_color: awaySnap.secondary_color }
+        : typeof resolveTeamBuilderPaletteColors === 'function'
           ? resolveTeamBuilderPaletteColors(awayCore, awayColors)
           : awayColors;
       gameStore.setColors({
@@ -2120,6 +2130,12 @@ export function createGameScene(Phaser) {
             stats.nameCell = row.nameCell; // Store name cell for energy color coding
           }
         });
+        // Keep Playcall Center headshots on the live five (not stale URL starters).
+        try {
+          if (typeof window.populatePlayHeadshots === 'function') {
+            window.populatePlayHeadshots();
+          }
+        } catch (e) { /* ignore */ }
       };
 
       const hydrateBoxScore = () => {

@@ -14,6 +14,18 @@ function canonicalTeamName(name) {
 }
 
 function resolvePrimaryColor(teamObj, fallback = '#1a1a2e') {
+  // Prefer total chrome snapshot — never summary/player-stamped core palette alone.
+  if (typeof lookupTeamChrome === 'function' && teamObj) {
+    const chrome = lookupTeamChrome(
+      teamObj.name || teamObj.team_name || teamObj.display_name || teamObj.team_id,
+      {
+        label: teamObj.display_name || teamObj.name,
+        primary_color: teamObj?.colors?.primary_color || teamObj?.primary_color,
+        secondary_color: teamObj?.colors?.secondary_color || teamObj?.secondary_color,
+      }
+    );
+    if (chrome?.primary_color) return chrome.primary_color;
+  }
   return teamObj?.colors?.primary_color || teamObj?.primary_color || fallback;
 }
 
@@ -29,15 +41,19 @@ function getTeamContext(gameData, scoreOverride = null) {
     homeTeamObj?.name || gameData?.home_team?.name || 'Home Team';
   const awayCore =
     awayTeamObj?.name || gameData?.away_team?.name || 'Away Team';
-  // potg.teamName is display-only — single chrome field (display_name || name).
-  const homeTeamName =
+  // potg.teamName is display-only — snapshot / display_name || name.
+  let homeTeamName =
     homeTeamObj?.display_name ||
     gameData?.home_team?.display_name ||
     homeCore;
-  const awayTeamName =
+  let awayTeamName =
     awayTeamObj?.display_name ||
     gameData?.away_team?.display_name ||
     awayCore;
+  if (typeof lookupTeamChrome === 'function') {
+    homeTeamName = lookupTeamChrome(homeCore, { label: homeTeamName }).label || homeTeamName;
+    awayTeamName = lookupTeamChrome(awayCore, { label: awayTeamName }).label || awayTeamName;
+  }
 
   const scoreSource = scoreOverride || gameData?.score || {};
   const homeScore = toNumber(scoreSource[homeCore] ?? homeTeamObj?.score ?? 0);

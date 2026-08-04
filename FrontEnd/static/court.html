@@ -5221,7 +5221,7 @@
 
     // ✅ SS&S: Populate shooter headshots for the 6-play list using intended shooter from play skeletons
     // This runs on all game entry/re-entry instances (game start, quarter breaks, timeouts, foul outs, overtime)
-    // Lineups are locked at timeout navigation points, so we can safely assign images here
+    // Prefer live five from gameScene (currentLineup / homeLineup); URL params are a cold-start fallback only.
     // Uses the same logic as backend: extracts intended shooter from successful skeleton's final step
     async function populatePlayHeadshots() {
       // Ensure API_CONFIG is loaded
@@ -5234,26 +5234,48 @@
       const playOptions = document.querySelectorAll('#offense-play-scroller .play-option');
       const urlParams = new URLSearchParams(window.location.search);
       
-      // Get user team side and lineup from URL params
+      // Get user team side and lineup — live scene first, URL second.
       const userTeamSide = urlParams.get('my_team'); // "home" or "away"
       if (!userTeamSide) {
         console.warn('⚠️ [PLAYCALL HEADSHOTS] No my_team in URL params, cannot populate headshots');
         return;
       }
-      
-      // Build lineup object from URL params
+
+      const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
       const lineup = {};
-      const positions = ['pg', 'sg', 'sf', 'pf', 'c'];
-      positions.forEach(pos => {
-        const paramKey = `${userTeamSide}_${pos}`;
-        const playerId = urlParams.get(paramKey);
-        if (playerId) {
-          lineup[pos.toUpperCase()] = playerId;
-        }
-      });
+      const scene = (typeof window !== 'undefined') ? window.currentGameScene : null;
+      const liveSide =
+        scene && scene.currentLineup && scene.currentLineup[userTeamSide]
+          ? scene.currentLineup[userTeamSide]
+          : null;
+      const bootSide =
+        scene && userTeamSide === 'home' && scene.homeLineup
+          ? scene.homeLineup
+          : scene && userTeamSide === 'away' && scene.awayLineup
+            ? scene.awayLineup
+            : null;
+      const sourceLineup =
+        liveSide && Object.keys(liveSide).length
+          ? liveSide
+          : bootSide && Object.keys(bootSide).length
+            ? bootSide
+            : null;
+
+      if (sourceLineup) {
+        positions.forEach((pos) => {
+          const playerId = sourceLineup[pos] || sourceLineup[pos.toLowerCase()];
+          if (playerId) lineup[pos] = String(playerId);
+        });
+      } else {
+        positions.forEach((pos) => {
+          const paramKey = `${userTeamSide}_${pos.toLowerCase()}`;
+          const playerId = urlParams.get(paramKey);
+          if (playerId) lineup[pos] = playerId;
+        });
+      }
       
       if (Object.keys(lineup).length === 0) {
-        console.warn('⚠️ [PLAYCALL HEADSHOTS] No lineup data in URL params, cannot populate headshots');
+        console.warn('⚠️ [PLAYCALL HEADSHOTS] No lineup data in scene or URL params, cannot populate headshots');
         return;
       }
       
@@ -6016,6 +6038,8 @@
     populatePlayHeadshots().catch(error => {
       console.error('❌ [PLAYCALL HEADSHOTS] Error populating headshots:', error);
     });
+    // Expose for gameScene lineup updates (mid-game sub / resume turn).
+    window.populatePlayHeadshots = populatePlayHeadshots;
     
     // Load and apply Playcall Center ordering from playbooks (debounced; retries after replaceState/game_id)
     schedulePlaycallPlaybookLoad();
@@ -6601,20 +6625,35 @@
         if (typeof ensureTeamBuilderVisualReady === 'function') {
           await ensureTeamBuilderVisualReady(urlParams.get('franchise_id'));
         }
+        if (typeof ensureTeamBuilderChromeSnapshot === 'function') {
+          await ensureTeamBuilderChromeSnapshot(urlParams.get('franchise_id'));
+        }
+        const homeChromeSnap =
+          typeof lookupTeamChrome === 'function'
+            ? lookupTeamChrome(homeTeamName, homeRoster)
+            : null;
+        const awayChromeSnap =
+          typeof lookupTeamChrome === 'function'
+            ? lookupTeamChrome(awayTeamName, awayRoster)
+            : null;
         const homeChrome =
-          typeof resolveTeamBuilderDisplayName === 'function'
+          homeChromeSnap?.label ||
+          (typeof resolveTeamBuilderDisplayName === 'function'
             ? resolveTeamBuilderDisplayName(homeTeamName, homeUrlDisplay)
-            : homeUrlDisplay;
+            : homeUrlDisplay);
         const awayChrome =
-          typeof resolveTeamBuilderDisplayName === 'function'
+          awayChromeSnap?.label ||
+          (typeof resolveTeamBuilderDisplayName === 'function'
             ? resolveTeamBuilderDisplayName(awayTeamName, awayUrlDisplay)
-            : awayUrlDisplay;
-        const homePal =
-          typeof resolveTeamBuilderPaletteColors === 'function'
+            : awayUrlDisplay);
+        const homePal = homeChromeSnap
+          ? { primary_color: homeChromeSnap.primary_color, secondary_color: homeChromeSnap.secondary_color }
+          : typeof resolveTeamBuilderPaletteColors === 'function'
             ? resolveTeamBuilderPaletteColors(homeTeamName, homeRoster)
             : homeRoster;
-        const awayPal =
-          typeof resolveTeamBuilderPaletteColors === 'function'
+        const awayPal = awayChromeSnap
+          ? { primary_color: awayChromeSnap.primary_color, secondary_color: awayChromeSnap.secondary_color }
+          : typeof resolveTeamBuilderPaletteColors === 'function'
             ? resolveTeamBuilderPaletteColors(awayTeamName, awayRoster)
             : awayRoster;
         const homeColor = homePal?.primary_color;
@@ -6622,7 +6661,7 @@
         if (!homeColor || !awayColor) return false;
 
         if (typeof applyTeamVibrantDocumentVars === 'function') {
-          await applyTeamVibrantDocumentVars(homeChrome, awayChrome, homeRoster, awayRoster);
+          await applyTeamVibrantDocumentVars(homeChrome, awayChrome, homePal, awayPal);
         } else {
           document.documentElement.style.setProperty('--home-vibrant-color', homeColor);
           document.documentElement.style.setProperty('--away-vibrant-color', awayColor);

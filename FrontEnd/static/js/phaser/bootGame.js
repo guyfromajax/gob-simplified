@@ -139,11 +139,15 @@ const queryFranchiseId = urlParams.get('franchise_id');
 const urlMode = urlParams.get('mode');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', queryFranchiseId || null) : (queryFranchiseId || null);
 
-// Resolver-owned hydrate gate (ensureTeamBuilderVisualReady). Kick early so
+// Resolver-owned hydrate gate + total chrome snapshot. Kick early so
 // court/banner paint does not race the first chrome apply.
 const teamBuilderVisualHydratePromise =
   typeof ensureTeamBuilderVisualReady === 'function'
     ? ensureTeamBuilderVisualReady(franchiseId)
+    : Promise.resolve(null);
+const teamBuilderChromeSnapshotPromise =
+  typeof ensureTeamBuilderChromeSnapshot === 'function'
+    ? ensureTeamBuilderChromeSnapshot(franchiseId)
     : Promise.resolve(null);
 
 function attachMatchupTeamIds(payload) {
@@ -152,10 +156,14 @@ function attachMatchupTeamIds(payload) {
   return payload;
 }
 
-/** Chrome asset/label name — hydrated visual authority, URL display fallback. */
+/** Chrome asset/label name — total snapshot when ready, else hydrate resolver. */
 function courtChromeName(side) {
   const core = side === 'away' ? awayTeam : homeTeam;
   const urlDisp = side === 'away' ? awayDisplay : homeDisplay;
+  if (typeof lookupTeamChrome === 'function' && typeof getTeamBuilderChromeSnapshot === 'function' &&
+      getTeamBuilderChromeSnapshot()) {
+    return lookupTeamChrome(core, { label: urlDisp || core }).label || urlDisp || core;
+  }
   if (typeof resolveTeamBuilderDisplayName === 'function') {
     return resolveTeamBuilderDisplayName(core, urlDisp || core);
   }
@@ -424,6 +432,16 @@ console.log("🏀 Tournament launch params:", {
 const GameScene = createGameScene(Phaser);
 let game;
 let isSimulating = false;
+
+/** Pause FE TB leak detector during full_sim / presentation (staging measurement). */
+function setTbLeakDetectorBulkSimPaused(paused) {
+  try {
+    if (typeof window !== 'undefined' && window.TeamBuilderLeakDetector &&
+        typeof window.TeamBuilderLeakDetector.setBulkSimPaused === 'function') {
+      window.TeamBuilderLeakDetector.setBulkSimPaused(paused);
+    }
+  } catch (e) { /* ignore */ }
+}
 
 function hasResumeFlowFlags(params) {
   return (
@@ -718,15 +736,25 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     awayTeamObj = typeof lastSummary.away_team === 'object' ? lastSummary.away_team : null;
   }
   
-  // Extract colors; prefer hydrated TB visual (same source as court generator).
+  // Extract colors from total chrome snapshot (never summary/roster colours alone).
   const homeColorsRaw = homeTeamObj?.colors || lastSummary.home_team_colors;
   const awayColorsRaw = awayTeamObj?.colors || lastSummary.away_team_colors;
-  const homeColors =
-    typeof resolveTeamBuilderPaletteColors === 'function'
+  const homeSnap =
+    typeof lookupTeamChrome === 'function'
+      ? lookupTeamChrome(courtChromeName('home'), homeColorsRaw)
+      : null;
+  const awaySnap =
+    typeof lookupTeamChrome === 'function'
+      ? lookupTeamChrome(courtChromeName('away'), awayColorsRaw)
+      : null;
+  const homeColors = homeSnap
+    ? { primary_color: homeSnap.primary_color, secondary_color: homeSnap.secondary_color }
+    : typeof resolveTeamBuilderPaletteColors === 'function'
       ? resolveTeamBuilderPaletteColors(courtChromeName('home'), homeColorsRaw)
       : homeColorsRaw;
-  const awayColors =
-    typeof resolveTeamBuilderPaletteColors === 'function'
+  const awayColors = awaySnap
+    ? { primary_color: awaySnap.primary_color, secondary_color: awaySnap.secondary_color }
+    : typeof resolveTeamBuilderPaletteColors === 'function'
       ? resolveTeamBuilderPaletteColors(courtChromeName('away'), awayColorsRaw)
       : awayColorsRaw;
 
@@ -735,10 +763,10 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   try {
     if (typeof applyTeamVibrantDocumentVars === 'function') {
       await applyTeamVibrantDocumentVars(
-        courtChromeName('home'),
-        courtChromeName('away'),
-        homeColorsRaw,
-        awayColorsRaw
+        homeSnap?.label || courtChromeName('home'),
+        awaySnap?.label || courtChromeName('away'),
+        homeColors,
+        awayColors
       );
     }
   } catch (e) { /* ignore */ }
@@ -2243,16 +2271,34 @@ async function startGame({ homeRoster, awayRoster, animate = true, resumeActive 
   gameStore.setRosters({ home: homeRoster, away: awayRoster });
   try {
     await teamBuilderVisualHydratePromise;
+    await teamBuilderChromeSnapshotPromise;
   } catch (e) { /* non-fatal */ }
+  if (typeof ensureTeamBuilderChromeSnapshot === 'function') {
+    try {
+      await ensureTeamBuilderChromeSnapshot(franchiseId);
+    } catch (e) {
+      console.warn('⚠️ [bootGame] chrome snapshot failed:', e);
+    }
+  }
 
   const homeChromeBoot = courtChromeName('home');
   const awayChromeBoot = courtChromeName('away');
-  const homePalette =
-    typeof resolveTeamBuilderPaletteColors === 'function'
+  const homeSnap =
+    typeof lookupTeamChrome === 'function'
+      ? lookupTeamChrome(homeTeam || homeChromeBoot, homeRoster)
+      : null;
+  const awaySnap =
+    typeof lookupTeamChrome === 'function'
+      ? lookupTeamChrome(awayTeam || awayChromeBoot, awayRoster)
+      : null;
+  const homePalette = homeSnap
+    ? { primary_color: homeSnap.primary_color, secondary_color: homeSnap.secondary_color }
+    : typeof resolveTeamBuilderPaletteColors === 'function'
       ? resolveTeamBuilderPaletteColors(homeChromeBoot, homeRoster)
       : homeRoster;
-  const awayPalette =
-    typeof resolveTeamBuilderPaletteColors === 'function'
+  const awayPalette = awaySnap
+    ? { primary_color: awaySnap.primary_color, secondary_color: awaySnap.secondary_color }
+    : typeof resolveTeamBuilderPaletteColors === 'function'
       ? resolveTeamBuilderPaletteColors(awayChromeBoot, awayRoster)
       : awayRoster;
 
@@ -2267,10 +2313,15 @@ async function startGame({ homeRoster, awayRoster, animate = true, resumeActive 
     },
   });
 
-  // Court chrome CSS vars — same hydrated visual as resolveCourtImagePath.
+  // Court chrome CSS vars — snapshot palette (same source as resolveCourtImagePath).
   try {
     if (typeof applyTeamVibrantDocumentVars === 'function') {
-      await applyTeamVibrantDocumentVars(homeChromeBoot, awayChromeBoot, homeRoster, awayRoster);
+      await applyTeamVibrantDocumentVars(
+        homeSnap?.label || homeChromeBoot,
+        awaySnap?.label || awayChromeBoot,
+        homePalette,
+        awayPalette
+      );
     } else if (typeof document !== 'undefined' && document.documentElement) {
       document.documentElement.style.setProperty('--home-vibrant-color', homePalette.primary_color || '#ff6200');
       document.documentElement.style.setProperty('--away-vibrant-color', awayPalette.primary_color || '#ff6200');
@@ -2571,6 +2622,7 @@ async function handleSimQuarter() {
     return;
   }
   isSimulating = true;
+  setTbLeakDetectorBulkSimPaused(true);
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
   const simQuarterBtn = document.querySelector('.sim-to-fourth-button');
@@ -2806,6 +2858,7 @@ async function handleSimQuarter() {
     alert(`Simulation Error: ${errorMessage}`);
   } finally {
     isSimulating = false;
+    setTbLeakDetectorBulkSimPaused(false);
     if (playBtn) playBtn.disabled = false;
     if (simFullBtn) simFullBtn.disabled = false;
     if (simQuarterBtn) simQuarterBtn.disabled = false;
@@ -2838,6 +2891,7 @@ async function handleSimFullGame() {
     resetGameContext();
   }
   isSimulating = true;
+  setTbLeakDetectorBulkSimPaused(true);
   
   // Remove the pre-game button container from DOM
   const preGameContainer = document.querySelector('.pre-game-container');
@@ -3121,6 +3175,9 @@ async function handleSimFullGame() {
       await preppingCoverPromise;
     } catch (e) { /* covers are self-guarded */ }
     try {
+      if (typeof ensureTeamBuilderChromeSnapshot === 'function') {
+        await ensureTeamBuilderChromeSnapshot(franchiseId);
+      }
       const timeline = buildSimTimeline(quarterSummaries, {
         homeRoster,
         awayRoster,
@@ -3160,6 +3217,7 @@ async function handleSimFullGame() {
     [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = false; });
   } finally {
     isSimulating = false;
+    setTbLeakDetectorBulkSimPaused(false);
   }
 }
 
