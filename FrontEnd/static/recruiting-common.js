@@ -49,9 +49,7 @@
   // one letter mapping (formatRtDisplay). Returns "C/B" when a ceiling is present, the
   // current grade alone otherwise, "--" when there is no rating.
   function formatRtWithPotential(rt, potentialRt) {
-    if (rt == null) return '--';
-    var cur = global.formatRtDisplay(rt);
-    return (potentialRt != null) ? cur + '/' + global.formatRtDisplay(potentialRt) : cur;
+    return global.formatRtWithPotentialDisplay(rt, potentialRt);
   }
 
   function fetchJSON(url, options) {

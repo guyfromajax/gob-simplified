@@ -12418,6 +12418,7 @@ def get_practice_squad_team(
 
     team_name_map = _format_team_name_map(franchise=franchise_doc)
     players = []
+    from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD, potential_rt_for_player
     for slot in roster_slots:
         pid = str(slot.get("player_id") or "")
         source = slot.get("source")
@@ -12434,6 +12435,10 @@ def get_practice_squad_team(
                 "name": slot.get("name") or f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip(),
                 "parent_team_name": parent_name,
                 "position_ratings": doc.get("position_ratings") or {},
+                POTENTIAL_RT_FIELD: potential_rt_for_player(
+                    pid, doc.get("entry_tier"), doc.get("potential_factor"),
+                    doc.get("position_ratings") or {},
+                ),
                 "attributes": doc.get("attributes") or {},
                 "year": format_player_year_display(meta.get("year")) if meta.get("year") else None,
                 "archetype": meta.get("archetype") or "",
@@ -12451,6 +12456,10 @@ def get_practice_squad_team(
                 "name": slot.get("name") or doc.get("name") or "",
                 "parent_team_name": None,
                 "position_ratings": doc.get("position_ratings") or {},
+                POTENTIAL_RT_FIELD: potential_rt_for_player(
+                    pid, doc.get("entry_tier"), doc.get("potential_factor"),
+                    doc.get("position_ratings") or {},
+                ),
                 "attributes": doc.get("attributes") or {},
                 "year": format_player_year_display(doc.get("year")) if doc.get("year") else None,
                 "archetype": doc.get("archetype") or "",

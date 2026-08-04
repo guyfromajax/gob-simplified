@@ -239,6 +239,10 @@ def compute_projected_starting_five(players: List[Dict[str, Any]]) -> List[Dict[
                 "height": p.get("height"),
                 "weight": p.get("weight"),
                 "rt": rt_out,
+                # Already-ratcheted display ceiling computed by the roster/recruit
+                # payload builder. Preserve it through this reduced projected-five
+                # DTO; the card renderer performs formatting only.
+                "potential_rt_ratcheted": p.get("potential_rt_ratcheted"),
                 "attributes": attr_display,
             }
         )

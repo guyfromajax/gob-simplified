@@ -50,6 +50,20 @@
     return global.RT_DISPLAY_MODE === 'letter' ? getRtLetterGrade(v) : String(rt);
   }
 
+  /**
+   * Format the display-only current/potential pair through the same canonical
+   * RT mapping. Potential is an already-ratcheted ceiling supplied by the
+   * backend; missing potential deliberately falls back to current alone.
+   */
+  function formatRtWithPotentialDisplay(rt, potentialRt) {
+    var current = numericRt(rt);
+    if (current === null) return '--';
+    var potential = numericRt(potentialRt);
+    return potential === null
+      ? formatRtDisplay(rt)
+      : formatRtDisplay(rt) + '/' + formatRtDisplay(potentialRt);
+  }
+
   function getRtBucketClass(rt) {
     return getRtPresentation(rt).className;
   }
@@ -69,6 +83,7 @@
   global.getRtPresentation = getRtPresentation;
   global.getRtLetterGrade = getRtLetterGrade;
   global.formatRtDisplay = formatRtDisplay;
+  global.formatRtWithPotentialDisplay = formatRtWithPotentialDisplay;
   global.getRtBucketClass = getRtBucketClass;
   global.getRecruitRtBucketClass = getRecruitRtBucketClass;
   global.getRecruitRtBucketClassForYear = getRecruitRtBucketClassForYear;

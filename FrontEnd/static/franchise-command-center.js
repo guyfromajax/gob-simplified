@@ -2629,7 +2629,10 @@ function renderPracticeSquad(data) {
         addCell(displayVal);
       });
       const rt = best.rating;
-      addCell(rt ?? '-', typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : '');
+      addCell(
+        rt == null ? '-' : formatRtWithPotentialDisplay(rt, p.potential_rt_ratcheted),
+        typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : ''
+      );
       tbody.appendChild(tr);
     } catch (e) {
       console.error('Error rendering practice squad player:', p, e);
@@ -2736,6 +2739,7 @@ function renderTeam(data) {
         weight: p.weight ?? '--',
         attributes: p.attributes || {},
         rt: best.rating,
+        potential_rt_ratcheted: p.potential_rt_ratcheted,
         has_playing_time_promise: !!p.has_playing_time_promise,
         is_graduating: !!p.is_graduating,
         walk_on: !!p.walk_on,
@@ -2819,9 +2823,8 @@ function renderTeam(data) {
     // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
     // projected ceiling; header stays "RT", color stays by current rating. This runs in both
     // Roster-tab render paths (initial renderTeam + post-sort re-render).
-    const _potRt = p.potential_rt_ratcheted;
     addCell(
-      _potRt != null ? formatRtDisplay(p.rt) + '/' + formatRtDisplay(_potRt) : formatRtDisplay(p.rt),
+      formatRtWithPotentialDisplay(p.rt, p.potential_rt_ratcheted),
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
     );
 
@@ -3112,9 +3115,8 @@ function sortRosterTable(columnName, direction) {
     // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
     // projected ceiling; header stays "RT", color stays by current rating. This runs in both
     // Roster-tab render paths (initial renderTeam + post-sort re-render).
-    const _potRt = p.potential_rt_ratcheted;
     addCell(
-      _potRt != null ? formatRtDisplay(p.rt) + '/' + formatRtDisplay(_potRt) : formatRtDisplay(p.rt),
+      formatRtWithPotentialDisplay(p.rt, p.potential_rt_ratcheted),
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
     );
 

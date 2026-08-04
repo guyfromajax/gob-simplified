@@ -161,7 +161,9 @@ function renderProjectedStartingFiveCards(rows, opts) {
         : pid && window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function'
           ? window.API_CONFIG.getPlayerImageUrl(pid, { size: 'card' })
         : genericUrl;
-    const rt = typeof formatRtDisplay === 'function' ? formatRtDisplay(r.rt) : (r.rt != null ? r.rt : '—');
+    const rt = typeof formatRtWithPotentialDisplay === 'function'
+      ? formatRtWithPotentialDisplay(r.rt, r.potential_rt_ratcheted)
+      : (typeof formatRtDisplay === 'function' ? formatRtDisplay(r.rt) : (r.rt != null ? r.rt : '—'));
     const rtClass =
       typeof getRtBucketClass === 'function' ? getRtBucketClass(r.rt) : 'rt-unknown';
     const jersey =

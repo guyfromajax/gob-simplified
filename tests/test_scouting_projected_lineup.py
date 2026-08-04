@@ -2,11 +2,11 @@
 from BackEnd.utils.scouting_utils import compute_projected_starting_five
 
 
-def _p(pid, ratings: dict, attrs=None):
+def _p(pid, ratings: dict, attrs=None, potential_rt=None):
     base_attrs = {k: 50 for k in ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]}
     if attrs:
         base_attrs.update(attrs)
-    return {
+    player = {
         "_id": pid,
         "first_name": "F",
         "last_name": pid,
@@ -18,6 +18,9 @@ def _p(pid, ratings: dict, attrs=None):
         "attributes": base_attrs,
         "position_ratings": ratings,
     }
+    if potential_rt is not None:
+        player["potential_rt_ratcheted"] = potential_rt
+    return player
 
 
 def test_greedy_assigns_each_player_once():
@@ -70,6 +73,14 @@ def test_attributes_floor_ten_in_output():
     assert len(row) == 1
     assert row[0]["attributes"]["SC"] == 8
     assert row[0]["attributes"]["SH"] == 7
+
+
+def test_projected_five_preserves_ratcheted_potential_rt():
+    row = compute_projected_starting_five(
+        [_p("1", {"PG": 36}, potential_rt=61)]
+    )
+    assert row[0]["rt"] == 36.0
+    assert row[0]["potential_rt_ratcheted"] == 61
 
 
 def test_enrich_projected_five_season_avgs():

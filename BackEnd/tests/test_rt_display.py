@@ -71,3 +71,31 @@ process.stdout.write(JSON.stringify(grades));
         if frontend != backend
     ]
     assert not mismatches, f"Frontend/backend RT grade drift: {mismatches}"
+
+
+def test_frontend_current_potential_formatter_uses_canonical_mapping_and_fallback():
+    node_script = r"""
+const fs = require('fs');
+const vm = require('vm');
+const context = { window: {} };
+vm.runInNewContext(fs.readFileSync(process.argv[1], 'utf8'), context);
+const format = context.window.formatRtWithPotentialDisplay;
+process.stdout.write(JSON.stringify({
+  pair: format(36, 61),
+  sameBand: format(60, 67),
+  fallback: format(55, null),
+  missing: format(null, 80)
+}));
+"""
+    result = subprocess.run(
+        ["node", "-e", node_script, str(FRONTEND_RT_HELPER)],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert json.loads(result.stdout) == {
+        "pair": "D/B",
+        "sameBand": "B/B",
+        "fallback": "C+",
+        "missing": "--",
+    }

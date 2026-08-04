@@ -6811,6 +6811,10 @@ try:
                             "jersey": ts_meta.get("jersey"),
                             "archetype": ts_meta.get("archetype"),
                             "position_ratings": d.get("position_ratings") or {},
+                            POTENTIAL_RT_FIELD: potential_rt_for_player(
+                                pid, d.get("entry_tier"), d.get("potential_factor"),
+                                d.get("position_ratings") or {},
+                            ),
                             "attributes": ts_attrs,
                             # Practice Squad season stats (regional PS games).
                             "ps_stats": d.get("ps_season_stats") or {},
@@ -6857,6 +6861,11 @@ try:
                             "jersey": None,
                             "archetype": s.get("archetype"),
                             "position_ratings": s.get("position_ratings") or {},
+                            POTENTIAL_RT_FIELD: potential_rt_for_player(
+                                str(s.get("recruit_id") or s.get("player_id") or ""),
+                                s.get("entry_tier"), s.get("potential_factor"),
+                                s.get("position_ratings") or {},
+                            ),
                             "attributes": r_attrs,
                             "ps_stats": frd_stats.get(s.get("recruit_id"), {}),
                             "is_recruit": True,

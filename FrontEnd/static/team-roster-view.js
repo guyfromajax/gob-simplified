@@ -200,6 +200,7 @@ async function loadRoster() {
           weight: p.weight || '--',
           attributes: attrs,
           position_ratings: posRatings,
+          potential_rt_ratcheted: p.potential_rt_ratcheted,
           highestRT: highestRT !== -Infinity ? highestRT : null,
           highestPos: highestPos || '--',
           psStats: p.stats || {},
@@ -278,6 +279,7 @@ async function loadRoster() {
         weight: p.weight || '--',
         attributes: attrs,
         position_ratings: posRatings, // Store full position ratings for player view
+        potential_rt_ratcheted: p.potential_rt_ratcheted,
         highestRT: highestRT !== -Infinity ? highestRT : null,
         highestPos: highestPos || (p.position || '--'),
         photo: p.photo || null,
@@ -309,6 +311,7 @@ async function loadRoster() {
         weight: p.weight || '--',
         attributes: p.attributes || {},
         position_ratings: posRatings,
+        potential_rt_ratcheted: p.potential_rt_ratcheted,
         highestRT: highestRT !== -Infinity ? highestRT : null,
         psStats: p.ps_stats || {},
         isRecruit: !!p.is_recruit,
@@ -701,12 +704,9 @@ function renderRosterInto(data, tbodyId) {
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
     // Potential Rating (§Phase 4): show current/potential (e.g. C/B) when the backend
     // supplied a projected ceiling; header stays "RT", color stays by current rating.
-    const _potRt = p.potential_rt_ratcheted;
     const _rtText = p.highestRT === null
       ? '-'
-      : (_potRt != null
-          ? formatRtDisplay(p.highestRT) + '/' + formatRtDisplay(_potRt)
-          : formatRtDisplay(p.highestRT));
+      : formatRtWithPotentialDisplay(p.highestRT, p.potential_rt_ratcheted);
     addCell(
       _rtText,
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.highestRT) : ''
