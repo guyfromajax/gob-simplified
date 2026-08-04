@@ -179,7 +179,7 @@ function renderProjectedStartingFiveCards(rows, opts) {
     article.innerHTML = `
       <div class="p5-photo">
         <span class="p5-pos">${scoutingEscapeHtml(r.position || '—')}</span>
-        <span class="p5-rt-badge ${scoutingEscapeHtml(rtClass)}">${scoutingEscapeHtml(rt)}</span>
+        <span class="p5-rt-badge ${scoutingEscapeHtml(rtClass)}" data-tooltip="current/potential" title="current/potential">${scoutingEscapeHtml(rt)}</span>
         <img loading="lazy" width="240" height="240" src="${scoutingEscapeHtml(imgSrc)}" alt="${scoutingEscapeHtml(name)}">
       </div>
       <div class="p5-body">
@@ -227,6 +227,9 @@ function renderProjectedStartingFiveCards(rows, opts) {
     row.appendChild(article);
   });
   el.appendChild(row);
+  if (typeof window.initAttributeTooltips === 'function') {
+    window.initAttributeTooltips(el, ['[data-tooltip]']);
+  }
 }
 
 /** @deprecated Alias — prefer renderProjectedStartingFiveCards */

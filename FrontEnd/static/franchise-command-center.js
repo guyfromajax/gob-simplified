@@ -2616,6 +2616,7 @@ function renderPracticeSquad(data) {
         td.textContent = content;
         if (extraClass) td.className = extraClass;
         tr.appendChild(td);
+        return td;
       };
       addCell(best.pos || '--');
       addCell(yearMap[(p.year || '').toLowerCase()] || p.year || '--');
@@ -2629,10 +2630,12 @@ function renderPracticeSquad(data) {
         addCell(displayVal);
       });
       const rt = best.rating;
-      addCell(
+      const rtCell = addCell(
         rt == null ? '-' : formatRtWithPotentialDisplay(rt, p.potential_rt_ratcheted),
         typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : ''
       );
+      rtCell.setAttribute('data-tooltip', 'current/potential');
+      rtCell.setAttribute('title', 'current/potential');
       tbody.appendChild(tr);
     } catch (e) {
       console.error('Error rendering practice squad player:', p, e);
@@ -2802,6 +2805,7 @@ function renderTeam(data) {
       td.textContent = content;
       if (extraClass) td.className = extraClass;
       tr.appendChild(td);
+      return td;
     };
 
     addCell(p.pos);
@@ -2823,10 +2827,12 @@ function renderTeam(data) {
     // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
     // projected ceiling; header stays "RT", color stays by current rating. This runs in both
     // Roster-tab render paths (initial renderTeam + post-sort re-render).
-    addCell(
+    const rtCell = addCell(
       formatRtWithPotentialDisplay(p.rt, p.potential_rt_ratcheted),
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
     );
+    rtCell.setAttribute('data-tooltip', 'current/potential');
+    rtCell.setAttribute('title', 'current/potential');
 
     tbody.appendChild(tr);
   });
@@ -3096,6 +3102,7 @@ function sortRosterTable(columnName, direction) {
       td.textContent = content;
       if (extraClass) td.className = extraClass;
       tr.appendChild(td);
+      return td;
     };
 
     addCell(p.pos);
@@ -3115,10 +3122,12 @@ function sortRosterTable(columnName, direction) {
     // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
     // projected ceiling; header stays "RT", color stays by current rating. This runs in both
     // Roster-tab render paths (initial renderTeam + post-sort re-render).
-    addCell(
+    const rtCell = addCell(
       formatRtWithPotentialDisplay(p.rt, p.potential_rt_ratcheted),
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
     );
+    rtCell.setAttribute('data-tooltip', 'current/potential');
+    rtCell.setAttribute('title', 'current/potential');
 
     tbody.appendChild(tr);
   });

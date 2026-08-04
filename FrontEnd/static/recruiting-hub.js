@@ -91,7 +91,7 @@
     return '<thead><tr>' +
       (boardActive() ? '<th class="act"></th>' : '') +
       th('name', 'Name', 'name-col') + th('pos', 'Pos') + th('year', 'Yr') + th('height', 'Ht') + th('weight', 'Wt') +
-      attrTh + '<th class="num attr-sep" data-sortkey="rt">RT' + arrow('rt') + '</th>' +
+      attrTh + '<th class="num attr-sep" data-sortkey="rt" data-tooltip="current/potential" title="current/potential">RT' + arrow('rt') + '</th>' +
       '<th class="lean-col">Leans / Your Standing</th></tr></thead>';
   }
   function rowHtml(r) {
@@ -113,7 +113,7 @@
       '<td class="year">' + Common.escapeHtml(r.yearDisplay) + '</td>' +
       '<td class="num">' + Common.escapeHtml(r.height) + '</td>' +
       '<td class="num">' + (r.weight != null ? r.weight : '--') + '</td>' + attrs +
-      '<td class="rt attr-sep"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></td>' +
+      '<td class="rt attr-sep" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></td>' +
       '<td class="lean-col">' + Spine.Lean.ladderHtml(r.leanModel) + '</td></tr>';
   }
   function poolBodyHtml() {
@@ -209,7 +209,7 @@
       '<span class="islot-grip"><span></span><span></span><span></span><span></span><span></span><span></span></span>' +
       '<div class="islot-body"><div class="islot-name"><span class="nm">' + Common.escapeHtml(r.name) + '</span>' + stand + '</div>' +
         '<div class="islot-meta"><span class="islot-pos">' + Common.escapeHtml(r.pos) + '</span><span>Rgn ' + regionOf(r) + '</span>' +
-        '<span class="islot-rt ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + ' RT</span></div></div>' +
+        '<span class="islot-rt ' + Spine.rtClassForYear(r.rt, r.year) + '" data-tooltip="current/potential" title="current/potential">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + ' RT</span></div></div>' +
       '<div class="islot-right"><span class="islot-lists c' + claimed + '" title="' + claimed + ' of 3 lean slots claimed">' +
         '<span class="dots">' + dots + '</span><span class="cap">' + (claimed === 0 ? 'Open list' : claimed + '/3 leans') + '</span></span></div>' +
       '<button class="islot-remove" data-id="' + id + '" title="Remove" type="button">×</button></div>';
@@ -350,7 +350,7 @@
         '<div class="prow-arch">' + Common.escapeHtml(r.archetype) + '</div></div>' +
       '<span class="prow-pos">' + Common.escapeHtml(r.pos) + '</span>' +
       '<span class="prow-region">' + regionOf(r) + '</span>' +
-      '<span class="prow-rt"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
+      '<span class="prow-rt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
       '<span class="prow-leans" title="' + claimed + ' of 3 leans">' + dots + '</span>' +
       '<div><div class="stepper"><button data-step="-1" data-id="' + r.recruitId + '"' + (a.points === 0 ? ' disabled' : '') + '>−</button>' +
         '<span class="val' + (a.points === 0 ? ' zero' : '') + '">' + a.points + '</span>' +
@@ -372,7 +372,7 @@
       : '<div class="rail-list">' + cids.map(function (x) {
           return '<div class="citem" data-jump="' + x.r.recruitId + '" title="Jump to recruit"><div class="citem-body">' +
             '<div class="citem-name"><span class="nm">' + Common.escapeHtml(x.r.name) + '</span>' + (x.a.promise ? '<span class="pmk">· PT</span>' : '') + '</div>' +
-            '<div class="citem-meta"><span class="citem-pts">' + x.a.points + ' pts</span><span>' + Common.escapeHtml(x.r.pos) + ' · ' + Common.formatRtWithPotential(x.r.rt, x.r.potentialRt) + ' RT</span>' +
+            '<div class="citem-meta"><span class="citem-pts">' + x.a.points + ' pts</span><span data-tooltip="current/potential" title="current/potential">' + Common.escapeHtml(x.r.pos) + ' · ' + Common.formatRtWithPotential(x.r.rt, x.r.potentialRt) + ' RT</span>' +
             '<span class="citem-odds" style="color:var(--muted)">' + x.o.pct + '%</span></div></div>' +
             '<button class="citem-x" data-remove="' + x.r.recruitId + '" title="Remove">×</button></div>';
         }).join('') + '</div>';
@@ -509,7 +509,7 @@
         '<div class="sname"><span class="nm">' + Common.escapeHtml(r.name) + '</span></div>' +
         '<span class="scol spos">' + Common.escapeHtml(r.pos) + '</span>' +
         '<span class="scol sregion">' + regionOf(r) + '</span>' +
-        '<span class="scol srt"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
+        '<span class="scol srt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
         '<span class="scol">' + signStandChip(r) + '</span>' +
         '<div class="ssigned"><span class="logo ' + (s.withYou ? 'you' : 'rival') + '">' + Common.escapeHtml(ab) + '</span>' +
           '<span class="team ' + (s.withYou ? 'you' : 'rival') + '">' + Common.escapeHtml(s.team) + '</span></div>' +
@@ -556,7 +556,7 @@
       var vrec = state.byId[String(yourVisit.recruit_id)];
       var leanNote = vrec && vrec.leansToUser ? 'now leaning you at <b>#' + (vrec.yourRank || 1) + '</b>. Odds up sharply.' : 'visit logged this week.';
       heroVisit = '<div class="wvisit"><span class="wvisit-mark gain">' + ARROW_UP + '</span><div class="wvisit-body">' +
-        '<div class="nm">' + Common.recruitNameLinkHtml(yourVisit.recruit_id, context.franchiseId, yourVisit.name) + '<span class="wmeta"><span class="pos">' + Common.escapeHtml(yourVisit.pos) + '</span>Region ' + Common.escapeHtml(yourVisit.home_region) + ' · ' + Common.formatRtWithPotential(yourVisit.rt, yourVisit.potential_rt_ratcheted) + ' RT</span></div>' +
+        '<div class="nm">' + Common.recruitNameLinkHtml(yourVisit.recruit_id, context.franchiseId, yourVisit.name) + '<span class="wmeta" data-tooltip="current/potential" title="current/potential"><span class="pos">' + Common.escapeHtml(yourVisit.pos) + '</span>Region ' + Common.escapeHtml(yourVisit.home_region) + ' · ' + Common.formatRtWithPotential(yourVisit.rt, yourVisit.potential_rt_ratcheted) + ' RT</span></div>' +
         '<div class="sub">Visit landed — ' + leanNote + '</div></div></div>';
     } else {
       heroVisit = '<div class="wvisit"><div class="wvisit-body"><div class="nm">No visit this week</div><div class="sub">Your program didn\'t land a visit in Week ' + state.week + '.</div></div></div>';

@@ -692,6 +692,7 @@ function renderRosterInto(data, tbodyId) {
       td.textContent = content;
       if (extraClass) td.className = extraClass;
       tr.appendChild(td);
+      return td;
     };
 
     addCell(p.pos);
@@ -707,10 +708,12 @@ function renderRosterInto(data, tbodyId) {
     const _rtText = p.highestRT === null
       ? '-'
       : formatRtWithPotentialDisplay(p.highestRT, p.potential_rt_ratcheted);
-    addCell(
+    const rtCell = addCell(
       _rtText,
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.highestRT) : ''
     );
+    rtCell.setAttribute('data-tooltip', 'current/potential');
+    rtCell.setAttribute('title', 'current/potential');
     
     tbody.appendChild(tr);
   });

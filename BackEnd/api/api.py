@@ -1347,6 +1347,15 @@ try:
         from bson import ObjectId
         db_summary = summarize_game_state(gm, exclude_animations=True)
         db_summary["timeout_reason"] = timeout_reason
+        identity_source = None
+        try:
+            write_id_peek = resolve_game_write_id(games_collection, game_id)
+            identity_source = games_collection.find_one(
+                {"_id": write_id_peek},
+                {"franchise_id": 1, "mode": 1, "tournament_id": 1, "user_team_side": 1},
+            )
+        except Exception:
+            identity_source = None
         db_summary["resume_anchor"] = _build_resume_anchor(
             db_summary,
             {
@@ -1355,6 +1364,8 @@ try:
                 "resume_from_timeout": True,
             },
             timeout_context=db_summary,
+            identity_source=identity_source,
+            gm=gm,
         )
         trace_id = db_summary.get("timeout_trace_id") or gm.game_state.get("timeout_trace_id")
         game_id_type = type(game_id).__name__
@@ -2464,10 +2475,19 @@ try:
         body,
         timeout_context: dict | None = None,
         anchor_type: str | None = None,
+        identity_source: dict | None = None,
+        gm=None,
     ) -> dict:
+        from BackEnd.utils.resume_anchor_identity import stamp_resume_identity_on_snapshot
+
         home_lineup, away_lineup = _extract_saved_lineups(db_summary)
         snapshot = copy.deepcopy(db_summary)
         snapshot.pop("resume_anchor", None)
+        # Future-proof: stamp identity onto the snapshot so it is self-sufficient.
+        # Merge-on-restore still covers historical anchors that lack these fields.
+        stamp_resume_identity_on_snapshot(
+            snapshot, body=body, identity_source=identity_source, gm=gm
+        )
         timeout_context = timeout_context if isinstance(timeout_context, dict) else {}
         resolved_anchor_type = _infer_resume_anchor_type(body, timeout_context, anchor_type)
         timeout_next_play_type = (
@@ -3386,18 +3406,25 @@ try:
                 # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
                 if saved:
                     if body.resume_from_anchor and isinstance(saved.get("resume_anchor"), dict):
+                        root_doc = saved
                         anchor = saved.get("resume_anchor") or {}
                         anchor_snapshot = anchor.get("snapshot") if isinstance(anchor.get("snapshot"), dict) else None
                         if anchor_snapshot:
-                            saved = anchor_snapshot
+                            # Merge: game state from anchor; franchise_id/mode from root.
+                            # Wholesale replace discarded identity and rebuilt from core rosters.
+                            from BackEnd.utils.resume_anchor_identity import merge_resume_anchor_snapshot
+
+                            saved = merge_resume_anchor_snapshot(root_doc, anchor_snapshot)
                             body.quarter = int(saved.get("quarter") or body.quarter or 1)
                             logging.warning(
-                                "🧭 [RESUME-ANCHOR-RESTORE] using snapshot game_id=%s quarter=%s clock=%s time_remaining=%s next_play=%s",
+                                "🧭 [RESUME-ANCHOR-RESTORE] merged snapshot game_id=%s quarter=%s clock=%s time_remaining=%s next_play=%s root_mode=%s root_franchise_id=%s",
                                 game_id,
                                 saved.get("quarter"),
                                 saved.get("clock"),
                                 saved.get("time_remaining"),
                                 saved.get("timeout_next_play_type"),
+                                root_doc.get("mode"),
+                                root_doc.get("franchise_id"),
                             )
                         else:
                             logging.warning("⚠️ [RESUME-ANCHOR-RESTORE] resume_anchor missing snapshot game_id=%s", game_id)
@@ -3484,10 +3511,29 @@ try:
                             # If request was invalid/missing, home_strategy/away_strategy already contain DB settings
                             # If request was valid, home_strategy/away_strategy contain request settings
                             # GameManager constructor will apply these settings correctly
-                            # ✅ FRANCHISE MODE: Extract franchise_id from saved game document if present
-                            saved_franchise_id = saved.get("franchise_id")
-                            saved_mode = saved.get("mode", "single")
-                            franchise_id_for_roster = saved_franchise_id if saved_mode == "franchise" else None
+                            # ✅ FRANCHISE MODE: Prefer merged saved identity; body is a secondary source.
+                            # Never silently fall open to core rosters when the root said franchise.
+                            from BackEnd.utils.resume_anchor_identity import resolve_franchise_id_for_roster
+
+                            try:
+                                saved_mode, franchise_id_for_roster = resolve_franchise_id_for_roster(
+                                    saved, body
+                                )
+                            except ValueError as roster_guard_err:
+                                logging.error(
+                                    "🚨 [RESUME-ROSTER-GUARD] %s game_id=%s saved_mode=%s "
+                                    "saved_franchise_id=%s body_mode=%s body_franchise_id=%s",
+                                    roster_guard_err,
+                                    game_id,
+                                    (saved or {}).get("mode"),
+                                    (saved or {}).get("franchise_id"),
+                                    getattr(body, "mode", None),
+                                    getattr(body, "franchise_id", None),
+                                )
+                                raise HTTPException(
+                                    status_code=500,
+                                    detail=str(roster_guard_err),
+                                ) from roster_guard_err
                             
                             gm_create_start = time.time()
                             gm = GameManager(
@@ -4627,6 +4673,12 @@ try:
                     pre_sim_anchor_summary,
                     body,
                     timeout_context=locals().get("timeout_saved_state"),
+                    identity_source={
+                        "franchise_id": getattr(body, "franchise_id", None),
+                        "mode": getattr(body, "mode", None),
+                        "tournament_id": getattr(body, "tournament_id", None),
+                    },
+                    gm=gm,
                 )
                 pre_sim_anchor_id = resolve_game_write_id(games_collection, game_id)
                 games_collection.update_one(
@@ -5296,6 +5348,11 @@ try:
                                 "resume_from_timeout": False,
                             },
                             anchor_type="quarter_break",
+                            identity_source=games_collection.find_one(
+                                {"_id": quarter_save_id},
+                                {"franchise_id": 1, "mode": 1, "tournament_id": 1, "user_team_side": 1},
+                            ),
+                            gm=gm,
                         )
                         save_update = {"$set": db_summary}
                         _anchor = db_summary["resume_anchor"]
@@ -5739,6 +5796,11 @@ try:
                                 "resume_from_timeout": False,
                             },
                             anchor_type="quarter_break",
+                            identity_source=games_collection.find_one(
+                                {"_id": quarter_save_id},
+                                {"franchise_id": 1, "mode": 1, "tournament_id": 1, "user_team_side": 1},
+                            ),
+                            gm=gm,
                         )
                         save_update = {"$set": db_summary}
                         _anchor = db_summary["resume_anchor"]

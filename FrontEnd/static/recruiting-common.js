@@ -321,7 +321,7 @@
         '<td>' + recruit.attrs.ND + '</td>',
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
-        '<td class="' + recruitRtClass(recruit.rt, recruit.year) + '">' + formatRtWithPotential(recruit.rt, recruit.potentialRt) + '</td>',
+        '<td class="' + recruitRtClass(recruit.rt, recruit.year) + '" data-tooltip="current/potential" title="current/potential">' + formatRtWithPotential(recruit.rt, recruit.potentialRt) + '</td>',
         useLadder
           ? '<td class="lean-ladder-cell">' + global.RecruitingSpine.Lean.ladderHtml(
               global.RecruitingSpine.Lean.fromBackend({ Lean: recruit.lean }, { userTeamId: userTeamId, teamNameMap: teamNameMap })

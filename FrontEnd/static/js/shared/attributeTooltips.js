@@ -142,6 +142,19 @@ function initAttributeTooltips(container = document, selectors = []) {
     elements.forEach(element => {
       const text = element.textContent.trim();
       const upperText = text.toUpperCase();
+      const explicitTooltip = element.getAttribute('data-tooltip');
+
+      // Surface-specific explanatory copy can opt into the shared tooltip UX
+      // without adding a global abbreviation meaning (for example, potential
+      // RT displays use "current/potential" while current-only RT stays Rating).
+      if (explicitTooltip) {
+        injectTooltipStyles();
+        element.classList.add('attr-tooltip');
+        element.setAttribute('title', explicitTooltip);
+        setupTooltipEvents(element, explicitTooltip);
+        tooltipCount++;
+        return;
+      }
       
       // Check if this is an attribute abbreviation
       if (ATTRIBUTE_NAMES[upperText]) {
@@ -191,4 +204,3 @@ function addTooltip(element, abbreviation) {
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = { initAttributeTooltips, addTooltip, ATTRIBUTE_NAMES };
 }
-

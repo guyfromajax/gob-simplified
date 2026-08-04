@@ -210,6 +210,8 @@
       // Toggle button - shows highest rated position
       const toggle = document.createElement('button');
       toggle.className = 'ratings-dropdown-toggle';
+      toggle.setAttribute('data-tooltip', 'current/potential');
+      toggle.setAttribute('title', 'current/potential');
       toggle.innerHTML = `${topPos}: ${formatRtDisplay(topRating)}${player.potential_rt_ratcheted != null ? '/' + formatRtDisplay(player.potential_rt_ratcheted) : ''} <span style="font-size: 10px;">▼</span>`;
       toggle.addEventListener('click', (e) => {
         e.stopPropagation();
