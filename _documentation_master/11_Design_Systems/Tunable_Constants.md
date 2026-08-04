@@ -243,7 +243,7 @@ middle band falls back to ordinary shot resolution. The two outcome thresholds a
 | `BLOCK_FIGHT_RANGE_MIN` / `BLOCK_FIGHT_RANGE_MAX` | constants/__init__.py | `0 / 10` | Second trigger, attempted only after aggression misses: `roll <= defense fight`. |
 | Defensive `fight` | team attribute | live team value | Second-trigger comparison value; higher fight produces more reconciliation attempts. |
 | `BLOCK_PLAYER_ROLL_MIN` / `BLOCK_PLAYER_ROLL_MAX` | constants/__init__.py | `1 / 300` | Third trigger, after aggression and fight miss, rolls against `defender ID + defensive_efficiency × height_rating`. Lowering the maximum increases individual rim-protector attempts. |
-| Height rating (`height_to_block_score`) | shared.py | `≤78→0`, `h−78`, `≥88→10` (offsets from `LEAGUE_MEDIAN_HEIGHT_IN`=78; 1 pt/inch) | Feeds both the third attempt trigger and reconciliation. In reconciliation it becomes `height_rating × 10 + randint(-9,9)` and receives 40% weight. (Re-banded from the old `≤72:0;73–81:1–9;≥82:10` by the height re-band — see the Height-distribution section.) |
+| Height rating (`height_to_block_score`) | shared.py | `≤77→0`, `h−77`, `≥87→10` (offsets from `LEAGUE_MEDIAN_HEIGHT_IN`=77; 1 pt/inch — rides the median automatically) | Feeds both the third attempt trigger and reconciliation. In reconciliation it becomes `height_rating × 10 + randint(-9,9)` and receives 40% weight. (Now median 77 after the 2026-08 HS −1in shift; the code uses the constant, so it moved on its own.) |
 | Defender block composite | shot_manager.py | `height 40% + ID 40% + IQ 20%`, then `× randint(1,6)` | Determines `defense_block_score`; higher attributes or roll make negative reconciliation diff and blocks more likely. |
 | Contest-result eligibility | shot_micro_movements constants | `neutral` or `defense_win`; boundaries `±150` | `offense_win` shots do not enter the block funnel. Changing contest boundaries changes the eligible population. |
 | Shooter finish threshold | shot_manager.py | `250` | When reconciliation lands in the foul band, shooter finish score above 250 makes the basket for an and-one. Does not affect block volume. |
@@ -882,7 +882,7 @@ Constants for the RT formula (§3.6), position-intent generation (§11.2), the p
 | Constant | Value | Effect |
 |---|---|---|
 | `POSITION_WEIGHTS` | 5 vectors, §3.6.1 (each sums to 1.0) | attribute mix per position; one table for players+recruits |
-| `HEIGHT_FITNESS` | (ideal, short/in, tall/in): PG 73.5/.020/.050 · SG 76/.030/.045 · SF 78.5/.035/.035 · PF 80.5/.050/.025 · C 82.5/.060/.010 | multiplicative height gate, all 5 positions |
+| `HEIGHT_FITNESS` | (ideal, short/in, tall/in): PG 72.5/.020/.050 · SG 75/.030/.045 · SF 77.5/.035/.035 · PF 79.5/.050/.025 · C 81.5/.060/.010 | multiplicative height gate, all 5 positions. **This is the edit point for `HEIGHT_IDEAL_IN`** (ideals −1in for the 2026-08 HS shift; penalties held). |
 | `HEIGHT_FITNESS_FLOOR` / `_CAP` | 0.50 / 1.15 | fitness clamp (peak 1.0 at ideal; cap is a guard) |
 
 ### Interim generation — `BackEnd/utils/player_generation.py`
@@ -893,11 +893,18 @@ Constants for the RT formula (§3.6), position-intent generation (§11.2), the p
 | `TIER_FREQUENCY` | .07 / .20 / .40 / .20 / .11 / .02 | share of generated players per tier (§4.1). Supersedes the 4-value `TIER_FREQUENCY` in design §12. |
 | `RUNG_MULTIPLIERS` | JH 1.00 · FR 1.17 · SO 1.43 · JR 1.80 · SR 2.00 | class-year ladder; target RT = anchor × rung (§4.2) |
 | `POSITION_INTENT_SHARE` | 0.20 | ~even position intent |
-| `HEIGHT_IDEAL_IN` | = fitness ideals | per-position height mean (§11.2) |
-| `HEIGHT_SD_IN` | 2.1 | per-position height sd (league aggregate ≈ mean 78, sd 3.6) |
+| `HEIGHT_IDEAL_IN` | PG 72.5 · SG 75 · SF 77.5 · PF 79.5 · C 81.5 (in) | **Dual-purpose**: per-position **generation mean** (`draw_height`) AND the **RT height-fitness peak**. ⚠️ **DERIVED — the real edit point is elsewhere.** It's a comprehension over `HEIGHT_FITNESS` in **`BackEnd/utils/position_ratings.py`**; the only value that does anything is the `ideal` in each `HEIGHT_FITNESS` tuple. Editing anything named `HEIGHT_IDEAL_IN`, or this row, **silently does nothing**. Tuning rule below. |
+| `HEIGHT_SD_IN` | 2.1 | per-position height sd (league aggregate ≈ mean 77, sd 3.6). Non-uniform lever — changing it widens/narrows position overlap (tweener rate). |
+| `WEIGHT_AT_MEDIAN` | 209.5 (lb) | Body weight at the league median height (77in). The whole-league weight anchor — raise/lower to make everyone heavier/lighter at their height. **Display/flavor only — RT ignores weight.** (−5.5 from 215 with the HS height shift keeps BUILD constant; a further cut here = leaner-for-HS, a separate adjustment.) |
+| `WEIGHT_LB_PER_INCH` | 5.5 | Weight **slope** — lb added per inch above the median (subtracted below). Continuous, so no band artifact (a 77→78in inch is +5.5lb, not a ~27lb jump). Lower it to decouple weight from height — slimmer bigs without moving guards. |
+| `WEIGHT_NOISE_LB` | ±12 | Uniform jitter around the line so same-height players differ. One rng draw (stream-preserving). `weight = WEIGHT_AT_MEDIAN + WEIGHT_LB_PER_INCH·(h−77) ± noise`; measured league p10/p50/p90 ≈ 176/206/236, PG p50 181 → C p50 230. |
 | `PROFILE_FILLER` | 0.45 | unweighted-attr baseline as fraction of signature attr |
 | `PROFILE_ND_BASE` | 0.60 | ND baseline (ND is not in any RT vector) |
 | `ATTR_NOISE_SD` | 0.13 | per-attribute spread → tweener/tie rate (sharper identities per decision #7; ≥100 ≈ 5.7%) |
+
+**Height/weight tuning rule.** A **uniform** shift of all five `HEIGHT_IDEAL_IN` **plus** `LEAGUE_MEDIAN_HEIGHT_IN` (=77) by the same number of inches is **safe** — RT, position supply, and the fitness curve are all unchanged. Fitness is defined *relative to each ideal* (peak stays at the ideal), the generation mean shifts with it, and the weight line (`WEIGHT_AT_MEDIAN` + `WEIGHT_LB_PER_INCH`·(h − median)) and the height class-year bands are all expressed **relative to `LEAGUE_MEDIAN_HEIGHT_IN`**, so they ride the shift together. A **non-uniform** change — moving one position's ideal relative to the others, or changing `HEIGHT_SD_IN` — is an **anchor edit**: it reshapes position supply (which heights favour which positions) and the fitness curve, and is not neutral.
+
+> ⚠️ **`opening_tip` is the exception.** `opening_tip.get_height_scale_value` uses **absolute inch literals** (`>86`→10, `≥84`→9, `≥82`→8, `81`→7, … `76`→2, `<76`→1) anchored to the centre median, **not** offsets from `LEAGUE_MEDIAN_HEIGHT_IN`. It was manually "+3 re-banded" for the pass-1 recal and will **not** ride a uniform shift — it must be re-banded by the same amount alongside any height shift, or the tip-off contest desyncs from the new distribution.
 
 ### Pool remap — `scripts/regenerate_universal_pool.py`
 

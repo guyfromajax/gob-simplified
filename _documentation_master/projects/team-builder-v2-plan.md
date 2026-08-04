@@ -744,6 +744,26 @@ Team Builder's pool is **`recruit_set_0001` ∪ `builder_set_0001`**. Recruit as
 
 **Artifacts:** `builder_set_0001.manifest.json` (full genes), `builder_set_0001.published.json` (filtered subset — `build.frame`, `build.definition`, `portrait.skin` only), 450 R2 objects, `SCHEMA.md` updated for both sets.
 
+#### 6.5b The blank-mask defect — a path used once
+
+**Found 3 August 2026** when 2 of 15 players on a live custom roster rendered the generic silhouette. Assignment was correct; both had exact-match `builder_set_0001` ids. **Ten builder kits had shipped with empty tank masks** — eight byte-identical, two near-zero — so `make_signed_master` raised `no tank found` and no master was ever written.
+
+**Root cause:** `ensure_sidecars_from_png` on the **`keep_teen` path** called the tank detector on an **RGBA** array. Alpha 255 inflated max − min, so shaded white fabric failed the neutrality gate and the tank came out empty. The function then **wrote that empty mask anyway**, while falling back to person-bbox for the JSON geometry — two artifacts derived from one detection, and only one of them noticed the failure. `bake_one` and the recruit bake used RGB and were unaffected, which is why `recruit_set_0001`'s 300 masks were clean.
+
+**That path exists because of a late decision.** Choosing teen age language created a rebake route used for exactly one batch of 10 images — and all 10 were damaged. **A code path used once is a code path nobody tests.**
+
+**Why nothing caught it earlier:**
+
+- Reconciliation counted images; variety QC compared faces. **Both check the portrait; neither checked the mask.** The visible artifact was fine.
+- Warm-paint caught the exception per player, logged it, left `image_painted` unset, and **Apply still returned success**.
+- `ensure`-on-404 resolved the builder prefix correctly, found the kit, and failed on the same empty mask — **a retry that re-reads a broken input is not a fallback**, it makes a transient-looking failure permanent.
+
+**Fixes:** tank detection forced to RGB; sidecar rebuild asserts tank pixels before writing, with no blank write and no person-bbox mask fallback; a bake gate failing any attempt under 5,000 tank pixels with a re-roll; `--rebuild-masks` / `--validate-masks` CLI; and Apply now returns `portrait_paint` counts and logs both paint failures and missing-kit skips.
+
+**Audit result:** `recruit_set_0001` clean across all 300 (minimum ~113k tank pixels); `builder_set_0001`'s 10 rebuilt and re-uploaded; both affected masters re-painted.
+
+> **The general rule: validate the artifact the system consumes, not the one a person looks at.** Every check in this phase examined portraits. The mask is what makes a portrait usable, and nothing looked at it until two players went missing on a live roster.
+
 **Seed stability.** The classifier's rerolls are UUID-seeded and Team Builder `player_id`s are minted (§4.5c). **The portrait shown in the wizard must be the portrait that ships** — either mint the id when the wizard opens, or seed from something stable at that moment and carry it through Apply. This is the walk-on idempotency problem in another form: a value the user sees, then silently regenerated.
 
 **Duplicates are blocked within a roster where the pool allows it**, and re-roll skips ids already used. Where a cell cannot supply enough distinct images, matching quality wins over uniqueness.

@@ -48,9 +48,12 @@ def _cpu_train_week(fpd, year, weeks=26):
 def _fresh(pos, tier, seed):
     rng = random.Random(seed)
     jh = gen.generate_player(pos, "JH", tier, rng)
+    # Pin potential_factor to 1.0 (reference ceiling): a test asserting the developed SHAPE
+    # must not depend on what hash(player_id) happens to yield — with the fixed id "x" that
+    # resolved to 0.90, which silently scaled every developed attribute down ~10%.
     return {"player_id": "x", "meta": {"year": "JH", "height": jh["height"], "weight": jh["weight"]},
             "attributes": dict(jh["attributes"]), "position_ratings": dict(jh["position_ratings"]),
-            "entry_tier": tier, "position_intent": pos}, rng
+            "entry_tier": tier, "position_intent": pos, "potential_factor": 1.0}, rng
 
 
 def test_partA_writes_both_and_full_cycle_preserves_growth():
@@ -115,6 +118,9 @@ def test_cpu_path_preserves_shape():
 
     Averaged over seeds: a single career carries large peak/HT variance, so this is a
     DISTRIBUTIONAL property (the league's mean developed shape), not a per-career one."""
+    random.seed(20260804)  # the CPU training path (execute_training) draws from global
+                           # random; seed it so this distributional check is deterministic,
+                           # not a coin-flip against the floor.
     N = 12
     for pos in POSITIONS:
         finals = []
@@ -145,6 +151,7 @@ def test_cpu_path_preserves_shape():
                 assert mean_attr[a] >= 0.70 * target, (
                     f"{pos}/{a}: mean developed {mean_attr[a]:.0f} starved vs profile target "
                     f"{target:.0f} (<70%). Non-signature attributes must not collapse on turnover.")
-        if pos == "C":                                  # the attribute that collapsed to 26 live
+        if pos == "C":  # the attribute that collapsed to 26 live; pinned-pf baseline ≈ 52,
+                        # so the 48 floor is a collapse-guard with headroom, not a coin-flip.
             assert mean_attr["SC"] > 48, \
                 f"C mean scoring {mean_attr['SC']:.0f} — the shooting collapse regressed."

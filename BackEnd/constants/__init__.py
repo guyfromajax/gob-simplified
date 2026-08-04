@@ -19,7 +19,7 @@ ALL_ATTRS = [
 # (design §11.2, league aggregate ~mean 78, sd 3.6). Single home for the
 # missing-height fallback so this default is not re-scattered as literals across
 # shot_manager / player / quick_foul / team_builder_roster. Was 72-76 pre-recal.
-LEAGUE_MEDIAN_HEIGHT_IN = 78
+LEAGUE_MEDIAN_HEIGHT_IN = 77  # 2026-08 uniform −1in HS shift (was 78); moves WITH HEIGHT_FITNESS ideals
 
 BOX_SCORE_KEYS = [
     "FGA", "FGM", "3PTA", "3PTM", "FTA", "FTM",

@@ -5472,7 +5472,7 @@ function showDevSimPopup(topData) {
         ">Simulate Regular Season</button>
         <button id="dev-sim-cancel-btn" style="
           padding: 12px 24px;
-          background: #ccc;
+          background: #cdcdcd;
           color: #333;
           border: none;
           border-radius: 5px;
@@ -5480,7 +5480,7 @@ function showDevSimPopup(topData) {
           font-size: 16px;
         ">Cancel</button>
       </div>
-      <p style="color: #999; font-size: 12px; margin-top: 20px;">
+      <p style="color: #9a9a9a; font-size: 12px; margin-top: 20px;">
         ⚠️ Development feature - can be disabled in code
       </p>
     `;
@@ -5699,7 +5699,7 @@ function showDevSimPopup(topData) {
             </p>
             <button id="dev-sim-close-btn" style="
               padding: 12px 24px;
-              background: #ccc;
+              background: #cdcdcd;
               color: #333;
               border: none;
               border-radius: 5px;

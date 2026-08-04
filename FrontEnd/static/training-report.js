@@ -1831,7 +1831,7 @@ function renderTrainingNotes() {
     const placeholder = document.createElement('p');
     placeholder.className = 'notes-placeholder';
     placeholder.textContent = 'No training notes for this session.';
-    placeholder.style.color = '#999';
+    placeholder.style.color = '#9a9a9a';
     placeholder.style.fontStyle = 'italic';
     container.appendChild(placeholder);
     return;

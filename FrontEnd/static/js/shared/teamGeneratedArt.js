@@ -508,10 +508,10 @@
     }
     return {
       hardwoodStyle: 'medium_medium',
-      oobColor: primary || '#2a2a2a',
-      laneColor: primary || '#2a2a2a',
+      oobColor: primary || '#2b2b2b',
+      laneColor: primary || '#2b2b2b',
       outsideWoodColor: '#DBB891',
-      halfArcFillColor: secondary || '#f2f2f2',
+      halfArcFillColor: secondary || '#f3f3f3',
     };
   }
 

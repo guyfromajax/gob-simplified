@@ -156,17 +156,18 @@ ATTR_NOISE_SD = 0.13           # per-attribute multiplicative spread → tweener
 RT_ATTRS = tuple(sorted({a for w in POSITION_WEIGHTS.values() for a in w}))
 CORE_ATTRS = RT_ATTRS + ("ND",)
 
-# ── Weight from height (design §11.2 / Phase 5 re-band) ──────────────────────
-# Bands expressed as offsets from the league median so the next distribution
-# shift is a one-line change, not another sweep. At median 78: <74 / 74-77 /
-# 78-81 / >=82 (was <72/72-75/76-80/>80 pre-recal).
-_MED = LEAGUE_MEDIAN_HEIGHT_IN
-WEIGHT_BY_HEIGHT_BANDS = (
-    (_MED - 4, (170, 200)),   # below median-4
-    (_MED,     (190, 225)),   # median-4 .. median-1
-    (_MED + 4, (215, 255)),   # median .. median+3
-    (10 ** 9,  (240, 290)),   # median+4 and up
-)
+# ── Weight from height (design §11.2) ───────────────────────────────────────
+# CONTINUOUS linear model, anchored at the league median so it rides a uniform
+# height shift automatically. Replaces the old 4-band step function, whose
+# artifact (78" and 81" identical, 77"→78" jumping ~27lb) showed on roster pages.
+# Display/flavor ONLY — RT ignores weight, so all three are free to tune.
+WEIGHT_AT_MEDIAN = 209.5      # lb at LEAGUE_MEDIAN_HEIGHT_IN (77in). −5.5 with the HS height
+                              # shift (1in × slope) so BUILD is constant — same weight-for-
+                              # height, ~5.5lb lighter absolute. (Leaner-for-HS is a SEPARATE
+                              # future cut to this value; keep the two adjustments distinct.)
+WEIGHT_LB_PER_INCH = 5.5      # lb per inch above/below the median
+WEIGHT_NOISE_LB = 12          # ± uniform jitter (ONE rng draw — matches the old randint,
+                              # so the downstream generation stream is byte-identical)
 
 
 def normalize_year(year: Optional[str]) -> str:
@@ -201,10 +202,14 @@ def draw_height(position: str, rng: random.Random, year: Optional[str] = None) -
 
 
 def weight_from_height(height: float, rng: random.Random) -> int:
-    for ceil_in, (lo, hi) in WEIGHT_BY_HEIGHT_BANDS:
-        if height < ceil_in:
-            return rng.randint(lo, hi)
-    return rng.randint(*WEIGHT_BY_HEIGHT_BANDS[-1][1])
+    """Body weight from height: a continuous line anchored at the league median plus
+    ±WEIGHT_NOISE_LB uniform jitter (design §11.2). Display/flavor only — RT ignores
+    weight. One rng draw (matching the prior banded draw), so downstream is unchanged.
+
+        weight = WEIGHT_AT_MEDIAN + WEIGHT_LB_PER_INCH·(height − median) ± noise
+    """
+    base = WEIGHT_AT_MEDIAN + WEIGHT_LB_PER_INCH * (float(height) - LEAGUE_MEDIAN_HEIGHT_IN)
+    return max(1, round(base + rng.uniform(-WEIGHT_NOISE_LB, WEIGHT_NOISE_LB)))
 
 
 def target_rt(tier: str, year: str) -> float:
@@ -317,6 +322,7 @@ def balanced_class_years(count: int, rng: random.Random) -> list[str]:
 __all__ = [
     "POSITIONS", "JH_ANCHOR_BY_TIER", "TIER_FREQUENCY", "RUNG_MULTIPLIERS",
     "HEIGHT_IDEAL_IN", "HEIGHT_SD_IN", "CLASS_YEARS", "CORE_ATTRS", "RT_ATTRS",
+    "WEIGHT_AT_MEDIAN", "WEIGHT_LB_PER_INCH", "WEIGHT_NOISE_LB",
     "normalize_year", "draw_tier", "draw_position_intent", "draw_height",
     "weight_from_height", "target_rt", "position_profile",
     "generate_core_attributes", "generate_player", "balanced_class_years",

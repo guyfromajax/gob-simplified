@@ -520,7 +520,10 @@ def replaced_core_only_palette(franchise_id: str) -> frozenset[str]:
         )
         if c
     }
-    return frozenset(core_set - overlay_set)
+    # Pure white/black are universal UI chrome — exclude those two needles only
+    # (not a general achromatic rule). See FE teamBuilderLeakDetector.js.
+    universal = {"#ffffff", "#000000"}
+    return frozenset(c for c in (core_set - overlay_set) if c not in universal)
 
 
 def scan_json_for_replaced_colors(

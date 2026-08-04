@@ -195,8 +195,8 @@
   }
 
   function defaultsFromTeamColors(primary, secondary) {
-    var p = parseHex(primary) || '#2a2a2a';
-    var s = parseHex(secondary) || '#f2f2f2';
+    var p = parseHex(primary) || '#2b2b2b';
+    var s = parseHex(secondary) || '#f3f3f3';
     var outsideTone = HARDWOOD_TONES[HARDWOOD_VARIANTS.medium_medium.outside];
     var oob = p;
     if (contrastRatio(oob, outsideTone) < 2.5) {
@@ -312,8 +312,8 @@
 
   function resolveRenderParams(opts) {
     opts = opts || {};
-    var primary = parseHex(opts.primary) || '#2a2a2a';
-    var secondary = parseHex(opts.secondary) || '#f2f2f2';
+    var primary = parseHex(opts.primary) || '#2b2b2b';
+    var secondary = parseHex(opts.secondary) || '#f3f3f3';
     var defaults = defaultsFromTeamColors(primary, secondary);
     var styleKey = resolveHardwoodStyleKey(opts.hardwoodStyle || defaults.hardwoodStyle);
     // When caller omits outsideWoodColor, use the style's outside tone (Node oracle).

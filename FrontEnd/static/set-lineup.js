@@ -2846,13 +2846,13 @@ function createCardFront(player) {
     if (yearText === 'senior') {
       yearColor = '#FFD700'; // Bright gold
     } else if (yearText === 'junior') {
-      yearColor = '#C0C0C0'; // Bright silver
+      yearColor = '#c1c1c1'; // Bright silver
     } else if (yearText === 'sophomore') {
       yearColor = '#32CD32'; // Bright lime green
     } else if (yearText === 'freshman') {
       yearColor = '#FF69B4'; // Bright pink
     } else {
-      yearColor = '#C0C0C0'; // Default to silver
+      yearColor = '#c1c1c1'; // Default to silver
     }
     
     yearDisplay.style.cssText = `

@@ -156,6 +156,14 @@
     return '#' + raw.toLowerCase();
   }
 
+  // Pure white/black are universal UI chrome. A replaced core palette that is
+  // exactly #ffffff or #000000 is indistinguishable from normal text/fills —
+  // exclude those two needles only (not a general achromatic rule).
+  var UNIVERSAL_CHROME_COLORS = {
+    '#ffffff': true,
+    '#000000': true,
+  };
+
   function coreOnlyPaletteFromVisual(visual) {
     if (!visual) return {};
     var overlaySet = {};
@@ -166,9 +174,31 @@
     var out = {};
     [visual.replaced_primary_color, visual.replaced_secondary_color].forEach(function (c) {
       var n = normalizeHexColor(c);
-      if (n && !overlaySet[n]) out[n] = true;
+      if (!n || overlaySet[n] || UNIVERSAL_CHROME_COLORS[n]) return;
+      out[n] = true;
     });
     return out;
+  }
+
+  function parseCssPx(value) {
+    var n = parseFloat(value);
+    return isFinite(n) ? n : 0;
+  }
+
+  function isVisibleBorderEdge(style, side) {
+    // getComputedStyle resolves border*Color even when nothing paints.
+    // Only score a side that actually draws (width > 0, style not none/hidden).
+    var width = parseCssPx(style['border' + side + 'Width']);
+    if (width <= 0) return false;
+    var bStyle = String(style['border' + side + 'Style'] || '').toLowerCase();
+    return bStyle !== 'none' && bStyle !== 'hidden' && bStyle !== '';
+  }
+
+  function isVisibleOutline(style) {
+    var width = parseCssPx(style.outlineWidth);
+    if (width <= 0) return false;
+    var oStyle = String(style.outlineStyle || '').toLowerCase();
+    return oStyle !== 'none' && oStyle !== 'hidden' && oStyle !== '';
   }
 
   function scanDomColors(root) {
@@ -186,6 +216,15 @@
     var hits = [];
     var els = doc.querySelectorAll('*');
     var maxScan = Math.min(els.length, 2500);
+    // color / backgroundColor always score. Border/outline colors only when
+    // the corresponding edge is actually drawn — otherwise computed values
+    // are phantoms (currentcolor / UA defaults on borderless chrome).
+    var borderSides = [
+      { prop: 'borderTopColor', side: 'Top' },
+      { prop: 'borderRightColor', side: 'Right' },
+      { prop: 'borderBottomColor', side: 'Bottom' },
+      { prop: 'borderLeftColor', side: 'Left' },
+    ];
     for (var i = 0; i < maxScan; i++) {
       var el = els[i];
       if (isAllowlistedElement(el)) continue;
@@ -196,11 +235,20 @@
         continue;
       }
       if (!style) continue;
-      var props = ['color', 'backgroundColor', 'borderTopColor', 'outlineColor'];
       var matched = [];
-      for (var p = 0; p < props.length; p++) {
-        var norm = normalizeHexColor(style[props[p]]);
-        if (norm && coreOnly[norm]) matched.push(props[p] + '=' + norm);
+      var fillProps = ['color', 'backgroundColor'];
+      for (var f = 0; f < fillProps.length; f++) {
+        var fillNorm = normalizeHexColor(style[fillProps[f]]);
+        if (fillNorm && coreOnly[fillNorm]) matched.push(fillProps[f] + '=' + fillNorm);
+      }
+      for (var b = 0; b < borderSides.length; b++) {
+        if (!isVisibleBorderEdge(style, borderSides[b].side)) continue;
+        var bNorm = normalizeHexColor(style[borderSides[b].prop]);
+        if (bNorm && coreOnly[bNorm]) matched.push(borderSides[b].prop + '=' + bNorm);
+      }
+      if (isVisibleOutline(style)) {
+        var oNorm = normalizeHexColor(style.outlineColor);
+        if (oNorm && coreOnly[oNorm]) matched.push('outlineColor=' + oNorm);
       }
       if (!matched.length) continue;
       hits.push({
@@ -269,7 +317,7 @@
       'right:0',
       'z-index:2147483647',
       'background:#8b1a1a',
-      'color:#fff',
+      'color:#ffffff',
       'font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,monospace',
       'padding:10px 14px',
       'box-shadow:0 4px 16px rgba(0,0,0,0.45)',
@@ -308,7 +356,7 @@
     dismiss.type = 'button';
     dismiss.textContent = 'Dismiss';
     dismiss.style.cssText =
-      'background:#fff;color:#8b1a1a;border:0;padding:4px 10px;font:inherit;cursor:pointer;';
+      'background:#ffffff;color:#8b1a1a;border:0;padding:4px 10px;font:inherit;cursor:pointer;';
     dismiss.onclick = function () { clearBanner(); };
     banner.appendChild(dismiss);
 
@@ -444,6 +492,8 @@
     leakNeedlesForReplacedName: leakNeedlesForReplacedName,
     shortDerivedNeedlesForReplacedName: shortDerivedNeedlesForReplacedName,
     normalizeHexColor: normalizeHexColor,
+    isVisibleBorderEdge: isVisibleBorderEdge,
+    isVisibleOutline: isVisibleOutline,
     ALLOWLISTED_SELECTORS: ALLOWLISTED_SELECTORS,
     ALLOWLISTED_DERIVED_NEEDLES: ALLOWLISTED_DERIVED_NEEDLES,
   };

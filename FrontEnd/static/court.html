@@ -19,6 +19,10 @@
   <script src="/js/shared/playbookTeamId.js"></script>
   <script src="/js/shared/teamShotThresholdScale.js"></script>
   <script src="/js/shared/tierEmblem.js"></script>
+  <!-- Defines window.formatRtDisplay / getRtColor and sets RT_DISPLAY_MODE='letter'.
+       Required by the Phaser matchup/preview tiles (matchupsUiShared) — without it their
+       formatRtDisplay falls back to "--" for every player's RT. -->
+  <script src="/js/shared/rtBucket.js"></script>
   <script src="/defense-display.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
@@ -704,7 +708,7 @@
     .player-name-label {
       font-size: 14px;
       font-weight: bold;
-      color: #C0C0C0; /* Silver */
+      color: #c1c1c1; /* Silver */
       text-align: center;
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
       white-space: nowrap;
@@ -1041,7 +1045,7 @@
     .player-box-score td {
       text-align: center;
       padding: 5px 4px;
-      border-bottom: 1px solid #2a2a2a;
+      border-bottom: 1px solid #2b2b2b;
     }
 
     .player-box-score td:first-child {
@@ -1147,14 +1151,14 @@
       border-radius: 8px;
       overflow: hidden;
       position: relative;
-      border: 1px solid #c0c0c0; /* Silver border for contrast */
+      border: 1px solid #c1c1c1; /* Silver border for contrast */
     }
     .team-chemistry-bar {
       width: 110px;        /* Match pill width */
       height: 16px;        /* Match pill height */
       background: rgba(0, 0, 0, 0.3);
       border-radius: 8px;
-      border: 1px solid #c0c0c0; /* Silver border for contrast */
+      border: 1px solid #c1c1c1; /* Silver border for contrast */
       overflow: hidden;
     }
     /* Override command-center-team-styles.css colors for dark theme */
@@ -1547,7 +1551,7 @@
     }
 
     #text-scroll-panel::-webkit-scrollbar-thumb {
-      background: #999;
+      background: #9a9a9a;
       border-radius: 5px;
       border: 2px solid #fff;
     }
@@ -2428,8 +2432,8 @@
     }
 
     .playcall-option.active[data-aggression="normal"] {
-      border: 2px solid #999999 !important;
-      box-shadow: 0 0 10px #999999 !important;
+      border: 2px solid #9a9a9a !important;
+      box-shadow: 0 0 10px #9a9a9a !important;
     }
 
     .playcall-option.active[data-aggression="aggressive"] {
@@ -2889,7 +2893,7 @@
       height: 144px;
       flex-shrink: 0;
       overflow: hidden;
-      background: #111;
+      background: #121212;
     }
     .ann-portrait-zone::after {
       content: '';
@@ -2907,7 +2911,7 @@
       height: 130px;
       flex-shrink: 0;
       overflow: hidden;
-      background: #111;
+      background: #121212;
       border: 3px solid #cc3333;
       box-sizing: border-box;
     }
@@ -3561,7 +3565,7 @@
       top: 0;
       left: 0;
       transform: none;
-      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+      background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
       border: 2px solid #9c27b0;
       border-radius: 8px;
       padding: 8px;
@@ -3604,7 +3608,7 @@
     }
 
     .speed-option.speed-option-superfast:hover {
-      background: linear-gradient(180deg, #f0f0f0 0%, #c0c0c0 50%, #a0a0a0 100%);
+      background: linear-gradient(180deg, #f0f0f0 0%, #c1c1c1 50%, #a0a0a0 100%);
       border-color: #000;
       color: #000;
     }
@@ -3620,7 +3624,7 @@
     #player-tooltip {
       position: fixed;
       display: none;
-      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+      background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
       border: 2px solid #ff6200;
       border-radius: 8px;
       padding: 12px;
@@ -3762,7 +3766,7 @@
     #play-tooltip {
       position: fixed;
       display: none;
-      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+      background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
       border: 2px solid #ff6200;
       border-radius: 8px;
       padding: 12px 16px;
@@ -6422,7 +6426,7 @@
       pill.style.background = 'rgba(0, 0, 0, 0.3)';
       pill.style.borderRadius = '8px';
       pill.style.overflow = 'hidden';
-      pill.style.border = '1px solid #c0c0c0'; // Silver border for contrast
+      pill.style.border = '1px solid #c1c1c1'; // Silver border for contrast
 
       const centerLine = document.createElement('div');
       centerLine.className = 'pill-center-line';
@@ -6483,7 +6487,7 @@
       wrapper.style.height = '16px';
       wrapper.style.background = 'rgba(0, 0, 0, 0.3)';
       wrapper.style.borderRadius = '8px';
-      wrapper.style.border = '1px solid #c0c0c0';
+      wrapper.style.border = '1px solid #c1c1c1';
       wrapper.style.overflow = 'hidden';
 
       const fill = document.createElement('div');
@@ -7512,7 +7516,7 @@
       const isZone = defenseTypeLower.includes('zone');
       defenseEl.textContent = defenseType.toUpperCase();
       // Color: Man = gray, any Zone = purple
-      defenseEl.style.color = isZone ? '#BB86FC' : (defenseTypeLower === 'man' ? '#D0D0D0' : '#999');
+      defenseEl.style.color = isZone ? '#BB86FC' : (defenseTypeLower === 'man' ? '#D0D0D0' : '#9a9a9a');
 
       // ✅ FIX: Offense - Display play name instead of Type → Focus
       const playName = data.offense.name || 'PLAY';

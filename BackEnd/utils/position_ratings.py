@@ -39,12 +39,17 @@ HEIGHT_FITNESS_FLOOR = 0.50
 HEIGHT_FITNESS_CAP = 1.15
 
 # (ideal_in, short_penalty_per_inch, tall_penalty_per_inch)
+# Ideals are HIGH-SCHOOL heights (2026-08 uniform −1in shift; GOB is a HS sim, the
+# prior ideals were effectively college). Penalties (short/tall per-inch) UNCHANGED so
+# the shift is a pure translation — position supply and the fitness curve are preserved.
+# NOTE: HEIGHT_IDEAL_IN in player_generation.py is a comprehension over THIS dict — the
+# `ideal` here is the only edit point; editing anything named HEIGHT_IDEAL_IN does nothing.
 HEIGHT_FITNESS: Dict[str, tuple[float, float, float]] = {
-    "PG": (73.5, 0.020, 0.050),
-    "SG": (76.0, 0.030, 0.045),
-    "SF": (78.5, 0.035, 0.035),
-    "PF": (80.5, 0.050, 0.025),
-    "C":  (82.5, 0.060, 0.010),
+    "PG": (72.5, 0.020, 0.050),
+    "SG": (75.0, 0.030, 0.045),
+    "SF": (77.5, 0.035, 0.035),
+    "PF": (79.5, 0.050, 0.025),
+    "C":  (81.5, 0.060, 0.010),
 }
 
 

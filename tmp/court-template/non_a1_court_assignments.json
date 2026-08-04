@@ -10,7 +10,17 @@
       "half_circle_fill": "inside_hardwood",
       "oob_fill": "primary",
       "line_fill": "primary",
-      "output": "/Users/jamesdavies/gob-simplified/FrontEnd/static/images/teams/ada/ada_court.jpg"
+      "output": "/Users/jamesdavies/gob-simplified/FrontEnd/static/images/teams/ada/ada_court.jpg",
+      "resolved": {
+        "primary": "#264653",
+        "secondary": "#e76f51",
+        "inside_wood": "#EAD8C6",
+        "outside_wood": "#DBB891",
+        "lane_color": "#e76f51",
+        "half_circle_color": "#EAD8C6",
+        "oob_color": "#264653",
+        "line_color": "#264653"
+      }
     }
   ]
 }
