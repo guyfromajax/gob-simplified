@@ -1,0 +1,8 @@
+/* Shared art styles. The generators own all pixels; these only size the
+   surfaces they draw into. */
+.banner-canvas{display:block;width:100%;height:auto}
+.court-wrap{position:relative;transition:opacity .12s}
+.court-wrap.busy{opacity:.72}
+.court-canvas{display:block;width:100%;height:auto;border-radius:4px}
+.jersey-svg{display:block;width:100%;height:auto;border-radius:8px}
+.mark-svg{display:block;border-radius:10px}

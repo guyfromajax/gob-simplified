@@ -1004,11 +1004,17 @@ Two new filters join talent, prestige and geography (§5.3) — **five filters, 
 
 | Height tier | Class tier |
 |---|---|
-| Tier 1: Tallest | Tier 1: Experience |
-| Tier 2 | Tier 2 |
+| Tier 1: Tallest | Tier 1: Most Experienced |
+| Tier 2: Taller | Tier 2: Experienced |
 | Tier 3: Balanced | Tier 3: Balanced |
-| Tier 4 | Tier 4 |
-| Tier 5: Quickest | Tier 5: Youthful |
+| Tier 4: Quicker | Tier 4: Young |
+| Tier 5: Quickest | Tier 5: Youngest |
+
+> **Class labels must not say "potential." Established 4 August 2026.** `potential_factor` is a ±15% draw at generation and `entry_tier` is fixed at creation; **neither responds to class, height or attribute edits.** A freshman-heavy roster gets **more seasons before graduation**, not higher projected ceilings.
+>
+> Labelling Tier 5 "Most Potential" would conflate runway with the Potential Rating system and mislead any user who picked it expecting better players. The tiers describe **age and experience**, which is both true and a legible strategic trade: veterans win sooner and leave sooner; youth buys more seasons at the same ceilings.
+>
+> **Corollary: potential RT is not shown in the roster editor.** If it were, a user editing class would reasonably expect it to move, and it would not.
 
 **Rank-based, exactly as §5.3** — ranks across the 128, ties broken by `team_id`, band sizes 26/25/26/25/26. Not value thresholds: heights cluster tightly and class values are small integers, so ties are certain and a threshold split would leave teams unbanded.
 
@@ -1039,3 +1045,23 @@ Height separates cleanly across five rank bands. **Class has only 18 distinct in
 10. Over-budget and exact-spend states are visible **at the point of editing**, not only at Apply (§4.5).
 11. **Weight is never computed on the client.** It shows the inherited value until height is edited, then a short label; the figure is computed once at Apply by the backend. No `weight_from_height` implementation exists in frontend code.
 12. **`roster_shape_at_creation` records height and class totals** alongside the attribute shape (§10.3a).
+
+---
+
+## 11. Open game-design question — development undoes authored attributes
+
+**Raised 4 August 2026, not a defect.**
+
+Offseason development is an attractor toward `jh_anchor × ladder_rung × coaching_factor × potential_factor`, with attributes then blended toward the position profile and rescaled to hit that RT. It does **not** pull toward the attributes the user authored.
+
+So a player carefully rebuilt in the Team Builder editor is **clawed back toward his archetype at the next rollover.** The edit is a starting point the development system partially undoes.
+
+That may be correct — development is a system, and a one-time edit arguably shouldn't override it permanently. But it means Team Builder's promise is **"shape your roster for this season"** rather than **"shape your program,"** and users will notice by season two.
+
+**Decide deliberately:**
+
+1. Is partial reversion intended, or should authored attributes bias the development target?
+2. If intended, **should the wizard say so?** A user who spends twenty minutes redistributing attributes and watches them drift will feel misled, even if the behaviour is correct.
+3. Does this interact with capped mode's competitive claim? If a capped roster converges toward its archetype anyway, the online-eligibility guarantee is stronger than it needed to be.
+
+Related and already established: `entry_tier`, `potential_factor` and the development growth profile are all rolled at generation, persisted on the FPD, carried unchanged through Apply, and **never re-rolled** by Team Builder edits. The growth profile is not surfaced anywhere in the UI.

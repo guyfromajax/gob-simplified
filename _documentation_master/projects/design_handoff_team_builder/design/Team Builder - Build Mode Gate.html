@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Team Builder — Build Mode</title>
+<link rel="stylesheet" href="tb-gate.css">
+</head>
+<body>
+<div class="vbar">
+  <span>Prototype view — not part of the design</span>
+  <div class="seg" id="zoom">
+    <button data-z="fit" class="on">Fit</button><button data-z="1">100%</button><button data-z="1.25">125%</button><button data-z="1.5">150%</button><button data-z="2">200%</button>
+  </div>
+</div>
+
+<div class="gate" id="stage" data-screen-label="Build mode gate">
+  <div class="ctx"><b data-bind="program">Cascade Valley</b><i></i><span data-bind="abbr">CVU</span><i></i>replacing <span data-bind="replaced">Rainier Central</span><i></i><span data-bind="conference">Conference 14</span></div>
+
+  <h1>This Choice Is Permanent</h1>
+  <div class="rule"></div>
+
+  <div class="cards">
+    <button class="mode" data-mode="capped">
+      <div class="m-hd">
+        <div class="m-k">Capped</div>
+        <div class="m-elig ok">Eligible for online play</div>
+        <div class="m-sub"><b>Multiplayer or Single-Player</b>Eligible for leaderboards, multiplayer leagues, and head-to-head games.</div>
+      </div>
+      <div class="m-body">
+        <p class="m-lead">Three budgets, inherited from <span data-bind="replaced">Rainier Central</span>.</p>
+        <ul class="m-rules">
+          <li><b>Attributes</b><span>Every player keeps his own total. Points never move between players.</span></li>
+          <li><b>Height</b><span><span data-bind="heightBudget">1,164</span>″ across the fifteen. Under the cap is allowed.</span></li>
+          <li><b>Year</b><span><span data-bind="classBudget">38</span> exactly. Not more, not less.</span></li>
+        </ul>
+      </div>
+      <div class="m-ft">
+        <span class="m-pick">Click to choose</span>
+        <span class="m-tick"><i>✓</i>Chosen</span>
+      </div>
+    </button>
+
+    <button class="mode" data-mode="uncapped">
+      <div class="m-hd">
+        <div class="m-k">Uncapped</div>
+        <div class="m-elig no">Not eligible for online play</div>
+        <div class="m-sub"><b>Single Player only</b>Total anarchy.</div>
+      </div>
+      <div class="m-body">
+        <p class="m-lead">No budgets at all.</p>
+        <ul class="m-rules">
+          <li><b>Attributes</b><span>Any value from 5 to 99. No total to land on.</span></li>
+          <li><b>Height</b><span>Any height from 5′6″ to 7′0″. No team cap.</span></li>
+          <li><b>Year</b><span>Any mix of years. No team total.</span></li>
+        </ul>
+      </div>
+      <div class="m-ft">
+        <span class="m-pick">Click to choose</span>
+        <span class="m-tick"><i>✓</i>Chosen</span>
+      </div>
+    </button>
+  </div>
+
+  <div class="commit" id="commit">
+    <div class="c-txt" id="ctext">Nothing is chosen yet.</div>
+    <button class="btn" id="go" disabled>Continue to Roster</button>
+  </div>
+  <button class="back">← Back to Identity</button>
+</div>
+
+<div class="toast hide" id="toast"><div class="t"></div><div class="s"></div></div>
+
+<script>
+(function () {
+  /* Everything the chosen slot decides. Static product constants (5–99, 66–84,
+     fifteen players, FR/SO/JR/SR) stay in the markup; these do not. */
+  var PROGRAM = {
+    program: 'Cascade Valley',
+    abbr: 'CVU',
+    replaced: 'Rainier Central',
+    conference: 'Conference 14',
+    heightBudget: (1164).toLocaleString('en-US'),
+    classBudget: 38
+  };
+  [].forEach.call(document.querySelectorAll('[data-bind]'), function (el) {
+    var k = el.getAttribute('data-bind');
+    if (PROGRAM[k] !== undefined) el.textContent = PROGRAM[k];
+  });
+
+  var stage = document.getElementById('stage');
+  var zoom = document.getElementById('zoom');
+  var mode = null;
+  var cards = [].slice.call(document.querySelectorAll('.mode'));
+  var commit = document.getElementById('commit');
+  var ctext = document.getElementById('ctext');
+  var go = document.getElementById('go');
+  var toast = document.getElementById('toast');
+
+  var COPY = {
+    capped: PROGRAM.program + ' will be built <b>capped</b> and <b>will be eligible</b> for online play.',
+    uncapped: PROGRAM.program + ' will be built <b>uncapped</b> and <b>will never be eligible</b> for online play.'
+  };
+
+  cards.forEach(function (c) {
+    c.addEventListener('click', function () {
+      mode = c.getAttribute('data-mode');
+      cards.forEach(function (x) { x.classList.toggle('on', x === c); });
+      ctext.innerHTML = COPY[mode];
+      commit.classList.add('armed');
+      go.disabled = false;
+    });
+  });
+
+  go.addEventListener('click', function () {
+    toast.querySelector('.t').textContent = 'Next — Roster';
+    toast.querySelector('.s').textContent = mode === 'capped'
+      ? 'Fifteen inherited players, three budgets, nothing that has to be filled in.'
+      : 'Fifteen inherited players and no budgets. Inherited values are still the starting point.';
+    toast.classList.remove('hide');
+    setTimeout(function () { toast.classList.add('hide'); }, 4200);
+  });
+  toast.addEventListener('click', function () { toast.classList.add('hide'); });
+
+  function fit() {
+    var z = localStorage.getItem('tbGateZoom') || 'fit';
+    stage.style.zoom = z === 'fit' ? Math.min(1, window.innerWidth / 1120) : Number(z);
+    [].forEach.call(zoom.children, function (b) { b.classList.toggle('on', b.getAttribute('data-z') === z); });
+  }
+  zoom.addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    localStorage.setItem('tbGateZoom', b.getAttribute('data-z')); fit();
+  });
+  window.addEventListener('resize', fit);
+  fit();
+})();
+</script>
+</body>
+</html>
