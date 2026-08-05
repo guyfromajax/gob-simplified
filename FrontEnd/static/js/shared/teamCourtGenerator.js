@@ -268,11 +268,11 @@
    * Region map (Node drawWoodBase):
    *   outsideWood — full in-bounds floor fill first (midcourt + area outside the
    *                 3PT lobes). This is what `outsideWoodColor` paints.
-   *   insideWood  — left/right 3PT lobes ("key" corners), from the style key only;
-   *                 not exposed as a separate colour picker.
+   *   insideWood  — left/right 3PT lobes ("key" corners). Style key by default;
+   *                 `insideWoodColor` overrides when provided (symmetric with outside).
    *
-   * `outsideWoodColor` overrides outside wood when provided; when omitted, outside
-   * comes from the style key. Not a centre-circle fill and not inside wood.
+   * `outsideWoodColor` / `insideWoodColor` override wood when provided; when omitted,
+   * tones come from the style key. Not a centre-circle fill.
    */
   function resolveHardwoodStyleKey(styleKey) {
     var key = styleKey || 'medium_medium';
@@ -301,6 +301,20 @@
         );
       }
     }
+    // Symmetric with outsideWoodColor: custom hex overrides the style-key tone.
+    // Validation (contrast floor vs line colour) lives at Apply / the Identity
+    // studio — this generator stays dumb so existing courts keep rendering.
+    if (opts.insideWoodColor != null && String(opts.insideWoodColor).trim()) {
+      var insideParsed = parseHex(opts.insideWoodColor);
+      if (insideParsed) {
+        insideWood = insideParsed;
+      } else {
+        insideWood = _loudCourtParam(
+          'unresolvable insideWoodColor ' + JSON.stringify(opts.insideWoodColor),
+          HARDWOOD_TONES[variant.inside]
+        );
+      }
+    }
     return {
       styleKey: styleKey,
       insideWood: insideWood,
@@ -322,9 +336,14 @@
       opts.outsideWoodColor != null && String(opts.outsideWoodColor).trim()
         ? opts.outsideWoodColor
         : HARDWOOD_TONES[HARDWOOD_VARIANTS[styleKey].outside];
+    var insideOpt =
+      opts.insideWoodColor != null && String(opts.insideWoodColor).trim()
+        ? opts.insideWoodColor
+        : HARDWOOD_TONES[HARDWOOD_VARIANTS[styleKey].inside];
     var wood = resolveWoodColors({
       hardwoodStyle: styleKey,
       outsideWoodColor: outsideOpt,
+      insideWoodColor: insideOpt,
     });
     var oob = parseHex(opts.oobColor);
     if (opts.oobColor != null && String(opts.oobColor).trim() && !oob) {
@@ -346,6 +365,7 @@
       oobColor: oob || defaults.oobColor,
       laneColor: lane || defaults.laneColor,
       outsideWoodColor: wood.outsideWood,
+      insideWoodColor: wood.insideWood,
       halfArcFillColor: half || defaults.halfArcFillColor,
       lineColor: parseHex(opts.lineColor) || COLORS.line,
       insideWood: wood.insideWood,

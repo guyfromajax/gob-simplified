@@ -218,7 +218,7 @@ function App() {
 
             <div className="grp">
               <div className="fld"><label>School name</label>
-                <input value={cfg.name} maxLength="26" onChange={e => setName(e.target.value)} /></div>
+                <input value={cfg.name} maxLength="23" onChange={e => setName(e.target.value)} /></div>
               <div className="row2">
                 <div className="fld"><label>Mascot</label>
                   <input value={cfg.mascot} maxLength="20" onChange={e => set('mascot', e.target.value)} /></div>

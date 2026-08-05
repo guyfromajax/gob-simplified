@@ -16,8 +16,8 @@ class TestWizardWalkOnsIdempotent(unittest.TestCase):
             def find_one(self, query, projection=None):
                 key = (
                     query.get("user_id"),
-                    query.get("draft_id"),
                     query.get("replaced_object_id"),
+                    query.get("schema_version"),
                 )
                 doc = stored.get(key)
                 if not doc:
@@ -29,8 +29,8 @@ class TestWizardWalkOnsIdempotent(unittest.TestCase):
             def update_one(self, query, update, upsert=False):
                 key = (
                     query.get("user_id"),
-                    query.get("draft_id"),
                     query.get("replaced_object_id"),
+                    query.get("schema_version"),
                 )
                 doc = stored.get(key, {})
                 doc.update(query)
@@ -70,16 +70,16 @@ class TestWizardWalkOnsIdempotent(unittest.TestCase):
             def find_one(self, query, projection=None):
                 key = (
                     query.get("user_id"),
-                    query.get("draft_id"),
                     query.get("replaced_object_id"),
+                    query.get("schema_version"),
                 )
                 return stored.get(key)
 
             def update_one(self, query, update, upsert=False):
                 key = (
                     query.get("user_id"),
-                    query.get("draft_id"),
                     query.get("replaced_object_id"),
+                    query.get("schema_version"),
                 )
                 doc = dict(query)
                 doc.update(update.get("$set") or {})

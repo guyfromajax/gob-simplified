@@ -2586,13 +2586,15 @@ class TeamSelection(BaseModel):
 
 
 class TeamBuilderCourtParams(BaseModel):
-    """Five court colour parameters — recipe only, never a rendered image (§6.3b)."""
+    """Court colour recipe — never a rendered image (§6.3b)."""
 
     hardwoodStyle: str = "medium_medium"
     oobColor: str
     laneColor: str
     outsideWoodColor: str
     halfArcFillColor: str
+    # Optional custom inside-the-arcs wood (symmetric with outsideWoodColor).
+    insideWoodColor: str | None = None
 
 
 class TeamBuilderApplyRequest(BaseModel):
@@ -2610,15 +2612,20 @@ class TeamBuilderApplyRequest(BaseModel):
     # Court recipe — nested on franchises.team_builder with primary/secondary.
     # Never a rendered image; never written to FTD.
     court: TeamBuilderCourtParams | None = None
-    # edit | import — Keep and Generate retired (§4.5c)
+    # edit only — Keep / Generate / import retired (§4.5c / CSV retirement)
     roster_mode: str = "edit"
     # capped | uncapped — determines online eligibility (v2 §4)
     attribute_mode: str = "capped"
+    # Alias accepted from the FE build_mode gate; stored as attribute_mode.
+    build_mode: str | None = None
+    # Authored edit rows for the 15 (diff onto inherited). Not a CSV import path.
     imported_players: list[dict[str, Any]] | None = None
     # Optional capped budgets for the authored 15 (wizard walk-on totals included).
     per_player_budgets: list[int] | None = None
     # Wizard draft key — used to clear idempotent walk-on storage after Apply.
     draft_id: str | None = None
+    # Banner composition key (baseline default).
+    banner_variant: str | None = None
 
 
 class PlayGameRequest(BaseModel):
@@ -3492,15 +3499,15 @@ def get_team_builder_page():
     return FileResponse(STATIC_DIR / "team-builder.html")
 
 
-@router.get("/franchise/team-builder/slot-roster.csv")
-def team_builder_slot_roster_csv(
+@router.get("/franchise/team-builder/slot-roster")
+def team_builder_slot_roster_json(
     object_id: str = Query(..., description="Core team ObjectId for the replaced slot"),
     user: dict = Depends(get_current_user),
 ):
-    """Export a core team's scholarship roster as CSV for Team Builder Step 3."""
-    from BackEnd.utils.team_builder_roster import build_slot_roster_csv
+    """Scholarship roster as JSON for the Team Builder editor (identity-keyed)."""
+    from BackEnd.utils.team_builder_roster import build_slot_roster_players
 
-    _ = user  # auth required; roster is core data readable by any signed-in user
+    _ = user
     try:
         team_oid = ObjectId(str(object_id).strip())
     except Exception:
@@ -3511,17 +3518,15 @@ def team_builder_slot_roster_csv(
         raise HTTPException(status_code=404, detail="Program not found")
 
     try:
-        csv_body = build_slot_roster_csv(db, team_oid)
+        players = build_slot_roster_players(db, team_oid)
     except ValueError:
         raise HTTPException(status_code=404, detail="Program not found")
 
-    slug = re.sub(r"[^a-z0-9]+", "-", str(team_doc.get("name") or "roster").lower()).strip("-")
-    filename = f"{slug or 'slot'}-roster.csv"
-    return Response(
-        content=csv_body,
-        media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-    )
+    return {
+        "replaced_object_id": str(team_oid),
+        "team_name": team_doc.get("name"),
+        "players": players,
+    }
 
 
 @router.get("/franchise/team-builder/league-context")
@@ -3580,6 +3585,165 @@ class TeamBuilderPortraitPickRequest(BaseModel):
     slot: int
     image_id: str
     players: list[TeamBuilderPortraitPlayer]
+
+
+# Eleven RT-weighted attributes — ND is intentionally excluded (budget only).
+_TB_RT_ATTR_KEYS = ("AG", "BH", "FT", "ID", "IQ", "OD", "PS", "RB", "SC", "SH", "ST")
+
+
+class TeamBuilderRatingsPlayer(BaseModel):
+    """Nested attributes + height only — one shape, no top-level attr fallback."""
+
+    player_id: str | None = None
+    height: float
+    attributes: dict[str, Any]
+
+
+class TeamBuilderPositionRatingsRequest(BaseModel):
+    """Builder-only; wraps compute_position_ratings. Does not persist."""
+
+    players: list[TeamBuilderRatingsPlayer]
+
+
+class TeamBuilderDraftUpsertRequest(BaseModel):
+    replaced_object_id: str
+    draft_id: str | None = None
+    chapter: str | None = None
+    build_mode: str | None = None
+    identity: dict[str, Any] | None = None
+    roster: dict[str, Any] | None = None
+    portraits: list[dict[str, Any]] | None = None
+    walk_ons: list[dict[str, Any]] | None = None
+    extra: dict[str, Any] | None = None
+
+
+@router.post("/franchise/team-builder/position-ratings")
+def team_builder_position_ratings(
+    body: TeamBuilderPositionRatingsRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Recompute position ratings via ``compute_position_ratings`` only.
+
+    Builder-only, stateless. Refuses missing height or any of the eleven RT
+    attribute keys (no fail-open defaults). Nested ``attributes`` shape only.
+    """
+    from BackEnd.utils.position_ratings import compute_position_ratings
+
+    _ = user  # auth dependency — same as other franchise routes
+    if not body.players:
+        raise HTTPException(status_code=400, detail="players is required")
+    if len(body.players) > 15:
+        raise HTTPException(status_code=400, detail="at most 15 players per request")
+
+    out: list[dict[str, Any]] = []
+    for idx, row in enumerate(body.players):
+        try:
+            height = float(row.height)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"players[{idx}].height is required",
+            )
+        if height <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"players[{idx}].height must be positive",
+            )
+        attrs = row.attributes if isinstance(row.attributes, dict) else None
+        if not attrs:
+            raise HTTPException(
+                status_code=400,
+                detail=f"players[{idx}].attributes is required",
+            )
+        missing = [k for k in _TB_RT_ATTR_KEYS if k not in attrs or attrs.get(k) is None]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"players[{idx}].attributes missing keys: {', '.join(missing)}",
+            )
+        # Nested shape only — do not pass top-level attribute keys.
+        payload = {"height": height, "attributes": {k: attrs[k] for k in _TB_RT_ATTR_KEYS}}
+        ratings = compute_position_ratings(payload)
+        item: dict[str, Any] = {"position_ratings": ratings}
+        if row.player_id:
+            item["player_id"] = row.player_id
+        out.append(item)
+
+    return {"players": out}
+
+
+@router.get("/franchise/team-builder/drafts")
+def team_builder_list_drafts(user: dict = Depends(get_current_user)):
+    """Unfinished programs for Program Select — looked up by user_id, not localStorage."""
+    from BackEnd.utils.team_builder_drafts import list_unfinished_drafts
+
+    drafts = list_unfinished_drafts(db, user_id=str(user.get("user_id") or ""))
+    return {"drafts": drafts}
+
+
+@router.post("/franchise/team-builder/drafts")
+def team_builder_upsert_draft(
+    body: TeamBuilderDraftUpsertRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist one unfinished draft per (user, franchise slot)."""
+    from BackEnd.utils.team_builder_drafts import upsert_draft
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    if not db.teams.find_one({"_id": replaced_oid}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Replaced program not found")
+
+    patch: dict[str, Any] = {}
+    if body.chapter is not None:
+        patch["chapter"] = body.chapter
+    if body.build_mode is not None:
+        patch["build_mode"] = body.build_mode
+    if body.identity is not None:
+        patch["identity"] = body.identity
+    if body.roster is not None:
+        patch["roster"] = body.roster
+    if body.portraits is not None:
+        patch["portraits"] = body.portraits
+    if body.walk_ons is not None:
+        patch["walk_ons"] = body.walk_ons
+    if body.extra is not None:
+        patch["extra"] = body.extra
+
+    try:
+        doc = upsert_draft(
+            db,
+            user_id=str(user.get("user_id") or ""),
+            replaced_object_id=str(replaced_oid),
+            patch=patch,
+            draft_id=body.draft_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"draft": doc}
+
+
+@router.delete("/franchise/team-builder/drafts/{replaced_object_id}")
+def team_builder_discard_draft(
+    replaced_object_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Explicit discard of an unfinished program for one slot."""
+    from BackEnd.utils.team_builder_drafts import delete_draft_for_slot
+
+    try:
+        replaced_oid = ObjectId(str(replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    deleted = delete_draft_for_slot(
+        db,
+        user_id=str(user.get("user_id") or ""),
+        replaced_object_id=str(replaced_oid),
+    )
+    return {"deleted": deleted}
 
 
 @router.post("/franchise/team-builder/wizard-walk-ons")
@@ -3822,7 +3986,11 @@ def team_builder_apply(
         online_eligible_for_mode,
     )
     from BackEnd.utils.franchise_team_display import (
+        INSIDE_WOOD_LINE_CONTRAST_MIN,
         TEAM_BUILDER_FIELD,
+        contrast_ratio,
+        inside_wood_contrast_ok,
+        normalize_banner_variant,
         normalize_court_params,
         normalize_jersey_preset,
     )
@@ -3851,6 +4019,13 @@ def team_builder_apply(
     custom_name = (body.name or "").strip()
     if not custom_name:
         raise HTTPException(status_code=400, detail="School name is required")
+    from BackEnd.constants.team_builder_budget import PROGRAM_NAME_MAX_LEN
+
+    if len(custom_name) > PROGRAM_NAME_MAX_LEN:
+        raise HTTPException(
+            status_code=400,
+            detail=f"School name must be at most {PROGRAM_NAME_MAX_LEN} characters",
+        )
     abbreviation = (body.abbreviation or "").strip().upper()[:3]
     if len(abbreviation) != 3:
         raise HTTPException(status_code=400, detail="Abbreviation must be 3 characters")
@@ -3872,15 +4047,18 @@ def team_builder_apply(
     home_slot = _allocate_home_slot(user.get("user_id"), body.home_slot)
 
     roster_mode = (body.roster_mode or "edit").strip().lower()
-    if roster_mode not in ("edit", "import"):
+    if roster_mode != "edit":
         raise HTTPException(
             status_code=400,
             detail=(
-                "Roster path must be edit or import. Keep and Generate are retired — "
-                "play a program as-is in normal mode, or author all 15 in the editor."
+                "Roster path must be edit. CSV import, Keep, and Generate are retired — "
+                "author all 15 in the editor."
             ),
         )
-    attribute_mode = normalize_attribute_mode(body.attribute_mode)
+    # FE may send build_mode from the gate; attribute_mode is the stored field.
+    attribute_mode = normalize_attribute_mode(
+        body.attribute_mode or body.build_mode or "capped"
+    )
     # §4.5c: top-up applies on every path; Keep's exemption retired with the path.
     online_eligible = online_eligible_for_mode(attribute_mode)
     league_ctx = compute_league_attr_context(db)
@@ -3897,10 +4075,23 @@ def team_builder_apply(
         "primary_color": body.primary_color,
         "secondary_color": body.secondary_color,
         "jersey_preset": normalize_jersey_preset(body.jersey_preset),
+        "banner_variant": normalize_banner_variant(body.banner_variant),
         "asset_strategy": "generated",
         "roster_mode": roster_mode,
         "attribute_mode": attribute_mode,
     }
+    if body.court is not None:
+        raw_inside = getattr(body.court, "insideWoodColor", None)
+        if raw_inside not in (None, "") and not inside_wood_contrast_ok(raw_inside):
+            ratio = contrast_ratio(str(raw_inside), "#6e675f")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Inside wood colour contrast against court lines is "
+                    f"{ratio:.2f}:1; need at least {INSIDE_WOOD_LINE_CONTRAST_MIN:.1f}:1"
+                ),
+            )
+
     court = normalize_court_params(
         body.court,
         primary_color=body.primary_color,
@@ -4136,13 +4327,10 @@ def team_builder_apply(
         portrait_paint["failed"].append({"error": "warm_paint_aborted"})
 
     try:
-        from BackEnd.utils.team_builder_roster import clear_wizard_walk_ons_for_user
+        from BackEnd.utils.team_builder_drafts import delete_draft_for_slot
 
-        # Drop all drafts for this user — Apply completed; budgets are frozen on FPD.
-        clear_wizard_walk_ons_for_user(
-            db,
-            user_id=str(user.get("user_id") or ""),
-        )
+        # Drop drafts for this user — Apply completed; budgets are frozen on FPD.
+        delete_draft_for_slot(db, user_id=str(user.get("user_id") or ""))
     except Exception:
         logger.exception("[TEAM-BUILDER] wizard walk-on draft cleanup failed")
 

@@ -11,14 +11,13 @@ from BackEnd.constants.team_builder_budget import (
     ATTR_MIN,
     CORE_12_ATTRS,
     apply_capped_topup,
+    clamp_attr,
     core12_total,
     evaluate_mode_roster,
     force_core12_to_budget,
 )
 from BackEnd.utils.team_builder_roster import (
-    count_importable_players,
     generate_roster_at_band,
-    normalize_imported_players,
     replace_slot_roster,
 )
 
@@ -43,6 +42,18 @@ def _player_row(attrs: dict, name=("Attack", "Player"), year="FR"):
     }
 
 
+def _force_rows_to_budgets(rows, budgets):
+    """Shared capped-boundary helper — same force used at Apply."""
+    out = []
+    for i, row in enumerate(rows):
+        attrs = dict(row.get("attributes") or {})
+        budget = budgets[i] if i < len(budgets) else budgets[-1]
+        forced = force_core12_to_budget(attrs, int(budget))
+        shipped = {key: forced[key] for key in CORE_12_ATTRS}
+        out.append(shipped)
+    return out
+
+
 JASON = {
     "SC": 4,
     "SH": 2,
@@ -60,8 +71,8 @@ JASON = {
 
 
 class TestCriterion2CappedBoundaryAttacks(unittest.TestCase):
-    def test_19_import_not_exactly_fifteen_is_rejected(self):
-        """§4.5a: import must be exactly 15 — never truncated, never padded."""
+    def test_19_edit_not_exactly_fifteen_is_rejected(self):
+        """§4.5a: edit must be exactly 15 — never truncated, never padded."""
         from unittest.mock import MagicMock
 
         franchise_id = ObjectId()
@@ -93,7 +104,7 @@ class TestCriterion2CappedBoundaryAttacks(unittest.TestCase):
                     franchise_id=franchise_id,
                     team_object_id=team_oid,
                     team_name="Attack U",
-                    roster_mode="import",
+                    roster_mode="edit",
                     imported_players=rows,
                     franchise_team_data_collection=ftd_col,
                     franchise_players_data_collection=fpd_col,
@@ -105,85 +116,37 @@ class TestCriterion2CappedBoundaryAttacks(unittest.TestCase):
     def test_2_capped_budgets_cover_all_fifteen_including_walk_ons(self):
         """Criterion 2 re-run: points cannot cross a player boundary across 15."""
         budgets = [400] * 12 + [180, 190, 200]
-        band = {"height": 72, "weight": 190, "attrs": _even(400)}
-        # Raise player 0, lower player 14 — each forced to own budget.
         rows = []
         for i, b in enumerate(budgets):
             attrs = _even(b + 80 if i == 0 else (b - 40 if i == 14 else b))
             rows.append(_player_row(attrs, (f"P{i}", "Bound")))
-        players = normalize_imported_players(
-            rows,
-            band_defaults=band,
-            team_name="Attack U",
-            team_object_id=ObjectId(),
-            attribute_mode="capped",
-            apply_topup=True,
-            per_player_budgets=budgets,
-        )
-        self.assertEqual(len(players), 15)
-        shipped = [core12_total(p["attributes"]) for p in players]
-        self.assertEqual(shipped, budgets)
+        shipped = _force_rows_to_budgets(rows, budgets)
+        self.assertEqual(len(shipped), 15)
+        self.assertEqual([core12_total(a) for a in shipped], budgets)
 
-    def test_2a_raise_past_inherited_forced_back_on_import(self):
+    def test_2a_raise_past_inherited_forced_back(self):
         inherited_budget = 400
         attack = _even(500)
-        band = {"height": 72, "weight": 190, "attrs": _even(400)}
-        players = normalize_imported_players(
-            [_player_row(attack)],
-            band_defaults=band,
-            team_name="Attack U",
-            team_object_id=ObjectId(),
-            attribute_mode="capped",
-            apply_topup=True,
-            per_player_budgets=[inherited_budget],
-        )
-        shipped = core12_total(players[0]["attributes"])
-        self.assertEqual(shipped, inherited_budget)
+        forced = force_core12_to_budget(attack, inherited_budget)
+        self.assertEqual(core12_total(forced), inherited_budget)
 
     def test_2b_lower_a_raise_b_cannot_cross_budgets(self):
-        band = {"height": 72, "weight": 190, "attrs": _even(400)}
-        players = normalize_imported_players(
-            [_player_row(_even(350), ("A", "One")), _player_row(_even(450), ("B", "Two"))],
-            band_defaults=band,
-            team_name="Attack U",
-            team_object_id=ObjectId(),
-            attribute_mode="capped",
-            apply_topup=True,
-            per_player_budgets=[400, 400],
-        )
-        totals = [core12_total(p["attributes"]) for p in players]
-        self.assertEqual(totals, [400, 400])
+        a = force_core12_to_budget(_even(350), 400)
+        b = force_core12_to_budget(_even(450), 400)
+        self.assertEqual([core12_total(a), core12_total(b)], [400, 400])
 
-    def test_2c_capped_import_forced_to_inherited_budgets(self):
-        band = {"height": 72, "weight": 190, "attrs": _even(400)}
+    def test_2c_capped_forced_to_inherited_budgets(self):
         inherited = [300, 310, 320, 330, 340]
         attack = [_even(600) for _ in range(5)]
-        players = normalize_imported_players(
-            [_player_row(a, (f"P{i}", "X")) for i, a in enumerate(attack)],
-            band_defaults=band,
-            team_name="Attack U",
-            team_object_id=ObjectId(),
-            attribute_mode="capped",
-            apply_topup=True,
-            per_player_budgets=inherited,
-        )
-        shipped = [core12_total(p["attributes"]) for p in players]
-        self.assertEqual(shipped, inherited)
+        shipped = [
+            force_core12_to_budget(a, inherited[i]) for i, a in enumerate(attack)
+        ]
+        self.assertEqual([core12_total(a) for a in shipped], inherited)
 
 
 class TestCriterion4UncappedPool(unittest.TestCase):
     def test_4_over_runtime_pool_is_detected(self):
-        rows = [_player_row(_even(600), (f"P{i}", "Over")) for i in range(12)]
-        band = {"height": 72, "weight": 190, "attrs": _even(400)}
-        players = normalize_imported_players(
-            rows,
-            band_defaults=band,
-            team_name="Pool Breakers",
-            team_object_id=ObjectId(),
-            attribute_mode="uncapped",
-            apply_topup=False,
-        )
-        attrs = [p["attributes"] for p in players]
+        attrs = [_even(600) for _ in range(12)]
         team_total = sum(core12_total(a) for a in attrs)
         pool = 5000
         evaluation = evaluate_mode_roster(
@@ -194,7 +157,7 @@ class TestCriterion4UncappedPool(unittest.TestCase):
 
 
 class TestCriterion5Clamp(unittest.TestCase):
-    def test_5_clamp_matrix_on_import(self):
+    def test_5_clamp_matrix(self):
         cases = {
             "zero": 0,
             "four": 4,
@@ -203,20 +166,9 @@ class TestCriterion5Clamp(unittest.TestCase):
             "non_numeric": "abc",
             "empty": "",
         }
-        band = {"height": 72, "weight": 190, "attrs": _even(400)}
         for label, raw in cases.items():
             with self.subTest(label=label):
-                attrs = {k: 40 for k in CORE_12_ATTRS}
-                attrs["SC"] = raw  # type: ignore[assignment]
-                players = normalize_imported_players(
-                    [_player_row(attrs)],
-                    band_defaults=band,
-                    team_name="Clamp U",
-                    team_object_id=ObjectId(),
-                    attribute_mode="capped",
-                    apply_topup=False,
-                )
-                sc = int(players[0]["attributes"]["SC"])
+                sc = clamp_attr(raw)
                 self.assertGreaterEqual(sc, ATTR_MIN, label)
                 self.assertLessEqual(sc, ATTR_MAX, label)
 
@@ -283,7 +235,6 @@ class TestPath3GenerateBounds(unittest.TestCase):
             apply_topup=True,
         )
         self.assertEqual(len(generated), 15)
-        # Scholarship slots force to inherited budgets; walk-ons keep as-generated.
         budgets = [60, 400] + [400] * 10
         for i in range(12):
             forced = force_core12_to_budget(

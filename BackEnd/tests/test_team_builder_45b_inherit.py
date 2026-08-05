@@ -244,14 +244,14 @@ class TestEditorIsADiff(unittest.TestCase):
         self.assertEqual(len(set(new_ids)), 15)
         self.assertTrue(set(new_ids).isdisjoint(set(old_ids)))
 
-    def test_replace_slot_roster_rejects_keep_and_generate(self):
+    def test_replace_slot_roster_rejects_non_edit_modes(self):
         franchise_id = ObjectId()
         team_oid = ObjectId()
         ftd_coll = MagicMock()
         ftd_coll.find_one.return_value = {"players": [f"old-{i}" for i in range(15)]}
         fpd_coll = MagicMock()
         fpd_coll.find.return_value = []
-        for mode in ("keep", "generate", "KEEP", "Generate"):
+        for mode in ("keep", "generate", "KEEP", "Generate", "import", "IMPORT"):
             with self.assertRaises(ValueError) as ctx:
                 replace_slot_roster(
                     franchise_id=franchise_id,

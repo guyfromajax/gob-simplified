@@ -205,31 +205,29 @@ The cap is removed, not relaxed. Do not reintroduce it.
 
 ### 4.3 The top-up rule
 
-The 5-per-attribute minimum implies a per-player floor of **60** (5 × 12). But inherited totals go as low as **24**, and a player holding 24 points cannot put 5 in every attribute.
+The 5-per-attribute minimum implies a per-player floor of **60** (5 × 12). When this section was written (1 August 2026), inherited totals went as low as **24**, and a player holding 24 points could not put 5 in every attribute.
 
-**Rule: in capped mode, any inherited player below 60 is topped up to exactly 60 at Apply.**
+**Original rule:** in capped mode, any inherited player below 60 is topped up to exactly 60 at Apply.
 
-Consequence, stated plainly: a capped roster's total will exceed the replaced program's by the sum of those shortfalls. Capped is therefore *near*-inherited, not literally inherited.
+**Retired as a user-facing concern, 5 August 2026.** Attribute recalibration moved the league core-12 minimum from 24 to ≈**190**. Staging and production both have **zero** players below 60 (Jason Potter / Concord, the former worst case at 24, is now 302). The editor also cannot create a sub-60 total: each attribute is floored at 5, so the minimum reachable sum is 12 × 5 = 60 by construction. The condition §4.3 existed to correct can no longer arise from any path.
 
-**Measured, 1 August 2026 — rule confirmed, ship as written.**
+| What | Status |
+|---|---|
+| User-facing "Topped up from …" copy | **Removed** — dead UI is worse than absent UI |
+| Server-side `apply_capped_topup` / `TOPUP_FLOOR` | **Kept** as a defensive guard — cheap and correct if bad data ever appears |
+| `roster_shape_at_creation` post-top-up recording | Unchanged |
+
+**Historical measurement (1 August 2026, pre-recalibration)** — retained so the old numbers are not re-derived as current:
 
 Source: `teams/all_players_with_team_names.txt`, core-12 across all 1,536 players.
 
-| Metric | Value |
+| Metric | Value (then) |
 |---|---|
 | Players below 60 | **13** (0.85%) |
-| Teams with ≥1 below-60 player | **12 / 128** — 116 programs untouched |
-| Median team top-up | **0** |
-| Max single-team top-up | **36** (Concord) — ~0.6% of a median team total |
-| League-wide top-up | 136 points |
-| Position on roster | All 13 in the bottom 3 of a 12-man roster; 12 are last |
+| Teams with ≥1 below-60 player | **12 / 128** |
+| Max single-team top-up | **36** (Concord) |
 
-**The league-wide figure is not the decision metric and should not be cited as one.** A user replaces one program, so the number that governs is the worst single-team top-up: 36 points, roughly 0.6% of team total, concentrated in the 12th man. Capped remains *near*-inherited with a deviation too small to carry competitive meaning.
-
-**Two consequences, both binding:**
-
-1. **The top-up is surfaced, never silent.** Where an inherited total is raised, the editor states it: *"Topped up from 24 — every player needs at least 5 in each attribute."* A budget that reads 60 against an inherited 24 with no explanation is indistinguishable from a bug, and silent adjustment is the pattern v1.3 §8.6 forbids.
-2. **`roster_shape_at_creation` (§4.7) records post-top-up values.** It exists so a future eligibility rule can be applied retroactively; storing the pre-top-up shape would have that rule evaluate a roster that never shipped.
+Do not re-surface the top-up in the editor from this section. The surface was retired because the subjects disappeared, not because the guard was wrong.
 
 ### 4.4 Per-player ceilings
 
@@ -871,7 +869,7 @@ Team Builder's pool is **`recruit_set_0001` ∪ `builder_set_0001`**. Recruit as
 | 2 | Top-5 cap retired entirely | Redundant under capped (points can't move between players); unnecessary under uncapped (ineligible by definition) |
 | 3 | Capped reallocation is **within a player**, uncapped is **across the roster** | The distinction is what makes capped safe for competitive play |
 | 4 | Players below 60 are topped up to 60 in capped mode, **on every path** | Clean rule; the alternative is an unsatisfiable minimum. Accepts that capped is near-inherited, not literally inherited. The *Keep*-path exemption was retired with the path itself (§4.5c). |
-| 19 | The top-up is surfaced in the editor, not applied silently | A budget reading 60 against an inherited 24 with no explanation is indistinguishable from a bug — and silent adjustment is the pattern v1.3 §8.6 forbids everywhere else |
+| 19 | ~~The top-up is surfaced in the editor, not applied silently~~ — **retired 2026-08-05** | Recalibration removed all sub-60 subjects (league min ≈190). Surface removed; server guard kept. See §4.3. |
 | 20 | The §4.3 gate metric is **worst single-team top-up**, not the league-wide sum | A user replaces one program; no franchise ever experiences the league total. The original gate wording asked for the wrong number. |
 | 21 | **No league constant is stored as a literal** (§4.4a) | Attribute recalibration runs as a parallel workstream. A snapshot literal goes wrong silently — no error, just a budget that stops meaning what the spec says. |
 | 22 | The capped per-player ceiling is dropped, not recalculated | Reallocation cannot create points, so it can never bind. A bound that cannot fire is a literal waiting to go stale. |
@@ -903,6 +901,11 @@ Team Builder's pool is **`recruit_set_0001` ∪ `builder_set_0001`**. Recruit as
 | 15 | `CH`/`EM`/`MO` removed from the CSV template | Currently offered then silently discarded — the exact pattern v1.3 forbids |
 | 16 | **Resolve at the edge, on the way out** | The resolver belongs in response serialization only. Applying it to constructors and persistence put display names on the identity path and broke the sim. |
 | 17 | **Identity comparisons stay strict** | The strict matchup gate is what surfaced the leak. A tolerant comparator would have hidden it until statistics were wrong. |
+| 38 | **Program name max length = 23** (2026-08-05; corrected same day) | Plate field is 264 card units at the 20px wordmark floor. Measured Bebas Neue Pro in-browser: **24×W = 269.7** (overflow), **23×W = 258.4** (fits). League longest real name is 22. Cap is a guarantee, not a probability. If more room is needed later, widen Plate's 264-unit field — do not raise the cap alone. Enforced in Identity clients and at Apply. |
+| 39 | **ND display term is Endurance** (2026-08-05) | "Natural Durability" retired from living code comments and docs. Attribute key `ND` unchanged. Archived documentation may still use the old expansion. |
+| 40 | **Inside-wood contrast floor = 3.0 vs `#6e675f`** (2026-08-05) | WCAG non-text minimum for graphical objects. Grain overlays drop interior median contrast ~0.12–0.18 from the flat swatch; a flat-swatch 3.0 lands effective contrast in the same band as shipping medium hardwood, which still reads the 3PT arc at Identity display width (~880px). Client feedback + Apply refuse; generator stays dumb. **Applies to custom colours only** — stock hardwood style keys are exempt by measurement (they already ship on ~120 courts; medium is ≈2.99 flat and still reads). Extending the validator to style keys would make medium illegal league-wide; that is not a bug to "fix." |
+| 41 | **CSV import / Keep / Generate retired** (2026-08-05) | Sole roster path is inline edit (`roster_mode: "edit"`). No dormant CSV endpoint — a later league-wide upload feature builds fresh. |
+| 42 | **§4.3 top-up surface retired** (2026-08-05) | Recalibration: league core-12 min ≈190; 0 players below 60 in staging/production. Editor min is 60 by construction (5×12). UI copy removed; `apply_capped_topup` remains as a defensive server guard only. |
 | 18 | **`.name` is core, `.display_name` is the overlay** | Removing the overlay from `.name` without giving display a home just moves the leak somewhere worse. |
 
 ---

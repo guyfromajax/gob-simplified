@@ -120,8 +120,65 @@ COURT_PARAM_KEYS = (
     "oobColor",
     "laneColor",
     "outsideWoodColor",
+    "insideWoodColor",
     "halfArcFillColor",
 )
+
+# Fixed court line colour (teamCourtGenerator COLORS.line). Custom inside wood
+# must clear WCAG non-text contrast against this (see decision / measurement note).
+COURT_LINE_COLOR = "#6e675f"
+INSIDE_WOOD_LINE_CONTRAST_MIN = 3.0
+
+
+def _srgb_to_lin(channel: float) -> float:
+    c = channel / 255.0
+    return c / 12.92 if c <= 0.04045 else ((c + 0.055) / 1.055) ** 2.4
+
+
+def _relative_luminance(hex_color: str) -> float:
+    text = str(hex_color or "").strip()
+    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", text):
+        return 0.0
+    r = int(text[1:3], 16)
+    g = int(text[3:5], 16)
+    b = int(text[5:7], 16)
+    return (
+        0.2126 * _srgb_to_lin(r)
+        + 0.7152 * _srgb_to_lin(g)
+        + 0.0722 * _srgb_to_lin(b)
+    )
+
+
+def contrast_ratio(a: str, b: str) -> float:
+    """WCAG contrast ratio between two #RRGGBB colours."""
+    la = _relative_luminance(a)
+    lb = _relative_luminance(b)
+    lighter = max(la, lb)
+    darker = min(la, lb)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def inside_wood_contrast_ok(hex_color: str | None) -> bool:
+    """True when custom inside wood clears the line-colour floor (or is absent)."""
+    text = str(hex_color or "").strip()
+    if not text:
+        return True
+    if not re.fullmatch(r"#[0-9A-Fa-f]{6}", text, flags=re.IGNORECASE):
+        return False
+    return contrast_ratio(text, COURT_LINE_COLOR) >= INSIDE_WOOD_LINE_CONTRAST_MIN
+
+
+# Banner compositions — chevron retired; baseline is the default.
+BANNER_VARIANT_KEYS = frozenset({"baseline", "keel", "plate", "sash"})
+DEFAULT_BANNER_VARIANT = "baseline"
+
+
+def normalize_banner_variant(value: Any) -> str:
+    """Persisted banner_variant key. Unknown / chevron → baseline."""
+    key = str(value or "").strip().lower()
+    if key == "chevron" or key not in BANNER_VARIANT_KEYS:
+        return DEFAULT_BANNER_VARIANT
+    return key
 
 
 def normalize_jersey_preset(value: Any) -> int:
@@ -182,13 +239,20 @@ def normalize_court_params(
     if style not in HARDWOOD_STYLE_KEYS:
         style = "medium_medium"
 
-    return {
+    out: dict[str, str] = {
         "hardwoodStyle": style,
         "oobColor": _normalize_hex_color(value.get("oobColor"), primary),
         "laneColor": _normalize_hex_color(value.get("laneColor"), primary),
         "outsideWoodColor": _normalize_hex_color(value.get("outsideWoodColor"), "#DBB891"),
         "halfArcFillColor": _normalize_hex_color(value.get("halfArcFillColor"), secondary),
     }
+    # Optional custom inside-wood override (symmetric with outside). Absent →
+    # style-key tone at render time. Present → must already have cleared the
+    # contrast floor at Apply (caller refuses); we only normalize the hex.
+    raw_inside = value.get("insideWoodColor")
+    if raw_inside not in (None, ""):
+        out["insideWoodColor"] = _normalize_hex_color(raw_inside, out["outsideWoodColor"])
+    return out
 
 
 def resolve_team_abbreviation(
@@ -287,6 +351,7 @@ def resolve_team_display(
         "conference": core.get("conference"),
         "region": core.get("region"),
         "jersey_preset": normalize_jersey_preset(overlay.get("jersey_preset")),
+        "banner_variant": normalize_banner_variant(overlay.get("banner_variant")),
     }
     # Parameters only — never a render. Absent on legacy overlays → FE defaults.
     court = normalize_court_params(

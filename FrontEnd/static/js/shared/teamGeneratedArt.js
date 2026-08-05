@@ -365,10 +365,261 @@
     throw new Error('TeamGeneratedArt banner requires a DOM canvas');
   }
 
+  /**
+   * Banner composition keys persisted as banner_variant (default baseline).
+   * Letters B/C/D/E from the prototype are not stored.
+   */
+  var BANNER_VARIANT_KEYS = ['baseline', 'keel', 'plate', 'sash'];
+  var WORD_MAX_W_PLATE = 264; // Plate field width — not the shared 300
+
+  function normalizeBannerVariant(value) {
+    var key = String(value || '').trim().toLowerCase();
+    if (key === 'chevron' || key === 'a') return 'chevron'; // shipped control; not a stored choice
+    if (BANNER_VARIANT_KEYS.indexOf(key) >= 0) return key;
+    return 'baseline';
+  }
+
+  function drawSpacedTextAligned(ctx, text, x, y, letterSpacing, align) {
+    var chars = String(text || '').split('');
+    var total = 0;
+    var widths = [];
+    for (var i = 0; i < chars.length; i++) {
+      var w = ctx.measureText(chars[i]).width;
+      widths.push(w);
+      total += w;
+      if (i < chars.length - 1) total += letterSpacing;
+    }
+    var cursor = align === 'left' ? x : x - total / 2;
+    for (var j = 0; j < chars.length; j++) {
+      ctx.fillText(chars[j], cursor, y);
+      cursor += widths[j] + letterSpacing;
+    }
+  }
+
+  function bannerBase(opts, width) {
+    var primary = opts.primary || '#27408E';
+    var secondary = opts.secondary || '#15181f';
+    return {
+      primary: primary,
+      secondary: secondary,
+      dark: shadeHex(primary, -0.16),
+      scale: width / CARD_W,
+      initials: initialsFromName(opts.name, opts.abbreviation, opts.teamId || opts.object_id),
+      school: String(opts.name || 'Custom Program').toUpperCase(),
+      mascot: String(opts.mascot || '').trim().toUpperCase(),
+    };
+  }
+
+  function drawGhostInitials(ctx, s, height, color, x) {
+    ctx.font = GHOST_SIZE * s.scale + 'px ' + BEBAS_STACK;
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.12;
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'alphabetic';
+    if (typeof ctx.letterSpacing === 'string') ctx.letterSpacing = -2 * s.scale + 'px';
+    ctx.fillText(s.initials, (x == null ? -14 : x) * s.scale, height + 26 * s.scale);
+    if (typeof ctx.letterSpacing === 'string') ctx.letterSpacing = '0px';
+    ctx.globalAlpha = 1;
+  }
+
+  /** Wordmark + mascot shared by every composition; only the field width/align change. */
+  function drawBannerType(ctx, s, width, height, ink, surface, align, x, maxCardW) {
+    var maxW = (maxCardW == null ? WORD_MAX_W : maxCardW) * s.scale;
+    var fit = fitWordmark(ctx, s.school, maxW, WORD_START * s.scale, WORD_FLOOR * s.scale);
+    ctx.font = fit.size + 'px ' + BEBAS_STACK;
+    ctx.fillStyle = ink;
+    ctx.textAlign = align || 'center';
+    ctx.textBaseline = 'alphabetic';
+    var wx = x == null ? width / 2 : x;
+    ctx.fillText(s.school, wx, WORD_Y * s.scale);
+    var mascotAlpha = 0;
+    var mascotComposite = null;
+    var mascotContrast = null;
+    if (s.mascot) {
+      mascotAlpha = opacityForContrast(ink, surface, MASCOT_OPACITY_TARGET, CONTRAST_FLOOR);
+      mascotComposite = compositeOver(ink, surface, mascotAlpha);
+      mascotContrast = contrastRatio(mascotComposite, surface);
+      ctx.font = '300 ' + MASCOT_SIZE * s.scale + 'px ' + OSWALD_STACK;
+      ctx.fillStyle = ink;
+      ctx.globalAlpha = mascotAlpha;
+      ctx.textAlign = 'left';
+      drawSpacedTextAligned(
+        ctx,
+        s.mascot,
+        wx,
+        MASCOT_Y * s.scale,
+        4.5 * s.scale,
+        align === 'left' ? 'left' : 'center'
+      );
+      ctx.globalAlpha = 1;
+    }
+    return {
+      wordSize: fit.size,
+      wordFloor: WORD_FLOOR * s.scale,
+      atFloor: fit.atFloor,
+      overflows: fit.overflows,
+      ink: ink,
+      inkPrimary: ink,
+      primary: s.primary,
+      secondary: s.secondary,
+      initials: s.initials,
+      dark: s.dark,
+      contrastPrimary: contrastRatio(ink, surface),
+      mascotAlpha: mascotAlpha,
+      mascotComposite: mascotComposite,
+      mascotContrast: mascotContrast,
+      width: width,
+      height: height,
+    };
+  }
+
+  /** Keel — secondary vertical band on the right with initials; wordmark clear. */
+  function drawKeelBanner(ctx, width, height, opts) {
+    opts = opts || {};
+    var s = bannerBase(opts, width);
+    ctx.save();
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = s.primary;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = s.dark;
+    ctx.fillRect(332 * s.scale, 0, width - 332 * s.scale, height);
+    ctx.fillStyle = s.secondary;
+    ctx.fillRect(322 * s.scale, 0, 10 * s.scale, height);
+    ctx.globalAlpha = 0.4;
+    ctx.fillRect(314 * s.scale, 0, 4 * s.scale, height);
+    ctx.globalAlpha = 1;
+    drawGhostInitials(ctx, s, height, s.secondary);
+    var ink = inkOn(s.primary);
+    var meta = drawBannerType(ctx, s, 322 * s.scale, height, ink, s.primary);
+    ctx.font = 34 * s.scale + 'px ' + BEBAS_STACK;
+    ctx.fillStyle = inkOn(s.dark);
+    ctx.textAlign = 'center';
+    ctx.fillText(s.initials, (332 + (400 - 332) / 2) * s.scale, 90 * s.scale);
+    ctx.restore();
+    meta.inkDark = inkOn(s.dark);
+    meta.contrastDark = contrastRatio(meta.inkDark, s.dark);
+    meta.bannerVariant = 'keel';
+    return meta;
+  }
+
+  /** Baseline — default stored variant; nothing crosses the wordmark. */
+  function drawBaselineBanner(ctx, width, height, opts) {
+    opts = opts || {};
+    var s = bannerBase(opts, width);
+    ctx.save();
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = s.primary;
+    ctx.fillRect(0, 0, width, height);
+    var g = ctx.createLinearGradient(0, 0, 0, height);
+    g.addColorStop(0, 'rgba(255,255,255,0.10)');
+    g.addColorStop(0.55, 'rgba(0,0,0,0)');
+    g.addColorStop(1, 'rgba(0,0,0,0.28)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, width, height);
+    drawGhostInitials(ctx, s, height, s.secondary);
+    ctx.fillStyle = s.secondary;
+    ctx.fillRect(0, height - 9 * s.scale, width, 9 * s.scale);
+    ctx.globalAlpha = 0.35;
+    ctx.fillRect(0, height - 13 * s.scale, width, 2 * s.scale);
+    ctx.globalAlpha = 1;
+    var ink = inkOn(s.primary);
+    var meta = drawBannerType(ctx, s, width, height, ink, s.primary);
+    ctx.restore();
+    meta.bannerVariant = 'baseline';
+    return meta;
+  }
+
+  /** Plate — secondary plate with initials; wordmark left-aligned on a 264-wide field. */
+  function drawPlateBanner(ctx, width, height, opts) {
+    opts = opts || {};
+    var s = bannerBase(opts, width);
+    var plateW = 104 * s.scale;
+    ctx.save();
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = s.primary;
+    ctx.fillRect(0, 0, width, height);
+    ctx.fillStyle = 'rgba(0,0,0,0.16)';
+    ctx.fillRect(plateW, 0, width - plateW, height);
+    ctx.fillStyle = s.secondary;
+    ctx.fillRect(0, 0, plateW, height);
+    var plateInk = inkOn(s.secondary);
+    ctx.font = 62 * s.scale + 'px ' + BEBAS_STACK;
+    ctx.fillStyle = plateInk;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(s.initials, plateW / 2, 92 * s.scale);
+    var ink = inkOn(s.primary);
+    var meta = drawBannerType(
+      ctx,
+      s,
+      width,
+      height,
+      ink,
+      s.primary,
+      'left',
+      plateW + 18 * s.scale,
+      WORD_MAX_W_PLATE
+    );
+    ctx.restore();
+    meta.plateInk = plateInk;
+    meta.plateContrast = contrastRatio(plateInk, s.secondary);
+    meta.bannerVariant = 'plate';
+    return meta;
+  }
+
+  /** Sash — diagonal kept but dropped under the wordmark. */
+  function drawSashBanner(ctx, width, height, opts) {
+    opts = opts || {};
+    var s = bannerBase(opts, width);
+    ctx.save();
+    ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = s.primary;
+    ctx.fillRect(0, 0, width, height);
+    drawGhostInitials(ctx, s, height, s.secondary, 250);
+    ctx.fillStyle = s.dark;
+    fillPath(ctx, [
+      [0, 122 * s.scale],
+      [width, 105 * s.scale],
+      [width, height],
+      [0, height],
+    ]);
+    ctx.fillStyle = s.secondary;
+    ctx.globalAlpha = 0.92;
+    fillPath(ctx, [
+      [0, 122 * s.scale],
+      [width, 105 * s.scale],
+      [width, 109 * s.scale],
+      [0, 126 * s.scale],
+    ]);
+    ctx.globalAlpha = 1;
+    var ink = inkOn(s.primary);
+    var meta = drawBannerType(ctx, s, width, height, ink, s.primary);
+    ctx.restore();
+    meta.inkDark = inkOn(s.dark);
+    meta.contrastDark = contrastRatio(meta.inkDark, s.dark);
+    meta.bannerVariant = 'sash';
+    return meta;
+  }
+
+  function drawBanner(ctx, width, height, opts) {
+    opts = opts || {};
+    var variant = normalizeBannerVariant(opts.banner_variant || opts.bannerVariant);
+    if (variant === 'keel') return drawKeelBanner(ctx, width, height, opts);
+    if (variant === 'plate') return drawPlateBanner(ctx, width, height, opts);
+    if (variant === 'sash') return drawSashBanner(ctx, width, height, opts);
+    // baseline is the stored default; chevron remains available as the shipped control
+    if (String(opts.banner_variant || opts.bannerVariant || '').toLowerCase() === 'chevron') {
+      var chevron = drawChevronBanner(ctx, width, height, opts);
+      chevron.bannerVariant = 'chevron';
+      return chevron;
+    }
+    return drawBaselineBanner(ctx, width, height, opts);
+  }
+
   function renderBanner(opts, width, height, mime, quality) {
     var canvas = makeCanvas(width, height);
     var ctx = canvas.getContext('2d');
-    var meta = drawChevronBanner(ctx, width, height, opts);
+    var meta = drawBanner(ctx, width, height, opts);
     var url =
       mime === 'image/jpeg'
         ? canvas.toDataURL('image/jpeg', quality == null ? 0.92 : quality)
@@ -391,7 +642,7 @@
     var height = size === 'primary' ? PRIMARY_H : CARD_H;
     var canvas = makeCanvas(width, height);
     var ctx = canvas.getContext('2d');
-    return drawChevronBanner(ctx, width, height, opts);
+    return drawBanner(ctx, width, height, opts);
   }
 
   function svgMark(opts) {
@@ -562,6 +813,9 @@
     PRIMARY_H: PRIMARY_H,
     WORD_START: WORD_START,
     WORD_FLOOR: WORD_FLOOR,
+    WORD_MAX_W: WORD_MAX_W,
+    WORD_MAX_W_PLATE: WORD_MAX_W_PLATE,
+    BANNER_VARIANT_KEYS: BANNER_VARIANT_KEYS,
     INK_DARK: INK_DARK,
     INK_LIGHT: INK_LIGHT,
     MASCOT_OPACITY_TARGET: MASCOT_OPACITY_TARGET,
@@ -577,8 +831,14 @@
     contrastRatio: contrastRatio,
     deriveThirdTone: deriveThirdTone,
     normalizeJerseyPreset: normalizeJerseyPreset,
+    normalizeBannerVariant: normalizeBannerVariant,
     ensureBannerFonts: ensureBannerFonts,
     drawChevronBanner: drawChevronBanner,
+    drawKeelBanner: drawKeelBanner,
+    drawBaselineBanner: drawBaselineBanner,
+    drawPlateBanner: drawPlateBanner,
+    drawSashBanner: drawSashBanner,
+    drawBanner: drawBanner,
     analyzeBanner: analyzeBanner,
     svgMark: svgMark,
     markDataUrl: markDataUrl,

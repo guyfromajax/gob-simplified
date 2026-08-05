@@ -181,18 +181,19 @@ class TestSeedStability(unittest.TestCase):
         stored = {}
 
         def find_one(query, proj=None):
-            key = (query["user_id"], query["draft_id"], query["replaced_object_id"])
+            key = (query["user_id"], query["replaced_object_id"], query.get("schema_version"))
             doc = stored.get(key)
             if not doc:
                 return None
-            if proj and "portraits" in proj:
-                return {"portraits": doc["portraits"]}
+            if proj:
+                return {k: doc[k] for k in proj if k in doc}
             return doc
 
         def update_one(query, update, upsert=False):
-            key = (query["user_id"], query["draft_id"], query["replaced_object_id"])
-            portraits = update["$set"]["portraits"]
-            stored[key] = {"portraits": portraits}
+            key = (query["user_id"], query["replaced_object_id"], query.get("schema_version"))
+            doc = stored.get(key, {})
+            doc.update(update.get("$set") or {})
+            stored[key] = doc
 
         col = MagicMock()
         col.find_one.side_effect = find_one

@@ -56,20 +56,20 @@
     { maxRank: 128, band: 5 },
   ];
 
-  // §10.5 — named end-bands for height / class filters.
+  // §10.5 / plan — named end-bands for height / class filters (verbatim).
   var HEIGHT_BAND_LABELS = {
     1: 'Tier 1: Tallest',
-    2: 'Tier 2',
+    2: 'Tier 2: Taller',
     3: 'Tier 3: Balanced',
-    4: 'Tier 4',
+    4: 'Tier 4: Quicker',
     5: 'Tier 5: Quickest',
   };
   var CLASS_BAND_LABELS = {
-    1: 'Tier 1: Experience',
-    2: 'Tier 2',
+    1: 'Tier 1: Most Experienced',
+    2: 'Tier 2: Experienced',
     3: 'Tier 3: Balanced',
-    4: 'Tier 4',
-    5: 'Tier 5: Youthful',
+    4: 'Tier 4: Young',
+    5: 'Tier 5: Youngest',
   };
 
   function escapeHtml(value) {

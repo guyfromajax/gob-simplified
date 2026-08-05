@@ -79,6 +79,27 @@ This document replaces `team-builder-resolver-enumeration.md`. It covers derived
 | team-builder wizard preview | abbr + full name | chrome | n/a |
 | DOM leak detector | name needles + core-palette colors | chrome scan | yes |
 
+### E2. Team Builder v2 — seven chapter surfaces (2026-08-05)
+
+All seven await / resolve chrome through `ensureTeamBuilderChromeSnapshot` / `lookupTeamChrome` (or inherited snapshot from Program Select). Structural keys stay `replaced_object_id` / core name; display strings are overlay-only after Establish.
+
+| # | Surface | Entry | Chrome / identity notes |
+|---|---|---|---|
+| 1 | **Program Select** (`franchise-select-team`) | Mode Select → Choose Program; also TB cancel return | Non-mod **Enter Franchise** and TB **Open Team Builder** share this page. Awaits chrome snapshot before painting grid art/labels. Tutorial hides TB entry. |
+| 2 | **Ⅰ Claim** (same page, `?builder=1`) | Open Team Builder / unfinished draft | Builder mode banner; **Take This Place** → Identity with `replaced_object_id`. Selection key = ObjectId. |
+| 3 | **Ⅱ Identity** (`team-builder` chapter) | Claim / draft resume | Live banner/court/jersey previews from authored identity; court tokens not resolved hex. Name cap 24. |
+| 4 | **Build mode gate** | After Identity | Explains capped/uncapped; year-vs-potential guard once. Mode written permanently only at Establish. |
+| 5 | **Ⅲ Roster** | After Gate | Diff editor; budgets bind by player identity; Endurance copy; RT from server only. |
+| 6 | **Review** | After Roster | Composition of identity + legality; eligibility copy; Establish CTA. |
+| 7 | **Establish** | After Review | Apply sequence; then FCC. Leak detector must stay clean through mid-game resume on the resulting franchise. |
+
+### Acceptance blockers (2026-08-05)
+
+| Criterion | Status | Why |
+|---|---|---|
+| **#13** mid-game resume half | **Blocked** | Unit leak sweep clean; inventory updated. Resume (init-game / simulate-quarter / stats to minted ids) unexercised — needs an authenticated session against the new build. |
+| **#15** Apply cold/warm timing | **Blocked** | `replace_slot_roster` ~5ms is not the number. Full Apply including `_warm_team_builder_roster_masters` (15 portrait masters) not measured. Do not anchor Establish on a placeholder. Needs the same authenticated session. |
+
 ---
 
 ## Part 2 — Independent implementations by form

@@ -1,18 +1,40 @@
-# Team Builder System (**verified 2026-07-28**)
+# Team Builder System
 
-> Implementation doc for agents and human developers. Product behavior, UX copy, and acceptance criteria live in `_documentation_master/projects/mod-system/team-builder-v1-spec.md` (authoritative on *what* the feature must do). This file documents *how* it is wired in the codebase so you can change it without thread context.
+> **Authoritative product rules:** `_documentation_master/projects/team-builder-v2-plan.md`. Presentation: `projects/design_handoff_team_builder/README.md`.
+>
+> **Roster path (current):** Apply accepts `roster_mode: "edit"` only. CSV import (`slot-roster.csv` and the import helpers) is fully retired — no dormant route. Diff-onto-inherited via `imported_players` (§4.5b). Walk-ons/portraits still minted in the builder.
 >
 > Verified vs `franchise_team_display.py`, `franchise_routes.py` (`team_builder_apply`, play-next), `team_manager.py`, `api.py` (init-game / simulate-quarter matchup gate), `common.js` (`getTeamAssetPath`), `team-builder.js`, identity helpers in `franchise_geek_points.py`.
+
+### Superseded sections (do not trust for current behaviour)
+
+| Section | Why superseded | Trust instead |
+|---|---|---|
+| **Split of duties** (v1-spec as product authority) | Product rules moved to `team-builder-v2-plan.md` + design handoff README | Plan + README |
+| **§1** entry / mid-franchise wording | Still true on overlay model; flow is now seven chapters, not “wizard only at start” as the sole mental model | Plan § flow; design README |
+| **§2** “Soft budget only” row | Soft eligibility + over-budget CSV apply is retired; capped/uncapped hard budgets govern | Plan §4; `team_builder_budget.py` |
+| **§4.1** `roster_mode: keep \| generate \| import` | Those modes are retired; sole path is `edit` | Plan decisions #30 / #41; Apply route |
+| **§4.2** FPD note “for import/generate” | Same — edit rewrite path only | `team_builder_roster.py` |
+| **§6.1** five-step UX path | Replaced by Program Select → Claim → Identity → Gate → Roster → Review → Establish | Design handoff README; `team-builder.js` chapters |
+| **§6.2** step 5 “Optional roster replace (keep \| generate \| import)” | Always edit rewrite (minted ids + portraits); no optional Keep | Apply + roster utils |
+| **§6.3** `slot-roster.csv` endpoint | Endpoint and CSV helpers deleted | — (gone) |
+| **§7** soft budget table / “Never blocks Apply” / over-limit CSV | Replaced by capped/uncapped attribute + height + year budgets | Plan §4 / §10; budget constants |
+| **§8** entire Roster modes table | Keep / Generate / Import retired | Plan §4.5c; decision #41 |
+| **§10** “Roster replace / CSV” row label | Utils still own edit rewrite; CSV is gone | `team_builder_roster.py` |
+| **§11** soft-budget / import test descriptions | Tests retargeted; CSV import tests removed | `BackEnd/tests/test_team_builder_*.py` |
+
+**Still trustworthy for identity/sim wiring (read carefully, verify against code):** §3 Identity model, §4.3 Resolver API, §5 Shared producers, §9 Gameplay path, §12 Explicit non-goals, §13 Agent checklist.
 
 ### Split of duties (read first)
 
 | Doc | Owns | Does **not** own |
 |---|---|---|
-| **`../projects/mod-system/team-builder-v1-spec.md`** | Product behavior, UX flow, user-facing copy, acceptance criteria, v1 scope cuts | Data models, file paths, how overlay/resolver/sim identity are wired |
-| **This file (`Team_Builder_System.md`)** | Implementation: identity rules, overlay schema, Apply/endpoints, shared producers, gameplay path, file map, tests | Product copy strings and “should we build X?” decisions — those stay in the spec |
+| **`../projects/team-builder-v2-plan.md`** | Product behaviour, budgets, identity rules, acceptance criteria | Pixel-level presentation |
+| **`../projects/design_handoff_team_builder/README.md`** | Presentation, copy, interaction, seven-screen layout | Budget arithmetic |
+| **This file (`Team_Builder_System.md`)** | Implementation map: overlay schema, Apply/endpoints, shared producers, gameplay path, file map, tests — **except superseded sections above** | Product copy; “should we build X?” |
 | **`../projects/mod-system/team-builder-identity-inventory.md`** | Team identity / chrome inventory (derived forms, overlay awareness) | Narrative product or full system architecture |
 
-When product intent and code disagree, treat the **spec** as the statement of intent and this file as the map of current wiring — raise a finding; do not silently rewrite the spec from the codebase (see spec §0).
+When product intent and code disagree, treat the **v2 plan** as the statement of intent and this file as the map of current wiring — raise a finding; do not silently rewrite the plan from the codebase.
 
 ---
 

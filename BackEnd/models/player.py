@@ -29,7 +29,7 @@ def clamp_mo(value):
         return 0
 
 
-# Fatigue (NG) decay tiers by ND (Natural Durability), ordered high-ND → low-ND
+# Fatigue (NG) decay tiers by ND (Endurance), ordered high-ND → low-ND
 # (least → most depletion). A player's tier is the first whose threshold his ND
 # meets (last tier = ND < 9). The MO momentum bonus pulls the decay from the
 # highest tier (index 0, ND>89). See Energy_System.md § Depletion Calculation.
@@ -197,7 +197,7 @@ class Player:
 
     def get_fatigue_decay_amount(self, omit_zeros=False):
         """
-        Calculate fatigue decay amount based on ND (Natural Durability) attribute.
+        Calculate fatigue decay amount based on ND (Endurance) attribute.
         
         Args:
             omit_zeros: If True, removes all zero values from the depletion list before selection.

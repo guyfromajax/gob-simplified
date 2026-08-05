@@ -1,6 +1,8 @@
 ##Bugs
 1. Teleported an HCO entry step, result was a DB turnover
 2. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
+3. EOQ is still not perfect
+4. Fast Break animations have defenders stopping short before the shooter shoots the shot
 
 
 ##Full Product Readiness

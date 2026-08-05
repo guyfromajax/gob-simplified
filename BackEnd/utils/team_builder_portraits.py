@@ -643,13 +643,15 @@ def get_or_create_wizard_portraits(
     if len(players) != 15:
         raise ValueError(f"portrait_roster_size_invalid:{len(players)}")
 
+    from BackEnd.utils.team_builder_drafts import SCHEMA_VERSION
+
     col = db["team_builder_wizard_drafts"]
     query = {
         "user_id": user_key,
-        "draft_id": draft_key,
         "replaced_object_id": slot_key,
+        "schema_version": SCHEMA_VERSION,
     }
-    existing = col.find_one(query, {"portraits": 1}) or {}
+    existing = col.find_one(query, {"portraits": 1, "draft_id": 1}) or {}
     stored = existing.get("portraits") if not force_reassign else None
     reassign_set = {
         int(i) for i in (force_reassign_slots or []) if isinstance(i, (int, float)) or str(i).isdigit()
@@ -669,11 +671,13 @@ def get_or_create_wizard_portraits(
                 preserve[i] = dict(row)
 
     assignments = assign_roster_portraits(players, preserve=preserve)
+    stable_draft = str(existing.get("draft_id") or draft_key).strip()
     col.update_one(
         query,
         {
             "$set": {
                 **query,
+                "draft_id": stable_draft,
                 "portraits": assignments,
                 "updated_at": datetime.utcnow(),
             },
@@ -701,21 +705,25 @@ def update_wizard_portrait_slot(
 
     query = {
         "user_id": str(user_id).strip(),
-        "draft_id": str(draft_id).strip(),
         "replaced_object_id": str(replaced_object_id).strip(),
     }
+    from BackEnd.utils.team_builder_drafts import SCHEMA_VERSION
+
+    query["schema_version"] = SCHEMA_VERSION
     col = db["team_builder_wizard_drafts"]
-    doc = col.find_one(query, {"portraits": 1}) or {}
+    doc = col.find_one(query, {"portraits": 1, "draft_id": 1}) or {}
     portraits = list(doc.get("portraits") or [])
     slot = int(assignment["slot"])
     while len(portraits) < 15:
         portraits.append({})
     portraits[slot] = dict(assignment)
+    stable_draft = str(doc.get("draft_id") or draft_id).strip()
     col.update_one(
         query,
         {
             "$set": {
                 **query,
+                "draft_id": stable_draft,
                 "portraits": portraits,
                 "updated_at": datetime.utcnow(),
             },

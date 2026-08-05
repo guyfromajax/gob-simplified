@@ -119,7 +119,7 @@ function App() {
 
         <div className="bench">
           <div className="bf"><label>School name</label>
-            <input type="text" value={cfg.name} maxLength="26" onChange={e => set('name', e.target.value)} /></div>
+            <input type="text" value={cfg.name} maxLength="23" onChange={e => set('name', e.target.value)} /></div>
           <div className="bf narrow"><label>Mascot</label>
             <input type="text" value={cfg.mascot} maxLength="20" onChange={e => set('mascot', e.target.value)} /></div>
           <div className="bf tiny"><label>Abbr</label>

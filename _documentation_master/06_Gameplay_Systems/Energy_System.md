@@ -2,6 +2,8 @@
 
 > **Note:** Inline line-number citations below have drifted from the live files (the logic/values are verified current). Search by function name rather than line number.
 
+> **Terminology (2026-08-05):** ND expands to **Endurance**. Archived docs may still say Natural Durability for the same attribute key.
+
 **Base Constants**
 
 1. **Energy Attribute**: `NG` (Natural Growth/Nerve/Game)
@@ -13,7 +15,7 @@
    - **Halftime Break**: Random from `[0.15, 0.16, 0.17, 0.18, 0.19, 0.2]`
    - **Timeout Break**: Random from `[0.03, 0.04, 0.05, 0.06]`
    - **Bench Recharge**: 20% chance 0, 70% chance +0.01, 10% chance +0.02 (per HCO turn only)
-6. **Depletion System**: ND (Natural Durability) attribute-based via `get_fatigue_decay_amount()`
+6. **Depletion System**: ND (Endurance) attribute-based via `get_fatigue_decay_amount()`
 7. **Depletion Turn Types**: HCO, Fast Break, FCP, HCT
 8. **Key Files**:
    - `BackEnd/models/player.py` - `get_fatigue_decay_amount()`, `decay_energy()`, `recharge_energy()` (lines 124-169)
@@ -42,7 +44,7 @@ The Energy System manages player energy (NG attribute) depletion during active g
 - Energy recharges during breaks (quarter breaks, halftime, timeouts)
 - Bench players recharge slightly during HCO turns
 - Energy affects all player attributes through rescaling
-- ND (Natural Durability) attribute determines fatigue resistance
+- ND (Endurance) attribute determines fatigue resistance
 
 ### Energy Replenishment
 
@@ -128,7 +130,7 @@ The Energy System manages player energy (NG attribute) depletion during active g
 
 #### Overview
 
-Energy depletion occurs during active gameplay when players are actively participating in turns. All 10 active lineup players (5 per team) lose energy based on their ND (Natural Durability) attribute.
+Energy depletion occurs during active gameplay when players are actively participating in turns. All 10 active lineup players (5 per team) lose energy based on their ND (Endurance) attribute.
 
 **Turn Types with Energy Depletion:**
 - **HCO** (Half Court Offense) turns
@@ -154,7 +156,7 @@ Energy depletion occurs during active gameplay when players are actively partici
 
 **Method:** `BackEnd/models/player.py` - `get_fatigue_decay_amount()` (ND tiers in the module-level `_ND_DECAY_TIERS` list)
 
-**Formula:** Based on player's ND (Natural Durability) attribute, returns a random amount from a weighted list. Optionally omits zero values for defensive players on FCP/HCT turns. A positive-MO player may decay from the highest tier (`ND > 89`) (see *Momentum bonus* below).
+**Formula:** Based on player's ND (Endurance) attribute, returns a random amount from a weighted list. Optionally omits zero values for defensive players on FCP/HCT turns. A positive-MO player may decay from the highest tier (`ND > 89`) (see *Momentum bonus* below).
 
 **Parameters:**
 - `omit_zeros` (default: False): If True, removes all zero values from the depletion list before selection. Used for defensive players on FCP/HCT turns to ensure they always lose some energy.
@@ -242,7 +244,7 @@ This ensures that as energy depletes, the 10 malleable attributes (SC, SH, ID, O
 ### Energy and Attribute Scaling
 
 **Malleable Attributes (`MALLEABLE_ATTRS` in `BackEnd/constants/__init__.py`):**
-The following 10 attributes are scaled by NG. Everything else — including NG itself, EM (Emotion), MO (Momentum), CH (Chemistry), **ND (Natural Durability)**, and **IQ (Intelligence)** — is **not** scaled.
+The following 10 attributes are scaled by NG. Everything else — including NG itself, EM (Emotion), MO (Momentum), CH (Chemistry), **ND (Endurance)**, and **IQ (Intelligence)** — is **not** scaled.
 - SC (Scoring)
 - SH (Shooting)
 - ID (Inside Defense)

@@ -1,8 +1,6 @@
-"""Team Builder roster export, import, and edit helpers (§8, §8.8, §4.5c)."""
+"""Team Builder roster helpers — slot load, edit diffs, wizard walk-ons (§4.5b/c)."""
 from __future__ import annotations
 
-import csv
-import io
 import random
 import uuid
 from copy import deepcopy
@@ -52,16 +50,7 @@ _META_INHERIT_KEYS = (
     "portrait",
 )
 
-ROSTER_CSV_HEADERS: tuple[str, ...] = (
-    "first_name",
-    "last_name",
-    "class_year",
-    "height_in",
-    "weight_lb",
-    "jersey",
-    *CORE_12_ATTRS,
-)
-
+ROSTER_SIZE = 15
 MAX_ROSTER_SIZE = 15
 AUTHORED_ROSTER_SIZE = 15
 SCHOLARSHIP_SIZE = 12
@@ -175,13 +164,16 @@ def load_core_roster_rows_for_slot(db: Any, team_object_id: ObjectId) -> list[di
 
 
 def class_year_for_export(year: Any) -> str:
-    """Map core year to FR/SO/JR/SR for CSV export; blank when not applicable."""
+    """Map core year to FR/SO/JR/SR for JSON slot-roster; blank when not applicable."""
     abbrev = format_player_year_abbrev(year)
     return abbrev if abbrev in _EXPORTABLE_CLASS_YEARS else ""
 
 
 def parse_import_class_year(raw: Any) -> str | None:
-    """Return canonical class year (Freshman…) or None when unrecognized."""
+    """Return canonical class year (Freshman…) or None when unrecognized.
+
+    Named for historical CSV import; still used by edit-row diffs.
+    """
     if raw is None:
         return None
     text = str(raw).strip()
@@ -196,24 +188,21 @@ def parse_import_class_year(raw: Any) -> str | None:
     return None
 
 
-def _player_row_for_csv(player: Mapping[str, Any]) -> dict[str, Any]:
-    attrs = player.get("attributes") or {}
-    row = {
-        "first_name": player.get("first_name") or "",
-        "last_name": player.get("last_name") or "",
-        "class_year": class_year_for_export(player.get("year")),
-        "height_in": player.get("height") if player.get("height") is not None else "",
-        "weight_lb": player.get("weight") if player.get("weight") is not None else "",
-        "jersey": player.get("jersey") if player.get("jersey") is not None else "",
-    }
-    for key in CORE_12_ATTRS:
-        val = attrs.get(key)
-        row[key] = val if val is not None and val != "" else ""
-    return row
+_SLOT_ROSTER_PROJECTION: dict[str, int] = {
+    "first_name": 1,
+    "last_name": 1,
+    "year": 1,
+    "height": 1,
+    "weight": 1,
+    "jersey": 1,
+    "attributes": 1,
+    "position_ratings": 1,
+    "player_id": 1,
+}
 
 
-def build_slot_roster_csv(db: Any, team_object_id: ObjectId) -> str:
-    """Export a core team's scholarship roster as CSV (walk-ons excluded)."""
+def _ordered_slot_player_docs(db: Any, team_object_id: ObjectId) -> list[dict[str, Any]]:
+    """Scholarship players for a core slot, ordered by ``teams.player_ids`` identity."""
     team_doc = db.teams.find_one({"_id": team_object_id}, {"player_ids": 1, "name": 1})
     if not team_doc:
         raise ValueError("team_not_found")
@@ -230,15 +219,7 @@ def build_slot_roster_csv(db: Any, team_object_id: ObjectId) -> str:
     if player_ids:
         for doc in db.players.find(
             {"_id": {"$in": player_ids}},
-            {
-                "first_name": 1,
-                "last_name": 1,
-                "year": 1,
-                "height": 1,
-                "weight": 1,
-                "jersey": 1,
-                "attributes": 1,
-            },
+            _SLOT_ROSTER_PROJECTION,
         ):
             players_by_id[str(doc["_id"])] = doc
 
@@ -257,24 +238,40 @@ def build_slot_roster_csv(db: Any, team_object_id: ObjectId) -> str:
     if not ordered:
         for doc in db.players.find(
             {"team_id": team_object_id},
-            {
-                "first_name": 1,
-                "last_name": 1,
-                "year": 1,
-                "height": 1,
-                "weight": 1,
-                "jersey": 1,
-                "attributes": 1,
-            },
+            _SLOT_ROSTER_PROJECTION,
         ):
             ordered.append(doc)
+    return ordered[:SCHOLARSHIP_SIZE]
 
-    buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=list(ROSTER_CSV_HEADERS), lineterminator="\n")
-    writer.writeheader()
-    for player in ordered[:MAX_ROSTER_SIZE]:
-        writer.writerow(_player_row_for_csv(player))
-    return buf.getvalue()
+
+def build_slot_roster_players(db: Any, team_object_id: ObjectId) -> list[dict[str, Any]]:
+    """
+    Scholarship roster as JSON rows for the Team Builder editor.
+
+    Bound by ``source_player_id`` (stable core identity), never by find() ordinal.
+    """
+    ordered = _ordered_slot_player_docs(db, team_object_id)
+    rows: list[dict[str, Any]] = []
+    for doc in ordered:
+        attrs = doc.get("attributes") or {}
+        core_attrs = {key: attrs.get(key) for key in CORE_12_ATTRS}
+        source_id = str(doc.get("player_id") or doc.get("_id") or "")
+        rows.append(
+            {
+                "source_player_id": source_id,
+                "first_name": doc.get("first_name") or "",
+                "last_name": doc.get("last_name") or "",
+                "class_year": class_year_for_export(doc.get("year")),
+                "year": doc.get("year"),
+                "height_in": doc.get("height") if doc.get("height") is not None else None,
+                "weight_lb": doc.get("weight") if doc.get("weight") is not None else None,
+                "jersey": doc.get("jersey") if doc.get("jersey") is not None else None,
+                "attributes": core_attrs,
+                "position_ratings": dict(doc.get("position_ratings") or {}),
+                "walk_on": False,
+            }
+        )
+    return rows
 
 
 def _median_int(values: Sequence[int]) -> int:
@@ -463,9 +460,9 @@ def apply_row_diff_to_inherited(
     apply_topup: bool = False,
 ) -> dict[str, Any]:
     """
-    §4.5b: clone inherited player, overwrite only fields the editor/CSV sends.
+    §4.5b: clone inherited player, overwrite only fields the editor sends.
 
-    Blank optional CSV cells mean inherit. CH/EM/MO and non-editor meta are never
+    Blank optional cells mean inherit. CH/EM/MO and non-editor meta are never
     taken from the row.
     """
     out = deepcopy(dict(inherited))
@@ -693,97 +690,6 @@ def _build_fpd_doc(
     return doc
 
 
-def normalize_imported_players(
-    imported_players: Sequence[Mapping[str, Any]] | None,
-    *,
-    band_defaults: Mapping[str, Any],
-    team_name: str,
-    team_object_id: ObjectId,
-    attribute_mode: str = "capped",
-    apply_topup: bool = False,
-    per_player_budgets: Sequence[int] | None = None,
-) -> list[dict[str, Any]]:
-    """Validate import/edit rows; return normalized player payloads (max 15).
-
-    In capped mode, when per_player_budgets is provided (slot order), each player's
-    core-12 is forced to that budget so points cannot cross player boundaries.
-    """
-    if not imported_players:
-        return []
-
-    mode = normalize_attribute_mode(attribute_mode)
-    normalized: list[dict[str, Any]] = []
-    for row in imported_players:
-        if len(normalized) >= MAX_ROSTER_SIZE:
-            break
-        meta_in = row.get("meta") if isinstance(row.get("meta"), Mapping) else {}
-        first = str(row.get("first_name") or meta_in.get("first_name") or "").strip()
-        last = str(row.get("last_name") or meta_in.get("last_name") or "").strip()
-        if not first or not last:
-            continue
-        year = parse_import_class_year(
-            row.get("class_year") or meta_in.get("year") or row.get("year")
-        )
-        if not year:
-            continue
-
-        height = _safe_int(
-            row.get("height_in"),
-            _safe_int(row.get("height"), _safe_int(meta_in.get("height"), band_defaults.get("height", LEAGUE_MEDIAN_HEIGHT_IN))),
-        )
-        weight = _safe_int(
-            row.get("weight_lb"),
-            _safe_int(row.get("weight"), _safe_int(meta_in.get("weight"), band_defaults.get("weight", 185))),
-        )
-        jersey = _safe_int(row.get("jersey"), _safe_int(meta_in.get("jersey")))
-
-        core_attrs = _normalize_import_core_attrs(
-            row,
-            band_defaults,
-            attribute_mode=mode,
-            apply_topup=apply_topup,
-        )
-        idx = len(normalized)
-        if mode == "capped" and per_player_budgets is not None and idx < len(per_player_budgets):
-            forced = force_core12_to_budget(core_attrs, int(per_player_budgets[idx]))
-            core_attrs = {key: forced[key] for key in CORE_12_ATTRS}
-            for key in CORE_12_ATTRS:
-                core_attrs[f"anchor_{key}"] = core_attrs[key]
-        attributes = _finalize_franchise_attributes(core_attrs)
-
-        is_walk_on = bool(row.get("walk_on")) or str(
-            meta_in.get("archetype") or row.get("archetype") or ""
-        ) == "Walk On"
-        meta: dict[str, Any] = {
-            "first_name": first,
-            "last_name": last,
-            "team": team_name,
-            "team_id": str(team_object_id),
-            "height": height,
-            "weight": weight,
-            "year": year,
-            "jersey": jersey,
-        }
-        if is_walk_on:
-            meta["archetype"] = "Walk On"
-        entry = {
-            "meta": meta,
-            "attributes": attributes,
-        }
-        if row.get("entry_tier") or meta_in.get("entry_tier"):
-            entry["entry_tier"] = row.get("entry_tier") or meta_in.get("entry_tier")
-        if row.get("position_intent") or meta_in.get("position_intent"):
-            entry["position_intent"] = row.get("position_intent") or meta_in.get(
-                "position_intent"
-            )
-        if row.get("development") is not None:
-            entry["development"] = row.get("development")
-        elif is_walk_on:
-            entry["entry_tier"] = entry.get("entry_tier") or "Poor"
-        normalized.append(entry)
-    return normalized
-
-
 def slot_per_player_budgets(
     source_fpd_docs: Sequence[Mapping[str, Any]],
     *,
@@ -802,7 +708,7 @@ def slot_per_player_budgets(
 def count_importable_players(
     imported_players: Sequence[Mapping[str, Any]] | None,
 ) -> int:
-    """Count rows with a name. Class year may be blank (inherit — §4.5b)."""
+    """Count authored rows with a name. Class year may be blank (inherit — §4.5b)."""
     if not imported_players:
         return 0
     count = 0
@@ -876,23 +782,28 @@ def get_or_create_wizard_walk_ons(
     if not user_key or not slot_key or not draft_key:
         raise ValueError("wizard_walk_ons_key_incomplete")
 
+    from BackEnd.utils.team_builder_drafts import SCHEMA_VERSION
+
     col = db["team_builder_wizard_drafts"]
+    # One draft per (user, slot) — draft_id is a stable field, not a second axis.
     query = {
         "user_id": user_key,
-        "draft_id": draft_key,
         "replaced_object_id": slot_key,
+        "schema_version": SCHEMA_VERSION,
     }
-    existing = col.find_one(query, {"walk_ons": 1})
+    existing = col.find_one(query, {"walk_ons": 1, "draft_id": 1})
     stored = (existing or {}).get("walk_ons") if existing else None
     if isinstance(stored, list) and len(stored) == WALK_ON_COUNT:
         return stored
 
     walk_ons = build_wizard_walk_on_players()
+    stable_draft = str((existing or {}).get("draft_id") or draft_key).strip()
     col.update_one(
         query,
         {
             "$set": {
                 **query,
+                "draft_id": stable_draft,
                 "walk_ons": walk_ons,
                 "updated_at": datetime.utcnow(),
             },
@@ -1307,12 +1218,12 @@ def replace_slot_roster(
     """
     Replace the replaced slot's franchise roster after season init.
 
-    §4.5c: only edit and import. Both author exactly 15 players, mint fresh
-    player_ids, and apply capped top-up universally. Init's 15 FPD ids are
-    deleted so orphans do not remain.
+    §4.5c: edit only. Authors exactly 15 players, mints fresh player_ids,
+    and applies capped top-up universally. Init's 15 FPD ids are deleted so
+    orphans do not remain.
 
-    Edit/import (§4.5b): clone each inherited player and overwrite only fields
-    the row sends.
+    Edit (§4.5b): clone each inherited player and overwrite only fields the
+    row sends.
 
     Portrait kit reference is ``meta.image_id`` — a recruit_set id, builder_set
     id, or later an upload key. Flat base-league ``photo`` paths are stripped
@@ -1337,7 +1248,7 @@ def replace_slot_roster(
     ordered_fpd = _ordered_source_fpd(source_fpd, old_player_ids)
 
     mode = (roster_mode or "edit").strip().lower()
-    if mode not in ("edit", "import"):
+    if mode != "edit":
         raise ValueError(f"roster_mode_invalid:{mode}")
     attr_mode = normalize_attribute_mode(attribute_mode)
     # §4.5c: Keep retired — capped top-up on every rewrite path.
@@ -1516,14 +1427,13 @@ def collect_roster_shape_fields(
 
 
 __all__ = [
-    "ROSTER_CSV_HEADERS",
     "MAX_ROSTER_SIZE",
     "AUTHORED_ROSTER_SIZE",
     "SCHOLARSHIP_SIZE",
     "WALK_ON_COUNT",
     "apply_row_diff_to_inherited",
     "apply_diffs_to_inherited_roster",
-    "build_slot_roster_csv",
+    "build_slot_roster_players",
     "build_wizard_walk_on_players",
     "get_or_create_wizard_walk_ons",
     "clear_wizard_walk_ons_for_user",
@@ -1532,7 +1442,6 @@ __all__ = [
     "collect_roster_shape_fields",
     "compute_inherited_shape_budgets",
     "load_core_roster_rows_for_slot",
-    "normalize_imported_players",
     "parse_import_class_year",
     "replace_slot_roster",
     "slot_per_player_budgets",

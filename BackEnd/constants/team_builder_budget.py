@@ -17,6 +17,13 @@ TOPUP_FLOOR = 60
 
 CORE_12_ATTRS = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT")
 
+# Program display name — Identity clients + Apply.
+# Why 24 (not design's 26): Plate banner field is 264 card units at the 20px
+# wordmark floor; 26×W overflows. League longest real name is 22
+# (Amariabi International). If more room is needed later, widen Plate's field —
+# do not raise the cap alone.
+PROGRAM_NAME_MAX_LEN = 23
+
 ATTRIBUTE_MODES = frozenset({"capped", "uncapped"})
 
 # §10.2 — Team Builder height range (generation may use a wider window).
