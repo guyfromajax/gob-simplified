@@ -12,6 +12,7 @@
     this.setMode = opts.setMode;
     this.onContinue = opts.onContinue || function () {};
     this.onBack = opts.onBack || function () {};
+    this.onModeChange = opts.onModeChange || function () {};
     this._bound = false;
   }
 
@@ -78,18 +79,11 @@
       '<div class="m-ft"><span class="m-pick">Click to choose</span>' +
       '<span class="m-tick"><i>✓</i>Chosen</span></div></button>' +
       '</div>' +
-      '<div class="commit" id="tb-gate-commit">' +
-      '<div class="c-txt" id="tb-gate-ctext">Nothing is chosen yet.</div>' +
-      '<button type="button" class="btn" id="tb-gate-go" disabled>Continue to Roster</button>' +
-      '</div>' +
       '<button type="button" class="back" id="tb-gate-back">← Back to Identity</button>' +
       '</div>';
 
     this._els = {
       cards: [].slice.call(this.root.querySelectorAll('.mode')),
-      commit: this.root.querySelector('#tb-gate-commit'),
-      ctext: this.root.querySelector('#tb-gate-ctext'),
-      go: this.root.querySelector('#tb-gate-go'),
       back: this.root.querySelector('#tb-gate-back'),
     };
     this._bind();
@@ -102,41 +96,43 @@
       card.addEventListener('click', function () {
         self.setMode(card.getAttribute('data-mode'));
         self.sync();
+        self.onModeChange(self.getMode());
       });
-    });
-    this._els.go.addEventListener('click', function () {
-      if (!self.getMode()) return;
-      self.onContinue();
     });
     this._els.back.addEventListener('click', function () {
       self.onBack();
     });
   };
 
-  GateChapter.prototype.sync = function () {
+  /** Band copy when Continue is disabled / armed — primary action lives in the statebar. */
+  GateChapter.prototype.getActionCopy = function () {
     var mode = this.getMode();
     var ctx = this.getContext() || {};
     var program = ctx.programName || 'Your program';
+    if (!mode) {
+      return { ready: false, reason: 'Nothing is chosen yet.' };
+    }
+    if (mode === 'capped') {
+      return {
+        ready: true,
+        reason:
+          escapeHtml(program) +
+          ' will be built <b>capped</b> and <b>will be eligible</b> for online play.',
+      };
+    }
+    return {
+      ready: true,
+      reason:
+        escapeHtml(program) +
+        ' will be built <b>uncapped</b> and <b>will never be eligible</b> for online play.',
+    };
+  };
+
+  GateChapter.prototype.sync = function () {
+    var mode = this.getMode();
     this._els.cards.forEach(function (c) {
       c.classList.toggle('on', c.getAttribute('data-mode') === mode);
     });
-    if (!mode) {
-      this._els.ctext.textContent = 'Nothing is chosen yet.';
-      this._els.commit.classList.remove('armed');
-      this._els.go.disabled = true;
-      return;
-    }
-    if (mode === 'capped') {
-      this._els.ctext.innerHTML =
-        escapeHtml(program) +
-        ' will be built <b>capped</b> and <b>will be eligible</b> for online play.';
-    } else {
-      this._els.ctext.innerHTML =
-        escapeHtml(program) +
-        ' will be built <b>uncapped</b> and <b>will never be eligible</b> for online play.';
-    }
-    this._els.commit.classList.add('armed');
-    this._els.go.disabled = false;
   };
 
   function escapeHtml(s) {

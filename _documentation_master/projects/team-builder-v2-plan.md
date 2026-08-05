@@ -8,6 +8,20 @@
 
 ---
 
+## 0a. Action bar rule (chapter screens)
+
+**Added 5 August 2026.** The primary action lives in the **top state band** on Identity, Gate, Roster and Review. Nothing else carries it.
+
+| Act | Colour / placement |
+|---|---|
+| Advance (Continue / Continue to Review) | Orange, band |
+| Irreversible commit (Establish ⟨Program⟩) | Orange fill on Review band — heavier type + more padding than Continue. Not green (green = valid). Page headline carries permanence. |
+| Leave the builder (Enter Franchise) | Off-band, Establish curtain only |
+
+When the action is unavailable it is visibly disabled **and** the band shows the reason beside it (Gate: *"Nothing is chosen yet."*; Roster: legality verdict). Never a live-looking dead control. Content insets that depend on chrome height use measured `--tb-statebar-h` / `--chrome-h`.
+
+---
+
 ## 0. How to use this document
 
 Same rules as the v1 spec, which still apply to everything it covers:
@@ -762,6 +776,10 @@ Adjacent-by-lightness ΔE00: pale→normal 10.58 · normal→asian 5.61 · asian
 
 Selection = ring, not fill change. No taxonomy in rendered attributes. Match counts aggregate across every key the selected chip maps to.
 
+**Frame / Definition labels (approved 2026-08-05).** Group names match the classifier; "Build" is retired in this UI because build mode is already a load-bearing product noun. Help: *"Frame is how big and broad he's built. Definition is how muscular or soft that frame looks."* Frame chip **Doughy → Heavy** (display only): Doughy names soft tissue (Definition's domain) while sitting at the large end of the size ramp (`FRAMES = Slight → Lean → Normal → Broad → Doughy`). Classifier key stays `Doughy`.
+
+**Match-count copy.** No filters: `450 portraits` (catalog order — not player-fit; do not claim "closest first"). Filters active: `N matches, shown first. The rest stay selectable.`
+
 #### Uniqueness collides with scarcity
 
 Blocking duplicate portraits within a roster is unenforceable in sparse cells: a roster with four Broad-Toned players faces five such images across every skin tone. **Where a cell cannot supply a unique image, frame relaxation takes precedence over the uniqueness rule** — and the fix for the underlying scarcity is §6.5a, not a cleverer matcher.
@@ -943,6 +961,7 @@ Team Builder's pool is **`recruit_set_0001` ∪ `builder_set_0001`**. Recruit as
 | 41 | **CSV import / Keep / Generate retired** (2026-08-05) | Sole roster path is inline edit (`roster_mode: "edit"`). No dormant CSV endpoint — a later league-wide upload feature builds fresh. |
 | 42 | **§4.3 top-up surface retired** (2026-08-05) | Recalibration: league core-12 min ≈190; 0 players below 60 in staging/production. Editor min is 60 by construction (5×12). UI copy removed; `apply_capped_topup` remains as a defensive server guard only. |
 | 43 | **Portrait picker skin tone = unlabelled 5-chip ramp; no race vocabulary in the UI** (§6.5b, 2026-08-05) | Original brief required it; it was lost in handoff. Merges by CIEDE2000 on measured pool Lab, not category names. Classifier keys unchanged underneath. Dim-don't-filter unchanged. |
+| 44 | **Primary action always lives in the top state band on every chapter screen** (2026-08-05) | Moving the CTA between band and footer taught users the band was unreliable. Dead/disabled band buttons without an adjacent reason are forbidden. Advance = orange Continue / Continue to Review; Establish = orange but heavier type/padding (not green — green means valid); Enter Franchise stays on the Establish curtain. Band height is measured (`--tb-statebar-h` / `--chrome-h`), never hardcoded into content insets. |
 | 18 | **`.name` is core, `.display_name` is the overlay** | Removing the overlay from `.name` without giving display a home just moves the leak somewhere worse. |
 
 ---

@@ -161,8 +161,8 @@ Clicking **Open Team Builder** changes **five things at once**. A click that cha
 
   - **The consequence is the largest text on each card, above any explanation of budgets** — stated in the plainest available language.
   - Card footer: `Click to choose` 11.5px `--tx3`, warming to `--org` **on hover only**. At rest it would be the loudest thing on each card and would beat the eligibility line; it is a hint, not a CTA — the whole card is the button.
-- **Commitment row:** status text (*"Nothing is chosen yet."* → *"Cascade Valley will be built **capped** and **will be eligible** for online play."*) + **Continue to Roster**, disabled until a card is chosen.
-- `← Back to Identity`
+- **No bottom primary CTA.** Choosing a mode card lights the **state band** Continue (orange). When nothing is chosen, the band shows a disabled Continue with adjacent copy *"Nothing is chosen yet."* When a mode is chosen, the band reason updates to the eligibility sentence and Continue enables. Never a live-looking dead control.
+- `← Back to Identity` (content-area secondary only)
 
 **Dynamic vs static values.** Height budget, Year budget, replaced program, program name, abbreviation and conference come from the chosen slot — all 128 differ. The attribute range 5–99, the height range 5′6″–7′0″, fifteen players and FR/SO/JR/SR are product constants and are correctly hardcoded.
 
@@ -189,8 +189,9 @@ Framing it as a wizard step actively destroys that — a step says "complete thi
 | Build mode | ● Capped | eligible for online play |
 | Roster | ● Ready / Not legal | *n* of 15 changed |
 
-- **Action cell**, `flex: 0 0 auto`, pinned right: *"Editable until you establish the program"* 11px `--tx2`, max-width 22ch, right-aligned — then the primary button **Establish ⟨Program⟩** (`--org`, 42px, `white-space: nowrap`), gated on legality.
-- **Disabled button state must read as present-but-unavailable, not absent:** `rgba(255,255,255,.10)` bg, `rgba(255,255,255,.5)` label (4.51:1), `rgba(255,255,255,.22)` border. This is the screen's primary action and it is disabled by default whenever the roster is illegal.
+- **Action cell**, `flex: 0 0 auto`, pinned right: adjacent **reason** + primary band button. When legal: reason *"Editable until you establish the program"* and the action enabled. When illegal: action **disabled** and the reason is the legality verdict (same substance as the page verdict — unplaced points / year / height), not a silent dead control.
+- **Disabled button state must read as present-but-unavailable, not absent:** reduced opacity, `cursor: not-allowed`. Never a primary that looks live and isn't.
+- **Roster band CTA:** **Continue to Review** (orange). It navigates only — Apply lives on Review. Naming the destination matters: Roster is the last authoring step, so a bare Continue could be read as commit.
 
 **b. Budget band** (`.budgetbar`) — `--panelL`, radius 12px, padding 14px 18px, flex-wrap, gap 16px 22px.
 - **h1** Bebas 27px: *"Edit Your Roster"*
@@ -222,7 +223,7 @@ Framing it as a wizard step actively destroys that — a step says "complete thi
 
 **Tone (skin):** unlabelled swatches in a light-to-dark ramp — **no race vocabulary in the interface** (no labels, tooltips, `title`, `alt`, `aria-label` taxonomy, CSS class names, or `data-*` values carrying classifier skin keys). Accessible names are positional/tonal only (e.g. *"Skin tone 1 of 5, lightest"*). Chip fills are **measured** mean colours from the pool; selection is a **ring**, not a fill change; chips 1 and 5 carry a stronger border so they read on `#0e1118`. Classifier keys stay unchanged underneath — a chip may map to multiple keys (display-layer merge). Match counts aggregate across every key a selected chip maps to. **Do not normalise chroma** to smooth the ramp — ends are duller than the mid by measurement. Full method, Lab table, ΔE00 basis and chip→key map: `team-builder-v2-plan.md` §6.5b.
 
-**Frame / Build:** labelled sets (orthogonal classifier axes — skeleton vs muscle/fat). Group labels and help copy must be approved before shipping; do not invent flavour text.
+**Frame / Definition:** labelled sets (orthogonal classifier axes — skeleton vs muscle/fat). Help: *"Frame is how big and broad he's built. Definition is how muscular or soft that frame looks."* Frame value **Doughy** is shown as **Heavy** (display-layer only; classifier key unchanged) so the size ramp reads Slight → Lean → Normal → Broad → Heavy. Match-count: no filters → *N portraits*; filters active → *N matches, shown first. The rest stay selectable.* (No-filter order is catalog order — do not claim player-fit.)
 
 ### 5. Review (`Team Builder - Review.html`)
 
@@ -242,7 +243,8 @@ Framing it as a wizard step actively destroys that — a step says "complete thi
     - **Standings:** 8 rows, columns Program / Conf / Overall / Preseason. The user's row is tinted in their own primary via `linear-gradient(125deg, var(--me) 0, transparent 78%)` with a 3px inset left bar, name in Bebas 17px.
   - **Right:** Team Measures (Height budget, Year budget, Attribute points, Changed from inherited, **Average Height**, Year shape) and Program Details (Conference, Region, Replacing, National Programs 128)
 - **Home Court** — the real court render, 700px wide, max-width 700px centered
-- **Sticky footer bar:** `← Back to the Roster` ghost + **Establish ⟨Program⟩** (`--grn`, 46px). No confirmation dialog — the gravity comes from the sentence, not from an "are you sure."
+- **No bottom primary CTA.** The commit lives in the **state band** only (`Establish ⟨Program⟩`). Page gravity: full-width *"This Program Is Permanent"* plus a one-line consequence; the band performs the click. `← Back to the Roster` is a content-area secondary control, not a footbar.
+- **Action-bar rule (all chapter screens):** the primary action always lives in the top state band. Advance (Continue / Continue to Review) is orange. Irreversible **Establish** is also orange fill — distinguished by **heavier type and more horizontal padding**, not by green (green means valid/legal throughout the product) and not by red (creates, doesn't destroy). The screen headline carries permanence; the chip's job is to be unmistakably primary. Establish curtain / Enter Franchise stays off-band. When the band action is unavailable it is visibly disabled **and** the adjacent reason states why. Never render a primary that looks live and isn't. Band height is measured into `--tb-statebar-h` / `--chrome-h` — never hardcode content insets from assumed chrome size.
 
 **There is no schedule card.** Confirmed: **the schedule does not exist at this point in the flow.** An earlier revision showed six dated fixtures; it was removed rather than showing data that isn't real. The standings already put the seven programs the user will face on screen.
 

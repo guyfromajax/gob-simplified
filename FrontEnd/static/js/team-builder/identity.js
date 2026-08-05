@@ -894,6 +894,22 @@
     );
   };
 
+  /** Plain reason when Continue is disabled — shown in the state band. */
+  IdentityChapter.prototype.getBlockedReason = function () {
+    if (this.isReady()) return null;
+    var id = this.getIdentity();
+    if (!String(id.name || '').trim()) return 'Enter a program name.';
+    if (String(id.name || '').length > C.PROGRAM_NAME_MAX_LEN) {
+      return 'Program name is too long.';
+    }
+    if (!String(id.mascot || '').trim()) return 'Enter a mascot.';
+    if (this._uniq.state === 'checking') return 'Checking abbreviation…';
+    if (this._uniq.state === 'short') return 'Abbreviation needs three characters.';
+    if (this._uniq.state !== 'ok') return 'Abbreviation is taken.';
+    if (!insideWoodContrastOk(id)) return 'Inside wood contrast is too low.';
+    return 'Finish identity to continue.';
+  };
+
   IdentityChapter.prototype.syncContinue = function () {
     this.onReadyChange(this.isReady());
   };

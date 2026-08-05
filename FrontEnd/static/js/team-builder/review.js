@@ -280,12 +280,20 @@
       })
       .join('');
 
+    var programName = id.name || 'Program';
+
     this.root.innerHTML =
       '<div class="rv">' +
       '<div class="rv-top">' +
       '<div class="rv-eb">Review</div>' +
-      '<div class="rv-note">Everything below is still editable until you establish the program.</div>' +
+      '<button type="button" class="btn ghost sm" id="tb-rv-back">← Back to the Roster</button>' +
       '</div>' +
+      '<h1 class="rv-perm">This Program Is Permanent</h1>' +
+      '<p class="rv-perm-s">Establish writes <b>' +
+      escapeHtml(programName) +
+      '</b> into the league in place of ' +
+      escapeHtml(ctx.replaced.name || 'the replaced program') +
+      '. That cannot be undone.</p>' +
       '<div class="hero"><canvas id="tb-rv-banner" aria-label="Program banner"></canvas></div>' +
       '<div class="card" style="margin-top:14px">' +
       '<div class="c-hd"><h2>Roster</h2></div>' +
@@ -360,23 +368,16 @@
       '<div class="card" style="margin-top:14px"><div class="c-hd"><h2>Home Court</h2></div>' +
       '<div style="padding:12px 16px 16px"><div class="courtwrap">' +
       '<canvas id="tb-rv-court" class="court" aria-label="Home court"></canvas>' +
-      '</div></div></div></div>' +
-      '<div class="footbar"><div class="fb-in">' +
-      '<button type="button" class="btn ghost" id="tb-rv-back">← Back to the Roster</button>' +
-      '<div class="fb-t"></div>' +
-      '<button type="button" class="btn" id="tb-rv-establish">Establish</button>' +
-      '</div></div>';
+      '</div></div></div></div>';
 
     this._els = {
       banner: this.root.querySelector('#tb-rv-banner'),
       court: this.root.querySelector('#tb-rv-court'),
       back: this.root.querySelector('#tb-rv-back'),
-      establish: this.root.querySelector('#tb-rv-establish'),
     };
     this._bind();
     this._paintBanner();
     this._paintCourt();
-    this._fitEstablish();
   };
 
   ReviewChapter.prototype._bind = function () {
@@ -387,28 +388,8 @@
       var t = e.target;
       if (t && t.id === 'tb-rv-back') {
         self.onBack();
-        return;
-      }
-      if (t && t.id === 'tb-rv-establish') {
-        self.onEstablish();
       }
     });
-  };
-
-  ReviewChapter.prototype._fitEstablish = function () {
-    var btn = this._els && this._els.establish;
-    if (!btn) return;
-    var name = (this.host.getIdentity && this.host.getIdentity().name) || 'Program';
-    var label = 'Establish ' + name;
-    btn.textContent = label;
-    btn.style.fontSize = '';
-    var size = 17;
-    var min = 12;
-    btn.style.fontSize = size + 'px';
-    while (size > min && btn.scrollWidth > btn.clientWidth + 1) {
-      size -= 0.5;
-      btn.style.fontSize = size + 'px';
-    }
   };
 
   ReviewChapter.prototype._paintBanner = function () {

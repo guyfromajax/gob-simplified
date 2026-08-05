@@ -390,27 +390,77 @@
     scheduleSave();
   }
 
+  function measureChrome() {
+    var bar = els.statebar;
+    var h = 0;
+    if (bar && !bar.hidden) {
+      h = Math.ceil(bar.getBoundingClientRect().height) || 0;
+    }
+    document.documentElement.style.setProperty('--tb-statebar-h', h + 'px');
+    // Establish / full-bleed chapters subtract total top chrome (auth + band).
+    var auth = document.querySelector('.auth-bar');
+    var authH = auth ? Math.ceil(auth.getBoundingClientRect().height) || 0 : 0;
+    document.documentElement.style.setProperty('--chrome-h', authH + h + 'px');
+  }
+
+  function ensureChromeObserver() {
+    if (!els.statebar || els._chromeObs) return;
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measureChrome);
+      els._chromeObs = true;
+      return;
+    }
+    els._chromeObs = new ResizeObserver(function () {
+      measureChrome();
+    });
+    els._chromeObs.observe(els.statebar);
+  }
+
+  function stripReasonHtml(html) {
+    return String(html || '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
   function renderStatebar() {
     var bar = els.statebar;
     if (!bar) return;
-    var show = state.chapter === 'identity' || state.chapter === 'roster';
+    // Primary action lives in the band on every chapter screen. Establish (curtain) has none.
+    var show =
+      state.chapter === 'identity' ||
+      state.chapter === 'gate' ||
+      state.chapter === 'roster' ||
+      state.chapter === 'review';
     bar.hidden = !show;
-    if (!show) return;
+    if (!show) {
+      measureChrome();
+      return;
+    }
 
     var id = state.identity;
     var replaced = state.replaced || {};
     var conf = conferenceLabel(replaced);
     var region = regionLabel(replaced);
-    var chapLabel =
-      state.chapter === 'identity'
-        ? 'Ⅱ · Identity'
-        : state.chapter === 'roster'
-          ? 'Ⅲ · Roster'
-          : '—';
-    var path =
-      state.chapter === 'identity'
-        ? 'Claim · <b style="color:#fff">Identity</b> · Roster'
-        : 'Claim · Identity · <b style="color:#fff">Roster</b>';
+    var chapMeta = {
+      identity: {
+        label: 'Ⅱ · Identity',
+        path: 'Claim · <b style="color:#fff">Identity</b> · Gate · Roster · Review',
+      },
+      gate: {
+        label: 'Gate · Build mode',
+        path: 'Claim · Identity · <b style="color:#fff">Gate</b> · Roster · Review',
+      },
+      roster: {
+        label: 'Ⅲ · Roster',
+        path: 'Claim · Identity · Gate · <b style="color:#fff">Roster</b> · Review',
+      },
+      review: {
+        label: 'Review',
+        path: 'Claim · Identity · Gate · Roster · <b style="color:#fff">Review</b>',
+      },
+    };
+    var meta = chapMeta[state.chapter] || { label: '—', path: '' };
     var modeHtml = state.buildMode
       ? '<span class="dot ' +
         (state.buildMode === 'capped' ? 'd-ok' : 'd-bad') +
@@ -421,13 +471,14 @@
           ? 'eligible for online play'
           : 'not eligible for online play') +
         '</small>'
-      : '<span class="dot d-off"></span>Not chosen<small>next screen · decides online play</small>';
+      : '<span class="dot d-off"></span>Not chosen<small>decides online play</small>';
 
-    var rosterStatus = state.rosterChapter && state.rosterChapter.loaded
-      ? state.rosterChapter.getStatus()
-      : null;
+    var rosterStatus =
+      state.rosterChapter && state.rosterChapter.loaded
+        ? state.rosterChapter.getStatus()
+        : null;
     var rosterCell;
-    if (state.chapter === 'roster' && rosterStatus) {
+    if ((state.chapter === 'roster' || state.chapter === 'review') && rosterStatus) {
       rosterCell =
         '<span class="dot ' +
         (rosterStatus.legal ? 'd-ok' : 'd-bad') +
@@ -448,34 +499,66 @@
         '</small>';
     }
 
-    var ready =
-      state.identityChapter && typeof state.identityChapter.isReady === 'function'
-        ? state.identityChapter.isReady()
-        : false;
+    var actionReady = false;
+    var actionLabel = 'Continue';
+    var actionId = 'tb-sb-continue';
+    var actionClass = 'btn';
+    var reasonHtml = '';
+    var programName = id.name || 'Program';
 
-    var actionHtml;
     if (state.chapter === 'identity') {
-      actionHtml =
-        '<button type="button" class="btn" id="tb-sb-continue"' +
-        (ready ? '' : ' disabled') +
-        '>Continue</button>';
+      actionReady =
+        state.identityChapter && typeof state.identityChapter.isReady === 'function'
+          ? state.identityChapter.isReady()
+          : false;
+      actionLabel = 'Continue';
+      actionId = 'tb-sb-continue';
+      reasonHtml = actionReady
+        ? 'Editable until you establish the program'
+        : (state.identityChapter && state.identityChapter.getBlockedReason
+            ? state.identityChapter.getBlockedReason()
+            : 'Finish identity to continue.') || 'Finish identity to continue.';
+    } else if (state.chapter === 'gate') {
+      var gateCopy =
+        state.gateChapter && typeof state.gateChapter.getActionCopy === 'function'
+          ? state.gateChapter.getActionCopy()
+          : { ready: !!state.buildMode, reason: 'Nothing is chosen yet.' };
+      actionReady = !!gateCopy.ready;
+      actionLabel = 'Continue';
+      actionId = 'tb-sb-continue';
+      reasonHtml = gateCopy.reason || 'Nothing is chosen yet.';
     } else if (state.chapter === 'roster') {
       var legal = rosterStatus ? rosterStatus.legal : false;
-      actionHtml =
-        '<div class="act-stack">' +
-        '<button type="button" class="btn establish" id="tb-sb-establish"' +
-        (legal ? '' : ' disabled') +
-        '>Establish</button></div>';
-    } else {
-      actionHtml = '';
+      actionReady = legal;
+      actionLabel = 'Continue to Review';
+      actionId = 'tb-sb-roster-next';
+      actionClass = 'btn';
+      reasonHtml = legal
+        ? 'Editable until you establish the program'
+        : stripReasonHtml((rosterStatus && rosterStatus.reason) || 'Roster is not legal.');
+    } else if (state.chapter === 'review') {
+      actionReady = true;
+      actionLabel = 'Establish ' + programName;
+      actionId = 'tb-sb-establish';
+      // Orange like Continue; heavier type + padding (not green — green means valid in this product).
+      actionClass = 'btn sb-commit';
+      reasonHtml =
+        'Writes <b>' +
+        escapeHtml(programName) +
+        '</b> into the league. This cannot be undone.';
     }
+
+    var reasonIsHtml =
+      state.chapter === 'gate' || state.chapter === 'review'
+        ? reasonHtml.indexOf('<') !== -1
+        : false;
 
     bar.innerHTML =
       '<div class="sb-cell chap"><div class="sb-k">Chapter</div>' +
       '<div class="sb-v">' +
-      chapLabel +
+      meta.label +
       '<small>' +
-      path +
+      meta.path +
       '</small></div></div>' +
       '<div class="sb-cell link" id="tb-sb-claim"><div class="sb-k">Replacing</div>' +
       '<div class="sb-v">' +
@@ -485,7 +568,7 @@
       (region ? ' · ' + escapeHtml(region) : '') +
       '</small></div></div>' +
       '<div class="sb-cell' +
-      (state.chapter === 'roster' ? ' link' : '') +
+      (state.chapter === 'roster' || state.chapter === 'review' ? ' link' : '') +
       '" id="tb-sb-program"><div class="sb-k">Program</div>' +
       '<div class="sb-v">' +
       escapeHtml(id.name || '—') +
@@ -495,7 +578,7 @@
       escapeHtml(id.mascot || '—') +
       '</small></div></div>' +
       '<div class="sb-cell' +
-      (state.chapter === 'roster' ? ' link' : '') +
+      (state.chapter === 'roster' || state.chapter === 'review' ? ' link' : '') +
       '" id="tb-sb-mode"><div class="sb-k">Build mode</div>' +
       '<div class="sb-v">' +
       modeHtml +
@@ -506,9 +589,33 @@
       '</div></div>' +
       '<div class="sb-spacer"></div>' +
       '<div class="sb-cell act">' +
-      '<span class="sb-rev">Editable until you establish the program</span>' +
-      actionHtml +
-      '</div>';
+      '<span class="sb-rev' +
+      (actionReady ? '' : ' blocked') +
+      '" id="tb-sb-reason">' +
+      (reasonIsHtml ? reasonHtml : escapeHtml(reasonHtml)) +
+      '</span>' +
+      '<button type="button" class="' +
+      actionClass +
+      '" id="' +
+      actionId +
+      '"' +
+      (actionReady ? '' : ' disabled') +
+      ' aria-disabled="' +
+      (actionReady ? 'false' : 'true') +
+      '">' +
+      escapeHtml(actionLabel) +
+      '</button></div>';
+
+    if (state.chapter === 'review') {
+      var estBtn = document.getElementById('tb-sb-establish');
+      if (
+        estBtn &&
+        state.rosterChapter &&
+        typeof state.rosterChapter.fitEstablishLabel === 'function'
+      ) {
+        state.rosterChapter.fitEstablishLabel(estBtn, programName);
+      }
+    }
 
     var claim = document.getElementById('tb-sb-claim');
     if (claim) {
@@ -517,13 +624,13 @@
       });
     }
     var prog = document.getElementById('tb-sb-program');
-    if (prog && state.chapter === 'roster') {
+    if (prog && (state.chapter === 'roster' || state.chapter === 'review')) {
       prog.addEventListener('click', function () {
         setChapter('identity');
       });
     }
     var modeCell = document.getElementById('tb-sb-mode');
-    if (modeCell && state.chapter === 'roster') {
+    if (modeCell && (state.chapter === 'roster' || state.chapter === 'review')) {
       modeCell.addEventListener('click', function () {
         setChapter('gate');
       });
@@ -531,23 +638,31 @@
     var cont = document.getElementById('tb-sb-continue');
     if (cont) {
       cont.addEventListener('click', function () {
-        if (state.identityChapter && state.identityChapter.isReady()) {
-          setChapter('gate');
+        if (cont.disabled) return;
+        if (state.chapter === 'identity') {
+          if (state.identityChapter && state.identityChapter.isReady()) setChapter('gate');
+        } else if (state.chapter === 'gate') {
+          if (state.gateChapter && state.gateChapter.onContinue) state.gateChapter.onContinue();
         }
       });
     }
-    var establish = document.getElementById('tb-sb-establish');
-    if (establish) {
-      if (state.rosterChapter && typeof state.rosterChapter.fitEstablishLabel === 'function') {
-        state.rosterChapter.fitEstablishLabel(establish, id.name || 'Program');
-      } else {
-        establish.textContent = 'Establish ' + (id.name || 'Program');
-      }
-      establish.addEventListener('click', function () {
-        if (establish.disabled) return;
+    var rosterNext = document.getElementById('tb-sb-roster-next');
+    if (rosterNext) {
+      rosterNext.addEventListener('click', function () {
+        if (rosterNext.disabled) return;
         setChapter('review');
       });
     }
+    var establish = document.getElementById('tb-sb-establish');
+    if (establish && state.chapter === 'review') {
+      establish.addEventListener('click', function () {
+        if (establish.disabled) return;
+        setChapter('establish');
+      });
+    }
+
+    ensureChromeObserver();
+    measureChrome();
   }
 
   function ensureIdentityChapter() {
@@ -614,6 +729,9 @@
       setMode: function (mode) {
         state.buildMode = normalizeMode(mode);
         scheduleSave();
+      },
+      onModeChange: function () {
+        renderStatebar();
       },
       onContinue: async function () {
         if (!state.buildMode) return;
@@ -780,6 +898,7 @@
     if (els.app) {
       els.app.classList.toggle('establishing', state.chapter === 'establish');
       els.app.classList.toggle('reviewing', state.chapter === 'review');
+      els.app.classList.toggle('gating', state.chapter === 'gate');
     }
 
     if (state.chapter === 'identity') {

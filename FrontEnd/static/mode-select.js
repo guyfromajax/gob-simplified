@@ -1468,7 +1468,13 @@ async function confirmDeleteFranchise() {
     return;
   }
   const franchiseId = String(target.franchise_id);
+  // Same click as the slot "Delete Franchise" control.
+  playSound('click-beep.wav');
   if (deleteFranchiseModalConfirm) deleteFranchiseModalConfirm.disabled = true;
+  closeDeleteFranchiseModal();
+  if (window.PageLoadOverlay && typeof window.PageLoadOverlay.show === 'function') {
+    window.PageLoadOverlay.show('Deleting franchise…');
+  }
   try {
     const res = await fetch(
       API_CONFIG.buildUrl('/franchise/' + encodeURIComponent(franchiseId)),
@@ -1476,16 +1482,22 @@ async function confirmDeleteFranchise() {
     );
     if (!res.ok) {
       console.warn('[mode-select] delete franchise failed:', res.status);
+      if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
+        window.PageLoadOverlay.hide();
+      }
       alert('Could not delete that franchise. Try again.');
       return;
     }
     if (window.FranchiseLS && typeof window.FranchiseLS.clearAllForFranchise === 'function') {
       window.FranchiseLS.clearAllForFranchise(franchiseId);
     }
-    closeDeleteFranchiseModal();
+    // Reload lands on mode select; initial loading panel covers the refresh.
     window.location.reload();
   } catch (e) {
     console.warn('[mode-select] delete franchise error:', e);
+    if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
+      window.PageLoadOverlay.hide();
+    }
     alert('Could not delete that franchise. Try again.');
   } finally {
     if (deleteFranchiseModalConfirm) deleteFranchiseModalConfirm.disabled = false;

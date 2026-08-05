@@ -150,6 +150,7 @@ button {
   padding: 9px 12px;
   background: rgba(255, 255, 255, 0.02);
   flex: 0 0 auto;
+  max-width: min(420px, 100%);
 }
 .sb-rev {
   font-size: 11px;
@@ -157,8 +158,39 @@ button {
   color: var(--tx2);
   letter-spacing: 0.02em;
   text-align: right;
-  max-width: 22ch;
+  max-width: 28ch;
   text-wrap: pretty;
+}
+.sb-rev.blocked {
+  color: rgba(255, 255, 255, 0.55);
+}
+.sb-rev b {
+  color: #fff;
+  font-weight: 600;
+}
+.sb-cell.act .btn:disabled,
+.sb-cell.act .btn[disabled] {
+  opacity: 0.42;
+  cursor: not-allowed;
+  filter: grayscale(0.2);
+}
+/* Review commit — same orange as Continue; heavier weight, not green (green = valid). */
+.sb-cell.act .btn.sb-commit {
+  background: var(--org);
+  color: #0b0d14;
+  border-color: rgba(255, 255, 255, 0.22);
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  padding-left: 22px;
+  padding-right: 22px;
+  min-height: 42px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.16);
+}
+.sb-cell.act .btn:not(.sb-commit) {
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  padding-left: 14px;
+  padding-right: 14px;
 }
 .dot {
   width: 7px;
@@ -1187,6 +1219,13 @@ button {
 .mdl-a .btn{flex:2}.mdl-a .btn.ghost{flex:1}
 .pk-hd{display:flex;gap:18px;align-items:flex-end;padding:18px 22px 14px;border-bottom:1px solid var(--bdr2);flex-wrap:wrap}
 .pk-hd h3{font-family:var(--disp);font-size:24px;margin:0;color:#fff;letter-spacing:.04em;font-weight:700;flex:1 0 auto}
+.pk-help{
+  flex:1 0 100%;
+  margin:4px 0 0;
+  font-size:12px;
+  line-height:1.4;
+  color:var(--tx2);
+}
 .tones{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
 .tones button[data-tone-any]{
   font-family:var(--disp);
@@ -1318,7 +1357,7 @@ button {
 
 /* ——— Review curtain ——— */
 .shell.reviewing {
-  padding-bottom: 132px;
+  padding-bottom: 40px;
 }
 .rv {
   max-width: 1400px;
@@ -1327,10 +1366,10 @@ button {
 }
 .rv-top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding-bottom: 12px;
+  padding-bottom: 8px;
 }
 .rv-eb {
   font-size: 10px;
@@ -1338,6 +1377,29 @@ button {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--org);
+}
+.rv-perm {
+  font-family: var(--disp);
+  font-size: clamp(36px, 5vw, 56px);
+  line-height: 0.96;
+  letter-spacing: 0.02em;
+  color: #fff;
+  text-align: center;
+  margin: 10px 0 8px;
+  font-weight: 700;
+}
+.rv-perm-s {
+  text-align: center;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--tx2);
+  max-width: 52ch;
+  margin: 0 auto 18px;
+  text-wrap: pretty;
+}
+.rv-perm-s b {
+  color: #fff;
+  font-weight: 600;
 }
 .rv-note {
   font-size: 11.5px;

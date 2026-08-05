@@ -163,6 +163,26 @@
       edge: true,
     },
   ];
+
+  /**
+   * Frame / Definition picker rows — display labels only.
+   * Classifier keys stay as Slight…Doughy / Cut…Soft. Doughy→Heavy because
+   * Doughy names soft tissue (Definition's job); Heavy completes the size ramp.
+   */
+  var PORTRAIT_FRAME_CHIPS = [
+    { key: 'Slight', label: 'Slight' },
+    { key: 'Lean', label: 'Lean' },
+    { key: 'Normal', label: 'Normal' },
+    { key: 'Broad', label: 'Broad' },
+    { key: 'Doughy', label: 'Heavy' },
+  ];
+  var PORTRAIT_DEFINITION_CHIPS = [
+    { key: 'Cut', label: 'Cut' },
+    { key: 'Toned', label: 'Toned' },
+    { key: 'Soft', label: 'Soft' },
+  ];
+  var PORTRAIT_FILTER_HELP =
+    "Frame is how big and broad he's built. Definition is how muscular or soft that frame looks.";
   var TOPUP_FLOOR = 60;
   var HEIGHT_MIN_IN = 66;
   var HEIGHT_MAX_IN = 84;
@@ -244,6 +264,9 @@
     ATTR_MIN: ATTR_MIN,
     ATTR_MAX: ATTR_MAX,
     PORTRAIT_SKIN_CHIPS: PORTRAIT_SKIN_CHIPS,
+    PORTRAIT_FRAME_CHIPS: PORTRAIT_FRAME_CHIPS,
+    PORTRAIT_DEFINITION_CHIPS: PORTRAIT_DEFINITION_CHIPS,
+    PORTRAIT_FILTER_HELP: PORTRAIT_FILTER_HELP,
     TOPUP_FLOOR: TOPUP_FLOOR,
     HEIGHT_MIN_IN: HEIGHT_MIN_IN,
     HEIGHT_MAX_IN: HEIGHT_MAX_IN,

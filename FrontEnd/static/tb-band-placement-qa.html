@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>TB Round 9 — band placement QA</title>
+  <link rel="stylesheet" href="/css/fonts.css" />
+  <link rel="stylesheet" href="/css/gob-buttons.css" />
+  <link rel="stylesheet" href="/team-builder.css" />
+  <style>
+    body { padding: 24px; }
+    .qa-frame {
+      margin: 0 0 28px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 14px;
+      overflow: hidden;
+      background: rgba(0,0,0,.2);
+    }
+    .qa-label {
+      font-size: 11px;
+      letter-spacing: .14em;
+      text-transform: uppercase;
+      color: rgba(255,255,255,.45);
+      padding: 10px 14px;
+      border-bottom: 1px solid rgba(255,255,255,.08);
+    }
+    .qa-body { padding: 14px; min-height: 120px; }
+    .qa-body h1 {
+      font-family: var(--disp);
+      font-size: 42px;
+      margin: 12px 0 6px;
+      text-align: center;
+      color: #fff;
+    }
+    .qa-body p {
+      text-align: center;
+      color: var(--tx2);
+      font-size: 13px;
+      max-width: 48ch;
+      margin: 0 auto;
+    }
+    .qa-note { margin: 0 0 18px; color: var(--tx2); font-size: 13px; max-width: 70ch; line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <p class="qa-note">
+    Round 9 fixture: primary action in the top band on Identity / Gate / Roster / Review.
+    Establish curtain has no band. Disabled actions show adjacent reason.
+  </p>
+
+  <div class="qa-frame" id="f-identity">
+    <div class="qa-label">1 · Identity — Continue (orange)</div>
+    <div class="shell" style="padding:12px;max-width:none">
+      <div class="statebar"></div>
+      <div class="qa-body"><p>Identity content (band carries Continue)</p></div>
+    </div>
+  </div>
+
+  <div class="qa-frame" id="f-gate">
+    <div class="qa-label">2 · Gate — Continue disabled + “Nothing is chosen yet.”</div>
+    <div class="shell" style="padding:12px;max-width:none">
+      <div class="statebar"></div>
+      <div class="qa-body"><h1>This Choice Is Permanent</h1><p>Mode cards below; no bottom CTA</p></div>
+    </div>
+  </div>
+
+  <div class="qa-frame" id="f-roster">
+    <div class="qa-label">3 · Roster — Continue to Review</div>
+    <div class="shell" style="padding:12px;max-width:none">
+      <div class="statebar"></div>
+      <div class="qa-body"><p>Roster workspace; legality reason appears when illegal</p></div>
+    </div>
+  </div>
+
+  <div class="qa-frame" id="f-review">
+    <div class="qa-label">4 · Review — Establish in band (heavier orange) + permanence headline</div>
+    <div class="shell reviewing" style="padding:12px;max-width:none">
+      <div class="statebar"></div>
+      <div class="qa-body">
+        <h1 class="rv-perm">This Program Is Permanent</h1>
+        <p class="rv-perm-s">Establish writes <b>Emery</b> into the league. That cannot be undone.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="qa-frame" id="f-establish">
+    <div class="qa-label">5 · Establish curtain — no band; Enter Franchise stays in-page</div>
+    <div class="shell establishing" style="padding:12px;max-width:none">
+      <div class="qa-body">
+        <p>Waiting / charter sequence</p>
+        <button type="button" class="btn" style="margin:16px auto;display:block;background:var(--grn);color:#0b0d14;border:0;height:46px;padding:0 22px;border-radius:10px;font-family:var(--disp);letter-spacing:.08em">Enter Franchise</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function bar(cells, reason, btnHtml) {
+      return (
+        cells +
+        '<div class="sb-spacer"></div>' +
+        '<div class="sb-cell act"><span class="sb-rev' +
+        (btnHtml.indexOf(' disabled') !== -1 ? ' blocked' : '') +
+        '">' +
+        reason +
+        '</span>' +
+        btnHtml +
+        '</div>'
+      );
+    }
+    function cells(chap, path) {
+      return (
+        '<div class="sb-cell chap"><div class="sb-k">Chapter</div><div class="sb-v">' +
+        chap +
+        '<small>' +
+        path +
+        '</small></div></div>' +
+        '<div class="sb-cell"><div class="sb-k">Replacing</div><div class="sb-v">Concord<small>Conference 3 · Region B</small></div></div>' +
+        '<div class="sb-cell"><div class="sb-k">Program</div><div class="sb-v">Emery<small>EME · Eagles</small></div></div>' +
+        '<div class="sb-cell"><div class="sb-k">Build mode</div><div class="sb-v"><span class="dot d-ok"></span>Capped<small>eligible for online play</small></div></div>' +
+        '<div class="sb-cell"><div class="sb-k">Roster</div><div class="sb-v"><span class="dot d-ok"></span>Ready<small>inherited, unchanged</small></div></div>'
+      );
+    }
+    document.querySelector('#f-identity .statebar').innerHTML = bar(
+      cells('Ⅱ · Identity', 'Claim · <b style="color:#fff">Identity</b> · Gate · Roster · Review'),
+      'Editable until you establish the program',
+      '<button type="button" class="btn">Continue</button>'
+    );
+    document.querySelector('#f-gate .statebar').innerHTML = bar(
+      cells('Gate · Build mode', 'Claim · Identity · <b style="color:#fff">Gate</b> · Roster · Review').replace(
+        'Capped<small>eligible for online play</small>',
+        '<span class="dot d-off"></span>Not chosen<small>decides online play</small>'
+      ),
+      'Nothing is chosen yet.',
+      '<button type="button" class="btn" disabled>Continue</button>'
+    );
+    document.querySelector('#f-roster .statebar').innerHTML = bar(
+      cells('Ⅲ · Roster', 'Claim · Identity · Gate · <b style="color:#fff">Roster</b> · Review'),
+      'Editable until you establish the program',
+      '<button type="button" class="btn">Continue to Review</button>'
+    );
+    document.querySelector('#f-review .statebar').innerHTML = bar(
+      cells('Review', 'Claim · Identity · Gate · Roster · <b style="color:#fff">Review</b>'),
+      'Writes <b>Emery</b> into the league. This cannot be undone.',
+      '<button type="button" class="btn sb-commit">Establish Emery</button>'
+    );
+  </script>
+</body>
+</html>

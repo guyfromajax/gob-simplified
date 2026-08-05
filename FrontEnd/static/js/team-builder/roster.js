@@ -692,7 +692,6 @@
         var input = row.querySelector('input[data-attr]');
         if (input && Number(input.value) !== v) input.value = String(v);
       }
-      if (capped) this._syncCappedAttrLimits(host, p);
       var poolEl = host.querySelector('.pool');
       if (poolEl) {
         var pool = attrPoolDelta(p);
@@ -730,19 +729,6 @@
     }
     this.paintBoard();
     this.paintBudgets();
-  };
-
-  /** Refresh range max so thumbs cannot drag into unfunded points (capped only). */
-  RosterChapter.prototype._syncCappedAttrLimits = function (host, p) {
-    if (!host || !p) return;
-    var pool = attrPoolDelta(p);
-    host.querySelectorAll('input[data-attr]').forEach(function (input) {
-      var code = input.getAttribute('data-attr');
-      var cur = Number(p.attrs[code]);
-      if (isNaN(cur)) cur = C.ATTR_MIN;
-      var max = Math.min(C.ATTR_MAX, cur + Math.max(0, pool));
-      input.max = String(max);
-    });
   };
 
   RosterChapter.prototype.setClass = function (cls) {
@@ -1354,7 +1340,8 @@
       var moved = value !== base;
       var d = value - base;
       var isNd = t.code === 'ND';
-      var rangeMax = capped ? cappedAttrMax(p, t.code) : C.ATTR_MAX;
+      // Always min–ATTR_MAX so thumb/fill share one scale. Capped spend is
+      // enforced in setAttr (not via input.max — that made every thumb jump).
       return (
         '<div class="attr' +
         (moved ? ' moved' : '') +
@@ -1380,7 +1367,7 @@
         '<input type="range" min="' +
         C.ATTR_MIN +
         '" max="' +
-        rangeMax +
+        C.ATTR_MAX +
         '" value="' +
         value +
         '" data-attr="' +
@@ -1669,11 +1656,7 @@
     var matchCount = scored.filter(function (s) {
       return s.exact;
     }).length;
-
-    var frames = Object.keys((this.catalog && this.catalog.counts && this.catalog.counts.frame) || {});
-    var defs = Object.keys(
-      (this.catalog && this.catalog.counts && this.catalog.counts.definition) || {}
-    );
+    var poolTotal = (this.catalog && this.catalog.total) || entries.length;
 
     function selectedToneIdx() {
       if (!skinKeys || !skinKeys.length) return -1;
@@ -1722,27 +1705,27 @@
         .join('') +
       '</div></div>';
 
-    function labelledRow(label, values, key) {
+    function labelledAxisRow(label, chips, filterKey) {
       return (
         '<div><div class="mt-k" style="margin-bottom:5px">' +
-        label +
+        escapeHtml(label) +
         '</div><div class="builds">' +
         '<button type="button" data-filter-key="' +
-        key +
+        filterKey +
         '" data-filter-val=""' +
-        (!self.pickerFilter[key] ? ' class="on"' : '') +
+        (!self.pickerFilter[filterKey] ? ' class="on"' : '') +
         '>Any</button>' +
-        values
-          .map(function (v) {
+        chips
+          .map(function (chip) {
             return (
               '<button type="button" data-filter-key="' +
-              key +
+              filterKey +
               '" data-filter-val="' +
-              escapeHtml(v) +
+              escapeHtml(chip.key) +
               '"' +
-              (self.pickerFilter[key] === v ? ' class="on"' : '') +
+              (self.pickerFilter[filterKey] === chip.key ? ' class="on"' : '') +
               '>' +
-              escapeHtml(v) +
+              escapeHtml(chip.label) +
               '</button>'
             );
           })
@@ -1751,9 +1734,16 @@
       );
     }
 
-    // Match-count copy: interim "N matches" until two-state copy is approved.
-    var noteHtml =
-      '<b>' + matchCount + ' match' + (matchCount === 1 ? '' : 'es') + '</b>';
+    // No-filter order is catalog order, not player-fit — do not claim "closest first."
+    var noteHtml = filtersActive
+      ? '<b>' +
+        matchCount +
+        ' match' +
+        (matchCount === 1 ? '' : 'es') +
+        '</b>, shown first. The rest stay selectable.'
+      : '<b>' + poolTotal + ' portraits</b>';
+
+    var helpLine = C.PORTRAIT_FILTER_HELP || '';
 
     host.innerHTML =
       '<div class="ov" data-picker-close>' +
@@ -1761,8 +1751,11 @@
       '<div class="mdl-acc"></div>' +
       '<div class="pk-hd"><h3>Portrait</h3>' +
       toneRow +
-      labelledRow('Frame', frames, 'frame') +
-      labelledRow('Build', defs, 'definition') +
+      labelledAxisRow('Frame', C.PORTRAIT_FRAME_CHIPS || [], 'frame') +
+      labelledAxisRow('Definition', C.PORTRAIT_DEFINITION_CHIPS || [], 'definition') +
+      (helpLine
+        ? '<p class="pk-help">' + escapeHtml(helpLine) + '</p>'
+        : '') +
       '</div>' +
       '<div class="pk-note">' +
       noteHtml +
@@ -1789,7 +1782,7 @@
         })
         .join('') +
       '</div>' +
-      '<div class="pk-ft"><div class="hint">Best matches first. Every player already has a portrait — this is an override.</div>' +
+      '<div class="pk-ft"><div class="hint">Every player already has a portrait — this is an override.</div>' +
       '<button type="button" class="btn ghost sm" data-picker-close>Done</button></div>' +
       '</div></div>';
 
