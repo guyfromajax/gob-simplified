@@ -1,7 +1,7 @@
 /**
  * Team Builder — Establish sequence.
  * Curtain after Apply. Timing floors are design beats; close waits on the server.
- * Progress reports real elapsed time against measured Apply duration.
+ * Wait row uses the same green pulse bar as the training load overlay.
  */
 (function (global) {
   'use strict';
@@ -40,14 +40,10 @@
     this.onError = opts.onError || function () {};
     this.onBack = opts.onBack || function () {};
     this._timers = [];
-    this._tickTimer = null;
     this._phase = -1;
     this._lines = 0;
     this._swapped = false;
     this._ready = false;
-    this._pct = 0;
-    this._applyMs = null;
-    this._applyStarted = 0;
     this._franchiseId = null;
     this._error = null;
     this._fontsReady = false;
@@ -62,8 +58,6 @@
     this._lines = 0;
     this._swapped = false;
     this._ready = false;
-    this._pct = 0;
-    this._applyMs = null;
     this._error = null;
     this._franchiseId = null;
     this.paint();
@@ -89,10 +83,6 @@
   EstablishChapter.prototype._clearTimers = function () {
     this._timers.forEach(clearTimeout);
     this._timers = [];
-    if (this._tickTimer) {
-      clearInterval(this._tickTimer);
-      this._tickTimer = null;
-    }
   };
 
   EstablishChapter.prototype._at = function (ms, fn) {
@@ -229,9 +219,7 @@
       rows +
       '</tbody></table></div></div>' +
       '<div class="wait">' +
-      '<div class="w-rule"><i style="width:' +
-      this._pct +
-      '%"></i></div>' +
+      '<div class="w-pulse" aria-hidden="true"><span></span></div>' +
       '<div class="w-t">' +
       escapeHtml(waitLabel) +
       '</div></div>' +
@@ -335,31 +323,8 @@
     if (this._ready && this._swapped && !this._error && this._phase < 3) {
       this._at(420, function () {
         self._phase = 3;
-        self._pct = 100;
         self.paint();
       });
-    }
-  };
-
-  EstablishChapter.prototype._updatePct = function () {
-    var elapsed = Date.now() - this._applyStarted;
-    if (this._applyMs != null && this._applyMs > 0) {
-      this._pct = Math.min(100, Math.round((elapsed / this._applyMs) * 100));
-    } else {
-      // Soft approach until Apply returns — never claims complete early.
-      this._pct = Math.min(92, Math.round((elapsed / 4000) * 100));
-    }
-    var rule = this.root.querySelector('.w-rule i');
-    var label = this.root.querySelector('.w-t');
-    if (rule) rule.style.width = this._pct + '%';
-    if (label) {
-      var waitLabel = !this._swapped
-        ? 'Writing the charter'
-        : !this._ready
-          ? 'Waiting on the league office'
-          : 'Complete';
-      if (this._error) waitLabel = 'Could not establish';
-      label.textContent = waitLabel;
     }
   };
 
@@ -372,22 +337,14 @@
       this.onError(this._error);
       return;
     }
-    this._applyStarted = Date.now();
-    // Progress only — no console.time / per-frame logging (acceptance #16).
-    this._tickTimer = setInterval(function () {
-      self._updatePct();
-    }, 120);
 
     Promise.resolve()
       .then(function () {
         return applyFn();
       })
       .then(function (result) {
-        self._applyMs = Date.now() - self._applyStarted;
         self._ready = true;
         self._franchiseId = result && result.franchise_id ? result.franchise_id : null;
-        self._pct = 100;
-        self._updatePct();
         if (!self._franchiseId) {
           self._error = 'Apply succeeded without a franchise id.';
           self.paint();
@@ -398,17 +355,10 @@
         self._maybeClose();
       })
       .catch(function (err) {
-        self._applyMs = Date.now() - self._applyStarted;
         self._error = (err && err.message) || 'Unable to establish the program.';
         self._ready = false;
         self.paint();
         self.onError(self._error);
-      })
-      .finally(function () {
-        if (self._tickTimer) {
-          clearInterval(self._tickTimer);
-          self._tickTimer = null;
-        }
       });
   };
 

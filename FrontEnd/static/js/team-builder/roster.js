@@ -183,6 +183,14 @@
     return p.budget - coreTotal(p.attrs);
   }
 
+  /** Capped: hard ceiling for one attr = remaining pool + current value. */
+  function cappedAttrMax(p, code) {
+    var current = Number(p.attrs[code]);
+    if (isNaN(current)) current = C.ATTR_MIN;
+    var pool = attrPoolDelta(p);
+    return Math.min(C.ATTR_MAX, current + Math.max(0, pool));
+  }
+
   function RosterChapter(opts) {
     bootDeps();
     this.root = opts.root;
@@ -644,7 +652,16 @@
   };
 
   RosterChapter.prototype.setAttr = function (code, value) {
+    var p0 = this.selectedPlayer();
+    if (!p0) return;
+    var current = Number(p0.attrs[code]);
+    if (isNaN(current)) current = C.ATTR_MIN;
     var v = Math.max(C.ATTR_MIN, Math.min(C.ATTR_MAX, Math.round(Number(value) || C.ATTR_MIN)));
+    var capped = this.getMode() === 'capped';
+    // Capped: cannot spend past this player's budget — free points first by lowering others.
+    if (capped && v > current) {
+      v = Math.min(v, cappedAttrMax(p0, code));
+    }
     this.patchSelected(function (p) {
       var next = Object.assign({}, p, { attrs: Object.assign({}, p.attrs) });
       next.attrs[code] = v;
@@ -672,11 +689,13 @@
           dlt.textContent = moved ? (d > 0 ? '+' + d : String(d)) : '—';
           dlt.style.color = moved ? 'var(--org)' : 'var(--tx3)';
         }
+        var input = row.querySelector('input[data-attr]');
+        if (input && Number(input.value) !== v) input.value = String(v);
       }
+      if (capped) this._syncCappedAttrLimits(host, p);
       var poolEl = host.querySelector('.pool');
       if (poolEl) {
         var pool = attrPoolDelta(p);
-        var capped = this.getMode() === 'capped';
         var tot = coreTotal(p.attrs);
         var vEl = poolEl.querySelector('.pool-l .v');
         if (vEl) {
@@ -711,6 +730,19 @@
     }
     this.paintBoard();
     this.paintBudgets();
+  };
+
+  /** Refresh range max so thumbs cannot drag into unfunded points (capped only). */
+  RosterChapter.prototype._syncCappedAttrLimits = function (host, p) {
+    if (!host || !p) return;
+    var pool = attrPoolDelta(p);
+    host.querySelectorAll('input[data-attr]').forEach(function (input) {
+      var code = input.getAttribute('data-attr');
+      var cur = Number(p.attrs[code]);
+      if (isNaN(cur)) cur = C.ATTR_MIN;
+      var max = Math.min(C.ATTR_MAX, cur + Math.max(0, pool));
+      input.max = String(max);
+    });
   };
 
   RosterChapter.prototype.setClass = function (cls) {
@@ -844,6 +876,7 @@
 
   RosterChapter.prototype.openPicker = async function () {
     this.pickerOpen = true;
+    this.pickerFilter = { skin: null, frame: null, definition: null };
     this.paint();
     if (!this.catalog) {
       try {
@@ -1321,6 +1354,7 @@
       var moved = value !== base;
       var d = value - base;
       var isNd = t.code === 'ND';
+      var rangeMax = capped ? cappedAttrMax(p, t.code) : C.ATTR_MAX;
       return (
         '<div class="attr' +
         (moved ? ' moved' : '') +
@@ -1346,7 +1380,7 @@
         '<input type="range" min="' +
         C.ATTR_MIN +
         '" max="' +
-        C.ATTR_MAX +
+        rangeMax +
         '" value="' +
         value +
         '" data-attr="' +
@@ -1605,30 +1639,18 @@
     if (!host || !p) return;
     var self = this;
     var entries = (this.catalog && this.catalog.entries) || [];
-    var meta = p.portrait_meta || {};
-    var targetSkin = this.pickerFilter.skin || meta.skin || null;
-    var targetFrame = this.pickerFilter.frame || meta.frame || null;
-    var targetDef = this.pickerFilter.definition || meta.definition || null;
+    var filterSkin = this.pickerFilter.skin || null;
+    var filterFrame = this.pickerFilter.frame || null;
+    var filterDef = this.pickerFilter.definition || null;
 
-    var scored = entries
-      .map(function (e) {
-        var exact =
-          (!targetSkin || e.skin === targetSkin) &&
-          (!targetFrame || e.frame === targetFrame) &&
-          (!targetDef || e.definition === targetDef);
-        var score =
-          (targetSkin && e.skin !== targetSkin ? 2 : 0) +
-          (targetFrame && e.frame !== targetFrame ? 3 : 0) +
-          (targetDef && e.definition !== targetDef ? 1 : 0);
-        return Object.assign({}, e, { exact: exact, score: score });
-      })
-      .sort(function (a, b) {
-        return a.score - b.score;
-      });
+    var visible = entries.filter(function (e) {
+      if (filterSkin && e.skin !== filterSkin) return false;
+      if (filterFrame && e.frame !== filterFrame) return false;
+      if (filterDef && e.definition !== filterDef) return false;
+      return true;
+    });
+    var matchCount = visible.length;
 
-    var exactCount = scored.filter(function (s) {
-      return s.exact;
-    }).length;
     var skins = Object.keys((this.catalog && this.catalog.counts && this.catalog.counts.skin) || {});
     var frames = Object.keys((this.catalog && this.catalog.counts && this.catalog.counts.frame) || {});
     var defs = Object.keys(
@@ -1674,21 +1696,18 @@
       chipRow('Build', defs, 'definition') +
       '</div>' +
       '<div class="pk-note"><b>' +
-      exactCount +
-      ' exact match' +
-      (exactCount === 1 ? '' : 'es') +
-      '</b> in a pool of ' +
-      ((this.catalog && this.catalog.total) || entries.length) +
-      ' — best matches first, the rest dimmed but still selectable. Nothing is removed, so the grid never empties.</div>' +
+      matchCount +
+      ' match' +
+      (matchCount === 1 ? '' : 'es') +
+      '</b></div>' +
       '<div class="pk-grid">' +
-      scored
+      visible
         .map(function (e) {
           var url =
             API_CONFIG.getRecruitImageUrl &&
             API_CONFIG.getRecruitImageUrl(e.image_id, { size: 'card' });
           return (
             '<div class="pk-i' +
-            (e.exact ? '' : ' off') +
             (e.image_id === p.image_id ? ' on' : '') +
             '" data-pick="' +
             escapeHtml(e.image_id) +
@@ -1701,7 +1720,7 @@
         })
         .join('') +
       '</div>' +
-      '<div class="pk-ft"><div class="hint">Best matches first. Every player already has a portrait — this is an override.</div>' +
+      '<div class="pk-ft"><div class="hint">Every player already has a portrait — this is an override.</div>' +
       '<button type="button" class="btn ghost sm" data-picker-close>Done</button></div>' +
       '</div></div>';
 
