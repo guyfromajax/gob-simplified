@@ -234,7 +234,7 @@ function App() {
             <button className={'btn lg' + (builder ? '' : ' grn')} onClick={() => setToast(builder
               ? { t: 'Next — Identity', s: 'Name your program, color it and design its court. ' + sel.name + '’s place is held until you establish it.' }
               : { t: 'Entering ' + sel.name, s: 'Take the program over exactly as it stands — roster, schedule and standing intact.' })}>
-              {builder ? 'Take This Place' : 'Enter Franchise'}
+              {builder ? 'Take This Slot' : 'Enter Franchise'}
             </button>
           </div>
         )}

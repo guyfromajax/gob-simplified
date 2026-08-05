@@ -109,13 +109,6 @@
     intangibles: { label: 'Intangibles', color: '#d4a017' },
   };
 
-  /**
-   * Exact copy for the ND control — do not paraphrase, do not reuse elsewhere.
-   * Display term is Endurance; never "Natural Durability".
-   */
-  var ENDURANCE_COPY =
-    "Endurance doesn't raise his position ratings — it protects them. Fatigue drags his other attributes down as a game wears on; this slows that, and makes him less likely to foul on defense.";
-
   var POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
   var POS_COLOR = {
     PG: '#4A90D9',
@@ -203,7 +196,6 @@
     CORE_12_ATTRS: CORE_12_ATTRS,
     RT_ATTR_KEYS: RT_ATTR_KEYS,
     ATTR_CATS: ATTR_CATS,
-    ENDURANCE_COPY: ENDURANCE_COPY,
     POSITIONS: POSITIONS,
     POS_COLOR: POS_COLOR,
     CLASSES: CLASSES,

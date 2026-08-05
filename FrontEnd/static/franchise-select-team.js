@@ -2,7 +2,7 @@
  * Program Select + Claim — replaces the old TeamPicker-mounted franchise entry.
  *
  * Browse mode: Enter Franchise (non-mod path).
- * Builder mode: Take This Place → team-builder.html Identity.
+ * Builder mode: Take This Slot → team-builder.html Identity.
  * Tutorial mode: preserved (username modal funnel); TB entry hidden.
  *
  * Chrome: await ensureTeamBuilderChromeSnapshot before painting team art/labels
@@ -471,7 +471,7 @@
     var headline = state.builder
       ? 'You are taking <em>' + escapeHtml(team.name) + "</em>'s place"
       : escapeHtml(team.name) + ' <em>' + escapeHtml(team.mascot || '') + '</em>';
-    var cta = state.builder ? 'Take This Place' : 'Enter Franchise';
+    var cta = state.builder ? 'Take This Slot' : 'Enter Franchise';
     var ctaClass = state.builder ? 'btn lg' : 'btn lg grn';
     els.actionInner.innerHTML =
       '<div class="ab-art"><img src="' +

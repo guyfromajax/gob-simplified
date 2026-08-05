@@ -377,9 +377,8 @@
         attributes: cloneAttrs(p.attrs),
       };
       if (p.minted_player_id) row.player_id = p.minted_player_id;
-      if (p.image_id) {
-        row.meta = { image_id: p.image_id };
-      }
+      // Top-level image_id — Apply stamp reads row.image_id (not row.meta.image_id).
+      if (p.image_id) row.image_id = p.image_id;
       return row;
     });
   };
@@ -734,10 +733,6 @@
     });
     this.paint();
     this.commitRelease();
-    // §10.4 — height edit re-runs assignment unless portrait_locked.
-    if (!this.players[idx].portrait_locked) {
-      this.ensurePortraits({ forceSlots: [idx] });
-    }
   };
 
   RosterChapter.prototype.setFirst = function (v) {
@@ -788,9 +783,6 @@
     });
     this.paint();
     this.commitRelease();
-    if (!this.players[idx].portrait_locked) {
-      this.ensurePortraits({ forceSlots: [idx] });
-    }
   };
 
   RosterChapter.prototype.randomizePortrait = async function () {
@@ -1367,10 +1359,7 @@
         (moved ? 'var(--org)' : 'var(--tx3)') +
         '">' +
         (moved ? (d > 0 ? '+' + d : d) : '—') +
-        '</div></div>' +
-        (isNd
-          ? '<div class="nd-copy">' + escapeHtml(C.ENDURANCE_COPY) + '</div>'
-          : '')
+        '</div></div>'
       );
     }
 

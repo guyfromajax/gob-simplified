@@ -78,10 +78,6 @@
       '<div class="m-ft"><span class="m-pick">Click to choose</span>' +
       '<span class="m-tick"><i>✓</i>Chosen</span></div></button>' +
       '</div>' +
-      // Year vs potential — appears once on the gate only. Potential is fixed at
-      // generation (entry_tier / potential_factor); Year does not change it.
-      '<p class="year-guard">A younger roster has more seasons ahead, not better players. ' +
-      'Potential is fixed at generation.</p>' +
       '<div class="commit" id="tb-gate-commit">' +
       '<div class="c-txt" id="tb-gate-ctext">Nothing is chosen yet.</div>' +
       '<button type="button" class="btn" id="tb-gate-go" disabled>Continue to Roster</button>' +

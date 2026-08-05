@@ -1295,7 +1295,13 @@ def replace_slot_roster(
         row = rows[i] if i < len(rows) else {}
         meta = dict(player.get("meta") or {})
         meta.pop("photo", None)
-        image_id = row.get("image_id") or meta.get("image_id")
+        # Accept top-level image_id (Apply FE) or nested meta.image_id (defensive).
+        row_meta = row.get("meta") if isinstance(row.get("meta"), Mapping) else {}
+        image_id = (
+            row.get("image_id")
+            or (row_meta.get("image_id") if isinstance(row_meta, Mapping) else None)
+            or meta.get("image_id")
+        )
         if image_id:
             meta["image_id"] = str(image_id).strip()
             player["image_id"] = meta["image_id"]

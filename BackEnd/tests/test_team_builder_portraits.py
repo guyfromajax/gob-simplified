@@ -303,6 +303,73 @@ class TestSeedStability(unittest.TestCase):
             self.assertEqual(doc["meta"]["image_id"], images[i])
             self.assertNotIn("photo", doc)
 
+    def test_apply_accepts_nested_meta_image_id(self):
+        """Defensive: row.meta.image_id also stamps (legacy FE shape)."""
+        franchise_id = ObjectId()
+        team_oid = ObjectId()
+        source = []
+        for i in range(15):
+            attrs = _attrs(400 if i < 12 else 180)
+            for key in CORE_12_ATTRS:
+                attrs[f"anchor_{key}"] = attrs[key]
+            source.append(
+                {
+                    "franchise_id": str(franchise_id),
+                    "player_id": f"old-{i}",
+                    "meta": {
+                        "first_name": f"P{i}",
+                        "last_name": "Ship",
+                        "team": "Source U",
+                        "team_id": str(team_oid),
+                        "height": 74,
+                        "weight": 200,
+                        "year": "junior",
+                        "jersey": i + 1,
+                        "Home Region": "A",
+                        "archetype": "Walk On" if i >= 12 else "Athlete",
+                    },
+                    "attributes": attrs,
+                    "position_ratings": {"SF": 50},
+                    "entry_tier": "Great",
+                    "position_intent": "SF",
+                }
+            )
+        ftd = MagicMock()
+        ftd.find_one.return_value = {"players": [f"old-{i}" for i in range(15)]}
+        fpd = MagicMock()
+        fpd.find.return_value = source
+        players_coll = MagicMock()
+        players_coll.find_one.return_value = None
+        images = [e["image_id"] for e in load_tb_portrait_pool()[:15]]
+        rows = [
+            {
+                "first_name": source[i]["meta"]["first_name"],
+                "last_name": source[i]["meta"]["last_name"],
+                "class_year": "JR",
+                "height_in": 74,
+                "jersey": i + 1,
+                "attributes": {k: source[i]["attributes"][k] for k in CORE_12_ATTRS},
+                "player_id": str(uuid.uuid4()),
+                "meta": {"image_id": images[i]},
+            }
+            for i in range(15)
+        ]
+        _ids, new_docs = replace_slot_roster(
+            franchise_id=franchise_id,
+            team_object_id=team_oid,
+            team_name="Custom U",
+            roster_mode="edit",
+            imported_players=rows,
+            franchise_team_data_collection=ftd,
+            franchise_players_data_collection=fpd,
+            attribute_mode="capped",
+            team_pool=99999,
+            players_collection=players_coll,
+            wizard_walk_ons=None,
+        )
+        for i, doc in enumerate(new_docs):
+            self.assertEqual(doc["meta"]["image_id"], images[i])
+
 
 class TestPickerCatalog(unittest.TestCase):
     def test_counts_present_before_filter(self):
