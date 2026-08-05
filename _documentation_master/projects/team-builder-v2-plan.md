@@ -726,6 +726,42 @@ The classifier produces **117** `(frame × definition × skin)` cells. `set_0001
 
 An earlier draft of this section had the opposite order — hold skin, relax frame. **The measurement disproved it.** Skin coverage tracks the league closely while frame is the scarce axis, and holding frame while relaxing skin within race family lifts coverage from 76.6% to **93.7%**. A 7'1" 264 lb player with a lean face is a more visible error than one with a neighbouring skin tone.
 
+#### 6.5b Portrait picker — skin tone as an unlabelled ramp (2026-08-05)
+
+**Rule (behavioural authority):** no race vocabulary in the portrait picker interface. Skin tone is an unlabelled tonal ramp. Classifier keys are unchanged underneath — display-layer mapping only (§3.1a).
+
+**Dim, don't filter.** Reorder by match quality, dim non-matches, never remove; the grid never empties. Same rule as program select.
+
+**Measurement (do not rebuild from ΔL\* alone).** Mean cheek/face Lab from all 450 kit PNGs (crop `y 20–52%`, `x 30–70%`; jersey mask + low-alpha excluded; near-black / near-white dropped). Primary distance for merges: **CIEDE2000 (ΔE00)** between category mean Lab triples ordered by lightness. Threshold: **ΔE00 < 3** (JND ≈ 1–2 under good viewing; at ~28px adjacent chips on `#0e1118`, values under 3 do not read as different colours). First pass used ΔL\* < 5 and reached the same five chips for the wrong reason — inherit ΔE00.
+
+Nine-category Lab (mean ± σ), lightest → darkest:
+
+| Category | n | L\* | a\* | b\* |
+|---|---:|---:|---:|---:|
+| white-pale | 32 | 67.96 ± 3.01 | 9.20 ± 1.71 | 12.48 ± 2.73 |
+| white-normal | 62 | 56.32 ± 4.43 | 13.23 ± 1.98 | 16.92 ± 2.86 |
+| asian | 34 | 50.62 ± 4.84 | 13.83 ± 1.38 | 18.66 ± 1.74 |
+| hispanic | 49 | 49.66 ± 3.61 | 14.79 ± 1.40 | 19.66 ± 1.78 |
+| white-tan | 45 | 49.32 ± 3.48 | 14.72 ± 1.05 | 19.39 ± 1.44 |
+| black-light | 81 | 48.89 ± 4.42 | 14.30 ± 1.62 | 18.86 ± 2.26 |
+| ambiguous | 9 | 48.78 ± 4.22 | 13.45 ± 1.51 | 19.87 ± 1.20 |
+| black-normal | 97 | 43.75 ± 3.87 | 14.54 ± 1.45 | 18.26 ± 1.88 |
+| black-dark | 41 | 26.03 ± 2.73 | 8.25 ± 1.34 | 8.05 ± 1.48 |
+
+Adjacent-by-lightness ΔE00: pale→normal 10.58 · normal→asian 5.61 · asian→hispanic 1.20 · hispanic→white-tan 0.37 · white-tan→black-light **0.54** (identical h° 52.8) · black-light→ambiguous 1.14 · ambiguous→black-normal 5.12 · black-normal→black-dark 16.20. Mid-cluster worst internal pair 2.07; next gap 5.12 — any bar between ~2.1 and ~5.1 yields the same five chips.
+
+**Five chips (lightest → darkest).** Fills are measured mean RGB (mid chip n-weighted). **Chroma arcs — do not normalise:** ends are duller (C\* ~12–16) than the mid group (C\* ~24); that is pool truth, not a rendering error.
+
+| Chip | Fill | Classifier keys (match any) | Notes |
+|---|---|---|---|
+| 1 | `#bfa091` | `white-pale` | edge border; aria *"Skin tone 1 of 5, lightest"* |
+| 2 | `#a9806c` | `white-normal` | |
+| 3 | `#996d57` | `asian`, `hispanic`, `white-tan`, `black-light`, `ambiguous` | merge; `ambiguous` by measured tone, not a special case |
+| 4 | `#8a5f4b` | `black-normal` | |
+| 5 | `#4f3a32` | `black-dark` | edge border; aria *"Skin tone 5 of 5, darkest"* |
+
+Selection = ring, not fill change. No taxonomy in rendered attributes. Match counts aggregate across every key the selected chip maps to.
+
 #### Uniqueness collides with scarcity
 
 Blocking duplicate portraits within a roster is unenforceable in sparse cells: a roster with four Broad-Toned players faces five such images across every skin tone. **Where a cell cannot supply a unique image, frame relaxation takes precedence over the uniqueness rule** — and the fix for the underlying scarcity is §6.5a, not a cleverer matcher.
@@ -906,6 +942,7 @@ Team Builder's pool is **`recruit_set_0001` ∪ `builder_set_0001`**. Recruit as
 | 40 | **Inside-wood contrast floor = 3.0 vs `#6e675f`** (2026-08-05) | WCAG non-text minimum for graphical objects. Grain overlays drop interior median contrast ~0.12–0.18 from the flat swatch; a flat-swatch 3.0 lands effective contrast in the same band as shipping medium hardwood, which still reads the 3PT arc at Identity display width (~880px). Client feedback + Apply refuse; generator stays dumb. **Applies to custom colours only** — stock hardwood style keys are exempt by measurement (they already ship on ~120 courts; medium is ≈2.99 flat and still reads). Extending the validator to style keys would make medium illegal league-wide; that is not a bug to "fix." |
 | 41 | **CSV import / Keep / Generate retired** (2026-08-05) | Sole roster path is inline edit (`roster_mode: "edit"`). No dormant CSV endpoint — a later league-wide upload feature builds fresh. |
 | 42 | **§4.3 top-up surface retired** (2026-08-05) | Recalibration: league core-12 min ≈190; 0 players below 60 in staging/production. Editor min is 60 by construction (5×12). UI copy removed; `apply_capped_topup` remains as a defensive server guard only. |
+| 43 | **Portrait picker skin tone = unlabelled 5-chip ramp; no race vocabulary in the UI** (§6.5b, 2026-08-05) | Original brief required it; it was lost in handoff. Merges by CIEDE2000 on measured pool Lab, not category names. Classifier keys unchanged underneath. Dim-don't-filter unchanged. |
 | 18 | **`.name` is core, `.display_name` is the overlay** | Removing the overlay from `.name` without giving display a home just moves the leak somewhere worse. |
 
 ---

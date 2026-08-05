@@ -218,7 +218,11 @@ Framing it as a wizard step actively destroys that — a step says "complete thi
 - Right: **Attribute points — this player** pool (`used / budget`, green when 0 remaining, red when over), then 12 sliders grouped by category with **tick marks at inherited values**, then five position-rating cards.
 - **Full-width legend band** across the bottom of both columns: `repeat(4, minmax(0,1fr))`, 3 rows — all 12 codes with names, colored to their category.
 
-**e. Portrait picker** — skin tone and build **reorder** the 450-image pool and dim non-matches rather than filtering them. Best matches first, grid never reflows, never empties, no empty state to design. Same rule as the program grid, used a second time.
+**e. Portrait picker** — three filter axes (**Tone**, **Frame**, **Build**) **reorder** the 450-image pool and dim non-matches rather than filtering them. Best matches first, grid never reflows, never empties, no empty state to design. Same rule as the program grid, used a second time.
+
+**Tone (skin):** unlabelled swatches in a light-to-dark ramp — **no race vocabulary in the interface** (no labels, tooltips, `title`, `alt`, `aria-label` taxonomy, CSS class names, or `data-*` values carrying classifier skin keys). Accessible names are positional/tonal only (e.g. *"Skin tone 1 of 5, lightest"*). Chip fills are **measured** mean colours from the pool; selection is a **ring**, not a fill change; chips 1 and 5 carry a stronger border so they read on `#0e1118`. Classifier keys stay unchanged underneath — a chip may map to multiple keys (display-layer merge). Match counts aggregate across every key a selected chip maps to. **Do not normalise chroma** to smooth the ramp — ends are duller than the mid by measurement. Full method, Lab table, ΔE00 basis and chip→key map: `team-builder-v2-plan.md` §6.5b.
+
+**Frame / Build:** labelled sets (orthogonal classifier axes — skeleton vs muscle/fat). Group labels and help copy must be approved before shipping; do not invent flavour text.
 
 ### 5. Review (`Team Builder - Review.html`)
 

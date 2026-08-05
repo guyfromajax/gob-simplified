@@ -121,6 +121,48 @@
 
   var ATTR_MIN = 5;
   var ATTR_MAX = 99;
+
+  /**
+   * Portrait picker skin-tone chips (display layer only).
+   * Classifier keys are unchanged underneath — each chip maps to one or more
+   * keys for matching. Fills are measured mean RGB from the 450-image pool
+   * (face crop; see team-builder-v2-plan.md §6.5b). Do not normalise chroma:
+   * ends are duller (C* ~12–16) than the mid chip (C* ~24) by measurement.
+   * Never put classifier taxonomy in rendered markup (labels, titles, aria,
+   * class names, or data-* attributes).
+   */
+  var PORTRAIT_SKIN_CHIPS = [
+    {
+      fill: '#bfa091',
+      keys: ['white-pale'],
+      aria: 'Skin tone 1 of 5, lightest',
+      edge: true,
+    },
+    {
+      fill: '#a9806c',
+      keys: ['white-normal'],
+      aria: 'Skin tone 2 of 5',
+      edge: false,
+    },
+    {
+      fill: '#996d57',
+      keys: ['asian', 'hispanic', 'white-tan', 'black-light', 'ambiguous'],
+      aria: 'Skin tone 3 of 5',
+      edge: false,
+    },
+    {
+      fill: '#8a5f4b',
+      keys: ['black-normal'],
+      aria: 'Skin tone 4 of 5',
+      edge: false,
+    },
+    {
+      fill: '#4f3a32',
+      keys: ['black-dark'],
+      aria: 'Skin tone 5 of 5, darkest',
+      edge: true,
+    },
+  ];
   var TOPUP_FLOOR = 60;
   var HEIGHT_MIN_IN = 66;
   var HEIGHT_MAX_IN = 84;
@@ -201,6 +243,7 @@
     CLASSES: CLASSES,
     ATTR_MIN: ATTR_MIN,
     ATTR_MAX: ATTR_MAX,
+    PORTRAIT_SKIN_CHIPS: PORTRAIT_SKIN_CHIPS,
     TOPUP_FLOOR: TOPUP_FLOOR,
     HEIGHT_MIN_IN: HEIGHT_MIN_IN,
     HEIGHT_MAX_IN: HEIGHT_MAX_IN,

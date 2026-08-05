@@ -205,7 +205,7 @@
     this.selectedId = null;
     this.view = 'sig';
     this.pickerOpen = false;
-    this.pickerFilter = { skin: null, frame: null, definition: null };
+    this.pickerFilter = { skinKeys: null, frame: null, definition: null };
     this.catalog = null;
     this.loaded = false;
     this.loading = false;
@@ -876,7 +876,7 @@
 
   RosterChapter.prototype.openPicker = async function () {
     this.pickerOpen = true;
-    this.pickerFilter = { skin: null, frame: null, definition: null };
+    this.pickerFilter = { skinKeys: null, frame: null, definition: null };
     this.paint();
     if (!this.catalog) {
       try {
@@ -1639,25 +1639,90 @@
     if (!host || !p) return;
     var self = this;
     var entries = (this.catalog && this.catalog.entries) || [];
-    var filterSkin = this.pickerFilter.skin || null;
+    var skinKeys = this.pickerFilter.skinKeys;
     var filterFrame = this.pickerFilter.frame || null;
     var filterDef = this.pickerFilter.definition || null;
+    var toneChips = C.PORTRAIT_SKIN_CHIPS || [];
+    var filtersActive = !!(skinKeys && skinKeys.length) || !!filterFrame || !!filterDef;
 
-    var visible = entries.filter(function (e) {
-      if (filterSkin && e.skin !== filterSkin) return false;
-      if (filterFrame && e.frame !== filterFrame) return false;
-      if (filterDef && e.definition !== filterDef) return false;
-      return true;
-    });
-    var matchCount = visible.length;
+    function skinMatches(entrySkin) {
+      if (!skinKeys || !skinKeys.length) return true;
+      return skinKeys.indexOf(entrySkin) !== -1;
+    }
 
-    var skins = Object.keys((this.catalog && this.catalog.counts && this.catalog.counts.skin) || {});
+    var scored = entries
+      .map(function (e) {
+        var exact =
+          skinMatches(e.skin) &&
+          (!filterFrame || e.frame === filterFrame) &&
+          (!filterDef || e.definition === filterDef);
+        var score =
+          (skinKeys && skinKeys.length && !skinMatches(e.skin) ? 2 : 0) +
+          (filterFrame && e.frame !== filterFrame ? 3 : 0) +
+          (filterDef && e.definition !== filterDef ? 1 : 0);
+        return Object.assign({}, e, { exact: exact, score: score });
+      })
+      .sort(function (a, b) {
+        return a.score - b.score;
+      });
+
+    var matchCount = scored.filter(function (s) {
+      return s.exact;
+    }).length;
+
     var frames = Object.keys((this.catalog && this.catalog.counts && this.catalog.counts.frame) || {});
     var defs = Object.keys(
       (this.catalog && this.catalog.counts && this.catalog.counts.definition) || {}
     );
 
-    function chipRow(label, values, key) {
+    function selectedToneIdx() {
+      if (!skinKeys || !skinKeys.length) return -1;
+      for (var i = 0; i < toneChips.length; i++) {
+        var keys = toneChips[i].keys || [];
+        if (
+          keys.length === skinKeys.length &&
+          keys.every(function (k) {
+            return skinKeys.indexOf(k) !== -1;
+          })
+        ) {
+          return i;
+        }
+      }
+      return -1;
+    }
+    var toneOn = selectedToneIdx();
+
+    var toneRow =
+      '<div><div class="mt-k" style="margin-bottom:5px">Tone</div><div class="tones" role="group" aria-label="Skin tone">' +
+      '<button type="button" data-tone-any' +
+      (toneOn < 0 ? ' class="on"' : '') +
+      ' aria-label="Any skin tone" aria-pressed="' +
+      (toneOn < 0 ? 'true' : 'false') +
+      '">Any</button>' +
+      toneChips
+        .map(function (chip, idx) {
+          var on = toneOn === idx;
+          return (
+            '<button type="button" data-tone-idx="' +
+            idx +
+            '"' +
+            (chip.edge ? ' data-tone-edge' : '') +
+            (on ? ' class="on"' : '') +
+            ' style="background:' +
+            chip.fill +
+            '"' +
+            ' aria-label="' +
+            escapeHtml(chip.aria) +
+            '"' +
+            ' aria-pressed="' +
+            (on ? 'true' : 'false') +
+            '"></button>'
+          );
+        })
+        .join('') +
+      '</div></div>';
+
+    function labelledRow(label, values, key) {
       return (
         '<div><div class="mt-k" style="margin-bottom:5px">' +
         label +
@@ -1686,28 +1751,32 @@
       );
     }
 
+    // Match-count copy: interim "N matches" until two-state copy is approved.
+    var noteHtml =
+      '<b>' + matchCount + ' match' + (matchCount === 1 ? '' : 'es') + '</b>';
+
     host.innerHTML =
       '<div class="ov" data-picker-close>' +
       '<div class="mdl wide" data-picker-modal>' +
       '<div class="mdl-acc"></div>' +
       '<div class="pk-hd"><h3>Portrait</h3>' +
-      chipRow('Skin', skins, 'skin') +
-      chipRow('Frame', frames, 'frame') +
-      chipRow('Build', defs, 'definition') +
+      toneRow +
+      labelledRow('Frame', frames, 'frame') +
+      labelledRow('Build', defs, 'definition') +
       '</div>' +
-      '<div class="pk-note"><b>' +
-      matchCount +
-      ' match' +
-      (matchCount === 1 ? '' : 'es') +
-      '</b></div>' +
+      '<div class="pk-note">' +
+      noteHtml +
+      '</div>' +
       '<div class="pk-grid">' +
-      visible
+      scored
         .map(function (e) {
           var url =
             API_CONFIG.getRecruitImageUrl &&
             API_CONFIG.getRecruitImageUrl(e.image_id, { size: 'card' });
+          var dim = filtersActive && !e.exact;
           return (
             '<div class="pk-i' +
+            (dim ? ' off' : '') +
             (e.image_id === p.image_id ? ' on' : '') +
             '" data-pick="' +
             escapeHtml(e.image_id) +
@@ -1720,7 +1789,7 @@
         })
         .join('') +
       '</div>' +
-      '<div class="pk-ft"><div class="hint">Every player already has a portrait — this is an override.</div>' +
+      '<div class="pk-ft"><div class="hint">Best matches first. Every player already has a portrait — this is an override.</div>' +
       '<button type="button" class="btn ghost sm" data-picker-close>Done</button></div>' +
       '</div></div>';
 
@@ -1737,6 +1806,20 @@
         e.stopPropagation();
       });
     }
+    host.querySelectorAll('[data-tone-any]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        self.pickerFilter.skinKeys = null;
+        self.paintPicker();
+      });
+    });
+    host.querySelectorAll('[data-tone-idx]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var idx = Number(btn.getAttribute('data-tone-idx'));
+        var chip = toneChips[idx];
+        self.pickerFilter.skinKeys = chip ? chip.keys.slice() : null;
+        self.paintPicker();
+      });
+    });
     host.querySelectorAll('[data-filter-key]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var key = btn.getAttribute('data-filter-key');

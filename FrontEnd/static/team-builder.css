@@ -1187,9 +1187,40 @@ button {
 .mdl-a .btn{flex:2}.mdl-a .btn.ghost{flex:1}
 .pk-hd{display:flex;gap:18px;align-items:flex-end;padding:18px 22px 14px;border-bottom:1px solid var(--bdr2);flex-wrap:wrap}
 .pk-hd h3{font-family:var(--disp);font-size:24px;margin:0;color:#fff;letter-spacing:.04em;font-weight:700;flex:1 0 auto}
-.tones{display:flex;gap:5px}
-.tones button{width:26px;height:26px;border-radius:6px;border:1px solid rgba(255,255,255,.2);padding:0}
-.tones button.on{box-shadow:0 0 0 2px var(--org);border-color:transparent}
+.tones{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+.tones button[data-tone-any]{
+  font-family:var(--disp);
+  font-size:12px;
+  letter-spacing:.05em;
+  background:rgba(255,255,255,.05);
+  border:1px solid var(--bdr);
+  color:var(--tx2);
+  border-radius:6px;
+  padding:5px 9px;
+}
+.tones button[data-tone-any].on{
+  background:rgba(255,255,255,.13);
+  color:#fff;
+  border-color:rgba(255,255,255,.3);
+}
+/* Unlabelled tonal chips — selection is a ring; fill is the measured colour. */
+.tones button[data-tone-idx]{
+  width:28px;
+  height:28px;
+  border-radius:6px;
+  padding:0;
+  border:1px solid rgba(255,255,255,.22);
+  cursor:pointer;
+  flex:0 0 auto;
+}
+/* Ends need a stronger edge against #0e1118 or they vanish. */
+.tones button[data-tone-idx][data-tone-edge]{
+  border-color:rgba(255,255,255,.55);
+}
+.tones button[data-tone-idx].on{
+  box-shadow:0 0 0 2px #fff;
+  border-color:transparent;
+}
 .builds{display:flex;gap:5px}
 .builds button{font-family:var(--disp);font-size:12px;letter-spacing:.05em;background:rgba(255,255,255,.05);border:1px solid var(--bdr);color:var(--tx2);border-radius:6px;padding:5px 9px}
 .builds button.on{background:rgba(255,255,255,.13);color:#fff;border-color:rgba(255,255,255,.3)}
