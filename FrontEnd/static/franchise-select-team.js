@@ -138,7 +138,6 @@
   function setBuilderMode(on) {
     state.builder = !!on && !TUTORIAL_MODE;
     if (els.modeBanner) els.modeBanner.hidden = !state.builder;
-    if (els.tbEntry) els.tbEntry.hidden = state.builder || TUTORIAL_MODE;
     if (els.root) els.root.classList.toggle('building', state.builder);
     if (els.title) {
       els.title.textContent = state.builder
@@ -165,6 +164,16 @@
       else url.searchParams.delete('builder');
       window.history.replaceState({}, '', url.pathname + url.search);
     } catch (e) {}
+    // Draft card ↔ Open Team Builder exclusivity lives in renderDraftCard.
+    if (TUTORIAL_MODE) {
+      if (els.tbEntry) els.tbEntry.hidden = true;
+      if (els.draftHost) {
+        els.draftHost.hidden = true;
+        els.draftHost.innerHTML = '';
+      }
+    } else {
+      renderDraftCard();
+    }
     renderActionBar();
     syncStickyOffsets();
   }
@@ -238,22 +247,35 @@
   }
 
   function renderDraftCard() {
-    if (!els.draftHost || TUTORIAL_MODE || state.builder) {
-      if (els.draftHost) els.draftHost.hidden = true;
-      return;
-    }
-    var draft = state.drafts && state.drafts[0];
-    if (!draft || !draft.replaced_object_id) {
+    if (!els.draftHost) return;
+
+    // Builder / tutorial: neither draft card nor (for tutorial) Open Team Builder.
+    if (TUTORIAL_MODE || state.builder) {
       els.draftHost.hidden = true;
+      els.draftHost.innerHTML = '';
+      if (els.tbEntry) els.tbEntry.hidden = true;
       return;
     }
+
+    var draft = state.drafts && state.drafts[0];
+    var hasDraft = !!(draft && draft.replaced_object_id);
+
+    // Mutually exclusive with Open Team Builder: draft present → card only.
+    if (!hasDraft) {
+      els.draftHost.hidden = true;
+      els.draftHost.innerHTML = '';
+      if (els.tbEntry) els.tbEntry.hidden = false;
+      return;
+    }
+
+    els.draftHost.hidden = false;
+    if (els.tbEntry) els.tbEntry.hidden = true;
+
     var slotTeam = teamById(draft.replaced_object_id);
     var programName =
       (draft.identity && draft.identity.name) ||
       (slotTeam && slotTeam.name) ||
       'Unfinished program';
-    var chapter = draft.chapter || 'claim';
-    els.draftHost.hidden = false;
     els.draftHost.innerHTML =
       '<div class="dc-t">' +
       '<div class="dc-h">' +

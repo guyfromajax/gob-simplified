@@ -61,6 +61,7 @@ button{font-family:inherit;cursor:pointer}
 
 /* the entry: the sentence carries the meaning, the button carries the verb */
 .tbe{margin-top:16px;display:flex;align-items:center;gap:24px;background:linear-gradient(120deg,rgba(247,148,32,.11),rgba(247,148,32,.03) 46%,rgba(255,255,255,.02));border:1px solid rgba(247,148,32,.3);border-radius:14px;padding:16px 20px}
+.tbe[hidden]{display:none!important}
 .tbe-t{flex:1;min-width:0}
 .tbe-h{font-family:var(--disp);font-size:28px;letter-spacing:.03em;color:#fff;line-height:1}
 .tbe-t p{font-size:13px;line-height:1.55;color:var(--tx2);margin:7px 0 0;max-width:78ch;text-wrap:pretty}
@@ -133,6 +134,7 @@ button{font-family:inherit;cursor:pointer}
 .team-select-back-link:hover{color:#fff}
 .team-select-error{margin:14px 24px 0;max-width:1420px;padding:12px 14px;border-radius:10px;border:1px solid rgba(255,109,109,.45);background:rgba(255,109,109,.08);color:#ffb4b4;font-size:13px}
 .draft-card{margin:16px 0 0;display:flex;align-items:center;gap:18px;background:rgba(74,144,217,.1);border:1px solid rgba(74,144,217,.35);border-radius:14px;padding:14px 18px}
+.draft-card[hidden]{display:none!important}
 .draft-card .dc-h{font-family:var(--disp);font-size:22px;letter-spacing:.03em;color:#fff}
 .draft-card .dc-s{font-size:12.5px;color:var(--tx2);margin-top:4px;line-height:1.45}
 .draft-card .dc-a{margin-left:auto;display:flex;gap:10px;flex:none}
