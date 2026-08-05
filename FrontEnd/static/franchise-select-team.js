@@ -785,6 +785,8 @@
 
     if (els.openTb) {
       els.openTb.addEventListener('click', function () {
+        // Same confirm SFX as the FCC green Advance button.
+        playSound('confirm-1-lowervol.wav');
         setBuilderMode(true);
       });
     }
