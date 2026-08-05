@@ -87,6 +87,19 @@
       .replace(/"/g, '&quot;');
   }
 
+  /** Same confirm SFX as the FCC green Advance (play-now) button. */
+  function playAdvanceSound() {
+    try {
+      var base =
+        typeof API_CONFIG !== 'undefined' && API_CONFIG.buildStaticPath
+          ? API_CONFIG.buildStaticPath('/sounds/')
+          : '/sounds/';
+      var a = new Audio(base + encodeURIComponent('confirm-1-lowervol.wav'));
+      a.volume = 0.7;
+      a.play().catch(function () {});
+    } catch (_) {}
+  }
+
   function teamAbbr(team) {
     if (!team) return '';
     if (team.abbreviation) {
@@ -646,6 +659,7 @@
     if (cont) {
       cont.addEventListener('click', function () {
         if (cont.disabled) return;
+        playAdvanceSound();
         if (state.chapter === 'identity') {
           if (state.identityChapter && state.identityChapter.isReady()) setChapter('gate');
         } else if (state.chapter === 'gate') {
@@ -657,6 +671,7 @@
     if (rosterNext) {
       rosterNext.addEventListener('click', function () {
         if (rosterNext.disabled) return;
+        playAdvanceSound();
         setChapter('review');
       });
     }
@@ -664,6 +679,7 @@
     if (establish && state.chapter === 'review') {
       establish.addEventListener('click', function () {
         if (establish.disabled) return;
+        playAdvanceSound();
         setChapter('establish');
       });
     }

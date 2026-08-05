@@ -1014,13 +1014,11 @@
           : '') +
         '</div>';
     } else {
+      // Uncapped: height/year are reference readouts only — no eligibility verdict chip
+      // (eligibility is already decided at the gate; capped keeps Legal / Not legal).
       meters =
         meterHtml('Height — team', '', hu, hb, '″', false, true) +
-        meterHtml('Year — team', '', cu, cb, '', false, true) +
-        '<div class="verdict bad">' +
-        '<div class="vd-k">Not eligible</div>' +
-        '<div class="vd-t">Written permanently when the program is established.</div>' +
-        '</div>';
+        meterHtml('Year — team', '', cu, cb, '', false, true);
     }
 
     host.innerHTML =

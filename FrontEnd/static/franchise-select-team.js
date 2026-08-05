@@ -686,7 +686,7 @@
       if (!btn || btn.classList.contains('out')) return;
       var oid = btn.getAttribute('data-oid');
       if (!oid) return;
-      playSound('click-beep.wav');
+      playSound('click-tiny.wav');
       state.selectedId = oid;
       renderGrid();
       renderActionBar();
