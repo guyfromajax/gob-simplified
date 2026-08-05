@@ -397,14 +397,19 @@
       h = Math.ceil(bar.getBoundingClientRect().height) || 0;
     }
     document.documentElement.style.setProperty('--tb-statebar-h', h + 'px');
-    // Establish / full-bleed chapters subtract total top chrome (auth + band).
+    // Sticky band sits under the fixed auth bar; measure, never hardcode.
     var auth = document.querySelector('.auth-bar');
     var authH = auth ? Math.ceil(auth.getBoundingClientRect().height) || 0 : 0;
+    if (!authH && document.body.classList.contains('has-auth-bar')) {
+      authH = 72;
+    }
+    document.documentElement.style.setProperty('--tb-sticky-top', authH + 'px');
+    // Establish / full-bleed chapters subtract total top chrome (auth + band).
     document.documentElement.style.setProperty('--chrome-h', authH + h + 'px');
   }
 
   function ensureChromeObserver() {
-    if (!els.statebar || els._chromeObs) return;
+    if (els._chromeObs) return;
     if (typeof ResizeObserver === 'undefined') {
       window.addEventListener('resize', measureChrome);
       els._chromeObs = true;
@@ -413,7 +418,9 @@
     els._chromeObs = new ResizeObserver(function () {
       measureChrome();
     });
-    els._chromeObs.observe(els.statebar);
+    if (els.statebar) els._chromeObs.observe(els.statebar);
+    var auth = document.querySelector('.auth-bar');
+    if (auth) els._chromeObs.observe(auth);
   }
 
   function stripReasonHtml(html) {
@@ -1023,6 +1030,11 @@
     els.boot.hidden = true;
     els.app.hidden = false;
     setChapter(state.chapter, { replace: true });
+    ensureChromeObserver();
+    measureChrome();
+    // Auth bar may inject after first paint — sticky top must track it.
+    setTimeout(measureChrome, 0);
+    setTimeout(measureChrome, 250);
   }
 
   if (document.readyState === 'loading') {

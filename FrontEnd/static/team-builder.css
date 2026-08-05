@@ -77,7 +77,13 @@ button {
 
 /* ---------- state strip ---------- */
 .statebar {
-  background: var(--panel);
+  position: sticky;
+  /* --tb-sticky-top = measured auth-bar height (0 if none). Never hardcode. */
+  top: var(--tb-sticky-top, 0px);
+  z-index: 40;
+  background: rgba(22, 26, 36, 0.97);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--bdr);
   border-radius: 12px;
   display: flex;
@@ -85,6 +91,7 @@ button {
   overflow: hidden;
   box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
   flex-wrap: wrap;
+  margin-bottom: 4px;
 }
 .sb-cell {
   padding: 11px 18px;
