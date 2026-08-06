@@ -266,9 +266,8 @@ export class AnimationEngine {
     this.animationHandlers.set('DEFENSIVE_STOP', this.handleDefensiveStop.bind(this));
     // ✅ TIMEOUT: Add handler for TIMEOUT turns
     this.animationHandlers.set('TIMEOUT', this.handleTimeout.bind(this));
-    // ✅ Phase 4: Final Turn — RUN_OUT_CLOCK / FINAL_HOLD / Final Turn shot
+    // ✅ Phase 4: Final Turn — RUN_OUT_CLOCK / Final Turn shot
     this.animationHandlers.set('RUN_OUT_CLOCK', this.handleRunOutClock.bind(this));
-    this.animationHandlers.set('FINAL_HOLD', this.handleFinalHold.bind(this));
     this.animationHandlers.set('FINAL_TURN_SHOT', this.handleFinalTurnShot.bind(this));
   }
 
@@ -983,12 +982,9 @@ export class AnimationEngine {
       return this.animationHandlers.get('FAST_BREAK');
     }
 
-    // ✅ Phase 4: Final Turn — route RUN_OUT_CLOCK, FINAL_HOLD, and Final Turn shot
+    // ✅ Phase 4: Final Turn — route RUN_OUT_CLOCK and Final Turn shot
     if (turnData.result_type === 'RUN_OUT_CLOCK') {
       return this.animationHandlers.get('RUN_OUT_CLOCK');
-    }
-    if (turnData.result_type === 'FINAL_HOLD') {
-      return this.animationHandlers.get('FINAL_HOLD');
     }
     if (turnData.final_turn === true && this.isShotAttempt(turnData)) {
       return this.animationHandlers.get('FINAL_TURN_SHOT');
@@ -1762,24 +1758,7 @@ export class AnimationEngine {
   }
 
   /**
-   * Phase 4: FINAL_HOLD — no shot, run clock out (short delay), then complete.
-   * Quarter/game end is triggered by the API when quarter_complete is true.
-   */
-  async handleFinalHold(turnData, context) {
-    if (turnData.text && this.scene.events) {
-      this.scene.events.emit('textScroll', turnData.text);
-    }
-    const animationConfig = (await import('./animation_config.js')).default;
-    const holdMs = animationConfig?.finalTurn?.holdClockOutMs ?? 1800;
-    await new Promise(resolve => setTimeout(resolve, holdMs));
-    if (turnData?.quarter_ends_after) {
-      const { signalQuarterEnded } = await import('../utils/quarterEndAirhorn.js');
-      signalQuarterEnded(this.scene, turnData, { phase: 'playbackComplete' });
-    }
-  }
-
-  /**
-   * Q4/OT Run Out The Clock — drift all players to spots, drain clock, airhorn, hold.
+   * Run Out The Clock — drift all players to spots, drain clock, airhorn, hold.
    */
   async handleRunOutClock(turnData, context) {
     const { runOutClockSequence } = await import('./runOutClock.js');

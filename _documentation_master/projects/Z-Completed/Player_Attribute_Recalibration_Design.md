@@ -596,6 +596,8 @@ Argmax balance then follows by construction. The weight vectors only need to be 
 
 Target per-position height distributions (inches, approximate): PG 73.5, SG 76, SF 78.5, PF 80.5, C 82.5, each with sd ≈ 2.0-2.2, giving a league aggregate near mean 78, sd 3.6.
 
+> **Superseded figures (2026-08-04).** These are the original pass-1 ideals. Two later uniform HS shifts (−1 then −2) moved every ideal **−3in** and `LEAGUE_MEDIAN_HEIGHT_IN` 78 → 77 → 75. Live values now: PG 70.5 · SG 73 · SF 75.5 · PF 77.5 · C 79.5; adult mean ≈ 75.2, live rostered league p50 ≈ 74 (grow-into-frame). Canonical live reference: `Tunable_Constants.md` and `Position_Ratings_System.md`. The per-position/median figures throughout this pass-1 record are historical.
+
 > **⚠️ DEFECT — this section as written produces adult heights for every class year. Open, fix pending.**
 >
 > Those per-position figures are **mature** heights: they mirror the height-fitness peaks in §3.6.2, the values at which a player's rating is maximised at that position. `player_generation.draw_height()` implements them literally — `gauss(HEIGHT_IDEAL_IN[position], 2.1)` with **no class-year term** — so a JH recruit is generated at the same height as a senior. `weight_from_height` then derives weight from that inflated height, so the weight error is downstream of the same cause.

@@ -294,8 +294,8 @@ foul/dead-ball result controls SIP synthesis.
 
 ### Phase 7 — Migrate EOQ and FLSS
 
-Migrate final shot/rebound behavior, FLSS, BIP runoff, `FINAL_HOLD`,
-`RUN_OUT_CLOCK`, terminal inbound suppression, and quarter-complete payloads.
+Migrate final shot/rebound behavior, FLSS, BIP runoff, `RUN_OUT_CLOCK`,
+terminal inbound suppression, and quarter-complete payloads.
 
 The final playable turn must animate before quarter completion. Do not create a
 BIP/SIP after a terminal event or introduce an additional clock draw.

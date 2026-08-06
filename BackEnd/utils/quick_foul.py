@@ -9,16 +9,16 @@ _documentation_master/06_Gameplay_Systems/Situational_Logic_System.md
 
 Flow (all Q4/OT):
 - ``quick_foul_in_play`` is a pure function of game state and can be evaluated at
-  any point (BIP/SIP setup, HCO turn start).
+  any point (BIP/SIP setup, possession start).
 - On a BIP/SIP that leads into a quick foul, ``build_quick_foul_inbound_setup``
   produces the bespoke setup formation: SF inbounds to one of two candidate
   receivers; the paired fouling defender is pre-positioned within
   ``QUICK_FOUL_APPROACH_RADIUS_GRID`` of that receiver. No foul executes on the
   inbound turn.
-- The foul itself executes at the START of the following HCO turn (universal
-  hook), on the current ball handler (= the inbound receiver), via
+- The foul itself executes at the START of the following routed possession,
+  before HCO/HCT/FCP resolution, on the current ball handler (= the inbound receiver), via
   ``build_quick_foul_animation_steps``: a converge (sprint) step then a reach-in
-  micro. The same HCO-start hook also covers DREB / OREB-kickout / Final Turn
+  micro. The same possession-start hook also covers DREB / OREB-kickout / Final Turn
   entries where there is no setup step (the converge sprint carries the fouler
   in).
 """

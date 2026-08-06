@@ -332,7 +332,7 @@ For HCO / FCP / HCT **stopper** results (turnover or foul), the engine calls `ap
 |------|-------------------------------|
 | `BackEnd/engine/phase_resolution.py` | HCO shot (`pre_resolve_shot`); HCO turnover + O/D non-shooting fouls (`post_stopper`); Final Turn shot; FCP/HCT shot and non-shot (turnover, steal, dead ball, foul); fast break shot (`pre_shot`); FB turnover/foul (`post_stopper`); free throws (`resolve_free_throw_logic`); and-one / FT-related branches as wired. |
 | `BackEnd/engine/rim_runner_fast_break.py` | Rim Runner shots (`pre_shot`); high-tier steal (`resolve_turnover_logic` + animations + `post_stopper`); bat-OOB dead ball (`post_stopper`); other RR shot branches. |
-| `BackEnd/models/turn_manager.py` | Shot-clock forced shot (`pre_resolve_shot`); SIDE_INBOUND / BASELINE_INBOUND setup payloads; OREB kickout merge; **situational force foul after BIP/SIP** (`hco_situational_force_foul_inbound`); **`_execute_final_turn_force_foul`** (`hco_force_foul_final_turn`). |
+| `BackEnd/models/turn_manager.py` | Shot-clock forced shot (`pre_resolve_shot`); SIDE_INBOUND / BASELINE_INBOUND setup payloads; OREB kickout merge; situational force foul after BIP/SIP through the universal possession-start quick-foul schema. |
 | `BackEnd/models/game_manager.py` | **Force foul after DREB** when `force_foul_after_dreb` (`hco_force_foul_after_dreb`). |
 | `BackEnd/utils/opening_tip.py` | Opening tip (`opening_tip` source on snapshot). |
 | `BackEnd/utils/quarter_start.py` | Quarter-start baseline inbound. |
@@ -351,7 +351,6 @@ These appear on snapshot objects for grep-friendly tracing (not exhaustive of ev
 | `fb_turnover_post_stopper` / `fb_non_shooting_foul_post_stopper` | Standard fast break non-shot (dynamic suffix on FB path). |
 | `fb_rr_turnover_post_stopper` / `fb_rr_bat_oob_post_stopper` | Rim Runner steal tier and batted ball OOB. |
 | `hco_situational_force_foul_inbound` | Situational “quick foul” after inbound (`situational_force_foul_pending`). Victim `coords` set from pending payload before snapshot. |
-| `hco_force_foul_final_turn` | Final-turn force foul (`_execute_final_turn_force_foul`); victim/defender picks use live `Player.coords`. |
 | `hco_force_foul_after_dreb` | Force foul injected after DREB branch; rebounder/defender picks use synced `Player.coords` (fallback: `defense_rebounder_coords` / bounce). |
 | `opening_tip` | Opening tip animation finals. |
 | `free_throw_attempt` | FT snapshot helper. |

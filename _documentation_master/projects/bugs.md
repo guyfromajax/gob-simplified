@@ -10,12 +10,11 @@
 2. College and Pro setup
 
 ##Playtest Launch / In Progress
-1. Stripe
+1. Stripe / Paddle
 2. Balance Player Attribute Progression from season to season
 3. Balance Team attributes
-4. Team mod system
 -----
-5. PvP sim -- playtest post-launch / immediate parallel task
+4. PvP sim -- playtest post-launch / immediate parallel task
 
 
 ##Full Product Perfection
@@ -67,6 +66,10 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 ## Stale FB test suite — open follow-up [CODE-CLEANUP]
 
 Stale pre-refactor FB tests were deleted 6-12-26; suite is green. **Still open:** current-engine FB coverage is thin — `test_fast_break_rr_triangle_updates.py` covers RR/Triangle emitters, but the CR resolver path and `after_steal_fast_break.py` (resolver + emitter) have little/no direct test coverage. Write new tests against the current resolvers when FB work resumes.
+
+## Two test modules fail to import — invisible coverage debt (found 2026-08-04) [CODE-CLEANUP]
+
+`test_eoq_clock_progression.py` and `test_final_turn_entry_pass_chain.py` raise `ImportError` at collection — they import symbols that no longer exist (`roll_anchor_clock` from `eoq_clock_progression`, `_append_final_turn_entry_pass_if_needed` from `skeleton_step_emitter`). A module that can't import is **invisible debt**: it reads as passing coverage while testing nothing, and the exclusion (`--ignore` in any full-suite run) becomes permanent by default. Either repoint each test at the current API (the behaviour it covers — EOQ clock progression, final-turn entry-pass chaining — likely still exists under a renamed function) or delete it if the behaviour is gone. Do not leave them uncollectable.
 
 ## P0 — HCO contract clock overruns (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
 

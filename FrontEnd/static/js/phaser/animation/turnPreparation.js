@@ -203,8 +203,7 @@ export async function prepareTurnForAnimation({ turn, scene, turnIndex, homeTeam
     // zones) or no announce (normal zone); see EOQ_Perfection_Brief + Announcement_System.md.
     const isFinalTurnShotAttempt =
       turn.final_turn === true
-      && turn.flss !== true
-      && turn.result_type !== 'FINAL_HOLD';
+      && turn.flss !== true;
     if (isFinalTurnShotAttempt) {
       const suppressFinalShotSfx = turn.suppress_final_shot_sfx === true;
       announceGameEvent('FINAL_SHOT', turn, scene, {

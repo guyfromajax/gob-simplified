@@ -72,7 +72,7 @@ All detections follow this pattern:
 ### 5. SIDE_INBOUND
 - **Detection:** `turn.result_type === "SIDE_INBOUND"`
 - **Routes to:** `AnimationRouter` → `handleSideInbound()`
-- **Notes:** Always runs the full SIP — the old "skip when in FastBreak state" guard was removed (needed for BATCH `[CHARGE, SIDE_INBOUND]` / `[FOUL, SIDE_INBOUND]`).
+- **Notes:** Every emitted SIP runs in full and is clock-neutral. Backend does not emit SIP when its source is terminal or the game clock is already 0:00.
 
 ### 6. BASELINE_INBOUND
 - **Detection:** `turn.result_type === "BASELINE_INBOUND"`
@@ -96,7 +96,7 @@ All detections follow this pattern:
 ### 10. PUTBACK_MAKE / PUTBACK_MISS / OREB_KICKOUT
 - **Detection:** `turn.result_type === "PUTBACK_MAKE" || "PUTBACK_MISS" || "OREB_KICKOUT"`
 - **Routes to:** `AnimationRouter` → `handlePutback()` (delegates to `handleOrebTurn` in `animateGameTurns.js`)
-- **Notes:** All three result types use the same handler.
+- **Notes:** All three result types use the same handler. Short-clock putbacks may carry `eoq_shortened_oreb`; their schema preserves the full post-release visual resolution while pinning game-clock boundaries at 0:00. An eligible leading-offense OREB instead arrives as `RUN_OUT_CLOCK` with `oreb_run_out` and uses the Run Out handler.
 
 ### 11. TURNOVER
 - **Detection:** `turn.result_type === "TURNOVER"`
@@ -117,22 +117,17 @@ All detections follow this pattern:
 - **Routes to:** `AnimationRouter` → `handleDefault()` when `animations[]` **or** `animation_steps[]` present; otherwise direct announcements + score updates.
 - **Notes:** Includes FCP/HCT → HCO transitions (press break) and regular HCO setup turns. The `animation_steps` clause matters for HCT trap-broken turns, which emit only schema steps after the dynamic_hct refactor.
 
-### 15. FINAL_HOLD
-- **Detection:** `turn.result_type === "FINAL_HOLD"`
-- **Routes to:** `AnimationRouter` → `handleFinalHold()`
-- **Notes:** Final Turn (clock out, then quarter/game end).
-
-### 16. Final-turn FOUL
+### 15. Final-turn FOUL
 - **Detection:** `turn.final_turn === true && turn.result_type === "FOUL"`
 - **Routes to:** `AnimationRouter`
 - **Notes:** Final Turn shot blocking foul. (Unreachable for animated fouls — detection 3 catches them first; this catches non-animated final-turn fouls that fell through.)
 
-### 17. Shot attempts (MAKE / MISS / BLOCK, non-fast-break)
+### 16. Shot attempts (MAKE / MISS / BLOCK, non-fast-break)
 - **Detection:** `!turn.fast_break && (turn.result_type === "MAKE" || "MISS" || "BLOCK")`
 - **Routes to:** `AnimationRouter` → `AnimationEngine` → `handleShotAttempt()` → `ShotAnimationSystem`
 - **Notes:** Catches all half-court shots — HCO and FCP/HCT shot attempts alike (FCP/HCT shots carry `fcp_shot` / `hct_shot` flags and route through the same path). Uses `result_type` directly, not `current_turn === "HCO"`.
 
-### 18. STEAL
+### 17. STEAL
 - **Detection:** `turn.result_type === "STEAL"`
 - **Routes to:** `AnimationRouter` → `handleSteal()` (hybrid: skeleton + steal action) when `animations[]` **or** `animation_steps[]` present (standalone steal turns). Otherwise, if the turn carries a STEAL event (`turn.events` with `event_type === "STEAL"`) and the scene is not in FastBreak state, the steal is handled **inline** via `runPass()` (ball handler → stealer) + `possessionChange` emit — not through the router.
 
@@ -157,7 +152,6 @@ All detections follow this pattern:
 | `FAST_BREAK` (explicit or MAKE/MISS/BLOCK + flag) | ✅ Yes | `handleFastBreak()` |
 | `HCO` (with animation payload) | ✅ Yes | `handleDefault()` |
 | `HCO` (non-animated) | ❌ No | Direct announcements |
-| `FINAL_HOLD` | ✅ Yes | `handleFinalHold()` |
 | `FOUL` + `final_turn` | ✅ Yes | router |
 | `MAKE`/`MISS`/`BLOCK` (non-FB shot) | ✅ Yes | `handleShotAttempt()` → `ShotAnimationSystem` |
 | `STEAL` (with animation payload) | ✅ Yes | router |
@@ -211,7 +205,6 @@ All handlers follow this pattern:
 | `handlePass()` | `PASS` (detected) | Pass animations | `PassAnimationSystem` | `playTurnAnimation()` |
 | `handleDefault()` | `HCO`, `DEFAULT`, `FOUL`, `CHARGE`, `DEAD_BALL`, `DEAD BALL` | Default/fallback handler (skeleton) | `playTurnAnimation()` | None |
 | `handleTimeout()` | `TIMEOUT` | Timeout handling | Direct implementation | None |
-| `handleFinalHold()` | `FINAL_HOLD` | Final Turn clock-out hold | Direct implementation (text scroll + `holdClockOutMs` wait) | None |
 | `handleFinalTurnShot()` | `FINAL_TURN_SHOT` (detected) | Final Turn shot fallback when `animation_steps` missing | `runSchemaPlaybackTurn()` if steps present; else `ShotAnimationSystem` / `playTurnAnimation()` | Normal Final Turn shots with steps never reach this handler — `processTurn` schema gate runs first |
 
 Note: `DEAD BALL` is registered under both spellings — the backend sends `"DEAD BALL"` (with space); `"DEAD_BALL"` is kept defensively. `CHARGE` maps to `handleDefault` (skeleton animation, no shot) so `finalizeTurnAfterAnimation` can announce "Charge!".
@@ -244,7 +237,6 @@ Note: `DEAD BALL` is registered under both spellings — the backend sends `"DEA
    - If `turnData.fast_break === true` (or string `"true"`) OR `turnData.result_type === "FAST_BREAK"` → `handleFastBreak()`
 
 2. **Final Turn:**
-   - If `result_type === "FINAL_HOLD"` → `handleFinalHold()`
    - If `final_turn === true` AND `isShotAttempt(turnData)` → `handleFinalTurnShot()`
 
 3. **Specific Result Type:**
@@ -294,7 +286,7 @@ FCP/HCT has no special routing — FCP/HCT shots hit `SHOT_ATTEMPT`, other FCP/H
 
 **What it does:**
 - Routes to `PassAnimationSystem` (if available) or falls back to `runSideInboundSetup()`
-- Always runs the full SIP — the old FastBreak-state skip was removed (detection layer routes SIP unconditionally; needed for BATCH `[CHARGE, SIDE_INBOUND]` / `[FOUL, SIDE_INBOUND]`)
+- Runs every SIP supplied by the backend; the backend terminal-inbound gate prevents post-buzzer SIP payloads
 - Sets `scene._previousTurnWasInbound = true` and `scene._previousInboundTurnType = 'SIDE_INBOUND'` so the next HCO lead-in can validate its source-scoped contract
 
 **Key Features:**
@@ -352,6 +344,7 @@ FCP/HCT has no special routing — FCP/HCT shots hit `SHOT_ATTEMPT`, other FCP/H
 **Key Features:**
 - Unified handler for all OREB-related outcomes
 - Delegates to specialized OREB handler
+- Honors backend-authored shortened OREB schema clocks; the frontend does not truncate or choose the shot
 
 ### 7. `handleTimeout()`
 **Registered for:** `TIMEOUT`  
@@ -455,14 +448,7 @@ FCP/HCT has no special routing — FCP/HCT shots hit `SHOT_ATTEMPT`, other FCP/H
 - Skeleton animation support
 - Handles multiple result types
 
-### 15. `handleFinalHold()`
-**Registered for:** `FINAL_HOLD`
-
-**What it does:**
-- Emits the turn text to the text scroll
-- Waits `animationConfig.finalTurn.holdClockOutMs` (default 1800ms) — the "clock out" beat before quarter/game end
-
-### 16. `handleFinalTurnShot()`
+### 15. `handleFinalTurnShot()`
 **Registered for:** `FINAL_TURN_SHOT` (reached via `determineHandler` when `final_turn === true` + shot attempt)
 
 **What it does:**
@@ -473,7 +459,12 @@ FCP/HCT has no special routing — FCP/HCT shots hit `SHOT_ATTEMPT`, other FCP/H
 
 Full registration list in `initializeDefaultHandlers()` (order doesn't matter — it's a Map):
 
-`FREE_THROW`, `SIDE_INBOUND`, `BASELINE_INBOUND`, `TURNOVER`, `FAST_BREAK`, `SHOT_ATTEMPT`, `REBOUND`, `PASS`, `HCO`, `FOUL`, `CHARGE`, `DEAD_BALL`, `DEAD BALL`, `STEAL`, `DEFAULT`, `PUTBACK_MAKE`, `PUTBACK_MISS`, `OREB_KICKOUT`, `OPENING_TIP`, `DEFENSIVE_STOP`, `TIMEOUT`, `FINAL_HOLD`, `FINAL_TURN_SHOT`
+`FREE_THROW`, `SIDE_INBOUND`, `BASELINE_INBOUND`, `TURNOVER`, `FAST_BREAK`, `SHOT_ATTEMPT`, `REBOUND`, `PASS`, `HCO`, `FOUL`, `CHARGE`, `DEAD_BALL`, `DEAD BALL`, `STEAL`, `DEFAULT`, `PUTBACK_MAKE`, `PUTBACK_MISS`, `OREB_KICKOUT`, `OPENING_TIP`, `DEFENSIVE_STOP`, `TIMEOUT`, `RUN_OUT_CLOCK`, `FINAL_TURN_SHOT`
+
+`RUN_OUT_CLOCK` with `oreb_run_out=true` first tweens the rebounder to
+`oreb_capture_coords`, attaches the ball, then carries the ball with that player
+through the normal run-out drift. The backend has already suppressed putback
+resolution and made the turn terminal.
 
 ## Specialized Animation Systems
 

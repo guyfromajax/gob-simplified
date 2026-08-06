@@ -180,6 +180,23 @@ class GameManager:
         self.game_state["clock"] = f"{minutes}:{seconds:02d}"
         return applied
 
+    def _finalize_synthesized_clock_turn(
+        self,
+        turn: dict,
+        *,
+        apply_clock_update: bool = True,
+    ) -> bool:
+        """Apply/normalize a bypass turn and report whether it ended the period."""
+        if apply_clock_update:
+            self.turn_manager.update_clock_and_possession(turn)
+        from BackEnd.utils.eoq_clock_progression import normalize_quarter_end_after_clock_update
+
+        normalize_quarter_end_after_clock_update(self, turn)
+        return bool(
+            int(self.game_state.get("time_remaining") or 0) <= 0
+            and turn.get("quarter_ends_after")
+        )
+
     
     def _init_game_state(self):
         from BackEnd.utils.sim_random import sim_rng as random
@@ -1474,7 +1491,13 @@ class GameManager:
                 
                 self._append_turn(oreb_turn)
                 # Apply OREB turn's time_elapsed to game state (same method as run_micro_turn)
-                self.turn_manager.update_clock_and_possession(oreb_turn)
+                oreb_ended_period = self._finalize_synthesized_clock_turn(oreb_turn)
+
+                # Do not flip possession, resolve a post-buzzer DREB, or process
+                # another OREB after this synthesized turn reaches 0:00.
+                if oreb_ended_period:
+                    self.game_state.pop("pending_oreb", None)
+                    break
 
                 # Handle possession flip for OREB turn (doesn't go through run_micro_turn)
                 if oreb_turn.get("possession_flips"):
@@ -1532,7 +1555,7 @@ class GameManager:
                         self._append_turn(dreb_turn)
                         if not oreb_turn.get("flss_after_dreb"):
                             self._maybe_stamp_hco_setup(dreb_turn)
-                        self.turn_manager.update_clock_and_possession(dreb_turn)
+                        self._finalize_synthesized_clock_turn(dreb_turn)
                         if oreb_turn.get("flss_after_dreb"):
                             from BackEnd.utils.eoq_clock_progression import schedule_flss_after_dreb
 
@@ -1677,7 +1700,7 @@ class GameManager:
                     # DREB turn doesn't go through the main _micro_turn flow,
                     # so stamp hco_setup here for its DREB → HCO transition.
                     self._maybe_stamp_hco_setup(dreb_turn)
-                self.turn_manager.update_clock_and_possession(dreb_turn)
+                self._finalize_synthesized_clock_turn(dreb_turn)
 
                 if (
                     dreb_turn.get("result_type") != "FOUL"
@@ -1801,7 +1824,7 @@ class GameManager:
         # injected here — ``force_foul_after_dreb`` (set in shot_manager) only
         # routes the possession straight to HCO (no outlet/FB). The intentional
         # foul on the rebounder now executes at the START of that HCO turn via
-        # the universal quick-foul hook (turn_manager._execute_quick_foul_at_hco_start),
+        # the universal quick-foul hook (turn_manager._execute_quick_foul_at_possession_start),
         # so BIP/SIP/DREB/OREB-kickout/Final-Turn all share one UESS-animated path.
 
         # (Foul-out check and timeout creation now run inside _append_turn for the main result)
@@ -1822,10 +1845,18 @@ class GameManager:
         # If the turn ended with a dead-ball turnover, a non-shooting foul
         # that does not result in free throws, or a charge (offensive foul),
         # prepare a sideline inbound and append its payload so the front end can animate it.
+        from BackEnd.utils.eoq_clock_progression import should_emit_clock_stopped_inbound
+
         if (
-            (sip_gate_result.get("result_type") == "FOUL" and self.game_state.get("free_throws_remaining", 0) == 0)
-            or sip_gate_result.get("result_type") == "DEAD BALL"
-            or sip_gate_result.get("result_type") == "CHARGE"
+            should_emit_clock_stopped_inbound(self, sip_gate_result)
+            and (
+                (
+                    sip_gate_result.get("result_type") == "FOUL"
+                    and self.game_state.get("free_throws_remaining", 0) == 0
+                )
+                or sip_gate_result.get("result_type") == "DEAD BALL"
+                or sip_gate_result.get("result_type") == "CHARGE"
+            )
         ):
             # ✅ FIX: Flip possession BEFORE setup_side_inbound so correct team inbounds
             # Dead ball turnovers and offensive fouls always flip possession
@@ -1909,7 +1940,7 @@ class GameManager:
                     return
             else:
                 # Situational Force Foul after SIP is handled by the quick-foul
-                # setup (setup_side_inbound) + universal HCO-start hook — no
+                # setup (setup_side_inbound) + universal possession-start hook — no
                 # pending flag needed here.
                 from BackEnd.utils.eoq_clock_progression import schedule_flss_after_inbound
 
@@ -1953,9 +1984,10 @@ class GameManager:
                     ft_pending,
                 )
                 return
-            if self.game_state.get("time_remaining", 1) == 0:
+            if not should_emit_clock_stopped_inbound(self, last_turn):
                 last_turn["quarter_ends_after"] = True
                 last_turn["next_play_type"] = None
+                last_turn.pop("next_turn", None)
                 logging.debug("✅ [FINAL PLAY] Skipping BIP — quarter ends after this turn (time_remaining=0)")
                 return
             # ✅ Flip possession BEFORE creating BASELINE_INBOUND (gold standard pattern)
@@ -2038,7 +2070,7 @@ class GameManager:
                     return
             else:
                 # Situational Force Foul after BIP is handled by the quick-foul
-                # setup (setup_baseline_inbound) + universal HCO-start hook — no
+                # setup (setup_baseline_inbound) + universal possession-start hook — no
                 # pending flag needed here.
                 from BackEnd.utils.eoq_clock_progression import schedule_flss_after_inbound
 
@@ -2055,6 +2087,14 @@ class GameManager:
                     game_state=self.game_state,
                     source="bypass:BIP",
                 )
+                bip_ended_period = self._finalize_synthesized_clock_turn(
+                    inbound_payload,
+                    apply_clock_update=False,
+                )
+                if bip_ended_period:
+                    # Prevent the pressure/HCO route selected before runoff from
+                    # surviving as backend state beyond the terminal BIP.
+                    next_defensive_setup = None
                 # Store offense destinations for pre-step-0 bring-up when next turn is HCO
                 if not next_defensive_setup:
                     self.game_state["_prev_offense_positions_for_hco"] = inbound_payload.get("oDestinations") or {}
@@ -2217,10 +2257,6 @@ class GameManager:
         current = result.get("current_turn")
         result_type = result.get("result_type")
         
-        # FINAL_HOLD is terminal for the possession/period boundary.
-        if result_type == "FINAL_HOLD":
-            return None
-
         if result_type == "RUN_OUT_CLOCK":
             return None
 

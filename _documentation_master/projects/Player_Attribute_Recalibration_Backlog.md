@@ -92,7 +92,9 @@ The 20 archetype display strings collapsed to 5 derived from (intent, tier). Cou
 Existing franchises keep old-scale short players while gaining height-gated PF and C ratings, so interior players' ratings collapse. Deliberately not migrated; the recalibration is new-franchises-only.
 
 **Shot-blocking effectively gone.** **ACCEPTED — documented so it is not misdiagnosed.**
-`height_to_block_score` returns 0 at or below the league median of 78, and an old-scale roster's p90 height *is* 78. A "nobody blocks shots on my save" report is this, not a bug.
+`height_to_block_score` returns 0 at or below the league median, and an old-scale roster's p90 height sat at the median. A "nobody blocks shots on my save" report is this, not a bug.
+
+> **Update (2026-08-04):** the block median is now **75** (`LEAGUE_MEDIAN_HEIGHT_IN`: 78 → 77 → 75). The band rides the constant, so the threshold moved down with it. New-scale (recalibrated, shorter) rosters sit at league p50 74 / p90 80, so roughly half score 0 on the block trigger — the same interaction, now at the shorter scale. Old-scale saves (p90 ~78) are *above* the new threshold, so the original "old-scale loses blocking" framing no longer applies to them.
 
 **Legacy `entry_tier` derivation.** **ACCEPTED.**
 A legacy player with no `entry_tier` has it derived from current RT, which misclassifies players whose RT collapsed under height gating — a distorted big reads as Poor and then develops on a Poor ladder, compounding the degradation above.

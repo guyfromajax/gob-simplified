@@ -1107,20 +1107,13 @@ Height separates cleanly across five rank bands. **Class has only 18 distinct in
 
 ---
 
-## 11. Open game-design question — development undoes authored attributes
+## 11. Development vs authorship — closed as a TB question
 
-**Raised 4 August 2026, not a defect.**
+**Raised 4 August 2026. Measured 6 August 2026. Reframes out of Team Builder.**
 
-Offseason development is an attractor toward `jh_anchor × ladder_rung × coaching_factor × potential_factor`, with attributes then blended toward the position profile and rescaled to hit that RT. It does **not** pull toward the attributes the user authored.
+Original brief + closure: `s11-development-vs-authorship.md`. Raw measurement: `s11-authorship-drift-findings.md`.
 
-So a player carefully rebuilt in the Team Builder editor is **clawed back toward his archetype at the next rollover.** The edit is a starting point the development system partially undoes.
+Three-arm retention at graduation was control **0.147** / realistic **0.150** / extreme **0.147** — authorship is not special. The offseason α-blend homogenises **every** program the same way. TB options 2–3 (reclassify / re-derive potential) are dead; they assumed authorship was the victim.
 
-That may be correct — development is a system, and a one-time edit arguably shouldn't override it permanently. But it means Team Builder's promise is **"shape your roster for this season"** rather than **"shape your program,"** and users will notice by season two.
+**Living question:** should development *reshape* or *grow*? That is simulation design, not a TB fix. Own section: [`Player_Development_System.md` → Reshape vs grow](../10_Players_Systems/Player_Development_System.md#reshape-vs-grow--open-simulation-design).
 
-**Decide deliberately:**
-
-1. Is partial reversion intended, or should authored attributes bias the development target?
-2. If intended, **should the wizard say so?** A user who spends twenty minutes redistributing attributes and watches them drift will feel misled, even if the behaviour is correct.
-3. Does this interact with capped mode's competitive claim? If a capped roster converges toward its archetype anyway, the online-eligibility guarantee is stronger than it needed to be.
-
-Related and already established: `entry_tier`, `potential_factor` and the development growth profile are all rolled at generation, persisted on the FPD, carried unchanged through Apply, and **never re-rolled** by Team Builder edits. The growth profile is not surfaced anywhere in the UI.

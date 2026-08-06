@@ -5385,7 +5385,18 @@ try:
                     reset_all_player_momentum(gm)
                 except Exception as e:
                     logging.error(f"⚠️ EOG: Player momentum reset failed: {e}")
-            next_quarter = gm.quarter if is_final or gm.quarter > 4 else gm.quarter + 1
+            # Recovery/idempotency path: perform the same EOQ state transition as
+            # normal post-turn completion instead of merely changing the serialized
+            # copy. Tied overtime advances to another OT just like regulation ties.
+            completed_quarter = gm.quarter
+            next_quarter = completed_quarter if is_final else completed_quarter + 1
+            gm.game_state.pop("final_turn_shot_this_turn", None)
+            from BackEnd.utils.eoq_clock_progression import clear_late_clock_eoq_chain
+
+            clear_late_clock_eoq_chain(gm.game_state)
+            if not is_final:
+                gm.quarter = next_quarter
+                gm.game_state["quarter"] = next_quarter
             logging.warning(
                 "🧭 [SIM TURN EARLY RETURN TRACE] reason=quarter_complete game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s pending_terminal_ft=%s",
                 game_id,
@@ -5694,7 +5705,8 @@ try:
             
             # Check if quarter is now complete.
             # Edge-case rule: if FT is still pending at 0:00, quarter is NOT complete yet.
-            # Phase 6: Final Turn shot and FINAL_HOLD use time_elapsed = time_remaining, so clock reaches 0
+            # Final Turn and Run Out turns consume their authored clock time; when
+            # that reaches 0 this block advances to Quarter Break / OT / game end.
             # after the turn (or after FTs if shooting foul); this block then sets quarter_complete and
             # advances to Quarter Break / OT / game end via existing logic.
             pending_terminal_ft_after_turn = _has_pending_terminal_free_throw(gm)
@@ -5721,27 +5733,6 @@ try:
                     quarter_complete,
                 )
 
-            # Detect repeated FINAL_HOLD at 0:00 (infinite-loop symptom).
-            if isinstance(latest_turn, dict) and latest_turn.get("result_type") == "FINAL_HOLD" and gm.game_state.get("time_remaining", 0) <= 0:
-                streak = int(gm.game_state.get("_debug_final_hold_streak", 0) or 0) + 1
-                gm.game_state["_debug_final_hold_streak"] = streak
-                if streak >= 2:
-                    logging.error(
-                        "🚨 [ZERO CLOCK LOOP TRACE] repeated FINAL_HOLD streak=%s game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s pending_terminal_ft=%s free_throws_remaining=%s offensive_state=%s latest_turn_next=%s",
-                        streak,
-                        game_id,
-                        gm.quarter,
-                        gm.game_state.get("clock"),
-                        gm.game_state.get("time_remaining"),
-                        gm.game_state.get("shot_clock_remaining"),
-                        pending_terminal_ft_after_turn,
-                        gm.game_state.get("free_throws_remaining"),
-                        gm.game_state.get("offensive_state"),
-                        latest_turn.get("next_play_type"),
-                    )
-            else:
-                gm.game_state["_debug_final_hold_streak"] = 0
-            
             # Debug logging for quarter completion check
             if quarter_complete:
                 turn_type = latest_turn.get("result_type", "UNKNOWN") if latest_turn else "NONE"

@@ -337,7 +337,7 @@ At AG=50, `base_rate / STANDARD` = 1, so each archetype runs at its table rate i
 
 - Only `gate_player_ids` are guaranteed to reach `destination` by step end.
 - Non-gate movers end at `_interrupted_coord` (`start + rate × T` toward destination). The advance trigger (the gate reaching its destination / step T elapsing) ends the step; every other player stops at wherever they've progressed to.
-- Destinations may carry across consecutive steps so a slow mover can keep progressing toward the same target (e.g., HCT defenders: BIP step 1 → BIP step 2 → HCT walk-up all share the same destination).
+- Destinations may carry across consecutive steps so a slow mover can keep progressing toward the same target (e.g., HCT defenders: BIP step 1 → BIP step 2 → HCT walk-up all share the same destination; RR/Triangle trailing players continue through pass/drive → shot motion). Carry uses the prior step's authored destination, not a re-rolled/reconstructed target; explicit later-step roles such as shooter or shot defender override it.
 
 **Logic reads the interrupted end, not the destination (§1 applied to motion).** A player's authoritative step-end position is the interrupted `end.coords[p]` the emitter renders — NOT the `destination` intent. All game logic — contest, steal, foul, rebound, over-and-back / frontcourt / shot-clock reads — MUST decide from `end.coords[p]`. Reading the `destination` (or "snapping" a player to their full target) means deciding from a position the FE never showed — a §1 single-coord-source violation, not merely a render detail.
 

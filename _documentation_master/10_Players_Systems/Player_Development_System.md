@@ -14,7 +14,7 @@ target_RT = _compress_rt( jh_anchor × ladder_multiplier(rung) × coaching_facto
 
 - `jh_anchor` — the player's JH-scale anchor, derived from `entry_tier` via `JH_ANCHOR_BY_TIER`.
 - `ladder_multiplier(rung)` — the class-year rung on the ladder. **Includes the player's peak bonuses** (peaks stack on top of the standard rung increments).
-- `f` — coaching-quality multiplier, bounded `[0.85, 1.20]`. **Currently dormant at 1.0** for every player (the live coaching-quality seam returns `None`), so the league holds exactly on the ladder until per-player allocation capture ships.
+- `f` — coaching-quality multiplier, bounded `[0.85, 1.20]`. **Currently dormant at 1.0** for every player (`_coaching_accumulator_for_player` hardwired to `None`), so the league holds exactly on the ladder until per-player allocation capture ships. **Open:** is that unfinished, deliberate, or a bug? See [Reshape vs grow](#reshape-vs-grow--open-simulation-design) — inert `f` plus a strong shape attractor is why the league converges rather than softens.
 - `potential_factor` — career-static ±15% ceiling scalar (`POTENTIAL_FACTOR_BAND = 0.15`), drawn once at generation, independent of `entry_tier` and `ch_seed`. **LIVE** (Potential Rating Phase 3). A pure scalar on the target, so it lifts the *level* with the *same profile shape* — a shooter stays a shooter. Legacy players with no stored value resolve deterministically from `player_id` (`resolve_potential_factor`).
 - `_compress_rt` — soft cap near `RT_SOFT_CAP = 130`, asymptote ≈ 138. Below the cap it is identity; it only bends the very top. The extreme cohort Elite × 3-peak × 1.15 targets `50 × 2.6 × 1.15 = 149.5`, compressed to **137.3**. (Achieved RT, recomputed from attributes, can overshoot the compressed target for a <0.1% tail — a pre-existing property of recompute-from-attributes, not introduced by `potential_factor`.)
 
@@ -29,6 +29,8 @@ Because the target is absolute and re-anchored every rollover, nothing drifts: i
 ## Shape Attractor
 
 Constant: `OFFSEASON_ATTRACTOR_ALPHA = 0.55`.
+
+> **Open design question (2026-08-06):** this constant reshapes players toward a positional mean on a career schedule nobody chose against. See [Reshape vs grow](#reshape-vs-grow--open-simulation-design). Do not retune α as a casual lever until that question is answered.
 
 Rather than distributing an additive budget, the offseason targets **both a level** (the ladder RT) **and a shape** (the position/tier/year profile), and it separates them (2026-08 attractor-level fix):
 
@@ -85,7 +87,7 @@ Plus the CPU-path **"preserves shape"** invariant: the offseason regrows toward 
 
 | Constant | Value | Effect |
 |---|---|---|
-| `OFFSEASON_ATTRACTOR_ALPHA` | `0.55` | Fraction of the gap to the profile closed each offseason. Higher = faster convergence and tighter shape; lower = user focus persists longer as a spike |
+| `OFFSEASON_ATTRACTOR_ALPHA` | `0.55` | Fraction of the gap to the profile closed each offseason. See [Reshape vs grow](#reshape-vs-grow--open-simulation-design) before retuning — career retention at 0.55 is ~9% for a freshman, and the constant was fitted against single-season feel, not a four-year criterion. |
 | `STD_RUNG_INCREMENT` (× JH anchor) | FR .17 / SO .20 / JR .15 / SR .18 (Σ .70 → 1.7× at zero peaks) | Per-rung standard growth; sets the class-year ladder |
 | `PEAK_BONUS` | `+0.30 × jh_anchor`, fixed per peak | Each rolled peak adds this to the target; peaks stack (0–3), so career multiple runs 1.7× (0 peaks) → 2.6× (3 peaks) |
 | `HT_TOTAL` (mean) | `Normal(3.2, 1.9)` clamped `[0,8]`; per-rung cap 2.5 in | Total career height gain; `HT_TOTAL_MEAN = 3.2` in sets how far below frame a JH starts |
@@ -95,6 +97,77 @@ Plus the CPU-path **"preserves shape"** invariant: the offseason regrows toward 
 | `RT_COMPRESSION_THRESHOLD` / `RT_SOFT_CAP` | `95` / `130` | RT gains compress above 95; ~130 is the practical ceiling (individual attributes are uncapped) |
 | `OFFSEASON_DISTRIBUTION_BLEND` | `0.70` | **Vestigial** — the additive-budget distribution blend; superseded by the shape attractor (`OFFSEASON_ATTRACTOR_ALPHA`). |
 | `JH_ANCHOR_BY_TIER` | Poor→Elite JH-scale anchors (e.g. Average 30, Elite 50) | Maps `entry_tier` to the `jh_anchor` the target formula multiplies |
+
+## Reshape vs grow — open simulation design
+
+**Surfaced 6 August 2026 via Team Builder §11. Not a Team Builder problem.**  
+TB measurement: `projects/s11-authorship-drift-findings.md`. Closed TB brief: `projects/s11-development-vs-authorship.md`.
+
+### What the measurement actually found
+
+Three arms on one median roster, same seed — control **0.147** · realistic **0.150** · extreme **0.147** retained profile-deviation at graduation.
+
+Authorship is not being erased. **Individuality is**, and the same force hits all 128 programs every offseason. The α-blend toward `position_profile(training_position)` is proportional: it takes the same 55% bite out of everyone's distance from the positional mean. A user's authored 6'2" centre and an untouched base-league centre converge at the same rate.
+
+Team Builder did not create this. It made it visible — third instrument finding after the empty defenses cache and the 443 in-loop DB writes per quarter.
+
+### The number nobody chose against a career
+
+At `OFFSEASON_ATTRACTOR_ALPHA = 0.55`, a freshman retains `(1 − α)³ ≈ 9%` of distinctive shape by graduation. Measurement found **~8%** — the model is behaving exactly as specified.
+
+| Career retention target | Required α |
+|---|---:|
+| 75% across four years | ≈ 0.09 |
+| 50% across four years | ≈ 0.21 |
+| **Current** | **0.55** |
+
+Current α is 2.6×–6× stronger than either career target. Tunable_Constants documents it as fitted for **single-season feel** (Average C SC ~52, focus spike ~+8). Confirm with whoever picked it before retuning — they may have had a reason — but the spread is large enough that it reads as a constant chosen without a career-length criterion.
+
+### Separate open question — coaching differentiation is inert
+
+`_coaching_accumulator_for_player` is hardwired to `None`, so `f ≡ 1.0` for every player.
+
+The input that would differentiate development between programs is inert. Strong force toward the positional mean; nothing pushing programs apart. That is why the league converges rather than merely softening.
+
+Is that unfinished (pillar 3 not shipped), deliberately disabled, or a bug? Needs its own answer. It may be the more consequential of the two findings.
+
+### Dead options from the TB framing
+
+| Option | Why dead |
+|---|---|
+| Re-run archetype classification at Establish | Blend targets `position_profile(training_position)`, not archetype. Reclassifying changes nothing unless it changes training position, and it wouldn't fix homogenization for anyone else. |
+| Re-derive `potential_factor` from authored attrs | Scalar on growth *magnitude*. Does not touch the blend target. |
+| Freeze authored attributes | Two classes of player; permanent special case. Still wrong. |
+
+Both of the first two assumed authorship was the victim. It isn't.
+
+### The actual question
+
+**Should development reshape a player, or grow him?**
+
+- **Reshape (current):** blend toward a positional mean. Necessarily subtracts from whatever a player is best at — that is where he is furthest from the mean. A 90-rebounding centre losing rebounding as he matures is regression to type wearing development's clothes.
+- **Grow (alternative):** mostly add, distributed with a bias toward positional needs; subtract only in decline. Players improve; they don't get averaged. Preserves individuality without exempting anyone.
+
+This is a core simulation decision. It affects scouting, recruiting, whether the SIGNATURE bars on the roster screen mean anything after year two, and whether two programs feel different in season three.
+
+### Product asymmetry (why TB still matters as the symptom)
+
+Everyone loses their shape. Only the Team Builder user *chose* theirs. The mechanism is not TB-specific and TB is not disadvantaged relative to the league — but the experience is worse for exactly the users who paid the most attention. That is why TB is the reason this surfaced, not an argument for a TB-specific fix.
+
+### Before choosing — measure league-wide convergence
+
+One roster proved the mechanism. The headline needs the league.
+
+Measure attribute spread across all 128 programs' players at **t0 vs t+3**:
+- standard deviation per attribute
+- distance between best and worst team at each position
+
+| If… | Then… |
+|---|---|
+| The league is measurably flattening | Headline finding; outranks TB-plan work. Model change (grow vs reshape), not a constant tweak. |
+| Spread holds because recruiting injects variety faster than the blend removes it | α is a tuning question — cheaper. Still confirm career criterion before dialing. |
+
+Either way, that measurement decides constant-vs-model before anything is designed.
 
 ## Key Files
 

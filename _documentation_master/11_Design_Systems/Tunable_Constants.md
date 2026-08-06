@@ -243,7 +243,7 @@ middle band falls back to ordinary shot resolution. The two outcome thresholds a
 | `BLOCK_FIGHT_RANGE_MIN` / `BLOCK_FIGHT_RANGE_MAX` | constants/__init__.py | `0 / 10` | Second trigger, attempted only after aggression misses: `roll <= defense fight`. |
 | Defensive `fight` | team attribute | live team value | Second-trigger comparison value; higher fight produces more reconciliation attempts. |
 | `BLOCK_PLAYER_ROLL_MIN` / `BLOCK_PLAYER_ROLL_MAX` | constants/__init__.py | `1 / 300` | Third trigger, after aggression and fight miss, rolls against `defender ID + defensive_efficiency × height_rating`. Lowering the maximum increases individual rim-protector attempts. |
-| Height rating (`height_to_block_score`) | shared.py | `≤77→0`, `h−77`, `≥87→10` (offsets from `LEAGUE_MEDIAN_HEIGHT_IN`=77; 1 pt/inch — rides the median automatically) | Feeds both the third attempt trigger and reconciliation. In reconciliation it becomes `height_rating × 10 + randint(-9,9)` and receives 40% weight. (Now median 77 after the 2026-08 HS −1in shift; the code uses the constant, so it moved on its own.) |
+| Height rating (`height_to_block_score`) | shared.py | `≤75→0`, `h−75`, `≥85→10` (offsets from `LEAGUE_MEDIAN_HEIGHT_IN`=75; 1 pt/inch — rides the median automatically) | Feeds both the third attempt trigger and reconciliation. In reconciliation it becomes `height_rating × 10 + randint(-9,9)` and receives 40% weight. (Now median 75 after the 2026-08 HS shifts −1 then −2; the code uses the constant, so it moved on its own.) |
 | Defender block composite | shot_manager.py | `height 40% + ID 40% + IQ 20%`, then `× randint(1,6)` | Determines `defense_block_score`; higher attributes or roll make negative reconciliation diff and blocks more likely. |
 | Contest-result eligibility | shot_micro_movements constants | `neutral` or `defense_win`; boundaries `±150` | `offense_win` shots do not enter the block funnel. Changing contest boundaries changes the eligible population. |
 | Shooter finish threshold | shot_manager.py | `250` | When reconciliation lands in the foul band, shooter finish score above 250 makes the basket for an and-one. Does not affect block volume. |
@@ -258,9 +258,9 @@ week-aggregate shot reports.
 
 | Constant | File | Value | Effect |
 |---|---|---|---|
-| `LEAGUE_MEDIAN_HEIGHT_IN` | constants/__init__.py | `78` | Base for height bands / block height-rating and team-builder band defaults. |
+| `LEAGUE_MEDIAN_HEIGHT_IN` | constants/__init__.py | `75` | Base for height bands / block height-rating and team-builder band defaults. (78 → 77 → 75 across the two 2026-08 HS shifts.) |
 
-**Caveat (2026-08-01, grow-into-frame):** `78` describes the **adult** height distribution (the §11.2 fitness peaks). Since three of four class years have not finished growing (§16.3 grow-into-frame, §11.3 pool stagger), the **live rostered league sits at ~77.3** (measured on the re-migrated pool: FR 76.0 / SO 77.0 / JR 78.0 / SR 78.5). Any band expressed as an offset from `78` is therefore ~0.7in high relative to the actual population — small and probably invisible, but it is the absolutes-against-an-assumed-distribution pattern in miniature. Documented so it is not rediscovered; not currently worth re-tuning.
+**Caveat (2026-08-01, grow-into-frame; figures updated 2026-08-04 for the −2in shift):** `75` describes the **adult** height distribution (the §11.2 fitness peaks; mean of the five ideals ≈ 75.2). Since three of four class years have not finished growing (§16.3 grow-into-frame, §11.3 pool stagger), the **live rostered league sits at ~74** (measured on the re-recalibrated pool: FR 72.9 / SO 74.0 / JR 74.9 / SR 75.5; league p50 74). Any band expressed as an offset from `75` is therefore ~1in high relative to the actual population — small and probably invisible, but it is the absolutes-against-an-assumed-distribution pattern in miniature. Documented so it is not rediscovered; not currently worth re-tuning.
 
 ## Dynamic HCO Defense (Pass Interception)
 
@@ -842,7 +842,7 @@ Effects are stated in gameplay terms; movement figures are where we measured the
 
 | Lever | now | What it changes in the game | Rough movement | Status |
 |---|---|---|---|---|
-| `OFFSEASON_ATTRACTOR_ALPHA` | 0.55 | How hard each offseason pulls a player toward his ideal position shape vs letting training-driven deviation stand. Higher → everyone converges to the archetype (a big always scores); lower → training focus makes bigger, more persistent spikes. | At 0.55: reference-developed Average C lands SC ~52; a scoring-focused C spikes ~+8. α=0.7 → SC ~55, spike ~+4. | LIVE |
+| `OFFSEASON_ATTRACTOR_ALPHA` | 0.55 | How hard each offseason pulls a player toward his ideal position shape vs letting training-driven deviation stand. Higher → everyone converges to the archetype (a big always scores); lower → training focus makes bigger, more persistent spikes. **Open — see Reshape vs grow in Player_Development_System.md before retuning.** Career retention at 0.55 is ~(1−α)³ ≈ 9% for a freshman (measured ~8%); 75%/50% career retention would need α ≈ 0.09 / 0.21. Fitted against single-season feel (Average C SC ~52, focus spike ~+8), not a four-year criterion. | At 0.55: reference-developed Average C lands SC ~52; a scoring-focused C spikes ~+8. α=0.7 → SC ~55, spike ~+4. | LIVE — under review |
 | `PEAK_BONUS` | +0.30 × JH anchor | Size of a "coming-of-age" peak season. Career multiple = 1.7 + 0.30·peaks → 0/1/2/3 peaks give 1.7 / 2.0 / 2.3 / 2.6× the JH anchor. | +0.10 ≈ +3 RT/peak at Average. | LIVE |
 | `STD_RUNG_INCREMENT` | FR.17 SO.20 JR.15 SR.18 | The no-peak career arc — how much RT a peakless player gains each year (Σ .70 → 1.7× at SR). | shifts the per-rung ladder shape | LIVE |
 | `CH_PEAK_LOW`/`_HIGH` | (.38,.52,.10,0)→(.02,.58,.34,.06) | How strongly a player's hidden CH predicts peak count (high-CH → more peaks). Midpoint peak dist 20/55/22/3. | widens/narrows the high-CH advantage | LIVE |
@@ -865,7 +865,7 @@ Effects are stated in gameplay terms; movement figures are where we measured the
 | **`_CPU_REFERENCE_BASE`** (CPU base allocation) | fitted so base × ~1.65 focus amp scores ~1.0 vs the frozen reference | CPU drifts off the ladder (players swing −10 in-season / +10 offseason, and once quality is live, sink under the ladder). | never change alone — change *with* the reference; **locked by `tests/test_cpu_reference_training.py`** |
 | **`POSITION_WEIGHTS`** (the 5 RT weight vectors) | see reference table | These *define RT*. Changing them re-scales every player's RT and re-sorts positions. | the whole class-year ladder, `HEIGHT_FITNESS`, and a full **pool re-migration** |
 | **`COACHING_SATURATION_CAP`** (a.k.a. QUALITY_CAP) | 4.0 pts/attr | Sets what "good coaching" means (points where an attr saturates). Rescales the quality metric. | the reference (must still score 1.0) + `_CPU_REFERENCE_BASE` + `COACHING_STANDARD_BUDGET`/`COACHING_HEADROOM` |
-| **`LEAGUE_MEDIAN_HEIGHT_IN`** | 78 | Base for every height-offset band (block scoring, weight bands, camp gates). Describes the **adult** distribution; the live rostered league sits ~77.3 (grow-into-frame), so bands run ~0.7in high — see the Height-distribution section above. | all `MED±` offset bands that reference it |
+| **`LEAGUE_MEDIAN_HEIGHT_IN`** | 75 | Base for every height-offset band (block scoring, weight bands, camp gates). Describes the **adult** distribution; the live rostered league sits ~74 (grow-into-frame), so bands run ~1in high — see the Height-distribution section above. (78 → 77 → 75 across the two 2026-08 HS shifts.) | all `MED±` offset bands that reference it |
 
 ---
 
@@ -882,7 +882,7 @@ Constants for the RT formula (§3.6), position-intent generation (§11.2), the p
 | Constant | Value | Effect |
 |---|---|---|
 | `POSITION_WEIGHTS` | 5 vectors, §3.6.1 (each sums to 1.0) | attribute mix per position; one table for players+recruits |
-| `HEIGHT_FITNESS` | (ideal, short/in, tall/in): PG 72.5/.020/.050 · SG 75/.030/.045 · SF 77.5/.035/.035 · PF 79.5/.050/.025 · C 81.5/.060/.010 | multiplicative height gate, all 5 positions. **This is the edit point for `HEIGHT_IDEAL_IN`** (ideals −1in for the 2026-08 HS shift; penalties held). |
+| `HEIGHT_FITNESS` | (ideal, short/in, tall/in): PG 70.5/.020/.050 · SG 73/.030/.045 · SF 75.5/.035/.035 · PF 77.5/.050/.025 · C 79.5/.060/.010 | multiplicative height gate, all 5 positions. **This is the edit point for `HEIGHT_IDEAL_IN`** (ideals −3in total for the 2026-08 HS shifts: −1 then −2; penalties held). |
 | `HEIGHT_FITNESS_FLOOR` / `_CAP` | 0.50 / 1.15 | fitness clamp (peak 1.0 at ideal; cap is a guard) |
 
 ### Interim generation — `BackEnd/utils/player_generation.py`
@@ -893,18 +893,18 @@ Constants for the RT formula (§3.6), position-intent generation (§11.2), the p
 | `TIER_FREQUENCY` | .07 / .20 / .40 / .20 / .11 / .02 | share of generated players per tier (§4.1). Supersedes the 4-value `TIER_FREQUENCY` in design §12. |
 | `RUNG_MULTIPLIERS` | JH 1.00 · FR 1.17 · SO 1.43 · JR 1.80 · SR 2.00 | class-year ladder; target RT = anchor × rung (§4.2) |
 | `POSITION_INTENT_SHARE` | 0.20 | ~even position intent |
-| `HEIGHT_IDEAL_IN` | PG 72.5 · SG 75 · SF 77.5 · PF 79.5 · C 81.5 (in) | **Dual-purpose**: per-position **generation mean** (`draw_height`) AND the **RT height-fitness peak**. ⚠️ **DERIVED — the real edit point is elsewhere.** It's a comprehension over `HEIGHT_FITNESS` in **`BackEnd/utils/position_ratings.py`**; the only value that does anything is the `ideal` in each `HEIGHT_FITNESS` tuple. Editing anything named `HEIGHT_IDEAL_IN`, or this row, **silently does nothing**. Tuning rule below. |
-| `HEIGHT_SD_IN` | 2.1 | per-position height sd (league aggregate ≈ mean 77, sd 3.6). Non-uniform lever — changing it widens/narrows position overlap (tweener rate). |
-| `WEIGHT_AT_MEDIAN` | 209.5 (lb) | Body weight at the league median height (77in). The whole-league weight anchor — raise/lower to make everyone heavier/lighter at their height. **Display/flavor only — RT ignores weight.** (−5.5 from 215 with the HS height shift keeps BUILD constant; a further cut here = leaner-for-HS, a separate adjustment.) |
+| `HEIGHT_IDEAL_IN` | PG 70.5 · SG 73 · SF 75.5 · PF 77.5 · C 79.5 (in) | **Dual-purpose**: per-position **generation mean** (`draw_height`) AND the **RT height-fitness peak**. ⚠️ **DERIVED — the real edit point is elsewhere.** It's a comprehension over `HEIGHT_FITNESS` in **`BackEnd/utils/position_ratings.py`**; the only value that does anything is the `ideal` in each `HEIGHT_FITNESS` tuple. Editing anything named `HEIGHT_IDEAL_IN`, or this row, **silently does nothing**. Tuning rule below. |
+| `HEIGHT_SD_IN` | 2.1 | per-position height sd (league aggregate ≈ mean 75, sd 3.6). Non-uniform lever — changing it widens/narrows position overlap (tweener rate). |
+| `WEIGHT_AT_MEDIAN` | 198.5 (lb) | Body weight at the league median height (75in). The whole-league weight anchor — raise/lower to make everyone heavier/lighter at their height. **Display/flavor only — RT ignores weight.** (History: 215 → 209.5 (−5.5, −1in shift) → 198.5 (−11, −2in shift). Each drop is slope×Δin so the line moves down WITH the median and BUILD stays constant — same weight-for-height, just lighter absolute. A further cut here = leaner-for-HS, a separate adjustment.) |
 | `WEIGHT_LB_PER_INCH` | 5.5 | Weight **slope** — lb added per inch above the median (subtracted below). Continuous, so no band artifact (a 77→78in inch is +5.5lb, not a ~27lb jump). Lower it to decouple weight from height — slimmer bigs without moving guards. |
-| `WEIGHT_NOISE_LB` | ±12 | Uniform jitter around the line so same-height players differ. One rng draw (stream-preserving). `weight = WEIGHT_AT_MEDIAN + WEIGHT_LB_PER_INCH·(h−77) ± noise`; measured league p10/p50/p90 ≈ 176/206/236, PG p50 181 → C p50 230. |
+| `WEIGHT_NOISE_LB` | ±12 | Uniform jitter around the line so same-height players differ. One rng draw (stream-preserving). `weight = WEIGHT_AT_MEDIAN + WEIGHT_LB_PER_INCH·(h−75) ± noise`; measured league p10/p50/p90 ≈ 164/195/226, PG p50 168 → C p50 219 (post −2in shift). |
 | `PROFILE_FILLER` | 0.45 | unweighted-attr baseline as fraction of signature attr |
 | `PROFILE_ND_BASE` | 0.60 | ND baseline (ND is not in any RT vector) |
 | `ATTR_NOISE_SD` | 0.13 | per-attribute spread → tweener/tie rate (sharper identities per decision #7; ≥100 ≈ 5.7%) |
 
-**Height/weight tuning rule.** A **uniform** shift of all five `HEIGHT_IDEAL_IN` **plus** `LEAGUE_MEDIAN_HEIGHT_IN` (=77) by the same number of inches is **safe** — RT, position supply, and the fitness curve are all unchanged. Fitness is defined *relative to each ideal* (peak stays at the ideal), the generation mean shifts with it, and the weight line (`WEIGHT_AT_MEDIAN` + `WEIGHT_LB_PER_INCH`·(h − median)) and the height class-year bands are all expressed **relative to `LEAGUE_MEDIAN_HEIGHT_IN`**, so they ride the shift together. A **non-uniform** change — moving one position's ideal relative to the others, or changing `HEIGHT_SD_IN` — is an **anchor edit**: it reshapes position supply (which heights favour which positions) and the fitness curve, and is not neutral.
+**Height/weight tuning rule.** A **uniform** shift of all five `HEIGHT_IDEAL_IN` **plus** `LEAGUE_MEDIAN_HEIGHT_IN` (=75) by the same number of inches is **safe** — RT, position supply, and the fitness curve are all unchanged. Fitness is defined *relative to each ideal* (peak stays at the ideal), the generation mean shifts with it, and the weight line (`WEIGHT_AT_MEDIAN` + `WEIGHT_LB_PER_INCH`·(h − median)) and the height class-year bands are all expressed **relative to `LEAGUE_MEDIAN_HEIGHT_IN`**, so they ride the shift together. A **non-uniform** change — moving one position's ideal relative to the others, or changing `HEIGHT_SD_IN` — is an **anchor edit**: it reshapes position supply (which heights favour which positions) and the fitness curve, and is not neutral.
 
-> ⚠️ **`opening_tip` is the exception.** `opening_tip.get_height_scale_value` uses **absolute inch literals** (`>86`→10, `≥84`→9, `≥82`→8, `81`→7, … `76`→2, `<76`→1) anchored to the centre median, **not** offsets from `LEAGUE_MEDIAN_HEIGHT_IN`. It was manually "+3 re-banded" for the pass-1 recal and will **not** ride a uniform shift — it must be re-banded by the same amount alongside any height shift, or the tip-off contest desyncs from the new distribution.
+> ⚠️ **`opening_tip` is the exception.** `opening_tip.get_height_scale_value` uses **absolute inch literals** (`>83`→10, `≥81`→9, `≥79`→8, `78`→7, … `73`→2, `<73`→1) anchored to the centre median, **not** offsets from `LEAGUE_MEDIAN_HEIGHT_IN`. It was manually "+3 re-banded" for the pass-1 recal, then hand-re-banded −1 and −2 for the two 2026-08 HS shifts; it will **not** ride a uniform shift — it must be re-banded by the same amount alongside any height shift, or the tip-off contest desyncs from the new distribution.
 
 ### Pool remap — `scripts/regenerate_universal_pool.py`
 
@@ -914,6 +914,8 @@ Constants for the RT formula (§3.6), position-intent generation (§11.2), the p
 | `IDENTITY_STRENGTH` | 0.15 | how much a player's old attribute shape modulates the new position profile ("a shooter stays a shooter"); 0.35 imported the old SH-spike artifact (≥100 12.6%→6.4% at 0.15) |
 
 ### Height re-band (§11.2 — league median 72 → 78)
+
+> **Current value note (2026-08-04):** `LEAGUE_MEDIAN_HEIGHT_IN` is now **75** (78 → 77 → 75 across the two 2026-08 HS shifts, −1 then −2). This section documents the original pass-1 re-band and states `MED=78` as it stood then. Every `MED±` band below is an offset from the constant and rides it automatically, so substitute **MED = 75** for current behaviour; the `≤median` block-score / p90 figures in the Pass-2 watch shift down 3in likewise. `opening_tip` is the one exception (absolute literals, re-banded by hand — now `≥79→8`, see the ⚠️ note above).
 
 | Constant / location | Value | Effect |
 |---|---|---|

@@ -93,7 +93,6 @@ describe('AnimationEngine', () => {
   describe('Final Turn UESS hold', () => {
     test('_isFinalTurnSchemaShot detects make/miss/block only', () => {
       expect(engine._isFinalTurnSchemaShot({ final_turn: true, result_type: 'MISS' })).toBe(true);
-      expect(engine._isFinalTurnSchemaShot({ final_turn: true, result_type: 'FINAL_HOLD' })).toBe(false);
       expect(engine._isFinalTurnSchemaShot({ final_turn: false, result_type: 'MISS' })).toBe(false);
     });
   });

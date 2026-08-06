@@ -105,6 +105,22 @@ def test_should_run_out_clock_q4():
     assert sl.should_run_out_clock(g4, 25) is False
 
 
+def test_eoq_situational_action_priority_and_score_bands():
+    assert sl.get_eoq_situational_action(_Game(4, 71, 70), 25) == "FORCE_FOUL"
+    assert sl.get_eoq_situational_action(_Game(4, 78, 70), 25) == "FORCE_FOUL"
+    assert sl.get_eoq_situational_action(_Game(4, 79, 70), 25) == "RUN_OUT_CLOCK"
+    assert sl.get_eoq_situational_action(_Game(4, 70, 70), 25) == "FINAL_SHOT"
+    assert sl.get_eoq_situational_action(_Game(4, 67, 70), 25) == "FINAL_SHOT"
+    assert sl.get_eoq_situational_action(_Game(4, 66, 70), 25) == "QUICK_SHOT"
+    assert sl.get_eoq_situational_action(_Game(4, 51, 70), 25) == "RUN_OUT_CLOCK"
+
+
+def test_eoq_situational_action_outside_active_window():
+    assert sl.get_eoq_situational_action(_Game(3, 79, 70), 25) is None
+    assert sl.get_eoq_situational_action(_Game(4, 79, 70), 31) is None
+    assert sl.get_eoq_situational_action(_Game(4, 79, 70), 0) is None
+
+
 def test_strip_terminal_rebound_fields():
     payload = {
         "rebounderId": "p1",

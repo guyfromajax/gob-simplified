@@ -306,6 +306,29 @@ def should_run_out_clock(game, time_remaining_seconds):
     return delta >= 1 or delta < -18
 
 
+def get_eoq_situational_action(game, time_remaining_seconds):
+    """Return the authoritative Q4/OT action for a live turn at <=30 seconds.
+
+    Priority is deliberate and shared by HCO, HCT, FCP, and FAST_BREAK:
+    Force Foul -> Run Out -> Quick Shot -> Final Shot. ``None`` means the
+    Q4/OT late-clock decision layer is not active.
+    """
+    if not is_situational_active(getattr(game, "quarter", None)):
+        return None
+    if time_remaining_seconds is None:
+        return None
+    time_remaining = int(time_remaining_seconds)
+    if time_remaining <= 0 or time_remaining > 30:
+        return None
+    if is_slow_it_down(game, time_remaining) and should_force_foul(game, time_remaining):
+        return "FORCE_FOUL"
+    if should_run_out_clock(game, time_remaining):
+        return "RUN_OUT_CLOCK"
+    if is_quick_shot(game, time_remaining):
+        return "QUICK_SHOT"
+    return "FINAL_SHOT"
+
+
 def would_take_final_shot(game, time_remaining_seconds):
     """
     True when this possession should attempt a Final Shot (not run-out, force foul, or quick shot).

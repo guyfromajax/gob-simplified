@@ -50,6 +50,7 @@ from BackEnd.engine.rim_runner_step_emitter import (
     _fb_play_label,
     _finalize_rr_steps,
     _interrupted_coord,
+    _initialize_continuing_movement,
     is_lane_pass_to_rr_resolution_turn,
     _player_lookup_by_id,
     closeout_contest_coord,
@@ -128,6 +129,7 @@ def _build_parallel_move_step(
     next_step: NextStep,
     announcement: Optional[Announcement] = None,
     arrival_player_ids: Optional[List[str]] = None,
+    previous_step: Optional[AnimationStep] = None,
 ) -> Optional[AnimationStep]:
     if gate_player_id not in step_start_coords:
         return None
@@ -160,16 +162,13 @@ def _build_parallel_move_step(
         recv_rate = _ag_grid_per_game_sec(recv_player, mover[2])
         t = max(t, _traversal_seconds(step_start_coords[pid], mover[1], recv_rate))
 
-    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
-    archetype: Dict[str, PlayerArchetype] = {
-        pid: "stationary" for pid in step_start_coords
-    }
-    destinations: Dict[str, Optional[GridCoord]] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
-    end_coords: Dict[str, GridCoord] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
+    actions, archetype, destinations, end_coords = _initialize_continuing_movement(
+        step_start_coords=step_start_coords,
+        previous_step=previous_step,
+        step_t=t,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+    )
 
     for pid, target, arch, action in movers:
         if pid not in step_start_coords:
@@ -303,6 +302,7 @@ def _build_branch_pass_step(
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
     next_step_index: int,
+    previous_step: Optional[AnimationStep] = None,
 ) -> Optional[AnimationStep]:
     if passer_id not in step_start_coords or receiver_id not in step_start_coords:
         return None
@@ -310,16 +310,13 @@ def _build_branch_pass_step(
     dist = _euclid(passer_coord, receiver_target)
     t = max(FB_PASS_MIN_GAME_SECONDS, dist / float(FB_PASS_GRID_SPOTS_PER_GAME_SECOND))
 
-    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
-    archetype: Dict[str, PlayerArchetype] = {
-        pid: "stationary" for pid in step_start_coords
-    }
-    destinations: Dict[str, Optional[GridCoord]] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
-    end_coords: Dict[str, GridCoord] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
+    actions, archetype, destinations, end_coords = _initialize_continuing_movement(
+        step_start_coords=step_start_coords,
+        previous_step=previous_step,
+        step_t=t,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+    )
 
     actions[passer_id] = "pass"
     actions[receiver_id] = "receive"
@@ -379,6 +376,7 @@ def _build_triangle_decision_steps(
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
     next_step_index: int,
+    previous_step: AnimationStep,
 ) -> List[AnimationStep]:
     """Zero or more decision lead-in steps (pass and/or drive)."""
     out: List[AnimationStep] = []
@@ -389,6 +387,7 @@ def _build_triangle_decision_steps(
     cursor_clock = clock_remaining_at_start
     cursor_sc = shot_clock_remaining_at_start
     cursor_coords = dict(step_start_coords)
+    cursor_previous = previous_step
     next_idx = next_step_index
 
     logging.warning(
@@ -401,7 +400,7 @@ def _build_triangle_decision_steps(
     )
 
     def append_step(step: Optional[AnimationStep]) -> bool:
-        nonlocal cursor_clock, cursor_sc, cursor_coords, next_idx
+        nonlocal cursor_clock, cursor_sc, cursor_coords, cursor_previous, next_idx
         if step is None:
             return False
         step["end"]["next"] = {"kind": "next_step", "index": next_idx}
@@ -410,6 +409,7 @@ def _build_triangle_decision_steps(
         cursor_clock -= dt
         cursor_sc -= dt
         cursor_coords = dict(step["end"]["coords"])
+        cursor_previous = step
         next_idx += 1
         return True
 
@@ -443,6 +443,7 @@ def _build_triangle_decision_steps(
                 clock_remaining_at_start=cursor_clock,
                 shot_clock_remaining_at_start=cursor_sc,
                 next_step_index=next_idx,
+                previous_step=cursor_previous,
             )
         )
         return out
@@ -474,6 +475,7 @@ def _build_triangle_decision_steps(
                 clock_remaining_at_start=cursor_clock,
                 shot_clock_remaining_at_start=cursor_sc,
                 next_step_index=next_idx,
+                previous_step=cursor_previous,
             )
         )
         return out
@@ -523,6 +525,7 @@ def _build_triangle_decision_steps(
         shot_clock_remaining_at_start=cursor_sc,
         next_step={"kind": "next_step", "index": next_idx},
         arrival_player_ids=drive_arrival_ids,
+        previous_step=cursor_previous,
     )
     if not append_step(drive_step):
         logging.warning(
@@ -551,6 +554,7 @@ def _build_triangle_decision_steps(
                     clock_remaining_at_start=cursor_clock,
                     shot_clock_remaining_at_start=cursor_sc,
                     next_step_index=next_idx,
+                    previous_step=cursor_previous,
                 )
             )
     elif branch == "triangle_drive_corner_kick":
@@ -580,6 +584,7 @@ def _build_triangle_decision_steps(
                         clock_remaining_at_start=cursor_clock,
                         shot_clock_remaining_at_start=cursor_sc,
                         next_step_index=next_idx,
+                        previous_step=cursor_previous,
                     )
                 )
     return out
@@ -601,18 +606,12 @@ def _build_triangle_shot_motion_step(
     step_start_coords: Dict[str, GridCoord],
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
+    previous_step: Optional[AnimationStep] = None,
 ) -> Optional[AnimationStep]:
     shooter = turn_result.get("shooter") or fb_roles.get("shooter")
     shooter_id = _safe_id(shooter)
     if not shooter_id or shooter_id not in step_start_coords:
         return None
-
-    # Everyone holds their post-decision position by default. Fully UESS: no
-    # legacy ``_movement_end_coord`` lookups — the setup/decision steps already
-    # routed off-ball players into place, so they stay put on the shot step.
-    end_coords: Dict[str, GridCoord] = {
-        pid: dict(step_start_coords[pid]) for pid in step_start_coords
-    }
 
     shooter_start = step_start_coords[shooter_id]
     shot_spot = _shot_spot_from_roles(turn_result, fb_roles)
@@ -622,10 +621,13 @@ def _build_triangle_shot_motion_step(
     t = max(0.2, _traversal_seconds(shooter_start, shooter_end, shooter_rate))
 
     defender_id = _safe_id(turn_result.get("defender") or fb_roles.get("defender"))
-    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
-    archetype: Dict[str, PlayerArchetype] = {
-        pid: "stationary" for pid in step_start_coords
-    }
+    actions, archetype, destinations, end_coords = _initialize_continuing_movement(
+        step_start_coords=step_start_coords,
+        previous_step=previous_step,
+        step_t=t,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+    )
 
     actions[shooter_id] = "shoot"
     archetype[shooter_id] = "sprint"
@@ -642,9 +644,9 @@ def _build_triangle_shot_motion_step(
         d_rate = _ag_grid_per_game_sec(d_player, "sprint")
         end_coords[defender_id] = _interrupted_coord(d_start, contest, d_rate, t)
 
-    destinations: Dict[str, Optional[GridCoord]] = {
-        pid: dict(end_coords[pid]) for pid in step_start_coords
-    }
+    destinations[shooter_id] = dict(shooter_end)
+    if defender_id and defender_id in step_start_coords:
+        destinations[defender_id] = dict(contest)
 
     ball: BallState = {"owner_player_id": shooter_id}
     advance_trigger: AdvanceTrigger = {
@@ -920,6 +922,7 @@ def build_triangle_animation_steps(
         clock_remaining_at_start=clock_remaining - elapsed,
         shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
         next_step_index=_next_step_index(steps),
+        previous_step=setup_step,
     )
     for decision_step in decision_steps:
         steps.append(decision_step)
@@ -959,6 +962,7 @@ def build_triangle_animation_steps(
         step_start_coords=last_end_coords,
         clock_remaining_at_start=clock_remaining - elapsed,
         shot_clock_remaining_at_start=shot_clock_remaining - elapsed,
+        previous_step=steps[-1] if steps else None,
     )
     if shot_motion is not None:
         steps.append(shot_motion)

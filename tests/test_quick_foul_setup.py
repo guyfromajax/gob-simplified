@@ -184,3 +184,27 @@ def test_quick_foul_in_play_detection():
         score={"O": 10, "D": 5},
     )
     assert qf.quick_foul_in_play(game_q1) is False
+
+
+def test_quick_foul_bip_preserves_selected_pressure_route():
+    from tests.test_utils import build_mock_game
+
+    for pressure in ("FCP", "HCT"):
+        game = build_mock_game()
+        for team_index, team in enumerate((game.home_team, game.away_team)):
+            for pos, player in team.lineup.items():
+                player.player_id = f"{team_index}-{pos}"
+        game.quarter = 4
+        game.score[game.offense_team.name] = 72
+        game.score[game.defense_team.name] = 70
+        game.game_state["time_remaining"] = 25
+
+        payload = game.turn_manager.setup_baseline_inbound(
+            next_defensive_setup=pressure
+        )
+
+        assert payload["quick_foul_setup"] is True
+        assert payload["quick_foul_pressure_setup"] == pressure
+        assert payload["next_defensive_setup"] == pressure
+        assert payload["next_play_type"] == pressure
+        assert payload["next_turn"] == pressure

@@ -43,11 +43,13 @@ Multiplicative, piecewise-linear. Peaks at the position's ideal height (fitness 
 
 | Pos | Ideal (in) | Short penalty /in | Tall penalty /in |
 |-----|-----------|-------------------|------------------|
-| PG | 73.5 | .020 | .050 |
-| SG | 76.0 | .030 | .045 |
-| SF | 78.5 | .035 | .035 |
-| PF | 80.5 | .050 | .025 |
-| C | 82.5 | .060 | .010 |
+| PG | 70.5 | .020 | .050 |
+| SG | 73.0 | .030 | .045 |
+| SF | 75.5 | .035 | .035 |
+| PF | 77.5 | .050 | .025 |
+| C | 79.5 | .060 | .010 |
+
+*(Ideals are −3in from the original pass-1 values (73.5/76/78.5/80.5/82.5) after the two 2026-08 HS shifts, −1 then −2; penalties unchanged. These are the live `HEIGHT_FITNESS` tuple values.)*
 
 The asymmetry is what separates neighbouring positions structurally: a guard's fitness falls off fast when he is tall, a centre's falls off fast when short but barely when tall.
 
@@ -56,7 +58,7 @@ The asymmetry is what separates neighbouring positions structurally: a guard's f
 PF and C previously shared four of five weighted attributes (RB, ST, ID, SC), so no weight tuning could separate them and both interior positions collapsed/overlapped. Separation is now structural, on two axes:
 
 - **Signature attributes each neighbour ignores.** PF = the mobile, stretch big: carries **AG .16** and **SH .14** and **no ID**. C = the rim-protecting anchor: carries **ID .32** (the largest single weight at any position) and **no AG, no SH**.
-- **Asymmetric height fitness.** PF peaks at 80.5 in and penalises being too tall gently; C peaks at 82.5 in and penalises being short steeply. The two curves pull the positions apart instead of fighting over shared attributes.
+- **Asymmetric height fitness.** PF peaks at 77.5 in and penalises being too tall gently; C peaks at 79.5 in and penalises being short steeply. The two curves pull the positions apart instead of fighting over shared attributes.
 
 ## When RT is calculated
 

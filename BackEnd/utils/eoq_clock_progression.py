@@ -116,6 +116,7 @@ def clear_late_clock_eoq_chain(game_state: Dict[str, Any]) -> None:
     game_state.pop("suppress_final_shot_sfx", None)
     game_state.pop("eoq_trace_seq", None)
     game_state.pop("eoq_trace_turn_in_seq", None)
+    game_state.pop("_debug_final_hold_streak", None)
 
 
 def _late_chain_active(game: Any, result: Dict[str, Any]) -> bool:
@@ -344,6 +345,21 @@ def apply_eoq_final_free_throw_routing(
                 result["terminal_dreb_eoq"] = True
 
 
+def should_emit_clock_stopped_inbound(game: Any, source_turn: Dict[str, Any]) -> bool:
+    """Whether a BIP/SIP may be synthesized after a clock-stopped result.
+
+    Inbounds consume no game clock, but they are still live-possession
+    continuations and therefore cannot be appended after the period has been
+    declared terminal. Unfinished free throws are handled before this seam.
+    """
+    if not isinstance(source_turn, dict):
+        return False
+    if source_turn.get("quarter_ends_after"):
+        return False
+    game_state = getattr(game, "game_state", None) or {}
+    return int(game_state.get("time_remaining") or 0) > 0
+
+
 def schedule_flss_after_dreb(
     game: Any,
     dreb_source_turn: Optional[Dict[str, Any]],
@@ -447,7 +463,7 @@ def ensure_quarter_end_clock_drain(game: Any, result: Dict[str, Any]) -> None:
             result.get("next_play_type") is None
             and result.get("next_turn") is None
             and str(result.get("result_type") or "").upper()
-            in {"MAKE", "MISS", "BLOCK", "PUTBACK_MAKE", "PUTBACK_MISS", "FINAL_HOLD", "RUN_OUT_CLOCK"}
+            in {"MAKE", "MISS", "BLOCK", "PUTBACK_MAKE", "PUTBACK_MISS", "RUN_OUT_CLOCK"}
         )
     )
     if not terminal:
@@ -467,6 +483,69 @@ def ensure_quarter_end_clock_drain(game: Any, result: Dict[str, Any]) -> None:
     result["quarter_ends_after"] = True
     result["next_play_type"] = None
     result.pop("next_turn", None)
+
+
+def normalize_quarter_end_after_clock_update(game: Any, result: Dict[str, Any]) -> None:
+    """Remove impossible continuation routing once this turn actually reaches 0:00.
+
+    Shot routing is resolved before ``update_clock_and_possession`` applies the
+    emitted turn's elapsed time.  A turn may therefore be authored with a BIP,
+    OREB, or DREB continuation and only subsequently consume the final game
+    seconds.  Normalize that payload after the clock update so the frontend
+    cannot animate a possession transition beyond the period boundary.
+
+    A shooting foul with free throws remaining is the sole exception: the free
+    throw sequence must finish at 0:00 before the quarter is complete.
+    """
+    if not isinstance(result, dict):
+        return
+    gs = getattr(game, "game_state", None) or {}
+    if int(gs.get("time_remaining") or 0) > 0:
+        return
+
+    next_play = str(result.get("next_play_type") or result.get("next_turn") or "").upper()
+    free_throws_remaining = int(
+        result.get("free_throws_remaining", gs.get("free_throws_remaining", 0)) or 0
+    )
+    if next_play == "FREE_THROW" or free_throws_remaining > 0:
+        return
+
+    # Clock contracts are authored before the authoritative game-state update.
+    # Until every resolver has runway-aware truncation, a synthesized schema can
+    # therefore contain a negative terminal clock even though game_state clamps
+    # at zero. Never expose a negative clock to playback.
+    for step in result.get("animation_steps") or []:
+        if not isinstance(step, dict):
+            continue
+        for boundary in ("start", "end"):
+            clock = (step.get(boundary) or {}).get("clock")
+            if not isinstance(clock, dict):
+                continue
+            for key in ("clock_remaining", "shot_clock_remaining"):
+                value = clock.get(key)
+                if isinstance(value, (int, float)):
+                    clock[key] = max(0, value)
+
+    result["quarter_ends_after"] = True
+    result["next_play_type"] = None
+    result.pop("next_turn", None)
+    result.pop("next_defensive_setup", None)
+    result.pop("hco_setup", None)
+    result["possession_flips"] = False
+    result["clock_end"] = 0
+
+    # A terminal boundary cannot retain state that schedules another live-ball
+    # possession. Quarter initialization owns the next period's fresh state.
+    clear_late_clock_eoq_chain(gs)
+    gs.pop("final_turn_shot_this_turn", None)
+    gs.pop("pending_oreb", None)
+    for key in (
+        "flss_possession_pending",
+        "flss_from_dreb",
+        "flss_after_dreb",
+        "force_foul_after_dreb",
+    ):
+        result.pop(key, None)
 
 
 def finalize_terminal_dreb_turn(game: Any, dreb_turn: Dict[str, Any]) -> None:
