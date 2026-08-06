@@ -35,10 +35,14 @@ def test_height_fitness_peaks_at_ideal():
 
 
 def test_height_fitness_asymmetric_penalty():
-    # C falls off fast when short, barely when tall.
-    assert height_fitness("C", 80) < height_fitness("C", 85)
-    # PG falls off fast when tall, barely when short.
-    assert height_fitness("PG", 84) < height_fitness("PG", 70)
+    # Expressed relative to each position's ideal so this is shift-invariant — a uniform
+    # HS height shift moves the ideals but not the asymmetry it asserts.
+    c_ideal = HEIGHT_FITNESS["C"][0]
+    # C falls off fast when short, barely when tall: equally-far-below < equally-far-above.
+    assert height_fitness("C", c_ideal - 4) < height_fitness("C", c_ideal + 4)
+    pg_ideal = HEIGHT_FITNESS["PG"][0]
+    # PG falls off fast when tall, barely when short: equally-far-above < equally-far-below.
+    assert height_fitness("PG", pg_ideal + 4) < height_fitness("PG", pg_ideal - 4)
 
 
 def test_height_fitness_floor_and_cap():

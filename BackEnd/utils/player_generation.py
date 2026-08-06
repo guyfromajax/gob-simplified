@@ -161,10 +161,11 @@ CORE_ATTRS = RT_ATTRS + ("ND",)
 # height shift automatically. Replaces the old 4-band step function, whose
 # artifact (78" and 81" identical, 77"→78" jumping ~27lb) showed on roster pages.
 # Display/flavor ONLY — RT ignores weight, so all three are free to tune.
-WEIGHT_AT_MEDIAN = 209.5      # lb at LEAGUE_MEDIAN_HEIGHT_IN (77in). −5.5 with the HS height
-                              # shift (1in × slope) so BUILD is constant — same weight-for-
-                              # height, ~5.5lb lighter absolute. (Leaner-for-HS is a SEPARATE
-                              # future cut to this value; keep the two adjustments distinct.)
+WEIGHT_AT_MEDIAN = 198.5      # lb at LEAGUE_MEDIAN_HEIGHT_IN (75in). Dropped WITH each HS height
+                              # shift by slope×Δin so BUILD is constant — same weight-for-height,
+                              # just lighter absolute: −5.5 for the −1in shift, −11.0 for the −2in
+                              # (from 209.5). (Leaner-for-HS is a SEPARATE future cut to this value
+                              # beyond the build-preserving one; keep the two adjustments distinct.)
 WEIGHT_LB_PER_INCH = 5.5      # lb per inch above/below the median
 WEIGHT_NOISE_LB = 12          # ± uniform jitter (ONE rng draw — matches the old randint,
                               # so the downstream generation stream is byte-identical)

@@ -12,7 +12,7 @@ def test_opening_tip_integration_structure():
     game = build_mock_game()
     game.quarter = 1
     
-    tip_turn = execute_opening_tip(game)
+    _offense, _defense, tip_turn = execute_opening_tip(game)
     
     # Verify essential turn fields
     assert "result_type" in tip_turn
@@ -86,7 +86,7 @@ def test_opening_tip_integration_possession():
     initial_offense = game.offense_team
     initial_defense = game.defense_team
     
-    tip_turn = execute_opening_tip(game)
+    _offense, _defense, tip_turn = execute_opening_tip(game)
     
     # Possession should be assigned to one team
     assert game.offense_team is not None
@@ -114,7 +114,7 @@ def test_opening_tip_integration_player_ids():
     for player in game.away_team.lineup.values():
         all_player_ids.add(getattr(player, "player_id", str(id(player))))
     
-    tip_turn = execute_opening_tip(game)
+    _offense, _defense, tip_turn = execute_opening_tip(game)
     
     # Verify all animation player IDs are valid
     for anim in tip_turn["animations"]:
@@ -127,7 +127,7 @@ def test_opening_tip_integration_text_generation():
     game = build_mock_game()
     game.quarter = 1
     
-    tip_turn = execute_opening_tip(game)
+    _offense, _defense, tip_turn = execute_opening_tip(game)
     
     # Text should be a non-empty string
     assert isinstance(tip_turn["text"], str)
@@ -143,7 +143,7 @@ def test_opening_tip_integration_no_possession_flip():
     game = build_mock_game()
     game.quarter = 1
     
-    tip_turn = execute_opening_tip(game)
+    _offense, _defense, tip_turn = execute_opening_tip(game)
     
     # Opening tip should not count as a possession change
     assert tip_turn["possession_flips"] == False

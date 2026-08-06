@@ -44,31 +44,31 @@ OPENING_TIP_ENTRANCE_POSITIONS = {
 def get_height_scale_value(height):
     """Convert player height to tip-off scale value (1-10).
 
-    Re-banded +3 in. for the recalibrated height distribution (design §11.2), then −1in
-    for the 2026-08 HS height shift. These are ABSOLUTE inch literals anchored to the centre
-    median, NOT offsets from LEAGUE_MEDIAN_HEIGHT_IN — so they do NOT ride a uniform height
-    shift and must be re-banded by hand alongside one. After the −1: centre median 82→81
-    still lands mid-scale (81 → 8), preserving the tip-off contest.
+    Re-banded +3 in. for the recalibrated height distribution (design §11.2), then −1in and
+    −2in for the two 2026-08 HS height shifts (−3in total). These are ABSOLUTE inch literals
+    anchored to the centre median, NOT offsets from LEAGUE_MEDIAN_HEIGHT_IN — so they do NOT
+    ride a uniform height shift and must be re-banded by hand alongside one. After the −2:
+    centre median 81→79 still lands mid-scale (79 → 8), preserving the tip-off contest.
     """
-    if height > 85:
+    if height > 83:
         return 10
-    elif height >= 83:
-        return 9
     elif height >= 81:
+        return 9
+    elif height >= 79:
         return 8
-    elif height == 80:
-        return 7
-    elif height == 79:
-        return 6
     elif height == 78:
-        return 5
+        return 7
     elif height == 77:
-        return 4
+        return 6
     elif height == 76:
-        return 3
+        return 5
     elif height == 75:
+        return 4
+    elif height == 74:
+        return 3
+    elif height == 73:
         return 2
-    else:  # < 75
+    else:  # < 73
         return 1
 
 def execute_opening_tip(game):

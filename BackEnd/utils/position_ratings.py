@@ -45,11 +45,11 @@ HEIGHT_FITNESS_CAP = 1.15
 # NOTE: HEIGHT_IDEAL_IN in player_generation.py is a comprehension over THIS dict — the
 # `ideal` here is the only edit point; editing anything named HEIGHT_IDEAL_IN does nothing.
 HEIGHT_FITNESS: Dict[str, tuple[float, float, float]] = {
-    "PG": (72.5, 0.020, 0.050),
-    "SG": (75.0, 0.030, 0.045),
-    "SF": (77.5, 0.035, 0.035),
-    "PF": (79.5, 0.050, 0.025),
-    "C":  (81.5, 0.060, 0.010),
+    "PG": (70.5, 0.020, 0.050),
+    "SG": (73.0, 0.030, 0.045),
+    "SF": (75.5, 0.035, 0.035),
+    "PF": (77.5, 0.050, 0.025),
+    "C":  (79.5, 0.060, 0.010),
 }
 
 

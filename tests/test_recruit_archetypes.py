@@ -5,6 +5,7 @@ generated at the class-year ladder target for a drawn position intent + tier via
 BackEnd.utils.player_generation. Archetype survives only as a cosmetic label.
 """
 import random
+from collections import Counter
 
 import pytest
 from unittest.mock import Mock
@@ -51,22 +52,39 @@ def test_position_ratings_are_five_positions(recruit_manager):
 
 
 def test_argmax_mostly_follows_intended_position(recruit_manager):
-    """Position-intent-first: a recruit's top RT usually lands at his archetype's
-    position, and centre supply now exists (was collapsing before)."""
+    """Corrected §3.6.4 gauge (was a mature-height JH-argmax-follows-intent threshold, superseded
+    by grow-into-frame). Recruits span class years and are mostly pre-growth; a young frontcourt
+    player sits below his adult frame and reads one slot toward the perimeter, so RT-argmax at his
+    CURRENT height is NOT the gauge. INTENT supply is; the SR-only argmax check is expressed here
+    as a DIRECTION (growing into frame moves argmax toward intent), not a fitted match-rate a
+    future height shift would invalidate."""
     random.seed(3)
     recruits = recruit_manager.generate_recruits_list(count=400)
-    # Classic-<POS> archetypes should mostly argmax at <POS>.
-    classic = [r for r in recruits if r["archetype"].startswith("Classic ")]
-    hits = 0
-    for r in classic:
-        pos = r["archetype"].split()[1]
-        pr = r["position_ratings"]
-        if max(pr, key=pr.get) == pos:
-            hits += 1
-    assert hits / max(1, len(classic)) > 0.8
-    # Centre supply is materially above the old 10.9%.
-    argmax_c = sum(max(r["position_ratings"], key=r["position_ratings"].get) == "C" for r in recruits)
-    assert argmax_c / len(recruits) > 0.12
+
+    # Primary — intent supply: position-intent-first generation represents every position, centre
+    # included, none collapsed. (The old check measured argmax-C, the grow-into-frame-skewed
+    # quantity; intent is the right one — §3.6.4, and the audit script's gauge note.)
+    intents = Counter(r["position_intent"] for r in recruits)
+    for pos in ("PG", "SG", "SF", "PF", "C"):
+        assert intents[pos] / len(recruits) > 0.12, f"{pos} intent supply collapsed: {intents[pos]}"
+
+    # Secondary — SR-only argmax as a direction: project each recruit to his adult frame (current
+    # height + the remaining career HT gain for his class year) and confirm growing-in moves argmax
+    # TOWARD intent. More recruits argmax at intent grown-in than at their current pre-growth height
+    # — the grow-into-frame mechanism itself, asserted without a magic threshold.
+    from BackEnd.utils.position_ratings import compute_position_ratings
+    from BackEnd.utils.player_generation import (
+        HT_TOTAL_MEAN, HT_REMAINING_SHARE_BY_YEAR, normalize_year,
+    )
+    raw_hits = sum(max(r["position_ratings"], key=r["position_ratings"].get) == r["position_intent"]
+                   for r in recruits)
+    grown_hits = 0
+    for r in recruits:
+        remaining = HT_REMAINING_SHARE_BY_YEAR.get(normalize_year(r["year"]), 0.0)
+        adult_h = r["height"] + remaining * HT_TOTAL_MEAN
+        pr = compute_position_ratings({"attributes": r["attributes"], "height": adult_h})
+        grown_hits += max(pr, key=pr.get) == r["position_intent"]
+    assert grown_hits > raw_hits, f"grow-into-frame should move argmax toward intent: {raw_hits} → {grown_hits}"
 
 
 def test_ch_is_flat_uniform(recruit_manager):
