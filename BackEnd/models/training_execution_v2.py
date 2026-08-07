@@ -59,6 +59,7 @@ def execute_training(
     skip_pre_training_depreciation: bool = False,
     coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
     training_playbook_focus: Optional[Dict[str, List[str]]] = None,
+    gain_scale: Optional[float] = None,
 ) -> Tuple[List[dict], dict, Dict, Dict, Dict]:
     """
     Main training execution function.
@@ -75,10 +76,14 @@ def execute_training(
         team: Team dict with team attributes
         allocations: Training point allocations (frontend format)
         coaching_focus: Optional coaching focus selection
+        gain_scale: Multiplier on positive weekly gains. Defaults to
+            ``IN_SEASON_GAIN_SCALE``; camp passes ``CAMP_GAIN_SCALE``.
     
     Returns:
         Tuple of (updated_players, updated_team, training_report_data)
     """
+    if gain_scale is None:
+        gain_scale = IN_SEASON_GAIN_SCALE
     # Store original baselines BEFORE any changes
     original_player_baselines = {
         p["_id"]: {attr: p.get("attributes", {}).get(f"anchor_{attr}", 0) 
@@ -119,11 +124,11 @@ def execute_training(
     # Defense effectiveness share-decay runs at EOG (see build_eog_defensive_effectiveness_decay_ftd_updates); offense CMD at EOG separately.
 
     # Step 1: Apply pre-training conditions
-    # Skip for first training (training camp) in franchise mode
+    # Skip for training camp weeks (framework §10.3)
     if not skip_pre_training_depreciation:
         players, team = apply_pre_training_conditions(players, team)
     else:
-        logger.warning("⏭️ [TRAINING] Skipping pre-training conditions (first training/training camp)")
+        logger.warning("⏭️ [TRAINING] Skipping pre-training conditions (training camp)")
     
     # Step 2: Apply training points (pass original baselines for report calculation)
     players, team, training_report = apply_training_points(
@@ -132,6 +137,7 @@ def execute_training(
         original_baselines=original_player_baselines,
         original_team_baseline=original_team_baseline,
         coaching_focus_custom_by_player=coaching_focus_custom_by_player,
+        gain_scale=gain_scale,
     )
     
     # Step 3: Apply play/defense training
@@ -425,6 +431,45 @@ def _scale_install_training_effectiveness_points(
 # mean, so reallocation moves the player page while barely moving RT).
 IN_SEASON_GAIN_SCALE = 0.18
 
+# Per-point raw gain bands for player attributes (before year-max adjustment).
+# Points 1–5 MUST be distinct: a prior retune unified 1–3 at (2,4) so reference
+# held flat, but that erased slider resolution across the bottom half — mild and
+# moderate strategies became indistinguishable after scale+round (framework §10.6).
+# E[raw|5] stays 4.5 ((3,6)) so max-commitment season level does not silently
+# retune while shape resolution is restored.
+PLAYER_ATTR_GAIN_RANGE_BY_POINTS = {
+    0: (-2, -1),  # E = -1.5  neglect
+    1: (1, 3),    # E =  2.0
+    2: (2, 3),    # E =  2.5
+    3: (2, 4),    # E =  3.0
+    4: (3, 5),    # E =  4.0
+    5: (3, 6),    # E =  4.5  held
+}
+
+
+def _player_attr_gain_range(points: int) -> Tuple[int, int]:
+    """Return (min, max) raw gain band for an allocation of ``points`` (0–5)."""
+    bucket = max(0, min(5, int(points)))
+    return PLAYER_ATTR_GAIN_RANGE_BY_POINTS[bucket]
+
+
+def _apply_scaled_gain_with_remainder(
+    player: dict, attr: str, raw_positive: int, gain_scale: float
+) -> int:
+    """Scale a positive raw gain and bank the fractional part per attribute.
+
+    ``int(round(raw × scale))`` zeroed ~19% of 1–3-pt rolls (seniors ~25%).
+    Carrying the sub-integer remainder across weeks lets consistent small
+    investment accumulate into whole points instead of being discarded weekly.
+    """
+    bag = player.setdefault("training_gain_remainders", {})
+    prev = float(bag.get(attr, 0.0) or 0.0)
+    total = (raw_positive * float(gain_scale)) + prev
+    whole = int(total)  # truncate toward 0; positive ⇒ floor
+    bag[attr] = total - whole
+    return whole
+
+
 PRE_TRAINING_DECAY_BY_YEAR = {
     "freshman": (-2, 0),
     "sophomore": (-2, 0),
@@ -449,6 +494,7 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     Pre-training conditions:
     - Player attributes (excluding EM, MO, NG): += randint(min, max) per player/attribute,
       where (min, max) is year-based: Freshman (-5,-1), Sophomore (-4,-1), Junior (-3,0), Senior (-2,0).
+    - Decay never subtracts below the weight-scaled position floor (framework §10.2).
     
     Args:
         players: List of player dicts with attributes
@@ -457,6 +503,8 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     Returns:
         Tuple of (updated_players, unchanged_team)
     """
+    from BackEnd.constants.training_shape import apply_floor_clamp_to_anchors
+
     for player in players:
         attrs = player.get("attributes", {})
         year = player.get("year", "")
@@ -467,6 +515,8 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
                 decrease = random.randint(decay_min, decay_max)
                 attrs[anchor_key] = max(PLAYER_ATTR_CLAMP[0], attrs[anchor_key] + decrease)
                 attrs[attr] = attrs[anchor_key]
+        # Floor bounds decay only — raise any core-12 that fell below need.
+        apply_floor_clamp_to_anchors(player)
     
     return players, team
 
@@ -480,6 +530,7 @@ def apply_training_points(
     original_baselines: Optional[Dict] = None,
     original_team_baseline: Optional[Dict] = None,
     coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
+    gain_scale: Optional[float] = None,
 ) -> Tuple[List[dict], dict, Dict]:
     """
     Apply training points to players and team based on allocations.
@@ -491,10 +542,13 @@ def apply_training_points(
         coaching_focus: Optional coaching focus; radio `value` from training UI (see parse_coaching_focus)
         original_baselines: Optional dict of original player baselines (before pre-training conditions)
         original_team_baseline: Optional dict of original team baseline (before pre-training conditions)
+        gain_scale: Positive-gain multiplier (in-season or camp).
     
     Returns:
         Tuple of (updated_players, updated_team, training_report_data)
     """
+    if gain_scale is None:
+        gain_scale = IN_SEASON_GAIN_SCALE
     # Use provided baselines or calculate from current state
     if original_baselines is None:
         player_baselines = {
@@ -615,6 +669,7 @@ def apply_training_points(
                                 multiplier,
                                 player_baselines.get(player["_id"], {}).get(attr),
                                 coaching_focus_custom_by_player=coaching_focus_custom_by_player,
+                                gain_scale=gain_scale,
                             )
                 
                 # Track team attribute contributions from multipliers
@@ -640,6 +695,7 @@ def apply_training_points(
                             multiplier,
                             player_baselines.get(player["_id"], {}).get(attr),
                             coaching_focus_custom_by_player=coaching_focus_custom_by_player,
+                            gain_scale=gain_scale,
                         )
             
             # Track team attribute contributions from multipliers (single-value categories)
@@ -895,73 +951,39 @@ def _apply_player_training_points(
     multiplier: float = 1.0,
     starting_baseline: Optional[int] = None,
     coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
+    gain_scale: Optional[float] = None,
 ):
     """
     Apply training points to a single player attribute.
-    
-    Base ranges (Player Attributes). See Training_System.md.
-    - 0 points: += random.randint(-2, -1)
-    - 1 point: += random.randint(0, 1)
-    - 2 points: += random.randint(2, 3)
-    - 3 points: += random.randint(2, 4)
-    - 4 points: += random.randint(3, 5)
-    - 5 points: += random.randint(3, 6)
-    
-    Year-based adjustments: leave minimums as is, only change maximums.
-    - Freshman: +5 to max
-    - Sophomore: +3 to max
-    - Junior: +2 to max
-    - Senior: +1 to max
-    
-    Focus amplifier: Applied based on sub_option selection
-    Multiplier: For attributes like CH that get 0.5 multiplier
+
+    Base ranges: ``PLAYER_ATTR_GAIN_RANGE_BY_POINTS`` (distinct across 1–5;
+    E[raw|5] held at 4.5). Year-max adjustments: Freshman +5 … Senior +1.
+    Positive gains scale via ``gain_scale`` with a per-attribute fractional
+    remainder (``training_gain_remainders``) so sub-integer signal accumulates.
     """
+    if gain_scale is None:
+        gain_scale = IN_SEASON_GAIN_SCALE
     attrs = player.get("attributes", {})
     anchor_key = f"anchor_{attr}"
-    
+
     # Get player year: only adjust max. Freshman +5, Sophomore +3, Junior +2, Senior +1.
     year = player.get("year", "").lower() if player.get("year") else ""
     max_adjustment = {"freshman": 5, "sophomore": 3, "junior": 2, "senior": 1}.get(year, 2)
-    
-    # Base range (min, max) by points. 0→(-2,-1), 1→(2,4), 2→(2,4), 3→(2,4), 4→(3,5), 5→(3,6).
-    # THE REFERENCE BAND (points 1-3) all share one range so a reference-allocated attribute
-    # holds ~flat in-season (measured net ≈ -0.7/season, restored by the offseason). base-1 was
-    # (0,1) — far too small to offset in-season decay at IN_SEASON_GAIN_SCALE, so the reference's
-    # baseline (base-1) attributes rotted ~-10 RT/season while the ladder (RT-weighted, leaning on
-    # the core) masked it; the offseason (RT-targeted) never restored it, so it compounded
-    # (SC -8.33 over a full cycle) → league FG% degraded 37.5%→26.5%. A global decay/scale change
-    # would over-inflate the mid band and reopen claw-back, so the fix is local to the low band.
-    # Structure: NEGLECT (base-0) declines, REFERENCE (1-3) holds, FOCUS (4-5) gains — an INVARIANT
-    # pinned by tests/test_in_season_invariants.py (in-season AND full-cycle). Any future change to
-    # decay or gain that erodes the reference breaks a test. See §7.2 / Tunable_Constants.
-    if points == 0:
-        base_min, base_max = -2, -1
-    elif points == 1:
-        base_min, base_max = 2, 4
-    elif points == 2:
-        base_min, base_max = 2, 4
-    elif points == 3:
-        base_min, base_max = 2, 4
-    elif points == 4:
-        base_min, base_max = 3, 5
-    elif points == 5:
-        base_min, base_max = 3, 6
-    else:
-        base_min, base_max = 3, 6
-    
+
+    base_min, base_max = _player_attr_gain_range(points)
     adjusted_max = base_max + max_adjustment
     increase = random.randint(base_min, adjusted_max)
-    
+
     # Apply multiplier (for CH in conditioning/film_study)
     increase = int(increase * multiplier)
 
     # If the player started training above 100 in this attribute, positive gains are halved.
     if (starting_baseline or 0) > 100 and increase > 0:
         increase = int(math.floor((increase * 0.5) + 0.5))
-    
+
     # Check if this attribute should be amplified based on focus
     should_amplify = False
-    
+
     # Handle Player Maximizer special cases (top 3 / next 3 / positional / custom)
     if sub_option in ["player-maximizer-top-3", "player-maximizer-attributes-4-6"]:
         # Rank by anchor for PLAYER_MAXIMIZER_RANKING_ATTRS (CH excluded; EM/MO/NG not in list)
@@ -970,7 +992,7 @@ def _apply_player_training_points(
             player_attrs.items(),
             key=lambda x: (-(x[1] if isinstance(x[1], (int, float)) else 0), x[0]),
         )
-        
+
         if sub_option == "player-maximizer-top-3":
             # Top 3 attributes
             top_attrs = [a[0] for a in sorted_attrs[:3]]
@@ -989,19 +1011,16 @@ def _apply_player_training_points(
     else:
         # Standard amplification check
         should_amplify = _should_amplify_player_attr(attr, archetype, sub_option)
-    
+
     # Apply focus amplifier if applicable
     if should_amplify:
         focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
         increase = int(increase * focus_multiplier)
-    
-    # Scale positive weekly gains down (design §7.2): the offseason event now owns
-    # ~70% of career growth, so a season's worth of weekly training should net only
-    # ~30%. Only positive gains scale — the 0-point (-2,-1) drag on unallocated
-    # attributes is unchanged. Fitted so the default full-allocation policy nets
-    # ~30% of career growth in the Monte Carlo (see IN_SEASON_GAIN_SCALE).
+
+    # Scale positive gains (in-season ~0.18; camp ~1.4) with fractional remainder.
+    # Only positive gains scale — the 0-point (-2,-1) drag is unchanged. §10.3 / §10.6.
     if increase > 0:
-        increase = int(round(increase * IN_SEASON_GAIN_SCALE))
+        increase = _apply_scaled_gain_with_remainder(player, attr, increase, gain_scale)
 
     # Apply increase
     current_val = attrs.get(anchor_key, 0)

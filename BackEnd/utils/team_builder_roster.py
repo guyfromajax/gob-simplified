@@ -1353,6 +1353,26 @@ def replace_slot_roster(
                 f"uncapped_pool_exceeded:{team_total}:{int(team_pool)}"
             )
 
+    # Framework §10.2: weight-scaled position floors bind at Apply — refuse, don't fix.
+    from BackEnd.constants.training_shape import floor_violations, resolve_training_position
+
+    for i, player in enumerate(players):
+        pos = resolve_training_position({
+            "training_position": player.get("training_position"),
+            "position_intent": player.get("position_intent")
+            or ((player.get("meta") or {}).get("position_intent")),
+            "position_ratings": player.get("position_ratings"),
+        })
+        viols = floor_violations(pos, player.get("attributes") or {})
+        if viols:
+            meta = player.get("meta") or {}
+            name = (
+                f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip()
+                or f"slot_{i + 1}"
+            )
+            detail = ",".join(f"{a}:{have}<{need}" for a, have, need in viols)
+            raise ValueError(f"shape_floor_violation:{name}:{pos}:{detail}")
+
     new_ids, new_docs = build_fpd_docs_from_players(franchise_id=franchise_id, players=players)
     # Delete every superseded FPD (init's 15, including its three walk-ons).
     removed_ids = [pid for pid in old_player_ids if pid not in set(new_ids)]

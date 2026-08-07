@@ -2,12 +2,10 @@
 
 Design §4-§8. This is the REAL, importable, pure, RNG-injectable implementation;
 the Monte Carlo harness (scripts/mc_growth_fit.py) is a thin driver over it, and
-production season-rollover will call the same `develop_one_offseason`. There is
-no separate harness model of the growth math — a throwaway would diverge from
-production and void the fitted constants.
-
-NOT wired into any live path in this pass (do not call from
-complete_season_transition). Fit first, wire later. No DB, no possessions.
+production season rollover (`finish_season` → `develop_rollover` →
+`develop_one_offseason`) calls the same math. There is no separate harness model
+of the growth math — a throwaway would diverge from production and void the
+fitted constants. Pure given ``rng``: no DB, no possessions.
 
 Two independent systems rolled once at generation and frozen (§5):
   - peak_count (0-3), CH-driven → HOW MUCH total career growth (§5.1)
@@ -16,7 +14,7 @@ Two independent systems rolled once at generation and frozen (§5):
 They must stay orthogonal: peaks scale magnitude, timing shifts schedule.
 
 Growth is measured against the training position (§9.1); here that is the
-generated position intent.
+generated position intent (or persisted ``training_position`` when set).
 """
 
 from __future__ import annotations
@@ -31,7 +29,6 @@ from BackEnd.utils.player_generation import (
     RT_ATTRS,
     RUNG_MULTIPLIERS,
     generate_player,
-    position_profile,
     HT_TOTAL_MEAN,
     HT_TOTAL_SD,
     HT_TOTAL_MIN,
@@ -122,14 +119,11 @@ OFFSEASON_DISTRIBUTION_BLEND = 0.70
 # per-attribute weight used for within-family distribution.
 NON_CORE_GROWTH_MULTIPLIER = 0.06
 
-# Part B (Direction 1): per-rollover strength of the offseason shape-and-level attractor.
-# The offseason pulls each attribute this fraction of the way toward its tier/year/position
-# PROFILE value scaled to the ladder RT. α<1 ⇒ attractor, not clamp: in-season focus
-# survives as a spike (α=1 would erase all deviation). Tuned against the faithful in-season
-# +offseason career: reference-developed Average C SC → ~52 (near the honest generation
-# value 58.5, below it because development is partial by design), with a visible focus spike
-# (+8). Raising it trades spike for shape; see the α frontier in the design notes.
-OFFSEASON_ATTRACTOR_ALPHA = 0.55
+# Part B: OFFSEASON_ATTRACTOR_ALPHA retired 2026-08-07 (framework §10.4). Shape is
+# owned by camp / in-season training + position floors; offseason is level-only
+# rescale. Symbol kept at 0.0 so old imports do not crash — must not be re-enabled
+# without restoring the blend path and the shape-dispersion suite gate.
+OFFSEASON_ATTRACTOR_ALPHA = 0.0
 # Intra-family concentration exponent on the position weights. 1.0 puts almost
 # all of a family's growth on its highest-weight attribute (which then must
 # exceed 100 to carry a high RT — an above-100 rate of ~30%). The DEFAULT policy
@@ -447,48 +441,21 @@ def develop_one_offseason(player: dict, rung: str, profile: dict,
         av = attrs.get(f"anchor_{a}")
         if av is not None:
             attrs[a] = av
-    # PART B (Direction 1): the offseason is an ATTRACTOR toward the tier/year/position
-    # PROFILE scaled to the ladder target RT — it targets BOTH a level (target_rt) and a
-    # shape (the profile). It replaces the old additive budget (B≥0), which could only add,
-    # so in-season growth ratcheted RT above the ladder and the leftover budget starved
-    # non-signature attributes (a big's scoring, a wing's shooting).
-    #
-    # LEVEL and SHAPE are separated (2026-08 attractor-level fix). The earlier form moved
-    # every attribute α toward `profile × k` in one step with no renormalisation, which let
-    # α govern the LEVEL as well as the shape: a 55% step toward a target that RISES every
-    # rung leaves a gap that compounds, so developed RT landed at ~0.91× the ladder (Elite
-    # seniors 91, not 100) while GENERATION hit the anchors exactly — the drift was masked
-    # for years because the seeded pool holds the anchors and only cohort turnover exposes
-    # it. The old "RT lands on the ladder by construction" comment was measurably false.
-    #
-    # Now: SHAPE moves α (the blended vector keeps the player's in-season focus as a spike
-    # in the RATIOS, so training still biases the profile), then LEVEL closes FULLY — a
-    # single closed-form rescale to hit target_rt exactly. RT = weighted_mean × fit is
-    # linear in the (all-growth) weighted attributes, so one rescale is exact. This makes
-    # the offseason a true absolute-target event: it lands developed players on the ladder
-    # and CLAWS BACK an in-season overshoot completely (the bidirectional job the old form
-    # only did 55% of), while α<1 preserves shape so focus survives as a spike paid for
-    # elsewhere. (`accumulator` no longer shapes the offseason distribution — focus is
-    # expressed in-season now; it still drives the QUALITY half → coaching_f → target_rt.)
-    prof = position_profile(position)
+    # PART B (framework §10.4): LEVEL only. Rescale the player's CURRENT attribute
+    # vector to hit target_rt exactly. Shape is owned by camp / in-season training;
+    # position floors (not an α-blend toward position_profile) prevent starvation.
+    # RT = fit · Σ weights·v is linear in the growth attrs, so one rescale is exact
+    # and claws back in-season overshoot completely. (`accumulator` is unused here —
+    # quality still drives coaching_f → target_rt above.)
     weights = POSITION_WEIGHTS[position]
     fit = height_fitness(position, player["height"]) or 1.0
-    denom = sum(weights.get(a, 0.0) * prof.get(a, 0.0) for a in GROWTH_ATTRS) or 1.0
-    k = (target_rt / fit) / denom
-    # SHAPE: α-blend each attribute toward its profile-scaled target (training bias in the
-    # pre-offseason `attrs` survives in the resulting ratios).
-    blended = {a: attrs.get(a, 0) + OFFSEASON_ATTRACTOR_ALPHA * (prof.get(a, 0.0) * k - attrs.get(a, 0))
-               for a in GROWTH_ATTRS}
-    # LEVEL: close fully. RT(v) = fit · Σ weights·v over the growth attributes, so scaling
-    # the blended vector by s = target_rt / RT(blended) lands the dev-position RT exactly on
-    # target in one step (all weighted attrs are growth attrs — verified).
-    rt_blended = fit * sum(weights.get(a, 0.0) * blended[a] for a in GROWTH_ATTRS)
-    s = (target_rt / rt_blended) if rt_blended > 0 else 1.0
+    rt_now = fit * sum(weights.get(a, 0.0) * float(attrs.get(a, 0) or 0) for a in GROWTH_ATTRS)
+    s = (target_rt / rt_now) if rt_now > 0 else 1.0
     st_gain = 0
     for a in GROWTH_ATTRS:
-        moved = max(1, int(round(blended[a] * s)))
+        moved = max(1, int(round(float(attrs.get(a, 0) or 0) * s)))
         if a == "ST":
-            st_gain = moved - attrs.get(a, 0)
+            st_gain = moved - int(attrs.get(a, 0) or 0)
         attrs[a] = moved
         attrs[f"anchor_{a}"] = moved           # write both — survives next in-season
 
@@ -590,16 +557,17 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
 
     ``season_allocation`` is the just-finished season's per-attribute training
     accumulator (attr → points/week, 0-5 per the drill sliders). None means "no
-    recorded season" (CPU teams until pillar 3, or a player with no season) → the
-    frozen reference → f 1.0 → lands on the validated ladder. It drives BOTH
-    accumulator jobs, kept separate in code:
+    recorded season" → frozen reference → f 1.0 → lands on the validated ladder.
+    Capture is gated behind pillar 3 (``_coaching_accumulator_for_player`` currently
+    returns None for everyone), so live rollover always takes this None path.
 
-      • QUALITY: scored against ``training_position`` (§9.2 — a designed conversion
-        is priced by the weight tables, so a natural SF trained toward PG must not
-        also eat a coaching-quality penalty) → cumulative career average → the
-        bounded modifier f on the offseason RT target.
-      • DISTRIBUTION (§7.3): the same allocation shapes WHERE the offseason budget
-        lands (blended in _distribution_fractions), so what was trained aims growth.
+    When a non-None allocation is supplied it drives the QUALITY half only:
+    scored against ``training_position`` (§9.2) → cumulative career
+    ``coaching_quality`` average → bounded modifier f on the offseason RT target.
+    The DISTRIBUTION half (§7.3 / ``_distribution_fractions`` /
+    ``OFFSEASON_DISTRIBUTION_BLEND``) is vestigial — retired with the shape
+    attractor; ``accumulator`` is still passed into ``develop_one_offseason``
+    but is unused there. Shape is camp / in-season + floors (§10).
 
     ``training_position`` is a persisted field defaulting to ``position_intent`` and
     forward-copied here. Returns {attributes, height, weight, position_ratings,
@@ -667,8 +635,10 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
     f = coaching_f(cq["avg"])
 
     # --- DISTRIBUTION half of the accumulator (§7.3) -------------------------
-    # The same allocation aims the offseason budget (blended with the age curve in
-    # _distribution_fractions). None → the default position-weighted aim.
+    # Vestigial: still threaded into develop_one_offseason for call-signature
+    # compatibility, but unused there — level-only offseason + floors replaced
+    # both the budget-aim path and the shape attractor. Quality (above) is the
+    # only live use of season_allocation.
     distribution_accumulator = season_allocation or None
 
     player = {

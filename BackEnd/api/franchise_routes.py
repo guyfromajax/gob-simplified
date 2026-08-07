@@ -2296,23 +2296,24 @@ _AUTOTRAIN_PLAYER_ATTRS = [
 # ── CPU reference training ────────────────────────────────────────────────────
 # CPU auto-train trains the coaching-quality REFERENCE (was: random allocation +
 # random focus, which nets −9 RT/season and scores well below 1.0 → the league
-# drifts under the ladder once quality is live). CPU base training is team-wide, so
-# a single allocation cannot equal the per-position reference for a PG and a C at
-# once; instead each player's own reference top-3 is amplified via player-maximizer
-# CUSTOM focus (positional-focus is misaligned with the reference for 4/5 positions
-# and amplifies off-position attrs). The team-wide base below is the common
-# substrate; the ~1.65× focus amplifier steers each player to his position.
-#
-# COUPLING (do not change either half alone): the base is FITTED so effective
-# allocation (base × _CPU_FOCUS_AMP_MEAN on each player's reference top-3) scores
-# ~1.0 per position against the FROZEN reference_allocation anchor. Change the
-# reference (weights/cap/breadth) or this base without re-fitting and CPU silently
-# drifts off the ladder — locked by tests/test_cpu_reference_training.py.
+# drifts under the ladder once quality is live). Under the framework cost curve
+# (§10.1) a single team-wide allocation cannot be affordable for a PG and a C at
+# once, so auto-train groups by development position and uses a per-position base.
+# Each player's own reference top-3 is still amplified via player-maximizer CUSTOM
+# focus. Bases are FITTED so effective allocation (base × _CPU_FOCUS_AMP_MEAN on
+# each player's reference top-3) scores ~1.0 per position against the FROZEN
+# reference_allocation anchor AND fits the senior cost budget with the shared
+# team/breaks footprint. Locked by tests/test_cpu_reference_training.py.
 _CPU_FOCUS_AMP_MEAN = 1.65  # season-mean of random.choice([1.5,1.6,1.7,1.8]) in _apply_player_training_points
-_CPU_REFERENCE_BASE = {  # per growth attribute → drill-slider points (0-5)
-    "SC": 1, "SH": 2, "ID": 2, "OD": 2, "PS": 1, "BH": 3,
-    "RB": 3, "ST": 1, "AG": 1, "ND": 1, "FT": 1, "IQ": 1,
+_CPU_REFERENCE_BASE_BY_POS = {
+    "PG": {"ST": 0, "AG": 1, "SC": 0, "SH": 0, "ID": 0, "OD": 0, "PS": 2, "BH": 3, "RB": 0, "FT": 1, "IQ": 1, "ND": 1},
+    "SG": {"ST": 0, "AG": 0, "SC": 2, "SH": 2, "ID": 0, "OD": 2, "PS": 0, "BH": 0, "RB": 0, "FT": 0, "IQ": 1, "ND": 1},
+    "SF": {"ST": 0, "AG": 2, "SC": 2, "SH": 0, "ID": 0, "OD": 2, "PS": 0, "BH": 0, "RB": 0, "FT": 1, "IQ": 1, "ND": 1},
+    "PF": {"ST": 2, "AG": 2, "SC": 0, "SH": 0, "ID": 0, "OD": 0, "PS": 0, "BH": 0, "RB": 2, "FT": 0, "IQ": 1, "ND": 1},
+    "C":  {"ST": 2, "AG": 0, "SC": 2, "SH": 0, "ID": 2, "OD": 0, "PS": 0, "BH": 0, "RB": 1, "FT": 0, "IQ": 1, "ND": 1},
 }
+# Legacy alias — tests / callers that still read a single base use SF substrate.
+_CPU_REFERENCE_BASE = _CPU_REFERENCE_BASE_BY_POS["SF"]
 
 
 def _cpu_reference_top3(position: str) -> list[str]:
@@ -2324,9 +2325,9 @@ def _cpu_reference_top3(position: str) -> list[str]:
     return [a for a, pts in ref.items() if pts == COACHING_REFERENCE_PRIMARY_PTS]
 
 
-def _cpu_reference_allocation() -> dict:
-    """Team-wide base substrate (drill-slider format), from _CPU_REFERENCE_BASE."""
-    b = _CPU_REFERENCE_BASE
+def _cpu_reference_allocation(position: str | None = None) -> dict:
+    """Per-position base substrate (drill-slider format). ``position=None`` → SF."""
+    b = _CPU_REFERENCE_BASE_BY_POS.get(position or "SF") or _CPU_REFERENCE_BASE_BY_POS["SF"]
     return {
         "player_drills": {
             "offense": {"inside": b["SC"], "outside": b["SH"]},
@@ -2434,11 +2435,18 @@ def auto_train_one_cpu_team(
     if not players_for_training:
         return {"status": "error", "reason": "no_players", "team_id": str(team_id)}
 
-    is_first = is_first_training if is_first_training is not None else (week == 1)
-    # CPU trains the coaching-quality reference (was: random allocation + random
-    # focus). Team-wide reference substrate + per-player custom focus steering each
-    # player to his own position's reference top-3. See _cpu_reference_* above.
-    allocations = _cpu_reference_allocation()
+    from BackEnd.constants.training_shape import (
+        CAMP_GAIN_SCALE,
+        is_camp_week,
+        resolve_training_position,
+    )
+    is_camp = (
+        bool(is_first_training)
+        if is_first_training is not None
+        else is_camp_week(week)
+    )
+
+    # Per-position bases + per-player custom focus (framework cost curve).
     coaching_focus = "player-maximizer-custom"
     coaching_focus_custom_by_player = _cpu_reference_custom_focus(players_for_training, fpd_by_player_id)
 
@@ -2459,20 +2467,57 @@ def auto_train_one_cpu_team(
     # errors). Quiet just this engine's logger for the call — user-team training, on a
     # different path, stays fully verbose.
     from BackEnd.utils.headless_simulation import quiet_training_engine_logs
+    from collections import defaultdict
+
+    groups: dict[str, list] = defaultdict(list)
+    for p in players_for_training:
+        fp = fpd_by_player_id.get(str(p["_id"])) or {}
+        pos = resolve_training_position({
+            "training_position": fp.get("training_position") or p.get("training_position"),
+            "position_intent": fp.get("position_intent") or p.get("position_intent"),
+            "position_ratings": fp.get("position_ratings") or p.get("position_ratings"),
+        })
+        groups[pos].append(p)
+
+    updated_players: list = []
+    updated_team = team_stats
+    updated_plays = plays_data
+    updated_scouting = scouting_data
+    training_report: dict = {}
+    gain_scale = CAMP_GAIN_SCALE if is_camp else None
+    apply_team_drills = True
     with quiet_training_engine_logs():
-        updated_players, updated_team, updated_plays, updated_scouting, training_report = execute_training(
-            players_for_training,
-            team_stats,
-            allocations,
-            coaching_focus,
-            plays_data=plays_data,
-            strategy_settings=strategy_settings,
-            playbook_settings=playbook_settings,
-            scouting_data=scouting_data,
-            playbook_training_mode="current-playbooks",
-            skip_pre_training_depreciation=is_first,
-            coaching_focus_custom_by_player=coaching_focus_custom_by_player,
-        )
+        for pos, group in groups.items():
+            allocations = _cpu_reference_allocation(pos)
+            if not apply_team_drills:
+                allocations = {
+                    "player_drills": allocations["player_drills"],
+                    "general": {
+                        "conditioning": allocations["general"]["conditioning"],
+                        "free_throws": allocations["general"]["free_throws"],
+                        "film_study": allocations["general"]["film_study"],
+                    },
+                    "team_drills": {},
+                }
+            up, updated_team, updated_plays, updated_scouting, training_report = execute_training(
+                group,
+                updated_team,
+                allocations,
+                coaching_focus,
+                plays_data=updated_plays,
+                strategy_settings=strategy_settings,
+                playbook_settings=playbook_settings,
+                scouting_data=updated_scouting,
+                playbook_training_mode="current-playbooks",
+                skip_pre_training_depreciation=is_camp,
+                coaching_focus_custom_by_player=coaching_focus_custom_by_player,
+                gain_scale=gain_scale,
+            )
+            updated_players.extend(up)
+            apply_team_drills = False
+
+    # Compat: callers still key off is_first for camp-weight coaching-focus counts.
+    is_first = is_camp
 
     position_ratings_updates: dict[str, dict] = {}
     for player in updated_players:
@@ -13745,8 +13790,9 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
 
     training_status = franchise_doc.get("training_status", {}) or {}
     week = int(franchise_doc.get("week", 1) or 1)
-    results = franchise_doc.get("results", {})
-    is_first_training = (week == 1 and not results.get("1"))
+    from BackEnd.constants.training_shape import CAMP_WEEKS, is_camp_week
+    is_first_training = is_camp_week(week)
+    is_last_camp_week = int(week) == CAMP_WEEKS
 
     if _postseason_training_disabled_for_week(week):
         raise HTTPException(
@@ -13804,7 +13850,7 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
     )
 
     cuts_ran_this_call = False
-    if is_first_training and not bool(training_status.get("cpu_training_camp_cuts_applied")):
+    if is_last_camp_week and not bool(training_status.get("cpu_training_camp_cuts_applied")):
         _apply_cpu_training_camp_cuts(franchise_id, excluded_team_id=str(team_id))
         cuts_ran_this_call = True
 
@@ -13822,7 +13868,7 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
         if ps_state:
             ps_fields["practice_squad"] = ps_state
 
-    if week >= 2 and week <= 19 and (franchise_doc.get("practice_squad") or {}).get("initialized"):
+    if week > CAMP_WEEKS and week <= 19 and (franchise_doc.get("practice_squad") or {}).get("initialized"):
         from BackEnd.practice_squad.manager import run_practice_squad_week
 
         # Serial poll bounds each request to one full game (manager commits PS state
@@ -13956,6 +14002,9 @@ def _build_custom_focus_roster_for_franchise(
                 "name": name,
                 "attrs": attr_vals,
                 "position_ratings": position_ratings,
+                "year": meta.get("year"),
+                "position_intent": fpd.get("position_intent"),
+                "training_position": fpd.get("training_position"),
                 "_sort_max_rt": _max_position_rating_from_fpd(fpd),
             }
         )
@@ -13986,13 +14035,17 @@ def get_training_points(franchise_id: str):
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
-    # Check if it's first training (training camp) - week 1 and no results yet
+    # Training camp = weeks 1..CAMP_WEEKS (framework §10.3)
     week = franchise_doc.get("week", 1)
-    results = franchise_doc.get("results", {})
-    is_first_training = (week == 1 and not results.get("1"))
-    
-    # First training (training camp) gets 30 points, otherwise 24
-    training_points = 30 if is_first_training else 24
+    from BackEnd.constants.training_shape import (
+        CAMP_POINT_BUDGET,
+        CAMP_WEEKS,
+        IN_SEASON_POINT_BUDGET,
+        cost_matrix,
+        is_camp_week,
+    )
+    is_first_training = is_camp_week(week)
+    training_points = CAMP_POINT_BUDGET if is_first_training else IN_SEASON_POINT_BUDGET
     
     total_time = (time.time() - endpoint_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] get_training_points TOTAL: {total_time:.2f}ms, training_points={training_points}, is_first_training={is_first_training}")
@@ -14004,6 +14057,9 @@ def get_training_points(franchise_id: str):
     return {
         "training_points": training_points,
         "is_first_training": is_first_training,
+        "is_camp_week": is_first_training,
+        "camp_weeks": CAMP_WEEKS,
+        "cost_matrix": cost_matrix(),
         "week": week,
         "user_team_name": franchise_doc.get("user_team_id"),
         "custom_focus_roster": custom_roster,
@@ -14123,9 +14179,19 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             detail="Training is disabled during postseason tournament weeks.",
         )
     
-    # Check if it's first training (training camp) - week 1 and no results yet
-    is_first_training = (week == 1 and not results.get("1"))
-    expected_points = 30 if is_first_training else 24
+    # Training camp = weeks 1..CAMP_WEEKS (framework §10.3)
+    from BackEnd.constants.training_shape import (
+        CAMP_GAIN_SCALE,
+        CAMP_POINT_BUDGET,
+        CAMP_WEEKS,
+        IN_SEASON_POINT_BUDGET,
+        is_camp_week,
+        player_week_spend,
+        resolve_training_position,
+    )
+    is_first_training = is_camp_week(week)
+    is_last_camp_week = int(week) == CAMP_WEEKS
+    expected_points = CAMP_POINT_BUDGET if is_first_training else IN_SEASON_POINT_BUDGET
     recruiting_results = franchise_doc.get("recruiting_results", {}) or {}
 
     if 20 <= week <= 26 and str(week) not in recruiting_results:
@@ -14190,29 +14256,14 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     else:
         raise HTTPException(status_code=400, detail="Invalid training phase")
     
-    # Validate total training points allocated
+    # Validate cost-weighted spend later (after roster load). Raw slider sum is
+    # no longer the budget unit — η is a budget cost (§10.1).
     training_data = req.training_data
     allocations = {
         "player_drills": training_data.get("player_drills", {}),
         "team_drills": training_data.get("team_drills", {}),
         "general": training_data.get("general", {})
     }
-    
-    # Calculate total points allocated
-    total_allocated = 0
-    for category in allocations.values():
-        if isinstance(category, dict):
-            for value in category.values():
-                if isinstance(value, dict):
-                    total_allocated += sum(value.values())
-                elif isinstance(value, (int, float)):
-                    total_allocated += value
-    
-    if total_allocated != expected_points:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid training points allocation. Expected {expected_points} points, got {total_allocated}."
-        )
 
     # ✅ SS&S: Always use user_team_object_id from franchise document as source of truth
     # This ensures we're always using the correct team, even if URL params are wrong
@@ -14304,6 +14355,33 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
 
     if not players_for_training:
         raise HTTPException(status_code=404, detail="No players found for training")
+
+    # Cost-curve budget: every roster player must be able to afford this plan.
+    over_budget = []
+    for player in players_for_training:
+        pos = resolve_training_position({
+            "training_position": player.get("training_position"),
+            "position_intent": (franchise_players.get(player["_id"]) or {}).get("position_intent")
+            or player.get("position_intent"),
+            "position_ratings": player.get("position_ratings"),
+        })
+        year = player.get("year") or ((player.get("meta") or {}).get("year"))
+        spend = player_week_spend(allocations, pos, year)
+        if spend > expected_points + 1e-6:
+            label = (
+                f"{player.get('first_name','')} {player.get('last_name','')}".strip()
+                or player["_id"]
+            )
+            over_budget.append(f"{label} ({pos}): {spend:.1f}/{expected_points}")
+    if over_budget:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Training allocation exceeds the cost budget for: "
+                + "; ".join(over_budget[:5])
+                + (f" (+{len(over_budget)-5} more)" if len(over_budget) > 5 else "")
+            ),
+        )
     
     # Get team stats (team_attributes) from FTD
     team_stats = ftd_doc.get("team_attributes", {}).copy()
@@ -14424,7 +14502,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: Loading {len(players_for_training)} players: {players_load_time:.2f}ms")
     
     # Execute training (applies pre-training conditions, then training points)
-    # Skip pre-training depreciation for first training (training camp) - week 1 before games
+    # Camp weeks: skip decay, CAMP_GAIN_SCALE (framework §10.3)
     training_exec_start = time.time()
     updated_players, updated_team, updated_plays, updated_scouting_data, training_report = execute_training(
         players_for_training,
@@ -14439,6 +14517,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         skip_pre_training_depreciation=is_first_training,
         coaching_focus_custom_by_player=normalized_custom,
         training_playbook_focus=training_playbook_focus_payload,
+        gain_scale=CAMP_GAIN_SCALE if is_first_training else None,
     )
     training_exec_time = (time.time() - training_exec_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: execute_training(): {training_exec_time:.2f}ms")
@@ -14526,7 +14605,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         logger.info(f"✅ [TRAINING] Saving scouting_data to FTD")
     else:
         logger.warning(f"⚠️ [TRAINING] updated_scouting_data is None, preserving existing scouting_data")
-    if is_first_training:
+    if is_last_camp_week:
         ftd_update["training_squad_players"] = []
 
     # Community Engagement → pending home-crowd band shift for user's next franchise game (consumed at game start)
@@ -14643,7 +14722,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     )
 
     cuts_ran_this_call = False
-    if is_first_training and not bool(training_status.get("cpu_training_camp_cuts_applied")):
+    if is_last_camp_week and not bool(training_status.get("cpu_training_camp_cuts_applied")):
         _apply_cpu_training_camp_cuts(franchise_id, excluded_team_id=str(team_id))
         cuts_ran_this_call = True
 

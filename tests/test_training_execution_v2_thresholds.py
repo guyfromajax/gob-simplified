@@ -280,8 +280,10 @@ def test_training_gain_is_halved_when_player_starts_above_100(monkeypatch):
     player = _make_player(year="junior", anchor_val=102)
     training._apply_player_training_points(player, "SC", 4, starting_baseline=102)
 
-    assert player["attributes"]["anchor_SC"] == 105
-    assert player["attributes"]["SC"] == 105
+    # Raw 5 → halved to 3 → 3 × 0.18 = 0.54 banked (no whole point yet).
+    assert player["attributes"]["anchor_SC"] == 102
+    assert player["attributes"]["SC"] == 102
+    assert abs(player["training_gain_remainders"]["SC"] - 0.54) < 1e-9
 
 
 def test_training_gain_is_not_reduced_when_player_starts_at_99(monkeypatch):
@@ -290,5 +292,7 @@ def test_training_gain_is_not_reduced_when_player_starts_at_99(monkeypatch):
     player = _make_player(year="junior", anchor_val=99)
     training._apply_player_training_points(player, "SC", 4, starting_baseline=99)
 
-    assert player["attributes"]["anchor_SC"] == 105
-    assert player["attributes"]["SC"] == 105
+    # Raw 6 × 0.18 = 1.08 → +1, rem 0.08.
+    assert player["attributes"]["anchor_SC"] == 100
+    assert player["attributes"]["SC"] == 100
+    assert abs(player["training_gain_remainders"]["SC"] - 0.08) < 1e-9

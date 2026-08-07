@@ -19,27 +19,31 @@ logging.disable(logging.CRITICAL)
 
 from BackEnd.utils import player_development as dev
 from BackEnd.utils import player_generation as gen
-from BackEnd.utils.player_generation import position_profile
-from BackEnd.utils.position_ratings import POSITION_WEIGHTS, height_fitness, compute_position_ratings
+from BackEnd.utils.position_ratings import compute_position_ratings
 from BackEnd.models.training_execution_v2 import execute_training
 from BackEnd.api.franchise_routes import _cpu_reference_allocation, _cpu_reference_top3
 
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 GROWTH = list(dev.GROWTH_ATTRS)
 _NULL = open(os.devnull, "w")
-_ALLOC = _cpu_reference_allocation()
 
 
 def _cpu_train_week(fpd, year, weeks=26):
     """Run the ACTUAL CPU in-season path for one season, mutating fpd['attributes']."""
+    from BackEnd.constants.training_shape import CAMP_GAIN_SCALE, is_camp_week
     pl = [{"_id": "x", "attributes": fpd["attributes"], "year": year, "height": fpd["meta"]["height"],
            "meta": fpd["meta"], "position_intent": fpd["position_intent"], "first_name": "A", "last_name": "B"}]
     top3 = _cpu_reference_top3(fpd["position_intent"])
+    alloc = _cpu_reference_allocation(fpd["position_intent"])
     with contextlib.redirect_stdout(_NULL):
-        for wk in range(weeks):
-            execute_training(pl, {}, _ALLOC, "player-maximizer-custom",
-                             coaching_focus_custom_by_player={"x": top3},
-                             skip_pre_training_depreciation=(wk == 0))
+        for wk in range(1, weeks + 1):
+            camp = is_camp_week(wk)
+            execute_training(
+                pl, {}, alloc, "player-maximizer-custom",
+                coaching_focus_custom_by_player={"x": top3},
+                skip_pre_training_depreciation=camp,
+                gain_scale=CAMP_GAIN_SCALE if camp else None,
+            )
     fpd["attributes"] = pl[0]["attributes"]
     fpd["position_ratings"] = compute_position_ratings(
         {"attributes": fpd["attributes"], "height": fpd["meta"]["height"]})
@@ -73,7 +77,7 @@ def test_partA_writes_both_and_full_cycle_preserves_growth():
     for a in GROWTH:
         assert fpd["attributes"][f"anchor_{a}"] == fpd["attributes"][a], f"{a}: anchor≠live after develop"
     grown = fpd["attributes"]["anchor_SC"]
-    assert grown > 40, f"attractor should develop a C's SC well above JH ({grown})"
+    assert grown > 40, f"level-only offseason should develop a C's SC well above JH ({grown})"
     # (2) one week-1 CPU training must preserve it (not reset to a stale pre-develop value)
     _cpu_train_week(fpd, "junior", weeks=1)
     after = fpd["attributes"]["anchor_SC"]
@@ -111,16 +115,14 @@ def test_developed_seniors_land_on_tier_anchors():
 
 
 def test_cpu_path_preserves_shape():
-    """PART B, the invariant replacing 'reference holds flat': a reference-coached player
-    developed through the ACTUAL CPU path lands with his tier/year/position PROFILE
-    preserved — non-signature attributes are not starved. This is what the old bare-reference
-    invariants could not see, and what the desync+ratchet violated (C scoring 44→26).
+    """PART B (framework §10.4). Without the α-attractor, the CPU path must still
+    let coaching move shape — reference top-3 attrs finish above neglected attrs.
 
-    Averaged over seeds: a single career carries large peak/HT variance, so this is a
-    DISTRIBUTIONAL property (the league's mean developed shape), not a per-career one."""
-    random.seed(20260804)  # the CPU training path (execute_training) draws from global
-                           # random; seed it so this distributional check is deterministic,
-                           # not a coin-flip against the floor.
+    Profile-alignment (≥70% of position_profile) was the attractor's job and is
+    deliberately retired; floors replace its anti-starvation half (see
+    test_decay_clamps_to_weight_scaled_floor).
+    """
+    random.seed(20260804)
     N = 12
     for pos in POSITIONS:
         finals = []
@@ -134,24 +136,42 @@ def test_cpu_path_preserves_shape():
                 fpd["entry_tier"] = out["entry_tier"]; fpd["meta"]["year"] = y
                 if y != "senior":
                     _cpu_train_week(fpd, y)
-            finals.append(dict(fpd["attributes"], **{"_rt": max(fpd["position_ratings"].values()),
-                                                     "_h": fpd["meta"]["height"]}))
+            finals.append(dict(fpd["attributes"]))
+
         mean_attr = {a: statistics.mean(f[f"anchor_{a}"] for f in finals) for a in GROWTH}
-        prof = position_profile(pos); w = POSITION_WEIGHTS[pos]
-        fit = height_fitness(pos, statistics.mean(f["_h"] for f in finals)) or 1.0
-        rt = statistics.mean(f["_rt"] for f in finals)
-        denom = sum(w.get(a, 0.0) * prof.get(a, 0.0) for a in GROWTH) or 1.0
-        k = (rt / fit) / denom
-        # no on-position attribute is starved below 70% of its profile target. The attractor
-        # is partial by design (α<1), so it lands below 100% — but the collapse drove SC to
-        # ~45% of target, which this catches while passing healthy development (~90%).
-        for a in GROWTH:
-            if w.get(a, 0.0) >= 0.10:
-                target = prof[a] * k
-                assert mean_attr[a] >= 0.70 * target, (
-                    f"{pos}/{a}: mean developed {mean_attr[a]:.0f} starved vs profile target "
-                    f"{target:.0f} (<70%). Non-signature attributes must not collapse on turnover.")
-        if pos == "C":  # the attribute that collapsed to 26 live; pinned-pf baseline ≈ 52,
-                        # so the 48 floor is a collapse-guard with headroom, not a coin-flip.
-            assert mean_attr["SC"] > 48, \
-                f"C mean scoring {mean_attr['SC']:.0f} — the shooting collapse regressed."
+        top3 = set(_cpu_reference_top3(pos))
+        top_mean = statistics.mean(mean_attr[a] for a in top3)
+        # Neglected = on-weight attrs the CPU base leaves at 0 for this position.
+        from BackEnd.api.franchise_routes import _CPU_REFERENCE_BASE_BY_POS
+        base = _CPU_REFERENCE_BASE_BY_POS[pos]
+        neglected = [a for a in GROWTH if base.get(a, 0) == 0 and a not in top3]
+        if neglected:
+            neg_mean = statistics.mean(mean_attr[a] for a in neglected)
+            assert top_mean > neg_mean, (
+                f"{pos}: reference top-3 mean {top_mean:.0f} should beat neglected "
+                f"{neg_mean:.0f} — coaching must still move shape."
+            )
+        if pos == "C":
+            # Collapse-guard: reference CPU keeps a token SC unit so scoring
+            # does not rot to the old 26 live bug under level-only offseason.
+            assert mean_attr["SC"] > 35, f"C mean scoring {mean_attr['SC']:.0f}"
+
+
+def test_decay_clamps_to_weight_scaled_floor():
+    """Floors bind at decay (§5 / §10.2) — a below-floor attr is raised, not left soft."""
+    from BackEnd.constants.training_shape import apply_floor_clamp_to_anchors, floor_need, core12_mean
+    from BackEnd.models.training_execution_v2 import apply_pre_training_conditions
+
+    attrs = {a: 50 for a in GROWTH}
+    attrs["ID"] = 5
+    for a in GROWTH:
+        attrs[f"anchor_{a}"] = attrs[a]
+    player = {
+        "_id": "p", "attributes": attrs, "year": "sophomore",
+        "position_intent": "C", "training_position": "C",
+    }
+    need = floor_need("C", "ID", core12_mean(attrs))
+    assert need > 5
+    apply_pre_training_conditions([player], {})
+    assert player["attributes"]["anchor_ID"] >= need
+    assert player["attributes"]["ID"] >= need

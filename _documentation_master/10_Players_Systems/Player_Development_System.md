@@ -26,13 +26,13 @@ Because the target is absolute and re-anchored every rollover, nothing drifts: i
 
 **RNG note (precise).** `potential_factor` is drawn **last** inside `generate_player`, so every *prior* draw for that same player (core attributes, CH, EM, weight) keeps its exact stream position — those fields are byte-identical to before the feature. However, the generator's `rng` is **shared across a generation run**, so consuming one extra value per player shifts the stream for every *subsequent* player in that run: **any seeded regeneration now yields a different downstream population than it did pre-feature.** This is harmless here — the retroactive pool write (Phase 5) and the projection read (Phase 4) both read stored state and never invoke generation — but a test that pins an exact seeded population across the whole run will differ.
 
-## Shape Attractor
+## Shape Attractor — **retired**
 
-Constant: `OFFSEASON_ATTRACTOR_ALPHA = 0.55`.
+Live constant: `OFFSEASON_ATTRACTOR_ALPHA = 0.0` (level-only offseason; shape owned by camp / in-season + floors). See framework §10.4 / §11.
 
-> **Open design question (2026-08-06):** this constant reshapes players toward a positional mean on a career schedule nobody chose against. See [Reshape vs grow](#reshape-vs-grow--open-simulation-design). Do not retune α as a casual lever until that question is answered.
+> Historical record below describes the α=0.55 blend that produced league shape convergence. Do not restore it.
 
-Rather than distributing an additive budget, the offseason targets **both a level** (the ladder RT) **and a shape** (the position/tier/year profile), and it separates them (2026-08 attractor-level fix):
+Rather than distributing an additive budget, the *former* offseason targeted **both a level** (the ladder RT) **and a shape** (the position/tier/year profile), and separated them (2026-08 attractor-level fix):
 
 ```
 # SHAPE — α-blend each attribute toward its profile-scaled target (training bias survives in the ratios)
@@ -47,6 +47,36 @@ The earlier form applied only the SHAPE step (`before + α·(target−before)`) 
 - **Lands on the ladder by construction — now actually true.** The level close is exact, so developed RT hits the tier anchor; the old "by construction" claim was measurably false and is now pinned by a test.
 - **Bidirectional and complete.** Pulls RT *fully* down to the ladder if the season overshot (the old form only clawed back 55% of an overshoot, leaving a permanent ratchet); fills non-signature attributes the old additive budget starved, so a center's scoring keeps growing.
 - **α < 1 still makes it an attractor for SHAPE, not a clamp.** A user's in-season focus survives as a proportional spike in the ratios (paid for elsewhere, since the level is fixed to the ladder) — pulled toward the profile, never snapped onto it.
+
+## Framework measured outcomes (reference)
+
+Canonical close-out numbers for the shape framework ([`player-development-framework.md`](player-development-framework.md)). Prefer this section over scattered §10 notes or findings docs when citing phase or force impact.
+
+**Basis (all tables below unless noted):** reference arm · n = 150 · gain-driven (camp + week_gain + offseason; decay excluded) · current build (`CAMP_WEEKS=3`, `CAMP_GAIN_SCALE=1.4`, attractor retired, fractional remainder + re-banded gains) · measured **2026-08-07** · script `scripts/s11_framework_baseline_measure.py` · artifacts `tmp/s11_framework_baseline/reference_phase_shares.json`, `baseline_strategy_spread.json`. Re-run the script rather than trusting the number alone.
+
+### Phase impact — share of career movement
+
+| Phase | Attribute movement | Shape movement |
+|---|---:|---:|
+| Training camp | 37.2% | 27.1% |
+| In-season | 52.0% | 71.9% |
+| Offseason | 10.8% | 1.0% |
+
+**35 / 35 / 30 retired, not met.** Camp landed on the old attribute target (~35%). In-season came in above. The offseason's absolute contribution did not shrink because the offseason changed — its share fell because the gain-path fixes strengthened coaching and enlarged the denominator. Offseason shape ~1% is expected (level-only by design).
+
+**Offseason acceptance** is the untrained-maturation table in framework §10.4 (potential pays off without training) — not phase share.
+
+### Force impact
+
+| Force | Outcome |
+|---|---|
+| **Coaching** | ~99% of shape movement (`of_shape_move_share_from_training_phases`). Coach-aligned projection **76.8%** on reference, **96.5%** on extreme; the residual is geometric overlap between reference emphasis and the position profile, not a competing pull. |
+| **Player identity** | Not a fixed share — cosine retention spans **0.84 → 0.41** by coaching intent. Reference **0.825**, mild **0.840**, moderate **0.772**, extreme **0.408**. |
+| **Position generics** | **0%** as a force. Expressed only as weight-scaled P6 floors (refuse at Apply; clamp decay) and the 1×–4× training cost matrix. |
+
+**55 / 45 identity-to-coaching superseded.** Coaching owns all shape movement; how much of a player survives is the coach's decision. The old **0.55** figure describes an aggressive reshaping coach, not a property of the mechanism — a typical (reference) coach lands near **0.83**, which is correct: reinforcing strengths should not erase him.
+
+Along / across decomposition (same basis; conversion-only reading): see `baseline_strategy_spread.json` → `strategy_across_shape_ladder` / `strategy_along_shape_ladder`. Suite: `BackEnd/utils/shape_movement.py`, `tests/test_training_shape_framework.py`.
 
 ## Anchor / Live Write Discipline
 
@@ -87,7 +117,7 @@ Plus the CPU-path **"preserves shape"** invariant: the offseason regrows toward 
 
 | Constant | Value | Effect |
 |---|---|---|
-| `OFFSEASON_ATTRACTOR_ALPHA` | `0.55` | Fraction of the gap to the profile closed each offseason. See [Reshape vs grow](#reshape-vs-grow--open-simulation-design) before retuning — career retention at 0.55 is ~9% for a freshman, and the constant was fitted against single-season feel, not a four-year criterion. |
+| `OFFSEASON_ATTRACTOR_ALPHA` | **`0.0`** (was 0.55) | **Retired.** Level-only offseason; was the fraction of the gap to the profile closed each rollover. Framework §11. |
 | `STD_RUNG_INCREMENT` (× JH anchor) | FR .17 / SO .20 / JR .15 / SR .18 (Σ .70 → 1.7× at zero peaks) | Per-rung standard growth; sets the class-year ladder |
 | `PEAK_BONUS` | `+0.30 × jh_anchor`, fixed per peak | Each rolled peak adds this to the target; peaks stack (0–3), so career multiple runs 1.7× (0 peaks) → 2.6× (3 peaks) |
 | `HT_TOTAL` (mean) | `Normal(3.2, 1.9)` clamped `[0,8]`; per-rung cap 2.5 in | Total career height gain; `HT_TOTAL_MEAN = 3.2` in sets how far below frame a JH starts |
@@ -98,10 +128,13 @@ Plus the CPU-path **"preserves shape"** invariant: the offseason regrows toward 
 | `OFFSEASON_DISTRIBUTION_BLEND` | `0.70` | **Vestigial** — the additive-budget distribution blend; superseded by the shape attractor (`OFFSEASON_ATTRACTOR_ALPHA`). |
 | `JH_ANCHOR_BY_TIER` | Poor→Elite JH-scale anchors (e.g. Average 30, Elite 50) | Maps `entry_tier` to the `jh_anchor` the target formula multiplies |
 
-## Reshape vs grow — open simulation design
+## Reshape vs grow — **closed** (grow level, coach shape)
 
-**Surfaced 6 August 2026 via Team Builder §11. Not a Team Builder problem.**  
-TB measurement: `projects/s11-authorship-drift-findings.md`. Closed TB brief: `projects/s11-development-vs-authorship.md`.
+**Surfaced 6 August 2026 via Team Builder §11; resolved 7 August 2026** in [`player-development-framework.md` §11](player-development-framework.md).  
+Attractor retired (`OFFSEASON_ATTRACTOR_ALPHA = 0.0`); offseason is level-only; camp + in-season own shape; floors replace the mean pull.  
+TB measurement (historical): `projects/s11-authorship-drift-findings.md`. Closed brief: `projects/s11-development-vs-authorship.md`.
+
+> The subsections below are the pre-resolution record. Do not retune α or treat reshape-vs-grow as open.
 
 ### What the measurement actually found
 
@@ -159,9 +192,9 @@ Everyone loses their shape. Only the Team Builder user *chose* theirs. The mecha
 **Seed 202608061 pause + shape/level correction — 6 August 2026.**  
 Full notes: `projects/s11-league-convergence-shape-vs-level.md` (raw capture: `s11-league-convergence-pause-findings.md`).
 
-Per-attribute σ within position is **level-contaminated** (attractor is RT-neutral; magnitudes fan out via tier/`potential_factor` while shape collapses). On **shape** — mean pairwise cosine distance of unit-mean attribute vectors, same survivors, grouped by t0 `training_position` — derived one-step retention averages **0.625** (FR/SO); career projection **\(\hat{r}^3 = 0.245 ≤ 0.4\)**. Second view (shape-component σ) career **0.379**, also ≤ 0.4. Level σ **grew** (R₂ ≈ 1.32). PC1 share of shape variance climbed ~+0.20–0.24. Guards collapse hardest; centres least. **Structural by the stated rule** — model question (reshape vs grow), not a casual α tweak. `OFFSEASON_ATTRACTOR_ALPHA` remains under review; nothing tuned yet.
+Per-attribute σ within position was **level-contaminated** under the attractor (RT-neutral; magnitudes fan out via tier/`potential_factor` while shape collapses). On **shape** — mean pairwise cosine distance of unit-mean attribute vectors — career projection **\(\hat{r}^3 = 0.245 ≤ 0.4\)** at α=0.55. That measurement justified retiring the attractor; see framework §10 / §11 for the shipped model.
 
-Separate: init FRD variety came from pre-built `recruit_sets` (n=300, mean attr σ 15.7); post-rollover FRD falls back to dynamic `generate_recruits_list(count=400)` once the set is consumed (mean attr σ 11.6). Same helper, different branch — not signing selection.
+**Still unowned** (framework §8a): init FRD variety from pre-built `recruit_sets` (mean attr σ 15.7) vs post-rollover `generate_recruits_list` (σ 11.6) — 26% variety loss after season one; and `training_position` has no live write path.
 
 ## Key Files
 

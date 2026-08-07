@@ -300,13 +300,15 @@ The training execution system applies pre-training conditions, allocates trainin
 
 #### Training Point Ranges
 
-**Player Attributes (Base Ranges):**
+**Player Attributes (Base Ranges)** (`PLAYER_ATTR_GAIN_RANGE_BY_POINTS` in `training_execution_v2.py`; year-max adjustments still apply on the high end only):
 - 0 points: `+= random.randint(-2, -1)`
-- 1 point: `+= random.randint(0, 1)`
+- 1 point: `+= random.randint(1, 3)`
 - 2 points: `+= random.randint(2, 3)`
 - 3 points: `+= random.randint(2, 4)`
 - 4 points: `+= random.randint(3, 5)`
 - 5 points: `+= random.randint(3, 6)`
+
+Positive gains are then scaled by `IN_SEASON_GAIN_SCALE` (0.18) or `CAMP_GAIN_SCALE` (camp), with a per-attribute fractional remainder (`training_gain_remainders`) so sub-integer signal accumulates across weeks instead of rounding away.
 
 **High Attribute Gain Reduction**
 - If a player's starting value for a trained attribute at the beginning of the training session is `> 100`, any positive gain to that attribute is reduced by `50%`, using rounded integer value.
@@ -321,62 +323,20 @@ Leave minimums as is, only change maximums
 - **Junior**: 0 to min, 2 to max
 - **Senior**: 0 to min, 1 to max
 
-**Year-Based Pre-Training Decay**
-- **Freshman**: -5  min, -2  max
-- **Sophomore**: -4  min, -1  max
-- **Junior**: -3  min to -1  max
-- **Senior**: -2  min to 0  max
+**Year-Based Pre-Training Decay** (code: `PRE_TRAINING_DECAY_BY_YEAR` in `training_execution_v2.py`; applied only when `skip_pre_training_depreciation` is false — i.e. skipped for training camp):
+- **Freshman / Sophomore**: -2 min, 0 max
+- **Junior / Senior**: -1 min, 0 max
 
-**Training Camp Bonus System**
-For training camp only, the following bonus will be run for each player, based on his CH value and his highest RT position.
-- Core Attributes by position:
-  - PG: PS, BH, IQ
-  - SG: SH, FT, OD
-  - SF: AG, choose 2 of these at random (SC, SH, ID, OD)
-  - PF: RB, ST, ID
-  - C: SC, ST, ID
-- Note: if a player has multiple positions tied for the highest RT, choose one at random
+**Training Camp (what it actually is today)**
 
-Then use the following CH scale for each player:
-- If CH > 80, for each core attribute `+= random.randint(4, 10)`
-- `elif CH > 60`: for each core attribute `+= random.randint(3, 8)`
-- `elif CH > 40`: for each core attribute `+= random.randint(2, 6)`
-- `elif CH > 20`: for each core attribute `+= random.randint(1, 4)`
-- else: no bonus applied
+Training camp is **not** a separate growth event. It is the same `execute_training` → `apply_training_points` path as weekly training, with two differences only:
 
-Then apply a final **Training Camp bonus by year** (runs for every player with a recognized `year`, regardless of CH). **Positive** rolls on an attribute use the same **high-attribute rule** as drill gains: if that attribute’s value **at the start of the training session** is `> 100`, halve the positive gain (rounded). Negative rolls are not halved. After all camp bonuses, player attributes are clamped to a **minimum of 1**.
+1. **Pre-training decay is skipped** (`skip_pre_training_depreciation=True` when franchise week 1 before the first game).
+2. **Point budget is 30** instead of 24.
 
-- **Top two positions:** Sort `PG`–`C` by RT. If **two** positions tie for highest RT, those are the two. If **more than two** tie for highest, choose **two** at random. If **one** is uniquely first and **two or more** tie for second, use the first and choose **one** of the tied second-tier positions at random. (All five positions are expected to have RT values.)
-- **Attribute set:** Union of core attributes for each of those two positions (same mapping as above; SF still draws two random attrs per SF definition), then add **ND**, **IQ**, **FT**, and **CH** if not already present, then add **exactly one** random attribute from trainable player attrs not in the set, **excluding** EM, MO, NG, and RT.
-- **Rolls:** Each attribute in that final list gets its **own** `random.randint`:
-  - **senior:** `+= random.randint(-5, 10)`
-  - **junior:** `+= random.randint(-5, 10)`
-  - **sophomore:** `+= random.randint(-8, 15)`
-  - **freshman:** `+= random.randint(-10, 22)`
+There is **no** camp-only CH/core-attribute bonus, **no** year-based camp bonus roll, and **no** camp HT/WT growth. Those used to exist; they were removed when the offseason development event took ownership of career physical/level growth (see comment in `apply_training_points` — camp keeps only the 30-point allocation and the decay skip; `training_camp_physique_notes` is always empty). Height and weight growth live in `develop_one_offseason` at season rollover, not at camp.
 
-Traning Camp Height / Weight bonsuses
--senior junior: none
--sophomore:
-  - height
-    - +0: 60% chance
-    - +1: 30% chance
-    - +2: 10% chance
-  - weight (note height filters are applied after the height change noted above)
-    - height > 75: += random.randint(0,10)
-    - else: += random.randint(0,5)
--freshman:
-  - height
-    - +0: 20% chance
-    - +1: 20% chance
-    - +2: 30% chance
-    - +3: 20% chance
-    - +4: 5% chance
-    - +5: 5% chance
-  - weight (note height filters are applied after the height change noted above)
-    - height > 75: += random.randint(10,30)
-    - elif height > 72: += random.randint(5,15)
-    - else: += random.randint(0,10)
-
+*(Older docs described a full Training Camp Bonus System and FR/SO HT/WT camp rolls. That behaviour is gone; do not re-implement from this paragraph's absence — the offseason owns it.)*
 
 **Team Attributes (training ranges by group):**
 - Standard install attrs (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`):
@@ -748,10 +708,15 @@ Eligible non-user teams run the same `execute_training()` engine. CPU allocation
 | Weekly allocation (per attribute) | Net over a 26-week season |
 |---|---|
 | 0 points (neglect) | declines |
-| reference band (points 1-3) | ≈ flat |
-| focused | gains |
+| reference primaries (pts=3) | ≈ flat |
+| reference baseline (pts=1) | mild drag (bands are distinct; see §10.6) |
+| focused (pts=4/5) | gains |
 
-The offseason distribution is the **shape attractor** (`OFFSEASON_ATTRACTOR_ALPHA` = 0.55): it pulls each attribute toward the tier/year/position profile scaled to the target RT (see `10_Players_Systems/Player_Development_System.md`). This **replaced** the older additive-budget aim (`OFFSEASON_DISTRIBUTION_BLEND`, now vestigial). Pre-training decay by year is unchanged (see **Year-Based Pre-Training Decay** above).
+The offseason is a **level-only** rescale of the player's current attributes onto
+the ladder RT target (plus HT/WT). Shape is owned by camp and in-season training;
+position floors replace the retired shape attractor (`OFFSEASON_ATTRACTOR_ALPHA`).
+Pre-training decay by year is unchanged (see **Year-Based Pre-Training Decay**
+above), and decay never subtracts below the weight-scaled position floor.
 
 **Coaching-quality metric.** A season's allocation is scored in **points per attribute per week, not shares**:
 
@@ -780,7 +745,7 @@ quality        = Σ contribution / Σ contribution(reference)
 | `COACHING_HEADROOM` | how far a budget optimum scores above 1.0 |
 | `COACHING_F_MIN` / `COACHING_F_MAX` | offseason multiplier bounds (0.85 / 1.20) |
 | `IN_SEASON_GAIN_SCALE` | weekly-gain scale (0.18) |
-| `OFFSEASON_ATTRACTOR_ALPHA` | offseason shape-attractor strength (0.55) — replaced `OFFSEASON_DISTRIBUTION_BLEND` (now vestigial) |
+| `OFFSEASON_ATTRACTOR_ALPHA` | **retired (0.0)** — shape attractor removed; offseason is level-only (§10.4) |
 
 ### Data Storage
 
@@ -796,7 +761,7 @@ quality        = Σ contribution / Σ contribution(reference)
 - `attributes.anchor_{attr}` and `attributes.{attr}` - Updated player attribute values
 - `position_ratings` - Recalculated position ratings after training
 - `attributes.NG` - Updated NG value when conditioning or scrimmages apply energy reduction
-- `meta.height` and `meta.weight` (integer inches / pounds) - **Training camp only** (freshman/sophomore): camp bonuses add to existing values; persisted via `$set`. If `meta` omitted height/weight (legacy or lazy FPD row), `run_franchise_training` backfills missing values from the universal `players` document before camp runs; `finalize_game` lazy FPD inserts also copy height/weight/year/jersey from `players` into `meta`.
+- `meta.height` and `meta.weight` (integer inches / pounds) — carried on the FPD; **career HT/WT growth is applied at offseason rollover** (`develop_one_offseason`), not at training camp. If `meta` omitted height/weight (legacy or lazy FPD row), `run_franchise_training` backfills missing values from the universal `players` document before training runs; `finalize_game` lazy FPD inserts also copy height/weight/year/jersey from `players` into `meta`.
 
 **Franchise Document:**
 - `latest_training` - Most recent training report (backward-compatible quick access)
