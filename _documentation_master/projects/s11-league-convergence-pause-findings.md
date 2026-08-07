@@ -1,5 +1,9 @@
 # League convergence — pause export (seed 202608061)
 
+> **Superseded on verdict.** Per-attribute σ retention was level-contaminated; do not use §7’s “≥ 0.7 / not structural” reading.  
+> **Corrected analysis:** [`s11-league-convergence-shape-vs-level.md`](s11-league-convergence-shape-vs-level.md) — shape cosine career projection **0.245 ≤ 0.4 → structural**.  
+> Exports and REACHED / ceiling / runtime sections below remain valid as raw capture.
+
 **Paused:** 6 August 2026 ~16:33 local  
 **Scratch DB:** `gob-s11-league-convergence` — **not deleted**  
 **Exports:** `tmp/s11_league_convergence/seed_202608061/` (+ `pause_export/`)  
@@ -100,9 +104,9 @@ Mid-season-3 state is not a valid t+3. Any re-run: **clean scratch**, **one seas
 
 | Question | From this pause |
 |---|---|
-| Within-position σ retention (derived 1-step → career³) | **~1.07 ≥ 0.7** → not structural by that rule |
-| Caveat | One-step not directly measured; no post-s1 FPD file |
-| Signing ceiling gap | Present in s1 (~0.75), absent in s2 (~0.99) |
-| Re-run needed? | Only if you want a **direct** one-offseason same-set σ, or multi-cycle team-distance at true t+3 |
+| Per-attribute σ retention (withdrawn) | Contaminated by level fan-out — **do not use** |
+| **Shape retention (corrected)** | Career cosine \(\hat{r}^3\) **0.245 ≤ 0.4** → **structural** — see `s11-league-convergence-shape-vs-level.md` |
+| Signing / generation ceilings | s1 gap partly explained by **set vs dynamic** generation paths, not only signing |
+| Re-run for 0.4–0.7 band | **Not required** on shape primary |
 
 `OFFSEASON_ATTRACTOR_ALPHA` stays flagged under review — this informs, it is not the decision.

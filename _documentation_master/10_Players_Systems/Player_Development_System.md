@@ -154,20 +154,14 @@ This is a core simulation decision. It affects scouting, recruiting, whether the
 
 Everyone loses their shape. Only the Team Builder user *chose* theirs. The mechanism is not TB-specific and TB is not disadvantaged relative to the league — but the experience is worse for exactly the users who paid the most attention. That is why TB is the reason this surfaced, not an argument for a TB-specific fix.
 
-### Before choosing — measure league-wide convergence
+### League-wide convergence — measured (shape, not level)
 
-One roster proved the mechanism. The headline needs the league.
+**Seed 202608061 pause + shape/level correction — 6 August 2026.**  
+Full notes: `projects/s11-league-convergence-shape-vs-level.md` (raw capture: `s11-league-convergence-pause-findings.md`).
 
-Measure attribute spread across all 128 programs' players at **t0 vs t+3**:
-- standard deviation per attribute
-- distance between best and worst team at each position
+Per-attribute σ within position is **level-contaminated** (attractor is RT-neutral; magnitudes fan out via tier/`potential_factor` while shape collapses). On **shape** — mean pairwise cosine distance of unit-mean attribute vectors, same survivors, grouped by t0 `training_position` — derived one-step retention averages **0.625** (FR/SO); career projection **\(\hat{r}^3 = 0.245 ≤ 0.4\)**. Second view (shape-component σ) career **0.379**, also ≤ 0.4. Level σ **grew** (R₂ ≈ 1.32). PC1 share of shape variance climbed ~+0.20–0.24. Guards collapse hardest; centres least. **Structural by the stated rule** — model question (reshape vs grow), not a casual α tweak. `OFFSEASON_ATTRACTOR_ALPHA` remains under review; nothing tuned yet.
 
-| If… | Then… |
-|---|---|
-| The league is measurably flattening | Headline finding; outranks TB-plan work. Model change (grow vs reshape), not a constant tweak. |
-| Spread holds because recruiting injects variety faster than the blend removes it | α is a tuning question — cheaper. Still confirm career criterion before dialing. |
-
-Either way, that measurement decides constant-vs-model before anything is designed.
+Separate: init FRD variety came from pre-built `recruit_sets` (n=300, mean attr σ 15.7); post-rollover FRD falls back to dynamic `generate_recruits_list(count=400)` once the set is consumed (mean attr σ 11.6). Same helper, different branch — not signing selection.
 
 ## Key Files
 
