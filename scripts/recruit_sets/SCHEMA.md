@@ -64,7 +64,11 @@ downloadable build it ships as a pack file. Self-contained (~1 MB), well under M
       "weight": 190,              // integer lbs,   AS GENERATED (not projected)
       "attributes": { /* exactly the dict generate_recruits_list() emits — see below */ },
       "position_ratings": { "PG": 41, "SG": 44, "SF": 47, "PF": 39, "C": 30 },
-      "Home Region": "C"          // stable identity — region A–H, baked once, same in every franchise
+      "Home Region": "C",         // stable identity — region A–H, baked once, same in every franchise
+      "entry_tier": "Average",    // talent tier Poor…Elite (RT anchor)         — carried since the 450 regen
+      "position_intent": "SG",    // generated position PG…C (height + RT target) — carried since the 450 regen
+      "potential_factor": 1.0,    // frozen growth factor used by progression     — carried since the 450 regen
+      "has_portrait": true        // kit exists in R2 (borrow-pool / fallback)    — carried since the 450 regen
     }
     // ... 449 more
   ]
@@ -94,6 +98,15 @@ downloadable build it ships as a pack file. Self-contained (~1 MB), well under M
   per-franchise from this region with its own randomness (75% "open", etc.), and jersey is still
   rolled at signing. A recruit with no `Home Region` (dynamic, or a legacy un-baked set) falls
   back to the loader's per-franchise random draw.
+- **`entry_tier`, `position_intent`, `potential_factor`, `has_portrait`** — carried top-level as
+  of the **450 regen**. They come straight from the current `generate_recruits_list()` / recalibrated
+  generation and are stored **deliberately** so a set reload can't drop them and re-introduce a
+  re-derive / potential-factor mismatch. `entry_tier` (Poor…Elite) and `position_intent`
+  (`PG…C`) are the tier + position the recruit was generated at (drive the RT anchor and the
+  position-based height draw); `potential_factor` is the frozen growth factor used by progression;
+  `has_portrait` (bool) tracks whether a kit exists in R2 (borrow-pool inclusion / generic
+  fallback). The loader tolerates extra fields — it validates presence of the core set, not a
+  closed schema — so these load into FRD verbatim.
 
 ### Deliberately excluded (layered on per-franchise at load time — never in the set)
 
