@@ -100,6 +100,7 @@ from BackEnd.utils.team_play_utils import iter_team_plays
 from BackEnd.utils.franchise_ftd_game_seed import prepare_ftd_for_new_game
 from BackEnd.models.game_manager import GameManager
 from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets, generate_walk_on_profile
+from BackEnd.models.franchise_manager import carry_dev_fields
 from BackEnd.utils.franchise_rank_prestige import (
     FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
     SOS_AVG_DEFAULT,
@@ -12075,6 +12076,10 @@ def _week_35_result_entry_from_recruit(recruit_doc: dict[str, Any], team_doc: di
         "walk_on": bool(walk_on),
         "signed_display": team_doc.get("name", "") + (" (walk on)" if walk_on else ""),
         "jersey": None,
+        # Identity/dev fields carried through signing (single declared set) so authored
+        # position_intent/entry_tier/potential_factor/development reach the FPD player
+        # instead of being re-derived (argmax intent, uuid-hashed potential) at rollover.
+        **carry_dev_fields(recruit_doc),
     }
 
 
@@ -15962,15 +15967,10 @@ def finish_season(req: FinishSeasonRequest):
                 "career": (fpd_doc.get("career") or zero_stats.copy()),
                 "attributes": (fpd_doc.get("attributes") or {}).copy(),
                 "position_ratings": (fpd_doc.get("position_ratings") or {}).copy(),
-                # Development pointer carried forward (§10). Without this the growth
-                # profile would vanish at rollover and the league would revert to the
-                # default curve — the highest-risk failure in this task.
-                "development": fpd_doc.get("development"),
-                "entry_tier": fpd_doc.get("entry_tier"),
-                "position_intent": fpd_doc.get("position_intent"),
-                "potential_factor": fpd_doc.get("potential_factor"),
-                "training_position": fpd_doc.get("training_position"),
-                "coaching_quality": fpd_doc.get("coaching_quality"),
+                # Development pointer + identity carried forward (§10, single declared
+                # set). Without this the growth profile would vanish at rollover and the
+                # league would revert to the default curve — the highest-risk failure here.
+                **carry_dev_fields(fpd_doc),
             }
             # Offseason development event (§7.1): develop the returning player onto
             # his new year's rung, then recompute ratings (incl. after HT growth).
@@ -16033,14 +16033,10 @@ def finish_season(req: FinishSeasonRequest):
                 signed_player.get("attributes") or {}
             ),
             "position_ratings": (signed_player.get("position_ratings") or {}).copy(),
-            # Development pointer from the recruit/walk-on source (§10); missing
-            # fields lazy-backfill inside develop_rollover.
-            "development": signed_player.get("development"),
-            "entry_tier": signed_player.get("entry_tier"),
-            "position_intent": signed_player.get("position_intent"),
-            "potential_factor": signed_player.get("potential_factor"),
-            "training_position": signed_player.get("training_position"),
-            "coaching_quality": signed_player.get("coaching_quality"),
+            # Identity/dev carry from the recruit/walk-on source (§10, single declared
+            # set); present values now flow through (authored intent/tier/potential),
+            # missing ones lazy-backfill inside develop_rollover.
+            **carry_dev_fields(signed_player),
         }
         # Signed players enter advanced one year, so they too walk an offseason rung.
         # No in-season record yet (just signed) → season_allocation None → f 1.0.
@@ -16188,10 +16184,11 @@ def finish_season(req: FinishSeasonRequest):
     fm.franchise_id = franchise_id
     schedule = fm.schedule_manager.generate_schedule()
     from BackEnd.models.recruit_sets import load_unused_set_or_generate
+    from BackEnd.models.franchise_manager import RECRUIT_CLASS_SIZE
     _prev_used = (db.franchises.find_one({"_id": franchise_id}, {"used_recruit_set_ids": 1})
                   or {}).get("used_recruit_set_ids") or []
     recruits, used_recruit_set_id = load_unused_set_or_generate(
-        db, fm.recruit_manager, _prev_used, count=400)
+        db, fm.recruit_manager, _prev_used, count=RECRUIT_CLASS_SIZE)
     region_team_ids = fm._build_region_team_map()
 
     franchise_recruits_data_collection.delete_many({"franchise_id": str(franchise_id)})
@@ -16210,17 +16207,12 @@ def finish_season(req: FinishSeasonRequest):
             "weight": recruit["weight"],
             "archetype": recruit["archetype"],
             "year": recruit["year"],
-            # entry_tier / position_intent / development MUST persist here. Dropping
-            # them (the pre-2026-08-01 bug) forced develop_rollover to re-derive
-            # entry_tier from the recruit's undeveloped JH RT at signing, which
-            # down-classified every recruit ~1.5 tiers permanently and collapsed the
-            # league's shooting on turnover. franchise_manager.py:537 forwards these
-            # to FPD if present; the creation FRD write (franchise_manager.py:538)
-            # already carries them — this recurring season write had diverged.
-            **({"entry_tier": recruit["entry_tier"]} if recruit.get("entry_tier") is not None else {}),
-            **({"position_intent": recruit["position_intent"]} if recruit.get("position_intent") is not None else {}),
-            **({"development": recruit["development"]} if recruit.get("development") is not None else {}),
-            **({"potential_factor": recruit["potential_factor"]} if recruit.get("potential_factor") is not None else {}),
+            # entry_tier / position_intent / development / potential_factor MUST persist
+            # here. Dropping them (the pre-2026-08-01 bug) forced develop_rollover to
+            # re-derive entry_tier from the recruit's undeveloped JH RT at signing,
+            # down-classifying recruits ~1.5 tiers and collapsing shooting on turnover.
+            # Single declared carry set (§ carry_dev_fields) — cannot silently diverge.
+            **carry_dev_fields(recruit),
             "Home Region": home_region,
             "Lean": fm._build_recruit_lean(home_region, region_team_ids),
             "created_at": recruit.get("created_at") or datetime.utcnow(),

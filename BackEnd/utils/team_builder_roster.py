@@ -27,7 +27,6 @@ from BackEnd.constants.team_builder_budget import (
 )
 from BackEnd.utils.player_generation import weight_from_height
 from BackEnd.models.franchise_manager import (
-    advance_recruit_year,
     choose_franchise_first_name,
     generate_walk_on_profile,
     get_franchise_name_assets,
@@ -735,8 +734,8 @@ def build_wizard_walk_on_players() -> list[dict[str, Any]]:
         wo = generate_walk_on_profile()
         name = str(wo.get("name") or "").strip()
         first_name, _, last_name = name.partition(" ")
-        # Match initialize_season: rolled year advances one step onto the roster.
-        year = advance_recruit_year(wo.get("year"))
+        # Walk-on year is drawn directly as a roster year (no advance step).
+        year = wo.get("year")
         attrs = dict(wo.get("attributes") or {})
         players.append(
             {
@@ -837,7 +836,7 @@ def _player_from_walk_on_profile(
 ) -> dict[str, Any]:
     name = str(wo.get("name") or "").strip()
     first_name, _, last_name = name.partition(" ")
-    year = advance_recruit_year(wo.get("year"))
+    year = wo.get("year")  # walk-on year drawn directly as a roster year (no advance)
     raw_attrs = dict(wo.get("attributes") or {})
     core = {
         key: int(raw_attrs.get(key) or ATTR_MIN) for key in CORE_12_ATTRS
@@ -915,7 +914,7 @@ def generate_roster_at_band(
                     "meta": {
                         "height": wo.get("height"),
                         "weight": wo.get("weight"),
-                        "year": advance_recruit_year(wo.get("year")),
+                        "year": wo.get("year"),  # drawn directly as a roster year (no advance)
                     },
                     "attributes": wo.get("attributes") or {},
                 }

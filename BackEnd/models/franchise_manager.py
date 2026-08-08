@@ -168,6 +168,28 @@ POOL_TO_FPD_PROJECTION = {
     **{_f: 1 for _f in POOL_TO_FPD_CARRY_FIELDS},
 }
 
+# ── Player identity/development carry — single source of truth ────────────────
+# The identity + development fields that must survive EVERY player-doc hop:
+# recruit → signed_player → FPD, and FPD → FPD at each season rollover. Declared
+# ONCE; every hop builds its carry via carry_dev_fields(), so a field added here
+# propagates to all hops and no hand-maintained cherry-pick can silently drop it
+# again — the drop that re-derived entry_tier/position_intent/potential_factor at
+# signing (see Player_Development_System.md). POOL_TO_FPD_CARRY_FIELDS above is the
+# pool-sourced subset (a pool row has no development/training_position/coaching_quality).
+PLAYER_DEV_CARRY_FIELDS = (
+    "entry_tier", "position_intent", "potential_factor",
+    "development", "training_position", "coaching_quality",
+)
+assert set(POOL_TO_FPD_CARRY_FIELDS) <= set(PLAYER_DEV_CARRY_FIELDS)
+
+
+def carry_dev_fields(src: dict) -> dict:
+    """Cherry-pick the canonical dev-carry fields from any recruit/player-shaped
+    source, omitting absent ones (develop_rollover backfills a missing field). A
+    PRESENT value is carried, so authored intent/tier/potential survive signing
+    instead of being re-derived from argmax RT / a fresh uuid."""
+    return {f: src[f] for f in PLAYER_DEV_CARRY_FIELDS if src.get(f) is not None}
+
 
 RECRUIT_YEAR_ADVANCE = {
     "jh": "Freshman",
@@ -182,21 +204,37 @@ def advance_recruit_year(year: str | None) -> str:
     return RECRUIT_YEAR_ADVANCE.get(str(year or "").strip().lower(), "Freshman")
 
 
-# Walk-on year roll weights (JH-heavy). Attributes/height/weight now come from the
-# shared position-intent generator at Poor tier — walk-ons are on the same ladder
-# as everyone else (design §4.1/§11.2), not a separate uniform-draw path, so a
-# fifth of the league is no longer off-scale next to ladder-scaled teammates.
-WALK_ON_YEAR_WEIGHTS = [("JH", 60), ("Freshman", 20), ("Sophomore", 10), ("Junior", 10)]
+# ── Ongoing-intake levers (steady-state class-year distribution) ──────────────
+# These three TOGETHER determine the league's steady-state class-year mix. The pool
+# age-up and set_0001 fix only the STARTING point; class years advance in lockstep,
+# so the distribution decays toward flat unless the ongoing dynamic recruit classes
+# and the walk-on stream sustain it. Changing one without the others breaks the steady
+# state. Documented in Tunable_Constants.md → "Ongoing intake". Read from here, not
+# duplicated at call sites.
+RECRUIT_CLASS_SIZE = 450   # dynamic recruit pool per season (matches set_0001's 450)
+
+# Recruit year mix — DRAWN PER RECRUIT (per-class variance, not exact counts). Recruits
+# advance one year on signing, so a JH recruit enters the roster as a Freshman, an FR
+# recruit as a Sophomore, etc. — the mechanism that sustains the upperclassman skew.
+RECRUIT_YEAR_WEIGHTS = [("JH", 55), ("Freshman", 15), ("Sophomore", 15), ("Junior", 15)]
+
+# Walk-on year mix — DRAWN DIRECTLY as roster years (no JH, no advance step; a walk-on
+# can never be a JH). Walk-ons populate the practice squad (the JV): mostly SO/JR who
+# haven't made varsity. The 10% senior share is deliberate (may play one season and
+# graduate). Attributes/height/weight come from the shared position-intent generator at
+# Poor tier — walk-ons are on the same class-year ladder as everyone else (§4.1/§11.2).
+WALK_ON_YEAR_WEIGHTS = [("Freshman", 10), ("Sophomore", 40), ("Junior", 40), ("Senior", 10)]
 
 
 def generate_walk_on_profile() -> dict:
     """Generate a single walk-on player profile.
 
     Shared by season-1 franchise init (3/team) and the week-35 roster fill.
-    Year rolls JH 60% / Freshman 20% / Sophomore 10% / Junior 10%; a position
+    Year is drawn DIRECTLY as a roster year from WALK_ON_YEAR_WEIGHTS (FR 10 / SO 40 /
+    JR 40 / SR 10 — no JH, no advance step; callers use ``year`` as-is). A position
     intent is drawn and the shared generator produces a Poor-tier player on the
-    class-year ladder (JH anchor 20 → SR 40). CH is flat randint(1,100) like
-    everyone else (§8) — no walk-on cap, so a high-CH walk-on can still develop.
+    class-year ladder. CH is flat randint(1,100) like everyone else (§8) — no walk-on
+    cap, so a high-CH walk-on can still develop.
     """
     from BackEnd.utils.player_generation import draw_position_intent, generate_player
     from BackEnd.utils.player_development import roll_growth_profile
@@ -391,10 +429,9 @@ class FranchiseManager:
                         "team_id": str(team_obj_id) if team_obj_id is not None else None,
                         "height": wo["height"],
                         "weight": wo["weight"],
-                        # Season-1 walk-ons land directly on an active roster, so the
-                        # rolled year is instantly upgraded one step (JH→Freshman, ...,
-                        # Junior→Senior); attributes were rolled from the pre-upgrade year.
-                        "year": advance_recruit_year(wo.get("year")),
+                        # Walk-on year is drawn DIRECTLY as a roster year (WALK_ON_YEAR_WEIGHTS,
+                        # FR/SO/JR/SR) — no advance step; a walk-on can never be a JH.
+                        "year": wo.get("year"),
                         "jersey": None,
                         "archetype": "Walk On",
                     },
@@ -444,7 +481,7 @@ class FranchiseManager:
         from BackEnd.models.recruit_sets import load_unused_set_or_generate
         # Draw a pre-built image-backed set if any are loaded; else generate dynamically.
         recruits, used_recruit_set_id = load_unused_set_or_generate(
-            self.db, self.recruit_manager, [], count=400)
+            self.db, self.recruit_manager, [], count=RECRUIT_CLASS_SIZE)
         _perf["generate_recruits"] = (time.time() - _t0) * 1000
 
         # ✅ FPD/FRD: Store players and recruits in standalone collections; keep franchise doc lean
@@ -520,10 +557,8 @@ class FranchiseManager:
                 # Development pointer (§10). entry_tier/position_intent carried from
                 # the pool or the walk-on roll; development present for walk-ons,
                 # else lazy-backfilled at the first offseason event.
-                **({"entry_tier": data["entry_tier"]} if data.get("entry_tier") is not None else {}),
-                **({"position_intent": data["position_intent"]} if data.get("position_intent") is not None else {}),
-                **({"development": data["development"]} if data.get("development") is not None else {}),
-                **({"potential_factor": data["potential_factor"]} if data.get("potential_factor") is not None else {}),
+                # Identity/dev carry from the single declared set (§ carry_dev_fields).
+                **carry_dev_fields(data),
             }
             for pid, data in players_map.items()
         ]
@@ -550,11 +585,9 @@ class FranchiseManager:
                 "weight": recruit["weight"],
                 "archetype": recruit["archetype"],
                 "year": recruit["year"],
-                # Development pointer (§10) so it survives signing → FPD.
-                **({"entry_tier": recruit["entry_tier"]} if recruit.get("entry_tier") is not None else {}),
-                **({"position_intent": recruit["position_intent"]} if recruit.get("position_intent") is not None else {}),
-                **({"development": recruit["development"]} if recruit.get("development") is not None else {}),
-                **({"potential_factor": recruit["potential_factor"]} if recruit.get("potential_factor") is not None else {}),
+                # Development pointer (§10) so it survives signing → FPD. Single
+                # declared carry set (§ carry_dev_fields) — no per-field hand-list.
+                **carry_dev_fields(recruit),
                 "Home Region": home_region,
                 "Lean": self._build_recruit_lean(home_region, region_team_ids),
                 "created_at": recruit.get("created_at") or datetime.utcnow(),
@@ -1013,29 +1046,7 @@ class RecruitManager:
             logger.error(f"Fallback names: {len(self.first_names)} first, {len(self.last_names)} last")
             self.first_name_weights = [1.0] * len(self.first_names)
 
-    def _roll_year_distribution(self, count):
-        """Roll the per-pool recruit year counts and return a shuffled list of years.
-
-        Junior = randint(5,15), Sophomore = randint(5,15), Freshman = randint(10,30),
-        JH = remainder of the pool. Sized for the canonical 300 pool but degrades
-        gracefully for smaller counts.
-        """
-        junior = random.randint(5, 15)
-        sophomore = random.randint(5, 15)
-        freshman = random.randint(10, 30)
-        years = (
-            ["Junior"] * junior
-            + ["Sophomore"] * sophomore
-            + ["Freshman"] * freshman
-        )
-        if len(years) >= count:
-            random.shuffle(years)
-            return years[:count]
-        years += ["JH"] * (count - len(years))
-        random.shuffle(years)
-        return years
-
-    def generate_recruits_list(self, count=40):
+    def generate_recruits_list(self, count=RECRUIT_CLASS_SIZE):
         """Generate and return a list of recruits (does not save to DB).
 
         Position-intent-first generation (design §11.2, interim §11.1): draw a
@@ -1053,9 +1064,14 @@ class RecruitManager:
         )
         from BackEnd.utils.player_development import roll_growth_profile
 
-        years = self._roll_year_distribution(count)
+        # Year DRAWN PER RECRUIT from RECRUIT_YEAR_WEIGHTS (per-class variance, not exact
+        # counts). Sustains the class-year distribution seeded by set_0001; seasons 2+ used
+        # to revert to JH-dominant entry via the old _roll_year_distribution.
+        _ry = [y for y, _w in RECRUIT_YEAR_WEIGHTS]
+        _rw = [_w for _y, _w in RECRUIT_YEAR_WEIGHTS]
         recruits = []
-        for year in years:
+        for _ in range(count):
+            year = random.choices(_ry, weights=_rw, k=1)[0]
             first_name = choose_franchise_first_name(self.first_names, self.first_name_weights)
             last_name = random.choice(self.last_names).title()
             name = f"{first_name} {last_name}"

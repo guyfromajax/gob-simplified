@@ -124,7 +124,7 @@ def assign_image_ids(recruits, db, base_set_id=BASE_IMAGE_SET_ID):
     return recruits
 
 
-def load_unused_set_or_generate(db, recruit_manager, used_set_ids, count=400):
+def load_unused_set_or_generate(db, recruit_manager, used_set_ids, count=None):
     """Return (recruits, used_set_id), each recruit stamped with an image_id.
 
     Pick a random set from `recruit_sets` whose set_id is not in used_set_ids and
@@ -133,7 +133,13 @@ def load_unused_set_or_generate(db, recruit_manager, used_set_ids, count=400):
     generation and return (generated_recruits, None), leaving current behavior
     unchanged. Either way, every returned recruit gets an image_id (its own for
     set recruits; a borrowed base-library portrait for dynamic recruits).
+
+    ``count`` defaults to the single-source RECRUIT_CLASS_SIZE (lazy import to avoid a
+    module-load cycle) so the dynamic class size can never drift from the seeded one.
     """
+    if count is None:
+        from BackEnd.models.franchise_manager import RECRUIT_CLASS_SIZE
+        count = RECRUIT_CLASS_SIZE
     try:
         used = set(used_set_ids or [])
         available = [d["set_id"] for d in db[COLLECTION].find({}, {"set_id": 1})

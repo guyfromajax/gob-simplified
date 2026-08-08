@@ -915,6 +915,33 @@ Constants for the RT formula (§3.6), position-intent generation (§11.2), the p
 
 > ⚠️ **`opening_tip` is the exception.** `opening_tip.get_height_scale_value` uses **absolute inch literals** (`>83`→10, `≥81`→9, `≥79`→8, `78`→7, … `73`→2, `<73`→1) anchored to the centre median, **not** offsets from `LEAGUE_MEDIAN_HEIGHT_IN`. It was manually "+3 re-banded" for the pass-1 recal, then hand-re-banded −1 and −2 for the two 2026-08 HS shifts; it will **not** ride a uniform shift — it must be re-banded by the same amount alongside any height shift, or the tip-off contest desyncs from the new distribution.
 
+### Ongoing intake — steady-state class-year distribution — `BackEnd/models/franchise_manager.py`
+
+These three levers **together** set the league's steady-state class-year mix. The pool age-up
+(active roster 10/20/30/40 FR/SO/JR/SR) and set_0001 (season-1 recruits at 55/15/15/15) fix only the
+**starting point**; class years advance in lockstep, so any seeded distribution **decays toward flat
+within ~4 seasons unless the ongoing intake sustains it.** Read from one place (single source), not
+duplicated at call sites.
+
+| Constant | Value | Effect (gameplay terms) |
+|---|---|---|
+| `RECRUIT_CLASS_SIZE` | 450 | Dynamic recruit pool generated per season (seasons 2+). Matches set_0001's 450 so the class the user recruits from is the same size every year. Read at all three load sites (recruit_sets default + both call sites). |
+| `RECRUIT_YEAR_WEIGHTS` | JH 55 / FR 15 / SO 15 / JR 15 (drawn per recruit) | The age of incoming recruits. **Recruits advance one year on signing**, so this enters the roster as FR 55 / SO 15 / JR 15 / SR 15 — a freshman-heavy but upperclassman-tailed intake. This is the main engine that sustains the skew. Drawn per recruit (per-class variance), not exact counts. |
+| `WALK_ON_YEAR_WEIGHTS` | FR 10 / SO 40 / JR 40 / SR 10 (drawn directly) | The age of walk-ons, who backfill roster seats recruits don't. Drawn **directly as roster years** — no JH, no advance step (a walk-on is never a JH). Sophomore/junior-heavy because walk-ons are the practice-squad/JV pool; the 10% senior share is deliberate (plays one year, may graduate). |
+
+**Changing one without the others breaks the steady state.** The recruit and walk-on mixes are a
+matched pair: recruits supply the freshman-heavy top of the funnel, walk-ons supply the SO/JR middle
+that recruits under-fill. Skewing recruits younger without adjusting walk-ons (or vice versa) shifts
+the whole distribution.
+
+**Verified compounding** (8-season fractional-flow sim from the current init state, recruits capped at
+the pool ration `450 / 128 teams ≈ 3.5`/team with walk-ons backfilling the rest of each team's
+graduations): converges to **FR 14 / SO 22 / JR 30 / SR 34** by season 8, seniors holding in the
+33–35 band, with a seasons 2–5 oscillation as the init-cohort bulge clears. The recruit:walk-on split
+(~2:1) is **emergent** — the 450 pool is smaller than league-wide graduations (~128 × ~5.25 ≈ 672),
+so recruits are rationed and walk-ons fill the deficit; changing `RECRUIT_CLASS_SIZE` or the league
+size shifts that split.
+
 ### Pool remap — `scripts/regenerate_universal_pool.py`
 
 | Constant | Value | Effect |
