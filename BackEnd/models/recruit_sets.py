@@ -45,7 +45,7 @@ def _available_kit_ids():
     try:
         from BackEnd.services import r2_images
         if not r2_images.is_configured():
-            logger.info("[recruit-image-pool] R2 not configured — borrow pool unfiltered")
+            logger.info("[recruit-image-pool] R2 not configured — falling back to has_portrait flag")
             _kit_ids_cache["ids"] = frozenset()
             return None
         keys = r2_images.list_keys(RECRUIT_KIT_PREFIX)
