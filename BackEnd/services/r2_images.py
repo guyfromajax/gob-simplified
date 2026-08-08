@@ -52,6 +52,26 @@ def get(key: str) -> bytes:
     return s3.get_object(Bucket=bucket, Key=key)["Body"].read()
 
 
+def list_keys(prefix: str) -> list[str]:
+    """Every object key under ``prefix`` (paginated). One list operation set at call
+    time — callers cache the result. Raises on R2 error; callers that must degrade
+    gracefully (e.g. the base image pool) should catch."""
+    s3, bucket = _s3()
+    keys: list[str] = []
+    token = None
+    while True:
+        kw = {"Bucket": bucket, "Prefix": prefix, "MaxKeys": 1000}
+        if token:
+            kw["ContinuationToken"] = token
+        resp = s3.list_objects_v2(**kw)
+        keys.extend(o["Key"] for o in resp.get("Contents", []))
+        if resp.get("IsTruncated"):
+            token = resp.get("NextContinuationToken")
+        else:
+            break
+    return keys
+
+
 def put(key: str, data: bytes, content_type: str = "image/png") -> None:
     s3, bucket = _s3()
     s3.put_object(Bucket=bucket, Key=key, Body=data,

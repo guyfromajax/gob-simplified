@@ -26,15 +26,59 @@ COLLECTION = "recruit_sets"
 BASE_IMAGE_SET_ID = "set_0001"
 
 
+# The portrait a dynamic recruit borrows is painted from a KIT asset in R2; an id
+# with no kit paints nothing → generic headshot. Filter the borrow pool to ids that
+# actually HAVE a kit so a batch of not-yet-arted recruit_ids (e.g. an expanded set
+# awaiting portraits) is never handed to a dynamic draw. File-existence, not a flag:
+# self-correcting as art uploads, and it catches any future missing/failed asset.
+RECRUIT_KIT_PREFIX = "recruits/kit/"
+_kit_ids_cache: dict = {"ids": None}  # available-asset set, computed ONCE per process
+
+
+def _available_kit_ids():
+    """Set of recruit_ids that have a kit asset in R2 (portrait-backed). Computed via a
+    single R2 LIST, cached for the process. Returns ``None`` when R2 is unavailable /
+    unconfigured / errors — the pool then falls back to UNFILTERED (current behaviour)
+    rather than emptying, so a missing R2 never breaks recruit generation."""
+    if _kit_ids_cache["ids"] is not None:
+        return _kit_ids_cache["ids"] or None
+    try:
+        from BackEnd.services import r2_images
+        if not r2_images.is_configured():
+            logger.info("[recruit-image-pool] R2 not configured — borrow pool unfiltered")
+            _kit_ids_cache["ids"] = frozenset()
+            return None
+        keys = r2_images.list_keys(RECRUIT_KIT_PREFIX)
+        ids = frozenset(
+            k[len(RECRUIT_KIT_PREFIX):-4] for k in keys
+            if k.endswith(".png") and not k.endswith(".mask.png")
+        )
+        _kit_ids_cache["ids"] = ids
+        logger.info("[recruit-image-pool] R2 kit assets available: %d", len(ids))
+        return ids or None
+    except Exception as e:  # noqa: BLE001 — any R2 failure → unfiltered, never break generation
+        logger.warning("[recruit-image-pool] R2 kit listing failed (%s) — borrow pool unfiltered", e)
+        _kit_ids_cache["ids"] = frozenset()
+        return None
+
+
 def _base_image_pool(db, set_id=BASE_IMAGE_SET_ID):
-    """The recruit_ids of the base image library — the portraits a dynamic
-    recruit can borrow. Empty (→ generic headshots) if the set isn't loaded."""
+    """The recruit_ids of the base image library — the portraits a dynamic recruit can
+    borrow — FILTERED to ids whose kit asset actually exists in R2. Empty (→ generic
+    headshots) if the set isn't loaded; unfiltered (degrades safe) if R2 is unavailable."""
     try:
         doc = db[COLLECTION].find_one({"set_id": set_id}, {"recruits.recruit_id": 1})
-        return [r.get("recruit_id") for r in (doc or {}).get("recruits", []) if r.get("recruit_id")]
+        ids = [r.get("recruit_id") for r in (doc or {}).get("recruits", []) if r.get("recruit_id")]
     except Exception as e:  # noqa: BLE001 — image assignment must never break generation
         logger.warning(f"base image pool lookup failed: {e}")
         return []
+    available = _available_kit_ids()
+    if available is not None:
+        before = len(ids)
+        ids = [i for i in ids if i in available]
+        logger.info("[recruit-image-pool] %d/%d recruit ids have a kit asset (%d portrait-less filtered out)",
+                    len(ids), before, before - len(ids))
+    return ids
 
 
 def assign_image_ids(recruits, db, base_set_id=BASE_IMAGE_SET_ID):
