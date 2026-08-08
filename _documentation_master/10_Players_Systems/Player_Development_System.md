@@ -1,12 +1,12 @@
 # Player Development System
 
-> How players grow across a college career. The primary growth event is the **offseason development event**, fired once per player at each season rollover; in-season training only *shapes* and *aims* it. Reasoning and derivation live in the archived design doc: `_documentation_master/projects/Z-Completed/Player_Attribute_Recalibration_Design.md`.
+> How players grow across a college career. **Camp and in-season training own shape** (~99% of career shape movement). The **offseason is level-only**: once per rollover it rescales the current attribute vector onto the ladder RT target (plus HT/WT). Floors and the training cost matrix are the position constraint — not an offseason blend toward the profile. Canonical measured outcomes are below; derivation archive: `_documentation_master/projects/Z-Completed/Player_Attribute_Recalibration_Design.md`. Framework: [`player-development-framework.md`](player-development-framework.md).
 
-**Module:** `BackEnd/utils/player_development.py` — `develop_one_offseason`, `develop_rollover`, `roll_growth_profile`.
+**Modules:** `BackEnd/utils/player_development.py` — `develop_one_offseason`, `develop_rollover`, `roll_growth_profile`. Shape constants: `BackEnd/constants/training_shape.py`. In-season execution: `BackEnd/models/training_execution_v2.py`.
 
 ## Offseason Development Event
 
-Fires **once per player per rollover** (the offseason between seasons), before Training Camp. It targets an **absolute** rating, not an incremental budget:
+Fires **once per player per rollover** (the offseason between seasons), before Training Camp. It targets an **absolute** rating and applies a **level-only** rescale — it does not redistribute shape:
 
 ```
 target_RT = _compress_rt( jh_anchor × ladder_multiplier(rung) × coaching_factor f × potential_factor )
@@ -14,13 +14,13 @@ target_RT = _compress_rt( jh_anchor × ladder_multiplier(rung) × coaching_facto
 
 - `jh_anchor` — the player's JH-scale anchor, derived from `entry_tier` via `JH_ANCHOR_BY_TIER`.
 - `ladder_multiplier(rung)` — the class-year rung on the ladder. **Includes the player's peak bonuses** (peaks stack on top of the standard rung increments).
-- `f` — coaching-quality multiplier, bounded `[0.85, 1.20]`. **Currently dormant at 1.0** for every player (`_coaching_accumulator_for_player` hardwired to `None`), so the league holds exactly on the ladder until per-player allocation capture ships. **Open:** is that unfinished, deliberate, or a bug? See [Reshape vs grow](#reshape-vs-grow--open-simulation-design) — inert `f` plus a strong shape attractor is why the league converges rather than softens.
-- `potential_factor` — career-static ±15% ceiling scalar (`POTENTIAL_FACTOR_BAND = 0.15`), drawn once at generation, independent of `entry_tier` and `ch_seed`. **LIVE** (Potential Rating Phase 3). A pure scalar on the target, so it lifts the *level* with the *same profile shape* — a shooter stays a shooter. Legacy players with no stored value resolve deterministically from `player_id` (`resolve_potential_factor`).
+- `f` — coaching-quality multiplier on the **RT target** (level, not shape), bounded `[0.85, 1.20]`. **Currently dormant at 1.0** for every player (`_coaching_accumulator_for_player` hardwired to `None`), so every program lands on the same ladder until per-player allocation capture ships (pillar 3). That dormancy is unfinished wiring, not a shape force — the shape attractor is retired (`OFFSEASON_ATTRACTOR_ALPHA = 0.0`).
+- `potential_factor` — career-static ±15% ceiling scalar (`POTENTIAL_FACTOR_BAND = 0.15`), drawn once at generation, independent of `entry_tier` and `ch_seed`. **LIVE** (Potential Rating Phase 3). A pure scalar on the target, so it lifts the *level* while preserving the player's current attribute ratios under the level-only rescale. Legacy players with no stored value resolve deterministically from `player_id` (`resolve_potential_factor`).
 - `_compress_rt` — soft cap near `RT_SOFT_CAP = 130`, asymptote ≈ 138. Below the cap it is identity; it only bends the very top. The extreme cohort Elite × 3-peak × 1.15 targets `50 × 2.6 × 1.15 = 149.5`, compressed to **137.3**. (Achieved RT, recomputed from attributes, can overshoot the compressed target for a <0.1% tail — a pre-existing property of recompute-from-attributes, not introduced by `potential_factor`.)
 
-Because the target is absolute and re-anchored every rollover, nothing drifts: in-season movement is either re-absorbed or, under good coaching, kept as a bounded residual below the smallest rung increment.
+Because the target is absolute and re-anchored every rollover, in-season **level** movement is either re-absorbed or, under good coaching, kept as a bounded residual below the smallest rung increment. In-season **shape** is not unwound here — camp and weekly training keep it.
 
-**Developed players land on the ladder (2026-08 attractor-level fix).** The offseason now closes the LEVEL fully (see Shape Attractor), so a developed senior's median RT sits **exactly on his tier anchor** — pinned by `test_developed_seniors_land_on_tier_anchors`. Before the fix the α-step undershot a rising target and developed seniors landed at ~0.91× the anchor (Elite 91, not 100); it was masked for a long time because **generation** hits the anchors by construction and only cohort turnover exposes the drift. Career multiple by peak count is now exact: 0/1/2/3 peaks → 1.70/2.00/2.30/2.60×.
+**Developed players land on the ladder (2026-08 level-close).** The offseason closes LEVEL fully (see Shape Attractor — retired for shape, retained for the level rescale), so a developed senior's median RT sits **exactly on his tier anchor** — pinned by `test_developed_seniors_land_on_tier_anchors`. Before the fix the α-step undershot a rising target and developed seniors landed at ~0.91× the anchor (Elite 91, not 100); it was masked for a long time because **generation** hits the anchors by construction and only cohort turnover exposes the drift. Career multiple by peak count is now exact: 0/1/2/3 peaks → 1.70/2.00/2.30/2.60×.
 
 **Senior RT spread by tier (measured, p10/p50/p90, positions pooled).** With `f` dormant and `potential_factor` live: Poor 34/40/48 · BelowAvg 42/50/60 · Average 51/60/72 · Good 59/70/84 · Great 68/80/96 · Elite 85/100/120. **Medians land on the anchors** (40/50/60/70/80/100); `potential_factor` widens each adjacent-tier tail overlap by only ~2–3 RT on top of the peak-driven baseline (peaks are the dominant spread source). This blur is the design intent — it stops the projected-potential display from leaking `entry_tier`.
 
@@ -102,30 +102,37 @@ Players are generated **below** their adult frame and grow into it over their co
 
 ## The Four Invariants
 
-Pinned by tests so a future change breaks a test rather than silently drifting the league. The invariant is **not** "nothing rots" — it is *reference holds flat, neglect costs, focus gains*:
+Pinned by tests so a future change breaks a test rather than silently drifting the league. The invariant is **not** "nothing rots" — it is *reference primaries hold near flat, neglect costs, focus gains*. Re-fitted after distinct 1–5 gain bands + fractional remainder (`tests/test_in_season_invariants.py`; do not restore the old per-attr `|Δ| < 3` gate):
 
-1. **Reference holds flat** — a player trained at the reference allocation nets ≈ 0 per on-position attribute over a season (`|Δ| < 3`).
-2. **Reference RT stays below the smallest rung increment** — the offseason absorbs the in-season residual, no claw-back.
+1. **Reference primaries hold near flat** — under the reference allocation, primary (pts=3) *mean* net over a season satisfies `|μ| < 4` (`FLAT_TOL`); each primary `|Δ| < 8`. Baseline (pts=1) attrs may drag mildly (must not collapse, must not gain).
+2. **Reference RT stays below the smallest rung increment** — in-season RT net in `(−5, smallest_rung)`; the offseason absorbs the residual, no claw-back.
 3. **Neglect declines** — a base-0 (untrained) attribute falls (`< −5` over a season).
-4. **Full cycle holds** — season **plus** rollover erodes nothing; the offseason restores what a correctly-coached season did not.
+4. **Full cycle holds for primaries** — season **plus** level-only rollover does not erode primaries (`mean Δ > −FLAT_TOL`); baseline may still drag.
 
-Plus the CPU-path **"preserves shape"** invariant: the offseason regrows toward the profile, preserving each player's relative attribute ordering (a shooter stays a shooter).
+Plus the CPU-path shape check (`test_cpu_path_preserves_shape`): under level-only offseason, **coaching still moves shape** — reference top-3 attrs finish above neglected attrs. Profile-alignment (≥70% of `position_profile`) was the attractor's job and is retired; floors replace its anti-starvation half.
 
-**Test files:** `tests/test_in_season_invariants.py`, `tests/test_offseason_attractor.py`.
+**Test files:** `tests/test_in_season_invariants.py`, `tests/test_offseason_attractor.py`, `tests/test_training_shape_framework.py`.
 
 ## Tunable Constants
 
+Canonical lever table: [`Tunable_Constants.md`](../11_Design_Systems/Tunable_Constants.md) A — LEVERS. Development-relevant values:
+
 | Constant | Value | Effect |
 |---|---|---|
-| `OFFSEASON_ATTRACTOR_ALPHA` | **`0.0`** (was 0.55) | **Retired.** Level-only offseason; was the fraction of the gap to the profile closed each rollover. Framework §11. |
+| `OFFSEASON_ATTRACTOR_ALPHA` | **`0.0`** (was 0.55) | **Retired.** Level-only offseason. Framework §11. |
+| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` | **3** / **1.4** | Camp phase length; camp gain scale (`training_shape.py`) |
+| `IN_SEASON_GAIN_SCALE` | **0.18** | Scales positive weekly gains after camp |
+| `PLAYER_ATTR_GAIN_RANGE_BY_POINTS` | 0:(−2,−1) … 5:(3,6) | Distinct raw bands; E[raw\|5]=4.5 held (`training_execution_v2.py`) |
+| Cost curve / `CLASS_COST_MULT` | cap **3.0**, zeros **4.0**; FR **1.0** → SR **1.4** | `Σ units × cost × class_mult ≤ 24/30` |
+| Shape floors | t0 **P6** + weight scale HIGH **0.50** / LOW **0.20** | Decay clamp + TB Apply (diff-scoped) |
 | `STD_RUNG_INCREMENT` (× JH anchor) | FR .17 / SO .20 / JR .15 / SR .18 (Σ .70 → 1.7× at zero peaks) | Per-rung standard growth; sets the class-year ladder |
 | `PEAK_BONUS` | `+0.30 × jh_anchor`, fixed per peak | Each rolled peak adds this to the target; peaks stack (0–3), so career multiple runs 1.7× (0 peaks) → 2.6× (3 peaks) |
 | `HT_TOTAL` (mean) | `Normal(3.2, 1.9)` clamped `[0,8]`; per-rung cap 2.5 in | Total career height gain; `HT_TOTAL_MEAN = 3.2` in sets how far below frame a JH starts |
 | `HT_CURVE_BY_TIMING` (share of career HT gain, FR/SO/JR/SR) | early 55/30/12/3 · **standard 40/30/20/10** · late 15/25/35/25 | When height arrives; standard row is the grow-into-frame stagger |
-| `COACHING_F_MIN` / `COACHING_F_MAX` | `0.85` / `1.20` | Bounds on the coaching multiplier `f` — coaching is worth ≈ ±1 tier step. Currently dormant at 1.0 |
-| `NON_CORE_GROWTH_MULTIPLIER` | `0.06` | **Vestigial** — the additive budget's non-signature floor; the shape attractor replaced that path. Non-signature filling now comes from the target profile's `PROFILE_FILLER`. |
-| `RT_COMPRESSION_THRESHOLD` / `RT_SOFT_CAP` | `95` / `130` | RT gains compress above 95; ~130 is the practical ceiling (individual attributes are uncapped) |
-| `OFFSEASON_DISTRIBUTION_BLEND` | `0.70` | **Vestigial** — the additive-budget distribution blend; superseded by the shape attractor (`OFFSEASON_ATTRACTOR_ALPHA`). |
+| `COACHING_F_MIN` / `COACHING_F_MAX` | `0.85` / `1.20` | Bounds on `f` (level only). Currently dormant at 1.0 |
+| `NON_CORE_GROWTH_MULTIPLIER` | `0.06` | **Vestigial** — retired distribution path; unused under level-only offseason |
+| `RT_COMPRESSION_THRESHOLD` / `RT_SOFT_CAP` | `95` / `130` | RT soft-cap machinery; ~130 is the practical ceiling (individual attributes are uncapped) |
+| `OFFSEASON_DISTRIBUTION_BLEND` | `0.70` | **Vestigial** — retired distribution path; unused under level-only offseason |
 | `JH_ANCHOR_BY_TIER` | Poor→Elite JH-scale anchors (e.g. Average 30, Elite 50) | Maps `entry_tier` to the `jh_anchor` the target formula multiplies |
 
 ## Reshape vs grow — **closed** (grow level, coach shape)
@@ -152,17 +159,17 @@ At `OFFSEASON_ATTRACTOR_ALPHA = 0.55`, a freshman retains `(1 − α)³ ≈ 9%` 
 |---|---:|
 | 75% across four years | ≈ 0.09 |
 | 50% across four years | ≈ 0.21 |
-| **Current** | **0.55** |
+| **Then (α live)** | **0.55** |
 
-Current α is 2.6×–6× stronger than either career target. Tunable_Constants documents it as fitted for **single-season feel** (Average C SC ~52, focus spike ~+8). Confirm with whoever picked it before retuning — they may have had a reason — but the spread is large enough that it reads as a constant chosen without a career-length criterion.
+α=0.55 was 2.6×–6× stronger than either career target — fitted for **single-season feel** (Average C SC ~52, focus spike ~+8), not a four-year criterion. That arithmetic is why the attractor was retired; live value is `0.0` (see Tunable Constants / A — LEVERS).
 
 ### Separate open question — coaching differentiation is inert
 
 `_coaching_accumulator_for_player` is hardwired to `None`, so `f ≡ 1.0` for every player.
 
-The input that would differentiate development between programs is inert. Strong force toward the positional mean; nothing pushing programs apart. That is why the league converges rather than merely softening.
+> **Still true after the attractor retirement:** `f` remains dormant (pillar 3). What is *not* still true is the pairing below — the “strong force toward the positional mean” was the α-blend, now retired. `f` is level-only when live; it does not reshape.
 
-Is that unfinished (pillar 3 not shipped), deliberately disabled, or a bug? Needs its own answer. It may be the more consequential of the two findings.
+Historical framing (pre-resolution): the input that would differentiate *level* between programs was inert while α homogenized shape. Is `f` dormancy unfinished, deliberate, or a bug? Needs its own answer — separate from reshape-vs-grow, which is closed.
 
 ### Dead options from the TB framing
 
@@ -198,8 +205,10 @@ Per-attribute σ within position was **level-contaminated** under the attractor 
 
 ## Key Files
 
-- `BackEnd/utils/player_development.py` — offseason event, growth-profile roll, rollover driver
+- `BackEnd/utils/player_development.py` — offseason event (level-only), growth-profile roll, rollover driver
+- `BackEnd/constants/training_shape.py` — camp, cost matrix, class cost mult, weight-scaled P6 floors
+- `BackEnd/utils/shape_movement.py` — along/across shape decomposition (measurement / suite)
 - `BackEnd/utils/player_generation.py` — JH start, grow-into-frame height draw
 - `BackEnd/utils/position_ratings.py` — RT recomputation after development
-- `BackEnd/models/training_execution_v2.py` — `execute_training`, anchor/live reset at week 1
-- `tests/test_offseason_attractor.py`, `tests/test_in_season_invariants.py` — invariant assertions
+- `BackEnd/models/training_execution_v2.py` — `execute_training`, gain bands, fractional remainder, decay + floor clamp
+- `tests/test_offseason_attractor.py`, `tests/test_in_season_invariants.py`, `tests/test_training_shape_framework.py` — invariant / framework assertions

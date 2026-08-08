@@ -1,71 +1,41 @@
 # Team Builder System
 
-> **Authoritative product rules:** `_documentation_master/projects/team-builder-v2-plan.md`. Presentation: `projects/design_handoff_team_builder/README.md`.
+> **Implementation map.** Product intent lives in `_documentation_master/projects/team-builder-v2-plan.md`; presentation in `projects/design_handoff_team_builder/README.md`. When intent and code disagree, the plan states intent and this file maps wiring — raise a finding, don't silently rewrite either.
 >
-> **Roster path (current):** Apply accepts `roster_mode: "edit"` only. CSV import (`slot-roster.csv` and the import helpers) is fully retired — no dormant route. Diff-onto-inherited via `imported_players` (§4.5b). Walk-ons/portraits still minted in the builder.
+> **Every section below describes current behaviour.** Superseded behaviour is in §14, marked as history. If you find a claim here that the code contradicts, that is a bug in this file — fix it, don't add a warning label. This document previously carried a table listing nine of its thirteen sections as untrustworthy; that pattern is what §14 exists to prevent.
 >
-> Verified vs `franchise_team_display.py`, `franchise_routes.py` (`team_builder_apply`, play-next), `team_manager.py`, `api.py` (init-game / simulate-quarter matchup gate), `common.js` (`getTeamAssetPath`), `team-builder.js`, identity helpers in `franchise_geek_points.py`.
-
-### Superseded sections (do not trust for current behaviour)
-
-| Section | Why superseded | Trust instead |
-|---|---|---|
-| **Split of duties** (v1-spec as product authority) | Product rules moved to `team-builder-v2-plan.md` + design handoff README | Plan + README |
-| **§1** entry / mid-franchise wording | Still true on overlay model; flow is now seven chapters, not “wizard only at start” as the sole mental model | Plan § flow; design README |
-| **§2** “Soft budget only” row | Soft eligibility + over-budget CSV apply is retired; capped/uncapped hard budgets govern | Plan §4; `team_builder_budget.py` |
-| **§4.1** `roster_mode: keep \| generate \| import` | Those modes are retired; sole path is `edit` | Plan decisions #30 / #41; Apply route |
-| **§4.2** FPD note “for import/generate” | Same — edit rewrite path only | `team_builder_roster.py` |
-| **§6.1** five-step UX path | Replaced by Program Select → Claim → Identity → Gate → Roster → Review → Establish | Design handoff README; `team-builder.js` chapters |
-| **§6.2** step 5 “Optional roster replace (keep \| generate \| import)” | Always edit rewrite (minted ids + portraits); no optional Keep | Apply + roster utils |
-| **§6.3** `slot-roster.csv` endpoint | Endpoint and CSV helpers deleted | — (gone) |
-| **§7** soft budget table / “Never blocks Apply” / over-limit CSV | Replaced by capped/uncapped attribute + height + year budgets | Plan §4 / §10; budget constants |
-| **§8** entire Roster modes table | Keep / Generate / Import retired | Plan §4.5c; decision #41 |
-| **§10** “Roster replace / CSV” row label | Utils still own edit rewrite; CSV is gone | `team_builder_roster.py` |
-| **§11** soft-budget / import test descriptions | Tests retargeted; CSV import tests removed | `BackEnd/tests/test_team_builder_*.py` |
-
-**Still trustworthy for identity/sim wiring (read carefully, verify against code):** §3 Identity model, §4.3 Resolver API, §5 Shared producers, §9 Gameplay path, §12 Explicit non-goals, §13 Agent checklist.
-
-### Split of duties (read first)
-
-| Doc | Owns | Does **not** own |
-|---|---|---|
-| **`../projects/team-builder-v2-plan.md`** | Product behaviour, budgets, identity rules, acceptance criteria | Pixel-level presentation |
-| **`../projects/design_handoff_team_builder/README.md`** | Presentation, copy, interaction, seven-screen layout | Budget arithmetic |
-| **This file (`Team_Builder_System.md`)** | Implementation map: overlay schema, Apply/endpoints, shared producers, gameplay path, file map, tests — **except superseded sections above** | Product copy; “should we build X?” |
-| **`../projects/mod-system/team-builder-identity-inventory.md`** | Team identity / chrome inventory (derived forms, overlay awareness) | Narrative product or full system architecture |
-
-When product intent and code disagree, treat the **v2 plan** as the statement of intent and this file as the map of current wiring — raise a finding; do not silently rewrite the plan from the codebase.
+> **Claims marked ⚠ are unverified** — carried forward from prior revisions or from design decisions without confirmation against code. See §15.
 
 ---
 
 ## 1. What it is
 
-Team Builder lets a user put **their own program** into a new franchise by **replacing one of the 128 core slots**. The league size stays 128; conference, schedule, and opponents are inherited from the replaced slot via its Mongo **ObjectId**.
+Team Builder lets a user put **their own program** into a new franchise by **replacing one of the 128 core slots**. League size stays 128; conference, schedule and opponents are inherited from the replaced slot via its Mongo **ObjectId**.
 
-Customizations are a **per-franchise overlay**. Core `teams` and `players` collections are **never mutated**. A franchise without `team_builder` is byte-identical to pre–Team Builder behavior (resolver + asset path are pass-through no-ops).
+Customisations are a **per-franchise overlay**. Core `teams` and `players` are **never mutated**. A franchise without `team_builder` behaves identically to pre-Team-Builder — the resolver and asset path are pass-through no-ops.
 
-**Entry point:** only from franchise team-select at new-franchise start. Franchise creation does **not** begin until Apply (`POST /franchise/team-builder/apply`). Mid-franchise editing is out of scope for v1.
+The user authors all fifteen players, seeded from the replaced program's roster. There is one roster path: edit.
 
-**Related orientation:** `Franchise_Mode_Overview.md` (this folder). Product spec and display checklist: see **Split of duties** above.
+**Entry:** from the franchise program-select screen at new-franchise start. No franchise document exists until Apply. Mid-franchise editing is out of scope.
 
 ---
 
-## 2. Fixed constraints (do not violate)
+## 2. Fixed constraints
 
 | Constraint | Meaning in code |
 |---|---|
 | League size invariant | Never insert a 129th team; never rewrite schedule topology |
 | Slot replacement | Schedule / FTD / standings stay keyed to the **replaced ObjectId** |
 | Per-franchise overlay | Identity lives on `franchises.team_builder`; core `teams`/`players` read-only |
-| Single entry | Wizard + Apply only; no mid-save edit UI |
+| Single entry | Program select → chapters → Apply; no mid-save edit UI |
 | No broken images | Custom art goes through `getTeamAssetPath`; terminal fallback is generic, never a 404 path |
-| Soft budget only | Over-budget imports still apply; eligibility is metadata, not a hard block |
+| Client is a pure renderer | The client may aggregate values it already holds; it may not compute values it doesn't hold |
 
 ---
 
-## 3. Identity model (read this first)
+## 3. Identity model — read this first
 
-Three layers. Conflating them is how Team Builder franchises break sim.
+Three layers. Conflating them is how Team Builder franchises break the sim.
 
 ```
 Structural (never custom names)
@@ -73,289 +43,389 @@ Structural (never custom names)
   team_id slug (e.g. HARDWOOD_FIELDS)  →  game-doc teams{} keys, some box-score paths
 
 Identity / keys (always core)
-  teams.name (e.g. Hardwood Fields)  →  TeamManager.name, score{}, matchup gate, init/sim home_team/away_team
+  teams.name (e.g. Hardwood Fields)  →  TeamManager.name, score{}, matchup gate,
+                                        init/sim home_team/away_team
 
-Display only (resolver at the edge — response serializers / chrome)
+Display only (resolved at the edge — response serializers / chrome)
   overlay name (e.g. Hanson)  →  TeamManager.display_name, summary teams[*].display_name,
-                                  play-next home_display/away_display, rankings labels
+                                 play-next home_display/away_display, rankings labels
 ```
 
 | Identifier | Example | Used for |
 |---|---|---|
 | `object_id` | `69a6fcb6…` | Slot key = `str(teams._id)`. Schedule `(away_id, home_id)`, FTD `team_id`, `user_team_object_id`, resolver key |
 | `team_id` (slug) | `HARDWOOD_FIELDS` | Core `teams.team_id`; game document map keys |
-| Core name | `Hardwood Fields` | `TeamManager.name`, `score{}` keys, simulate-quarter matchup gate, URL `home`/`away` |
-| Display name | `Hanson` | Chrome only — never construction, persistence keys, or matchup equality |
-| Player IDs | UUIDs | Unrelated layer — do not use as team keys |
+| Core name | `Hardwood Fields` | `TeamManager.name`, `score{}` keys, matchup gate, URL `home`/`away` |
+| Display name | `Hanson` | Chrome only — never construction, persistence, keys, or matchup equality |
+| Player IDs | UUIDs | Unrelated layer — never a team key |
 
-**The rule:** resolve at the edge, on the way out. The display resolver belongs in response serialization only — never in object construction, persistence, or anything used as a key. Join / load by ObjectId. Matchup gate stays **strict** core-name equality.
+**The rule: resolve at the edge, on the way out.** The display resolver belongs in response serialisation only — never in object construction, persistence, or anything used as a key, hash or comparison. Join and load by ObjectId. The matchup gate stays **strict** core-name equality.
 
-### Why this matters (known failure mode)
+### Why the gate is strict
 
-v1 leak: resolver fed construction (`TeamManager.name` = Hanson) and init-game rewrote request names to display. Court then sent core `Hardwood Fields` while GM held display → strict gate `400 game_id belongs to a different matchup`. A tolerant gate would have hidden the leak and allowed display-keyed game docs.
+A tolerant comparator hides leaks. The v1 failure: the resolver fed construction (`TeamManager.name` = Hanson) and init-game rewrote request names to display. The court then sent core `Hardwood Fields` while the GM held display, and the strict gate returned `400 game_id belongs to a different matchup`. That 400 was the system working — a tolerant gate would have accepted it and allowed display-keyed game documents to persist.
 
-**Phase 0 fix:** `.name` = core; `.display_name` = overlay; play-next emits core `home`/`away` + ObjectIds + `*_display` for chrome; init-game never rewrites via resolver; simulate-quarter gate is strict again.
+**Current:** `.name` is core; `.display_name` is overlay; play-next emits core `home`/`away` plus ObjectIds plus `*_display` for chrome; init-game never rewrites via the resolver.
 
-Helpers (structural matching — not the matchup gate):
+### The chrome hydration gate
 
-- `teams_match_for_franchise(a, b)` — `BackEnd/utils/franchise_geek_points.py`
-- `gm_team_matches_ref(gm_team, ref)` — playbook / team-pick helpers
+All seven chapter screens resolve team identity and colour through `lookupTeamChrome` / `ensureTeamBuilderChromeSnapshot` — never from raw team data or URL parameters. Three separate rounds of identity leaks came from new entry points rendering before hydration settled. **A deep link into a mid-flow chapter is itself an entry point** and does not inherit the guarantee from the chapter before it.
 
-Regression: `tests/test_tb_matchup_identity.py`. Score-dict consumers: `../projects/mod-system/team-builder-score-dict-consumers.md`.
+### The leak detector is observe-only
+
+It emits an `X-TB-Leak-Suspect` header rather than blocking. Identity fields are **exempt by design**: core names appearing in `turns[*].offense_team_id` and similar are the architecture working, not a leak. An earlier strict detector refused valid `simulate-quarter` responses for exactly this reason.
+
+Helpers (structural matching — **not** the matchup gate): `teams_match_for_franchise` in `franchise_geek_points.py`, `gm_team_matches_ref` for playbook and team-pick.
 
 ---
 
 ## 4. Data model
 
-### 4.1 Franchise document overlay
+### 4.1 Franchise overlay
 
-Field: `franchises.team_builder` (`TEAM_BUILDER_FIELD` in `franchise_team_display.py`).
-
-Written **once** at Apply. Shape (authoritative writer: `team_builder_apply`):
+Field: `franchises.team_builder` (`TEAM_BUILDER_FIELD` in `franchise_team_display.py`). Written **once**, at Apply, by `team_builder_apply`.
 
 ```python
 {
   "replaced_object_id": "<ObjectId str>",  # slot key — never changes
-  "replaced_name": "Hardwood Fields",      # core name at Apply time (orientation copy)
-  "name": "Hanson",                        # display name
-  "abbreviation": "HAN",                   # 3 chars
+  "replaced_name": "Hardwood Fields",      # core name at Apply (orientation copy)
+  "name": "Hanson",                        # display name, ≤ 23 chars
+  "abbreviation": "HAN",                   # 3 chars, unique
   "mascot": "...",
   "primary_color": "#...",
   "secondary_color": "#...",
-  "jersey_preset": 1,                      # 1 SOLID | 2 SOLID WITH TRIM (→ uniforms body/trim)
+  "jersey_preset": 1,                      # 1 SOLID | 2 SOLID WITH TRIM
+  "banner_variant": "baseline",            # baseline | keel | plate | sash
   "asset_strategy": "generated",
-  "roster_mode": "keep" | "generate" | "import",
-  # plus budget snapshot fields on the franchise root (see §7)
+  "roster_mode": "edit",                   # only value
+  "attribute_mode": "capped" | "uncapped",
+  "online_eligible": bool,                 # capped only; written once, never recomputed
 }
-# Legacy overlays may still carry accent_color / city_state; ignored.
 ```
 
-Also set on the franchise at init/Apply:
+Court recipe nests at **`franchises.team_builder.court`** (Apply via `normalize_court_params`; keys in `COURT_PARAM_KEYS`). Fields:
 
-| Field | Meaning |
+| Key | Stored value |
 |---|---|
-| `user_team_id` | **Custom display name** (baked at write time) |
-| `user_team_object_id` | Replaced slot ObjectId string |
-| `online_eligibility` | Soft flag from budget eval at Apply |
-| `hasEverExceededBudget` | Set once at Apply; never cleared |
-| `roster_shape_at_creation` | `{team_total, top5_total, max_player}` — unread in v1, required for future exploit closure |
+| `hardwoodStyle` | Style token, e.g. `medium_medium` |
+| `oobColor`, `laneColor`, `outsideWoodColor`, `halfArcFillColor` | `#RRGGBB` hex |
+| `insideWoodColor` | Optional `#RRGGBB`; omitted when using the style-key tone |
+
+Draft UI keeps palette tokens (`Primary` / `Secondary` / `Black` / custom hex) in identity state; **Apply resolves colours to hex before write.** Hex on the overlay does freeze those surfaces if the team palette later changes — that is current behaviour, not a token store.
 
 ### 4.2 What stays on the core slot
 
-| Store | Key | Unchanged by overlay? |
+| Store | Key | Unchanged? |
 |---|---|---|
-| `schedule` weeks | `(away_id, home_id)` ObjectIds | Yes — still the replaced ObjectId |
-| `franchise_team_data` | `franchise_id` + `team_id` (= slot ObjectId) | Yes |
-| `franchise_players_data` | `franchise_id` + `player_id` | Roster may be replaced; `meta.team` rewritten to custom name on Apply for import/generate |
+| `schedule` weeks | `(away_id, home_id)` ObjectIds | Yes — replaced ObjectId |
+| `franchise_team_data` | `franchise_id` + `team_id` (slot ObjectId) | Yes |
+| `franchise_players_data` | `franchise_id` + `player_id` | Roster is rewritten at Apply with minted `player_id`s; `meta.team` takes the custom name |
 | Universal `teams` / `players` | — | **Never written** |
 
-### 4.3 Resolver API
+### 4.3 Draft store
+
+Collection `team_builder_wizard_drafts`. **One document per `(user_id, replaced_object_id)`**, carrying `schema_version: 2`. `draft_id` is a stable minted field for walk-on and portrait idempotency — not a second key axis.
+
+Holds the full in-progress program: claim slot, identity, build mode, roster edits, walk-ons and portrait assignments. Portraits especially — the values a user sees must be the values that ship.
+
+- **Looked up server-side by `user_id`**, via `GET /franchise/team-builder/drafts`. `localStorage` (`tb-draft-id`) is an optimisation, never the only path — the unfinished-program card must appear for a user on a different machine or after clearing site data.
+- **Old-format rows (no or wrong `schema_version`) are discarded on read**, not migrated. Detection is by the positive version stamp, never by sniffing for missing fields.
+- Deleted on Establish and on explicit discard. No TTL.
+
+### 4.4 Resolver API
 
 `BackEnd/utils/franchise_team_display.py`:
 
 | Function | Role |
 |---|---|
 | `get_team_builder_overlay(franchise)` | Overlay dict or `None` |
-| `resolve_team_display(franchise, team_object_id, core_doc=…)→ dict` | Name, colors, mascot, abbr, `is_custom`, `asset_strategy`, `replaced_name`, … |
-| `resolve_team_name_map(franchise, team_ids=…)` | ObjectId → display name map |
+| `resolve_team_display(franchise, team_object_id, core_doc=…)` | Name, colours, mascot, abbr, `is_custom`, `asset_strategy`, `replaced_name` |
+| `resolve_team_name_map(franchise, team_ids=…)` | ObjectId → display name |
 
-**Pass-through:** no overlay, or ObjectId ≠ `replaced_object_id` → core `teams` values unchanged.
+**Pass-through:** no overlay, or ObjectId ≠ `replaced_object_id` → core values unchanged.
 
 ---
 
-## 5. Shared producers (display + assets)
+## 5. Shared producers
 
-**Policy:** intercept at shared producers, not 58 FE call sites. Future screens inherit resolution automatically.
+**Policy: intercept at shared producers, not at 58 frontend call sites.** New screens inherit resolution automatically. This is the same instinct applied to names, assets, abbreviations and the chrome snapshot — fix the producer, not the call site.
 
 ### 5.1 Display producers
 
 | # | Producer | Location |
 |---|---|---|
 | 1 | `_format_team_name_map(franchise=…)` | `franchise_routes.py` → `resolve_team_name_map` |
-| 2 | Season schedule payload | name lookup via resolver |
-| 3 | `_ftd_team_display` | `community_highlights.py` (ATL / highlights) |
+| 2 | Season schedule payload | resolver lookup |
+| 3 | `_ftd_team_display` | `community_highlights.py` |
 | 4 | `_franchise_summary_for_list` | mode-select slot cards |
 | 5 | `GET /roster?franchise_id=` | identity fields on response |
-| 6 | `TeamManager.__init__` | name/colors/mascot; custom-name → overlay → core `_id` |
+| 6 | `TeamManager.__init__` | name / colours / mascot |
 | 7 | Practice Squad parent labels | `_format_team_name_map(franchise_doc)` |
-| 8 | `POST /franchise/play-next-game` | `home`/`away` strings via `resolve_team_display`; **ids remain ObjectIds** |
+| 8 | `POST /franchise/play-next-game` | display strings; **ids remain ObjectIds** |
 
-Identity / chrome inventory: `team-builder-identity-inventory.md`.
+Plus the seven chapter surfaces, which resolve through the chrome snapshot (§3). Inventory: `team-builder-identity-inventory.md`.
 
 ### 5.2 Asset producer
 
 `getTeamAssetPath(teamNameOrSlug, assetKey, visualOverride)` in `FrontEnd/static/common.js`.
 
-- Custom overlays go **through** this function (not around it).
-- Server franchise payload is source of truth for visuals; `FranchiseLS` `team_builder_visual` is a **warm cache only** — must not be required for correct art (fresh browser / cleared storage must hydrate from API).
-- Terminal fallback: generic art (`general`), never a path that 404s.
-- Generated art: `FrontEnd/static/js/shared/teamGeneratedArt.js` (initials + colors + jersey presets).
+- Custom overlays go **through** it, not around it.
+- The server franchise payload is source of truth. `FranchiseLS` `team_builder_visual` is a **warm cache only** — a fresh browser must hydrate correctly from the API.
+- Terminal fallback is generic art, never a 404 path.
 
-**Banner convention:**
+**Player display names come from `/teams`, never derived from slugs** — `nameToTeamSlug` is lossy for internal capitals, periods and apostrophes. The `ida` asset folder is uppercase on disk while its file stem is lowercase; `couer_dalene` has a related mismatch. **Do not "fix" either stored id.**
+
+---
+
+## 6. Flow and Apply
+
+### 6.1 The seven chapters
+
+```
+Program Select → Ⅰ Claim → Ⅱ Identity → [Build mode gate] → Ⅲ Roster → Review → Establish
+```
+
+Program Select is the shared franchise entry — it serves both ordinary franchise creation and Team Builder. The remaining chapters live in one page with client-side chapter swapping and deep-linkable states, so the hydration gate is passed at two entry points rather than seven.
+
+**The primary action lives in the top status band on every chapter screen.** Nothing else carries it. When unavailable it is visibly disabled with the reason stated beside it — never a control that looks live and isn't. The Established screen is outside the chapter system and keeps its own action.
+
+**Build mode is written permanently at Establish.** There is no path to change it afterwards, and both the gate and Review say so in those words.
+
+### 6.2 The roster editor is a diff, not a form
+
+Two rules, each of which has already caused a production defect:
+
+**Any field the user does not edit keeps its inherited value.** Apply clones the inherited player document and overwrites only what changed; it does not construct a player from the payload. A zero-edit Apply once differed on 36 field paths because it built new documents from the wizard payload.
+
+**Bind by identity, never by ordinal position.** Budgets, edits and inherited values bind to players by identity. `find()` order is not roster order, and aligning to it silently wrote budgets to the wrong players.
+
+### 6.3 Apply
+
+`POST /franchise/team-builder/apply` → `team_builder_apply` in `franchise_routes.py`.
+
+1. Validate `replaced_object_id`, name (≤ 23 chars), abbreviation uniqueness.
+2. Allocate `home_slot`.
+3. Build the overlay.
+4. `FranchiseManager.initialize_season(...)` — schedule still ObjectId-keyed to the slot.
+5. Roster rewrite via `team_builder_roster.py`: clone inherited, apply the diff, mint `player_id`s.
+6. **Diff-scoped shape floors** (same principle as §4.5b): an attribute is checked against its position floor only if the editor row changed it relative to the inherited clone. Unedited attributes are legal by definition — that player already exists in the league. Server-side top-up / force-to-budget is not authorship and does not put an attribute in scope. A violation returns `shape_floor_violation` naming the player and attribute. **Apply refuses; it does not quietly correct.** Pathology is still caught: starving a player means editing those attributes down.
+7. Write `attribute_mode` and `online_eligible` (mode-only). Soft-budget echo fields are not written.
+8. `$set` the overlay; return franchise id for navigation into FCC.
+
+**Weight is computed once here, on the server.** The client shows the inherited value until height changes, then a short label. No `weight_from_height` implementation exists in frontend code.
+
+⚠ **Apply duration has never been measured.** It warm-paints fifteen portrait masters, so the cold figure — the first Establish in a session, which is what every real user gets — is the one the Establish sequence must be built around. A placeholder was used once and misled the design.
+
+### 6.4 Position ratings
+
+Server-computed by `compute_position_ratings` in `BackEnd/utils/position_ratings.py`, exposed through an endpoint that wraps **that exact function** — no parallel implementation. It takes one player mapping: height plus the eleven attributes in `POSITION_WEIGHTS` (`AG BH FT ID IQ OD PS RB SC SH ST`).
+
+The endpoint **rejects incomplete payloads** rather than defaulting a missing attribute to 0. The function's own `missing → 0` behaviour is fail-open, and empty-treated-as-a-value has caused three production defects here.
+
+Ratings arrive on control release. The UI shows `recomputing…` while pending and never displays a guessed value. Ratings are clamped at 1 below and **uncapped above**, so RT can exceed 99 in uncapped mode — no meter assumes a 0–99 range.
+
+**`RT` is the position rating at a slot. There is no overall rating in this product.** Don't introduce one.
+
+---
+
+## 7. Build modes and budgets
+
+Two modes, chosen at the gate, written permanently at Establish.
+
+**Capped** — eligible for online play. Three budgets, all inherited from the replaced program:
+
+| Budget | Rule |
+|---|---|
+| Attributes | Per player, inherited total. Points never move between players. |
+| Height | Team total, may not exceed inherited. Under is permitted and reads as neutral, not amber. |
+| Year / class | Team total, must equal inherited **exactly**. Both over and under are refused, with the shortfall or surplus stated. |
+
+Class ranks (`SR=4 / JR=3 / SO=2 / FR=1`) come from the server as `class_rank`, because that mapping is a rule rather than arithmetic.
+
+**Uncapped** — not eligible for online play. No budgets. Meters render as reference readouts rather than being removed, carrying *Not eligible · written permanently*.
+
+**No hardcoded league constants.** Any number derived from roster data is computed at runtime.
+
+**Potential does not respond to Year, height or attribute edits.** It is fixed at generation via `entry_tier` and `potential_factor`. A younger roster has more seasons ahead, not better players. The flow states this once, on the gate.
+
+---
+
+## 8. Assets
+
+### 8.1 Banners
+
+Four compositions — **Keel, Baseline (default), Plate, Sash** — stored as `banner_variant` with semantic string values, not option letters. Ordinals have already written budgets to the wrong players in this codebase.
+
+Primary 1920 × 679; card 400 × 141. Shrink-to-fit wordmark 50px → 20px floor, measured against **each composition's own field width** — Plate's is 264 card units, not 300.
+
+**Ink is pure `#000` or `#fff`, best-of-two by WCAG contrast**, floor ≈ 4.58:1. The guarantee requires pure black and white; near-black breaks it. Secondary colour never appears as text.
+
+The 23-character name cap derives from Plate's field at the 20px floor: 24 × W measures 269.7 against 264, 23 × W fits at 258.4. Longest real program name is 22. **Enforced in both clients and at Apply.**
 
 | Asset | File | Use |
 |---|---|---|
 | Full banner | `{slug}_banner_primary.jpg` | Detail / FCC / court chrome |
-| Card banner | `{slug}_banner_card.webp` (~400px wide) | Picker grid / first viewport |
+| Card banner | `{slug}_banner_card.webp` | Picker grid |
 
-Generated custom art matches card aspect so custom programs never request missing core files.
+### 8.2 Courts
 
----
+3333 × 2083, generated by `js/shared/teamCourtGenerator.js` — a port of `scripts/generate_non_a1_courts.mjs`, which produced 120 of 129 courts. Eight A1 exclusions: `bentley_truman, lancaster, four_corners, morristown, ocean_city, little_york, xavien, south_lancaster`.
 
-## 6. Create / Apply flow
+Geometry is fixed. Five colour parameters vary plus the hardwood style key: `oobColor`, `laneColor`, `outsideWoodColor` (midcourt, not centre), `insideWoodColor`, `halfArcFillColor`. There is no centre-circle colour.
 
-### 6.1 UX path (FE)
+**Custom inside-wood colours must clear 3.0:1 against the fixed line colour `#6e675f`**, so markings can't be erased. The client validates for feedback; **Apply refuses**; the generator stays dumb. **Stock style keys are exempt by measurement, not oversight** — shipping medium hardwood is itself ≈2.99, and extending the floor to style keys would make it illegal across 120 existing courts.
 
-1. `franchise-select-team` — pick existing program **or** enter Team Builder.
-2. Wizard: `FrontEnd/static/team-builder.html` + `team-builder.js` + `team-builder.css`.
-3. Steps: **Slot (0) → Identity (1) → Colors (2) → Roster optional (3) → Review (4)**.
-4. Slot picker reuses shared `TeamPicker` (`FrontEnd/static/js/shared/teamPicker.js`); selection key = `object_id`.
-5. Cancel returns to team-select with `home_slot` preserved; **no franchise doc yet**.
+### 8.3 Portraits
 
-### 6.2 Apply endpoint
+Pool of 450: `recruit_set_0001` (300) plus `builder_set_0001` (150). Exact classifier match 99.2%.
 
-`POST /franchise/team-builder/apply` — `team_builder_apply` in `franchise_routes.py`.
+Base-league players have face and jersey baked into one flat PNG; recruits have kit and mask and are recolourable.
 
-Order of operations:
+**Assignment classifies on height, weight and attributes, so height is final before assignment.** A later height edit re-runs assignment for that player **unless the user picked a portrait**, in which case `portrait_locked` preserves the choice.
 
-1. Validate `replaced_object_id`, name, 3-char abbreviation uniqueness vs `slice(0,3)` of other core names.
-2. Allocate `home_slot`.
-3. Build overlay dict.
-4. `FranchiseManager.initialize_season(user_team_id=custom_name, user_team_object_id=replaced_oid, …)` — schedule still ObjectId-keyed to the slot.
-5. Optional roster replace (`keep` | `generate` | `import`) via `BackEnd/utils/team_builder_roster.py`.
-6. Evaluate soft budget; persist eligibility + shape flags.
-7. `$set` `team_builder` overlay + eligibility fields on the franchise.
-8. Return franchise id + overlay + eligibility for FE navigation into FCC.
+**Choose sets `portrait_locked`. Randomize does not, and clears it** — the user said "not this one," not "this one." Randomize re-rolls against the player's *current* height, weight and attributes.
 
-**Write-time fact:** at create there are **no** `season_news` strings and **no** season game docs yet. News/games are written later, so they can resolve names after the overlay exists. FPD `meta.team` + `user_team_id` **are** written at create and rewritten by Apply when roster mode requires it.
+**The picker filters by tone, frame and definition. No race vocabulary appears anywhere** — not in labels, not in `alt` text, `aria-label` or any accessible name, not in CSS class names or rendered `data-` attributes. Accessible names are positional and tonal ("Skin tone 1 of 5, lightest").
 
-### 6.3 Supporting endpoints
+Five tone chips, derived by measurement rather than chosen, mapping to the nine classifier keys which are **unchanged underneath**:
 
-| Endpoint | Role |
-|---|---|
-| `GET /franchise/team-builder` (page) | Serves wizard HTML |
-| `GET /franchise/team-builder/slot-roster.csv` | Download replaced slot’s roster for import editing |
-| `GET /teams` | Additive fields: `conference`, `region`, `team_id`, `object_id` |
+| Chip | Classifier keys | Mean L* |
+|---|---|---:|
+| 1 | `white-pale` | 67.96 |
+| 2 | `white-normal` | 56.32 |
+| 3 | `asian` + `hispanic` + `white-tan` + `black-light` + `ambiguous` | 49.42 |
+| 4 | `black-normal` | 43.75 |
+| 5 | `black-dark` | 26.03 |
 
----
+The mid chip merges five categories because they are the same colour, not merely similar: full-Lab ΔE00 across that cluster peaks at 2.07, and `white-tan` ↔ `black-light` is 0.54 with identical hue angle. **Merge decisions use CIEDE2000 in full Lab, never ΔL\*** — the first pass used lightness alone and reached the right answer for the wrong reason. Chip fills are the n-weighted mean sRGB of their constituent images. **Do not normalise chroma to even out the ramp** — the ends are duller than the middle and that is the truth about this pool.
 
-## 7. Budget / online eligibility
+Filters **reorder and dim; they never remove.** The grid never empties.
 
-Constants: `BackEnd/constants/team_builder_budget.py`.
+**Two known asset gaps, not defects in the picker:** the pool holds one hue (h° 51.5–55.9 for eight of nine categories), and there is an 18-point lightness hole between L\* 44 and 26 with 218 of 450 images inside a 1.73-point band. Both are for the next image bake. Users also cannot filter by race — the intended consequence of removing race vocabulary, recorded so it isn't rediscovered as a bug.
 
-| Limit | Value | Principle |
-|---|---|---|
-| Team total (core-12 sum) | 6,400 | ~P90 of league team totals |
-| Top-5 sum | 3,950 | League max top-5 (~3,954) |
-| Per-player ceiling | 1,035 | League max player |
-| Per-player floor | 24 | League min; applies to top 12 only |
-
-Core-12 attrs: `SC SH ID OD PS BH RB ST AG ND IQ FT` (CH/EM/MO excluded; randomized at init like everyone else).
-
-`evaluate_roster_budget(player_attrs)` → soft result. **Never blocks Apply.** Over-limit CSV still imports.
-
-**Eligibility freezes at Apply** — never recomputed for the life of the franchise. Budget constrains *authored* input, not sim outcomes (camp cuts, development, etc.).
-
-`online_eligibility` is forward-looking metadata only. **Do not build online gating or matchmaking** until that product exists.
+**Uploads do not exist.** They are a committed fast follow. There is no upload control anywhere — a control that isn't wired is worse than an absent one.
 
 ---
 
-## 8. Roster modes
-
-`BackEnd/utils/team_builder_roster.py` (+ tests under `BackEnd/tests/test_team_builder_roster.py`).
-
-| Mode | Behavior |
-|---|---|
-| `keep` | Slot’s cloned FPD roster unchanged (fast path) |
-| `generate` | New fictional players at slot talent band; meter figures are **estimated** until Apply |
-| `import` | CSV → validated rows; required: `first_name`, `last_name`, `class_year` (FR/SO/JR/SR). Position not required |
-
-After import/generate, FPD `meta.team` and franchise `user_team_id` use the custom name; FTD still keyed by replaced ObjectId.
-
----
-
-## 9. Gameplay path (franchise + overlay)
+## 9. Gameplay path
 
 ### 9.1 Play next → lineup → court
 
 1. FCC calls `POST /franchise/play-next-game` → `{ home, away, home_id, away_id, week, … }` with **display** names and **ObjectId** ids.
 2. FCC builds `/set-lineup.html?...&home=&away=&home_id=&away_id=`.
-3. Lineup / court / Phaser always attach `home_id`/`away_id` on `init-game` and `simulate-quarter` payloads (`set-lineup.js`, `bootGame.js`, `gameScene.js`).
-4. Do **not** fall back structural id query params to display names.
+3. Lineup, court and Phaser always attach `home_id`/`away_id` on `init-game` and `simulate-quarter`.
+4. **Never** fall back from structural id parameters to display names.
 
 ### 9.2 init-game
 
-`POST /api/init-game` (`api.py`):
+`POST /api/init-game`. Accepts optional `home_id`/`away_id`. Franchise mode prefers ObjectId, falls back to core name, then overlay custom name → `replaced_object_id`. Resolves display names via `resolve_team_display` **before** constructing `GameManager`.
 
-- Accepts optional `home_id` / `away_id`.
-- Franchise mode: `load_ftd_data_for_team(franchise_id, team_id, team_name)` prefers ObjectId; falls back to core name, then overlay custom name → `replaced_object_id`.
-- When ids present, resolves display names via `resolve_team_display` before constructing `GameManager`.
-- `GameManager` / `TeamManager` apply overlay onto `.name` / colors; score dict uses **`gm.home_team.name` / `gm.away_team.name`** (stable for that game).
+### 9.3 Mid-game resume
 
-### 9.3 simulate-quarter matchup gate
+**A separate entry point with its own failure history.** `resume_anchor.snapshot` previously lacked `franchise_id` and `mode`, so resumed quarters loaded a different roster — simulating against core attributes and writing stats against core `player_id`s. That was league-wide, not Team-Builder-specific; Team Builder made it visible.
 
-When a cached GM exists for `game_id`, sides must match via ObjectId/slug/display helpers — **not** raw string equality of request name vs `gm.*.name`.
+Anything touching resume must carry franchise identity explicitly. **Empty is not missing** — this is the third defect of that class in this codebase.
 
-`QuarterSimulationRequest` includes optional `home_id` / `away_id`.
+### 9.4 In-game name-keyed maps — explicit non-goal
 
-### 9.4 In-game name-keyed maps (explicit non-goal for v1)
-
-Live `score[team.name]`, box maps, etc. stay keyed by the GM’s chosen display name for that game. Do **not** rewrite those to ObjectId in a casual pass — large and high-risk; unnecessary if init + matchup gate stay consistent.
+Live `score[team.name]` and box maps stay keyed by the GM's display name for that game. Do not rewrite them to ObjectId in a casual pass: large, high-risk, and unnecessary while init and the matchup gate stay consistent.
 
 ---
 
-## 10. Primary files (map)
+## 10. Interaction with player development
+
+Team Builder authors **shape**. The development system then owns what happens to it.
+
+- The offseason attractor is retired (`OFFSEASON_ATTRACTOR_ALPHA = 0.0`), so an authored roster's shape is no longer pulled toward the position profile. Authorship persists.
+- **Shape floors originate in the development framework and are enforced at Apply on the authored diff only** (§6.3). They are weight-scaled: attributes that matter at a position have real floors, attributes that don't have minimal ones, and the universals — ND, FT, IQ — are floored everywhere.
+- Floors are derived from a **pre-development** population at the per-attribute 6th percentile. Never re-derive them from a developed snapshot: doing so refuses legitimate creative rosters at a 10/10 rate. Do not lower the percentile to “let real players through” — that needs roughly P0.4 and catches nothing.
+- The decay clamp stays full-roster: its job is preventing further decline. A player already below the line simply cannot fall further; Apply’s diff scope does not change that.
+
+Details live in the Player Development System document. This section is the boundary, not a duplicate.
+
+---
+
+## 11. Primary files
 
 | Area | Path |
 |---|---|
 | Resolver | `BackEnd/utils/franchise_team_display.py` |
 | Apply + play-next display | `BackEnd/api/franchise_routes.py` |
-| Budget constants | `BackEnd/constants/team_builder_budget.py` |
-| Roster replace / CSV | `BackEnd/utils/team_builder_roster.py` |
+| Roster rewrite | `BackEnd/utils/team_builder_roster.py` |
+| Position ratings | `BackEnd/utils/position_ratings.py` |
+| Shape constants / floors / costs | `BackEnd/constants/training_shape.py` |
 | Identity match helpers | `BackEnd/utils/franchise_geek_points.py` |
 | Team overlay at runtime | `BackEnd/models/team_manager.py` |
 | Score keys after overlay | `BackEnd/models/game_manager.py` |
 | init / sim / FTD load / gate | `BackEnd/api/api.py` |
 | Roster load overlay name | `BackEnd/utils/roster_loader.py` |
-| CE / crowd id resolve | `BackEnd/utils/home_crowd.py` |
-| Playbook team pick | `BackEnd/api/gameplan_routes.py`, `team_settings_manager.py` (`gm_team_matches_ref`) |
-| Wizard | `FrontEnd/static/team-builder.{html,js,css}` |
-| Picker | `FrontEnd/static/js/shared/teamPicker.js` |
-| Assets | `FrontEnd/static/common.js` (`getTeamAssetPath`), `teamGeneratedArt.js` |
-| Visual cache | `FrontEnd/static/js/shared/franchiseLocalStorage.js` (`team_builder_visual`) |
-| FCC hydrate / play URL | `FrontEnd/static/franchise-command-center.js` |
+| Chapters | `FrontEnd/static/js/team-builder/{constants,identity,gate,roster,review,establish}.js`; orchestrator `FrontEnd/static/team-builder.js` |
+| Program select / claim | `FrontEnd/static/franchise-select-team.*` |
+| Generated art | `FrontEnd/static/js/shared/teamGeneratedArt.js` |
+| Court generator | `FrontEnd/static/js/shared/teamCourtGenerator.js` |
+| Assets | `FrontEnd/static/common.js` (`getTeamAssetPath`) |
+| Visual cache | `FrontEnd/static/js/shared/franchiseLocalStorage.js` |
 | Lineup / court ids | `FrontEnd/static/set-lineup.js`, `js/phaser/bootGame.js`, `gameScene.js` |
 
 ---
 
-## 11. Tests
+## 12. Tests
 
 | Test | Covers |
 |---|---|
-| `tests/test_tb_matchup_identity.py` | Strict core-name gate; display payload rejected; ObjectId helpers for FTD/schedule |
-| `tests/test_franchise_geek_points.py` (`gm_team_matches_ref_…`) | Display rename vs ObjectId/slug |
-| `BackEnd/tests/test_team_builder_budget.py` | Soft eligibility math |
-| `BackEnd/tests/test_team_builder_roster.py` | Roster replace / import helpers |
+| `tests/test_tb_matchup_identity.py` | Strict core-name gate; display payload rejected; ObjectId helpers |
+| `tests/test_franchise_geek_points.py` | Display rename vs ObjectId/slug |
+| `BackEnd/tests/test_team_builder_roster.py` | Roster rewrite helpers |
+| `BackEnd/tests/test_team_builder_diff_floors.py` | Diff-scoped Apply floors; creative/pathology battery; mixed-edit shortfall |
+| `tests/test_training_shape_framework.py` | Cost matrix ordering, walls, floors, camp locks, shape dispersion |
 
-When verifying staging: confirm `franchises.team_builder` present, `user_team_object_id` == core slot, core `teams`/`players` unchanged, Sim Full / Play Quarter no longer 400 on matchup, UI shows custom name.
-
----
-
-## 12. Explicit non-goals (v1)
-
-- Rewrite schedule pairs or FTD to store the custom string as the structural key
-- Mutate core `teams` / `players`
-- Mid-franchise Team Builder editing / undo after Apply
-- Logo upload, multi-slot replace, sharing/community browser
-- Online matchmaking gated on `online_eligibility`
-- Rewriting all in-game `score[team.name]` maps to ObjectId
+Staging verification: `franchises.team_builder` present, `user_team_object_id` equals the core slot, core `teams`/`players` unchanged, Play Quarter does not 400 on matchup, UI shows the custom name, **and a mid-game resume renders the correct roster**.
 
 ---
 
-## 13. Agent checklist (before changing TB)
+## 13. Agent checklist
 
-1. Will this compare or load teams by **display name** when `franchise_id` is present? Prefer ObjectId / `teams_match_for_franchise` / `gm_team_matches_ref`.
-2. Will a new UI surface show team identity? Prefer an existing producer or `resolve_team_display` — do not hard-read `teams.name` for the user slot.
-3. Will art break for `asset_strategy: generated`? Route through `getTeamAssetPath`; hydrate from server payload, not LS alone.
-4. Is the franchise missing `team_builder`? Your path must no-op.
-5. Are you about to “fix” eligibility by recomputing mid-season? Don’t — frozen at Apply by design.
+1. Will this compare or load teams by **display name** when `franchise_id` is present? Use ObjectId, `teams_match_for_franchise` or `gm_team_matches_ref`.
+2. New UI surface showing team identity? Use an existing producer or the chrome snapshot — never hard-read `teams.name` for the user slot.
+3. New rendering surface? It must pass the hydration gate, including deep links.
+4. Art for `asset_strategy: generated`? Route through `getTeamAssetPath`; hydrate from the server payload, not local storage alone.
+5. Franchise missing `team_builder`? Your path must no-op.
+6. Adding client-side arithmetic? The client may aggregate what it holds and may not compute what it doesn't.
+7. Correcting an invalid roster state? Refuse and say why. This feature does not adjust silently.
+
+---
+
+## 14. History
+
+Kept because the reasons are load-bearing — several of these were re-proposed after being retired.
+
+**Roster modes.** v1 offered `keep | generate | import`. Keep and Generate were removed first, then CSV import, leaving `edit` alone. Import was retired **including its backend endpoint and `slot-roster.csv`** — a later league-wide upload feature will have different requirements and gets built fresh. The Apply / rewrite diff field is still named **`imported_players`** — a naming artefact from CSV import. **Rename deferred** (cheap ~28 references; not declined — do it when next touching that surface).
+
+**Soft budgets.** v1 used league-wide caps — team total 6,400, top-5 3,950, per-player ceiling 1,035, floor 24 — evaluated at Apply as metadata that never blocked. Replaced by capped/uncapped modes with per-player inherited totals. Franchise-root **`hasEverExceededBudget`** and **`roster_shape_at_creation`** were write-only leftovers (Apply echo / FCC only; FE never read them). **Removed** from Apply `$set` / response and FCC; Apply `$unset`s them on new franchises.
+
+**Full-roster floor gate (retired).** Floors briefly bound every core-12 attribute on the shipped roster. A census on a full-roster check looked like miscalibration (~46% of players failing) until the arithmetic was unpacked: **6% is the per-attribute rate**; a player fails if *any* of twelve attrs is below its floor. Independent, that is \(1 - 0.94^{12} \approx 52\%\); measured ~46% with positive attribute correlation (≈1.4 shortfalls per failing player, many 1-pt). The floors were not wrong — the gate was aimed at league composition instead of authorship. **Fix was scope, not percentile:** Apply now validates the diff (§6.3). Do not re-derive floors from the 46% figure.
+
+**The §4.3 top-up.** Any player whose twelve-attribute total fell below 60 was raised to exactly 60 at Apply, because every attribute needs a minimum of 5. It affected 13 players league-wide. **Attribute recalibration retired it** — the league minimum is now ≈190, so no player can be below 60 from inherited data, and the editor's per-attribute floor of 5 makes 60 the minimum reachable by construction. The server-side guard remains; the user-facing copy was removed because it could never render.
+
+**The five-step wizard.** Slot → Identity → Colors → Roster → Review, replaced by the seven chapters. Removed rather than flagged; both flows were never left reachable.
+
+**The offseason shape attractor.** Blended every player 55% toward his position profile each offseason, retaining ~24% of career shape. Retired. Team Builder surfaced it, but it affected all 128 programs equally.
+
+---
+
+## 15. Unverified and outstanding
+
+**Still marked ⚠ above:**
+
+- **Cold Apply duration** — never measured; the Establish sequence was built without it
+
+**Outstanding work:**
+
+- **Portrait uploads (3c)** — committed fast follow, not built
+- **Acceptance criteria 12 and 13 need re-verification** — both passed against an Apply that could not refuse on shape floors
+- **`imported_players` rename** — deferred (see §14)
+- `player_id` coupling audit — requested, never delivered
+- R2 sweeper for orphaned FPDs from bad resumes
+- Static league assets to R2
+- Trademark clearance on the name "Team Builder"
+- `training_position` has no live write path — the shape floor follows position, so nobody can redirect it

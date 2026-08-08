@@ -1353,9 +1353,16 @@ def replace_slot_roster(
                 f"uncapped_pool_exceeded:{team_total}:{int(team_pool)}"
             )
 
-    # Framework §10.2: weight-scaled position floors bind at Apply — refuse, don't fix.
-    from BackEnd.constants.training_shape import floor_violations, resolve_training_position
+    # Framework §10.2 / TB §4.5b: floors bind on authored attribute diffs only.
+    # Compare the editor row to the inherited clone — not post-topup/force finals.
+    # Server-side top-up is not authorship; unedited attrs are legal by definition.
+    from BackEnd.constants.training_shape import (
+        CORE_12,
+        floor_violations,
+        resolve_training_position,
+    )
 
+    rows_for_floors = list(imported_players or [])
     for i, player in enumerate(players):
         pos = resolve_training_position({
             "training_position": player.get("training_position"),
@@ -1363,7 +1370,23 @@ def replace_slot_roster(
             or ((player.get("meta") or {}).get("position_intent")),
             "position_ratings": player.get("position_ratings"),
         })
-        viols = floor_violations(pos, player.get("attributes") or {})
+        inherited_row = inherited[i] if i < len(inherited) else {}
+        inherited_attrs = (inherited_row or {}).get("attributes") or {}
+        row = rows_for_floors[i] if i < len(rows_for_floors) else {}
+        merged_core = _merge_row_core_attrs(row)
+        changed = {
+            key
+            for key in CORE_12
+            if key in merged_core
+            and _safe_int(merged_core[key]) != _safe_int(inherited_attrs.get(key))
+        }
+        if not changed:
+            continue
+        viols = [
+            (a, have, need)
+            for a, have, need in floor_violations(pos, player.get("attributes") or {})
+            if a in changed
+        ]
         if viols:
             meta = player.get("meta") or {}
             name = (
@@ -1423,35 +1446,6 @@ def collect_budget_attrs(
     return attrs_list
 
 
-def collect_roster_shape_fields(
-    franchise_players_data_collection: Any,
-    franchise_id: Any,
-    player_ids: Sequence[str],
-) -> dict[str, list[Any]]:
-    """Attribute + height + class inputs for roster_shape_at_creation (§10.3a)."""
-    if not player_ids:
-        return {"attrs": [], "heights": [], "class_years": []}
-    by_id: dict[str, dict[str, Any]] = {}
-    for fpd in franchise_players_data_collection.find(
-        {
-            "franchise_id": str(franchise_id),
-            "player_id": {"$in": [str(pid) for pid in player_ids]},
-        },
-        {"player_id": 1, "attributes": 1, "meta.height": 1, "meta.year": 1},
-    ):
-        by_id[str(fpd.get("player_id"))] = fpd
-    attrs: list[dict[str, Any]] = []
-    heights: list[int] = []
-    class_years: list[Any] = []
-    for pid in player_ids:
-        doc = by_id.get(str(pid)) or {}
-        meta = doc.get("meta") or {}
-        attrs.append(doc.get("attributes") or {})
-        heights.append(int(_safe_int(meta.get("height"), 0) or 0))
-        class_years.append(meta.get("year"))
-    return {"attrs": attrs, "heights": heights, "class_years": class_years}
-
-
 __all__ = [
     "MAX_ROSTER_SIZE",
     "AUTHORED_ROSTER_SIZE",
@@ -1465,7 +1459,6 @@ __all__ = [
     "clear_wizard_walk_ons_for_user",
     "class_year_for_export",
     "collect_budget_attrs",
-    "collect_roster_shape_fields",
     "compute_inherited_shape_budgets",
     "load_core_roster_rows_for_slot",
     "parse_import_class_year",

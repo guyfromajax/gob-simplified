@@ -276,8 +276,6 @@ def evaluate_mode_roster(
     return {
         "attribute_mode": mode,
         "online_eligible": eligible,
-        # Retained unread field: true when uncapped (ineligible by mode) or over pool.
-        "has_ever_exceeded_budget": (not eligible) or over_pool > 0 or per_player_over > 0,
         "roster_shape": shape,
         "team_total": team_total,
         "team_pool": pool,

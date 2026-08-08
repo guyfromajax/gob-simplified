@@ -90,16 +90,12 @@ FAMILY_TIMING_WEIGHTS = {
 # How strongly 'early'/'late' shift a family's share between rungs.
 FAMILY_TIMING_SHIFT = 0.40
 
-# ── Family curves (§6) — per-rung MULTIPLIER on each family's attribute weights ─
-# NOT absolute budget shares. A share formulation dumps a big fraction of the
-# budget into the mental family, but ND has zero RT weight everywhere and IQ is
-# near-zero off PG, so hitting the RT ladder then needs a runaway budget that
-# balloons ND. As weight multipliers they shift WHICH RT-relevant attributes
-# grow by age — physical early, mental late — while the budget stays sized to the
-# RT the growth actually carries. The "physical" family here is ST/AG only (HT/WT
-# have their own curves below). Physical is front-loaded but keeps a real JR/SR
-# tail so a LATE-physical bloomer grows strength as an upperclassman (bounded by
-# magnitude, not locked out by rung — the earlier rung-lock was rejected).
+# ── Family curves (§6) — VESTIGIAL under level-only offseason ──────────────────
+# Historical per-rung phys/skill/mental weight multipliers for the retired
+# additive-budget distribution path (`_distribution_fractions`). Live offseason
+# is a uniform rescale onto target_rt (plus HT/WT); these multipliers are unused.
+# Kept exported for call-site / restore compatibility — do not tune as live knobs.
+# (HT/WT still use their own curves below; physical family timing still gates HT.)
 FAMILY_CURVES = {
     "FR": {"physical": 3.0, "skill": 1.0, "mental": 0.30},
     "SO": {"physical": 2.0, "skill": 1.2, "mental": 0.60},
@@ -107,29 +103,23 @@ FAMILY_CURVES = {
     "SR": {"physical": 0.35, "skill": 1.2, "mental": 3.2},
 }
 
-# ── Offseason distribution blend (§7.2-7.3) ───────────────────────────────────
-# NOT a magnitude split — there is no offseason/in-season magnitude split; the
-# offseason delivers the whole ladder (modulated by coaching-quality f) and
-# in-season nets ~zero. This is purely the DISTRIBUTION blend it was fitted as:
-# the offseason budget lands 70% by the age-shaped family curve and 30% by the
-# position-shaped accumulator. (Renamed from OFFSEASON_SPLIT, which misread as a
-# magnitude split.)
-OFFSEASON_DISTRIBUTION_BLEND = 0.70
-# Non-core attributes grow at a low but never-zero rate (§7.1) — a floor on the
-# per-attribute weight used for within-family distribution.
-NON_CORE_GROWTH_MULTIPLIER = 0.06
+# ── Offseason distribution helpers (§7.2-7.3) — DEAD / vestigial ───────────────
+# Level-only offseason retired the additive-budget age/position distribution path
+# entirely. These symbols are NOT live knobs and were NOT "replaced by the
+# attractor" — the attractor (`OFFSEASON_ATTRACTOR_ALPHA`) is also retired.
+# `develop_one_offseason` ignores `_distribution_fractions` / the accumulator.
+# Kept so old imports and the unused helper body do not crash; do not re-enable
+# without restoring a distribution path and its calibration suite.
+OFFSEASON_DISTRIBUTION_BLEND = 0.70  # was 70/30 age-curve vs accumulator blend
+NON_CORE_GROWTH_MULTIPLIER = 0.06    # was floor on per-attr weight in that path
 
 # Part B: OFFSEASON_ATTRACTOR_ALPHA retired 2026-08-07 (framework §10.4). Shape is
 # owned by camp / in-season training + position floors; offseason is level-only
 # rescale. Symbol kept at 0.0 so old imports do not crash — must not be re-enabled
 # without restoring the blend path and the shape-dispersion suite gate.
 OFFSEASON_ATTRACTOR_ALPHA = 0.0
-# Intra-family concentration exponent on the position weights. 1.0 puts almost
-# all of a family's growth on its highest-weight attribute (which then must
-# exceed 100 to carry a high RT — an above-100 rate of ~30%). The DEFAULT policy
-# should grow broadly; concentrated spikes (§4.3's 140-150) are meant to come
-# from focused in-season play, not the default distribution. Fitted to the ~5.5%
-# above-100 target (§3.6.4).
+# Intra-family concentration exponent — only referenced by the retired
+# `_distribution_fractions` helper. Unused under level-only offseason.
 INTRA_FAMILY_GAMMA = 0.20
 
 # ── HT (§6) — its OWN declining curve, keyed by the PHYSICAL timing group ─────
@@ -301,10 +291,8 @@ def roll_growth_profile(ch_seed: int, rng: random.Random,
 def _compress_rt(raw: float) -> float:
     """Soft ceiling near RT_SOFT_CAP (§4.3). Near-identity below the cap — the
     fitted increments already bound elite+3-peak at 50·2.6 = 130, so this is a
-    guard against focused-play overshoot rather than a load-bearing curve; it
-    only bends above the cap. (§4.3's "reduced efficiency above 95" is expressed
-    as attribute inflation — RT still reaches its tier target, but it costs more
-    attribute points as RT climbs, which is what INTRA_FAMILY_GAMMA governs.)"""
+    guard on the level-only target rather than a load-bearing curve; it only
+    bends above the cap."""
     if raw <= RT_SOFT_CAP:
         return raw
     over = raw - RT_SOFT_CAP
@@ -312,7 +300,9 @@ def _compress_rt(raw: float) -> float:
 
 
 def _family_multipliers_for_player(rung: str, timing: dict) -> Dict[str, float]:
-    """Per-family weight multipliers at ``rung`` after the player's timing."""
+    """VESTIGIAL — only called from unused ``_distribution_fractions``.
+
+    Per-family weight multipliers at ``rung`` after the player's timing."""
     base = dict(FAMILY_CURVES[rung])
     early_half = RUNG_TRANSITIONS.index(rung) <= 1  # FR/SO are the "early" rungs
     out = {}
@@ -329,11 +319,13 @@ def _family_multipliers_for_player(rung: str, timing: dict) -> Dict[str, float]:
 
 def _distribution_fractions(position: str, rung: str, timing: dict,
                             accumulator: Optional[Dict[str, float]]) -> Dict[str, float]:
-    """Per-attribute growth fractions (sum 1): a 70/30 blend of the age-shaped
-    offseason distribution and the position-shaped in-season accumulator
-    (§7.2-7.3). Offseason weight for attribute a = floored_position_weight^GAMMA ×
-    family_multiplier(family, rung). Weight-dominated, so the budget stays sized
-    to the RT the growth carries and no zero-weight attribute balloons."""
+    """VESTIGIAL / UNUSED — retired with level-only offseason (framework §10.4).
+
+    Historical per-attribute growth fractions (sum 1): a 70/30 blend of the
+    age-shaped family curve and the position-shaped accumulator (§7.2-7.3).
+    ``develop_one_offseason`` no longer calls this; kept for restore / tests.
+    Do not treat ``OFFSEASON_DISTRIBUTION_BLEND`` / ``NON_CORE_GROWTH_MULTIPLIER``
+    as live tunables."""
     weights = POSITION_WEIGHTS[position]
 
     def floored(a):
@@ -355,22 +347,15 @@ def _distribution_fractions(position: str, rung: str, timing: dict,
     return {a: v / tot for a, v in blend.items()}
 
 
-# Efficiency floor: keeps the analytic budget bounded when a rung's distribution
-# leans on low-RT-weight attributes (e.g. mental IQ/ND late), so those cosmetic
-# attributes cannot balloon while chasing the RT target.
+# Efficiency floor for the retired analytic-budget helper below.
 _EFFICIENCY_FLOOR = 0.05
 
 
 def _analytic_budget(attrs: dict, height: float, position: str,
                      fractions: Dict[str, float], target_rt: float) -> float:
-    """First-order attribute-point pool B to raise RT to ``target_rt``.
-
-    RT = weighted_mean × height_fitness, so ΔRT ≈ B · (Σ wᵢ·fracᵢ) · fitness.
-    Sizing B this way keeps growth proportional to the RT the distribution can
-    actually carry — a distribution that leans on zero-weight attributes (ND) is
-    inefficient, but B is bounded by the efficiency floor rather than exploding
-    to force the target. RT then tracks the ladder to first order (verified in
-    the MC) rather than by construction."""
+    """VESTIGIAL / UNUSED — first-order attribute-point pool for the retired
+    additive-budget path. Level-only offseason rescales attrs directly onto
+    ``target_rt`` and does not call this."""
     current = compute_position_ratings({"attributes": attrs, "height": height})[position]
     d_rt = target_rt - current
     if d_rt <= 0:
@@ -563,11 +548,12 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
 
     When a non-None allocation is supplied it drives the QUALITY half only:
     scored against ``training_position`` (§9.2) → cumulative career
-    ``coaching_quality`` average → bounded modifier f on the offseason RT target.
-    The DISTRIBUTION half (§7.3 / ``_distribution_fractions`` /
-    ``OFFSEASON_DISTRIBUTION_BLEND``) is vestigial — retired with the shape
-    attractor; ``accumulator`` is still passed into ``develop_one_offseason``
-    but is unused there. Shape is camp / in-season + floors (§10).
+    ``coaching_quality`` average → bounded modifier f on the offseason RT target
+    (level, not shape). The DISTRIBUTION half (§7.3 / ``_distribution_fractions``
+    / ``OFFSEASON_DISTRIBUTION_BLEND``) is vestigial — level-only offseason
+    retired both that path and the α-attractor; ``accumulator`` is still passed
+    into ``develop_one_offseason`` but unused there. Shape is camp / in-season +
+    floors (§10).
 
     ``training_position`` is a persisted field defaulting to ``position_intent`` and
     forward-copied here. Returns {attributes, height, weight, position_ratings,
@@ -636,9 +622,9 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
 
     # --- DISTRIBUTION half of the accumulator (§7.3) -------------------------
     # Vestigial: still threaded into develop_one_offseason for call-signature
-    # compatibility, but unused there — level-only offseason + floors replaced
-    # both the budget-aim path and the shape attractor. Quality (above) is the
-    # only live use of season_allocation.
+    # compatibility, but unused there. Level-only rescale retired the budget-aim
+    # distribution path and the α-attractor; quality (above) is the only live
+    # use of season_allocation (feeds f → target_rt).
     distribution_accumulator = season_allocation or None
 
     player = {

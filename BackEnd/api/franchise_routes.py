@@ -4026,7 +4026,6 @@ def team_builder_apply(
     Franchise creation begins here — not when the wizard opens.
     """
     from BackEnd.constants.team_builder_budget import (
-        evaluate_mode_roster,
         normalize_attribute_mode,
         online_eligible_for_mode,
     )
@@ -4040,7 +4039,6 @@ def team_builder_apply(
         normalize_jersey_preset,
     )
     from BackEnd.utils.team_builder_league_context import compute_league_attr_context
-    from BackEnd.utils.team_builder_roster import collect_roster_shape_fields
 
     existing_franchises = db.franchises.count_documents({"user_id": user.get("user_id")})
     if existing_franchises >= MAX_FRANCHISES_PER_USER:
@@ -4108,7 +4106,6 @@ def team_builder_apply(
     online_eligible = online_eligible_for_mode(attribute_mode)
     league_ctx = compute_league_attr_context(db)
     team_pool = int(league_ctx.get("team_pool") or 0)
-    team_median = int(league_ctx.get("team_median") or 0)
 
     replaced_name = team_doc.get("name") or ""
     overlay = {
@@ -4275,42 +4272,7 @@ def team_builder_apply(
         )
         raise HTTPException(status_code=500, detail="Unable to apply roster changes")
 
-    # Mode metadata. Shape is post-top-up (universal under §4.5c).
-    budget_meta: dict[str, Any] = {
-        "attribute_mode": attribute_mode,
-        "online_eligible": online_eligible,
-        "hasEverExceededBudget": not online_eligible,
-        "roster_shape_at_creation": None,
-    }
-    try:
-        ftd = franchise_team_data_collection.find_one(
-            {"franchise_id": franchise_id, "team_id": replaced_oid},
-            {"players": 1},
-        ) or {}
-        pids = [str(pid) for pid in (ftd.get("players") or []) if pid]
-        shape_fields = collect_roster_shape_fields(
-            franchise_players_data_collection,
-            franchise_id,
-            pids,
-        )
-        if shape_fields["attrs"]:
-            evaluation = evaluate_mode_roster(
-                attribute_mode=attribute_mode,
-                player_attrs=shape_fields["attrs"],
-                team_pool=team_pool,
-                team_median=team_median,
-                heights=shape_fields["heights"],
-                class_years=shape_fields["class_years"],
-            )
-            budget_meta = {
-                "attribute_mode": evaluation["attribute_mode"],
-                "online_eligible": bool(evaluation["online_eligible"]),
-                "hasEverExceededBudget": bool(evaluation["has_ever_exceeded_budget"]),
-                "roster_shape_at_creation": evaluation["roster_shape"],
-            }
-    except Exception:
-        logger.exception("[TEAM-BUILDER] budget eval failed franchise_id=%s", franchise_id)
-
+    # Mode metadata — eligibility is mode-only; soft-budget echo fields retired.
     db.franchises.update_one(
         {"_id": franchise_id},
         {
@@ -4318,14 +4280,16 @@ def team_builder_apply(
                 "home_slot": home_slot,
                 TEAM_BUILDER_FIELD: overlay,
                 "user_team_id": custom_name,
-                "attribute_mode": budget_meta["attribute_mode"],
+                "attribute_mode": attribute_mode,
                 # Spec field only. Legacy `online_eligibility` is derived at read edges.
-                "online_eligible": budget_meta["online_eligible"],
-                "hasEverExceededBudget": budget_meta["hasEverExceededBudget"],
-                "roster_shape_at_creation": budget_meta["roster_shape_at_creation"],
+                "online_eligible": online_eligible,
             },
-            # Drop the v1 twin so the two names cannot drift in storage.
-            "$unset": {"online_eligibility": ""},
+            # Drop v1 twins / unread soft-budget leftovers so names cannot drift.
+            "$unset": {
+                "online_eligibility": "",
+                "hasEverExceededBudget": "",
+                "roster_shape_at_creation": "",
+            },
         },
     )
 
@@ -4379,17 +4343,16 @@ def team_builder_apply(
     except Exception:
         logger.exception("[TEAM-BUILDER] wizard walk-on draft cleanup failed")
 
-    eligible = bool(budget_meta["online_eligible"])
+    eligible = bool(online_eligible)
     return {
         "status": "ok",
         "franchise_id": str(franchise_id),
         "home_slot": home_slot,
         "team_builder": overlay,
-        "attribute_mode": budget_meta["attribute_mode"],
+        "attribute_mode": attribute_mode,
         "online_eligible": eligible,
         # Derived alias for v1 readers — never assigned independently.
         "online_eligibility": eligible,
-        "roster_shape_at_creation": budget_meta["roster_shape_at_creation"],
         "portrait_paint": {
             "painted": int(portrait_paint.get("painted") or 0),
             "already_existed": int(portrait_paint.get("already_existed") or 0),
@@ -8493,10 +8456,6 @@ def command_center_data(
                 response["online_eligibility"] = eligible  # derived alias
                 if "attribute_mode" in franchise_doc:
                     response["attribute_mode"] = franchise_doc.get("attribute_mode")
-                if "hasEverExceededBudget" in franchise_doc:
-                    response["hasEverExceededBudget"] = bool(
-                        franchise_doc.get("hasEverExceededBudget")
-                    )
             except Exception:
                 logger.exception("[FCC] team display resolve failed franchise_id=%s", franchise_id)
         # Rankings list for Rankings tab: all FTD teams with natl_rank and team name, sorted by natl_rank
