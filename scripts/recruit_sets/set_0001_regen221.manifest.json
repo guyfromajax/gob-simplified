@@ -1,0 +1,5088 @@
+{
+  "set_id": "set_0001",
+  "entries": [
+    {
+      "recruit_id": "f58341e4-2251-4cdf-b2ea-666343b00232",
+      "projected": {
+        "height": 77,
+        "weight": 213,
+        "ST": 56,
+        "AG": 40,
+        "RT": 49
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, flat cheeks, medium eyebrows, a wide-bridged nose, almond-shaped eyes, and well-defined lips. He has an uneven skin texture. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "79af3d30-37a4-4cdb-8dd6-fe88e0703760",
+      "projected": {
+        "height": 76,
+        "weight": 201,
+        "ST": 68,
+        "AG": 55,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a tall boxy hi-top fade",
+        "face_prompt": "He has a square face with a slightly weak jaw, full round cheeks, bushy eyebrows, a rounded nose, almond-shaped eyes, and wide lips. He has a cool undertone. He looks older and more mature than his age, with a defined adult face. He has mild facial asymmetry.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "c01262b2-0464-48b7-940d-212cc649c67a",
+      "projected": {
+        "height": 77,
+        "weight": 212,
+        "ST": 65,
+        "AG": 31,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "box braids",
+        "face_prompt": "He has a square face with a sharp angular jaw, full round cheeks, bushy eyebrows, a rounded nose, wide-set eyes, and full lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "9268d698-eebf-47c7-be7b-38949c1fd066",
+      "projected": {
+        "height": 75,
+        "weight": 199,
+        "ST": 63,
+        "AG": 57,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a high skin fade shaved to the base with a thick block of hair on top",
+        "face_prompt": "He has a triangular face with a strong wide jaw, hollow cheeks, thick eyebrows, a low-bridged nose, slightly hooded eyes, and medium lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face. He has faint under-eye shadows.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": "a red headband"
+      }
+    },
+    {
+      "recruit_id": "5511748a-b4ff-48e3-b932-8a3a7e2faf82",
+      "projected": {
+        "height": 81,
+        "weight": 247,
+        "ST": 45,
+        "AG": 27,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "curly black hair",
+        "face_prompt": "He has a square face with a chiseled defined jaw, high prominent cheekbones, bushy eyebrows, a broad nose, almond-shaped eyes, and medium lips. He has a cool undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "376b3812-7c28-485c-ac82-ccbf84e2438b",
+      "projected": {
+        "height": 73,
+        "weight": 189,
+        "ST": 95,
+        "AG": 90,
+        "RT": 62
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has a square face with a sharp angular jaw, flat cheeks, thick eyebrows, a rounded nose, wide-set eyes, and wide lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has a strong prominent brow.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": "a white headband"
+      }
+    },
+    {
+      "recruit_id": "c61b472d-9e88-475f-98e3-ac715352637c",
+      "projected": {
+        "height": 81,
+        "weight": 222,
+        "ST": 69,
+        "AG": 34,
+        "RT": 62
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, wide cheekbones, bushy eyebrows, a broad nose, wide-set eyes, and wide lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face. He has faint under-eye shadows.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "80eea3fb-00a3-456a-b5c9-65ecedea375e",
+      "projected": {
+        "height": 74,
+        "weight": 198,
+        "ST": 99,
+        "AG": 84,
+        "RT": 64
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, high prominent cheekbones, medium eyebrows, a wide-bridged nose, hooded eyes, and wide lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face. He has deep-set piercing eyes.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": "a black headband"
+      }
+    },
+    {
+      "recruit_id": "56caadaf-e892-4d42-a2bc-a50e2fd98d20",
+      "projected": {
+        "height": 77,
+        "weight": 222,
+        "ST": 89,
+        "AG": 51,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "shaggy light-brown hair",
+        "face_prompt": "He has a rectangular face with a chiseled defined jaw, wide cheekbones, high-arched eyebrows, a straight narrow nose, deep-set eyes, and medium lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "blue-tinted sports goggles"
+      }
+    },
+    {
+      "recruit_id": "75752496-9022-4ef2-824c-4018147a4adf",
+      "projected": {
+        "height": 80,
+        "weight": 229,
+        "ST": 45,
+        "AG": 40,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a crew cut",
+        "face_prompt": "He has a square face with a soft rounded jaw, sunken cheeks, thick eyebrows, a straight nose, almond-shaped eyes, and thin lips. He has a matte complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "7f6aabcc-1c80-4033-a150-529339ba05e4",
+      "projected": {
+        "height": 80,
+        "weight": 229,
+        "ST": 65,
+        "AG": 36,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a round face with a soft rounded jaw, chiseled cheekbones, thick eyebrows, a wide-bridged nose, almond-shaped eyes, and full lips. He has a few teenage blemishes. He looks about his age, with a typical late-teen face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "047e467b-399b-444b-a8aa-d5cfd4c3c3f2",
+      "projected": {
+        "height": 76,
+        "weight": 201,
+        "ST": 28,
+        "AG": 38,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "slicked-back dark hair",
+        "face_prompt": "He has an oval face with a broad square jaw, wide cheekbones, medium eyebrows, a straight narrow nose, round eyes, and medium lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has a faint scar through one eyebrow.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "4618bfbe-2c6d-4002-8431-fe6ec04ada7e",
+      "projected": {
+        "height": 78,
+        "weight": 225,
+        "ST": 96,
+        "AG": 53,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a middle-part curtain cut",
+        "face_prompt": "He has a diamond-shaped face with a chiseled defined jaw, hollow cheeks, medium eyebrows, a straight nose, monolid eyes, and thin lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face. He has a subtly crooked nose.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a thin gold chain necklace"
+      }
+    },
+    {
+      "recruit_id": "29bef4b2-570e-4d7d-bbc9-8cad3327ec0d",
+      "projected": {
+        "height": 80,
+        "weight": 230,
+        "ST": 60,
+        "AG": 60,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a side-swept dark-brown quiff with tapered sides",
+        "face_prompt": "He has a diamond-shaped face with a soft rounded jaw, chiseled cheekbones, thick eyebrows, a straight narrow nose, hooded eyes, and medium lips. He has a matte complexion. He looks young for his age, with soft boyish baby-faced features. He has a small beauty mark near the lip.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "01a2e950-e149-4a7a-9459-bbb976f15d01",
+      "projected": {
+        "height": 80,
+        "weight": 248,
+        "ST": 65,
+        "AG": 33,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has a square face with a strong wide jaw, high prominent cheekbones, bushy eyebrows, a small upturned nose, close-set eyes, and full lips. He has a matte complexion. He looks older and more mature than his age, with a defined adult face. He has a birthmark on one cheek.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "f6ba425b-f960-48bb-af54-bc1c730504ff",
+      "projected": {
+        "height": 80,
+        "weight": 233,
+        "ST": 99,
+        "AG": 95,
+        "RT": 90
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "short blonde hair",
+        "face_prompt": "He has a square face with a sharp angular jaw, wide cheekbones, high-arched eyebrows, a straight nose, almond-shaped eyes, and thin lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": "a gray headband"
+      }
+    },
+    {
+      "recruit_id": "3a86a184-afb3-498c-b9d7-70c67cbc3f90",
+      "projected": {
+        "height": 78,
+        "weight": 218,
+        "ST": 54,
+        "AG": 34,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "short straight black hair",
+        "face_prompt": "He has a heart-shaped face with a sharp angular jaw, full round cheeks, thin eyebrows, a straight nose, monolid eyes, and full lips. He has light freckling. He looks about his age, with a typical late-teen face.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "98850d67-b4ad-4f57-b4ed-18a130dafa71",
+      "projected": {
+        "height": 77,
+        "weight": 204,
+        "ST": 82,
+        "AG": 59,
+        "RT": 62
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a textured crop with fringe",
+        "face_prompt": "He has a long oval face with a chiseled defined jaw, full round cheeks, medium eyebrows, a straight nose, hooded eyes, and medium lips. He has a slight oily sheen. He looks young for his age, with soft boyish baby-faced features. He has mild facial asymmetry.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "55c2e717-3f3f-40db-9317-da45c1b8bc3a",
+      "projected": {
+        "height": 76,
+        "weight": 216,
+        "ST": 78,
+        "AG": 43,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a tall boxy hi-top fade",
+        "face_prompt": "He has an oval face with a slightly weak jaw, soft baby-faced cheeks, slightly unibrow-connected eyebrows, a straight nose, round eyes, and full lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face. He has slightly protruding ears.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "80ebb964-0daa-43ae-a1bb-f5fb639f20c8",
+      "projected": {
+        "height": 74,
+        "weight": 188,
+        "ST": 98,
+        "AG": 71,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, high prominent cheekbones, medium eyebrows, a straight nose, wide-set eyes, and well-defined lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face. He has a strong prominent brow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a thin black headband"
+      }
+    },
+    {
+      "recruit_id": "939e0288-633f-41c4-8986-ece97a00e91f",
+      "projected": {
+        "height": 79,
+        "weight": 209,
+        "ST": 56,
+        "AG": 29,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has an oblong face with a sharp angular jaw, flat cheeks, thin eyebrows, a broad nose, wide-set eyes, and wide lips. He has a cool undertone. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "9d0e4d27-d52b-419c-a49b-e57246f4e2bf",
+      "projected": {
+        "height": 81,
+        "weight": 240,
+        "ST": 80,
+        "AG": 69,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a high skin fade shaved to the base with a thick block of hair on top",
+        "face_prompt": "He has a heart-shaped face with a chiseled defined jaw, flat cheeks, slightly unibrow-connected eyebrows, a wide-bridged nose, wide-set eyes, and full lips. He has a slight oily sheen. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "d77a9d51-337c-48bc-b85e-c9fb5a10dcfe",
+      "projected": {
+        "height": 78,
+        "weight": 216,
+        "ST": 67,
+        "AG": 33,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a brown mullet, short on top and long in the back",
+        "face_prompt": "He has a square face with a strong wide jaw, sunken cheeks, medium eyebrows, a straight narrow nose, deep-set eyes, and thin lips. He has a warm undertone. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "c2396877-e343-4624-9a26-d077d5ec02a7",
+      "projected": {
+        "height": 83,
+        "weight": 247,
+        "ST": 44,
+        "AG": 38,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "curly black hair",
+        "face_prompt": "He has a long oval face with a soft rounded jaw, sunken cheeks, straight flat eyebrows, a straight narrow nose, almond-shaped eyes, and medium lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "7229363f-db3f-4c61-bada-4a171d90706b",
+      "projected": {
+        "height": 79,
+        "weight": 224,
+        "ST": 67,
+        "AG": 47,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "wavy black hair",
+        "face_prompt": "He has a round face with a sharp angular jaw, hollow cheeks, medium eyebrows, a straight nose, almond-shaped eyes, and well-defined lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "c998cb2c-9684-4a22-8e81-8d86ca98f087",
+      "projected": {
+        "height": 77,
+        "weight": 205,
+        "ST": 48,
+        "AG": 38,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, chiseled cheekbones, bushy eyebrows, a wide-bridged nose, almond-shaped eyes, and wide lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has deep-set piercing eyes.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "a65a9b1b-087c-4a21-889b-6cc2b28866ad",
+      "projected": {
+        "height": 80,
+        "weight": 238,
+        "ST": 60,
+        "AG": 35,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a side-swept dark-brown quiff with tapered sides",
+        "face_prompt": "He has a round face with a sharp angular jaw, flat cheeks, slightly unibrow-connected eyebrows, a straight narrow nose, deep-set eyes, and well-defined lips. He has a matte complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "f5c99e21-b28c-4171-8957-2aa857a0e6c0",
+      "projected": {
+        "height": 74,
+        "weight": 186,
+        "ST": 73,
+        "AG": 60,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "spiky brown hair",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, sunken cheeks, slightly unibrow-connected eyebrows, a straight nose, round eyes, and thin lips. He has a few teenage blemishes. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "307f3a0a-bbe5-4c98-892d-9fc9ca5e9526",
+      "projected": {
+        "height": 78,
+        "weight": 206,
+        "ST": 72,
+        "AG": 46,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "short neatly side-parted dark-brown hair",
+        "face_prompt": "He has a round face with a rounded fleshy jaw, wide cheekbones, thick eyebrows, a straight narrow nose, almond-shaped eyes, and medium lips. He has a warm undertone. He looks about his age, with a typical late-teen face. He has a small mole on one cheek.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "afedb686-9f4c-49a8-821b-238897f6a648",
+      "projected": {
+        "height": 79,
+        "weight": 229,
+        "ST": 75,
+        "AG": 58,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, hollow cheeks, thick eyebrows, a wide-bridged nose, round eyes, and wide lips. He has a warm undertone. He looks young for his age, with soft boyish baby-faced features. He has a faint scar through one eyebrow.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "a2549a8e-5830-46fc-8a5e-ac81c4a1a9d4",
+      "projected": {
+        "height": 80,
+        "weight": 239,
+        "ST": 51,
+        "AG": 27,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has an oval face with a chiseled defined jaw, full round cheeks, thin eyebrows, a broad nose, round eyes, and well-defined lips. He has a cool undertone. He looks older and more mature than his age, with a defined adult face. He has faint under-eye shadows.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "c7dec675-b67a-4bdb-9ed2-728001926a9b",
+      "projected": {
+        "height": 76,
+        "weight": 193,
+        "ST": 66,
+        "AG": 63,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a crew cut",
+        "face_prompt": "He has a long oval face with a soft rounded jaw, full round cheeks, high-arched eyebrows, an aquiline nose, deep-set eyes, and full lips. He has a warm undertone. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "4a405283-f423-4494-9a02-9ac182c2a27f",
+      "projected": {
+        "height": 82,
+        "weight": 229,
+        "ST": 39,
+        "AG": 20,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a blond mullet, short on top and long in the back",
+        "face_prompt": "He has a rectangular face with a rounded fleshy jaw, chiseled cheekbones, medium eyebrows, an aquiline nose, close-set eyes, and medium lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face. He has a strong prominent brow.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "ec5a4db6-97f4-40b8-a64a-41cced06ead5",
+      "projected": {
+        "height": 77,
+        "weight": 208,
+        "ST": 55,
+        "AG": 54,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has an oblong face with a sharp angular jaw, flat cheeks, straight flat eyebrows, a wide-bridged nose, round eyes, and wide lips. He has a warm undertone. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": "light stubble"
+      }
+    },
+    {
+      "recruit_id": "44d32fda-5bbf-43d8-928e-22300e6ebb51",
+      "projected": {
+        "height": 79,
+        "weight": 230,
+        "ST": 65,
+        "AG": 30,
+        "RT": 62
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a square face with a sharp angular jaw, flat cheeks, slightly unibrow-connected eyebrows, a rounded nose, round eyes, and wide lips. He has a warm undertone. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "0d26e8a0-0439-43a5-98fc-fcd1264aac08",
+      "projected": {
+        "height": 73,
+        "weight": 184,
+        "ST": 98,
+        "AG": 75,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a rounded medium afro",
+        "face_prompt": "He has a heart-shaped face with a sharp angular jaw, hollow cheeks, thick eyebrows, a straight nose, wide-set eyes, and full lips. He has light freckling. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "thick black-framed glasses"
+      }
+    },
+    {
+      "recruit_id": "7a966321-ec31-4088-98f0-3c1e31dd741e",
+      "projected": {
+        "height": 78,
+        "weight": 224,
+        "ST": 64,
+        "AG": 39,
+        "RT": 71
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "wavy brown hair",
+        "face_prompt": "He has a rectangular face with a strong wide jaw, flat cheeks, medium eyebrows, an aquiline nose, hooded eyes, and medium lips. He has light freckling. He looks about his age, with a typical late-teen face.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "5a41a309-abbe-40d1-98f9-943f17dfd00b",
+      "projected": {
+        "height": 74,
+        "weight": 181,
+        "ST": 84,
+        "AG": 99,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "wavy black hair",
+        "face_prompt": "He has an oblong face with a slightly weak jaw, chiseled cheekbones, bushy eyebrows, a straight nose, almond-shaped eyes, and medium lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "29f3b71e-aa6a-4c5b-9476-24943a567304",
+      "projected": {
+        "height": 76,
+        "weight": 227,
+        "ST": 93,
+        "AG": 55,
+        "RT": 67
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a high-top fade",
+        "face_prompt": "He has a heart-shaped face with a rounded fleshy jaw, flat cheeks, high-arched eyebrows, a rounded nose, wide-set eyes, and full lips. He has an uneven skin texture. He looks young for his age, with soft boyish baby-faced features. He has a small mole on one cheek.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": "a black-and-gray tattoo sleeve on his left arm"
+      }
+    },
+    {
+      "recruit_id": "88ba1a0b-f0dc-4837-a36d-bdaf4b101897",
+      "projected": {
+        "height": 78,
+        "weight": 222,
+        "ST": 44,
+        "AG": 32,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has an oblong face with a sharp angular jaw, high prominent cheekbones, bushy eyebrows, a broad nose, wide-set eyes, and well-defined lips. He has light freckling. He looks older and more mature than his age, with a defined adult face. He has faint under-eye shadows.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "light stubble"
+      }
+    },
+    {
+      "recruit_id": "7010bd01-e0f6-4ed7-a0aa-3c6f325f6789",
+      "projected": {
+        "height": 81,
+        "weight": 243,
+        "ST": 49,
+        "AG": 25,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "shaggy light-brown hair",
+        "face_prompt": "He has a rectangular face with a narrow tapered jaw, flat cheeks, medium eyebrows, a straight nose, almond-shaped eyes, and medium lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face. He has deep-set piercing eyes.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "c1de4dda-395f-4eea-9408-c06c586fb9f3",
+      "projected": {
+        "height": 80,
+        "weight": 236,
+        "ST": 66,
+        "AG": 49,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "slicked-back black hair",
+        "face_prompt": "He has a rectangular face with a soft rounded jaw, hollow cheeks, high-arched eyebrows, a straight nose, deep-set eyes, and well-defined lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "black-framed sports goggles"
+      }
+    },
+    {
+      "recruit_id": "6253bd6a-b736-4bc8-8bc3-d50f36fcf9a0",
+      "projected": {
+        "height": 80,
+        "weight": 225,
+        "ST": 42,
+        "AG": 25,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, chiseled cheekbones, straight flat eyebrows, a broad nose, round eyes, and full lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a thin gold chain necklace"
+      }
+    },
+    {
+      "recruit_id": "ccf70e78-b19f-47d5-a8cc-611bd4d7af45",
+      "projected": {
+        "height": 78,
+        "weight": 227,
+        "ST": 62,
+        "AG": 53,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a round face with a sharp angular jaw, full round cheeks, medium eyebrows, a broad nose, wide-set eyes, and wide lips. He has light freckling. He looks about his age, with a typical late-teen face. He has a faint scar through one eyebrow.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a red headband"
+      }
+    },
+    {
+      "recruit_id": "abcdc858-2676-446a-9731-ce47b8ed5701",
+      "projected": {
+        "height": 82,
+        "weight": 241,
+        "ST": 45,
+        "AG": 25,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a rectangular face with a strong wide jaw, wide cheekbones, straight flat eyebrows, a rounded nose, round eyes, and full lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face. He has a subtly crooked nose.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "ab14fe7e-4138-4db4-8c60-1c318464b8da",
+      "projected": {
+        "height": 75,
+        "weight": 208,
+        "ST": 73,
+        "AG": 51,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a mid fade with curls on top",
+        "face_prompt": "He has a heart-shaped face with a strong wide jaw, high prominent cheekbones, straight flat eyebrows, an aquiline nose, almond-shaped eyes, and full lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has deep-set piercing eyes.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a thick white terry-cloth headband, tortoiseshell-framed glasses"
+      }
+    },
+    {
+      "recruit_id": "4bcc7834-1a27-4316-acd5-c0730b6d0ead",
+      "projected": {
+        "height": 79,
+        "weight": 231,
+        "ST": 76,
+        "AG": 52,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a rounded medium afro",
+        "face_prompt": "He has a round face with a chiseled defined jaw, flat cheeks, slightly unibrow-connected eyebrows, a broad nose, hooded eyes, and full lips. He has an uneven skin texture. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "6df4ce7c-bf65-44df-a54c-adc95ec895a6",
+      "projected": {
+        "height": 80,
+        "weight": 230,
+        "ST": 49,
+        "AG": 56,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a rectangular face with a soft rounded jaw, hollow cheeks, slightly unibrow-connected eyebrows, a straight narrow nose, round eyes, and medium lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has a small mole on one cheek.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": "a thin black headband"
+      }
+    },
+    {
+      "recruit_id": "10ffe388-7f15-473f-9b9c-3de76089e56e",
+      "projected": {
+        "height": 73,
+        "weight": 190,
+        "ST": 84,
+        "AG": 45,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "messy medium brown hair",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, wide cheekbones, straight flat eyebrows, a small upturned nose, almond-shaped eyes, and thin lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "2b379e72-2f69-414d-b95a-221a16d83827",
+      "projected": {
+        "height": 79,
+        "weight": 232,
+        "ST": 60,
+        "AG": 46,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a round face with a narrow tapered jaw, hollow cheeks, thick eyebrows, a wide-bridged nose, round eyes, and wide lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a thin silver chain necklace"
+      }
+    },
+    {
+      "recruit_id": "d2521f2b-f4e4-471a-833a-87f960fe1aac",
+      "projected": {
+        "height": 79,
+        "weight": 209,
+        "ST": 53,
+        "AG": 37,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a rectangular face with a broad square jaw, flat cheeks, thick eyebrows, a straight narrow nose, close-set eyes, and thin lips. He has a cool undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a small gold hoop earring in his left ear"
+      }
+    },
+    {
+      "recruit_id": "14de2860-2616-42b6-90ff-72103b5aa63c",
+      "projected": {
+        "height": 75,
+        "weight": 196,
+        "ST": 75,
+        "AG": 71,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, chiseled cheekbones, bushy eyebrows, a broad nose, hooded eyes, and well-defined lips. He has a matte complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "e32fb40c-c21f-4fb8-81ab-4798927dba85",
+      "projected": {
+        "height": 80,
+        "weight": 229,
+        "ST": 49,
+        "AG": 22,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a square face with a sharp angular jaw, flat cheeks, bushy eyebrows, a broad nose, hooded eyes, and wide lips. He has a few teenage blemishes. He looks about his age, with a typical late-teen face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "b7129cd1-3459-4dce-893a-637d05edfab7",
+      "projected": {
+        "height": 75,
+        "weight": 207,
+        "ST": 67,
+        "AG": 69,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a high skin fade shaved to the base with a thick block of hair on top",
+        "face_prompt": "He has a round face with a strong wide jaw, high prominent cheekbones, medium eyebrows, a straight nose, almond-shaped eyes, and wide lips. He has a warm undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "00eafe09-a066-49df-b11b-2832a1f073e7",
+      "projected": {
+        "height": 78,
+        "weight": 231,
+        "ST": 56,
+        "AG": 31,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "messy medium brown hair",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, chiseled cheekbones, straight flat eyebrows, a straight narrow nose, round eyes, and medium lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "6caf06c5-e4b6-4ef8-a290-36c5f0e60032",
+      "projected": {
+        "height": 81,
+        "weight": 226,
+        "ST": 51,
+        "AG": 43,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a side-swept ginger quiff with tapered sides",
+        "face_prompt": "He has a long oval face with a soft rounded jaw, wide cheekbones, thin eyebrows, a straight nose, almond-shaped eyes, and full lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "a5b0c557-7287-4b3a-91b2-d7aa8f8b17d7",
+      "projected": {
+        "height": 74,
+        "weight": 192,
+        "ST": 99,
+        "AG": 58,
+        "RT": 75
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a rectangular face with a soft rounded jaw, hollow cheeks, medium eyebrows, a wide-bridged nose, almond-shaped eyes, and full lips. He has a cool undertone. He looks young for his age, with soft boyish baby-faced features. He has a small mole on one cheek.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a thin silver chain necklace"
+      }
+    },
+    {
+      "recruit_id": "d1d101eb-285b-414f-b3da-7c31a4ec81b6",
+      "projected": {
+        "height": 72,
+        "weight": 188,
+        "ST": 96,
+        "AG": 62,
+        "RT": 53
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "tousled sandy-blond hair",
+        "face_prompt": "He has a square face with a soft rounded jaw, soft baby-faced cheeks, medium eyebrows, a straight narrow nose, deep-set eyes, and well-defined lips. He has a slight oily sheen. He looks young for his age, with soft boyish baby-faced features. He has a strong prominent brow.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "59af85b8-3b60-4e8d-80fc-a474be55d502",
+      "projected": {
+        "height": 84,
+        "weight": 273,
+        "ST": 45,
+        "AG": 24,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "box braids",
+        "face_prompt": "He has an oval face with a chiseled defined jaw, flat cheeks, slightly unibrow-connected eyebrows, a broad nose, almond-shaped eyes, and wide lips. He has a cool undertone. He looks young for his age, with soft boyish baby-faced features. He has a strong prominent brow.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "d7bfc592-c400-4e76-ba94-77cb0481eebe",
+      "projected": {
+        "height": 82,
+        "weight": 233,
+        "ST": 99,
+        "AG": 85,
+        "RT": 89
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a blond mullet, short on top and long in the back",
+        "face_prompt": "He has a long oval face with a broad square jaw, wide cheekbones, high-arched eyebrows, a straight narrow nose, deep-set eyes, and medium lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "tribal tattoo sleeves on both arms"
+      }
+    },
+    {
+      "recruit_id": "ebd415a5-7cc4-4bc7-845f-8803af378c73",
+      "projected": {
+        "height": 74,
+        "weight": 196,
+        "ST": 84,
+        "AG": 56,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "slicked-back dark hair",
+        "face_prompt": "He has a square face with a broad square jaw, sunken cheeks, medium eyebrows, a straight narrow nose, hooded eyes, and medium lips. He has a cool undertone. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "29f95b8c-4f0c-48c2-bc42-85c417a790b0",
+      "projected": {
+        "height": 78,
+        "weight": 222,
+        "ST": 79,
+        "AG": 72,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a square face with a narrow tapered jaw, flat cheeks, thin eyebrows, a straight narrow nose, almond-shaped eyes, and full lips. He has a cool undertone. He looks about his age, with a typical late-teen face. He has a cleft chin.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "2e2bcd9a-bc0e-4a47-a82b-52582e158731",
+      "projected": {
+        "height": 79,
+        "weight": 228,
+        "ST": 67,
+        "AG": 35,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a rounded medium afro",
+        "face_prompt": "He has a rectangular face with a sharp angular jaw, full round cheeks, bushy eyebrows, a wide-bridged nose, round eyes, and wide lips. He has a cool undertone. He looks young for his age, with soft boyish baby-faced features. He has a small chin scar.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "amber-tinted sports goggles"
+      }
+    },
+    {
+      "recruit_id": "d7eac24a-cb2a-439c-8775-146a6d037559",
+      "projected": {
+        "height": 77,
+        "weight": 234,
+        "ST": 69,
+        "AG": 64,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "short blonde hair",
+        "face_prompt": "He has an oval face with a sharp angular jaw, hollow cheeks, medium eyebrows, a straight narrow nose, downturned eyes, and medium lips. He has a cool undertone. He looks older and more mature than his age, with a defined adult face. He has deep-set piercing eyes.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "30798443-b6a7-463c-8759-86435153fc1e",
+      "projected": {
+        "height": 78,
+        "weight": 223,
+        "ST": 53,
+        "AG": 26,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "curly black hair",
+        "face_prompt": "He has a round face with a soft rounded jaw, full round cheeks, straight flat eyebrows, an aquiline nose, round eyes, and full lips. He has light freckling. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a white headband"
+      }
+    },
+    {
+      "recruit_id": "7c83227e-f237-4622-9515-f1513875a6b8",
+      "projected": {
+        "height": 75,
+        "weight": 201,
+        "ST": 60,
+        "AG": 70,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "flat twists",
+        "face_prompt": "He has an oval face with a slightly weak jaw, full round cheeks, thick eyebrows, a rounded nose, hooded eyes, and full lips. He has a cool undertone. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "246c98bc-cd09-4923-99e6-77ecad1ea9ce",
+      "projected": {
+        "height": 77,
+        "weight": 215,
+        "ST": 58,
+        "AG": 35,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a two-block cut",
+        "face_prompt": "He has a square face with a narrow tapered jaw, flat cheeks, straight flat eyebrows, a small button nose, monolid eyes, and thin lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "62567c0c-8b9c-44ac-a56b-17ddc8c54e4b",
+      "projected": {
+        "height": 80,
+        "weight": 248,
+        "ST": 64,
+        "AG": 47,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a mid-length wavy mop",
+        "face_prompt": "He has a long oval face with a rounded fleshy jaw, full round cheeks, slightly unibrow-connected eyebrows, a straight nose, deep-set eyes, and medium lips. He has a warm undertone. He looks older and more mature than his age, with a defined adult face. He has deep-set piercing eyes.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "f658de1b-db48-4233-b826-ce66da0a6794",
+      "projected": {
+        "height": 80,
+        "weight": 216,
+        "ST": 52,
+        "AG": 30,
+        "RT": 62
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a side-swept dark-brown quiff with tapered sides",
+        "face_prompt": "He has a triangular face with a sharp angular jaw, high prominent cheekbones, thick eyebrows, a straight narrow nose, close-set eyes, and thin lips. He has a matte complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "93b46396-c04d-49ee-b858-dbd2d06680e1",
+      "projected": {
+        "height": 77,
+        "weight": 234,
+        "ST": 47,
+        "AG": 51,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a temple fade with short curls",
+        "face_prompt": "He has an oval face with a broad square jaw, chiseled cheekbones, thick eyebrows, a wide-bridged nose, deep-set eyes, and full lips. He has a warm undertone. He looks about his age, with a typical late-teen face. He has mild facial asymmetry.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "be343097-9231-42f9-8a72-272b14274bdb",
+      "projected": {
+        "height": 78,
+        "weight": 238,
+        "ST": 80,
+        "AG": 56,
+        "RT": 64
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "wavy blonde hair",
+        "face_prompt": "He has a round face with a broad square jaw, flat cheeks, slightly unibrow-connected eyebrows, a straight nose, round eyes, and full lips. He has a matte complexion. He looks about his age, with a typical late-teen face. He has a small chin scar.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "675baf89-f9ae-4626-97a9-8f819cb0c6df",
+      "projected": {
+        "height": 77,
+        "weight": 203,
+        "ST": 38,
+        "AG": 41,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a long oval face with a soft rounded jaw, flat cheeks, medium eyebrows, a straight nose, hooded eyes, and well-defined lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "9e29a074-6279-41e5-ad9b-0350b6d68f97",
+      "projected": {
+        "height": 78,
+        "weight": 216,
+        "ST": 65,
+        "AG": 37,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "an afro with a fade",
+        "face_prompt": "He has a square face with a narrow tapered jaw, soft baby-faced cheeks, medium eyebrows, a wide-bridged nose, almond-shaped eyes, and full lips. He has a slight oily sheen. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "a tribal tattoo sleeve on his left arm"
+      }
+    },
+    {
+      "recruit_id": "b1c4320e-bcca-489f-8a17-649f3cb3a6b7",
+      "projected": {
+        "height": 74,
+        "weight": 208,
+        "ST": 62,
+        "AG": 49,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a high-top fade",
+        "face_prompt": "He has a long oval face with a narrow tapered jaw, full round cheeks, straight flat eyebrows, a wide-bridged nose, deep-set eyes, and wide lips. He has a warm undertone. He looks older and more mature than his age, with a defined adult face. He has a slightly broken nose.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "ee69829a-2f2d-40ef-9f4c-807b13bdde9b",
+      "projected": {
+        "height": 80,
+        "weight": 221,
+        "ST": 55,
+        "AG": 31,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a modern undercut",
+        "face_prompt": "He has a long oval face with a slightly weak jaw, high prominent cheekbones, thick eyebrows, an aquiline nose, almond-shaped eyes, and medium lips. He has a slight oily sheen. He looks about his age, with a typical late-teen face. He has a slightly broken nose.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a black-and-gray tattoo sleeve on his left arm"
+      }
+    },
+    {
+      "recruit_id": "fca74b0e-2752-418a-b5f9-3bde7ed292f1",
+      "projected": {
+        "height": 80,
+        "weight": 237,
+        "ST": 71,
+        "AG": 53,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a mid fade with curls on top",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, chiseled cheekbones, straight flat eyebrows, a straight narrow nose, deep-set eyes, and well-defined lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "small hoop earrings in both ears"
+      }
+    },
+    {
+      "recruit_id": "efef5a43-3771-4949-ad8f-250d06c5fabd",
+      "projected": {
+        "height": 79,
+        "weight": 240,
+        "ST": 42,
+        "AG": 29,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a round face with a broad square jaw, chiseled cheekbones, thick eyebrows, a broad nose, round eyes, and well-defined lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face. He has mild facial asymmetry.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "amber-tinted sports goggles, tribal tattoo sleeves on both arms"
+      }
+    },
+    {
+      "recruit_id": "fcd03323-654c-470b-96fd-079d5dd1f803",
+      "projected": {
+        "height": 75,
+        "weight": 193,
+        "ST": 55,
+        "AG": 47,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, wide cheekbones, thick eyebrows, an aquiline nose, hooded eyes, and full lips. He has a slight oily sheen. He looks about his age, with a typical late-teen face. He has a strong prominent brow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "8eb5aafa-a51a-4c60-9a83-4b128004ffe2",
+      "projected": {
+        "height": 81,
+        "weight": 240,
+        "ST": 48,
+        "AG": 29,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a side-swept dark-brown quiff with tapered sides",
+        "face_prompt": "He has a heart-shaped face with a chiseled defined jaw, hollow cheeks, medium eyebrows, a straight nose, almond-shaped eyes, and thin lips. He has a matte complexion. He looks about his age, with a typical late-teen face. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "4e22e519-d1b3-4ffb-b4fd-16083e97d0f8",
+      "projected": {
+        "height": 79,
+        "weight": 239,
+        "ST": 55,
+        "AG": 53,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a textured crop with fringe",
+        "face_prompt": "He has a long oval face with a chiseled defined jaw, flat cheeks, straight flat eyebrows, a small upturned nose, close-set eyes, and medium lips. He has a cool undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": "a cream headband, a geometric tattoo sleeve on his left arm"
+      }
+    },
+    {
+      "recruit_id": "b8e3f938-a942-4dc7-9200-7d672abf8ae6",
+      "projected": {
+        "height": 79,
+        "weight": 211,
+        "ST": 35,
+        "AG": 21,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "short dreadlocks",
+        "face_prompt": "He has a heart-shaped face with a chiseled defined jaw, hollow cheeks, thick eyebrows, a rounded nose, wide-set eyes, and wide lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "dd955c59-9c86-49d1-9f67-c2005858c3cb",
+      "projected": {
+        "height": 72,
+        "weight": 186,
+        "ST": 99,
+        "AG": 72,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "shaggy light-brown hair",
+        "face_prompt": "He has a round face with a strong wide jaw, flat cheeks, bushy eyebrows, a straight nose, deep-set eyes, and well-defined lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "85290c14-e3f6-41a3-b69a-0c32b3ffd2f3",
+      "projected": {
+        "height": 82,
+        "weight": 241,
+        "ST": 54,
+        "AG": 23,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "tousled sandy-blond hair",
+        "face_prompt": "He has a square face with a soft rounded jaw, chiseled cheekbones, straight flat eyebrows, a small upturned nose, round eyes, and medium lips. He has light freckling. He looks about his age, with a typical late-teen face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "0f035970-a16a-45cb-a78a-8d5979d525bf",
+      "projected": {
+        "height": 73,
+        "weight": 184,
+        "ST": 71,
+        "AG": 85,
+        "RT": 58
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "slicked-back black hair",
+        "face_prompt": "He has an oval face with a sharp angular jaw, sunken cheeks, thin eyebrows, a straight nose, round eyes, and full lips. He has a matte complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": "a white headband"
+      }
+    },
+    {
+      "recruit_id": "d5aa979b-ab3e-4e8f-b5ec-ef29444aae0e",
+      "projected": {
+        "height": 78,
+        "weight": 223,
+        "ST": 60,
+        "AG": 31,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "shoulder-length dreadlocks",
+        "face_prompt": "He has an oblong face with a chiseled defined jaw, chiseled cheekbones, thick eyebrows, a wide-bridged nose, almond-shaped eyes, and well-defined lips. He has an uneven skin texture. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "a white headband"
+      }
+    },
+    {
+      "recruit_id": "860b8c2f-5bbe-4b04-81ce-b89e3cbb53e4",
+      "projected": {
+        "height": 76,
+        "weight": 216,
+        "ST": 84,
+        "AG": 56,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a mid fade with curls on top",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, full round cheeks, bushy eyebrows, an aquiline nose, almond-shaped eyes, and full lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a Polynesian tribal tattoo sleeve on his right arm"
+      }
+    },
+    {
+      "recruit_id": "8587cae9-7996-476b-a4c2-aa6a4c4ac4e1",
+      "projected": {
+        "height": 76,
+        "weight": 213,
+        "ST": 75,
+        "AG": 31,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a side-part with short sides",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, high prominent cheekbones, straight flat eyebrows, a small upturned nose, hooded eyes, and medium lips. He has a matte complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": "a white headband"
+      }
+    },
+    {
+      "recruit_id": "5f5ff13d-9707-4cc1-907d-915436546f10",
+      "projected": {
+        "height": 77,
+        "weight": 234,
+        "ST": 27,
+        "AG": 47,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "curly brown hair",
+        "face_prompt": "He has a rectangular face with a sharp angular jaw, soft baby-faced cheeks, thick eyebrows, an aquiline nose, round eyes, and thin lips. He has an uneven skin texture. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "db4684f4-2da5-4ce3-823b-f6a40259f896",
+      "projected": {
+        "height": 82,
+        "weight": 237,
+        "ST": 55,
+        "AG": 55,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "short dreadlocks",
+        "face_prompt": "He has a long oval face with a narrow tapered jaw, high prominent cheekbones, bushy eyebrows, a rounded nose, round eyes, and wide lips. He has a matte complexion. He looks about his age, with a typical late-teen face. He has a faint scar through one eyebrow.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a thin gold chain necklace"
+      }
+    },
+    {
+      "recruit_id": "4a444c35-1847-4b3b-9d61-d1a7700a34c4",
+      "projected": {
+        "height": 80,
+        "weight": 246,
+        "ST": 49,
+        "AG": 22,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "wavy black hair",
+        "face_prompt": "He has an oval face with a soft rounded jaw, chiseled cheekbones, bushy eyebrows, a straight narrow nose, round eyes, and full lips. He has a slight oily sheen. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "0a1395cc-80aa-4a0c-9c55-3b8868e36f2e",
+      "projected": {
+        "height": 72,
+        "weight": 190,
+        "ST": 32,
+        "AG": 72,
+        "RT": 57
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a taper fade with a line-up",
+        "face_prompt": "He has a square face with a chiseled defined jaw, full round cheeks, bushy eyebrows, a wide-bridged nose, hooded eyes, and well-defined lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has a small mole on one cheek.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "a cream headband"
+      }
+    },
+    {
+      "recruit_id": "0b5ab9d1-b96a-4b21-b19d-4a701e0dc1af",
+      "projected": {
+        "height": 76,
+        "weight": 207,
+        "ST": 51,
+        "AG": 48,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "slicked-back dark hair",
+        "face_prompt": "He has an oval face with a soft rounded jaw, wide cheekbones, straight flat eyebrows, a straight narrow nose, close-set eyes, and medium lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": "script-and-symbols tattoo sleeves on both arms"
+      }
+    },
+    {
+      "recruit_id": "9c736a43-b267-4ca5-a1c6-305f0d893fd1",
+      "projected": {
+        "height": 76,
+        "weight": 217,
+        "ST": 69,
+        "AG": 49,
+        "RT": 60
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, flat cheeks, medium eyebrows, a broad nose, almond-shaped eyes, and full lips. He has a few teenage blemishes. He looks about his age, with a typical late-teen face.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "3b049fab-700c-430b-a98a-e27d50f03b53",
+      "projected": {
+        "height": 72,
+        "weight": 174,
+        "ST": 44,
+        "AG": 99,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a diamond-shaped face with a narrow tapered jaw, high prominent cheekbones, thick eyebrows, a rounded nose, round eyes, and full lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "f9bbdf45-dc8a-4729-acdf-39a2cbdd336b",
+      "projected": {
+        "height": 76,
+        "weight": 213,
+        "ST": 67,
+        "AG": 47,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a blond mullet, short on top and long in the back",
+        "face_prompt": "He has an oblong face with a slightly weak jaw, wide cheekbones, bushy eyebrows, a straight narrow nose, almond-shaped eyes, and full lips. He has a few teenage blemishes. He looks young for his age, with soft boyish baby-faced features. He has a small chin scar.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "eddfa213-21ad-440f-a6c0-db06d1e09217",
+      "projected": {
+        "height": 78,
+        "weight": 223,
+        "ST": 49,
+        "AG": 37,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "tousled sandy-blond hair",
+        "face_prompt": "He has a round face with a soft rounded jaw, flat cheeks, medium eyebrows, a straight narrow nose, round eyes, and thin lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "24922507-5592-4585-b81a-0621074eb572",
+      "projected": {
+        "height": 68,
+        "weight": 172,
+        "ST": 42,
+        "AG": 99,
+        "RT": 82
+      },
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a square face with a soft rounded jaw, high prominent cheekbones, bushy eyebrows, a rounded nose, almond-shaped eyes, and full lips. He has an uneven skin texture. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "e352ef7a-e876-4f15-9a86-6a9e036db09a",
+      "projected": {
+        "height": 81,
+        "weight": 252,
+        "ST": 62,
+        "AG": 56,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a textured crop with fringe",
+        "face_prompt": "He has a heart-shaped face with a broad square jaw, flat cheeks, thick eyebrows, an aquiline nose, hooded eyes, and full lips. He has a warm undertone. He looks young for his age, with soft boyish baby-faced features. He has a small chin scar.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "d57ade7f-0e0d-4c9e-bf5e-ce294ff05bf9",
+      "projected": {
+        "height": 78,
+        "weight": 224,
+        "ST": 45,
+        "AG": 37,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "short brown hair",
+        "face_prompt": "He has a square face with a broad square jaw, chiseled cheekbones, medium eyebrows, a small upturned nose, round eyes, and medium lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a gray headband, clear sports goggles"
+      }
+    },
+    {
+      "recruit_id": "d7d5e781-073b-47c7-8e75-3041b8da2742",
+      "projected": {
+        "height": 73,
+        "weight": 200,
+        "ST": 31,
+        "AG": 55,
+        "RT": 51
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, hollow cheeks, slightly unibrow-connected eyebrows, a broad nose, almond-shaped eyes, and full lips. He has an uneven skin texture. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "0248a3bc-b58a-41ee-8ec3-9f82e62a0325",
+      "projected": {
+        "height": 75,
+        "weight": 202,
+        "ST": 69,
+        "AG": 58,
+        "RT": 56
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a side-swept dark-brown quiff with tapered sides",
+        "face_prompt": "He has a round face with a soft rounded jaw, full round cheeks, bushy eyebrows, a small upturned nose, round eyes, and thin lips. He has a warm undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "2531dc0d-30b9-4fd5-ac8d-3047cc339e3f",
+      "projected": {
+        "height": 78,
+        "weight": 208,
+        "ST": 55,
+        "AG": 38,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a high skin fade shaved to the base with a thick block of hair on top",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, flat cheeks, slightly unibrow-connected eyebrows, a broad nose, almond-shaped eyes, and full lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "592f2043-b55b-4e76-bfa3-12a2a8f52062",
+      "projected": {
+        "height": 72,
+        "weight": 184,
+        "ST": 46,
+        "AG": 78,
+        "RT": 66
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, high prominent cheekbones, thick eyebrows, a broad nose, hooded eyes, and well-defined lips. He has a matte complexion. He looks about his age, with a typical late-teen face. He has a birthmark on one cheek.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "cc726899-898d-4a73-bb3c-b3d7d081f1f6",
+      "projected": {
+        "height": 74,
+        "weight": 188,
+        "ST": 98,
+        "AG": 78,
+        "RT": 64
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a long oval face with a soft rounded jaw, flat cheeks, thick eyebrows, a rounded nose, wide-set eyes, and wide lips. He has a matte complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "33cb8b95-a5d4-4431-b06a-e741b40d198b",
+      "projected": {
+        "height": 81,
+        "weight": 222,
+        "ST": 40,
+        "AG": 23,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "short dreadlocks",
+        "face_prompt": "He has a rectangular face with a soft rounded jaw, sunken cheeks, bushy eyebrows, a rounded nose, almond-shaped eyes, and wide lips. He has a slight oily sheen. He looks about his age, with a typical late-teen face. He has a slightly broken nose.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": "light stubble"
+      }
+    },
+    {
+      "recruit_id": "c5042986-d9f4-48a2-a454-1d1ddf08003b",
+      "projected": {
+        "height": 76,
+        "weight": 214,
+        "ST": 42,
+        "AG": 71,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has an oval face with a sharp angular jaw, full round cheeks, medium eyebrows, a broad nose, hooded eyes, and full lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "621bed22-45d4-476d-b42b-4b3182b03c0b",
+      "projected": {
+        "height": 75,
+        "weight": 193,
+        "ST": 58,
+        "AG": 71,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a curly sponge top",
+        "face_prompt": "He has a rectangular face with a narrow tapered jaw, flat cheeks, thick eyebrows, a broad nose, round eyes, and full lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "7f57997d-3e8d-4ab9-a0c3-495e38d165b8",
+      "projected": {
+        "height": 82,
+        "weight": 229,
+        "ST": 58,
+        "AG": 31,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a taper fade with a line-up",
+        "face_prompt": "He has a triangular face with a soft rounded jaw, high prominent cheekbones, medium eyebrows, a broad nose, deep-set eyes, and wide lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has a small beauty mark near the lip.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "ec898517-f077-45ff-84a2-a8aa3d3d32f3",
+      "projected": {
+        "height": 70,
+        "weight": 166,
+        "ST": 49,
+        "AG": 76,
+        "RT": 64
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "waves with a low fade",
+        "face_prompt": "He has a square face with a rounded fleshy jaw, high prominent cheekbones, medium eyebrows, a broad nose, almond-shaped eyes, and full lips. He has a warm undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a cream headband"
+      }
+    },
+    {
+      "recruit_id": "4bde67d6-59e1-4197-9cf0-00fd5cacc6a5",
+      "projected": {
+        "height": 76,
+        "weight": 218,
+        "ST": 68,
+        "AG": 58,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has a round face with a sharp angular jaw, high prominent cheekbones, thick eyebrows, a straight nose, wide-set eyes, and wide lips. He has a cool undertone. He looks about his age, with a typical late-teen face. He has a small chin scar.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "21ecba6e-a7be-4c67-8e6b-16e5f1e1aca0",
+      "projected": {
+        "height": 77,
+        "weight": 215,
+        "ST": 52,
+        "AG": 34,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "box braids",
+        "face_prompt": "He has a square face with a narrow tapered jaw, chiseled cheekbones, thick eyebrows, a broad nose, deep-set eyes, and wide lips. He has a matte complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a thin silver chain necklace"
+      }
+    },
+    {
+      "recruit_id": "ac877cc1-9f71-4415-b55b-b46230d48233",
+      "projected": {
+        "height": 79,
+        "weight": 229,
+        "ST": 45,
+        "AG": 91,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a blond mullet, short on top and long in the back",
+        "face_prompt": "He has an oval face with a strong wide jaw, wide cheekbones, thick eyebrows, a small upturned nose, close-set eyes, and medium lips. He has a warm undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "9e62a66e-fabc-4787-9096-ff500b95437f",
+      "projected": {
+        "height": 74,
+        "weight": 204,
+        "ST": 99,
+        "AG": 99,
+        "RT": 91
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a two-block cut",
+        "face_prompt": "He has a round face with a broad square jaw, chiseled cheekbones, medium eyebrows, a small button nose, slightly hooded eyes, and medium lips. He has a matte complexion. He looks older and more mature than his age, with a defined adult face. He has a faint scar through one eyebrow.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "0913d09b-fec1-441a-a1e1-c022ad567965",
+      "projected": {
+        "height": 79,
+        "weight": 231,
+        "ST": 48,
+        "AG": 29,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a round face with a narrow tapered jaw, chiseled cheekbones, thin eyebrows, a rounded nose, almond-shaped eyes, and full lips. He has a slight oily sheen. He looks young for his age, with soft boyish baby-faced features. He has a slightly broken nose.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "cf68b615-c6de-4a23-80e0-ead1f16e1b62",
+      "projected": {
+        "height": 71,
+        "weight": 185,
+        "ST": 30,
+        "AG": 85,
+        "RT": 65
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a short black crop",
+        "face_prompt": "He has a heart-shaped face with a strong wide jaw, flat cheeks, medium eyebrows, an aquiline nose, round eyes, and full lips. He has a cool undertone. He looks about his age, with a typical late-teen face. He has a birthmark on one cheek.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "2ee01424-157b-4aae-b6e1-af7479e79ec2",
+      "projected": {
+        "height": 76,
+        "weight": 206,
+        "ST": 43,
+        "AG": 40,
+        "RT": 37
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "messy medium brown hair",
+        "face_prompt": "He has a square face with a narrow tapered jaw, full round cheeks, thick eyebrows, a small upturned nose, almond-shaped eyes, and well-defined lips. He has a warm undertone. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": "a black headband, clear-framed glasses"
+      }
+    },
+    {
+      "recruit_id": "d7ab3425-9ff8-4996-a710-79b1aa93c41b",
+      "projected": {
+        "height": 76,
+        "weight": 209,
+        "ST": 99,
+        "AG": 45,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a long oval face with a narrow tapered jaw, hollow cheeks, thick eyebrows, a broad nose, deep-set eyes, and full lips. He has light freckling. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": "tribal tattoo sleeves on both arms"
+      }
+    },
+    {
+      "recruit_id": "75bcc441-261d-4865-8486-9b50924a78d6",
+      "projected": {
+        "height": 72,
+        "weight": 188,
+        "ST": 25,
+        "AG": 64,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a temple fade with short curls",
+        "face_prompt": "He has a rectangular face with a sharp angular jaw, high prominent cheekbones, high-arched eyebrows, a rounded nose, wide-set eyes, and full lips. He has a warm undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "cfff6a73-4876-442b-becc-d10a5507a971",
+      "projected": {
+        "height": 76,
+        "weight": 220,
+        "ST": 80,
+        "AG": 53,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a round face with a strong wide jaw, flat cheeks, straight flat eyebrows, a rounded nose, wide-set eyes, and full lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features. He has a subtly crooked nose.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "07cc122e-9730-4c45-bb73-c179e9107a9b",
+      "projected": {
+        "height": 77,
+        "weight": 218,
+        "ST": 55,
+        "AG": 40,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a long oval face with a narrow tapered jaw, chiseled cheekbones, straight flat eyebrows, a broad nose, wide-set eyes, and wide lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a black headband"
+      }
+    },
+    {
+      "recruit_id": "b2f496dd-c9ea-493c-ade4-15b4d9e5ffb3",
+      "projected": {
+        "height": 72,
+        "weight": 192,
+        "ST": 34,
+        "AG": 72,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "short dreadlocks",
+        "face_prompt": "He has a diamond-shaped face with a sharp angular jaw, full round cheeks, bushy eyebrows, a wide-bridged nose, deep-set eyes, and well-defined lips. He has a few teenage blemishes. He looks young for his age, with soft boyish baby-faced features. He has thick expressive eyebrows.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "4e9f31a5-3d04-4f3d-b7ea-83f262b2594e",
+      "projected": {
+        "height": 74,
+        "weight": 186,
+        "ST": 95,
+        "AG": 52,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a long oval face with a strong wide jaw, sunken cheeks, straight flat eyebrows, a broad nose, wide-set eyes, and wide lips. He has a warm undertone. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "5773286a-d4d4-45da-a7d4-dd5bb7004c6c",
+      "projected": {
+        "height": 74,
+        "weight": 194,
+        "ST": 58,
+        "AG": 36,
+        "RT": 42
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a round face with a broad square jaw, wide cheekbones, slightly unibrow-connected eyebrows, a wide-bridged nose, round eyes, and full lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has thick expressive eyebrows.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": "a black headband"
+      }
+    },
+    {
+      "recruit_id": "36e6de08-2c62-4c44-b9f7-c8cdf9a38ba2",
+      "projected": {
+        "height": 77,
+        "weight": 224,
+        "ST": 25,
+        "AG": 55,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a black undercut",
+        "face_prompt": "He has a heart-shaped face with a strong wide jaw, high prominent cheekbones, medium eyebrows, a straight nose, almond-shaped eyes, and medium lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "fdbf432c-fedb-43d1-903a-1987dd1beaf2",
+      "projected": {
+        "height": 81,
+        "weight": 225,
+        "ST": 74,
+        "AG": 66,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "flat twists",
+        "face_prompt": "He has a heart-shaped face with a sharp angular jaw, flat cheeks, medium eyebrows, a rounded nose, round eyes, and full lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "tortoiseshell-framed glasses"
+      }
+    },
+    {
+      "recruit_id": "8711d7c1-0605-4a4e-ba8c-05ffa4f0ed69",
+      "projected": {
+        "height": 76,
+        "weight": 219,
+        "ST": 76,
+        "AG": 42,
+        "RT": 56
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has an oval face with a broad square jaw, wide cheekbones, high-arched eyebrows, a broad nose, wide-set eyes, and well-defined lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "57f541f2-cac1-4e9f-b264-8a11bafec008",
+      "projected": {
+        "height": 76,
+        "weight": 220,
+        "ST": 27,
+        "AG": 85,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a temple fade with short curls",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, full round cheeks, slightly unibrow-connected eyebrows, a broad nose, round eyes, and wide lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has a small chin scar.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "bd175006-6fd2-466b-8279-8ffc294bed05",
+      "projected": {
+        "height": 80,
+        "weight": 240,
+        "ST": 62,
+        "AG": 40,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "wavy brown hair",
+        "face_prompt": "He has an oval face with a strong wide jaw, flat cheeks, bushy eyebrows, a small upturned nose, downturned eyes, and medium lips. He has light freckling. He looks older and more mature than his age, with a defined adult face. He has slightly protruding ears.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "tribal tattoo sleeves on both arms"
+      }
+    },
+    {
+      "recruit_id": "cdb6f0a1-e3ed-47d8-80a5-d8bf2adc1fc2",
+      "projected": {
+        "height": 77,
+        "weight": 232,
+        "ST": 56,
+        "AG": 36,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a mini afro puff top",
+        "face_prompt": "He has a heart-shaped face with a slightly weak jaw, full round cheeks, medium eyebrows, a wide-bridged nose, deep-set eyes, and wide lips. He has a few teenage blemishes. He looks young for his age, with soft boyish baby-faced features. He has thick expressive eyebrows.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a red headband"
+      }
+    },
+    {
+      "recruit_id": "10bd7bfc-048f-432f-addd-43e6e3f50d7c",
+      "projected": {
+        "height": 72,
+        "weight": 185,
+        "ST": 35,
+        "AG": 82,
+        "RT": 66
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a curly sponge top",
+        "face_prompt": "He has a round face with a sharp angular jaw, hollow cheeks, thick eyebrows, a broad nose, almond-shaped eyes, and wide lips. He has a warm undertone. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "7a74deb5-8d21-4465-b785-cc58cc329167",
+      "projected": {
+        "height": 78,
+        "weight": 213,
+        "ST": 48,
+        "AG": 29,
+        "RT": 35
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "short neatly side-parted dark-brown hair",
+        "face_prompt": "He has an oval face with a slightly weak jaw, flat cheeks, medium eyebrows, a straight narrow nose, downturned eyes, and thin lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face. He has a cleft chin.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "e83b8c6f-9965-4c8c-ab1c-81fc6116ac22",
+      "projected": {
+        "height": 80,
+        "weight": 235,
+        "ST": 95,
+        "AG": 44,
+        "RT": 91
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "curly brown hair",
+        "face_prompt": "He has a long oval face with a rounded fleshy jaw, high prominent cheekbones, slightly unibrow-connected eyebrows, a straight nose, almond-shaped eyes, and medium lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face. He has a cleft chin.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "caf88f9b-9564-4b6f-8254-a3c10c6cfd92",
+      "projected": {
+        "height": 73,
+        "weight": 177,
+        "ST": 32,
+        "AG": 71,
+        "RT": 56
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a taper fade with a line-up",
+        "face_prompt": "He has a heart-shaped face with a strong wide jaw, high prominent cheekbones, medium eyebrows, a broad nose, wide-set eyes, and well-defined lips. He has a warm undertone. He looks about his age, with a typical late-teen face. He has deep-set piercing eyes.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "e4ba20a2-c443-4acb-8f87-eb80c3497bd9",
+      "projected": {
+        "height": 78,
+        "weight": 212,
+        "ST": 49,
+        "AG": 52,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a rounded medium afro",
+        "face_prompt": "He has a rectangular face with a chiseled defined jaw, high prominent cheekbones, bushy eyebrows, a wide-bridged nose, hooded eyes, and wide lips. He has a cool undertone. He looks young for his age, with soft boyish baby-faced features. He has mild facial asymmetry.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "e914622c-3814-44d5-a4fd-1b8ef62e6497",
+      "projected": {
+        "height": 76,
+        "weight": 213,
+        "ST": 80,
+        "AG": 34,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a taper fade with a line-up",
+        "face_prompt": "He has a diamond-shaped face with a narrow tapered jaw, high prominent cheekbones, medium eyebrows, a broad nose, almond-shaped eyes, and medium lips. He has a warm undertone. He looks about his age, with a typical late-teen face. He has a faint scar through one eyebrow.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "small diamond stud earrings in both ears"
+      }
+    },
+    {
+      "recruit_id": "83196776-3df4-428d-8a33-3a0dc34914dd",
+      "projected": {
+        "height": 77,
+        "weight": 211,
+        "ST": 21,
+        "AG": 48,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "short neatly side-parted dark-brown hair",
+        "face_prompt": "He has a rectangular face with a strong wide jaw, flat cheeks, thick eyebrows, a straight narrow nose, round eyes, and full lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "58907b81-8e3a-472d-bf8a-ae53db1a5784",
+      "projected": {
+        "height": 76,
+        "weight": 199,
+        "ST": 70,
+        "AG": 79,
+        "RT": 62
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "wavy black hair",
+        "face_prompt": "He has an oval face with a slightly weak jaw, wide cheekbones, bushy eyebrows, a straight nose, almond-shaped eyes, and medium lips. He has a matte complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "b505fe5d-9f31-4133-9c90-e8a65288a07a",
+      "projected": {
+        "height": 77,
+        "weight": 215,
+        "ST": 67,
+        "AG": 31,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "messy medium brown hair",
+        "face_prompt": "He has a round face with a slightly weak jaw, high prominent cheekbones, medium eyebrows, a straight nose, deep-set eyes, and full lips. He has a matte complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "661ea2dc-0979-44f8-a95c-cd3d2aa639ad",
+      "projected": {
+        "height": 74,
+        "weight": 202,
+        "ST": 38,
+        "AG": 89,
+        "RT": 65
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "box braids",
+        "face_prompt": "He has an oblong face with a narrow tapered jaw, flat cheeks, thick eyebrows, a broad nose, round eyes, and full lips. He has a cool undertone. He looks young for his age, with soft boyish baby-faced features. He has a small chin scar.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "d87e45c0-6294-45bc-904d-88a1d9008d3e",
+      "projected": {
+        "height": 78,
+        "weight": 230,
+        "ST": 44,
+        "AG": 33,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has an oval face with a soft rounded jaw, sunken cheeks, straight flat eyebrows, a broad nose, almond-shaped eyes, and well-defined lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "7e187a36-09e7-43ce-94c6-7b2adbbcf94f",
+      "projected": {
+        "height": 78,
+        "weight": 226,
+        "ST": 45,
+        "AG": 24,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "shoulder-length dreadlocks",
+        "face_prompt": "He has a long oval face with a strong wide jaw, sunken cheeks, thin eyebrows, a broad nose, almond-shaped eyes, and full lips. He has a cool undertone. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "22fbf033-d376-4ecd-a71f-bed41d5e2b1b",
+      "projected": {
+        "height": 75,
+        "weight": 194,
+        "ST": 27,
+        "AG": 69,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has an oblong face with a slightly weak jaw, full round cheeks, straight flat eyebrows, a rounded nose, almond-shaped eyes, and well-defined lips. He has an uneven skin texture. He looks young for his age, with soft boyish baby-faced features. He has a cleft chin.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a white headband"
+      }
+    },
+    {
+      "recruit_id": "16bef2ec-f3a2-4411-841d-4a74696a81a2",
+      "projected": {
+        "height": 72,
+        "weight": 180,
+        "ST": 75,
+        "AG": 58,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "short twists",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, wide cheekbones, medium eyebrows, a straight nose, round eyes, and wide lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "c23c7b32-0d7a-4694-88e5-cfcd4141fe58",
+      "projected": {
+        "height": 79,
+        "weight": 213,
+        "ST": 57,
+        "AG": 42,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a rectangular face with a strong wide jaw, flat cheeks, thick eyebrows, a wide-bridged nose, almond-shaped eyes, and full lips. He has a few teenage blemishes. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a thick white terry-cloth headband, thin black-framed glasses, light stubble"
+      }
+    },
+    {
+      "recruit_id": "909c8342-f3a4-46f8-b3e0-6569c75a46df",
+      "projected": {
+        "height": 75,
+        "weight": 195,
+        "ST": 27,
+        "AG": 67,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "flat twists",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, high prominent cheekbones, bushy eyebrows, a broad nose, round eyes, and full lips. He has a few teenage blemishes. He looks about his age, with a typical late-teen face.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "61b5fb6f-d62d-4d06-b033-1b35f66f32dc",
+      "projected": {
+        "height": 82,
+        "weight": 248,
+        "ST": 53,
+        "AG": 53,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a heart-shaped face with a strong wide jaw, full round cheeks, bushy eyebrows, a wide-bridged nose, almond-shaped eyes, and wide lips. He has a cool undertone. He looks about his age, with a typical late-teen face. He has a small beauty mark near the lip.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "45c28145-24f1-49ef-9f0d-346f2c56c7d8",
+      "projected": {
+        "height": 84,
+        "weight": 242,
+        "ST": 56,
+        "AG": 35,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a side-swept blond quiff with tapered sides",
+        "face_prompt": "He has a long oval face with a slightly weak jaw, soft baby-faced cheeks, medium eyebrows, a straight narrow nose, downturned eyes, and well-defined lips. He has a cool undertone. He looks older and more mature than his age, with a defined adult face. He has slightly protruding ears.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": "black-framed sports goggles"
+      }
+    },
+    {
+      "recruit_id": "c7e2d02c-d46e-4699-aa0f-a6c9aaa259c3",
+      "projected": {
+        "height": 75,
+        "weight": 211,
+        "ST": 29,
+        "AG": 75,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a taper fade with a line-up",
+        "face_prompt": "He has a triangular face with a soft rounded jaw, hollow cheeks, thick eyebrows, a rounded nose, round eyes, and wide lips. He has a warm undertone. He looks young for his age, with soft boyish baby-faced features. He has a faint scar through one eyebrow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "aa1c0544-db25-44d8-8272-b1eb1954df46",
+      "projected": {
+        "height": 73,
+        "weight": 194,
+        "ST": 75,
+        "AG": 67,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, flat cheeks, straight flat eyebrows, a rounded nose, wide-set eyes, and full lips. He has a cool undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a white headband"
+      }
+    },
+    {
+      "recruit_id": "3bb08b84-cff7-46e3-8f7d-c9e0af0acc7a",
+      "projected": {
+        "height": 74,
+        "weight": 188,
+        "ST": 75,
+        "AG": 45,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has an oval face with a chiseled defined jaw, flat cheeks, straight flat eyebrows, a broad nose, wide-set eyes, and well-defined lips. He has a few teenage blemishes. He looks young for his age, with soft boyish baby-faced features. He has thick expressive eyebrows.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "2acfa3f4-1beb-4693-89f3-89b4a51da919",
+      "projected": {
+        "height": 78,
+        "weight": 229,
+        "ST": 29,
+        "AG": 38,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "wavy black hair",
+        "face_prompt": "He has a round face with a sharp angular jaw, full round cheeks, thick eyebrows, a straight narrow nose, round eyes, and medium lips. He has a slight oily sheen. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "cb064738-e8cd-45d0-be7d-eb87678b5fdd",
+      "projected": {
+        "height": 79,
+        "weight": 228,
+        "ST": 68,
+        "AG": 49,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "curly black hair",
+        "face_prompt": "He has a round face with a sharp angular jaw, soft baby-faced cheeks, straight flat eyebrows, a straight narrow nose, round eyes, and well-defined lips. He has a few teenage blemishes. He looks about his age, with a typical late-teen face.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "fb916d84-f8f6-4e79-b5cf-a0bae732bbc6",
+      "projected": {
+        "height": 77,
+        "weight": 235,
+        "ST": 25,
+        "AG": 73,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a rounded medium afro",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, wide cheekbones, medium eyebrows, a broad nose, round eyes, and full lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features. He has mild facial asymmetry.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "647f472f-2bb1-4f20-986d-36f75c1df8cd",
+      "projected": {
+        "height": 72,
+        "weight": 180,
+        "ST": 27,
+        "AG": 84,
+        "RT": 56
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a diamond-shaped face with a chiseled defined jaw, high prominent cheekbones, high-arched eyebrows, a rounded nose, round eyes, and wide lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face. He has a strong prominent brow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "74dd9e84-8571-4c02-a9e0-e40310b64107",
+      "projected": {
+        "height": 70,
+        "weight": 174,
+        "ST": 38,
+        "AG": 48,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a side-swept blond quiff with tapered sides",
+        "face_prompt": "He has a heart-shaped face with a chiseled defined jaw, flat cheeks, thick eyebrows, a straight narrow nose, round eyes, and thin lips. He has a matte complexion. He looks about his age, with a typical late-teen face. He has a strong prominent brow.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": "thin black-framed glasses"
+      }
+    },
+    {
+      "recruit_id": "46c7bbaa-6112-4279-a6bc-0424274caea5",
+      "projected": {
+        "height": 69,
+        "weight": 166,
+        "ST": 24,
+        "AG": 80,
+        "RT": 58
+      },
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "cornrows",
+        "face_prompt": "He has an oval face with a sharp angular jaw, high prominent cheekbones, thick eyebrows, a wide-bridged nose, wide-set eyes, and full lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "8cf605bc-876f-4851-8606-2f2ab9ca5dbf",
+      "projected": {
+        "height": 81,
+        "weight": 238,
+        "ST": 46,
+        "AG": 20,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a round face with a narrow tapered jaw, full round cheeks, medium eyebrows, a rounded nose, deep-set eyes, and full lips. He has a few teenage blemishes. He looks about his age, with a typical late-teen face. He has a small mole on one cheek.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "b7ec5d4d-26ee-4411-b155-3659e5fe6c13",
+      "projected": {
+        "height": 75,
+        "weight": 208,
+        "ST": 99,
+        "AG": 35,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "wavy black hair",
+        "face_prompt": "He has a square face with a narrow tapered jaw, full round cheeks, medium eyebrows, an aquiline nose, deep-set eyes, and full lips. He has an uneven skin texture. He looks older and more mature than his age, with a defined adult face. He has mild facial asymmetry.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": "tribal tattoo sleeves on both arms"
+      }
+    },
+    {
+      "recruit_id": "76a5d9d0-2039-4c5d-9186-420e5694e53b",
+      "projected": {
+        "height": 77,
+        "weight": 219,
+        "ST": 49,
+        "AG": 68,
+        "RT": 90
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "cornrows",
+        "face_prompt": "He has a round face with a chiseled defined jaw, full round cheeks, medium eyebrows, a broad nose, almond-shaped eyes, and full lips. He has a matte complexion. He looks about his age, with a typical late-teen face. He has a subtly crooked nose.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "blue-tinted sports goggles"
+      }
+    },
+    {
+      "recruit_id": "d36e4870-b7e4-4415-8f7f-e4d98da987e5",
+      "projected": {
+        "height": 81,
+        "weight": 255,
+        "ST": 44,
+        "AG": 25,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "short blonde hair",
+        "face_prompt": "He has an oval face with a slightly weak jaw, flat cheeks, thick eyebrows, a straight nose, deep-set eyes, and full lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a thin silver chain necklace"
+      }
+    },
+    {
+      "recruit_id": "b874fa01-1ad3-4857-82df-d7f684f700d1",
+      "projected": {
+        "height": 75,
+        "weight": 206,
+        "ST": 35,
+        "AG": 46,
+        "RT": 62
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a short black crop",
+        "face_prompt": "He has an oval face with a soft rounded jaw, sunken cheeks, thick eyebrows, a straight narrow nose, deep-set eyes, and full lips. He has a matte complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "efb674b6-b345-416c-bc96-fa65332be955",
+      "projected": {
+        "height": 76,
+        "weight": 209,
+        "ST": 31,
+        "AG": 38,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "shoulder-length dreadlocks",
+        "face_prompt": "He has an oval face with a rounded fleshy jaw, high prominent cheekbones, thick eyebrows, a straight nose, wide-set eyes, and full lips. He has a matte complexion. He looks young for his age, with soft boyish baby-faced features. He has deep-set piercing eyes.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "14f0b1cb-5ff0-43c6-bc29-5e1ff4d2557c",
+      "projected": {
+        "height": 78,
+        "weight": 223,
+        "ST": 40,
+        "AG": 86,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a mini afro puff top",
+        "face_prompt": "He has a square face with a chiseled defined jaw, full round cheeks, slightly unibrow-connected eyebrows, a rounded nose, round eyes, and full lips. He has light freckling. He looks about his age, with a typical late-teen face. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "06e56c4d-c323-4107-9fb7-884eecd13520",
+      "projected": {
+        "height": 72,
+        "weight": 174,
+        "ST": 24,
+        "AG": 56,
+        "RT": 36
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a temple fade with short curls",
+        "face_prompt": "He has a round face with a broad square jaw, wide cheekbones, medium eyebrows, a broad nose, round eyes, and wide lips. He has an uneven skin texture. He looks older and more mature than his age, with a defined adult face. He has a subtly crooked nose.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "35b088db-9198-42f9-bc4d-c99afa54d125",
+      "projected": {
+        "height": 78,
+        "weight": 209,
+        "ST": 51,
+        "AG": 98,
+        "RT": 89
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a curly sponge top",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, hollow cheeks, thick eyebrows, a straight nose, deep-set eyes, and full lips. He has a warm undertone. He looks about his age, with a typical late-teen face. He has a small chin scar.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "18879347-fce0-4a17-a5a5-80460eec1ea0",
+      "projected": {
+        "height": 76,
+        "weight": 207,
+        "ST": 32,
+        "AG": 69,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "shoulder-length dreadlocks",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, full round cheeks, bushy eyebrows, a broad nose, round eyes, and wide lips. He has a slight oily sheen. He looks about his age, with a typical late-teen face. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "698360aa-63da-4297-917f-dba81837e3d3",
+      "projected": {
+        "height": 78,
+        "weight": 236,
+        "ST": 35,
+        "AG": 55,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a mid-length wavy mop",
+        "face_prompt": "He has an oval face with a sharp angular jaw, wide cheekbones, thick eyebrows, a straight narrow nose, close-set eyes, and thin lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features. He has a slightly broken nose.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "ec983767-d373-4a50-9771-7c53cd0a84b1",
+      "projected": {
+        "height": 69,
+        "weight": 156,
+        "ST": 36,
+        "AG": 41,
+        "RT": 62
+      },
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a side-swept blond quiff with tapered sides",
+        "face_prompt": "He has a rectangular face with a strong wide jaw, full round cheeks, bushy eyebrows, a straight nose, close-set eyes, and medium lips. He has a warm undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "40dc6ea7-11fc-43bf-ad86-4fb290b31a20",
+      "projected": {
+        "height": 79,
+        "weight": 215,
+        "ST": 76,
+        "AG": 68,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "curly black hair",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, wide cheekbones, thick eyebrows, a straight narrow nose, almond-shaped eyes, and medium lips. He has an uneven skin texture. He looks older and more mature than his age, with a defined adult face. He has deep-set piercing eyes.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "6186d422-bdf4-42fe-97ef-0639097babcf",
+      "projected": {
+        "height": 81,
+        "weight": 249,
+        "ST": 49,
+        "AG": 29,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has a round face with a soft rounded jaw, flat cheeks, bushy eyebrows, a broad nose, hooded eyes, and full lips. He has a few teenage blemishes. He looks about his age, with a typical late-teen face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "tribal tattoo sleeves on both arms"
+      }
+    },
+    {
+      "recruit_id": "53d622b8-e9c4-41a4-a99d-51f7f337289e",
+      "projected": {
+        "height": 77,
+        "weight": 198,
+        "ST": 39,
+        "AG": 85,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a temple fade with short curls",
+        "face_prompt": "He has a square face with a sharp angular jaw, full round cheeks, high-arched eyebrows, a broad nose, deep-set eyes, and full lips. He has a cool undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "75a5008f-5153-4ccd-ba96-bd58eb8c8232",
+      "projected": {
+        "height": 77,
+        "weight": 210,
+        "ST": 39,
+        "AG": 49,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a modern undercut",
+        "face_prompt": "He has a long oval face with a slightly weak jaw, high prominent cheekbones, slightly unibrow-connected eyebrows, a straight narrow nose, hooded eyes, and full lips. He has a slight oily sheen. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "4598c249-0359-4d83-8bb4-ec63d8f10063",
+      "projected": {
+        "height": 76,
+        "weight": 215,
+        "ST": 62,
+        "AG": 45,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a textured crop with fringe",
+        "face_prompt": "He has a round face with a sharp angular jaw, wide cheekbones, bushy eyebrows, a broad nose, hooded eyes, and medium lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has a slightly broken nose.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "8a17ca64-e6b1-444e-afc1-5170e3aa9afc",
+      "projected": {
+        "height": 77,
+        "weight": 217,
+        "ST": 64,
+        "AG": 73,
+        "RT": 64
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "short neatly side-parted dark-brown hair",
+        "face_prompt": "He has an oval face with a soft rounded jaw, full round cheeks, straight flat eyebrows, a straight narrow nose, close-set eyes, and full lips. He has a cool undertone. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "d9514839-7a6e-43bd-8733-058b788a14a0",
+      "projected": {
+        "height": 72,
+        "weight": 190,
+        "ST": 42,
+        "AG": 35,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has a square face with a soft rounded jaw, sunken cheeks, thick eyebrows, an aquiline nose, close-set eyes, and thin lips. He has a matte complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "57e029c3-7ff5-4155-9aa2-735300a4fd6d",
+      "projected": {
+        "height": 75,
+        "weight": 195,
+        "ST": 37,
+        "AG": 78,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has an oval face with a soft rounded jaw, wide cheekbones, medium eyebrows, a straight narrow nose, almond-shaped eyes, and full lips. He has a few teenage blemishes. He looks about his age, with a typical late-teen face. He has slightly protruding ears.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "8f82f91b-0f09-4dd6-b046-f7269aa54d8b",
+      "projected": {
+        "height": 78,
+        "weight": 236,
+        "ST": 69,
+        "AG": 31,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "short dreadlocks",
+        "face_prompt": "He has a diamond-shaped face with a narrow tapered jaw, flat cheeks, medium eyebrows, a rounded nose, almond-shaped eyes, and wide lips. He has a cool undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": "a thin silver chain necklace"
+      }
+    },
+    {
+      "recruit_id": "a26cdb55-d9cd-4ac7-b8af-299ce683d5a4",
+      "projected": {
+        "height": 76,
+        "weight": 199,
+        "ST": 32,
+        "AG": 71,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has an oblong face with a sharp angular jaw, hollow cheeks, thin eyebrows, a rounded nose, almond-shaped eyes, and well-defined lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face. He has deep-set piercing eyes.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "34f21e9f-069b-438b-b64f-c099812c71af",
+      "projected": {
+        "height": 78,
+        "weight": 232,
+        "ST": 25,
+        "AG": 56,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has a round face with a narrow tapered jaw, flat cheeks, medium eyebrows, a wide-bridged nose, round eyes, and full lips. He has a cool undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a thick white terry-cloth headband, a small black stud earring in his right ear"
+      }
+    },
+    {
+      "recruit_id": "d905a03c-2876-4e1c-b808-c71091c9a6e2",
+      "projected": {
+        "height": 76,
+        "weight": 192,
+        "ST": 45,
+        "AG": 93,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a square face with a strong wide jaw, high prominent cheekbones, thick eyebrows, a broad nose, wide-set eyes, and well-defined lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "b8af6b0a-9a53-452f-92af-5cbc1c60b8de",
+      "projected": {
+        "height": 77,
+        "weight": 198,
+        "ST": 26,
+        "AG": 74,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a mid fade with curls on top",
+        "face_prompt": "He has an oval face with a chiseled defined jaw, flat cheeks, thick eyebrows, a broad nose, almond-shaped eyes, and medium lips. He has a warm undertone. He looks about his age, with a typical late-teen face. He has a birthmark on one cheek.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a thin mustache"
+      }
+    },
+    {
+      "recruit_id": "3e1f844a-ae5f-40b5-a3fa-5ebe46014630",
+      "projected": {
+        "height": 72,
+        "weight": 168,
+        "ST": 82,
+        "AG": 89,
+        "RT": 67
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "tousled sandy-blond hair",
+        "face_prompt": "He has an oval face with a strong wide jaw, flat cheeks, bushy eyebrows, a straight narrow nose, almond-shaped eyes, and thin lips. He has a slight oily sheen. He looks about his age, with a typical late-teen face. He has mild facial asymmetry.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "f33c021f-e443-412c-8ed1-ec461736e2df",
+      "projected": {
+        "height": 78,
+        "weight": 206,
+        "ST": 36,
+        "AG": 72,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "shoulder-length dreadlocks",
+        "face_prompt": "He has an oblong face with a soft rounded jaw, full round cheeks, bushy eyebrows, a broad nose, round eyes, and full lips. He has a slight oily sheen. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a black headband, amber-tinted sports goggles"
+      }
+    },
+    {
+      "recruit_id": "164e400b-101b-42f0-84b1-f6914cce8ea8",
+      "projected": {
+        "height": 78,
+        "weight": 208,
+        "ST": 52,
+        "AG": 28,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a side-swept dark quiff with tapered sides",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, flat cheeks, thick eyebrows, a straight nose, almond-shaped eyes, and well-defined lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "8a2d46f2-efc8-4064-8b5a-53bc58ddfdb1",
+      "projected": {
+        "height": 76,
+        "weight": 198,
+        "ST": 46,
+        "AG": 58,
+        "RT": 72
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "short twists",
+        "face_prompt": "He has a diamond-shaped face with a chiseled defined jaw, chiseled cheekbones, bushy eyebrows, a wide-bridged nose, round eyes, and full lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face. He has a small mole on one cheek.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "61461c69-efe8-44bb-8087-8bafc6edadf6",
+      "projected": {
+        "height": 78,
+        "weight": 224,
+        "ST": 35,
+        "AG": 71,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a temple fade with short curls",
+        "face_prompt": "He has a rectangular face with a strong wide jaw, flat cheeks, thin eyebrows, a broad nose, almond-shaped eyes, and full lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has mild facial asymmetry.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "clear-framed glasses, a thin gold chain necklace"
+      }
+    },
+    {
+      "recruit_id": "6c886343-bd50-4a7e-b14e-092a83fa2637",
+      "projected": {
+        "height": 75,
+        "weight": 202,
+        "ST": 21,
+        "AG": 46,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a side-part with short sides",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, full round cheeks, bushy eyebrows, a straight narrow nose, almond-shaped eyes, and thin lips. He has a matte complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "a4a12bf0-23e0-4dca-96ce-d1bf01f8a1c0",
+      "projected": {
+        "height": 74,
+        "weight": 190,
+        "ST": 80,
+        "AG": 60,
+        "RT": 49
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a rectangular face with a rounded fleshy jaw, hollow cheeks, slightly unibrow-connected eyebrows, a rounded nose, wide-set eyes, and full lips. He has light freckling. He looks about his age, with a typical late-teen face. He has a small chin scar.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "52d6f268-a264-4238-a99c-651b119ced00",
+      "projected": {
+        "height": 72,
+        "weight": 186,
+        "ST": 25,
+        "AG": 35,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a mini afro puff top",
+        "face_prompt": "He has a heart-shaped face with a strong wide jaw, flat cheeks, thick eyebrows, a broad nose, almond-shaped eyes, and well-defined lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "326dd8ae-2205-4fee-b016-089d1c7a386f",
+      "projected": {
+        "height": 78,
+        "weight": 228,
+        "ST": 95,
+        "AG": 55,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "shoulder-length dreadlocks",
+        "face_prompt": "He has an oval face with a sharp angular jaw, flat cheeks, thin eyebrows, a broad nose, almond-shaped eyes, and wide lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has slightly protruding ears.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a thin gold chain necklace"
+      }
+    },
+    {
+      "recruit_id": "6133fdd6-7c8c-4656-9045-e4149bc78e81",
+      "projected": {
+        "height": 83,
+        "weight": 256,
+        "ST": 44,
+        "AG": 20,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a textured fringe crop",
+        "face_prompt": "He has an oval face with a soft rounded jaw, full round cheeks, straight flat eyebrows, a small button nose, monolid eyes, and medium lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features. He has mild facial asymmetry.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "clear sports goggles"
+      }
+    },
+    {
+      "recruit_id": "6c372f67-4475-4e1e-a9f0-0fe29ec39668",
+      "projected": {
+        "height": 74,
+        "weight": 184,
+        "ST": 35,
+        "AG": 42,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a long oval face with a broad square jaw, high prominent cheekbones, medium eyebrows, a rounded nose, almond-shaped eyes, and wide lips. He has an uneven skin texture. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "f2611c50-b447-4a07-890a-7110934095eb",
+      "projected": {
+        "height": 79,
+        "weight": 227,
+        "ST": 44,
+        "AG": 47,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a side-part with short sides",
+        "face_prompt": "He has a square face with a sharp angular jaw, full round cheeks, bushy eyebrows, a straight narrow nose, deep-set eyes, and thin lips. He has a warm undertone. He looks about his age, with a typical late-teen face. He has a small beauty mark near the lip.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "08e197fd-03c3-4d07-bc0d-1becba8b2ebb",
+      "projected": {
+        "height": 77,
+        "weight": 233,
+        "ST": 64,
+        "AG": 42,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a taper fade with a line-up",
+        "face_prompt": "He has a heart-shaped face with a sharp angular jaw, hollow cheeks, straight flat eyebrows, a broad nose, almond-shaped eyes, and full lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "84e8bf1a-ed78-40f6-86d1-c4913924e34d",
+      "projected": {
+        "height": 77,
+        "weight": 226,
+        "ST": 22,
+        "AG": 56,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a round face with a broad square jaw, full round cheeks, straight flat eyebrows, a straight nose, almond-shaped eyes, and medium lips. He has a warm undertone. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "276c7855-5198-4bca-b4d5-8df4e0a0b868",
+      "projected": {
+        "height": 75,
+        "weight": 212,
+        "ST": 42,
+        "AG": 96,
+        "RT": 76
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "cornrows",
+        "face_prompt": "He has a square face with a sharp angular jaw, sunken cheeks, straight flat eyebrows, a broad nose, wide-set eyes, and wide lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "9d60b405-91f1-4482-8be7-fc5ecf9dc027",
+      "projected": {
+        "height": 75,
+        "weight": 205,
+        "ST": 30,
+        "AG": 66,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "short light-brown hair",
+        "face_prompt": "He has a square face with a soft rounded jaw, soft baby-faced cheeks, high-arched eyebrows, an aquiline nose, downturned eyes, and full lips. He has a warm undertone. He looks older and more mature than his age, with a defined adult face. He has slightly protruding ears.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "6d333b1f-1796-4c75-8668-ce1e54aa9c35",
+      "projected": {
+        "height": 75,
+        "weight": 207,
+        "ST": 31,
+        "AG": 76,
+        "RT": 64
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has an oval face with a rounded fleshy jaw, high prominent cheekbones, medium eyebrows, a rounded nose, round eyes, and well-defined lips. He has a few teenage blemishes. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a thick white terry-cloth headband"
+      }
+    },
+    {
+      "recruit_id": "090ceed2-04d7-442b-8d05-6a5a62082b6f",
+      "projected": {
+        "height": 73,
+        "weight": 190,
+        "ST": 35,
+        "AG": 36,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "short brown hair",
+        "face_prompt": "He has an oval face with a chiseled defined jaw, hollow cheeks, thick eyebrows, a small upturned nose, hooded eyes, and thin lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face. He has a birthmark on one cheek.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "857d2c0b-3758-4e8d-8ac7-7dfe7025df8a",
+      "projected": {
+        "height": 76,
+        "weight": 224,
+        "ST": 87,
+        "AG": 45,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a high-top fade",
+        "face_prompt": "He has a heart-shaped face with a sharp angular jaw, full round cheeks, slightly unibrow-connected eyebrows, a broad nose, almond-shaped eyes, and well-defined lips. He has a warm undertone. He looks about his age, with a typical late-teen face. He has a cleft chin.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "61610075-f359-4d34-8c15-4f939fa503e1",
+      "projected": {
+        "height": 74,
+        "weight": 194,
+        "ST": 42,
+        "AG": 99,
+        "RT": 64
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a long oval face with a strong wide jaw, hollow cheeks, thick eyebrows, a wide-bridged nose, deep-set eyes, and full lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "thick black-framed glasses, a thin gold chain necklace"
+      }
+    },
+    {
+      "recruit_id": "f80ea02c-6c83-46d4-8f60-f3017f96c651",
+      "projected": {
+        "height": 77,
+        "weight": 220,
+        "ST": 20,
+        "AG": 24,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "cornrows",
+        "face_prompt": "He has a round face with a broad square jaw, high prominent cheekbones, straight flat eyebrows, a straight nose, almond-shaped eyes, and full lips. He has a few teenage blemishes. He looks older and more mature than his age, with a defined adult face. He has a strong prominent brow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "4d548c56-dcc9-4861-a3e8-96d0a7f45ae1",
+      "projected": {
+        "height": 75,
+        "weight": 195,
+        "ST": 25,
+        "AG": 62,
+        "RT": 62
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "wavy blonde hair",
+        "face_prompt": "He has an oblong face with a soft rounded jaw, chiseled cheekbones, thick eyebrows, a straight narrow nose, deep-set eyes, and medium lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "91db3a48-1e0d-43b4-af38-3107d2f7c187",
+      "projected": {
+        "height": 78,
+        "weight": 230,
+        "ST": 71,
+        "AG": 31,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a mini afro puff top",
+        "face_prompt": "He has a rectangular face with a narrow tapered jaw, flat cheeks, thick eyebrows, a rounded nose, almond-shaped eyes, and wide lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "bb9f4019-e43f-410d-b5f9-84b434f1c151",
+      "projected": {
+        "height": 75,
+        "weight": 193,
+        "ST": 27,
+        "AG": 31,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a side-swept blond quiff with tapered sides",
+        "face_prompt": "He has a triangular face with a rounded fleshy jaw, full round cheeks, medium eyebrows, a straight narrow nose, almond-shaped eyes, and thin lips. He has an uneven skin texture. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "335225ff-0bfb-4792-b6da-19c9b778c13e",
+      "projected": {
+        "height": 76,
+        "weight": 211,
+        "ST": 31,
+        "AG": 77,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a long oval face with a rounded fleshy jaw, sunken cheeks, thick eyebrows, a wide-bridged nose, almond-shaped eyes, and full lips. He has a slight oily sheen. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "11a0294e-7070-4ff9-ba33-b71dee8f396f",
+      "projected": {
+        "height": 74,
+        "weight": 202,
+        "ST": 31,
+        "AG": 65,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "shoulder-length dreadlocks",
+        "face_prompt": "He has a square face with a strong wide jaw, sunken cheeks, medium eyebrows, a straight nose, wide-set eyes, and wide lips. He has light freckling. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "52b089ef-c03b-439b-ad7f-e7028175b340",
+      "projected": {
+        "height": 75,
+        "weight": 194,
+        "ST": 91,
+        "AG": 36,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "wavy brown hair",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, wide cheekbones, bushy eyebrows, a straight nose, hooded eyes, and medium lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "d4495c7b-6ef4-471e-a3b9-fa5369e3b631",
+      "projected": {
+        "height": 76,
+        "weight": 217,
+        "ST": 99,
+        "AG": 62,
+        "RT": 64
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a tall boxy hi-top fade",
+        "face_prompt": "He has a rectangular face with a soft rounded jaw, wide cheekbones, straight flat eyebrows, a rounded nose, deep-set eyes, and well-defined lips. He has a smooth clear complexion. He looks about his age, with a typical late-teen face. He has a faint scar through one eyebrow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "black-framed sports goggles"
+      }
+    },
+    {
+      "recruit_id": "ae073bcb-3c34-4ae9-85fa-5e38200e2f42",
+      "projected": {
+        "height": 77,
+        "weight": 222,
+        "ST": 38,
+        "AG": 82,
+        "RT": 73
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a side-swept dark quiff with tapered sides",
+        "face_prompt": "He has an oval face with a chiseled defined jaw, sunken cheeks, straight flat eyebrows, a straight nose, almond-shaped eyes, and medium lips. He has a few teenage blemishes. He looks about his age, with a typical late-teen face.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "ba1f3d97-a738-4a97-b342-3eed2047691c",
+      "projected": {
+        "height": 75,
+        "weight": 191,
+        "ST": 22,
+        "AG": 40,
+        "RT": 54
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a high skin fade shaved to the base with a thick block of hair on top",
+        "face_prompt": "He has a rectangular face with a narrow tapered jaw, high prominent cheekbones, straight flat eyebrows, a wide-bridged nose, round eyes, and full lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "8135b877-fc28-4f4a-8800-697c1d11a554",
+      "projected": {
+        "height": 78,
+        "weight": 221,
+        "ST": 38,
+        "AG": 99,
+        "RT": 91
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a modern undercut",
+        "face_prompt": "He has a round face with a narrow tapered jaw, full round cheeks, slightly unibrow-connected eyebrows, an aquiline nose, close-set eyes, and well-defined lips. He has a cool undertone. He looks about his age, with a typical late-teen face.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "a1bcfb1e-6683-4ce0-926d-0f29d44ec439",
+      "projected": {
+        "height": 75,
+        "weight": 191,
+        "ST": 22,
+        "AG": 55,
+        "RT": 49
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a curly sponge top",
+        "face_prompt": "He has an oblong face with a narrow tapered jaw, flat cheeks, medium eyebrows, a rounded nose, round eyes, and wide lips. He has a slight oily sheen. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "cca4fe08-6c3b-47d8-be23-69a74b0b8085",
+      "projected": {
+        "height": 74,
+        "weight": 182,
+        "ST": 86,
+        "AG": 28,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a modern mullet with faded sides",
+        "face_prompt": "He has a square face with a soft rounded jaw, hollow cheeks, thick eyebrows, a straight narrow nose, deep-set eyes, and medium lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "c2b0df6e-12d8-45bb-8b31-79c905025940",
+      "projected": {
+        "height": 77,
+        "weight": 215,
+        "ST": 27,
+        "AG": 62,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a high skin fade shaved to the base with a thick block of hair on top",
+        "face_prompt": "He has a square face with a broad square jaw, soft baby-faced cheeks, slightly unibrow-connected eyebrows, a rounded nose, almond-shaped eyes, and wide lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "7c8dbe4b-80e0-4e18-a76d-66bbeffd4ec8",
+      "projected": {
+        "height": 75,
+        "weight": 199,
+        "ST": 45,
+        "AG": 95,
+        "RT": 75
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "box braids",
+        "face_prompt": "He has an oval face with a strong wide jaw, wide cheekbones, slightly unibrow-connected eyebrows, a broad nose, wide-set eyes, and full lips. He has a warm undertone. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "6a821085-1178-4e46-a982-a54c315f50dc",
+      "projected": {
+        "height": 78,
+        "weight": 237,
+        "ST": 60,
+        "AG": 29,
+        "RT": 55
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a black undercut",
+        "face_prompt": "He has a round face with a chiseled defined jaw, wide cheekbones, bushy eyebrows, a low-bridged nose, monolid eyes, and medium lips. He has a smooth clear complexion. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": "small cross earrings in both ears"
+      }
+    },
+    {
+      "recruit_id": "0667a60e-cb5a-4c72-9b88-baaed7d4cc9b",
+      "projected": {
+        "height": 76,
+        "weight": 195,
+        "ST": 54,
+        "AG": 28,
+        "RT": 35
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a rectangular face with a chiseled defined jaw, high prominent cheekbones, medium eyebrows, a broad nose, almond-shaped eyes, and well-defined lips. He has a smooth clear complexion. He looks older and more mature than his age, with a defined adult face.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      }
+    },
+    {
+      "recruit_id": "aa410806-b16a-4d6f-933c-ead0f5b6871e",
+      "projected": {
+        "height": 76,
+        "weight": 219,
+        "ST": 20,
+        "AG": 56,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a rounded medium afro",
+        "face_prompt": "He has a rectangular face with a soft rounded jaw, wide cheekbones, thick eyebrows, a wide-bridged nose, almond-shaped eyes, and full lips. He has a few teenage blemishes. He looks young for his age, with soft boyish baby-faced features.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": "a black headband"
+      }
+    },
+    {
+      "recruit_id": "97cbdd0d-025e-451b-9544-7acad48aead7",
+      "projected": {
+        "height": 74,
+        "weight": 184,
+        "ST": 27,
+        "AG": 79,
+        "RT": 63
+      },
+      "build": {
+        "frame": "Lean",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a round face with a broad square jaw, wide cheekbones, high-arched eyebrows, a straight nose, almond-shaped eyes, and wide lips. He has an uneven skin texture. He looks about his age, with a typical late-teen face.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": "a thin silver chain necklace"
+      }
+    },
+    {
+      "recruit_id": "0f8b54c7-1839-4821-8c90-277e9a2e3b76",
+      "projected": {
+        "height": 77,
+        "weight": 217,
+        "ST": 25,
+        "AG": 49,
+        "RT": 45
+      },
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a square face with a strong wide jaw, wide cheekbones, slightly unibrow-connected eyebrows, a straight nose, wide-set eyes, and wide lips. He has a few teenage blemishes. He looks about his age, with a typical late-teen face.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      }
+    }
+  ]
+}
