@@ -10,7 +10,7 @@ for the full architecture; this file is the exact field-level spec the **baker**
 
 | Sequence | Purpose | Who draws from it | Current |
 |---|---|---|---|
-| **`recruit_set_NNNN`** | Pre-built recruit classes (stats + kits) | Recruit assignment **only** | `recruit_set_0001` (300) |
+| **`recruit_set_NNNN`** | Pre-built recruit classes (stats + kits) | Recruit assignment **only** | `recruit_set_0001` (450) |
 | **`builder_set_NNNN`** | Portrait kits for Team Builder body/skin coverage | Team Builder picker + fitted assignment | `builder_set_0001` (150) |
 
 **Team Builder pool** = `recruit_set_0001` ∪ `builder_set_0001`.  
@@ -26,7 +26,8 @@ for the full architecture; this file is the exact field-level spec the **baker**
 Future recruit classes continue `recruit_set_0002`, `0003`, … (new prefix optional at cutover).  
 Future builder extensions continue `builder_set_0002`, `0003`, ….
 
-A recruit set is 300 pre-built recruits shipped as a unit. Each recruit carries a **stable
+A recruit set is a batch of pre-built recruits shipped as a unit (`recruit_set_0001` is **450**
+after the regen; was 300). Each recruit carries a **stable
 `recruit_id`** that keys its pre-generated uniform kit. At signing the player gets a fresh
 unique `player_id` (not the recruit_id — set recruits share one recruit_id across franchises,
 which would collide); the portrait follows via `image_id`.
@@ -51,8 +52,8 @@ downloadable build it ships as a pack file. Self-contained (~1 MB), well under M
 ```jsonc
 {
   "set_id": "set_0001",           // human-readable, stable, globally unique
-  "version": 1,                   // schema/content version; bump if regenerated
-  "recruit_count": 300,
+  "version": 2,                   // schema/content version; bump if regenerated
+  "recruit_count": 450,
   "recruits": [
     {
       "recruit_id": "550e8400-e29b-41d4-a716-446655440000",  // stable UUID
@@ -63,9 +64,13 @@ downloadable build it ships as a pack file. Self-contained (~1 MB), well under M
       "weight": 190,              // integer lbs,   AS GENERATED (not projected)
       "attributes": { /* exactly the dict generate_recruits_list() emits — see below */ },
       "position_ratings": { "PG": 41, "SG": 44, "SF": 47, "PF": 39, "C": 30 },
-      "Home Region": "C"          // stable identity — region A–H, baked once, same in every franchise
+      "Home Region": "C",         // stable identity — region A–H, baked once, same in every franchise
+      "entry_tier": "Average",    // talent tier Poor…Elite (RT anchor)         — carried since the 450 regen
+      "position_intent": "SG",    // generated position PG…C (height + RT target) — carried since the 450 regen
+      "potential_factor": 1.0,    // frozen growth factor used by progression     — carried since the 450 regen
+      "has_portrait": true        // kit exists in R2 (borrow-pool / fallback)    — carried since the 450 regen
     }
-    // ... 299 more
+    // ... 449 more
   ]
 }
 ```
@@ -85,14 +90,23 @@ downloadable build it ships as a pack file. Self-contained (~1 MB), well under M
   present; do not cherry-pick.
 - **`position_ratings`** — as produced by `compute_position_ratings(recruit, profile="recruit")`;
   keys are `PG SG SF PF C`.
-- **`year`** — one of the four recruit years. A 300-pool skews heavily **JH** (Freshman 10–30,
-  Sophomore 5–15, Junior 5–15, JH = remainder).
+- **`year`** — one of the four recruit years. The pool skews heavily **JH** (per draw: Freshman
+  10–30, Sophomore 5–15, Junior 5–15, JH = remainder — so a larger pool is proportionally more JH).
 - **`Home Region`** — one of `A`–`H`. **Stable identity**: baked once (by the baker, or by
   `bake_home_region.py` for the original set) and read verbatim by the loader, so the recruit
   lands in the same region in every franchise. Note: `Lean` is **not** stored — it still derives
   per-franchise from this region with its own randomness (75% "open", etc.), and jersey is still
   rolled at signing. A recruit with no `Home Region` (dynamic, or a legacy un-baked set) falls
   back to the loader's per-franchise random draw.
+- **`entry_tier`, `position_intent`, `potential_factor`, `has_portrait`** — carried top-level as
+  of the **450 regen**. They come straight from the current `generate_recruits_list()` / recalibrated
+  generation and are stored **deliberately** so a set reload can't drop them and re-introduce a
+  re-derive / potential-factor mismatch. `entry_tier` (Poor…Elite) and `position_intent`
+  (`PG…C`) are the tier + position the recruit was generated at (drive the RT anchor and the
+  position-based height draw); `potential_factor` is the frozen growth factor used by progression;
+  `has_portrait` (bool) tracks whether a kit exists in R2 (borrow-pool inclusion / generic
+  fallback). The loader tolerates extra fields — it validates presence of the core set, not a
+  closed schema — so these load into FRD verbatim.
 
 ### Deliberately excluded (layered on per-franchise at load time — never in the set)
 
@@ -174,7 +188,9 @@ Files:
 
 ## Validation rules (baker must enforce)
 
-1. Recruit sets: `recruits` length == `recruit_count` == 300.
+1. Recruit sets: `recruits` length == `recruit_count`. (`recruit_set_0001` is **450** after the
+   300→450 regen — 300 reuse + 150 new; it was 300 pre-regen. The invariant is the length/count
+   match, not a fixed number.)
 2. All ids unique **within the set** and disjoint from every other published kit UUID
    (recruit + builder). Before writing any kit to a flat or prefixed path, verify no collision.
 3. Every kit has bust + mask + geometry at its R2 keys before the set is published.
