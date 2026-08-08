@@ -59,6 +59,10 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="validate + preview, no write")
     ap.add_argument("--allow-mock", action="store_true",
                     help="proceed even without MONGO_URI (writes to ephemeral mongomock — for testing only)")
+    ap.add_argument("--force", action="store_true",
+                    help="override the revert guard — allow loading a set whose recruit_count is LOWER "
+                         "than what's already in the collection (normally refused, since a stale file "
+                         "would wipe a larger live set, e.g. reverting the 450 regen back to 300).")
     args = ap.parse_args()
 
     # Import db FIRST — that is what loads .env/.env.local and sets MONGO_URI.
@@ -91,11 +95,25 @@ def main():
         try:
             doc = json.load(open(p))
             validate(doc)
+            # Revert guard: never let a smaller set-file silently overwrite a larger
+            # live set (e.g. a stale set_0001.json at 300 clobbering the 450 regen).
+            existing = coll.find_one({"set_id": doc["set_id"]}, {"recruit_count": 1})
+            existing_count = (existing or {}).get("recruit_count")
+            shrinking = existing_count is not None and doc["recruit_count"] < existing_count
+            if shrinking and not args.force:
+                print(f"[BLOCKED] {os.path.basename(p)}: {doc['set_id']} would shrink "
+                      f"{existing_count} -> {doc['recruit_count']} recruits. Refusing (revert guard). "
+                      f"Pass --force only if this shrink is intentional.")
+                fail += 1
+                continue
             if args.dry_run:
-                print(f"[ok] {os.path.basename(p)}: valid, {doc['recruit_count']} recruits (would upsert {doc['set_id']})")
+                warn = "  ⚠️ SHRINK (allowed via --force)" if shrinking else ""
+                print(f"[ok] {os.path.basename(p)}: valid, {doc['recruit_count']} recruits "
+                      f"(would upsert {doc['set_id']}){warn}")
             else:
                 coll.replace_one({"set_id": doc["set_id"]}, doc, upsert=True)
-                print(f"[ok] upserted {doc['set_id']} ({doc['recruit_count']} recruits)")
+                note = f" (was {existing_count})" if existing_count is not None else ""
+                print(f"[ok] upserted {doc['set_id']} ({doc['recruit_count']} recruits){note}")
             ok += 1
         except Exception as e:
             print(f"[fail] {os.path.basename(p)}: {type(e).__name__}: {str(e)[:160]}")
