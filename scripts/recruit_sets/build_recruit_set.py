@@ -140,8 +140,13 @@ def bounded_race_weights(recruits, seed, cap_pp=8):
 
 def build_one(recruit, random_weights=None):
     """One recruit -> (set record, manifest entry). recruit is a generate_recruits_list dict.
-    random_weights balances the pool's race mix to the league target (compute_random_weights)."""
-    rid = str(uuid.uuid4())
+    random_weights balances the pool's race mix to the league target (compute_random_weights).
+
+    Keeps an existing recruit_id when the input already has one (rebuilding the baking
+    manifest for an already-minted recruit — genes are seeded by rid, so this reproduces
+    that recruit's face while recomputing the build frame from his current physicals);
+    mints a fresh uuid only for brand-new recruits."""
+    rid = recruit.get("recruit_id") or str(uuid.uuid4())
     name = recruit["name"]
     year = recruit.get("year", "JH")
     attrs = recruit["attributes"]
