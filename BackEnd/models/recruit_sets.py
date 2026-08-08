@@ -56,19 +56,27 @@ def _available_kit_ids():
         _kit_ids_cache["ids"] = ids
         logger.info("[recruit-image-pool] R2 kit assets available: %d", len(ids))
         return ids or None
-    except Exception as e:  # noqa: BLE001 — any R2 failure → unfiltered, never break generation
-        logger.warning("[recruit-image-pool] R2 kit listing failed (%s) — borrow pool unfiltered", e)
+    except Exception as e:  # noqa: BLE001 — any R2 failure → flag fallback, never break generation
+        # An unreachable asset store in production is an error, not a warning: it disables the
+        # PRIMARY (R2 file-existence) filter and drops the pool onto the has_portrait fallback.
+        logger.error("[recruit-image-pool] R2 kit listing failed (%s) — falling back to has_portrait flag", e)
         _kit_ids_cache["ids"] = frozenset()
         return None
 
 
 def _base_image_pool(db, set_id=BASE_IMAGE_SET_ID):
-    """The recruit_ids of the base image library — the portraits a dynamic recruit can
-    borrow — FILTERED to ids whose kit asset actually exists in R2. Empty (→ generic
-    headshots) if the set isn't loaded; unfiltered (degrades safe) if R2 is unavailable."""
+    """The recruit_ids of the base image library — the portraits a dynamic recruit can borrow.
+
+    PRIMARY filter: ids whose kit asset actually exists in R2 (self-correcting as art uploads).
+    FAIL-SAFE fallback when R2 is unavailable: exclude ids flagged ``has_portrait: false`` (set on
+    not-yet-arted recruits), so an R2 outage lands on CORRECT behaviour (portrait-less ids stay out
+    of dynamic draws) rather than leaking all of them. Empty (→ generic headshots) if the set isn't
+    loaded."""
     try:
-        doc = db[COLLECTION].find_one({"set_id": set_id}, {"recruits.recruit_id": 1})
-        ids = [r.get("recruit_id") for r in (doc or {}).get("recruits", []) if r.get("recruit_id")]
+        doc = db[COLLECTION].find_one(
+            {"set_id": set_id}, {"recruits.recruit_id": 1, "recruits.has_portrait": 1})
+        recruits = (doc or {}).get("recruits", [])
+        ids = [r.get("recruit_id") for r in recruits if r.get("recruit_id")]
     except Exception as e:  # noqa: BLE001 — image assignment must never break generation
         logger.warning(f"base image pool lookup failed: {e}")
         return []
@@ -78,6 +86,14 @@ def _base_image_pool(db, set_id=BASE_IMAGE_SET_ID):
         ids = [i for i in ids if i in available]
         logger.info("[recruit-image-pool] %d/%d recruit ids have a kit asset (%d portrait-less filtered out)",
                     len(ids), before, before - len(ids))
+        return ids
+    # R2 down → fail SAFE on the flag rather than passing every id (the leak the filter prevents).
+    flagged = {r.get("recruit_id") for r in recruits if r.get("has_portrait") is False}
+    if flagged:
+        before = len(ids)
+        ids = [i for i in ids if i not in flagged]
+        logger.error("[recruit-image-pool] R2 unavailable — has_portrait fallback excluded %d flagged, %d remain",
+                     before - len(ids), len(ids))
     return ids
 
 

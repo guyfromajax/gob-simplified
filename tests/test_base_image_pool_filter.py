@@ -7,10 +7,18 @@ from unittest.mock import patch, Mock
 import BackEnd.models.recruit_sets as rs
 
 
-def _db_with(recruit_ids):
+def _db_with(recruit_ids, flags=None):
+    """flags: optional {recruit_id: has_portrait_bool} to stamp has_portrait."""
+    flags = flags or {}
     db = Mock()
     col = Mock()
-    col.find_one.return_value = {"recruits": [{"recruit_id": r} for r in recruit_ids]}
+    recs = []
+    for r in recruit_ids:
+        d = {"recruit_id": r}
+        if r in flags:
+            d["has_portrait"] = flags[r]
+        recs.append(d)
+    col.find_one.return_value = {"recruits": recs}
     db.__getitem__ = Mock(return_value=col)
     return db
 
@@ -30,13 +38,24 @@ def test_pool_filters_to_ids_with_a_kit_asset():
     assert "b" in pool and pool.count("b") == 1, "mask.png must not create a phantom id"
 
 
-def test_pool_degrades_to_unfiltered_when_r2_errors():
+def test_r2_error_falls_back_to_has_portrait_flag():
+    """R2 down → fail SAFE: exclude has_portrait=false ids (not-yet-arted), not pass all."""
+    _reset_cache()
+    db = _db_with(["a", "b", "c"], flags={"a": True, "b": True, "c": False})
+    with patch("BackEnd.services.r2_images.is_configured", return_value=True), \
+         patch("BackEnd.services.r2_images.list_keys", side_effect=RuntimeError("R2 down")):
+        pool = rs._base_image_pool(db)
+    assert set(pool) == {"a", "b"}, "flagged-false id must be excluded when R2 is unreachable"
+
+
+def test_r2_error_without_flags_stays_unfiltered():
+    """Backward-compat: R2 down + no has_portrait flags → unfiltered (never empty)."""
     _reset_cache()
     db = _db_with(["a", "b", "c"])
     with patch("BackEnd.services.r2_images.is_configured", return_value=True), \
          patch("BackEnd.services.r2_images.list_keys", side_effect=RuntimeError("R2 down")):
         pool = rs._base_image_pool(db)
-    assert set(pool) == {"a", "b", "c"}, "on R2 error the pool must stay unfiltered, not empty"
+    assert set(pool) == {"a", "b", "c"}
 
 
 def test_pool_unfiltered_when_r2_unconfigured():
