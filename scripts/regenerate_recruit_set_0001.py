@@ -115,8 +115,15 @@ print(f"SELF-CHECK  year JH/FR/SO/JR = "+"/".join(f"{100*yc[y]/N:.1f}" for y in 
 print("            expected  54.0/15.1/14.2/16.7 | 6.4/21.1/40.0/19.1/11.3/2.0 | 22.0/22.0/18.7/18.7/18.7 | Hector=SG")
 
 # ----- build docs -----
+# Generation keys on abbreviated years internally (draw_height/target_rt via
+# normalize_year), but the recruit-set contract is FULL names (SCHEMA, the loader
+# validator, and the season-rollover advancer). Convert at the output boundary.
+_YEAR_FULL = {"JH": "JH", "FR": "Freshman", "SO": "Sophomore", "JR": "Junior", "SR": "Senior"}
+def _full_year(y): return _YEAR_FULL.get(y, y)
+
+
 def doc(s):
-    return {"recruit_id":s["recruit_id"],"name":s["name"],"year":s["year"],"archetype":s["archetype"],
+    return {"recruit_id":s["recruit_id"],"name":s["name"],"year":_full_year(s["year"]),"archetype":s["archetype"],
             "height":s["height"],"weight":s["weight"],"attributes":s["attributes"],
             "position_ratings":s["position_ratings"],"Home Region":s["home"],
             "entry_tier":s["entry_tier"],"position_intent":s["intent"],"potential_factor":s["potential_factor"],
@@ -135,10 +142,10 @@ with open(SP/"set0001_reused_movers.csv","w",newline="") as f:
     bi={"guard":0,"wing":1,"big":2}
     for s in sorted(reused,key=lambda s:-(abs(s["height"]-float(s["old"]["height"]))+abs(s["weight"]-float(s["old"]["weight"]))/8.0)):
         o=s["old"]; ob=band(o["height"]); nb=band(s["height"])
-        w.writerow([s["recruit_id"],s["name"],normalize_year(o.get("year")),s["year"],s["intent"],s["tier"],o["height"],s["height"],s["height"]-float(o["height"]),o["weight"],s["weight"],s["weight"]-float(o["weight"]),ob,nb,int(ob!=nb),abs(bi[nb]-bi[ob])])
+        w.writerow([s["recruit_id"],s["name"],_full_year(normalize_year(o.get("year"))),_full_year(s["year"]),s["intent"],s["tier"],o["height"],s["height"],s["height"]-float(o["height"]),o["weight"],s["weight"],s["weight"]-float(o["weight"]),ob,nb,int(ob!=nb),abs(bi[nb]-bi[ob])])
 with open(SP/"set0001_new150_portraits.csv","w",newline="") as f:
     w=csv.writer(f); w.writerow(["recruit_id","name","year","intent","height","weight","entry_tier"])
-    for s in [x for x in slots if not x["reuse"]]: w.writerow([s["recruit_id"],s["name"],s["year"],s["intent"],s["height"],s["weight"],s["tier"]])
+    for s in [x for x in slots if not x["reuse"]]: w.writerow([s["recruit_id"],s["name"],_full_year(s["year"]),s["intent"],s["height"],s["weight"],s["tier"]])
 print("CSVs written to scratchpad.")
 
 print(f"\nMODE: {'COMMIT' if A.commit else 'DRY-RUN (no writes)'}")
