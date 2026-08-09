@@ -104,7 +104,7 @@ SHAPE_P6_FLOOR_BASE: Dict[str, Dict[str, float]] = {
 }
 
 # ── Camp ────────────────────────────────────────────────────────────────────
-CAMP_WEEKS = 3
+CAMP_WEEKS = 1
 CAMP_GAIN_SCALE = 1.4
 CAMP_POINT_BUDGET = 30
 IN_SEASON_POINT_BUDGET = 24

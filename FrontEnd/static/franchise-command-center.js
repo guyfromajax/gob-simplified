@@ -3838,7 +3838,7 @@ function updatePlayButton(data) {
   const eosTournament = data.eos_tournament;
   const week = Number(data.week || 1);
   const trainingDisabledForEos = !!data.training_disabled_for_eos;
-  const trainingDisabledForPostseason = !!data.training_disabled_for_postseason || (week >= 27 && week <= 34);
+  const trainingDisabledForPostseason = !!data.training_disabled_for_postseason || week >= 27;
   const userEliminated = data.user_eliminated != null ? !!data.user_eliminated : null;
   const offerSimRest = data.offer_sim_rest != null ? !!data.offer_sim_rest : null;
   const regionQualified = !!data.region_qualified;

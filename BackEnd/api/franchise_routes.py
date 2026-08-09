@@ -122,7 +122,7 @@ WEEK_35_RECRUITING_POINTS_BUDGET = 50
 SEASON_TRANSITION_TOKEN_FIELD = "season_transition_token"
 RANK_PRESTIGE_SYSTEM_VERSION_FIELD = "rank_prestige_system_version"
 RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD = "rank_prestige_last_applied_week"
-POSTSEASON_TRAINING_DISABLED_WEEKS = range(27, 35)
+LAST_TRAINING_WEEK = 26
 POSTSEASON_EOG_TEAM_ATTRS_DISABLED_WEEKS = range(27, 35)
 CPU_SIM_RUNNING_STALE_SECONDS = 180
 # Heartbeat cadence for persisting cpu_sim_job progress during the CPU-week loop.
@@ -140,13 +140,17 @@ def _week_in_policy_range(week: Any, policy_weeks: range) -> bool:
 
 
 def _postseason_training_disabled_for_week(week: Any) -> bool:
-    return _week_in_policy_range(week, POSTSEASON_TRAINING_DISABLED_WEEKS)
+    try:
+        return int(week) > LAST_TRAINING_WEEK
+    except (TypeError, ValueError):
+        return False
 
 
 def _training_status_reset_after_advance_to_week(dest_week: Any) -> dict[str, Any] | None:
     """
     Weekly training applies when entering a normal franchise week.
-    EOS tournament weeks (27-34) do not use training; do not churn training_status there.
+    Weeks after the 26-week regular season do not use training; do not churn
+    training_status there.
     """
     if _postseason_training_disabled_for_week(dest_week):
         return None
@@ -13770,7 +13774,7 @@ def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
     if _postseason_training_disabled_for_week(week):
         raise HTTPException(
             status_code=400,
-            detail="Training is disabled during postseason tournament weeks.",
+            detail="Training is unavailable after week 26.",
         )
 
     if franchise_training_fully_complete_for_week(training_status, week):
@@ -14008,8 +14012,13 @@ def get_training_points(franchise_id: str):
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
-    # Training camp = weeks 1..CAMP_WEEKS (framework §10.3)
+    # Training camp is week 1; weeks 2–26 are in-season training.
     week = franchise_doc.get("week", 1)
+    if _postseason_training_disabled_for_week(week):
+        raise HTTPException(
+            status_code=400,
+            detail="Training is unavailable after week 26.",
+        )
     from BackEnd.constants.training_shape import (
         CAMP_POINT_BUDGET,
         CAMP_WEEKS,
@@ -14149,10 +14158,10 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     if _postseason_training_disabled_for_week(week):
         raise HTTPException(
             status_code=400,
-            detail="Training is disabled during postseason tournament weeks.",
+            detail="Training is unavailable after week 26.",
         )
     
-    # Training camp = weeks 1..CAMP_WEEKS (framework §10.3)
+    # Training camp is week 1; weeks 2–26 are in-season training.
     from BackEnd.constants.training_shape import (
         CAMP_GAIN_SCALE,
         CAMP_POINT_BUDGET,

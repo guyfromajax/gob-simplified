@@ -2,6 +2,7 @@
 import random
 from unittest.mock import patch
 import pytest
+from pathlib import Path
 
 from BackEnd.models.training_execution_v2 import (
     IN_SEASON_GAIN_SCALE,
@@ -78,6 +79,37 @@ def test_flat_budget_rejects_fractional_notches_even_when_the_sum_is_whole():
         training_points_spent({"player_drills": {"offense": {"inside": 0.5, "outside": 0.5}}})
 
 
+def test_client_and_server_share_the_flat_notch_budget_contract():
+    """Regression: client and submit route must not price the same plan differently."""
+    allocation = {
+        "player_drills": {
+            "offense": {"inside": 5, "outside": 5},
+            "defense": {"inside": 5, "outside": 5},
+        },
+        "team_drills": {"offense_install": 5, "defense_install": 5},
+        "general": {"breaks": 0},
+    }
+    client_notches = sum(
+        int(value)
+        for section in allocation.values()
+        for block in section.values()
+        for value in (block.values() if isinstance(block, dict) else [block])
+    )
+    assert client_notches == 30
+    assert training_points_spent(allocation) == client_notches
+
+    root = Path(__file__).resolve().parents[1]
+    frontend = (root / "FrontEnd/static/training.js").read_text(encoding="utf-8")
+    route = (root / "BackEnd/api/franchise_routes.py").read_text(encoding="utf-8")
+    total_body = frontend[frontend.index("function calculateTotalPoints"):
+                          frontend.index("function formatPointsDisplay")]
+    assert "parseInt(slider.value" in total_body
+    assert "DIVISOR" not in total_body and "MULT" not in total_body
+    assert "spend = training_points_spent(allocations)" in route
+    for retired in ("player_week_spend", "allocation_budget_cost", "class_cost_multiplier"):
+        assert retired not in route
+
+
 def test_fit_and_class_are_gain_multipliers_not_budget_prices():
     assert training_attr_gain_multiplier("C", "AG") == 0.25
     assert CLASS_GAIN_MULT["FR"] == 1.0
@@ -89,8 +121,8 @@ def test_fit_and_class_are_gain_multipliers_not_budget_prices():
 def test_senior_wall_full_allocation_remains_meaningfully_positive_over_season():
     """Worst stack: minimum raw roll, C agility wall, senior class taper.
 
-    Three camp weeks at 1.4 plus 23 in-season weeks at 0.18 must still bank
-    enough persisted fraction to produce four whole attribute points.
+    One camp week at 1.4 plus 25 in-season weeks at 0.18 must still bank
+    enough persisted fraction to produce three whole attribute points.
     """
     player = {
         "year": "senior",
@@ -98,15 +130,15 @@ def test_senior_wall_full_allocation_remains_meaningfully_positive_over_season()
         "attributes": {"anchor_AG": 50, "AG": 50},
     }
     with patch.object(random, "randint", return_value=3):
-        for _ in range(3):
+        for _ in range(1):
             _apply_player_training_points(
                 player, "AG", points=5, archetype=None, sub_option=None,
                 gain_scale=CAMP_GAIN_SCALE,
             )
-        for _ in range(23):
+        for _ in range(25):
             _apply_player_training_points(
                 player, "AG", points=5, archetype=None, sub_option=None,
                 gain_scale=IN_SEASON_GAIN_SCALE,
             )
-    assert player["attributes"]["anchor_AG"] == 54
-    assert 0.46 < player["training_gain_remainders"]["AG"] < 0.48
+    assert player["attributes"]["anchor_AG"] == 53
+    assert 0.15 < player["training_gain_remainders"]["AG"] < 0.17

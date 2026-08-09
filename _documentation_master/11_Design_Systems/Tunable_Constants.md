@@ -843,7 +843,7 @@ Effects are stated in gameplay terms; movement figures are where we measured the
 | Lever | now | What it changes in the game | Rough movement | Status |
 |---|---|---|---|---|
 | `OFFSEASON_ATTRACTOR_ALPHA` | **0.0** | **Retired (framework §10.4 / §11).** Offseason is level-only rescale onto the ladder RT target; shape is owned by camp + in-season + weight-scaled floors. Symbol kept so old imports do not crash — do not re-enable without restoring the blend path and the shape-dispersion suite gate. Historical α=0.55 career retention was ~(1−α)³ ≈ 9%. | none (level-only) | **DEAD** |
-| `CAMP_WEEKS` | **3** | Franchise weeks 1..N are training camp (`is_camp_week`): 30-point flat budget, pre-training decay skipped, `CAMP_GAIN_SCALE` applied. | 2 → shorter camp; 4 → longer | LIVE (`training_shape.py`) |
+| `CAMP_WEEKS` | **1** | Franchise week 1 is training camp (`is_camp_week`): 30-point flat budget, pre-training decay skipped, `CAMP_GAIN_SCALE` applied. Weeks 2–26 use 24; weeks 27+ have no training. | Changing this alters the product schedule | LIVE (`training_shape.py`) |
 | `CAMP_GAIN_SCALE` | **1.4** | Multiplier on positive camp gains (vs `IN_SEASON_GAIN_SCALE` for weeks after camp). | ↑ = louder camp shape/level | LIVE |
 | `IN_SEASON_GAIN_SCALE` | 0.18 | Scales positive weekly gains after camp. Kept low so a reference season stays inside the offseason ladder step (no claw-back). Shape movement is still mostly here + camp (~99% of career shape). | ↑ strands well-coached players above the ladder | LIVE (but see backlog) |
 | `PLAYER_ATTR_GAIN_RANGE_BY_POINTS` | 0:(−2,−1) · 1:(1,3) · 2:(2,3) · 3:(2,4) · 4:(3,5) · 5:(3,6) | Raw gain bands before year-max / scale / remainder. **1–5 must stay distinct** (E[raw\|5]=4.5 held). Re-unifying 1–3 erases slider resolution. | changes strategy spacing | LIVE (`training_execution_v2.py`) |
@@ -981,7 +981,7 @@ Fitted offline against 10k Monte Carlo careers (`scripts/mc_growth_fit.py`) over
 module `BackEnd/utils/player_development.py`; wired into `finish_season` (the season
 rollover), which runs `develop_one_offseason` per player after the year bump and before
 Training Camp. Camp's CH bonus, year bonus and FR/SO HT/WT growth were **deleted** — the
-offseason event owns career HT/WT and level. Camp is weeks **1..`CAMP_WEEKS`** (3): 30-point **cost** budget, decay skipped, gains scaled by `CAMP_GAIN_SCALE` (1.4).
+offseason event owns career HT/WT and level. Camp is week **1** (`CAMP_WEEKS = 1`): 30-point flat budget, decay skipped, gains scaled by `CAMP_GAIN_SCALE` (1.4). Weeks 2–26 use 24 points; weeks 27+ have no training.
 
 ### Exposed for tuning
 
@@ -993,7 +993,7 @@ offseason event owns career HT/WT and level. Camp is weeks **1..`CAMP_WEEKS`** (
 | `OFFSEASON_DISTRIBUTION_BLEND` | 0.70 | **DEAD / vestigial.** Was the additive-budget age/position distribution blend. Unused under level-only offseason. |
 | `NON_CORE_GROWTH_MULTIPLIER` | 0.06 | **DEAD / vestigial.** Was the non-signature weight floor on that distribution path. |
 | `OFFSEASON_ATTRACTOR_ALPHA` | **0.0** | **DEAD.** Level-only offseason; see A — LEVERS. |
-| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` | 3 / 1.4 | Camp phase length and camp gain scale (`training_shape.py`). |
+| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` | 1 / 1.4 | Camp phase length and camp gain scale (`training_shape.py`). |
 | `CLASS_GAIN_MULT` | FR 1.0 · SO 1/1.1 (~.91) · JR 1/1.25 (.80) · SR 1/1.4 (~.71) | Class multiplier on positive gain, applied before the persisted remainder split. |
 | `PLAYER_ATTR_GAIN_RANGE_BY_POINTS` | see A — LEVERS | Distinct 0–5 raw gain bands (`training_execution_v2.py`). |
 | `FAMILY_CURVES` | FR 3.0/1.0/.30 · SO 2.0/1.2/.60 · JR .60/1.3/2.2 · SR .35/1.2/3.2 | per-rung weight multipliers (phys/skill/mental) → physical-early, mental-late |

@@ -7,8 +7,9 @@ This document should reflect the current franchise training implementation in co
 **Base Constants**
 
 1. **Flat integer budget** (`CAMP_POINT_BUDGET` / `IN_SEASON_POINT_BUDGET` in `training_shape.py`):
-   - **Training camp** (`is_camp_week`: franchise weeks **1..`CAMP_WEEKS`**, currently **3**): **30** points
-   - **In-season** (weeks after camp): **24** points
+   - **Training camp** (`is_camp_week`: franchise week **1**; `CAMP_WEEKS = 1`): **30** points
+   - **In-season** (weeks **2–26**): **24** points
+   - **After week 26:** training is unavailable; budget and submit endpoints reject the request
    - Every slider notch costs exactly **1 point**, for every drill, player position, and class. Spend is the raw integer slider sum via `training_points_spent`; there is no weighted-price or roster-maximum pricing path.
 2. **Slider Range**: 0-5 points per slider (discrete integer steps)
 3. **Training Page Files**: `FrontEnd/static/training.html`, `FrontEnd/static/training.js`, `FrontEnd/static/training.css`
@@ -44,7 +45,7 @@ triple from the player's highest current RT, not from `training_position`.
 
 **Training System Flow (15 Steps)**
 
-1. **Page Load**: Frontend fetches budget + cost matrix from `/franchise/training-points` (30 camp / 24 in-season)
+1. **Page Load**: Frontend fetches the flat budget + gain-divisor matrix from `/franchise/training-points` (30 in week 1 / 24 in weeks 2–26; rejected after week 26)
 2. **User Allocates Points**: User distributes units across 20 sliders; Points Remaining tracks **cost spend** against the week budget
 3. **User Selects Focus**: User selects one coaching focus archetype and sub-option
 4. **Recruiting Invites Access (Weeks 20-26 only)**: Training page shows a green `Recruiting Invites` button below `Submit Training` that routes to the phase-aware Recruiting Hub at `recruiting.html`
@@ -87,7 +88,7 @@ While CPU training runs (`POST /franchise/run-training/cpu-train`), the training
 
 ### Post-Training Camp Cut Flow
 
-- **Trigger:** Only after the **last** camp week completes (`week == CAMP_WEEKS`, currently **3**), during the CPU training phase (`cpu_training_camp_cuts_applied`).
+- **Trigger:** After week **1** training completes (`week == CAMP_WEEKS`, currently **1**), during the CPU training phase (`cpu_training_camp_cuts_applied`).
 - **User Team:**
   - If user roster size is greater than 12 when the user returns to FCC from the training report, FCC shows a modal:
     - `You need to cut X players`
@@ -193,8 +194,9 @@ While CPU training runs (`POST /franchise/run-training/cpu-train`), the training
 - Each slider has discrete integer steps from 0 to 5; every notch spends one point
 - Default value for all sliders on page load: 0
 - Flat point budget from `/franchise/training-points`:
-  - **Camp weeks** (`is_camp_week`, weeks 1..`CAMP_WEEKS`): **30**
-  - **In-season**: **24**
+  - **Camp week** (`is_camp_week`, week 1): **30**
+  - **In-season weeks 2–26**: **24**
+  - **Weeks 27+**: unavailable
 - Franchise client also loads `gain_divisor_matrix` + roster years/positions to display each player drill's effective-value range across the roster
 - Moving any slider by +1 subtracts exactly **1** from Points Remaining
 - Prevents allocating past the budget (clamps or reverts last interaction)
@@ -272,7 +274,7 @@ The training execution system applies pre-training conditions, allocates trainin
    - Applies random decreases to player attributes (excluding EM, MO, NG)
    - Player attributes: see pre-training decay section below
    - Team attributes are no longer decayed in training. They are updated at the end of each game based on performance (see End_Of_Game_System.md). For a side-by-side of how each team attribute is changed in EOG vs Training, see `docs/To Do/team_attributes_eog_vs_training_comparison.md`.
-   - **Skipped on camp weeks** — `is_camp_week(week)` sets `skip_pre_training_depreciation=True` (weeks 1..`CAMP_WEEKS`)
+   - **Skipped during camp** — `is_camp_week(week)` sets `skip_pre_training_depreciation=True` for week 1
 
 2. **Training Point Application** (`apply_training_points`)
    - Maps drill allocations to player/team attributes
@@ -352,12 +354,12 @@ Leave minimums as is, only change maximums
 
 **Training Camp (what it actually is today)**
 
-Training camp is **not** a separate growth event. It is the same `execute_training` → `apply_training_points` path as in-season weeks, for franchise weeks **1..`CAMP_WEEKS`** (currently **3**). Differences vs in-season:
+Training camp is **not** a separate growth event. It is the same `execute_training` → `apply_training_points` path as in-season weeks, for franchise week **1** (`CAMP_WEEKS = 1`). Differences vs in-season:
 
 1. **Pre-training decay is skipped** (`skip_pre_training_depreciation=True` via `is_camp_week`).
 2. **Flat point budget is 30** (`CAMP_POINT_BUDGET`) instead of 24.
 3. **Gain scale is `CAMP_GAIN_SCALE` (1.4)** instead of `IN_SEASON_GAIN_SCALE` (0.18).
-4. **Camp cuts** run once after the **last** camp week (`week == CAMP_WEEKS`), not after week 1.
+4. **Camp cuts** run once after week 1 (`week == CAMP_WEEKS`).
 
 There is **no** camp-only CH/core-attribute bonus, **no** year-based camp bonus roll, and **no** camp HT/WT growth. Those used to exist; they were removed when the offseason development event took ownership of career physical/level growth (see comment in `apply_training_points` — `training_camp_physique_notes` is always empty). Height and weight growth live in `develop_one_offseason` at season rollover, not at camp.
 
@@ -606,7 +608,7 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
   - **Defense:** Original baseline is post-remap effectiveness at session start (no random pre-training decay). Delta reflects **install training** for that session; usage-share decay is applied at **EOG** (franchise).
   - **Offense (motion/set):** Original baseline is **unchanged** at session start (no random play decay in training). Delta reflects **install training only** for that session. Longer-term CMD drift from game usage is applied at **EOG** (franchise), not on the training report.
   - Minimum displayed effectiveness logic still clamps at 0 in the engine where applicable.
-  - **Training camp:** Pre-training **player** conditions are skipped on `is_camp_week` (weeks 1..`CAMP_WEEKS`); play/defense CMD is unchanged during training regardless.
+  - **Training camp:** Pre-training **player** conditions are skipped on `is_camp_week` (week 1); play/defense CMD is unchanged during training regardless.
 
 **Training Notes Section:**
 - Header: "Training Notes"
@@ -713,7 +715,7 @@ Eligible non-user teams run the same `execute_training()` engine. CPU allocation
 - `cpu_autotrain_week` claims each FTD before delta writes so retries cannot double-train a team.
 - Player attributes, position ratings, and `training_gain_remainders`; team attributes, plays, scouting data, coaching-focus counters, and `training_reports.{week}` are persisted.
 - EOS-eliminated teams are skipped.
-- After the final camp week (`week == CAMP_WEEKS`, currently week 3), CPU teams are cut to 12 players.
+- After camp (`week == CAMP_WEEKS`, currently week 1), CPU teams are cut to 12 players.
 - CPU auto-training does not currently persist the user-path `pending_community_engagement` next-game flag.
 
 **Franchise Roster Source Of Truth:**
@@ -766,7 +768,7 @@ quality        = Σ contribution / Σ contribution(reference)
 | `COACHING_HEADROOM` | how far a budget optimum scores above 1.0 |
 | `COACHING_F_MIN` / `COACHING_F_MAX` | offseason multiplier bounds (0.85 / 1.20) |
 | `IN_SEASON_GAIN_SCALE` | in-season gain scale (0.18) |
-| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` / `CAMP_POINT_BUDGET` | camp length (3), camp gain scale (1.4), flat camp budget (30) |
+| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` / `CAMP_POINT_BUDGET` | camp length (1 week), camp gain scale (1.4), flat camp budget (30) |
 | `IN_SEASON_POINT_BUDGET` | flat in-season budget (24) |
 | `TRAINING_COST_WEIGHTS` / `CLASS_GAIN_MULT` | position-fit gain divisors and class-year gain multipliers; neither changes budget spend |
 | `OFFSEASON_ATTRACTOR_ALPHA` | **retired (0.0)** — shape attractor removed; offseason is level-only |

@@ -57,9 +57,9 @@ def test_od_and_sh_are_not_size_ordered():
 
 
 def test_camp_constants_locked():
-    assert CAMP_WEEKS == 3
+    assert CAMP_WEEKS == 1
     assert CAMP_GAIN_SCALE == 1.4
-    assert is_camp_week(1) and is_camp_week(3) and not is_camp_week(4)
+    assert is_camp_week(1) and not is_camp_week(2) and not is_camp_week(27)
 
 
 def test_floors_refuse_starved_id_big():
