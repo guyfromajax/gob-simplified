@@ -15926,9 +15926,9 @@ def finish_season(req: FinishSeasonRequest):
         year = str(year_value or "").strip().lower()
         mapping = {
             "jh": "Freshman",
-            "freshman": "Sophomore",
-            "sophomore": "Junior",
-            "junior": "Senior",
+            "freshman": "Sophomore", "fr": "Sophomore",   # accept abbrev defensively
+            "sophomore": "Junior", "so": "Junior",
+            "junior": "Senior", "jr": "Senior",
         }
         return mapping.get(year, str(year_value or "Freshman").title())
 

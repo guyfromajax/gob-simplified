@@ -193,9 +193,9 @@ def carry_dev_fields(src: dict) -> dict:
 
 RECRUIT_YEAR_ADVANCE = {
     "jh": "Freshman",
-    "freshman": "Sophomore",
-    "sophomore": "Junior",
-    "junior": "Senior",
+    "freshman": "Sophomore", "fr": "Sophomore",   # accept abbrev defensively
+    "sophomore": "Junior", "so": "Junior",
+    "junior": "Senior", "jr": "Senior",
 }
 
 
