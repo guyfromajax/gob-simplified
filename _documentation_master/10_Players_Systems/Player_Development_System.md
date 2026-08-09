@@ -91,7 +91,12 @@ Canonical close-out numbers for the shape framework ([`player-development-framew
 | Force | Outcome |
 |---|---|
 | **Coaching** | ~99% of shape movement (`of_shape_move_share_from_training_phases`). Coach-aligned projection **76.8%** on reference, **96.5%** on extreme; the residual is geometric overlap between reference emphasis and the position profile, not a competing pull. |
-| **Player identity** | Not a fixed share — cosine retention spans **0.84 → 0.41** by coaching intent. Reference **0.825**, mild **0.840**, moderate **0.772**, extreme **0.408**. |
+| **Player identity** | Not a fixed share — cosine retention spans **0.84 → 0.41** by coaching intent. Reference **0.825**, mild **0.839**, moderate **0.772**, extreme **0.405**. |
+
+Player-development persistence contracts cover both sides of every Mongo boundary: read
+projections must load every required field, and write projections must explicitly persist every
+mutated sidecar. In particular, `training_gain_remainders` lives beside `attributes` on FPD, is
+never written to core players, and is included in the annual player-development carry contract.
 | **Position generics** | **0%** as a force. Expressed only as weight-scaled P6 floors (refuse at Apply; clamp decay) and the 1×–4× training cost matrix. |
 
 **55 / 45 identity-to-coaching superseded.** Coaching owns all shape movement; how much of a player survives is the coach's decision. The old **0.55** figure describes an aggressive reshaping coach, not a property of the mechanism — a typical (reference) coach lands near **0.83**, which is correct: reinforcing strengths should not erase him.

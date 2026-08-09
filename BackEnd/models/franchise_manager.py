@@ -179,6 +179,7 @@ POOL_TO_FPD_PROJECTION = {
 PLAYER_DEV_CARRY_FIELDS = (
     "entry_tier", "position_intent", "potential_factor",
     "development", "training_position", "coaching_quality",
+    "training_gain_remainders",
 )
 assert set(POOL_TO_FPD_CARRY_FIELDS) <= set(PLAYER_DEV_CARRY_FIELDS)
 

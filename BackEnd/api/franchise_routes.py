@@ -2349,12 +2349,12 @@ def _cpu_reference_custom_focus(players_for_training: list[dict], fpd_by_player_
     """Map every roster player → his development-position reference top-3, so
     player-maximizer-custom amplifies each player toward his own position. Uses
     position_intent (always present); falls back to the primary RT position."""
-    from BackEnd.models.training_execution_v2 import primary_position_from_position_ratings
+    from BackEnd.constants.training_shape import resolve_training_position
     out: dict[str, list[str]] = {}
     for p in players_for_training:
         pid = str(p["_id"])
         fp = fpd_by_player_id.get(pid) or {}
-        pos = fp.get("position_intent") or primary_position_from_position_ratings(fp.get("position_ratings"))
+        pos = resolve_training_position(fp)
         out[pid] = _cpu_reference_top3(pos)
     return out
 
@@ -2417,6 +2417,8 @@ def auto_train_one_cpu_team(
             )
         }
 
+    from BackEnd.constants.training_shape import training_position_projection
+
     players_for_training: list[dict] = []
     for pid in team_player_ids:
         fp = fpd_by_player_id.get(str(pid))
@@ -2430,6 +2432,8 @@ def auto_train_one_cpu_team(
             "team": str(team_id),
             "attributes": fp.get("attributes", {}),
             "position_ratings": fp.get("position_ratings", {}),
+            **training_position_projection(fp),
+            "training_gain_remainders": dict(fp.get("training_gain_remainders") or {}),
             "year": meta.get("year"),
             "meta": meta,
         })
@@ -2472,12 +2476,7 @@ def auto_train_one_cpu_team(
 
     groups: dict[str, list] = defaultdict(list)
     for p in players_for_training:
-        fp = fpd_by_player_id.get(str(p["_id"])) or {}
-        pos = resolve_training_position({
-            "training_position": fp.get("training_position") or p.get("training_position"),
-            "position_intent": fp.get("position_intent") or p.get("position_intent"),
-            "position_ratings": fp.get("position_ratings") or p.get("position_ratings"),
-        })
+        pos = resolve_training_position(p)
         groups[pos].append(p)
 
     updated_players: list = []
@@ -2567,6 +2566,9 @@ def auto_train_one_cpu_team(
                     fpd_set[f"attributes.{attr}"] = attrs[attr]
             if "NG" in attrs:
                 fpd_set["attributes.NG"] = attrs["NG"]
+            fpd_set["training_gain_remainders"] = dict(
+                player.get("training_gain_remainders") or {}
+            )
             if pid in position_ratings_updates:
                 fpd_set["position_ratings"] = position_ratings_updates[pid]
             if fpd_set:
@@ -13931,6 +13933,7 @@ def _build_custom_focus_roster_for_franchise(
     Rows for the Player Maximizer Custom modal: same roster order as franchise training execution.
     """
     from BackEnd.models.training_execution_v2 import PLAYER_MAXIMIZER_RANKING_ATTRS
+    from BackEnd.constants.training_shape import training_position_projection
 
     ranking = list(PLAYER_MAXIMIZER_RANKING_ATTRS)
     user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
@@ -13974,8 +13977,7 @@ def _build_custom_focus_roster_for_franchise(
                 "attrs": attr_vals,
                 "position_ratings": position_ratings,
                 "year": meta.get("year"),
-                "position_intent": fpd.get("position_intent"),
-                "training_position": fpd.get("training_position"),
+                **training_position_projection(fpd),
                 "_sort_max_rt": _max_position_rating_from_fpd(fpd),
             }
         )
@@ -14159,6 +14161,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         is_camp_week,
         player_week_spend,
         resolve_training_position,
+        training_position_projection,
     )
     is_first_training = is_camp_week(week)
     is_last_camp_week = int(week) == CAMP_WEEKS
@@ -14319,6 +14322,10 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             "team": team_name or team_id,  # Use team_name if available, otherwise use team_id
             "attributes": franchise_player_data.get("attributes", {}),
             "position_ratings": franchise_player_data.get("position_ratings", {}),
+            **training_position_projection(franchise_player_data),
+            "training_gain_remainders": dict(
+                franchise_player_data.get("training_gain_remainders") or {}
+            ),
             "year": meta.get("year"),
             "meta": meta,
         }
@@ -14330,12 +14337,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     # Cost-curve budget: every roster player must be able to afford this plan.
     over_budget = []
     for player in players_for_training:
-        pos = resolve_training_position({
-            "training_position": player.get("training_position"),
-            "position_intent": (franchise_players.get(player["_id"]) or {}).get("position_intent")
-            or player.get("position_intent"),
-            "position_ratings": player.get("position_ratings"),
-        })
+        pos = resolve_training_position(player)
         year = player.get("year") or ((player.get("meta") or {}).get("year"))
         spend = player_week_spend(allocations, pos, year)
         if spend > expected_points + 1e-6:
@@ -14538,6 +14540,9 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
                 fpd_set[f"attributes.{attr}"] = attrs[attr]
         if "NG" in attrs:
             fpd_set["attributes.NG"] = attrs["NG"]
+        fpd_set["training_gain_remainders"] = dict(
+            player.get("training_gain_remainders") or {}
+        )
         if pid in position_ratings_updates:
             fpd_set["position_ratings"] = position_ratings_updates[pid]
         pm = player.get("meta") or {}

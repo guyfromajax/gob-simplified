@@ -594,7 +594,12 @@ def develop_rollover(fpd_doc: dict, new_year: str, rng: random.Random,
     # training_position: where the player is being coached this cycle. Defaults to
     # position_intent (natural fit) and is forward-copied; a user converting a
     # player sets it explicitly (UI deferred to a later pass).
-    training_position = fpd_doc.get("training_position") or position_intent
+    from BackEnd.constants.training_shape import resolve_training_position
+    training_position = resolve_training_position({
+        **fpd_doc,
+        "position_intent": position_intent,
+        "position_ratings": ratings,
+    })
     entry_tier = fpd_doc.get("entry_tier")
     if not entry_tier:
         # FALLBACK — should fire ONLY for legacy docs. It fired for every new recruit

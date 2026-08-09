@@ -62,3 +62,13 @@ def test_no_hop_hand_lists_dev_fields_instead_of_the_helper():
     )
     assert not bad, f"hand-listed dev-field carry found — use carry_dev_fields: {bad}"
     assert src.count("carry_dev_fields(") >= 4, "expected carry_dev_fields at each FPD/FRD hop"
+
+
+def test_training_remainders_are_in_carry_and_both_training_write_paths():
+    """The fractional sidecar must survive weekly writes and annual FPD rebuilds."""
+    assert "training_gain_remainders" in PLAYER_DEV_CARRY_FIELDS
+    src = (ROOT / "BackEnd/api/franchise_routes.py").read_text(encoding="utf-8")
+    assert src.count('fpd_set["training_gain_remainders"]') == 2
+    assert src.count('get("training_gain_remainders") or {}') >= 4
+    assert 'db.players.update_one' not in src[src.find('fpd_set["training_gain_remainders"]') - 500:
+                                              src.rfind('fpd_set["training_gain_remainders"]') + 500]

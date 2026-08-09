@@ -3757,6 +3757,18 @@ function showNewSeasonConfirmModal() {
   return overlay;
 }
 
+// Practice-squad assignment screen URL. Shared by the required-cuts modal CTA and
+// the Green Action Button's 'cut-players' mode so both land on the same screen
+// with the same return path.
+function buildAssignPracticeSquadUrl() {
+  const params = new URLSearchParams();
+  params.set('franchise_id', franchiseId);
+  params.set('team_id', userTeamId);
+  params.set('from', 'fcc');
+  params.set('return_url', getCurrentRelativeUrl());
+  return `/cut-players.html?${params.toString()}`;
+}
+
 function showCutPlayersRequiredModal(cutCount) {
   const overlay = document.createElement('div');
   overlay.className = 'gob-modal-overlay fcc-cut-required-modal is-visible';
@@ -3770,7 +3782,7 @@ function showCutPlayersRequiredModal(cutCount) {
         <p id="fcc-cut-required-copy" class="gob-modal-subtitle">Assign ${cutCount} player${cutCount === 1 ? '' : 's'} to your practice squad. They'll sit out this season, but they'll keep developing and return eligible next year.</p>
       </div>
       <div class="gob-modal-actions">
-        <button type="button" class="gob-modal-btn-dismiss" id="fcc-cut-required-close">Close</button>
+        <button type="button" class="gob-modal-btn-primary is-green" id="fcc-cut-required-close">Assign Practice Squad</button>
       </div>
     </div>
   `;
@@ -3785,8 +3797,13 @@ function showCutPlayersRequiredModal(cutCount) {
     if (event.target === overlay || event.target.classList.contains('gob-modal-backdrop')) close();
   });
   document.addEventListener('keydown', onKeydown);
-  overlay.querySelector('#fcc-cut-required-close')?.addEventListener('click', () => {
+  // Straight to the assignment screen — no extra Green Action Button hop.
+  overlay.querySelector('#fcc-cut-required-close')?.addEventListener('click', async () => {
+    playSound('confirm-1-lowervol.wav');
+    const sfxReady = waitForConfirmSfx();
     close();
+    await sfxReady;
+    window.location.href = buildAssignPracticeSquadUrl();
   });
   document.body.appendChild(overlay);
   overlay.querySelector('#fcc-cut-required-close')?.focus();
@@ -4083,13 +4100,8 @@ playNowBtn.addEventListener('click', async () => {
   }
 
   if (mode === 'cut-players') {
-    const params = new URLSearchParams();
-    params.set('franchise_id', franchiseId);
-    params.set('team_id', userTeamId);
-    params.set('from', 'fcc');
-    params.set('return_url', getCurrentRelativeUrl());
     await confirmSfxReady;
-    window.location.href = `/cut-players.html?${params.toString()}`;
+    window.location.href = buildAssignPracticeSquadUrl();
     return;
   }
   

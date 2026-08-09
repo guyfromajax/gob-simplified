@@ -23,8 +23,9 @@ def test_player_attr_range_point_1_freshman(monkeypatch):
     player = _make_player(year="freshman")
     training._apply_player_training_points(player, "SC", 1)
 
-    # Base 1-point range (0,1) with freshman max adjustment +5 -> (0,6)
-    assert calls == [(0, 6)]
+    # Framework §10.6 distinct-gain-band decision superseded the original (0,1)
+    # snapshot: point 1 is now (1,3), with freshman max adjustment +5 -> (1,8).
+    assert calls == [(1, 8)]
 
 
 def test_player_attr_range_point_0_includes_year_max_adjustment(monkeypatch):
@@ -58,16 +59,19 @@ def test_player_attr_range_point_5_sophomore(monkeypatch):
 
 
 def test_pre_training_decay_ranges_by_year():
-    assert training._pre_training_decay_range_for_year("freshman") == (-5, -2)
-    assert training._pre_training_decay_range_for_year("sophomore") == (-4, -1)
-    assert training._pre_training_decay_range_for_year("junior") == (-3, -1)
-    assert training._pre_training_decay_range_for_year("senior") == (-2, 0)
+    # The offseason-ownership decision (§7.2) explicitly retired the heavy decay
+    # treadmill below; weekly decay is now light drag because rollover owns growth.
+    assert training._pre_training_decay_range_for_year("freshman") == (-2, 0)
+    assert training._pre_training_decay_range_for_year("sophomore") == (-2, 0)
+    assert training._pre_training_decay_range_for_year("junior") == (-1, 0)
+    assert training._pre_training_decay_range_for_year("senior") == (-1, 0)
 
 
 def test_pre_training_conditions_use_freshman_decay_range(monkeypatch):
     def fake_randint(a, b):
-        assert (a, b) == (-5, -2)
-        return -5
+        # Same §7.2 offseason-ownership decision as the range contract above.
+        assert (a, b) == (-2, 0)
+        return -2
 
     monkeypatch.setattr(training.random, "randint", fake_randint)
     monkeypatch.setattr(training, "TRAINABLE_PLAYER_ATTRS", ["SC"])
@@ -76,7 +80,7 @@ def test_pre_training_conditions_use_freshman_decay_range(monkeypatch):
     players, _team = training.apply_pre_training_conditions([player], {})
     updated = players[0]["attributes"]["anchor_SC"]
 
-    assert updated == 45
+    assert updated == 48
 
 
 def test_rebound_modifier_uses_half_point_accrual_from_rebounding_and_scrimmages(monkeypatch):
@@ -217,14 +221,15 @@ def test_breaks_does_not_wipe_rebound_modifier_float_gains(monkeypatch):
 
 def test_rebound_modifier_training_keeps_two_decimal_precision(monkeypatch):
     monkeypatch.setattr(training.random, "randint", lambda a, b: 3)  # +0.03
-    monkeypatch.setattr(training.random, "choice", lambda seq: 1.5)
 
     team = {"rebound_modifier": 0.2}
     training._apply_rebound_modifier_training(
         team, 1, archetype="authoritarian", sub_option="authoritarian-rebounding"
     )
 
-    assert team["rebound_modifier"] == 0.24  # round(0.03 * 1.5, 2) = 0.04 → 0.24
+    # The EOG Structural Pass flat-2x focus decision superseded the former random
+    # 1.5–1.8 amplifier: round(0.03 * 2, 2) = 0.06 → 0.26.
+    assert team["rebound_modifier"] == 0.26
 
 
 def test_scrimmages_feed_team_chemistry_at_quarter_rate(monkeypatch):

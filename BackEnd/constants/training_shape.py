@@ -270,12 +270,7 @@ def apply_floor_clamp_to_anchors(player: dict, position: Optional[str] = None) -
     a single pass can leave a 1pt shortfall when raising one attr lifts the mean.
     """
     attrs = player.get("attributes") or {}
-    pos = position or player.get("training_position") or player.get("position_intent")
-    if not pos:
-        ratings = player.get("position_ratings") or {}
-        if ratings:
-            pos = max(ratings, key=ratings.get)
-    pos = pos or "SF"
+    pos = position or resolve_training_position(player)
     for _ in range(len(CORE_12) + 1):
         mean = core12_mean(attrs)
         raised = False
@@ -302,6 +297,15 @@ def resolve_training_position(player: Mapping) -> str:
         if best in TRAINING_COST_WEIGHTS:
             return best
     return "SF"
+
+
+def training_position_projection(player: Mapping) -> dict[str, Optional[str]]:
+    """Fields every training-player producer must carry into execution/UI."""
+    return {
+        "training_position": player.get("training_position"),
+        "position_intent": player.get("position_intent"),
+        "resolved_training_position": resolve_training_position(player),
+    }
 
 
 # Drill subtype → growth attribute (player-development cost units).

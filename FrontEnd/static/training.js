@@ -380,19 +380,7 @@ function setSliderValue(slider, value) {
  * Primary development position for a custom-focus roster row.
  */
 function rosterRowPosition(row) {
-  if (row.training_position) return row.training_position;
-  if (row.position_intent) return row.position_intent;
-  const pr = row.position_ratings || {};
-  let best = null;
-  let bestV = -1;
-  Object.keys(pr).forEach(function (k) {
-    const v = Number(pr[k]);
-    if (!Number.isNaN(v) && v > bestV) {
-      bestV = v;
-      best = k;
-    }
-  });
-  return best || 'SF';
+  return row.resolved_training_position;
 }
 
 /**
