@@ -150,8 +150,8 @@
       return '<span class="my-region-filter"><span class="my-region-label">my region</span>' +
         '<button class="' + classes + '" data-region="' + r + '" aria-label="Region ' + r + ', my region">' + r + '</button></span>';
     };
-    var chips = state.userRegion ? myRegionChip(state.userRegion) : '';
-    chips += '<button class="chip' + (state.region === 'all' ? ' is-active' : '') + '" data-region="all">All</button>';
+    var chips = '<button class="chip' + (state.region === 'all' ? ' is-active' : '') + '" data-region="all">All</button>';
+    if (state.userRegion) chips += myRegionChip(state.userRegion);
     chips += remainingRegions.map(function (r) {
       return '<button class="chip' + (state.region === r ? ' is-active' : '') + '" data-region="' + r + '">' + r + '</button>';
     }).join('');

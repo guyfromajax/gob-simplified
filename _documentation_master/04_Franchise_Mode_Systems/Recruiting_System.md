@@ -280,9 +280,10 @@ The current shared recruiting presentation uses:
 
 RT remains numeric in data and is rendered through the shared letter-grade helper. Recruiting
 surfaces that expose ceiling context render current/potential from backend `potential_rt_ratcheted`.
-In the Hub pool toolbar, the user team's region (from `team_region` in the recruiting-data payload)
-is ordered first, followed by `All` and the other region filters, and is persistently identified in
-green with the `my region` label. The active-filter treatment remains visually distinct.
+In the Hub pool toolbar, `All` is ordered first, followed by the user team's region (from
+`team_region` in the recruiting-data payload) and then the other region filters. The user region is
+persistently identified in green with the `my region` label. The active-filter treatment remains
+visually distinct.
 Immediately to its right, the year filter offers `All`, `JR`, `SO`, `FR`, and `JH`; year, region,
 name, and leaning filters compose rather than replacing one another.
 
