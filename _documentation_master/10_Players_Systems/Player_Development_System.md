@@ -176,7 +176,7 @@ Canonical lever table: [`Tunable_Constants.md`](../11_Design_Systems/Tunable_Con
 | `CAMP_WEEKS` / `CAMP_GAIN_SCALE` | **3** / **1.4** | Camp phase length; camp gain scale (`training_shape.py`) |
 | `IN_SEASON_GAIN_SCALE` | **0.18** | Scales positive weekly gains after camp |
 | `PLAYER_ATTR_GAIN_RANGE_BY_POINTS` | 0:(−2,−1) … 5:(3,6) | Distinct raw bands; E[raw\|5]=4.5 held (`training_execution_v2.py`) |
-| Cost curve / `CLASS_COST_MULT` | cap **3.0**, zeros **4.0**; FR **1.0** → SR **1.4** | `Σ units × cost × class_mult ≤ 24/30` |
+| Gain-fit divisor / `CLASS_GAIN_MULT` | divisor cap **3.0**, walls **4.0**; FR **1.0** → SR **1/1.4** | flat integer spend `Σ notches = 24/30`; position/class multiply gain before remainder |
 | Shape floors | t0 **P6** + weight scale HIGH **0.50** / LOW **0.20** | Decay clamp + TB Apply (diff-scoped) |
 | `STD_RUNG_INCREMENT` (× JH anchor) | FR .17 / SO .20 / JR .15 / SR .18 (Σ .70 → 1.7× at zero peaks) | Per-rung standard growth; sets the class-year ladder |
 | `PEAK_BONUS` | `+0.30 × jh_anchor`, fixed per peak | Each rolled peak adds this to the target; peaks stack (0–3), so career multiple runs 1.7× (0 peaks) → 2.6× (3 peaks) |

@@ -1,13 +1,12 @@
 """Locks the CPU-reference-training coupling: the tuned per-position bases
 (_CPU_REFERENCE_BASE_BY_POS) and the frozen coaching-quality reference are two
 constants that MUST agree, so CPU scores ~1.0 per position and the league sits
-on the ladder once quality is live. Bases must also fit the senior cost budget
-with the shared team/breaks footprint. A change to either the reference or a
+on the ladder once quality is live. Bases must also fit the flat player-point
+share after the shared team/breaks footprint. A change to either the reference or a
 base, without re-fitting, breaks a test here instead of silently drifting the
 league. Models the effective allocation as base × mean-focus-amplifier on each
 player's reference top-3 (what player-maximizer-custom produces at CPU scale)."""
 from BackEnd.utils import player_development as dev
-from BackEnd.constants.training_shape import allocation_budget_cost
 
 POS = ("PG", "SG", "SF", "PF", "C")
 _TEAM_RAW = 8  # breaks 1 + team drills 7
@@ -40,12 +39,12 @@ def test_cpu_reference_training_scores_one_per_position():
     assert spread < 0.08, f"per-position CPU quality spread {spread:.3f} too wide"
 
 
-def test_cpu_reference_bases_fit_senior_cost_budget():
+def test_cpu_reference_bases_fit_flat_player_budget():
     from BackEnd.api.franchise_routes import _CPU_REFERENCE_BASE_BY_POS
     for p in POS:
-        spend = allocation_budget_cost(_CPU_REFERENCE_BASE_BY_POS[p], p, "senior")
-        assert spend <= _PLAYER_BUDGET + 1e-6, (
-            f"{p}: senior player-attr cost {spend:.2f} exceeds budget {_PLAYER_BUDGET}"
+        spend = sum(int(v or 0) for v in _CPU_REFERENCE_BASE_BY_POS[p].values())
+        assert spend <= _PLAYER_BUDGET, (
+            f"{p}: player-attr points {spend} exceed budget {_PLAYER_BUDGET}"
         )
 
 

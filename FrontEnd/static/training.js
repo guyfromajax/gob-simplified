@@ -1,12 +1,12 @@
 // Training Page JavaScript
 let TOTAL_POINTS = 24; // Will be updated from API for franchise mode
-/** @type {Record<string, Record<string, number>>|null} */
-let TRAINING_COST_MATRIX = null;
-const CLASS_COST_MULT = {
+/** Existing position-fit values, now gain divisors rather than budget prices. */
+let TRAINING_GAIN_DIVISOR_MATRIX = null;
+const CLASS_GAIN_MULT = {
   freshman: 1.0, Freshman: 1.0, FR: 1.0,
-  sophomore: 1.1, Sophomore: 1.1, SO: 1.1,
-  junior: 1.25, Junior: 1.25, JR: 1.25,
-  senior: 1.4, Senior: 1.4, SR: 1.4,
+  sophomore: 1 / 1.1, Sophomore: 1 / 1.1, SO: 1 / 1.1,
+  junior: 1 / 1.25, Junior: 1 / 1.25, JR: 1 / 1.25,
+  senior: 1 / 1.4, Senior: 1 / 1.4, SR: 1 / 1.4,
 };
 const SLIDER_ATTR_CODES = {
   'offense-inside': 'SC',
@@ -383,49 +383,59 @@ function rosterRowPosition(row) {
   return row.resolved_training_position;
 }
 
-/**
- * Unit cost for one slider notch on ``attr``, as the most expensive roster
- * player would pay (team-wide plan must fit everyone).
- */
-function unitCostForAttr(attr) {
-  if (!TRAINING_COST_MATRIX || !attr) return 1;
-  const rows = customFocusRoster.length ? customFocusRoster : [{ position_intent: 'SF', year: 'senior' }];
-  let maxCost = 1;
-  rows.forEach(function (row) {
-    const pos = rosterRowPosition(row);
-    const base = (TRAINING_COST_MATRIX[pos] && TRAINING_COST_MATRIX[pos][attr]) || 1;
-    const mult = CLASS_COST_MULT[row.year] || CLASS_COST_MULT[String(row.year || '').toLowerCase()] || 1;
-    maxCost = Math.max(maxCost, base * mult);
-  });
-  return maxCost;
-}
-
-/**
- * Calculate total points allocated across all sliders.
- * Franchise mode with a cost matrix: spent = Σ units × cost (team drills = 1).
- */
+/** Every slider notch costs exactly one whole budget point. */
 function calculateTotalPoints() {
   let total = 0;
   allSliders.forEach(slider => {
-    const units = parseInt(slider.value) || 0;
-    if (!TRAINING_COST_MATRIX) {
-      total += units;
-      return;
-    }
-    const attr = SLIDER_ATTR_CODES[slider.id];
-    if (attr) {
-      total += units * unitCostForAttr(attr);
-    } else {
-      total += units; // team drills / breaks
-    }
+    total += parseInt(slider.value, 10) || 0;
   });
   return total;
 }
 
 function formatPointsDisplay(n) {
-  if (!TRAINING_COST_MATRIX) return String(Math.round(n));
-  const rounded = Math.round(n * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return String(Math.round(n));
+}
+
+function classGainMultiplier(year) {
+  return CLASS_GAIN_MULT[year] || CLASS_GAIN_MULT[String(year || '').toLowerCase()] || 1;
+}
+
+function effectiveGainRate(row, attr) {
+  if (!TRAINING_GAIN_DIVISOR_MATRIX || !attr) return 1;
+  const pos = rosterRowPosition(row);
+  const divisor = (TRAINING_GAIN_DIVISOR_MATRIX[pos] && TRAINING_GAIN_DIVISOR_MATRIX[pos][attr]) || 1;
+  return (1 / divisor) * classGainMultiplier(row.year);
+}
+
+function effectiveValueText(minPct, maxPct) {
+  if (minPct !== maxPct) return `Effective value: ${minPct}%–${maxPct}%`;
+  if (minPct === 100) return 'Full value';
+  if (minPct === 50) return 'Half value';
+  if (minPct === 25) return 'Quarter value';
+  return `Effective value: ${minPct}%`;
+}
+
+function renderEffectiveValueLabels() {
+  if (!TRAINING_GAIN_DIVISOR_MATRIX || !customFocusRoster.length) return;
+  Object.keys(SLIDER_ATTR_CODES).forEach(function (sliderId) {
+    const slider = document.getElementById(sliderId);
+    const label = slider && slider.closest('.slider-label');
+    if (!label) return;
+    const attr = SLIDER_ATTR_CODES[sliderId];
+    const rates = customFocusRoster.map(function (row) { return effectiveGainRate(row, attr); });
+    const minPct = Math.round(Math.min.apply(null, rates) * 100);
+    const maxPct = Math.round(Math.max.apply(null, rates) * 100);
+    let badge = label.querySelector('.effective-value');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'effective-value';
+      const labelText = label.querySelector('.label-text');
+      if (labelText) labelText.insertAdjacentElement('afterend', badge);
+      else label.insertBefore(badge, label.firstChild);
+    }
+    badge.textContent = effectiveValueText(minPct, maxPct);
+    badge.title = `Training gains vary by each player's position fit and class year. This drill delivers ${minPct}%–${maxPct}% of its base gain across your roster.`;
+  });
 }
 
 /**
@@ -630,9 +640,7 @@ function canAllocateMore() {
   for (const slider of allSliders) {
     const cur = parseInt(slider.value, 10) || 0;
     if (cur >= parseInt(slider.max || '5', 10)) continue;
-    const attr = SLIDER_ATTR_CODES[slider.id];
-    const cost = (TRAINING_COST_MATRIX && attr) ? unitCostForAttr(attr) : 1;
-    if (spent + cost <= TOTAL_POINTS + 1e-6) return true;
+    if (spent + 1 <= TOTAL_POINTS) return true;
   }
   return false;
 }
@@ -655,8 +663,7 @@ function updatePointsRemaining() {
     }
   }
   
-  // Cost budgets rarely hit exactly — ready when nothing more fits under the cap.
-  const allPointsAllocated = remaining >= -1e-6 && !canAllocateMore();
+  const allPointsAllocated = remaining === 0;
   const focusSelected = isCoachingFocusSelected();
   const pmOk = isPlayerMaximizerSubmitReady();
 
@@ -724,7 +731,7 @@ window.addEventListener('resize', function () {
 });
 
 /**
- * Auto-Train: assign points under the cost budget and pick a random focus
+ * Auto-Train: assign whole points under the flat budget and pick a random focus
  */
 function autoAssignTraining() {
   playSound('chaotic-choice.wav');
@@ -733,18 +740,11 @@ function autoAssignTraining() {
 
   sliders.forEach(slider => setSliderValue(slider, 0));
 
-  // Prefer cheap attrs first so a mixed roster can still spend the budget.
-  const ranked = sliders.slice().sort(function (a, b) {
-    const ca = SLIDER_ATTR_CODES[a.id] ? unitCostForAttr(SLIDER_ATTR_CODES[a.id]) : 1;
-    const cb = SLIDER_ATTR_CODES[b.id] ? unitCostForAttr(SLIDER_ATTR_CODES[b.id]) : 1;
-    return ca - cb;
-  });
+  const ranked = sliders.slice();
 
-  // Pass 1: put 1 on as many cheap sliders as fit.
+  // Pass 1: put 1 on as many sliders as fit.
   ranked.forEach(function (slider) {
-    const attr = SLIDER_ATTR_CODES[slider.id];
-    const cost = (TRAINING_COST_MATRIX && attr) ? unitCostForAttr(attr) : 1;
-    if (calculateTotalPoints() + cost <= TOTAL_POINTS + 1e-6) {
+    if (calculateTotalPoints() + 1 <= TOTAL_POINTS) {
       setSliderValue(slider, 1);
     }
   });
@@ -761,9 +761,7 @@ function autoAssignTraining() {
       const cur = parseInt(slider.value, 10) || 0;
       const maxV = parseInt(slider.max || '5', 10);
       if (cur >= maxV) continue;
-      const attr = SLIDER_ATTR_CODES[slider.id];
-      const cost = (TRAINING_COST_MATRIX && attr) ? unitCostForAttr(attr) : 1;
-      if (calculateTotalPoints() + cost <= TOTAL_POINTS + 1e-6) {
+      if (calculateTotalPoints() + 1 <= TOTAL_POINTS) {
         setSliderValue(slider, cur + 1);
         bumped = true;
         break;
@@ -1216,10 +1214,10 @@ submitBtn.addEventListener('click', async function() {
   
   const trainingData = collectTrainingData();
   
-  // Cost budget: spend until nothing more fits (exact fill is rare with float costs).
+  // Flat integer budget: every slider notch costs exactly one point.
   const remaining = TOTAL_POINTS - calculateTotalPoints();
-  if (remaining < -1e-6 || canAllocateMore()) {
-    alert(`Please allocate training points until none remain (budget ${TOTAL_POINTS}).`);
+  if (remaining !== 0) {
+    alert(`Please allocate all ${TOTAL_POINTS} training points before submitting.`);
     return;
   }
   
@@ -1514,13 +1512,14 @@ async function initializeTrainingPoints() {
       if (response.ok) {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
-        if (data.cost_matrix && typeof data.cost_matrix === 'object') {
-          TRAINING_COST_MATRIX = data.cost_matrix;
+        if (data.gain_divisor_matrix && typeof data.gain_divisor_matrix === 'object') {
+          TRAINING_GAIN_DIVISOR_MATRIX = data.gain_divisor_matrix;
         }
         currentWeek = Number(data.week || 1);
         currentTeamName = data.user_team_name || currentTeamName || '';
         if (Array.isArray(data.custom_focus_roster)) {
           customFocusRoster = data.custom_focus_roster;
+          renderEffectiveValueLabels();
         }
         if (Array.isArray(data.player_maximizer_ranking_attrs)) {
           customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
@@ -1915,7 +1914,7 @@ function updateRequirementsBar() {
   const total = TOTAL_POINTS;
   const used = calculateTotalPoints();
   const remaining = total - used;
-  const pointsComplete = remaining >= -1e-6 && !canAllocateMore();
+  const pointsComplete = remaining === 0;
 
   if (reqPointsUsedEl) reqPointsUsedEl.textContent = formatPointsDisplay(used);
   if (reqPointsTotalEl) reqPointsTotalEl.textContent = formatPointsDisplay(total);

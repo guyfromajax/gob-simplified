@@ -43,9 +43,7 @@ from BackEnd.api.franchise_routes import (  # noqa: E402
 from BackEnd.constants.training_shape import (  # noqa: E402
     CAMP_GAIN_SCALE,
     CAMP_WEEKS,
-    allocation_budget_cost,
     is_camp_week,
-    training_attr_cost,
 )
 from BackEnd.utils.shape_movement import decompose_shape_delta  # noqa: E402
 
@@ -133,16 +131,16 @@ def _units_to_alloc(units: dict) -> dict:
     }
 
 
-def _fit_under_budget(units: dict, pos: str, budget: float = 22.0) -> dict:
-    """Trim most expensive units until senior cost ≤ budget (leave room for breaks)."""
+def _fit_under_budget(units: dict, pos: str, budget: int = 22) -> dict:
+    """Trim units until the flat integer allocation fits (leave room for breaks)."""
     u = {a: int(units.get(a, 0) or 0) for a in GROWTH}
     for _ in range(40):
-        if allocation_budget_cost(u, pos, "senior") <= budget + 1e-6:
+        if sum(u.values()) <= budget:
             break
-        cands = [(a, training_attr_cost(pos, a), u[a]) for a in GROWTH if u[a] > 0]
+        cands = [(a, u[a]) for a in GROWTH if u[a] > 0]
         if not cands:
             break
-        cands.sort(key=lambda x: (-x[1], -x[2], x[0]))
+        cands.sort(key=lambda x: (-x[1], x[0]))
         u[cands[0][0]] -= 1
     return u
 

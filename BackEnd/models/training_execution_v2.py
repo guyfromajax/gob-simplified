@@ -958,8 +958,8 @@ def _apply_player_training_points(
 
     Base ranges: ``PLAYER_ATTR_GAIN_RANGE_BY_POINTS`` (distinct across 1–5;
     E[raw|5] held at 4.5). Year-max adjustments: Freshman +5 … Senior +1.
-    Positive gains scale via ``gain_scale`` with a per-attribute fractional
-    remainder (``training_gain_remainders``) so sub-integer signal accumulates.
+    Positive gains scale by session, position fit, and class year before entering
+    the per-attribute fractional remainder (``training_gain_remainders``).
     """
     if gain_scale is None:
         gain_scale = IN_SEASON_GAIN_SCALE
@@ -1020,7 +1020,9 @@ def _apply_player_training_points(
     # Scale positive gains (in-season ~0.18; camp ~1.4) with fractional remainder.
     # Only positive gains scale — the 0-point (-2,-1) drag is unchanged. §10.3 / §10.6.
     if increase > 0:
-        increase = _apply_scaled_gain_with_remainder(player, attr, increase, gain_scale)
+        from BackEnd.constants.training_shape import player_attr_gain_multiplier
+        effective_scale = gain_scale * player_attr_gain_multiplier(player, attr)
+        increase = _apply_scaled_gain_with_remainder(player, attr, increase, effective_scale)
 
     # Apply increase
     current_val = attrs.get(anchor_key, 0)

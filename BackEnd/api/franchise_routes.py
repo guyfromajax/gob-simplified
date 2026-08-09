@@ -2297,13 +2297,13 @@ _AUTOTRAIN_PLAYER_ATTRS = [
 # ── CPU reference training ────────────────────────────────────────────────────
 # CPU auto-train trains the coaching-quality REFERENCE (was: random allocation +
 # random focus, which nets −9 RT/season and scores well below 1.0 → the league
-# drifts under the ladder once quality is live). Under the framework cost curve
-# (§10.1) a single team-wide allocation cannot be affordable for a PG and a C at
-# once, so auto-train groups by development position and uses a per-position base.
+# drifts under the ladder once quality is live). Position fit now discounts gain,
+# so auto-train groups by development position to preserve each role's intended
+# reference emphasis rather than to make differently priced plans affordable.
 # Each player's own reference top-3 is still amplified via player-maximizer CUSTOM
 # focus. Bases are FITTED so effective allocation (base × _CPU_FOCUS_AMP_MEAN on
 # each player's reference top-3) scores ~1.0 per position against the FROZEN
-# reference_allocation anchor AND fits the senior cost budget with the shared
+# reference_allocation anchor AND fits the flat 24-point budget with the shared
 # team/breaks footprint. Locked by tests/test_cpu_reference_training.py.
 _CPU_FOCUS_AMP_MEAN = 1.65  # season-mean of random.choice([1.5,1.6,1.7,1.8]) in _apply_player_training_points
 _CPU_REFERENCE_BASE_BY_POS = {
@@ -2451,7 +2451,7 @@ def auto_train_one_cpu_team(
         else is_camp_week(week)
     )
 
-    # Per-position bases + per-player custom focus (framework cost curve).
+    # Per-position bases + per-player custom focus (gain-side fit model).
     coaching_focus = "player-maximizer-custom"
     coaching_focus_custom_by_player = _cpu_reference_custom_focus(players_for_training, fpd_by_player_id)
 
@@ -14014,7 +14014,7 @@ def get_training_points(franchise_id: str):
         CAMP_POINT_BUDGET,
         CAMP_WEEKS,
         IN_SEASON_POINT_BUDGET,
-        cost_matrix,
+        gain_divisor_matrix,
         is_camp_week,
     )
     is_first_training = is_camp_week(week)
@@ -14032,7 +14032,7 @@ def get_training_points(franchise_id: str):
         "is_first_training": is_first_training,
         "is_camp_week": is_first_training,
         "camp_weeks": CAMP_WEEKS,
-        "cost_matrix": cost_matrix(),
+        "gain_divisor_matrix": gain_divisor_matrix(),
         "week": week,
         "user_team_name": franchise_doc.get("user_team_id"),
         "custom_focus_roster": custom_roster,
@@ -14159,8 +14159,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         CAMP_WEEKS,
         IN_SEASON_POINT_BUDGET,
         is_camp_week,
-        player_week_spend,
-        resolve_training_position,
+        training_points_spent,
         training_position_projection,
     )
     is_first_training = is_camp_week(week)
@@ -14230,8 +14229,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     else:
         raise HTTPException(status_code=400, detail="Invalid training phase")
     
-    # Validate cost-weighted spend later (after roster load). Raw slider sum is
-    # no longer the budget unit — η is a budget cost (§10.1).
+    # Flat budget: every slider notch costs exactly one whole point.
     training_data = req.training_data
     allocations = {
         "player_drills": training_data.get("player_drills", {}),
@@ -14334,26 +14332,14 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     if not players_for_training:
         raise HTTPException(status_code=404, detail="No players found for training")
 
-    # Cost-curve budget: every roster player must be able to afford this plan.
-    over_budget = []
-    for player in players_for_training:
-        pos = resolve_training_position(player)
-        year = player.get("year") or ((player.get("meta") or {}).get("year"))
-        spend = player_week_spend(allocations, pos, year)
-        if spend > expected_points + 1e-6:
-            label = (
-                f"{player.get('first_name','')} {player.get('last_name','')}".strip()
-                or player["_id"]
-            )
-            over_budget.append(f"{label} ({pos}): {spend:.1f}/{expected_points}")
-    if over_budget:
+    try:
+        spend = training_points_spent(allocations)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if spend != expected_points:
         raise HTTPException(
             status_code=400,
-            detail=(
-                "Training allocation exceeds the cost budget for: "
-                + "; ".join(over_budget[:5])
-                + (f" (+{len(over_budget)-5} more)" if len(over_budget) > 5 else "")
-            ),
+            detail=f"Training allocation must spend exactly {expected_points} points; received {spend}",
         )
     
     # Get team stats (team_attributes) from FTD

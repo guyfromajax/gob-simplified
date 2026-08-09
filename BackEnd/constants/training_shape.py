@@ -1,7 +1,7 @@
-"""Player-development shape constants — cost curve, floors, camp (§10).
+"""Player-development shape constants — fit discounts, floors, camp (§10).
 
-Cost is a budget multiplier (not a gain damper). Floors are weight-scaled from
-the same TRAINING_COST_WEIGHTS table. Shape-P6 bases are frozen from the
+Position fit is a gain divisor (never a budget price). Floors are weight-scaled
+from the same TRAINING_COST_WEIGHTS table. Shape-P6 bases are frozen from the
 pre-development t0 league export (seed 202608061); never re-derive from a
 developed snapshot.
 """
@@ -16,7 +16,7 @@ CORE_12: Tuple[str, ...] = (
 )
 POSITIONS: Tuple[str, ...] = ("PG", "SG", "SF", "PF", "C")
 
-# ── Cost curve ──────────────────────────────────────────────────────────────
+# ── Position-fit gain curve ─────────────────────────────────────────────────
 TRAINING_COST_GAMMA = 1.0
 TRAINING_COST_DERIVED_CAP = 3.0
 TRAINING_COST_ZERO = 4.0
@@ -31,22 +31,22 @@ TRAINING_COST_PHYSICAL_ZEROS: Dict[str, frozenset] = {
     "C": frozenset({"AG"}),
 }
 
-CLASS_COST_MULT: Dict[str, float] = {
+CLASS_GAIN_MULT: Dict[str, float] = {
     "freshman": 1.0,
-    "sophomore": 1.1,
-    "junior": 1.25,
-    "senior": 1.4,
+    "sophomore": 1.0 / 1.1,
+    "junior": 1.0 / 1.25,
+    "senior": 1.0 / 1.4,
     "Freshman": 1.0,
-    "Sophomore": 1.1,
-    "Junior": 1.25,
-    "Senior": 1.4,
+    "Sophomore": 1.0 / 1.1,
+    "Junior": 1.0 / 1.25,
+    "Senior": 1.0 / 1.4,
     "FR": 1.0,
-    "SO": 1.1,
-    "JR": 1.25,
-    "SR": 1.4,
+    "SO": 1.0 / 1.1,
+    "JR": 1.0 / 1.25,
+    "SR": 1.0 / 1.4,
 }
 
-# Final locked weights (2026-08-07). Universals omitted → cost 1.
+# Final locked weights (2026-08-07). Universals omitted → divisor 1.
 TRAINING_COST_WEIGHTS: Dict[str, Dict[str, float]] = {
     "PG": {
         "BH": 0.30, "AG": 0.25, "PS": 0.15, "OD": 0.15, "SH": 0.135,
@@ -118,14 +118,14 @@ def is_camp_week(week: int) -> bool:
     return 1 <= w <= CAMP_WEEKS
 
 
-def class_cost_multiplier(year: Optional[str]) -> float:
+def class_gain_multiplier(year: Optional[str]) -> float:
     if not year:
         return 1.0
-    return CLASS_COST_MULT.get(str(year).strip(), CLASS_COST_MULT.get(str(year).strip().lower(), 1.0))
+    return CLASS_GAIN_MULT.get(str(year).strip(), CLASS_GAIN_MULT.get(str(year).strip().lower(), 1.0))
 
 
-def training_attr_cost(position: str, attr: str) -> float:
-    """Unit cost for one allocation point on ``attr`` at ``position``."""
+def training_attr_gain_divisor(position: str, attr: str) -> float:
+    """Existing fit matrix expressed as a gain divisor, not a budget price."""
     if attr in TRAINING_COST_UNIVERSALS:
         return 1.0
     pos = position if position in TRAINING_COST_WEIGHTS else "SF"
@@ -142,19 +142,16 @@ def training_attr_cost(position: str, attr: str) -> float:
     return round(min(TRAINING_COST_DERIVED_CAP, raw), 2)
 
 
-def allocation_budget_cost(
-    units_by_attr: Mapping[str, float],
-    position: str,
-    year: Optional[str] = None,
-) -> float:
-    """Σ units × attr_cost × class_mult."""
-    mult = class_cost_multiplier(year)
-    total = 0.0
-    for attr, units in units_by_attr.items():
-        if not units:
-            continue
-        total += float(units) * training_attr_cost(position, attr) * mult
-    return total
+def training_attr_gain_multiplier(position: str, attr: str) -> float:
+    """Fraction of raw gain retained for position fit (walls retain 25%)."""
+    return 1.0 / training_attr_gain_divisor(position, attr)
+
+
+def player_attr_gain_multiplier(player: Mapping, attr: str) -> float:
+    """Combined position-fit and class-year multiplier for one player's gain."""
+    position = resolve_training_position(player)
+    year = player.get("year") or ((player.get("meta") or {}).get("year"))
+    return training_attr_gain_multiplier(position, attr) * class_gain_multiplier(year)
 
 
 def _cost_rel(position: str, attr: str) -> float:
@@ -389,16 +386,29 @@ def non_player_raw_points(allocations: Mapping) -> float:
     return total
 
 
-def player_week_spend(
-    allocations: Mapping,
-    position: str,
-    year: Optional[str] = None,
-) -> float:
-    """Position-priced player units + flat team/breaks share."""
-    return allocation_budget_cost(
-        units_by_attr_from_allocations(allocations), position, year
-    ) + non_player_raw_points(allocations)
+def training_points_spent(allocations: Mapping) -> int:
+    """Flat budget: every allocation leaf is a whole point count.
+
+    Reject fractional API payloads rather than truncating them or allowing two
+    fractional leaves to add up to an apparently valid integer budget.
+    """
+    def _sum_whole(value) -> int:
+        if isinstance(value, Mapping):
+            return sum(_sum_whole(child) for child in value.values())
+        if value is None:
+            return 0
+        if isinstance(value, bool):
+            raise ValueError("training allocations must be whole numbers from 0 to 5")
+        try:
+            number = float(value)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("training allocations must be whole numbers from 0 to 5") from exc
+        if not number.is_integer() or not 0 <= number <= 5:
+            raise ValueError("training allocations must be whole numbers from 0 to 5")
+        return int(number)
+
+    return _sum_whole(allocations)
 
 
-def cost_matrix() -> Dict[str, Dict[str, float]]:
-    return {pos: {a: training_attr_cost(pos, a) for a in CORE_12} for pos in POSITIONS}
+def gain_divisor_matrix() -> Dict[str, Dict[str, float]]:
+    return {pos: {a: training_attr_gain_divisor(pos, a) for a in CORE_12} for pos in POSITIONS}

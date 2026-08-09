@@ -53,15 +53,18 @@ def test_all_position_consumers_use_the_canonical_resolver_or_projection():
     api = (ROOT / "BackEnd/api/franchise_routes.py").read_text(encoding="utf-8")
     team_builder = (ROOT / "BackEnd/utils/team_builder_roster.py").read_text(encoding="utf-8")
     frontend = (ROOT / "FrontEnd/static/training.js").read_text(encoding="utf-8")
+    execution = (ROOT / "BackEnd/constants/training_shape.py").read_text(encoding="utf-8")
 
     # User/CPU producers and the client payload originate from one projection.
     assert api.count("training_position_projection(") >= 3
-    # User budget validation and CPU grouping consume the same resolved player shape.
-    assert "pos = resolve_training_position(player)" in api
+    # Flat budget validation no longer depends on position. Gain execution and
+    # CPU grouping both consume the canonical resolver.
+    assert "position = resolve_training_position(player)" in execution
     assert "pos = resolve_training_position(p)" in api
     # Team Builder already used the canonical resolver.
     assert "pos = resolve_training_position({" in team_builder
-    # Browser pricing consumes the server result; it has no independent fallback chain.
+    # Browser effective-value presentation consumes the server result; it has no
+    # independent fallback chain.
     start = frontend.index("function rosterRowPosition")
     end = frontend.index("\n}", start)
     resolver_body = frontend[start:end]

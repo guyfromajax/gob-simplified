@@ -1,6 +1,6 @@
 """Permanent suite for the player-development shape framework (§10).
 
-Shape-dispersion lives HERE — not as a follow-up. Every cost / floor / camp /
+Shape-dispersion lives HERE — not as a follow-up. Every fit / floor / camp /
 offseason parameter was chosen against shape; a suite that can only see level
 will undo the next tuning pass.
 """
@@ -16,27 +16,27 @@ from BackEnd.constants.training_shape import (
     POSITIONS,
     TRAINING_COST_PHYSICAL_ZEROS,
     TRAINING_COST_ZERO,
-    cost_matrix,
+    gain_divisor_matrix,
     floor_violations,
     is_camp_week,
-    training_attr_cost,
+    training_attr_gain_divisor,
 )
 from BackEnd.utils import player_development as dev
 from BackEnd.utils import player_generation as gen
 
 
-# ── Cost matrix locks ─────────────────────────────────────────────────────────
+# ── Gain-divisor matrix locks ─────────────────────────────────────────────────
 
-def test_cost_matrix_ag_and_st_monotonicity():
-    """AG dearer as bigger; ST cheaper as bigger (framework §10.1)."""
-    ag = [training_attr_cost(p, "AG") for p in POSITIONS]
-    st = [training_attr_cost(p, "ST") for p in POSITIONS]
+def test_gain_divisor_matrix_ag_and_st_monotonicity():
+    """AG is less effective as players get bigger; ST more effective."""
+    ag = [training_attr_gain_divisor(p, "AG") for p in POSITIONS]
+    st = [training_attr_gain_divisor(p, "ST") for p in POSITIONS]
     assert ag == sorted(ag), f"AG not ordered PG→C: {ag}"
     assert st == sorted(st, reverse=True), f"ST not ordered PG→C desc: {st}"
 
 
-def test_cost_matrix_walls_only_on_explicit_zeros():
-    matrix = cost_matrix()
+def test_gain_divisor_matrix_walls_only_on_explicit_zeros():
+    matrix = gain_divisor_matrix()
     for pos in POSITIONS:
         zeros = TRAINING_COST_PHYSICAL_ZEROS[pos]
         for a in CORE_12:
@@ -49,8 +49,8 @@ def test_cost_matrix_walls_only_on_explicit_zeros():
 
 def test_od_and_sh_are_not_size_ordered():
     """Documented exceptions — perimeter D peaks at the wing; shooting has no size order."""
-    od = [training_attr_cost(p, "OD") for p in POSITIONS]
-    sh = [training_attr_cost(p, "SH") for p in POSITIONS]
+    od = [training_attr_gain_divisor(p, "OD") for p in POSITIONS]
+    sh = [training_attr_gain_divisor(p, "SH") for p in POSITIONS]
     assert od != sorted(od) and od != sorted(od, reverse=True)
     assert sh != sorted(sh) and sh != sorted(sh, reverse=True)
     assert od[2] == min(od), "SF should be cheapest OD (wing peak)"

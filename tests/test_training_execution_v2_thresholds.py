@@ -1,4 +1,5 @@
 import BackEnd.models.training_execution_v2 as training
+import BackEnd.constants.training_shape as training_shape
 
 
 def _make_player(year="junior", anchor_val=50):
@@ -281,6 +282,9 @@ def test_scrimmages_feed_team_chemistry_at_quarter_rate(monkeypatch):
 
 def test_training_gain_is_halved_when_player_starts_above_100(monkeypatch):
     monkeypatch.setattr(training.random, "randint", lambda a, b: 5)
+    # This assertion owns the >100 halving boundary, so isolate it from the
+    # separately tested position/class gain discount.
+    monkeypatch.setattr(training_shape, "player_attr_gain_multiplier", lambda _p, _a: 1.0)
 
     player = _make_player(year="junior", anchor_val=102)
     training._apply_player_training_points(player, "SC", 4, starting_baseline=102)
@@ -293,6 +297,7 @@ def test_training_gain_is_halved_when_player_starts_above_100(monkeypatch):
 
 def test_training_gain_is_not_reduced_when_player_starts_at_99(monkeypatch):
     monkeypatch.setattr(training.random, "randint", lambda a, b: 6)
+    monkeypatch.setattr(training_shape, "player_attr_gain_multiplier", lambda _p, _a: 1.0)
 
     player = _make_player(year="junior", anchor_val=99)
     training._apply_player_training_points(player, "SC", 4, starting_baseline=99)
