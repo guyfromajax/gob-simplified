@@ -133,6 +133,34 @@ Plus the CPU-path shape check (`test_cpu_path_preserves_shape`): under level-onl
 
 **Test files:** `tests/test_in_season_invariants.py`, `tests/test_offseason_attractor.py`, `tests/test_training_shape_framework.py`.
 
+## Open — training-squad progression is a second, uncorrected shape channel
+
+`_apply_training_squad_progression_and_report` (`franchise_routes.py:11486`, `_ts_progression_delta`)
+evolves every **training-squad** player's 13 attributes weeks 2–26 (user **and** CPU) by an
+**independent CH-gated ±2 random walk per attribute**, with a min-1 clamp only — **no shape floors,
+no fitted rung increment**. It is a distinct path from `develop_rollover`; the Four Invariants above
+do **not** cover it (they test the reference-allocation offseason path).
+
+Why this is a shape problem, not just "unfitted physics":
+
+- **Level damage washes out; shape damage does not.** The offseason is absolute-target and rescales
+  the current vector onto the ladder, so wherever in-season left the *level*, the rung close
+  re-anchors it. But that rescale is **uniform — it preserves ratios** (§ Shape Attractor — retired;
+  Offseason Development Event). So a floorless per-attribute random walk **permanently distorts the
+  profile**, and the offseason merely scales the distorted shape up to target.
+- That makes it a **second uncorrected shape channel**, structurally the same as the one under
+  investigation after the attractor was retired (`OFFSEASON_ATTRACTOR_ALPHA = 0.0`) — and it runs on
+  the **training squad, ~20% of the league**.
+
+**Magnitude** (CH flat 1–100, weighting the delta bands): ≈ **−7 per attribute per season** on
+average, with **~79% of training-squad players declining** (only CH > 79 has positive drift). Not
+marginal.
+
+**Measurement + warning:** the **same per-position shape check outstanding on the drift work** would
+surface this. Whoever runs that check must account for this path first — **measuring shape drift
+while a floorless random walk runs on a fifth of the league will attribute the drift to the wrong
+cause.** (Flagged 2026-08 during the walk-on tier / peak-eligibility work; no fix attempted here.)
+
 ## Tunable Constants
 
 Canonical lever table: [`Tunable_Constants.md`](../11_Design_Systems/Tunable_Constants.md) A — LEVERS. Development-relevant values:

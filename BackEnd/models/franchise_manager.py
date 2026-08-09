@@ -225,6 +225,14 @@ RECRUIT_YEAR_WEIGHTS = [("JH", 55), ("Freshman", 15), ("Sophomore", 15), ("Junio
 # Poor tier — walk-ons are on the same class-year ladder as everyone else (§4.1/§11.2).
 WALK_ON_YEAR_WEIGHTS = [("Freshman", 10), ("Sophomore", 40), ("Junior", 40), ("Senior", 10)]
 
+# Walk-on TIER mix — DRAWN PER WALK-ON (replaces the old hardcoded Poor). Walk-ons are
+# mostly weak, a meaningful minority ordinary, and ~one Good per team every few seasons —
+# enough that finding one feels like something. No Great/Elite: at ~200 walk-ons/season
+# even 0.5% Elite is one per league per season, which a user sees essentially never. Tier
+# already limits them (a Poor walk-on with 3 peaks + max potential reaches ~RT 60, a useful
+# senior not a star), so potential_factor is NOT skewed — see generate_walk_on_profile.
+WALK_ON_TIER_WEIGHTS = [("Poor", 65), ("BelowAverage", 25), ("Average", 8), ("Good", 2)]
+
 
 def generate_walk_on_profile() -> dict:
     """Generate a single walk-on player profile.
@@ -237,7 +245,7 @@ def generate_walk_on_profile() -> dict:
     cap, so a high-CH walk-on can still develop.
     """
     from BackEnd.utils.player_generation import draw_position_intent, generate_player
-    from BackEnd.utils.player_development import roll_growth_profile
+    from BackEnd.utils.player_development import roll_growth_profile, remaining_rungs_for_year
 
     first_names, last_names, first_name_weights = get_franchise_name_assets()
     year = random.choices(
@@ -245,13 +253,23 @@ def generate_walk_on_profile() -> dict:
         weights=[w for _, w in WALK_ON_YEAR_WEIGHTS],
         k=1,
     )[0]
+    tier = random.choices(
+        [t for t, _ in WALK_ON_TIER_WEIGHTS],
+        weights=[w for _, w in WALK_ON_TIER_WEIGHTS],
+        k=1,
+    )[0]
     first_name = choose_franchise_first_name(first_names, first_name_weights)
     last_name = random.choice(last_names).title()
     name = f"{first_name} {last_name}"
 
     intent = draw_position_intent(random)
-    gp = generate_player(intent, year, "Poor", random, name=name)
-    development = roll_growth_profile(int(gp["attributes"].get("CH", 50)), random)
+    # Tier drawn per walk-on; the SAME value feeds the generator and the returned
+    # entry_tier so the player is generated and labelled on one ladder (never split).
+    gp = generate_player(intent, year, tier, random, name=name)
+    # Peaks restricted to the rungs still ahead of this roster year (§11.3) — a senior
+    # walk-on correctly ends with zero peaks rather than phantom ones behind him.
+    development = roll_growth_profile(int(gp["attributes"].get("CH", 50)), random,
+                                     eligible_peak_rungs=remaining_rungs_for_year(year))
     return {
         "recruit_id": None,
         "name": name,
@@ -259,9 +277,11 @@ def generate_walk_on_profile() -> dict:
         "position_ratings": gp["position_ratings"],
         "height": gp["height"],
         "weight": gp["weight"],
+        # archetype stays the "Walk On" SENTINEL (not the derived 5-label): roster
+        # display gating, the walk_on flag and band resampling all key off it.
         "archetype": "Walk On",
         "year": year,
-        "entry_tier": "Poor",
+        "entry_tier": tier,
         "position_intent": intent,
         "development": development,
         "potential_factor": gp["potential_factor"],
@@ -1062,7 +1082,7 @@ class RecruitManager:
             draw_tier,
             generate_player,
         )
-        from BackEnd.utils.player_development import roll_growth_profile
+        from BackEnd.utils.player_development import roll_growth_profile, remaining_rungs_for_year
 
         # Year DRAWN PER RECRUIT from RECRUIT_YEAR_WEIGHTS (per-class variance, not exact
         # counts). Sustains the class-year distribution seeded by set_0001; seasons 2+ used
@@ -1081,8 +1101,11 @@ class RecruitManager:
             # Shared generator draws height + target-scaled attributes + CH/EM/MO/NG.
             gp = generate_player(intent, year, tier, random, name=name)
             # Growth profile frozen at generation from the (flat) CH seed (§5, §10).
+            # Peaks restricted to the rungs still ahead of the recruit (§11.3): he signs
+            # advanced one year, so a peak on a rung already behind him would never fire.
             ch_seed = int(gp["attributes"].get("CH", 50))
-            development = roll_growth_profile(ch_seed, random)
+            development = roll_growth_profile(ch_seed, random,
+                                              eligible_peak_rungs=remaining_rungs_for_year(year))
 
             recruits.append({
                 "name": name,

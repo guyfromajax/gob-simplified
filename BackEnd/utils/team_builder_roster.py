@@ -1148,19 +1148,18 @@ def _build_inherited_roster_payloads(
         if fpd:
             inherited.append(_payload_from_fpd_doc(fpd))
         else:
+            # No wizard walk-on and no source FPD for this slot. This payload IS
+            # persisted (→ apply_diffs_to_inherited_roster → roster docs), so draw a
+            # REAL walk-on from the shared generator rather than a hardcoded-Poor stub —
+            # single-sourced tier (WALK_ON_TIER_WEIGHTS) + populated attributes/dev.
+            wo = generate_walk_on_profile()
+            _first, _, _last = str(wo.get("name") or "").partition(" ")
             inherited.append(
-                {
-                    "meta": {
-                        "first_name": "Walk",
-                        "last_name": "On",
-                        "team": team_name,
-                        "team_id": str(team_object_id),
-                        "archetype": "Walk On",
-                        "year": "Freshman",
-                    },
-                    "attributes": {},
-                    "entry_tier": "Poor",
-                }
+                _payload_from_wizard_walk_on(
+                    {**wo, "first_name": _first or "Walk", "last_name": _last or "On"},
+                    team_name=team_name,
+                    team_object_id=team_object_id,
+                )
             )
     return inherited
 

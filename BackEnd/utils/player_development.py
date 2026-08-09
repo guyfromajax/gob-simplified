@@ -288,6 +288,21 @@ def roll_growth_profile(ch_seed: int, rng: random.Random,
             "ht_total": ht_total}
 
 
+def remaining_rungs_for_year(year) -> List[str]:
+    """Peak-eligible rungs for a player GENERATED at ``year`` — the offseason
+    transitions still AHEAD of him, so a peak never lands on a rung already behind
+    (§11.3 past-fixed/future-varies). JH → all four (FR/SO/JR/SR); a senior → none.
+    Pass this as ``eligible_peak_rungs`` at every generation site (roll_growth_profile
+    caps peak_count to the eligible list, so a senior walk-on correctly gets zero peaks).
+
+    Works for BOTH walk-ons (``year`` is the roster year, used as-is) and recruits: a
+    recruit signs advanced one year and develop_rollover fires the transition INTO that
+    advanced year, which nets to exactly this slice taken from the GENERATION year — so
+    both sites pass the year they generate at."""
+    from BackEnd.utils.player_generation import normalize_year
+    return list(RUNG_TRANSITIONS[_RATINGS_LADDER.index(normalize_year(year)):])
+
+
 def _compress_rt(raw: float) -> float:
     """Soft ceiling near RT_SOFT_CAP (§4.3). Near-identity below the cap — the
     fitted increments already bound elite+3-peak at 50·2.6 = 130, so this is a
@@ -659,6 +674,6 @@ __all__ = [
     "COACHING_HEADROOM", "COACHING_REFERENCE_BREADTH",
     "COACHING_REFERENCE_PRIMARY_PTS", "COACHING_REFERENCE_BASELINE_PTS",
     "reference_allocation", "season_coaching_quality", "coaching_f",
-    "roll_growth_profile", "develop_one_offseason", "develop_rollover",
-    "init_career", "simulate_career", "entry_tier_at_year",
+    "roll_growth_profile", "remaining_rungs_for_year", "develop_one_offseason",
+    "develop_rollover", "init_career", "simulate_career", "entry_tier_at_year",
 ]
