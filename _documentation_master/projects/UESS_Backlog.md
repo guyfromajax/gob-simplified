@@ -11,6 +11,69 @@
 > - **Item 11 (After-Steal FB migration) — DONE (May 2026).** New resolver `after_steal_fast_break.py` + emitter `after_steal_fast_break_step_emitter.py`; schema steps + shared post-shot chain. §2.7 / §3.2 After-Steal rows below are obsolete.
 > - **Still open:** 5 (backend visual clamping), 7 (`apply_coords_from_animations_list` mid-resolution calls — now 12 sites in phase_resolution + 6 in rim_runner), 8 (clock-authority ordering bug), 9 (`shot_state_snapshot` — still zero grep hits), 10 (Opening Tip emitter — not built), 12 (remaining embedded-DREB paths), 13 (FE pure-renderer cleanup), 14 (ownership fields — still zero grep hits), 15 (static HCT removal — callers still live in phase_resolution), 16 (dead FE code), 17 (UESS §2 doc updates).
 
+## Coordinate-orientation cleanup status (August 2026)
+
+The canonical runtime/payload mirror is backend-only
+`x_away = 100 - x_home`; emitted gameplay coordinates are already in final
+display orientation. The focused migration completed Final Turn alignment,
+general BIP, SIP, OREB kickout, and the Fast Break BLOCK landing correction.
+Those paths no longer require frontend orientation selection.
+
+Remaining exceptions are compatibility/dead-code work under the broader
+frontend pure-renderer backlog:
+
+1. **Legacy Fast Break renderer:** `fastBreak.js::animateDefensiveStop` can
+   still mirror backend animation coordinates for away offense and replace the
+   backend ball-handler endpoint with a frontend top-of-key target. Legacy FB
+   shot/rebound/get-back branches also retain frontend basket selection and
+   random fallback destinations. All four migrated FB families use schema when
+   `animation_steps` exist; remove these coordinate decisions together with the
+   legacy renderer/fallback retirement, not piecemeal.
+2. **Schema no-arc shot fallback:** `animationPlayback.js::runShotAttempt`
+   still infers the attacking rim/sweet spot from the shooter sprite when
+   `schema_rendered_arc` is absent. Supported migrated shot emitters stamp the
+   schema arc; retain this only as an explicit compatibility fallback until all
+   callers are proven covered.
+3. **Generic defensive-stop fallback:**
+   `turnAnimation.js::runDefensiveStopTransition` remains reachable for a
+   non-Fast-Break `DEFENSIVE_STOP` without schema and selects the top-of-key
+   target, nearest defender, and contest offset in the frontend. Replace it
+   with backend endpoints or remove it after supported caller coverage is
+   proven.
+4. **Disabled countdown choreography:** `countdownAnimation.js` still chooses
+   and mirrors random player destinations, but its only callsite is inside the
+   disabled clipboard-countdown block in `gameScene.js`. Treat it as dead
+   coaching-moment code: delete it or redesign it as explicitly cosmetic before
+   re-enabling; it must not become gameplay-coordinate authority.
+5. **Coordinate-contract test drift:** the focused August 2026 audit found a
+   one-grid FCP home/away mismatch in
+   `test_bip_pressure_destinations_have_home_away_parity` and two stale Final
+   Turn expectations (deterministic paired spot selection and resolver-level
+   `time_elapsed`, now owned by post-emit EOQ clock progression). Trace the FCP
+   one-grid delta before changing production geometry; update Final Turn tests
+   only after aligning their RNG/clock fixtures with the current contracts.
+
+No gameplay-facing `101 - x` formula remains in the animation source. Frontend
+grid-to-pixel conversion and render-only offsets remain allowed; any new team-
+side mirror or random gameplay destination in schema playback is a regression.
+
+## Hybrid unit-completion compatibility layer
+
+The March 2026 unified-animation blueprint has been retired as architecture
+guidance. Its remaining implementation artifact,
+`FrontEnd/static/js/phaser/animation/unitCompletionContract.js`, is still
+imported by six hybrid/legacy animation modules and emits validation telemetry
+for provisional `skeleton` and `dynamic_event` units. Runtime flags such as
+`HCO_STEP_MOVEMENT_STRICT_CONTRACT` and the legacy Fast Break contract telemetry
+therefore remain compatibility diagnostics.
+
+Do not extend this layer into schema gameplay. UESS schema steps already carry
+the authoritative completion inputs (`advance_trigger`, clocks, end state, and
+`end.next`). As legacy callers are removed, delete their validator calls,
+strict-mode flags, and branch-specific fallback/clamp/snap telemetry after
+equivalent backend-schema observability is confirmed. The two observed HCO
+clock-overrun failures remain separately tracked in `bugs.md`.
+
 Read-only audit of the UESS (Universal End-State Sync) migration. No code edits. All findings cited file:line.
 
 References: [`UESS_System.md`](../00_General_Systems/UESS_System.md), [`Step_By_Step_System.md`](../00_General_Systems/Step_By_Step_System.md).

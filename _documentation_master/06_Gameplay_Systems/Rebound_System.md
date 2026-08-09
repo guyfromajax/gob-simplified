@@ -33,7 +33,14 @@ Schema emitters apply overlays via `_apply_overlay_motion_to_shoot_step` and con
 
 **Backend discrete `DREB` turn** (`result_type` / `current_turn` **`DREB`**, `animation_steps` from `dreb_step_emitter.py`): animates the rebounder moving to the ball at the bounce spot. Non-captor players normally hold their post-shot coordinates, except for backend-stamped failed rebound attemptors (see below), who collapse toward randomized near-bounce spots.
 
-**Half-court outlet** (rebounder dribble / pass to outlet receiver per `dreb_outlet_pass`, teammates moving toward the new offense end — unit **`hco.lead_in.from_dreb_outlet`** in `turnAnimation.js` → `runDefensiveReboundSetup`) **is not** emitted as part of `dreb_step_emitter` steps. For discrete **DREB → HCO/HCT/FCP**, the client runs that setup **after** `AnimationEngine` finishes **`playTurn`** for the DREB row, using the **previous** MISS/BLOCK turn for **`dreb_outlet_pass`** and **`offense_getback`**. Skip when `DREB.next_play_type` is **FAST_BREAK** (fast break owns outlet) or when the shot turn has **`force_foul_after_dreb`**.
+**Half-court outlet** is not emitted as part of the discrete DREB capture step.
+For DREB → HCO/HCT/FCP, the next HCO schema entry orchestrator consumes the
+prior MISS/BLOCK row's `dreb_outlet_pass` contract and renders the ball-handler
+to PG handoff plus walk-up. The former post-DREB frontend
+`runDefensiveReboundSetup` lead-in was removed from schema playback because it
+double-executed the outlet and caused a handoff teleport. DREB → FAST_BREAK
+uses the Fast Break outlet instead; DREB foul and force-foul-after-DREB paths do
+not use this half-court handoff.
 
 **Embedded DREB** (MISS/BLOCK turn still owns rebound, no separate `DREB` row — e.g. many **FREE_THROW** misses, unmigrated FCP / FB variants): outlet still runs from **`ShotAnimationSystem.handleDefensiveRebound`** → **`runDefensiveReboundSetup`** when `next_play_type` is **HCO/HCT/FCP** on that same shot turn. **Rebound!** headline rules (including idempotency with discrete rows): **`Announcement_System.md`**.
 

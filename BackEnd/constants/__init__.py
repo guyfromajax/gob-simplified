@@ -325,7 +325,8 @@ FINAL_TURN_HANDOFF_CONVERGE_GRID = 6.0
 # (`_compute_bh_target` / fb_drive). `compute_fb_shot_geometry` remains for
 # broken-HCT FB (`dynamic_hct_shot.py`) and the after-steal legacy path.
 
-# FB Drive Cutoff & Stop Decision — per-play rollout (see FB_Drive_Cutoff_Work_Plan.md)
+# FB Drive Cutoff & Stop Decision — default-on reversible switches
+# (see Fast_Break_System.md, "FB Drive Cutoff & Stop Decision")
 USE_FB_DRIVE_RESOLUTION_AFTER_STEAL = True
 # After-Steal pass-ahead in transition (Fast_Break_System.md §After-Steal
 # Coordinated Transition). When the BH has a clear lane and an open teammate is

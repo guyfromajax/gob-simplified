@@ -468,4 +468,4 @@ the result of these stages.)
 
 **Not routed via `offensive_state`:** `OREB`, `DREB`, `BASELINE_INBOUND` — use `pending_*` flags when extra payload is required (`pending_oreb`, `pending_dreb_fb_play_key`, `pending_terminal_ft`, `situational_force_foul_pending`).
 
-**Hardening (open):** log/assert when a turn resolves without updating `offensive_state` — see [`projects/offensive_state_hardening.md`](../projects/offensive_state_hardening.md).
+**Hardening (open):** log/assert when a turn resolves without explicitly publishing `offensive_state` (including valid same-state writes). This is the immediate guardrail in [`step_transition_centralization.md`](../projects/step_transition_centralization.md#immediate-offensive_state-guardrail).

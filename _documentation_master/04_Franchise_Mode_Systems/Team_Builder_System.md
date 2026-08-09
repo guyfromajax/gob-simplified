@@ -208,7 +208,7 @@ Two rules, each of which has already caused a production defect:
 3. Build the overlay.
 4. `FranchiseManager.initialize_season(...)` — schedule still ObjectId-keyed to the slot.
 5. Roster rewrite via `team_builder_roster.py`: clone inherited, apply the diff, mint `player_id`s.
-6. **Diff-scoped shape floors** (same principle as §4.5b): an attribute is checked against its position floor only if the editor row changed it relative to the inherited clone. Unedited attributes are legal by definition — that player already exists in the league. Server-side top-up / force-to-budget is not authorship and does not put an attribute in scope. A violation returns `shape_floor_violation` naming the player and attribute. **Apply refuses; it does not quietly correct.** Pathology is still caught: starving a player means editing those attributes down.
+6. **Diff-scoped shape floors** (same principle as §4.5b): an attribute is checked against its position floor only if the editor row changed it relative to the inherited clone. Unedited attributes are legal by definition — that player already exists in the league. Server-side top-up / force-to-budget is not authorship and does not put an attribute in scope. The roster layer raises `shape_floor_violation` naming the player and attribute, and **Apply refuses rather than quietly correcting**. The HTTP handler does not yet map that code to dedicated copy, so the client currently receives the generic `Unable to apply roster changes` detail. Pathology is still caught: starving a player means editing those attributes down.
 7. Write `attribute_mode` and `online_eligible` (mode-only). Soft-budget echo fields are not written.
 8. `$set` the overlay; return franchise id for navigation into FCC.
 
@@ -423,9 +423,14 @@ Kept because the reasons are load-bearing — several of these were re-proposed 
 
 - **Portrait uploads (3c)** — committed fast follow, not built
 - **Acceptance criteria 12 and 13 need re-verification** — both passed against an Apply that could not refuse on shape floors
+- **Shape-floor Apply error mapping/test** — roster enforcement has focused unit coverage, but the
+  HTTP handler still hides its player/attribute detail behind a generic 400 and has no endpoint-level
+  regression assertion
 - **`imported_players` rename** — deferred (see §14)
 - `player_id` coupling audit — requested, never delivered
 - R2 sweeper for orphaned FPDs from bad resumes
 - Static league assets to R2
 - Trademark clearance on the name "Team Builder"
 - `training_position` has no live write path — the shape floor follows position, so nobody can redirect it
+- **Uncapped runtime meter** — Apply uses runtime `league-context`, but the Team Builder frontend
+  does not consume the endpoint for a live team-pool/league-marker display

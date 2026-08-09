@@ -1,8 +1,24 @@
 # HCO Roles / Victim-ID Audit — handoff brief
 
-**Status:** scoped, not started. Spun out of the StepState thread (2026-07-19) so it can run in a
-separate agent WITHOUT blocking the StepState work plan. One concrete instance (bug #5) is already
-**confirmed + fixed**; this brief hands off the broader audit it implies.
+**Status:** ACTIVE VERIFICATION DEBT — implementation audit rechecked 2026-08-08.
+The original mapping and primary fixes are complete; this file remains because
+bounded verification and one low-frequency attribution edge are still open.
+
+## Current status (2026-08-08)
+
+| Finding | Current disposition |
+|---|---|
+| Stale non-shot ball handler / victim (bug #5) | **Shipped.** The stop-step handler is synchronized into `roles`; dynamic measurement found the no-index fallback dead in practice. |
+| Ball-owner snap-back after reversal | **Shipped.** `_walk_ball_owners` carries the running owner instead of reselecting PG-first every step. |
+| Moment-defender stash discarded | **Shipped.** `_hco_moment_defender_id` now overrides the later recompute. This is stat/draw-moving and still owes the recorded distributional verification plus seeded-reference re-cut. |
+| Zone moment defender selected from the wrong layer | **Shipped.** Selection uses the rendered per-step guard map with documented fallbacks; canonical behavior and remaining validation debt live in `Dynamic_HCO_System.md`. |
+| Interception finalizer | **Retain as a separate path.** Measurement found its interceptor/contact correct; passer identity was explicit in 96% of samples. The remaining ~4% stale-victim fallback is low priority but unresolved. |
+| Split-encoded reversal DBTO ordering | **Shipped in current code and canonical docs.** The pending-pass walk transfers on the later receive step. No dedicated current test was found by the 2026-08-08 audit, and the recorded in-app confirmation is still not marked complete. |
+| Universal stop-state rewrite | **Not recommended from current evidence.** Measurement ruled out the proposed broad consolidation as disproportionate to the remaining defects. |
+
+The unresolved step-zero owner bootstrap disagreement belongs to
+`projects/UESS Audits/HCO_UESS_Audit.md`; it is not a reason to broaden this
+non-shot finalization audit.
 
 > **Purpose:** determine whether HCO **non-shot outcome finalization** (turnover / foul / steal) is
 > structurally unsound — the same fact (who has the ball / who is the victim / where did it happen)
@@ -225,13 +241,13 @@ Probe (`[SEAM2B]`, sim-safe `_build_all_animations` grid): at each moment-steal,
 
 ## ✅ SHIPPED status (2026-07-24)
 - **Seam 3 (moment-defender credit):** committed `eddd85671`. Owes distributional verify + reference re-cut (batch).
-- **Zone on-ball-defender SELECTION (guard-map fix):** committed `e5752203b`. `_stamp_contest_defender_grid` stamps the render's per-step guard map (ZONE-only) into `step["_step_state"]["guard"]`; `_zone_bh_defender` returns the defender whose guarded player == the BH (exact, frame-independent) with the polygon path as unstamped fallback. Zone rank-1 credited==nearest 38%→65%; matches the render by construction. Full plan: [zone_selection_fix.md](zone_selection_fix.md). Residual (render's own guardian is physical-nearest only ~61% of zone steps) is a **design decision** in `assign_all_zone_defenders`, not a bug — left as-is per product call.
-- **DBTO fumble-before-pass timing (split-encoded reversals):** fix implemented, **uncommitted**, render-only.
+- **Zone on-ball-defender SELECTION (guard-map fix):** committed `e5752203b`. `_stamp_contest_defender_grid` stamps the render's per-step guard map (ZONE-only) into `step["_step_state"]["guard"]`; `_zone_bh_defender` returns the defender whose guarded player == the BH (exact, frame-independent) with the polygon path as unstamped fallback. Zone rank-1 credited==nearest 38%→65%; matches the render by construction. Canonical behavior is now documented in [`Dynamic_HCO_System.md`](../06_Gameplay_Systems/Dynamic_HCO_System.md). Residual (render's own guardian is physical-nearest only ~61% of zone steps) is a **design decision** in `assign_all_zone_defenders`, not a bug — left as-is per product call.
+- **DBTO fumble-before-pass timing (split-encoded reversals):** fix is present in the current tree and documented canonically in `Stopper_System.md` and `Step_By_Step_System.md`; render-only.
 
 ## DBTO fumble-before-ball-arrival — trace + fix (2026-07-24)
 - **Symptom (product-eye):** on some (not all) HCO dead-ball turnovers, the victim's sprite animated the DBTO micro-movement + announcement *before* the ball had been passed to him; the pass landed only after.
 - **Root cause (agent trace):** `_walk_ball_owners` (`skeleton_step_emitter.py`) transfers ball ownership only when ONE step holds both a `pass` and a `receive`. On **split-encoded reversals** — the receiver relocates into the catch, so his `receive` lands on a *separate* step from the passer's `pass` — the transfer never fired → `is_pass_step` false everywhere → no timed ball flight / no `ball_reaches_player` gate. The ball stayed with the passer until the injected fumble step hardcoded `ball_state = victim` ([dead_ball_fumble.py:149](../../BackEnd/engine/dead_ball_fumble.py#L149)). So the fumble jitter + whistle collapsed onto the ownership flip → visibly *before* arrival. **Same-step reversals were always correct** (transfer fired → timed flight waited for the ball); **non-reversal DBTOs** had no pending pass → never affected. That's the some-but-not-all.
 - **Fix (#1, consumer-side):** the walk now carries a **pending pass** (lone `pass` sets it; owner stays with passer) and flips ownership on the **next `receive` step**. Chosen over stamping `receive` onto the pass step because flipping on the receive step keeps flight geometry correct (meet-point resolves from the receiver's actual catch motion, not his pre-move spot — the same coord-frame landmine that made zone Attempt-1 worse). One rule, handles all splits uniformly; HCT shares the walk so it benefits too.
 - **Verification:** unit test — split reversal now flips owner on the receive step (`…(PG,PG),(PG,SG)`); same-step control unchanged. **Game-outcome neutral** (seeded 20-game signature identical fix on/off) → render-only, **NO reference re-cut owed** (unlike Seam-3/zone). **Sim Perf Capstone NOT disrupted:** `_walk_ball_owners` is *not called in the stat-sim path* (0 calls across 20 games / 147 HCO turns — HCO animation build is gated to the render path via `TurnManager.resolve_half_court_offense`, which pooled/stat sims bypass); the cpu/turn deltas seen mid-measurement were thermal noise (FIX-OFF came out both faster and slower than ON).
-- **Owed:** in-app visual confirm on a split-reversal DBTO (ball lands before the fumble jitter/announce). Fix uncommitted in `skeleton_step_emitter.py`.
+- **Owed:** retain an in-app visual confirmation on a split-reversal DBTO (ball lands before the fumble jitter/announce) and add durable focused regression coverage for the pending-pass ownership walk.
 - **Producer cause (unconfirmed, low priority):** what makes a reversal split-encode vs same-step — leaning "receiver relocating into the catch" (movement pass) over "hot read"; not needed for the fix, a one-probe census (`phase_resolution.py:6084-6109` same/split tally) would settle it.

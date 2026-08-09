@@ -1,5 +1,5 @@
 /**
- * Run Out The Clock — terminal no-shot possession animation (EOQ_Perfection_Brief).
+ * Run Out The Clock — terminal no-shot possession animation (EOQ_System.md).
  * Step 1: all players drift to assigned spots at drift archetype rate (8 grid/game-sec).
  * Step 2: scoreboard runs to 0:00, airhorn, brief hold before quarter-end modal.
  */
@@ -27,6 +27,20 @@ function driftDurationMs(sprite, destXPx, destYPx, tickMs) {
 
 export async function runOutClockSequence({ scene, playerSprites, turnData, onUpdate }) {
   if (scene?.skipToEnd || !turnData) return;
+
+  // The backend uses RUN_OUT_CLOCK as the terminal result family at an
+  // already-expired 0:00 entry. Do not invent drift or clock-running motion.
+  if (turnData.clock_expired_no_action) {
+    if (onUpdate) {
+      onUpdate({ clock: '0:00', time_remaining: 0, shot_clock_remaining: 0 });
+    }
+    signalQuarterEnded(
+      scene,
+      { ...turnData, clock_start: 0, clock_end: 0 },
+      { phase: 'playbackComplete' },
+    );
+    return;
+  }
 
   const oDestinations = turnData.oDestinations || turnData.o_destinations || {};
   const dDestinations = turnData.dDestinations || turnData.d_destinations || {};

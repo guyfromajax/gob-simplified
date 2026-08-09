@@ -1,5 +1,5 @@
 """
-End-of-quarter / end-of-game perfection helpers (EOQ_Perfection_Brief.md).
+End-of-quarter / end-of-game helpers (EOQ_System.md).
 
 Run Out The Clock (Q4/OT strategy plus universal no-shot terminal fallback)
 and FLSS (Forced Last Second Shot, all quarters).
@@ -195,6 +195,29 @@ def build_run_out_clock_result(game, time_remaining_sec: int) -> dict:
         "dDestinations": d_dest,
         "ball_handler_pos": bh_pos,
         "run_out_clock": True,
+    }
+
+
+def build_clock_expired_result(game, current_state: str) -> dict:
+    """Terminal no-action payload for a live-ball state entered at 0:00.
+
+    This is intentionally distinct from a normal Run Out result: it carries no
+    destinations and tells playback not to invent movement after the buzzer.
+    """
+    return {
+        "result_type": "RUN_OUT_CLOCK",
+        "current_turn": current_state,
+        "time_elapsed": 0,
+        "clock_start": 0,
+        "clock_end": 0,
+        "offense_team_id": game.offense_team.team_id,
+        "possession_flips": False,
+        "next_play_type": None,
+        "next_turn": None,
+        "quarter_ends_after": True,
+        "run_out_clock": True,
+        "clock_expired_no_action": True,
+        "forced_shot": False,
     }
 
 

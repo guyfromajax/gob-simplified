@@ -638,7 +638,7 @@ export class AnimationEngine {
       // through to the legacy handler if its backend emitter returned None
       // (logged backend-side as … EMITTER NULL). Other turn types fall
       // through to the legacy handler dispatch below. See:
-      // _documentation_master/projects/FB_UESS_Migration.md
+      // _documentation_master/06_Gameplay_Systems/Fast_Break_System.md
       const MIGRATED_FB_PLAYS = new Set(["covert_release", "rim_runner", "triangle", "after_steal"]);
       const isMigratedFbVariant =
         turnData?.current_turn === "FAST_BREAK"

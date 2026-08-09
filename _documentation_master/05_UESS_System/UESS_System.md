@@ -13,6 +13,29 @@ The **Universal End-State Sync (UESS)** system is the contract by which every tu
 
 This doc is the single source of truth for the contract. Code is the implementation; if they disagree, the code is right and this doc is wrong.
 
+### 1.1 Display-oriented coordinate contract
+
+- Gameplay grid space is `x=0..100`, `y=0..50`, with midcourt at `x=50`.
+- Runtime `Player.coords`, position snapshots, payload destinations, and schema
+  endpoints use final display orientation.
+- Reusable backend templates may be authored for home offense, but the backend
+  applies horizontal court orientation before emission with
+  `x_away = 100 - x_home`; that horizontal mirror leaves the selected point's
+  y unchanged. Thus rims mirror `91 <-> 9`, baselines `3 <-> 97`, and midcourt
+  remains 50. A resolver may still intentionally choose a different named
+  upper/lower spot; that selection is separate from orientation conversion.
+- Payload consumers must not infer orientation from team identity. The frontend
+  converts grid coordinates to pixels but must not mirror, randomize, replace,
+  or otherwise reinterpret gameplay destinations.
+- Missing backend coordinates fail closed on migrated paths. A legacy renderer
+  may retain fallback behavior only while that renderer itself remains an
+  explicitly tracked compatibility path.
+
+Final Turn alignment, BIP, SIP, OREB kickout, and migrated schema shot paths
+follow this contract. Remaining legacy exceptions are cataloged in
+[`UESS_Backlog.md`](../projects/UESS_Backlog.md) under coordinate-orientation
+cleanup.
+
 ---
 
 ## 2. Migration state
@@ -27,7 +50,7 @@ This doc is the single source of truth for the contract. Code is the implementat
 | Fast Break — Rim Runner | ✅ Migrated | `rim_runner_step_emitter` |
 | DREB (rebound capture) | ✅ Migrated | `dreb_step_emitter` (discrete DREB rows are promoted after HCO/HCT/FCP MISS/BLOCK, final-FT DREB, OREB putback miss → DREB, and migrated Fast Break MISS/BLOCK paths; DREB Over The Back fouls resolve inside this row and emit `turn_stop: FOUL`) |
 | HCO | ✅ Migrated | `skeleton_step_emitter` (schema + universal entry orchestrator; natural-travel-time step T) |
-| FCP | ✅ Migrated | `skeleton_step_emitter` (shared with HCO; FCP-specific gates + sprint archetypes + walker seed for BIP→FCP ball-owner carry; randomized BIP setup positions) |
+| FCP (dynamic) | ✅ Migrated | `dynamic_fcp_step_emitter` wrapper over the shared dynamic HCT emitter; legacy/non-dynamic payloads retain the skeleton fallback |
 | OREB (putback / kickout) | ✅ Migrated | `oreb_step_emitter` (branches by `result_type`: KICKOUT reuses `build_kickout_step`; PUTBACK_MAKE/MISS reuse `[shoot]/[ball_flight]/[hold]/[bounce]` builders; PUTBACK_MISS second rebound is dispatched as a separate DREB turn via the extended `_build_dreb_turn_from_miss` trigger) |
 | Fast Break — Triangle | ✅ Migrated | `triangle_step_emitter` (shares burst/outlet with RR) |
 | Fast Break — After Steal | ✅ Migrated | `after_steal_fast_break_step_emitter.build_after_steal_fast_break_animation_steps` |
@@ -35,6 +58,34 @@ This doc is the single source of truth for the contract. Code is the implementat
 | Timeout | ⏳ Not migrated (low priority — minimal animation) | — |
 | Final Shot | ✅ Migrated | Routes through `turn_manager._emit_hco_animation_steps` → `build_skeleton_animation_steps` (shared with HCO). Frontend renders the **full** ``animation_steps[]`` via `playTurn()` (no step-0 skip or parallel alignment tween). Empty emit stamps `eoq_schema_emit_failed` (fail closed for MAKE announce). Step 0 hold pacing is backend ``_step_t_floor_game_seconds`` computed backward from a **rolled anchor** (outside shoot @ 1–3s, attack drive @ 2–4s). ``time_elapsed`` derives from schema burn after emit (not a forced full-clock drain). See [`EOQ_System.md`](../06_Gameplay_Systems/EOQ_System.md) §Final Shot. |
 | FLSS | ✅ Migrated | Same emitter path as Final Shot/HCO; sprint drive + shoot @ ~1s. Same empty-emit contract. Post-emit clock/quarter-end via `eoq_clock_progression.finalize_flss_post_emit`. SIP/BIP/foul→SIP arm FLSS via `schedule_flss_after_inbound` (chain-active gate). |
+
+### 2.1 Fast Break StepState bridge
+
+All four migrated Fast Break families also pass through the additive
+`FastBreakStepState` bridge in `BackEnd/engine/fb_step_state.py`. The family
+emitters currently author `AnimationStep[]`; `TurnManager` freezes those facts
+into `turn_result["fb_step_states"]`, projects them back to schema, and stamps
+each projected step with `_fb_step_state`. This establishes the lifecycle
+`resolve -> emit -> freeze -> project -> draw` without changing gameplay or
+frontend playback. Formal StepState ownership may move upstream primitive by
+primitive only after projection-parity coverage is retained.
+
+### 2.2 FCP/HCT PressureStepState bridge
+
+Dynamic FCP and HCT share the centralized pressure emission path
+`TurnManager._emit_pressure_animation_steps(...)`. The resolver's loop segments
+are emitted as schema, frozen into `result["pressure_step_states"]` by
+`BackEnd/engine/pressure_step_state.py`, and projected back to schema; every
+projected step carries `_pressure_step_state`.
+
+Formal projection currently covers entry/advance/pass steps, pass
+interceptions, batted-OOB contact and drift, terminal steal/foul/dead-ball
+steps, dead-ball fumbles, pressure-owned shot setup, and shared post-shot
+beats. The remaining architectural migration is upstream ownership: individual
+pressure builders still create schema first and should eventually return
+formal `PressureStepState` values directly. Until that work is parity-tested,
+the whole-turn projection bridge and transitional `schema_projection` snapshot
+remain intentional.
 
 ---
 
@@ -396,7 +447,7 @@ Ball moves at fixed grid/game-sec rate independent of player rates.
 
 ## 12. Known gaps and remediation (from legacy audit)
 
-Single source of truth for the violation catalog, remediation order, and item statuses: [`UESS_Backlog.md`](../projects/UESS_Backlog.md) (status header at top). Discussion notes: [`projects/offensive_state_hardening.md`](../projects/offensive_state_hardening.md).
+Single source of truth for the violation catalog, remediation order, and item statuses: [`UESS_Backlog.md`](../projects/UESS_Backlog.md) (status header at top). Turn-routing hardening and centralization: [`step_transition_centralization.md`](../projects/step_transition_centralization.md).
 
 **Headline state (June 2026):** All gameplay turn types except Opening Tip and Timeout emit schema steps. The FE is not yet a pure renderer on all paths, and the §6 / §7 contracts remain unbuilt — see the backlog for open items. Ball-coord continuity (§8.4) is now a documented invariant but is **not enforced by construction** (no `final_ball_coords` snapshot; step-seam continuity is emitter-upheld, not asserted) — the likely source of the intermittent ball-teleport bugs at ownership/turn seams.
 

@@ -131,12 +131,13 @@ def _late_chain_active(game: Any, result: Dict[str, Any]) -> bool:
     )
 
 
-def should_route_final_turn_to_flss(time_remaining: Optional[int]) -> bool:
-    """True when preflight budget failure should route to FLSS instead of full Final Turn."""
-    tr = int(time_remaining or 0)
-    if tr <= 0:
-        return True
-    return tr <= FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK
+def should_route_final_turn_to_flss(_time_remaining: Optional[int]) -> bool:
+    """A failed Final Turn pacing preflight always routes to FLSS.
+
+    Callers only resolve FLSS while the game clock is positive; the universal
+    0:00 entry guard terminates without starting any live-ball action.
+    """
+    return True
 
 
 def eoq_first_gate_open(

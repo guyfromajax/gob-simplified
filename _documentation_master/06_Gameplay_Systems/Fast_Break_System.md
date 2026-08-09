@@ -2,7 +2,7 @@
 
 > **Canonical reference (Bible):** This document is the **single source of truth** for sustained Fast Break knowledge—selection logic, coordinates, defensive stops, shot attempts, constants, and file touchpoints. In-flight implementation checklists may live in `docs/To Do/FB_Playcall_Update.md`; SS&S process notes for FB shot routing live in `docs/To Do/Archive/fast_break_shot_spot_process_review.md`. If something conflicts, **treat this file as authoritative** unless the team explicitly updates both.
 >
-> **Planned overhaul (June 2026):** **FB Drive Cutoff & Stop Decision** (below) is the approved design for a geo-based drive resolver across all FB play keys. It **supersedes** the CR outlet-phase cutoff (Steps 5–8 in *Fast Break Resolution Flow*), the get-back-only shot-defender gates, and the point-race **`compute_fb_shot_geometry`** helper. A full doc reconciliation will follow implementation; until then, treat the new section as authoritative where it conflicts with older subsections.
+> **Drive-cutoff unification (shipped June–July 2026):** **FB Drive Cutoff & Stop Decision** is live for all four FB play keys. It supersedes the CR outlet-phase cutoff, get-back-only shot-defender gates, and point-race geometry on live FB attack drives. The four reversible `USE_FB_DRIVE_RESOLUTION_*` safety switches remain default-`True`; limited legacy geometry remains only for broken-HCT FB shots and the after-steal flag-off fallback.
 
 **Base Constants**
 
@@ -224,29 +224,22 @@ When two defenders both retreat to basket defense, the second defender's spot is
 #### After Steal (`after_steal`) — UESS migrated (May 2026)
 
 - **When**: Fast break entered from **steal** (not DREB outlet). `play_key_for_fast_break_entry(False)` → **`after_steal`**.
-- **What (current resolver — replaces the legacy steal-entry/stopper path):** No outlet; ball handler = stealer. Resolution is in `BackEnd/engine/after_steal_fast_break.py` (`resolve_after_steal_fast_break`), **not** the legacy steal-entry movement + ±6 defensive-stop skill check in Steps 4–8:
-  - **BH (stealer) target:** drives to a rim band — `x = basket.x ± random(2,3)`, `y ∈ [19, 31]` (AWAY basket x=9 → x∈[11,12]; HOME x=91 → x∈[88,89]).
-  - **Defenders:** **all five** sprint to a single target = `BH_target_x ± 2` toward basket, same y. Per-defender traversal time = `euclid(start, target) / AG-sprint-rate` (`_ag_grid_per_game_sec`); smallest time = **first arriver**. If `t_first < t_shooter`, the other defenders **freeze** at their interpolated positions (clamped no closer than `DEFENDER_FREEZE_CLAMP_GRID_SPOTS = 6` from basket, never pulled backward from start).
-  - **Contested check** (at `t_shooter`): the defender whose x is closest to basket; if past the shooter's x → **CONTESTED** (that defender is the shot defender), else **UNCONTESTED**.
-  - **Shot type:** **`attack`** (drive-to-the-rim finish — the stealer sprints and finishes himself). Scores with **Attack** attribute weights (`SC·5, AG·2, ST·1, IQ·1, CH·1` — agility-based rim finishing) and the **attack** defensive-foul thresholds, **not** Inside (`SC·6, ST·2, …` post weights). `is_paint` stays **True** (the finish is physically in the paint → the rim contest is ID-focused paint defense), matching `resolve_shot`'s FB attack path. *(Changed from `inside` — June 2026; a steal-and-go is a drive, not a post-up.)*
-  - **Shot resolution:** CONTESTED → `shot_manager.calculate_shot_score(apply_defense=True)`, made if `shot_score ≥ shot_threshold`; UNCONTESTED → `apply_defense=False`, then **universal uncontested inside/attack make roll** (`BackEnd/utils/uncontested_shot.py`). **Outcome is MAKE or MISS only — there is no `DEFENSIVE_STOP` on this path.**
-  - **Other 4 offensive players:** sample 4 unique spots (no collisions) from the 11-name `AFTER_STEAL_OFFENSE_SPOT_NAMES` HCO setup list (mirrored for away).
+- **What:** No outlet; the stealer begins as ball handler. The live path delegates
+  to `after_steal_drive_integration.py` and the universal drive/cutoff resolver,
+  including geometric cutoff attempts, stop decisions, fouls/turnovers, rim
+  finishes, coordinated transition spacing, cutoff cascades, and optional
+  pass-ahead chains. The flag-off legacy resolver remains rollback-only.
+- **Shot type:** self-finished attempts are `attack` shots in the paint and use
+  the normal universal shot/foul/uncontested-resolution contracts.
 - **UESS schema**: After-steal FB is fully migrated to the unified animation step schema. **No frontend choreography logic** — all positions, transitions, announcements, and SFX are backend-emitted. FE is a pure renderer (`runSchemaPlaybackTurn`).
 - **Emitter**: `BackEnd/engine/after_steal_fast_break_step_emitter.py::build_after_steal_fast_break_animation_steps`. Routed via `resolve_fast_break_logic` (`phase_resolution.py`) — same pattern as `covert_release` schema emission, in the same block.
 - **FE gate**: `MIGRATED_FB_PLAYS` in `AnimationEngine.js` includes `"after_steal"` (alongside `covert_release`, `rim_runner`, `triangle`); the FE step dispatcher consumes the schema steps directly.
 - **Legacy code removed**: `animateStealEntry()` in `fastBreak.js`, the `is_steal_entry` routing branch, and the `STEAL_ENTRY_*` constant imports were deleted during migration. The FE constants in `fastBreakConstants.js` remain for reference but are no longer consumed.
 
-**Step schema (MAKE / MISS / BLOCK — the only outcomes):** built by `after_steal_fast_break_step_emitter.build_after_steal_fast_break_animation_steps`.
-
-| Step | Purpose | Key fields |
-|---|---|---|
-| 0 — drive (single step) | Stealer sprints to his shot spot **ending in shot motion**; all defenders sprint to the single defender target (first-arrival freeze); the other 4 offensive players sprint to their sampled HCO setup spots; "Fast Break!" secondary announcement on `start` | `action[stealer] = "shoot"`, `archetype[stealer] = "sprint"`, others `action/archetype = "sprint"`, `end.coords` = resolver `after_steal_end_coords`, `ball.owner_player_id = stealer`, `advance_trigger` gates on stealer reaching `bh_target`, `start.announcement = "Fast Break!"` (`_build_drive_step`) |
-| 1 — ball flight | Variant-aware flight to rim; launch SFX on release | post-shot sub-step; `sfx_on_ball_release = shot_launch_sfx(...)`; `sfx_on_ball_arrival = shot_result_sfx(variant, result)` (omitted for RATTLE) |
-| 2+ — variant sub-steps | RATTLE hops / BANK_MAKE settle / BANK_MISS graze / AIRBALL OOB | Emitted by skeleton's `_build_post_shot_sub_steps`; per-hop `rattle-leather.wav` for RATTLE |
-| N — hold (MAKE) | "Fast Break Score!" announcement (or "...And 1!") at the ball's settle point | `start.announcement.text` overridden in-place by `_override_fb_make_announcement` from skeleton's default "It's Good!" |
-| N — bounce (MISS) | Ball bounces from rim to backend-stamped bounce spot; "Shooting Foul!" stamped on `end.announcement` if miss + defensive shooting foul | `_stamp_shooting_foul_on_miss_end` (shared helper) |
-
-> **No defensive-stop branch.** The after-steal resolver returns only MAKE/MISS (BLOCK rendered as a miss outcome); there is no `DEFENSIVE_STOP`, no step-back-to-top-of-key step, and no "Great Stop!" announcement on this path (unlike Covert Release / Rim Runner DREB breaks, which can stop). The emitter (`build_after_steal_fast_break_animation_steps`) only handles `("MAKE", "MISS", "BLOCK")`.
+**Step schema:** `build_after_steal_fast_break_animation_steps` prepends any
+resolver-authored pass-ahead hops, delegates drive/meet/stop/terminal rendering
+to the shared FB drive emitter, and appends the shared shot-micro and post-shot
+sub-steps when the branch attempts a shot. It is not restricted to MAKE/MISS.
 
 **Make announcement text:** Per design, steal-FB makes read as "Fast Break Score!" not "It's Good!" (overrides skeleton's default). The emitter post-processes the make-hold step's `start.announcement.text` from "It's Good!" → "Fast Break Score!" (and the and-1 variant). Helper: `_override_fb_make_announcement` in the after_steal emitter.
 
@@ -393,7 +386,7 @@ Result: DEFENSIVE_STOP (defender at x=57 is ahead AND within y-range, distance: 
 
 ### Defensive Stop vs. Shot Attempt Determination
 
-> **Legacy (pre–June 2026 overhaul):** The outlet-phase drive cutoff below is **removed** by the approved **FB Drive Cutoff & Stop Decision** section. Kept for reference until implementation lands.
+> **Legacy (pre–June 2026 overhaul):** The outlet-phase drive cutoff below is removed from the live default-on path by **FB Drive Cutoff & Stop Decision**. It remains historical/flag-off reference only.
 
 **Logic (HOME Orientation):**
 
@@ -764,13 +757,11 @@ The outlet passer tracks:
 
 ---
 
-## FB Drive Cutoff & Stop Decision *(approved design — implementation pending, June 2026)*
-
-> **Work plan:** [`projects/FB_Drive_Cutoff_Work_Plan.md`](../projects/FB_Drive_Cutoff_Work_Plan.md)
+## FB Drive Cutoff & Stop Decision ✅ *(live across all play keys, June–July 2026)*
 
 Unified geo-based resolver for **all FB play keys** (`covert_release`, `rim_runner`, `triangle`, `after_steal`). Replaces the split between (a) CR outlet-phase cutoff + universal HCO stop and (b) the point-race **`compute_fb_shot_geometry`** model.
 
-**Planned modules:** `BackEnd/engine/fb_drive_resolution.py` (`resolve_fb_drive_step`), `BackEnd/engine/fb_stop_decision.py`, `BackEnd/utils/fb_geo_helpers.py`. Emitters remain pure renderers; resolver stamps `fb_drive_resolution` on the turn.
+**Key modules:** `BackEnd/engine/fb_drive_resolution.py` (`resolve_fb_drive_step`, `resolve_fb_drive_with_cascade`), `BackEnd/engine/fb_stop_decision.py`, and `BackEnd/utils/fb_geo_helpers.py`. The resolver stamps `fb_drive_resolution`; play-key integrations consume it and schema emitters remain renderers. Live integrations: `after_steal_drive_integration.py`, `covert_release_drive_integration.py`, and `rim_runner_drive_integration.py` (RR + Triangle).
 
 ### Scope
 
@@ -788,7 +779,10 @@ Unified geo-based resolver for **all FB play keys** (`covert_release`, `rim_runn
 ### Drive geometry
 
 - **BH path:** straight segment **drive-step start → pre-rolled `shot_spot`** (rim band: `basket_x ± randint(2,4)`, `y ∈ [19,31]`).
-- **Rates / animation:** **`sprint`** for BH and cutoff defenders in **after-steal** drive resolution; logic rates = animation archetype rates (`_ag_grid_per_game_sec`). **RR/Triangle finisher** (Phase 4 UESS): driver + cutoff defenders + pass/receive-area helpers use HCO **`standard`** pace (14 grid/game-sec @ AG=50); get-backs and RR burst/outlet remain **`sprint`** / **`burst`**.
+- **Rates / animation:** driver and cutoff defenders use the shared
+  `finisher_pace` (`standard`/HCO pace) across all four live drive paths; logic
+  rates match animation archetype rates (`_ag_grid_per_game_sec`). Get-backs
+  and RR burst/outlet movement retain their explicit `sprint` / `burst` pace.
 
 #### Phase 4 finisher announcements *(RR / Triangle — July 2026)*
 
@@ -810,7 +804,11 @@ Phase 4 wired RR/Triangle finishers through **`_build_finisher_drive_resolution_
 
 **Charge/blocking-foul read is geo-gated:** `fb_drive_resolution.resolve_fb_drive_step` only reads charge/blocking-foul at the meet when the meet is near the attacking basket — **x ≥ 64** for home offense, **x ≤ 37** for away offense (`_charge_read_in_play`). Meets further from the rim skip the charge read and proceed to the normal POS_O / NEUTRAL logic.
 - **Defender pool:** all five defenders; **geo-gated** only (no hard-coded get-back / outlet exclusions). Outlet contest defenders are organically excluded when **`drift`** on the drive step prevents a timely meet.
-- **Defender start seeding (all FB keys):** the cutoff race seeds each defender from his **live `player.coords`** (end-of-DREB / release-moment position), matching the offense (`off_starts`), the after-steal path, and CR's release-moment seeding. RR/Triangle previously seeded defenders from their fast-break **animation `end` coords** (`between_key_and_rim()` get-back destinations near the rim) via a now-removed `_def_starts_by_pos_from_animations` helper — that teleported get-back defenders onto the drive line and credited **phantom "Nice stop" cutoffs** no defender could physically make. Fixed to `_lineup_starts_by_pos(def_lineup)` in `rim_runner_drive_integration.resolve_attack_drive_finisher_turn`.
+- **Defender start seeding:** CR and After Steal seed from their live/shared
+  transition state. RR/Triangle build their UESS preamble once and seed both
+  offenses and defenses from the rendered lane-pass/setup `end.coords`; the
+  emitter reuses that exact preamble, avoiding a second RNG draw. No live
+  resolver reads the legacy animator packet for cutoff geometry.
 - **Path corridor:** `FB_CUTOFF_PATH_CORRIDOR = 14` (perpendicular distance to segment); **`defender_time_slack = 1.0`**. No aggression re-roll.
 - **Selection:** `best_cutoff_on_drive()` — **earliest meet** on path (farthest-from-rim intercept); tie → closer defender to meet. One winner; others continue toward **`basketSpot`** for rebound position.
 - **Failed prior stopper:** permanently excluded from a second cutoff attempt; **`drift`** on drive step, then sprint on later steps.
@@ -900,11 +898,16 @@ Sign: side that increases distance from stopper at meet. Clamp to court bounds.
 
 ---
 
-# Universal Fast Break Shot Geometry Helper *(legacy — superseded by FB Drive Cutoff & Stop Decision above; retained until migration complete)*
+# Universal Fast Break Shot Geometry Helper *(limited legacy reuse)*
 
-Shared backend module that computes shooter target, defender race
-outcome, and contested decision for FB shot attempts across Rim Runner,
-Covert Release, and Steal-FB. Triangle is intentionally untouched.
+This helper is not the live geometry source for default-on Covert Release,
+Rim Runner, Triangle, or After Steal. It remains active for broken-HCT FB shots
+(`dynamic_hct_shot.py`) and is retained by the reversible After Steal flag-off
+fallback. The historical descriptions below explain that legacy contract; they
+must not override the live drive-cutoff section above.
+
+Backend module that computes shooter target, defender race outcome, and
+contested decision for its remaining legacy consumers.
 
 **Module:** `BackEnd/utils/fast_break_shot_geometry.py`
 **Public function:** `compute_fb_shot_geometry(...)`
@@ -978,6 +981,9 @@ USE_FB_DRIVE_RESOLUTION_RR = True
 USE_FB_DRIVE_RESOLUTION_TRIANGLE = True
 ```
 
+All four switches are default-`True` in production. Their flag-off branches are
+fallback ownership, not a second live gameplay specification.
+
 Steal-FB live path uses drive resolution when the after-steal flag is on; Triangle contest uses the RR/Triangle drive flag.
 
 ## Function signature
@@ -1036,15 +1042,66 @@ Schema emitters remain pure renderers.
 
 All four FB play keys (`covert_release`, `rim_runner`, `triangle`, `after_steal`) use backend `animation_steps` when present; FE `AnimationEngine` `MIGRATED_FB_PLAYS` gates schema playback. Legacy `runFastBreakSequence` runs only without steps.
 
+### FastBreakStepState bridge
+
+Fast Break is StepState-bridged. After the selected family emitter resolves and
+authors `animation_steps`, `TurnManager` uses
+`BackEnd/engine/fb_step_state.py` to freeze those steps into
+`turn_result["fb_step_states"]` and project them back to the animation schema.
+Each projected step carries its source state in `_fb_step_state`. This is an
+additive, behavior-neutral bridge: emitters remain the current source of schema
+facts while formal StepState ownership can move upstream one primitive at a
+time without changing the frontend contract.
+
+Contract coverage in `tests/test_fb_step_state_contract.py` spans all four FB
+families, the shared drive and outlet primitives, projection parity, terminal
+outcomes, and TurnManager stamping/projection. Shared observability lives in
+`BackEnd/engine/fb_uess_debug.py`; it summarizes play key, result, step/state
+counts, schema clock burn, ball ownership, final-coordinate coverage, and any
+emitter fallback. Live fallback/no-step events are also covered by the temporary
+Sentry hook documented in `00_Operations/Bespoke_Sentry.md`.
+
+### Coordinate authority and shared primitives
+
+Live FB decisions do not source cutoff or shot geometry from
+`Animator.capture_fast_break_animation(...)`. CR and After Steal use their
+live/shared transition state; RR and Triangle build their schema preamble once,
+seed resolver participants from its rendered end coordinates, and reuse the
+same preamble during emission. The last schema step's `end.coords` remains the
+authority for cross-turn `final_coords`.
+
+Repeated mechanics are centralized at the primitive level:
+
+- `fb_drive_step_emitter.build_fb_drive_resolution_steps` owns shared
+  drive/meet/stop/terminal/post-shot orchestration for all four families.
+- `fb_outlet_pass_step_emitter.build_fb_outlet_pass_step` owns the live shared
+  outlet-pass mechanics for RR/Triangle and CR while callers supply their
+  family-specific mover targets.
+- Family emitters retain their legitimate setup/preamble shapes.
+
+One coordinate seam remains documented rather than guessed away: RR drive
+resolution seeds `bh_start` from the intended `rim_runner_burst_phase.rr_to`
+catch target, while a moving lead pass can render the receiver at the computed
+pass meet point slightly short of that target. A future fix should compute one
+authoritative catch point before resolution and share it with both resolver and
+emitter; changing this requires gameplay alignment because it can alter cutoff
+timing and outcomes.
+
 Missed FB rebound-capture detail is backend-authored: the shot turn carries the rebound winner, bounce spot, and near-bounce failed-attemptor IDs; the discrete DREB/OREB schema turn renders those players. No frontend rebound-attemptor selection is allowed.
 
 ---
 
 ## Known limitations / scope notes
 
-- **Triangle** is intentionally not migrated. Its existing shot
-  location and defender selection logic remains.
-- **Backward compatibility:** legacy paths in RR/CR are preserved
-  in-file behind the feature flags. Set either flag to `False` to
-  revert that FB type without affecting the other.
+- **Triangle is migrated:** Triangle spot-ups use the unified contest path,
+  while Triangle attacks use the shared FB drive resolver and waypoint
+  contract.
+- **Limited legacy geometry:** `compute_fb_shot_geometry(...)` remains in use
+  for broken-HCT fast-break shots and the After Steal flag-off fallback. It is
+  not the live drive-resolution path for CR, RR, Triangle, or After Steal.
+- **Backward compatibility:** each of the four play types retains a reversible
+  legacy branch behind its own feature flag. All four flags default to `True`.
+- **Fallback retirement remains deferred:** do not collapse the four drive
+  flags or remove legacy renderer packets until representative prototype/Sentry
+  coverage confirms that no live emitter-null path still depends on them.
 - **Gameplay-feel impact:** uncontested inside/attack now use a discipline/fight roll (base 99) instead of auto-make; tunable via `uncontested_shot.py` constants.

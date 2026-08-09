@@ -1,76 +1,130 @@
-# EOG Persistence — Tier 3 Design/Plan (systematize + parallelize)
+# EOG Persistence — Tier 3 Work Plan
 
-**Status:** PLAN ONLY — not implemented. Integrity-first; ship only after the dual-run proof.
-**Owner context:** CPU-week persistence loop in `_complete_week_finish_cpu_and_persist` (`franchise_routes.py`). Tiers 1–2 already shipped (Tier 2 = batched `cpu_sim_job` persist + N-game heartbeat).
+**Status:** Active, partially implemented. Phase 0 instrumentation is shipped; Phases 1–3 are not
+implemented. Do not start semantic refactoring until the Phase 0 traffic evidence and a fresh
+post-N+1-fix timing baseline are captured.
 
-## Problem
+**Scope:** CPU-week persistence in `_complete_week_finish_cpu_and_persist`
+(`BackEnd/api/franchise_routes.py`). Tiers 1–2 and the batched static-team lookup fix are already
+shipped. The current measured history and verification rules live in
+[`Sim_Perf_Capstone.md`](Sim_Perf_Capstone.md).
 
-The per-CPU-game end-of-game (EOG) persistence is ~15 sequential Atlas round-trips × 63 games ≈ **~950 round-trips (~20s wall)**, dominated by network latency, not compute. Built piecemeal by multiple agents, so the same **large game doc is re-loaded 3× per game** and the **`_id`-variant resolution is duplicated** across:
+## Current state
 
-| Consumer | Re-reads game? | Why |
-|---|---|---|
-| `stat_updater.finalize_game` | 2–3× (initial + ObjectId fallback + "freshness" re-read at ~1667) | stat rollup + applied_games/matchups claim |
-| `_save_game_result` | 1× (`_id` resolution find_ones) | team records |
-| `update_team_attributes_after_game` (`[EOG-GAME-DOC-SELECT]`) | 1× (picks "richer" of two `_id` docs) | team-attr deltas + play/scouting decay |
+The CPU simulation itself runs in parallel, but successful full-game results still pass through a
+sequential persistence loop. That loop writes the game, calls `stat_updater.finalize_game`, records
+the result, applies EOG team-attribute/play/scouting updates, and applies momentum.
 
-Those defensive re-reads are **Feb-2026 EOG persistence guardrails** — scar tissue from the "two docs per game" (`_id` as string vs ObjectId) incident. They are *not* obviously dead; they must be proven dead before removal.
+The canonical `games.eog_inputs` snapshot already exists and team-attribute formulas consume it,
+but `update_team_attributes_after_game()` first reloads the game and only then builds/persists the
+snapshot. Other consumers still perform their own game reads and `_id` resolution:
+
+| Consumer | Current reason for reading |
+|---|---|
+| `stat_updater.finalize_game` | Stat rollup, idempotency claims, and legacy `_id` fallback/freshness checks |
+| `_save_game_result` | Result persistence and legacy `_id` resolution |
+| `update_team_attributes_after_game` | Richer-doc selection, `eog_inputs`, team deltas, and play/scouting decay |
+
+These reads include February 2026 guardrails from the string/ObjectId duplicate-game incident.
+They may only be bypassed where production evidence proves the fallback is dormant.
 
 ## Goal
 
-Realize the design the EOG doc already prescribes ([`06_Gameplay_Systems/End_Of_Game_System.md`](../06_Gameplay_Systems/End_Of_Game_System.md) §"EOG Data Source & Access Method"):
+For the trusted CPU-week caller, construct one frozen EOG work item from the already-available
+in-memory summary, preserve every existing write and idempotency guarantee, and reduce redundant
+reads/writes. After equivalence is proven, overlap only persistence work demonstrated to be
+independent and thread-safe.
 
-> "read from **one** frozen per-game snapshot (`games.eog_inputs`)… Build and persist `eog_inputs` **once**, then compute all EOG attribute changes from `eog_inputs` only."
+This extends rather than replaces the canonical EOG rule in
+[`End_Of_Game_System.md`](../06_Gameplay_Systems/End_Of_Game_System.md): team-attribute calculations
+read from one frozen `games.eog_inputs` snapshot.
 
-One snapshot in, one pass, batched flush, parallelized across games.
+## RNG constraint
 
-## ⚠️ RNG determination (drives the verification design)
+EOG attribute changes and offensive/defensive effectiveness decay consume the global `random`
+stream. This has two consequences:
 
-**EOG DOES consume RNG.** `calculate_attr_changes` (`franchise_routes.py:1601+`) and the offensive-play / defensive-scouting decay (`training_execution_v2.py`) call **global `random.randint(...)`** per team per game (shot_threshold, discipline, fight, rebound_modifier, efficiencies, chemistry, decay bands).
+1. A seeded old/new comparison is exact only if draw count and order are identical.
+2. Moving those draws into concurrent threads would make cross-game draw assignment
+   schedule-dependent. Phase 3 therefore cannot simply thread the current whole persistence body.
 
-Consequences:
-- A naive dual-run of the same game through old vs new EOG paths produces **different** deltas unless **seeded identically AND the RNG draw order/count is preserved**.
-- Therefore the new orchestrator MUST preserve the exact `random.*` draw sequence (same calls, same order) to allow a seeded byte-identical diff. If it can't, fall back to the **poison-test rule** (draw-count changes aren't verifiable by exact diff — keep the draws, poison the output; see `feedback_poison_test_rule`).
-- Separately, per the capstone RNG rule (each independent subsystem gets its own stream), EOG's use of global `random` is itself a latent coupling — note it, but keep it out of scope for Tier 3 unless the orchestrator refactor makes swapping to a dedicated `eog_rng` free.
+Keep the existing serial draw order for the equivalence refactor. Before parallel flush, either
+materialize all RNG-dependent outputs serially or separately approve and verify a dedicated,
+per-game EOG RNG design. A dedicated RNG migration is not implicitly authorized by this plan.
 
-## Phase 0 — Instrumentation-first (SHIP THIS ALONE, LEAVE IT IN PROD)
+## Phase 0 — instrumentation and evidence (implemented; evidence gate open)
 
-Before deleting any defensive read, prove it's dead with real traffic.
+The following log-only instrumentation is present:
 
-- Add a counter/log that fires **only when a defensive path actually does work**:
-  - `finalize_game`: log when the ObjectId fallback (`~1604`) or the "freshness" re-read (`~1667`) returns a **different/richer** doc than the first read.
-  - `update_team_attributes_after_game`: log when `[EOG-GAME-DOC-SELECT]` picks the **ObjectId** doc over the string doc (i.e., the string-`_id` canonicalization did NOT already win).
-  - `_save_game_result`: log when its `_id` resolution finds a **duplicate** doc to purge.
-- Emit at a greppable tag, e.g. `[EOG-IDGUARD-FIRED]`, at INFO/WARNING with franchise_id/week/game_id.
-- **Exit criterion:** after N real week-advances (regular + EOS), if `[EOG-IDGUARD-FIRED]` count is 0, the guardrails are dead for franchise CPU games (whose `_id` is freshly minted and written once) → safe to bypass. If it fires, the guardrail stays and we do NOT bypass that read.
+- `[EOG-IDGUARD-FIRED]` in `stat_updater.finalize_game` when ObjectId fallback is required.
+- `[EOG-IDGUARD-FIRED]` in `update_team_attributes_after_game` when a duplicate exists or the
+  ObjectId document wins richer-doc selection.
+- `[EOG-IDGUARD-FIRED]` in `_save_game_result` when its ObjectId fallback is required.
+- `[CPU-PERSIST-TIMING]`, `[CPU-PERSIST-SUBTIMING]`, and `[FINALIZE-SUBTIMING]` for the persistence
+  baseline and attribution.
 
-## Phase 1 — One-snapshot EOG orchestrator
+Required evidence before Phase 1:
 
-- Build/persist `eog_inputs` **once** per game from the in-memory sim `summary` (already have it — no read).
-- Single `apply_eog_for_game(game_doc, eog_inputs, …)` that runs, from that one snapshot: stat rollup (FPD season/career + user career record), team-attr deltas, offensive-play + defensive-scouting decay, team records, momentum.
-- Accumulate writes into **one FTD update per team** (team_attributes + `plays.*.effectiveness` + `scouting_data.defense.*.effectiveness`) instead of several separate `update_one`s.
-- Only bypass the Phase-0-proven-dead re-reads; keep every guardrail Phase 0 shows still fires.
-- Preserve exact `random.*` draw order (see RNG note) so Phase 2 can verify by seeded diff.
-- Postseason freeze (weeks 27–34) must be preserved verbatim. The retired lightweight-game override no longer exists.
+- Capture counts by `site` across representative regular-season and EOS week advances.
+- Record whether any guard fired and preserve every firing guard in the trusted path.
+- Capture a fresh timing baseline after the shipped `_build_franchise_team_maps_from_ftd` batch
+  fix; the original ~95-second loop and ~82-second `finalize_game` figures are historical, not a
+  valid current baseline.
+- Confirm `[EOG-ATTR-FAILURE]` remains zero during the sample.
 
-## Phase 2 — Dual-run byte-identical verification (gate before ship)
+## Phase 1 — trusted one-snapshot work item (not started)
 
-- Harness: for many real staging games, run the CURRENT EOG path and the NEW orchestrator on the **same** game doc under a **fixed seed**, and assert the resulting **FPD + FTD + game-doc writes are byte-identical** (same `$set`/`$inc` keys and values). Same residual-style proof used for the ±2 scoring bug (zero residual across games).
-- Because EOG consumes RNG: seed both runs identically **and** confirm identical draw counts. If the orchestrator changes draw order/count, switch that surface to poison-testing (assert the write *shape* + that outputs move together when the RNG output is poisoned), not exact diff.
-- Cover: regular season, EOS weeks (bracket sync), postseason freeze, and a game whose team plays only once (disjointness assumption for Phase 3).
+- Define a CPU-week-only work item containing the frozen game summary, canonical IDs, scores,
+  week, franchise ID, and prebuilt `eog_inputs`.
+- Persist the game and `eog_inputs` together rather than writing the game and then rereading it to
+  construct the snapshot.
+- Add optional trusted-input entry points to shared functions. Defaults must preserve today's
+  behavior for user games and tournaments.
+- Bypass only `_id` fallback reads proven dormant in Phase 0. Preserve any guard that fired.
+- Preserve postseason weeks 27–34 exactly: write `team_attribute_changes: {}` and do not mutate
+  EOG team attributes or play/scouting effectiveness.
+- Preserve global RNG call count and order.
+- Accumulate compatible updates where doing so is byte-equivalent; do not assume separate FTD
+  operations can be merged without proving Mongo update semantics and clamping order match.
 
-## Phase 3 — Parallel flush
+## Phase 2 — equivalence gate (not started)
 
-- Each week every team plays once → per-game FTD/FPD/`db.games` writes are **disjoint across games**. Persistence is I/O-bound, so a thread pool (I/O wait overlaps; no GIL issue) can take the ~20s flush toward a few seconds.
-- Shared writes stay serial / atomic: the franchise doc `results` array, `cpu_sim_jobs`, and the `applied_games`/`applied_matchups` claim inside `finalize_game`. Pull them out of the parallel section or keep them as atomic ops.
-- Threads (not the spawn process pool) — this is I/O wait, and pymongo clients are thread-safe (fork-unsafe, not thread-unsafe). Verify connection-pool size ≥ worker count.
+Build a harness that applies current and proposed EOG paths to isolated copies of the same inputs
+under identical RNG state, then compares all resulting game, FPD, FTD, and franchise writes.
 
-## Expected payoff
+Coverage must include:
 
-- Phase 1 alone: eliminates ~2–3 large-doc re-reads/game + duplicated `_id` logic + batches FTD writes → meaningful latency + bandwidth cut.
-- Phase 3: overlaps the remaining round-trips → target **~20s → a few seconds**.
+- regular season and postseason-freeze games;
+- string-ID and retained legacy ObjectId/duplicate-doc cases;
+- repeat application/idempotency behavior;
+- EOS bracket/result synchronization;
+- one normal full CPU week with all matchups represented.
 
-## Guardrails / non-negotiables
+Assert identical RNG state after each path. If a surface intentionally changes draw count/order,
+it is outside the equivalence refactor and requires poison testing plus an explicitly approved
+basketball change.
 
-- Integrity > speed. Nothing ships without the Phase-2 zero-residual proof.
-- Do not delete a defensive `_id` read until Phase-0 prod traffic shows `[EOG-IDGUARD-FIRED]` = 0 for that path.
-- Shared functions (`finalize_game`, `update_team_attributes_after_game`) are also used by the **user game (phase-a)** and **tournaments** — any optional "trusted in-memory doc" path must default to today's behavior and only activate for the CPU-week caller.
+## Phase 3 — safe parallel flush (not started)
+
+- First separate serial RNG-dependent calculation and shared/idempotency claims from I/O-only
+  writes.
+- Inventory write keys, not just team membership. Team-specific FTD/FPD writes are usually
+  disjoint because each team plays once, but franchise results, CPU-job state, aggregate claims,
+  and EOS bracket structures are shared.
+- Parallelize only the proven-disjoint I/O units with a bounded thread pool. PyMongo is
+  thread-safe, but verify the Mongo connection-pool capacity is at least the chosen worker count.
+- Keep shared writes serial or atomic, then run the normal week-completeness/finalization gate.
+- Re-run the Phase 2 equivalence suite plus failure-injection tests before enabling the path.
+- Ship behind a kill switch and compare timing/error telemetry before changing the default.
+
+## Exit criteria
+
+- No dropped, duplicated, or double-applied game/stat/team updates.
+- Byte-equivalent writes and unchanged RNG state for the behavior-preserving path.
+- Postseason freeze and EOS bracket behavior unchanged.
+- All retained `_id` guardrails still work under explicit legacy fixtures.
+- A measured end-to-end improvement on the current staging baseline large enough to justify the
+  added orchestration complexity.
+
+Integrity remains more important than the latency target. If the current post-fix measurement no
+longer justifies Tier 3, retain Phase 0 telemetry and close the optimization without refactoring.

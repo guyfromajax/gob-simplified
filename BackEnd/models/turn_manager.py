@@ -1727,50 +1727,16 @@ class TurnManager:
         if result is not None:
             pass  # Force Foul already handled; skip state routing (HCO/HCT/FCP)
         elif state in clock_enforced_states and game_clock_remaining <= 0:
-            if sl.should_run_out_clock(self.game, game_clock_remaining):
-                from BackEnd.engine.eoq_perfection import build_run_out_clock_result
+            from BackEnd.engine.eoq_perfection import build_clock_expired_result
 
-                result = build_run_out_clock_result(self.game, max(game_clock_remaining, 0))
-                low_clock_branch = "GAME_CLOCK_LE_0_RUN_OUT"
-            elif state == "HCO" and game_state.get("final_turn_shot_this_turn"):
-                # Final Turn wins over FLSS when both would trigger at 0:00 — but
-                # only HCO runs the full Final Turn (via ``resolve_final_turn_shot``
-                # in the HCO ``else`` branch). Non-HCO states (HCT/FCP/FAST_BREAK)
-                # can't consume the flag there, so let them fall through to FLSS.
-                pass
-            elif sl.would_take_final_shot(self.game, game_clock_remaining):
-                from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step
-                from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
-
-                # Consume any armed Final-Turn flag so it can't leak into a later
-                # HCO possession (non-HCO states never popped it themselves).
-                game_state.pop("final_turn_shot_this_turn", None)
-                log_eoq_routing_decision(
-                    self.game,
-                    branch="GAME_CLOCK_LE_0_FLSS",
-                    game_clock_remaining=game_clock_remaining,
-                    would_final_shot=True,
-                )
-                log_eoq_step(self.game, "FLSS", "resolve_flss", "START", extra={"state": state})
-                result = resolve_flss_shot_logic(self.game, state)
-                log_eoq_step(
-                    self.game,
-                    "FLSS",
-                    "resolve_flss",
-                    "END",
-                    extra={
-                        "result_type": result.get("result_type"),
-                        "flss_zone": result.get("flss_zone"),
-                        "shooter_id": result.get("shooter_id"),
-                    },
-                )
-                low_clock_branch = "GAME_CLOCK_LE_0_FLSS"
-            else:
-                from BackEnd.engine.eoq_perfection import build_run_out_clock_result
-
-                result = build_run_out_clock_result(self.game, 0)
-                result["forced_shot"] = False
-                low_clock_branch = "GAME_CLOCK_LE_0_RUN_OUT"
+            # At 0:00 no live-ball resolver may begin. In particular, an armed
+            # HCO Final Turn must not resolve a shot and a pending FLSS must not
+            # receive the resolver's one-second default budget.
+            game_state.pop("final_turn_shot_this_turn", None)
+            game_state.pop("flss_possession_pending", None)
+            game_state.pop("final_shot_possession_active", None)
+            result = build_clock_expired_result(self.game, state)
+            low_clock_branch = "GAME_CLOCK_LE_0_TERMINAL"
         elif (
             shot_clock_violations_allowed
             and state in clock_enforced_states

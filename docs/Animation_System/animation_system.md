@@ -1382,7 +1382,9 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 - `opp` field determines which players go to opposite side (defensive side)
 - Ball handlers (usually PG) have `opp=True` and go to opposite side
 - Outlet players have `opp=False` and stay on normal offense side
-- Coordinate flipping formula: `x = 101 - x` for away team offense
+- Historical note: supported BIP payloads now arrive in final display
+  orientation. Backend horizontal mirroring uses `x = 100 - x`; the frontend
+  no longer interprets `opp` or mirrors gameplay destinations.
 
 ---
 
@@ -1434,12 +1436,12 @@ After a made shot (HCO MAKE, PUTBACK_MAKE, Fast Break MAKE, Free Throw MAKE), th
 - **Backend:** `apply_opposite_side_logic()` converts locations to coords and stores in `coords` field
 - **Frontend:** Prioritizes `coords` field (backend-applied logic), falls back to `location` with manual `opp` application
 
-**Coordinate Flipping:**
-- Formula: `x = 101 - x` (flips around midcourt)
-- Applied for:
-  - Away team offense (normal flip)
-  - Home team offense with `opp=True` (ball handlers go to away side)
-  - Away team offense with `opp=False` (outlet players go to away side)
+**Coordinate orientation (current contract):**
+- Backend formula: `x_away = 100 - x_home`.
+- `opp` is a backend-only legacy/template input; emitted `oDestinations` and
+  `dDestinations` are final display-oriented coordinates.
+- The frontend converts grid coordinates to pixels and does not mirror or
+  reinterpret supported BIP gameplay destinations.
 
 ### Key Functions
 
@@ -3170,4 +3172,3 @@ if (remainingOffensivePromises.length > 0) {
 **Fix (backend):** In the DREB→HCO and DREB→Fast Break blocks in `BackEnd/models/game_manager.py`, we still call `switch_possession()` and clear `result["possession_flips"]`, but we **do not** set `result["offense_team_id"] = self.offense_team.team_id`. The result turn keeps the **old** offense (the team that had the ball during the play). The frontend then classifies offense/defense correctly for the step loop; pass and defenders animate in sync. End-of-turn ball attachment (stealer/rebounder) is unchanged and does not rely on the result’s `offense_team_id`.
 
 **Why Dead ball was fixed too:** When the *previous* turn was a Steal or DREB, we had been writing the new team onto that turn’s result, so the frontend set `scene.offenseTeamId` to the new team. The *next* turn (e.g. Dead ball) could then use that stale scene value before updating from the dead ball turn’s payload, so dead ball appeared out of sync. By no longer writing the new team onto Steal/DREB results, we stopped poisoning scene for the following turn; dead ball’s payload (old offense) now drives classification correctly.
-

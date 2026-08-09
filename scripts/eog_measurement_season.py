@@ -202,7 +202,7 @@ def main() -> int:
         with open(path) as fh:
             lines = sum(1 for _ in fh)
     print(f"\nWeeks advanced this run: {weeks_done}. Band-log file: {path} ({lines} lines).")
-    print("Next: python scripts/eog_band_report.py --strict "
+    print("Next: python scripts/eog_band_report.py "
           f"{path}")
     return 0
 

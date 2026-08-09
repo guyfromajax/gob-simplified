@@ -10,7 +10,7 @@ The suspicion was mostly **wrong about the cause** — starting attributes weren
 
 - **New position-rating formula** — five per-position weight vectors + **multiplicative** height fitness, which separates PF/C (the old additive-height formula collapsed interior positions). → `Position_Ratings_System.md`
 - **Six-tier entry ladder + class-year rungs** (JH→SR ~doubles by construction); regenerated the universal pool via a rank-preserving migration. → `Player_Attribute_System.md`
-- **Offseason development event** — absolute RT target × coaching factor; replaced the additive budget with a **shape attractor (α=0.55)** that targets both a level and a profile; fixed an **anchor/live desync** where in-season training silently wiped offseason growth; added **HT grow-into-frame**. This stopped the real defect — **shooting collapsing on turnover** (a big's scoring, a wing's shooting were being starved to ~half). → `Player_Development_System.md`
+- **Offseason development event** — absolute RT target × coaching factor, now a **level-only rescale** that preserves current shape; the interim `α=0.55` positional attractor was retired after league-convergence measurement showed it erased individuality. The project also fixed an **anchor/live desync** where in-season training silently wiped offseason growth and added **HT grow-into-frame**. → `Player_Development_System.md`
 - **`entry_tier` persistence fix** — the season recruit write dropped `entry_tier`, so signed recruits were re-derived from undeveloped RT and **down-classified ~1.5 tiers**; the derive was also year-blind. → `Player_Development_System.md` / `Training_System.md`
 - **Coaching quality** — saturating-coverage metric (points, not shares), a frozen reference, CPU trains it. **Dormant until pillar 3** wires per-player capture. → `Training_System.md`
 
@@ -21,7 +21,7 @@ The suspicion was mostly **wrong about the cause** — starting attributes weren
 |---|---|
 | tiers, rungs, families, peaks, growth profile, ≥100 rate | `10_Players_Systems/Player_Attribute_System.md` |
 | RT formula, weight vectors, height fitness, PF/C separation | `10_Players_Systems/Position_Ratings_System.md` |
-| offseason event, shape attractor, anchor/live, grow-into-frame, invariants | `10_Players_Systems/Player_Development_System.md` |
+| offseason event, retired attractor, potential rating, anchor/live, grow-into-frame, invariants | `10_Players_Systems/Player_Development_System.md` |
 | coaching quality, frozen reference, in-season model, CPU training | `09_Training_Systems/Training_System.md` |
 | every tunable knob (levers vs calibration anchors, live vs dormant) | `11_Design_Systems/Tunable_Constants.md` |
 | **the reasoning, rejected paths, and full project history** | `projects/Z-Completed/Player_Attribute_Recalibration_Design.md` |

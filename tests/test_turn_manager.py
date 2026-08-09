@@ -52,6 +52,39 @@ def test_turn_manager_run_micro_turn_executes():
     assert "result_type" in result
 
 
+def test_armed_hco_final_turn_at_zero_is_terminal_without_shot(monkeypatch):
+    game = build_mock_game()
+    game.quarter = 2
+    game.game_state.update(
+        {
+            "offensive_state": "HCO",
+            "time_remaining": 0,
+            "shot_clock_remaining": 0,
+            "final_turn_shot_this_turn": True,
+            "final_shot_possession_active": True,
+        }
+    )
+    tm = game.turn_manager
+
+    def _unexpected_final_turn():
+        raise AssertionError("Final Turn resolver must not run after 0:00")
+
+    monkeypatch.setattr(tm, "resolve_final_turn_shot", _unexpected_final_turn)
+
+    result = tm.run_micro_turn()
+
+    assert result["result_type"] == "RUN_OUT_CLOCK"
+    assert result["clock_expired_no_action"] is True
+    assert result["time_elapsed"] == 0
+    assert result["clock_end"] == 0
+    assert result["quarter_ends_after"] is True
+    assert result["next_play_type"] is None
+    assert "oDestinations" not in result
+    assert "dDestinations" not in result
+    assert "final_turn_shot_this_turn" not in game.game_state
+    assert "final_shot_possession_active" not in game.game_state
+
+
 def test_eoq_empty_schema_failure_is_not_stamped_during_full_sim():
     game = build_mock_game()
     game.game_state["_is_full_simulation"] = True

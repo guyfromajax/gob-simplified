@@ -33,6 +33,25 @@ Franchise progression never writes to the universal `players` / `teams` collecti
 | `franchise_team_data` (FTD) | `franchise_id` + `team_id` | Per-team progression: team attributes, `plays` (with effectiveness), `scouting_data`, `playbook_settings`, strategy settings |
 | `franchise_players_data` (FPD) | `franchise_id` + `player_id` | Per-player progression: trained attributes (SC, SH, …, NG), year, roster membership |
 
+### Two-slot account contract
+
+Each account may own at most two concurrent franchises
+(`MAX_FRANCHISES_PER_USER = 2`). `GET /franchise/list` returns both in stable
+`home_slot` order, creation allocates an empty slot, and deletion targets an
+explicit owned `franchise_id`; the legacy delete-current route refuses to choose
+between two franchises. Franchise pages treat the URL `franchise_id` as identity.
+`FranchiseLS` is only a namespaced cache (`franchise:{id}:…`), so two tabs or
+slots do not share week, team, EOG, or complete-week state.
+
+Career-wide counters remain deliberately user-scoped in v1: record, coaching
+archetypes, Geek Points, and championships aggregate games from both slots.
+`geek_points_by_team` and `championships_by_team` use the canonical team key, so
+two slots using the same program contribute to the same program bucket. FTE
+completion is also user-scoped; creating a second franchise does not restart the
+tutorial funnel. Recruit-set consumption and all roster/progression state remain
+per-franchise. Soft archive, per-slot career ledgers, and more than two slots are
+not supported.
+
 Season initialization (`FranchiseManager.initialize_season`, `BackEnd/models/franchise_manager.py`) generates the 26-week schedule, sets `week = 1`, and seeds FTD/FPD for all 128 teams from the universal collections. `FRANCHISE_START_WEEK` env var can start a franchise at a later week for testing.
 
 Roster size rule: teams carry **12–15 players** from post-recruiting through the season transition; after week-1 training camp the roster must be cut to a legal 12 before gameplay resumes (`cut-players.html`, `cut_required` on the command-center payload).

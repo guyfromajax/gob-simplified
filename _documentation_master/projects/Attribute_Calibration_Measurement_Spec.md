@@ -1,109 +1,152 @@
-# Attribute Calibration — Measurement Spec
+# Attribute Calibration — Measurement Specification
 
-**Purpose:** establish what the attribute scale and progression actually look like, in numbers, so future tuning argues against measurements rather than impressions.
+**Status:** Retained measurement backlog, refreshed 2026-08-08. No single completed report covering
+all sections was found. The archived four-season validation answered part of the progression and
+team-strength work, but roster-relative recruit and walk-on questions remain open.
 
-**Not a tuning exercise.** This is a read of the world as it stands after the pass-2 fixes. Do not change any constant in response to what it shows.
+**Purpose:** establish what the current attribute scale, roster composition, and progression look
+like so tuning is argued against measurements rather than impressions.
 
-## Ground rules
+This is not authority to tune constants or mutate a database. Analysis should be read-only. If a
+new longitudinal dataset is required, producing it with `scripts/season_advance_harness.py` is a
+separate mutating task that requires an explicitly disposable staging franchise.
 
-- **Percentiles, not standard deviations.** Almost every distribution here is deliberately skewed — the tier ladder is 7/20/40/20/11/2, and offseason gains are multi-modal because a peak year and a non-peak year are different populations. Report **p10 / p25 / p50 / p75 / p90**, plus min and max. Where a distribution genuinely looks symmetric, an SD is a useful addition, not a replacement.
-- **Measure `anchor_` attributes**, never live/fatigued values.
-- **Prefer starter-weighted to whole-roster means.** Bench composition diluted the signal badly in the four-season run. Where a roster-wide figure is reported, report the starter figure beside it.
-- **Report progression in display units as well as raw points.** Attributes display on the 1-10 scale, so a +3 raw gain reads as +0.3 on screen. Both numbers, always — the question "would a user notice this?" is only answerable in what they see.
-- **Read-only.** No writes, no code changes. Use the migrated pool and the Phase 4 run's existing boundary snapshots wherever possible rather than generating new runs.
+## Current model assumptions
 
----
+Measurements must use the current framework, not the July pass-2 model:
 
-## 1. Franchise start — what a new user's league looks like
+- Offseason development is level-only (`OFFSEASON_ATTRACTOR_ALPHA = 0.0`); camp and in-season
+  training own shape.
+- `potential_factor` is live and widens outcomes within a tier.
+- CPU auto-training uses the fitted reference path, not random allocation.
+- Dynamic recruit classes and `set_0001` are currently sized to 450.
+- Walk-on roster years are drawn directly as FR/SO/JR/SR = 10/40/40/10; there is no JH advance in
+  that path.
+- Coaching factor `f` remains dormant at 1.0 until per-player allocation capture ships.
 
-Measured on a fresh franchise initialized off the migrated pool.
+Canonical mechanics: [`Player_Attribute_System.md`](../10_Players_Systems/Player_Attribute_System.md),
+[`Player_Development_System.md`](../10_Players_Systems/Player_Development_System.md), and
+[`Training_System.md`](../09_Training_Systems/Training_System.md).
 
-**Team strength, per team (128 teams):**
+## Measurement rules
+
+- Report p10 / p25 / p50 / p75 / p90, min, max, and sample size. Add mean/SD only when useful; do
+  not replace percentiles for skewed or multimodal populations.
+- Measure persisted `anchor_` attributes where both anchor and live/fatigued values exist.
+- Report starter-weighted and roster-wide results side by side. Never infer starter health from a
+  whole-roster mean.
+- Report raw attribute points and intended display units (`raw / 10`) together where perceptibility
+  matters. The frontend display consolidation remains incomplete, so name the actual surface used.
+- For longitudinal comparisons, match the same `player_id` across boundaries. Cross-sectional
+  class comparisons do not prove development.
+- Stratify before interpreting: class year, `entry_tier`, peak count, position/training position,
+  and `potential_factor` band can each explain real mixture effects.
+- Record database, franchise ID, season/week, Git SHA, dataset path, and extraction timestamp.
+
+## Dataset strategy
+
+Use two explicitly separate datasets:
+
+1. **Current cross-section:** a fresh franchise initialized from the current pool. This supports
+   league, roster, recruit, and walk-on comparisons without advancing the save.
+2. **Longitudinal boundaries:** durable snapshots from a current multi-season harness run. The old
+   Phase 4 boundary files were temporary and were not retained, so do not claim they are available.
+
+Do not combine historical pass-2 snapshots with a current cross-section as if they represent one
+model version.
+
+## 1. Franchise-start league
+
+For each of 128 teams calculate:
 
 | Metric | Definition |
 |---|---|
-| Starter strength | mean RT of the projected starting five, at each player's best position |
-| Depth | mean RT of the 6th-10th players |
-| Top-end | best player's RT |
+| Starter strength | Mean RT of the projected starting five, using the canonical lineup helper |
+| Depth | Mean RT of players ranked 6–10 by the same roster-selection basis |
+| Top end | Highest player RT |
 
-For each of those three: p10 / p25 / p50 / p75 / p90, min, max. Name the actual best and worst team.
-
-**The gap that matters:** how far apart are the p90 and p10 teams in starter strength, in RT and as a percentage? That is the answer to "how much better is a good team than a bad one at franchise start."
-
-**Roster composition of the median team:** RT of each of the 15 players, sorted. This shows the drop from starter to bench in one line.
-
-**League-wide player distribution:** RT percentiles across all 1,920 players, plus the same split by class year and by entry tier.
-
----
+Report the percentile set for all three, the named best/worst teams, and the p90–p10 starter gap in
+RT and percent. For the team nearest median starter strength, list all 15 player RTs in descending
+order. Report league player RT by class, entry tier, position, and potential-factor quintile.
 
 ## 2. Offseason progression
 
-From the Phase 4 boundary snapshots — the same players tracked across rollovers.
+Match returning players immediately before and after each rollover. Report RT and per-attribute
+change by rung (JH→FR, FR→SO, SO→JR, JR→SR), peak count, and potential-factor quintile.
 
-**Per-player RT gain per offseason**, at p10 / p25 / p50 / p75 / p90, min, max — **split by peak count (0 / 1 / 2 / 3) and aggregated.** Splitting matters: peaks are the largest variance driver, and a lumped distribution describes nobody.
+For attributes, split the player's training-position top-three from other core attributes and show
+raw/display-unit movement. Report HT/WT longitudinally by rung. Separate the level-only offseason
+change from camp/in-season change; combining them would hide which force moved shape.
 
-Also split by class-year rung (JH→FR, FR→SO, SO→JR, JR→SR), since rung increments differ.
+Headline outputs:
 
-**Per-attribute gain per offseason**, same percentiles, for the position's signature attributes and its non-signature attributes separately. In raw points and display units.
+- median and p90 RT gain per rung;
+- median signature/non-signature attribute movement;
+- zero/one/two/three-peak career curves;
+- the share finishing below, at, or above displayed Potential Rating.
 
-**Height and weight gain per offseason**, same percentiles, split by class-year rung. This is also the longitudinal check that the HT curve fires — the same players across boundaries, not the class-year cross-section.
+## 3. Recruits relative to destination rosters
 
-**The headline question:** what does a median player's RT gain feel like on the 1-10 display, and what does a 3-peak player's look like? If both round to the same displayed number, progression is invisible regardless of what the data says.
+Report recruit RT percentiles overall and by entry tier/year, then join signed recruits to their
+destination team's pre-signing roster:
 
----
+- recruit percentile within that roster;
+- share entering the projected starting five, top ten, or neither;
+- signed recruit RT versus the graduating player(s) whose departure created capacity;
+- results by prestige/recruiting-strength band so one league-wide mean does not hide allocation.
 
-## 3. Recruits — measured relative to rosters, not in isolation
+Keep generated pool, signed subset, and active-roster entrant separate. Selection changes the
+distribution.
 
-Absolute values first: RT at p10 / p25 / p50 / p75 / p90, min, max, and the same by entry tier.
+## 4. Walk-ons relative to rosters
 
-**Then the question that actually matters:** where does a recruit land on the roster he joins?
+Use the same absolute and destination-relative tables as recruits. Report:
 
-- What percentile of an existing roster is the median recruit? The p90 recruit? The p10?
-- What share of recruits would crack the starting five immediately? The top ten? Neither?
-- How does a signed recruit's RT compare to the player whose graduation opened the spot?
+- share entering the top ten at arrival and before graduation;
+- best walk-on versus median signed recruit;
+- contribution by class year and seasons remaining;
+- steady-state roster share after the season-1 cohort clears.
 
-That last one is the direct read on whether recruiting replaces what a team loses.
+Do not reuse the old “~20% therefore freshman-heavy” premise. Current walk-on years are drawn
+directly 10/40/40/10, while the recruit supply is 450; measure the resulting steady state.
 
----
+## 5. Camp and in-season training
 
-## 4. Walk-ons
+From weekly matched-player snapshots, report season RT change and mean net/absolute per-attribute
+movement under CPU reference and representative user policies. Split training-position top-three
+from neglected attributes and camp from regular-season weeks.
 
-Same absolute percentiles, and the same roster-relative framing.
-
-**The specific question:** is a walk-on a warm body or a contributor? What share ever reach the top ten of their roster, and how does the best walk-on in the league compare to a median recruit?
-
-Walk-ons are ~20% of the league by design, so if they are pure filler that is a large share of the league doing nothing.
-
----
-
-## 5. In-season training
-
-From the Phase 4 per-week movement capture.
-
-**Per-player RT change across a season**, percentiles, split by allocation policy where the data allows — CPU reference versus the harness's user-team policy.
-
-**Per-attribute weekly movement**: mean net and mean absolute change, for signature and non-signature attributes separately. In raw points and display units.
-
-**The perceptibility question, which is the point of this section:** how many weeks of training does it take for a single attribute to move one full display unit — a 1-10 step? If the answer is more than a few weeks, the training report shows nothing happening whatever the underlying data says.
-
----
+Perceptibility output: distribution of weeks required to cross one raw point and ten raw points
+(one intended 1–10 display unit), plus the actual training-report indicators users see while the
+numeric value has not crossed a bucket.
 
 ## 6. Season-over-season team strength
 
-Not in the original list, and the most important section.
+For each team and boundary, report starter strength change and decompose it into:
 
-For each team, across each boundary: change in starter strength, in RT and as a percentage. Percentiles across the 128 teams.
+- graduation/removal;
+- returning-player development/training;
+- recruits and walk-ons entering the roster;
+- lineup-selection change.
 
-- What does the median team gain or lose per season?
-- What does the p90 team do — and is it the same team each year, or does strength rotate?
-- How much of a team's change is graduation, how much development, how much recruiting?
+Track rank persistence: how many p90 teams remain p90 one, two, and three seasons later? Report both
+team-level rotation and league-wide percentiles. Attribute/minutes-weighted and box-score measures
+must accompany RT because the archived validation proved RT can remain stable while basketball
+attributes deteriorate.
 
-This is the original question that started the project ("anecdotal steep team-talent dropoff from season 1 to season 2"), and it is the most direct read on whether progression feels like anything from the user's chair.
+## Deliverable and completion gate
 
----
+Produce one versioned report with tables, provenance, extraction code/query reference, and links to
+the underlying machine-readable artifacts. Mark each section complete, unavailable, or blocked;
+do not silently omit a requested split.
 
-## Deliverable
+The measurement is complete only when:
 
-One report, tables throughout, minimal prose. Every figure in raw units with the display-scale equivalent beside it wherever a user would see it.
+- static and longitudinal datasets are version-compatible;
+- every percentile includes `n`;
+- starter and roster-wide readings are both present;
+- recruits/walk-ons are evaluated relative to destination rosters;
+- team-strength change is decomposed rather than merely described;
+- findings are copied into the canonical system doc or active backlog before this spec is retired.
 
-Flag anything that looks wrong, but **do not fix it in this pass.** The point is to establish the baseline; tuning decisions come after, argued against these numbers.
+Flag anomalies, but make no gameplay or tuning change in the measurement pass.

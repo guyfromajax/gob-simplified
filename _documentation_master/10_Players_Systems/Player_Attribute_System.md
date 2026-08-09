@@ -113,10 +113,17 @@ Peaks control *how much*; timing controls *when*. The two axes stay orthogonal i
 
 ### Growth mechanics (summary)
 
-- **Offseason development event** fires at season rollover, before Training Camp: look up rung → base budget → apply CH-seeded peak check → apply family-timing modifiers → distribute across attributes by position weights × family curve → roll HT/WT → recompute all five RTs → emit a report. Non-core attributes grow slowly but never zero out.
-- **In-season training shapes rather than earns** — weekly decay and per-point gains both shrunk so net stays roughly flat under reference (baseline) coaching; attributes still move visibly. Specialization is expressed as *rate*, not direction: everything grows, focused attributes grow much faster.
-- **Accumulator** — in-season allocation aims the offseason budget (attributes trained most get the largest offseason share) and is separately scored to a coaching-quality signal. It is also the mid-season switch penalty: switch focus late and the aim scrambles.
-- **Coaching-quality multiplier** (`f`, bounded [0.85, 1.20]) is built but currently **dormant** — the live seam returns None so `f` = 1.0 for every player and the league holds exactly on the ladder. It activates with per-player training focus (planned).
+- **Offseason development** fires at rollover before Training Camp and rescales the player's
+  current attribute vector onto the absolute rung/peak/potential RT target. It changes level, not
+  shape; the former positional attractor is retired.
+- **Camp and in-season training own shape.** The cost matrix, player focus, and weight-scaled
+  position floors determine which attributes move and prevent role-critical starvation without a
+  pull toward the positional mean.
+- **Coaching-quality multiplier** (`f`, bounded [0.85, 1.20]) is built but currently **dormant** —
+  the live seam returns None so `f = 1.0`. It activates only after per-player allocation capture is
+  implemented.
+- Peaks and family timing still determine the career level curve and when growth arrives; HT/WT
+  retain their separate grow-into-frame path.
 
 ### Data model
 
@@ -154,7 +161,7 @@ development: {
 | `FAMILY_CURVES` | FR 3.0/1.0/.30 · SO 2.0/1.2/.60 · JR .60/1.3/2.2 · SR .35/1.2/3.2 | Per-rung phys/skill/mental growth weights |
 | `FAMILY_TIMING_WEIGHTS` | phys 30/55/15 · skill 25/50/25 · mental 20/50/30 | Early/standard/late timing odds |
 | `HT_TOTAL` | Normal(3.2, 1.9) clamp [0,8], 2.5 in/rung cap | Career height gain |
-| `NON_CORE_GROWTH_MULTIPLIER` | 0.06 | Vestigial — offseason additive-budget floor, superseded by the shape attractor (see `Player_Development_System.md`) |
+| `NON_CORE_GROWTH_MULTIPLIER` | 0.06 | Vestigial — retired offseason distribution path; unused by the level-only rescale |
 | `RT_COMPRESSION_THRESHOLD` | 95 | RT above which gains compress |
 | `RT_SOFT_CAP` | 130 | Practical RT ceiling |
 | `COACHING_F_MIN` / `COACHING_F_MAX` | 0.85 / 1.20 | Bounds on the (dormant) coaching multiplier |

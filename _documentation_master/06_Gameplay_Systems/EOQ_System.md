@@ -8,7 +8,6 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 - Q4/OT **score-band** situational rules (Slow It Down, Quick Shot, Force Foul, Run Out) → [`Situational_Logic_System.md`](Situational_Logic_System.md)
 - Full-game completion (Q4/OT final, overtime, navigation) → [`End_Of_Game_System.md`](End_Of_Game_System.md)
 - OREB putback floors and kickout math → [`Rebound_System.md`](Rebound_System.md)
-- Product backlog / polish items → [`projects/EOQ_Perfection_Brief.md`](../projects/EOQ_Perfection_Brief.md)
 
 ---
 
@@ -17,7 +16,7 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 1. **Quarter end is clock-driven.** A period ends when `game_state.time_remaining` reaches **0**, not when a possession flag fires alone.
 2. **Every live entry is runway-protected.** HCO retains its structured Final Turn gate. HCT, FCP, and every migrated Fast Break are previewed on an RNG-neutral deep clone; if the complete turn does not fit while reserving the one-second FLSS release window, only complete non-terminal movement steps that fit are retained before FLSS.
 3. **Backend owns routing.** The frontend renders turn payloads (`animation_steps`, flags). It must not decide EOQ branches locally.
-4. **OREB ≠ EOQ chain start.** Offensive rebounds happen all game. They route to putback turns but **do not** start the EOQ chain unless clock ≤ 30 **and** a chain is already active (see §5). A short-clock putback preserves capture and release; an eligible leading Q4/OT offense secures the board and runs out the clock.
+4. **OREB ≠ EOQ chain start.** Offensive rebounds happen all game. They route to putback turns but **do not** start the EOQ chain unless clock ≤ 30 **and** a chain is already active (see §5). A short-clock putback preserves capture and release; a Q4/OT offense eligible for Run Out because it is leading or trailing by more than 18 secures the board and drains the clock instead.
 5. **Zero is terminal everywhere.** After every clock mutation, the universal finalizer clamps backend/schema clocks, removes next-play/setup/possession-flip continuation, and clears pending EOQ state. Unfinished free throws are the sole exception.
 
 ---
@@ -119,7 +118,7 @@ flowchart TD
     G2 --> I
     I --> J[resolve_final_turn_shot]
     J -->|preflight OK| K[UESS Final Turn animation]
-    J -->|preflight fail <=8s| L
+    J -->|preflight fail at any positive clock| L
     K --> M{clock > 0 after shot?}
     M -->|Make| N[BIP -> may schedule FLSS]
     M -->|Miss OREB| O[Putback if chain active]
@@ -219,8 +218,9 @@ stream.
 For an HCO follow-up after an executed EOQ shot,
 `can_run_final_turn_followup()` still decides repeat Final Turn versus FLSS. HCO
 then uses `evaluate_final_turn_pacing()` for its structured alignment/handoff
-decision and retains its documented `>8s` best-effort fallback. The measured
-preview rule specifically removes known overruns from HCT/FCP/Fast Break.
+decision. If the structured Final Turn cannot release inside the available
+clock, it routes to FLSS at every positive clock value. The measured preview
+rule provides the equivalent overrun protection for HCT/FCP/Fast Break.
 
 **SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns stamp `suppress_final_shot_sfx` — FE shows the “Final Shot” headline but skips the court stinger. FLSS never shows the headline; penalty/heave zones play coach VO via backend-stamped `sfx_on_step_start` on the terminal shoot step. Presentation rules do **not** drive routing.
 
@@ -258,12 +258,11 @@ When `final_turn_shot_this_turn` is popped during handler routing:
   | `pg_direct` | PG already held the ball | PG | none |
   | `handoff` | PG didn't, and the handoff fits | PG | **handoff-first** (before alignment) |
   | `skip_handoff` | PG didn't, base fits but the handoff *doesn't* | **live handler** (swapped into the PG's BH spot; PG↔handler alignment swap) | none |
-  | `best_effort` | base doesn't fit, `time_remaining > 8` | PG | handoff fires (delivery wins; shot may land late) |
-  | *(FLSS)* | base doesn't fit, `time_remaining ≤ 8` | — | routes to FLSS |
+  | *(FLSS)* | base doesn't fit at any positive clock | — | routes to FLSS |
 
   - **Handoff-first ordering.** The handoff is **prepended before alignment** (`_prepend_final_turn_handoff_if_needed` → `build_handoff_step`): the PG sprints from his pre-alignment spot to within `FINAL_TURN_HANDOFF_CONVERGE_GRID` (6) grid of the live handler and receives; the following alignment step then tweens everyone to their Final Shot spots (PG drifts handoff-point→BH spot — no zig-zag). Emitted as 2 sub-steps (converge, pass).
   - **Handoff cost is the *real* converge travel.** `_estimate_entry_pass_seconds` sizes it as *PG's prior spot → live handler's prior spot* (Euclidean / sprint) **+** a short pass — NOT the 6-grid receive radius. A far-apart PG/handler makes the handoff expensive and can (correctly) tip the possession into `skip_handoff` — the ball still gets a structured Final Shot, just run by the live handler in place.
-  - **Delivery is guaranteed, not flag-gated.** Step 0 pins the ball to the emitter's own skeleton-BH (`_final_turn_skeleton_bh_id`); in `skip_handoff`/`pg_direct` that BH already holds it (emitter self-skips the handoff via its `prior_owner == bh_id` check), and in `handoff`/`best_effort` the prepended handoff delivered it first. When the pacing `include_entry_pass` resolver disagrees with the emitter's, the handoff still fires (logged) rather than stranding the ball.
+  - **Delivery is guaranteed, not flag-gated.** Step 0 pins the ball to the emitter's own skeleton-BH (`_final_turn_skeleton_bh_id`); in `skip_handoff`/`pg_direct` that BH already holds it (emitter self-skips the handoff via its `prior_owner == bh_id` check), and in `handoff` the prepended handoff delivered it first. When the pacing `include_entry_pass` resolver disagrees with the emitter's, the handoff still fires (logged) rather than stranding the ball.
 - **Idle motion:** Steps 0 (alignment hold) and 1 (off-ball players stand) stamp cosmetic `idle_wander` flourishes (reuses `_roll_subtle_idle_motion`, the Motion subtle-idle roller; zone D → shuffle). Render-only + UESS-safe; rolled *after* `resolve_shot` so the idle RNG never perturbs the shot.
 - **Shot choice:** 50% Outside / 50% Attack; Q4+ trailing by **exactly 3** → forced Outside three.
 - **Shooter weights:** Rank by SH (outside) or SC+AG (attack); weighted random 50 / 30 / 20 / 9 / 1.
@@ -273,10 +272,9 @@ When `final_turn_shot_this_turn` is popped during handler routing:
 
 If preflight cannot meet the anchor:
 
-- **`time_remaining > 8`:** Best-effort Final Turn still emitted (walk-up consumes clock per design).
-- **`time_remaining ≤ 8`:** Route to `resolve_flss_shot_logic()` (`route_flss` / `FINAL_SHOT_BUDGET_FLSS`).
+- **At any positive clock:** Route to `resolve_flss_shot_logic()` (`route_flss` / `FINAL_SHOT_BUDGET_FLSS`).
 
-At **game clock ≤ 0** on entry: if `final_turn_shot_this_turn` is already set **and `state == "HCO"`**, Final Turn wins over FLSS (HCO runs the full Final Turn); otherwise the low-clock branch resolves FLSS when eligible or the terminal Run Out path when no shot should be attempted. Non-HCO states (HCT/FCP/FAST_BREAK) never run the full Final Turn, so a stray armed flag no longer suppresses their FLSS.
+At **game clock ≤ 0** on entry, every clock-enforced live state returns an inert terminal payload. It clears armed Final Turn/FLSS state and starts neither a shot nor player movement; only the quarter-end signal is emitted. An unfinished free-throw trip remains the sole 0:00 continuation exception.
 
 **Non-HCO measured FLSS:** HCT / FCP / FAST_BREAK possessions at `0 < time_remaining ≤ 30` are previewed before their live resolver. If the complete schema fits, it runs normally. If it overruns, complete non-terminal steps inside `time_remaining − 1` are prepended to FLSS. `should_force_eoq_last_shot()` and its fixed `≤8s` bound remain a fail-safe only when a usable preview schema cannot be produced. **OREB is excluded** because its capture/putback fitting is handled separately in §9.
 
@@ -298,9 +296,8 @@ When `turn.suppress_final_shot_sfx === true` on a Final Turn, pass `suppressCour
 |-----------|--------|
 | Follow-up runway check fails (`EOQ_FOLLOWUP_FLSS`) | `turn_manager.run_micro_turn()` after `final_shot_ran_this_chain` |
 | `flss_possession_pending` after late-clock BIP/SIP (make **or** FOUL/CHARGE→SIP in chain) | `schedule_flss_after_inbound()` — arms when source has `late_clock_eoq` **or** `late_clock_eoq_chain_active`; may be cleared at entry if follow-up runway favors Final Turn |
-| Final Turn preflight budget fail at ≤ 8s | `resolve_final_turn_shot()` |
+| Final Turn preflight budget fail at any positive clock | `resolve_final_turn_shot()` |
 | Post-DREB when chain active and clock > 2s | `schedule_flss_after_dreb()` |
-| Game clock ≤ 0, eligible, Final Turn not already flagged (or state ≠ HCO) | `turn_manager` low-clock branch |
 | **HCT / FCP / FAST_BREAK** preview exceeds measured runway | Safe complete prefix → FLSS (`RUNWAY_SHORTENED_FLSS`) |
 | Non-HCO preview unavailable at `0 < clock ≤ 8` | Fixed-cutoff fail-safe → FLSS (`LOW_CLOCK_FLSS`) |
 
@@ -308,7 +305,16 @@ When `turn.suppress_final_shot_sfx === true` on a Final Turn, pass `suppressCour
 
 **Implementation:** `eoq_perfection.py` → `resolve_flss_shot_logic()`, `compute_flss_drive_plan()`, `build_flss_skeleton_steps()`.
 
-**Zones:** normal / penalty / heave (heave terminal). See EOQ_Perfection_Brief for zone thresholds.
+**Zones** (home offense; mirror x-coordinates for away):
+
+| Zone | Home x | Behavior |
+|------|--------|----------|
+| Normal | `x ≥ 64` (`FLSS_NORMAL_SHOT_MIN_X_HOME`) | Standard shot; no coach VO |
+| Penalty | `57 ≤ x < 64` (`FLSS_DEEP_KEY_X_HOME`) | Forced outside shot with penalty; coach VO |
+| Heave | `x < 57` | Desperation-heave math; coach VO; heave SFX eligible at `x ≤ 50` (`FLSS_HEAVE_MAX_X_HOME`) |
+
+At `time_remaining <= 0`, FLSS is not eligible: the universal live-entry
+guard returns the inert terminal payload described in §4.
 
 **Post-emit:** `finalize_flss_post_emit()` — 1s make burn at ≤ 1s clock; quarter drain when terminal.
 
@@ -364,6 +370,9 @@ Universal rules (all quarters):
 - OREB at **> 30s** or **without active chain:** putback only; no `late_clock_eoq` tag, no chain activation.
 - If a normal putback schema fits, it is unchanged. If only post-release animation overruns, normal capture/release timing is preserved and later flight/rim/bounce time is clamped at 0:00. If capture plus release cannot fit, those beats are proportionally shortened and release occurs at the buzzer (`eoq_shortened_oreb`).
 - If `should_run_out_clock()` applies before OREB resolution, no speculative shot/foul/score mutation occurs. The rebounder visibly captures the ball, remains its owner, and the `RUN_OUT_CLOCK` animation drains the period (`oreb_run_out`).
+  This includes an offense that is leading and the explicit out-of-range case
+  where it trails by more than 18; tied and competitively trailing offenses
+  retain the buzzer-putback path.
 
 ---
 
@@ -440,5 +449,5 @@ Disable trace for bulk sims: `game_state['eoq_trace'] = False` or `window.GOB_EO
 | 2026-06 | FT last-shot routing no longer starts chain (`late_clock_ft_resolution`); first Final Shot preserved after FT/OREB paths |
 | 2026-06 | Post-DREB FLSS when chain active and clock > 2s; terminal DREB at ≤ 2s |
 | 2026-07 | Unified `signalQuarterEnded` airhorn helper; `quarter_ends_after` playback path for FT / hold / Run Out |
-| 2026-08 | Retired legacy `FINAL_HOLD`; all no-shot clock expiration uses the fully animated Run Out path |
+| 2026-08 | Retired legacy `FINAL_HOLD`; positive-clock no-shot strategy uses animated Run Out, while an already-expired 0:00 entry is inert |
 | 2026-08 | Added universal terminal normalization, measured HCT/FCP/Fast Break prefix-to-FLSS routing, short-clock OREB fitting/run-out, and the terminal BIP/SIP gate |

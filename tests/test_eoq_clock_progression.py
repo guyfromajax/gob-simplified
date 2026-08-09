@@ -508,8 +508,10 @@ def test_pacing_uses_rolled_anchor(monkeypatch):
     assert plan.anchor_clock == 1.0
 
 
-def test_should_route_final_turn_to_flss_only_at_low_clock():
-    assert should_route_final_turn_to_flss(20) is False
+def test_failed_final_turn_pacing_routes_flss_at_every_clock():
+    assert should_route_final_turn_to_flss(30) is True
+    assert should_route_final_turn_to_flss(20) is True
+    assert should_route_final_turn_to_flss(9) is True
     assert should_route_final_turn_to_flss(8) is True
     assert should_route_final_turn_to_flss(0) is True
 

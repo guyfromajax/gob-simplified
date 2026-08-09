@@ -71,9 +71,11 @@ Stale pre-refactor FB tests were deleted 6-12-26; suite is green. **Still open:*
 
 `test_eoq_clock_progression.py` and `test_final_turn_entry_pass_chain.py` raise `ImportError` at collection — they import symbols that no longer exist (`roll_anchor_clock` from `eoq_clock_progression`, `_append_final_turn_entry_pass_if_needed` from `skeleton_step_emitter`). A module that can't import is **invisible debt**: it reads as passing coverage while testing nothing, and the exclusion (`--ignore` in any full-suite run) becomes permanent by default. Either repoint each test at the current API (the behaviour it covers — EOQ clock progression, final-turn entry-pass chaining — likely still exists under a renamed function) or delete it if the behaviour is gone. Do not leave them uncollectable.
 
-## P0 — HCO contract clock overruns (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
+## P0 — HCO legacy completion-contract clock overruns (6-12-26) [CODE-CLEANUP]
 
-Two critical issues from the animation blueprint's "Known HCO Turn Issues" list (`projects/Unified_Animation_System.md`):
+Two critical issues retained from the retired hybrid-animation blueprint; the
+live compatibility validator is documented in
+[`Core_Animation_System.md`](../05_UESS_System/Core_Animation_System.md):
 
 1. **HCO resolution hard overrun:** observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on a `DEAD BALL` path. **Partial mitigation (Option A):** turn-boundary guards in `turnAnimation.js` use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`). Throws still exist; needs live validation before closing.
 2. **HCO step-pass hard overrun in BATCH/DEAD BALL sub-turns:** observed throw `"[HCO step pass contract] clock overrun ... elapsedGameSeconds=405.78"` at `step=6`. **Still uncapped** — step-pass guard uses raw `Date.now() - stepStartMs` (no Option A). Track separately from #1.

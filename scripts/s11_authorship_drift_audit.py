@@ -1,25 +1,24 @@
 #!/usr/bin/env python3
-"""§11 authorship-vs-development audit — three arms, same seed.
+"""Historical §11 authorship-vs-development audit — three arms, same seed.
 
-Answers the measurement brief in
-``_documentation_master/projects/s11-development-vs-authorship.md``.
+This harness originally exposed the now-retired offseason shape attractor. The
+resolved model is documented in ``10_Players_Systems/Player_Development_System.md``
+and ``10_Players_Systems/player-development-framework.md``. Re-running this script
+against current code measures the current level-only offseason; it does not
+reproduce the August 2026 pre-framework findings without checking out that code.
 
 Path under test
 ---------------
 1. **Apply stamp** via ``apply_diffs_to_inherited_roster`` + ``build_fpd_docs_from_players``
    (same functions ``replace_slot_roster`` / ``team_builder_apply`` use).
-2. **Offseason** via ``develop_rollover(..., season_allocation=None)`` — the exact call
-   ``finish_season`` makes today for every player, because
-   ``_coaching_accumulator_for_player`` is hardwired to return ``None`` (f ≡ 1.0).
+2. **Offseason** via ``develop_rollover(..., season_allocation=None)``.
 
 Why not full game weeks / full ``finish_season``
 ------------------------------------------------
 ``develop_one_offseason`` does **not** consume minutes, usage, or box-score stats.
-Shape is an α-blend toward ``position_profile(training_position)``; level closes to
-the ladder RT. The only in-season input is ``season_allocation`` → coaching_f, and
-that seam currently returns None for everyone. Full seasons would measure the same
-attractor at ~148 min/arm. Schedule/recruit regen inside ``finish_season`` does not
-touch the original fifteen's attributes.
+The only in-season input to this path is ``season_allocation`` → coaching_f, and
+the live accumulator currently returns None for everyone. Schedule/recruit regen
+inside ``finish_season`` does not touch the original fifteen's attributes.
 
 Scratch data
 ------------
@@ -88,10 +87,6 @@ SEED = 20260806
 BASE_TEAM_ID = "69a6fcb68d2c56aa82e48ac0"
 BASE_TEAM_NAME = "Couer d'Alene"
 OUT_DIR = _REPO / "tmp" / "s11_audit"
-FINDINGS_PATH = (
-    _REPO / "_documentation_master" / "projects" / "s11-authorship-drift-findings.md"
-)
-
 YEAR_ORDER = ("Freshman", "Sophomore", "Junior", "Senior")
 
 

@@ -26,6 +26,26 @@ Because the target is absolute and re-anchored every rollover, in-season **level
 
 **RNG note (precise).** `potential_factor` is drawn **last** inside `generate_player`, so every *prior* draw for that same player (core attributes, CH, EM, weight) keeps its exact stream position — those fields are byte-identical to before the feature. However, the generator's `rng` is **shared across a generation run**, so consuming one extra value per player shifts the stream for every *subsequent* player in that run: **any seeded regeneration now yields a different downstream population than it did pre-feature.** This is harmless here — the retroactive pool write (Phase 5) and the projection read (Phase 4) both read stored state and never invoke generation — but a test that pins an exact seeded population across the whole run will differ.
 
+### Potential Rating display
+
+Potential Rating is fully shipped. The canonical projection helper is
+`BackEnd/utils/rt_projection.py`:
+
+```text
+raw projection = JH_ANCHOR_BY_TIER[entry_tier] × 2.0 × potential_factor
+displayed potential = max(raw projection, current highest RT)
+```
+
+The ratchet is computed at read time and is never separately persisted. Payloads expose the
+already-ratcheted value as `potential_rt_ratcheted`; views must not repeat the formula. The shared
+letter formatter renders `current/potential` while keeping the column header `RT`. Missing legacy
+factors resolve deterministically from `player_id` and warn, because the universal pool backfill is
+complete.
+
+Consumers include Team Roster, the FCC roster/recruiting surfaces, Recruiting Hub pages, and
+roster-management flows that explicitly show ceiling context. Other gameplay surfaces may continue
+to show current RT alone. Core tests: `test_potential_factor.py` and `test_rt_projection.py`.
+
 ## Shape Attractor — **retired**
 
 Live constant: `OFFSEASON_ATTRACTOR_ALPHA = 0.0` (level-only offseason; shape owned by camp / in-season + floors). See framework §10.4 / §11.
@@ -139,69 +159,25 @@ Canonical lever table: [`Tunable_Constants.md`](../11_Design_Systems/Tunable_Con
 
 **Surfaced 6 August 2026 via Team Builder §11; resolved 7 August 2026** in [`player-development-framework.md` §11](player-development-framework.md).  
 Attractor retired (`OFFSEASON_ATTRACTOR_ALPHA = 0.0`); offseason is level-only; camp + in-season own shape; floors replace the mean pull.  
-TB measurement (historical): `projects/s11-authorship-drift-findings.md`. Closed brief: `projects/s11-development-vs-authorship.md`.
 
-> The subsections below are the pre-resolution record. Do not retune α or treat reshape-vs-grow as open.
+Historical measurements found that the old `0.55` attractor erased individuality league-wide,
+not Team Builder authorship specifically: three Team Builder arms retained roughly 15% of their
+initial profile deviation at graduation, while the corrected league-shape measurement projected
+career cosine retention of **0.245**. Per-attribute variance had initially hidden the convergence
+because level continued to fan out while player shapes collapsed. Those findings justified the
+shipped level-only model; they are summarized here so the superseded project notes are unnecessary.
 
-### What the measurement actually found
+Do not restore α, reclassify archetypes as a workaround, re-derive `potential_factor` from authored
+attributes, or create a special freeze for authored players. None addresses the retired league-wide
+mean pull.
 
-Three arms on one median roster, same seed — control **0.147** · realistic **0.150** · extreme **0.147** retained profile-deviation at graduation.
+Two separate follow-ons remain open in
+[`Player_Attribute_Recalibration_Backlog.md`](../projects/Player_Attribute_Recalibration_Backlog.md):
 
-Authorship is not being erased. **Individuality is**, and the same force hits all 128 programs every offseason. The α-blend toward `position_profile(training_position)` is proportional: it takes the same 55% bite out of everyone's distance from the positional mean. A user's authored 6'2" centre and an untouched base-league centre converge at the same rate.
-
-Team Builder did not create this. It made it visible — third instrument finding after the empty defenses cache and the 443 in-loop DB writes per quarter.
-
-### The number nobody chose against a career
-
-At `OFFSEASON_ATTRACTOR_ALPHA = 0.55`, a freshman retains `(1 − α)³ ≈ 9%` of distinctive shape by graduation. Measurement found **~8%** — the model is behaving exactly as specified.
-
-| Career retention target | Required α |
-|---|---:|
-| 75% across four years | ≈ 0.09 |
-| 50% across four years | ≈ 0.21 |
-| **Then (α live)** | **0.55** |
-
-α=0.55 was 2.6×–6× stronger than either career target — fitted for **single-season feel** (Average C SC ~52, focus spike ~+8), not a four-year criterion. That arithmetic is why the attractor was retired; live value is `0.0` (see Tunable Constants / A — LEVERS).
-
-### Separate open question — coaching differentiation is inert
-
-`_coaching_accumulator_for_player` is hardwired to `None`, so `f ≡ 1.0` for every player.
-
-> **Still true after the attractor retirement:** `f` remains dormant (pillar 3). What is *not* still true is the pairing below — the “strong force toward the positional mean” was the α-blend, now retired. `f` is level-only when live; it does not reshape.
-
-Historical framing (pre-resolution): the input that would differentiate *level* between programs was inert while α homogenized shape. Is `f` dormancy unfinished, deliberate, or a bug? Needs its own answer — separate from reshape-vs-grow, which is closed.
-
-### Dead options from the TB framing
-
-| Option | Why dead |
-|---|---|
-| Re-run archetype classification at Establish | Blend targets `position_profile(training_position)`, not archetype. Reclassifying changes nothing unless it changes training position, and it wouldn't fix homogenization for anyone else. |
-| Re-derive `potential_factor` from authored attrs | Scalar on growth *magnitude*. Does not touch the blend target. |
-| Freeze authored attributes | Two classes of player; permanent special case. Still wrong. |
-
-Both of the first two assumed authorship was the victim. It isn't.
-
-### The actual question
-
-**Should development reshape a player, or grow him?**
-
-- **Reshape (current):** blend toward a positional mean. Necessarily subtracts from whatever a player is best at — that is where he is furthest from the mean. A 90-rebounding centre losing rebounding as he matures is regression to type wearing development's clothes.
-- **Grow (alternative):** mostly add, distributed with a bias toward positional needs; subtract only in decline. Players improve; they don't get averaged. Preserves individuality without exempting anyone.
-
-This is a core simulation decision. It affects scouting, recruiting, whether the SIGNATURE bars on the roster screen mean anything after year two, and whether two programs feel different in season three.
-
-### Product asymmetry (why TB still matters as the symptom)
-
-Everyone loses their shape. Only the Team Builder user *chose* theirs. The mechanism is not TB-specific and TB is not disadvantaged relative to the league — but the experience is worse for exactly the users who paid the most attention. That is why TB is the reason this surfaced, not an argument for a TB-specific fix.
-
-### League-wide convergence — measured (shape, not level)
-
-**Seed 202608061 pause + shape/level correction — 6 August 2026.**  
-Full notes: `projects/s11-league-convergence-shape-vs-level.md` (raw capture: `s11-league-convergence-pause-findings.md`).
-
-Per-attribute σ within position was **level-contaminated** under the attractor (RT-neutral; magnitudes fan out via tier/`potential_factor` while shape collapses). On **shape** — mean pairwise cosine distance of unit-mean attribute vectors — career projection **\(\hat{r}^3 = 0.245 ≤ 0.4\)** at α=0.55. That measurement justified retiring the attractor; see framework §10 / §11 for the shipped model.
-
-**Still unowned** (framework §8a): init FRD variety from pre-built `recruit_sets` (mean attr σ 15.7) vs post-rollover `generate_recruits_list` (σ 11.6) — 26% variety loss after season one; and `training_position` has no live write path.
+- `_coaching_accumulator_for_player` remains dormant, so coaching quality does not yet differentiate
+  offseason **level** targets.
+- Init recruit-set variety (mean attribute σ 15.7) differs from dynamic post-rollover generation
+  (σ 11.6), and `training_position` still lacks a live write path.
 
 ## Key Files
 

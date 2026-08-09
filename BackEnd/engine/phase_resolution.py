@@ -1907,7 +1907,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # All FB variants (CR / RR / Triangle / After-Steal) now emit unified
         # AnimationStep[] via their own emitters; the legacy renderer is only a
         # fallback when an emitter returns None (logged as … EMITTER NULL). See
-        # _documentation_master/projects/FB_UESS_Migration.md.
+        # _documentation_master/06_Gameplay_Systems/Fast_Break_System.md.
         if fb_play_key == "covert_release":
             try:
                 from BackEnd.engine.covert_release_step_emitter import (
@@ -2183,7 +2183,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     # All FB variants (CR / RR / Triangle / After-Steal) now emit unified
     # AnimationStep[] via their own emitters; the legacy renderer is only a
     # fallback when an emitter returns None (logged as … EMITTER NULL). See
-    # _documentation_master/projects/FB_UESS_Migration.md.
+    # _documentation_master/06_Gameplay_Systems/Fast_Break_System.md.
     if fb_play_key == "covert_release":
         try:
             from BackEnd.engine.covert_release_step_emitter import (
@@ -5785,7 +5785,8 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
         # The zone who-guards-whom map is freshly populated on game.zone_defender_assignments_by_step
         # by the compute_defender_grid above (its zone branch). Stamp it per step — ZONE ONLY, since the
         # shared ledger is stale/irrelevant for man — so the on-ball moment + pass-contest read the
-        # render's EXACT assignment instead of reconstructing "who's on the BH" (zone_selection_fix.md).
+        # render's EXACT assignment instead of reconstructing "who's on the BH".
+        # Canonical contract: Dynamic_HCO_System.md, zone guard-map selection.
         from BackEnd.utils.defense_utils import is_zone_defense
         _is_zone_stamp = is_zone_defense((getattr(game, "game_state", {}) or {}).get("defense_playcall"))
         _guard_by_step = (getattr(game, "zone_defender_assignments_by_step", {}) or {}) if _is_zone_stamp else {}
@@ -6211,7 +6212,7 @@ def _zone_bh_defender(defense_playcall, bh_location, is_away_offense, def_lineup
     """On-ball ZONE defender at a step. PREFERS the render's EXACT guard assignment stamped on the step
     (``step["_step_state"]["guard"]`` = ``{def_pos: guarded_off_player_id}`` from
     ``assign_all_zone_defenders``): the defender whose guarded player == the ball handler — the same
-    who-guards-whom the render draws, frame-independent (zone_selection_fix.md). Falls back to the
+    who-guards-whom the render draws, frame-independent. Falls back to the
     legacy polygon selection (defender whose zone polygon contains the BH spot, then nearest centroid,
     then position) when no guard is stamped. Used by the per-step moment + the pass-contest exclusion."""
     # Guard-map path: the defender the render assigned to the ball handler (exact, no distance guessing).
@@ -7323,7 +7324,7 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
 
     time_remaining_now = int(game_state.get("time_remaining") or 0)
     # Final Shot mode cascade (see EOQ_System.md):
-    #   base doesn't fit          → FLSS (late clock) / best-effort (bh=PG, handoff still fires)
+    #   base doesn't fit          → FLSS
     #   PG had the ball           → pg_direct (no handoff)
     #   handoff fits              → handoff (bh=PG, delivered handoff-first)
     #   base fits, handoff doesn't→ skip_handoff (live handler runs it from the PG spot; no FLSS)
@@ -7331,12 +7332,6 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     if not pacing.can_meet_anchor:
         if should_route_final_turn_to_flss(time_remaining_now):
             return {"route_flss": True, "flss_reason": pacing.reason}
-        handoff_mode = "best_effort"
-        log_eoq_step(
-            game, "FINAL_SHOT", "pacing_best_effort", "END",
-            extra={"reason": pacing.reason, "time_remaining": time_remaining_now},
-        )
-        apply_step0_hold_floor(skeleton, 0.0)
     elif pacing.include_entry_pass and not pacing.handoff_fits:
         # Base Final Shot fits but the handoff doesn't → skip it. The live handler
         # runs the shot from the PG's ball-handler spot (BH↔PG spot swap); making him
@@ -7471,10 +7466,10 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     if final_turn_animations:
         shot_result["animations"] = final_turn_animations
     shot_result["final_turn"] = True
-    # A handoff is emitted only in handoff / best-effort modes (bh stays PG, ball
+    # A handoff is emitted only in handoff mode (BH stays PG and the ball is
     # delivered to him). In skip_handoff the live handler IS the skeleton BH → no
     # handoff; pg_direct never needed one.
-    shot_result["final_turn_include_entry_pass"] = handoff_mode in ("handoff", "best_effort")
+    shot_result["final_turn_include_entry_pass"] = handoff_mode == "handoff"
     shot_result["final_turn_handoff_mode"] = handoff_mode
     shot_result["final_turn_include_walkup"] = pacing.include_walkup
     shot_result["final_turn_anchor_clock"] = pacing.anchor_clock

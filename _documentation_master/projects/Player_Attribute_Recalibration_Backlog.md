@@ -1,165 +1,106 @@
 # Player Attribute Recalibration — Deferred Backlog
 
-**Repo path:** `_documentation_master/projects/Player_Attribute_Recalibration_Backlog.md`
-**Companion to:** [`Player_Attribute_Recalibration_Design.md`](Player_Attribute_Recalibration_Design.md) (working doc) and [`Player_Attribute_Recalibration_Brief.md`](Player_Attribute_Recalibration_Brief.md)
-**Last updated:** 2026-07-30
+**Status:** Active follow-on backlog. The recalibration itself is complete and archived in
+[`Player_Attribute_Recalibration_Design.md`](Z-Completed/Player_Attribute_Recalibration_Design.md).
+Canonical behavior lives in the player, position-rating, development, and training system docs.
 
-Items deferred from the recalibration, each with a **trigger** rather than a date. Several outlive the project — this file is intended to survive the design doc's move to `Z-Completed/`.
+This file contains only unresolved or deliberately accepted follow-ons. Completed work is removed
+rather than retained as a second history; Git and the archived design preserve that record.
 
-Status key: **OPEN** · **ACCEPTED** (a known consequence, deliberately not fixed) · **DONE**
+## Coaching-quality activation
 
----
+### Per-player allocation capture — open
 
-## Blocks the coaching-quality system going live
+`_coaching_accumulator_for_player` still returns `None`, so offseason coaching factor `f` is `1.0`
+for every player. User and CPU training share `execute_training`; capture must be gated at the
+calling endpoint so user allocations are attributed correctly without treating CPU execution as a
+user decision.
 
-**CPU auto-train must allocate the reference.** *Trigger: pillar 3 (CPU training).* **OPEN — hard requirement, not optional.**
-Measured in-season net: reference coaching +4.76 RT/season, CPU-actual −9.13. CPU uses `generate_random_training_allocations` + `generate_random_coaching_focus`. The coaching-quality normalisation assumes CPU ≈ reference so CPU scores 1.0 and the league sits on the ladder; with random allocation CPU scores well below 1.0 and the whole league drifts under it. CPU must train the frozen reference, or archetype-modulated variants distributed around it.
+CPU reference auto-training is already shipped and tested. The old random-CPU allocation defect
+and its projected ~15 RT user advantage are resolved; do not reopen them from older project notes.
 
-**Transitional competitive imbalance.** *Trigger: resolved by the item above.* **OPEN.**
-Until CPU allocation is fixed, a sensibly-coached user gains ~+5 RT/season while CPU teams sag ~−10 — a ~15 RT per-season swing in the user's favour, live on `develop` today. Does not compound across seasons (the offseason re-anchors), but alpha difficulty feedback gathered before the fix is measuring the artifact rather than the game.
+### Training-position control — open
 
-**Per-player allocation capture.** *Trigger: pillar 3.* **OPEN.**
-`_coaching_accumulator_for_player` returns `None`, so `f` = 1.0 for everyone and the coaching multiplier is dormant. User and CPU training share one `execute_training` engine with no internal user/CPU flag, so recording must be gated at the calling endpoint (user persist block `franchise_routes.py:13573`, never the CPU block `:2408`).
+`training_position` exists, persists, defaults to `position_intent`, and is carried through
+rollover, but it has no user write surface or CPU season-start assignment policy. The future UI
+should show the projected RT/conversion cost. CPU rules still need product agreement; the prior
+proposal was to prefer adjacent positions for persistent depth-chart needs, respect height, and
+avoid converting seniors.
 
-**`training_position` UI and CPU season-start assignment.** *Trigger: pillar 3.* **OPEN.**
-The field exists, is persisted, defaults to `position_intent`, and is forward-copied at rollover. Nothing sets it. Needs the user interface (showing projected RT impact of a conversion) and the CPU rules — depth-chart holes over two seasons, height permitting, adjacent positions preferred, never convert a senior.
+### Mid-season switch penalty — blocked by training-position control
 
----
+Measure and decide the switch penalty only after the live write path and a real per-player focus
+policy exist. The prior Monte Carlo could not express this decision.
 
 ## Validation still owed
 
-**Multi-season validation harness.** *Trigger: after CPU allocation is fixed.* **OPEN.**
-No create-and-advance-four-seasons driver exists. `eog_measurement_season.py` runs regular weeks 1-26 only. Building one needs postseason weeks 27-34 driven headless (never exercised), a `run_week_35_recruiting` auth workaround (that route has `Depends(get_current_user)`), and a rollover loop. Held deliberately: running it while CPU teams decay ~10 RT/season would measure the artifact. Cost is ~8 hours locally; running co-located with the DB would cut it several-fold, since `finalize_game` persistence latency dominates and the engine does not.
+- **Weekly movement in a played season:** in-memory validation proved attributes move while
+  reference-coached RT stays broadly flat, but the user-facing weekly feel still needs live play.
+- **JH→FR live rollover:** unit/Monte Carlo coverage exists; confirm the first real rollover of
+  signed recruits.
+- **Practice Squad parity fixture:** the exact-diff harness needs a self-created durable PS fixture
+  instead of a shared staging franchise that can disappear.
 
-**Mid-season training-position switch penalty (§9.4).** *Trigger: after `training_position` UI exists.* **OPEN.**
-Structurally unmeasurable in the Monte Carlo — under a no-user-focus policy the accumulator collapses to the position weights. Needs a live season with a real user-focus policy.
+The reusable full-season/multi-season driver now exists as `scripts/season_advance_harness.py` and
+the four-season validation has been completed. “No multi-season harness” is no longer an open item.
 
-**Weekly movement visibility (§7.2), live.** *Trigger: live season with a user-focus policy.* **OPEN.**
-Confirmed in memory over 1,920 players: under reference coaching, net per-attribute change ≈ 0.000 with mean |Δ| 0.52/week — attributes move visibly while RT stays flat. Not yet confirmed against a real played season.
+## Display and profile consolidation
 
-**JH→FR rung, live.** *Trigger: first real rollover with signed recruits.* **OPEN.**
-The Step B dry run loaded FPD only, so the JH→FR transition was never exercised — the franchise has no JH players and pool freshmen roll to SO. That rung fires only for signed recruits and remains validated by Monte Carlo alone.
+- **Attribute display sweep:** converge player attributes on the intended 1–10 presentation while
+  RT remains a letter/1–100-derived grade; remove duplicated transforms and stale scale toggles.
+- **`attributeDisplay.js`:** the canonical helper still has no broad importer adoption; duplicated
+  formatting remains across frontend surfaces.
+- **CH visibility:** `attributeTooltips.js` still defines CH as “Clutch,” while the recalibration
+  design treated CH as hidden. Decide whether the display is intentional before removing either
+  the tooltip or the hidden-field claim.
+- **Player profile:** decide whether OVERALL follows `training_position`, how a higher alternate
+  position is signaled, and whether MOMENTUM remains on the profile. This depends on the
+  training-position product decision above.
 
-**PS-parity anchor (`--mode both`).** *Trigger: when a durable PS fixture exists.* **OPEN.**
-The current anchor is CPU-only because the PS reference franchise `6a5e1f0e517ebcc58d981675` was deleted from shared staging. A single-arm anchor gives *false* confidence: a refactor breaking PS-only code returns a clean exact-diff. Preferred fix is a harness that creates its own fixture rather than pointing at a franchise anyone can delete.
+Potential Rating itself is shipped and is not part of this display debt. Its canonical formula and
+surface contract live in `Player_Development_System.md`.
 
----
+## Gameplay and progression tuning
 
-## Display sweep
+- **Above-100 frequency — accepted pending play:** approximately 7.5% of the pool and 19% of
+  seniors have at least one attribute ≥100. Judge in play; do not tune solely to an old 5.5% lock.
+- **In-season RT swing — accepted pending play:** the calibrated distribution is intentionally
+  broad. Re-measure against the current post-framework gain path before changing it.
+- **Backfilled peak skew:** inherited mid-career players can only place peaks on remaining rungs,
+  temporarily skewing early franchise seasons toward one-peak careers. Revisit only if development
+  feels muted before generated cohorts replace the inherited pool.
+- **Blanket-versus-custom training tax:** measure when per-player training-position/focus controls
+  are live; it is roster-composition dependent.
+- **Recency weighting:** rejected for four-year careers. Reopen only if JUCO/redshirt support makes
+  careers materially longer.
+- **Shot calibration:** remains a separate gameplay calibration effort, not a player-recalibration
+  fix.
+- **Recruit archetype labels:** optionally restore richer cosmetic labels derived from current
+  shape if recruiting presentation feels too uniform.
+- **Recruit generation variety:** init `recruit_sets` measured wider than dynamic post-rollover
+  generation (mean attribute σ roughly 15.7 vs 11.6). Determine whether that branch difference is
+  intentional before changing either generator.
 
-**Attribute and RT display consolidation.** *Trigger: independent — can run any time.* **OPEN.**
-All attributes on the 1-10 scale (extending to 11, 12, 13+ past 100), RT on 1-100, every scaling toggle removed. Attribute bars fill on the 1-100 scale with the 1-10 value beside them; all bars scale to 100 and pin above it. Roughly 25 frontend surfaces: training report, roster displays, set-lineup, recruiting pages, player profile, and 16 static team-roster demo pages.
+## Existing-save consequences — accepted
 
-**CH tooltip conflict.** *Trigger: with the display sweep.* **OPEN — design conflict.**
-`attributeTooltips.js:7` carries a CH tooltip labelled "Clutch", which means CH is surfaced somewhere today. §8 states CH is never displayed. Either the surface is found and removed, or §8 is aspirational.
+- Old-scale saves are not migrated onto the recalibrated physical/RT distribution; new cohorts
+  replace them over time.
+- Legacy players missing `entry_tier` derive it from current RT, which can misclassify distorted
+  old-scale bigs. This is accepted rather than guessed backward from incomplete history.
+- Player block-height behavior follows the current `LEAGUE_MEDIAN_HEIGHT_IN` constant (75); older
+  notes based on 77/78 are historical.
 
-**`attributeDisplay.js` consolidation.** *Trigger: with the display sweep.* **OPEN.**
-A canonical helper already exists with no importers, while the ÷10 transform is duplicated across ~15 files. Two surfaces show raw 1-100 instead: `training-report.js:1121` and `scoutingReport.js:85`. The tutorial's "Attribute Scale" legend still documents 0-100 bands.
+## Downstream systems
 
-**Player profile changes.** *Trigger: with the display sweep.* **OPEN.**
-`OVERALL` becomes the training position's RT rather than max RT; the training position is highlighted in orange in the position list; `MOMENTUM` is replaced by `POSITION`. Momentum needs a new home if the profile is currently its only surface. Recommended addition: a quiet secondary marker on the highest RT when it is not the training position, so a user converting a player can see the cost.
+- **Archetype thresholds:** re-derive team-identity thresholds against recalibrated distributions
+  when that system is next tuned.
+- **EOG attributes:** the EOG band retune remains open and has its own measurement runbook.
+- **Program persistence:** four-season validation found recruiting has more influence on roster
+  strength than development and elite programs rotate quickly. If durable program quality is the
+  goal, tune prestige→recruiting outcomes rather than widening initial rosters.
 
----
+## Adjacent documentation debt
 
-## Tuning to revisit in gameplay
-
-**Above-100 frequency.** *Trigger: user testing.* **ACCEPTED.**
-Lands at 7.5% of the pool and 19.0% of seniors against an originally-accepted 5.5%. Structural — reaching Elite senior RT 100 through a weighted mean with a concentrated weight (SG's SH at .42) forces high-tier seniors to carry a 100+ attribute. Locked; to be judged in play rather than tuned.
-
-**In-season per-season RT swing.** *Trigger: user testing.* **ACCEPTED.**
-p10 −14 / p90 +13 RT within a season. Accepted as-is pending feel.
-
-**Backfill peak skew.** *Trigger: if development reads as muted in a franchise's first three seasons.* **OPEN.**
-Backfilled mid-career players hold peaks only on remaining rungs, so the league skews toward one peak (20.1/62.1/16.3/1.5 vs 20/55/22/3) until they graduate. Arguably a feature — inherited players are what they are and multi-peak stars come from players you recruited. Fix if needed: roll peaks per remaining rung rather than rolling a career count and truncating.
-
-**Blanket-vs-custom training tax.** *Trigger: when per-player training focus is built (~Sept 2026).* **OPEN.**
-The ~2-point tax costs 0.024-0.047 quality (f 0.95-0.98) per position, but that is not the real decision. The real comparison is one blanket allocation across five position types at 24 points versus five tailored allocations at 22 — roster-diversity dependent, and it needs measuring on a real roster. The tax is a feature parameter, not a metric parameter.
-
-**Recency weighting on cumulative coaching quality.** *Trigger: if career length grows (JUCO, redshirt years).* **OPEN.**
-Evaluated and rejected: at four seasons with a clamped band it moves `f` by a fraction of a display bucket, not worth the parameter.
-
-**Shot calibration.** *Trigger: a dedicated shot-calibration pass.* **OPEN — pre-existing, not this project's.**
-FG% 37.5% and 3PT% 25.3% against real college basketball's ~44% and ~33%. The pre-recalibration anchor was already low at 39.1% and 28.4%, so this predates the recalibration, which moved it slightly further that way.
-
-**Recruit archetype label variety.** *Trigger: if recruiting pages feel flavourless.* **OPEN — cosmetic.**
-The 20 archetype display strings collapsed to 5 derived from (intent, tier). Could be restored as a cosmetic descriptor derived from attribute shape.
-
----
-
-## Accepted consequences for existing saves
-
-**Distorted RT for bigs.** **ACCEPTED.**
-Existing franchises keep old-scale short players while gaining height-gated PF and C ratings, so interior players' ratings collapse. Deliberately not migrated; the recalibration is new-franchises-only.
-
-**Shot-blocking effectively gone.** **ACCEPTED — documented so it is not misdiagnosed.**
-`height_to_block_score` returns 0 at or below the league median, and an old-scale roster's p90 height sat at the median. A "nobody blocks shots on my save" report is this, not a bug.
-
-> **Update (2026-08-04):** the block median is now **75** (`LEAGUE_MEDIAN_HEIGHT_IN`: 78 → 77 → 75). The band rides the constant, so the threshold moved down with it. New-scale (recalibrated, shorter) rosters sit at league p50 74 / p90 80, so roughly half score 0 on the block trigger — the same interaction, now at the shorter scale. Old-scale saves (p90 ~78) are *above* the new threshold, so the original "old-scale loses blocking" framing no longer applies to them.
-
-**Legacy `entry_tier` derivation.** **ACCEPTED.**
-A legacy player with no `entry_tier` has it derived from current RT, which misclassifies players whose RT collapsed under height gating — a distorted big reads as Poor and then develops on a Poor ladder, compounding the degradation above.
-
----
-
-## Documentation
-
-**Harvest into evergreen system docs.** *Trigger: project close.* **OPEN.**
-The design doc is organised by decision narrative and is ~66k characters; it should move to `Z-Completed/` as the record of how decisions were made, not become the evergreen reference. Durable content harvests to:
-
-| Destination | Content |
-|---|---|
-| `10_Players_Systems/Player_Attribute_System.md` | ladder, tiers, families, growth profile, peaks |
-| `10_Players_Systems/Position_Ratings_System.md` | new RT formula, multiplicative height fitness |
-| `10_Players_Systems/Player_Development_System.md` *(new)* | the offseason development event |
-| `09_Training_Systems/Training_System.md` | coaching quality, in-season model |
-| `11_Design_Systems/Tunable_Constants.md` | done |
-
-**Stale-doc audit.** *Trigger: with the harvest.* **OPEN.**
-Agents have repeatedly found system docs describing removed behaviour — the distant-sim sections in `balancing_team_attributes.md` and `End_Of_Game_System.md`, wrong function names, half-stale schemas. Worth one sweep listing which docs now lie, since that is what future agents are briefed from.
-
-**Update the brief.** *Trigger: project close.* **OPEN.**
-`Player_Attribute_Recalibration_Brief.md` still describes the original suspicion and no longer resembles what the project became. It is the entry point.
-
----
-
-## Downstream dependencies this project created
-
-**Archetype threshold recalibration.** *Trigger: pillar 3.* **OPEN.**
-Team-identity thresholds were explicitly parked pending recalibrated attributes — the existing `cum_nd` 200/350 cutoffs sit essentially on the league median and route 53% of teams into a "weak" branch. They must be re-derived against the new distributions.
-
-**EOG attribute retune.** *Trigger: after pillar 3.* **OPEN.**
-Parked behind this project. Note `momentum_score` removal was deliberately deferred out of the distant-sunset cleanup to avoid changing training draw counts mid-flight.
-
----
-
-## Tuning findings from Phase-4 validation (waiting for the tuning pass)
-
-Measured on the four-season pass-2 validation run (fresh scratch off the re-migrated pool). Numbers included so the tuning pass argues against measurements, not impressions.
-
-**Program range is a PERSISTENCE problem, not an init-spread one.** *Trigger: tuning pass.* **OPEN.**
-Only **3 of 13** top-10% teams stay top-10% across four seasons — strength rotates hard. Added init spread would wash out in ~2 seasons. The lever for durable "good programs stay good" is the **prestige→recruiting link** (make high-prestige teams recruit better), NOT wider starting rosters. Note: prestige and talent are deliberately INDEPENDENT axes at init (the four-quadrant difficulty selector); do not couple them at allocation — couple prestige to *recruiting outcomes* over time instead.
-
-**Recruiting outweighs development ~26:4 in season-over-season team strength.** *Trigger: tuning pass.* **OPEN.**
-Decomposition of the s1→s2 starter-strength change (per 5 starters): graduation **−31 RT**, recruiting **+26**, development **+4**, net −1.4. Design intent was roughly **2:1** recruiting:development. Development is currently a minor factor; if the intent is for player development to matter more to a team's arc, this is the gap to close.
-
-**JR ladder runs ~5 RT low.** *Trigger: tuning pass.* **OPEN.**
-Junior class-year p50 RT lands **49 vs 54 designed**; senior is on target (60), FR/SO close. Mid-career RT slightly undershoots — likely the attractor pulling toward the profile at α=0.55 not fully reaching the JR rung target. Minor.
-
-**The ≥100-attribute rate has two bases; the lock is ambiguous.** *Trigger: tuning pass.* **OPEN.**
-**5.5% on the pool**, **4.4% on the roster** — walk-ons (all Poor, no 100s) dilute the rostered rate below the pool's. Decide which base the 5.5% lock refers to. Roster is what users actually see; hitting 5.5% *there* requires ~**6.9%** on the pool.
-
-**Walk-on year weights open the league FR-heavy.** *Trigger: tuning pass (or with the recruit-supply fix).* **OPEN.**
-`WALK_ON_YEAR_WEIGHTS` = JH 60 / FR 20 / SO 10 / JR 10, and every walk-on advances one step on arrival, so **~60% become freshmen**. A fresh franchise opens at **~32% FR** vs ~23% for the other three years (median 5 FR/team, max 9). Not a correctness bug (rosters are still 15), but it skews the class-year cross-section; adjust the weights if a balanced opening class is wanted.
-
-**In-season training is imperceptible on the 1–10 display.** *Trigger: training-report UX (in progress).* **OPEN — being addressed in UX, not gains.**
-At the reference in-season rate it takes **87–180 weeks to move one display unit** (÷10): SC ~87, SH/ID/IQ ~180. A user watching the weekly training report sees nothing move within a season; visible progression is offseason-only (+0.79 display/season on signature attrs). Being addressed via **directional arrows** in the training report rather than by inflating in-season gains (which would break the 70/30 offseason/in-season split and the reference-holds-flat invariant).
-
----
-
-## Documentation debt (pre-existing — surfaced during this project, not caused by it)
-
-**Distant-sim doc debt.** *Trigger: any work touching tournaments or the practice squad.* **OPEN.**
-`Franchise_Tournament_System.md`, `Practice_Squad_Games_System.md`, `Rank_Prestige_System.md`, `Championship_Announce_Moments.md`, and `Tournament_Execution_System.md` still describe the **removed** distant-sim engine and template training (`_apply_franchise_distant_cpu_training`) as live behaviour. The distant-sunset project replaced both with full turn-by-turn CPU sims + real `execute_training` auto-training, but these docs were never updated. **Stale system docs are what agents (and people) get briefed from — this exact class of staleness produced real errors during the recalibration** (the old position-rating formula was "verified"-stamped and wrong). Fix before building on tournaments / practice squad. The recalibration's own stale docs are already fixed; these are the adjacent debt.
-
-**MO range discrepancy.** *Trigger: any work touching momentum.* **OPEN.**
-`Player_Attribute_System.md` documents player MO as **−10/+10**; the canonical range is **−5/+5** (`MO_MIN = -5` / `MO_MAX = 5` in `BackEnd/constants/momentum.py`, the single source of truth imported by `player.clamp_mo`; team MO is the derived 5× sum = ±25). **The code is authoritative — the doc's −10/+10 is wrong.** Correct the doc the next time momentum work touches it (left unfixed here to keep the recalibration close-out scoped).
+Some tournament, Practice Squad, rank/prestige, and championship documentation still uses
+“distant” terminology after the distant simulation/training engines were retired. Audit those
+documents before using their old route descriptions as implementation guidance.

@@ -307,6 +307,10 @@ Two quantisation defects fixed:
 | Attractor gone | `OFFSEASON_ATTRACTOR_ALPHA = 0.0`; offseason is level-only |
 | Team Builder authored shape survives | No proportional bite toward `position_profile` each rollover |
 
-Earlier TB measurement (`projects/s11-development-vs-authorship.md`, `s11-authorship-drift-findings.md`) correctly found that authorship was not uniquely victimised — **individuality** was, league-wide, via α. That model question ("reshape vs grow") is answered: **grow level, coach shape**. Do not re-open α or authorship drift against the retired blend.
+The earlier Team Builder measurement correctly found that authorship was not uniquely victimised —
+**individuality** was, league-wide, via α. The durable measurements and rationale are summarized in
+[`Player_Development_System.md`](Player_Development_System.md#reshape-vs-grow--closed-grow-level-coach-shape).
+That model question ("reshape vs grow") is answered: **grow level, coach shape**. Do not re-open α
+or authorship drift against the retired blend.
 
 **Unowned follow-ons** from this work: §8a (recruit σ branch; `training_position` write path).

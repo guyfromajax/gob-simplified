@@ -2,9 +2,14 @@
 
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
-**Spec version:** 2.0 — draft for alignment
-**Status:** **Phases 0–3 closed**, verified by a clean played week including a mid-game resume and a non-mod control. **Phase 4 (height and class budgets, §10) specced, not started.** 3c (uploads) is the committed fast follow — deferred deliberately as the only workstream requiring infrastructure. A UX and design overhaul runs alongside, briefed that both are coming.
-**Last updated:** 1 August 2026
+**Spec version:** 2.0 — implementation/decision record
+**Status:** **Phases 0–4 shipped.** Height/class budgets and diff-scoped shape floors are live.
+The remaining committed feature is 3c uploads, deliberately deferred because it requires upload
+storage, cascade deletion, and orphan cleanup. Smaller outstanding verification/UX debt is tracked
+canonically in [`Team_Builder_System.md`](../04_Franchise_Mode_Systems/Team_Builder_System.md#15-unverified-and-outstanding).
+Earlier sections preserve the decisions as they evolved and may describe paths later retired; use
+the canonical system document for current runtime behavior.
+**Last updated:** 8 August 2026
 
 ---
 
@@ -1111,9 +1116,7 @@ Height separates cleanly across five rank bands. **Class has only 18 distinct in
 
 **Raised 4 August 2026. Measured 6 August 2026. Reframes out of Team Builder.**
 
-Original brief + closure: `s11-development-vs-authorship.md`. Raw measurement: `s11-authorship-drift-findings.md`.
-
 Three-arm retention at graduation was control **0.147** / realistic **0.150** / extreme **0.147** — authorship is not special. The offseason α-blend homogenises **every** program the same way. TB options 2–3 (reclassify / re-derive potential) are dead; they assumed authorship was the victim.
 
-**Living question:** should development *reshape* or *grow*? That is simulation design, not a TB fix. Own section: [`Player_Development_System.md` → Reshape vs grow](../10_Players_Systems/Player_Development_System.md#reshape-vs-grow--open-simulation-design).
-
+**Resolution:** development grows level while coaching owns shape. This is simulation design, not a
+TB fix. Canonical section: [`Player_Development_System.md` → Reshape vs grow](../10_Players_Systems/Player_Development_System.md#reshape-vs-grow--closed-grow-level-coach-shape).

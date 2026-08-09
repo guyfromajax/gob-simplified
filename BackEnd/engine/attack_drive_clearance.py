@@ -546,7 +546,7 @@ def _resolve_hco_drive_contest(driver, primary_def, off_team, def_team):
     the stop (1.0 = reaches the rim); contact ∈ {None, 'D_FOUL', 'O_FOUL', 'DEAD BALL'} (routed by S2b).
     `def_mod`/`off_mod` feed HCO team efficiency; `exclude_steal=True` (a drive collision is a
     charge/block/lost-handle, not a pickpocket) + `clean_stop=True` (distinguish the C clean stop from
-    a contested B). See Dynamic_MM_Brief §S2 + projects/attack_contest_unification.md."""
+    a contested B). See Dynamic_HCO_System.md, "Attack-drive contest"."""
     from BackEnd.engine.dynamic_hct import _resolve_moment
     off_attrs = getattr(off_team, "team_attributes", {}) or {}
     def_attrs = getattr(def_team, "team_attributes", {}) or {}
@@ -1238,7 +1238,7 @@ def build_attack_drive_sequence(
     # native `should_shoot` dish read), not the blind `shoot_prob` coin flip: dish to a teammate whose
     # look beats the contested pull-up, else take the pull-up. HCO-native (the stopped BH re-enters the
     # half-court read). Wrapped so a read error can never break the drive. (Full reset/freelance = a
-    # follow-up.) See Dynamic_MM_Brief §S2 / attack_contest_unification.md.
+    # follow-up.) See Dynamic_HCO_System.md, "Attack-drive contest".
     _s2e_dish_pos = None
     if _three_tier and drive_tier in ("B", "C"):
         try:

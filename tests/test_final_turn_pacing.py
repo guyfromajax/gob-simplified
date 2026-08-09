@@ -102,6 +102,39 @@ def test_pacing_insufficient_time_routes_flss(monkeypatch):
     assert result.get("route_flss") is True
 
 
+def test_pacing_failure_above_legacy_cutoff_routes_flss(monkeypatch):
+    _patch_resolve(monkeypatch)
+    monkeypatch.setattr(random, "random", lambda: 0.99)
+    monkeypatch.setattr(random, "choice", lambda values: values[0])
+    monkeypatch.setattr(
+        "BackEnd.engine.final_turn_pacing.evaluate_final_turn_pacing",
+        lambda *args, **kwargs: SimpleNamespace(
+            can_meet_anchor=False,
+            reason="insufficient_total_budget",
+            step0_hold_floor=0.0,
+            include_entry_pass=False,
+            handoff_fits=False,
+            include_walkup=False,
+            anchor_clock=1.0,
+            micro_reserve_seconds=1.0,
+        ),
+    )
+
+    game = _game(time_remaining=20)
+    result = phase_resolution.resolve_final_turn_shot_logic(
+        game,
+        o_destinations={pos: {"x": 64, "y": 25} for pos in POSITIONS},
+        d_destinations={},
+        position_to_spot={pos: "deep upper wing" for pos in POSITIONS},
+        bh_pos="PG",
+    )
+
+    assert result == {
+        "route_flss": True,
+        "flss_reason": "insufficient_total_budget",
+    }
+
+
 def test_pacing_hold_floor_accounts_for_move_beats(monkeypatch):
     _patch_resolve(monkeypatch)
     random_values = iter([0.01, 0, 0, 0, 0, 0, 0])

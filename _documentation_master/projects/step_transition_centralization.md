@@ -80,6 +80,32 @@ does not yet match the canonical runtime model:
 Do not make the registry authoritative until it is rebuilt from verified
 runtime behavior and parity-tested.
 
+### Immediate `offensive_state` guardrail
+
+Before the full planner/executor migration, add a small defense-in-depth check
+for the current handler-owned contract. `offensive_state` is the canonical next
+resolver (`HCO`, `HCT`, `FCP`, `FAST_BREAK`, or `FREE_THROW`);
+`next_play_type` remains informational. `OREB`, `DREB`, and inbound turns are
+coordinated through their existing synthetic-turn and `pending_*` payloads, not
+by adding new `offensive_state` values.
+
+The guard must detect whether a handler explicitly published its next routing
+state, not merely whether the value changed—a valid HCO → HCO transition can
+write the same value. Start with a diagnostic assertion/log in test or debug
+profiles, then cover every legitimate same-state and `pending_*` exception
+before considering production enforcement.
+
+This guardrail addresses two May 2026 After-Steal incidents where MAKE-no-foul
+and MISS-no-foul exits left `offensive_state="FAST_BREAK"`, producing a repeating
+BIP/FB route. The resolver fixes shipped, but the informal contract remains easy
+for a new exit path to violate. Existing `transition_validator.py` does not close
+this gap: it validates the resulting state when enough context exists, does not
+prove the handler wrote it, and its invalid-transition warning in `GameManager`
+is currently disabled.
+
+Do not introduce the full `TransitionPlan` merely to obtain this guardrail. It
+is a bounded precursor to the phased centralization below.
+
 ---
 
 ## 3. Target Architecture

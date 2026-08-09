@@ -8,7 +8,7 @@ Cross-cutting engineering and product plans that span multiple systems (not tied
 |----------|--------|
 | [bugs.md](./bugs.md) | Product bugs, features, animation/UESS backlog |
 | [Animation_Cleanup.md](./Animation_Cleanup.md) | FE animation consolidation (Tier 2–5, Projects A–D) |
-| [offensive_state_hardening.md](./offensive_state_hardening.md) | `offensive_state` routing hardening (open) |
+| [`step_transition_centralization.md`](../step_transition_centralization.md) | `offensive_state` guardrail plus broader routing centralization (open) |
 
 ## Canonical docs (moved out of projects)
 

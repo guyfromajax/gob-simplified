@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # EOG-band measurement season runner. Sets all env, then drives the target
-# franchise (6a66449127f0298bd27584c5, South Lancaster) through the regular
-# season in-process. Writes the dataset to an ABSOLUTE local path so it survives
+# franchise (default configured in eog_measurement_season.py) through the regular
+# season in-process. Target overrides use GOB_MEASUREMENT_FRANCHISE_ID and
+# GOB_MEASUREMENT_TEAM. Writes the dataset to an ABSOLUTE local path so it survives
 # independent of Railway's ephemeral filesystem.
 #
 # Usage:

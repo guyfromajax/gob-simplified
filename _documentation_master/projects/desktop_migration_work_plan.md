@@ -2,9 +2,9 @@
 
 **Purpose:** Practical work plan for migrating GOB from an online-only web app to the hybrid model: a standalone desktop build for single-player franchise play, with the online layer (accounts, community, recruit packs, subscription, PvP) remaining on remote infrastructure.
 
-**Companion docs:** `app_build_dynamics.md` (target behavior — which builds have which locks), `repo_audit.md` (codebase evidence this plan is built on), `Steam_Strategy.md` (the calendar this must serve).
+**Canonical companion:** [`Steam_Strategy.md`](../12_GTM/Steam_Strategy.md) — release and promotion calendar this migration must serve.
 
-**Last updated:** July 2026
+**Last updated:** August 2026
 
 ---
 
@@ -19,7 +19,73 @@
 
 ---
 
-## 1. Target architecture
+## 1. Build and distribution contract
+
+The files always download to the user's computer. Revocation means refusing to
+authorize a build, not deleting local files. Two independent gates are available:
+
+1. **Steam entitlement**, for Steam-distributed builds.
+2. **GOB backend authentication**, only for builds deliberately made dependent
+   on the remote service.
+
+The build profile decides which gates exist:
+
+| Build profile | Steam gate | GOB backend gate | Offline standalone | Product job |
+|---|---:|---:|---:|---|
+| Playtest via Steam | Yes | Yes | No | Revocable, generous full-loop PMF validation |
+| Playtest via direct download | No | Yes | No | Same test scope; backend auth is the revocation gate |
+| Next Fest Demo | Steam distribution | Optional | Target: yes | Permanent public acquisition artifact with deliberate scope limits |
+| Paid Steam single-player | No required DRM gate | No for base game | Yes | Owned product that continues running offline |
+| Paid direct single-player | No | No for base game | Yes | Same owned product, delivered outside Steam |
+
+### 1.1 Playtest
+
+The Playtest remains on the current backend-dependent architecture and does not
+wait for desktop migration. It should expose the full playable franchise loop
+needed to measure retention rather than an artificial season cap; features may
+still be excluded for readiness or stability. Access is cohort-based and
+revocable. Steam access can be disabled in Steamworks, and GOB can independently
+stop honoring Playtest-tier authentication. Direct-download testers have only
+the backend gate, which is sufficient on its own.
+
+The Playtest winds down before paid launch. Its cannibalization risk is managed
+through controlled waves and conversion while testers are engaged, not through
+self-destructing files.
+
+### 1.2 Next Fest Demo
+
+The Demo is a separate permanent public artifact, not the Playtest. Because it
+cannot be treated as a temporary revocable cohort, it receives an intentional
+scope limit such as a season, team, or time cap. It is emitted from the same
+standalone pipeline through a build profile, not maintained as a code fork. The
+exact limit remains an open product decision informed by Playtest data.
+
+Clean rule: **revoke the Playtest; constrain the Demo.**
+
+### 1.3 Paid single-player
+
+The paid base game is standalone and requires neither a GOB account nor a
+network connection for franchise play. Steam and direct customers receive the
+same underlying offline architecture; the storefront changes delivery and
+purchase verification, not the single-player runtime contract. Steam's optional
+DRM wrapper remains a separate future choice and is not a dependency of this
+plan.
+
+The server-side moat is the online layer—recruit packs, subscriptions, live PvP,
+tournaments, leaderboards, franchise sharing, and community features—not a
+phone-home requirement in the base game.
+
+### 1.4 Account and entitlement bridge
+
+Both storefront variants must still reach GOB's remote backend for optional
+online products. A Steam or direct customer creates or links a GOB account only
+when using those features. Pack ownership and subscriptions remain authenticated
+server-side; purchased pack content is then installed into the local profile.
+This bridge is required regardless of the base game's DRM choice.
+
+---
+
+## 2. Target architecture
 
 ```
 ┌─────────────────────────────────────────────────────┐
@@ -54,7 +120,7 @@
 
 ---
 
-## 2. Workstreams
+## 3. Workstreams
 
 Ordered so early items unblock later ones and are independently testable against the current cloud version.
 
@@ -91,7 +157,7 @@ The query string is currently a cross-page state container and resume protocol (
 
 ### WS-5: Online/offline seam & entitlement
 - **Endpoint routing split:** game/franchise routes → local; auth, community, leaderboards, feedback, recruit-pack, subscription routes → remote. One routing table in the API config, not scattered conditionals.
-- **Offline-first identity:** single-player must work with no account and no network (the OOTP-direct promise). A GOB account is required only to *link* online features (per `app_build_dynamics.md` §6 — the account bridge for pack redemption and subscription across both storefronts).
+- **Offline-first identity:** single-player must work with no account and no network. A GOB account is required only to link online features through the account bridge in §1.4.
 - Recruit-pack delivery to desktop: purchased packs download through authenticated remote calls and install into local assets/DB; base 300 portrait set ships in the bundle (no runtime R2 dependency for offline play).
 - Graceful degradation: online panels (community highlights, leaderboards) render an offline state rather than blocking anything.
 
@@ -99,11 +165,11 @@ The query string is currently a cross-page state container and resume protocol (
 - Reproducible build script: compile engine → bundle frontend + shell → installer artifacts.
 - SteamPipe depot configuration; internal branch first; install and play via Steam client as a real tester (per original onboarding checklist).
 - Direct-download variant of the same build (the "one standalone build, two storefronts" model).
-- **Demo variant:** same pipeline with scope limits compiled in (per `app_build_dynamics.md` §3 — the Demo is permanent, so it is constrained: e.g., season cap/team cap). Build flag, not a fork.
+- **Demo variant:** same pipeline with the §1.2 scope limit compiled in. Build flag, not a fork.
 
 ---
 
-## 3. Calendar (integrates with Steam_Strategy.md §6)
+## 4. Calendar (integrates with [`Steam_Strategy.md`](../12_GTM/Steam_Strategy.md) §6)
 
 | Window | Playtest track (current architecture) | Migration track |
 |---|---|---|
@@ -122,7 +188,7 @@ The query string is currently a cross-page state container and resume protocol (
 
 ---
 
-## 4. Risks
+## 5. Risks
 
 | Risk | Likelihood | Mitigation |
 |---|---|---|
@@ -136,7 +202,7 @@ The query string is currently a cross-page state container and resume protocol (
 
 ---
 
-## 5. Open decisions
+## 6. Open decisions
 
 1. **Electron vs Tauri** — default Electron; close after WS-4 spike.
 2. **Loopback service vs in-process bridge** — default loopback (zero frontend changes); close during WS-2.
@@ -147,7 +213,9 @@ The query string is currently a cross-page state container and resume protocol (
 
 ---
 
-## 6. Definition of done (per milestone)
+## 7. Definition of done
+
+### 7.1 Per workstream
 
 - **WS-1:** cloud product runs on Mongo adapter with zero behavior change; SQLite adapter passes the same engine test suite.
 - **WS-2:** full franchise season completes locally, offline, network monitor showing zero remote calls; sim performance within acceptable range on reference low-end hardware.
@@ -155,3 +223,12 @@ The query string is currently a cross-page state container and resume protocol (
 - **WS-4:** installable build on a clean Windows machine with no dev tooling; cold start to playable under acceptable threshold.
 - **WS-5:** fresh install plays a full offline season with no account; account link + pack purchase installs content into local DB.
 - **WS-6:** same pipeline emits Steam depot build, direct installer, and scope-limited demo from one source tree; Steam-installed build passes a real-player test session.
+
+### 7.2 Per build profile
+
+| Profile | Acceptance gate |
+|---|---|
+| Playtest | Full intended test loop runs on the remote architecture; cohort access can be revoked through backend auth, and Steam entitlement when distributed there. |
+| Demo | Produced from the common desktop pipeline with its selected scope limit; installs cleanly and never depends on Playtest credentials. |
+| Paid Steam | Base franchise mode completes a full offline season after installation through Steam; optional online features require linked GOB entitlement only when opened. |
+| Paid direct | The same base-game and online/offline contracts pass from the direct installer; its update mechanism follows the decision in §6. |

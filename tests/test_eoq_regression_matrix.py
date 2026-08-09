@@ -18,6 +18,7 @@ from BackEnd.utils.eoq_clock_progression import (
     schedule_flss_after_dreb,
     should_emit_clock_stopped_inbound,
 )
+from tests.test_utils import build_mock_game
 
 
 CLOCKS = (30, 9, 8, 3, 1, 0)
@@ -56,42 +57,182 @@ def _game(*, quarter=4, margin=0, clock=30):
     )
 
 
+def _route_result(marker):
+    return {
+        "result_type": "DEAD BALL",
+        "time_elapsed": 0,
+        "next_play_type": None,
+        "possession_flips": False,
+        "route_marker": marker,
+    }
+
+
+def _prepare_live_turn_manager(monkeypatch, *, state, clock, margin, quarter=4):
+    game = build_mock_game()
+    game.quarter = quarter
+    game.score = {
+        game.offense_team.name: 70 + margin,
+        game.defense_team.name: 70,
+    }
+    game.game_state.update(
+        {
+            "score": game.score,
+            "offensive_state": state,
+            "time_remaining": clock,
+            # Keep the shot-clock gate independent from this game-clock matrix.
+            "shot_clock_remaining": 30,
+        }
+    )
+    for team in (game.home_team, game.away_team):
+        for player in team.lineup.values():
+            player.stats["game"].setdefault("MIN", 0)
+    tm = game.turn_manager
+    monkeypatch.setattr(tm, "_preview_non_hco_eoq_turn", lambda *_: (True, None))
+    monkeypatch.setattr(tm, "_emit_pressure_animation_steps", lambda *_: None)
+    monkeypatch.setattr(
+        tm,
+        "_execute_quick_foul_at_possession_start",
+        lambda *_: _route_result("FORCE_FOUL"),
+    )
+    monkeypatch.setattr(tm, "resolve_final_turn_shot", lambda: _route_result("FINAL_SHOT"))
+    monkeypatch.setattr(tm, "resolve_half_court_offense", lambda: _route_result("HCO_NORMAL"))
+    monkeypatch.setattr(tm, "_execute_forced_shot", lambda *_: _route_result("FORCED_SHOT"))
+    monkeypatch.setattr(
+        "BackEnd.engine.eoq_perfection.resolve_flss_shot_logic",
+        lambda *_: {
+            **_route_result("FLSS"),
+            "result_type": "MISS",
+            "time_elapsed": 1,
+            "flss": True,
+        },
+    )
+    monkeypatch.setattr(
+        tm,
+        "set_playcalls",
+        lambda: {
+            "offense": "Base",
+            "defense": "man",
+            "offense_play_type": "motion",
+            "offense_focus": "outside",
+            "defense_type": "man",
+            "defense_focus": None,
+            "offense_override_cleared": False,
+        },
+    )
+    monkeypatch.setattr(tm, "calculate_ev", lambda **_: 0)
+    monkeypatch.setattr(tm, "_store_ev_score", lambda *_: None)
+    monkeypatch.setattr(
+        "BackEnd.models.turn_manager.resolve_fast_break_logic",
+        lambda *_: _route_result("FAST_BREAK_NORMAL"),
+    )
+    monkeypatch.setattr(
+        "BackEnd.models.turn_manager.resolve_full_court_press_logic",
+        lambda *_: _route_result("FCP_NORMAL"),
+    )
+    monkeypatch.setattr(
+        "BackEnd.models.turn_manager.resolve_half_court_trap_logic",
+        lambda *_: _route_result("HCT_NORMAL"),
+    )
+    return game, tm
+
+
 @pytest.mark.parametrize("state", LIVE_ENTRY_STATES)
-@pytest.mark.parametrize("clock", CLOCKS)
+@pytest.mark.parametrize("clock", (30, 9, 8, 3, 1))
 @pytest.mark.parametrize("margin,expected", Q4_MARGIN_ACTIONS.items())
-def test_q4_entry_priority_matrix(state, clock, margin, expected):
-    """Every live entry sees the same score/clock decision before its resolver."""
-    game = _game(quarter=4, margin=margin, clock=clock)
+def test_q4_entry_priority_matrix_runs_each_live_state(
+    monkeypatch, state, clock, margin, expected
+):
+    """Every live state passes through TurnManager's authoritative priority gate."""
+    game, tm = _prepare_live_turn_manager(
+        monkeypatch, state=state, clock=clock, margin=margin
+    )
 
-    action = sl.get_eoq_situational_action(game, clock)
+    result = tm.run_micro_turn()
 
-    assert action == (None if clock == 0 else expected), (state, clock, margin)
+    if expected == "RUN_OUT_CLOCK":
+        assert result["result_type"] == "RUN_OUT_CLOCK"
+        assert result["quarter_ends_after"] is True
+        assert game.game_state["time_remaining"] == 0
+    elif expected == "FORCE_FOUL":
+        assert result["route_marker"] == "FORCE_FOUL"
+    elif expected == "FINAL_SHOT" and state == "HCO":
+        assert result["route_marker"] == "FINAL_SHOT"
+    elif expected == "FINAL_SHOT" and clock == 1:
+        assert result["route_marker"] == "FLSS"
+        assert result["flss"] is True
+    else:
+        expected_normal = {
+            "HCO": "HCO_NORMAL",
+            "HCT": "HCT_NORMAL",
+            "FCP": "FCP_NORMAL",
+            "FAST_BREAK": "FAST_BREAK_NORMAL",
+        }[state]
+        assert result["route_marker"] == expected_normal
+
+
+@pytest.mark.parametrize("state", LIVE_ENTRY_STATES)
+def test_zero_clock_live_entry_is_inert_for_every_state(monkeypatch, state):
+    game, tm = _prepare_live_turn_manager(
+        monkeypatch, state=state, clock=0, margin=-3
+    )
+    game.game_state["final_turn_shot_this_turn"] = True
+    game.game_state["flss_possession_pending"] = True
+
+    result = tm.run_micro_turn()
+
+    assert result["result_type"] == "RUN_OUT_CLOCK"
+    assert result["clock_expired_no_action"] is True
+    assert result["quarter_ends_after"] is True
+    assert result["time_elapsed"] == 0
+    assert game.game_state["time_remaining"] == 0
+    assert "route_marker" not in result
 
 
 @pytest.mark.parametrize("quarter", (1, 2, 3))
 @pytest.mark.parametrize("state", LIVE_ENTRY_STATES)
 @pytest.mark.parametrize("clock", CLOCKS)
-def test_q1_q3_tied_entry_matrix_pursues_shot_when_clock_is_live(
-    quarter, state, clock
+def test_q1_q3_tied_entry_matrix_runs_each_live_state(
+    monkeypatch, quarter, state, clock
 ):
-    game = _game(quarter=quarter, margin=0, clock=clock)
-    manager = TurnManager.__new__(TurnManager)
-    manager.game = game
+    game, tm = _prepare_live_turn_manager(
+        monkeypatch,
+        state=state,
+        clock=clock,
+        margin=0,
+        quarter=quarter,
+    )
 
-    # Q1-Q3 have no Q4 score-band override. Non-HCO states enter the measured
-    # preview path; HCO owns its structured Final Turn gate.
-    assert sl.get_eoq_situational_action(game, clock) is None
-    if state == "HCO":
-        assert clock == 0 or game.quarter < 4
+    result = tm.run_micro_turn()
+
+    if clock == 0:
+        assert result["clock_expired_no_action"] is True
+        assert result["quarter_ends_after"] is True
+    elif state == "HCO":
+        assert result["route_marker"] == "FINAL_SHOT"
+    elif clock == 1:
+        assert result["route_marker"] == "FLSS"
+        assert result["flss"] is True
     else:
-        assert manager._should_preview_non_hco_eoq_turn(clock) is (clock > 0)
+        expected_normal = {
+            "HCT": "HCT_NORMAL",
+            "FCP": "FCP_NORMAL",
+            "FAST_BREAK": "FAST_BREAK_NORMAL",
+        }[state]
+        assert result["route_marker"] == expected_normal
 
 
 @pytest.mark.parametrize("turn_type", SYNTHESIZED_TURNS)
 @pytest.mark.parametrize("clock", CLOCKS)
 def test_synthesized_turn_terminal_matrix(turn_type, clock):
     game = _game(clock=clock)
-    game.game_state["time_remaining"] = 0
+
+    def update_clock(turn):
+        game.game_state["time_remaining"] = max(
+            0,
+            game.game_state["time_remaining"] - int(turn.get("time_elapsed") or 0),
+        )
+
+    game.turn_manager = SimpleNamespace(update_clock_and_possession=update_clock)
     turn = {
         "current_turn": turn_type,
         "result_type": turn_type,
@@ -99,6 +240,7 @@ def test_synthesized_turn_terminal_matrix(turn_type, clock):
         "next_turn": "HCO",
         "next_defensive_setup": "FCP",
         "possession_flips": True,
+        "time_elapsed": clock,
         "clock_start": clock,
         "clock_end": -2,
         "animation_steps": [
@@ -119,8 +261,10 @@ def test_synthesized_turn_terminal_matrix(turn_type, clock):
         ],
     }
 
-    normalize_quarter_end_after_clock_update(game, turn)
+    ended = GameManager._finalize_synthesized_clock_turn(game, turn)
 
+    assert ended is True
+    assert game.game_state["time_remaining"] == 0
     assert turn["quarter_ends_after"] is True
     assert turn["next_play_type"] is None
     assert "next_turn" not in turn
