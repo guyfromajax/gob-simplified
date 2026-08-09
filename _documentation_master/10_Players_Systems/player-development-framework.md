@@ -104,7 +104,7 @@ Seven separate occurrences of the same masking pattern — including one I intro
 These are not in the framework build and have **no assigned next step**. Flagged so they are not forgotten because they fell out of an "out of scope" list:
 
 1. **Recruit generation branch** — init draws from frozen `recruit_set_0001` at mean attr σ **15.7**; subsequent classes from live `generate_recruits_list` at σ **11.6**. A real **26% variety loss after season one**. Same helper, different branch — not signing selection.
-2. **`training_position` has no live write path.** It defaults to `position_intent`, so nobody can redirect the position a player is developed toward. The position floor and cost curve follow it — conversion / positional-redirect coaching cannot be expressed until a write path exists.
+2. **`training_position` has no live write path.** It defaults to `position_intent`, so nobody can redirect the position a player is developed toward. The position floor and gain percentage follow it — conversion / positional-redirect coaching cannot be expressed until a write path exists.
 
 ## 9. Rules
 
@@ -114,18 +114,20 @@ These are not in the framework build and have **no assigned next step**. Flagged
 
 ## 10. Accepted for build (2026-08-07)
 
-### 10.1 Cost curve (budget cost, not gain damper)
+### 10.1 Direct gain percentages (supersedes the historical cost derivation below)
+
+> **Current representation:** the cost representation described historically in this subsection is retired. The live system stores `TRAINING_GAIN_PERCENTAGES` directly, charges one point per notch, and applies position/class percentages to gain before the remainder split. The complete authoritative table is in `../11_Design_Systems/Tunable_Constants.md`.
 
 - `cost_a = 1/η_a`, `η_a = clamp((w_a/w_max)^γ, η_min, 1)`.
 - **γ = 1.0**, **η_min = 0.25** (max cost 4). Class cost multipliers: FR 1.0 / SO 1.1 / JR 1.25 / SR 1.4.
 - Gains use allocation **units** and normal `IN_SEASON_GAIN_SCALE`; η never multiplies the gain roll.
 - Spent budget = `Σ units_a × cost_a × class_mult` must fit the week’s point pool (24 in-season / 30 camp).
 
-**Weight basis — `TRAINING_COST_WEIGHTS`, not `POSITION_WEIGHTS` alone.**
+**Historical weight basis — retired source weights, not `POSITION_WEIGHTS` alone.**
 
 **Standing rules:**
 
-1. Dedicated **`TRAINING_COST_WEIGHTS`**.
+1. Dedicated retired source weights (no longer present in live code).
 2. **Universals cost 1 everywhere: ND, FT, IQ.**
 3. **Absent from the cost table → cost 1.** Absence never falls through to max cost.
 4. **Explicit `0` = physically constrained only** (“a body like that can’t do this”). Skills sit in the graduated mid-band.
@@ -143,7 +145,7 @@ These are not in the framework build and have **no assigned next step**. Flagged
 
 **Not zeros:** SF RB (wings rebound); C OD (scheme/effort — mid-band ~2.5); PF SC (lifted — PFs score).
 
-**Locked `TRAINING_COST_WEIGHTS` (final, post AG/ST mono):**
+**Historical source weights (final, post AG/ST mono; no longer live):**
 
 ```
 PG: BH 0.30, AG 0.25, PS 0.15, OD 0.15, SH 0.135, SC 0.12, ST 0.105, RB 0, ID 0
@@ -185,10 +187,10 @@ AG belongs in the ordered set: the C/AG wall (“size and mass prevent elite lat
 
 ### 10.2 Floors — weight-scaled (not a uniform percentile)
 
-**Rule shape:** floor strength tracks how much the attribute matters at that position — same weight basis as cost (`TRAINING_COST_WEIGHTS`), with universals always full.
+**Rule shape:** floor strength tracks how much the attribute matters at that position. Live code stores the validated result directly in `SHAPE_FLOOR_MULTIPLIERS`, with universals always full.
 
 ```
-rel = w_a / w_max   (from TRAINING_COST_WEIGHTS; universals → rel = 1)
+rel = w_a / w_max   (historical derivation only; universals → rel = 1)
 mult = 1 if universal or rel ≥ 0.50
      = 0 if rel ≤ 0.20          → need = 1 (minimal)
      = lerp otherwise
@@ -225,7 +227,7 @@ Base distribution = **t0 shape-P6** (pre-development only). High-weight attrs ge
 
 **Standing calibration rule:** derive the *shape percentile base* only from a pre-development population. Never from a developed snapshot (C ID abs@median 15→61). The weight scaling is the rule; the percentile is just the distributional input.
 
-**Do not use bare `POSITION_WEIGHTS` as the floor basis** — it omits PF ID (and similar), so a rim-protector PF with ID=8 would incorrectly pass. Floor and cost share `TRAINING_COST_WEIGHTS`.
+**Do not rebuild floors from bare `POSITION_WEIGHTS`** — it omits PF ID (and similar), so a rim-protector PF with ID=8 would incorrectly pass. Preserve `SHAPE_FLOOR_MULTIPLIERS`.
 
 ### 10.3 Camp
 

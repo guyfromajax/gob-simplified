@@ -14,46 +14,70 @@ from BackEnd.constants.training_shape import (
     CAMP_WEEKS,
     CORE_12,
     POSITIONS,
-    TRAINING_COST_PHYSICAL_ZEROS,
-    TRAINING_COST_ZERO,
-    gain_divisor_matrix,
+    TRAINING_GAIN_PERCENTAGES,
+    TRAINING_GAIN_INVARIANT_EXCEPTIONS,
+    TRAINING_GAIN_UNIVERSALS,
+    TRAINING_PHYSICAL_WALLS,
+    gain_percentage_matrix,
     floor_violations,
     is_camp_week,
-    training_attr_gain_divisor,
+    training_attr_gain_multiplier,
 )
 from BackEnd.utils import player_development as dev
 from BackEnd.utils import player_generation as gen
 
 
-# ── Gain-divisor matrix locks ─────────────────────────────────────────────────
+# ── Direct gain-percentage invariants ─────────────────────────────────────────
 
-def test_gain_divisor_matrix_ag_and_st_monotonicity():
-    """AG is less effective as players get bigger; ST more effective."""
-    ag = [training_attr_gain_divisor(p, "AG") for p in POSITIONS]
-    st = [training_attr_gain_divisor(p, "ST") for p in POSITIONS]
-    assert ag == sorted(ag), f"AG not ordered PG→C: {ag}"
-    assert st == sorted(st, reverse=True), f"ST not ordered PG→C desc: {st}"
+def test_cross_position_gain_orderings_are_locked():
+    """Big-player attrs rise PG→C; perimeter movement/creation falls."""
+    for attr in ("RB", "ID"):
+        values = [TRAINING_GAIN_PERCENTAGES[p][attr] for p in POSITIONS]
+        assert values == sorted(values) and values[0] < values[-1], f"{attr}: {values}"
+    for attr in ("BH", "PS", "AG"):
+        values = [TRAINING_GAIN_PERCENTAGES[p][attr] for p in POSITIONS]
+        assert values == sorted(values, reverse=True) and values[0] > values[-1], f"{attr}: {values}"
+
+    strength = [TRAINING_GAIN_PERCENTAGES[p]["ST"] for p in POSITIONS]
+    violations = {
+        (POSITIONS[i], POSITIONS[i + 1])
+        for i in range(len(POSITIONS) - 1)
+        if strength[i] > strength[i + 1]
+    }
+    assert violations == set(TRAINING_GAIN_INVARIANT_EXCEPTIONS["strength_ordering"])
 
 
-def test_gain_divisor_matrix_walls_only_on_explicit_zeros():
-    matrix = gain_divisor_matrix()
+def test_every_selectable_training_target_totals_the_same():
+    totals = {pos: sum(TRAINING_GAIN_PERCENTAGES[pos].values()) for pos in POSITIONS}
+    assert set(totals.values()) == {808}, totals
+
+
+def test_25_percent_is_reserved_for_documented_physical_walls():
+    matrix = gain_percentage_matrix()
+    named_exceptions = set(TRAINING_GAIN_INVARIANT_EXCEPTIONS["nonphysical_25_percent"])
+    actual_nonphysical = set()
     for pos in POSITIONS:
-        zeros = TRAINING_COST_PHYSICAL_ZEROS[pos]
         for a in CORE_12:
-            c = matrix[pos][a]
-            if a in zeros:
-                assert c == TRAINING_COST_ZERO, f"{pos}/{a} wall missing"
-            else:
-                assert c <= 3.0 + 1e-9, f"{pos}/{a} over derived cap: {c}"
+            if matrix[pos][a] == 25.0 and a not in TRAINING_PHYSICAL_WALLS[pos]:
+                actual_nonphysical.add((pos, a))
+            if a in TRAINING_PHYSICAL_WALLS[pos]:
+                assert matrix[pos][a] == 25.0, f"documented wall changed: {pos}/{a}"
+    assert actual_nonphysical == named_exceptions
+
+
+def test_universals_are_100_percent_at_every_position():
+    for pos in POSITIONS:
+        for attr in TRAINING_GAIN_UNIVERSALS:
+            assert TRAINING_GAIN_PERCENTAGES[pos][attr] == 100.0, f"{pos}/{attr}"
 
 
 def test_od_and_sh_are_not_size_ordered():
     """Documented exceptions — perimeter D peaks at the wing; shooting has no size order."""
-    od = [training_attr_gain_divisor(p, "OD") for p in POSITIONS]
-    sh = [training_attr_gain_divisor(p, "SH") for p in POSITIONS]
+    od = [training_attr_gain_multiplier(p, "OD") for p in POSITIONS]
+    sh = [training_attr_gain_multiplier(p, "SH") for p in POSITIONS]
     assert od != sorted(od) and od != sorted(od, reverse=True)
     assert sh != sorted(sh) and sh != sorted(sh, reverse=True)
-    assert od[2] == min(od), "SF should be cheapest OD (wing peak)"
+    assert od[2] == max(od), "SF should receive full-value OD (wing peak)"
 
 
 def test_camp_constants_locked():

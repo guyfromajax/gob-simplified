@@ -1,12 +1,12 @@
 // Training Page JavaScript
 let TOTAL_POINTS = 24; // Will be updated from API for franchise mode
-/** Existing position-fit values, now gain divisors rather than budget prices. */
-let TRAINING_GAIN_DIVISOR_MATRIX = null;
-const CLASS_GAIN_MULT = {
-  freshman: 1.0, Freshman: 1.0, FR: 1.0,
-  sophomore: 1 / 1.1, Sophomore: 1 / 1.1, SO: 1 / 1.1,
-  junior: 1 / 1.25, Junior: 1 / 1.25, JR: 1 / 1.25,
-  senior: 1 / 1.4, Senior: 1 / 1.4, SR: 1 / 1.4,
+/** Direct gain percentages; neither table participates in budget spend. */
+let TRAINING_GAIN_PERCENTAGE_MATRIX = null;
+const CLASS_GAIN_PERCENTAGES = {
+  freshman: 100, Freshman: 100, FR: 100,
+  sophomore: 91, Sophomore: 91, SO: 91,
+  junior: 80, Junior: 80, JR: 80,
+  senior: 71, Senior: 71, SR: 71,
 };
 const SLIDER_ATTR_CODES = {
   'offense-inside': 'SC',
@@ -397,14 +397,15 @@ function formatPointsDisplay(n) {
 }
 
 function classGainMultiplier(year) {
-  return CLASS_GAIN_MULT[year] || CLASS_GAIN_MULT[String(year || '').toLowerCase()] || 1;
+  const pct = CLASS_GAIN_PERCENTAGES[year] || CLASS_GAIN_PERCENTAGES[String(year || '').toLowerCase()] || 100;
+  return pct / 100;
 }
 
 function effectiveGainRate(row, attr) {
-  if (!TRAINING_GAIN_DIVISOR_MATRIX || !attr) return 1;
+  if (!TRAINING_GAIN_PERCENTAGE_MATRIX || !attr) return 1;
   const pos = rosterRowPosition(row);
-  const divisor = (TRAINING_GAIN_DIVISOR_MATRIX[pos] && TRAINING_GAIN_DIVISOR_MATRIX[pos][attr]) || 1;
-  return (1 / divisor) * classGainMultiplier(row.year);
+  const pct = (TRAINING_GAIN_PERCENTAGE_MATRIX[pos] && TRAINING_GAIN_PERCENTAGE_MATRIX[pos][attr]) || 100;
+  return (pct / 100) * classGainMultiplier(row.year);
 }
 
 function effectiveValueText(minPct, maxPct) {
@@ -416,7 +417,7 @@ function effectiveValueText(minPct, maxPct) {
 }
 
 function renderEffectiveValueLabels() {
-  if (!TRAINING_GAIN_DIVISOR_MATRIX || !customFocusRoster.length) return;
+  if (!TRAINING_GAIN_PERCENTAGE_MATRIX || !customFocusRoster.length) return;
   Object.keys(SLIDER_ATTR_CODES).forEach(function (sliderId) {
     const slider = document.getElementById(sliderId);
     const label = slider && slider.closest('.slider-label');
@@ -1512,8 +1513,8 @@ async function initializeTrainingPoints() {
       if (response.ok) {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
-        if (data.gain_divisor_matrix && typeof data.gain_divisor_matrix === 'object') {
-          TRAINING_GAIN_DIVISOR_MATRIX = data.gain_divisor_matrix;
+        if (data.gain_percentage_matrix && typeof data.gain_percentage_matrix === 'object') {
+          TRAINING_GAIN_PERCENTAGE_MATRIX = data.gain_percentage_matrix;
         }
         currentWeek = Number(data.week || 1);
         currentTeamName = data.user_team_name || currentTeamName || '';

@@ -13,7 +13,7 @@ from BackEnd.models.training_execution_v2 import (
 )
 from BackEnd.constants.training_shape import (
     CAMP_GAIN_SCALE,
-    CLASS_GAIN_MULT,
+    CLASS_GAIN_PERCENTAGES,
     training_attr_gain_multiplier,
     training_points_spent,
 )
@@ -112,10 +112,10 @@ def test_client_and_server_share_the_flat_notch_budget_contract():
 
 def test_fit_and_class_are_gain_multipliers_not_budget_prices():
     assert training_attr_gain_multiplier("C", "AG") == 0.25
-    assert CLASS_GAIN_MULT["FR"] == 1.0
-    assert abs(CLASS_GAIN_MULT["SO"] - (1 / 1.1)) < 1e-12
-    assert CLASS_GAIN_MULT["JR"] == 0.8
-    assert abs(CLASS_GAIN_MULT["SR"] - (1 / 1.4)) < 1e-12
+    assert CLASS_GAIN_PERCENTAGES["FR"] == 100.0
+    assert CLASS_GAIN_PERCENTAGES["SO"] == 91
+    assert CLASS_GAIN_PERCENTAGES["JR"] == 80.0
+    assert CLASS_GAIN_PERCENTAGES["SR"] == 71
 
 
 def test_senior_wall_full_allocation_remains_meaningfully_positive_over_season():
@@ -141,4 +141,5 @@ def test_senior_wall_full_allocation_remains_meaningfully_positive_over_season()
                 gain_scale=IN_SEASON_GAIN_SCALE,
             )
     assert player["attributes"]["anchor_AG"] == 53
-    assert 0.15 < player["training_gain_remainders"]["AG"] < 0.17
+    # Direct SR 71% class percentage leaves 0.14175 after the three whole gains.
+    assert 0.14 < player["training_gain_remainders"]["AG"] < 0.15

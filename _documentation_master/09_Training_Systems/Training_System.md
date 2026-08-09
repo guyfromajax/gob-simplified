@@ -16,7 +16,7 @@ This document should reflect the current franchise training implementation in co
 4. **Training Report Page**: `FrontEnd/static/training-report.html`
 5. **Backend Execution**: `BackEnd/models/training_execution_v2.py`; shape/gain-fit dials in `BackEnd/constants/training_shape.py`
 6. **API Endpoints (franchise training)**:
-   - `GET /franchise/training-points` - Budget (30 camp / 24 in-season), `is_camp_week`, `camp_weeks`, and `gain_divisor_matrix` for the client
+   - `GET /franchise/training-points` - Budget (30 camp / 24 in-season), `is_camp_week`, `camp_weeks`, and `gain_percentage_matrix` for the client
    - `POST /franchise/run-training/user` - **User phase only**: runs `execute_training` for the user team, persists FPD/FTD + `latest_training`, sets `training_status.user_training_applied_week` and leaves `training_completed` **false** until CPU training completes. Requires auth + franchise ownership. Response includes `training_highlights` for the loading feed.
    - `POST /franchise/run-training/cpu-train` - **CPU phase**: runs real auto-training for eligible CPU teams, **last-camp-week** cuts (`week == CAMP_WEEKS`), and bounded Practice Squad work. During PS weeks it may return `status: "processing"` plus progress and `retry_after_ms`; the client polls until success.
    - `POST /franchise/run-training` - **Legacy/full path**: reaches the same user + CPU end state in one request and resumes the CPU phase when user training is already applied.
@@ -197,7 +197,7 @@ While CPU training runs (`POST /franchise/run-training/cpu-train`), the training
   - **Camp week** (`is_camp_week`, week 1): **30**
   - **In-season weeks 2–26**: **24**
   - **Weeks 27+**: unavailable
-- Franchise client also loads `gain_divisor_matrix` + roster years/positions to display each player drill's effective-value range across the roster
+- Franchise client also loads `gain_percentage_matrix` + roster years/positions to display each player drill's effective-value range across the roster
 - Moving any slider by +1 subtracts exactly **1** from Points Remaining
 - Prevents allocating past the budget (clamps or reverts last interaction)
 - Submit requires `Points Remaining == 0`; decimal and unspendable remainders are impossible
@@ -205,7 +205,7 @@ While CPU training runs (`POST /franchise/run-training/cpu-train`), the training
 
 ### Position fit and class taper
 
-Position fit and class affect **gain, never price**. The locked `TRAINING_COST_WEIGHTS` derivation is preserved verbatim as a divisor: 1.00 → 100%, 1.43 → about 70%, 2.86 → about 35%, and explicit physical walls at 4.00 → 25%. `CLASS_GAIN_MULT` is the inverse of the retired class price taper: FR 1.00, SO `1/1.1` (~0.91), JR `1/1.25` (0.80), SR `1/1.4` (~0.71). The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`.
+Position fit and class affect **gain, never price**. They are stored directly as percentages in `TRAINING_GAIN_PERCENTAGES` and `CLASS_GAIN_PERCENTAGES`; there is no cost matrix or reciprocal derivation. Class rates are FR 100%, SO ~91%, JR 80%, SR ~71%. The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`.
 
 This moved the fractional component off the budget so the user always sees and spends whole points while retaining the original cross-position granularity. Shape floors and `resolve_training_position()` are unchanged.
 
@@ -770,7 +770,7 @@ quality        = Σ contribution / Σ contribution(reference)
 | `IN_SEASON_GAIN_SCALE` | in-season gain scale (0.18) |
 | `CAMP_WEEKS` / `CAMP_GAIN_SCALE` / `CAMP_POINT_BUDGET` | camp length (1 week), camp gain scale (1.4), flat camp budget (30) |
 | `IN_SEASON_POINT_BUDGET` | flat in-season budget (24) |
-| `TRAINING_COST_WEIGHTS` / `CLASS_GAIN_MULT` | position-fit gain divisors and class-year gain multipliers; neither changes budget spend |
+| `TRAINING_GAIN_PERCENTAGES` / `CLASS_GAIN_PERCENTAGES` | direct position-fit and class-year gain percentages; neither changes budget spend |
 | `OFFSEASON_ATTRACTOR_ALPHA` | **retired (0.0)** — shape attractor removed; offseason is level-only |
 
 ### Data Storage

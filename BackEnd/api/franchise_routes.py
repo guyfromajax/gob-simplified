@@ -14023,7 +14023,7 @@ def get_training_points(franchise_id: str):
         CAMP_POINT_BUDGET,
         CAMP_WEEKS,
         IN_SEASON_POINT_BUDGET,
-        gain_divisor_matrix,
+        gain_percentage_matrix,
         is_camp_week,
     )
     is_first_training = is_camp_week(week)
@@ -14041,7 +14041,7 @@ def get_training_points(franchise_id: str):
         "is_first_training": is_first_training,
         "is_camp_week": is_first_training,
         "camp_weeks": CAMP_WEEKS,
-        "gain_divisor_matrix": gain_divisor_matrix(),
+        "gain_percentage_matrix": gain_percentage_matrix(),
         "week": week,
         "user_team_name": franchise_doc.get("user_team_id"),
         "custom_focus_roster": custom_roster,

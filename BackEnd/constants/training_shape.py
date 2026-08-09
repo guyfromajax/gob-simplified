@@ -1,7 +1,6 @@
-"""Player-development shape constants — fit discounts, floors, camp (§10).
+"""Player-development shape constants — gain percentages, floors, camp (§10).
 
-Position fit is a gain divisor (never a budget price). Floors are weight-scaled
-from the same TRAINING_COST_WEIGHTS table. Shape-P6 bases are frozen from the
+Position fit and class are stored directly as gain percentages. Shape-P6 bases are frozen from the
 pre-development t0 league export (seed 202608061); never re-derive from a
 developed snapshot.
 """
@@ -16,63 +15,49 @@ CORE_12: Tuple[str, ...] = (
 )
 POSITIONS: Tuple[str, ...] = ("PG", "SG", "SF", "PF", "C")
 
-# ── Position-fit gain curve ─────────────────────────────────────────────────
-TRAINING_COST_GAMMA = 1.0
-TRAINING_COST_DERIVED_CAP = 3.0
-TRAINING_COST_ZERO = 4.0
-TRAINING_COST_UNIVERSALS = frozenset({"ND", "FT", "IQ"})
-
-# Explicit physical zeros — "a body like that can't do this."
-TRAINING_COST_PHYSICAL_ZEROS: Dict[str, frozenset] = {
-    "PG": frozenset({"RB", "ID"}),
-    "SG": frozenset({"RB", "ID"}),
-    "SF": frozenset(),
-    "PF": frozenset(),
-    "C": frozenset({"AG"}),
+# ── Direct gain percentages ─────────────────────────────────────────────────
+TRAINING_GAIN_UNIVERSALS = frozenset({"ND", "FT", "IQ"})
+TRAINING_PHYSICAL_WALLS: Dict[str, frozenset] = {
+    "PG": frozenset({"RB", "ID"}), "SG": frozenset({"RB", "ID"}),
+    "SF": frozenset(), "PF": frozenset(), "C": frozenset({"AG"}),
 }
 
-CLASS_GAIN_MULT: Dict[str, float] = {
-    "freshman": 1.0,
-    "sophomore": 1.0 / 1.1,
-    "junior": 1.0 / 1.25,
-    "senior": 1.0 / 1.4,
-    "Freshman": 1.0,
-    "Sophomore": 1.0 / 1.1,
-    "Junior": 1.0 / 1.25,
-    "Senior": 1.0 / 1.4,
-    "FR": 1.0,
-    "SO": 1.0 / 1.1,
-    "JR": 1.0 / 1.25,
-    "SR": 1.0 / 1.4,
+# Direct authored percentages; there is no cost or reciprocal calculation.
+TRAINING_GAIN_PERCENTAGES: Dict[str, Dict[str, float]] = {
+    "PG": {"ST": 35, "AG": 83, "SC": 40, "SH": 45, "ID": 25, "OD": 70, "PS": 85, "BH": 100, "RB": 25, "FT": 100, "IQ": 100, "ND": 100},
+    "SG": {"ST": 35, "AG": 68, "SC": 55, "SH": 100, "ID": 25, "OD": 60, "PS": 70, "BH": 70, "RB": 25, "FT": 100, "IQ": 100, "ND": 100},
+    "SF": {"ST": 40, "AG": 53, "SC": 82, "SH": 64, "ID": 50, "OD": 91, "PS": 39, "BH": 39, "RB": 50, "FT": 100, "IQ": 100, "ND": 100},
+    "PF": {"ST": 99, "AG": 45, "SC": 55, "SH": 47, "ID": 67, "OD": 35, "PS": 35, "BH": 25, "RB": 100, "FT": 100, "IQ": 100, "ND": 100},
+    "C": {"ST": 77, "AG": 25, "SC": 68, "SH": 40, "ID": 100, "OD": 40, "PS": 33, "BH": 25, "RB": 100, "FT": 100, "IQ": 100, "ND": 100},
 }
 
-# Final locked weights (2026-08-07). Universals omitted → divisor 1.
-TRAINING_COST_WEIGHTS: Dict[str, Dict[str, float]] = {
-    "PG": {
-        "BH": 0.30, "AG": 0.25, "PS": 0.15, "OD": 0.15, "SH": 0.135,
-        "SC": 0.12, "ST": 0.105, "RB": 0.0, "ID": 0.0,
+CLASS_GAIN_PERCENTAGES: Dict[str, float] = {
+    "freshman": 100, "sophomore": 91, "junior": 80, "senior": 71,
+    "Freshman": 100, "Sophomore": 91, "Junior": 80, "Senior": 71,
+    "FR": 100, "SO": 91, "JR": 80, "SR": 71,
+}
+
+# Named exceptions to table invariants. Tests assert this exact list so an
+# exception cannot be added silently.
+TRAINING_GAIN_INVARIANT_EXCEPTIONS = {
+    "strength_ordering": {
+        ("PF", "C"): "PF strength 99% intentionally exceeds C 77% for prototype feel testing.",
     },
-    "SG": {
-        "SH": 0.42, "OD": 0.25, "SC": 0.231, "AG": 0.231, "BH": 0.168,
-        "PS": 0.168, "ST": 0.147, "RB": 0.0, "ID": 0.0,
-    },
-    "SF": {
-        "OD": 0.20, "SC": 0.18, "SH": 0.14, "AG": 0.1053, "ID": 0.1099,
-        "RB": 0.1099, "PS": 0.0772, "BH": 0.0772, "ST": 0.088,
-    },
-    "PF": {
-        "RB": 0.30, "ST": 0.22, "ID": 0.20, "SC": 0.165, "SH": 0.14,
-        "AG": 0.1364, "OD": 0.105, "PS": 0.105, "BH": 0.10,
-    },
-    "C": {
-        "ID": 0.32, "RB": 0.32, "ST": 0.2462, "SC": 0.18, "SH": 0.128,
-        "OD": 0.128, "BH": 0.1067, "PS": 0.1067, "AG": 0.0,
+    "nonphysical_25_percent": {
+        ("PF", "BH"): "Low handling value under review; not a documented physical wall.",
+        ("C", "BH"): "Low handling value under review; not a documented physical wall.",
     },
 }
 
 # ── Floors (weight-scaled shape-P6) ─────────────────────────────────────────
-FLOOR_REL_HIGH = 0.50
-FLOOR_REL_LOW = 0.20
+# Direct floor multipliers preserve the former weight-derived floor behavior.
+SHAPE_FLOOR_MULTIPLIERS: Dict[str, Dict[str, float]] = {
+    "PG": {"ST": .4999999999999999, "AG": 1.0, "SC": .6666666666666667, "SH": .8333333333333336, "ID": 0.0, "OD": 1.0, "PS": 1.0, "BH": 1.0, "RB": 0.0, "FT": 1.0, "IQ": 1.0, "ND": 1.0},
+    "SG": {"ST": .4999999999999999, "AG": 1.0, "SC": 1.0, "SH": 1.0, "ID": 0.0, "OD": 1.0, "PS": .6666666666666667, "BH": .6666666666666667, "RB": 0.0, "FT": 1.0, "IQ": 1.0, "ND": 1.0},
+    "SF": {"ST": .7999999999999998, "AG": 1.0, "SC": 1.0, "SH": 1.0, "ID": 1.0, "OD": 1.0, "PS": .62, "BH": .62, "RB": 1.0, "FT": 1.0, "IQ": 1.0, "ND": 1.0},
+    "PF": {"ST": 1.0, "AG": .8488888888888889, "SC": 1.0, "SH": .8888888888888891, "ID": 1.0, "OD": .4999999999999999, "PS": .4999999999999999, "BH": .44444444444444453, "RB": 1.0, "FT": 1.0, "IQ": 1.0, "ND": 1.0},
+    "C": {"ST": 1.0, "AG": 0.0, "SC": 1.0, "SH": .6666666666666667, "ID": 1.0, "OD": .6666666666666667, "PS": .44479166666666664, "BH": .44479166666666664, "RB": 1.0, "FT": 1.0, "IQ": 1.0, "ND": 1.0},
+}
 
 # Frozen t0 shape-P6 (attr / mean) by position — pre-development population only.
 SHAPE_P6_FLOOR_BASE: Dict[str, Dict[str, float]] = {
@@ -121,30 +106,15 @@ def is_camp_week(week: int) -> bool:
 def class_gain_multiplier(year: Optional[str]) -> float:
     if not year:
         return 1.0
-    return CLASS_GAIN_MULT.get(str(year).strip(), CLASS_GAIN_MULT.get(str(year).strip().lower(), 1.0))
-
-
-def training_attr_gain_divisor(position: str, attr: str) -> float:
-    """Existing fit matrix expressed as a gain divisor, not a budget price."""
-    if attr in TRAINING_COST_UNIVERSALS:
-        return 1.0
-    pos = position if position in TRAINING_COST_WEIGHTS else "SF"
-    if attr in TRAINING_COST_PHYSICAL_ZEROS.get(pos, ()):
-        return TRAINING_COST_ZERO
-    weights = TRAINING_COST_WEIGHTS[pos]
-    if attr not in weights:
-        return 1.0
-    wa = float(weights[attr])
-    if wa <= 0:
-        return TRAINING_COST_ZERO
-    wmax = max(v for v in weights.values() if v > 0)
-    raw = (wmax / wa) ** TRAINING_COST_GAMMA
-    return round(min(TRAINING_COST_DERIVED_CAP, raw), 2)
+    key = str(year).strip()
+    pct = CLASS_GAIN_PERCENTAGES.get(key, CLASS_GAIN_PERCENTAGES.get(key.lower(), 100.0))
+    return float(pct / 100)
 
 
 def training_attr_gain_multiplier(position: str, attr: str) -> float:
-    """Fraction of raw gain retained for position fit (walls retain 25%)."""
-    return 1.0 / training_attr_gain_divisor(position, attr)
+    """Fraction of raw gain retained from the direct percentage table."""
+    pos = position if position in TRAINING_GAIN_PERCENTAGES else "SF"
+    return float(TRAINING_GAIN_PERCENTAGES[pos].get(attr, 100) / 100)
 
 
 def player_attr_gain_multiplier(player: Mapping, attr: str) -> float:
@@ -154,29 +124,9 @@ def player_attr_gain_multiplier(player: Mapping, attr: str) -> float:
     return training_attr_gain_multiplier(position, attr) * class_gain_multiplier(year)
 
 
-def _cost_rel(position: str, attr: str) -> float:
-    if attr in TRAINING_COST_UNIVERSALS:
-        return 1.0
-    pos = position if position in TRAINING_COST_WEIGHTS else "SF"
-    weights = TRAINING_COST_WEIGHTS[pos]
-    if attr not in weights:
-        return 0.0
-    wa = float(weights[attr])
-    if wa <= 0:
-        return 0.0
-    positives = [v for v in weights.values() if v > 0]
-    if not positives:
-        return 0.0
-    return wa / max(positives)
-
-
 def floor_mult(position: str, attr: str) -> float:
-    rel = _cost_rel(position, attr)
-    if attr in TRAINING_COST_UNIVERSALS or rel >= FLOOR_REL_HIGH:
-        return 1.0
-    if rel <= FLOOR_REL_LOW:
-        return 0.0
-    return (rel - FLOOR_REL_LOW) / (FLOOR_REL_HIGH - FLOOR_REL_LOW)
+    pos = position if position in SHAPE_FLOOR_MULTIPLIERS else "SF"
+    return SHAPE_FLOOR_MULTIPLIERS[pos].get(attr, 0.0)
 
 
 def floor_need(position: str, attr: str, mean_core12: float) -> int:
@@ -286,12 +236,12 @@ def apply_floor_clamp_to_anchors(player: dict, position: Optional[str] = None) -
 
 def resolve_training_position(player: Mapping) -> str:
     pos = player.get("training_position") or player.get("position_intent")
-    if pos in TRAINING_COST_WEIGHTS:
+    if pos in TRAINING_GAIN_PERCENTAGES:
         return pos
     ratings = player.get("position_ratings") or {}
     if ratings:
         best = max(ratings, key=ratings.get)
-        if best in TRAINING_COST_WEIGHTS:
+        if best in TRAINING_GAIN_PERCENTAGES:
             return best
     return "SF"
 
@@ -410,5 +360,8 @@ def training_points_spent(allocations: Mapping) -> int:
     return _sum_whole(allocations)
 
 
-def gain_divisor_matrix() -> Dict[str, Dict[str, float]]:
-    return {pos: {a: training_attr_gain_divisor(pos, a) for a in CORE_12} for pos in POSITIONS}
+def gain_percentage_matrix() -> Dict[str, Dict[str, float]]:
+    return {
+        pos: {attr: float(pct) for attr, pct in TRAINING_GAIN_PERCENTAGES[pos].items()}
+        for pos in POSITIONS
+    }

@@ -847,8 +847,8 @@ Effects are stated in gameplay terms; movement figures are where we measured the
 | `CAMP_GAIN_SCALE` | **1.4** | Multiplier on positive camp gains (vs `IN_SEASON_GAIN_SCALE` for weeks after camp). | ↑ = louder camp shape/level | LIVE |
 | `IN_SEASON_GAIN_SCALE` | 0.18 | Scales positive weekly gains after camp. Kept low so a reference season stays inside the offseason ladder step (no claw-back). Shape movement is still mostly here + camp (~99% of career shape). | ↑ strands well-coached players above the ladder | LIVE (but see backlog) |
 | `PLAYER_ATTR_GAIN_RANGE_BY_POINTS` | 0:(−2,−1) · 1:(1,3) · 2:(2,3) · 3:(2,4) · 4:(3,5) · 5:(3,6) | Raw gain bands before year-max / scale / remainder. **1–5 must stay distinct** (E[raw\|5]=4.5 held). Re-unifying 1–3 erases slider resolution. | changes strategy spacing | LIVE (`training_execution_v2.py`) |
-| `CLASS_GAIN_MULT` | FR **1.0** / SO **1/1.1 ≈ .91** / JR **1/1.25 = .80** / SR **1/1.4 ≈ .71** | Multiplies positive attribute gain after position fit and before the remainder split. Every class still spends one point per notch. | ↓ upperclass mult = slower late-career gain | LIVE |
-| Position-fit divisor (`TRAINING_COST_*`) | derived cap **3.0**; explicit physical zeros **4.0**; universals ND/FT/IQ divisor **1** | The original cost matrix is retained verbatim as a gain divisor: `gain_mult = 1 / min(3, (w_max/w_a)^γ)`; explicit 0-weight physical walls divide by 4 (25%). It no longer prices the budget. | changes off-role gain efficiency without fractional spend | LIVE |
+| `CLASS_GAIN_PERCENTAGES` | FR **100%** / SO **91%** / JR **80%** / SR **71%** | Direct percentage on positive attribute gain after position fit and before the remainder split. Every class still spends one point per notch. | ↓ upperclass percentage = slower late-career gain | LIVE |
+| `TRAINING_GAIN_PERCENTAGES` | direct position × attribute table below, **25%–100%** | Direct percentage on positive attribute gain. No cost matrix and no reciprocal derivation. | changes off-role gain efficiency without fractional spend | LIVE |
 | Shape floors (P6 + weight scale) | t0 **shape-P6** base; HIGH **0.50** / LOW **0.20** | `need = ceil(P6[pos][attr] × mean(core-12) × floor_mult)`. Full floor at universal or rel≥0.50; minimal (need=1) at rel≤0.20; lerp between. Bind at decay clamp + Team Builder Apply (diff-scoped). **Never re-derive from a developed snapshot.** | ↓ percentile → weaker floors | LIVE |
 | `PEAK_BONUS` | +0.30 × JH anchor | Size of a "coming-of-age" peak season. Career multiple = 1.7 + 0.30·peaks → 0/1/2/3 peaks give 1.7 / 2.0 / 2.3 / 2.6× the JH anchor. | +0.10 ≈ +3 RT/peak at Average. | LIVE |
 | `STD_RUNG_INCREMENT` | FR.17 SO.20 JR.15 SR.18 | The no-peak career arc — how much RT a peakless player gains each year (Σ .70 → 1.7× at SR). | shifts the per-rung ladder shape | LIVE |
@@ -864,6 +864,26 @@ Effects are stated in gameplay terms; movement figures are where we measured the
 | `OFFSEASON_DISTRIBUTION_BLEND` | 0.70 | **Vestigial — do not tune.** Additive-budget age/position distribution blend. Unused: `develop_one_offseason` is level-only and ignores the accumulator. | none | DEAD |
 | `NON_CORE_GROWTH_MULTIPLIER` | 0.06 | **Vestigial — do not tune.** Floor on per-attr weight in the retired distribution path. Same fate as `OFFSEASON_DISTRIBUTION_BLEND`. | none | DEAD |
 
+### Training gain percentages — primary tuning table
+
+These are the percentages of raw positive attribute gain retained for position fit. Class percentage and session scale multiply this value before the persisted fractional remainder is split from the whole gain. Every selectable target totals **808**, so changing training position redistributes effectiveness without changing total trainability. ND, FT, and IQ are universal at 100%.
+
+| Position | ST | AG | SC | SH | ID | OD | PS | BH | RB | FT | IQ | ND | Row avg |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| PG | 35% | 83% | 40% | 45% | 25% | 70% | 85% | 100% | 25% | 100% | 100% | 100% | 67.3% |
+| SG | 35% | 68% | 55% | 100% | 25% | 60% | 70% | 70% | 25% | 100% | 100% | 100% | 67.3% |
+| SF | 40% | 53% | 82% | 64% | 50% | 91% | 39% | 39% | 50% | 100% | 100% | 100% | 67.3% |
+| PF | 99% | 45% | 55% | 47% | 67% | 35% | 35% | 25% | 100% | 100% | 100% | 100% | 67.3% |
+| C | 77% | 25% | 68% | 40% | 100% | 40% | 33% | 25% | 100% | 100% | 100% | 100% | 67.3% |
+| **Column avg** | **57.2%** | **54.8%** | **60.0%** | **59.2%** | **53.4%** | **59.2%** | **52.4%** | **51.8%** | **60.0%** | **100.0%** | **100.0%** | **100.0%** | **67.3%** |
+
+Class table: **FR 100% · SO 91% · JR 80% · SR 71%**.
+
+Named exceptions read by the invariant tests:
+
+- **Strength ordering:** PF 99% exceeds C 77%, knowingly breaking the intended rise-with-size ordering so the difference can be felt in the prototype.
+- **Nonphysical wall values:** PF and C ball handling are 25% even though neither is a documented physical wall. Decision pending: 28–30% would communicate “very low” without diluting the wall meaning, with returned points reassigned elsewhere to retain the 808 total.
+
 ## B — CALIBRATION ANCHORS (turning these re-scales the whole league)
 
 | Anchor | now | What breaks if it changes | Must be re-fitted alongside |
@@ -873,7 +893,7 @@ Effects are stated in gameplay terms; movement figures are where we measured the
 | **`POSITION_WEIGHTS`** (the 5 RT weight vectors) | see reference table | These *define RT*. Changing them re-scales every player's RT and re-sorts positions. | the whole class-year ladder, `HEIGHT_FITNESS`, and a full **pool re-migration** |
 | **`COACHING_SATURATION_CAP`** (a.k.a. QUALITY_CAP) | 4.0 pts/attr | Sets what "good coaching" means (points where an attr saturates). Rescales the quality metric. | the reference (must still score 1.0) + `_CPU_REFERENCE_BASE` + `COACHING_STANDARD_BUDGET`/`COACHING_HEADROOM` |
 | **`LEAGUE_MEDIAN_HEIGHT_IN`** | 75 | Base for every height-offset band (block scoring, weight bands, camp gates). Describes the **adult** distribution; the live rostered league sits ~74 (grow-into-frame), so bands run ~1in high — see the Height-distribution section above. (78 → 77 → 75 across the two 2026-08 HS shifts.) | all `MED±` offset bands that reference it |
-| **`TRAINING_COST_WEIGHTS`** | per-position table in `training_shape.py` | Defines the position-fit gain landscape and floor weight basis. Changing it retunes gain discounts and which attrs get real floors; budget remains flat. | gain-divisor + floor battery (`tests/test_training_shape_framework.py`) |
+| **`TRAINING_GAIN_PERCENTAGES`** | full table below and in `training_shape.py` | Primary position-fit tuning surface. Changing a cell directly changes retained gain; budget remains flat. | percentage invariants + shape battery (`tests/test_training_shape_framework.py`) |
 | **`SHAPE_P6_FLOOR_BASE`** | frozen t0 shape-P6 | Distributional input to floors. Re-deriving from a developed league refuses creative shapes. | floor battery + TB Apply |
 
 ---
@@ -994,7 +1014,7 @@ offseason event owns career HT/WT and level. Camp is week **1** (`CAMP_WEEKS = 1
 | `NON_CORE_GROWTH_MULTIPLIER` | 0.06 | **DEAD / vestigial.** Was the non-signature weight floor on that distribution path. |
 | `OFFSEASON_ATTRACTOR_ALPHA` | **0.0** | **DEAD.** Level-only offseason; see A — LEVERS. |
 | `CAMP_WEEKS` / `CAMP_GAIN_SCALE` | 1 / 1.4 | Camp phase length and camp gain scale (`training_shape.py`). |
-| `CLASS_GAIN_MULT` | FR 1.0 · SO 1/1.1 (~.91) · JR 1/1.25 (.80) · SR 1/1.4 (~.71) | Class multiplier on positive gain, applied before the persisted remainder split. |
+| `CLASS_GAIN_PERCENTAGES` | FR 100% · SO 91% · JR 80% · SR 71% | Class percentage on positive gain, applied before the persisted remainder split. |
 | `PLAYER_ATTR_GAIN_RANGE_BY_POINTS` | see A — LEVERS | Distinct 0–5 raw gain bands (`training_execution_v2.py`). |
 | `FAMILY_CURVES` | FR 3.0/1.0/.30 · SO 2.0/1.2/.60 · JR .60/1.3/2.2 · SR .35/1.2/3.2 | per-rung weight multipliers (phys/skill/mental) → physical-early, mental-late |
 | `HT_TOTAL_MEAN` / `HT_TOTAL_SD` | 3.2 / 1.9 (clamp [0,8]) | career HT gain (p10/p50/p90 ≈ 0/3/6 in) |
