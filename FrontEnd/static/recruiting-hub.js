@@ -20,6 +20,13 @@
   var Spine = window.RecruitingSpine;
   var ATTR_KEYS = Common.ATTR_KEYS;
   var REGION_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  var YEAR_FILTERS = [
+    { value: 'all', label: 'All' },
+    { value: 'Junior', label: 'JR' },
+    { value: 'Sophomore', label: 'SO' },
+    { value: 'Freshman', label: 'FR' },
+    { value: 'JH', label: 'JH' }
+  ];
   var SORTABLE = { name: 'text', pos: 'text', year: 'text', height: 'num', weight: 'num', rt: 'num' };
   var INVITE_WEEKS = [20, 21, 22, 23, 24, 25, 26];
   var POS_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
@@ -27,10 +34,10 @@
 
   var context = Common.getQueryContext();
   var state = {
-    week: 1, phase: 'passive', userTeamId: null,
+    week: 1, phase: 'passive', userTeamId: null, userRegion: '',
     recruits: [], byId: {}, newLeanIds: new Set(),
     board: [],                       // ordered recruit ids (invite phase)
-    search: '', region: 'all', mineOnly: false,
+    search: '', region: 'all', year: 'all', mineOnly: false,
     sort: { key: 'rt', dir: 'desc' }, collapsed: {},
     drag: { from: null, over: null },
     // Signing Day (wk 35)
@@ -61,6 +68,7 @@
     var q = state.search.trim().toLowerCase();
     return state.recruits.filter(function (r) {
       if (state.region !== 'all' && regionOf(r) !== state.region) return false;
+      if (state.year !== 'all' && r.year !== state.year) return false;
       if (state.mineOnly && !r.leansToUser) return false;
       if (q && String(r.name).toLowerCase().indexOf(q) === -1) return false;
       return true;
@@ -136,11 +144,24 @@
     return rows;
   }
   function toolbarHtml(total, shown) {
-    var chips = '<button class="chip' + (state.region === 'all' ? ' is-active' : '') + '" data-region="all">All</button>' +
-      REGION_ORDER.map(function (r) { return '<button class="chip' + (state.region === r ? ' is-active' : '') + '" data-region="' + r + '">' + r + '</button>'; }).join('');
+    var remainingRegions = REGION_ORDER.filter(function (r) { return r !== state.userRegion; });
+    var myRegionChip = function (r) {
+      var classes = 'chip is-my-region' + (state.region === r ? ' is-active' : '');
+      return '<span class="my-region-filter"><span class="my-region-label">my region</span>' +
+        '<button class="' + classes + '" data-region="' + r + '" aria-label="Region ' + r + ', my region">' + r + '</button></span>';
+    };
+    var chips = state.userRegion ? myRegionChip(state.userRegion) : '';
+    chips += '<button class="chip' + (state.region === 'all' ? ' is-active' : '') + '" data-region="all">All</button>';
+    chips += remainingRegions.map(function (r) {
+      return '<button class="chip' + (state.region === r ? ' is-active' : '') + '" data-region="' + r + '">' + r + '</button>';
+    }).join('');
+    var yearChips = YEAR_FILTERS.map(function (year) {
+      return '<button class="chip' + (state.year === year.value ? ' is-active' : '') + '" data-year="' + year.value + '">' + year.label + '</button>';
+    }).join('');
     return '<div class="pool-toolbar"><div class="ptb-group"><span class="ptb-label">Find</span>' +
       '<input class="ptb-search" id="pool-search" placeholder="Name…" value="' + Common.escapeHtml(state.search) + '"></div>' +
       '<div class="ptb-group"><span class="ptb-label">Region</span>' + chips + '</div>' +
+      '<div class="ptb-group"><span class="ptb-label">Year</span>' + yearChips + '</div>' +
       '<button class="chip mine' + (state.mineOnly ? ' is-active' : '') + '" id="pool-mine">◗ Leaning to me</button>' +
       '<span class="ptb-count">Showing <strong>' + shown + '</strong> of ' + total + '</span></div>';
   }
@@ -155,6 +176,7 @@
     var search = host.querySelector('#pool-search');
     if (search) search.addEventListener('input', function () { state.search = this.value; renderPoolBodyOnly(); updateCount(); });
     host.querySelectorAll('.pool-toolbar .chip[data-region]').forEach(function (b) { b.addEventListener('click', function () { state.region = this.dataset.region; renderPool(); }); });
+    host.querySelectorAll('.pool-toolbar .chip[data-year]').forEach(function (b) { b.addEventListener('click', function () { state.year = this.dataset.year; renderPool(); }); });
     var mine = host.querySelector('#pool-mine'); if (mine) mine.addEventListener('click', function () { state.mineOnly = !state.mineOnly; renderPool(); });
     host.querySelectorAll('th[data-sortkey]').forEach(function (thEl) {
       if (!SORTABLE[thEl.dataset.sortkey]) return;
@@ -648,6 +670,8 @@
         state.week = Number(data.week || 1);
         state.phase = Spine.Phase.forWeek(state.week);
         state.userTeamId = data.team_id || context.teamId;
+        state.userRegion = REGION_ORDER.indexOf(String(data.team_region || '').trim().toUpperCase()) !== -1
+          ? String(data.team_region).trim().toUpperCase() : '';
         state.teamName = data.team || 'your program';
         state.currentResultsWeek = data.current_results_week;
         state.week35Results = data.week_35_recruiting_results || {};

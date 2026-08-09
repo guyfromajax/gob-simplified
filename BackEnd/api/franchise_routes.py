@@ -12486,6 +12486,12 @@ def get_recruiting_data(
     if not user_team_id:
         raise HTTPException(status_code=404, detail="User team not selected")
 
+    user_team_doc = db.teams.find_one(
+        {"_id": ObjectId(user_team_id)},
+        {"region": 1},
+    )
+    user_team_region = str((user_team_doc or {}).get("region") or "").strip().upper()
+
     ftd_doc = franchise_team_data_collection.find_one(
         {"franchise_id": fid, "team_id": ObjectId(user_team_id)},
         {"Recruits": 1, RECRUITING_ORDERS_WEEK_35_FIELD: 1},
@@ -12532,6 +12538,7 @@ def get_recruiting_data(
     return {
         "team": team_name,
         "team_id": user_team_id,
+        "team_region": user_team_region,
         "week": franchise_doc.get("week", 1),
         "new_lean_recruit_ids": new_lean_recruit_ids,
         "current_results_week": franchise_doc.get("week", 1) if str(franchise_doc.get("week", 1)) in (franchise_doc.get("recruiting_results", {}) or {}) else None,

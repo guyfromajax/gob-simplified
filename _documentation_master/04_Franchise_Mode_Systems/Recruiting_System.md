@@ -263,7 +263,7 @@ document records the discrepancy; it does not choose or implement a correction.
 |---|---|---|
 | GET | `/franchise/recruits` | Recruit list |
 | GET | `/recruit/{recruit_id}` | Single recruit |
-| GET | `/franchise/recruiting-data` | Hub/board payload, potential ratings, leans, results state |
+| GET | `/franchise/recruiting-data` | Hub/board payload, user-team region, potential ratings, leans, results state |
 | GET | `/franchise/recruiting-results` | Weekly visit result payload |
 | POST | `/franchise/recruiting-orders` | Save weekly or week-35 boards |
 | POST | `/franchise/run-week-35-recruiting` | Resolve final signings and advance 35→36 |
@@ -280,6 +280,11 @@ The current shared recruiting presentation uses:
 
 RT remains numeric in data and is rendered through the shared letter-grade helper. Recruiting
 surfaces that expose ceiling context render current/potential from backend `potential_rt_ratcheted`.
+In the Hub pool toolbar, the user team's region (from `team_region` in the recruiting-data payload)
+is ordered first, followed by `All` and the other region filters, and is persistently identified in
+green with the `my region` label. The active-filter treatment remains visually distinct.
+Immediately to its right, the year filter offers `All`, `JR`, `SO`, `FR`, and `JH`; year, region,
+name, and leaning filters compose rather than replacing one another.
 
 ## 11. Key files and tests
 
