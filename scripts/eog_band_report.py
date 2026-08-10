@@ -44,7 +44,23 @@ HISTOGRAM_INPUTS = [
     ("fb_opp_modifier", "opponent_fb_volume", "int"),
     ("pt_opp_modifier", "opponent_pt_volume", "int"),
     ("defensive_efficiency", "max_share", "float"),
+    # rebound_modifier bands on the DIFFERENTIAL (eog_attr_rules.rebound_modifier_change:
+    # `diff = treb - opp_treb`, cut at +-8 / +-4 / within-3). The instrumentation logs the
+    # two totals, not the difference, so it is DERIVED below — without this the quantity
+    # the ladder actually keys on has no histogram at all.
+    ("rebound_modifier", "differential", "int"),
 ]
+
+# (attr, field) -> f(inputs) -> value | None, for quantities the bands key on but the
+# instrumentation does not log directly.
+DERIVED_INPUTS = {
+    ("rebound_modifier", "differential"): (
+        lambda i: (i["treb"] - i["opp_treb"])
+        if isinstance(i.get("treb"), (int, float))
+        and isinstance(i.get("opp_treb"), (int, float))
+        else None
+    ),
+}
 
 
 def load_records(path: str) -> tuple[list[dict], list[dict]]:
@@ -65,11 +81,20 @@ def load_records(path: str) -> tuple[list[dict], list[dict]]:
                 continue
             payload = line[len(TAG):] if line.startswith(TAG) else line
             try:
-                records.append(json.loads(payload))
+                rec = json.loads(payload)
             except json.JSONDecodeError:
                 bad += 1
+                continue
+            # A record with no `attr` is not a band row (a stray header variant, a
+            # truncated line, a future record_type). Dropping it here keeps one bad
+            # line from killing the whole report after a multi-hour run — every
+            # downstream table groups by attr and sorts the keys.
+            if not isinstance(rec, dict) or not isinstance(rec.get("attr"), str):
+                bad += 1
+                continue
+            records.append(rec)
     if bad:
-        print(f"# warning: skipped {bad} unparseable line(s)", file=sys.stderr)
+        print(f"# warning: skipped {bad} unparseable/non-band line(s)", file=sys.stderr)
     return headers, records
 
 
@@ -342,13 +367,20 @@ def input_histograms(records: list[dict]) -> None:
 
     print("\n## 3. Input histograms (threshold-setting raw inputs)")
     for attr, field, kind in HISTOGRAM_INPUTS:
-        values = [
-            r["inputs"][field]
-            for r in by_attr.get(attr, [])
-            if isinstance(r.get("inputs"), dict) and field in r["inputs"]
-            and isinstance(r["inputs"][field], (int, float))
-        ]
-        print(f"\n  {attr}.{field}  (n={len(values)})")
+        derive = DERIVED_INPUTS.get((attr, field))
+        values = []
+        for r in by_attr.get(attr, []):
+            inputs = r.get("inputs")
+            if not isinstance(inputs, dict):
+                continue
+            if derive is not None:
+                v = derive(inputs)
+            else:
+                v = inputs.get(field)
+            if isinstance(v, (int, float)):
+                values.append(v)
+        suffix = "  (derived)" if derive is not None else ""
+        print(f"\n  {attr}.{field}  (n={len(values)}){suffix}")
         _histogram(values, is_float=(kind == "float"))
 
 
