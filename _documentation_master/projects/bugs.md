@@ -277,3 +277,54 @@ then fix the 3 imports; then seed both RNG streams via an autouse conftest fixtu
 - **Owner:** belongs with the shot-tuning pass (see `project_shot_system_tuning`), NOT with the
   focus-slider work. Needs its own before/after across those four rates, and it will interact
   with the 3PT-rate calibration.
+
+### MEASURED AND REJECTED: NG pull/return hysteresis pair (August 2026)
+
+Implemented, swept, head-to-head'd, then **stripped** rather than left as inert plumbing —
+this project has surfaced four orphaned mechanisms already, and shipping the scaffolding for
+a rejected one is the same pattern. Recording the results so the work isn't lost.
+
+**What it was:** replace the single `NG >= 0.80` eligibility gate with a pair — a player ON
+THE FLOOR stays eligible until NG < PULL, and once benched cannot return until NG >= RETURN.
+The late-game relaxation (0.64 in the final 4:00 of Q4/OT) composed multiplicatively
+(factor 0.64/0.80) against BOTH ends, so `(0.80, 0.80)` reproduced the old behaviour exactly.
+
+**Sweep (16 games per pair, w = 1.0 so only the gate moved):**
+
+| pull/return | star min% | stint mean | subs/rebuild | floor NG mean | floor NG min |
+|---|---|---|---|---|---|
+| 0.80/0.80 (control) | 40.5%* | 1.21 | 4.01 | 0.879 | 0.600 |
+| 0.75/0.85 | 40.5%* | 1.41 | 3.37 | 0.852 | 0.520 |
+| 0.70/0.90 | 40.5%* | 1.46 | 3.21 | 0.842 | 0.510 |
+| 0.65/0.90 | 41.4%* | 1.58 | 2.94 | 0.824 | 0.450 |
+| 0.60/0.95 | 41.0%* | 1.71 | 2.68 | 0.805 | 0.420 |
+
+\* these star-minutes figures are VOID — see the metric warning in
+`06_Gameplay_Systems/CPU_Team_Rotation_System.md`. The *relative* flatness across pairs is
+still informative (the defect was constant across arms); the absolute level is not.
+
+**Head-to-head vs (0.80, 0.80), 32 games each, both directions:**
+
+| pair | record | win% | SE | mean margin |
+|---|---|---|---|---|
+| 0.75/0.85 | 14-18 | 43.8% | +/-8.8 | **-1.81** |
+| 0.70/0.90 | 15-17 | 46.9% | +/-8.8 | **-1.66** |
+| 0.65/0.90 | 16-16 | 50.0% | +/-8.8 | -0.56 |
+
+**Verdict — rejected.** Three findings:
+1. **Churn improves genuinely** — substitutions per rebuild fall 20-33%, mean stint length
+   rises 41%. This is the only real benefit, and it is cosmetic.
+2. **It costs about a point a game.** No pair beat the control; all three margins are
+   negative. Mechanically unsurprising: holding a tired player past PULL is by construction
+   fielding someone worse than the best available alternative.
+3. **It does not move star minutes at all** (flat across every pair). Star minutes are an
+   equilibrium of the fatigue economy — on-floor decay ~0.015/possession
+   (`_ND_DECAY_TIERS`) against bench recovery ~0.009/possession
+   (`phase_resolution.py` bench recharge) — not a property of the thresholds. Widening
+   hysteresis buys a longer stint and pays for it with a proportionally longer rest.
+
+**When to revisit:** only if the FATIGUE ECONOMY changes. In a slower-decay world long
+stints may arise without paying a point a game for them, at which point hysteresis might be
+unnecessary rather than merely unprofitable. **Do not revisit by searching for a better
+threshold pair** — the sweep covered 0.60-0.80 pull against 0.80-0.95 return and the shape
+was monotonic throughout: more hysteresis, less churn, more exhaustion, same minutes.
