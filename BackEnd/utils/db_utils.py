@@ -174,7 +174,7 @@ _LINEUP_POSITIONS = ("PG", "SG", "SF", "PF", "C")
 # Intermediate w trades responsiveness against "ride your stars" — a top-heavy roster should
 # keep a tired star on when the alternative is worse across the whole game, not just now.
 # This single weight is the intended home for archetype influence (via starter_bench_gap).
-LINEUP_EFFECTIVE_WEIGHT_DEFAULT = 1.0
+LINEUP_EFFECTIVE_WEIGHT_DEFAULT = 0.25
 
 
 def _player_effective_slot_rating(player: Player, pos: str) -> float:
