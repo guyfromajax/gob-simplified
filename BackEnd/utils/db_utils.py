@@ -711,40 +711,54 @@ def _apply_conservative_strategy_override(settings: dict, team: TeamManager, gam
 
 def autoset_strategy_settings(team: TeamManager, game_state=None):
     """
-    Automatically set strategy settings for a computer team from its active five
-    (Game_Init_System.md § Computer Team Strategy Logic).
+    Ensure a computer team has strategy settings, and apply the situational
+    sit-on-the-lead override (Game_Init_System.md § Computer Team Strategy Logic).
 
-    Regenerates settings during timeouts, quarter breaks, and foul-outs.
-    When ``game_state`` is supplied, Q4+ CPU tempo uses score/time logic.
+    IDEMPOTENT ON THE DERIVATION. A CPU team's game plan is derived ONCE — normally at
+    ``TeamManager.__init__`` from the projected starting five — and then persists as
+    ``team.strategy_settings_base`` for the rest of the game. This function no longer
+    re-derives it at every lineup rebuild.
+
+    WHY: it used to recompute from the CURRENT five at every quarter break / timeout /
+    foul-out, so a team's identity shifted several times a game as players tired, and no
+    per-team slider configuration was reachable at all — anything a caller set was
+    overwritten by the next rebuild. Measured: 52–84% of team-games had every slider
+    changed between tip and final buzzer.
+
+    WHAT STILL HAPPENS EVERY CALL: the sit-on-the-lead override. It is re-evaluated
+    against the live ``game_state`` and applied on top of the persisted base, so a
+    comfortable lead still dials the eight conservative settings down — and, because the
+    base is kept separate, the team reverts to its real game plan if the lead evaporates.
 
     Args:
         team: TeamManager instance (must be a computer team, not user team)
         game_state: Optional live game state (quarter, time_remaining, score)
 
     Returns:
-        dict: New strategy settings
+        dict: The team's effective strategy settings
     """
     # ✅ DEBUG: Log if this is being called on a user team (this would be a bug!)
     if team.is_user_team:
         # logging.warning(f"⚠️ [AUTOSET STRATEGY] ERROR: autoset_strategy_settings() called on USER team: {team.name} (is_user_team={team.is_user_team}). This should NOT happen!")
         # Don't autoset strategy for user teams
         return team.strategy_settings
-    
-    # ✅ DEBUG: Log when autoset is called on computer teams
-    old_inside = team.strategy_settings.get('inside', 'MISSING') if hasattr(team, 'strategy_settings') and team.strategy_settings else 'MISSING'
-    # logging.warning(f"🔍 [AUTOSET STRATEGY] Autosetting strategy for COMPUTER team: {team.name}, old inside: {old_inside}")
-    
-    # Regenerate strategy settings from the team's current five active players
-    # (Game_Init_System.md § Computer Team Strategy Logic). Falls back to the
-    # legacy random init internally if five players can't be resolved.
-    new_strategy_settings = team._compute_strategic_strategy_settings(game_state)
-    # Sit-on-the-lead override: when comfortably ahead, dial the eight conservative settings down
-    # (other settings keep their computed values). Only fires here — i.e. at the quarter-break /
-    # timeout / foul-out instances that call autoset — never at game init (no lead at 0–0).
-    new_strategy_settings = _apply_conservative_strategy_override(new_strategy_settings, team, game_state)
-    team.strategy_settings = new_strategy_settings
-    
-    new_inside = new_strategy_settings.get('inside', 'MISSING')
-    # logging.warning(f"🔍 [AUTOSET STRATEGY] New inside: {new_inside}")
-    
-    return new_strategy_settings
+
+    # Establish the persistent base ONCE. Callers reach here after init, so the settings
+    # already present (init-derived, or supplied by a saved game / gameplan) ARE the game
+    # plan — adopt them rather than recomputing. The _compute_ fallback covers the case
+    # where a caller somehow arrives with no settings at all, preserving the original
+    # "ensure settings exist" guarantee these call sites were providing.
+    base = getattr(team, "strategy_settings_base", None)
+    if not base:
+        current = getattr(team, "strategy_settings", None)
+        if current and isinstance(current, dict) and len(current) > 0:
+            base = dict(current)
+        else:
+            base = team._compute_strategic_strategy_settings(game_state)
+        team.strategy_settings_base = base
+
+    # Sit-on-the-lead override: when comfortably ahead, dial the eight conservative settings
+    # down (all others keep their base values). Applied to a COPY of the base every call, so
+    # it both fires while the lead holds and reverts cleanly once it doesn't.
+    team.strategy_settings = _apply_conservative_strategy_override(dict(base), team, game_state)
+    return team.strategy_settings

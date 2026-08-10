@@ -1,17 +1,17 @@
 ##Bugs
-1. Teleported an HCO entry step, result was a DB turnover
-2. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
-3. EOQ is still not perfect
-4. Fast Break animations have defenders stopping short before the shooter shoots the shot
+1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
+2. Screenshot Capture Tool is still not working
+3. Remove BT background from recruit images
 
 
 ##Full Product Readiness
 1. Downloadable game vs Live game dynamics
 2. College and Pro setup
+3. ~~Assign images and jersey numbers to walk ons who make the roster -- and paint their jersey~~ **DONE** (camp-cut assign + walk_on_portraits pool; publish kits to R2 via `scripts/recruit_sets/publish_walk_on_portraits.py`)
 
 ##Playtest Launch / In Progress
-1. Stripe / Paddle
-2. Balance Player Attribute Progression from season to season
+1. Steam
+2. Stripe
 3. Balance Team attributes
 -----
 4. PvP sim -- playtest post-launch / immediate parallel task
@@ -71,11 +71,9 @@ Stale pre-refactor FB tests were deleted 6-12-26; suite is green. **Still open:*
 
 `test_eoq_clock_progression.py` and `test_final_turn_entry_pass_chain.py` raise `ImportError` at collection — they import symbols that no longer exist (`roll_anchor_clock` from `eoq_clock_progression`, `_append_final_turn_entry_pass_if_needed` from `skeleton_step_emitter`). A module that can't import is **invisible debt**: it reads as passing coverage while testing nothing, and the exclusion (`--ignore` in any full-suite run) becomes permanent by default. Either repoint each test at the current API (the behaviour it covers — EOQ clock progression, final-turn entry-pass chaining — likely still exists under a renamed function) or delete it if the behaviour is gone. Do not leave them uncollectable.
 
-## P0 — HCO legacy completion-contract clock overruns (6-12-26) [CODE-CLEANUP]
+## P0 — HCO contract clock overruns (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
 
-Two critical issues retained from the retired hybrid-animation blueprint; the
-live compatibility validator is documented in
-[`Core_Animation_System.md`](../05_UESS_System/Core_Animation_System.md):
+Two critical issues from the animation blueprint's "Known HCO Turn Issues" list (`projects/Unified_Animation_System.md`):
 
 1. **HCO resolution hard overrun:** observed throw `"[HCO resolution contract] clock overrun ... elapsedGameSeconds=649.00"` on a `DEAD BALL` path. **Partial mitigation (Option A):** turn-boundary guards in `turnAnimation.js` use contract-capped elapsed (`min(wall_elapsed_ms, real_time_elapsed_ms + guard_slack_ms)`). Throws still exist; needs live validation before closing.
 2. **HCO step-pass hard overrun in BATCH/DEAD BALL sub-turns:** observed throw `"[HCO step pass contract] clock overrun ... elapsedGameSeconds=405.78"` at `step=6`. **Still uncapped** — step-pass guard uses raw `Date.now() - stepStartMs` (no Option A). Track separately from #1.
@@ -165,3 +163,30 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 - **Why “fixed” after user timeout + lineup change:** set-lineup Return forces `resume_from_timeout=true` → resume-state probe skipped → `/api/game` path → name lookup fails → dump does not run; Phaser remount rebuilds 5.
 - **Not proven without URL/network capture:** exact entry params on the bad computer-timeout return (e.g. whether resume-state was probed because `resume_from_timeout` was missing/false). Mechanism that produces 12 rows is clear; that one trigger instance is the remaining link.
 - **Likely fix (when authorized):** filter to `PG`–`C` (or current lineup IDs) in `displayAccumulatedPlayerStats`, and/or resolve box score by `team_id` consistently.
+
+### DEFERRED: M0 throwaway DB for DB-dependent tests — restore runbook (August 2026)
+
+Deferred, not cancelled. Needed when identity wiring starts and DB-dependent tests matter.
+Context: `tests/conftest.py` block-lists `gob` and `gob-staging`, so the 217 DB-touching tests
+(45 files, 42 of which contain `delete_many({})`) cannot run without a throwaway.
+
+- **Size constraint:** staging is **498.84 MB storage against the 512 MB M0 cap**. A full clone
+  does not fit. **Restore a subset**, not everything — `plays`, `teams`, `defenses`, and a small
+  slice of `players` cover most fixture needs; skip `games`, `franchise_players_data`,
+  `franchise_team_data` and the `players_backup_*` collections, which are the bulk.
+- **Namespace rename is required** (source db `gob-staging` → target `gob-test`):
+  ```
+  mongodump   --uri "<staging-uri>" --db gob-staging \
+              --collection plays --collection teams --collection defenses \
+              --out /tmp/gobdump
+  mongorestore --uri "<m0-uri>" \
+              --nsFrom 'gob-staging.*' --nsTo 'gob-test.*' \
+              /tmp/gobdump
+  ```
+  Without `--nsFrom/--nsTo` the restore recreates the database under its original name, which
+  the conftest guard then blocks — the rename is what makes the throwaway usable.
+- **Then:** point `.env.local` at the M0 with db name `gob-test` (any name not in
+  `_BLOCKED_DB_NAMES`) and the guard passes legitimately rather than being worked around.
+- **Prefer a separate M0 cluster over a `gob-test` database on the production cluster** — the guard
+  block-lists by database *name*, so a same-cluster scratch db is one connection-string typo away
+  from the real thing.
