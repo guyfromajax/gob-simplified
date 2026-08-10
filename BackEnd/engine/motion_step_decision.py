@@ -247,6 +247,21 @@ OUTSIDE_SHOT_MIN_GAP_BY_TIER = {
 # shot volume/timing intact while steering eligible outside players toward drives.
 OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.55
 
+# Focus-emphasis: how far one point of the inside/attack/outside strategy slider moves a
+# candidate's shot quality. Slider 0–4 with 2 == neutral, so the multiplier spans
+# 0.5x (slider 0) .. 1.5x (slider 4). Sized against the optimal bar (clock x 2.0 x tempo:
+# ~60 early, ~20 late) and read scores in the +/-50 range, so it is a real lever late in
+# the clock without swamping the mismatch read itself.
+#
+# WHY THIS EXISTS: `attack` and `outside` already steered motion via
+# `_weighted_attack_or_outside`, but `inside` reached nothing — a post player's read could
+# never be promoted by team emphasis. The orphaned `_build_shot_type_weighted_list`
+# (phase_resolution) was the original implementation of that intent and had no callers
+# after the 2026-07-11 motion/set-play unification. This restores the surface at the point
+# the current architecture actually decides between candidates.
+FOCUS_EMPHASIS_STEP = 0.25
+FOCUS_EMPHASIS_NEUTRAL = 2
+
 # Retained as an explicit all-tier acceptance dial. At 100, selected outside
 # shots are never discarded after the weighted attack-vs-outside choice.
 OUTSIDE_SHOT_ACCEPTANCE_PCT_BY_TIER = {
@@ -271,18 +286,35 @@ SM_PRECEDENCE_TEMPOS = {
 
 
 def _weighted_attack_or_outside(player, off_team, rng):
-    """Weighted attack-vs-outside pick biased by team emphasis (`strategy_settings` attack/outside,
-    0–4, +10 each). A stronger skill / higher emphasis is chosen MORE often, not always."""
+    """Attack-vs-outside pick from the PLAYER alone: attack_score=(AG+SC)/2 vs
+    outside_score=SH x OUTSIDE_SHOT_SELECTION_MULTIPLIER. A stronger skill is chosen MORE
+    often, not always.
+
+    Team emphasis is deliberately NOT here. The `attack`/`outside` sliders used to add
+    +10/point to these scores, which meant the sliders steered shot type in TWO places —
+    this roll and (since the focus-emphasis wiring) the quality multiplier in
+    `_evaluate_shot`. Two mechanisms for one job is how the orphaned
+    `_build_shot_type_weighted_list` came about in the first place: they drift, and the
+    docs end up describing whichever the author remembered. Emphasis now lives in exactly
+    one place, `_focus_emphasis`.
+
+    The resulting model is also the more honest one: shot TYPE reflects who the player is,
+    and the coach's emphasis decides WHO SHOOTS. The team mix still moves with the sliders
+    — emphasising outside raises the quality of outside-classified candidates so more of
+    them win the `should_shoot` comparison — it shifts through SELECTION rather than
+    through RECLASSIFICATION.
+
+    ``off_team`` is retained in the signature: callers pass it positionally, and it keeps
+    the seam open for a future player-level (rather than team-level) bias.
+    """
     a = getattr(player, "attributes", {}) or {}
-    s = getattr(off_team, "strategy_settings", {}) or {}
-    attack_score = (a.get("AG", 0) + a.get("SC", 0)) / 2 + s.get("attack", 2) * 10
-    outside_score = (
-        a.get("SH", 0) + s.get("outside", 2) * 10
-    ) * OUTSIDE_SHOT_SELECTION_MULTIPLIER
+    attack_score = (a.get("AG", 0) + a.get("SC", 0)) / 2
+    outside_score = a.get("SH", 0) * OUTSIDE_SHOT_SELECTION_MULTIPLIER
     total = attack_score + outside_score
     # Same sub-1 rounding guard as _choose_attack_or_outside: int(round(total)) can
-    # collapse 0<total<1 to 0 and make rng.randint(1, 0) raise. Latent here (emphasis
-    # defaults usually floor total ~20) but real if both emphases are set to 0.
+    # collapse 0<total<1 to 0 and make rng.randint(1, 0) raise. MORE reachable now that
+    # the emphasis floor (~+20 from the sliders) is gone — a player with near-zero
+    # AG/SC/SH now genuinely lands here.
     if int(round(total)) < 1:
         return "outside"
     return "attack" if rng.randint(1, int(round(total))) <= attack_score else "outside"
@@ -353,6 +385,35 @@ def _apply_outside_shot_acceptance(decision, shot_clock, rng):
     return None
 
 
+def _focus_emphasis(off_team, shot_type):
+    """Multiplier for the team's inside/attack/outside emphasis on this shot type.
+
+    Slider keys are literally 'inside' / 'attack' / 'outside', so the shot type indexes
+    the slider directly. Neutral (2) returns 1.0. Pure arithmetic — draws no RNG, so
+    wiring this adds nothing to the sim stream.
+    """
+    s = getattr(off_team, "strategy_settings", {}) or {}
+    try:
+        val = int(s.get(shot_type, FOCUS_EMPHASIS_NEUTRAL))
+    except (TypeError, ValueError):
+        val = FOCUS_EMPHASIS_NEUTRAL
+    return 1.0 + FOCUS_EMPHASIS_STEP * (val - FOCUS_EMPHASIS_NEUTRAL)
+
+
+def _apply_focus_emphasis(quality, mult):
+    """Apply the emphasis multiplier sign-safely.
+
+    Read scores are DIFFERENTIALS and are frequently negative, so a naive `quality * mult`
+    inverts the intent — emphasising inside would make a bad inside read even worse and
+    push it further from selection. Scaling a positive quality up and shrinking a negative
+    quality toward zero keeps 'more emphasis => more likely to be chosen' true in both
+    regimes.
+    """
+    if mult == 1.0 or quality == 0:
+        return quality
+    return quality * mult if quality > 0 else quality / mult
+
+
 def _evaluate_shot(player, position, location, read_scores, off_team, shot_clock,
                    tempo_call, openness, rng, separation_map=None):
     """(shot_type, quality, optimal, is_mismatch, eligible) for one candidate."""
@@ -363,7 +424,11 @@ def _evaluate_shot(player, position, location, read_scores, off_team, shot_clock
     else:
         shot_type = _weighted_attack_or_outside(player, off_team, rng)
     raw = float(scores.get(shot_type, 0.0))
-    quality = raw + openness
+    # Team focus emphasis. Applied to the candidate's quality (not to the type roll), because
+    # this architecture picks a type per candidate and then competes candidates — so emphasis
+    # belongs where candidates are compared. `is_mismatch` below stays on the RAW score: a hot
+    # read is a genuine personnel edge, not something a slider should be able to manufacture.
+    quality = _apply_focus_emphasis(raw + openness, _focus_emphasis(off_team, shot_type))
     eligible = _outside_shot_is_eligible(position, shot_type, shot_clock, separation_map)
     return (
         shot_type,

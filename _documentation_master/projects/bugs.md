@@ -190,3 +190,90 @@ Context: `tests/conftest.py` block-lists `gob` and `gob-staging`, so the 217 DB-
 - **Prefer a separate M0 cluster over a `gob-test` database on the production cluster** — the guard
   block-lists by database *name*, so a same-cluster scratch db is one connection-string typo away
   from the real thing.
+
+### Test suite cannot run end to end — four independent causes (August 2026)
+
+**Impact:** nobody can complete a full run, which is why **19 deterministic failures accumulated
+invisibly** in the motion/shot area alone. This blocks regression coverage for the CPU identity
+wiring and rotation work that comes next. It is a workstream, not a pre-commit step.
+
+**1. Three files do not import.** `pytest --collect-only` → **2,274 collected, 3 errors**:
+`tests/test_final_turn_entry_pass_chain.py`, `BackEnd/tests/test_mask_validation.py`,
+`tests/test_shared_defense.py`. Example: `ImportError: cannot import name
+'_append_final_turn_entry_pass_if_needed' from 'BackEnd.engine.skeleton_step_emitter'` — the
+emitter's private API moved and these were not updated. Their tests never run and never report
+as failures. Same failure mode as the orphaned-function sweep: code moved, the referencing thing
+did not.
+
+**2. Ten tests vary run to run, from TWO independent sources.** Measured over 5 identical runs per
+arm: **22, 23, 23, 23, 20** vs **26, 21, 23, 22, 22** — same code both times. Flaky:
+`test_motion_moment.py` (6), `test_motion_dynamic_resolver.py` (3), `test_motion_pass_lane.py` (1).
+  - `BackEnd/utils/sim_random.sim_rng` seeds from OS entropy when unseeded (by design). Tests that
+    exercise the walk without seeding get a different stream each run.
+  - The **stdlib** `random` module is used directly in `BackEnd/api/gameplan_routes.py`
+    (`populate_team_plays`, `populate_scouting_data`) — those draws are NOT on the isolated sim
+    stream, so seeding `sim_rng` alone is insufficient.
+  - A third factor, `PYTHONHASHSEED`, is filed separately below — it is not only a test problem.
+
+**3. At least one test hangs forever.** `tests/test_defensive_pressure_all_scenarios.py` stalls
+after 2 failures and produces no further output — observed 37 minutes with zero progress, at 19%
+of the run. Confirmed **pre-existing** (HEAD hangs at the identical point, not caused by the
+focus-emphasis change). `pytest-timeout` is **not installed**, so a hang is a wall rather than a
+reported failure.
+  - ⚠️ **The hang inventory is UNKNOWN.** We only know of this one because we never got past it.
+    There may be more beyond 19%.
+
+**4. `pytest.ini` sets `addopts = --maxfail=2`,** so a default invocation aborts after the second
+failure — which, given 19 deterministic failures, means a default run shows almost nothing. Needs
+`--maxfail=999 --continue-on-collection-errors` to see the real picture.
+
+**Suggested order (when authorized):** install `pytest-timeout` and run with `--timeout=60
+--timeout-method=thread` to convert hangs into failures and produce the hang inventory in one pass;
+then fix the 3 imports; then seed both RNG streams via an autouse conftest fixture; then revisit
+`--maxfail`. Only after that is the 19-failure backlog worth triaging.
+
+### `PYTHONHASHSEED` reaches simulation behaviour — game results depend on an unrecorded value (August 2026)
+
+- **Finding:** with `sim_rng` AND the stdlib `random` both explicitly seeded per quarter, repeated
+  runs of the same sim still produced different results — until `PYTHONHASHSEED=0` was set, after
+  which two runs were **bit-identical** (results and RNG draw counts alike).
+- **Implication:** something on the sim path iterates a `set` or `dict` of strings in an order that
+  reaches behaviour. Python randomises string hashing per process by default, so **live game results
+  depend on a per-process value that nobody sets, controls, or records.**
+- **Why this is not just a test problem:** it means a production game is not reproducible even given
+  the same seed, and any seeded investigation is only valid within a single process. It undermines
+  SS&S reproducibility guarantees generally.
+- **Same class as the pymongo global-stream finding** documented in `BackEnd/utils/sim_random.py`:
+  an invisible external input perturbing the simulation. That one was fixed by isolating the RNG;
+  this one is still open.
+- **Likely fix (when authorized):** find the offending iteration (candidates: any `set` of position
+  or player-id strings feeding ordered logic, `_step_locations`, read-map construction, defender
+  grids) and impose a deterministic order — `sorted()` at the point of use. Pinning
+  `PYTHONHASHSEED` in the runtime would mask it, not fix it, and would not help anyone reading a
+  historical game.
+
+### `OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.55` is the real driver of attack dominance (August 2026)
+
+- **Symptom:** Motion shot types run **~77% attack at NEUTRAL sliders** (2/2/2), and ~90% at
+  `attack=4/outside=0`. Measured over 5 matched seed sets, 15 quarters/config.
+- **Not the sliders.** Removing team emphasis from the `_weighted_attack_or_outside` type roll
+  (so the sliders act only through `_focus_emphasis`) moved the neutral mix by **0.1 points**
+  (77.02% → 77.11%) and the 4/0 extreme by only 3 points (92.7% → 89.7%). The sliders were
+  symmetric noise on top of an already-lopsided base.
+- **Root cause** — `BackEnd/engine/motion_step_decision.py`:
+  ```
+  attack_score  = (AG + SC)/2                              ~55 for a typical starter
+  outside_score = SH * OUTSIDE_SHOT_SELECTION_MULTIPLIER    ~30  (SH ~55, discounted 45%)
+  -> attack wins ~65% of type rolls before any emphasis
+  ```
+  The constant's own comment says it exists to "steer eligible outside players toward drives".
+  At 0.55 that thumb is heavy. Raising it toward **~0.8** is the actual lever; it would pull
+  neutral attack from ~77% to roughly the mid-60s and bring the 4/0 extreme down with it.
+- **⚠️ NOT just a shot-mix dial.** Attack decisions are what generate contact: they route through
+  `_create_attack_drive_shoot_steps`, whose drives can end in foul / charge / dead-ball turnover.
+  Roughly **two-thirds of attack decisions never become shots** (decision-level attack ~80% vs
+  final-shot attack ~25%). So changing this constant moves **foul rate, free-throw rate and
+  turnover rate**, not only the inside/attack/outside split.
+- **Owner:** belongs with the shot-tuning pass (see `project_shot_system_tuning`), NOT with the
+  focus-slider work. Needs its own before/after across those four rates, and it will interact
+  with the 3PT-rate calibration.

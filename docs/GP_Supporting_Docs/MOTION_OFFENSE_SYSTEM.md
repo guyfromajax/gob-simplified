@@ -241,10 +241,10 @@ shot_score -= penalty
 - ✅ Loop structure validated in Play Builder V2
 
 ### ✅ Phase 2: Engine Logic - COMPLETE
-- ✅ Location-based shot type determination implemented (`_is_inside_location()`, `_is_outside_location()`, `_check_inside_shot_possibility()`, `_check_outside_shot_possibility()`)
+- ⚠️ Location-based shot type determination: `_is_inside_location()` / `_is_outside_location()` are live, but `_check_inside_shot_possibility()` / `_check_outside_shot_possibility()` have **zero callers** since the 2026-07-11 motion/set-play unification
 - ✅ Drive destination logic implemented (`_determine_attack_drive_destination()` - upper/lower/central mapping)
 - ✅ Attack shot penalty system implemented (`_apply_attack_penalty()`)
-- ✅ Focus-based probability weighting implemented (`_build_shot_type_weighted_list()` using strategy_settings)
+- ⚠️ Focus-based probability weighting: `_build_shot_type_weighted_list()` has **zero callers**. The intent is now implemented as a quality multiplier in `motion_step_decision._focus_emphasis` (`FOCUS_EMPHASIS_STEP = 0.25`, sliders scale candidate quality 0.5x-1.5x)
 - ✅ Player attribute (IQ) override logic - Focus influences probability, player attributes affect shot calculations
 - ✅ Loop continuation logic - Motion plays use base_loop skeleton, engine continues until turn-ending event
 
@@ -270,10 +270,10 @@ shot_score -= penalty
 - ✅ `BackEnd/engine/phase_resolution.py` - Motion execution logic
   - `resolve_motion_offense_shot()` (line 3093) - Main motion shot resolution
   - `_is_inside_location()`, `_is_outside_location()` - Location detection
-  - `_check_inside_shot_possibility()`, `_check_outside_shot_possibility()`, `_check_attack_shot_possibility()` - Shot possibility checks
+  - `_check_inside_shot_possibility()`, `_check_outside_shot_possibility()`, `_check_attack_shot_possibility()` - Shot possibility checks (**zero callers** - legacy)
   - `_determine_attack_drive_destination()` - Drive destination logic
   - `_apply_attack_penalty()` - Attack penalty calculation
-  - `_build_shot_type_weighted_list()` - Focus-based probability weighting
+  - `_build_shot_type_weighted_list()` - Focus-based probability weighting (**zero callers** - legacy)
   - `_create_attack_drive_shoot_steps()`, `_create_shoot_step()`, `_create_pass_receive_step()` - Step creation helpers
 - ✅ `BackEnd/models/turn_manager.py` - Playcall selection (handles Motion vs Set Play selection)
 - ✅ `BackEnd/models/shot_manager.py` - Shot calculation (uses playcall parameter from motion system)
@@ -295,7 +295,7 @@ shot_score -= penalty
 
 2. **Penalty Application**: ✅ **RESOLVED** - Attack penalty is applied in motion-specific logic (`_apply_attack_penalty()`) before calling `calculate_shot_score()`. The penalty is subtracted from `shot_score` before the final threshold check.
 
-3. **Focus Probability Weights**: ✅ **RESOLVED** - Uses `strategy_settings` weights (`inside`, `attack`, `outside`) from team settings. Default weights are 2 for each type. The weighted list is built by `_build_shot_type_weighted_list()` which multiplies each type by its weight value.
+3. **Focus Probability Weights**: ⚠️ **RE-IMPLEMENTED ELSEWHERE** - `_build_shot_type_weighted_list()` is orphaned (zero callers). The live mechanism is `motion_step_decision._focus_emphasis`: the `inside`/`attack`/`outside` sliders (0-4, 2 = neutral) scale a shot candidate's quality by 0.5x-1.5x where candidates are compared in `should_shoot`. This is the **single** place team emphasis acts — the sliders were removed from the `_weighted_attack_or_outside` type roll so that shot TYPE reflects the player and emphasis decides WHO SHOOTS. See the "Live shot-type path" section of `_documentation_master/06_Gameplay_Systems/Motion_Offense_Shot_System.md` for measured lever strengths.
 
 4. **IQ Override Logic**: ⚠️ **PARTIALLY IMPLEMENTED** - Player IQ is used in shot calculations (affects shot score), but there's no explicit "override" mechanism that allows high-IQ players to ignore focus preferences. Focus influence is purely probability-based via strategy_settings weights. This may be a future enhancement.
 
