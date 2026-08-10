@@ -9,7 +9,10 @@ This module implements the new training execution system with:
 """
 
 import math
-import random
+# Training draws from a DEDICATED stream, not the global module: pymongo consumes
+# the global stream (bulk_write does, even matching zero documents), which made
+# training results depend on unrelated DB activity. See BackEnd/utils/training_random.
+from BackEnd.utils.training_random import training_rng as random
 import logging
 from typing import List, Dict, Tuple, Optional, Any
 from BackEnd.constants import ALL_ATTRS, LEAGUE_MEDIAN_HEIGHT_IN

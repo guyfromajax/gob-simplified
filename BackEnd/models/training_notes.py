@@ -9,7 +9,10 @@ from __future__ import annotations
 
 from typing import Any, Dict, List, Optional, Tuple
 
-import random
+# Training draws from a DEDICATED stream, not the global module: pymongo consumes
+# the global stream (bulk_write does, even matching zero documents), which made
+# training results depend on unrelated DB activity. See BackEnd/utils/training_random.
+from BackEnd.utils.training_random import training_rng as random
 
 from BackEnd.constants import ALL_ATTRS
 

@@ -834,3 +834,56 @@ quality        = Σ contribution / Σ contribution(reference)
 - The Training Report frontend resolves offensive deltas by `play_id` first, while still displaying the play `name`
 - **Training loading feed** (`build_training_loading_highlights`) does **not** surface play/defense effectiveness deltas; it uses archetyped copy from `training_feed_lines.py` (see `Training_System_Live_Feed.md`).
 - Offensive `playbook_settings` are now expected to be `play_id`-keyed, though runtime compatibility still tolerates older name-keyed maps
+
+---
+
+## Randomness: training draws from its OWN stream (August 2026)
+
+Training draws from **`training_rng`** (`BackEnd/utils/training_random.py`), not the global
+`random` module and **not** `sim_rng`.
+
+**Why it was changed.** Training shared the global stream with `pymongo`, and `bulk_write`
+consumes that stream even when it matches zero documents. So unrelated database activity
+shifted training results. Measured on a 12-man roster over 4 weeks under an identical seed:
+adding a **single no-op `bulk_write`** before training changed the attributes of **all 12
+players** (RB 17→14, SH 69→71, and so on). Training is deterministic in isolation but the
+franchise path does a variable amount of DB work, so **a seeded training run could not be
+replayed.**
+
+**Why a separate stream and not `sim_rng`.** Training runs concurrently with simulation — a
+franchise week sims games and trains teams. Sharing `sim_rng` would reintroduce exactly the
+cross-subsystem coupling both modules exist to remove: the number of games simmed would shift
+training outcomes.
+
+| module | binding |
+|---|---|
+| `models/training_execution_v2.py` | `from BackEnd.utils.training_random import training_rng as random` |
+| `models/training_notes.py` | same |
+| `models/training_manager.py` | same |
+
+**Deliberately NOT converted:** `populate_team_plays` / `populate_scouting_data` in
+`api/gameplan_routes.py` (function-local `import random`, lines 572 and 879). They seed play
+effectiveness/momentum/cloaking at franchise and game **creation**; `run_franchise_training`
+contains no call to either. They belong to whatever stream game setup eventually owns.
+
+**Verification (the check that matters).** Two runs, identical seed, the only difference being
+one no-op `pymongo` write:
+
+| | before | after |
+|---|---|---|
+| BackEnd draws on the GLOBAL stream | 640 | **0** |
+| draws on `training_rng` | 0 | **640** |
+| identical player attributes | **False** (12 of 12 differed) | **True** |
+| identical team attributes | True | True |
+
+**Draw count is unchanged — 640 → 640, site for site**, which is the point: the conversion is a
+pure rebinding, not a behaviour change.
+
+| draws | site |
+|---|---|
+| 624 | `training_execution_v2:apply_pre_training_conditions` |
+| 12 | `training_execution_v2:_apply_team_training_points` |
+| 4 | `training_notes:_locker_room_note` |
+
+Re-check with `BackEnd.utils.sim_random.install_global_draw_guard()` +
+`global_draw_report()`; the tally must stay empty on the training path.
