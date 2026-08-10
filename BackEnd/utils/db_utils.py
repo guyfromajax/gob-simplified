@@ -19,6 +19,7 @@ POSITION_TRAITS = {
 # Q4: applied only when time_remaining > 240 (late Q4 / OT have no extra foul limit).
 DEFAULT_FOUL_LIMITS_BY_QUARTER = {1: 1, 2: 2, 3: 3, 4: 3}
 
+
 def get_player_rating(player, traits: List[str]) -> float:
     total = 0
     for trait in traits:
@@ -163,6 +164,70 @@ def _player_slot_rating(player: Player, pos: str) -> float:
 
 
 _LINEUP_POSITIONS = ("PG", "SG", "SF", "PF", "C")
+
+# Selector objective blend (Lineup selection):
+#     score = w * static_rating + (1 - w) * effective_rating
+# w = 1.0 is pure static position_ratings (paper talent, fatigue-blind) — the historical
+# behaviour and the current default. w = 0.0 is pure effective rating (who is better RIGHT
+# NOW), which makes rotation EMERGENT: a starter tires, his effective rating falls below a
+# fresh backup's, the next rebuild seats the backup, he recovers on the bench and returns.
+# Intermediate w trades responsiveness against "ride your stars" — a top-heavy roster should
+# keep a tired star on when the alternative is worse across the whole game, not just now.
+# This single weight is the intended home for archetype influence (via starter_bench_gap).
+LINEUP_EFFECTIVE_WEIGHT_DEFAULT = 1.0
+
+
+def _player_effective_slot_rating(player: Player, pos: str) -> float:
+    """Position rating recomputed from NG-RESCALED attributes — what the player is worth right
+    now, not on paper.
+
+    Only MALLEABLE_ATTRS rescale with energy; IQ/CH and height do not, so an IQ-heavy player
+    degrades more slowly than ``rating * NG`` would suggest. That is why this recomputes the
+    rating rather than scaling it.
+
+    Cached on the player object per NG value: NG is the only input that moves within a game.
+    """
+    attrs = getattr(player, "attributes", None) or {}
+    try:
+        ng = float(attrs.get("NG", 1.0) or 1.0)
+    except (TypeError, ValueError):
+        ng = 1.0
+    ng = max(0.0, min(1.0, ng))
+    cache = getattr(player, "_eff_slot_rating_cache", None)
+    if cache is None or cache.get("_ng") != ng:
+        from BackEnd.constants import MALLEABLE_ATTRS
+        from BackEnd.utils.position_ratings import compute_position_ratings
+
+        scaled = {k: (float(v) * ng if k in MALLEABLE_ATTRS else v)
+                  for k, v in attrs.items() if isinstance(v, (int, float))}
+        try:
+            ratings = compute_position_ratings(
+                {"attributes": scaled, "height": getattr(player, "height", None)}
+            )
+        except Exception:
+            ratings = {}
+        cache = {"_ng": ng, **{p: float(ratings.get(p, 0.0)) for p in _LINEUP_POSITIONS}}
+        try:
+            player._eff_slot_rating_cache = cache
+        except Exception:
+            pass
+    val = cache.get(pos)
+    if val is None or val <= 0:
+        # No usable recompute (missing height/attrs) — degrade to the static rating scaled by
+        # NG rather than dropping the player out of contention entirely.
+        return _player_slot_rating(player, pos) * ng
+    return float(val)
+
+
+def _blended_slot_rating(player: Player, pos: str, effective_weight: float) -> float:
+    """score = w * static + (1 - w) * effective. w == 1.0 skips the recompute entirely."""
+    w = LINEUP_EFFECTIVE_WEIGHT_DEFAULT if effective_weight is None else float(effective_weight)
+    if w >= 1.0:
+        return _player_slot_rating(player, pos)
+    static = _player_slot_rating(player, pos)
+    if w <= 0.0:
+        return _player_effective_slot_rating(player, pos)
+    return w * static + (1.0 - w) * _player_effective_slot_rating(player, pos)
 
 # ── Computer-team situational-override tunables (Computer_Team_GamePlan_System.md) ──
 # Conservative strategy (sit on the lead): lead thresholds + the late-Q4 time split.
@@ -327,11 +392,13 @@ def solve_best_assignment(
     *,
     required_ids: Optional[set] = None,
     preference_fn=None,
+    effective_weight: float = None,
 ) -> Dict[str, Player]:
     """EXACT max-weight assignment of ``positions`` over ``players``. Returns {pos: Player}.
 
-    Objective = sum of ``_player_slot_rating(player, pos)`` across the filled slots, plus an
-    optional ``preference_fn`` bonus. Solved by DP over position bitmasks: 2^len(positions)
+    Objective = sum of ``_blended_slot_rating(player, pos, effective_weight)`` across the
+    filled slots, plus an optional ``preference_fn`` bonus. See
+    ``LINEUP_EFFECTIVE_WEIGHT_DEFAULT`` for what the weight means. Solved by DP over position bitmasks: 2^len(positions)
     states x len(players), so microseconds at five slots and a twelve-man pool. This replaces
     a greedy position-by-position fill, which could not find the best five — measured at a mean
     17.5-point shortfall, optimal in only 19% of rebuilds, with a bench player outrating the
@@ -357,7 +424,7 @@ def solve_best_assignment(
     required_ids = {str(x) for x in (required_ids or set())}
 
     def score(p, pos):
-        v = _player_slot_rating(p, pos)
+        v = _blended_slot_rating(p, pos, effective_weight)
         if preference_fn is not None:
             try:
                 v += float(preference_fn(p, pos) or 0.0)
@@ -441,6 +508,7 @@ def build_unified_autoset_lineup_from_eligible(
     prefer_lowest_rt: bool = False,
     position_fill_order: Optional[List[str]] = None,
     preference_fn=None,
+    effective_weight: float = None,
 ) -> Dict[str, Player]:
     """
     Canonical autoset selection after eligibility + waterfall. Seats the EXACT best five by
@@ -486,10 +554,12 @@ def build_unified_autoset_lineup_from_eligible(
         chosen = forced + rest[: max(0, len(positions) - len(forced))]
         if len(chosen) < len(positions):
             chosen = (chosen + [p for p in eligible_players if p not in chosen])[: len(positions)]
-        return solve_best_assignment(chosen, positions, preference_fn=preference_fn)
+        return solve_best_assignment(chosen, positions, preference_fn=preference_fn,
+                                     effective_weight=effective_weight)
 
     return solve_best_assignment(
-        eligible_players, positions, required_ids=force_set, preference_fn=preference_fn
+        eligible_players, positions, required_ids=force_set, preference_fn=preference_fn,
+        effective_weight=effective_weight,
     )
 
 
@@ -500,6 +570,7 @@ def fill_unified_lineup_gaps(
     *,
     existing_assignments: Dict[str, Player],
     preference_fn=None,
+    effective_weight: float = None,
 ) -> Dict[str, Player]:
     """
     Fill only ``missing_positions`` with the EXACT best available players, holding the already-
@@ -525,7 +596,8 @@ def fill_unified_lineup_gaps(
             f"(available={len(available)}, needed={len(order)})"
         )
     result: Dict[str, Player] = dict(existing_assignments)
-    result.update(solve_best_assignment(available, order, preference_fn=preference_fn))
+    result.update(solve_best_assignment(available, order, preference_fn=preference_fn,
+                                        effective_weight=effective_weight))
     return result
 
 
