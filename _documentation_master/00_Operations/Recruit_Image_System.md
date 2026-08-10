@@ -275,9 +275,16 @@ Mechanically identical; only storage differs:
 1. **Season-1 init** — `franchise_manager.py:437` (+ FRD insert `:522`): load an unused set;
    use its stable ids.
 2. **Finish-season rollover** — `franchise_routes.py:14079` (+ FRD insert `:14086`): same swap.
-3. **Signing** — `franchise_routes.py:10344`: `player_id = recruit_doc.get("recruit_id") or str(uuid.uuid4())`
-   (real recruits keep their id → image lineage survives; walk-ons — `recruit_id: None`,
-   `franchise_manager.py:224` — still get a fresh id and fall back to the generic headshot).
+3. **Signing** — signed recruits always get a fresh `player_id` (uuid4) so uniform masters never
+   collide across franchises; portrait lineage is `image_id`. Week-35 fill walk-ons also get a
+   fresh `player_id` and usually no `image_id` at signing.
+4. **Walk-on makes the 12** — after last-camp-week cuts, survivors with archetype `Walk On` and no
+   `meta.image_id` borrow from the **71 walk-on kits** at
+   `portrait-kits/walk_on_portraits/` (remapped UUIDs from the retired set_0001 mover archive;
+   manifest `BackEnd/data/walk_on_portraits_manifest.json`). Season de-dupe:
+   `franchises.walk_on_image_ids_used` (cleared at `finish_season`). Paint via
+   `ensure_player_image` / user eager warm — same kit path as recruits once `resolve_kit_keys`
+   resolves the walk-on prefix.
 
 Two properties this buys for free:
 

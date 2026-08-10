@@ -142,10 +142,20 @@ def _pool_by_id() -> dict[str, dict[str, Any]]:
 
 
 def resolve_kit_keys(image_id: str | None) -> tuple[str, str] | None:
-    """Return (kit_png_key, mask_png_key) for a TB/recruit image_id, or None."""
+    """Return (kit_png_key, mask_png_key) for a TB/recruit/walk-on image_id, or None."""
     iid = str(image_id or "").strip()
     if not iid:
         return None
+    # Walk-on portraits use remapped UUIDs under portrait-kits/walk_on_portraits/
+    # and MUST win over recruits/kit/ (source retired ids collide with live regen art).
+    try:
+        from BackEnd.utils.walk_on_portraits import walk_on_image_id_set, walk_on_kit_prefix
+
+        if iid in walk_on_image_id_set():
+            prefix = walk_on_kit_prefix()
+            return f"{prefix}/{iid}.png", f"{prefix}/{iid}.mask.png"
+    except Exception:
+        pass
     entry = _pool_by_id().get(iid)
     if entry:
         prefix = entry["kit_prefix"]

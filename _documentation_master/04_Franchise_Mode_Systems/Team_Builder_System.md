@@ -18,6 +18,12 @@ The user authors all fifteen players, seeded from the replaced program's roster.
 
 **Entry:** from the franchise program-select screen at new-franchise start. No franchise document exists until Apply. Mid-franchise editing is out of scope.
 
+**Walk-on portraits at Apply:** wizard walk-ons may already carry `meta.image_id` from the TB
+450-kit pool. Camp-cut walk-on assignment **skips** any Walk On that already has `meta.image_id`
+or `meta.jersey` — TB choices are left alone. Season-init walk-ons without a TB portrait get a
+walk-on-pool face + jersey only when they survive onto the post-camp active 12 (see
+`Recruiting_System.md` §8).
+
 ---
 
 ## 2. Fixed constraints

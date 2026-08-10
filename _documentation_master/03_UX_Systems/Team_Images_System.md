@@ -61,7 +61,7 @@ FrontEnd/static/images/teams/
 | **banner_primary** | Mode-select franchise card + team buttons; franchise team-select cards + loading banner; bracket (FCC); court scoreboard (gameScene, bootGame); EOG completion popup + in-game stats panel; box-score header; pulse loading overlay (`pageLoadOverlay.js`); FTE tutorial situation screen; *(sunset)* single-game/tournament team-select, TCC. |
 | **logo_square**     | FCC header; game plan; set-lineup header; player-detail team logo; post-game press conference; *(sunset)* tournament top bar. |
 | **court**           | Court/game page (Phaser background); play-details; play-builder(s); default in builders = general_court.jpg. |
-| **background**      | Team roster view (headshot container); set-lineup (headshot container); player-detail (portrait background). |
+| **background**      | Team roster view (headshot container); set-lineup (headshot container); player-detail for assigned players and signed recruits. Unsigned recruit detail uses neutral `#747474` because no team owns the player yet. |
 
 ---
 

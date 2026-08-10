@@ -11327,11 +11327,13 @@ def _week_1_cut_requirement(
     fid: ObjectId | None,
     user_team_id: str | None,
 ) -> dict[str, int | bool]:
+    """User camp-cut gate: after the last camp week (``CAMP_WEEKS``) training completes."""
     if not franchise_doc or not fid or not user_team_id:
         return {"roster_count": 0, "cut_count": 0, "cut_required": False}
+    from BackEnd.constants.training_shape import CAMP_WEEKS
     week = int(franchise_doc.get("week", 1) or 1)
     training_status = franchise_doc.get("training_status", {}) or {}
-    if week != 1 or not franchise_training_fully_complete_for_week(training_status, week):
+    if week != CAMP_WEEKS or not franchise_training_fully_complete_for_week(training_status, week):
         return {"roster_count": 0, "cut_count": 0, "cut_required": False}
     try:
         team_object_id = ObjectId(user_team_id)
@@ -11361,8 +11363,9 @@ def _maybe_initialize_practice_squad_week_1(
     defer_if_user_cut_pending=True (default). When the user roster is already
     legal (no cut required), initialization runs immediately from CPU training.
     """
+    from BackEnd.constants.training_shape import CAMP_WEEKS
     week = int(franchise_doc.get("week", 1) or 1)
-    if week != 1:
+    if week != CAMP_WEEKS:
         return None
     if (franchise_doc.get("practice_squad") or {}).get("initialized"):
         return None
@@ -11400,6 +11403,8 @@ def _maybe_initialize_practice_squad_week_1(
 
 
 def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str | None = None) -> None:
+    from BackEnd.utils.walk_on_roster_identity import assign_walk_ons_making_active_roster
+
     ftd_docs = list(franchise_team_data_collection.find(
         {"franchise_id": franchise_id},
         {"team_id": 1, "players": 1, "scholarship_players": 1, "training_squad_players": 1, "playing_time_promise_players": 1},
@@ -11420,41 +11425,59 @@ def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str 
                 {"franchise_id": franchise_id, "team_id": ftd_doc.get("team_id")},
                 {"$set": {"training_squad_players": [], "updated_at": datetime.utcnow()}},
             )
-            continue
+            remaining_ids = roster_player_ids
+        else:
+            # Lowest-RT players move to the training squad — NOT cut/deleted. They stay
+            # in FPD (ineligible to play) and rejoin the pool at next Training Camp.
+            ts_ids = _choose_cut_player_ids(roster_player_ids, fpd_map, cut_count)
+            ts_set = set(ts_ids)
+            remaining_ids = [player_id for player_id in roster_player_ids if player_id not in ts_set]
+            existing_ts = [
+                str(player_id) for player_id in (ftd_doc.get("training_squad_players") or []) if player_id
+            ]
+            new_training_squad = existing_ts + [pid for pid in ts_ids if pid not in existing_ts]
+            remaining_scholarships = [
+                str(player_id) for player_id in (ftd_doc.get("scholarship_players") or [])
+                if str(player_id) in remaining_ids
+            ]
+            remaining_ptp = [
+                str(player_id) for player_id in (ftd_doc.get("playing_time_promise_players") or [])
+                if str(player_id) in remaining_ids
+            ]
+            total_player_attrs = sum(
+                core_total_player_attrs((fpd_map.get(player_id) or {}).get("attributes") or {})
+                for player_id in remaining_ids
+            )
+            _update_ftd_roster_state(
+                franchise_id,
+                ftd_doc.get("team_id"),
+                {
+                    "players": remaining_ids,
+                    "scholarship_players": remaining_scholarships,
+                    "training_squad_players": new_training_squad,
+                    "playing_time_promise_players": remaining_ptp,
+                    "total_player_attrs": total_player_attrs,
+                    "updated_at": datetime.utcnow(),
+                },
+            )
 
-        # Lowest-RT players move to the training squad — NOT cut/deleted. They stay
-        # in FPD (ineligible to play) and rejoin the pool at next Training Camp.
-        ts_ids = _choose_cut_player_ids(roster_player_ids, fpd_map, cut_count)
-        ts_set = set(ts_ids)
-        remaining_ids = [player_id for player_id in roster_player_ids if player_id not in ts_set]
-        existing_ts = [
-            str(player_id) for player_id in (ftd_doc.get("training_squad_players") or []) if player_id
-        ]
-        new_training_squad = existing_ts + [pid for pid in ts_ids if pid not in existing_ts]
-        remaining_scholarships = [
-            str(player_id) for player_id in (ftd_doc.get("scholarship_players") or [])
-            if str(player_id) in remaining_ids
-        ]
-        remaining_ptp = [
-            str(player_id) for player_id in (ftd_doc.get("playing_time_promise_players") or [])
-            if str(player_id) in remaining_ids
-        ]
-        total_player_attrs = sum(
-            core_total_player_attrs((fpd_map.get(player_id) or {}).get("attributes") or {})
-            for player_id in remaining_ids
-        )
-        _update_ftd_roster_state(
-            franchise_id,
-            ftd_doc.get("team_id"),
-            {
-                "players": remaining_ids,
-                "scholarship_players": remaining_scholarships,
-                "training_squad_players": new_training_squad,
-                "playing_time_promise_players": remaining_ptp,
-                "total_player_attrs": total_player_attrs,
-                "updated_at": datetime.utcnow(),
-            },
-        )
+        # Walk-ons who survive onto the active 12 get jersey + portrait (CPU = lazy paint).
+        try:
+            assign_walk_ons_making_active_roster(
+                franchise_id=franchise_id,
+                team_id=ftd_doc.get("team_id"),
+                active_player_ids=remaining_ids,
+                fpd_map=fpd_map,
+                franchise_players_data_collection=franchise_players_data_collection,
+                franchises_collection=db.franchises,
+                warm=False,
+            )
+        except Exception:
+            logger.exception(
+                "[WALK-ON-ROSTER] CPU assign failed franchise=%s team=%s",
+                str(franchise_id),
+                team_id,
+            )
 
 
 TRAINING_SQUAD_ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "CH"]
@@ -12245,18 +12268,16 @@ def _build_cpu_week_35_orders(
 
 
 def _allowed_jersey_numbers(position: str) -> list[int]:
-    pos = str(position or "").upper()
-    if pos == "PG":
-        return list(range(0, 37))
-    if pos in {"SG", "SF"}:
-        return list(range(0, 46)) + [77]
-    return [number for number in range(0, 56) if number < 20 or number > 29] + [88, 91, 99]
+    from BackEnd.utils.jersey_assignment import allowed_jersey_numbers
+    return allowed_jersey_numbers(position)
 
 
 def _assign_jerseys_to_signed_players(
     signed_players: list[dict[str, Any]],
     franchise_id: str | ObjectId,
 ) -> None:
+    from BackEnd.utils.jersey_assignment import jersey_position_for_player, pick_jersey_number
+
     team_to_existing_numbers: dict[str, set[int]] = defaultdict(set)
     franchise_id_obj = ObjectId(franchise_id) if isinstance(franchise_id, str) else franchise_id
     ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id_obj}, {"team_id": 1, "players": 1}))
@@ -12282,10 +12303,8 @@ def _assign_jerseys_to_signed_players(
 
     for player in signed_players:
         team_id = str(player.get("team_id") or "")
-        allowed = [number for number in _allowed_jersey_numbers(player.get("pos")) if number not in team_to_existing_numbers[team_id]]
-        if not allowed:
-            allowed = _allowed_jersey_numbers(player.get("pos"))
-        jersey = random.choice(allowed)
+        pos = jersey_position_for_player(player)
+        jersey = pick_jersey_number(pos, team_to_existing_numbers[team_id])
         player["jersey"] = jersey
         team_to_existing_numbers[team_id].add(jersey)
 
@@ -13331,8 +13350,29 @@ def cut_franchise_players(
         },
     )
 
+    # Walk-ons who survive onto the active 12: jersey + portrait; eager-warm user team.
+    from BackEnd.constants.training_shape import CAMP_WEEKS
+    walk_on_assign = {}
+    try:
+        from BackEnd.utils.walk_on_roster_identity import assign_walk_ons_making_active_roster
+
+        walk_on_assign = assign_walk_ons_making_active_roster(
+            franchise_id=fid,
+            team_id=team_object_id,
+            active_player_ids=remaining_roster_ids,
+            fpd_map=fpd_map,
+            franchise_players_data_collection=franchise_players_data_collection,
+            franchises_collection=db.franchises,
+            teams_collection=db.teams,
+            franchise_doc=franchise_doc,
+            warm=True,
+        )
+    except Exception:
+        logger.exception("[WALK-ON-ROSTER] user assign failed franchise=%s", str(fid))
+        walk_on_assign = {}
+
     ps_initialized = False
-    if int(franchise_doc.get("week", 1) or 1) == 1:
+    if int(franchise_doc.get("week", 1) or 1) == CAMP_WEEKS:
         ps_initialized = (
             _maybe_initialize_practice_squad_week_1(
                 fid,
@@ -13349,6 +13389,11 @@ def cut_franchise_players(
         "cut_names": cut_names,
         "remaining_roster_count": len(remaining_roster_ids),
         "practice_squad_initialized": ps_initialized,
+        "walk_on_roster_assign": {
+            "jersey_assigned": int(walk_on_assign.get("jersey_assigned") or 0),
+            "image_assigned": int(walk_on_assign.get("image_assigned") or 0),
+            "warmed": int(walk_on_assign.get("warmed") or 0),
+        },
     }
 
 
@@ -16261,6 +16306,8 @@ def finish_season(req: FinishSeasonRequest):
             "week_35_recruiting_ran": False,
             WEEK_35_RECRUITING_RESULTS_FIELD: {},
             AWARDS_FIELD: awards_reset,
+            # Fresh walk-on portrait deck each season (camp-cut assign reuses only within a season).
+            "walk_on_image_ids_used": [],
             "training_status.training_completed": False,
             "training_status.session_type": "preseason",
             "training_status.training_disabled_for_eos": False,

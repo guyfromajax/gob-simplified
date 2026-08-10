@@ -1,0 +1,292 @@
+{
+  "version": 1,
+  "kit_prefix": "portrait-kits/walk_on_portraits",
+  "source_archive_prefix": "portrait-kits/set_0001_retired_movers",
+  "count": 71,
+  "portraits": [
+    {
+      "image_id": "2a963000-2f23-5fef-b371-eed09e978de9",
+      "source_retired_id": "2acfa3f4-1beb-4693-89f3-89b4a51da919"
+    },
+    {
+      "image_id": "a2c82800-20a7-52cc-8469-68e40516c375",
+      "source_retired_id": "cb064738-e8cd-45d0-be7d-eb87678b5fdd"
+    },
+    {
+      "image_id": "f9a090fd-6db9-5300-bf90-912b8d38df1c",
+      "source_retired_id": "fb916d84-f8f6-4e79-b5cf-a0bae732bbc6"
+    },
+    {
+      "image_id": "e524b0dc-9932-5016-aaca-168eab8fbb92",
+      "source_retired_id": "647f472f-2bb1-4f20-986d-36f75c1df8cd"
+    },
+    {
+      "image_id": "b2ad57db-8b32-5b82-9ff6-7e401b21ab53",
+      "source_retired_id": "74dd9e84-8571-4c02-a9e0-e40310b64107"
+    },
+    {
+      "image_id": "fed72893-7e10-5646-ad5c-64714f304cf6",
+      "source_retired_id": "46c7bbaa-6112-4279-a6bc-0424274caea5"
+    },
+    {
+      "image_id": "486154d3-4b0c-50c5-ab07-e645f16b6901",
+      "source_retired_id": "8cf605bc-876f-4851-8606-2f2ab9ca5dbf"
+    },
+    {
+      "image_id": "025d724e-91b0-520e-a56e-eb5326515216",
+      "source_retired_id": "b7ec5d4d-26ee-4411-b155-3659e5fe6c13"
+    },
+    {
+      "image_id": "0673d242-7b7f-5a9a-bdcb-6e3f5f7db242",
+      "source_retired_id": "76a5d9d0-2039-4c5d-9186-420e5694e53b"
+    },
+    {
+      "image_id": "7070d8a1-fa32-57da-8430-e40f2cace61a",
+      "source_retired_id": "d36e4870-b7e4-4415-8f7f-e4d98da987e5"
+    },
+    {
+      "image_id": "e5568950-6712-5d22-89b5-a8eb0714b8e9",
+      "source_retired_id": "b874fa01-1ad3-4857-82df-d7f684f700d1"
+    },
+    {
+      "image_id": "6f7e19f2-d720-5c9c-83ef-9a0c7bbb5d34",
+      "source_retired_id": "efb674b6-b345-416c-bc96-fa65332be955"
+    },
+    {
+      "image_id": "b0ca11ef-4293-5164-839e-ffe646569a27",
+      "source_retired_id": "14f0b1cb-5ff0-43c6-bc29-5e1ff4d2557c"
+    },
+    {
+      "image_id": "fd3265b4-4b5e-5eeb-9e4d-3d09d71ebb38",
+      "source_retired_id": "06e56c4d-c323-4107-9fb7-884eecd13520"
+    },
+    {
+      "image_id": "cd946850-1df2-5150-a54b-bdb13f6611ed",
+      "source_retired_id": "35b088db-9198-42f9-bc4d-c99afa54d125"
+    },
+    {
+      "image_id": "2e1fa177-ae92-52f9-be46-8d4a31ec100d",
+      "source_retired_id": "18879347-fce0-4a17-a5a5-80460eec1ea0"
+    },
+    {
+      "image_id": "600a3123-48ab-5c86-a30d-8da9af8a25e7",
+      "source_retired_id": "698360aa-63da-4297-917f-dba81837e3d3"
+    },
+    {
+      "image_id": "ddbbbe24-f81f-53d4-b058-47a0c6666aa1",
+      "source_retired_id": "ec983767-d373-4a50-9771-7c53cd0a84b1"
+    },
+    {
+      "image_id": "d46d7386-3cb6-5afc-947a-ef16a904f6d8",
+      "source_retired_id": "40dc6ea7-11fc-43bf-ad86-4fb290b31a20"
+    },
+    {
+      "image_id": "2b66d3c7-df55-5882-a89f-c0bc0b9b2be4",
+      "source_retired_id": "6186d422-bdf4-42fe-97ef-0639097babcf"
+    },
+    {
+      "image_id": "8ca1b1a4-ef85-5d62-bdf6-b4c7de211718",
+      "source_retired_id": "53d622b8-e9c4-41a4-a99d-51f7f337289e"
+    },
+    {
+      "image_id": "e0d350dd-ee70-58dc-b423-e30639b6d347",
+      "source_retired_id": "75a5008f-5153-4ccd-ba96-bd58eb8c8232"
+    },
+    {
+      "image_id": "15cb0a09-6ccb-5b27-b7ec-4ad4fd5f1e62",
+      "source_retired_id": "4598c249-0359-4d83-8bb4-ec63d8f10063"
+    },
+    {
+      "image_id": "3e865e5c-dc0c-5f00-9163-46b7d0aad70c",
+      "source_retired_id": "8a17ca64-e6b1-444e-afc1-5170e3aa9afc"
+    },
+    {
+      "image_id": "a62d6534-dd29-57dd-bbe5-9b1df6eb0b2c",
+      "source_retired_id": "d9514839-7a6e-43bd-8733-058b788a14a0"
+    },
+    {
+      "image_id": "f31aca90-0ab5-52f2-b4bd-5900a7d39516",
+      "source_retired_id": "57e029c3-7ff5-4155-9aa2-735300a4fd6d"
+    },
+    {
+      "image_id": "4aab386a-0a17-51f8-b6d0-c1045b8cb4a8",
+      "source_retired_id": "8f82f91b-0f09-4dd6-b046-f7269aa54d8b"
+    },
+    {
+      "image_id": "70fc2580-7ddd-5202-9e75-4d7010f90156",
+      "source_retired_id": "a26cdb55-d9cd-4ac7-b8af-299ce683d5a4"
+    },
+    {
+      "image_id": "5774fe56-881a-5829-b268-6acbb8c4747b",
+      "source_retired_id": "34f21e9f-069b-438b-b64f-c099812c71af"
+    },
+    {
+      "image_id": "ff5fbe36-f4aa-5c41-990f-4ae0df804485",
+      "source_retired_id": "d905a03c-2876-4e1c-b808-c71091c9a6e2"
+    },
+    {
+      "image_id": "6acc8491-c1a4-52e5-bb78-9f618c09110b",
+      "source_retired_id": "b8af6b0a-9a53-452f-92af-5cbc1c60b8de"
+    },
+    {
+      "image_id": "58ccef9e-1e24-560c-b56e-844f3e8b9560",
+      "source_retired_id": "3e1f844a-ae5f-40b5-a3fa-5ebe46014630"
+    },
+    {
+      "image_id": "deb0c341-377e-5b9d-9aa7-5b9c613ca43e",
+      "source_retired_id": "f33c021f-e443-412c-8ed1-ec461736e2df"
+    },
+    {
+      "image_id": "fe479b94-0fb7-5fb2-8be4-80b09fdd603e",
+      "source_retired_id": "164e400b-101b-42f0-84b1-f6914cce8ea8"
+    },
+    {
+      "image_id": "4ed50d79-a395-5384-92c9-9b7781250ee9",
+      "source_retired_id": "8a2d46f2-efc8-4064-8b5a-53bc58ddfdb1"
+    },
+    {
+      "image_id": "fdccfefd-9ff7-5438-8e3e-5ea83d61f06d",
+      "source_retired_id": "61461c69-efe8-44bb-8087-8bafc6edadf6"
+    },
+    {
+      "image_id": "26975a70-2a89-5bce-9d79-32812250ef2d",
+      "source_retired_id": "6c886343-bd50-4a7e-b14e-092a83fa2637"
+    },
+    {
+      "image_id": "a0972d5b-8e0a-5591-8b74-cb29e60ed340",
+      "source_retired_id": "a4a12bf0-23e0-4dca-96ce-d1bf01f8a1c0"
+    },
+    {
+      "image_id": "63bee7c1-ecab-5910-b14f-03a852b258d5",
+      "source_retired_id": "52d6f268-a264-4238-a99c-651b119ced00"
+    },
+    {
+      "image_id": "0a8bb2e9-8e10-5a0b-a954-947699f982f7",
+      "source_retired_id": "326dd8ae-2205-4fee-b016-089d1c7a386f"
+    },
+    {
+      "image_id": "b26b49e2-9653-5b5d-8b1d-004641b86863",
+      "source_retired_id": "6133fdd6-7c8c-4656-9045-e4149bc78e81"
+    },
+    {
+      "image_id": "7f74d394-8a17-5bc6-bf64-430eed2d47a3",
+      "source_retired_id": "6c372f67-4475-4e1e-a9f0-0fe29ec39668"
+    },
+    {
+      "image_id": "7396808e-a1d0-5b56-af35-654aaa7f0baf",
+      "source_retired_id": "f2611c50-b447-4a07-890a-7110934095eb"
+    },
+    {
+      "image_id": "bab41d4e-fbb0-58ce-9547-5abfa81fcb16",
+      "source_retired_id": "08e197fd-03c3-4d07-bc0d-1becba8b2ebb"
+    },
+    {
+      "image_id": "09d8422d-85b0-53ed-96f0-9972a882a62b",
+      "source_retired_id": "84e8bf1a-ed78-40f6-86d1-c4913924e34d"
+    },
+    {
+      "image_id": "10b7c58e-70a8-5967-8ef6-16d46a84c3d5",
+      "source_retired_id": "276c7855-5198-4bca-b4d5-8df4e0a0b868"
+    },
+    {
+      "image_id": "4f9ec9f1-963a-58a6-89ad-1c44e1846226",
+      "source_retired_id": "9d60b405-91f1-4482-8be7-fc5ecf9dc027"
+    },
+    {
+      "image_id": "4dd05f3a-3ed5-516b-8f7d-2fd4db56e56b",
+      "source_retired_id": "6d333b1f-1796-4c75-8668-ce1e54aa9c35"
+    },
+    {
+      "image_id": "ac6fa1bd-dc1c-5b69-be0c-5ebcb09783cc",
+      "source_retired_id": "090ceed2-04d7-442b-8d05-6a5a62082b6f"
+    },
+    {
+      "image_id": "3de80714-f969-51cd-a326-e413f170507c",
+      "source_retired_id": "857d2c0b-3758-4e8d-8ac7-7dfe7025df8a"
+    },
+    {
+      "image_id": "6edafc9f-70ba-5feb-973e-59418ad8caed",
+      "source_retired_id": "61610075-f359-4d34-8c15-4f939fa503e1"
+    },
+    {
+      "image_id": "4b234bad-0265-539c-86c2-8e70d7c4e977",
+      "source_retired_id": "f80ea02c-6c83-46d4-8f60-f3017f96c651"
+    },
+    {
+      "image_id": "d0a9f1b0-a8cc-5be4-bc9a-215cf78590ff",
+      "source_retired_id": "4d548c56-dcc9-4861-a3e8-96d0a7f45ae1"
+    },
+    {
+      "image_id": "19a6e2bb-4311-5bc1-bf27-33779ab92dd3",
+      "source_retired_id": "91db3a48-1e0d-43b4-af38-3107d2f7c187"
+    },
+    {
+      "image_id": "85e09871-4fc0-579d-9bb8-d59b4557b27d",
+      "source_retired_id": "bb9f4019-e43f-410d-b5f9-84b434f1c151"
+    },
+    {
+      "image_id": "493006d2-6177-5dd4-9825-36f7059561ed",
+      "source_retired_id": "335225ff-0bfb-4792-b6da-19c9b778c13e"
+    },
+    {
+      "image_id": "8bd77031-9729-57ac-877b-e474a38130a0",
+      "source_retired_id": "11a0294e-7070-4ff9-ba33-b71dee8f396f"
+    },
+    {
+      "image_id": "97efce43-e633-5191-8c78-9e3a0b1b4c89",
+      "source_retired_id": "52b089ef-c03b-439b-ad7f-e7028175b340"
+    },
+    {
+      "image_id": "74fed08f-d1e4-5c49-8b65-4b3fdaf845f1",
+      "source_retired_id": "d4495c7b-6ef4-471e-a3b9-fa5369e3b631"
+    },
+    {
+      "image_id": "a805d0e2-d042-5b38-8645-5a26f9c385a8",
+      "source_retired_id": "ae073bcb-3c34-4ae9-85fa-5e38200e2f42"
+    },
+    {
+      "image_id": "7af244f2-82b1-56f0-a794-19350ea08384",
+      "source_retired_id": "ba1f3d97-a738-4a97-b342-3eed2047691c"
+    },
+    {
+      "image_id": "800bccc9-fcb1-5e7f-a515-6fd0bf5f1022",
+      "source_retired_id": "8135b877-fc28-4f4a-8800-697c1d11a554"
+    },
+    {
+      "image_id": "9afc3fc2-814e-507c-b562-bcc1932838ea",
+      "source_retired_id": "a1bcfb1e-6683-4ce0-926d-0f29d44ec439"
+    },
+    {
+      "image_id": "2148e3ab-78fb-56f9-8b3f-090e84f2ff93",
+      "source_retired_id": "cca4fe08-6c3b-47d8-be23-69a74b0b8085"
+    },
+    {
+      "image_id": "3251b23f-45cb-514d-8686-9c62ec1f0e41",
+      "source_retired_id": "c2b0df6e-12d8-45bb-8b31-79c905025940"
+    },
+    {
+      "image_id": "e08672d4-1758-5e8a-a536-56e551a81527",
+      "source_retired_id": "7c8dbe4b-80e0-4e18-a76d-66bbeffd4ec8"
+    },
+    {
+      "image_id": "3e6999f4-b013-5882-99fb-e9115ee735ca",
+      "source_retired_id": "6a821085-1178-4e46-a982-a54c315f50dc"
+    },
+    {
+      "image_id": "dd764983-76ad-5e33-bb03-9f525f06982f",
+      "source_retired_id": "0667a60e-cb5a-4c72-9b88-baaed7d4cc9b"
+    },
+    {
+      "image_id": "b99c9d57-3cf8-566e-8ce5-9d703d8e0452",
+      "source_retired_id": "aa410806-b16a-4d6f-933c-ead0f5b6871e"
+    },
+    {
+      "image_id": "e2bae9d0-612d-5ec0-a387-b143dec0eddf",
+      "source_retired_id": "97cbdd0d-025e-451b-9544-7acad48aead7"
+    },
+    {
+      "image_id": "bcd2498e-6c22-5a2a-88ad-d11fb4aeaccb",
+      "source_retired_id": "0f8b54c7-1839-4821-8c90-277e9a2e3b76"
+    }
+  ]
+}

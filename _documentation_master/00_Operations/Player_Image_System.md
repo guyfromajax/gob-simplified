@@ -16,6 +16,7 @@ This is the operational reference. The original design rationale lives in [proje
 | S3 API endpoint | `https://21a46b928c6e8b378d9cd96097346e7d.r2.cloudflarestorage.com` |
 | Object layout | `players/master/<player_id>.png` + `players/master/generic_headshot.png` |
 | `<player_id>` | the player document `_id` (UUID). Filenames are exactly `<_id>.png` |
+| Walk-on kits | `portrait-kits/walk_on_portraits/<image_id>.{png,mask.png,json}` (71 remapped retired-mover kits; see Recruit_Image_System) |
 | Master format | full-res transparent PNG (~3–7 MB, 3530×3412) — source of truth |
 | Images plan | "Images & Stream" **$0/mo**, "Use my own storage" — free tier, **5,000 unique transforms/month** |
 
@@ -72,6 +73,23 @@ Verify CORS + delivery any time:
 curl -sI -H "Origin: https://x" "https://assets.geekedoutgames.com/cdn-cgi/image/width=128,format=auto/players/master/generic_headshot.png" | grep -iE "http/|access-control|content-type"
 # expect: 200, image/avif (or webp), access-control-allow-origin: *
 ```
+
+---
+
+## Walk-on roster makers (camp cuts)
+
+When a Walk On survives camp cuts onto the active 12, the backend stamps `meta.image_id` from the
+walk-on portrait pool and paints (user eager / CPU lazy) into `players/master/<player_id>.png`
+using the same kit+mask recolor path as signed recruits (`resolve_kit_keys` →
+`make_signed_master`). Publish kits once with:
+
+```bash
+.venv/bin/python scripts/recruit_sets/publish_walk_on_portraits.py            # dry-run
+.venv/bin/python scripts/recruit_sets/publish_walk_on_portraits.py --commit   # copy from retired-movers archive
+```
+
+Requires the retired-mover archive already on the bucket (`backup_retired_mover_kits.py`). Manifest:
+`BackEnd/data/walk_on_portraits_manifest.json`.
 
 ---
 

@@ -186,6 +186,29 @@
     return staticPrefix + '/images/teams/general/general_logo_square.png';
   }
 
+  function getPortraitBackground(player, staticPrefix = '') {
+    const isUnsignedRecruit = !!player?.is_recruit && !player?.is_signed;
+    if (isUnsignedRecruit) {
+      return {
+        className: 'pd-portrait-wrap--unsigned-recruit',
+        style: '',
+      };
+    }
+
+    // A signed FRD record has not necessarily been converted into a player yet,
+    // so its assigned school lives at signed_team_name rather than team.
+    const teamName = normalizeTeamName(
+      (player?.is_recruit && player?.is_signed ? player?.signed_team_name : null)
+      || player?.team
+      || 'Free Agent'
+    );
+    const background = getTeamBackground(teamName, staticPrefix);
+    return {
+      className: '',
+      style: `background-image:url('${background}');background-size:cover;background-position:center;`,
+    };
+  }
+
   function goBack() {
     const params = new URLSearchParams(window.location.search);
     // Same-origin guard: return_url is attacker-controllable via the query string.
@@ -452,7 +475,9 @@
     const lastName = player.last_name || '';
     // Recruits carry a single `name`; players carry first_name/last_name.
     const fullName = `${firstName} ${lastName}`.trim() || player.name || 'Unknown Player';
-    const rawTeam = player.team || 'Free Agent';
+    const rawTeam = (isRecruit && player.is_signed ? player.signed_team_name : null)
+      || player.team
+      || 'Free Agent';
     const team = normalizeTeamName(rawTeam);
     const heightValue = player.height || player.HT || 75;
     const height = formatHeight(heightValue);
@@ -476,7 +501,7 @@
     const rtValue = getPlayerOverall(player);
     const momentumValue = getPlayerMomentum(player);
     const emotionEmoji = getEmotionEmoji(player);
-    const teamBackground = getTeamBackground(team, staticPrefix);
+    const portraitBackground = getPortraitBackground(player, staticPrefix);
     const teamPrimaryColor = player.primary_color || POSITION_CONFIG[positionAbbrev]?.color || '';
     const posConfig = getPositionConfig(positionAbbrev);
     const positionRatingsBlock = renderPositionRatingsBlock(player, positionAbbrev);
@@ -487,7 +512,7 @@
       <div class="resource-page-container fcc-brand-page-shell pd-shell">
         <aside class="pd-left-card">
           <button class="pd-back-btn" id="pd-back-btn">Back</button>
-          <div class="pd-portrait-wrap" style="background-image:url('${teamBackground}');background-size:cover;background-position:center;">
+          <div class="pd-portrait-wrap ${portraitBackground.className}" style="${portraitBackground.style}">
             ${isRecruit
               ? buildRecruitPortrait(fullName)
               : (hasLazyMaster

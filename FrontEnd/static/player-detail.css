@@ -99,6 +99,13 @@ input[type="reset"] {
   justify-content: center;
 }
 
+/* Unsigned recruits have no program identity yet. The Style Guide's dark
+   neutral keeps white tank tops and the full skin-tone range legible without
+   implying an affiliation. Signed recruits use their assigned team artwork. */
+.pd-portrait-wrap--unsigned-recruit {
+  background: #747474;
+}
+
 .pd-portrait {
   width: 100%;
   height: 100%;

@@ -470,18 +470,12 @@ class GameManager:
         from BackEnd.utils.db_utils import build_lineup_from_mongo, autoset_strategy_settings
         try:
             if rebuild_both_lineups:
-                # Computer timeout during simmed quarters: rebuild both teams
-                calling_team.lineup = build_lineup_from_mongo(calling_team, self.game_state)
-                other_team = self.away_team if calling_team == self.home_team else self.home_team
-                other_team.lineup = build_lineup_from_mongo(other_team, self.game_state)
-                # Autoset strategy settings for both computer teams
-                if not calling_team.is_user_team:
-                    autoset_strategy_settings(calling_team, self.game_state)
-                    logging.info(f"✅ TIMEOUT: Autoset strategy settings for {calling_team.name}")
-                if not other_team.is_user_team:
-                    autoset_strategy_settings(other_team, self.game_state)
-                    logging.info(f"✅ TIMEOUT: Autoset strategy settings for {other_team.name}")
-                logging.info(f"✅ TIMEOUT: Rebuilt both team lineups ({calling_team.name} and {other_team.name})")
+                self._rebuild_both_lineups_for_full_sim_break()
+                logging.info(
+                    "✅ TIMEOUT: Rebuilt both team lineups (%s and %s)",
+                    self.home_team.name,
+                    self.away_team.name,
+                )
             elif timeout_reason == "USER":
                 # User timeout: rebuild computer team only
                 computer_team = self.away_team if not self.away_team.is_user_team else self.home_team
@@ -680,6 +674,7 @@ class GameManager:
             return
         foul_out_id_str = str(foul_out_id)
         from BackEnd.main import _ensure_complete_lineup
+        full_simulation = bool(self.game_state.get("_is_full_simulation"))
         for team in [self.home_team, self.away_team]:
             for pos, player in list((team.lineup or {}).items()):
                 if (
@@ -688,12 +683,25 @@ class GameManager:
                     and str(player.player_id) == foul_out_id_str
                 ):
                     team.lineup[pos] = None
-                    _ensure_complete_lineup(
-                        team,
-                        self.game_state,
-                        allow_incomplete_user_foul_out_transition=True,
-                    )
+                    # A full-sim foul-out rebuilds both complete lineups in the
+                    # unified timeout path (or the headless equivalent). Avoid a
+                    # throwaway one-slot selection and its extra sim_rng draws.
+                    if not full_simulation:
+                        _ensure_complete_lineup(
+                            team,
+                            self.game_state,
+                            allow_incomplete_user_foul_out_transition=True,
+                        )
                     return
+
+    def _rebuild_both_lineups_for_full_sim_break(self):
+        """Rebuild both lineups while keeping strategy autoset computer-only."""
+        from BackEnd.utils.db_utils import build_lineup_from_mongo, autoset_strategy_settings
+
+        for team in (self.home_team, self.away_team):
+            team.lineup = build_lineup_from_mongo(team, self.game_state)
+            if not team.is_user_team:
+                autoset_strategy_settings(team, self.game_state)
 
     def _maybe_stamp_hco_setup(self, result: dict) -> None:
         """Stamp ``hco_setup.inbound_pass`` on a turn that transitions to HCO
@@ -1263,7 +1271,10 @@ class GameManager:
         """Create foul-out timeout turn using the unified timeout path, then save."""
 
         if self.game_state.get("_headless_simulation"):
-            # The universal foul-out funnel has already removed/replaced the player.
+            # Headless full sims skip the interactive timeout, so perform the
+            # single full rebuild here after deferred removal left the slot empty.
+            if self.game_state.get("_is_full_simulation"):
+                self._rebuild_both_lineups_for_full_sim_break()
             # Headless games have no lineup modal or resume client, so creating an
             # interactive timeout and attempting an immediate DB save is both wasted
             # work and incorrect lifecycle coupling.
@@ -1329,6 +1340,7 @@ class GameManager:
         timeout_turn = self.call_timeout(
             calling_team=calling_team,
             timeout_reason="FOUL_OUT",
+            rebuild_both_lineups=bool(self.game_state.get("_is_full_simulation")),
             foul_out_player=foul_out_player,
             foul_out_context=foul_out_context,
         )

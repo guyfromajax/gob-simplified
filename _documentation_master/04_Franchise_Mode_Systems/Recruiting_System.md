@@ -207,15 +207,18 @@ score = subtotal × lean multiplier
 - Winner is drawn proportionally from finalist scores.
 - Scholarship offers do not currently affect score or roster scholarship state.
 
-Signed results retain the player-generation fields, assign a non-conflicting position-based jersey,
-and are persisted under `week_35_recruiting_results`.
+Signed results retain the player-generation fields, assign a non-conflicting position-based jersey
+(`BackEnd/utils/jersey_assignment.py` — pool by **`position_intent`**, excluding numbers already
+worn on the team's active roster; falls back to best RT position if intent is missing), and are
+persisted under `week_35_recruiting_results`.
 
 ## 8. Walk-on generation and roster fill
 
 `generate_walk_on_profile()` is shared by season-one initialization, week-35 roster fill, and Team
 Builder wizard generation. It uses the same player generator at **Poor** entry tier, draws position
 intent and `potential_factor`, rolls a development profile, uses flat CH 1–100, and stamps
-archetype `Walk On`.
+archetype `Walk On`. Season-1 / TB walk-ons start with `meta.jersey = None` and usually no
+`meta.image_id` (TB authored portraits are left alone).
 
 Walk-on years are separate from recruit years:
 
@@ -227,8 +230,27 @@ Walk-on years are separate from recruit years:
 | Senior | 10% |
 
 The generator contract says these are direct roster years: no JH and no advancement. Season-one
-initialization follows that contract and adds three walk-ons per team directly to the 12-player core
-roster.
+initialization follows that contract and adds three walk-ons per team onto the pre-cut 15-man
+`FTD.players` list (12 scholarship + 3 walk-ons).
+
+### Making the active 12 (jersey + portrait)
+
+After the **last camp week** (`CAMP_WEEKS`, currently 3) training completes, user and CPU camp cuts
+reduce each roster to 12. Walk-ons who **survive onto that 12** (not sent to `training_squad_players`)
+receive:
+
+1. **Jersey** — same helper as week-35 signing (`position_intent`, conflict-aware), skipped if
+   `meta.jersey` is already set.
+2. **Portrait** — random kit from the 71-id walk-on pool (`portrait-kits/walk_on_portraits/`,
+   manifest `BackEnd/data/walk_on_portraits_manifest.json`), skipped if `meta.image_id` is already
+   set (e.g. Team Builder). League-wide within the franchise season: used ids live on
+   `franchises.walk_on_image_ids_used`; when the pool is exhausted, ids may repeat. Cleared at
+   `finish_season`.
+3. **Paint** — user team eager-warmed into `players/master/<player_id>.png` in team colors; CPU
+   lazy via `POST /player-image/ensure`.
+
+Hook: `assign_walk_ons_making_active_roster` from `cut_franchise_players` (user) and
+`_apply_cpu_training_camp_cuts` (CPU).
 
 ### Current week-35 discrepancy
 

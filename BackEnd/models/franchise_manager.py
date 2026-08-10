@@ -430,9 +430,10 @@ class FranchiseManager:
         _perf["players_find_and_loop"] = (time.time() - _t0) * 1000
 
         # ✅ Season 1 walk-ons: every team carries 3 walk-ons so each roster sits at
-        # 15. During week-1 Training Camp each team assigns 3 to the training squad
-        # (user picks; CPU auto-picks lowest RT), leaving 12 active. Generated here
-        # under the franchise-creation load screen so the FCC lands lag-free.
+        # 15. After the last camp week (CAMP_WEEKS) each team assigns extras to the
+        # training squad (user picks; CPU auto-picks lowest RT), leaving 12 active.
+        # Survivors get jersey + walk-on portrait at that cut. Generated here under
+        # the franchise-creation load screen so the FCC lands lag-free.
         _t0 = time.time()
         for team in self.teams:
             team_obj_id = team.get("_id")
