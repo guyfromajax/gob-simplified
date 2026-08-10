@@ -1291,7 +1291,7 @@ class Animator:
         offensive_animations = {}  # Store by position for defensive matching
         
         # Build animation for OFFENSIVE players from skeleton
-        for position in all_positions:
+        for position in sorted(all_positions, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             player = off_lineup.get(position)
             if not player:
                 continue

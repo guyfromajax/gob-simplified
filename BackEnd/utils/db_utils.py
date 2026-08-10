@@ -234,6 +234,56 @@ def _blended_slot_rating(player: Player, pos: str, effective_weight: float) -> f
 CONSERVATIVE_LEAD_THRESHOLD = 20            # Q1–Q3, and Q4+ when > CONSERVATIVE_LATE_Q4_SECONDS remain
 CONSERVATIVE_LATE_Q4_LEAD_THRESHOLD = 15    # Q4+ when ≤ CONSERVATIVE_LATE_Q4_SECONDS remain
 CONSERVATIVE_LATE_Q4_SECONDS = 239
+
+# ── SELF-REGULATION OVERRIDE (foul trouble + fatigue) ────────────────────────────────────
+# A press team backs off when its guards are in foul trouble or gassed, the way a real one
+# does. Sits alongside the sit-on-the-lead override on the same seam (strategy_settings_base
+# stays untouched, so this reverts the moment the trouble clears).
+#
+# COMPLEMENTS the per-quarter foul limits rather than duplicating them: those are a
+# PERSONNEL lever evaluated only at rebuild boundaries, this is a TACTICS lever. And the
+# limits are switched off entirely in the final 4:00 of Q4 and all OT — where 39% of
+# foul-outs occur — so there, this is the only brake that exists.
+QUARTER_SECONDS = 480.0
+REGULATION_SECONDS = QUARTER_SECONDS * 4
+
+# "On pace to foul out": fouls > 5 x fraction of regulation elapsed. End of Q1 -> 2+,
+# half -> 3+, end of Q3 -> 4+. SELF_REG_FOUL_MIN keeps a single early foul from counting,
+# since any foul in the first minutes is technically ahead of pace.
+SELF_REG_FOUL_PACE_MULT = 5.0
+SELF_REG_FOUL_MIN = 2
+# ABSOLUTE floor under the pace test, and it is load-bearing. By late Q4 the pace line has
+# risen to ~4.7, so a player sitting on 4 fouls scores as NOT ahead of pace — exactly where
+# the override matters most (59% of FCP rebuilds in Q4 have a 4-foul player on the floor,
+# and the per-quarter limits are switched off there). Pace measures PROJECTED foul-out; one
+# foul from disqualification is maximal danger whatever the clock says.
+#
+# APPLIED TO ON-FLOOR PLAYERS ONLY. The two tests answer different questions: the pace test
+# is ASSET MANAGEMENT (roster-wide — a player benched at four fouls is exactly the asset
+# being protected, and you want him available in the fourth), while the absolute floor is a
+# RIGHT-NOW concern. A benched four-foul player is not at imminent risk of anything; that is
+# what benching him accomplished.
+SELF_REG_FOUL_ABS = 4
+SELF_REG_FOUL_FULL_COUNT = 3      # players in trouble for full foul severity
+SELF_REG_NG_FLOOR_FRAC = 0.33     # roster fraction below the NG floor where fatigue starts
+SELF_REG_NG_FULL_FRAC = 0.66      # ... and where it saturates
+
+# Per-slider damp weights. `aggression` generates fouls within any defensive turn, so foul
+# trouble drives it hardest; hc_trap/fc_press generate the pressure turns that burn NG at
+# 1.30x the normal rate (apply_energy_decay omit_zeros_for_defense), so fatigue drives those.
+SELF_REG_WEIGHTS_FOUL = {"aggression": 1.00, "hc_trap": 0.50, "fc_press": 0.50}
+SELF_REG_WEIGHTS_FATIGUE = {"aggression": 0.40, "hc_trap": 0.80, "fc_press": 0.80}
+# League baseline means — the damp TARGET and hard floor. Damping is proportional toward
+# these, never to a fixed value and never to zero: a press team backs off to roughly
+# average, it does not stop being a press team.
+SELF_REG_TARGETS = {"aggression": 2.00, "hc_trap": 0.99, "fc_press": 0.99}
+
+# TRAILING LATE — a team down two possessions in the last five minutes should keep pressing
+# despite foul trouble. Suppresses self-regulation entirely rather than inverting it;
+# raising sliders ABOVE the identity base is new behaviour belonging to the deferred
+# mid-game adjustment layer, not to this override.
+SELF_REG_DESPERATION_SECONDS = 300
+SELF_REG_DESPERATION_MARGIN = 6
 # Blowout lineup (rest starters): margin-of-victory thresholds + Q4 time splits.
 BLOWOUT_Q3_MARGIN = 50
 BLOWOUT_Q4_MARGIN_EARLY = 35                # Q4, > BLOWOUT_Q4_EARLY_SECONDS remain
@@ -873,6 +923,112 @@ def _apply_conservative_strategy_override(settings: dict, team: TeamManager, gam
     return settings
 
 
+def _self_reg_elapsed_fraction(game_state) -> float:
+    """Fraction of REGULATION elapsed. OT counts as fully elapsed (1.0), so the
+    on-pace-to-foul-out test stays at its strictest there rather than resetting."""
+    quarter = int(game_state.get("quarter") or 1)
+    if quarter > 4:
+        return 1.0
+    time_remaining = float(game_state.get("time_remaining") or 0)
+    elapsed = (quarter - 1) * QUARTER_SECONDS + (QUARTER_SECONDS - time_remaining)
+    return max(0.0, min(1.0, elapsed / REGULATION_SECONDS))
+
+
+def _self_reg_desperation_active(team, game_state) -> bool:
+    """True when the team is trailing by SELF_REG_DESPERATION_MARGIN+ in the final
+    SELF_REG_DESPERATION_SECONDS of Q4, or at any point in OT. Keep pressing."""
+    quarter = int(game_state.get("quarter") or 1)
+    if quarter < 4:
+        return False
+    if quarter == 4:
+        time_remaining = float(game_state.get("time_remaining") or 0)
+        if time_remaining > SELF_REG_DESPERATION_SECONDS:
+            return False
+    margin = _team_score_margin(team, game_state)
+    if margin is None:
+        return False
+    return margin <= -SELF_REG_DESPERATION_MARGIN
+
+
+def _self_reg_severities(team, game_state):
+    """(foul_severity, fatigue_severity), each 0.0-1.0."""
+    try:
+        players = list(team.get_all_players())
+    except Exception:
+        return 0.0, 0.0
+    if not players:
+        return 0.0, 0.0
+
+    elapsed = _self_reg_elapsed_fraction(game_state)
+    pace_line = SELF_REG_FOUL_PACE_MULT * elapsed
+    lineup = getattr(team, "lineup", None) or {}
+    on_floor_ids = {
+        str(getattr(p, "player_id", "")) for p in lineup.values() if p is not None
+    }
+    trouble = 0
+    for p in players:
+        fouls = p.get_stat("F", "game") or 0
+        if fouls >= 5:
+            continue
+        on_floor = str(getattr(p, "player_id", "")) in on_floor_ids
+        ahead_of_pace = fouls >= SELF_REG_FOUL_MIN and fouls > pace_line
+        one_from_out = on_floor and fouls >= SELF_REG_FOUL_ABS
+        if ahead_of_pace or one_from_out:
+            trouble += 1
+    sev_foul = min(1.0, trouble / float(SELF_REG_FOUL_FULL_COUNT))
+
+    # Same NG floor the lineup gate uses, so both agree about what "tired" means.
+    quarter = int(game_state.get("quarter") or 1)
+    time_remaining = float(game_state.get("time_remaining") or QUARTER_SECONDS)
+    is_late_q4_or_ot = (quarter == 4 and time_remaining < 240) or quarter > 4
+    ng_floor = 0.64 if is_late_q4_or_ot else 0.8
+    blocked = sum(1 for p in players
+                  if float(p.attributes.get("NG", 1.0) or 1.0) < ng_floor)
+    frac = blocked / float(len(players))
+    span = max(1e-9, SELF_REG_NG_FULL_FRAC - SELF_REG_NG_FLOOR_FRAC)
+    sev_fat = max(0.0, min(1.0, (frac - SELF_REG_NG_FLOOR_FRAC) / span))
+    return sev_foul, sev_fat
+
+
+def _apply_self_regulation_override(settings: dict, team, game_state) -> dict:
+    """Damp aggression / hc_trap / fc_press toward the league baseline in proportion to how
+    much foul trouble and fatigue the team is carrying.
+
+    DETERMINISTIC — no RNG draw, deliberately unlike the conservative override. This is a
+    continuous response to a continuous state; a draw would make behaviour jitter between
+    stoppages for no reason, and it keeps the sim's draw count unchanged.
+
+    Sliders are only ever lowered, and never below SELF_REG_TARGETS."""
+    if not isinstance(game_state, dict) or not isinstance(team, TeamManager):
+        return settings
+    if getattr(team, "is_user_team", False):
+        return settings
+    if _self_reg_desperation_active(team, game_state):
+        return settings
+
+    sev_foul, sev_fat = _self_reg_severities(team, game_state)
+    if sev_foul <= 0.0 and sev_fat <= 0.0:
+        return settings
+
+    for slider, target in SELF_REG_TARGETS.items():
+        current = settings.get(slider)
+        if current is None:
+            continue
+        try:
+            current = float(current)
+        except (TypeError, ValueError):
+            continue
+        if current <= target:
+            continue
+        move = max(sev_foul * SELF_REG_WEIGHTS_FOUL.get(slider, 0.0),
+                   sev_fat * SELF_REG_WEIGHTS_FATIGUE.get(slider, 0.0))
+        if move <= 0.0:
+            continue
+        damped = current - move * (current - target)
+        settings[slider] = max(int(round(target)), min(4, int(round(damped))))
+    return settings
+
+
 def autoset_strategy_settings(team: TeamManager, game_state=None):
     """
     Ensure a computer team has strategy settings, and apply the situational
@@ -924,5 +1080,14 @@ def autoset_strategy_settings(team: TeamManager, game_state=None):
     # Sit-on-the-lead override: when comfortably ahead, dial the eight conservative settings
     # down (all others keep their base values). Applied to a COPY of the base every call, so
     # it both fires while the lead holds and reverts cleanly once it doesn't.
-    team.strategy_settings = _apply_conservative_strategy_override(dict(base), team, game_state)
+    # CONSERVATIVE WINS. Both overrides target aggression / hc_trap / fc_press and the
+    # conservative rolls damp strictly harder, so stacking them would double-count.
+    if _conservative_strategy_active(team, game_state):
+        team.strategy_settings = _apply_conservative_strategy_override(
+            dict(base), team, game_state
+        )
+    else:
+        team.strategy_settings = _apply_self_regulation_override(
+            dict(base), team, game_state
+        )
     return team.strategy_settings

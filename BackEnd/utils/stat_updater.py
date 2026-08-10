@@ -1494,7 +1494,7 @@ def finalize_game(
         existing_players = tournament_check.get("players", {}) if tournament_check else {}
         
         set_on_insert_doc: Dict[str, Any] = {}
-        for pid_str in processed_player_ids:
+        for pid_str in sorted(processed_player_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             if pid_str not in existing_players:
                 # Get player metadata from players_collection
                 try:
@@ -1604,7 +1604,7 @@ def finalize_game(
             updated_tournament_doc = tournaments_collection.find_one({"_id": tid}, {"players": 1})
             if updated_tournament_doc:
                 stats_doc: Dict[str, Any] = {}
-                for pid_str in processed_player_ids:
+                for pid_str in sorted(processed_player_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
                     pdata = updated_tournament_doc.get("players", {}).get(pid_str, {})
                     season_totals = pdata.get("season", {})
                     if season_totals:
@@ -2109,7 +2109,7 @@ def finalize_game(
         logger.info(f"🔍 [FINALIZE_GAME] Found {len(existing_fpd_ids)} existing players in FPD")
         logger.info(f"🔍 [FINALIZE_GAME] Need to process {len(processed_player_ids)} players from box_score")
 
-        for pid_str in processed_player_ids:
+        for pid_str in sorted(processed_player_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             if pid_str not in existing_fpd_ids:
                 try:
                     player_doc = players_collection.find_one(
@@ -2174,7 +2174,7 @@ def finalize_game(
         # Sim_Perf_Capstone "CPU-week EOG persistence" and End_of_Game_System). ordered=False
         # is safe (disjoint docs) and lets the server apply them concurrently.
         _fpd_ops: list[UpdateOne] = []
-        for pid_str in processed_player_ids:
+        for pid_str in sorted(processed_player_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             fpd_inc = {k.replace(f"players.{pid_str}.", ""): v for k, v in inc_doc.items() if k.startswith(f"players.{pid_str}.")}
             fpd_set = {k.replace(f"players.{pid_str}.", ""): v for k, v in set_doc.items() if k.startswith(f"players.{pid_str}.")}
             if fpd_inc or fpd_set:

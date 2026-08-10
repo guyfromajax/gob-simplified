@@ -1009,7 +1009,11 @@ def build_attack_drive_sequence(
         bh_defender_pos = off_to_def.get(ball_handler_pos, ball_handler_pos)
         _help_race_coords = def_positions  # S2c: race the man help defenders to the drive path
 
-        for off_pos in perimeter_moved:
+        # sorted(): perimeter_moved is a SET, so raw iteration follows string-hash order,
+        # which Python randomises per process. This loop consumes RNG draws per element
+        # (player_read, get_defender_coords), so the draw ORDER — and therefore every
+        # subsequent draw in the game — depended on PYTHONHASHSEED. See projects/bugs.md.
+        for off_pos in sorted(perimeter_moved):
             def_pos = off_to_def.get(off_pos)
             if not def_pos or def_pos not in def_lineup:
                 continue

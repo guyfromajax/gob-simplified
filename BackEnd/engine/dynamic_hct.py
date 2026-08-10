@@ -1159,7 +1159,7 @@ def _defense_targets(
         for pos, xy in trap.items():
             targets[pos] = _clamp_xy(xy)
         # Center defender (remaining backcourt guard): y=25, x ±4 toward basket.
-        backcourt = {"PG", "SG", "SF"}
+        backcourt = ("PG", "SG", "SF")  # tuple, not set: set order is hash-dependent
         center_candidates = [p for p in backcourt if p not in trap]
         if center_candidates:
             center_pos = center_candidates[0]

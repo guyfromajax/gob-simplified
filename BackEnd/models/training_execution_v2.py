@@ -265,7 +265,7 @@ def normalize_coaching_focus_custom_by_player(
         raise ValueError("No players on roster for custom focus validation.")
 
     out: Dict[str, List[str]] = {}
-    for pid in roster_ids:
+    for pid in sorted(roster_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
         entry = raw.get(pid)
         if entry is None:
             entry = raw.get(str(pid))

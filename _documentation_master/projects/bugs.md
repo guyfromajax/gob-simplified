@@ -252,6 +252,58 @@ then fix the 3 imports; then seed both RNG streams via an autouse conftest fixtu
   `PYTHONHASHSEED` in the runtime would mask it, not fix it, and would not help anyone reading a
   historical game.
 
+#### PARTIAL FIX + method to finish it (August 2026)
+
+**12 genuine hash-order dependencies found and fixed.** Each was a raw `set` iteration whose
+order reached RNG draw ORDER, so every subsequent draw in the game shifted:
+
+| file | what |
+|---|---|
+| `engine/attack_drive_clearance.py:1012` | `for off_pos in perimeter_moved` — set from `_apply_perimeter_relocations`; loop consumes `player_read` + `get_defender_coords` draws per element. **The primary site.** |
+| `models/animator.py:1294` | `for position in all_positions` — set; sets `offensive_animations` insertion order, which flows into zone overlap resolution |
+| `engine/dynamic_hct.py:1162` | `backcourt` was a set literal → now a tuple |
+| `engine/dynamic_hct_step_emitter.py:273`, `utils/shared.py:2543`, `utils/transition_bridge.py:312`, `utils/stat_updater.py` ×4, `utils/playbook_weights_utils.py:245`, `models/training_execution_v2.py:268` | raw set iteration, now `sorted(..., key=str)` |
+
+**Causally confirmed**: the first divergence between hash worlds moved 9,051 → 23,677 →
+31,023 draws as sites were fixed, and `PYTHONHASHSEED` 0 and 7 now produce **identical** games
+(they did not before).
+
+**STILL NOT FIXED.** Seeds 1 and 2 still diverge. On the identity-ON arm, 96 team-games, the
+between-seed spread is **points/tg 69.22–70.58 and FCP foul-outs/tg 1.04–1.35** — comparable
+to the effects being measured. **The instrument is still not trustworthy for effects of this
+size.** Until it is, pin `PYTHONHASHSEED` for every arm of every comparison.
+
+**Next site**: the OREB rebounder selection. Trace shows identical RNG state through draw
+31,022, then `mo_shot_roll` takes a different branch (`player_momentum.py:54` vs `:57`) via
+`shot_manager.calculate_shot_score` ← `shared.resolve_offensive_rebound` ← 
+`turn_manager.resolve_offensive_rebound_turn:5252`. Same draws, different rebounder — so the
+selection is order-dependent, most likely a `max()`/`min()` tie broken by iteration order
+rather than a raw set iteration (the static scan for those is now clean).
+
+**Method to continue** (`scratchpad/hashfind.py` + `nextdiv.sh`): wrap every `sim_rng` method
+to record the caller's `file:line` per draw; run one game under two hash seeds; diff the
+call-site sequences to find the first differing draw index; re-run with deep stacks in a
+±2 window around it. That names the function in two passes.
+
+#### AUDIT — which earlier results were affected
+
+The rule: **arms compared WITHIN one process share that process's hash seed and are valid;
+arms run as separate invocations are not.**
+
+| harness | structure | verdict |
+|---|---|---|
+| `w_sweep.py` | `for w in WS` inside one process | **valid** |
+| `read_test.py` | `CONFIGS` looped in-process | **valid** |
+| `lineup_analyze.py`, `gates.py` | no per-arm invocation | **valid** |
+| `head2head.py`, `lineup_diag.py` | `argv[1]` is games count, single config | **valid** (absolute values are one hash world) |
+| `slider_ab.py` | `ARM = sys.argv[1]` — one arm per process | **INVALID across arms** |
+| `difficulty.py` | `TAG = sys.argv[1]` — one arm per process | **INVALID across arms** |
+| `foul_levers.py` | one arm per process | **INVALID** as originally run; later re-run pinned |
+
+No harness set `PYTHONHASHSEED` internally. The lineup diagnostics and gate sweep are
+structurally fine; the slider A/B and difficulty comparisons should be re-run pinned before
+being quoted again.
+
 ### `OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.55` is the real driver of attack dominance (August 2026)
 
 - **Symptom:** Motion shot types run **~77% attack at NEUTRAL sliders** (2/2/2), and ~90% at
@@ -328,3 +380,42 @@ stints may arise without paying a point a game for them, at which point hysteres
 unnecessary rather than merely unprofitable. **Do not revisit by searching for a better
 threshold pair** — the sweep covered 0.60-0.80 pull against 0.80-0.95 return and the shape
 was monotonic throughout: more hysteresis, less churn, more exhaustion, same minutes.
+
+## Database-safety incident + systemic holes (August 2026)
+
+### `_update_position_ratings` writes a derived cache on every GameManager construction — TICKET, not fixed
+
+- **Finding:** `GameManager.__init__` calls `_update_position_ratings()`, which recomputes
+  `position_ratings` from each player's attributes/height/name and **`bulk_write`s them to
+  `players`** for every non-franchise, non-synthetic player on both teams
+  (`BackEnd/models/game_manager.py:113-121`). **Constructing a GameManager is a database write.**
+- **Why it matters:** this made "read-only investigation" false for the entire CPU identity /
+  rotation / lineup / motion project. Every sim harness was writing `position_ratings` on each
+  game it constructed. On staging that is self-consistent, so it went unnoticed for weeks.
+- **The design question (not tonight's work):**
+  1. compute in memory, persist **only on change** — would not have helped here, the formula
+     genuinely differed;
+  2. compute in memory, persist **never**, with an explicit migration owning the stored field;
+  3. keep writing, but behind an explicit **read-only / no-persist mode** harnesses opt into.
+  Option 2 is cleanest — a cache that self-heals is exactly what makes its staleness invisible.
+  Option 3 is the smallest change and would immediately make sim harnesses honest.
+- **Supporting evidence:** prod `position_ratings` carries at least three formula generations
+  (53.6% match `93737625c`, 39.4% match `a88aa8fcc`, remainder older). Teams hold whatever was
+  deployed the last time they played, so the field is unreliable for league-wide analysis.
+
+### `.env.local` resolved against CWD, silently retargeting production — FIXED
+
+- **Was:** `BackEnd/db.py` chose its env file with `os.path.exists(".env.local")`, relative to the
+  **working directory**. Any script run from a subdirectory failed to find it, fell through to
+  `.env`, and connected to prod. One instance of a class, not a one-off.
+- **Incident:** a sim harness run from a scratch directory rewrote `position_ratings` on **192
+  prod player documents across 16 teams** with the recalibrated formula, while prod runs a
+  pre-recal formula. Deltas up to 38 rating points. Only that field changed — `attributes`,
+  `height` and `name` verified untouched.
+- **Now:** resolved against the repo root (`Path(__file__).resolve().parent.parent`).
+- **Plus a production access guard** in the same file: reaching `gob` requires an explicit
+  per-invocation opt-in, `GOB_DB_ACCESS=read` or `=write`, read from the **real process
+  environment snapshotted before dotenv load** — so it cannot be armed from a committed `.env`.
+  The deployed app is recognised by any `RAILWAY_*` variable. Unrecognised process → refuse at
+  import. `aggregate()` is deliberately not blocked in read mode, so `$out`/`$merge` can still
+  write; tighten if that becomes a real path.

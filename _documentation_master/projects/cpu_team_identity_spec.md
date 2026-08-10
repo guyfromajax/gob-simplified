@@ -361,3 +361,124 @@ effectively, and do outside-identity teams shoot better than the league?
 3. **Playbook concentration caps** — the specific values to raise them to.
 4. **Backup-quality bar** — per-pool re-derivation vs the within-team reformulation.
 5. **Vision persistence** — where it lives, and whether users get one too.
+
+---
+
+## Measured effect of the identity slice (August 2026)
+
+### ⚠️ READ FIRST — measurements MUST pin `PYTHONHASHSEED`
+
+`PYTHONHASHSEED` reaches simulation behaviour (see `projects/bugs.md`). Each process gets a
+random hash seed, so **two runs of the SAME configuration produce different games.** Measured
+run-to-run spread on a single arm, 96 team-games: FCP foul-outs/team-game **0.81 vs 1.19** —
+as large as any effect being tested.
+
+**Any arm-vs-arm comparison run in separate unpinned processes is invalid.** Run every arm
+with `PYTHONHASHSEED` pinned to the same value, and repeat across at least two values so
+between-world spread is visible. Verified: with `PYTHONHASHSEED=0`, two runs of the same arm
+are bit-identical across every metric.
+
+This defect voided two earlier rounds of conclusions on this project. Do not skip it.
+
+### Identity OFF vs ON — the valid comparison
+
+Mean of two pinned hash worlds (`PYTHONHASHSEED` 0 and 1), 96 team-games each, identical sim
+seeds, team aggregates summed from player stat containers (`PTS`/`FGA`/`FTA`/`TO`/`OREB`) —
+never from parsing turn `result_type` strings.
+
+| metric | identity OFF | identity ON | Δ | |
+|---|---|---|---|---|
+| **points / team-game** | **67.91** | **70.92** | **+3.02** | **+4.4%** |
+| possessions / team-game | 70.01 | 71.92 | +1.92 | +2.7% |
+| PPP | 0.970 | 0.986 | +0.016 | +1.7% |
+| FG% | 39.92 | 40.94 | +1.02pp | +2.6% |
+| 3PT% | 30.59 | 30.34 | −0.26pp | −0.8% |
+| fouls / team-game | 19.28 | 20.98 | +1.70 | +8.8% |
+| FTA / team-game | 20.09 | 21.73 | +1.63 | +8.1% |
+| turnovers / team-game | 11.07 | 11.84 | +0.77 | +6.9% |
+| foul-outs / team-game | 0.59 | 0.72 | +0.13 | +22.0% |
+
+**Identity raises scoring by ~3 points/team-game, and it is BOTH pace and efficiency** —
+possessions +2.7% and PPP +1.7%, roughly evenly split. Both hash worlds agree on direction and
+magnitude (+3.07 and +2.96), so this one is solid.
+
+### Corrections to earlier numbers on this project
+
+| claim | status |
+|---|---|
+| "identity raises scoring +12.2% (63.2 → 70.9)" | **overstated.** 16-game sample, and the OFF arm was miscounted by turn-string parsing. True effect **+4.4%**. |
+| "identity does NOT raise scoring (69.52 → 69.11)" | **also wrong.** 96 team-games but each arm ran in its own UNPINNED process, so it compared two different hash worlds. |
+| "foul-outs +42.9% with identity" | **noise.** 32 team-games, ~65 events, Poisson error ±11.6. Controlled value is **+22%**. |
+| "damping FCP aggression cuts FCP foul-outs 1.308 → 0.808" | **does not survive.** Cross-world artifact; see the lever table below. |
+
+Two methodology rules follow, both learned the expensive way:
+
+1. **Never parse turn `result_type` strings for team aggregates.** A turnover filter matched
+   `"DEAD_BALL_TURNOVER"` but not `"DEAD BALL"` — the largest turnover category — which
+   inverted a pace-vs-efficiency headline. Use the player stat containers.
+2. **Never compare arms across unpinned processes, and never tune against foul-out counts at
+   small n.**
+
+### What identity changes: foul concentration by vision
+
+Identity ON, mean of both hash worlds:
+
+| defensive vision | team-games | foul-outs / tg | fouls / tg |
+|---|---|---|---|
+| Multiple | 18 | 1.111 | 24.00 |
+| **Full-Court Press** | 52 | **1.000** | **24.46** |
+| Man Lockdown | 46 | 0.739 | 19.30 |
+| Zone | 46 | 0.434 | 19.30 |
+| Contain | 30 | 0.433 | 18.30 |
+
+Press teams commit clearly the most fouls (24.46 vs 18–19 for the passive visions) and
+disqualify players ~2.3× as often as Zone/Contain. Note **Multiple edges FCP on foul-outs on
+only 18 team-games** — too thin to rank against it.
+
+The league-wide foul-out rate is already 0.59/tg with identity OFF, against a real-basketball
+~0.2–0.4. **That is a pre-existing calibration issue identity did not cause**, and it is the
+larger number; tracked separately.
+
+### The scoring guardrail
+
+Identity's +3 points is a move toward realism from a cold baseline (67.9 → 70.9 against a
+college norm of ~70–72), not inflation. The guardrail for any damping or self-regulation work
+is therefore: **league points/team-game must not fall back toward the identity-OFF baseline of
+67.9. Staying within ~1 point of 70.9 is the pass condition.**
+
+### Lever comparison — foul trouble
+
+Mean of both hash worlds; single-arm between-world spread in brackets.
+
+| arm | points/tg | foul-outs/tg | FCP foul-outs/tg | FCP fouls/tg |
+|---|---|---|---|---|
+| identity ON (baseline) | 70.92 | 0.72 | 1.000 [0.81 / 1.19] | 24.46 |
+| tighter foul limits `{1:1,2:2,3:2,4:3}` | 70.72 | 0.68 | 1.097 [0.89 / 1.31] | 25.06 |
+| FCP aggression damp (3.05 → 2.50) | 71.04 | 0.73 | 0.981 [0.92 / 1.04] | 23.50 |
+| **self-regulation override** | **70.37** | **0.69** | 1.096 [1.19 / 1.00] | **23.52** |
+
+**No lever moves foul-outs detectably at this sample size.** The between-world spread on a
+single arm (0.81 → 1.19) exceeds every between-arm difference. Do not read a foul-out ranking
+off this table; it would need far more hash worlds to resolve.
+
+What IS consistent across both worlds: **damping and self-regulation each cut FCP fouls
+committed by ~1 per team-game (24.46 → 23.5)** while tighter limits raise them.
+
+### Self-regulation: the behavioural result
+
+This is the deliverable that did land, and it replicates across both worlds.
+
+| FCP slider | identity base when in trouble | effective when in trouble | effective when clear |
+|---|---|---|---|
+| `aggression` | 2.86 | **2.56** | 2.86 |
+| `hc_trap` | 2.69 | **2.16** | 2.91 |
+| `fc_press` | 2.84 | **2.25** | 2.70 |
+
+A press team in foul or fatigue trouble now visibly plays differently from the same team when
+clear, and reverts when the trouble passes. Scoring holds (70.37 vs 70.92 baseline, inside the
+0.7–1.5 between-world spread). Desperation suppression fires on ~10% of calls; the override
+moves at least one slider on ~19% of all calls and ~69% of FCP rebuilds.
+
+**Open concern:** 69% of FCP rebuilds register as in-trouble, which is more than the 51%
+calibration predicted (the absolute-4 floor added cases). Worth checking whether the identity
+is being damped too much of the time.

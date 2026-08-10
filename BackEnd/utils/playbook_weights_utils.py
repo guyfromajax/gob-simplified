@@ -242,7 +242,7 @@ def _fetch_universal_play_docs_by_id(play_ids: Iterable[str]) -> Dict[str, Dict[
 
     object_ids = []
     string_ids = []
-    for play_id in play_ids:
+    for play_id in sorted(play_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
         if not play_id:
             continue
         try:

@@ -380,11 +380,34 @@ class TeamManager:
             import logging
             if strategy_settings is not None:
                 logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.name} - strategy_settings provided but invalid (type={type(strategy_settings)}, len={len(strategy_settings) if isinstance(strategy_settings, dict) else 'N/A'}), using defaults")
-            # Computer teams derive a strategic game plan from their projected
-            # starting five (Game_Init_System.md § Computer Team Strategy Logic);
+            # Computer teams derive a strategic game plan from their projected starting five;
             # user teams keep the legacy random defaults (never auto-set).
+            #
+            # CPU TEAM IDENTITY (spec: projects/cpu_team_identity_spec.md). The projected five
+            # now yields eight frozen-scale signals -> a vision pair -> the slider draw, instead
+            # of the old per-slider _strategy_roll_* thresholds. Those thresholds were dead in
+            # practice: cum_nd > 350 matched 0 of 128 teams, so the branch that raised
+            # press/trap never fired and 89% of the league fell through to one low-variance
+            # roll. Identity replaces that. Falls back to the legacy derivation when a five
+            # cannot be resolved.
             if not self.is_user_team:
-                self.strategy_settings = self._compute_strategic_strategy_settings()
+                identity = None
+                try:
+                    from BackEnd.utils.team_identity import assign_identity
+
+                    identity = assign_identity(list(self.players.values()))
+                except Exception as e:  # never let identity break team construction
+                    import logging
+                    logging.warning("[IDENTITY] %s: assignment failed (%s); using legacy rolls",
+                                    self.name, e)
+                if identity:
+                    self.strategy_settings = identity["strategy_settings"]
+                    self.offensive_vision = identity["offensive_vision"]
+                    self.defensive_vision = identity["defensive_vision"]
+                    self.identity_signals = identity["signals"]
+                    self.fuel_capacity = identity["fuel_capacity"]
+                else:
+                    self.strategy_settings = self._compute_strategic_strategy_settings()
             else:
                 self.strategy_settings = self._init_strategy_settings()
         

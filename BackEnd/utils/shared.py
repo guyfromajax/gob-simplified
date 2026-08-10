@@ -2540,7 +2540,7 @@ def summarize_game_state(
     has_fresh_turns = len(game.turns) > 0 and not exclude_animations
     if has_fresh_turns:
         included_ids = {p["playerId"] for p in players}
-        for pid in referenced_ids:
+        for pid in sorted(referenced_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             if pid in included_ids:
                 continue
             player_obj = game.home_team.get_player_by_id(pid) or game.away_team.get_player_by_id(pid)
