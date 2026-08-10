@@ -121,11 +121,16 @@ def main() -> int:
             _abort("--seed requires FRANCHISE_CPU_SIM_USE_POOL=0 (spawned pool workers "
                    "re-seed per process and can't be made deterministic). Set it to 0.")
         import random as _random
-        from BackEnd.utils import sim_random
+        from BackEnd.utils import sim_random, training_random
         _random.seed(args.seed)          # EOG band deltas draw from global random
         sim_random.seed(args.seed)       # the engine draws from the isolated sim_rng
-        print(f"🎲 Seeded arm: sim_rng + global random = {args.seed} (single-process). "
-              f"Reproducible given the SAME restored start + PYTHONHASHSEED=0.")
+        # Training moved to its OWN stream (BackEnd/utils/training_random). Seeding
+        # global random no longer reaches it, so a seeded arm would otherwise run
+        # UNSEEDED training — and this harness trains every one of 26 weeks.
+        training_random.seed(args.seed)
+        print(f"🎲 Seeded arm: sim_rng + training_rng + global random = {args.seed} "
+              f"(single-process). Reproducible given the SAME restored start + "
+              f"PYTHONHASHSEED=0.")
 
     # ---- Safety gate 3: the franchise is who we think it is --------------------
     fid = ObjectId(TARGET_FRANCHISE_ID)
