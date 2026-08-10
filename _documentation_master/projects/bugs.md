@@ -1,20 +1,17 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
-2. Screenshot Capture Tool is still not working
-3. Remove BT background from recruit images
 
 
 ##Full Product Readiness
 1. Downloadable game vs Live game dynamics
 2. College and Pro setup
-3. ~~Assign images and jersey numbers to walk ons who make the roster -- and paint their jersey~~ **DONE** (camp-cut assign + walk_on_portraits pool; publish kits to R2 via `scripts/recruit_sets/publish_walk_on_portraits.py`)
+3. Training load screen to show previous week's highlights. Top scorers in teh nation, all-american team, 
 
 ##Playtest Launch / In Progress
 1. Steam
-2. Stripe
-3. Balance Team attributes
+2. Balance Team attributes
 -----
-4. PvP sim -- playtest post-launch / immediate parallel task
+3. PvP sim -- playtest post-launch / immediate parallel task
 
 
 ##Full Product Perfection
