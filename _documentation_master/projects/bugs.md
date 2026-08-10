@@ -285,6 +285,77 @@ to record the caller's `file:line` per draw; run one game under two hash seeds; 
 call-site sequences to find the first differing draw index; re-run with deep stacks in a
 ±2 window around it. That names the function in two passes.
 
+#### RESOLUTION: pinned structurally, remaining hunt PARKED (August 2026)
+
+**Decision: stop chasing sites; fix the failure mode instead.** Twelve fixes with causal
+confirmation did not shrink the between-seed spread, and the static scan for raw set iteration
+is now clean while divergence persists — so the remaining sites are subtler and possibly
+numerous. Pinning, meanwhile, works perfectly. Every false conclusion came from an UNPINNED
+run, so the defect to fix is **"requires remembering."**
+
+| where | how |
+|---|---|
+| measurement harnesses | `BackEnd/utils/repro.pin_hash_seed()` as the first statement. `PYTHONHASHSEED` is read at interpreter startup, so it cannot be set from inside a running process — the helper **re-executes** the interpreter with it set. A harness that cannot be run unpinned cannot produce another false result. |
+| production | `export PYTHONHASHSEED=0` in `start.sh`. Does not help with games already played, but from now on a reported game can be replayed. |
+
+An explicit `PYTHONHASHSEED` in the environment is **respected, not overridden** — deliberately
+varying it is how you measure between-world spread. Only the unset (and `"random"`) case is
+pinned. If the re-exec fails to take, `pin_hash_seed` **raises** rather than continuing
+unpinned.
+
+`repro.py` is loaded BY PATH in the harness preamble, not imported as `BackEnd.utils.repro`,
+because `BackEnd/utils/__init__.py` pulls in `stat_updater -> db` and the re-exec would
+otherwise open a Mongo connection twice. Pinned harnesses: `perf_sim_baseline.py`,
+`eog_measurement_season.py`, `simulate_100_quarters.py`, `s11_framework_baseline_measure.py`,
+`eog_db_sweep.py`.
+
+**When to un-park:** only if something specifically needs true hash-independence — e.g. running
+measurement arms across multiple workers/processes where a shared pin is not achievable, or a
+production incident that turns out to depend on hash order rather than seed. The next site and
+the two-pass tracing method are recorded above and remain valid.
+
+### Production games are NOT replayable — the per-game seed is never created or persisted (August 2026)
+
+**TICKET, not fixed.** Pinning `PYTHONHASHSEED` (done, `start.sh`) makes hash ORDER
+deterministic. It is **necessary but not sufficient**. A user reporting a strange game still
+cannot have it reproduced, and it would be easy to believe otherwise.
+
+**Why.** `cpu_week_pool` derives `seed = None if seed_base is None else seed_base + idx`
+(`utils/cpu_week_pool.py:85`, `:127`), and **production passes `seed_base=None`**. In
+`_run_franchise_cpu_full_simulation_core` (`api/franchise_routes.py:5205`) the seeding call is
+guarded by `if seed is not None:` — so in production `sim_rng` is **never seeded**. It
+self-seeds once from OS entropy at import and then runs as one continuous stream across every
+game in the process.
+
+So there is no per-game seed to record. The fix is not "log the seed we used" — it is
+**generate one per game, seed with it, then persist it.**
+
+**What the fix needs:**
+
+1. Generate a per-game seed in the production path (e.g. `secrets.randbits(63)`), pass it
+   where `seed_base + idx` goes today, so each game seeds independently of how many ran before
+   it. This also removes the current cross-game coupling inside a worker process.
+2. Persist it on the game document alongside the other provenance fields — `sim_seed`, plus
+   `training_seed` now that training has its own stream (`utils/training_random.py`), plus the
+   `PYTHONHASHSEED` in force and the git SHA (`_eog_band_git_sha()` already computes one from
+   `RAILWAY_GIT_COMMIT_SHA`).
+3. Add a replay entry point that takes a game document and re-runs it from those values.
+
+**Caveats the fix must respect:**
+
+- `sim_rng` is a plain instance shared across threads (deliberately — a thread-local proxy
+  measured +30% per draw, and the engine makes ~82k draws/game). **Replay therefore requires
+  single-threaded execution**, as `perf_sim_baseline.py --workers 1` already does. Per-game
+  seeding makes multi-process pools reproducible, but not multi-threaded ones.
+- Hash-order determinism is only partial — twelve sites fixed, divergence still present, hunt
+  parked. Replay depends on the pin staying in place, so `PYTHONHASHSEED` must be recorded per
+  game rather than assumed to be 0 forever.
+- Games played BEFORE this ships are unrecoverable. No amount of later work reconstructs them.
+
+**Value:** this is the difference between "we pinned the hash seed" and "a user can send us a
+game ID and we can watch exactly what they watched." Small change, and the second thing is the
+one people will actually ask for.
+
 #### AUDIT — which earlier results were affected
 
 The rule: **arms compared WITHIN one process share that process's hash seed and are valid;

@@ -21,6 +21,20 @@ Usage:
   python3 scripts/perf_sim_baseline.py --franchise <id> --games 63 --workers 4
 """
 
+# Pin PYTHONHASHSEED before anything else: unpinned runs are not reproducible and
+# have produced false measurement conclusions. See BackEnd/utils/repro.
+# Loaded BY PATH so this does not import the BackEnd.utils package, whose __init__
+# pulls in stat_updater -> db and would open a Mongo connection twice across the
+# re-exec.
+import os as _os, sys as _sys, importlib.util as _ilu
+_GOB_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+_sys.path.insert(0, _GOB_ROOT)
+_spec = _ilu.spec_from_file_location(
+    "_gob_repro", _os.path.join(_GOB_ROOT, "BackEnd", "utils", "repro.py"))
+_repro = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_repro)
+_repro.pin_hash_seed()
+
+
 from __future__ import annotations
 
 import argparse
