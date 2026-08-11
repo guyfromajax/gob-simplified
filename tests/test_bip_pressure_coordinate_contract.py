@@ -1,11 +1,11 @@
 """BIP pressure coordinates remain backend-owned and display-oriented."""
 
-import random
 from pathlib import Path
 
 import pytest
 
 from tests.test_oreb_kickout_coordinate_contract import _build_game
+from BackEnd.utils.sim_random import sim_rng
 
 
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
@@ -19,7 +19,9 @@ ANIMATION_DIR = TURN_ANIMATION.parent
 def _pressure_destinations(*, pressure_type, away_offense, seed):
     game = _build_game(away_offense=away_offense)
     game.turns = []
-    random.seed(seed)
+    # Engine randomness was deliberately isolated from stdlib random so DB and
+    # third-party draws cannot perturb simulation outcomes.
+    sim_rng.seed(seed)
     payload = game.turn_manager.setup_baseline_inbound(
         next_defensive_setup=pressure_type
     )
@@ -29,7 +31,7 @@ def _pressure_destinations(*, pressure_type, away_offense, seed):
 def _baseline_payload(*, away_offense, seed):
     game = _build_game(away_offense=away_offense)
     game.turns = []
-    random.seed(seed)
+    sim_rng.seed(seed)
     return game.turn_manager.setup_baseline_inbound()
 
 

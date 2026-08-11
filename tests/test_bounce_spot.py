@@ -60,12 +60,16 @@ def test_build_post_shot_sub_steps_flss_miss_appends_bounce():
         {
             "start": {
                 "coords": {"pg1": {"x": 52, "y": 24}},
+                "destination": {"pg1": {"x": 52, "y": 24}},
                 "action": {"pg1": "shoot"},
+                "archetype": {"pg1": "shot_motion"},
                 "clock": {"clock_remaining": 1.0, "shot_clock_remaining": 1.0},
             },
             "end": {
                 "coords": {"pg1": {"x": 52, "y": 24}},
+                "ball": {"coords": {"x": 52, "y": 24}},
                 "clock": {"clock_remaining": 0.0, "shot_clock_remaining": 0.0},
+                "time_elapsed": 1.0,
                 "next": {"kind": "turn_stop", "event": "SHOT_ATTEMPT", "payload": {}},
             },
         }
