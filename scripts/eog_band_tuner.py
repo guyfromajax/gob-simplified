@@ -41,15 +41,30 @@ import json
 from collections import Counter, defaultdict
 
 TAG = "[EOG-BAND] "
+CLAMP_RATES: dict = {}
 
-# Season training drift per attribute, MEASURED on the identity season (report §2b).
-# Fixed input: we tune EOG against it, not the other way round.
+# Season training drift per attribute, MEASURED directly from the CPU reference plan
+# (auto_train_one_cpu_team, dry_run, 12 seeds x 64 teams, post-gating) with every attribute reset to
+# MID-RANGE first. Fixed input: we tune EOG against it, not the other way round.
+#
+# ⚠️ DO NOT source these from the report's §2b column. That estimator conditions on both
+# endpoints being unclamped, so for an attribute whose population is pressed against a clamp
+# it measures only the SURVIVORS — the teams that have not yet railed, i.e. exactly those
+# with the smallest deltas. Measured gap: team_chemistry -93.6 true vs -10.2 inferred (9.2x),
+# discipline -91.6 vs -48.1 (1.9x). Unconstrained attributes agreed within 10%. Tuning EOG
+# against the censored column silently under-corrects the attributes that need it most.
 TRAINING_PER_SEASON = {
-    "shot_threshold": +51.4, "discipline": -48.1, "fight": +32.0,
-    "team_chemistry": -10.2, "defensive_efficiency": +7.6,
-    "offensive_efficiency": +7.5, "fb_opp_modifier": +7.3,
-    "pt_opp_modifier": +7.5, "pt_efficiency": +7.3,
-    "rebound_modifier": +0.2, "fb_efficiency": +7.4,
+    "shot_threshold": +56.4,
+    "pt_opp_modifier": +7.9,
+    "offensive_efficiency": +7.8,
+    "defensive_efficiency": +7.8,
+    "fb_opp_modifier": +7.8,
+    "pt_efficiency": +7.7,
+    "fb_efficiency": +7.1,
+    "discipline": -6.0,
+    "team_chemistry": -5.3,
+    "fight": +3.3,
+    "rebound_modifier": +0.2,
 }
 
 # ── configuration ────────────────────────────────────────────────────────────────────────
@@ -205,6 +220,17 @@ def band_for(attr, rec, C):
     return None
 
 
+def clamp_rates(recs):
+    """Share of logged rows where EOG's write was clamped. High rates mean any
+    drift figure derived from unclamped-only transitions is a SURVIVOR estimate."""
+    out = {}
+    for attr, rows in recs.items():
+        n = len(rows)
+        c = sum(1 for r in rows if r.get("clamped"))
+        out[attr] = (100.0 * c / n) if n else 0.0
+    return out
+
+
 def load(path):
     out = defaultdict(list)
     for line in open(path):
@@ -269,14 +295,24 @@ def validate(recs, C):
 
 def table(res, label):
     print(f"\n{'='*84}\n{label}\n{'='*84}")
-    print(f"  {'attr':<24}{'EOG/g':>8}{'EOG/szn':>9}{'training':>10}{'COMBINED':>10}   bands")
+    print(f"  {'attr':<24}{'EOG/g':>8}{'EOG/szn':>9}{'training':>10}{'COMBINED':>10}{'clamp%':>8}   bands")
     rows = []
     for attr, d in res.items():
         tr = TRAINING_PER_SEASON.get(attr, 0.0)
         rows.append((attr, d["eog_per_game"], d["eog_season"], tr, d["eog_season"] + tr, d))
     for attr, pg, sz, tr, comb, d in sorted(rows, key=lambda x: -abs(x[4])):
         top = " ".join(f"{k}={100*v/d['n']:.0f}%" for k, v in d["freq"].most_common(3))
-        print(f"  {attr:<24}{pg:>+8.3f}{sz:>+9.1f}{tr:>+10.1f}{comb:>+10.1f}   {top}")
+        cr = (CLAMP_RATES or {}).get(attr, 0.0)
+        mark = " ⚠" if cr >= 5.0 else "  "
+        print(f"  {attr:<24}{pg:>+8.3f}{sz:>+9.1f}{tr:>+10.1f}{comb:>+10.1f}{cr:>7.1f}{mark} {top}")
+    hot = [a for a, _p, _s, _t, _c, _d in rows if (CLAMP_RATES or {}).get(a, 0) >= 5.0]
+    if hot:
+        print("\n  ⚠ CLAMPED IN THE SOURCE LOG (>=5% of rows): " + ", ".join(sorted(hot)))
+        print("    Censoring is a property of the METRIC, not this dataset. Any drift figure")
+        print("    derived from unclamped-only transitions (e.g. the report's §2b training")
+        print("    column) is a SURVIVOR estimate for these attributes and understates the")
+        print("    true pressure — by up to 9x when measured. Source training numbers from a")
+        print("    direct mid-range dry run instead, never from the log.")
     return {a: c for a, _p, _s, _t, c, _d in rows}
 
 
@@ -288,6 +324,8 @@ def main():
     args = ap.parse_args()
 
     recs = load(args.path)
+    global CLAMP_RATES
+    CLAMP_RATES = clamp_rates(recs)
     print(f"loaded {sum(len(v) for v in recs.values())} band rows, {len(recs)} attributes")
 
     if args.validate:

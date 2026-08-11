@@ -1126,6 +1126,26 @@ def _normalize_allocations(allocations: Dict) -> Dict:
     
     return normalized
 
+# Neglect-decay gating — see _apply_team_training_points. Expected season cost is
+# 26 weeks x chance x mean(bucket-0 range), where the range is now (-1, 0), mean -0.5:
+# Calibrated against the MEASURED call frequency of the CPU reference plan, which
+# rolls chemistry ~4.7x and discipline ~4.7x per week across their several source
+# categories — the per-roll value alone is misleading.
+#   chemistry 0.10 -> about -3/season on the 7-25 range   (was -93.6)
+#   default   0.25 -> about -7/season on the +-20 range   (was -91.6 for discipline)
+NEGLECT_DECAY_CHANCE_CHEMISTRY = 0.10
+NEGLECT_DECAY_CHANCE_DEFAULT = 0.25
+
+# Fight has the mirror-image version of the same frequency problem. It is rolled
+# ~4.7x per week (strength + conditioning, buckets 1 and 2 — it essentially never
+# hits bucket 0), so per-roll GAINS multiply the same way neglect penalties did:
+# measured +44.4/season on a +-20 range, which rails in about 12 weeks. EOG cannot
+# offset it — fight's EOG is structurally zero, one winner per game — so combined
+# drift IS training and the fix has to be here. Gating positive fight deltas lands
+# the season total with the other nine attributes.
+FIGHT_GAIN_CHANCE = 0.45
+
+
 def _apply_team_training_points(team: dict, team_attr: str, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):
     """
     Apply training points to a team attribute.
@@ -1144,8 +1164,10 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
         5: (2, 5),
     }
     # Shared by Strength+Conditioning → fight and defense/passing/BH → discipline.
+    # Bucket 0 (= the category received NO allocation) is the NEGLECT DECAY; see
+    # NEGLECT_DECAY_* below for why it is now gated rather than applied every week.
     fight_discipline_training_ranges = {
-        0: (-4, -3),
+        0: (-1, 0),
         1: (-1, 1),
         2: (0, 2),
         3: (1, 3),
@@ -1153,8 +1175,8 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
         5: (3, 5),
     }
     chemistry_ranges = {
-        0: (-3, -1),
-        1: (0, 1),
+        0: (-1, 0),
+        1: (-1, 1),   # 1 point = hold station; chemistry must be invested in to grow
         2: (1, 2),
         3: (2, 3),
         4: (2, 4),
@@ -1171,6 +1193,33 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     points_bucket = max(0, min(5, int(points)))
     low, high = ranges[points_bucket]
     delta = random.randint(low, high)
+
+    # ── NEGLECT DECAY, probability-gated (leveling pass, 2026-08-11) ────────────
+    # Bucket 0 means the coach allocated NOTHING to the categories feeding this
+    # attribute. That should cost something visible over a season — but the old
+    # ranges ((-4,-3) fight/discipline, (-3,-1) chemistry) charged it EVERY week.
+    # Measured on the CPU reference plan (a player-development plan, which
+    # allocates nothing to the chemistry/discipline categories): discipline
+    # -91.6/season on a 40-point range and team_chemistry -93.6 on an 18-point
+    # range — four and a half ranges and five ranges respectively. Every team
+    # floored, and a floored attribute carries no information at all.
+    #
+    # Design target: a season of default training moves a NEGLECTED attribute a
+    # few points, so neglect is visible but EOG (winning, losing, close games) is
+    # what actually drives the attribute across a season.
+    #
+    # Integer weekly rolls cannot express "-3 per season" directly — the smallest
+    # non-zero weekly penalty, -1 at even odds, is already -13/season. So the
+    # penalty is PROBABILITY-GATED: it fires on a fraction of weeks and is zero
+    # otherwise. Expected season cost = 26 x chance x mean(range).
+    if team_attr == "fight" and delta > 0 and random.random() >= FIGHT_GAIN_CHANCE:
+        delta = 0
+
+    if points_bucket == 0 and delta < 0:
+        chance = (NEGLECT_DECAY_CHANCE_CHEMISTRY if team_attr == "team_chemistry"
+                  else NEGLECT_DECAY_CHANCE_DEFAULT)
+        if random.random() >= chance:
+            delta = 0
 
     # Apply focus amplifier if this attribute is amplified by the selected focus.
     # Flat 2x, no randomness (EOG Structural Pass, Task 6): the old

@@ -129,8 +129,11 @@ ST_FG_45_TO_50_LOSS = (0, 4)
 ST_FG_LE_45 = (3, 8)
 
 # discipline
+# DISC_ABOVE deepened -1..-2 -> -1..-3 so EOG nets +10/season instead of +14, landing
+# discipline's combined drift with the rest of the pack once training was corrected
+# from -91.6 (measured) to -4.7.
 DISC_BELOW = (1, 2)
-DISC_ABOVE = (-2, -1)
+DISC_ABOVE = (-3, -1)
 DISC_EQUAL = (-1, 0)
 
 # fight
