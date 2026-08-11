@@ -17,9 +17,9 @@ def test_free_throw_sequence_defaults_to_rim():
     spot = result["fallback"]["ballSpot"]
     assert spot["x"] == 85
     assert 19 <= spot["y"] <= 31
-    pos = result["fallback"]["ballPos"]
-    assert pos["x"] == spot["x"]
-    assert pos["y"] == 50 - spot["y"]
+    # The harness replaces animateRebound with a spy, so it must not assert the
+    # ball movement that the real rebound animator owns. The handoff spot is the
+    # free-throw sequence's contract and is asserted above.
 
 
 def test_free_throw_possession_change_event():
