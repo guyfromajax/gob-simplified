@@ -14,6 +14,13 @@ def extract_ball_owners(animations, step_count):
 
 def test_ball_ownership_transitions():
     game = build_mock_game()
+    # Animation ownership is keyed by player_id.  The shared legacy mock leaves
+    # every id as None, which collapses all five players into one identity and
+    # makes the final lineup position appear to own every step.
+    for team in (game.home_team, game.away_team):
+        for pos, player in team.lineup.items():
+            player.player_id = f"{team.name}-{pos}"
+
     tm = game.turn_manager
     roles = tm.assign_roles()
     animator = Animator(game)

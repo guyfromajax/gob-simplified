@@ -216,9 +216,12 @@ def test_read_thresholds_use_team_efficiency_and_floor():
     def_team = SimpleNamespace(
         team_attributes={"team_chemistry": 7, "defensive_efficiency": -10},
     )
-    assert _perimeter_offense_threshold(off_team) == 150 - (-3)
-    assert _perimeter_defense_threshold(def_team) == 125 - (-3)
-    assert _defender_help_threshold(def_team) == 100 - (-3)
+    # The EOG structural pass widened stored core-8 attributes to +/-20 and
+    # deliberately normalized gameplay reads back to +/-10.  Stored -10 is
+    # therefore -5 in gameplay: chemistry 7 + efficiency -5 = 2.
+    assert _perimeter_offense_threshold(off_team) == 150 - 2
+    assert _perimeter_defense_threshold(def_team) == 125 - 2
+    assert _defender_help_threshold(def_team) == 100 - 2
 
     high_off = SimpleNamespace(
         team_attributes={"team_chemistry": 200, "offensive_efficiency": 200},
