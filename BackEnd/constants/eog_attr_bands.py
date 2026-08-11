@@ -44,17 +44,47 @@ Design notes (see EOG Structural Pass):
 
 # shot_threshold — team FG% bands (golf score: lower = better shooting mindset)
 #
-# ⚠️ INTERIM — CUT AGAINST A KNOWN-MISCALIBRATED INPUT.
-#   cut against : team FG% over 3,328 team-games (identity season, 2026-08-10)
-#   measured    : mean 34.0%, median 33.8%, p33 30.3, p67 37.3
-#   target       : the shot-tuning pass exists to raise this toward ~45%
-# At 45/50 the old cuts put 90.4% of team-games in one band and drove
-# shot_threshold to +222/season, railing 127 of 128 teams. These cuts fix that
-# for the CURRENT distribution. WHEN SHOOTING IS RETUNED THESE INVERT the problem
-# — a league shooting 45% would land almost everything in fg_gt_50.
-# Re-run scripts/eog_band_tuner.py against a fresh season log and re-cut.
-FG_PCT_HIGH = 37
-FG_PCT_MID = 30
+# ⚠️ INTERIM — RE-DERIVE BEFORE REUSING. The whole block below is calibrated against ONE
+# season's measured FG%-vs-shot_threshold response, and that response is SEASON-SPECIFIC
+# (see the corollary). The shot-tuning pass invalidates it by construction.
+#
+# HOW THIS ATTRIBUTE DIFFERS FROM THE OTHER TEN
+# ---------------------------------------------
+# shot_threshold is the only attribute whose band INPUT it also DETERMINES. It is the bar a
+# shot must clear, so it sets team FG%, and FG% selects the band that moves it. That loop is
+# INTENDED — it is the compounding effect of game performance — so the band is not a defect
+# and must not be removed from EOG or inverted. The fault was magnitude only: at ±85/season
+# on a 0-200 range it saturated inside a season (123 of 128 teams railed at the ceiling).
+#
+# Because the loop compounds, this attribute is tuned to a VARIANCE target, not a mean one:
+# near-neutral centre, spread that grows meaningfully, few teams reaching either rail. The
+# other ten want slightly-positive mean drift; this one does not.
+#
+# THE COROLLARY — what a future tuner will get wrong first
+# --------------------------------------------------------
+#   * GAIN sets SPEED. BAND POSITION sets WHERE TEAMS SETTLE.
+#   * The neutral band must sit BELOW the equilibrium FG% so the negative branch carries
+#     more mass and offsets training's steady upward push (+56.4/season measured). Centring
+#     the neutral band ON the equilibrium makes training dominate and every team drifts up.
+#   * The equilibrium FG% is SEASON-SPECIFIC. RE-DERIVE IT BEFORE RE-CUTTING AND NEVER
+#     REUSE A PREVIOUS SEASON'S FIT.
+#
+# Evidence for that last point: fitting FG% = a + b*shot_threshold per season gives
+# b = -0.1125 (baseline), -0.0691 (identity), -0.1413 (verification) — non-overlapping 95%
+# CIs. Pooling them produces a chord between clouds at different equilibria, not a response
+# curve. Binning by shot_threshold shows the LEVEL shifts too: mean cross-season spread
+# 6.42pp, max 9.15pp (at S=80-99: baseline 43.7%, identity 40.1%, verification 39.0%).
+#
+# CURRENT CALIBRATION (verification season, 2026-08-11)
+#   basis      FG% = 51.25 - 0.14126 * shot_threshold, residual sd 7.67pp  => 37.1% at S=100
+#   simulated  26 weeks x 128 teams x 12 trials from init 95-105:
+#              mean 105.8, sd 22.3, p10 79, p90 135, drift +5.8, ZERO teams at either rail
+#   chosen deliberately CONSERVATIVE over a wider-spread option (24/38 gain 8: sd 34.0 but
+#   0.3 teams railing) because the fit is thinnest exactly where new bands push teams —
+#   n=256 at S=100-119 against n=1008 at 80-99. Re-fit from the next season, where teams
+#   will actually sit, and widen from a basis that covers the target range.
+FG_PCT_HIGH = 36
+FG_PCT_MID = 24
 
 # discipline — team (F+TO) vs opponent (F+TO) + buffer
 DISCIPLINE_OPP_BUFFER = 8
@@ -123,10 +153,12 @@ CHEM_LOW_RANK_MAX = 128
 # EOG nets ~0 across the league; shot_threshold's residual season drift is now
 # training-driven, not EOG-driven. Label names still say 50/45 — they are band
 # IDs in the instrumentation vocabulary, not thresholds.
-ST_FG_GT_50 = (-8, -3)
-ST_FG_45_TO_50_WIN = (-4, 0)
-ST_FG_45_TO_50_LOSS = (0, 4)
-ST_FG_LE_45 = (3, 8)
+# gain 6: means -4 / 0 / +4 across the three bands. Label names still say 50/45 — they are
+# band IDs in the instrumentation vocabulary, not thresholds.
+ST_FG_GT_50 = (-6, -2)
+ST_FG_45_TO_50_WIN = (-1, 0)
+ST_FG_45_TO_50_LOSS = (0, 1)
+ST_FG_LE_45 = (2, 6)
 
 # discipline
 # DISC_ABOVE deepened -1..-2 -> -1..-3 so EOG nets +10/season instead of +14, landing
