@@ -59,7 +59,10 @@ def test_finalize_game_franchise_skips_when_matchup_already_applied(monkeypatch)
         SimpleNamespace(franchises=mock_franchises),
     )
     monkeypatch.setattr(stat_updater, "_build_franchise_team_maps_from_ftd", lambda _fid: ({}, {}))
-    monkeypatch.setattr(stat_updater, "commit_user_game_record", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "BackEnd.utils.user_game_commit.commit_user_game_record",
+        lambda *args, **kwargs: None,
+    )
     monkeypatch.setattr(stat_updater, "_update_defensive_playcall_season_stats", lambda *args, **kwargs: None)
     monkeypatch.setattr(stat_updater, "_update_offensive_play_season_stats", lambda *args, **kwargs: None)
 
@@ -116,7 +119,10 @@ def test_finalize_game_franchise_records_applied_matchups_on_claim(monkeypatch):
         SimpleNamespace(franchises=mock_franchises),
     )
     monkeypatch.setattr(stat_updater, "_build_franchise_team_maps_from_ftd", lambda _fid: ({}, {}))
-    monkeypatch.setattr(stat_updater, "commit_user_game_record", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        "BackEnd.utils.user_game_commit.commit_user_game_record",
+        lambda *args, **kwargs: None,
+    )
     monkeypatch.setattr(stat_updater, "_update_defensive_playcall_season_stats", lambda *args, **kwargs: None)
     monkeypatch.setattr(stat_updater, "_update_offensive_play_season_stats", lambda *args, **kwargs: None)
 

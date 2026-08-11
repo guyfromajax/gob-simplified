@@ -19,7 +19,7 @@ client = TestClient(app)
 
 
 def _setup_teams_and_players():
-    """Insert 8 teams (required for schedule) and a few players for FPD."""
+    """Insert the canonical 128-team league and a few players for FPD."""
     db.games.delete_many({})
     db.teams.delete_many({})
     db.franchises.delete_many({})
@@ -28,8 +28,9 @@ def _setup_teams_and_players():
     franchise_team_data_collection.delete_many({})
     db.players.delete_many({})
 
-    # Conference 1 required so schedule generation gets exactly 8 teams for round-robin
-    team_ids = [ObjectId() for _ in range(8)]
+    # Franchise scheduling requires 16 conferences of eight teams, paired into
+    # eight regions (two conferences / 16 teams per region).
+    team_ids = [ObjectId() for _ in range(128)]
     teams = [
         {
             "_id": team_ids[i],
@@ -37,10 +38,12 @@ def _setup_teams_and_players():
             "record": {"W": 0, "L": 0},
             "PF": 0,
             "PA": 0,
-            "conference": 1,
+            "conference": (i % 16) + 1,
+            "region": chr(ord("A") + ((i % 16) // 2)),
+            "prestige": 500,
             "player_ids": [] if i > 0 else ["p1", "p2"],
         }
-        for i in range(8)
+        for i in range(128)
     ]
     db.teams.insert_many(teams)
 
