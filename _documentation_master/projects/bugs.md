@@ -5,8 +5,7 @@
 ##Full Product Readiness
 1. Downloadable game vs Live game dynamics
 2. College and Pro setup
-3. Training load screen to show previous week's highlights. Top scorers in teh nation, all-american team, 
-4. Make sure scouting report tab and team roster pages are wired with the team's preset starting lineups instead of our previous formula for displaying them
+3. Make sure scouting report tab and team roster pages are wired with the team's preset starting lineups instead of our previous formula for displaying them
 
 ##Playtest Launch / In Progress
 1. Steam
@@ -648,3 +647,46 @@ cut against, its measured value at cut time, and that a material shift requires 
 Not a band, so outside the tuner's model. With the new ladder, rebound drift is +0.1/season on
 a 0.0-1.0 range, so 0.5 gives symmetric headroom and should stop the week-3 flooring (93 teams).
 Confirm against a short run rather than assuming.
+
+## ⚠️ MEASUREMENT FRANCHISES ARE SEEDED BY PROD CODE, MEASURED BY LOCAL CODE (August 2026)
+
+**The structural hazard behind several hours of confusion, stated once so it is not
+rediscovered.** A measurement franchise is created through the UI, which talks to the
+**deployed Railway backend running `main`**. The season is then driven **in-process by local
+`develop` code**. So every value seeded at creation comes from prod, and everything computed
+during the run comes from local. Anything changed since the last deploy **seeds wrong,
+silently, and looks like data rather than an error.**
+
+`main` is currently **158 commits behind `develop`**.
+
+### Audit: what differs (prod `main` -> local `develop`)
+
+| surface | prod (main) | local (develop) | consequence for a measurement franchise |
+|---|---|---|---|
+| **`position_ratings.py` RT model** | pre-recalibration | recalibrated | **100% of FPD players carry old-formula `position_ratings`, median delta 24, max 55.** Baked in at creation and NOT recomputed for franchise mode (`_update_position_ratings` skips `is_franchise`). Feeds `projected_starting_five` -> identity signals -> starter strength, and every lineup decision. |
+| **`player_generator.py`, `recruit_generator.py`** | ABSENT | present | prod builds rosters by a different path; the player population itself may differ |
+| **`TEAM_ATTR_CLAMPS` core-8** | ±10 | ±20 | prod-written attributes live in HALF the range local code assumes |
+| `team_chemistry` init (franchise) | `randint(7, 10)` | `randint(8, 11)` | 21% of the league born on the 7 floor |
+| `rebound_modifier` init (franchise) | 0.2 | 0.5 | floors 93/128 teams by week 3 |
+| `eog_attr_bands.py` | ABSENT | present | prod has no band configuration at all |
+| `team_identity.py`, `franchise_identity.py` | ABSENT | present | prod has no CPU identity |
+| `TEAM_ATTR_RANGES["rebound_modifier"]` | (0.0, 0.4) | (0.0, 1.0) | no practical difference — franchise init sets the value explicitly |
+| `init_team_attributes` single-mode rebound | `TEAM_ATTR_RANGES` (= 0.0-0.4) | literal 0.0-0.4 | identical behaviour |
+
+### Before the next measurement season, do ONE of
+
+1. **Deploy `develop` first**, so seeded and measured code agree. Cleanest.
+2. **Normalise after creation** — a setup script that overwrites every seeded value local code
+   would produce differently, run before week 1. This is what was done ad hoc for
+   `rebound_modifier` on the verification franchise (all 128 FTDs set to 0.5). It must also
+   recompute FPD `position_ratings` with the local formula, which was NOT done.
+3. **Provision locally** rather than through the UI.
+
+### Standing caveat for the identity and verification seasons
+
+Both were UI-created, so BOTH carry prod-formula `position_ratings`. They are therefore
+consistent WITH EACH OTHER — the band thresholds cut against the identity season apply to the
+verification season — but neither matches what local code would generate, and neither will
+match production once the recalibration deploys. **The thresholds will need re-cutting after
+that deploy.** Re-running `scripts/eog_band_tuner.py` against a post-deploy season is seconds;
+the trap is not noticing it is needed.

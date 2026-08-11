@@ -820,7 +820,13 @@ class TeamManager:
             rm_lo, rm_hi = 0.0, 0.4
             if mode == "franchise":
                 attr_range = (-2, 0)
-                team_chemistry = random.randint(7, 10)
+                # 8-11, not 7-10: the clamp floor IS 7, so a team rolled at 7 starts
+                # PINNED and cannot register a loss until it first wins something.
+                # Measured on the identity season: 21% of the league began on the floor,
+                # which is missing data rather than a design choice. This does not settle
+                # whether chemistry should BUILD across a season or stay STABLE — see
+                # projects/bugs.md — it just stops teams being born unable to move down.
+                team_chemistry = random.randint(8, 11)
                 # Re-centred 0.2 -> 0.5 (leveling pass, 2026-08-11). On the widened
                 # 0.0-1.0 clamp, 0.2 sits a fifth off the floor while the old EOG ladder
                 # drifted -1.2/season — 93 of 128 teams hit 0.0 by WEEK 3, after which the
