@@ -18,9 +18,10 @@ def mock_game():
         player.name = name
         player.position = position
         player.attributes = {
-            "SC": 75, "RB": 70, "PS": 65, "ST": 60,
-            "BK": 55, "3P": 50, "FT": 80, "HT": 72,
-            "IQ": 70, "CH": 70, "AG": 70, "OD": 70, "ID": 70,
+            "SC": 75, "SH": 75, "ID": 70, "OD": 70,
+            "PS": 65, "BH": 65, "RB": 70, "ST": 60, "AG": 70,
+            "FT": 80, "ND": 70, "IQ": 70, "CH": 70,
+            "EM": 5, "MO": 5, "NG": 1.0,
         }
         player.record_stat = MagicMock()
         player.record_shot_result = MagicMock()
@@ -67,11 +68,14 @@ def mock_game():
     game.away_team = away_team
     game.offense_team = home_team
     game.defense_team = away_team
+    game.quarter = 1
     game.game_state = {
         "offensive_state": "HCO",
         "quarter": 1,
         "time_remaining": 600,
         "current_playcall": "Base",
+        # Required ShotManager state; real games initialize and set this before HCO.
+        "defense_playcall": "man",
     }
     game.turn_manager = MagicMock()
     game.turn_manager.logger = MagicMock()
@@ -94,11 +98,16 @@ def test_hco_airball_miss_routes_to_baseline_inbound(mock_game):
     }
 
     with patch("BackEnd.models.shot_manager.random.random", return_value=0.9):
-        with patch(
-            "BackEnd.models.shot_manager.select_shot_variant",
-            return_value=SHOT_VARIANT_AIRBALL,
+        with patch.object(
+            shot_manager,
+            "calculate_shot_score",
+            return_value=(0, 0, 0, False, None, 0),
         ):
-            result = shot_manager.resolve_shot(roles)
+            with patch(
+                "BackEnd.models.shot_manager.select_shot_variant",
+                return_value=SHOT_VARIANT_AIRBALL,
+            ):
+                result = shot_manager.resolve_shot(roles)
 
     assert result["result_type"] == "MISS"
     assert result.get("shot_variant") == SHOT_VARIANT_AIRBALL
@@ -123,11 +132,16 @@ def test_hco_non_airball_miss_still_resolves_rebound(mock_game):
     }
 
     with patch("BackEnd.models.shot_manager.random.random", return_value=0.9):
-        with patch(
-            "BackEnd.models.shot_manager.select_shot_variant",
-            return_value="CLANK",
+        with patch.object(
+            shot_manager,
+            "calculate_shot_score",
+            return_value=(0, 0, 0, False, None, 0),
         ):
-            result = shot_manager.resolve_shot(roles)
+            with patch(
+                "BackEnd.models.shot_manager.select_shot_variant",
+                return_value="CLANK",
+            ):
+                result = shot_manager.resolve_shot(roles)
 
     assert result["result_type"] == "MISS"
     assert result.get("shot_variant") == "CLANK"
