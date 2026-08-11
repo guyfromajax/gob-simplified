@@ -44,6 +44,10 @@ const customFocusAssignBtn = document.getElementById('custom-focus-assign-btn');
 const customFocusCancelBtn = document.getElementById('custom-focus-cancel-btn');
 let currentWeek = 1;
 let currentTeamName = '';
+let currentSeason = 1;
+let trainingNewswirePromise = null;
+let trainingNewswireOverlayActive = false;
+let trainingNewswireError = null;
 
 /** @type {{ player_id: string, name: string, attrs: Record<string, number> }[]} */
 let customFocusRoster = [];
@@ -238,35 +242,59 @@ function resetPlayerMaximizerResolvedState() {
   resetCustomFocusCommitted();
 }
 
-/** Distant-training overlay: rotate user-team highlight lines */
-const TRAINING_CPU_HIGHLIGHT_MS = 5000;
-const TRAINING_HIGHLIGHT_FALLBACK = 'Finishing league training…';
-
-function shuffleArrayInPlace(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const t = arr[i];
-    arr[i] = arr[j];
-    arr[j] = t;
-  }
-  return arr;
+function trainingNewswireCacheKey(franchiseId, season, week) {
+  return `gob_training_newswire_${franchiseId}_s${season}_w${week}`;
 }
 
-/**
- * Non-empty array of strings for the highlight stream (randomized). Uses fallback if API sent none.
- * @param {unknown} trainingHighlights
- * @returns {string[]}
- */
-function buildRandomizedTrainingHighlightLines(trainingHighlights) {
-  const out = [];
-  if (Array.isArray(trainingHighlights)) {
-    trainingHighlights.forEach(function (h) {
-      if (typeof h === 'string' && h.trim()) out.push(h.trim());
-    });
+function prefetchTrainingNewswire(franchiseId) {
+  if (!franchiseId) return null;
+  const key = trainingNewswireCacheKey(franchiseId, currentSeason, currentWeek);
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(key) || 'null');
+    if (cached && Number(cached.season) === currentSeason && Number(cached.current_week) === currentWeek) {
+      trainingNewswireError = null;
+      trainingNewswirePromise = Promise.resolve(cached);
+      return trainingNewswirePromise;
+    }
+  } catch (_cacheError) {}
+  const headers = typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {};
+  trainingNewswireError = null;
+  const url = `${API_CONFIG.buildUrl('/franchise/league-news')}?franchise_id=${encodeURIComponent(franchiseId)}`;
+  trainingNewswirePromise = fetch(url, { headers }).then(async function(response) {
+    if (!response.ok) throw new Error(`League news unavailable (${response.status})`);
+    const payload = await response.json();
+    try { sessionStorage.setItem(key, JSON.stringify(payload)); } catch (_cacheError) {}
+    return payload;
+  }).catch(function(error) {
+    trainingNewswireError = error;
+    return null;
+  });
+  return trainingNewswirePromise;
+}
+
+function showTrainingNewswire(franchiseId) {
+  trainingNewswireOverlayActive = true;
+  const promise = trainingNewswirePromise || prefetchTrainingNewswire(franchiseId);
+  if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+    window.PageLoadOverlay.show({ variant: 'newswire', data: null });
   }
-  if (out.length === 0) return [TRAINING_HIGHLIGHT_FALLBACK];
-  shuffleArrayInPlace(out);
-  return out;
+  if (!promise) return Promise.resolve(null);
+  return promise.then(function(payload) {
+    if (!payload) throw trainingNewswireError || new Error('League news unavailable');
+    if (trainingNewswireOverlayActive && window.PageLoadOverlay && window.PageLoadOverlay.show) {
+      window.PageLoadOverlay.show({ variant: 'newswire', data: payload });
+    }
+    return payload;
+  }).catch(function(error) {
+    console.warn('[TRAINING] League news fallback:', error);
+    if (trainingNewswireOverlayActive && window.PageLoadOverlay && window.PageLoadOverlay.show) {
+      window.PageLoadOverlay.show({
+        variant: 'pulse', title: '', subtitle: 'Training in progress',
+        teamName: currentTeamName || '', assetKey: 'banner_primary'
+      });
+    }
+    return null;
+  });
 }
 
 async function fetchFranchiseCommandCenterData(franchiseId) {
@@ -1275,14 +1303,10 @@ submitBtn.addEventListener('click', async function() {
   try {
     this.disabled = true;
     this.textContent = 'Submitting...';
-    if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-      window.PageLoadOverlay.show({
-        variant: 'pulse',
-        title: '',
-        subtitle: 'Preparing your training…',
-        teamName: currentTeamName || '',
-        assetKey: 'banner_primary'
-      });
+    if (mode === 'franchise' && franchiseId) {
+      showTrainingNewswire(franchiseId);
+    } else if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+      window.PageLoadOverlay.show({ variant: 'pulse', subtitle: 'Training in progress' });
     }
 
     const jsonHeaders = Object.assign(
@@ -1311,30 +1335,6 @@ submitBtn.addEventListener('click', async function() {
         if (userResult && userResult.detail) detail = userResult.detail;
         throw new Error(detail);
       } else {
-        const lines = buildRandomizedTrainingHighlightLines(
-          userResult && userResult.training_highlights
-        );
-        let highlightStreamId = null;
-        let currentIndex = 0;
-        try {
-          if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-            window.PageLoadOverlay.show({
-              variant: 'pulse',
-              title: '',
-              subtitle: lines[currentIndex],
-              teamName: currentTeamName || '',
-              assetKey: 'banner_primary'
-            });
-          }
-          highlightStreamId = window.setInterval(function () {
-            if (currentIndex < lines.length - 1) {
-              currentIndex += 1;
-              if (window.PageLoadOverlay && window.PageLoadOverlay.updatePulseSubtitle) {
-                window.PageLoadOverlay.updatePulseSubtitle(lines[currentIndex]);
-              }
-            }
-          }, TRAINING_CPU_HIGHLIGHT_MS);
-
           const cpuTrainingUrl = API_CONFIG.buildUrl('/franchise/run-training/cpu-train');
           do {
             const cpuTrainingRes = await fetch(cpuTrainingUrl, {
@@ -1353,16 +1353,6 @@ submitBtn.addEventListener('click', async function() {
               throw new Error(detail);
             }
             if (result && result.status === 'processing') {
-              const progress = result.progress || {};
-              const done = Number(progress.completed_games || 0);
-              const totalGames = Number(progress.total_games || 0);
-              if (window.PageLoadOverlay && window.PageLoadOverlay.updatePulseSubtitle) {
-                window.PageLoadOverlay.updatePulseSubtitle(
-                  totalGames > 0
-                    ? `Practice Squad games: ${done} of ${totalGames} complete…`
-                    : 'Finishing Practice Squad games…'
-                );
-              }
               const retryAfterMs = Math.max(250, Number(result.retry_after_ms || 1000));
               await new Promise(resolve => window.setTimeout(resolve, retryAfterMs));
             }
@@ -1370,11 +1360,6 @@ submitBtn.addEventListener('click', async function() {
           if (!result || !['success', 'already_completed'].includes(result.status)) {
             throw new Error((result && result.detail) || 'Training did not reach a terminal state.');
           }
-        } finally {
-          if (highlightStreamId !== null) {
-            window.clearInterval(highlightStreamId);
-          }
-        }
       }
     } else {
       console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
@@ -1434,6 +1419,7 @@ submitBtn.addEventListener('click', async function() {
     
   } catch (error) {
     console.error('Failed to submit training:', error);
+    trainingNewswireOverlayActive = false;
     if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
       window.PageLoadOverlay.hide();
     }
@@ -1449,15 +1435,7 @@ async function resumeCpuTraining(franchiseId) {
     { 'Content-Type': 'application/json' },
     (typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {})
   );
-  if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-    window.PageLoadOverlay.show({
-      variant: 'pulse',
-      title: '',
-      subtitle: 'Resuming Practice Squad games…',
-      teamName: currentTeamName || '',
-      assetKey: 'banner_primary'
-    });
-  }
+  showTrainingNewswire(franchiseId);
   let result = null;
   do {
     const response = await fetch(API_CONFIG.buildUrl('/franchise/run-training/cpu-train'), {
@@ -1474,16 +1452,6 @@ async function resumeCpuTraining(franchiseId) {
       throw new Error((result && result.detail) || `HTTP error! status: ${response.status}`);
     }
     if (result && result.status === 'processing') {
-      const progress = result.progress || {};
-      const done = Number(progress.completed_games || 0);
-      const totalGames = Number(progress.total_games || 0);
-      if (window.PageLoadOverlay && window.PageLoadOverlay.updatePulseSubtitle) {
-        window.PageLoadOverlay.updatePulseSubtitle(
-          totalGames > 0
-            ? `Practice Squad games: ${done} of ${totalGames} complete…`
-            : 'Finishing Practice Squad games…'
-        );
-      }
       const retryAfterMs = Math.max(250, Number(result.retry_after_ms || 1000));
       await new Promise(resolve => window.setTimeout(resolve, retryAfterMs));
     }
@@ -1517,7 +1485,9 @@ async function initializeTrainingPoints() {
           TRAINING_GAIN_PERCENTAGE_MATRIX = data.gain_percentage_matrix;
         }
         currentWeek = Number(data.week || 1);
+        currentSeason = Number(data.season || 1);
         currentTeamName = data.user_team_name || currentTeamName || '';
+        prefetchTrainingNewswire(franchiseId);
         if (Array.isArray(data.custom_focus_roster)) {
           customFocusRoster = data.custom_focus_roster;
           renderEffectiveValueLabels();
@@ -1530,6 +1500,7 @@ async function initializeTrainingPoints() {
             await resumeCpuTraining(franchiseId);
           } catch (resumeError) {
             console.error('Failed to resume CPU training:', resumeError);
+            trainingNewswireOverlayActive = false;
             if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
               window.PageLoadOverlay.hide();
             }

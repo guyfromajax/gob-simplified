@@ -1,4 +1,4 @@
-## Training System (**verified 2026-08-09**)
+## Training System (**verified 2026-08-11**)
 
 > CPU template training is retired. User and CPU teams now share `execute_training`; CPU teams receive generated allocations/focus and use `cpu_autotrain_week` for per-team idempotency. The split endpoints are `/franchise/run-training/user` and `/franchise/run-training/cpu-train`.
 
@@ -17,10 +17,11 @@ This document should reflect the current franchise training implementation in co
 5. **Backend Execution**: `BackEnd/models/training_execution_v2.py`; shape/gain-fit dials in `BackEnd/constants/training_shape.py`
 6. **API Endpoints (franchise training)**:
    - `GET /franchise/training-points` - Budget (30 camp / 24 in-season), `is_camp_week`, `camp_weeks`, and `gain_percentage_matrix` for the client
-   - `POST /franchise/run-training/user` - **User phase only**: runs `execute_training` for the user team, persists FPD/FTD + `latest_training`, sets `training_status.user_training_applied_week` and leaves `training_completed` **false** until CPU training completes. Requires auth + franchise ownership. Response includes `training_highlights` for the loading feed.
+   - `POST /franchise/run-training/user` - **User phase only**: runs `execute_training` for the user team, persists FPD/FTD + `latest_training`, sets `training_status.user_training_applied_week` and leaves `training_completed` **false** until CPU training completes. Requires auth + franchise ownership.
    - `POST /franchise/run-training/cpu-train` - **CPU phase**: runs real auto-training for eligible CPU teams, **last-camp-week** cuts (`week == CAMP_WEEKS`), and bounded Practice Squad work. During PS weeks it may return `status: "processing"` plus progress and `retry_after_ms`; the client polls until success.
    - `POST /franchise/run-training` - **Legacy/full path**: reaches the same user + CPU end state in one request and resumes the CPU phase when user training is already applied.
    - `GET /franchise/training-report` - Get training report data
+   - `GET /franchise/league-news` - Authenticated, read-only national Top 10, key-games, and league-leader payload for the training load screen
 7. **Coaching Focus Archetypes**: Authoritarian, Systems Coach, Player Maximizer, Culture Builder — per-leaf code behavior: `Coaching_Focus_Implementation_Map.md` in this folder
 8. **Rebound Modifier Range**: 0.0-1.0 (clamped)
 9. **Pre-Training defense CMD decay**: Scouting defense rows with effectiveness > 0 reduced by `random.randint(5, 15)` before install training. **Offensive** play effectiveness is **not** decayed here; it is reduced at **EOG** from playcall share (see `End_Of_Game_System.md`).
@@ -49,7 +50,7 @@ triple from the player's highest current RT, not from `training_position`.
 2. **User Allocates Points**: User distributes units across 20 sliders; Points Remaining tracks **cost spend** against the week budget
 3. **User Selects Focus**: User selects one coaching focus archetype and sub-option
 4. **Recruiting Invites Access (Weeks 20-26 only)**: Training page shows a green `Recruiting Invites` button below `Submit Training` that routes to the phase-aware Recruiting Hub at `recruiting.html`
-5. **Submit Training (Franchise)**: Frontend sends `POST /franchise/run-training/user` then `POST /franchise/run-training/cpu-train` (see **Training loading feed** below).
+5. **Submit Training (Franchise)**: Frontend sends `POST /franchise/run-training/user` then `POST /franchise/run-training/cpu-train` while the independent **League News Wire** load screen rotates.
 6. **Backend Validation**: `training_points_spent(allocations)` must equal the expected flat budget exactly (30 camp / 24 in-season)
    - week 20 special case: if no recruiting orders have ever been saved, training is blocked until the user saves recruiting orders
 7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing; `execute_training` merges any legacy `scouting_data.defense` row keys onto canonical `defense_id` keys before baselines (same remap as gameplay). **Defense and offensive play CMD effectiveness decay from game usage share runs at franchise EOG only** (`End_Of_Game_System.md`); not during training.
@@ -62,24 +63,16 @@ triple from the player's highest current RT, not from `training_position`.
 14. **Computer team training (phase 2)**: Eligible non-user teams run real auto-training through `execute_training`. FTDs record `cpu_autotrain_week` for idempotent retries. The franchise then records `training_completed` and `cpu_training_complete_week`.
 15. **Post-Training Camp Cuts**: After the **last** camp week (`week == CAMP_WEEKS`), applied during the CPU phase; user cut flow from FCC when roster > 12.
 
-### Training loading feed (franchise, between user and CPU phases)
+### Training load League News Wire (franchise, between user and CPU phases)
 
-While CPU training runs (`POST /franchise/run-training/cpu-train`), the training page keeps a full-screen **pulse** overlay and shows a stream of highlight lines derived from user-team training.
+While training runs, `PageLoadOverlay` uses its separate `newswire` variant to rotate neutral national league graphics. The retired archetype loading-feed generator is no longer produced or returned by training APIs.
 
-**Backend — highlight list**
-
-- Module: `BackEnd/utils/training_loading_highlights.py` — `build_training_loading_highlights(training_report, ftd_coaching_focus=...)`.
-- Copy comes from `BackEnd/utils/training_feed_lines.py`: archetyped player/team/scrimmage/break lines plus one **`COACHING_FOCUS_FLAVOR`** line per build. Uses `training_report.coaching_focus.archetype` (session) and `training_report.ftd_coaching_focus` (FTD counters; optional kwarg override). See `Training_System_Live_Feed.md`.
-- Returns up to **36** de-duplicated lines for the client to consume.
-
-**Frontend — stream behavior**
-
-- Files: `FrontEnd/static/training.js`, `FrontEnd/static/js/shared/pageLoadOverlay.js`.
-- Phase 1 overlay subtitle: **“Preparing your training…”** (team name as pulse title).
-- After phase 1 succeeds: highlights are copied, shuffled, and shown one line at a time. The last line remains until CPU training completes.
-- `PageLoadOverlay.updatePulseSubtitle(text)` updates only the subtitle between ticks (avoids re-running full `show()` each time).
-- Phase 1 and phase 2 requests include `API_CONFIG.getAuthHeaders()` (Bearer token).
-- During weeks 2–19, phase 2 is a durable polling workflow. Responses report Practice Squad progress. Refreshing or revisiting detects an applied user phase with incomplete CPU training and resumes automatically.
+- `GET /franchise/league-news` consolidates the national Top 10, current-week key games, and eight qualified leaderboards into pre-ranked lists of exactly ten. In Week 4, standings and leaders are through Week 3 while Key Games are Week 4.
+- Week 1 uses the preseason deck: program-rank Top 10 and season marquee matchups. Preseason Top 10 rows intentionally have no trailing record.
+- `training.js` prefetches and session-caches the payload by franchise, season, and week. At submit, the news request and training request proceed independently.
+- A pending news request shows only the header and green “Training in progress” pulse. A rejected request falls back to the existing team-banner pulse variant.
+- Available graphics rotate in a fixed order every 6000ms. Missing or short lists are omitted. Rotation stops immediately when the overlay hides.
+- During weeks 2–19, phase 2 remains a durable polling workflow. Refreshing or revisiting detects an applied user phase with incomplete CPU training and resumes automatically under the same newswire.
 
 **Franchise training state helpers**
 
@@ -112,7 +105,7 @@ While CPU training runs (`POST /franchise/run-training/cpu-train`), the training
 
 **Table of contents** (Markdown anchor targets; slug style matches common renderers such as GitHub.)
 
-- [Training loading feed (franchise, between user and distant phases)](#training-loading-feed-franchise-between-user-and-distant-phases)
+- [Training load League News Wire (franchise, between user and CPU phases)](#training-load-league-news-wire-franchise-between-user-and-cpu-phases)
 - [Post-Training Camp Cut Flow](#post-training-camp-cut-flow)
 - [Training Page Layout](#training-page-layout)
 - [Slider Behavior](#slider-behavior)
@@ -669,7 +662,7 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 1. **Training Submission:**
    - User spends the flat integer budget (24 in-season / 30 camp) across sliders and selects coaching focus on `training.html`
    - **Player Maximizer:** `GET /franchise/training-points` includes `custom_focus_roster` (attrs, `position_ratings`, both position identity fields, and `resolved_training_position`) and `player_maximizer_ranking_attrs` for the modal. Submit sends a **resolved** leaf (never bare `player-maximizer-choose-attributes`). Payload includes `coaching_focus_custom_by_player` when `coaching_focus` is `player-maximizer-custom`.
-   - **Franchise:** Frontend sends `POST /franchise/run-training/user` with training data, then `POST /franchise/run-training/cpu-train` with `{ franchise_id }`, with the loading feed between them. The legacy combined endpoint still reaches the same final state.
+   - **Franchise:** Frontend sends `POST /franchise/run-training/user` with training data, then `POST /franchise/run-training/cpu-train` with `{ franchise_id }`, with the independent League News Wire overlay covering both phases. The legacy combined endpoint still reaches the same final state.
    - **Data Initialization (Auto-Population):**
      - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
      - If `scouting_data` is empty or missing the `defense` structure, backend automatically initializes it using `TeamManager._init_scouting_data()`
@@ -810,8 +803,9 @@ quality        = Σ contribution / Σ contribution(reference)
 **Frontend:**
 - `FrontEnd/static/training.html` - Training allocation page
 - `FrontEnd/static/training.css` - Training page styling
-- `FrontEnd/static/training.js` - Training logic; franchise submit uses user + CPU endpoints and highlight stream
-- `FrontEnd/static/js/shared/pageLoadOverlay.js` - Loader; `updatePulseSubtitle` for feed ticks
+- `FrontEnd/static/training.js` - Training logic; franchise submit uses user + CPU endpoints and prefetches the newswire
+- `FrontEnd/static/js/shared/pageLoadOverlay.js` - Shared loader and `newswire` variant host
+- `FrontEnd/static/js/shared/trainingNewswire.js` / `FrontEnd/static/css/training-newswire.css` - League-news rendering, motion, asset fallback, and rotation
 - `FrontEnd/static/training-report.html` - Training report display page
 - `FrontEnd/static/training-report.css` - Report page styling
 - `FrontEnd/static/training-report.js` - Report data loading and rendering
@@ -821,8 +815,8 @@ quality        = Σ contribution / Σ contribution(reference)
 - `BackEnd/models/training_execution_v2.py` - Core training execution logic (gains, remainder, floor clamp)
 - `BackEnd/constants/training_shape.py` - Camp weeks/flat budgets/gain scale, position-fit divisors, class gain taper, P6 floors, `training_points_spent`
 - `BackEnd/models/training_notes.py` - Structured training-notes generation for report sections
-- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/cpu-train`) and CPU auto-training/idempotency; also `GET /franchise/training-report`, `GET /franchise/schedule`.
-- `BackEnd/utils/training_loading_highlights.py` - `training_highlights` for loading feed
+- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/cpu-train`) and CPU auto-training/idempotency; also `GET /franchise/training-report`, `GET /franchise/schedule`, and `GET /franchise/league-news`.
+- `BackEnd/utils/franchise_league_news.py` - Consolidated, pre-ranked training newswire payload
 - `BackEnd/utils/franchise_training_state.py` - Split-phase completion helpers for FCC and cuts
 - `BackEnd/utils/franchise_coaching_focus_counts.py` - FTD `coaching_focus` archetype counters (user team)
 - `BackEnd/utils/player_development.py` - Offseason level-only RT rescale + HT/WT (not weekly training)
@@ -832,7 +826,7 @@ quality        = Σ contribution / Σ contribution(reference)
 - Training report play deltas use `play_id` as the canonical key when available
 - `training_report["plays_effectiveness_changes"]` is keyed by `play_id` for offense and by **canonical defense row keys** (`man`, `2-3-zone`, … — same as `scouting_data["defense"]` after `execute_training`) for defensive sets; the report UI may still show human-readable names via defense display helpers
 - The Training Report frontend resolves offensive deltas by `play_id` first, while still displaying the play `name`
-- **Training loading feed** (`build_training_loading_highlights`) does **not** surface play/defense effectiveness deltas; it uses archetyped copy from `training_feed_lines.py` (see `Training_System_Live_Feed.md`).
+- The training load newswire is league context only; play/defense effectiveness deltas remain in the Training Report.
 - Offensive `playbook_settings` are now expected to be `play_id`-keyed, though runtime compatibility still tolerates older name-keyed maps
 
 ---

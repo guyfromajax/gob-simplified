@@ -196,13 +196,15 @@
         statIntervalMs: Number(input.statIntervalMs) > 0 ? Number(input.statIntervalMs) : 8000,
         imageSrc: input.imageSrc || '',
         teamName: input.teamName || '',
-        assetKey: input.assetKey || 'banner_primary'
+        assetKey: input.assetKey || 'banner_primary',
+        data: input.data || null
       };
     }
     return { variant: 'spinner', message: '' };
   }
 
   function applySpinnerVariant(overlay, options) {
+    resetNewswire(overlay);
     var content = overlay.querySelector('.page-load-overlay-content');
     if (!content) return;
     var spinner = content.querySelector('.page-load-overlay-spinner');
@@ -218,6 +220,7 @@
   }
 
   function applyPulseVariant(overlay, options) {
+    resetNewswire(overlay);
     clearPulseFeedTimer();
     var content = overlay.querySelector('.page-load-overlay-content');
     if (!content) return;
@@ -307,6 +310,38 @@
     pulse.style.display = 'block';
   }
 
+  function applyNewswireVariant(overlay, options) {
+    clearPulseFeedTimer();
+    var content = overlay.querySelector('.page-load-overlay-content');
+    if (content) content.style.display = 'none';
+    var newswire = overlay.querySelector('.page-load-overlay-newswire');
+    if (!newswire) {
+      newswire = document.createElement('div');
+      newswire.className = 'page-load-overlay-newswire';
+      overlay.appendChild(newswire);
+    }
+    newswire.style.display = 'grid';
+    overlay.style.background = '#07080c';
+    overlay.setAttribute('role', 'presentation');
+    overlay.setAttribute('aria-live', 'off');
+    if (global.GOBTrainingNewswire) {
+      global.GOBTrainingNewswire.mount(newswire, options.data);
+    }
+  }
+
+  function resetNewswire(overlay) {
+    var newswire = overlay && overlay.querySelector('.page-load-overlay-newswire');
+    if (newswire) newswire.style.display = 'none';
+    if (global.GOBTrainingNewswire) global.GOBTrainingNewswire.unmount();
+    var content = overlay && overlay.querySelector('.page-load-overlay-content');
+    if (content) content.style.display = 'flex';
+    if (overlay) {
+      overlay.style.background = 'rgba(0,0,0,0.92)';
+      overlay.setAttribute('role', 'status');
+      overlay.setAttribute('aria-live', 'polite');
+    }
+  }
+
   /**
    * Update pulse subtitle only (e.g. rotating training highlights) without re-running full show().
    */
@@ -343,7 +378,9 @@
         document.addEventListener('DOMContentLoaded', function onReady() {
           document.removeEventListener('DOMContentLoaded', onReady);
           var readyOverlay = getOrCreateOverlay();
-          if (options.variant === 'pulse') {
+          if (options.variant === 'newswire') {
+            applyNewswireVariant(readyOverlay, options);
+          } else if (options.variant === 'pulse') {
             applyPulseVariant(readyOverlay, options);
           } else {
             applySpinnerVariant(readyOverlay, options);
@@ -354,7 +391,9 @@
       return;
     }
     var overlay = getOrCreateOverlay();
-    if (options.variant === 'pulse') {
+    if (options.variant === 'newswire') {
+      applyNewswireVariant(overlay, options);
+    } else if (options.variant === 'pulse') {
       applyPulseVariant(overlay, options);
     } else {
       applySpinnerVariant(overlay, options);
@@ -371,6 +410,7 @@
       el.style.display = 'none';
     }
     clearPulseFeedTimer();
+    if (global.GOBTrainingNewswire) global.GOBTrainingNewswire.unmount();
   }
 
   function getTeamNameFromGameDoc(gameDoc, side) {

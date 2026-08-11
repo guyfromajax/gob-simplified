@@ -976,7 +976,10 @@ function filesystemTeamAssetPath(teamNameOrSlug, assetKey) {
   if (!useSlug || useSlug === 'general' || !CORE_TEAM_ASSET_SLUGS[useSlug]) {
     useSlug = spec.fallbackSlug || 'general';
   }
-  return '/images/teams/' + useSlug + '/' + useSlug + '_' + assetKey + '.' + spec.ext;
+  // IDA predates the lowercase asset-directory convention.
+  var folderSlug = useSlug === 'ida' ? 'IDA' : useSlug;
+  var fileSlug = useSlug === 'ida' && assetKey === 'banner_primary' ? 'IDA' : useSlug;
+  return '/images/teams/' + folderSlug + '/' + fileSlug + '_' + assetKey + '.' + spec.ext;
 }
 
 /**
