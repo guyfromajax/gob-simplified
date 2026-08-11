@@ -488,3 +488,67 @@ was monotonic throughout: more hysteresis, less churn, more exhaustion, same min
   The deployed app is recognised by any `RAILWAY_*` variable. Unrecognised process → refuse at
   import. `aggregate()` is deliberately not blocked in read mode, so `$out`/`$merge` can still
   write; tighten if that becomes a real path.
+
+## EOG leveling pass (August 2026) — follow-ups
+
+### TICKET: locate the real source of the fight / discipline season drift
+
+**Measured on the identity season:** `fight` **+32.0**/season and `discipline` **−48.1**/season
+from TRAINING, against EOG contributions of **+0.6** and **+14.0**. Training dominates both, so
+their EOG bands were left DELIBERATELY UNTUNED in the leveling pass — compensating via EOG would
+require perverse bands (see below). Revisit the bands only after this is settled.
+
+**The persona coupling is NOT the cause — this was checked and ruled out.**
+`_apply_player_training_points` (`training_execution_v2.py:745-767`) looks asymmetric but is not:
+
+| nudge | fires when | sub-options hit |
+|---|---|---|
+| `fight` +1..+2 | culture-builder, sub != `culture-builder-teamwork` | 4 of 5 |
+| `discipline` −2..−1 | culture-builder, sub != `culture-builder-confidence` | 4 of 5 |
+| `discipline` +1..+2 | authoritarian, sub != `authoritarian-teamwork` | 4 of 5 |
+| `fight` −2..−1 | authoritarian, sub != `authoritarian-rebounding` | 4 of 5 |
+
+Equal magnitudes (±1.5 mean), equal firing rates, and `generate_random_coaching_focus` picks
+uniformly from 19 options. Expected net contribution to both attributes is **zero**. The
+drill mapping is symmetric too — `discipline` draws 0.25x from four categories, `fight` 0.5x
+from two; both total 1.0x.
+
+**Direct measurement contradicts the season figures.** Running `execute_training` 200x with
+`generate_random_training_allocations(24)`:
+
+| focus | Δfight/season | Δdiscipline/season |
+|---|---|---|
+| none | −4.5 | +4.9 |
+| random | −10.8 | +3.9 |
+
+**Opposite sign and an order of magnitude smaller** than the season's +32 / −48.
+
+**Two candidates remain, neither yet confirmed:**
+1. **CPU auto-train does not use random allocation.** `auto_train_one_cpu_team` trains a
+   "coaching-quality REFERENCE" plan (see the comment above `_AUTOTRAIN_PLAYER_ATTRS` in
+   `franchise_routes.py`). 127 of 128 teams in the season are CPU, so the measured drift
+   reflects that reference plan, not the random path measured above. **Measure the reference
+   plan's per-attribute effect first — this is the most likely owner.**
+2. **The "training" figure is INFERRED, not measured.** Report §2b derives it from
+   unclamped week-to-week `pre`->`post` gaps in the band log, so it attributes EVERY
+   non-EOG change to training — including anything else that writes team attributes between
+   games (EOS, training camp, rollover). Verify the attribution before trusting the number.
+
+**Why not just tune EOG around it:** `fight` EOG is structurally zero (every game has exactly
+one winner, so win +1 / loss −1 nets to 0 league-wide); offsetting +32 would require losses to
+hurt far more than wins help, i.e. every team drifts down over a season. `discipline` would need
+EOG ≈ +2.04/game, which on a ±20 range rails the ceiling in about six games.
+
+### The two INTERIM constants
+
+`FG_PCT_MID/HIGH` and `OFF_CONC_REWARD/MIDDLE` are cut against inputs already scheduled to
+change (shot calibration; the playbook generator's 20% concentration cap for 4+ set plays).
+The dependency is recorded beside each constant in `constants/eog_attr_bands.py` — what it was
+cut against, its measured value at cut time, and that a material shift requires re-running
+`scripts/eog_band_tuner.py`. When either input moves, these cuts invert the problem.
+
+### `rebound_modifier` init 0.2 -> 0.5 — NOT DONE
+
+Not a band, so outside the tuner's model. With the new ladder, rebound drift is +0.1/season on
+a 0.0-1.0 range, so 0.5 gives symmetric headroom and should stop the week-3 flooring (93 teams).
+Confirm against a short run rather than assuming.

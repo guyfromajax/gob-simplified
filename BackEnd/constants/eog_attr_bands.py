@@ -7,9 +7,22 @@ also flow into the `[EOG-BAND]` instrumentation. Keep NO band vocabulary or
 threshold literals anywhere else — divergent copies are how the drifted-duplicate
 bug happened (EOG Structural Pass, Task 7/8).
 
-ALL NUMBERS HERE ARE PROVISIONAL. This pass lands mechanism, not magnitude; the
-leveling phase retunes after re-measuring with CPU archetypes. Change values here,
-never inline in a branch.
+LEVELING PASS (2026-08-11): thresholds re-cut to measured p33/p67 and midpoints
+retuned against the identity season (36,608 team-game rows). Verify any change with
+
+    python scripts/eog_band_tuner.py <season log> --validate     # must be 100%
+    python scripts/eog_band_tuner.py <season log> --config <candidate>
+
+The tuner mirrors eog_attr_rules.py and computes expected drift offline in seconds —
+do NOT re-run a 2-hour season to evaluate a band change.
+
+TWO CONSTANTS ARE MARKED ⚠️ INTERIM below (FG_PCT_*, OFF_CONC_*). They are cut
+against inputs we already plan to change; each records what it was cut against and
+its measured value at cut time. A material shift in either input requires re-running
+the tuner — the cuts will otherwise invert the problem they solved.
+
+discipline and fight deltas are DELIBERATELY UNTUNED — their season drift is
+training-driven, not EOG-driven. See projects/bugs.md.
 
 Design notes (see EOG Structural Pass):
 - Concentration reward/middle/penalty deltas average ~-0.5/game ≈ -13/season at
@@ -106,10 +119,14 @@ CHEM_LOW_RANK_MAX = 128
 # ─────────────────────────────────────────────────────────────────────────────
 
 # shot_threshold
-ST_FG_GT_50 = (-10, -5)
-ST_FG_45_TO_50_WIN = (-5, 0)
-ST_FG_45_TO_50_LOSS = (0, 5)
-ST_FG_LE_45 = (5, 10)
+# Narrowed alongside the FG threshold re-cut. Symmetric about the middle band so
+# EOG nets ~0 across the league; shot_threshold's residual season drift is now
+# training-driven, not EOG-driven. Label names still say 50/45 — they are band
+# IDs in the instrumentation vocabulary, not thresholds.
+ST_FG_GT_50 = (-8, -3)
+ST_FG_45_TO_50_WIN = (-4, 0)
+ST_FG_45_TO_50_LOSS = (0, 4)
+ST_FG_LE_45 = (3, 8)
 
 # discipline
 DISC_BELOW = (1, 2)
@@ -121,21 +138,27 @@ FIGHT_WIN = (0, 2)
 FIGHT_LOSS = (-2, 0)
 
 # rebound_modifier (5-band ladder; values are hundredths, applied as /100)
-REB_OUTREBOUND_GT_8 = (2, 12)       # +0.02 .. +0.12
-REB_OUTREBOUND_4_7 = (0, 5)         # 0.00 .. +0.05
-REB_WITHIN_3 = (-8, -2)             # -0.02 .. -0.08  (stored lo<hi; negative)
-REB_OUTREBOUNDED_4_7 = (-10, -5)    # -0.05 .. -0.10
-REB_OUTREBOUNDED_GT_8 = (-25, -15)  # -0.15 .. -0.25
+# Rebalanced for the widened margins above. With the extremes now ~21% per tail
+# instead of 33%, the deep negative band no longer dominates; the ladder nets
+# +0.1/season on the 0.0-1.0 range instead of -1.2.
+REB_OUTREBOUND_GT_8 = (4, 14)       # +0.04 .. +0.14
+REB_OUTREBOUND_4_7 = (0, 6)         # 0.00 .. +0.06
+REB_WITHIN_3 = (-3, 3)              # -0.03 .. +0.03
+REB_OUTREBOUNDED_4_7 = (-8, -2)     # -0.02 .. -0.08
+REB_OUTREBOUNDED_GT_8 = (-12, -4)   # -0.04 .. -0.12
 
 # concentration bands shared by offense / fb / pt
-CONC_REWARD_DELTA = (0, 1)
-CONC_MIDDLE_DELTA = (-1, 0)
+# Shifted up one notch. At the OLD thresholds these averaged -0.5/game; once the
+# thresholds are cut at even thirds that becomes -13/season, over-cancelling
+# training's ~+7.5 and leaving every concentration attribute net negative.
+CONC_REWARD_DELTA = (0, 2)
+CONC_MIDDLE_DELTA = (-1, 1)
 CONC_PENALTY_DELTA = (-2, -1)
 CONC_ATROPHY_DELTA = (-1, 0)        # zero-volume atrophy (fb/pt only)
 
 # defensive_efficiency (same shape as concentration reward/middle/penalty)
-DEF_REWARD_DELTA = (0, 1)
-DEF_MIDDLE_DELTA = (-1, 0)
+DEF_REWARD_DELTA = (0, 2)
+DEF_MIDDLE_DELTA = (-1, 1)
 DEF_PENALTY_DELTA = (-2, -1)
 
 # volume ladder (fb_opp / pt_opp)
@@ -143,15 +166,19 @@ VOL_ATROPHY_DELTA = (-1, 0)
 VOL_UNDER_DELTA = (-1, 0)
 VOL_HEALTHY_DELTA = (0, 1)
 VOL_OVER_DELTA = (-1, 0)
+# (unchanged — the volume ladders land in target once their bands are re-cut)
 
 # team_chemistry
-CHEM_BEAT_LOWER = (0, 1)
-CHEM_BEAT_HIGHER_NON_TOP10 = (1, 2)
-CHEM_BEAT_TOP10 = (2, 4)
-CHEM_LOSE_TO_TOP10 = (-1, 0)
-CHEM_LOSE_TO_HIGHER_NON_TOP10 = (-2, 0)
-CHEM_LOSE_TO_100_128 = (-5, -3)
-CHEM_LOSE_TO_OTHER_LOWER = (-3, -2)
+# Lifted across the board. The loss bands were deep enough that ALL 128 teams hit
+# the 7 floor by week 2 on an 18-point range (7-25). Losing to a stronger team no
+# longer costs chemistry outright; only losing to a much weaker one does.
+CHEM_BEAT_LOWER = (0, 2)
+CHEM_BEAT_HIGHER_NON_TOP10 = (1, 3)
+CHEM_BEAT_TOP10 = (2, 5)
+CHEM_LOSE_TO_TOP10 = (0, 1)
+CHEM_LOSE_TO_HIGHER_NON_TOP10 = (-1, 1)
+CHEM_LOSE_TO_100_128 = (-4, -2)
+CHEM_LOSE_TO_OTHER_LOWER = (-2, -1)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Band label vocabulary (single source). {label: (lo, hi)} per attribute — the

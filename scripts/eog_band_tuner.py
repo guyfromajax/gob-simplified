@@ -53,7 +53,12 @@ TRAINING_PER_SEASON = {
 }
 
 # ── configuration ────────────────────────────────────────────────────────────────────────
-CURRENT = {
+# NOTE: this dict is the tuner's own copy of the band configuration. After the
+# 2026-08-11 leveling pass the LIVE values in BackEnd/constants/eog_attr_bands.py
+# differ from what produced the identity-season log, so `--validate` against that
+# log must use the AS-LOGGED values below, not the live ones. Validate against a
+# log captured under the current constants before trusting a new tuning run.
+AS_LOGGED = {
     "FG_PCT_HIGH": 50, "FG_PCT_MID": 45,
     "DISCIPLINE_OPP_BUFFER": 8,
     "REBOUND_BIG_MARGIN": 8, "REBOUND_MID_MARGIN": 4, "REBOUND_EVEN_MARGIN": 3,
@@ -83,6 +88,7 @@ CURRENT = {
     "CHEM_LOSE_TO_HIGHER_NON_TOP10": (-2, 0), "CHEM_LOSE_TO_100_128": (-5, -3),
     "CHEM_LOSE_TO_OTHER_LOWER": (-3, -2),
 }
+CURRENT = AS_LOGGED
 
 
 def mid(rng_pair):
