@@ -309,7 +309,7 @@ def test_append_week_news_resolves_user_conference_from_string_team_id(monkeypat
     monkeypatch.setattr(
         franchise_routes,
         "_format_team_name_map",
-        lambda team_ids=None: {str(rival_oid): "Rival U"},
+        lambda team_ids=None, franchise=None: {str(rival_oid): "Rival U"},
     )
     monkeypatch.setattr(
         franchise_routes,
@@ -353,7 +353,7 @@ def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
     monkeypatch.setattr(
         franchise_routes,
         "_format_team_name_map",
-        lambda team_ids=None: {team_a: "Underdog U", team_b: "Favorite State"},
+        lambda team_ids=None, franchise=None: {team_a: "Underdog U", team_b: "Favorite State"},
     )
 
     franchise_doc = {
