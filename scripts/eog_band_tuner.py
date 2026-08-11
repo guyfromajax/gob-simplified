@@ -320,6 +320,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("path")
     ap.add_argument("--validate", action="store_true")
+    ap.add_argument("--live", action="store_true",
+                    help="validate/evaluate against the LIVE eog_attr_bands constants")
     ap.add_argument("--config", default=None, help="python file defining CANDIDATE dict")
     args = ap.parse_args()
 
@@ -329,7 +331,27 @@ def main():
     print(f"loaded {sum(len(v) for v in recs.values())} band rows, {len(recs)} attributes")
 
     if args.validate:
-        return 0 if validate(recs, CURRENT) else 1
+        # --validate MUST use the config that PRODUCED the log, not whatever is current.
+        # There are now three generations (pre-leveling, post-leveling, post-shot-retune),
+        # so validating a log against the wrong one reports mass "drift" that is really a
+        # config mismatch. --config layers a candidate on top of AS_LOGGED; --live uses the
+        # constants file as it stands right now.
+        C = copy.deepcopy(CURRENT)
+        if args.live:
+            import BackEnd.constants.eog_attr_bands as _B
+            for k in list(C):
+                if hasattr(_B, k):
+                    v = getattr(_B, k)
+                    C[k] = tuple(v) if isinstance(v, (list, tuple)) else v
+            print("(validating against the LIVE constants file)")
+        elif args.config:
+            ns = {}
+            exec(open(args.config).read(), ns)
+            C.update(ns["CANDIDATE"])
+            print(f"(validating against AS_LOGGED + {args.config})")
+        else:
+            print("(validating against AS_LOGGED — the pre-leveling config)")
+        return 0 if validate(recs, C) else 1
 
     base = evaluate(recs, CURRENT)
     table(base, "CURRENT configuration")

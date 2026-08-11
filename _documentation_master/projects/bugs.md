@@ -747,3 +747,69 @@ franchise and its FTD/FPD/FRD rows.
 
 The data check was negative-controlled against prod BEFORE the deploy and correctly FAILED on
 both collections — it detects a stale copy rather than merely returning green.
+
+
+## EOG band logging in PRODUCTION (August 2026)
+
+Enabled so tester franchises produce the re-fit basis for `shot_threshold`. Those seasons are
+the first ever run under the new bands, and they generate data in the region the model cannot
+see — the fit behind the current calibration has n=256 at S=100-119 against n=1008 at 80-99.
+
+### Why Mongo, not the file sink
+
+`GOB_EOG_BAND_LOG=1` writes JSONL to a local path. **In production that produces nothing
+retrievable**: Railway's container filesystem is ephemeral and `railway.json` declares no
+volume, so the file dies on the next redeploy, each replica writes its own partial, and no
+endpoint serves it. The default path is relative, inheriting the same CWD-relative hazard that
+sent a sim harness at production.
+
+    GOB_EOG_BAND_LOG=mongo            # off | file (local harnesses) | mongo (production)
+    GOB_EOG_BAND_FRANCHISES=a,b       # OPTIONAL RESTRICTION — unset/empty logs EVERY franchise
+    GOB_EOG_BAND_TTL_DAYS=90          # retention
+
+Logging every franchise by default is deliberate: tester franchises are created whenever, so
+naming ids in advance would mean discovering which to log only after the season is half gone.
+
+### Cost — measured, not estimated
+
+| | |
+|---|---|
+| row size | 379 bytes JSONL / **258 bytes BSON** |
+| franchise-season | 36,608 rows = **9.0 MiB** in Mongo |
+| extra input computation | 0.026 ms/game — **0.001%** of a CPU week |
+| Mongo writes, batch 500 | **3.96 ms/game** = 0.25 s on a ~160 s week (**0.16%**) |
+
+Batch is 500, not 50: each `insert_many` is an Atlas round-trip (~45 ms), so batch 50 cost
+~20 ms/game. `complete_week` flushes at week end and an `atexit` hook flushes on shutdown, so
+a hard crash loses at most the current week's tail.
+
+### Extraction
+
+    GOB_DB_ACCESS=read scripts/eog_band_export.py --list
+    GOB_DB_ACCESS=read scripts/eog_band_export.py --franchise-id <id> -o out.jsonl
+    scripts/eog_band_tuner.py out.jsonl --validate --live
+
+`--list` shows rows, weeks and whether a season is complete (26 weeks / 36,608 rows). Verified
+round-trip: 1,408 rows through Mongo and back came out **byte-identical**.
+
+⚠️ **`--validate` must use the config that PRODUCED the log.** There are now three generations
+(pre-leveling, post-leveling, post-shot-retune) and validating against the wrong one reports
+mass "drift" that is really a config mismatch — the verification log scored 8 of 11 attributes
+as mismatched against `AS_LOGGED`, and 11 of 11 clean against its own config. `--validate` now
+honours `--config` and `--live`.
+
+### What tester data can and cannot answer
+
+~99% of rows still come from uniform-reference-plan CPU teams — only 1 of 128 teams in a
+franchise is the user's — so the sample is not meaningfully contaminated by deliberate human
+training. The real distinction is which QUESTION the data answers:
+
+* **The FG%-vs-shot_threshold slope fit is VALID regardless of training.** It is a property of
+  the engine and rosters — what FG% a team produces at a given threshold — and training does
+  not enter it. This is exactly the re-fit the `shot_threshold` calibration needs.
+* **The band-POSITION calibration is NOT valid**, because it depends on the training drift the
+  neutral band must offset (+56.4/season measured on the uniform plan). A league with human
+  training has a different balance point.
+
+So tester seasons answer the question we need and not the other one. Re-derive the slope from
+them; do not re-derive the training constants from them.

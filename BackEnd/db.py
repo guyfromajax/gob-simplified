@@ -219,6 +219,10 @@ if client:
     # gob.alpha_feedback on prod, gob-staging.alpha_feedback on staging — DB chosen
     # by _get_database_name, no per-env branching).
     alpha_feedback_collection = db["alpha_feedback"]
+    # EOG band instrumentation. Durable home for the [EOG-BAND] records: Railway's
+    # container filesystem is EPHEMERAL and declares no volume, so the file sink
+    # produces nothing retrievable in production. TTL-expired, see ensure_eog_band_log_index.
+    eog_band_log_collection = db["eog_band_log"]
     print("🔵 [DEBUG] db.py: Collections initialized", file=sys.stderr, flush=True)
 else:
     print("🔵 [DEBUG] db.py: Using mongomock (no MongoDB connection)", file=sys.stderr, flush=True)
@@ -252,6 +256,7 @@ else:
     around_the_league_collection = db["around_the_league"]
     # Alpha 12-question feedback survey (lazily created on first insert).
     alpha_feedback_collection = db["alpha_feedback"]
+    eog_band_log_collection = db["eog_band_log"]
     print("🔵 [DEBUG] db.py: Mongomock collections initialized", file=sys.stderr, flush=True)
 
 print("🔵 [DEBUG] db.py: Module initialization complete", file=sys.stderr, flush=True)
@@ -359,3 +364,28 @@ def ensure_users_username_index():
         )
     except Exception as e:
         print(f"⚠️ [DB] ensure_users_username_index: {e}", file=sys.stderr, flush=True)
+
+
+# Retention for EOG band instrumentation. A franchise-season is ~36,600 rows / ~13 MiB as
+# JSONL, so 50 concurrent seasons is well under a gigabyte — the TTL is housekeeping, not a
+# capacity control. Override with GOB_EOG_BAND_TTL_DAYS.
+EOG_BAND_LOG_TTL_DAYS = int(os.environ.get("GOB_EOG_BAND_TTL_DAYS", "90") or 90)
+
+
+def ensure_eog_band_log_index():
+    """TTL on `created_at` plus a (franchise_id, week) index for extraction.
+    Idempotent; safe to call on startup. Skips when using mongomock."""
+    if not client:
+        return
+    try:
+        eog_band_log_collection.create_index(
+            [("created_at", 1)],
+            expireAfterSeconds=EOG_BAND_LOG_TTL_DAYS * 86400,
+            name="eog_band_ttl",
+        )
+        eog_band_log_collection.create_index(
+            [("franchise_id", 1), ("week", 1)],
+            name="eog_band_franchise_week",
+        )
+    except Exception as e:
+        print(f"⚠️ [DB] ensure_eog_band_log_index: {e}", file=sys.stderr, flush=True)

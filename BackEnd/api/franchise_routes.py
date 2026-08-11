@@ -73,9 +73,7 @@ from BackEnd.utils.franchise_training_state import (
     franchise_training_fully_complete_for_week,
     franchise_user_training_applied_for_week,
 )
-from BackEnd.utils.training_loading_highlights import build_training_loading_highlights
 from BackEnd.utils.franchise_coaching_focus_counts import (
-    COACHING_FOCUS_FTD_COUNT_KEYS,
     carryover_coaching_focus_counts_for_new_season,
     user_ftd_coaching_focus_increment,
 )
@@ -1403,14 +1401,48 @@ _EOG_BAND_LOG_LOCK = threading.Lock()
 _EOG_BAND_LOG_FH = None
 _EOG_BAND_LOG_FH_PATH = None
 _EOG_BAND_GIT_SHA = None
+_EOG_BAND_BUFFER: list = []
+# 500, not 50: each insert_many is an Atlas round-trip (~45 ms), so batch 50 cost
+# ~20 ms/game while 500 costs ~2 ms. complete_week flushes at the end of every week, so a
+# hard crash loses at most the current week's tail rather than a season.
+_EOG_BAND_BATCH = 500
+
+
+def _eog_band_log_mode() -> str:
+    """'off' | 'file' | 'mongo'.
+
+    FILE is for local measurement harnesses. It is NOT usable in production: Railway's
+    container filesystem is ephemeral and declares no volume, so the file dies on the next
+    redeploy, each replica writes its own partial, and nothing serves it.
+    MONGO is the production sink — durable, queryable, TTL-expired.
+    """
+    raw = os.environ.get("GOB_EOG_BAND_LOG", "0").strip().lower()
+    if raw == "mongo":
+        return "mongo"
+    if raw in ("1", "true", "yes", "on", "file"):
+        return "file"
+    return "off"
 
 
 def _eog_band_log_enabled() -> bool:
-    return os.environ.get("GOB_EOG_BAND_LOG", "0").strip().lower() in ("1", "true", "yes", "on")
+    return _eog_band_log_mode() != "off"
 
 
 def _eog_band_log_path() -> str:
     return os.environ.get("GOB_EOG_BAND_LOG_FILE", "eog_band_log.jsonl")
+
+
+# Optional RESTRICTION, not a requirement: unset/empty logs EVERY franchise. Tester
+# franchises are created whenever, so naming ids in advance would mean discovering which
+# to log only after the season is half gone.
+def _eog_band_franchise_filter() -> set:
+    raw = (os.environ.get("GOB_EOG_BAND_FRANCHISES") or "").strip()
+    return {p.strip() for p in raw.split(",") if p.strip()} if raw else set()
+
+
+def _eog_band_should_log(franchise_id) -> bool:
+    allow = _eog_band_franchise_filter()
+    return (not allow) or (str(franchise_id) in allow)
 
 
 def _eog_band_git_sha() -> str:
@@ -1455,13 +1487,35 @@ def _eog_band_header_record() -> dict:
 
 
 def _emit_eog_band_record(record: dict) -> None:
-    """Append one [EOG-BAND] JSONL record to the dedicated measurement file.
+    """Append one [EOG-BAND] record to the configured sink.
 
-    No-op unless GOB_EOG_BAND_LOG is truthy. Instrumentation must never break a
-    game, so all failures are swallowed.
+    No-op unless GOB_EOG_BAND_LOG is set. Instrumentation must never break a game, so all
+    failures are swallowed. Mongo writes are BUFFERED (insert_many every
+    _EOG_BAND_BATCH rows) — 36,600 individual inserts per franchise-season would be the
+    only part of this instrumentation with a measurable cost.
     """
     global _EOG_BAND_LOG_FH, _EOG_BAND_LOG_FH_PATH
+    mode = _eog_band_log_mode()
+    if mode == "off":
+        return
+    if not _eog_band_should_log(record.get("franchise_id")):
+        return
     try:
+        if mode == "mongo":
+            from BackEnd.db import eog_band_log_collection
+            doc = dict(record)
+            doc["created_at"] = datetime.utcnow()      # TTL anchor
+            doc["git_sha"] = _eog_band_git_sha()
+            with _EOG_BAND_LOG_LOCK:
+                _EOG_BAND_BUFFER.append(doc)
+                if len(_EOG_BAND_BUFFER) >= _EOG_BAND_BATCH:
+                    batch, _EOG_BAND_BUFFER[:] = list(_EOG_BAND_BUFFER), []
+                else:
+                    batch = None
+            if batch:
+                eog_band_log_collection.insert_many(batch, ordered=False)
+            return
+
         line = "[EOG-BAND] " + json.dumps(record, default=str)
         path = _eog_band_log_path()
         with _EOG_BAND_LOG_LOCK:
@@ -1483,6 +1537,24 @@ def _emit_eog_band_record(record: dict) -> None:
             _EOG_BAND_LOG_FH.write(line + "\n")
     except Exception:
         pass
+
+
+def flush_eog_band_buffer() -> int:
+    """Write any buffered Mongo rows. Registered atexit and safe to call anywhere."""
+    try:
+        with _EOG_BAND_LOG_LOCK:
+            if not _EOG_BAND_BUFFER:
+                return 0
+            batch, _EOG_BAND_BUFFER[:] = list(_EOG_BAND_BUFFER), []
+        from BackEnd.db import eog_band_log_collection
+        eog_band_log_collection.insert_many(batch, ordered=False)
+        return len(batch)
+    except Exception:
+        return 0
+
+
+import atexit as _atexit
+_atexit.register(flush_eog_band_buffer)
 
 
 def _finalize_team_attributes_for_game(
@@ -6553,6 +6625,10 @@ def _finalize_franchise_week_after_cpu_games(
     ts_reset = _training_status_reset_after_advance_to_week(update_fields.get("week"))
     if ts_reset:
         update_fields.update(ts_reset)
+    _flushed = flush_eog_band_buffer()
+    if _flushed:
+        logger.info("🧪 [EOG-BAND] flushed %s buffered rows at week end", _flushed)
+
     logger.warning(
         "🧭 [COMPLETE-WEEK-PERSIST] Persisting franchise week/results update. franchise_id=%s completed_week=%s next_week=%s results_count=%s update_keys=%s",
         franchise_id_str,
@@ -9366,6 +9442,25 @@ def season_schedule(franchise_id: str, conference: Optional[int] = None, user_te
 @router.get("/franchise/schedule/national")
 def national_schedule(franchise_id: str):
     return _build_season_schedule_payload(franchise_id=franchise_id)
+
+
+@router.get("/franchise/league-news")
+def franchise_league_news(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """One read-only, pre-ranked payload for the training load newswire."""
+    try:
+        franchise_oid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID format")
+    verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    franchise_doc = db.franchises.find_one({"_id": franchise_oid})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    from BackEnd.utils.franchise_league_news import build_franchise_league_news
+
+    return build_franchise_league_news(franchise_doc)
 
 
 def get_leaders(
@@ -14109,6 +14204,7 @@ def get_training_points(franchise_id: str):
         "camp_weeks": CAMP_WEEKS,
         "gain_percentage_matrix": gain_percentage_matrix(),
         "week": week,
+        "season": int(franchise_doc.get("current_season") or 1),
         "user_team_name": franchise_doc.get("user_team_id"),
         "custom_focus_roster": custom_roster,
         "player_maximizer_ranking_attrs": ranking_attrs,
@@ -14280,24 +14376,10 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
                 "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={week}&from=training",
             }
         if franchise_user_training_applied_for_week(training_status, week):
-            lt = franchise_doc.get("latest_training") or {}
-            user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-            ftd_override = lt.get("ftd_coaching_focus")
-            if not isinstance(ftd_override, dict):
-                ftd_row = franchise_team_data_collection.find_one(
-                    {"franchise_id": franchise_id, "team_id": ObjectId(user_team_object_id)},
-                    {"coaching_focus": 1},
-                ) or {}
-                raw_cf = ftd_row.get("coaching_focus") or {}
-                ftd_override = {
-                    k: int(raw_cf.get(k, 0) or 0) for k in COACHING_FOCUS_FTD_COUNT_KEYS
-                }
+            _user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
             return {
                 "status": "user_training_already_applied",
                 "week": week,
-                "training_highlights": build_training_loading_highlights(
-                    lt, ftd_coaching_focus=ftd_override
-                ),
                 "team_id": user_team_object_id,
                 "redirect": None,
             }
@@ -14656,14 +14738,6 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             franchise_doc.setdefault("recruiting_results", {})[str(week)] = week_assignments
 
     session_type = training_status.get("session_type", "in-season")
-    ftd_counts_for_highlights: dict[str, int] = {}
-    pre_cf = ftd_doc.get("coaching_focus") or {}
-    for _k in COACHING_FOCUS_FTD_COUNT_KEYS:
-        try:
-            ftd_counts_for_highlights[_k] = int(pre_cf.get(_k, 0) or 0)
-        except (TypeError, ValueError):
-            ftd_counts_for_highlights[_k] = 0
-
     # Persist the `general` allocations (incl. film_study) so the FCC Scouting
     # Report can gate the opponent's Play Usage on Film Study > 0 for this week.
     _general_alloc = training_data.get("general") or {}
@@ -14694,7 +14768,6 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         "defenses_effectiveness_changes": training_report.get("defenses_effectiveness_changes", {}),
         "session_type": session_type,
         "date": datetime.now().strftime("%Y-%m-%d"),
-        "ftd_coaching_focus": ftd_counts_for_highlights,
         "team_drills": training_data.get("team_drills") or {},
         "general": _general_alloc,
     }
@@ -14722,11 +14795,6 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     )
     if cf_inc:
         ftd_ops["$inc"] = cf_inc
-        for _path, _inc in cf_inc.items():
-            _sub = _path.replace("coaching_focus.", "")
-            if _sub in ftd_counts_for_highlights:
-                ftd_counts_for_highlights[_sub] = ftd_counts_for_highlights.get(_sub, 0) + int(_inc)
-        training_report_data["ftd_coaching_focus"] = ftd_counts_for_highlights
     if ftd_ops:
         franchise_team_data_collection.update_one(
             {"franchise_id": franchise_id, "team_id": team_object_id},
@@ -14735,13 +14803,10 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
 
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update_user})
 
-    training_highlights = build_training_loading_highlights(training_report_data)
-
     if phase == "user_only":
         return {
             "status": "success",
             "week": week,
-            "training_highlights": training_highlights,
             "player_changes": player_logs,
             "team_changes": team_log,
             "coaching_focus": training_report.get("coaching_focus", {}),
@@ -14775,7 +14840,6 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     return {
         "status": "success",
         "week": week,
-        "training_highlights": training_highlights,
         "player_changes": player_logs,
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
