@@ -491,7 +491,65 @@ was monotonic throughout: more hysteresis, less churn, more exhaustion, same min
 
 ## EOG leveling pass (August 2026) — follow-ups
 
-### TICKET: locate the real source of the fight / discipline season drift
+### RESOLVED + ESCALATED: the fight / discipline drift owner (August 2026)
+
+**Diagnosed. Two of the three candidates are closed; a bigger one opened.**
+
+**(b) reset/rollover artifact — RULED OUT.** The per-week training delta is SPREAD EVENLY
+across all 26 weeks, not spiked. `fight` runs +0.4..+2.0 every week, `discipline` -0.4..-3.6;
+the top three weeks hold only 20% and 29% of total movement. Controls
+(`offensive_efficiency`, `fb_efficiency`, `shot_threshold`, `team_chemistry`) are equally
+smooth, top-3 concentration 15-16% — so §2b is NOT absorbing large one-off EOS/camp writes
+into the training column for any attribute.
+
+**Persona coupling — RULED OUT TWICE OVER.** The nudges are equal in magnitude (±1.5 mean) and
+fire at 4-of-5 sub-options each way, so they cancel at uniform selection. And they never fire
+at all for CPU teams: `auto_train_one_cpu_team` pins `coaching_focus = "player-maximizer-custom"`,
+so the archetype is ALWAYS `player-maximizer`. The culture-builder / authoritarian branches are
+dead code on the CPU path, and 127 of 128 teams are CPU.
+
+**(a) the CPU reference plan — CONFIRMED OWNER for fight/discipline.** Measured directly via
+`auto_train_one_cpu_team(..., dry_run=True)` over 40 teams (all pymongo writes blocked; zero
+write attempts):
+
+| attribute | reference plan | §2b inferred | verdict |
+|---|---|---|---|
+| team_chemistry | -11.7 | -10.2 | ✅ fully explained |
+| offensive_efficiency | +7.2 | +7.5 | ✅ fully explained |
+| fight | **+16.2** | +27 .. +32 | direction right, ~60% of magnitude |
+| discipline | **-24.1** | -35 .. -48 | direction right, ~60% of magnitude |
+| **shot_threshold** | **+1.3** | **+51.4** | ❌ **40x GAP — NOT TRAINING** |
+
+The fight/discipline residual is plausibly estimator bias: §2b conditions on BOTH endpoints
+unclamped, which progressively drops teams that have drifted to the clamp and leaves only
+small-delta survivors (visible as `discipline` decaying -3.55 at wk2 to -0.44 at wk14). That
+biases the estimate DOWNWARD, so the true drift is probably larger than either figure.
+
+**Action for fight/discipline:** the owner is the reference plan's drill->team-attr mapping
+(`training_execution_v2.py:607-617` — discipline draws 0.25x from four categories, fight 0.5x
+from two). Retune there, not in the EOG bands.
+
+### ⚠️ NEW: `shot_threshold` has an unidentified ~+2/week writer
+
+**The single largest unexplained drift in the system, and the main reason shot_threshold was
+railing 127 of 128 teams.**
+
+- §2b attributes **+51.4/season** to "training".
+- The CPU reference plan produces **+1.3/season**. A 40x gap.
+- It is NOT a reset artifact: the per-week breakdown shows a steady **~+2.0 every single week**,
+  weeks 2 through 26, not a spike.
+- So something writes `shot_threshold` between games that is neither EOG nor CPU auto-training.
+
+After the leveling re-cut, EOG contributes **-3.1**/season, so essentially ALL of the remaining
++48.3 combined drift on this attribute is the unknown writer. **Find it before tuning
+shot_threshold further** — the bands are now roughly neutral and any further EOG change would
+be compensating for a bug.
+
+Search suggestions: anything writing `team_attributes.shot_threshold` outside
+`eog_attr_rules` / `training_execution_v2` — EOS processing, rank/prestige application,
+`home_crowd`, or a per-game persist path.
+
+### (superseded by the entry above) Original fight/discipline ticket
 
 **Measured on the identity season:** `fight` **+32.0**/season and `discipline` **−48.1**/season
 from TRAINING, against EOG contributions of **+0.6** and **+14.0**. Training dominates both, so

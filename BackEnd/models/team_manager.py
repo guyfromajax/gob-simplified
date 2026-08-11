@@ -821,7 +821,13 @@ class TeamManager:
             if mode == "franchise":
                 attr_range = (-2, 0)
                 team_chemistry = random.randint(7, 10)
-                rebound_modifier = 0.2  # init center stays 0.2 on the new 0.0-1.0 scale (Task 2)
+                # Re-centred 0.2 -> 0.5 (leveling pass, 2026-08-11). On the widened
+                # 0.0-1.0 clamp, 0.2 sits a fifth off the floor while the old EOG ladder
+                # drifted -1.2/season — 93 of 128 teams hit 0.0 by WEEK 3, after which the
+                # attribute carried no information. 0.5 is the midpoint of the live range,
+                # giving symmetric headroom in both directions. The band re-cut alone takes
+                # season drift to +0.1, so this is headroom rather than the fix.
+                rebound_modifier = 0.5
                 shot_threshold = random.randint(FRANCHISE_INIT_LO, FRANCHISE_INIT_HI)
             else:
                 # Single Game or tournament fallback (no seed)
