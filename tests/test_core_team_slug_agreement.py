@@ -1,9 +1,10 @@
 """
 Guardrail: for the 128 core teams, asset folder, stored team_id, and
-FE/BE-derived path slug must agree — except Couer d'Alene.
+FE/BE-derived path slug must agree — except the documented Couer d'Alene slug
+mismatch and IDA folder-casing exception.
 
-See team-builder-identity-inventory.md (Known anomaly — Couer d'Alene).
-Normalizing any one of the three forms in isolation will fail this test.
+See team-builder-identity-inventory.md (Couer d'Alene) and the Team Builder
+handoff's folder-case map (IDA). Normalizing one form in isolation will fail.
 """
 
 from __future__ import annotations
@@ -22,6 +23,9 @@ ASSETS_DIR = ROOT / "FrontEnd" / "static" / "images" / "teams"
 COUER_DISPLAY = "Couer d'Alene"
 COUER_STORED_TEAM_ID = "couer_d_alene"
 COUER_ASSET_AND_DERIVED = "couer_dalene"
+IDA_DISPLAY = "IDA"
+IDA_STORED_AND_DERIVED = "ida"
+IDA_ASSET_FOLDER = "IDA"
 
 
 def _load_core_teams() -> list[tuple[str, str]]:
@@ -66,14 +70,24 @@ def test_couer_dalene_is_documented_three_way_mismatch(core_teams):
     )
 
 
+def test_ida_is_documented_folder_case_exception(core_teams):
+    """IDA keeps its legacy uppercase asset folder; stored and derived ids are lowercase."""
+    matches = [(n, tid) for n, tid in core_teams if n == IDA_DISPLAY]
+    assert len(matches) == 1, f"expected one {IDA_DISPLAY!r} row"
+    _name, stored = matches[0]
+    assert stored.lower() == IDA_STORED_AND_DERIVED
+    assert slug_from_display_name(IDA_DISPLAY) == IDA_STORED_AND_DERIVED
+    assert (ASSETS_DIR / IDA_ASSET_FOLDER).is_dir()
+
+
 def test_all_other_core_teams_asset_stored_and_derived_agree(core_teams):
     """
-    For every core team except Couer d'Alene:
+    For every core team except Couer d'Alene and IDA:
     asset directory name == stored team_id (lower) == FE/BE-derived slug.
     """
     failures: list[str] = []
     for name, stored_raw in core_teams:
-        if name == COUER_DISPLAY:
+        if name in {COUER_DISPLAY, IDA_DISPLAY}:
             continue
         stored = stored_raw.lower()
         derived = slug_from_display_name(name)
@@ -95,6 +109,6 @@ def test_all_other_core_teams_asset_stored_and_derived_agree(core_teams):
 
     assert not failures, (
         "Core team slug forms must agree (asset dir, stored team_id, "
-        "FE/BE-derived). Couer d'Alene is the only documented exception.\n"
+        "FE/BE-derived), excluding the documented Couer d'Alene and IDA exceptions.\n"
         + "\n".join(failures)
     )

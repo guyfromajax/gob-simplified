@@ -38,5 +38,8 @@ def test_assign_roles_outputs_roles_dict():
     roles = game.turn_manager.assign_roles()
     assert isinstance(roles, dict)
     assert "shooter" in roles
-    assert "pass_chain" in roles
+    # HCO role derivation now uses the authored skeleton timeline directly;
+    # pass_chain was retired in favor of per-step ownership.
+    assert "steps" in roles
+    assert "ball_owner_by_step" in roles
     assert "defender" in roles
