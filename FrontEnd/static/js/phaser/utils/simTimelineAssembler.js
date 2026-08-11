@@ -26,6 +26,7 @@
  */
 
 import { calculatePotgPoints } from '../../shared/potg.js';
+import { readableTeamPresentationColor } from './matchupsUiShared.js';
 
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const MO_GLYPH_THRESHOLD = 4; // |MO| >= 4 → hot/cold glyph — matches existing MO_GLYPH_THRESHOLD (gameScene.js:221), the ±5-scale box-score convention
@@ -137,7 +138,10 @@ function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName)
         teamName: hChrome.label,
         name: hChrome.label,
         abbr: hChrome.abbreviation,
-        color: hChrome.primary_color || '#1F8A5B',
+        color: readableTeamPresentationColor(
+          hChrome.primary_color || '#1F8A5B',
+          hChrome.secondary_color
+        ),
         rank: rankOf(homeT, homeRoster),
         rec: recOf(homeT, homeRoster),
       },
@@ -145,7 +149,10 @@ function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName)
         teamName: aChrome.label,
         name: aChrome.label,
         abbr: aChrome.abbreviation,
-        color: aChrome.primary_color || '#9E1B32',
+        color: readableTeamPresentationColor(
+          aChrome.primary_color || '#9E1B32',
+          aChrome.secondary_color
+        ),
         rank: rankOf(awayT, awayRoster),
         rec: recOf(awayT, awayRoster),
       },

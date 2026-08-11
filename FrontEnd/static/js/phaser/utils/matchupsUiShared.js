@@ -12,6 +12,44 @@ export const POSITION_COLORS = Object.freeze({
   C: "#D4A017",
 });
 
+export const DARK_PRESENTATION_BACKGROUND = "#0b0d14";
+export const TEAM_COLOR_TEXT_CONTRAST_MIN = 4.5;
+
+function normalizeHexColor(value) {
+  const text = String(value || "").trim();
+  const short = /^#([0-9a-f]{3})$/i.exec(text);
+  if (short) return `#${short[1].split("").map((c) => c + c).join("")}`;
+  return /^#[0-9a-f]{6}$/i.test(text) ? text : null;
+}
+
+function relativeLuminance(hex) {
+  const color = normalizeHexColor(hex);
+  if (!color) return null;
+  const channels = [1, 3, 5].map((start) => {
+    const srgb = parseInt(color.slice(start, start + 2), 16) / 255;
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+export function colorContrastRatio(foreground, background = DARK_PRESENTATION_BACKGROUND) {
+  const fg = relativeLuminance(foreground);
+  const bg = relativeLuminance(background);
+  if (fg == null || bg == null) return 0;
+  return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+}
+
+/** Primary brand color when readable on dark presentation UI; secondary otherwise. */
+export function readableTeamPresentationColor(primary, secondary, options = {}) {
+  const background = options.background || DARK_PRESENTATION_BACKGROUND;
+  const minimum = Number(options.minimum) || TEAM_COLOR_TEXT_CONTRAST_MIN;
+  const normalizedPrimary = normalizeHexColor(primary);
+  if (normalizedPrimary && colorContrastRatio(normalizedPrimary, background) >= minimum) {
+    return normalizedPrimary;
+  }
+  return normalizeHexColor(secondary) || normalizedPrimary || "#ffffff";
+}
+
 /** RT color from the shared grade presentation. */
 export function rtBadgeBg(rt) {
   return typeof window !== "undefined" && typeof window.getRtColor === "function"

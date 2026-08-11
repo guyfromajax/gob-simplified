@@ -30,39 +30,71 @@ Design notes (see EOG Structural Pass):
 # ─────────────────────────────────────────────────────────────────────────────
 
 # shot_threshold — team FG% bands (golf score: lower = better shooting mindset)
-FG_PCT_HIGH = 50
-FG_PCT_MID = 45
+#
+# ⚠️ INTERIM — CUT AGAINST A KNOWN-MISCALIBRATED INPUT.
+#   cut against : team FG% over 3,328 team-games (identity season, 2026-08-10)
+#   measured    : mean 34.0%, median 33.8%, p33 30.3, p67 37.3
+#   target       : the shot-tuning pass exists to raise this toward ~45%
+# At 45/50 the old cuts put 90.4% of team-games in one band and drove
+# shot_threshold to +222/season, railing 127 of 128 teams. These cuts fix that
+# for the CURRENT distribution. WHEN SHOOTING IS RETUNED THESE INVERT the problem
+# — a league shooting 45% would land almost everything in fg_gt_50.
+# Re-run scripts/eog_band_tuner.py against a fresh season log and re-cut.
+FG_PCT_HIGH = 37
+FG_PCT_MID = 30
 
 # discipline — team (F+TO) vs opponent (F+TO) + buffer
 DISCIPLINE_OPP_BUFFER = 8
 
 # rebound_modifier — differential (treb - opp_treb) band boundaries.
 # >= BIG: dominant; MID..BIG-1: solid; within ±EVEN: even; mirror below.
-REBOUND_BIG_MARGIN = 8
-REBOUND_MID_MARGIN = 4
+# Widened from 8/4/3: at those cuts 65.5% of team-games landed in the two extreme
+# bands (|diff| >= 8), so the ladder's tails dominated the drift. Measured p20/p80
+# of the differential are -14/+14, so 14/7/3 gives roughly even fifths.
+REBOUND_BIG_MARGIN = 14
+REBOUND_MID_MARGIN = 7
 REBOUND_EVEN_MARGIN = 3
 
 # offensive_efficiency — concentration (largest play's share of offensive possessions)
-OFF_CONC_REWARD = 0.30
-OFF_CONC_MIDDLE = 0.45
+#
+# ⚠️ INTERIM — CUT AGAINST A CAPPED INPUT.
+#   cut against : max_share over 3,328 team-games (identity season, 2026-08-10)
+#   measured    : mean 0.273, median 0.265, p33 0.233, p67 0.300
+#   cap          : the playbook generator ceilings any single set play at 20% once
+#                  a team runs 4+ set plays — a DEFERRED fix. The observed spread
+#                  is therefore compressed by the generator, not by coaching.
+# At 0.30/0.45 the old cuts put 68% in the reward band and 2% in the penalty band.
+# WHEN THE CONCENTRATION CAP IS LIFTED these cuts become far too tight.
+# Re-run scripts/eog_band_tuner.py against a fresh season log and re-cut.
+OFF_CONC_REWARD = 0.23
+OFF_CONC_MIDDLE = 0.30
 
 # defensive_efficiency — max share among HCO defense rows (unchanged this pass)
-DEF_MAX_SHARE_REWARD = 0.39
-DEF_MAX_SHARE_MIDDLE = 0.49
+# Re-cut to measured p33/p67 (0.424 / 0.569); at 0.39/0.49 the penalty band took 51%.
+DEF_MAX_SHARE_REWARD = 0.42
+DEF_MAX_SHARE_MIDDLE = 0.57
 
 # fb_efficiency — concentration over CR/RR/Triangle (after_steal excluded)
-FB_CONC_REWARD = 0.45
-FB_CONC_MIDDLE = 0.60
+# Re-cut to measured p33/p67 (0.444 / 0.533).
+FB_CONC_REWARD = 0.44
+FB_CONC_MIDDLE = 0.53
 
 # pt_efficiency — concentration over [3 HCT variant A's + fcp_used]
+# Re-cut to measured p33/p67 (0.500 / 0.700).
 PT_CONC_REWARD = 0.50
-PT_CONC_MIDDLE = 0.75
+PT_CONC_MIDDLE = 0.70
 
 # fb_opp_modifier — opponent fast-break VOLUME (after_steal excluded)
-FB_OPP_HEALTHY_BAND = (5, 10)   # (lo, hi) inclusive healthy band
+FB_OPP_HEALTHY_BAND = (7, 13)   # (lo, hi) inclusive; measured p33/p67 = 7/12
 
 # pt_opp_modifier — opponent press/trap VOLUME (hct_used + fcp_used)
-PT_HEALTHY_BAND = (7, 14)       # median measured 6.0 → likely penalizes ~56% for now
+# Opponent pressure volume is strongly BIMODAL once identity is live: press-vision
+# teams generate a median of 15 pressure possessions, everyone else 4-6 (measured
+# 2026-08-10, 3.0x separation, press p10 = 9). The old 7-14 band sat in the valley
+# between the two modes, penalising commitment — 53.7% of press games scored as
+# overuse. 9-20 makes the healthy band mean "you faced a real press", which is what
+# an opponent-pressure modifier should reward.
+PT_HEALTHY_BAND = (9, 20)
 
 # team_chemistry — national-rank thresholds (lower rank int = better)
 CHEM_TOP_RANK = 10

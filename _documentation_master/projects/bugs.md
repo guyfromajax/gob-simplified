@@ -6,6 +6,7 @@
 1. Downloadable game vs Live game dynamics
 2. College and Pro setup
 3. Training load screen to show previous week's highlights. Top scorers in teh nation, all-american team, 
+4. Make sure scouting report tab and team roster pages are wired with the team's preset starting lineups instead of our previous formula for displaying them
 
 ##Playtest Launch / In Progress
 1. Steam
