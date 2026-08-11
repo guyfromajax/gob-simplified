@@ -7705,6 +7705,27 @@ def complete_week(req: CompleteWeekRequest):
 
     req = _harden_complete_week_request_week(franchise_doc, req)
 
+    # CPU TEAM IDENTITY — assign/refresh before any game is simmed this week.
+    # Idempotent and season-keyed: it is a no-op once each team's identity matches the
+    # current season and CONSTANTS_VERSION. It lives here because franchise creation
+    # seeds FTD strategy_settings BEFORE rosters are attached, so identity cannot be
+    # computed at that site; this is the first point each season where a projected five
+    # is guaranteed to exist. Without it, FTD supplies flat-neutral all-2s sliders,
+    # TeamManager takes its "settings were supplied" branch, and identity never runs in
+    # franchise mode at all. See BackEnd/utils/franchise_identity.
+    try:
+        from BackEnd.utils.franchise_identity import ensure_franchise_identities
+
+        _identity_summary = ensure_franchise_identities(
+            franchise_id,
+            int(franchise_doc.get("current_season") or 1),
+            int(franchise_doc.get("week") or 1),
+        )
+        if _identity_summary.get("assigned"):
+            logger.warning("🧬 [IDENTITY] franchise=%s %s", req.franchise_id, _identity_summary)
+    except Exception as _identity_err:  # never let identity block a week
+        logger.error("[IDENTITY] assignment failed for %s: %s", req.franchise_id, _identity_err)
+
     _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
     user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
 

@@ -99,6 +99,12 @@ FUEL_CAPACITY = {"low": 1, "mid": 2, "high": 4}
 
 SOFTMAX_TEMPERATURE = 0.5
 
+# Bump when SIGNAL_SCALE, the residual slopes, the weight tables, FUEL_CAPACITY_BOUNDS or
+# the softmax temperature change. Persisted on each team's identity sub-document so a stale
+# identity assigned under different constants can be detected and reassigned rather than
+# silently reused.
+CONSTANTS_VERSION = 1
+
 # ── SLIDER DRAW TABLES ───────────────────────────────────────────────────────────────────
 # Weights over slider values [0,1,2,3,4]. A vision names only the sliders it cares about.
 #
@@ -343,5 +349,10 @@ def assign_identity(players: Sequence, rng=None) -> Optional[Dict]:
         "defensive_vision": dfn,
         "strategy_settings": draw_strategy_settings(off, dfn, rng=rng),
         "signals": {k: round(v, 4) for k, v in z.items() if not k.startswith("_")},
+        "scores": {
+            side: {v: round(sc, 4) for v, sc in table.items()}
+            for side, table in score_visions(z).items()
+        },
         "fuel_capacity": fuel_capacity(z),
+        "constants_version": CONSTANTS_VERSION,
     }
