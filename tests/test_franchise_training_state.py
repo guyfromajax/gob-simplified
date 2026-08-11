@@ -47,8 +47,9 @@ def test_retired_cpu_completion_field_is_not_authoritative():
 def test_only_neutral_cpu_training_route_is_registered():
     from BackEnd.api.api import app
 
-    # FastAPI/Starlette versions may expose internal included-router containers
-    # alongside concrete routes; only concrete entries own a path.
-    paths = {path for route in app.routes if (path := getattr(route, "path", None))}
+    # Use FastAPI's public, fully-expanded route schema.  Inspecting app.routes is
+    # version-dependent: some Starlette releases retain included routers as
+    # pathless container objects instead of flattening their child routes.
+    paths = set(app.openapi().get("paths", {}))
     assert "/franchise/run-training/cpu-train" in paths
     assert "/franchise/run-training/distant-cpu" not in paths

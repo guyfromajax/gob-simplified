@@ -24,6 +24,14 @@ def _setup_game(one_and_one: bool):
     return game, shooter
 
 
+def _force_non_airball_ft_miss(monkeypatch):
+    """Keep miss-path tests on the live-ball rebound branch."""
+    monkeypatch.setattr(
+        "BackEnd.constants.shot_variants.select_ft_shot_variant",
+        lambda *args, **kwargs: "FREE_THROW_MISS",
+    )
+
+
 def test_standard_free_throw_records_points_and_totals():
     game, shooter = _setup_game(one_and_one=False)
     result = resolve_free_throw_logic(game)
@@ -92,7 +100,7 @@ def test_free_throw_animation_empty_offense_lineup():
     assert packet == []
 
 
-def test_two_shot_final_make_flips_possession():
+def test_two_shot_final_make_requests_baseline_inbound_possession_flip():
     game, shooter = _setup_game(one_and_one=False)
     game.game_state["free_throws_remaining"] = 2
 
@@ -103,16 +111,18 @@ def test_two_shot_final_make_flips_possession():
     game.game_state["shooter"] = shooter
     second = resolve_free_throw_logic(game)
     assert second["possession_flips"] is True
-    game.turn_manager.update_clock_and_possession(second)
-    assert game.offense_team == game.away_team
+    assert second["next_play_type"] == "BASELINE_INBOUND"
+    # The resolver declares the transition. GameManager owns the single actual
+    # switch when it synthesizes the ensuing baseline inbound.
+    assert game.offense_team == game.home_team
 
 
 def test_and_one_make_results_in_baseline_inbound():
     game, _ = _setup_game(one_and_one=False)
     result = resolve_free_throw_logic(game)
     assert result["possession_flips"] is True
-    game.turn_manager.update_clock_and_possession(result)
-    assert game.offense_team == game.away_team
+    assert result["next_play_type"] == "BASELINE_INBOUND"
+    assert game.offense_team == game.home_team
 
 
 def test_and_one_miss_results_in_rebound(monkeypatch):
@@ -123,7 +133,11 @@ def test_and_one_miss_results_in_rebound(monkeypatch):
     shooter.attributes["MO"] = 0
     monkeypatch.setattr("BackEnd.engine.phase_resolution.random.randint", lambda a, b: 100 if a == 1 and b == 100 else 1)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 1.0)
-    monkeypatch.setattr("BackEnd.engine.phase_resolution.choose_rebounder", lambda r, s: "C")
+    _force_non_airball_ft_miss(monkeypatch)
+    monkeypatch.setattr(
+        "BackEnd.engine.phase_resolution.determine_rebounder",
+        lambda *args, **kwargs: (game.defense_team.lineup["C"], game.defense_team, "DREB"),
+    )
     result = resolve_free_throw_logic(game)
     assert result["possession_flips"] is True
     assert game.game_state["last_rebounder"] is game.defense_team.lineup["C"]
@@ -145,7 +159,11 @@ def test_one_and_one_miss_ends_possession(monkeypatch):
     shooter.attributes["MO"] = 0
     monkeypatch.setattr("BackEnd.engine.phase_resolution.random.randint", lambda a, b: 100 if a == 1 and b == 100 else 1)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 1.0)
-    monkeypatch.setattr("BackEnd.engine.phase_resolution.choose_rebounder", lambda r, s: "C")
+    _force_non_airball_ft_miss(monkeypatch)
+    monkeypatch.setattr(
+        "BackEnd.engine.phase_resolution.determine_rebounder",
+        lambda *args, **kwargs: (game.defense_team.lineup["C"], game.defense_team, "DREB"),
+    )
     result = resolve_free_throw_logic(game)
     assert result["possession_flips"] is True
     assert game.game_state["free_throws_remaining"] <= 0
@@ -182,6 +200,7 @@ def test_missed_final_ft_dreb_can_arm_fast_break(monkeypatch):
         lambda a, b: 100 if (a, b) == (1, 100) else 1,
     )
     monkeypatch.setattr(_rnd, "random", lambda: 0.0)
+    _force_non_airball_ft_miss(monkeypatch)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.determine_rebounder", fake_determine_rebounder)
     monkeypatch.setattr(
         "BackEnd.engine.dreb_fast_break_arming.play_key_for_fast_break_entry",
@@ -246,6 +265,7 @@ def test_missed_final_ft_rebound_uses_ft_updated_player_coords(monkeypatch):
         lambda a, b: 100 if (a, b) == (1, 100) else 1,
     )
     monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 1.0)
+    _force_non_airball_ft_miss(monkeypatch)
     monkeypatch.setattr("BackEnd.engine.phase_resolution.determine_rebounder", fake_determine_rebounder)
     monkeypatch.setattr(Animator, "capture_free_throw_animation", lambda *args, **kwargs: ft_anims)
 
@@ -254,7 +274,7 @@ def test_missed_final_ft_rebound_uses_ft_updated_player_coords(monkeypatch):
 
 
 def test_missed_final_ft_away_offense_rebound_uses_court_absolute_coords(monkeypatch):
-    """Away FT: apply_coords flips animation finals to runtime-home; rebound math must see absolutes."""
+    """Away FT rebound math reads the court-absolute animation endpoints."""
     game, shooter = _setup_game(one_and_one=False)
     game.offense_team = game.away_team
     game.defense_team = game.home_team
@@ -275,11 +295,11 @@ def test_missed_final_ft_away_offense_rebound_uses_court_absolute_coords(monkeyp
 
     offense_pg.coords = {"x": 15, "y": 10}
     defense_c.coords = {"x": 90, "y": 40}
-    # Animator finals (court-absolute); after apply_coords away-offense → runtime-home flip.
+    # Animator finals and runtime player coordinates share the court-absolute contract.
     anim_pg = {"x": 26, "y": 25}
     anim_c = {"x": 11, "y": 19}
-    expected_runtime_pg = {"x": 100 - anim_pg["x"], "y": anim_pg["y"]}
-    expected_runtime_c = {"x": 100 - anim_c["x"], "y": anim_c["y"]}
+    expected_runtime_pg = anim_pg
+    expected_runtime_c = anim_c
 
     ft_anims = [
         {"playerId": offense_pg_id, "end": anim_pg, "movement": []},
@@ -290,7 +310,7 @@ def test_missed_final_ft_away_offense_rebound_uses_court_absolute_coords(monkeyp
     def fake_determine_rebounder(
         g, bounce_spot=None, exclude_player_ids=None, penalize_player_ids=None, **kwargs
     ):
-        # Mock bypasses shared.determine_rebounder; coords stay runtime-home after apply_coords.
+        # Mock bypasses shared.determine_rebounder; coords remain court-absolute.
         assert offense_pg.coords == expected_runtime_pg
         assert defense_c.coords == expected_runtime_c
         return defense_c, game.defense_team, "DREB"
@@ -300,6 +320,7 @@ def test_missed_final_ft_away_offense_rebound_uses_court_absolute_coords(monkeyp
         lambda a, b: 100 if (a, b) == (1, 100) else 1,
     )
     monkeypatch.setattr("BackEnd.engine.phase_resolution.random.random", lambda: 1.0)
+    _force_non_airball_ft_miss(monkeypatch)
     monkeypatch.setattr(
         "BackEnd.engine.phase_resolution.determine_rebounder",
         fake_determine_rebounder,
