@@ -1,7 +1,7 @@
-import random
 import unittest
 from unittest.mock import patch
 
+from BackEnd.models import training_execution_v2
 from BackEnd.models.training_execution_v2 import (
     _apply_player_training_points,
     _pre_training_decay_range_for_year,
@@ -30,7 +30,7 @@ class _FakeRng:
 
 
 class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
-    # fb_opp_modifier — volume ladder, healthy band FB_OPP_HEALTHY_BAND (5, 10).
+    # fb_opp_modifier — volume ladder using the production healthy-band constant.
     def test_fb_opp_modifier_zero_volume_atrophy(self):
         rng = _FakeRng("lo")
         label, delta = fb_opp_modifier_change(0, rng=rng)
@@ -55,7 +55,7 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         self.assertEqual(label, "fb_opp_over")
         self.assertEqual(rng.calls[-1], B.VOL_OVER_DELTA)
 
-    # pt_opp_modifier — volume ladder, healthy band PT_HEALTHY_BAND (7, 14).
+    # pt_opp_modifier — volume ladder using the remeasured production band (9, 20).
     def test_pt_opp_modifier_zero_volume_atrophy(self):
         rng = _FakeRng("lo")
         label, _ = pt_opp_modifier_change(0, rng=rng)
@@ -98,15 +98,19 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
             "attributes": {"anchor_SC": 50, "SC": 50},
         }
 
-        with patch.object(random, "randint", side_effect=fake_randint):
+        # Training RNG isolation deliberately replaced Python's global random stream;
+        # patch the same dedicated stream production uses.
+        with patch.object(training_execution_v2.random, "randint", side_effect=fake_randint):
             _apply_player_training_points(player, "SC", points=2, archetype=None, sub_option=None, multiplier=1.0)
 
         # Base range for 2 pts is (2,3) + senior max-adjustment (+1) → (2,4);
         # fake_randint returns the high end (4).
         self.assertEqual(calls[-1], (2, 4))
-        # Positive weekly gains scale with fractional remainder (§10.6).
+        # Positive weekly gains scale by session, position fit, and class before
+        # entering the fractional remainder (§10.6 and the discount-model decision).
         from BackEnd.models.training_execution_v2 import IN_SEASON_GAIN_SCALE
-        scaled = 4 * IN_SEASON_GAIN_SCALE  # 0.72
+        from BackEnd.constants.training_shape import player_attr_gain_multiplier
+        scaled = 4 * IN_SEASON_GAIN_SCALE * player_attr_gain_multiplier(player, "SC")
         expected_whole = int(scaled)
         expected_rem = scaled - expected_whole
         self.assertEqual(player["attributes"]["anchor_SC"], 50 + expected_whole)
@@ -266,7 +270,7 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
                     "name": "Morristown",
                     "scouting": {
                         "offense": {"Fast_Break_Entries": 4, "Fast_Break_Success": 3},
-                        "defense": {"HCT": {"used": 11, "success": 4}, "FCP": {"used": 6, "success": 4}},
+                        "defense": {"HCT": {"used": 15, "success": 4}, "FCP": {"used": 6, "success": 4}},
                     },
                 },
             },
@@ -277,7 +281,7 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
         eog_inputs = build_eog_inputs_from_game_doc(game_doc, "LANCASTER", "MORRISTOWN")
         opponent_scouting = eog_inputs["away"]["scouting"]
         opponent_pt_volume = int(opponent_scouting.get("pt_total_attempts", 0))
-        # HCT.used 11 + FCP.used 6 = 17 > PT_HEALTHY_BAND hi (14) → over-volume band.
+        # HCT.used 15 + FCP.used 6 = 21 > current PT_HEALTHY_BAND hi (20).
         self.assertGreater(opponent_pt_volume, B.PT_HEALTHY_BAND[1])
 
         rng = _FakeRng("lo")
