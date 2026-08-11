@@ -2,7 +2,7 @@ from fastapi.testclient import TestClient
 
 from BackEnd.api.api import app
 from BackEnd.api.franchise_routes import get_team_player_stats
-from BackEnd.db import db
+from BackEnd.db import db, franchise_players_data_collection
 # Note: franchise_state_collection removed - using franchise document instead
 
 
@@ -12,6 +12,7 @@ client = TestClient(app)
 def setup_function(_fn):
     db.franchises.delete_many({})
     db.teams.delete_many({})
+    franchise_players_data_collection.delete_many({})
     # Note: franchise_state_collection cleanup removed - no longer used
 
 
@@ -20,22 +21,30 @@ def seed_franchise():
         {
             "user_team_id": "Team1",  # Use new approach instead of franchise_state
             "user_team_object_id": "t1",
-            "players": {
-                "p1": {
-                    "meta": {"team_id": "t1", "first_name": "A", "last_name": "One"},
-                    "season": {"PTS": 5},
-                },
-                "p2": {
-                    "meta": {"team_id": "t1", "first_name": "B", "last_name": "Two"},
-                    "season": {"PTS": 10},
-                },
-                "p3": {
-                    "meta": {"team_id": "t2", "first_name": "C", "last_name": "Three"},
-                    "season": {"PTS": 7},
-                },
-            }
         }
     ).inserted_id
+    franchise_players_data_collection.insert_many(
+        [
+            {
+                "franchise_id": str(fid),
+                "player_id": "p1",
+                "meta": {"team_id": "t1", "first_name": "A", "last_name": "One"},
+                "season": {"PTS": 5},
+            },
+            {
+                "franchise_id": str(fid),
+                "player_id": "p2",
+                "meta": {"team_id": "t1", "first_name": "B", "last_name": "Two"},
+                "season": {"PTS": 10},
+            },
+            {
+                "franchise_id": str(fid),
+                "player_id": "p3",
+                "meta": {"team_id": "t2", "first_name": "C", "last_name": "Three"},
+                "season": {"PTS": 7},
+            },
+        ]
+    )
     return str(fid)
 
 
@@ -62,4 +71,3 @@ def test_get_team_player_stats_and_endpoints():
     assert resp.status_code == 200
     data2 = resp.json()
     assert [p["player_id"] for p in data2["players"]] == ["p2", "p1"]
-
