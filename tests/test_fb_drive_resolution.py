@@ -62,7 +62,7 @@ def _drive_kwargs(**overrides):
     return defaults
 
 
-def test_no_meet_all_defenders_to_basket_spot():
+def test_no_meet_all_defenders_advance_toward_basket_spot():
     kwargs = _drive_kwargs(
         def_starts={
             "PG": {"x": 10.0, "y": 10.0},
@@ -77,9 +77,18 @@ def test_no_meet_all_defenders_to_basket_spot():
     assert result["outcome"] == "NO_MEET"
     assert result["bh_path_knots"] == [kwargs["bh_start"], kwargs["shot_spot"]]
     basket = attacking_basket_coord(is_away_offense=False)
+    starts_by_id = {
+        kwargs["def_lineup"][pos].player_id: coord
+        for pos, coord in kwargs["def_starts"].items()
+    }
+    target = HCO_STRING_SPOTS["basketSpot"]
     for pid, coord in result["defender_end_coords"].items():
-        assert coord["x"] == pytest.approx(HCO_STRING_SPOTS["basketSpot"]["x"])
-        assert coord["y"] == pytest.approx(HCO_STRING_SPOTS["basketSpot"]["y"])
+        start = starts_by_id[pid]
+        start_distance = ((start["x"] - target["x"]) ** 2 + (start["y"] - target["y"]) ** 2) ** 0.5
+        end_distance = ((coord["x"] - target["x"]) ** 2 + (coord["y"] - target["y"]) ** 2) ** 0.5
+        # Movement is interrupted by the shot beat; defenders pursue the basket
+        # destination but are no longer snapped there instantaneously.
+        assert end_distance < start_distance
     assert basket["x"] == pytest.approx(91.0)
 
 
@@ -233,6 +242,10 @@ def test_steal_meet_skips_x_ahead_reject_and_uses_next(monkeypatch):
     monkeypatch.setattr(
         "BackEnd.engine.fb_drive_resolution.resolve_cutoff_contest",
         lambda *a, **k: ("NEUTRAL", 1.0, None),
+    )
+    monkeypatch.setattr(
+        "BackEnd.engine.fb_drive_resolution.calculate_charge",
+        lambda *a, **k: None,
     )
 
     result = resolve_fb_drive_step(**_drive_kwargs(steal_entry=True))

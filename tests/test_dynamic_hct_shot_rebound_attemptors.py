@@ -46,6 +46,12 @@ def test_hct_fast_break_miss_stamps_near_bounce_attemptors_from_shot_seed(monkey
     game.game_state["offensive_state"] = "HCT"
     game.offense_team.team_attributes["shot_threshold"] = 100
     _force_clean_miss(monkeypatch)
+    # This test exercises the live-rebound path. Airballs intentionally route
+    # directly to a baseline inbound and therefore have no rebounder payload.
+    monkeypatch.setattr(
+        "BackEnd.constants.shot_variants.select_shot_variant",
+        lambda *args, **kwargs: "CLANK",
+    )
     monkeypatch.setattr(
         "BackEnd.utils.shared.calculate_bounce_spot",
         lambda *args, **kwargs: {"x": 89, "y": 25},
@@ -115,6 +121,11 @@ def test_hct_attack_basket_miss_stamps_near_bounce_attemptors_from_shot_coords(m
     _sync_ids_and_rosters(game)
     game.game_state["offensive_state"] = "HCT"
     game.offense_team.team_attributes["shot_threshold"] = 100
+    # Keep this assertion on the live-rebound branch; AIRBALL has no rebounder.
+    monkeypatch.setattr(
+        "BackEnd.constants.shot_variants.select_shot_variant",
+        lambda *args, **kwargs: "CLANK",
+    )
     monkeypatch.setattr(
         "BackEnd.utils.shared.calculate_bounce_spot",
         lambda *args, **kwargs: {"x": 89, "y": 25},

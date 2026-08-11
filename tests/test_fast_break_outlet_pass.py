@@ -90,23 +90,9 @@ class TestFastBreakOutletPassRoles:
             
             result = resolve_fast_break_logic(game)
         
-        # If result_type is DEFENSIVE_STOP, it returns early without roles
-        # In that case, we can't verify outlet pass roles, but we can verify the function handled None rebounder gracefully
-        if result.get("result_type") == "DEFENSIVE_STOP":
-            # Early return for DEFENSIVE_STOP doesn't include roles
-            # But we verified the function handled None rebounder without crashing
-            assert result is not None
-            print(f"✅ Test passed: function handled None rebounder gracefully (DEFENSIVE_STOP)")
-        else:
-            # SHOT result includes roles
-            assert "roles" in result
-            roles = result["roles"]
-            
-            # Verify outlet pass roles are None (no rebounder)
-            assert roles["outlet_passer"] is None, \
-                "outlet_passer should be None when last_rebounder is None"
-            assert roles["outlet_receiver"] is None, \
-                "outlet_receiver should be None when last_rebounder is None"
-            
-            print(f"✅ Test passed: outlet roles correctly None when last_rebounder is None")
-
+        # A missing rebounder is an invalid DREB seam. The unified Covert Release
+        # path must fail safely into its legacy-animation fallback; it does not
+        # promise a normal ``roles`` payload for malformed input.
+        assert result is not None
+        assert result.get("fb_emitter_fallback_reason") == "covert_release:missing_bh_id"
+        assert "animation_steps" not in result
