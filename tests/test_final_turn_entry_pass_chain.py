@@ -3,7 +3,7 @@
 from types import SimpleNamespace
 
 from BackEnd.engine.skeleton_step_emitter import (
-    _append_final_turn_entry_pass_if_needed,
+    _prepend_final_turn_handoff_if_needed,
     build_skeleton_animation_steps,
 )
 
@@ -14,8 +14,8 @@ def _coords_map(prefix):
     return {f"{prefix}_{p}": {"x": 50.0 + i, "y": 25.0} for i, p in enumerate(POSITIONS)}
 
 
-def test_final_turn_entry_pass_next_does_not_self_loop():
-    """Inserted entry pass must advance to skeleton step 1 (index 2), not index 1."""
+def test_final_turn_handoff_next_does_not_self_loop():
+    """The replacement handoff chain advances into alignment without self-looping."""
     off_lineup = {
         p: SimpleNamespace(player_id=f"h_{p}", attributes={"AG": 50})
         for p in POSITIONS
@@ -26,9 +26,9 @@ def test_final_turn_entry_pass_next_does_not_self_loop():
     }
     steps = [
         {
-            "start": {"coords": _coords_map("h")},
+            "start": {"coords": {**_coords_map("h"), **_coords_map("a")}},
             "end": {
-                "coords": _coords_map("h"),
+                "coords": {**_coords_map("h"), **_coords_map("a")},
                 "time_elapsed": 17.0,
             },
         }
@@ -57,23 +57,36 @@ def test_final_turn_entry_pass_next_does_not_self_loop():
         ]
     }
     turn = {"final_turn": True, "result_type": "MISS", "skeleton": skeleton}
+    animations = [
+        {
+            "playerId": f"{prefix}_{pos}",
+            "movement": [{"coords": {"x": 55.0 + i, "y": 25.0}}],
+        }
+        for prefix in ("h", "a")
+        for i, pos in enumerate(POSITIONS)
+    ]
 
-    _append_final_turn_entry_pass_if_needed(
+    _prepend_final_turn_handoff_if_needed(
         steps=steps,
         turn_result=turn,
         prior_turn=prior_turn,
         skeleton_steps=skeleton["steps"],
         off_lineup=off_lineup,
         def_lineup=def_lineup,
+        animations=animations,
+        is_away_offense=False,
         clock_remaining_at_turn_start=21.0,
         shot_clock_remaining_at_turn_start=14.0,
         elapsed_so_far=17.0,
     )
 
-    assert len(steps) == 2
-    entry = steps[1]
-    assert entry["end"]["next"] == {"kind": "next_step", "index": 2}
-    assert entry["start"]["advance_trigger"]["metadata"]["reason"] == "final_turn_entry_pass"
+    assert len(steps) == 3
+    assert steps[1]["end"]["next"] == {"kind": "next_step", "index": 2}
+    assert steps[2]["end"]["next"] == {"kind": "next_step", "index": 3}
+    assert (
+        steps[2]["start"]["advance_trigger"]["metadata"]["reason"]
+        == "final_turn_handoff_pass"
+    )
 
 
 def test_final_turn_emitter_step_chain_indices_with_entry_pass(monkeypatch):

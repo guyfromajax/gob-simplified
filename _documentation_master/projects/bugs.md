@@ -64,9 +64,12 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 
 Stale pre-refactor FB tests were deleted 6-12-26; suite is green. **Still open:** current-engine FB coverage is thin — `test_fast_break_rr_triangle_updates.py` covers RR/Triangle emitters, but the CR resolver path and `after_steal_fast_break.py` (resolver + emitter) have little/no direct test coverage. Write new tests against the current resolvers when FB work resumes.
 
-## Two test modules fail to import — invisible coverage debt (found 2026-08-04) [CODE-CLEANUP]
+## Resolved — stale Final Turn test import (found 2026-08-04, fixed 2026-08-11)
 
-`test_eoq_clock_progression.py` and `test_final_turn_entry_pass_chain.py` raise `ImportError` at collection — they import symbols that no longer exist (`roll_anchor_clock` from `eoq_clock_progression`, `_append_final_turn_entry_pass_if_needed` from `skeleton_step_emitter`). A module that can't import is **invisible debt**: it reads as passing coverage while testing nothing, and the exclusion (`--ignore` in any full-suite run) becomes permanent by default. Either repoint each test at the current API (the behaviour it covers — EOQ clock progression, final-turn entry-pass chaining — likely still exists under a renamed function) or delete it if the behaviour is gone. Do not leave them uncollectable.
+`test_final_turn_entry_pass_chain.py` was repointed from the retired
+`_append_final_turn_entry_pass_if_needed` helper to the current
+`_prepend_final_turn_handoff_if_needed` path. Its monotonic/no-self-loop contract remains
+covered. The separate `roll_anchor_clock` debt was resolved earlier.
 
 ## P0 — HCO contract clock overruns (carried from Unified_Animation_System.md, 6-12-26) [CODE-CLEANUP]
 
@@ -194,13 +197,12 @@ Context: `tests/conftest.py` block-lists `gob` and `gob-staging`, so the 217 DB-
 invisibly** in the motion/shot area alone. This blocks regression coverage for the CPU identity
 wiring and rotation work that comes next. It is a workstream, not a pre-commit step.
 
-**1. Three files do not import.** `pytest --collect-only` → **2,274 collected, 3 errors**:
-`tests/test_final_turn_entry_pass_chain.py`, `BackEnd/tests/test_mask_validation.py`,
-`tests/test_shared_defense.py`. Example: `ImportError: cannot import name
-'_append_final_turn_entry_pass_if_needed' from 'BackEnd.engine.skeleton_step_emitter'` — the
-emitter's private API moved and these were not updated. Their tests never run and never report
-as failures. Same failure mode as the orphaned-function sweep: code moved, the referencing thing
-did not.
+**1. Resolved 2026-08-11 — stale imports no longer block collection.** Final Turn
+coverage now targets the current handoff helper, and shared-defense symmetry coverage now
+targets the unified `get_defender_coords` API instead of the two deliberately retired
+assignment helpers. Full local collection reaches 2,337 tests with the image-mask test
+excluded only because the local virtualenv predates the already-declared NumPy/SciPy
+requirements; hosted CI installs both from `requirements.txt`.
 
 **2. Ten tests vary run to run, from TWO independent sources.** Measured over 5 identical runs per
 arm: **22, 23, 23, 23, 20** vs **26, 21, 23, 22, 22** — same code both times. Flaky:
