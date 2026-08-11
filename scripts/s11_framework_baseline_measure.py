@@ -11,6 +11,8 @@ build. Two close-out questions:
 Writes JSON under tmp/s11_framework_baseline/.
 """
 
+from __future__ import annotations
+
 # Pin PYTHONHASHSEED before anything else: unpinned runs are not reproducible and
 # have produced false measurement conclusions. See BackEnd/utils/repro.
 # Loaded BY PATH so this does not import the BackEnd.utils package, whose __init__
@@ -23,8 +25,6 @@ _spec = _ilu.spec_from_file_location(
     "_gob_repro", _os.path.join(_GOB_ROOT, "BackEnd", "utils", "repro.py"))
 _repro = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_repro)
 _repro.pin_hash_seed()
-
-from __future__ import annotations
 
 import contextlib
 import json
