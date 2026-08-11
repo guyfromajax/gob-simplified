@@ -511,6 +511,7 @@ try:
                 ensure_frd_index,
                 ensure_games_franchise_index,
                 ensure_franchises_user_id_index,
+                ensure_eog_band_log_index,
             )
             ensure_users_username_index()
             ensure_ftd_index()
@@ -518,6 +519,11 @@ try:
             ensure_frd_index()
             ensure_games_franchise_index()
             ensure_franchises_user_id_index()
+            # TTL + (franchise_id, week) for the EOG band instrumentation. Without this the
+            # collection still accepts writes, so logging LOOKS fine while nothing ever
+            # expires and every export is a collection scan — and GOB_EOG_BAND_TTL_DAYS
+            # silently does nothing, because the index it configures does not exist.
+            ensure_eog_band_log_index()
         except Exception as e:
             print(f"⚠️ [WARNING] startup: ensure indexes: {e}", file=sys.stderr, flush=True)
 

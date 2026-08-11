@@ -369,7 +369,11 @@ def ensure_users_username_index():
 # Retention for EOG band instrumentation. A franchise-season is ~36,600 rows / ~13 MiB as
 # JSONL, so 50 concurrent seasons is well under a gigabyte — the TTL is housekeeping, not a
 # capacity control. Override with GOB_EOG_BAND_TTL_DAYS.
-EOG_BAND_LOG_TTL_DAYS = int(os.environ.get("GOB_EOG_BAND_TTL_DAYS", "90") or 90)
+# 180, not 90: the TTL runs from created_at, so a tester who takes two or three months to
+# play 26 weeks loses their EARLY weeks — and a season with weeks 8-26 is unusable for a
+# re-fit while still reading as nearly complete in eog_band_export.py --list. At ~9 MiB per
+# franchise-season the storage is irrelevant; partial expiry is not.
+EOG_BAND_LOG_TTL_DAYS = int(os.environ.get("GOB_EOG_BAND_TTL_DAYS", "180") or 180)
 
 
 def ensure_eog_band_log_index():
@@ -377,12 +381,28 @@ def ensure_eog_band_log_index():
     Idempotent; safe to call on startup. Skips when using mongomock."""
     if not client:
         return
+    want = EOG_BAND_LOG_TTL_DAYS * 86400
     try:
         eog_band_log_collection.create_index(
-            [("created_at", 1)],
-            expireAfterSeconds=EOG_BAND_LOG_TTL_DAYS * 86400,
-            name="eog_band_ttl",
+            [("created_at", 1)], expireAfterSeconds=want, name="eog_band_ttl",
         )
+    except Exception as e:
+        # create_index REFUSES to change expireAfterSeconds on an existing index
+        # (IndexOptionsConflict). Without this branch a later GOB_EOG_BAND_TTL_DAYS change
+        # logs a warning and keeps the OLD retention — the env var reads as authoritative
+        # while doing nothing. collMod is the only way to retune a live TTL.
+        if getattr(e, "code", None) == 85:
+            try:
+                res = db.command("collMod", "eog_band_log", index={
+                    "keyPattern": {"created_at": 1}, "expireAfterSeconds": want})
+                print(f"🔵 [DB] eog_band TTL retuned "
+                      f"{res.get('expireAfterSeconds_old')}s -> {res.get('expireAfterSeconds_new')}s",
+                      file=sys.stderr, flush=True)
+            except Exception as e2:
+                print(f"⚠️ [DB] eog_band TTL collMod failed: {e2}", file=sys.stderr, flush=True)
+        else:
+            print(f"⚠️ [DB] eog_band ttl index: {e}", file=sys.stderr, flush=True)
+    try:
         eog_band_log_collection.create_index(
             [("franchise_id", 1), ("week", 1)],
             name="eog_band_franchise_week",
