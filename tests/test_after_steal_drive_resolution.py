@@ -114,6 +114,9 @@ def test_pos_o_stamps_path_knots_on_turn(monkeypatch):
                 "contest_result": None,
                 "contest_margin": None,
                 "shot_defense_score_raw": 0.0,
+                # Required by the made-dunk momentum contract added after these
+                # resolver fixtures were authored.
+                "shooter_player": kwargs.get("shooter"),
             },
         },
     )
@@ -434,7 +437,7 @@ def test_pass_ahead_makes_receiver_the_shooter_and_credits_assist(monkeypatch):
 
     calls = {"n": 0}
 
-    def fake_find(bh, bh_start, off_lineup, def_lineup, is_away):
+    def fake_find(bh, bh_start, off_lineup, def_lineup, is_away, rendered_start):
         calls["n"] += 1
         if calls["n"] == 1:
             return off_lineup["SG"], {"x": 78.0, "y": 25.0}
@@ -475,6 +478,7 @@ def test_pass_ahead_makes_receiver_the_shooter_and_credits_assist(monkeypatch):
                 "contest_result": None,
                 "contest_margin": None,
                 "shot_defense_score_raw": 0.0,
+                "shooter_player": kw.get("shooter"),
             },
         },
     )
@@ -615,6 +619,7 @@ def test_miss_with_oreb_stamps_ball_bounce_coords(monkeypatch):
                 "contest_result": None,
                 "contest_margin": None,
                 "shot_defense_score_raw": 0.0,
+                "shooter_player": kwargs.get("shooter"),
             },
         },
     )
