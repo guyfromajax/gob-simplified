@@ -105,6 +105,10 @@ def test_fcp_miss_dreb_promotes_to_discrete_dreb_turn(monkeypatch):
     )
 
     monkeypatch.setattr(game.turn_manager, "run_micro_turn", lambda: fcp_miss)
+    monkeypatch.setattr(
+        "BackEnd.utils.shared.resolve_over_the_back_foul",
+        lambda *args, **kwargs: None,
+    )
 
     result = game.simulate_macro_turn()
 
@@ -140,6 +144,10 @@ def test_emergency_foul_out_reentry_does_not_interrupt_dreb_promotion(monkeypatc
     )
 
     monkeypatch.setattr(game.turn_manager, "run_micro_turn", lambda: hco_miss)
+    monkeypatch.setattr(
+        "BackEnd.utils.shared.resolve_over_the_back_foul",
+        lambda *args, **kwargs: None,
+    )
 
     result = game.simulate_macro_turn()
 
@@ -171,6 +179,10 @@ def test_after_steal_fast_break_miss_dreb_promotes_to_discrete_dreb_turn(monkeyp
     after_steal_miss["fast_break_play"] = "after_steal"
 
     monkeypatch.setattr(game.turn_manager, "run_micro_turn", lambda: after_steal_miss)
+    monkeypatch.setattr(
+        "BackEnd.utils.shared.resolve_over_the_back_foul",
+        lambda *args, **kwargs: None,
+    )
 
     result = game.simulate_macro_turn()
 
