@@ -529,25 +529,63 @@ biases the estimate DOWNWARD, so the true drift is probably larger than either f
 (`training_execution_v2.py:607-617` — discipline draws 0.25x from four categories, fight 0.5x
 from two). Retune there, not in the EOG bands.
 
-### ⚠️ NEW: `shot_threshold` has an unidentified ~+2/week writer
+### ⚠️ RETRACTED: "shot_threshold has an unidentified writer" — it was a measurement error
 
-**The single largest unexplained drift in the system, and the main reason shot_threshold was
-railing 127 of 128 teams.**
+**There is no mystery writer.** The claim came from a dry-run measurement taken against
+END-OF-SEASON state where **123 of 128 teams sat at the 200 ceiling**, so every training gain
+was clamped to zero and the plan appeared to produce +1.3/season. Re-measured with attributes
+reset to mid-range, the SAME reference plan produces **+60.5/season** against §2b's +51.4 —
+fully explained by training. Only three writers touch team attributes (EOG apply, CPU
+auto-train, user training) and that is correct.
 
-- §2b attributes **+51.4/season** to "training".
-- The CPU reference plan produces **+1.3/season**. A 40x gap.
-- It is NOT a reset artifact: the per-week breakdown shows a steady **~+2.0 every single week**,
-  weeks 2 through 26, not a spike.
-- So something writes `shot_threshold` between games that is neither EOG nor CPU auto-training.
+Also note: the "nothing in week 1" signal that motivated the hunt is an artifact. The training
+delta is computed as `pre[w] - post[w-1]`, so week 1 has no value BY CONSTRUCTION. It is not
+evidence of a state-dependent writer.
 
-After the leveling re-cut, EOG contributes **-3.1**/season, so essentially ALL of the remaining
-+48.3 combined drift on this attribute is the unknown writer. **Find it before tuning
-shot_threshold further** — the bands are now roughly neutral and any further EOG change would
-be compensating for a bug.
+### ⚠️ THE REAL FINDING: §2b systematically UNDERSTATES training for clamped attributes
 
-Search suggestions: anything writing `team_attributes.shot_threshold` outside
-`eog_attr_rules` / `training_execution_v2` — EOS processing, rank/prestige application,
-`home_crowd`, or a per-game persist path.
+Reference plan measured two ways over 40 teams (`dry_run=True`, writes blocked, zero attempts):
+
+| attribute | from LIVE (railed) state | from UNCLAMPED state | §2b inferred | ratio |
+|---|---|---|---|---|
+| **team_chemistry** | -11.0 | **-93.6** | -10.2 | **9.2x** |
+| **discipline** | -17.6 | **-91.6** | -48.1 | **1.9x** |
+| **shot_threshold** | +5.9 | **+60.5** | +51.4 | 1.2x |
+| fight | +26.0 | +37.1 | +32.0 | 1.2x |
+| pt_efficiency | +6.5 | +9.1 | +7.3 | 1.2x |
+| offensive_efficiency | +7.2 | +7.8 | +7.5 | 1.0x |
+| defensive_efficiency | +11.0 | +7.8 | +7.6 | 1.0x |
+| fb_efficiency | +7.8 | +6.5 | +7.4 | 0.9x |
+| rebound_modifier | +0.5 | +0.2 | +0.2 | 1.0x |
+
+§2b conditions on BOTH endpoints unclamped, so for an attribute whose population is pressed
+against a clamp it measures only the survivors — the teams that have not yet railed, which are
+precisely the ones with small deltas. **The unconstrained attributes agree within 10%; the
+railing ones are understated by up to 9x.**
+
+**This invalidates part of the leveling pass.** EOG was tuned against the inferred column, so
+for the four clamped attributes the resulting combined drift is much worse than the tuner
+reported:
+
+| attribute | tuner said | with TRUE training pressure |
+|---|---|---|
+| team_chemistry | +0.8 | **≈ -83** |
+| discipline | -34.2 | **≈ -78** |
+| shot_threshold | +48.3 | **≈ +57** |
+| fight | +32.0 | **≈ +37** |
+
+The seven unconstrained attributes are unaffected and their tuning stands.
+
+**Which number is the right target?** Neither alone. The unclamped figure is the training
+PRESSURE; the inferred figure is the movement REALISED among teams that have not railed. EOG
+should be tuned against the pressure — if it is not, the attribute rails, and a railed attribute
+carries no information regardless of what the realised drift looks like. Update
+`TRAINING_PER_SEASON` in `scripts/eog_band_tuner.py` to the unclamped column and re-tune those
+four.
+
+**But the pressure is too large to absorb in EOG alone.** team_chemistry at -93.6/season on an
+18-point range cannot be offset by any sane band — EOG would need +3.6/game. The training side
+has to come down for team_chemistry and discipline; only then is EOG re-tuning meaningful.
 
 ### (superseded by the entry above) Original fight/discipline ticket
 
