@@ -690,3 +690,60 @@ verification season — but neither matches what local code would generate, and 
 match production once the recalibration deploys. **The thresholds will need re-cutting after
 that deploy.** Re-running `scripts/eog_band_tuner.py` against a post-deploy season is seconds;
 the trap is not noticing it is needed.
+
+## DEPLOY CHECKLIST — develop -> main (prepared 2026-08-11)
+
+`main` is 158 commits behind. Testers are on ±10 clamps, no CPU identity, and
+pre-recalibration attributes. No migration path is needed: users are told to abandon
+existing franchises and start new ones.
+
+| # | step | notes |
+|---|---|---|
+| 1 | **Back up prod collections** | DONE — `~/gob-measurement-archive/db_backups_predeploy/`, checksummed, reload-verified. `gob.players_backup` is NOT a usable rollback (stale; attributes differ on 1440/1536). |
+| 2 | **Merge develop -> main** | code half |
+| 3 | **Copy `players` + `recruit_sets`** staging -> prod | data half. NOT the skeletons — see below. |
+| 4 | `GOB_DB_ACCESS=write` in Railway | redundant signal for the prod guard; `RAILWAY_*` alone also satisfies it |
+| 5 | CSP: allow `fonts.googleapis.com`, `www.googletagmanager.com` | new external hosts |
+| 6 | Site callout: abandon current franchises | |
+| 7 | **`scripts/verify_deploy.py`** | proves the deploy took — see below |
+
+**ORDERING IS BACKUP -> MERGE -> COPY, not copy -> merge.** New code reading old data is a
+known-good combination — both measurement seasons ran 26 weeks on exactly that (local code
+against prod-formula ratings). OLD code reading NEW data is untested: prod's current build
+would be handling a `recruit_sets` 50% larger than it expects.
+
+### Do NOT copy the skeletons
+
+`fcp_skeletons` / `hct_skeletons` hash differently across databases but are **identical except
+for `_id`** — every coordinate matches. Copying would churn prod for no benefit. **Heuristic
+worth keeping: same byte size + different hash usually means metadata; a real content change
+moves the size.** `recruit_sets` moved 146 KB -> 356 KB, and that one is real.
+
+### `recruit_sets` 300 -> 450 is INTENTIONAL
+
+Deliberate regeneration (`1277580c6`, 2026-08-08): 150 added recruits plus the `entry_tier` /
+`position_intent` / `potential_factor` / `has_portrait` fields. It is a balance change riding
+along with the attributes deploy — 50% more recruits available — and should be stated in the
+callout, not discovered.
+
+⚠️ **Prod's document claims `version=2` but holds the 300-recruit content with none of the
+regen fields.** A version check would pass on stale data; only a content checksum catches it.
+
+### Post-deploy verification — `scripts/verify_deploy.py`
+
+Nothing else on the list confirms the deploy took, and silent divergence is the failure being
+closed. `/health` now reports `commit`, `hash_seed` and `db_access` so the running build is
+answerable from outside.
+
+    scripts/verify_deploy.py --health-url https://<prod>/health   # A: build
+    GOB_DB_ACCESS=read scripts/verify_deploy.py --data            # B: data (prod URI)
+    scripts/verify_deploy.py --franchise-id <id> --delete         # C: seeding
+
+C needs a throwaway franchise created in the UI (creation requires an authenticated session,
+which the script deliberately does not embed) at **week 1, unplayed** — training moves the
+seeded values immediately. It checks identity persisted, sliders varying, `rebound_modifier`
+0.5, `team_chemistry` 8-11, `shot_threshold` 80-90, core-8 clamps ±20, then deletes the
+franchise and its FTD/FPD/FRD rows.
+
+The data check was negative-controlled against prod BEFORE the deploy and correctly FAILED on
+both collections — it detects a stale copy rather than merely returning green.
