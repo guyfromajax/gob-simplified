@@ -1,6 +1,5 @@
 """Final Turn backend coordinate ownership and home/away parity."""
 
-import random
 from types import SimpleNamespace
 
 import pytest
@@ -8,9 +7,29 @@ import pytest
 from BackEnd.engine import phase_resolution
 from BackEnd.engine.skeleton_step_emitter import _variant_flight_end
 from BackEnd.models.turn_manager import TurnManager
+from BackEnd.utils.sim_random import sim_rng
 
 
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
+
+
+def _stub_final_turn_pacing(monkeypatch, *, step0_hold_floor):
+    """Keep skeleton-shape tests independent of the separate FLSS fit gate."""
+    pacing = SimpleNamespace(
+        can_meet_anchor=True,
+        reason="test-fixture-fits",
+        step0_hold_floor=step0_hold_floor,
+        step0_hold_floor_with_handoff=step0_hold_floor,
+        include_entry_pass=False,
+        handoff_fits=True,
+        include_walkup=False,
+        anchor_clock=1.0,
+        micro_reserve_seconds=0.0,
+    )
+    monkeypatch.setattr(
+        "BackEnd.engine.final_turn_pacing.evaluate_final_turn_pacing",
+        lambda *args, **kwargs: pacing,
+    )
 
 
 def _alignment_manager(*, away_offense):
@@ -35,7 +54,10 @@ def _alignment_manager(*, away_offense):
 
 def _build_alignments(*, away_offense, seed):
     manager = _alignment_manager(away_offense=away_offense)
-    random.seed(seed)
+    # TurnManager draws alignments from the dedicated simulation RNG, not
+    # Python's module-global random stream. Reset the stream being exercised so
+    # home/away calls consume identical choices before coordinate mirroring.
+    sim_rng.seed(seed)
     offense, _, _ = manager._build_final_turn_offense_alignment()
     defense, zone = manager._build_final_turn_defense_alignment()
     return offense, defense, zone
@@ -67,7 +89,7 @@ def test_final_turn_defense_pg_uses_top_lane_not_key():
     from BackEnd.constants import HCO_STRING_SPOTS
 
     manager = _alignment_manager(away_offense=False)
-    random.seed(42)
+    sim_rng.seed(42)
     d_dest, _zone = manager._build_final_turn_defense_alignment()
     assert d_dest["PG"] == HCO_STRING_SPOTS["topLane"]
     assert d_dest["PG"] != HCO_STRING_SPOTS["key"]
@@ -113,6 +135,7 @@ def test_final_turn_block_target_uses_backend_display_oriented_bounce_spot():
 
 
 def test_final_turn_attack_shot_unwraps_attack_drive_steps(monkeypatch):
+    _stub_final_turn_pacing(monkeypatch, step0_hold_floor=3.0)
     lineup = {
         pos: SimpleNamespace(
             player_id=f"home_{pos}",
@@ -159,9 +182,9 @@ def test_final_turn_attack_shot_unwraps_attack_drive_steps(monkeypatch):
         lambda game: 0,
     )
     random_values = iter([0.99, 0, 0, 0, 0, 0, 0])
-    monkeypatch.setattr(random, "random", lambda: next(random_values, 0))
-    monkeypatch.setattr(random, "choice", lambda values: values[0])
-    monkeypatch.setattr(random, "shuffle", lambda values: None)
+    monkeypatch.setattr(sim_rng, "random", lambda: next(random_values, 0))
+    monkeypatch.setattr(sim_rng, "choice", lambda values: values[0])
+    monkeypatch.setattr(sim_rng, "shuffle", lambda values: None)
     monkeypatch.setattr(
         phase_resolution,
         "set_shooter_coords_from_skeleton_last_step",
@@ -187,7 +210,9 @@ def test_final_turn_attack_shot_unwraps_attack_drive_steps(monkeypatch):
     )
 
     assert result["final_turn"] is True
-    assert result["time_elapsed"] == 7
+    # UESS owns clock accounting: the emitter derives time_elapsed from the
+    # emitted step clocks. The resolver marks the late-clock chain.
+    assert result["late_clock_eoq"] is True
     assert isinstance(result["skeleton"]["steps"], list)
     assert len(result["skeleton"]["steps"]) == 4
     assert result["skeleton"]["steps"][2]["pos_actions"]["PG"]["action"] == "drive"
@@ -196,6 +221,7 @@ def test_final_turn_attack_shot_unwraps_attack_drive_steps(monkeypatch):
 
 
 def test_final_turn_outside_step0_floor_stamps_hold(monkeypatch):
+    _stub_final_turn_pacing(monkeypatch, step0_hold_floor=20.0)
     lineup = {
         pos: SimpleNamespace(
             player_id=f"home_{pos}",
@@ -233,9 +259,9 @@ def test_final_turn_outside_step0_floor_stamps_hold(monkeypatch):
         lambda game: 0,
     )
     random_values = iter([0.01, 0, 0, 0, 0, 0, 0])
-    monkeypatch.setattr(random, "random", lambda: next(random_values, 0))
-    monkeypatch.setattr(random, "choice", lambda values: values[0])
-    monkeypatch.setattr(random, "shuffle", lambda values: None)
+    monkeypatch.setattr(sim_rng, "random", lambda: next(random_values, 0))
+    monkeypatch.setattr(sim_rng, "choice", lambda values: values[0])
+    monkeypatch.setattr(sim_rng, "shuffle", lambda values: None)
     monkeypatch.setattr(
         phase_resolution,
         "set_shooter_coords_from_skeleton_last_step",
@@ -261,7 +287,7 @@ def test_final_turn_outside_step0_floor_stamps_hold(monkeypatch):
     )
 
     assert result["final_turn"] is True
-    assert result["time_elapsed"] == 29
+    assert result["late_clock_eoq"] is True
     floor = result["skeleton"]["steps"][0]["_step_t_floor_game_seconds"]
     assert floor is not None
     assert floor > 15
@@ -269,6 +295,7 @@ def test_final_turn_outside_step0_floor_stamps_hold(monkeypatch):
 
 
 def test_final_turn_attack_step0_floor_stamps_hold(monkeypatch):
+    _stub_final_turn_pacing(monkeypatch, step0_hold_floor=20.0)
     lineup = {
         pos: SimpleNamespace(
             player_id=f"home_{pos}",
@@ -304,9 +331,9 @@ def test_final_turn_attack_step0_floor_stamps_hold(monkeypatch):
 
     monkeypatch.setattr("BackEnd.utils.situational_logic.get_score_delta", lambda game: 0)
     random_values = iter([0.99, 0, 0, 0, 0, 0, 0])
-    monkeypatch.setattr(random, "random", lambda: next(random_values, 0))
-    monkeypatch.setattr(random, "choice", lambda values: values[0])
-    monkeypatch.setattr(random, "shuffle", lambda values: None)
+    monkeypatch.setattr(sim_rng, "random", lambda: next(random_values, 0))
+    monkeypatch.setattr(sim_rng, "choice", lambda values: values[0])
+    monkeypatch.setattr(sim_rng, "shuffle", lambda values: None)
     monkeypatch.setattr(
         phase_resolution,
         "set_shooter_coords_from_skeleton_last_step",
