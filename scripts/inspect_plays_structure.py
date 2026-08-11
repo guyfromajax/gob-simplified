@@ -5,26 +5,15 @@ This helps understand the current play structure before brainstorming motion off
 """
 
 import sys
-import os
+import argparse
 import json
 from pathlib import Path
 
-# Add parent directory to path for BackEnd imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from pymongo import MongoClient
-from dotenv import load_dotenv
 from bson import ObjectId
 
-load_dotenv()
-
-def get_db():
-    """Get MongoDB database connection."""
-    mongo_uri = os.getenv("MONGO_URI")
-    if not mongo_uri:
-        raise ValueError("MONGO_URI environment variable not set")
-    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-    return client["gob"]
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 def json_serial(obj):
     """JSON serializer for objects not serializable by default json code"""
@@ -33,13 +22,16 @@ def json_serial(obj):
     raise TypeError(f"Type {type(obj)} not serializable")
 
 def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    parser.add_argument("--output", type=Path, default=ROOT / "docs" / "current_plays_structure.json")
+    args = parser.parse_args()
     print("🔍 Fetching all plays from MongoDB...")
-    
-    db = get_db()
-    plays_collection = db["plays"]
-    
-    # Get all plays
-    plays = list(plays_collection.find({}))
+    connection = connect_migration_target(args.db, write=False)
+    try:
+        plays = list(connection.database["plays"].find({}))
+    finally:
+        connection.close()
     
     print(f"✅ Found {len(plays)} plays")
     
@@ -55,7 +47,7 @@ def main():
         plays_data.append(play_dict)
     
     # Save to file
-    output_file = Path(__file__).parent.parent / "docs" / "current_plays_structure.json"
+    output_file = args.output
     with open(output_file, 'w') as f:
         json.dump(plays_data, f, indent=2, default=json_serial)
     
@@ -90,4 +82,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

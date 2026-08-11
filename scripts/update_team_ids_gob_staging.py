@@ -2,30 +2,13 @@
 One-off: update team_id for four teams in gob-staging to match 128_teams.txt.
 Run from repo root: python3 scripts/update_team_ids_gob_staging.py
 """
-import os
+import argparse
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 DB_NAME = "gob-staging"
 
@@ -39,19 +22,22 @@ UPDATES = [
 
 
 def main():
-    if not client:
-        print("❌ MongoDB client not available.")
-        sys.exit(1)
-    teams = client[DB_NAME]["teams"]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target(DB_NAME, write=args.apply)
+    teams = connection.database["teams"]
     for name, new_team_id in UPDATES:
-        result = teams.update_one({"name": name}, {"$set": {"team_id": new_team_id}})
-        if result.modified_count:
-            print(f"  Updated {name!r} -> team_id={new_team_id!r}")
-        elif result.matched_count:
+        existing = teams.find_one({"name": name}, {"team_id": 1})
+        result = teams.update_one({"name": name}, {"$set": {"team_id": new_team_id}}) if args.apply else None
+        if existing and existing.get("team_id") != new_team_id:
+            print(f"  {'Updated' if args.apply else 'Would update'} {name!r} -> team_id={new_team_id!r}")
+        elif existing:
             print(f"  No change for {name!r} (already {new_team_id!r})")
         else:
             print(f"  ⚠ No team found with name={name!r}")
     print("Done.")
+    connection.close()
 
 
 if __name__ == "__main__":

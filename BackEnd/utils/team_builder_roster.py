@@ -1351,48 +1351,9 @@ def replace_slot_roster(
                 f"uncapped_pool_exceeded:{team_total}:{int(team_pool)}"
             )
 
-    # Framework §10.2 / TB §4.5b: floors bind on authored attribute diffs only.
-    # Compare the editor row to the inherited clone — not post-topup/force finals.
-    # Server-side top-up is not authorship; unedited attrs are legal by definition.
-    from BackEnd.constants.training_shape import (
-        CORE_12,
-        floor_violations,
-        resolve_training_position,
-    )
-
-    rows_for_floors = list(imported_players or [])
-    for i, player in enumerate(players):
-        pos = resolve_training_position({
-            "training_position": player.get("training_position"),
-            "position_intent": player.get("position_intent")
-            or ((player.get("meta") or {}).get("position_intent")),
-            "position_ratings": player.get("position_ratings"),
-        })
-        inherited_row = inherited[i] if i < len(inherited) else {}
-        inherited_attrs = (inherited_row or {}).get("attributes") or {}
-        row = rows_for_floors[i] if i < len(rows_for_floors) else {}
-        merged_core = _merge_row_core_attrs(row)
-        changed = {
-            key
-            for key in CORE_12
-            if key in merged_core
-            and _safe_int(merged_core[key]) != _safe_int(inherited_attrs.get(key))
-        }
-        if not changed:
-            continue
-        viols = [
-            (a, have, need)
-            for a, have, need in floor_violations(pos, player.get("attributes") or {})
-            if a in changed
-        ]
-        if viols:
-            meta = player.get("meta") or {}
-            name = (
-                f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip()
-                or f"slot_{i + 1}"
-            )
-            detail = ",".join(f"{a}:{have}<{need}" for a, have, need in viols)
-            raise ValueError(f"shape_floor_violation:{name}:{pos}:{detail}")
+    # No per-attribute shape floors on Team Builder Apply. Capped mode already
+    # binds each player to their inherited core-12 total (force/top-up); uncapped
+    # binds the team pool above. Redistribution within those totals is allowed.
 
     new_ids, new_docs = build_fpd_docs_from_players(franchise_id=franchise_id, players=players)
     # Delete every superseded FPD (init's 15, including its three walk-ons).

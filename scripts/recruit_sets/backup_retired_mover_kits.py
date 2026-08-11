@@ -31,6 +31,8 @@ import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "scripts"))
+from script_secrets import ScriptSecretError, load_r2_credentials
 
 SRC_PREFIX = "recruits/kit/"
 DEST_PREFIX = "portrait-kits/set_0001_retired_movers/"
@@ -77,6 +79,11 @@ def main():
 
     ids = load_ids(args)
     print(f"retired movers to archive: {len(ids)}  (expected 71)")
+
+    try:
+        os.environ.update(load_r2_credentials())
+    except ScriptSecretError as exc:
+        sys.exit(f"R2 not configured: {exc}")
 
     from BackEnd.services import r2_images
     if not r2_images.is_configured():

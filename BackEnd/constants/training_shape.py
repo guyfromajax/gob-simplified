@@ -168,48 +168,6 @@ def floor_violations(
     return out
 
 
-def _attr_int(attrs: Mapping[str, float] | None, key: str) -> int:
-    if not attrs:
-        return 0
-    have = attrs.get(key)
-    if have is None:
-        have = attrs.get(f"anchor_{key}", 0)
-    return int(have or 0)
-
-
-def authored_core12_changes(
-    final_attrs: Mapping[str, float],
-    inherited_attrs: Mapping[str, float] | None,
-) -> set[str]:
-    """Core-12 keys whose final value differs from the inherited clone."""
-    if inherited_attrs is None:
-        return set(CORE_12)
-    return {
-        a
-        for a in CORE_12
-        if _attr_int(final_attrs, a) != _attr_int(inherited_attrs, a)
-    }
-
-
-def authored_floor_violations(
-    position: str,
-    final_attrs: Mapping[str, float],
-    inherited_attrs: Mapping[str, float] | None,
-) -> list[Tuple[str, int, int]]:
-    """Floor check scoped to authored attribute changes (Team Builder §4.5b).
-
-    Unedited attributes are legal by definition — they already play in the league.
-    Pathology still fails: starving a player means editing those attrs down.
-    """
-    viols = floor_violations(position, final_attrs)
-    if not viols:
-        return []
-    changed = authored_core12_changes(final_attrs, inherited_attrs)
-    if not changed:
-        return []
-    return [(a, have, need) for a, have, need in viols if a in changed]
-
-
 def apply_floor_clamp_to_anchors(player: dict, position: Optional[str] = None) -> None:
     """Raise any core-12 anchor (and live) that decayed below the floor. No other writes.
 

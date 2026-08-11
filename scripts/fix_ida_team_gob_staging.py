@@ -2,43 +2,24 @@
 One-off: Update IDA Academy -> IDA (name and team_id) in gob-staging teams collection.
 Run from repo root: python3 scripts/fix_ida_team_gob_staging.py
 """
-import os
+import argparse
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
-
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 if __name__ == "__main__":
-    if not client:
-        print("❌ MongoDB client not available.")
-        sys.exit(1)
-    teams = client["gob-staging"]["teams"]
-    r = teams.update_one(
-        {"name": "IDA Academy"},
-        {"$set": {"name": "IDA", "team_id": "IDA"}},
-    )
-    if r.matched_count:
-        print("✅ [gob-staging] Updated team: IDA Academy → IDA (name and team_id)")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target("gob-staging", write=args.apply)
+    teams = connection.database["teams"]
+    existing = teams.find_one({"name": "IDA Academy"}, {"_id": 1})
+    r = teams.update_one({"name": "IDA Academy"}, {"$set": {"name": "IDA", "team_id": "IDA"}}) if args.apply else None
+    if existing:
+        print(f"✅ [gob-staging] {'Updated' if args.apply else 'Would update'} team: IDA Academy → IDA")
     else:
         print("ℹ️  [gob-staging] No document with name 'IDA Academy' found (may already be IDA)")
+    connection.close()

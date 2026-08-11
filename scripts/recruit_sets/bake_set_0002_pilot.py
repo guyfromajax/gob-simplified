@@ -142,9 +142,8 @@ def build_pilot_meta():
 
 
 def bake(slots, force=False):
-    gen.load_env(os.path.join(ROOT, ".env"))
     if not os.environ.get("GEMINI_API_KEY"):
-        sys.exit("GEMINI_API_KEY not set")
+        sys.exit("GEMINI_API_KEY not set in the invoking process")
     from google import genai
     from PIL import Image
     import numpy as np

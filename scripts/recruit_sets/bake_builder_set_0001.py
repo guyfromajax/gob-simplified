@@ -644,9 +644,8 @@ def main():
             import_teen_pilot(s)
             print(f"[keep] {s['frame']}-{s['definition']}/{s['skin']}  {s['image_id'][:8]}…")
 
-    gen.load_env(os.path.join(ROOT, ".env"))
     if not os.environ.get("GEMINI_API_KEY"):
-        sys.exit("GEMINI_API_KEY not set")
+        sys.exit("GEMINI_API_KEY not set in the invoking process")
     from google import genai
     client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
     ref_cache = {}

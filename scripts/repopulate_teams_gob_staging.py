@@ -7,32 +7,15 @@ zeroed team attributes (for Single/Tournament/Franchise init).
 TSV columns: id, team, mascot, team_id, primary_color, secondary_color, conference, region, prestige
 Region is letter (A–H). Run from repo root: python3 scripts/repopulate_teams_gob_staging.py
 """
+import argparse
 import os
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
+ROOT = Path(__file__).resolve().parents[1]
+_root = str(ROOT)
 sys.path.insert(0, _root)
-os.chdir(_root)
-
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
+from scripts.db_migration_cli import connect_migration_target
 
 TEAM_ATTR_KEYS = [
     "shot_threshold", "discipline", "fight", "rebound_modifier",
@@ -66,14 +49,15 @@ def parse_row(line):
 
 
 def main():
-    if not client:
-        print("❌ MongoDB client not available.")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
     if not os.path.exists(TEAMS_FILE):
         print(f"❌ File not found: {TEAMS_FILE}")
         sys.exit(1)
 
-    teams_coll = client[DB_NAME]["teams"]
+    connection = connect_migration_target(DB_NAME, write=args.apply)
+    teams_coll = connection.database["teams"]
     with open(TEAMS_FILE) as f:
         lines = f.readlines()
 
@@ -86,8 +70,9 @@ def main():
     if len(rows) != 128:
         print(f"⚠️ Expected 128 rows, got {len(rows)}. Proceeding anyway.")
 
-    deleted = teams_coll.delete_many({}).deleted_count
-    print(f"[{DB_NAME}] Deleted {deleted} existing team(s).")
+    existing_count = teams_coll.count_documents({})
+    deleted = teams_coll.delete_many({}).deleted_count if args.apply else existing_count
+    print(f"[{DB_NAME}] {'Deleted' if args.apply else 'Would delete'} {deleted} existing team(s).")
 
     docs = []
     for row in rows:
@@ -105,10 +90,11 @@ def main():
         }
         docs.append(doc)
 
-    if docs:
+    if docs and args.apply:
         teams_coll.insert_many(docs)
-    print(f"[{DB_NAME}] Inserted {len(docs)} team(s).")
+    print(f"[{DB_NAME}] {'Inserted' if args.apply else 'Would insert'} {len(docs)} team(s).")
     print("Done.")
+    connection.close()
 
 
 if __name__ == "__main__":

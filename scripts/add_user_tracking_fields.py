@@ -36,16 +36,7 @@ import sys
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, REPO_ROOT)
 
-try:
-    from dotenv import load_dotenv
-    if os.path.exists(".env.local"):
-        load_dotenv(".env.local")
-    else:
-        load_dotenv()
-except ImportError:
-    pass
-
-from pymongo import MongoClient
+from scripts.db_migration_cli import connect_migration_target
 
 
 # Load the schema helper as a standalone leaf module (avoids dragging in the
@@ -93,11 +84,7 @@ def parse_args():
 
 
 def get_mongo_client():
-    mongo_uri = os.environ.get("MONGO_URI")
-    if not mongo_uri:
-        print("ERROR: MONGO_URI not set in environment or .env file.", file=sys.stderr)
-        sys.exit(1)
-    return MongoClient(mongo_uri)
+    raise RuntimeError("Use connect_migration_target with an explicit target")
 
 
 def get_db_name(target: str) -> str:
@@ -179,8 +166,8 @@ def main():
     print("=" * 64)
     print()
 
-    client = get_mongo_client()
-    db = client[db_name]
+    connection = connect_migration_target(args.db, write=args.apply)
+    db = connection.database
     users = db["users"]
 
     missing_record, missing_archetypes, missing_lead, missing_reveal = print_pre_summary(users)

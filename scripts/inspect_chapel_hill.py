@@ -4,7 +4,8 @@ Inspect Chapel Hill player art in two places and build contact sheets to compare
   1. R2  (players/master/<uuid>.png) — what's currently live/uploaded
   2. local staging (assets_staging/players/<uuid>.png) — what's cued to upload
 
-Run on your machine (needs scripts/.r2.env with the R2 creds; never printed).
+Run on your machine with process R2 credentials or external
+``~/.config/gob/r2.env``; credentials are never printed.
 Outputs two small sheets under tmp/portrait-pilot/ that you can open or push:
     tmp/portrait-pilot/chapel_hill_R2.png
     tmp/portrait-pilot/chapel_hill_staging.png
@@ -17,22 +18,11 @@ import io
 import csv
 import argparse
 
-ENV_FILE = "scripts/.r2.env"
+from script_secrets import ScriptSecretError, load_r2_credentials
+
 KEY_PREFIX = "players/master/"
 STAGING = "assets_staging/players"
 OUT = "tmp/portrait-pilot"
-
-
-def load_env(path):
-    env = {}
-    if not os.path.exists(path):
-        raise SystemExit(f"R2 env not found: {path}")
-    for line in open(path):
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            k, v = line.split("=", 1)
-            env[k.strip()] = v.strip()
-    return env
 
 
 def a_font(size):
@@ -99,18 +89,17 @@ def main():
     n_st = build_sheet(rows, staging_get, "local staging", "chapel_hill_staging.png")
 
     # 2) R2 sheet — only if credentials are present
-    if not os.path.exists(ENV_FILE):
-        print(f"\n[skip] R2 check: {ENV_FILE} not found (no R2 creds configured).")
-        print(f"       staging has {n_st}/{len(rows)}. To also check live R2, create")
-        print(f"       {ENV_FILE} with R2_ACCESS_KEY_ID / R2_SECRET_ACCESS_KEY /")
-        print(f"       R2_ENDPOINT / R2_BUCKET, then re-run.")
+    try:
+        env = load_r2_credentials()
+    except ScriptSecretError as exc:
+        print(f"\n[skip] R2 check: {exc}")
+        print(f"       staging has {n_st}/{len(rows)}.")
         return
     try:
         import boto3
         from botocore.exceptions import ClientError
     except ImportError:
         raise SystemExit("R2 creds found but boto3 missing. Run:  pip install boto3")
-    env = load_env(ENV_FILE)
     s3 = boto3.client("s3", endpoint_url=env["R2_ENDPOINT"],
                       aws_access_key_id=env["R2_ACCESS_KEY_ID"],
                       aws_secret_access_key=env["R2_SECRET_ACCESS_KEY"],

@@ -97,7 +97,9 @@ Requires the retired-mover archive already on the bucket (`backup_retired_mover_
 
 New images never go in the repo. The upload script is **idempotent** (skips objects whose stored `sha256` matches), so re-running only uploads new/changed files.
 
-1. Ensure credentials exist: `scripts/.r2.env` (gitignored) with `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`. (See "Rotate token" if absent.)
+1. Ensure credentials exist in process variables or external
+   `~/.config/gob/r2.env` (mode `0600`) with `R2_ACCESS_KEY_ID`,
+   `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET`. (See "Rotate token" if absent.)
 2. Stage the files (filename **must** be `<player_id>.png`, i.e. the player `_id`):
    ```bash
    mkdir -p assets_staging/players        # gitignored
@@ -125,7 +127,8 @@ The credentials are **never** committed and **must not** be pasted into chat, PR
 1. Cloudflare → **R2** → **Manage R2 API Tokens** → **Create Account API token**.
 2. Permissions: **Object Read & Write**; Specify bucket: **`gob-player-images`** only; TTL as desired.
 3. On the result screen, copy **Access Key ID** + **Secret Access Key** (shown once).
-4. Update `scripts/.r2.env` locally with the new values (do not commit — it is gitignored).
+4. Update `~/.config/gob/r2.env` with the new values and run
+   `chmod 600 ~/.config/gob/r2.env`. Never place it under the repository.
 5. Verify: `./venv/bin/python3 scripts/upload_player_images_to_r2.py --dry-run` (connects + lists).
 6. Delete the **old** token in the dashboard.
 

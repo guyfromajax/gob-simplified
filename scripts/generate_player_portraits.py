@@ -14,7 +14,7 @@ Idempotent & resumable: skips any player who already has a finished master
 
 Setup (run where you have the paid Gemini key + open network — your machine):
     pip install google-genai pillow
-    # .env:  GEMINI_API_KEY=...   (auto-loaded, never printed)
+    # Supply GEMINI_API_KEY in the invoking process (never printed).
 
     # ALWAYS start with one player, then a full team, then scale:
     python3 scripts/generate_player_portraits.py --only "Stanley Keith"
@@ -58,15 +58,6 @@ PROMPT = (
 )
 
 
-def load_env(path=".env"):
-    if os.path.exists(path):
-        for line in open(path):
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-
-
 def slug(s):
     return re.sub(r"[^a-z0-9]", "", str(s).lower())
 
@@ -108,9 +99,8 @@ def main():
     if not rows:
         sys.exit("no matching players in the archetype map")
 
-    load_env()
     if not os.environ.get("GEMINI_API_KEY"):
-        sys.exit("GEMINI_API_KEY not set (checked env and .env).")
+        sys.exit("GEMINI_API_KEY not set in the invoking process.")
     try:
         from google import genai
         from PIL import Image

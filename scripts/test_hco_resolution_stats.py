@@ -87,7 +87,8 @@ def run_hco_statistics_test():
             "Four Corners", 
             mode="single",
             home_team_attributes=home_attrs,
-            away_team_attributes=away_attrs
+            away_team_attributes=away_attrs,
+            persist_position_ratings=False,
         )
         
         # Set initial lineups (autoset)
@@ -287,4 +288,3 @@ def run_hco_statistics_test():
 
 if __name__ == "__main__":
     run_hco_statistics_test()
-

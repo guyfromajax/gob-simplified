@@ -27,7 +27,7 @@ Typical use:
     python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage builder_kit
     python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage signed
 
-Credentials: scripts/.r2.env (gitignored), same as the league uploader.
+Credentials: process variables or external ``~/.config/gob/r2.env``.
 See _documentation_master/00_Operations/Recruit_Image_System.md and SCHEMA.md.
 """
 import os
@@ -39,7 +39,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.dirname(HERE)
 sys.path.insert(0, SCRIPTS)
 
-import upload_player_images_to_r2 as up   # noqa: E402  (load_env, sha256_of, remote_sha256)
+import upload_player_images_to_r2 as up   # noqa: E402  (sha256_of, remote_sha256)
+from script_secrets import ScriptSecretError, load_r2_credentials  # noqa: E402
 
 # stage -> (local dir, R2 key prefix)
 STAGES = {
@@ -60,7 +61,10 @@ def main():
     args = ap.parse_args()
     stages = list(STAGES) if "all" in args.stage else args.stage
 
-    env = up.load_env(up.ENV_FILE)
+    try:
+        env = load_r2_credentials()
+    except ScriptSecretError as exc:
+        sys.exit(f"ERROR: {exc}")
     import boto3
     s3 = boto3.client("s3", endpoint_url=env["R2_ENDPOINT"],
                       aws_access_key_id=env["R2_ACCESS_KEY_ID"],

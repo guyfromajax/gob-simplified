@@ -18,27 +18,16 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+from script_secrets import ScriptSecretError, load_r2_credentials
 
 MANIFEST = ROOT / "BackEnd" / "data" / "walk_on_portraits_manifest.json"
 KIT_EXTS = (".png", ".mask.png", ".json")
-
-
-def _load_env() -> None:
-    for name in (".env.local", ".env", "scripts/.r2.env"):
-        path = ROOT / name
-        if not path.exists():
-            continue
-        for line in path.read_text(encoding="utf-8").splitlines():
-            v = line.strip()
-            if v and not v.startswith("#") and "=" in v:
-                k, raw = v.split("=", 1)
-                os.environ.setdefault(k.strip(), raw.strip().strip('"').strip("'"))
 
 
 def main() -> int:
@@ -46,7 +35,6 @@ def main() -> int:
     ap.add_argument("--commit", action="store_true")
     args = ap.parse_args()
 
-    _load_env()
     data = json.loads(MANIFEST.read_text(encoding="utf-8"))
     src_prefix = str(data["source_archive_prefix"]).rstrip("/") + "/"
     dst_prefix = str(data["kit_prefix"]).rstrip("/") + "/"
@@ -55,9 +43,17 @@ def main() -> int:
     print(f"source {src_prefix}")
     print(f"dest   {dst_prefix}")
 
+    try:
+        os_values = load_r2_credentials()
+    except ScriptSecretError as exc:
+        print(f"R2 not configured: {exc}", file=sys.stderr)
+        return 1
+    import os
+    os.environ.update(os_values)
+
     from BackEnd.services import r2_images
     if not r2_images.is_configured():
-        print("R2 not configured (need R2_* env).", file=sys.stderr)
+        print("R2 not configured; supply R2_* variables in the invoking process.", file=sys.stderr)
         return 1
     s3, bucket = r2_images._s3()
     from botocore.exceptions import ClientError

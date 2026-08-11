@@ -59,6 +59,31 @@
     return best;
   }
 
+  /** RT shown on the board: rating at the listed position slot. */
+  function playerRt(p) {
+    if (!p || !p.ratings) return -1;
+    var pos = p.pos || primaryPos(p.ratings);
+    var v = Number(p.ratings[pos]);
+    return isNaN(v) ? -1 : v;
+  }
+
+  /**
+   * Order the roster board highest-RT → lowest within scholarship and walk-on
+   * groups (keeps the 12 + 3 split; does not mix WO into scholarship slots).
+   */
+  function sortPlayersByRt(players) {
+    if (!players || !players.length) return players || [];
+    var schSize = C.SCHOLARSHIP_SIZE || 12;
+    function cmp(a, b) {
+      var d = playerRt(b) - playerRt(a);
+      if (d) return d;
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    }
+    var sch = players.slice(0, schSize).sort(cmp);
+    var wo = players.slice(schSize).sort(cmp);
+    return sch.concat(wo);
+  }
+
   function initials(name) {
     return (name || '')
       .trim()
@@ -622,6 +647,7 @@
       self.players.forEach(function (p) {
         if (p.ratings_pending && p.ratings) p.ratings_pending = false;
       });
+      self.players = sortPlayersByRt(self.players);
     } catch (_) {
       // Keep pending false only when we have prior ratings; never invent values.
       this.players.forEach(function (p) {
@@ -1041,6 +1067,12 @@
     var mode = this.getMode();
     var capped = mode === 'capped';
 
+    // Keep board order = RT desc within scholarship / walk-on groups whenever
+    // ratings are already known (e.g. draft restore before a ratings round-trip).
+    if (this.players.some(function (p) { return p.ratings; })) {
+      this.players = sortPlayersByRt(this.players);
+    }
+
     var head =
       '<div class="pane-hd"><h2>Roster</h2><div class="sp"></div>' +
       '<div class="seg">' +
@@ -1407,9 +1439,7 @@
     var legend = C.CORE_12_ATTRS.map(function (t) {
       var cat = C.ATTR_CATS[t.cat] || { color: '#aaa' };
       return (
-        '<span' +
-        (t.code === 'ND' ? ' class="alegend-nd"' : '') +
-        '><b style="color:' +
+        '<span><b style="color:' +
         cat.color +
         '">' +
         t.code +

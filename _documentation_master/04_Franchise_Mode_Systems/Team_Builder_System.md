@@ -214,7 +214,7 @@ Two rules, each of which has already caused a production defect:
 3. Build the overlay.
 4. `FranchiseManager.initialize_season(...)` — schedule still ObjectId-keyed to the slot.
 5. Roster rewrite via `team_builder_roster.py`: clone inherited, apply the diff, mint `player_id`s.
-6. **Diff-scoped shape floors** (same principle as §4.5b): an attribute is checked against its position floor only if the editor row changed it relative to the inherited clone. Unedited attributes are legal by definition — that player already exists in the league. Server-side top-up / force-to-budget is not authorship and does not put an attribute in scope. The roster layer raises `shape_floor_violation` naming the player and attribute, and **Apply refuses rather than quietly correcting**. The HTTP handler does not yet map that code to dedicated copy, so the client currently receives the generic `Unable to apply roster changes` detail. Pathology is still caught: starving a player means editing those attributes down.
+6. **Attribute budgets only — no per-attribute shape floors.** Capped mode already forces each player to their inherited core-12 total; uncapped checks the team pool. Within those totals the editor may redistribute freely (including below development shape floors). Shape floors still bind in the development system (decay clamp); they do **not** refuse Team Builder Apply.
 7. Write `attribute_mode` and `online_eligible` (mode-only). Soft-budget echo fields are not written.
 8. `$set` the overlay; return franchise id for navigation into FCC.
 
@@ -343,9 +343,9 @@ Live `score[team.name]` and box maps stay keyed by the GM's display name for tha
 Team Builder authors **shape**. The development system then owns what happens to it.
 
 - The offseason attractor is retired (`OFFSEASON_ATTRACTOR_ALPHA = 0.0`), so an authored roster's shape is no longer pulled toward the position profile. Authorship persists.
-- **Shape floors originate in the development framework and are enforced at Apply on the authored diff only** (§6.3). They are weight-scaled: attributes that matter at a position have real floors, attributes that don't have minimal ones, and the universals — ND, FT, IQ — are floored everywhere.
-- Floors are derived from a **pre-development** population at the per-attribute 6th percentile. Never re-derive them from a developed snapshot: doing so refuses legitimate creative rosters at a 10/10 rate. Do not lower the percentile to “let real players through” — that needs roughly P0.4 and catches nothing.
-- The decay clamp stays full-roster: its job is preventing further decline. A player already below the line simply cannot fall further; Apply’s diff scope does not change that.
+- **Team Builder does not enforce shape floors.** The only attribute restriction at Apply is the inherited per-player total (capped) or team pool (uncapped). Redistributing below a position floor is allowed.
+- **Shape floors remain a development concern** (decay clamp in `training_shape.py`). They stop further decline in-season; they do not gate Establish.
+- Floors are derived from a **pre-development** population at the per-attribute 6th percentile. Never re-derive them from a developed snapshot.
 
 Details live in the Player Development System document. This section is the boundary, not a duplicate.
 
@@ -382,7 +382,7 @@ Details live in the Player Development System document. This section is the boun
 | `tests/test_tb_matchup_identity.py` | Strict core-name gate; display payload rejected; ObjectId helpers |
 | `tests/test_franchise_geek_points.py` | Display rename vs ObjectId/slug |
 | `BackEnd/tests/test_team_builder_roster.py` | Roster rewrite helpers |
-| `BackEnd/tests/test_team_builder_diff_floors.py` | Diff-scoped Apply floors; creative/pathology battery; mixed-edit shortfall |
+| `BackEnd/tests/test_team_builder_no_shape_floors.py` | Apply accepts below-floor redistribution when totals stay legal |
 | `tests/test_training_shape_framework.py` | Cost matrix ordering, walls, floors, camp locks, shape dispersion |
 
 Staging verification: `franchises.team_builder` present, `user_team_object_id` equals the core slot, core `teams`/`players` unchanged, Play Quarter does not 400 on matchup, UI shows the custom name, **and a mid-game resume renders the correct roster**.
@@ -409,7 +409,7 @@ Kept because the reasons are load-bearing — several of these were re-proposed 
 
 **Soft budgets.** v1 used league-wide caps — team total 6,400, top-5 3,950, per-player ceiling 1,035, floor 24 — evaluated at Apply as metadata that never blocked. Replaced by capped/uncapped modes with per-player inherited totals. Franchise-root **`hasEverExceededBudget`** and **`roster_shape_at_creation`** were write-only leftovers (Apply echo / FCC only; FE never read them). **Removed** from Apply `$set` / response and FCC; Apply `$unset`s them on new franchises.
 
-**Full-roster floor gate (retired).** Floors briefly bound every core-12 attribute on the shipped roster. A census on a full-roster check looked like miscalibration (~46% of players failing) until the arithmetic was unpacked: **6% is the per-attribute rate**; a player fails if *any* of twelve attrs is below its floor. Independent, that is \(1 - 0.94^{12} \approx 52\%\); measured ~46% with positive attribute correlation (≈1.4 shortfalls per failing player, many 1-pt). The floors were not wrong — the gate was aimed at league composition instead of authorship. **Fix was scope, not percentile:** Apply now validates the diff (§6.3). Do not re-derive floors from the 46% figure.
+**Shape-floor Apply gates (retired).** Floors briefly bound every core-12 attribute on the shipped roster, then a diff-scoped authored-only variant. Both refused Establish when an edited attribute sat below the position floor. **Product rule now:** mod teams are limited by attribute **totals** only (per-player inherited in capped; team pool in uncapped). Shape floors stay in development (decay clamp) and are not checked at Team Builder Apply.
 
 **The §4.3 top-up.** Any player whose twelve-attribute total fell below 60 was raised to exactly 60 at Apply, because every attribute needs a minimum of 5. It affected 13 players league-wide. **Attribute recalibration retired it** — the league minimum is now ≈190, so no player can be below 60 from inherited data, and the editor's per-attribute floor of 5 makes 60 the minimum reachable by construction. The server-side guard remains; the user-facing copy was removed because it could never render.
 
@@ -428,15 +428,11 @@ Kept because the reasons are load-bearing — several of these were re-proposed 
 **Outstanding work:**
 
 - **Portrait uploads (3c)** — committed fast follow, not built
-- **Acceptance criteria 12 and 13 need re-verification** — both passed against an Apply that could not refuse on shape floors
-- **Shape-floor Apply error mapping/test** — roster enforcement has focused unit coverage, but the
-  HTTP handler still hides its player/attribute detail behind a generic 400 and has no endpoint-level
-  regression assertion
 - **`imported_players` rename** — deferred (see §14)
 - `player_id` coupling audit — requested, never delivered
 - R2 sweeper for orphaned FPDs from bad resumes
 - Static league assets to R2
 - Trademark clearance on the name "Team Builder"
-- `training_position` has no live write path — the shape floor follows position, so nobody can redirect it
+- `training_position` has no live write path — development floors still resolve by position; TB no longer gates on them
 - **Uncapped runtime meter** — Apply uses runtime `league-context`, but the Team Builder frontend
   does not consume the endpoint for a live team-pool/league-marker display

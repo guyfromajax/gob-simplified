@@ -2,43 +2,27 @@
 Add prestige field (integer, 0) to all documents in the universal teams collection in gob-staging.
 Run from repo root: python3 scripts/add_prestige_gob_staging.py
 """
-import os
+import argparse
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
-
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 DB_NAME = "gob-staging"
 
 
 def main():
-    if not client:
-        print("❌ MongoDB client not available (MONGO_URI not set or connection failed).")
-        return
-    teams = client[DB_NAME]["teams"]
-    result = teams.update_many({}, {"$set": {"prestige": 0}})
-    print(f"[{DB_NAME}] ✅ Set prestige=0 on {result.modified_count} team(s) (matched {result.matched_count})")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target(DB_NAME, write=args.apply)
+    teams = connection.database["teams"]
+    matched = teams.count_documents({})
+    modified = teams.update_many({}, {"$set": {"prestige": 0}}).modified_count if args.apply else 0
+    print(f"[{DB_NAME}] {'Set' if args.apply else 'Would set'} prestige=0 on {modified if args.apply else matched} team(s)")
+    connection.close()
     print("Done.")
 
 

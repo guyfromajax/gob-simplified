@@ -7,16 +7,15 @@ writes, updates, deletes, creates indexes, or changes collection metadata.
 
 from __future__ import annotations
 
-import os
+import argparse
 import sys
 from collections import Counter
 from pathlib import Path
 
-from pymongo import MongoClient
-
-
 ROOT = Path(__file__).resolve().parents[1]
-DB_NAME = "gob-staging"
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
+
 COLLECTION_NAME = "players"
 
 CANONICAL_YEARS = ("senior", "junior", "sophomore", "freshman")
@@ -34,17 +33,6 @@ YEAR_ALIASES = {
 }
 
 
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for raw_line in path.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-
-
 def _normalize_year(value: object) -> str:
     if value is None:
         return "<missing>"
@@ -55,27 +43,22 @@ def _normalize_year(value: object) -> str:
 
 
 def main() -> int:
-    _load_env_file(ROOT / ".env.local")
-    _load_env_file(ROOT / ".env")
-
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI is not configured.", file=sys.stderr)
-        return 1
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=15_000)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
     try:
-        collection = client[DB_NAME][COLLECTION_NAME]
+        collection = connection.database[COLLECTION_NAME]
         total_documents = collection.count_documents({})
         counts = Counter(
             _normalize_year(document.get("year"))
             for document in collection.find({}, {"_id": 0, "year": 1})
         )
     finally:
-        client.close()
+        connection.close()
 
     canonical_total = sum(counts[year] for year in CANONICAL_YEARS)
-    print(f"Database: {DB_NAME}")
+    print(f"Database: {args.db}")
     print(f"Collection: {COLLECTION_NAME}")
     print(f"Total player documents: {total_documents}")
     print()

@@ -19,40 +19,17 @@ db defaults to gob-staging.
 
 from __future__ import annotations
 
-import os
+import argparse
 import sys
 from collections import Counter
 from pathlib import Path
 
 from bson import ObjectId
-from pymongo import MongoClient
-
 ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DB = "gob-staging"
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 MAX_ROSTER = 15
 ACTIVE_CAP = 12
-
-
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        s = line.strip()
-        if not s or s.startswith("#") or "=" not in s:
-            continue
-        k, v = s.split("=", 1)
-        k, v = k.strip(), v.strip().strip('"').strip("'")
-        if k and k not in os.environ:
-            os.environ[k] = v
-
-
-def _mongo_uri() -> str:
-    _load_env_file(ROOT / ".env.local")
-    _load_env_file(ROOT / ".env")
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment/.env files")
-    return uri
 
 
 def _ids(values) -> list[str]:
@@ -139,15 +116,19 @@ def inspect(db, franchise_id: str) -> int:
 
 
 def main() -> int:
-    args = [a for a in sys.argv[1:]]
-    client = MongoClient(_mongo_uri(), serverSelectionTimeoutMS=10000)
-    if not args or args[0] in ("--list", "-l"):
-        db_name = args[1] if len(args) > 1 else DEFAULT_DB
-        list_franchises(client[db_name])
-        return 0
-    franchise_id = args[0]
-    db_name = args[1] if len(args) > 1 else DEFAULT_DB
-    return inspect(client[db_name], franchise_id)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    parser.add_argument("franchise_id", nargs="?")
+    parser.add_argument("--list", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    try:
+        if args.list or not args.franchise_id:
+            list_franchises(connection.database)
+            return 0
+        return inspect(connection.database, args.franchise_id)
+    finally:
+        connection.close()
 
 
 if __name__ == "__main__":

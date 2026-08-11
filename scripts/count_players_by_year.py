@@ -9,43 +9,25 @@ Run from repo root:
 
 from __future__ import annotations
 
-import os
+import argparse
 from pathlib import Path
-
-from pymongo import MongoClient
+import sys
 
 ROOT = Path(__file__).resolve().parents[1]
-TARGET_DB = "gob"
+sys.path.insert(0, str(ROOT))
+
+from scripts.db_migration_cli import connect_migration_target
+
 COLLECTION = "players"
 CLASS_ORDER = ["Senior", "Junior", "Sophomore", "Freshman"]
 
 
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def _load_mongo_uri() -> str:
-    _load_env_file(ROOT / ".env.local")
-    _load_env_file(ROOT / ".env")
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment/.env files")
-    return uri
-
-
 def main() -> int:
-    client = MongoClient(_load_mongo_uri(), serverSelectionTimeoutMS=10000)
-    coll = client[TARGET_DB][COLLECTION]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    coll = connection.database[COLLECTION]
 
     total = coll.count_documents({})
     counts = {
@@ -53,7 +35,7 @@ def main() -> int:
         for doc in coll.aggregate([{"$group": {"_id": "$year", "count": {"$sum": 1}}}])
     }
 
-    print(f"[{TARGET_DB}.{COLLECTION}] total players: {total}\n")
+    print(f"[{args.db}.{COLLECTION}] total players: {total}\n")
     shown = 0
     for year in CLASS_ORDER:
         n = counts.pop(year, 0)
@@ -68,6 +50,7 @@ def main() -> int:
             shown += n
 
     print(f"\n  accounted for: {shown} / {total}")
+    connection.close()
     return 0
 
 

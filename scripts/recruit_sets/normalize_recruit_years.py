@@ -73,10 +73,8 @@ def run_files(paths, commit):
             print("    DRY-RUN — not written (pass --commit)")
 
 
-def run_db(set_id, commit):
-    from BackEnd.db import db, client
-    is_mock = "mongomock" in type(client).__module__
-    banner = f"DB: {db.name} | conn: {'MOCK (no MONGO_URI)' if is_mock else 'REAL'}"
+def run_db(db, set_id, commit):
+    banner = f"DB: {db.name}"
     print("=" * len(banner)); print(banner); print("=" * len(banner))
     query = {"set_id": set_id} if set_id else {}
     sets = list(db.recruit_sets.find(query))
@@ -95,19 +93,22 @@ def run_db(set_id, commit):
 
 def main():
     ap = argparse.ArgumentParser(description="Normalize recruit years abbrev -> full names.")
-    ap.add_argument("--db", action="store_true", help="normalize the recruit_sets collection")
+    ap.add_argument("--db", choices=["gob-staging", "gob"], help="normalize this recruit_sets collection")
     ap.add_argument("--set-id", default=None, help="limit --db to one set_id")
     ap.add_argument("--files", nargs="+", help="normalize local set/export JSON files in place")
-    ap.add_argument("--commit", action="store_true", help="actually write (default: dry-run)")
+    ap.add_argument("--apply", action="store_true", help="actually write (default: dry-run)")
     args = ap.parse_args()
     if not args.db and not args.files:
         ap.error("pass --db and/or --files")
     if args.files:
         print("── files ──")
-        run_files(args.files, args.commit)
+        run_files(args.files, args.apply)
     if args.db:
         print("── database ──")
-        run_db(args.set_id, args.commit)
+        from scripts.db_migration_cli import connect_migration_target
+        connection = connect_migration_target(args.db, write=args.apply)
+        run_db(connection.database, args.set_id, args.apply)
+        connection.close()
 
 
 if __name__ == "__main__":

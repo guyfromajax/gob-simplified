@@ -1318,17 +1318,11 @@ button {
   align-items: center;
   margin-top: 2px;
   padding: 6px 0 2px;
-  border-top: 1px dashed rgba(52, 236, 39, 0.35);
 }
 .attr-group-nd {
   margin-top: 8px;
   padding: 8px 8px 6px;
   border-radius: 8px;
-  background: rgba(52, 236, 39, 0.05);
-  border: 1px solid rgba(52, 236, 39, 0.22);
-}
-.alegend-nd b {
-  color: var(--grn) !important;
 }
 .btn.establish {
   max-width: min(280px, 42vw);

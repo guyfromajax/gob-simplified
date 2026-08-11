@@ -23,34 +23,17 @@ from __future__ import annotations
 import argparse
 import copy
 import logging
-import os
 import random
 import sys
 from pathlib import Path
 from typing import Any
 
 from bson import ObjectId
-from pymongo import MongoClient
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-os.chdir(ROOT)
-
-
-def _load_env(filepath: Path) -> None:
-    if not filepath.exists():
-        return
-    for line in filepath.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-
-
-for env_path in (ROOT / ".env.local", ROOT / ".env"):
-    _load_env(env_path)
+from scripts.db_migration_cli import connect_migration_target
 
 
 TEAM_ATTR_CLAMPS: dict[str, tuple[Any, Any]] = {}
@@ -106,7 +89,7 @@ from BackEnd.constants.eog_attr_bands import (  # noqa: E402
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--db", default=os.environ.get("MONGO_DB_NAME", "gob-staging"), help="Mongo database name")
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
     parser.add_argument("--franchise-id", help="Franchise _id. Defaults to most recent franchise with FTD rows.")
     parser.add_argument("--user-team", help="Optional user team selector: ObjectId/string id/name/mascot")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -405,13 +388,8 @@ def main() -> int:
     random.seed(args.seed)
     rng = random.Random(args.seed)
 
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set. Add it to .env.local/.env or export it.", file=sys.stderr)
-        return 1
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    db = client[args.db]
+    connection = connect_migration_target(args.db, write=False)
+    db = connection.database
     franchise = _find_franchise(db, args.franchise_id)
     franchise_id = franchise["_id"]
     ftd_docs = list(db.franchise_team_data.find({"franchise_id": franchise_id}))
@@ -552,6 +530,7 @@ def main() -> int:
     print("- shot_threshold is golf-score (lower is better).")
     print("- training_sum / eog_sum are post-clamp applied deltas accumulated each week.")
     print("- rebound_modifier net can differ slightly from training_sum+eog_sum due to rounding.")
+    connection.close()
     return 0
 
 

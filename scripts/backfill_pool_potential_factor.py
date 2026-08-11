@@ -14,38 +14,25 @@ Idempotent: skips any player that already carries potential_factor. Dry-run by d
   python scripts/backfill_pool_potential_factor.py --commit   # write, then verify
 """
 from __future__ import annotations
-import argparse, os, sys, statistics
+import argparse, sys, statistics
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
-os.chdir(REPO)
-from dotenv import load_dotenv
-load_dotenv(str(REPO / ".env.local"))
-
-# Parse + guard BEFORE importing BackEnd (that import connects to Mongo). The guard
-# requires --allow-db's value to appear in the connected MONGO_URI, so the tool can never
-# write to a DB you did not explicitly name. Default gob-staging keeps prior behavior;
-# pass --allow-db <prod-db-name> (with MONGO_URI pointed at prod) to backfill prod.
 _ap = argparse.ArgumentParser(description=__doc__)
-_ap.add_argument("--commit", action="store_true", help="write the $set (default: dry-run)")
-_ap.add_argument("--allow-db", default="gob-staging",
-                 help="DB-name substring that MUST appear in MONGO_URI (safety guard). "
-                      "Default gob-staging; pass your prod DB name to run there.")
+_ap.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+_ap.add_argument("--apply", action="store_true", help="write the $set (default: dry-run)")
 _args = _ap.parse_args()
-if _args.allow_db.lower() not in os.environ.get("MONGO_URI", "").lower():
-    print(f"ABORT: MONGO_URI does not contain '{_args.allow_db}' — refusing to write to an "
-          f"unnamed DB. Point MONGO_URI at the target and pass --allow-db <its name>.",
-          file=sys.stderr)
-    sys.exit(1)
 
-from BackEnd.db import players_collection
 from BackEnd.utils.player_generation import resolve_potential_factor, POTENTIAL_FACTOR_BAND
 from pymongo import UpdateOne
+from scripts.db_migration_cli import connect_migration_target
 
 
 def main():
     args = _args
+    connection = connect_migration_target(args.db, write=args.apply)
+    players_collection = connection.database["players"]
 
     total = players_collection.count_documents({})
     have = players_collection.count_documents({"potential_factor": {"$exists": True}})
@@ -69,8 +56,9 @@ def main():
               f"max {max(vals):.4f}  mean {statistics.mean(vals):.4f}  in-band {in_band}")
         print(f"  sample: " + ", ".join(f"{str(i)[:8]}…={v}" for i, v in targets[:5]))
 
-    if not args.commit:
-        print("\nDRY-RUN — no write. Re-run with --commit to persist.")
+    if not args.apply:
+        print("\nDRY-RUN — no write. Re-run with --apply to persist.")
+        connection.close()
         return
 
     if not targets:
@@ -89,6 +77,7 @@ def main():
                 print(f"  MISMATCH {i}: stored {stored} != displayed {pf}")
     print(f"equality check: {len(targets) - mism}/{len(targets)} match the pre-write displayed value "
           f"({'CLEAN' if mism == 0 else str(mism) + ' MISMATCHES'})")
+    connection.close()
 
 
 if __name__ == "__main__":

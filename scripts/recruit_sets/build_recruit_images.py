@@ -176,9 +176,8 @@ def main():
     ap.add_argument("--out-kit", default=OUT_KIT)
     args = ap.parse_args()
 
-    gen.load_env()
     if not os.environ.get("GEMINI_API_KEY"):
-        sys.exit("GEMINI_API_KEY not set (checked env and .env).")
+        sys.exit("GEMINI_API_KEY not set in the invoking process.")
     try:
         from google import genai
         from PIL import Image

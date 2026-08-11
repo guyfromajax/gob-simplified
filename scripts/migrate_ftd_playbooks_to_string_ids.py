@@ -32,16 +32,14 @@ from __future__ import annotations
 
 import argparse
 import copy
-import os
 import sys
 from pathlib import Path
 from typing import Any
 
-from pymongo import MongoClient
-
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+
+from scripts.db_migration_cli import connect_migration_target  # noqa: E402
 
 from BackEnd.utils.playbook_settings_utils import (  # noqa: E402
     build_legacy_playbook_settings_view,
@@ -53,32 +51,8 @@ from BackEnd.utils.playbook_settings_utils import (  # noqa: E402
 )
 
 
-DEFAULT_DB_NAME = "gob"
 DEFAULT_COLLECTION = "franchise_team_data"
 POSITION_FILTER_KEYS = ("standard", "PG", "SG", "SF", "PF", "C")
-
-
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def load_mongo_uri() -> str:
-    _load_env_file(ROOT / ".env.local")
-    _load_env_file(ROOT / ".env")
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment/.env files")
-    return uri
 
 
 def merge_play_lookups(
@@ -278,7 +252,7 @@ def migrate_ftd_doc(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Migrate FTD playbooks/plays to string-id keyed structure.")
-    parser.add_argument("--db", default=DEFAULT_DB_NAME, help=f"Mongo database name (default: {DEFAULT_DB_NAME})")
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
     parser.add_argument(
         "--collection",
         default=DEFAULT_COLLECTION,
@@ -297,8 +271,8 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    client = MongoClient(load_mongo_uri())
-    db = client[args.db]
+    connection = connect_migration_target(args.db, write=args.execute)
+    db = connection.database
     ftd_collection = db[args.collection]
     plays_collection = db["plays"]
 
@@ -358,6 +332,7 @@ def main() -> None:
     print(f"Warnings:  {warnings_count}")
     if not args.execute:
         print("No writes performed. Re-run with --execute to apply.")
+    connection.close()
 
 
 if __name__ == "__main__":

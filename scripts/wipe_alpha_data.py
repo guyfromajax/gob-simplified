@@ -33,17 +33,18 @@ SAFETY:
 - Provides collection counts before/after
 - Logs all operations
 
-WARNING: This is destructive. Test in staging first.
+This retained utility is staging-only. Production-wide wipes are retired.
 """
 
 import sys
 import os
+from pathlib import Path
 from typing import List
 
 # Add parent directory to path so we can import BackEnd
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from BackEnd.db import client, DB_NAME
+from BackEnd.script_db import STAGING_DB, ScriptDatabaseError, connect_script_database
 
 
 WIPE_COLLECTIONS = [
@@ -81,7 +82,7 @@ def confirm(prompt: str) -> bool:
         print("Please answer 'yes' or 'no'")
 
 
-def wipe_alpha_data(dry_run: bool = True, wipe_otps: bool = False):
+def wipe_alpha_data(db, dry_run: bool = True, wipe_otps: bool = False):
     """
     Wipe alpha data from MongoDB.
     
@@ -89,12 +90,10 @@ def wipe_alpha_data(dry_run: bool = True, wipe_otps: bool = False):
         dry_run: If True, only show what would be deleted (don't actually delete)
         wipe_otps: If True, also wipe alpha_otps collection
     """
-    db = client[DB_NAME]
-    
     print("=" * 80)
     print("ALPHA DATA WIPE SCRIPT")
     print("=" * 80)
-    print(f"Database: {DB_NAME}")
+    print(f"Database: {STAGING_DB}")
     print(f"Mode: {'DRY RUN (no changes)' if dry_run else 'EXECUTE (will delete data)'}")
     print(f"Wipe OTPs: {'YES' if wipe_otps else 'NO (preserved)'}")
     print("=" * 80)
@@ -139,7 +138,7 @@ def wipe_alpha_data(dry_run: bool = True, wipe_otps: bool = False):
     # EXECUTE mode - confirm before proceeding
     print("⚠️  WARNING: You are about to DELETE data from the database!")
     print()
-    if not confirm(f"Are you sure you want to wipe {len(collections_to_wipe)} collections from '{DB_NAME}'?"):
+    if not confirm(f"Are you sure you want to wipe {len(collections_to_wipe)} collections from '{STAGING_DB}'?"):
         print("❌ Wipe cancelled")
         return
     
@@ -197,11 +196,24 @@ if __name__ == "__main__":
     )
     
     args = parser.parse_args()
-    
+    connection = None
     try:
-        wipe_alpha_data(dry_run=not args.execute, wipe_otps=args.wipe_otps)
+        connection = connect_script_database(
+            target=STAGING_DB,
+            access="write" if args.execute else "read",
+            destructive=args.execute,
+            pristine_env=dict(os.environ),
+            repo_root=Path(__file__).resolve().parents[1],
+        )
+        wipe_alpha_data(connection.database, dry_run=not args.execute, wipe_otps=args.wipe_otps)
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        sys.exit(2)
     except Exception as e:
         print(f"❌ Error: {e}", file=sys.stderr)
         import traceback
         traceback.print_exc()
         sys.exit(1)
+    finally:
+        if connection is not None:
+            connection.close()

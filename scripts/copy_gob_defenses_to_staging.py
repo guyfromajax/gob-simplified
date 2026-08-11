@@ -1,122 +1,86 @@
 #!/usr/bin/env python3
-"""Replace gob-staging.defenses with an exact copy of gob.defenses.
+"""Replace staging defenses with an exact, verified copy of production defenses.
 
-Source credentials come from ``.env`` and target credentials from
-``.env.local``. The script hard-checks the database names, never writes to the
-source, stages the copied documents in a temporary target collection, verifies
-them, and then atomically renames that collection over ``defenses``.
-
-Usage:
-  .venv/bin/python scripts/copy_gob_defenses_to_staging.py
-  .venv/bin/python scripts/copy_gob_defenses_to_staging.py --execute
+Production is read-only and requires process-level ``GOB_DB_ACCESS=read``. Staging
+resolves independently from repo-root ``.env.local``. Dry-run is the default.
 """
 
 from __future__ import annotations
 
 import argparse
-import sys
+import os
 from pathlib import Path
+import sys
 from typing import Any
 
-from pymongo import MongoClient
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
+from BackEnd.script_db import (  # noqa: E402
+    PRODUCTION_DB,
+    STAGING_DB,
+    ScriptDatabaseError,
+    connect_script_database,
+)
 
-SOURCE_DB = "gob"
-TARGET_DB = "gob-staging"
 COLLECTION = "defenses"
 TEMP_COLLECTION = "defenses__copy_from_gob_tmp"
 
 
-def load_env_var(path: Path, key: str) -> str | None:
-    if not path.exists():
-        return None
-    for raw_line in path.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        name, value = line.split("=", 1)
-        if name.strip() == key:
-            return value.strip().strip('"').strip("'")
-    return None
-
-
-def docs_by_id(collection) -> dict[Any, dict[str, Any]]:
+def _docs_by_id(collection) -> dict[Any, dict[str, Any]]:
     return {doc["_id"]: doc for doc in collection.find({})}
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(
-        description="Replace gob-staging.defenses with an exact copy of gob.defenses."
-    )
-    parser.add_argument(
-        "--execute",
-        action="store_true",
-        help="Perform the replacement. Without this flag, only show the plan.",
-    )
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--execute", action="store_true", help="Replace staging defenses.")
     args = parser.parse_args()
-
-    repo_root = Path(__file__).resolve().parents[1]
-    source_uri = load_env_var(repo_root / ".env", "MONGO_URI")
-    target_uri = load_env_var(repo_root / ".env.local", "MONGO_URI")
-    if not source_uri:
-        print("Refusing: .env has no MONGO_URI for source gob.", file=sys.stderr)
-        return 1
-    if not target_uri:
-        print("Refusing: .env.local has no MONGO_URI for target gob-staging.", file=sys.stderr)
-        return 1
-
-    source_client = MongoClient(source_uri, serverSelectionTimeoutMS=10000)
-    target_client = MongoClient(target_uri, serverSelectionTimeoutMS=10000)
-    source_db = source_client.get_default_database()
-    target_db = target_client.get_default_database()
-    if source_db.name != SOURCE_DB:
-        print(
-            f"Refusing: source database is {source_db.name!r}, expected {SOURCE_DB!r}.",
-            file=sys.stderr,
-        )
-        return 1
-    if target_db.name != TARGET_DB:
-        print(
-            f"Refusing: target database is {target_db.name!r}, expected {TARGET_DB!r}.",
-            file=sys.stderr,
-        )
-        return 1
-
-    source_client.admin.command("ping")
-    target_client.admin.command("ping")
-    source_docs = list(source_db[COLLECTION].find({}))
-    target_count = target_db[COLLECTION].count_documents({})
-    print(f"Source {SOURCE_DB}.{COLLECTION}: {len(source_docs)} document(s), read-only")
-    print(f"Target {TARGET_DB}.{COLLECTION}: {target_count} document(s), will be replaced")
-    if not source_docs:
-        print("Refusing to replace the target from an empty source collection.", file=sys.stderr)
-        return 1
-    if not args.execute:
-        print("DRY RUN — no writes performed. Pass --execute to copy.")
-        return 0
-
-    temp = target_db[TEMP_COLLECTION]
-    temp.drop()
-    temp.insert_many(source_docs, ordered=True)
-    staged_docs = docs_by_id(temp)
-    expected_docs = {doc["_id"]: doc for doc in source_docs}
-    if staged_docs != expected_docs:
-        temp.drop()
-        print("Verification failed before replacement; target defenses was not changed.", file=sys.stderr)
-        return 1
-
-    temp.rename(COLLECTION, dropTarget=True)
-    copied_docs = docs_by_id(target_db[COLLECTION])
-    if copied_docs != expected_docs:
-        print("Post-copy verification failed.", file=sys.stderr)
-        return 1
-
-    print(
-        f"Copied and verified {len(copied_docs)} document(s): "
-        f"{SOURCE_DB}.{COLLECTION} -> {TARGET_DB}.{COLLECTION}."
+    pristine = dict(os.environ)
+    source = connect_script_database(
+        target=PRODUCTION_DB, access="read", pristine_env=pristine, repo_root=ROOT
     )
-    return 0
+    target = connect_script_database(
+        target=STAGING_DB,
+        access="write" if args.execute else "read",
+        destructive=args.execute,
+        pristine_env=pristine,
+        repo_root=ROOT,
+        force_local_staging=True,
+    )
+    try:
+        source_docs = list(source.database[COLLECTION].find({}))
+        if not source_docs:
+            raise ScriptDatabaseError(f"Refusing to copy empty {PRODUCTION_DB}.{COLLECTION}")
+        before = target.database[COLLECTION].count_documents({})
+        print(f"[PLAN] production={len(source_docs)} docs; staging={before} docs")
+        if not args.execute:
+            print("[DRY RUN] No staging data changed.")
+            return 0
+
+        temp = target.database[TEMP_COLLECTION]
+        temp.drop()
+        try:
+            temp.insert_many(source_docs, ordered=True)
+            expected = {doc["_id"]: doc for doc in source_docs}
+            if _docs_by_id(temp) != expected:
+                raise RuntimeError("Temporary defenses verification failed")
+            temp.rename(COLLECTION, dropTarget=True)
+            if _docs_by_id(target.database[COLLECTION]) != expected:
+                raise RuntimeError("Post-rename defenses verification failed")
+        except Exception:
+            if TEMP_COLLECTION in target.database.list_collection_names():
+                temp.drop()
+            raise
+        print(f"[DONE] copied and verified {len(source_docs)} defense documents")
+        return 0
+    finally:
+        source.close()
+        target.close()
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        raise SystemExit(2)

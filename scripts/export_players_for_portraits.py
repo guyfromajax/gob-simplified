@@ -2,12 +2,9 @@
 """
 Export the universal_players collection for the portrait-generation pipeline.
 
-Run this WHERE MONGO_URI IS SET (your local machine, a Cursor agent, or any
-environment with DB access) — the Claude Code web session is network-restricted
-and cannot reach the database.
+Run with an explicit database target:
 
-    export MONGO_URI="mongodb+srv://.../gob-staging?..."   # if not already set
-    python3 scripts/export_players_for_portraits.py
+    python3 scripts/export_players_for_portraits.py --db gob-staging
 
 Outputs (written next to this script, under scripts/):
     players_export.json   full normalized rows
@@ -17,15 +14,18 @@ and a quick height/weight distribution + provisional build tertiles.
 
 No secrets are printed.
 """
-import os
+import argparse
 import sys
 import csv
 import json
 import re
+from pathlib import Path
 
-DB_NAME = os.environ.get("MONGO_DB_NAME", "gob-staging")
-COLLECTION = os.environ.get("PLAYERS_COLLECTION", "universal_players")
-OUT_DIR = os.path.dirname(os.path.abspath(__file__))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
+
+OUT_DIR = Path(__file__).resolve().parent
 
 # Candidate field names — Mongo silently ignores ones that don't exist, so we
 # cast a wide net and normalize below. Adjust after seeing the printed keys.
@@ -81,25 +81,6 @@ def _first(doc, *keys):
     return None
 
 
-def load_env_file(path=".env"):
-    """Read KEY=VALUE lines from a local .env into os.environ (no printing).
-
-    Only sets vars that aren't already in the environment, so an explicitly
-    exported value still wins. Secrets never touch the terminal.
-    """
-    if not os.path.exists(path):
-        return
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, val = line.split("=", 1)
-            key, val = key.strip(), val.strip().strip('"').strip("'")
-            if key and key not in os.environ:
-                os.environ[key] = val
-
-
 def normalize(doc):
     fn, ln = doc.get("first_name"), doc.get("last_name")
     name = _first(doc, "name", "full_name") or " ".join(x for x in (fn, ln) if x)
@@ -125,23 +106,18 @@ def normalize(doc):
 
 
 def main():
-    load_env_file()   # auto-load MONGO_URI from .env — never printed
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        sys.exit("MONGO_URI not set (checked environment and .env). "
-                 "Run where the DB is reachable, or set MONGO_URI.")
-    try:
-        from pymongo import MongoClient
-    except ImportError:
-        sys.exit("pymongo not installed. Run:  pip install pymongo")
-
-    client = MongoClient(uri)
-    db = client.get_database(DB_NAME)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    parser.add_argument("--collection", default="players")
+    parser.add_argument("--output-dir", type=Path, default=OUT_DIR)
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    db = connection.database
     colls = db.list_collection_names()
 
     # Pick the players collection: env override, else the configured name,
     # else auto-detect from common candidates by which actually has docs.
-    candidates = [COLLECTION, "universal_players", "players", "universalPlayers",
+    candidates = [args.collection, "universal_players", "players", "universalPlayers",
                   "player", "Players"]
     chosen = None
     for c in candidates:
@@ -149,13 +125,12 @@ def main():
             chosen = c
             break
     if not chosen:
-        print(f"[diag] databases on this cluster: {client.list_database_names()}")
-        print(f"[diag] collections in '{DB_NAME}': {colls}")
-        sys.exit(f"No non-empty players collection found in '{DB_NAME}'. "
-                 "Set MONGO_DB_NAME / PLAYERS_COLLECTION to one of the above.")
+        print(f"[diag] collections in '{args.db}': {colls}")
+        sys.exit(f"No non-empty players collection found in '{args.db}'. "
+                 "Set --collection to one of the above.")
 
     coll = db[chosen]
-    print(f"[collection] using {DB_NAME}.{chosen} "
+    print(f"[collection] using {args.db}.{chosen} "
           f"({coll.estimated_document_count()} docs)")
 
     sample = coll.find_one({})
@@ -164,13 +139,14 @@ def main():
 
     proj = {f: 1 for f in PROJECTION_FIELDS}
     rows = [normalize(d) for d in coll.find({}, proj)]
-    print(f"[export] {len(rows)} players from {DB_NAME}.{chosen}")
+    print(f"[export] {len(rows)} players from {args.db}.{chosen}")
     if not rows:
         sys.exit("Collection returned 0 documents — nothing to export.")
 
-    json.dump(rows, open(os.path.join(OUT_DIR, "players_export.json"), "w"),
-              indent=2, default=str)
-    with open(os.path.join(OUT_DIR, "players_export.csv"), "w", newline="") as f:
+    args.output_dir.mkdir(parents=True, exist_ok=True)
+    with (args.output_dir / "players_export.json").open("w", encoding="utf-8") as json_file:
+        json.dump(rows, json_file, indent=2, default=str)
+    with (args.output_dir / "players_export.csv").open("w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows[0].keys()))
         w.writeheader()
         w.writerows(rows)
@@ -194,7 +170,8 @@ def main():
         print(f"         strong : BMI >= {t2:.1f}")
         print(f"       -> paste these cutoffs into classify_player_archetypes.py")
 
-    print("\n[done] wrote players_export.json and players_export.csv")
+    connection.close()
+    print(f"\n[done] wrote players_export.json and players_export.csv to {args.output_dir}")
 
 
 if __name__ == "__main__":

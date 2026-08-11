@@ -1,34 +1,17 @@
-# scripts/update_player_position_ratings.py
-# Adds a {"PG":..,"SG":..,"SF":..,"PF":..,"C":..} dict to each player doc as position_ratings
-
-import os, sys
+#!/usr/bin/env python3
+"""Compatibility entry point for universal-player position-rating maintenance."""
+import argparse
+import sys
 from pathlib import Path
+ROOT = Path(__file__).resolve().parents[1]; sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
+from scripts.maintain_universal_roster import recalculate_ratings
 
-# Make BackEnd importable (same pattern as your other scripts)
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from BackEnd.db import players_collection  # uses your existing DB wiring
-from BackEnd.utils.position_ratings import compute_position_ratings  # built earlier
-
-scanned = updated = 0
-
-# Pull minimal fields just for logs; compute_position_ratings reads what it needs
-for doc in players_collection.find({}, {"team": 1, "first_name": 1, "last_name": 1, "attributes": 1, "height": 1}):
-    scanned += 1
-    ratings = compute_position_ratings(doc)  # returns dict with PG/SG/SF/PF/C, ints 1..100
-
-    res = players_collection.update_one(
-        {"_id": doc["_id"]},
-        {"$set": {"position_ratings": ratings}}
-    )
-
-    name = f"{doc.get('first_name','?')} {doc.get('last_name','?')}"
-    team = doc.get("team", "?")
-    if res.modified_count:
-        updated += 1
-        print(f"SET: {team} — {name} -> {ratings}")
-    else:
-        print(f"OK:  {team} — {name} (no change)")
-
-print("\n— done —")
-print(f"players scanned: {scanned}   updated: {updated}")
+if __name__ == "__main__":
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    ap.add_argument("--apply", action="store_true")
+    args = ap.parse_args()
+    conn = connect_migration_target(args.db, write=args.apply)
+    print(recalculate_ratings(conn.database["players"], apply=args.apply))
+    conn.close()

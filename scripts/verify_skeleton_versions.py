@@ -4,15 +4,14 @@ Quick script to verify skeleton versions in MongoDB.
 """
 
 import sys
-import os
+import argparse
 from pathlib import Path
 
-# Add parent directory to path for BackEnd imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
-from BackEnd.db import plays_collection
-
-def verify_versions():
+def verify_versions(plays_collection):
     """Check what versions exist for each variant in each play."""
     
     plays = list(plays_collection.find({}))
@@ -41,5 +40,11 @@ def verify_versions():
         print()
 
 if __name__ == "__main__":
-    verify_versions()
-
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    try:
+        verify_versions(connection.database.plays)
+    finally:
+        connection.close()

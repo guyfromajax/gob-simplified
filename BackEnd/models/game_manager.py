@@ -27,7 +27,7 @@ class GameManager:
     _POST_MAKE_BIP_CLOCK_RUN_THRESHOLD_SECONDS = 60
     _POST_MAKE_BIP_CLOCK_RUNOFF_SECONDS = 2
 
-    def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, home_strategy_calls=None, away_strategy_calls=None, mode="single", user_team_side=None, franchise_id=None, community_engagement_crowd_shift="none", home_roster_override=None, away_roster_override=None, home_synthetic_team_id=None, away_synthetic_team_id=None):
+    def __init__(self, home_team_name, away_team_name, home_strategy_settings=None, away_strategy_settings=None, home_team_attributes=None, away_team_attributes=None, home_scouting_data=None, away_scouting_data=None, home_plays_data=None, away_plays_data=None, home_strategy_calls=None, away_strategy_calls=None, mode="single", user_team_side=None, franchise_id=None, community_engagement_crowd_shift="none", home_roster_override=None, away_roster_override=None, home_synthetic_team_id=None, away_synthetic_team_id=None, persist_position_ratings=True):
         # ✅ SS&S: Set is_user_team flag based on user_team_side
         is_home_user = user_team_side == "home"
         is_away_user = user_team_side == "away"
@@ -42,7 +42,10 @@ class GameManager:
         if "tempo" not in self.away_team.strategy_settings:
             self.away_team.strategy_settings["tempo"] = tempo_value
 
-        # Recalculate position ratings for all players (attributes may have changed)
+        # Recalculate position ratings for all players (attributes may have changed).
+        # Offline measurement callers can suppress only the persistence side effect;
+        # in-memory ratings are still recalculated identically.
+        self.persist_position_ratings = persist_position_ratings
         self._update_position_ratings()
         # Score keys = core TeamManager.name (never overlay display_name).
         self.score = {self.home_team.name: 0, self.away_team.name: 0}
@@ -108,7 +111,7 @@ class GameManager:
                 }
                 new_ratings = compute_position_ratings(player_dict)
                 player.ratings = new_ratings
-                if not is_franchise and not synthetic and hasattr(player, "player_id") and player.player_id:
+                if self.persist_position_ratings and not is_franchise and not synthetic and hasattr(player, "player_id") and player.player_id:
                     bulk_operations.append(
                         UpdateOne(
                             {"_id": player.player_id},

@@ -4,30 +4,15 @@ Sync 128 teams from teams/128_teams.txt into gob-staging universal teams collect
 - New teams: insert full doc (name, mascot, team_id, colors, region, conference, prestige, player_ids: [], all team attrs 0).
 Run from repo root: python3 scripts/sync_128_teams_gob_staging.py
 """
+import argparse
 import os
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
+ROOT = Path(__file__).resolve().parents[1]
+_root = str(ROOT)
 sys.path.insert(0, _root)
-os.chdir(_root)
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
+from scripts.db_migration_cli import connect_migration_target
 
 TEAM_ATTR_KEYS = [
     "shot_threshold", "discipline", "fight", "rebound_modifier",
@@ -61,14 +46,15 @@ def parse_row(line):
 
 
 def main():
-    if not client:
-        print("❌ MongoDB client not available.")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
     if not os.path.exists(TEAMS_FILE):
         print(f"❌ File not found: {TEAMS_FILE}")
         sys.exit(1)
 
-    teams = client[DB_NAME]["teams"]
+    connection = connect_migration_target(DB_NAME, write=args.apply)
+    teams = connection.database["teams"]
     with open(TEAMS_FILE) as f:
         lines = f.readlines()
 
@@ -84,10 +70,11 @@ def main():
     for row in rows:
         existing = teams.find_one({"$or": [{"team_id": row["team_id"]}, {"name": row["school"]}]})
         if existing:
-            teams.update_one(
-                {"_id": existing["_id"]},
-                {"$set": {"region": row["region"], "conference": row["conference"], "prestige": row["prestige"]}},
-            )
+            if args.apply:
+                teams.update_one(
+                    {"_id": existing["_id"]},
+                    {"$set": {"region": row["region"], "conference": row["conference"], "prestige": row["prestige"]}},
+                )
             updated += 1
         else:
             doc = {
@@ -102,12 +89,14 @@ def main():
                 "player_ids": [],
                 **TEAM_ATTRS_ZERO,
             }
-            teams.insert_one(doc)
+            if args.apply:
+                teams.insert_one(doc)
             inserted += 1
 
     print(f"[{DB_NAME}] Updated {updated} existing team(s) (region, conference, prestige only).")
     print(f"[{DB_NAME}] Inserted {inserted} new team(s).")
     print("Done.")
+    connection.close()
 
 
 if __name__ == "__main__":

@@ -3,32 +3,13 @@ Add 8 new teams to the universal teams collection in gob-staging only.
 All team attribute values are 0 (game/tournament/franchise init overwrites at creation).
 Run from repo root: python3 scripts/add_new_teams_gob_staging.py
 """
-import os
+import argparse
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
-
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 # All team attribute keys set to 0 for new teams (init overwrites at game/tournament/franchise creation)
 TEAM_ATTR_KEYS = [
@@ -99,11 +80,12 @@ NEW_TEAMS = [
 
 
 def main():
-    if not client:
-        print("❌ MongoDB client not available (MONGO_URI not set or connection failed).")
-        return
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target("gob-staging", write=args.apply)
     db_name = "gob-staging"
-    teams = client[db_name]["teams"]
+    teams = connection.database["teams"]
     for t in NEW_TEAMS:
         existing = teams.find_one({"$or": [{"name": t["name"]}, {"team_id": t["team_id"]}]})
         if existing:
@@ -118,9 +100,11 @@ def main():
             "player_ids": [],
             **TEAM_ATTRS_ZERO,
         }
-        teams.insert_one(doc)
-        print(f"  [{db_name}] ✅ Inserted {t['name']} ({t['team_id']})")
+        if args.apply:
+            teams.insert_one(doc)
+        print(f"  [{db_name}] ✅ {'Inserted' if args.apply else 'Would insert'} {t['name']} ({t['team_id']})")
     print("\n✅ Done.")
+    connection.close()
 
 
 if __name__ == "__main__":

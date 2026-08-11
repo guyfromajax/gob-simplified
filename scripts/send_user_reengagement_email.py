@@ -14,20 +14,12 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import os
 import sys
+from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-try:
-    from dotenv import load_dotenv
-
-    if os.path.exists(".env.local"):
-        load_dotenv(".env.local")
-    else:
-        load_dotenv()
-except ImportError:
-    pass
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 DEFAULT_CAMPAIGN = "2026-06-revisit"
 
@@ -61,14 +53,8 @@ def main() -> int:
         print("Refusing production execute without --confirm-production-write")
         return 1
 
-    # The DB name is selected here and exported BEFORE importing BackEnd.db so the
-    # suppression/email helpers resolve to the intended database.
-    os.environ["MONGO_DB_NAME"] = "gob-staging" if args.db == "staging" else "gob"
-    if not os.environ.get("MONGO_URI"):
-        print("MONGO_URI not set")
-        return 1
-
-    from BackEnd.db import db
+    connection = connect_migration_target(args.db, write=args.execute)
+    db = connection.database
     from BackEnd.utils.email_suppression import (
         campaign_sent_email_set,
         normalize_email,
@@ -81,9 +67,9 @@ def main() -> int:
     users = db["users"]
     all_emails = sorted({normalize_email(u.get("email", "")) for u in users.find({}, {"email": 1}) if u.get("email")})
 
-    suppress_recent = recent_alpha_send_email_set(days=args.recent_days)
-    suppress_unsub = unsubscribed_email_set()
-    suppress_campaign = campaign_sent_email_set(args.campaign)
+    suppress_recent = recent_alpha_send_email_set(days=args.recent_days, db_override=db)
+    suppress_unsub = unsubscribed_email_set(db_override=db)
+    suppress_campaign = campaign_sent_email_set(args.campaign, db_override=db)
     exclude = {normalize_email(e) for e in args.exclude.split(",") if e.strip()}
 
     recipients = [
@@ -105,7 +91,7 @@ def main() -> int:
         recipients = [only]
         print(f"--only filter: restricting to {only}")
 
-    print(f"Target: {os.environ['MONGO_DB_NAME']}  campaign={args.campaign}")
+    print(f"Target: {connection.target}  campaign={args.campaign}")
     print(f"Users with email: {len(all_emails)}")
     print(f"Suppressed — recent alpha ({args.recent_days}d): {len(suppress_recent & set(all_emails))}"
           f" | unsubscribed: {len(suppress_unsub & set(all_emails))}"
@@ -129,13 +115,14 @@ def main() -> int:
             continue
         ok = send_reengagement_email(email)
         if ok:
-            record_campaign_send(email, args.campaign)
+            record_campaign_send(email, args.campaign, db_override=db)
             sent += 1
             print(f"SENT  {email}")
         else:
             print(f"FAIL  {email}")
 
     print(f"{'Would send' if args.dry_run else 'Sent'}: {sent}")
+    connection.close()
     return 0
 
 

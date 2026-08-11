@@ -6,7 +6,7 @@ Usage: python scripts/fetch_sentry_issue.py <issue_id> [output.md]
   issue_id   Sentry issue ID (e.g. from the issue URL).
   output.md  Optional. Default: docs/Sentry_Bug_Reports/Bug1.md under repo root.
 
-Requires: SENTRY_AUTH_TOKEN in .env or environment.
+Requires: SENTRY_AUTH_TOKEN in the invoking process.
 Optional: SENTRY_ORG (default: geeked-out-games).
 
 If the file appears empty in your editor after a successful run, close and reopen
@@ -16,12 +16,6 @@ import os
 import sys
 import json
 import requests
-
-try:
-    from dotenv import load_dotenv
-    load_dotenv()
-except ImportError:
-    pass
 
 BASE = "https://sentry.io/api/0"
 
@@ -39,12 +33,12 @@ def main():
 
     token = os.environ.get("SENTRY_AUTH_TOKEN")
     if not token:
-        print("Set SENTRY_AUTH_TOKEN in .env or environment.", file=sys.stderr)
+        print("Set SENTRY_AUTH_TOKEN in the invoking process.", file=sys.stderr)
         _out_dir = os.path.dirname(out_path)
         if _out_dir:
             os.makedirs(_out_dir, exist_ok=True)
         with open(out_path, "w") as f:
-            f.write(f"# Sentry issue `{issue_id}`\n\n**Error:** SENTRY_AUTH_TOKEN not set. Set it in .env or environment and re-run.\n")
+            f.write(f"# Sentry issue `{issue_id}`\n\n**Error:** SENTRY_AUTH_TOKEN not set in the invoking process.\n")
         sys.exit(1)
 
     headers = {"Authorization": f"Bearer {token}"}

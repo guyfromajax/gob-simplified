@@ -40,7 +40,6 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pymongo import MongoClient
 from pymongo.operations import UpdateOne
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -55,8 +54,9 @@ from BackEnd.utils.player_development import (  # noqa: E402
     roll_growth_profile,
 )
 from BackEnd.utils.player_generation import normalize_year  # noqa: E402
+from BackEnd.script_db import STAGING_DB, connect_script_database  # noqa: E402
 
-DB_NAME = "gob-staging"
+DB_NAME = STAGING_DB
 COLLECTION = "players"
 WRITE_FIELDS = frozenset({
     "year", "attributes", "height", "weight", "position_ratings", "development",
@@ -79,16 +79,6 @@ YEAR_ORDER = ("freshman", "sophomore", "junior", "senior")
 # Shape-preservation abort — level-only rescale must keep attribute ratios.
 SHAPE_COSINE_MIN = 0.990
 SHAPE_COSINE_MEDIAN_MIN = 0.999
-
-
-def _load_env(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        v = line.strip()
-        if v and not v.startswith("#") and "=" in v:
-            k, raw = v.split("=", 1)
-            os.environ.setdefault(k.strip(), raw.strip().strip('"').strip("'"))
 
 
 def _quantile(xs: list[float], p: float) -> float:
@@ -544,7 +534,7 @@ def _commit_from_manifest(db, manifest_path: Path) -> None:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--db", default=DB_NAME)
+    ap.add_argument("--db", choices=[DB_NAME], default=DB_NAME)
     ap.add_argument("--seed", type=int, default=20260808, help="RNG seed (selection + develop)")
     ap.add_argument("--commit", action="store_true",
                     help="backup + write (requires --from-manifest from an approved dry-run)")
@@ -554,17 +544,13 @@ def main() -> int:
                     help="directory for dry-run manifest (default tmp/pool_age_up_<ts>)")
     args = ap.parse_args()
 
-    for f in (ROOT / ".env.local", ROOT / ".env"):
-        _load_env(f)
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise SystemExit("MONGO_URI not set")
-    if DB_NAME not in uri and "gob-staging" not in uri.lower():
-        # URI may omit db name; still require explicit --db == gob-staging below.
-        pass
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=20000)
-    db = client[args.db]
+    connection = connect_script_database(
+        target=args.db,
+        access="write" if args.commit else "read",
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
+    db = connection.database
     _assert_db(db)
 
     if args.commit:
@@ -572,7 +558,7 @@ def main() -> int:
             raise SystemExit("--commit requires --from-manifest <dry-run manifest.json>")
         print(f"MODE: COMMIT from {args.from_manifest}")
         _commit_from_manifest(db, args.from_manifest)
-        client.close()
+        connection.close()
         return 0
 
     # ── dry-run ──────────────────────────────────────────────────────────────
@@ -618,7 +604,7 @@ def main() -> int:
     print(f"    .venv/bin/python scripts/age_up_pool_class_years.py --commit "
           f"--from-manifest {path}")
 
-    client.close()
+    connection.close()
     return 0
 
 

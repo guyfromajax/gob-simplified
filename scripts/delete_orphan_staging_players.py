@@ -1,66 +1,58 @@
-"""
-Delete orphan player docs from gob-staging.players: those whose _id is not
-in any team's player_ids (leftover duplicates from the UUID migration).
+#!/usr/bin/env python3
+"""Delete staging players not referenced by any staging team's ``player_ids``.
 
-Requires --yes to perform deletes. Without --yes, reports how many would be deleted.
-Run from repo root: python3 scripts/delete_orphan_staging_players.py [--yes]
+Dry-run is the default; pass ``--yes`` to delete the computed IDs.
 """
+
+from __future__ import annotations
+
+import argparse
 import os
+from pathlib import Path
 import sys
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
-for path in [".env.local", ".env"]:
-    if os.path.exists(path):
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-
-from pymongo import MongoClient
+from BackEnd.script_db import STAGING_DB, ScriptDatabaseError, connect_script_database  # noqa: E402
 
 
-def main():
-    dry_run = "--yes" not in sys.argv
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set.")
-        sys.exit(1)
-
-    client = MongoClient(uri)
-    staging = client["gob-staging"]
-
-    # All player_ids that teams reference
-    teams = list(staging["teams"].find({}, {"player_ids": 1}))
-    referenced = set()
-    for t in teams:
-        for pid in t.get("player_ids") or []:
-            referenced.add(str(pid))
-
-    # Orphans: player _id not in referenced
-    players = list(staging["players"].find({}, {"_id": 1}))
-    orphan_ids = [p["_id"] for p in players if str(p["_id"]) not in referenced]
-
-    print(f"Player docs referenced by teams: {len(referenced)}")
-    print(f"Orphan player docs (not in any team): {len(orphan_ids)}")
-
-    if not orphan_ids:
-        print("Nothing to delete.")
-        return
-
-    if dry_run:
-        print("\nDry run. Run with --yes to delete these orphans.")
-        sys.exit(0)
-
-    result = staging["players"].delete_many({"_id": {"$in": orphan_ids}})
-    print(f"\nDeleted {result.deleted_count} orphan player doc(s).")
-    print("Done.")
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--yes", action="store_true", help="Delete computed orphans.")
+    args = parser.parse_args()
+    connection = connect_script_database(
+        target=STAGING_DB,
+        access="write" if args.yes else "read",
+        destructive=args.yes,
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
+    try:
+        referenced = {
+            str(player_id)
+            for team in connection.database["teams"].find({}, {"player_ids": 1})
+            for player_id in (team.get("player_ids") or [])
+        }
+        orphan_ids = [
+            player["_id"]
+            for player in connection.database["players"].find({}, {"_id": 1})
+            if str(player["_id"]) not in referenced
+        ]
+        print(f"[PLAN] referenced={len(referenced)} orphan_players={len(orphan_ids)}")
+        if not args.yes:
+            print("[DRY RUN] No staging data changed.")
+            return 0
+        result = connection.database["players"].delete_many({"_id": {"$in": orphan_ids}})
+        print(f"[DONE] deleted={result.deleted_count}")
+        return 0
+    finally:
+        connection.close()
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        raise SystemExit(main())
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        raise SystemExit(2)

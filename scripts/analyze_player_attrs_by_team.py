@@ -10,7 +10,7 @@ sectioned by conference (1-16).
 
 from __future__ import annotations
 
-import os
+import argparse
 import statistics
 import sys
 from collections import defaultdict
@@ -18,29 +18,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-os.chdir(ROOT)
-
-
-def _load_env(filepath: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
-    if filepath.exists():
-        for line in filepath.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for p in [ROOT / ".env.local", ROOT / ".env"]:
-    for k, v in _load_env(p).items():
-        os.environ.setdefault(k, v)
-
-from pymongo import MongoClient
+from scripts.db_migration_cli import connect_migration_target
 
 from BackEnd.utils.position_ratings import compute_position_ratings
 
-DB_NAME = "gob-staging"
 ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
 OUTPUT_PATH = ROOT / "_documentation_master" / "projects" / "Player_Attr_Analysis.md"
 TEAMS_FILE = ROOT / "teams" / "128_teams.txt"
@@ -188,13 +169,11 @@ def _format_player_sum_distribution(player_sums: list[int]) -> list[str]:
 
 
 def main() -> int:
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set", file=sys.stderr)
-        return 1
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    db = client[DB_NAME]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    db = connection.database
     players_coll = db["players"]
     teams_coll = db["teams"]
 
@@ -259,7 +238,7 @@ def main() -> int:
     lines = [
         "# Player Attribute Analysis (gob-staging)",
         "",
-        f"Source: `{DB_NAME}.players` universal collection",
+        f"Source: `{args.db}.players` universal collection",
         f"Total players analyzed: {player_count}",
         f"Total teams: {len(team_stats)}",
         "",
@@ -340,6 +319,7 @@ def main() -> int:
     OUTPUT_PATH.write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")
     print(f"Analyzed {player_count} players across {len(team_stats)} teams")
     print(f"Report written to {OUTPUT_PATH}")
+    connection.close()
     return 0
 
 

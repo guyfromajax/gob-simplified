@@ -88,7 +88,8 @@ The previously-planned nameserver migration is **not needed** and has been dropp
 5. ✅ DONE (2026-06-30) — **CORS** via Response Header Transform Rule "CORS for player image assets" on geekedoutgames.com (all requests → `Set static: Access-Control-Allow-Origin: *`). Verified `access-control-allow-origin: *` on both transformed + direct image responses.
 
 ### Phase 2: Upload masters — ✅ DONE (2026-06-30)
-- Script: `scripts/upload_player_images_to_r2.py` (boto3 → R2 S3 API; reads `scripts/.r2.env`, gitignored).
+- Script: `scripts/upload_player_images_to_r2.py` (boto3 → R2 S3 API; reads process
+  credentials or external mode-`0600` `~/.config/gob/r2.env`).
 - Idempotent: skips objects whose stored `sha256` metadata matches local → re-run = only new/changed images upload. **This is the runbook for adding new players.**
 - Result: **98/98 uploaded** to `players/master/<uuid>.png`, 0 failed. Remote count == local count; 8 checksum spot-checks all matched.
 - Manifest: `scripts/r2_upload_manifest.csv` (filename, asset_key, remote_url, file_size, sha256, status).

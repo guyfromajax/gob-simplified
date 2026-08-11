@@ -79,7 +79,7 @@ def simulate_quarters(num_quarters=20, home_team_name=None, away_team_name=None)
     # Simulate quarters
     for q_num in range(1, num_quarters + 1):
         # Create a new game manager for each quarter (fresh state)
-        gm = GameManager(home_team_name, away_team_name)
+        gm = GameManager(home_team_name, away_team_name, persist_position_ratings=False)
         gm.quarter = 1  # Always simulate as Q1 to get consistent behavior
         
         # Get initial turn count before simulation
@@ -138,4 +138,3 @@ if __name__ == "__main__":
     home_team = sys.argv[2] if len(sys.argv) > 2 else None
     away_team = sys.argv[3] if len(sys.argv) > 3 else None
     simulate_quarters(num_quarters, home_team, away_team)
-

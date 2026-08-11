@@ -28,6 +28,7 @@ Usage:
 from __future__ import annotations
 
 import argparse
+import atexit
 import os
 import sys
 from pathlib import Path
@@ -38,7 +39,6 @@ if str(_REPO) not in sys.path:
 
 TARGET_FRANCHISE_ID = os.environ.get("GOB_MEASUREMENT_FRANCHISE_ID", "6a67882a2b2eb443f8c7789f")
 EXPECTED_USER_TEAM = os.environ.get("GOB_MEASUREMENT_TEAM", "South Lancaster")
-EXPECTED_DB_MARKER = "gob-staging"
 FEED_DOC_ID = "global_feed"      # community_highlights
 BOARD_DOC_ID = "global_board"    # around_the_league
 
@@ -58,19 +58,33 @@ def main() -> int:
                    "run+restore). Exit 0 = reverted cleanly; exit 5 = mismatches.")
     ap.add_argument("--include-feeds", action="store_true",
                     help="Also snapshot/restore the two GLOBAL feed docs (isolated DB only).")
+    ap.add_argument("--yes", action="store_true",
+                    help="Required with --restore because restore replaces staging data.")
     args = ap.parse_args()
-
-    if EXPECTED_DB_MARKER not in os.environ.get("MONGO_URI", "").lower():
-        _abort(f"MONGO_URI does not point at '{EXPECTED_DB_MARKER}'. Refusing (prod guard).")
 
     from bson import ObjectId
     from bson.json_util import dumps, loads
-    from BackEnd.db import (
-        franchises_collection, franchise_team_data_collection,
-        franchise_players_data_collection, franchise_recruits_data_collection,
-        games_collection, users_collection,
-        community_highlights_collection, around_the_league_collection,
+    from BackEnd.script_db import STAGING_DB, connect_script_database
+
+    if args.restore and not args.yes:
+        _abort("--restore requires --yes")
+    connection = connect_script_database(
+        target=STAGING_DB,
+        access="write" if args.restore else "read",
+        destructive=bool(args.restore),
+        pristine_env=dict(os.environ),
+        repo_root=_REPO,
     )
+    atexit.register(connection.close)
+    db = connection.database
+    franchises_collection = db["franchises"]
+    franchise_team_data_collection = db["franchise_team_data"]
+    franchise_players_data_collection = db["franchise_players_data"]
+    franchise_recruits_data_collection = db["franchise_recruits_data"]
+    games_collection = db["games"]
+    users_collection = db["users"]
+    community_highlights_collection = db["community_highlights"]
+    around_the_league_collection = db["around_the_league"]
 
     fid = ObjectId(TARGET_FRANCHISE_ID)
     sfid = str(fid)

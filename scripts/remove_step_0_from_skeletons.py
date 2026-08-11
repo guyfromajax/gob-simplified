@@ -5,28 +5,18 @@ Step 0 (inbound setup) is now handled by BASELINE_INBOUND turn.
 Skeleton animations now start from old step 1 (new step 0).
 """
 
+import argparse
 import sys
-import os
+from pathlib import Path
 
 # Add parent directory to path for BackEnd imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
-from pymongo import MongoClient
-from dotenv import load_dotenv
+from scripts.db_migration_cli import connect_migration_target
 
-load_dotenv()
-
-def get_db():
-    """Get MongoDB database connection."""
-    mongo_uri = os.getenv("MONGO_URI")
-    if not mongo_uri:
-        raise ValueError("MONGO_URI environment variable not set")
-    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-    return client["gob"]
-
-def remove_step_0(collection_name, skeleton_name="Standard"):
+def remove_step_0(db, collection_name, skeleton_name="Standard", *, apply=False):
     """Remove step 0 from all version 0 variants in a skeleton."""
-    db = get_db()
     collection = db[collection_name]
     
     print(f"\n{'='*80}")
@@ -87,13 +77,17 @@ def remove_step_0(collection_name, skeleton_name="Standard"):
     
     if modified_variants:
         # Update the MongoDB document
-        result = collection.update_one(
-            {"_id": skeleton_doc["_id"]},
-            {"$set": {"variants": variants}}
-        )
+        result = None
+        if apply:
+            result = collection.update_one(
+                {"_id": skeleton_doc["_id"]},
+                {"$set": {"variants": variants}}
+            )
         
         print(f"\n{'='*80}")
-        print(f"✅ Updated {collection_name}: {result.modified_count} document(s) modified")
+        count = result.modified_count if result is not None else 0
+        verb = "Updated" if apply else "Would update"
+        print(f"✅ {verb} {collection_name}: {count if apply else 1} document(s)")
         print(f"📝 Modified {len(modified_variants)} variant(s):")
         for variant_name in modified_variants:
             print(f"  - {variant_name}")
@@ -104,24 +98,20 @@ def remove_step_0(collection_name, skeleton_name="Standard"):
         print(f"{'='*80}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    parser.add_argument("--apply", action="store_true", help="Write changes; default is dry-run")
+    args = parser.parse_args()
     print("🔧 Removing step 0 from FCP and HCT skeletons...")
     print("Step 0 (inbound setup) is now handled by BASELINE_INBOUND turn")
-    print("\n⚠️ WARNING: This will modify the MongoDB database!")
-    
-    # Check for --confirm flag
-    if "--confirm" not in sys.argv:
-        print("\n❌ Please run with --confirm flag to proceed:")
-        print("   python3 scripts/remove_step_0_from_skeletons.py --confirm")
-        sys.exit(1)
-    
-    print("\n✅ Proceeding with removal...")
+    connection = connect_migration_target(args.db, write=args.apply)
     
     # Remove step 0 from FCP skeletons
-    remove_step_0("fcp_skeletons", "Standard")
+    remove_step_0(connection.database, "fcp_skeletons", "Standard", apply=args.apply)
     
     # Remove step 0 from HCT skeletons
-    remove_step_0("hct_skeletons", "Standard")
+    remove_step_0(connection.database, "hct_skeletons", "Standard", apply=args.apply)
     
     print("\n✅ All step 0s removed!")
     print("🎯 Skeletons now start from old step 1 (press break action)")
-
+    connection.close()

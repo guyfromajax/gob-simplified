@@ -41,7 +41,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from statistics import NormalDist
 
-from pymongo import MongoClient
 from pymongo.operations import UpdateOne
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,21 +62,12 @@ from BackEnd.utils.player_generation import (  # noqa: E402
     normalize_year,
 )
 from BackEnd.utils.position_ratings import compute_position_ratings  # noqa: E402
+from BackEnd.script_db import STAGING_DB, connect_script_database  # noqa: E402
 
-DB_NAME = "gob-staging"
+DB_NAME = STAGING_DB
 COLLECTION = "players"
 # The ONLY fields this script writes — asserted against the $set doc before every write.
 WRITE_FIELDS = ("height", "weight", "position_ratings")
-
-
-def _load_env(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        v = line.strip()
-        if v and not v.startswith("#") and "=" in v:
-            k, raw = v.split("=", 1)
-            os.environ.setdefault(k.strip(), raw.strip().strip('"').strip("'"))
 
 
 def _num(v, d=0.0) -> float:
@@ -273,18 +263,17 @@ def _backup(db, db_name: str) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Idempotent HT/WT/RT recal of gob-staging.players")
-    ap.add_argument("--db", default=DB_NAME)
+    ap.add_argument("--db", choices=[DB_NAME], default=DB_NAME)
     ap.add_argument("--commit", action="store_true", help="back up then persist writes (default dry-run)")
     args = ap.parse_args()
 
-    for f in (ROOT / ".env.local", ROOT / ".env"):
-        _load_env(f)
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise SystemExit("MONGO_URI not set")
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=20000)
-    db = client[args.db]
+    connection = connect_script_database(
+        target=args.db,
+        access="write" if args.commit else "read",
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
+    db = connection.database
 
     # HARD GUARD: never write anywhere but gob-staging.
     if db.name != DB_NAME:
@@ -307,7 +296,7 @@ def main() -> int:
     else:
         print("  (no writes — re-run with --commit to back up and persist)")
 
-    client.close()
+    connection.close()
     return 0
 
 

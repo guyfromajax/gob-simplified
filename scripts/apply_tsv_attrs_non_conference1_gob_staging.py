@@ -4,33 +4,17 @@ values from teams/all_players_with_team_names.txt (the 12 attributes only:
 SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, plus anchor_* and position_ratings).
 Conference 1 players are skipped. Matches by first_name, last_name, team.
 """
+import argparse
 import os
 import sys
+from pathlib import Path
 
-_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = Path(__file__).resolve().parents[1]
+_root = str(ROOT)
 sys.path.insert(0, _root)
-os.chdir(_root)
-
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
 from BackEnd.utils.position_ratings import compute_position_ratings
 from pymongo import UpdateOne
+from scripts.db_migration_cli import connect_migration_target
 
 DB_NAME = "gob-staging"
 TSV_PATH = os.path.join(_root, "teams", "all_players_with_team_names.txt")
@@ -58,14 +42,15 @@ def _int(s, default=0):
 
 
 def main():
-    if not client:
-        print("❌ MongoDB client not available.")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
     if not os.path.exists(TSV_PATH):
         print(f"❌ File not found: {TSV_PATH}")
         sys.exit(1)
 
-    players_coll = client[DB_NAME]["players"]
+    connection = connect_migration_target(DB_NAME, write=args.apply)
+    players_coll = connection.database["players"]
 
     with open(TSV_PATH) as f:
         lines = [ln.rstrip("\n\r") for ln in f.readlines()]
@@ -105,13 +90,14 @@ def main():
             {"$set": set_doc},
         ))
 
-    if ops:
+    if ops and args.apply:
         result = players_coll.bulk_write(ops, ordered=False)
         updated = result.modified_count
     else:
-        updated = 0
-    print(f"[{DB_NAME}] Updated {updated} non-Conference 1 players (12 attrs + anchor_* + position_ratings).")
+        updated = len(ops) if not args.apply else 0
+    print(f"[{DB_NAME}] {'Updated' if args.apply else 'Would update'} {updated} non-Conference 1 players.")
     print(f"  Skipped {skipped_conf1} Conference 1 rows. {len(ops)} update ops sent.")
+    connection.close()
 
 
 if __name__ == "__main__":

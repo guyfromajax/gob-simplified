@@ -490,7 +490,7 @@ class TestCriterion25ShuffledFindOrder(unittest.TestCase):
                 "walk_on": i >= 12,
             }
             if i < 12:
-                # Restate inherited core-12 (diff-scoped floors; identity still binds budgets).
+                # Restate inherited core-12 (identity still binds budgets).
                 row["attributes"] = {k: doc["attributes"][k] for k in CORE_12_ATTRS}
             else:
                 # Blank -> inherit walk-on budget from identity-mapped FPD.

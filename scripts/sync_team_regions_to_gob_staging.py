@@ -3,38 +3,21 @@
 Update the region field on documents in the universal teams collection in gob-staging
 to match teams/128_teams.txt. Matches teams by name (school column).
 
-Run from repo root with MONGO_URI set (e.g. in .env or .env.local):
-  .venv/bin/python scripts/sync_team_regions_to_gob_staging.py
+Dry-run is the default. Pass --apply to persist staging changes.
 """
 
 from __future__ import annotations
 
 import os
+import argparse
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-os.chdir(ROOT)
+from BackEnd.script_db import STAGING_DB, ScriptDatabaseError, connect_script_database
 
-def _load_env(filepath: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
-    if filepath.exists():
-        for line in filepath.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for p in [ROOT / ".env.local", ROOT / ".env"]:
-    for k, v in _load_env(p).items():
-        os.environ.setdefault(k, v)
-
-from pymongo import MongoClient
-
-DB_NAME = "gob-staging"
+DB_NAME = STAGING_DB
 TSV_PATH = ROOT / "teams" / "128_teams.txt"
 # Column indices: id=0, school=1, mascot=2, team_id=3, ..., region=7, prestige=8
 IDX_SCHOOL = 1
@@ -42,10 +25,9 @@ IDX_REGION = 7
 
 
 def main() -> int:
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("❌ MONGO_URI not set. Set it in .env or .env.local", file=sys.stderr)
-        return 1
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true", help="Persist staging updates.")
+    args = parser.parse_args()
     if not TSV_PATH.exists():
         print(f"❌ File not found: {TSV_PATH}", file=sys.stderr)
         return 1
@@ -69,27 +51,36 @@ def main() -> int:
         if school and region:
             school_to_region[school] = region
 
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    teams_coll = client[DB_NAME]["teams"]
+    connection = connect_script_database(
+        target=DB_NAME,
+        access="write" if args.apply else "read",
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
+    teams_coll = connection.database["teams"]
 
     updated = 0
     not_found = 0
     for school, region in school_to_region.items():
-        result = teams_coll.update_one(
-            {"name": school},
-            {"$set": {"region": region}},
-        )
-        if result.matched_count:
+        current = teams_coll.find_one({"name": school}, {"region": 1})
+        if current:
             updated += 1
+            if args.apply:
+                teams_coll.update_one({"_id": current["_id"]}, {"$set": {"region": region}})
         else:
             not_found += 1
             print(f"  ⚠ No team named '{school}' in {DB_NAME}.teams", file=sys.stderr)
 
-    print(f"✅ Updated region for {updated} teams in {DB_NAME}.teams")
+    mode = "Updated" if args.apply else "Would update"
+    print(f"✅ {mode} region for {updated} teams in {DB_NAME}.teams")
     if not_found:
         print(f"   {not_found} schools from TSV had no matching team document.", file=sys.stderr)
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        sys.exit(2)

@@ -39,7 +39,6 @@ from collections import Counter
 from pathlib import Path
 from statistics import NormalDist
 
-from pymongo import MongoClient
 from pymongo.operations import UpdateOne
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -70,9 +69,10 @@ from BackEnd.utils.player_generation import (  # noqa: E402
     target_rt,
     weight_from_height,
 )
+from BackEnd.script_db import STAGING_DB, connect_script_database  # noqa: E402
 import random as _random
 
-DB_NAME = "gob-staging"
+DB_NAME = STAGING_DB
 # Position intent: capacity-constrained fit assignment (not height banding).
 # Soft per-bucket capacities 18-22% of the pool so a player is not bumped off his
 # best fit purely because a bucket hit exactly 20%.
@@ -112,16 +112,6 @@ def _universal_set_doc(p: dict) -> dict:
         "position_intent": p["_intent"],
         "potential_factor": p["_potential_factor"],
     }
-
-
-def _load_env(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        v = line.strip()
-        if v and not v.startswith("#") and "=" in v:
-            k, raw = v.split("=", 1)
-            os.environ.setdefault(k.strip(), raw.strip().strip('"').strip("'"))
 
 
 def _num(v, d=0.0):
@@ -506,24 +496,24 @@ def print_field_manifest(db_name, players, fpd_ex, fpd_changed, fpd_total,
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
-    ap.add_argument("--db", default=DB_NAME)
+    ap.add_argument("--db", choices=[DB_NAME], default=DB_NAME)
     ap.add_argument("--seed", type=int, default=20260729)
     ap.add_argument("--commit", action="store_true", help="persist writes (default dry-run)")
     ap.add_argument("--i-have-a-backup", action="store_true",
                     help="required with --commit; confirms backup_gob_staging_players.py was run")
     args = ap.parse_args()
 
-    for f in (ROOT / ".env.local", ROOT / ".env"):
-        _load_env(f)
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise SystemExit("MONGO_URI not set")
     commit = args.commit
     if commit and not args.i_have_a_backup:
         raise SystemExit("Refusing to --commit without --i-have-a-backup (run backup_gob_staging_players.py first).")
 
-    client = MongoClient(uri, serverSelectionTimeoutMS=20000)
-    db = client[args.db]
+    connection = connect_script_database(
+        target=args.db,
+        access="write" if commit else "read",
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
+    db = connection.database
     players = list(db["players"].find({}))
     print(f"loaded {len(players)} universal players from {args.db}.players")
 
@@ -548,7 +538,7 @@ def main() -> int:
     verb = "would recompute" if not commit else "recomputed"
     print(f"  FPD stored RT: {verb} {fpd_changed}/{fpd_total}")
     print(f"  FRD stored RT: {verb} {frd_changed}/{frd_total}")
-    client.close()
+    connection.close()
     return 0
 
 

@@ -4,23 +4,13 @@
 .env.local
 .env.production
 .env.railway
-.env.backup
 
 # Example/template files (safe to commit)
-!.env.railway.example
-
-# MongoDB backup output (mongodump)
-dump/
+!.env.example
 
 # EOG band measurement datasets + run logs (large local artifacts, not source)
 eog_band_*.jsonl
 season_run.log
-
-# Local backups (avoid committing large zips)
-gob-backup-*.zip
-
-# Backup script log (launchd)
-backup-mongodb.log
 
 __pycache__/
 *.pyc

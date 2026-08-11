@@ -4,22 +4,15 @@ Normalize year values to full words: SR→senior, JR→junior, SO→sophomore, F
 2. Updates gob-staging.players collection (year field).
 Requires --yes to run. Does not touch FPD/FTD.
 """
+import argparse
 import os
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
+ROOT = Path(__file__).resolve().parents[1]
+_root = str(ROOT)
 sys.path.insert(0, _root)
-os.chdir(_root)
-
-for path in [".env.local", ".env"]:
-    if os.path.exists(path):
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+from scripts.db_migration_cli import connect_migration_target
 
 YEAR_ABBR_TO_FULL = {
     "SR": "senior",
@@ -32,7 +25,7 @@ TSV_PATH = os.path.join(_root, "teams", "all_players_with_team_names.txt")
 YEAR_COLUMN_INDEX = 2
 
 
-def normalize_tsv():
+def normalize_tsv(*, apply=False):
     with open(TSV_PATH) as f:
         lines = f.readlines()
     if not lines:
@@ -54,36 +47,34 @@ def normalize_tsv():
             parts[YEAR_COLUMN_INDEX] = full
             changed += 1
         out.append("\t".join(parts))
-    with open(TSV_PATH, "w") as f:
-        f.write("\n".join(out) + "\n")
+    if apply:
+        with open(TSV_PATH, "w") as f:
+            f.write("\n".join(out) + "\n")
     return changed
 
 
-def normalize_gob_staging_players():
-    from BackEnd.db import client
-    if not client:
-        return 0, 0
-    coll = client["gob-staging"]["players"]
+def normalize_gob_staging_players(coll, *, apply=False):
     total = 0
     for abbr, full in YEAR_ABBR_TO_FULL.items():
-        result = coll.update_many({"year": abbr}, {"$set": {"year": full}})
-        total += result.modified_count
+        total += coll.update_many({"year": abbr}, {"$set": {"year": full}}).modified_count if apply else coll.count_documents({"year": abbr})
     return total, len(YEAR_ABBR_TO_FULL)
 
 
 def main():
-    if "--yes" not in sys.argv:
-        print("Normalizes year to full words (TSV + gob-staging.players). Requires --yes.")
-        sys.exit(1)
-    tsv_changed = normalize_tsv()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target("gob-staging", write=args.apply)
+    tsv_changed = normalize_tsv(apply=args.apply)
     print(f"[TSV] Updated year column for {tsv_changed} rows in {TSV_PATH}.")
     try:
-        db_changed, _ = normalize_gob_staging_players()
+        db_changed, _ = normalize_gob_staging_players(connection.database["players"], apply=args.apply)
         print(f"[gob-staging.players] Updated year field for {db_changed} documents.")
     except Exception as e:
         print(f"[gob-staging.players] Error: {e}")
         sys.exit(1)
     print("Done.")
+    connection.close()
 
 
 if __name__ == "__main__":

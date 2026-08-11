@@ -41,7 +41,6 @@ from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pymongo import MongoClient
 from pymongo.operations import UpdateOne
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -49,8 +48,9 @@ sys.path.insert(0, str(ROOT))
 
 from BackEnd.utils.player_generation import POSITIONS  # noqa: E402
 from BackEnd.utils.position_ratings import compute_position_ratings  # noqa: E402
+from BackEnd.script_db import STAGING_DB, connect_script_database  # noqa: E402
 
-DB_NAME = "gob-staging"
+DB_NAME = STAGING_DB
 COLLECTION = "players"
 ATTR_MIN, ATTR_MAX = 0, 100  # raw attribute scale (display divides by 10)
 
@@ -59,16 +59,6 @@ EDITS: dict[str, dict] = {
     "8487cb3b-887b-472a-90d9-f46caa572d46": {"attributes": {"BH": 68, "IQ": 61, "PS": 42}, "position_intent": "PG"},
     "8487cb3b-887b-472a-90d9-f46caa572d46": {"attributes": {"BH": 25, "PS": 24}},
 }
-
-
-def _load_env(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        v = line.strip()
-        if v and not v.startswith("#") and "=" in v:
-            k, raw = v.split("=", 1)
-            os.environ.setdefault(k.strip(), raw.strip().strip('"').strip("'"))
 
 
 def _validate(edits: dict, docs_by_id: dict) -> list[str]:
@@ -180,7 +170,7 @@ def _backup(db) -> str:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Targeted attribute/intent edits for gob-staging.players")
-    ap.add_argument("--db", default=DB_NAME)
+    ap.add_argument("--db", choices=[DB_NAME], default=DB_NAME)
     ap.add_argument("--edits", help="path to a JSON file with the EDITS shape (overrides the inline EDITS)")
     ap.add_argument("--commit", action="store_true", help="back up then persist (default dry-run)")
     args = ap.parse_args()
@@ -189,14 +179,13 @@ def main() -> int:
     if args.edits:
         edits = json.loads(Path(args.edits).read_text(encoding="utf-8"))
 
-    for f in (ROOT / ".env.local", ROOT / ".env"):
-        _load_env(f)
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise SystemExit("MONGO_URI not set")
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=20000)
-    db = client[args.db]
+    connection = connect_script_database(
+        target=args.db,
+        access="write" if args.commit else "read",
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
+    db = connection.database
     if db.name != DB_NAME:                      # HARD GUARD #1
         raise SystemExit(f"Refusing: target DB is {db.name!r}, expected {DB_NAME!r}. No writes.")
 
@@ -223,7 +212,7 @@ def main() -> int:
     else:
         print("  (no writes — re-run with --commit to back up and persist)")
 
-    client.close()
+    connection.close()
     return 0
 
 

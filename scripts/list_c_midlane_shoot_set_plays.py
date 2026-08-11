@@ -7,11 +7,12 @@ Output: Play Name, Skeleton (variant), Version number
 """
 
 import sys
-import os
+import argparse
+from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from BackEnd.db import plays_collection
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 
 def final_step_is_c_shoot_midlane(steps):
@@ -57,7 +58,14 @@ def iter_set_play_skeletons(play_doc):
 
 
 def main():
-    plays = list(plays_collection.find({"play_type": "set_play"}))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    try:
+        plays = list(connection.database.plays.find({"play_type": "set_play"}))
+    finally:
+        connection.close()
     results = []
 
     for play in plays:

@@ -5,15 +5,14 @@ This will help verify where opp fields should be located in the document structu
 """
 
 import sys
-import os
-from pymongo import MongoClient
-from bson import ObjectId
+import argparse
+from pathlib import Path
 import json
 
 # Add the parent directory to the sys.path to allow importing from BackEnd
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from BackEnd.db import fcp_skeletons_collection, hct_skeletons_collection
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 def check_skeleton_opp_fields(skeleton, skeleton_type):
     """Check if opp fields exist in a skeleton and show their location."""
@@ -55,12 +54,12 @@ def check_skeleton_opp_fields(skeleton, skeleton_type):
                     action_type = action.get("action", "N/A")
                     print(f"        {position}: location={location}, action={action_type}, opp={opp_value} {'✅' if has_opp else '❌ MISSING'}")
 
-def check_all_skeletons():
+def check_all_skeletons(db):
     print("="*60)
     print("Checking FCP Skeletons")
     print("="*60)
     
-    fcp_skeletons = list(fcp_skeletons_collection.find({}))
+    fcp_skeletons = list(db.fcp_skeletons.find({}))
     print(f"Found {len(fcp_skeletons)} FCP skeletons")
     
     for skeleton in fcp_skeletons:
@@ -70,7 +69,7 @@ def check_all_skeletons():
     print("Checking HCT Skeletons")
     print("="*60)
     
-    hct_skeletons = list(hct_skeletons_collection.find({}))
+    hct_skeletons = list(db.hct_skeletons.find({}))
     print(f"Found {len(hct_skeletons)} HCT skeletons")
     
     for skeleton in hct_skeletons:
@@ -119,5 +118,11 @@ Full document structure:
 """)
 
 if __name__ == "__main__":
-    check_all_skeletons()
-
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    try:
+        check_all_skeletons(connection.database)
+    finally:
+        connection.close()

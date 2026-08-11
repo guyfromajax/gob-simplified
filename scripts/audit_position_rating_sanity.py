@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import csv
 import math
-import os
 import statistics
 import sys
 from collections import Counter, defaultdict
@@ -23,7 +22,6 @@ from pathlib import Path
 from typing import Iterable, Sequence
 
 from bson import ObjectId
-from pymongo import MongoClient
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
@@ -33,8 +31,8 @@ from BackEnd.utils.position_ratings import (  # noqa: E402
     compute_position_ratings,
     height_fitness,
 )
+from scripts.db_migration_cli import connect_migration_target
 
-DB_NAME = "gob-staging"
 DEFAULT_FRANCHISE_ID = "6a67882a2b2eb443f8c7789f"
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 ATTRIBUTES = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT", "CH")
@@ -49,17 +47,6 @@ YEAR_ALIASES = {
     "sr": "SR",
     "senior": "SR",
 }
-
-
-def _load_env(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        value = line.strip()
-        if not value or value.startswith("#") or "=" not in value:
-            continue
-        key, raw = value.split("=", 1)
-        os.environ.setdefault(key.strip(), raw.strip().strip('"').strip("'"))
 
 
 def _number(value, default: float = 0.0) -> float:
@@ -209,6 +196,7 @@ def _write_csv(path: Path, rows: list[dict]) -> None:
 
 
 def _build_report(
+    db_name: str,
     franchise_id: str,
     players: list[dict],
     recruits: list[dict],
@@ -232,7 +220,7 @@ def _build_report(
     lines = [
         "# Position Rating Sanity Audit",
         "",
-        f"- Database: `{DB_NAME}`",
+        f"- Database: `{db_name}`",
         f"- Franchise: `{franchise_id}`",
         f"- Rostered players: **{player_count:,}** across **{source_counts['teams']:,}** FTD documents",
         f"- Current franchise recruit pool: **{recruit_count:,}** FRD documents",
@@ -481,7 +469,7 @@ def _build_report(
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--franchise-id", default=DEFAULT_FRANCHISE_ID)
-    parser.add_argument("--db", default=DB_NAME, choices=(DB_NAME,))
+    parser.add_argument("--db", required=True, choices=("gob-staging", "gob"))
     parser.add_argument(
         "--output-dir",
         type=Path,
@@ -489,20 +477,13 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    for path in (ROOT / ".env.local", ROOT / ".env"):
-        _load_env(path)
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment/.env files")
-
     try:
         franchise_object_id = ObjectId(args.franchise_id)
     except Exception as exc:
         raise RuntimeError("franchise-id must be a valid ObjectId") from exc
 
-    # This client is used only for find/find_one operations below.
-    client = MongoClient(uri, serverSelectionTimeoutMS=10_000)
-    db = client[args.db]
+    connection = connect_migration_target(args.db, write=False)
+    db = connection.database
     franchise = db["franchises"].find_one(
         {"_id": franchise_object_id},
         {"_id": 1, "used_recruit_set_ids": 1},
@@ -535,7 +516,7 @@ def main() -> int:
             },
         )
     )
-    client.close()
+    connection.close()
 
     if len(ftd_docs) != 128:
         raise RuntimeError(f"Expected 128 franchise teams; found {len(ftd_docs)}")
@@ -592,6 +573,7 @@ def main() -> int:
     _write_csv(recruit_path, recruits)
     report_path.write_text(
         _build_report(
+            args.db,
             args.franchise_id,
             players,
             recruits,

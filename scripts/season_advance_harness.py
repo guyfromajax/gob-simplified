@@ -335,21 +335,20 @@ def advance_one_season(fr, db, stat_updater, FPD, fid, user_team_oid, season_no,
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument("--db", required=True, choices=["gob-staging"])
+    ap.add_argument("--apply", action="store_true", help="Required: this harness mutates the target franchise")
     ap.add_argument("--franchise", required=True)
     ap.add_argument("--seasons", type=int, default=1)
     ap.add_argument("--measure-dir", default=None)
     args = ap.parse_args()
+    if not args.apply:
+        _abort("This harness mutates a franchise; re-run with --apply after verifying the target.")
 
-    # Load .env.local so MONGO_URI is populated before the guard (BackEnd.db does this
-    # on import, but the guard runs first / before the DB is imported).
-    try:
-        from dotenv import load_dotenv
-        env_local = _REPO / ".env.local"
-        load_dotenv(str(env_local)) if env_local.exists() else load_dotenv()
-    except Exception:
-        pass
-    if "gob-staging" not in os.environ.get("MONGO_URI", "").lower():
-        _abort("MONGO_URI does not point at gob-staging. Refusing.")
+    # Validate the same repo-root staging configuration before importing application
+    # routes, whose module-level collections are intentionally owned by BackEnd.db.
+    from scripts.db_migration_cli import connect_migration_target
+    preflight = connect_migration_target(args.db, write=True)
+    preflight.close()
     os.environ.setdefault("FRANCHISE_CPU_SIM_USE_POOL", "1")
 
     ObjectId, db, FPD, stat_updater, fr = _lazy_imports()

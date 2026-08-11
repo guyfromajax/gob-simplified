@@ -2,7 +2,7 @@
 """
 Upload player images to Cloudflare R2 (bucket: gob-player-images).
 
-Reads credentials from scripts/.r2.env (gitignored).
+Reads credentials from process variables or external ``~/.config/gob/r2.env``.
 Uploads <source>/*.png  ->  R2 key players/master/<filename>
 
 Default source is the gitignored staging dir assets_staging/players/ so new bulk
@@ -27,9 +27,9 @@ import sys
 
 import boto3
 from botocore.exceptions import ClientError
+from script_secrets import ScriptSecretError, load_r2_credentials
 
 # ---- Tunable constants ------------------------------------------------------
-ENV_FILE          = "scripts/.r2.env"
 # Default source: a gitignored staging dir so new bulk images never enter the repo.
 # Override with --source (e.g. the legacy FrontEnd dir during initial migration).
 DEFAULT_SOURCE    = "assets_staging/players"
@@ -38,21 +38,6 @@ CONTENT_TYPE  = "image/png"
 CACHE_CONTROL = "public, max-age=86400"     # 1 day at origin; CDN/transform layer caches longer
 MANIFEST_PATH = "scripts/r2_upload_manifest.csv"
 # ----------------------------------------------------------------------------
-
-
-def load_env(path):
-    env = {}
-    with open(path) as f:
-        for line in f:
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                env[k.strip()] = v.strip()
-    missing = [k for k in ("R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_ENDPOINT", "R2_BUCKET")
-               if not env.get(k) or env[k] == "REPLACE_ME"]
-    if missing:
-        sys.exit(f"ERROR: missing/placeholder values in {path}: {', '.join(missing)}")
-    return env
 
 
 def sha256_of(path):
@@ -82,7 +67,10 @@ def main():
     args = ap.parse_args()
     source_dir = args.source
 
-    env = load_env(ENV_FILE)
+    try:
+        env = load_r2_credentials()
+    except ScriptSecretError as exc:
+        sys.exit(f"ERROR: {exc}")
     s3 = boto3.client(
         "s3",
         endpoint_url=env["R2_ENDPOINT"],

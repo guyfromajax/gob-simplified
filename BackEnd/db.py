@@ -2,8 +2,7 @@ import os
 from pathlib import Path
 from pymongo import MongoClient
 from pymongo.collection import Collection
-from dotenv import load_dotenv
-from pymongo.errors import PyMongoError
+from BackEnd.env_config import resolve_database_environment
 
 # Snapshot the REAL process environment before any dotenv file is loaded. The prod-access
 # opt-in below is read from this snapshot only, so that dropping GOB_DB_ACCESS=write into
@@ -11,77 +10,30 @@ from pymongo.errors import PyMongoError
 # has to be given per invocation, on the command line, or by the deployment platform.
 _PRISTINE_ENV = dict(os.environ)
 
-# ✅ LOCAL DEV: Load .env.local if it exists (dev), otherwise use .env (Railway)
-# This allows local dev to use different MongoDB (local or Atlas) without affecting Railway
 import sys
 print("🔵 [DEBUG] db.py: Starting module", file=sys.stderr, flush=True)
 
-# ⚠️ RESOLVE AGAINST THE REPO ROOT, NEVER THE WORKING DIRECTORY.
-# This was `os.path.exists(".env.local")`, i.e. relative to CWD. Any script run from a
-# subdirectory therefore failed to find .env.local, fell through to .env, and connected to
-# PRODUCTION silently. That happened: a sim harness run from a scratch directory rewrote
-# position_ratings on 192 prod player documents. The repo root is fixed relative to this
-# file, so the target database no longer depends on where you happened to launch from.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_ENV_LOCAL = _REPO_ROOT / ".env.local"
-if _ENV_LOCAL.exists():
-    load_dotenv(_ENV_LOCAL)
-    print(f"🔧 [LOCAL DEV] Loaded {_ENV_LOCAL}", file=sys.stderr, flush=True)
-else:
-    load_dotenv(_REPO_ROOT / ".env")  # Load .env or use Railway env vars
-    print("☁️ [RAILWAY/PROD] Loaded .env or system environment", file=sys.stderr, flush=True)
-
-MONGO_URI = os.environ.get("MONGO_URI")
-
-def _get_database_name(uri: str | None) -> str:
-    """
-    Extract database name from MONGO_URI or use environment variable.
-    
-    Priority:
-    1. MONGO_DB_NAME environment variable (explicit)
-    2. Database name from MONGO_URI path (e.g., mongodb+srv://.../gob-staging?...)
-    3. Default to 'gob' (backward compatibility)
-    """
-    # Check for explicit database name environment variable
-    db_name_env = os.environ.get("MONGO_DB_NAME")
-    if db_name_env:
-        return db_name_env
-    
-    # Try to extract from MONGO_URI if it contains database name in path
-    if uri:
-        # Format: mongodb+srv://user:pass@cluster.mongodb.net/database?options
-        try:
-            from urllib.parse import urlparse, parse_qs
-            parsed = urlparse(uri)
-            if parsed.path and parsed.path != '/':
-                # Path will be like '/gob-staging' - remove leading slash
-                db_name = parsed.path.lstrip('/')
-                if db_name:
-                    return db_name
-        except Exception:
-            # If parsing fails, fall through to default
-            pass
-    
-    # Default to 'gob' for backward compatibility
-    return "gob"
+DB_ENV = resolve_database_environment(
+    pristine_env=_PRISTINE_ENV,
+    repo_root=_REPO_ROOT,
+    target_environ=os.environ,
+)
+MONGO_URI = DB_ENV.mongo_uri
+DB_NAME = DB_ENV.db_name
+USING_MONGOMOCK = DB_ENV.db_mode == "mongomock"
+print(
+    f"🔧 [DB CONFIG] source={DB_ENV.source} environment={DB_ENV.environment} "
+    f"database={DB_NAME} mode={DB_ENV.db_mode}",
+    file=sys.stderr,
+    flush=True,
+)
 
 def _init_client(uri: str | None):
-    """Initialize MongoDB client. Returns None on any error to allow graceful fallback to mongomock."""
+    """Initialize configured real Mongo. Errors intentionally propagate."""
     if not uri:
-        print("⚠️ [DB] MONGO_URI not set - will use mongomock", file=sys.stderr, flush=True)
-        return None
-    try:
-        # ✅ CRITICAL: Use connect=False to avoid blocking during import
-        # This creates the client without actually connecting, allowing the app to start
-        # The connection will be established lazily on first use
-        client = MongoClient(uri, serverSelectionTimeoutMS=5000, connect=False)
-        return client
-    except Exception as e:  # Catch ALL exceptions, not just PyMongoError
-        print(f"⚠️ [DB] Failed to initialize MongoDB client: {type(e).__name__}: {e}", file=sys.stderr, flush=True)
-        print(f"⚠️ [DB] Will fallback to mongomock for development", file=sys.stderr, flush=True)
-        import traceback
-        traceback.print_exc(file=sys.stderr)
-        return None
+        raise RuntimeError("Real Mongo mode requires MONGO_URI")
+    return MongoClient(uri, serverSelectionTimeoutMS=5000, connect=False)
 
 # ── PRODUCTION ACCESS GUARD ──────────────────────────────────────────────────────────────
 # Ad-hoc scripts should not be able to reach production by accident. Note that "read-only
@@ -113,10 +65,10 @@ class ProdWriteBlocked(RuntimeError):
 def _resolve_db_access(db_name: str) -> str:
     if db_name not in PROD_DB_NAMES:
         return "write"
-    explicit = (_PRISTINE_ENV.get("GOB_DB_ACCESS") or "").strip().lower()
+    explicit = (DB_ENV.process_environment.get("GOB_DB_ACCESS") or "").strip().lower()
     if explicit in ("read", "write"):
         return explicit
-    if any(k.startswith("RAILWAY_") for k in _PRISTINE_ENV):
+    if any(k.startswith("RAILWAY_") for k in DB_ENV.process_environment):
         return "write"
     return "refuse"
 
@@ -126,12 +78,16 @@ _MUTATORS = frozenset({
     "delete_one", "delete_many", "bulk_write", "find_one_and_update",
     "find_one_and_replace", "find_one_and_delete", "drop", "rename",
     "create_index", "create_indexes", "drop_index", "drop_indexes",
+    "create_search_index", "create_search_indexes", "update_search_index",
+    "drop_search_index", "initialize_ordered_bulk_op",
+    "initialize_unordered_bulk_op", "map_reduce",
 })
+_DATABASE_MUTATORS = frozenset({"create_collection", "drop_collection", "validate_collection"})
+_CLIENT_MUTATORS = frozenset({"drop_database", "start_session"})
 
 
 class _ReadOnlyCollection:
-    """Delegates reads, raises on mutators. NOTE: aggregate() is delegated, so an
-    aggregation using $out/$merge is NOT blocked by this proxy."""
+    """Delegate reads while blocking the complete supported collection write surface."""
 
     def __init__(self, coll):
         object.__setattr__(self, "_coll", coll)
@@ -145,6 +101,19 @@ class _ReadOnlyCollection:
             )
         return getattr(self._coll, name)
 
+    @property
+    def database(self):
+        return _ReadOnlyDatabase(self._coll.database)
+
+    def aggregate(self, pipeline, *args, **kwargs):
+        stages = list(pipeline)
+        if any(isinstance(stage, dict) and ({"$out", "$merge"} & set(stage)) for stage in stages):
+            raise ProdWriteBlocked(
+                f"Write 'aggregate($out/$merge)' blocked on production collection "
+                f"'{self._coll.name}' (GOB_DB_ACCESS=read)."
+            )
+        return self._coll.aggregate(stages, *args, **kwargs)
+
     def __getitem__(self, key):
         return _ReadOnlyCollection(self._coll[key])
 
@@ -157,8 +126,21 @@ class _ReadOnlyDatabase:
         object.__setattr__(self, "_db", database)
 
     def __getattr__(self, name):
+        if name in _DATABASE_MUTATORS:
+            raise ProdWriteBlocked(
+                f"Write 'database.{name}' blocked on production (GOB_DB_ACCESS=read)."
+            )
         value = getattr(self._db, name)
         return _ReadOnlyCollection(value) if isinstance(value, Collection) else value
+
+    @property
+    def client(self):
+        return _ReadOnlyClient(self._db.client)
+
+    def command(self, *_args, **_kwargs):
+        raise ProdWriteBlocked(
+            "Write-capable database.command blocked on production (GOB_DB_ACCESS=read)."
+        )
 
     def __getitem__(self, key):
         return _ReadOnlyCollection(self._db[key])
@@ -167,8 +149,24 @@ class _ReadOnlyDatabase:
         return f"<read-only {self._db!r}>"
 
 
-# Get database name (configurable for staging/production separation)
-DB_NAME = _get_database_name(MONGO_URI)
+class _ReadOnlyClient:
+    def __init__(self, client):
+        object.__setattr__(self, "_client", client)
+
+    def close(self):
+        return self._client.close()
+
+    def __getattr__(self, name):
+        if name in _CLIENT_MUTATORS:
+            raise ProdWriteBlocked(
+                f"Write 'client.{name}' blocked on production (GOB_DB_ACCESS=read)."
+            )
+        return getattr(self._client, name)
+
+    def __getitem__(self, key):
+        return _ReadOnlyDatabase(self._client[key])
+
+
 DB_ACCESS = _resolve_db_access(DB_NAME)
 if DB_ACCESS == "refuse":
     raise ProdAccessBlocked(
@@ -176,20 +174,20 @@ if DB_ACCESS == "refuse":
         f"process.\n"
         f"  read-only:  GOB_DB_ACCESS=read  <your command>\n"
         f"  read-write: GOB_DB_ACCESS=write <your command>\n"
-        f"If you meant to use staging, run from the repo root so .env.local is picked up "
-        f"(it is resolved against the repo root, not the working directory)."
+        f"If you meant to use staging, configure repo-root .env.local with "
+        f"ENVIRONMENT=development and MONGO_DB_NAME=gob-staging."
     )
 if DB_ACCESS == "read":
     print(f"🔒 [DB] PRODUCTION {DB_NAME!r} opened READ-ONLY (GOB_DB_ACCESS=read)",
           file=sys.stderr, flush=True)
 
-client = _init_client(MONGO_URI)
-
-if client:
+if not USING_MONGOMOCK:
+    client = _init_client(MONGO_URI)
     db = client[DB_NAME]
     if DB_ACCESS == "read":
         # Every collection below is derived via db["..."], so they all come back guarded.
         db = _ReadOnlyDatabase(db)
+        client = _ReadOnlyClient(client)
     players_collection = db["players"]
     teams_collection = db["teams"]
     games_collection = db["games"]
@@ -217,7 +215,7 @@ if client:
     around_the_league_collection = db["around_the_league"]
     # Alpha 12-question feedback survey (lazily created on first insert; lands in
     # gob.alpha_feedback on prod, gob-staging.alpha_feedback on staging — DB chosen
-    # by _get_database_name, no per-env branching).
+    # by the validated DB_ENV identity, no per-env branching).
     alpha_feedback_collection = db["alpha_feedback"]
     # EOG band instrumentation. Durable home for the [EOG-BAND] records: Railway's
     # container filesystem is EPHEMERAL and declares no volume, so the file sink
@@ -225,7 +223,7 @@ if client:
     eog_band_log_collection = db["eog_band_log"]
     print("🔵 [DEBUG] db.py: Collections initialized", file=sys.stderr, flush=True)
 else:
-    print("🔵 [DEBUG] db.py: Using mongomock (no MongoDB connection)", file=sys.stderr, flush=True)
+    print("🔵 [DEBUG] db.py: Using explicitly selected mongomock", file=sys.stderr, flush=True)
     import mongomock
     client = mongomock.MongoClient()
     db = client[DB_NAME]  # DB_NAME is defined at module level above
@@ -319,13 +317,19 @@ def ensure_frd_index():
 def ensure_games_franchise_index():
     """
     Index on games.franchise_id for franchise delete and any queries by franchise.
-    Idempotent; safe to call on startup.
+    Idempotent; safe to call on startup. Accept an equivalent existing index under
+    any name so environments created by older migrations do not raise a harmless
+    IndexOptionsConflict merely because the requested name changed.
     """
     if not client:
         return
     try:
+        desired_key = [("franchise_id", 1)]
+        for existing in games_collection.list_indexes():
+            if list((existing.get("key") or {}).items()) == desired_key:
+                return
         games_collection.create_index(
-            [("franchise_id", 1)],
+            desired_key,
             name="franchise_id_1",
         )
     except Exception as e:

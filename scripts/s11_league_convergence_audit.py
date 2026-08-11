@@ -24,6 +24,7 @@ from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 _REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO))
@@ -33,23 +34,29 @@ CORE_12 = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "FT", "ST", "AG", "IQ", "ND
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 YEAR_BUCKETS = ("FR", "SO", "JR", "SR")
 
-# Must set before BackEnd.db import.
-for _env in (".env", ".env.local"):
-    p = _REPO / _env
-    if not p.exists():
-        continue
-    for line in p.read_text().splitlines():
-        if not line.strip() or line.startswith("#") or "=" not in line:
-            continue
-        k, v = line.split("=", 1)
-        os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-
-os.environ["MONGO_DB_NAME"] = SCRATCH_DB
 os.environ.setdefault("FRANCHISE_CPU_SIM_USE_POOL", "0")
 
-# Guard: never run this against gob / gob-staging as the active DB name.
-if os.environ.get("MONGO_DB_NAME") in {"gob", "gob-staging"}:
-    sys.exit("Refusing: MONGO_DB_NAME must be the scratch DB, not gob/gob-staging")
+
+def _configure_validated_scratch_environment(target: str, confirm_db: str | None) -> None:
+    """Validate production credentials, then retarget only their URI path to scratch."""
+    from BackEnd.script_db import connect_production_cluster_scratch_database
+
+    pristine = dict(os.environ)
+    preflight = connect_production_cluster_scratch_database(
+        target=target,
+        access="write",
+        destructive=True,
+        confirm_db=confirm_db,
+        pristine_env=pristine,
+    )
+    preflight.close()
+    source_uri = pristine.get("MONGO_URI", "")
+    parsed = urlsplit(source_uri)
+    os.environ["MONGO_URI"] = urlunsplit(
+        (parsed.scheme, parsed.netloc, f"/{target}", parsed.query, parsed.fragment)
+    )
+    os.environ["MONGO_DB_NAME"] = target
+    os.environ["ENVIRONMENT"] = "test"
 
 
 def _norm_year(raw: Any) -> str | None:
@@ -668,6 +675,9 @@ def _print_headline(snap, ceil_gen) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
+    ap.add_argument("--db", required=True, choices=[SCRATCH_DB])
+    ap.add_argument("--confirm-db", required=True)
+    ap.add_argument("--apply", action="store_true", help="Required: provisions and mutates scratch data")
     ap.add_argument("--seed", type=int, required=True, help="Master seed for this run")
     ap.add_argument("--seasons", type=int, default=3)
     ap.add_argument(
@@ -675,6 +685,9 @@ def main() -> None:
         default=str(_REPO / "tmp" / "s11_league_convergence"),
     )
     args = ap.parse_args()
+    if not args.apply:
+        ap.error("this measurement mutates its scratch database; re-run with --apply")
+    _configure_validated_scratch_environment(args.db, args.confirm_db)
     out_dir = Path(args.out_root) / f"seed_{args.seed}"
     print(f"OUT={out_dir}")
     run_one_seed(args.seed, args.seasons, out_dir)

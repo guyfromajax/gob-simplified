@@ -69,6 +69,8 @@ def _abort(msg: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging"])
+    parser.add_argument("--apply", action="store_true", help="Required: advances and mutates the franchise")
     parser.add_argument(
         "--stop-after-week", type=int, default=REGULAR_SEASON_LAST_WEEK,
         help="Advance until franchise week exceeds this (default 26). Use 1 for the "
@@ -84,13 +86,15 @@ def main() -> int:
              "a draw, so seeded baseline vs changed desync at the first focus call.",
     )
     args = parser.parse_args()
+    if not args.apply:
+        parser.error("this harness mutates a franchise; re-run with --apply")
     stop_after = min(int(args.stop_after_week), REGULAR_SEASON_LAST_WEEK)
 
-    # ---- Safety gate 1: environment (before importing anything DB-bound) -------
-    mongo_uri = os.environ.get("MONGO_URI", "")
-    if EXPECTED_DB_MARKER not in mongo_uri.lower():
-        _abort(f"MONGO_URI does not point at '{EXPECTED_DB_MARKER}'. Refusing to run "
-               f"(guards against prod / an empty local DB). Got: {mongo_uri[:40]}...")
+    # Validate the repo-root staging write configuration before importing application
+    # routes, whose module-level collections are intentionally owned by BackEnd.db.
+    from scripts.db_migration_cli import connect_migration_target
+    preflight = connect_migration_target(args.db, write=True)
+    preflight.close()
 
     # Imports are deferred until AFTER the MONGO_URI guard so a misconfigured run
     # can't connect anywhere first.

@@ -11,19 +11,12 @@ has_portrait flags the 150 new (false) for the borrow-pool fail-safe fallback (s
 Default dry-run (self-check + CSVs); --commit backs up (recruit_sets_backups) then writes. gob-staging
 asserted twice; touches no other collection. See _documentation_master/projects/recruit_set_0001_regen/.
 """
-import os, sys, csv, uuid, argparse, statistics, random
+import os, sys, csv, uuid, argparse, statistics, random, atexit
 from pathlib import Path
 from collections import Counter
 from datetime import datetime, timezone
-ROOT=Path("/Users/jamesdavies/gob-simplified"); os.chdir(ROOT); sys.path.insert(0,str(ROOT))
-def le(fp):
-    if fp.exists():
-        for l in fp.read_text().splitlines():
-            l=l.strip()
-            if l and not l.startswith("#") and "=" in l:
-                k,v=l.split("=",1); os.environ.setdefault(k.strip(),v.strip().strip('"').strip("'"))
-for f in (ROOT/".env.local",ROOT/".env"): le(f)
-from pymongo import MongoClient
+ROOT=Path(__file__).resolve().parents[1]; os.chdir(ROOT); sys.path.insert(0,str(ROOT))
+from BackEnd.script_db import STAGING_DB, connect_script_database
 from BackEnd.utils.player_generation import (POSITIONS, CORE_ATTRS, HEIGHT_IDEAL_IN, draw_height, weight_from_height,
     generate_core_attributes, position_profile, target_rt, draw_tier, draw_potential_factor, normalize_year,
     HT_REMAINING_SHARE_BY_YEAR, HT_TOTAL_MEAN)
@@ -31,13 +24,15 @@ from BackEnd.utils.position_ratings import compute_position_ratings, POSITION_WE
 from BackEnd.constants import LEAGUE_MEDIAN_HEIGHT_IN
 from BackEnd.models.franchise_manager import RecruitManager, choose_franchise_first_name
 
-DB_NAME="gob-staging"; COLL="recruit_sets"; SETID="set_0001"; SEED=42; NEW=150
+DB_NAME=STAGING_DB; COLL="recruit_sets"; SETID="set_0001"; SEED=42; NEW=150
 IDS=0.15; ARCH=1.30; YEAR_W=[("JH",.55),("FR",.15),("SO",.15),("JR",.15)]
 SP=ROOT/"_documentation_master/projects/recruit_set_0001_regen"
 ap=argparse.ArgumentParser(); ap.add_argument("--commit",action="store_true"); A=ap.parse_args()
 
-db=MongoClient(os.environ["MONGO_URI"],serverSelectionTimeoutMS=20000)[DB_NAME]
-if db.name!=DB_NAME: raise SystemExit(f"Refusing: db is {db.name!r}")   # GUARD 1
+connection=connect_script_database(target=DB_NAME, access="write" if A.commit else "read",
+    pristine_env=dict(os.environ), repo_root=ROOT)
+atexit.register(connection.close)
+db=connection.database
 setdoc=db[COLL].find_one({"set_id":SETID}) or {}
 existing=setdoc.get("recruits") or []
 assert len(existing)==300, f"expected 300 got {len(existing)}"

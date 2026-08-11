@@ -12,8 +12,7 @@ any collection whose (count, checksum) moved and didn't come back is either
 uncaptured or restore-buggy — a hole, regardless of what the traces said.
 
 Usage:
-  export MONGO_URI='mongodb+srv://.../gob-staging'
-  python scripts/eog_db_sweep.py capture ./sweep_before.json
+  python scripts/eog_db_sweep.py capture ./sweep_before.json --db gob-staging
   # ... run 1 week, then restore ...
   python scripts/eog_db_sweep.py capture ./sweep_after.json
   python scripts/eog_db_sweep.py compare ./sweep_before.json ./sweep_after.json
@@ -35,6 +34,7 @@ _repro = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_repro)
 _repro.pin_hash_seed()
 
 import hashlib
+import argparse
 import json
 import os
 import sys
@@ -45,7 +45,6 @@ if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
 TARGET_FRANCHISE_ID = os.environ.get("GOB_MEASUREMENT_FRANCHISE_ID", "6a67882a2b2eb443f8c7789f")
-EXPECTED_DB_MARKER = "gob-staging"
 
 
 def _abort(msg: str) -> None:
@@ -53,12 +52,14 @@ def _abort(msg: str) -> None:
     sys.exit(1)
 
 
-def capture(outfile: str) -> int:
-    if EXPECTED_DB_MARKER not in os.environ.get("MONGO_URI", "").lower():
-        _abort(f"MONGO_URI does not point at '{EXPECTED_DB_MARKER}'.")
+def capture(outfile: str, database_name: str) -> int:
     from bson import ObjectId
     from bson.json_util import dumps
-    from BackEnd.db import db, franchises_collection
+    from scripts.db_migration_cli import connect_migration_target
+
+    connection = connect_migration_target(database_name, write=False)
+    db = connection.database
+    franchises_collection = db["franchises"]
 
     fid = ObjectId(TARGET_FRANCHISE_ID)
     fdoc = franchises_collection.find_one({"_id": fid}, {"user_id": 1})
@@ -85,6 +86,7 @@ def capture(outfile: str) -> int:
             h.update(s.encode())
         sweep[name] = {"total": total, "fcount": len(docs), "fchecksum": h.hexdigest()}
     Path(outfile).write_text(json.dumps(sweep, indent=0))
+    connection.close()
     print(f"✅ Swept {len(sweep)} collections → {outfile} "
           f"(franchise docs across {sum(v.get('fcount',0) for v in sweep.values())} rows)")
     return 0
@@ -114,16 +116,18 @@ def compare(a: str, b: str) -> int:
 
 
 def main() -> int:
-    if len(sys.argv) < 2 or sys.argv[1] not in ("capture", "compare"):
-        print(__doc__)
-        return 2
-    if sys.argv[1] == "capture":
-        if len(sys.argv) != 3:
-            _abort("capture needs an output file")
-        return capture(sys.argv[2])
-    if len(sys.argv) != 4:
-        _abort("compare needs two files")
-    return compare(sys.argv[2], sys.argv[3])
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    capture_parser = subparsers.add_parser("capture")
+    capture_parser.add_argument("outfile")
+    capture_parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    compare_parser = subparsers.add_parser("compare")
+    compare_parser.add_argument("before")
+    compare_parser.add_argument("after")
+    args = parser.parse_args()
+    if args.command == "capture":
+        return capture(args.outfile, args.db)
+    return compare(args.before, args.after)
 
 
 if __name__ == "__main__":

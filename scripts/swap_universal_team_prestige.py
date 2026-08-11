@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Swap selected universal-team prestige values in gob and gob-staging.
+"""Swap selected universal-team prestige values in one explicit database.
 
 Usage:
   .venv/bin/python scripts/swap_universal_team_prestige.py --dry-run
@@ -15,11 +15,9 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from pymongo import MongoClient
-
-
 ROOT = Path(__file__).resolve().parents[1]
-DATABASES = ("gob", "gob-staging")
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 COLLECTION = "teams"
 TEAM_PAIRS = (
     ("Monroe-Hayes", "D1 Institute"),
@@ -37,33 +35,10 @@ TEAM_PAIRS = (
 )
 
 
-def load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        text = line.strip()
-        if not text or text.startswith("#") or "=" not in text:
-            continue
-        key, value = text.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def load_mongo_uri() -> str:
-    load_env_file(ROOT / ".env.local")
-    load_env_file(ROOT / ".env")
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment, .env.local, or .env")
-    return uri
-
-
-def inspect_database(client: MongoClient, db_name: str) -> dict[str, dict[str, Any]]:
+def inspect_database(database, db_name: str) -> dict[str, dict[str, Any]]:
     names = [name for pair in TEAM_PAIRS for name in pair]
     docs = list(
-        client[db_name][COLLECTION].find(
+        database[COLLECTION].find(
             {"name": {"$in": names}},
             {"name": 1, "prestige": 1},
         )
@@ -79,7 +54,7 @@ def inspect_database(client: MongoClient, db_name: str) -> dict[str, dict[str, A
         if len(matches) != 1:
             suggestions = difflib.get_close_matches(
                 name,
-                client[db_name][COLLECTION].distinct("name"),
+                database[COLLECTION].distinct("name"),
                 n=3,
                 cutoff=0.5,
             )
@@ -97,12 +72,12 @@ def inspect_database(client: MongoClient, db_name: str) -> dict[str, dict[str, A
 
 
 def apply_database(
-    client: MongoClient,
+    database,
     db_name: str,
     teams: dict[str, dict[str, Any]],
     session: Any,
 ) -> None:
-    collection = client[db_name][COLLECTION]
+    collection = database[COLLECTION]
     for left_name, right_name in TEAM_PAIRS:
         left = teams[left_name]
         right = teams[right_name]
@@ -132,11 +107,11 @@ def print_plan(db_name: str, teams: dict[str, dict[str, Any]]) -> None:
 
 
 def verify_database(
-    client: MongoClient,
+    database,
     db_name: str,
     before: dict[str, dict[str, Any]],
 ) -> dict[str, dict[str, Any]]:
-    after = inspect_database(client, db_name)
+    after = inspect_database(database, db_name)
     for left_name, right_name in TEAM_PAIRS:
         if after[left_name]["prestige"] != before[right_name]["prestige"]:
             raise RuntimeError(f"{db_name}.{COLLECTION}: verification failed for {left_name!r}")
@@ -147,32 +122,28 @@ def verify_database(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--dry-run", action="store_true", help="Validate and report without writing")
-    mode.add_argument("--apply", action="store_true", help="Apply all prestige swaps")
+    parser.add_argument("--db", choices=("gob-staging", "gob"), required=True)
+    parser.add_argument("--apply", action="store_true", help="Apply all prestige swaps")
     args = parser.parse_args()
 
-    client = MongoClient(load_mongo_uri(), serverSelectionTimeoutMS=15000)
-    client.admin.command("ping")
+    connection = connect_migration_target(args.db, write=args.apply)
+    database = connection.database
 
-    before = {db_name: inspect_database(client, db_name) for db_name in DATABASES}
+    before = inspect_database(database, args.db)
     print("[before / planned swaps]")
-    for db_name in DATABASES:
-        print_plan(db_name, before[db_name])
+    print_plan(args.db, before)
 
-    if args.dry_run:
+    if not args.apply:
         print("[dry-run] Validation passed; no changes made.")
         return 0
 
-    with client.start_session() as session:
+    with connection.client.start_session() as session:
         with session.start_transaction():
-            for db_name in DATABASES:
-                apply_database(client, db_name, before[db_name], session)
+            apply_database(database, args.db, before, session)
 
     print("[after]")
-    for db_name in DATABASES:
-        after = verify_database(client, db_name, before[db_name])
-        print_plan(db_name, after)
+    after = verify_database(database, args.db, before)
+    print_plan(args.db, after)
 
     print("[done] Both databases verified.")
     return 0

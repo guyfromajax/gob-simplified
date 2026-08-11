@@ -8,34 +8,17 @@ team player_ids to []. You must also pass --yes to confirm.
   python3 scripts/load_players_from_tsv_gob_staging.py --replace --yes   # wipe + reload (requires --yes)
 Run from repo root.
 """
+import argparse
 import os
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
+ROOT = Path(__file__).resolve().parents[1]
+_root = str(ROOT)
 sys.path.insert(0, _root)
-os.chdir(_root)
-
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
 from BackEnd.utils.position_ratings import compute_position_ratings
 from bson import ObjectId
+from scripts.db_migration_cli import connect_migration_target
 
 DB_NAME = "gob-staging"
 TSV_PATH = os.path.join(_root, "teams", "all_players_with_team_names.txt")
@@ -64,29 +47,27 @@ def _int(s, default=0):
 
 
 def main():
-    if not client:
-        print("❌ MongoDB client not available.")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--replace", action="store_true")
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
     if not os.path.exists(TSV_PATH):
         print(f"❌ File not found: {TSV_PATH}")
         sys.exit(1)
 
-    replace = "--replace" in sys.argv
-    confirm_yes = "--yes" in sys.argv
-    players_coll = client[DB_NAME]["players"]
-    teams_coll = client[DB_NAME]["teams"]
+    replace = args.replace
+    connection = connect_migration_target(DB_NAME, write=args.apply)
+    players_coll = connection.database["players"]
+    teams_coll = connection.database["teams"]
 
     if replace:
-        if not confirm_yes:
-            print("❌ --replace will DELETE ALL players in gob-staging and reset all team player_ids.")
-            print("   Add --yes to confirm: python3 scripts/load_players_from_tsv_gob_staging.py --replace --yes")
-            sys.exit(1)
         current = players_coll.count_documents({})
-        print(f"⚠️  DESTRUCTIVE: Deleting all {current} player(s) from {DB_NAME}.players and resetting all team player_ids.")
-        deleted = players_coll.delete_many({}).deleted_count
-        print(f"[{DB_NAME}] Cleared {deleted} existing player(s).")
+        print(f"⚠️  {'DESTRUCTIVE: deleting' if args.apply else 'DRY RUN: would delete'} all {current} player(s).")
+        deleted = players_coll.delete_many({}).deleted_count if args.apply else current
+        print(f"[{DB_NAME}] {'Cleared' if args.apply else 'Would clear'} {deleted} existing player(s).")
         # Reset team player_ids so backfill doesn't append to stale refs
-        teams_coll.update_many({}, {"$set": {"player_ids": []}})
+        if args.apply:
+            teams_coll.update_many({}, {"$set": {"player_ids": []}})
         print(f"[{DB_NAME}] Reset all team player_ids to [].")
 
     with open(TSV_PATH) as f:
@@ -156,10 +137,11 @@ def main():
         print("No valid rows.")
         sys.exit(0)
     player_docs_only = [d[0] for d in docs]
-    result = players_coll.insert_many(player_docs_only, ordered=False)
-    inserted = len(result.inserted_ids)
+    result = players_coll.insert_many(player_docs_only, ordered=False) if args.apply else None
+    inserted_ids = result.inserted_ids if result else [d[0].get("_id") for d in docs]
+    inserted = len(player_docs_only)
 
-    for i, pid in enumerate(result.inserted_ids):
+    for i, pid in enumerate(inserted_ids):
         _, team_oid = docs[i]
         if team_oid:
             team_key = str(team_oid)
@@ -171,13 +153,15 @@ def main():
     for team_oid_str, pids in team_player_ids.items():
         if not pids:
             continue
-        teams_coll.update_one(
-            {"_id": ObjectId(team_oid_str)},
-            {"$push": {"player_ids": {"$each": pids}}},
-        )
+        if args.apply:
+            teams_coll.update_one(
+                {"_id": ObjectId(team_oid_str)},
+                {"$push": {"player_ids": {"$each": pids}}},
+            )
 
     print(f"[{DB_NAME}] Inserted {inserted} players and updated team player_ids.")
     print("Done.")
+    connection.close()
 
 
 if __name__ == "__main__":

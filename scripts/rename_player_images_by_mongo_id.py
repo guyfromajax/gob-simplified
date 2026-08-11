@@ -1,15 +1,15 @@
 # scripts/rename_player_images_by_mongo_id.py
-import os
+import argparse
 import re
 import sys
 from pathlib import Path
 
-from pymongo import MongoClient
-from dotenv import load_dotenv
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 # ---------- config ----------
 IMAGES_DIR = Path("FrontEnd/static/images/players")   # folder with your images
-DB_NAME = "gob"
 COLL_NAME = "players"
 # ----------------------------
 
@@ -19,20 +19,18 @@ def tokenize(name: str):
     return [t for t in re.split(r"[^A-Za-z]+", base.lower()) if t]
 
 def main():
-    load_dotenv()
-    mongo_uri = os.getenv("MONGO_URI") or os.getenv("MONGODB_URI")
-    if not mongo_uri:
-        print("ERROR: Missing MONGO_URI in .env")
-        sys.exit(1)
-
-    apply = "--apply" in sys.argv
+    parser = argparse.ArgumentParser(description="Rename local player images using IDs read from an explicit database.")
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    parser.add_argument("--apply", action="store_true", help="Rename local files; default is a dry run")
+    args = parser.parse_args()
+    apply = args.apply
 
     if not IMAGES_DIR.exists():
         print(f"ERROR: Images directory not found: {IMAGES_DIR.resolve()}")
         sys.exit(1)
 
-    client = MongoClient(mongo_uri)
-    coll = client[DB_NAME][COLL_NAME]
+    connection = connect_migration_target(args.db, write=False)
+    coll = connection.database[COLL_NAME]
 
     # pull only what we need
     players = list(coll.find({}, {"_id": 1, "first_name": 1, "last_name": 1}))
@@ -111,6 +109,7 @@ def main():
     print(f"  renamed:      {renamed}")
     print(f"  ambiguous:    {ambiguous}  (needs first-name in filename or manual map)")
     print(f"  no last name: {missing}")
+    connection.close()
 
 if __name__ == "__main__":
     main()

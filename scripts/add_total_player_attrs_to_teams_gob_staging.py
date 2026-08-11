@@ -4,35 +4,16 @@ using values from docs/To Do/total_team_attrs.md (first table: "Total team attri
 
 Run from repo root with venv activated: python scripts/add_total_player_attrs_to_teams_gob_staging.py
 """
+import argparse
 import os
 import sys
 import re
+from pathlib import Path
 
-_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+ROOT = Path(__file__).resolve().parents[1]
+_root = str(ROOT)
 sys.path.insert(0, _root)
-os.chdir(_root)
-
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-# Force gob-staging so we only touch staging
-os.environ["MONGO_DB_NAME"] = "gob-staging"
-
-from BackEnd.db import db
+from scripts.db_migration_cli import connect_migration_target
 
 DB_NAME = "gob-staging"
 DOC_PATH = os.path.join(_root, "docs", "To Do", "total_team_attrs.md")
@@ -68,9 +49,11 @@ def parse_total_attrs_from_md():
 
 
 def main():
-    if db.name != DB_NAME:
-        print(f"❌ DB is '{db.name}'. Set MONGO_DB_NAME=gob-staging (or use .env.local) to target gob-staging.")
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target(DB_NAME, write=args.apply)
+    db = connection.database
     name_to_total = parse_total_attrs_from_md()
     print(f"Parsed {len(name_to_total)} team names from {DOC_PATH}")
     teams_coll = db["teams"]
@@ -87,11 +70,13 @@ def main():
             missing.append((name, "(not in doc)"))
             continue
         value = name_to_total[name]
-        teams_coll.update_one({"_id": doc["_id"]}, {"$set": {"total_player_attrs": value}})
+        if args.apply:
+            teams_coll.update_one({"_id": doc["_id"]}, {"$set": {"total_player_attrs": value}})
         updated += 1
     print(f"Updated {updated} team documents with total_player_attrs.")
     if missing:
         print(f"⚠️ No value set for {len(missing)} teams: {missing[:10]}{'...' if len(missing) > 10 else ''}")
+    connection.close()
 
 
 if __name__ == "__main__":

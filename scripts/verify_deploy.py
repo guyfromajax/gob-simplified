@@ -97,10 +97,9 @@ def verify_build(url: str, expect_commit: str | None) -> None:
 
 
 # ── B. data ──────────────────────────────────────────────────────────────────────────
-def verify_data(snapshot_dir: str) -> None:
+def verify_data(db, snapshot_dir: str) -> None:
     section("B. DATA — did the collection copy land, byte for byte?")
     from bson import json_util
-    from BackEnd.db import db
     print(f"       connected to {db.name!r}")
     if db.name != "gob":
         check(False, f"expected to be pointed at prod ('gob'), got {db.name!r} — "
@@ -126,10 +125,11 @@ def verify_data(snapshot_dir: str) -> None:
 
 
 # ── C. seeding ───────────────────────────────────────────────────────────────────────
-def verify_seeding(franchise_id: str, delete: bool) -> None:
+def verify_seeding(db, franchise_id: str, delete: bool) -> None:
     section("C. SEEDING — does a NEW franchise get the new init values?")
     from bson import ObjectId
-    from BackEnd.db import db, franchise_team_data_collection as FTD, franchises_collection
+    FTD = db["franchise_team_data"]
+    franchises_collection = db["franchises"]
     print(f"       connected to {db.name!r}")
     oid = ObjectId(franchise_id)
     fdoc = franchises_collection.find_one({"_id": oid})
@@ -193,6 +193,7 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--health-url")
+    ap.add_argument("--db", choices=["gob"], help="Required for --data or --franchise-id")
     ap.add_argument("--expect-commit", default=None,
                     help="short SHA the deploy should be running (default: local HEAD)")
     ap.add_argument("--data", action="store_true", help="run the collection-content checks")
@@ -204,6 +205,15 @@ def main() -> int:
 
     if not (args.health_url or args.data or args.franchise_id):
         ap.error("nothing to do — pass --health-url, --data and/or --franchise-id")
+    if (args.data or args.franchise_id) and args.db != "gob":
+        ap.error("--data and --franchise-id require the explicit target --db gob")
+    if args.delete and not args.franchise_id:
+        ap.error("--delete requires --franchise-id")
+
+    connection = None
+    if args.data or args.franchise_id:
+        from scripts.db_migration_cli import connect_migration_target
+        connection = connect_migration_target("gob", write=args.delete)
 
     expect = args.expect_commit
     if args.health_url and not expect:
@@ -218,9 +228,11 @@ def main() -> int:
     if args.health_url:
         verify_build(args.health_url, expect)
     if args.data:
-        verify_data(args.snapshot)
+        verify_data(connection.database, args.snapshot)
     if args.franchise_id:
-        verify_seeding(args.franchise_id, args.delete)
+        verify_seeding(connection.database, args.franchise_id, args.delete)
+    if connection is not None:
+        connection.close()
 
     section("SUMMARY")
     failed = [m for ok, m in RESULTS if not ok]

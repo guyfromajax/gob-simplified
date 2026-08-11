@@ -9,8 +9,7 @@ process_player_portraits.py (cutout -> color-lock -> crop).
 
 Setup (run where you have the paid Gemini key + open network — your machine):
     pip install google-genai pillow
-    # In AI Studio: "Get API key", then add to .env:  GEMINI_API_KEY=...
-    # (.env is auto-loaded; the key is never printed)
+    # In AI Studio: "Get API key", then supply GEMINI_API_KEY in the invoking process.
 
     # ALWAYS test one player first to confirm the API call works:
     python3 scripts/generate_team_jerseys.py --team "Chapel Hill" --only "Stanley Keith"
@@ -65,15 +64,6 @@ def color_name(hexstr):
            else "blue" if hue < 255 else "purple" if hue < 290 else "magenta")
     mod = "light " if (v > 0.7 and s < 0.65) else "dark " if v < 0.45 else ""
     return f"{mod}{fam}"
-
-
-def load_env(path=".env"):
-    if os.path.exists(path):
-        for line in open(path):
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
 
 
 def slug(s):
@@ -154,10 +144,8 @@ def main():
                     help="use the team's SECONDARY color as the jersey body")
     args = ap.parse_args()
 
-    load_env()
     if not os.environ.get("GEMINI_API_KEY"):
-        sys.exit("GEMINI_API_KEY not set (checked env and .env). "
-                 "Get one in AI Studio -> Get API key, add to .env.")
+        sys.exit("GEMINI_API_KEY not set in the invoking process. Get one in AI Studio.")
     try:
         from google import genai
         from PIL import Image
