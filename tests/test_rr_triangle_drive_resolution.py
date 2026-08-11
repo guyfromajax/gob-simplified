@@ -442,6 +442,7 @@ def test_triangle_bh_drive_stamps_fb_drive_resolution(monkeypatch):
             "shot_defender": None,
             "shot_defender_id": None,
             "select_and_stamp_shot_micro_kwargs": {
+                "shooter_player": kwargs["shooter"],
                 "shot_type": "attack",
                 "shooter_id": "Lancaster-PG",
                 "shooter_x": 88.0,
@@ -486,7 +487,7 @@ def test_triangle_bh_drive_stamps_fb_drive_resolution(monkeypatch):
     assert len(result["fb_drive_resolution"]["bh_path_knots"]) == 4
 
 
-def _made_shot_stub(shooter_id):
+def _made_shot_stub(shooter):
     return {
         "made": True,
         "d_foul": False,
@@ -507,8 +508,9 @@ def _made_shot_stub(shooter_id):
         "shot_defender": None,
         "shot_defender_id": None,
         "select_and_stamp_shot_micro_kwargs": {
+            "shooter_player": shooter,
             "shot_type": "attack",
-            "shooter_id": shooter_id,
+            "shooter_id": shooter.player_id,
             "shooter_x": 88.0,
             "shooter_y": 25.0,
             "off_lineup": {},
@@ -540,7 +542,7 @@ def test_pos_o_make_resets_offensive_state_off_fast_break(monkeypatch):
     )
     monkeypatch.setattr(
         "BackEnd.engine.rim_runner_drive_integration._resolve_shot_attempt",
-        lambda **kwargs: _made_shot_stub("Lancaster-PG"),
+        lambda **kwargs: _made_shot_stub(kwargs["shooter"]),
     )
 
     game = build_mock_game()
@@ -598,7 +600,7 @@ def test_neutral_shoot_make_resets_offensive_state_off_fast_break(monkeypatch):
     rr, bh, fb_roles, fb_animations = _seed_rr_finisher(game)
     monkeypatch.setattr(
         "BackEnd.engine.rim_runner_drive_integration._resolve_shot_attempt",
-        lambda **kwargs: _made_shot_stub(rr.player_id),
+        lambda **kwargs: _made_shot_stub(kwargs["shooter"]),
     )
 
     result = resolve_attack_drive_finisher_turn(

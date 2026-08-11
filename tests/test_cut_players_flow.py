@@ -32,7 +32,7 @@ def test_week_1_cut_requirement_only_applies_after_training_completed(monkeypatc
         team_id,
     )
     active = franchise_routes._week_1_cut_requirement(
-        {"week": 1, "training_status": {"training_completed": True}},
+        {"week": 1, "training_status": {"week": 1, "training_completed": True}},
         object(),
         team_id,
     )
@@ -46,7 +46,11 @@ def test_maybe_initialize_practice_squad_week_1_defers_when_user_cut_pending(mon
     team_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
     franchise_doc = {
         "week": 1,
-        "training_status": {"cpu_training_camp_cuts_applied": True, "training_completed": True},
+        "training_status": {
+            "week": 1,
+            "cpu_training_camp_cuts_applied": True,
+            "training_completed": True,
+        },
         "practice_squad": {},
     }
 
@@ -82,7 +86,11 @@ def test_maybe_initialize_practice_squad_week_1_runs_after_user_cut(monkeypatch)
     team_id = "aaaaaaaaaaaaaaaaaaaaaaaa"
     franchise_doc = {
         "week": 1,
-        "training_status": {"cpu_training_camp_cuts_applied": True, "training_completed": True},
+        "training_status": {
+            "week": 1,
+            "cpu_training_camp_cuts_applied": True,
+            "training_completed": True,
+        },
         "practice_squad": {},
         "season_news": [],
     }
