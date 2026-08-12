@@ -285,7 +285,7 @@ Geometry is fixed. Five colour parameters vary plus the hardwood style key: `oob
 
 ### 8.3 Portraits
 
-Pool of 450: `recruit_set_0001` (300) plus `builder_set_0001` (150). Exact classifier match 99.2%.
+Portrait pools: `recruit_set_0001` (**450** after the 2026-08 regen — was 300) plus `builder_set_0001` (150), a distinct kit pool. The old "pool of 450 = 300 + 150" total and the 99.2% classifier-match figure predate the regen and need a recount against the current 450-recruit set.
 
 Base-league players have face and jersey baked into one flat PNG; recruits have kit and mask and are recolourable.
 

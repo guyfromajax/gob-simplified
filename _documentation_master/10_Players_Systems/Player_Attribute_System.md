@@ -26,7 +26,7 @@ JH RT is drawn from a single right-skewed distribution; tiers are labels on band
 - Right-skewed by design: Elite is +20 above Average, Poor only −10 below. No mirrored bottom tier; floor ~RT 18-20.
 - Tier is a label, not a mechanic. Rung multipliers and the growth model are tier-independent — they multiply whatever JH anchor was drawn. Nothing branches on tier.
 - Recruits entering as FR/SO/JR are slotted onto the ladder at their year and walk the remaining rungs.
-- Walk-ons run through the same generator at Poor tier with a drawn position intent (~3 of 15 per roster).
+- Walk-ons run through the same generator with a drawn position intent (~3 of 15 per roster) and a **tier drawn per walk-on** from `WALK_ON_TIER_WEIGHTS` (Poor 65 / BelowAverage 25 / Average 8 / Good 2) — mostly weak, a meaningful minority ordinary, ~one Good per team every few seasons. They keep the fixed `archetype = "Walk On"` sentinel (identity tag), not the derived display label.
 
 ### Class-year ladder (rungs)
 
@@ -135,11 +135,14 @@ position_intent       // top-level
 
 development: {
   peak_count,         // 0-3, rolled at generation
-  peak_rungs,         // e.g. ["SO_JR", "JR_SR"]
+  peak_rungs,         // reachable rungs only, e.g. ["JR", "SR"]
   family_timing: { physical, skill, mental },   // early | standard | late
   ch_seed,            // frozen career CH, hidden
-  focus_accumulator   // in-season aiming → offseason budget
+  ht_total            // career height gain, rolled once
 }
+// Offseason is level-only (no additive budget). In-season aiming lives in the
+// training accumulator, not here — the former focus_accumulator/offseason-budget
+// path is retired.
 ```
 
 - Carried forward explicitly by `finish_season`; a dropped field silently reverts a player to the default curve.

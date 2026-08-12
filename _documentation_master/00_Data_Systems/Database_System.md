@@ -36,8 +36,8 @@ Top-level map of the MongoDB layer: every collection, what owns it, and the iden
 | `tournaments` | Tournament-mode master docs |
 | `franchises` | Franchise master doc: week, schedule `results`, `season_news`, `season_inbox`, recruiting flags, user team fields; **`applied_games`** (finalized game `_id` strings) and **`applied_matchups`** (franchise-week matchup keys for stat rollup idempotency — see `Box_Score_System.md` §5) |
 | `franchise_team_data` (FTD) | Per-franchise, per-team state: plays copies, playbook settings, scouting, `natl_rank`, recruiting orders |
-| `franchise_players_data` (FPD) | Per-franchise player docs: meta, attributes, position ratings, season/career stats |
-| `franchise_recruits_data` (FRD) | Per-franchise recruit pool: attributes, archetype, `year`, `Home Region`, `Lean` |
+| `franchise_players_data` (FPD) | Per-franchise player docs: meta, attributes, position ratings, season/career stats, and the top-level identity/development carry — `entry_tier`, `position_intent`, `potential_factor`, plus the `development` subdoc (`peak_count`, `peak_rungs`, `family_timing`, `ch_seed`, `ht_total`) and `training_position`/`coaching_quality` (see `PLAYER_DEV_CARRY_FIELDS`) |
+| `franchise_recruits_data` (FRD) | Per-franchise recruit pool: attributes, `entry_tier`, `position_intent`, `potential_factor`, `development`, `year`, `Home Region`, `Lean`. `archetype` is a **derived display label** (from position_intent+tier), not a generation input |
 | `franchise_state` | **Deprecated** single-state doc; only read as a backward-compat fallback for user-team resolution |
 | `training_sessions` | Training run log |
 
@@ -72,6 +72,7 @@ Note: Mongo creates collections lazily on first write. As of 2026-06, `training_
 - `first_name`, `last_name`, `team`
 - attributes (`SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT`); anchor values set equal to these. `EM`, `MO`, `CH` initialized at 0 (game/mode init overwrites `CH` and `EM` 1–100, `MO` stays 0)
 - `jersey`, `year`, `height`, `weight`
+- the identity/development carry — `entry_tier`, `position_intent`, `potential_factor`, and a `development` profile (the generator logs loudly when `potential_factor`/`entry_tier` are missing, and `develop_rollover` lazy-backfills a missing `development` once). Prefer generating via `generate_player` so these are populated correctly rather than hand-seeding.
 - headshot: until specified otherwise, all new players use `/static/images/players/generic_headshot.png` (set `photo` to that path)
 
 ## Indexes (ensured at startup, idempotent)

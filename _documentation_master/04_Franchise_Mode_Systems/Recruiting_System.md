@@ -215,9 +215,10 @@ persisted under `week_35_recruiting_results`.
 ## 8. Walk-on generation and roster fill
 
 `generate_walk_on_profile()` is shared by season-one initialization, week-35 roster fill, and Team
-Builder wizard generation. It uses the same player generator at **Poor** entry tier, draws position
-intent and `potential_factor`, rolls a development profile, uses flat CH 1–100, and stamps
-archetype `Walk On`. Season-1 / TB walk-ons start with `meta.jersey = None` and usually no
+Builder wizard generation. It uses the same player generator with a **tier drawn per walk-on** from
+`WALK_ON_TIER_WEIGHTS` (Poor 65 / BelowAverage 25 / Average 8 / Good 2 — no longer 100% Poor), draws
+position intent and `potential_factor`, rolls a development profile (peaks restricted to the rungs
+still ahead of the drawn roster year), uses flat CH 1–100, and stamps archetype `Walk On`. Season-1 / TB walk-ons start with `meta.jersey = None` and usually no
 `meta.image_id` (TB authored portraits are left alone).
 
 Walk-on years are separate from recruit years:

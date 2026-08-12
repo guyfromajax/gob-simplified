@@ -354,7 +354,7 @@ Keeping the inherited faces *and* wearing the custom uniform is impossible witho
 |---|---|
 | Core team document | **12 players.** All 128 verified; the universal pool contains zero `Walk On` archetypes. |
 | Walk-ons | **Generated at franchise init**, not stored in core. `FranchiseManager.initialize_season` calls `generate_walk_on_profile()` three times per team after cloning core FPDs. |
-| Generation | `draw_position_intent` + `generate_player(tier="Poor")`; year weights JH 60 / FR 20 / SO 10 / JR 10, advanced one year; `archetype: "Walk On"`, `entry_tier: "Poor"` |
+| Generation | `draw_position_intent` + `generate_player` on a **tier drawn per walk-on** from `WALK_ON_TIER_WEIGHTS` (Poor 65 / BelowAverage 25 / Average 8 / Good 2 — no longer 100% Poor); year drawn **directly as a roster year** from `WALK_ON_YEAR_WEIGHTS` (FR 10 / SO 40 / JR 40 / SR 10 — no JH, no advance step); `archetype: "Walk On"`, `entry_tier` = the drawn tier |
 | Season-1 shape | `players` = 15, `scholarship_players` = `players[:12]`, `training_squad_players` = `[]` |
 | After Training Camp | 3 move to `training_squad_players`, leaving `players` = 12. **The user chooses which three**; it is not positional. |
 
@@ -382,7 +382,7 @@ Keeping the inherited faces *and* wearing the custom uniform is impossible witho
 
 #### Consequences
 
-- **Capped mode gains nothing exploitable.** Walk-ons are Poor-tier with low totals, points still cannot cross a player boundary, and their budgets are fixed at generation.
+- **Capped mode gains nothing exploitable.** Walk-ons are mostly weak (tiered Poor 65 / BelowAverage 25 / Average 8 / Good 2 — the occasional Good is still capped), points still cannot cross a player boundary, and their budgets are fixed at generation.
 - **Every slot now has a real inherited total**, including 13–15. The undefined-budget problem is closed by giving those slots a budget, not by removing them from user input.
 - **v1.3's floor carve-out is retired** — the rule that applied the attribute floor to the top 12 but not the bottom 3. All 15 are authored on the same terms.
 
@@ -819,7 +819,7 @@ Expected effect: exact match rises from **76.6%** to **99.2%**, and the collisio
 
 | Logical | On disk / R2 |
 |---|---|
-| `recruit_set_0001` (300) | legacy `set_0001.json`; kits remain at `recruits/kit/<uuid>.png`, not migrated |
+| `recruit_set_0001` (450, regenerated 2026-08) | legacy `set_0001.json`; kits remain at `recruits/kit/<uuid>.png`, not migrated |
 | `builder_set_0001` (150) | `builder_set_0001.allocation.json`; kits at `portrait-kits/builder_set_0001/<uuid>.png` |
 
 Team Builder's pool is **`recruit_set_0001` ∪ `builder_set_0001`**. Recruit assignment remains `recruit_set_0001` alone (`BASE_IMAGE_SET_ID`). A single global counter was rejected: recruits would skip 0001 → 0003 with no explanation visible in the name.

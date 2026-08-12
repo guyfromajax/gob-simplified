@@ -69,10 +69,20 @@ Season rollover ─► non-graduating active + non-graduating TS both return to 
 
 ## 4. Walk-on generation
 
-`generate_walk_on_profile()` — `BackEnd/models/franchise_manager.py:182`. Shared by season-1
-init and the week-35 roster fill. Low/small Freshman; attrs roll **1–32** with **≤3 over 29**;
-height 66–72"; `archetype="Walk On"`; **CH init `randint(1,90)`** (other ranges from
-`randomize_game_attributes`).
+`generate_walk_on_profile()` — `BackEnd/models/franchise_manager.py`. Shared by season-1
+init and the week-35 roster fill. Walk-ons now run through the **same shared player generator as
+recruits** (`generate_player` on a drawn position intent), not a bespoke low-attribute roll:
+- **Tier** drawn per walk-on from `WALK_ON_TIER_WEIGHTS` (Poor 65 / BelowAverage 25 / Average 8 /
+  Good 2) — mostly weak, a meaningful minority ordinary, ~one Good per team every few seasons (was
+  hardcoded 100% Poor with attrs 1–32).
+- **Year** drawn **directly as a roster year** from `WALK_ON_YEAR_WEIGHTS` (FR 10 / SO 40 / JR 40 /
+  SR 10) — no JH, no advance step (was Freshman-only).
+- Height/weight/attributes come from the shared generator at that tier and year (the −2-shifted
+  height model), not a hardcoded 66–72" band.
+- `CH` is flat `randint(1,100)` like everyone else — no walk-on cap, so a high-CH walk-on can still
+  develop the peaks that make a diamond-in-the-rough (was `randint(1,90)`).
+- `archetype="Walk On"` stays as the identity sentinel; peaks are restricted to the rungs still
+  ahead of the drawn roster year.
 
 - **Season 1:** `initialize_season` generates **3 walk-ons per team (all 128)** during
   franchise creation (under the load screen), → 15-man rosters. `franchise_manager.py:380`.

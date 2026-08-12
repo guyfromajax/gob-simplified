@@ -1,5 +1,11 @@
 ## CPU Team Lineup & Rotation System ✅ **SHIPPED** (August 2026)
 
+> ⚠️ **CALIBRATION PENDING RE-MEASUREMENT (post-recal, 2026-08).** `SIGNAL_SCALE`,
+> `RESIDUAL_SLOPE_VS_STRENGTH` and `STARTER_STRENGTH_MEAN` were calibrated against 128 teams under
+> the **pre-recalibration** attribute distribution (also ticketed in `projects/bugs.md`). They need
+> re-fitting against the post-recal distribution; the mechanism is unchanged, the numbers are stale
+> until re-measured.
+
 Describes what is IN THE CODE, not what was designed. Where a mechanism was designed,
 measured and rejected, that is stated as such.
 

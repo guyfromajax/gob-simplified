@@ -1,5 +1,13 @@
 # CPU Team Identity System ✅ **SHIPPED** (August 2026)
 
+> ⚠️ **CALIBRATION PENDING RE-MEASUREMENT (post-recal, 2026-08).** The frozen constants here —
+> `SIGNAL_SCALE`, the `STARTER_STRENGTH_MEAN` residualisation and its slopes, and the fuel-budget
+> terciles (`< 30.3209` / `30.3209–35.7506` / `>= 35.7506`) — were fitted against the **pre-recalibration**
+> attribute distribution. After the Player Attribute Recalibration (new RT formula, pool remap, −2
+> height shift, regenerated attributes) these means/sds/quantiles no longer sit at their intended
+> population points. The mechanism is unchanged; the **numbers need re-fitting** against the current
+> 128-team distribution. Treat the specific constants below as stale until re-measured.
+
 Describes what is **IN THE CODE**, not what was designed. Where something was designed,
 measured and rejected, that is stated as such.
 

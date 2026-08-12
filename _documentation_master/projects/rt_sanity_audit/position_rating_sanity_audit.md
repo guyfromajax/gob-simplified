@@ -1,5 +1,13 @@
 # Position Rating Sanity Audit
 
+> 🗄️ **SUPERSEDED (2026-08).** This is a dated staging snapshot from the **two-formula** era, when
+> recruit-profile RT and player-profile RT were computed separately. The recalibration unified RT
+> onto **one shared `compute_position_ratings` table for recruits and players, and RT no longer
+> changes at signing** (see `Position_Ratings_System.md`). Section H's "Confirmed" recruit↔player
+> RT **discontinuity** has therefore been ELIMINATED — do not action it as a live finding. The
+> 300-recruit-pool and pre-−2-shift height numbers below are also historical. Retained as a record
+> of the problem that motivated the unified table.
+
 - Database: `gob-staging`
 - Franchise: `6a67882a2b2eb443f8c7789f`
 - Rostered players: **1,920** across **128** FTD documents

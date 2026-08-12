@@ -1,6 +1,6 @@
 # Block System (Blocks on Shot Attempts)
 
-**Status:** Implemented (re-verified against code July 2026; attempt roll, fight trigger, thresholds, third individual-player trigger, and ascending 73–82+ height scale are in code)
+**Status:** Implemented (re-verified against code July 2026; attempt roll, fight trigger, thresholds, third individual-player trigger, and the median-relative height scale are in code. Height bands re-anchored to `LEAGUE_MEDIAN_HEIGHT_IN` (75 after the 2026-08 −2 shift), 2026-08.)
 **Depends on:** Shot System, Rebound System, Animation System, Data Persistence
 
 ---
@@ -34,8 +34,8 @@ If neither roll triggers → skip to standard shot reconciliation. Roll ranges a
 
 **Defender height_score (same for shooter height_score when used):**
 
-- Map player height (inches) to 0–10:
-  - ≥82 → 10, 81 → 9, 80 → 8, 79 → 7, 78 → 6, 77 → 5, 76 → 4, 75 → 3, 74 → 2, 73 → 1, ≤72 → 0.
+- Map player height (inches) to 0–10, expressed as offsets from `LEAGUE_MEDIAN_HEIGHT_IN` (design §11.2) so a distribution shift is a one-line constant change, not a threshold sweep: **median → 0; +`BLOCK_SCORE_TOP_OFFSET_IN` (10) inches → 10; 1 pt/inch between** (`height_to_block_score`, `shared.py`).
+  - At the current median **75**: ≤75 → 0, 76 → 1, 77 → 2, 78 → 3, 79 → 4, 80 → 5, 81 → 6, 82 → 7, 83 → 8, 84 → 9, ≥85 → 10.
 
 **Shooter height_score (for shooting-foul finish):**
 
@@ -193,6 +193,6 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 
 **Implementation notes (post-implementation):**
 - Block-volume recalibration (July 2026): `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` first moved from `-150` to `-100`, then to `-50` after a fresh three-week sample still averaged about 0.97 blocks per team-game. A `block_funnel_tracking` diagnostic follows eligible shots through trigger, reconciliation foul/fallback/block bands, actual blocks, and foul-owned block contacts; it is included in per-game and week-aggregate shot diagnostics.
-- Height mapping correction (July 2026): `height_to_block_score()` now implements the documented ascending scale as `height - 72` for 73–81 inches, clamped to 0 at 72 and below and 10 at 82 and above. The prior `82 - height` expression accidentally reversed the 73–81 tiers.
+- Height mapping (July 2026 correction; re-anchored 2026-08): `height_to_block_score()` is `h − LEAGUE_MEDIAN_HEIGHT_IN`, clamped 0 at the median and 10 at `median + BLOCK_SCORE_TOP_OFFSET_IN`. It moved from literal 73–81 bands to median-relative offsets in the 2026-08 −2 height shift, so at median 75 the scale is ≤75 → 0 … ≥85 → 10 (was the ≤72 → 0 … ≥82 → 10 literal band). The original July fix was correcting an accidentally-reversed `82 - height` expression.
 - Block announcement order: "BLOCK!" is fired from `ShotAnimationSystem.handleMissedShot` when `result_type === 'BLOCK'` (turnData._blockAnnounced set); `finalizeTurnAfterAnimation` only announces BLOCK if `!turn._blockAnnounced` (fallback).
 - Ball snap fix: `executeCompleteShotSequence` uses block spot (`ball_bounce_x`/`ball_bounce_y`) as `rimCoords` for BLOCK so the miss path (bounce, rebound) never references the rim for blocks.
