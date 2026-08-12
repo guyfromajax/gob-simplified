@@ -2,8 +2,8 @@
 
 > **Canonical scale module:** `BackEnd/constants/shot_threshold_scale.py`  
 > **Frontend mirror:** `FrontEnd/static/js/shared/teamShotThresholdScale.js`  
-> **Current values:** MIN **−50**, MAX **150**, MID **50** (span always 200; MID = MIN + 100)  
-> _Changed 2026-08-11 from 0/200/100 to shift the whole window down — lower raw = easier makes, so this raises league FG%._
+> **Current values:** MIN **−30**, MAX **170**, MID **70** (span always 200; MID = MIN + 100)  
+> _Changed 2026-08-11 from 0/200/100, then to −30/170/70 on 2026-08-12. Lower raw = easier makes, so shifting the window down raises league FG%._
 
 ## What this attribute is
 
@@ -50,30 +50,30 @@ made = shot_score >= shot_threshold
 
 **Span rule:** delta between lower and upper is always **200**; MID is always **MIN + 100** (= MAX − 100).
 
-## Wired consumers (current scale: −50–150, MID 50)
+## Wired consumers (current scale: −30–170, MID 70)
 
 When **`MIN`** changes, these values re-derive from `BackEnd/constants/shot_threshold_scale.py` (except items in the manual checklist below).
 
 | Area | Current value | Code / notes |
 |------|---------------|--------------|
-| **Team attribute clamp** (`TEAM_ATTR_RANGES`) | **−50 – 150** | Init, training, EOG clamp |
-| **Franchise init** | **45 – 55** | `FRANCHISE_INIT_LO` / `FRANCHISE_INIT_HI` — **MID ± 5** since the 2026-08-11 leveling pass (was MID−20/MID−10) |
-| **Single-game init** | **−50 – 150** | Full clamp range, uniform random |
+| **Team attribute clamp** (`TEAM_ATTR_RANGES`) | **−30 – 170** | Init, training, EOG clamp |
+| **Franchise init** | **65 – 75** | `FRANCHISE_INIT_LO` / `FRANCHISE_INIT_HI` — **MID ± 5** since the 2026-08-11 leveling pass (was MID−20/MID−10) |
+| **Single-game init** | **−30 – 170** | Full clamp range, uniform random |
 | **Tournament seeds** | See table below | `TOURNAMENT_SEED_ST_RANGES` |
-| **Score balancing** | Trailing **−70**, leading **130** | `MIN − 20` / `MAX − 20` |
-| **Rim-runner corner FB** | **130 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
-| **Uncontested-3 make bar** | **150 − CH + round(dist × 2.0)** | `SHOT_THRESHOLD_MAX` in `shot_manager.resolve_shot` — always tracks MAX |
-| **FTE tutorial** | User **−50**, computer **50** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
-| **UI pills** | Center **50**, span **−50–150** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
+| **Score balancing** | Trailing **−50**, leading **150** | `MIN − 20` / `MAX − 20` |
+| **Rim-runner corner FB** | **150 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
+| **Uncontested-3 make bar** | **170 − CH + round(dist × 2.0)** | `SHOT_THRESHOLD_MAX` in `shot_manager.resolve_shot` — always tracks MAX |
+| **FTE tutorial** | User **−30**, computer **70** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
+| **UI pills** | Center **70**, span **−30–170** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
 
 **Tournament seed shot_threshold ranges:**
 
 | Seed | Range | Notes |
 |------|-------|-------|
-| 1 | −50 – 50 | Best shooters |
-| 2 – 4 | −50 – 100 | |
-| 5 – 7 | 0 – 150 | |
-| 8 | 50 – 150 | Worst shooters |
+| 1 | −30 – 70 | Best shooters |
+| 2 – 4 | −30 – 120 | |
+| 5 – 7 | 20 – 170 | |
+| 8 | 70 – 170 | Worst shooters |
 
 ## Frontend files (import shared scale — do not hardcode MID)
 

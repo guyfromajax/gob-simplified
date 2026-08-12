@@ -77,7 +77,7 @@ The backend is the only authority for whether a completed period enters End of G
 **Team Attributes Update System**
 Team attributes will adjust at the end of game based on the notes below. Note this will replace the team attribute decay we had coded into the Training System. For a side-by-side comparison with Training, see `docs/To Do/team_attributes_eog_vs_training_comparison.md`.
 - Values are clamped to `TEAM_ATTR_CLAMPS` (`BackEnd/models/training_execution_v2.py`):
-  - `shot_threshold`: −50 to 150 · `rebound_modifier`: 0.0 to 1.0 · `team_chemistry`: 7 to 25 · `momentum_score`: -10 to 10
+  - `shot_threshold`: −30 to 170 · `rebound_modifier`: 0.0 to 1.0 · `team_chemistry`: 7 to 25 · `momentum_score`: -10 to 10
   - core 8 (`discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`): **-20 to 20** (widened from ±10 in the Structural Pass)
 - **Band selection lives in `BackEnd/eog_attr_rules.py`** — the SINGLE implementation `calculate_attr_changes` calls. All thresholds, band ranges, and label strings are named constants in **`BackEnd/constants/eog_attr_bands.py`**. All values below are **PROVISIONAL** (structural pass lands mechanism; the leveling phase retunes after re-measuring). End-of-game adjustments (each team, from the finished-game snapshot):
   - `shot_threshold` (golf score, lower better): FG% > 50 → `-10..-5`; FG% > 45 winner `-5..0` / loser `0..5`; FG% ≤ 45 → `5..10`.

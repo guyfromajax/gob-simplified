@@ -11,7 +11,7 @@ SPAN. Keep FrontEnd/static/js/shared/teamShotThresholdScale.js in sync.
 SPAN = 200
 HALF_SPAN = SPAN // 2  # 100 — max pill deviation from center in either direction
 
-MIN = -50
+MIN = -30
 MAX = MIN + SPAN  # 200
 MID = MIN + HALF_SPAN  # 100
 

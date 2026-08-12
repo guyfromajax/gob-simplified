@@ -5,7 +5,7 @@
 ## Base Constants
 
 1. **Core Team Attributes**:
-   - `shot_threshold` - Shot attempt threshold (range: −50 to 150; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+   - `shot_threshold` - Shot attempt threshold (range: −30 to 170; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
    - `discipline` - Turnover modifier (formerly `turnover_modifier`)
    - `fight` - Foul modifier (formerly `foul_modifier`)
    - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-1.0)
@@ -49,7 +49,7 @@ The Team Attribute Management System handles the initialization, storage, and up
 All team attributes are stored in team objects across all game modes:
 
 **Core Attributes:**
-- `shot_threshold` - Shot attempt threshold (range: −50 to 150, center at 50 for pill display; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+- `shot_threshold` - Shot attempt threshold (range: −30 to 170, center at 70 for pill display; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
 - `discipline` - Turnover modifier (formerly `turnover_modifier`)
 - `fight` - Foul modifier (formerly `foul_modifier`)
 - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-1.0, center at 0.5 for pill display)
@@ -79,7 +79,7 @@ All team attributes are stored in team objects across all game modes:
 **Franchise Mode (creation):**
 - Attribute range: `random.randint(-2, 0)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `shot_threshold`: `random.randint(45, 55)` (MID ± 5; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+- `shot_threshold`: `random.randint(65, 75)` (MID ± 5; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
 - `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
 - `rebound_modifier`: `0.2` (fixed center value)
 
@@ -91,7 +91,7 @@ All team attributes are stored in team objects across all game modes:
 
 When an existing franchise advances to a new season, `finish_season` (`BackEnd/api/franchise_routes.py`) **re-rolls** each team's `team_attributes` — nothing carries over. Implemented by `TeamManager.init_franchise_rollover_team_attributes(carryover_count)` (`team_manager.py`).
 
-- **Non-core fields** re-init exactly like franchise creation: `shot_threshold` `randint(45,55)`, `rebound_modifier` `0.5`, `team_chemistry` `randint(8,11)`, `momentum_score`/`distant_win_streak`/`distant_loss_streak` `0`.
+- **Non-core fields** re-init exactly like franchise creation: `shot_threshold` `randint(65,75)`, `rebound_modifier` `0.5`, `team_chemistry` `randint(8,11)`, `momentum_score`/`distant_win_streak`/`distant_loss_streak` `0`.
 - **The 8 core attrs** (`discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`) re-roll with `randint(lo, hi)` where `(lo,hi)` is scaled by **carryover count**.
 
 **Carryover count** = returning players from the prior season (active roster **+** training/practice squad, graduating seniors excluded), counted **before** this season's signed recruits are added. Source: `len(returning_players_by_team[team_id])`.
@@ -209,16 +209,16 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 - **Training amplifiers:** Matching coaching focus can amplify positive training gains. `breaks` can also multiply positive session gains; it directly adds extra changes to `team_chemistry`, `discipline`, and `fight` at 3+ points.
 - **CPU teams:** When the user runs training, eligible non-user teams run the shared `execute_training` engine with generated allocations and coaching focus. Per-team retries are guarded by `cpu_autotrain_week`.
 
-### Shooting (`shot_threshold`) (range: −50 to 150)
+### Shooting (`shot_threshold`) (range: −30 to 170)
 
 This is the team's intangible mindset to convert baskets. Their overall belief in their identity as a basketball team who scores points. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
-**Scale reference (−50–150, MID 50):** To change the scale, see **[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)** (agent workflow + manual checklist).
+**Scale reference (−30–170, MID 70):** To change the scale, see **[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)** (agent workflow + manual checklist).
 
 | Area | Current value |
 |------|---------------|
-| Team attribute clamp (`TEAM_ATTR_RANGES`) | **−50 – 150** |
-| Franchise init | **45 – 55** (MID ± 5) |
+| Team attribute clamp (`TEAM_ATTR_RANGES`) | **−30 – 170** |
+| Franchise init | **65 – 75** (MID ± 5) |
 | Tournament seeds | 1: **0–100** · 2–4: **0–150** · 5–7: **50–200** · 8: **100–200** |
 | Score balancing (one turn) | Trailing **−20**, leading **180** (`MIN−20` / `MAX−20`) |
 | Rim-runner corner FB | **180 − fb_efficiency** |
