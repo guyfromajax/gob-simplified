@@ -2,7 +2,7 @@
   "version": 1,
   "kit_prefix": "portrait-kits/walk_on_portraits",
   "source_archive_prefix": "portrait-kits/set_0001_retired_movers",
-  "count": 70,
+  "count": 71,
   "portraits": [
     {
       "image_id": "2a963000-2f23-5fef-b371-eed09e978de9",
@@ -283,6 +283,10 @@
     {
       "image_id": "bcd2498e-6c22-5a2a-88ad-d11fb4aeaccb",
       "source_retired_id": "0f8b54c7-1839-4821-8c90-277e9a2e3b76"
+    },
+    {
+      "image_id": "b90fcfeb-3c46-5626-a7bc-3b705e2d29d5",
+      "source_retired_id": "chapel_hill_ch_norm:e297fdab-a3da-45d0-af00-1742e371915d"
     }
   ]
 }
