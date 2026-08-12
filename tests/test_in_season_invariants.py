@@ -50,14 +50,20 @@ def _alloc(points: dict) -> dict:
     return a
 
 
-def _players(n=40, height=78):
+def _players(n=40, height=78, position=None):
     out = []
     for i in range(n):
         attrs = {}
         for a in GROWTH + ["CH"]:
             attrs[f"anchor_{a}"] = 50
             attrs[a] = 50
-        out.append({"_id": f"p{i}", "attributes": attrs, "year": _YEARS[i % 4], "height": height})
+        player = {"_id": f"p{i}", "attributes": attrs, "year": _YEARS[i % 4], "height": height}
+        if position is not None:
+            # Position-fit now scales gain, so position invariants must identify the
+            # position they claim to measure instead of falling through to derived RT.
+            player["position_intent"] = position
+            player["training_position"] = position
+        out.append(player)
     return out
 
 
@@ -79,7 +85,7 @@ def test_reference_holds_flat_in_season():
     for pos in POSITIONS:
         random.seed(7)
         ref = dev.reference_allocation(pos)          # {top-3: 3.0, other on-position: 1.0}
-        net = _train_net(_players(), _alloc({a: int(p) for a, p in ref.items()}))
+        net = _train_net(_players(position=pos), _alloc({a: int(p) for a, p in ref.items()}))
         primaries = [a for a, p in ref.items() if int(p) >= 3]
         baselines = [a for a, p in ref.items() if int(p) == 1]
         for attr in primaries:
@@ -106,7 +112,7 @@ def test_reference_rt_below_rung_increment():
     for pos in POSITIONS:
         random.seed(7)
         ref = dev.reference_allocation(pos)
-        players = _players()
+        players = _players(position=pos)
         rt0 = [compute_position_ratings({"attributes": p["attributes"], "height": p["height"]})[pos] for p in players]
         for _ in range(WEEKS):
             execute_training(players, {}, _alloc({a: int(p) for a, p in ref.items()}), coaching_focus=None)
@@ -139,7 +145,14 @@ def test_reference_holds_flat_full_cycle():
         for i in range(24):
             pl = dev.init_career(pos, "Average", 40 + i, random.Random(100 + i))[0]
             base = {a: pl["attributes"].get(a, 0) for a in primaries}
-            trainee = {"_id": "c", "attributes": dict(pl["attributes"]), "year": "freshman", "height": pl["height"]}
+            trainee = {
+                "_id": "c",
+                "attributes": dict(pl["attributes"]),
+                "year": "freshman",
+                "height": pl["height"],
+                "position_intent": pos,
+                "training_position": pos,
+            }
             for _ in range(WEEKS):
                 execute_training([trainee], {}, _alloc(ref_pts), coaching_focus=None)
             fpd = {"player_id": "c", "meta": {"height": trainee["height"], "weight": pl["weight"], "year": "sophomore"},
