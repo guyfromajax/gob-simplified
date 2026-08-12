@@ -8,8 +8,10 @@ let tweenCalled = false;
 
 const scene = {
   tweens: {
-    add: () => {
+    add: (cfg) => {
       tweenCalled = true;
+      cfg.onUpdate?.();
+      cfg.onComplete?.();
       return { stop: () => {} };
     },
     killTweensOf: () => {},
@@ -18,10 +20,13 @@ const scene = {
 };
 
 const ballSprite = {
+  x: 0,
+  y: 0,
   setPosition() {},
   setVisible() {},
   setDepth() {},
 };
+scene.ballSprite = ballSprite;
 
 await generateBallTween({
   scene,

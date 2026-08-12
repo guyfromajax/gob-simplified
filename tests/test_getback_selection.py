@@ -208,7 +208,9 @@ def _emergency_fixtures():
         ]
     }
     game = SimpleNamespace(zone_defender_assignments_by_step={})
-    off_team = SimpleNamespace(team_attributes={"fb_opp_modifier": 8})
+    # Core-8 values are stored on ±20 and normalized to the historical ±10
+    # gameplay scale. Stored 16 therefore exercises gameplay fb_opp == 8.
+    off_team = SimpleNamespace(team_attributes={"fb_opp_modifier": 16})
     kwargs = dict(
         off_team=off_team,
         off_lineup=off_lineup,
