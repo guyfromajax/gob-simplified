@@ -47,10 +47,19 @@ import urllib.request
 # them would churn prod for no benefit. See projects/bugs.md.
 COPIED_COLLECTIONS = ("players", "recruit_sets")
 
+# shot_threshold is DERIVED from the constants so it cannot go stale — it already did
+# once: this file hardcoded (80, 90) while the leveling pass moved init to 95-105, which
+# would have failed check C on a perfectly good deploy.
+from BackEnd.constants.shot_threshold_scale import (  # noqa: E402
+    FRANCHISE_INIT_LO as _ST_LO, FRANCHISE_INIT_HI as _ST_HI,
+)
+
+# The other two are literals in TeamManager.init_team_attributes rather than named
+# constants, so they cannot be derived and MUST be updated here by hand if that changes.
 EXPECTED_SEED = {
-    "rebound_modifier": (0.5, 0.5),
-    "team_chemistry": (8, 11),
-    "shot_threshold": (80, 90),
+    "rebound_modifier": (0.5, 0.5),      # team_manager.py, franchise branch
+    "team_chemistry": (8, 11),           # team_manager.py, randint(8, 11)
+    "shot_threshold": (_ST_LO, _ST_HI),  # derived
 }
 EXPECTED_CLAMPS = {
     "discipline": (-20, 20), "fight": (-20, 20),
