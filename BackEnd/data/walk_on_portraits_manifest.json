@@ -2,7 +2,7 @@
   "version": 1,
   "kit_prefix": "portrait-kits/walk_on_portraits",
   "source_archive_prefix": "portrait-kits/set_0001_retired_movers",
-  "count": 71,
+  "count": 70,
   "portraits": [
     {
       "image_id": "2a963000-2f23-5fef-b371-eed09e978de9",
@@ -67,10 +67,6 @@
     {
       "image_id": "2e1fa177-ae92-52f9-be46-8d4a31ec100d",
       "source_retired_id": "18879347-fce0-4a17-a5a5-80460eec1ea0"
-    },
-    {
-      "image_id": "600a3123-48ab-5c86-a30d-8da9af8a25e7",
-      "source_retired_id": "698360aa-63da-4297-917f-dba81837e3d3"
     },
     {
       "image_id": "ddbbbe24-f81f-53d4-b058-47a0c6666aa1",
