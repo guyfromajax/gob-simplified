@@ -443,6 +443,7 @@ def solve_best_assignment(
     required_ids: Optional[set] = None,
     preference_fn=None,
     effective_weight: float = None,
+    tie_break: str = "shuffle",
 ) -> Dict[str, Player]:
     """EXACT max-weight assignment of ``positions`` over ``players``. Returns {pos: Player}.
 
@@ -459,6 +460,17 @@ def solve_best_assignment(
     Variation at zero rating cost — unlike the old random fill order, which bought variation by
     giving up rating.
 
+    ``tie_break`` selects HOW that order is produced, and nothing else:
+
+    * ``"shuffle"`` (default, the GAME path) — ``sim_rng.shuffle``. Unchanged, including the
+      draw itself, so sim draw counts and repro are untouched.
+    * ``"stable"`` (the DISPLAY path) — sort by ``player_id``. Draws NOTHING. Display surfaces
+      run on page loads, OUTSIDE the sim; drawing from ``sim_rng`` there would desync the
+      stream (see the per-subsystem RNG rule), and a random tie-break would also make the
+      projected five flip between page loads for no reason. Equally-optimal assignments have
+      identical total rating, so this changes WHICH five is shown on an exact tie, never how
+      good it is.
+
     ``required_ids`` players MUST be seated (the locked FT shooter). Enforced as a hard
     constraint inside the optimisation — the best five CONTAINING them — not by pre-seating
     them and greedily filling around, which is what the old code did.
@@ -470,7 +482,10 @@ def solve_best_assignment(
     if n_pos == 0:
         return {}
     pool = list(players)
-    random.shuffle(pool)                      # random tie-break among equal optima
+    if tie_break == "stable":
+        pool.sort(key=lambda p: str(getattr(p, "player_id", "")))   # deterministic, zero draws
+    else:
+        random.shuffle(pool)                  # random tie-break among equal optima
     required_ids = {str(x) for x in (required_ids or set())}
 
     def score(p, pos):
@@ -693,6 +708,83 @@ def autoset_lineup_player_ids_from_payload(
         eligible, team_chemistry, position_fill_order=position_fill_order
     )
     return {pos: pl.player_id for pos, pl in lineup_players.items()}
+
+
+# Tip-off game state: what ``build_lineup_from_mongo`` is handed when a game starts. Q1 with a
+# full clock is not late-Q4/OT, so the waterfall opens at the 0.80 NG gate and no per-quarter
+# foul limit binds (nobody has fouled yet).
+PREGAME_STATE = {"quarter": 1, "time_remaining": 480}
+
+
+def projected_starting_five_from_payload(players_payload: List[dict]) -> Dict[str, str]:
+    """The five that AUTOSET WOULD FIELD AT TIP -> { PG/SG/...: player_id }.
+
+    This is the display counterpart of ``autoset_lineup_player_ids_from_payload``, and the
+    single source of truth for every "projected starting five" surface (FCC Scouting Report
+    tab, team roster pages, training report, practice-squad team, tournament). It exists so
+    those surfaces stop disagreeing with the floor.
+
+    PARITY IS STRUCTURAL, not a reimplementation. It runs the same eligibility waterfall, the
+    same ``solve_best_assignment`` DP and the same ``LINEUP_EFFECTIVE_WEIGHT_DEFAULT``
+    objective as the game, over the same full-roster pool. The previous display selector was a
+    separate GREEDY fill on raw ``position_ratings`` — the selector the sim measured and
+    rejected (optimal in 19% of rebuilds, mean 17.5-point shortfall).
+
+    ENERGY-AWARE ON PURPOSE. The objective is 25% paper talent / 75% NG-rescaled effective
+    rating, and NG persists to FPD and is written by the training paths — so a player the
+    week's training left tired legitimately drops out of the projection, because he is also
+    worth less at tip. Showing paper talent here would diverge from the floor for exactly the
+    players the user most needs to see.
+
+    TWO DIFFERENCES REMAIN, both correct:
+      * exact ties resolve deterministically here and randomly in the sim (see
+        ``solve_best_assignment``'s ``tie_break``) — same total rating either way;
+      * a user who sets a lineup manually overrides autoset entirely, so this is what autoset
+        WOULD have picked. CPU teams never override, so for them it is exact.
+
+    Blowout inversion, the FT-shooter force-include and foul-out gap fills are all mid-game
+    mechanics and cannot apply at tip, so none of them are modelled here.
+
+    Degrades to a PARTIAL five (fewer than five slots) on a short or fully-ineligible roster
+    rather than raising — a display surface must still render.
+    """
+    players: List[Player] = []
+    for raw in players_payload or []:
+        data = dict(raw)
+        # ``_id`` FIRST, matching how the display rows key themselves
+        # (``scouting_utils._player_sort_key``). A row carrying both keys under different
+        # values would otherwise seat an id the caller cannot map back, silently dropping a
+        # slot from the rendered five.
+        pid = data.get("_id") if data.get("_id") is not None else data.get("player_id")
+        if pid is not None:
+            data["player_id"] = str(pid)
+        players.append(Player(data))
+
+    if not players:
+        return {}
+
+    eligible: List[Player] = []
+    for ng_min, foul_limits_by_quarter in _waterfall_eligibility(PREGAME_STATE):
+        eligible = [
+            p
+            for p in players
+            if is_player_eligible_for_lineup(
+                p, PREGAME_STATE, ng_min=ng_min, foul_limits_by_quarter=foul_limits_by_quarter
+            )
+        ]
+        if len(eligible) >= 5:
+            break
+
+    # Short roster: the waterfall cannot manufacture bodies. Seat what exists over as many
+    # slots as it can fill, in the canonical position order.
+    if not eligible:
+        eligible = players
+    positions = list(_LINEUP_POSITIONS)[: min(5, len(eligible))]
+    if not positions:
+        return {}
+
+    seated = solve_best_assignment(eligible, positions, tie_break="stable")
+    return {pos: pl.player_id for pos, pl in seated.items()}
 
 
 def pending_ft_shooter_id(game_state) -> Optional[str]:

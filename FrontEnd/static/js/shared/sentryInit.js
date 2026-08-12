@@ -53,32 +53,4 @@
     })
     .catch(function () {});
 
-  function isCaptureEnv() {
-    var hostname = window.location.hostname;
-    if (hostname === 'localhost' || hostname === '127.0.0.1') return true;
-    if (hostname === 'staging.geekedoutbasketball.com') return true;
-    if (hostname === 'gob-test.netlify.app') return true;
-    if ((hostname.indexOf('.netlify.app') !== -1 || hostname.indexOf('.railway.app') !== -1)
-      && (hostname.indexOf('staging') !== -1 || hostname.indexOf('test') !== -1)) {
-      return true;
-    }
-    return false;
-  }
-
-  function loadCaptureBootstrap() {
-    if (!isCaptureEnv() || window.GOB_CAPTURE_BOOTSTRAPPED || window.API_CONFIG) return;
-    var prefix = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
-      ? '/static'
-      : '';
-    var script = document.createElement('script');
-    script.src = prefix + '/js/shared/captureBootstrap.js';
-    script.async = true;
-    document.head.appendChild(script);
-  }
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', loadCaptureBootstrap);
-  } else {
-    loadCaptureBootstrap();
-  }
 })();

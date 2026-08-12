@@ -386,11 +386,3 @@ window.API_CONFIG = API_CONFIG;
   }, true);
 })();
 
-(function loadCaptureBootstrap() {
-  if (typeof document === 'undefined' || !API_CONFIG.isCaptureEnv()) return;
-  const script = document.createElement('script');
-  script.src = API_CONFIG.buildStaticPath('/js/shared/captureBootstrap.js');
-  script.async = true;
-  document.head.appendChild(script);
-})();
-

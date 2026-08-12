@@ -1248,6 +1248,7 @@ function renderRosterAttributes() {
       bestPos,
       formatHeight(p.height),
       weightValue,
+      `${Math.round(ngValue * 100)}%`,
       Math.floor((anchorAttrs.anchor_SC ?? anchorAttrs.SC ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_SH ?? anchorAttrs.SH ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_ID ?? anchorAttrs.ID ?? 0) / 10),
@@ -1260,10 +1261,9 @@ function renderRosterAttributes() {
       Math.floor((anchorAttrs.anchor_ND ?? anchorAttrs.ND ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_IQ ?? anchorAttrs.IQ ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_FT ?? anchorAttrs.FT ?? 0) / 10),
-      `${Math.round(ngValue * 100)}%`,
       formatRtDisplay(rt)
     ];
-    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', `ng ${getEnergyClass(ngValue)}`, `rt ${rtBucketClassOrEmpty(rt)}`];
+    const classes = ['', '', 'ht', 'wt', `ng ${getEnergyClass(ngValue)}`, '', '', '', '', '', '', '', '', '', '', '', '', `rt ${rtBucketClassOrEmpty(rt)}`];
 
     cells.forEach((val, idx) => {
       const td = document.createElement('td');
@@ -1296,7 +1296,7 @@ function renderRosterAttributes() {
     newHeader.style.cursor = 'pointer';
     newHeader.style.userSelect = 'none';
     newHeader.addEventListener('click', () => {
-      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'RT'];
+      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'NG', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'RT'];
       sortRoster(columnNames[index]);
     });
   });
