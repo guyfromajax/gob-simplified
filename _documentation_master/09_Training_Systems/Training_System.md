@@ -639,6 +639,10 @@ These list the *attributes* (not players) the team collectively developed most /
 - **Concerning — in-season ("Concerning Regression"):** decay is live, so an attribute can net **decline**; flag the ones the team **actually lost ground in — team-sum < 0**. A low-but-positive laggard is *not* a regression here.
 
 The `1 SD` cut is the only knob (≈ the top/bottom ~2 of 12 attrs). Like the player awards, this is relative on purpose — no magnitude-calibrated constant to re-derive when the training scale moves.
+
+**Hard cap of 2 attributes per container** (`TEAM_ATTR_MAX_SHOWN = 2`, `_pick_standouts`, 2026-08). The SD cut alone is a *threshold*, not a limit — a lopsided session can push five or six attributes past it, and a container listing six attributes reads as noise rather than a finding. All three containers (both Concerning variants included, since they share one UI slot) now name the **most extreme two** and stop.
+
+**Ties at the cutoff break RANDOMLY**, from `training_rng`. A fixed tie-break — alphabetical, or `ALL_ATTRS` order — would surface the same attribute every session for an evenly-developed team, which reads as a pattern that isn't there. The draw happens **only when a tie actually straddles the cutoff**, so a session with distinct team-sums leaves the training stream untouched (asserted in `test_training_notes.py`). Notes are built after all training is applied, so the draw cannot affect that session's results.
 - Dynamic height: Expands automatically with content
 - No internal scrolling: All text is always visible
 

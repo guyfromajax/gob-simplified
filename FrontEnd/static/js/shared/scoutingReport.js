@@ -84,8 +84,11 @@ function renderProjectedStartingFive(rows, containerOrOpts) {
     ];
     SCOUTING_PROJECTED_ATTR_COLS.forEach((k) => {
       const raw = r.attributes && r.attributes[k] != null ? Number(r.attributes[k]) : NaN;
-      // Display scale 0–10 (team-page parity): floor(raw / 10).
-      cells.push(Number.isFinite(raw) ? String(Math.floor(raw / 10)) : '—');
+      // ALREADY on the 0–10 display scale — `compute_projected_starting_five` divides by 10
+      // server-side (`int(raw) // 10`). Dividing again here floored every attribute to 0
+      // (only a perfect 100 survived, as 1), which read as training deltas rather than
+      // totals. Print the value as given.
+      cells.push(Number.isFinite(raw) ? String(raw) : '—');
     });
     cells.push(typeof formatRtDisplay === 'function' ? formatRtDisplay(r.rt) : (r.rt != null ? String(r.rt) : '—'));
     cells.forEach((text) => {

@@ -539,6 +539,7 @@ Visual source: `projects/Scouting - Projected Five (Images).html`.
 - Per-game stats and DEF% are **server-enriched** on each `projected_starting_five` row (`ppg`, `rpg`, `apg`, `def_pct`) via shared `build_enriched_projected_starting_five()` (`scouting_utils.py`) using FPD `season` totals (`PTS`, `TREB`/`OREB`+`DREB`, `AST`, `GP`, `DEF_S`/`DEF_A`). DEF% is a whole percent (`round(DEF_S/DEF_A*100)` when `DEF_A > 0`, else `0`).
 - The same card renderer and enrichment helper power **team roster Starting 5** (`team-roster-view.html`) from `GET /roster/...` / Practice Squad team payloads (header label **Starting 5**; FCC keeps **Projected Starting Five**).
 - Core attribute columns are **not** shown in this section anymore (team attributes remain under Team Measures / team page).
+- ⚠️ **The attribute values on `projected_starting_five` rows are ALREADY on the 0–10 display scale** — `compute_projected_starting_five()` applies `int(raw) // 10` server-side (pinned by `test_attributes_floor_ten_in_output`). The table renderer (`renderProjectedStartingFive`, used by the Training Report and tournament scouting) must print them as-is. It divided by 10 a second time until 2026-08, flooring every attribute to `0` — only a perfect 100 survived, as `1` — which read as training deltas rather than totals.
 
 Important note:
 

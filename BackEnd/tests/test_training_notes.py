@@ -210,6 +210,52 @@ class TestTrainingNotes(unittest.TestCase):
         self.assertEqual(misc["body"], physique[0])
         self.assertLess(sections.index(misc), len(sections) - 1)
 
+    # ── Team-attribute containers cap at two ────────────────────────────────────────────
+
+    def test_strong_container_caps_at_two_and_keeps_the_largest(self):
+        # Four attrs clear the cut; only the two biggest are named.
+        by = self._one_player_container_bodies(
+            {"SC": 40, "SH": 35, "ID": 30, "OD": 25}, is_camp=True
+        )
+        self.assertEqual(by["Strong Cumulative Increase"], "SC, SH")
+
+    def test_camp_concerning_progression_caps_at_two_and_keeps_the_lowest(self):
+        deltas = {a: 10 for a in ["SC", "ID", "OD", "PS", "BH", "RB", "ST"]}
+        deltas.update({"SH": -20, "AG": -15, "FT": -10, "ND": -5})
+        by = self._one_player_container_bodies(deltas, is_camp=True)
+        self.assertEqual(by["Concerning Progression"], "AG, SH")
+
+    def test_inseason_regression_caps_at_two(self):
+        by = self._one_player_container_bodies(
+            {"SC": 40, "SH": -20, "AG": -15, "FT": -10, "ND": -5}, is_camp=False
+        )
+        self.assertEqual(by["Concerning Regression"], "AG, SH")
+
+    def test_boundary_tie_breaks_randomly_and_does_not_always_pick_the_same_attr(self):
+        """Three attrs tied at the cut for two slots: the third name must vary across runs.
+
+        A fixed tie-break would name the same attribute every session for an evenly-developed
+        team, reading as a pattern that isn't there.
+        """
+        from BackEnd.models.training_notes import _pick_standouts
+
+        seen = set()
+        for _ in range(60):
+            seen.add(tuple(_pick_standouts({"SC": 9, "SH": 9, "ID": 9}, strongest=True)))
+        self.assertEqual(len(seen), 3, f"expected all three pairs, got {seen}")
+        for pair in seen:
+            self.assertEqual(len(pair), 2)
+
+    def test_distinct_sums_draw_nothing_from_the_training_stream(self):
+        """No tie at the cutoff => no draws, so the training stream is unperturbed."""
+        from BackEnd.models.training_notes import _pick_standouts
+        from BackEnd.utils.training_random import training_rng
+
+        before = training_rng.getstate()
+        picked = _pick_standouts({"SC": 40, "SH": 30, "ID": 20, "OD": 10}, strongest=True)
+        self.assertEqual(picked, ["SC", "SH"])
+        self.assertEqual(training_rng.getstate(), before)
+
 
 if __name__ == "__main__":
     unittest.main()

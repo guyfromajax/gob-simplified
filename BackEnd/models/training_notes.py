@@ -74,18 +74,53 @@ def _team_attr_delta_sums(players: List[dict], baselines_by_id: Dict[Any, Dict[s
     return sums
 
 
+# Team-attribute containers show at most this many attributes. A container that lists six
+# attributes reads as noise, not a finding — the point is the standouts, so the report names
+# only the most extreme few and stops.
+TEAM_ATTR_MAX_SHOWN = 2
+
+
+def _pick_standouts(candidates: Dict[str, int], *, strongest: bool) -> List[str]:
+    """At most ``TEAM_ATTR_MAX_SHOWN`` attribute names, the most extreme team-sums first.
+
+    ``strongest`` picks the highest sums; otherwise the lowest. TIES AT THE CUTOFF BREAK
+    RANDOMLY — a fixed tie-break (alphabetical, attribute order) would surface the same
+    attribute every session for a team that develops evenly, which reads as a pattern that
+    isn't there.
+
+    Draws from ``training_rng`` ONLY when a tie actually straddles the cutoff, so a session
+    with distinct sums leaves the training stream untouched.
+    """
+    items = list(candidates.items())
+    if len(items) <= TEAM_ATTR_MAX_SHOWN:
+        return sorted(a for a, _ in items)
+
+    rank = (lambda kv: -kv[1]) if strongest else (lambda kv: kv[1])
+    ordered = sorted(items, key=rank)
+    cutoff = rank(ordered[TEAM_ATTR_MAX_SHOWN - 1])
+
+    clear = [kv for kv in ordered[:TEAM_ATTR_MAX_SHOWN] if rank(kv) != cutoff]
+    tied = [kv for kv in items if rank(kv) == cutoff]
+    need = TEAM_ATTR_MAX_SHOWN - len(clear)
+    chosen = random.sample(tied, need) if len(tied) > need else tied
+    return sorted(a for a, _ in clear + chosen)
+
+
 def _team_attr_extremes(sums: Dict[str, int]) -> Tuple[List[str], List[str]]:
     """(strong, laggard) attribute names relative to the session's own attr-sum spread:
     strong = team-sum > mean + CUT·SD; laggard = team-sum < mean − CUT·SD (population SD over
     the 12 attr-sums). Even development (SD ≈ 0) → both empty. Self-scaling, so no
-    magnitude-calibrated threshold is needed across camp vs in-season."""
+    magnitude-calibrated threshold is needed across camp vs in-season.
+
+    Each list is capped at ``TEAM_ATTR_MAX_SHOWN`` — see ``_pick_standouts``.
+    """
     vals = list(sums.values())
     if not vals:
         return [], []
     mean = statistics.mean(vals)
     cut = TEAM_ATTR_STDEV_CUT * statistics.pstdev(vals)
-    strong = sorted(a for a, s in sums.items() if s > mean + cut)
-    laggard = sorted(a for a, s in sums.items() if s < mean - cut)
+    strong = _pick_standouts({a: s for a, s in sums.items() if s > mean + cut}, strongest=True)
+    laggard = _pick_standouts({a: s for a, s in sums.items() if s < mean - cut}, strongest=False)
     return strong, laggard
 
 
@@ -308,8 +343,10 @@ def build_structured_training_report_notes(
         strong, _laggard = _team_attr_extremes(sums)
         sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(strong) if strong else NSS})
         # In-season decay is live → an attribute can NET decline; flag the ones the team
-        # actually lost ground in (team-sum < 0), the self-evident regression line.
-        regressed = sorted(a for a, s in sums.items() if s < 0)
+        # actually lost ground in (team-sum < 0), the self-evident regression line. Capped the
+        # same way as its camp counterpart ("Concerning Progression") — same container, same
+        # UI slot, so an uncapped list here would defeat the cap on the weekly report.
+        regressed = _pick_standouts({a: s for a, s in sums.items() if s < 0}, strongest=False)
         sections.append({"title": "Concerning Regression", "body": ", ".join(regressed) if regressed else NSS})
 
     plays_pick = _offensive_play_selection(plays_data)
