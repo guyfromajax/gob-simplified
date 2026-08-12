@@ -58,6 +58,25 @@ Dynamic HCO motion and set plays are permanent; their former flags are retired. 
 
 ---
 
+## Safety, Reproducibility & Instrumentation (Backend)
+
+Added August 2026 with the team-attribute retune. All optional except where noted.
+
+| Variable | Purpose | Default | Set where |
+|----------|---------|---------|-----------|
+| `GOB_DB_ACCESS` | **Production access guard.** Reaching the `gob` database requires an explicit per-invocation opt-in: `read` (connects, all 17 mutators raise) or `write`. Read from a snapshot of the REAL process env taken **before** any dotenv load, so it **cannot be armed from a committed `.env`**. The deployed app is also recognised by any `RAILWAY_*` variable. An unrecognised process reaching `gob` **raises at import**. Non-prod databases are unaffected. | unset → refuse for `gob` | Railway (`write`, as a redundant signal); on the command line for scripts |
+| `PYTHONHASHSEED` | **Set to `0` by `start.sh`.** Python randomises string hashing per process and several sim paths iterate sets or break ties in iteration order, so an unpinned process produces a different game from identical inputs. Measurement harnesses self-pin via `BackEnd/utils/repro.pin_hash_seed()`. | `0` in production | `start.sh` (already) |
+| `GOB_EOG_BAND_LOG` | EOG band instrumentation sink: `off` / `file` / `mongo`. **`file` is unusable in production** — Railway's filesystem is ephemeral with no volume, so the log dies on the next redeploy and nothing serves it. Use `mongo`. | `off` | Railway = `mongo` |
+| `GOB_EOG_BAND_FRANCHISES` | **Optional RESTRICTION**, comma-separated franchise ids. **Unset/empty logs EVERY franchise** — deliberate, because tester franchises are created whenever and naming ids in advance means discovering which to log only after the season is half gone. | unset (= all) | Railway, only to narrow |
+| `GOB_EOG_BAND_TTL_DAYS` | Retention for `eog_band_log`. **180, not 90:** the TTL runs from `created_at`, so a tester who takes two or three months to play 26 weeks loses their EARLY weeks — and a season with weeks 8-26 is unusable for a re-fit while still reading as nearly complete. ~9 MiB per franchise-season, so storage is irrelevant. | `180` | Railway |
+| `TB_LEAK_DETECTOR` | Team-builder replaced-name response scanner. Dev/staging on by default, production off unless `=1`. | off in prod | rarely needed |
+
+**Cost of band logging, measured:** 258 bytes/row BSON, 9.0 MiB per franchise-season,
+**3.96 ms/game** (0.16% of a ~160 s CPU week). Extract with
+`scripts/eog_band_export.py --franchise-id <id> -o out.jsonl`.
+
+---
+
 ## Frontend (Netlify / Static)
 
 No env vars in frontend code. API base URL is derived from `window.location.hostname` in `api-config.js`. Sentry DSN comes from backend `/app-config`.

@@ -1081,3 +1081,76 @@ Focus (2–3 attrs) and breadth (4-attr / proportional) both clear the reference
 
 ### Legacy-player caveat (existing saves, not backfilled) — READ BEFORE DEBUGGING
 A player with no `development` subdoc (a save that predates pass 2) is **lazy-backfilled** at his first rollover: a profile rolled once from his live CH (frozen as `ch_seed`), peaks restricted to his remaining rungs, and persisted so it never re-rolls. His `entry_tier` — if absent — is **derived from his current top RT**, which is *systematically low for old-scale bigs* whose RT collapsed under height gating (§3.6.7): a distorted big reads as a lower tier and develops on a lower ladder, compounding the degradation. This is accepted (recalibration is new-franchises-only, §14); new franchises never hit this path (entry_tier is carried pool→FPD). Do not diagnose a stunted legacy big as a bug.
+
+
+---
+
+## Team attribute retune / EOG leveling (August 2026)
+
+All values below are **NAMED CONSTANTS** — never inline a threshold in a branch. Evaluate any
+change with `scripts/eog_band_tuner.py` (offline, seconds) rather than a 2-hour season.
+
+### Scale — `BackEnd/constants/shot_threshold_scale.py`
+
+**ONE KNOB: change `MIN` only.** Everything else derives. Span is always 200.
+
+| constant | value | effect |
+|---|---|---|
+| `MIN` / `MAX` / `MID` | **−30 / 170 / 70** | the storage window; lower raw = easier makes |
+| `FRANCHISE_INIT_LO` / `_HI` | **MID ± 5 → 65 / 75** | mid-centred (was MID−20/MID−10) — init is COUPLED to EOG band position |
+| `BALANCING_TRAILING` / `_LEADING` | −50 / 150 | derived |
+| `TUTORIAL_USER` / `_COMPUTER` | −30 / 70 | derived |
+| `FAST_BREAK_CORNER_THRESHOLD_BASE` | 150 | derived |
+
+Full workflow — including the **mandatory EOG band re-cut** — in
+[`00_Operations/Shot_Threshold_Scale_Tuning.md`](../00_Operations/Shot_Threshold_Scale_Tuning.md).
+
+### EOG bands — `BackEnd/constants/eog_attr_bands.py`
+
+| constant | value | note |
+|---|---|---|
+| `FG_PCT_MID` / `FG_PCT_HIGH` | **26 / 40** | ⚠️ **INTERIM + SCALE-COUPLED** — cut for the −30…170 window at init 65-75. Every `MIN` change requires a re-cut; carrying the old cuts across two window moves drifted teams −28/season. |
+| `OFF_CONC_REWARD` / `_MIDDLE` | **0.23 / 0.30** | ⚠️ **INTERIM** — cut against a distribution the playbook generator caps (20% ceiling per set play at 4+ plays, a deferred fix) |
+| `DEF_MAX_SHARE_REWARD` / `_MIDDLE` | 0.42 / 0.57 | measured p33/p67 |
+| `FB_CONC_REWARD` / `_MIDDLE` | 0.44 / 0.53 | measured p33/p67 |
+| `PT_CONC_REWARD` / `_MIDDLE` | 0.50 / 0.70 | measured p33/p67 |
+| `REBOUND_BIG` / `_MID` / `_EVEN_MARGIN` | 14 / 7 / 3 | widened from 8/4/3 — 65.5% of games were landing in the extreme bands |
+| `FB_OPP_HEALTHY_BAND` | (7, 13) | |
+| `PT_HEALTHY_BAND` | **(9, 20)** | opponent pressure volume is BIMODAL with identity live (press median 15, others 4-6) |
+| `ST_FG_*` deltas | (−6,−2) / (−1,0)\|(0,1) / (2,6) | gain 6; variance-targeted |
+| `CONC_*` / `DEF_*` deltas | (0,2) / (−1,1) / (−2,−1) | shifted up one notch when thresholds moved to even thirds |
+| `DISC_ABOVE` | (−3,−1) | deepened from (−2,−1) |
+| `CHEM_*` | see file | lifted across the board; the old ladder floored all 128 teams by week 2 |
+
+### Training neglect gates — `BackEnd/models/training_execution_v2.py`
+
+| constant | value | effect |
+|---|---|---|
+| bucket-0 range | `(−1, 0)` | was `(−4,−3)` fight/discipline, `(−3,−1)` chemistry |
+| `NEGLECT_DECAY_CHANCE_CHEMISTRY` | **0.10** | ≈ −3/season (was −93.6) |
+| `NEGLECT_DECAY_CHANCE_DEFAULT` | **0.25** | ≈ −7/season (was −91.6 for discipline) |
+| `FIGHT_GAIN_CHANCE` | **0.45** | gates POSITIVE fight deltas; fight's gains multiplied to +44/season |
+| `TEAM_ATTR_CLAMPS` core-8 | **(−20, 20)** | widened from ±10 |
+
+These are probability gates because the attributes are rolled **~4.7x per week** across their
+source categories, and integer weekly rolls cannot express "−3/season" directly.
+
+### Lineup selection — `BackEnd/utils/db_utils.py`
+
+| constant | value | effect |
+|---|---|---|
+| `LINEUP_EFFECTIVE_WEIGHT_DEFAULT` | **0.25** | `score = w·static + (1−w)·effective`; the intended archetype hook via `starter_bench_gap` |
+| `DEFAULT_FOUL_LIMITS_BY_QUARTER` | `{1:1, 2:2, 3:3, 4:3}` | **not applied in the final 4:00 of Q4 or OT** — where 39% of foul-outs occur |
+| NG thresholds | 0.80 / 0.64 late | eligibility floor; governs star minutes |
+
+### CPU team identity + self-regulation
+
+See [`06_Gameplay_Systems/CPU_Team_Identity_System.md`](../06_Gameplay_Systems/CPU_Team_Identity_System.md) § Tunable Constants for the full table (`SIGNAL_SCALE`, residual slopes, `FUEL_CAPACITY_BOUNDS`, `VISION_COST`, `SOFTMAX_TEMPERATURE`, `MOTION_FLAT`/`CONTAIN_FLAT`, `CONSTANTS_VERSION`, and the ten `SELF_REG_*` constants).
+
+### Reproducibility / instrumentation
+
+| constant | location | value |
+|---|---|---|
+| `EOG_BAND_LOG_TTL_DAYS` | `BackEnd/db.py` | **180** (env `GOB_EOG_BAND_TTL_DAYS`) |
+| `_EOG_BAND_BATCH` | `franchise_routes.py` | **500** — each `insert_many` is a ~45 ms Atlas round-trip |
+| `DEFAULT_HASH_SEED` | `BackEnd/utils/repro.py` | `"0"` |

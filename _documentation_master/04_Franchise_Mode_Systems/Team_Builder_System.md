@@ -18,6 +18,8 @@ The user authors all fifteen players, seeded from the replaced program's roster.
 
 **Entry:** from the franchise program-select screen at new-franchise start. No franchise document exists until Apply. Mid-franchise editing is out of scope.
 
+**Feature flag:** `TEAM_BUILDER_ENABLED` (default **true** when unset). When **false**, authoring is dark: `/franchise/team-builder/*` returns 404, program-select hides Open Team Builder + unfinished-draft cards, and `team-builder.html` redirects away. Existing franchises that already have a `team_builder` overlay still resolve normally — this flag does not disable chrome/identity for shipped mods. Expose via `GET /app-config` → `teamBuilderEnabled`. Set false on production to merge the branch without shipping the wizard; flip to true when ready.
+
 **Walk-on portraits at Apply:** wizard walk-ons may already carry `meta.image_id` from the TB
 450-kit pool. Camp-cut walk-on assignment **skips** any Walk On that already has `meta.image_id`
 or `meta.jersey` — TB choices are left alone. Season-init walk-ons without a TB portrait get a

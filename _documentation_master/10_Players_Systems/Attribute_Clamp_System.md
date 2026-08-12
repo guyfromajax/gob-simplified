@@ -25,10 +25,11 @@ Applies to all trainable player attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, 
 
 | Clamp | Value |
 |-------|--------|
-| **Min** | 0 |
-| **Max** | 200 |
+| **Min** | **−30** |
+| **Max** | **170** |
+| MID (pill centre) | **70** |
 
-Source: `BackEnd/constants/shot_threshold_scale.py` via `TEAM_ATTR_RANGES`. Tuning: [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md).
+Source: `BackEnd/constants/shot_threshold_scale.py` via `TEAM_ATTR_RANGES` — **change `MIN` only, everything derives, and a change REQUIRES an EOG band re-cut**. Tuning: [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md).
 
 ### rebound_modifier
 

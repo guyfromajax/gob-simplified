@@ -156,17 +156,24 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 
 | Attribute | Direction | Rule (after clamp) |
 |-----------|-----------|---------------------|
-| **Offensive efficiency** | Uses offensive-play concentration from the full game snapshot. |
-| **Defensive efficiency** | Uses maximum HCO-defense usage share from the full game snapshot. |
-| **Fast break efficiency** | Uses strategic fast-break play concentration. |
-| **Press/trap (PT) efficiency** | Uses press/trap play concentration. |
-| **Fast break opp. modifier** | Uses opponent strategic fast-break volume. |
-| **PT opp. modifier** | Uses opponent press/trap volume. |
-| **Fight** | **Up** if win (**0…+2**); **flat/down** if lose (**−2…0**) | Margin does not change fight; only W/L. |
-| **Discipline** | **Up** (**+1…+2**) if your **F + TO** is **lower** than opponent **F + TO + 8**. **Down** (**−2…−1**) if yours is **higher**. Else **down or flat** (**−1…0**) | “Lower fouls + turnovers (with buffer)” rewards discipline. |
-| **Team chemistry** | **Rank-relative** | Based on opponent `natl_rank` where lower rank is better. Beat lower-ranked: **0…+1**; beat higher-ranked non-top-10: **+1…+2**; beat top-10: **+2…+4**. Lose to top-10: **−1…0**; lose to higher-ranked non-top-10: **−2…0**; lose to lower-ranked 100-128: **−5…−3**; lose to other lower-ranked: **−3…−2**. |
-| **Shot threshold** | See golf note | **FG% > 50%:** **down** (**−10…−5**) both teams. **FG% > 45% and ≤ 50%:** winner **down or flat** (**−5…0**), loser **up** (**0…+5**). **FG% ≤ 45%:** **up** (**+5…+10**) both. |
-| **Rebound modifier** | **Up** only with big edge; else **down** | **Up** (**+0.00…+0.05**) if your **DREB+OREB** **> opponent + 8**. **Down** (**−0.10…−0.05**) if **< opponent − 8**. Otherwise **down** (**−0.05…−0.01**). |
+| **Offensive efficiency** | Concentration | Largest play's share of offensive possessions: `≤0.23` → **+0…+2**; `≤0.30` → **−1…+1**; `>0.30` → **−2…−1**. Zero possessions = data-integrity (log, no change). |
+| **Defensive efficiency** | Concentration | Max HCO-defense usage share: `≤0.42` → **+0…+2**; `≤0.57` → **−1…+1**; `>0.57` → **−2…−1**. |
+| **Fast break efficiency** | Concentration | Over CR / RR / Triangle (`after_steal` excluded): `≤0.44` → **+0…+2**; `≤0.53` → **−1…+1**; `>0.53` → **−2…−1**. Zero FB volume → atrophy **−1…0**. |
+| **Press/trap efficiency** | Concentration | Over the 4 P/T plays: `≤0.50` → **+0…+2**; `≤0.70` → **−1…+1**; `>0.70` → **−2…−1**. Zero P/T volume → atrophy **−1…0**. |
+| **Fast break opp. modifier** | Volume ladder | Opponent FB volume, healthy **7–13**: `0` atrophy **−1…0**; `<7` **−1…0**; `7–13` **0…+1**; `>13` **−1…0**. |
+| **PT opp. modifier** | Volume ladder | Opponent P/T volume, healthy **9–20** (bimodal — press teams median 15, others 4–6). Same ladder shape. |
+| **Fight** | **Up** if win (**0…+2**); **down** if lose (**−2…0**) | Margin does not change fight; only W/L. **Nets structurally zero league-wide** — one winner per game — so fight's season drift is entirely training-driven. |
+| **Discipline** | Buffered comparison | **+1…+2** if your **F + TO** < opponent **F + TO + 8**; **−3…−1** if higher; **−1…0** if equal. |
+| **Team chemistry** | Rank-relative | Beat lower-ranked **0…+2**; beat higher non-top-10 **+1…+3**; beat top-10 **+2…+5**. Lose to top-10 **0…+1**; lose to higher non-top-10 **−1…+1**; lose to rank 100-128 **−4…−2**; lose to other lower **−2…−1**. Lifted across the board — the old ladder floored **all 128 teams by week 2**. |
+| **Shot threshold** | Golf score | **FG% > 40** → **−6…−2** both. **FG% > 26 and ≤ 40** → winner **−1…0**, loser **0…+1**. **FG% ≤ 26** → **+2…+6** both. ⚠️ **SCALE-COUPLED** — valid only for the current −30…170 window; every `MIN` change requires a re-cut. |
+| **Rebound modifier** | 5-band ladder (cents /100) | Outrebound by **≥14** → **+0.04…+0.14**; **7–13** → **0.00…+0.06**; **−3…+6** → **−0.03…+0.03**; outrebounded **4–13** → **−0.08…−0.02**; **≥14** → **−0.12…−0.04**. Asymmetric on purpose: rebound differential is zero-sum, so symmetric bands net zero drift. |
+
+Full band definitions, thresholds and the reasoning behind each re-cut live in
+[End_Of_Game_System.md](../06_Gameplay_Systems/End_Of_Game_System.md). All values are named
+constants in `BackEnd/constants/eog_attr_bands.py` — **never inline a threshold in a branch**.
+
+**Evaluate band changes with `scripts/eog_band_tuner.py`, not a season.** It recomputes expected
+drift offline from a season log in seconds and validates itself against the log (must be 100%).
 
 #### Training
 
@@ -180,7 +187,88 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 | **Shot threshold** | Scrimmages only | **0 pts → up +5…+15** (worse). **1 → up/flat 0…+5**. **2 → down −3…−8**; **3 → −5…−11**; **4 → −5…−15**; **5+ → −5…−20** (larger scrimmage = more **down** = better golf score). **Breaks** can scale how much of a **session “gain”** sticks (for shot threshold, a **decrease** counts as a gain). |
 | **Rebound modifier** | **Up or down** | **Rebounding drill and scrimmages:** half-up(**0.5 × points**) then same bucket table: **<1 effective point → −0.05…−0.03**; **1–2 → −0.03…+0.03**; **3–4 → +0.03…+0.05**; **5+ → +0.03…+0.10**. **Authoritarian–Rebounding** / focus match can **amplify positive** rebound bumps. |
 
+#### ⚠️ Neglect decay is PROBABILITY-GATED (leveling pass, August 2026)
+
+Point-bucket **0** means the coach allocated **nothing** to the categories feeding that
+attribute. That still costs something — but it used to cost it **every single week**, at
+`−4…−3` for fight/discipline and `−3…−1` for chemistry.
+
+Because the CPU reference plan is a player-development plan, it allocates nothing to the
+chemistry and discipline categories, so those attributes decayed **~−3.5/week indefinitely**:
+measured **team_chemistry −93.6/season** on an 18-point range and **discipline −91.6** on a
+40-point range. Every team floored, and a floored attribute carries no information.
+
+Per-roll intuition is misleading here: these attributes are rolled **~4.7x per week** across
+their several source categories, so both penalties and gains multiply. Chemistry's bucket 1 at
+`(0,1)` alone was worth **+32/season**.
+
+| constant | value | effect |
+|---|---|---|
+| bucket-0 range | `(−1, 0)` | was `(−4,−3)` / `(−3,−1)` |
+| `NEGLECT_DECAY_CHANCE_CHEMISTRY` | `0.10` | ≈ −3/season |
+| `NEGLECT_DECAY_CHANCE_DEFAULT` | `0.25` | ≈ −7/season |
+| `FIGHT_GAIN_CHANCE` | `0.45` | gates POSITIVE fight deltas — fight never hits bucket 0, and its gains multiplied to +44/season |
+| chemistry bucket 1 | `(−1, 1)` | one point holds station; chemistry must be invested in to grow |
+
+Integer weekly rolls cannot express "−3/season" directly — the smallest ungated penalty is
+already −13 — which is why these are probability gates rather than smaller ranges.
+
+**Measured after gating** (12 seeds × 64 teams, all attributes reset to mid-range first):
+team_chemistry **−5.3**, discipline **−6.0**, fight **+3.3**, everything else +7.1…+7.9.
+
 **Breaks (training, all attrs above):** **0–2** mostly changes a **multiplier** on **positive** session gains (player attrs + team attrs; for **shot_threshold**, a **decrease** is treated as a positive gain). **3+** adds the **team chemistry** random shifts in the table; **4–5** also applies the **discipline** and **fight** **down** ranges in the Fight/Discipline rows.
+
+### Season drift — the two forces, and what actually happens
+
+Every team attribute is pushed by **two independent forces** each week: **EOG** (game outcomes)
+and **TRAINING** (the coach's allocation). What matters is the **combined** figure, and the
+design target is **slightly positive** — a default coach drifts up a little, neglect falls,
+focus climbs.
+
+**THE THEME: railing stays possible, it just isn't the default.** An attribute that can never
+reach its clamp cannot express a great or terrible season. Before the leveling pass the league
+railed by construction — 123 of 128 teams pinned `shot_threshold` at the ceiling, all 128
+floored `team_chemistry` by week 2. After it, rails are reachable by outliers and unreachable by
+accident.
+
+**Verified over a full 26-week season under the new configuration** (128 teams, mean start →
+mean end):
+
+| attribute | predicted | **actual** | prior season |
+|---|---|---|---|
+| fb_opp_modifier | +7.2 | **+7.3** | +5.6 |
+| team_chemistry | +5.7 | **+8.0** | +0.5 |
+| pt_opp_modifier | +3.7 | **+4.8** | +3.6 |
+| fight | +3.3 | **+4.4** | +16.6 |
+| offensive_efficiency | +3.5 | **+3.5** | +10.8 |
+| discipline | +3.9 | **+3.4** | −12.9 |
+| pt_efficiency | +4.7 | **+3.1** | −1.1 |
+| fb_efficiency | +1.8 | **+2.9** | −1.3 |
+| defensive_efficiency | +3.3 | **+2.7** | −8.3 |
+| rebound_modifier | +0.1 | **−0.0** | +0.1 |
+
+**Ten of eleven predictions landed.** Total railed team-attributes fell **457 → 326**, and the
+mean clamp rate **15.1% → 6.2%**.
+
+`shot_threshold` is the exception and has its own dynamics — see the golf-score row above and
+[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md).
+
+⚠️ **This season did NOT test forced specialisation.** The CPU reference plan is uniform across
+all 127 CPU teams and vision-driven training allocation is still deferred, so team-attribute
+drills are identical league-wide. **"Does neglect decay while investment holds" remains
+unmeasured** — a flat specialisation result would be expected, not evidence of failure. The
+neglect gates above are calibrated for the neglect case only.
+
+### ⚠️ Traps that have already cost days
+
+| trap | what happens |
+|---|---|
+| **The training column is CENSORED for clamped attributes** | The `[EOG-BAND]` report infers training drift from unclamped week-to-week `pre`→`post` gaps, so for an attribute pressed against a clamp it measures only the SURVIVORS — the teams that have not yet railed, i.e. those with the smallest deltas. Measured gap: team_chemistry **−93.6 true vs −10.2 inferred (9.2x)**; discipline −91.6 vs −48.1. Unconstrained attributes agreed within 10%. **Source training numbers from a direct mid-range dry run of `auto_train_one_cpu_team`, never from the report.** |
+| **`shot_threshold` determines its own band input** | It is the bar a shot must clear, so it sets FG%, and FG% picks the band. Its equilibrium is **season- and scale-specific** — re-derive before re-cutting, never reuse a prior fit. |
+| **Gain vs position** | **Gain sets SPEED; band position sets WHERE TEAMS SETTLE.** The neutral band must sit BELOW the equilibrium FG% so the negative branch offsets training. |
+| **UI-created franchises carry DEPLOYED init values** | A franchise created through the UI is seeded by the deployed backend, then measured by local code. Anything changed since the last deploy seeds wrong, silently, and looks like data rather than an error. Caught once on `rebound_modifier` (0.2 vs 0.5) only because someone was looking for it. |
+| **`eog_band_tuner --validate` needs `--config`** | There are now three band generations. Validating a log against the wrong one reports mass "drift" that is really a config mismatch — one log scored 8 of 11 attributes as mismatched against the default, and 11 of 11 clean against its own config. |
+| **The rebuild-timeline metric halved star minutes** | Bucketing lineup rebuilds by `(game_id, team_name)` from a module-level context dict produced 40.5% star minutes when the true value was 69.0%, and ~14 players from a 12-man roster. Measure per TURN from the live lineup instead. See [CPU_Team_Rotation_System.md](../06_Gameplay_Systems/CPU_Team_Rotation_System.md). |
 
 ### Attribute Name Migration
 

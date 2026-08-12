@@ -727,10 +727,22 @@ Eligible non-user teams run the same `execute_training()` engine. CPU allocation
 
 | Weekly allocation (per attribute) | Net over a season |
 |---|---|
-| 0 points (neglect) | declines |
+| 0 points (neglect) | declines — **but the penalty is PROBABILITY-GATED as of the leveling pass**, see below |
 | reference primaries (pts=3) | ≈ flat |
 | reference baseline (pts=1) | mild drag (bands are distinct; see Player Development § gain bands) |
 | focused (pts=4/5) | gains |
+
+> **⚠️ TEAM-attribute neglect decay is gated (August 2026).** Point-bucket 0 used to charge
+> `−4…−3` (fight/discipline) or `−3…−1` (chemistry) **every week**. Because the CPU reference
+> plan allocates nothing to the chemistry and discipline categories, those attributes decayed
+> **~−3.5/week indefinitely** — measured **team_chemistry −93.6/season** on an 18-point range
+> and **discipline −91.6** on a 40-point range, flooring every team. The bucket-0 range is now
+> `(−1, 0)` and fires on a fraction of weeks: `NEGLECT_DECAY_CHANCE_CHEMISTRY = 0.10`,
+> `NEGLECT_DECAY_CHANCE_DEFAULT = 0.25`. `FIGHT_GAIN_CHANCE = 0.45` gates positive fight deltas
+> for the mirror-image reason. Measured after gating: chemistry **−5.3**, discipline **−6.0**,
+> fight **+3.3**. These attributes are rolled **~4.7x per week** across their source categories,
+> so per-roll intuition is misleading. See
+> [Team_Attribute_System.md](../04_Franchise_Mode_Systems/Team_Attribute_System.md) § Neglect decay.
 
 Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shape attractor (`OFFSEASON_ATTRACTOR_ALPHA=0`). Pre-training decay by year is unchanged (see **Year-Based Pre-Training Decay** above) and never subtracts below the weight-scaled position floor.
 
