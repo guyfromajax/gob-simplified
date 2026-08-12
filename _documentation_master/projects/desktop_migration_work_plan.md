@@ -100,7 +100,7 @@ This bridge is required regardless of the base game's DRM choice.
 │        │                                             │
 │  Persistence adapter ──► SQLite save file (.db)      │
 │                                                      │
-│  Bundled portrait assets (base 300 recruit set)      │
+│  Bundled portrait assets (base 450 recruit set)      │
 └──────────────────────┬──────────────────────────────┘
                        │ only for online features
                        ▼
@@ -158,7 +158,7 @@ The query string is currently a cross-page state container and resume protocol (
 ### WS-5: Online/offline seam & entitlement
 - **Endpoint routing split:** game/franchise routes → local; auth, community, leaderboards, feedback, recruit-pack, subscription routes → remote. One routing table in the API config, not scattered conditionals.
 - **Offline-first identity:** single-player must work with no account and no network. A GOB account is required only to link online features through the account bridge in §1.4.
-- Recruit-pack delivery to desktop: purchased packs download through authenticated remote calls and install into local assets/DB; base 300 portrait set ships in the bundle (no runtime R2 dependency for offline play).
+- Recruit-pack delivery to desktop: purchased packs download through authenticated remote calls and install into local assets/DB; base 450 portrait set ships in the bundle (no runtime R2 dependency for offline play).
 - Graceful degradation: online panels (community highlights, leaderboards) render an offline state rather than blocking anything.
 
 ### WS-6: Build pipeline & distribution

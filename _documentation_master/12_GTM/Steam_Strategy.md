@@ -1,3 +1,4 @@
+Document: Steam_Strategy.md
 
 ##Task
 1. Establish GOB's presence on Steam
@@ -16,13 +17,13 @@
 
 ##Monetization Plan
 - Game Sales: sell downloadable versions of the game
-    - comes with 300 "recruit" headshots that will be randomly assigned to newly created plaeyrs in every recruitign class assimung the user does not buy any additional recruit packs.
+    - comes with 450 "recruit" headshots that will be randomly assigned to newly created plaeyrs in every recruitign class assimung the user does not buy any additional recruit packs.
     - Pricing
         - Varsity: $29.99: game only
         - Varsity Plus: $34.99: game + 5 recruit packs
         - All-American: $54.99: game + 5 recruit packs + one year subscription
 - Recruit packs
-    - Sets of 300 custom built recruits each with their own headshot and attributes
+    - Sets of 450 custom built recruits each with their own headshot and attributes (matches the recruit class size, so a purchased set fully covers a season's class)
     - Pricing
         - One Pack: $2.99
         - Five Packs: $9.99
