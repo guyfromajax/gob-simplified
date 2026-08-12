@@ -157,6 +157,37 @@ class TestTrainingNotes(unittest.TestCase):
         by_title = {s["title"]: s for s in self._camp_sections(players)}
         self.assertEqual(by_title["Biggest Concern"]["body"], "None")
 
+    def _one_player_container_bodies(self, deltas, is_camp):
+        keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"]
+        base = {"1": {a: 50 for a in keys}}
+        attrs = {f"anchor_{a}": 50 + int(deltas.get(a, 0)) for a in keys}
+        players = [{"_id": "1", "first_name": "A", "last_name": "One", "year": "junior", "attributes": attrs}]
+        team = {"fb_efficiency": 0, "fb_opp_modifier": 0, "pt_efficiency": 0, "pt_opp_modifier": 0}
+        secs = build_structured_training_report_notes(
+            is_training_camp=is_camp, players=players, original_player_baselines=base,
+            team=team, plays_data={}, scouting_data={}, legacy_energy_notes=[])
+        return {s["title"]: s["body"] for s in secs}
+
+    def test_team_strong_container_flags_high_outlier(self):
+        # SC spikes team-wide, all else flat → SC is > mean + 1 SD of the 12 attr-sums.
+        by = self._one_player_container_bodies({"SC": 30}, is_camp=True)
+        self.assertEqual(by["Strong Cumulative Increase"], "SC")
+
+    def test_camp_concerning_progression_flags_low_laggard(self):
+        # 11 attrs +10, SH the laggard at -5 (< mean − 1 SD). Camp flags the least-developed.
+        deltas = {a: 10 for a in ["SC", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"]}
+        deltas["SH"] = -5
+        by = self._one_player_container_bodies(deltas, is_camp=True)
+        self.assertEqual(by["Concerning Progression"], "SH")
+
+    def test_inseason_regression_fires_on_negative_not_on_positive_laggard(self):
+        # In-season Concerning Regression uses the sum < 0 line: a low-but-positive laggard
+        # does NOT count as a regression; a negative one does.
+        by_pos = self._one_player_container_bodies({"SC": 30, "SH": 2}, is_camp=False)
+        self.assertEqual(by_pos["Concerning Regression"], "No Significant Updates")
+        by_neg = self._one_player_container_bodies({"SC": 30, "SH": -8}, is_camp=False)
+        self.assertEqual(by_neg["Concerning Regression"], "SH")
+
     def test_misc_physique_section_before_energy(self):
         attrs_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH"]
         base = {"1": {a: 50 for a in attrs_keys}}

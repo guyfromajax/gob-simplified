@@ -74,6 +74,21 @@ def _team_attr_delta_sums(players: List[dict], baselines_by_id: Dict[Any, Dict[s
     return sums
 
 
+def _team_attr_extremes(sums: Dict[str, int]) -> Tuple[List[str], List[str]]:
+    """(strong, laggard) attribute names relative to the session's own attr-sum spread:
+    strong = team-sum > mean + CUT·SD; laggard = team-sum < mean − CUT·SD (population SD over
+    the 12 attr-sums). Even development (SD ≈ 0) → both empty. Self-scaling, so no
+    magnitude-calibrated threshold is needed across camp vs in-season."""
+    vals = list(sums.values())
+    if not vals:
+        return [], []
+    mean = statistics.mean(vals)
+    cut = TEAM_ATTR_STDEV_CUT * statistics.pstdev(vals)
+    strong = sorted(a for a, s in sums.items() if s > mean + cut)
+    laggard = sorted(a for a, s in sums.items() if s < mean - cut)
+    return strong, laggard
+
+
 # Younger players swing wider BOTH ways by construction: training_execution_v2 gives a
 # year-max GAIN bump (FR +5 … SR +1) and a deeper year DECAY (FR/SO vs JR/SR). Normalise
 # each player's cumulative delta by that year factor so the awards surface a genuinely
@@ -90,6 +105,13 @@ YEAR_SWING_FACTOR = {"freshman": 1.5, "sophomore": 1.25, "junior": 1.1, "senior"
 # purpose — self-scales with whatever the camp produces, so no scale-calibrated constant to
 # drift when CAMP_GAIN_SCALE or the attribute recal moves the magnitudes.
 CAMP_CONCERN_MEDIAN_FRACTION = 0.5
+
+# Team attribute containers (Strong Cumulative Increase / Concerning Progression) flag the
+# per-attribute team-sums that stand out from the pack THIS session — beyond ±this many
+# standard deviations of the 12 attr-sums. Relative on purpose (like the player awards): it
+# self-scales across camp (CAMP_GAIN_SCALE) and in-season (IN_SEASON_GAIN_SCALE) magnitudes,
+# and an evenly-developed team (SD ≈ 0) flags nothing.
+TEAM_ATTR_STDEV_CUT = 1.0
 
 
 def _year_normalized_total(player: Dict, baselines_by_id: Dict[Any, Dict[str, int]]) -> float:
@@ -258,11 +280,11 @@ def build_structured_training_report_notes(
 
         sections.append(_locker_room_note(players))
 
-        hi = sorted(a for a, s in sums.items() if s > 49)
-        sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(hi) if hi else NSS})
-
-        lo = sorted(a for a, s in sums.items() if s < 21)
-        sections.append({"title": "Concerning Progression", "body": ", ".join(lo) if lo else NSS})
+        strong, laggard = _team_attr_extremes(sums)
+        sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(strong) if strong else NSS})
+        # Camp skips decay → attributes PROGRESS (some more than others); flag the laggards
+        # (< mean − 1 SD), the attrs the camp under-developed. Even development → NSS.
+        sections.append({"title": "Concerning Progression", "body": ", ".join(laggard) if laggard else NSS})
     else:
         pos = [(n, t) for n, t in normalized_by_name.items() if t > 0]
         if pos:
@@ -283,11 +305,12 @@ def build_structured_training_report_notes(
 
         sections.append(_locker_room_note(players))
 
-        hi = sorted(a for a, s in sums.items() if s >= 10)
-        sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(hi) if hi else NSS})
-
-        lo = sorted(a for a, s in sums.items() if s <= -10)
-        sections.append({"title": "Concerning Regression", "body": ", ".join(lo) if lo else NSS})
+        strong, _laggard = _team_attr_extremes(sums)
+        sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(strong) if strong else NSS})
+        # In-season decay is live → an attribute can NET decline; flag the ones the team
+        # actually lost ground in (team-sum < 0), the self-evident regression line.
+        regressed = sorted(a for a, s in sums.items() if s < 0)
+        sections.append({"title": "Concerning Regression", "body": ", ".join(regressed) if regressed else NSS})
 
     plays_pick = _offensive_play_selection(plays_data)
     sections.append({

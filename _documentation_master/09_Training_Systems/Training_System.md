@@ -629,6 +629,16 @@ Each player's **cumulative delta** = sum over the trainable attributes (all exce
 - **In-season:** `Practice Player Of The Week` = highest normalized gain (> 0); `Biggest Regression` = lowest normalized delta (< 0). Ties → co-winners.
 - **Training camp (week 1):** decay is skipped, so nobody truly regresses (`< 0` would be permanently empty). `Training Camp MVP` = highest normalized gain (> 0). **`Biggest Concern`** instead flags the year-normalized **laggard** — the lowest developer, but only if he landed below **`CAMP_CONCERN_MEDIAN_FRACTION` (0.5) × the squad's median normalized gain** (a player the camp's focus/position-fit didn't help). Even-development camps → "None". The threshold is **relative on purpose** so it self-scales with `CAMP_GAIN_SCALE` and needs no calibrated constant.
 - **Walk-ons need no special term:** they swing by their *year* (the model is year+allocation based, not tier based). In-season they sit on the Training Squad — excluded from this pool, with their own report — and at camp they're evaluated by year like everyone else.
+
+**Team attribute containers — Strong Cumulative Increase / Concerning Progression|Regression** (`training_notes.py`, 2026-08 retune)
+
+These list the *attributes* (not players) the team collectively developed most / least, from the per-attribute **team-sum** of `anchor_now − anchor_baseline` across all players (`_team_attr_delta_sums`). The old absolute cutoffs (`>49 / <21` camp, `≥10 / ≤−10` in-season) were calibrated to the pre-recal magnitudes and don't survive the ~8× gap between camp (`CAMP_GAIN_SCALE`) and in-season (`IN_SEASON_GAIN_SCALE`), so they're now **relative to the session's own spread** (`_team_attr_extremes`, `TEAM_ATTR_STDEV_CUT = 1.0`):
+
+- **Strong Cumulative Increase (both camp & in-season):** attributes whose team-sum is **> mean + 1 SD** of the 12 attr-sums — the standout gainers. Self-scales across regimes; an evenly-developed team (SD ≈ 0) flags nothing.
+- **Concerning — camp ("Concerning Progression"):** camp skips decay, so attributes *progress*; flag the **laggards** — team-sum **< mean − 1 SD** (the attrs the camp under-developed).
+- **Concerning — in-season ("Concerning Regression"):** decay is live, so an attribute can net **decline**; flag the ones the team **actually lost ground in — team-sum < 0**. A low-but-positive laggard is *not* a regression here.
+
+The `1 SD` cut is the only knob (≈ the top/bottom ~2 of 12 attrs). Like the player awards, this is relative on purpose — no magnitude-calibrated constant to re-derive when the training scale moves.
 - Dynamic height: Expands automatically with content
 - No internal scrolling: All text is always visible
 
