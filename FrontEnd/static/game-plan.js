@@ -301,14 +301,6 @@ function setHeader() {
   if (subtitle && teamName) {
     subtitle.textContent = teamName;
   }
-  
-  const logo = document.getElementById('team-logo');
-  if (logo && teamName) {
-    logo.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(teamName, 'logo_square') : '/images/teams/general/general_logo_square.png';
-    logo.alt = `${teamName} logo`;
-    logo.hidden = false;
-    logo.onerror = () => { logo.hidden = true; };
-  }
 }
 
 function ensureSliderVisual(slider) {

@@ -1,14 +1,13 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 2. Pregame UX stats wiring is inconsistent
+3. Improve FB Outlet Pass denied animation
+4. Scouting Report tab loads as empty when it's th first landing screen
 
 
 ##Full Product Readiness
-1. Copy and paste recruit sets and players to gob. Do we also need to do universal teams?
-2. Fine tune Conference 1 player attributes in universal players collection
-3. Recalibrate Traning Report thresholds
-4. Fine tuen height / weight
-5. Change leader screens and load modals to averages instead of totals
+1. Fine tuen height / weight
+2. Change leader screens and load modals to averages instead of totals
 
 
 ##Playtest Launch / In Progress
