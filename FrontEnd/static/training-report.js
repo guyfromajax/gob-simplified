@@ -1020,7 +1020,13 @@ function renderPlayersTable() {
       });
     }
 
-    row.appendChild(createCell(formatRtDisplay(getPlayerHighestRt(player))));
+    const rt = getPlayerHighestRt(player);
+    const rtCell = document.createElement('td');
+    rtCell.textContent = formatRtDisplay(rt);
+    if (typeof getRtBucketClass === 'function') {
+      rtCell.className = getRtBucketClass(rt);
+    }
+    row.appendChild(rtCell);
     
     tbody.appendChild(row);
   });
