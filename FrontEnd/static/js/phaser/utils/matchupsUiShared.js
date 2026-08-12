@@ -39,15 +39,26 @@ export function colorContrastRatio(foreground, background = DARK_PRESENTATION_BA
   return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
 }
 
-/** Primary brand color when readable on dark presentation UI; secondary otherwise. */
+/**
+ * Primary brand color when it clears the existing presentation threshold.
+ * Otherwise choose the more contrasting of the two brand colors; a secondary
+ * that is even darker than the primary must never make the fallback less legible.
+ */
 export function readableTeamPresentationColor(primary, secondary, options = {}) {
   const background = options.background || DARK_PRESENTATION_BACKGROUND;
   const minimum = Number(options.minimum) || TEAM_COLOR_TEXT_CONTRAST_MIN;
   const normalizedPrimary = normalizeHexColor(primary);
-  if (normalizedPrimary && colorContrastRatio(normalizedPrimary, background) >= minimum) {
+  const normalizedSecondary = normalizeHexColor(secondary);
+  const primaryContrast = normalizedPrimary
+    ? colorContrastRatio(normalizedPrimary, background)
+    : 0;
+  if (normalizedPrimary && primaryContrast >= minimum) {
     return normalizedPrimary;
   }
-  return normalizeHexColor(secondary) || normalizedPrimary || "#ffffff";
+  if (!normalizedPrimary) return normalizedSecondary || "#ffffff";
+  if (!normalizedSecondary) return normalizedPrimary;
+  const secondaryContrast = colorContrastRatio(normalizedSecondary, background);
+  return secondaryContrast > primaryContrast ? normalizedSecondary : normalizedPrimary;
 }
 
 /** RT color from the shared grade presentation. */

@@ -1260,9 +1260,10 @@ function renderRosterAttributes() {
       Math.floor((anchorAttrs.anchor_ND ?? anchorAttrs.ND ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_IQ ?? anchorAttrs.IQ ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_FT ?? anchorAttrs.FT ?? 0) / 10),
-      `${Math.round(ngValue * 100)}%`
+      `${Math.round(ngValue * 100)}%`,
+      formatRtDisplay(rt)
     ];
-    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', `ng ${getEnergyClass(ngValue)}`];
+    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', `ng ${getEnergyClass(ngValue)}`, `rt ${rtBucketClassOrEmpty(rt)}`];
 
     cells.forEach((val, idx) => {
       const td = document.createElement('td');
@@ -1273,11 +1274,7 @@ function renderRosterAttributes() {
         const nameText = document.createElement('span');
         nameText.textContent = val ?? '--';
         nameText.className = 'player-name-link';
-        const rtSpan = document.createElement('span');
-        rtSpan.className = `inline-rt ${rtBucketClassOrEmpty(rt)}`;
-        rtSpan.textContent = formatRtDisplay(rt);
         wrap.appendChild(nameText);
-        wrap.appendChild(rtSpan);
         td.appendChild(wrap);
       } else {
         td.textContent = val ?? '--';
@@ -1299,7 +1296,7 @@ function renderRosterAttributes() {
     newHeader.style.cursor = 'pointer';
     newHeader.style.userSelect = 'none';
     newHeader.addEventListener('click', () => {
-      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG'];
+      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG', 'RT'];
       sortRoster(columnNames[index]);
     });
   });
@@ -3391,9 +3388,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof initAttributeTooltips !== 'undefined') {
       const thead = document.querySelector('#roster-attributes-pane .roster-table thead');
       if (thead) {
-        // Include [data-attr] so the RT span nested inside the Player Name
-        // header (which would otherwise read as "Player NameRT" and miss the
-        // map) gets its own tooltip wiring.
+        // Include [data-attr] for explicitly keyed attribute headers such as RT.
         initAttributeTooltips(thead, ['th', '[data-attr]']);
       } else {
         console.warn('[TOOLTIP] thead element not found');

@@ -63,11 +63,7 @@ def test_all_position_consumers_use_the_canonical_resolver_or_projection():
     assert "pos = resolve_training_position(p)" in api
     # Team Builder already used the canonical resolver.
     assert "pos = resolve_training_position({" in team_builder
-    # Browser effective-value presentation consumes the server result; it has no
-    # independent fallback chain.
-    start = frontend.index("function rosterRowPosition")
-    end = frontend.index("\n}", start)
-    resolver_body = frontend[start:end]
-    assert "resolved_training_position" in resolver_body
-    assert "position_intent" not in resolver_body
-    assert "position_ratings" not in resolver_body
+    # The retired effective-value badges must not reintroduce a browser-side
+    # position resolver. Position fit remains a server-side gain concern.
+    assert "function rosterRowPosition" not in frontend
+    assert "renderEffectiveValueLabels" not in frontend

@@ -963,23 +963,6 @@ body.training-page .label-text {
   color: #9e9d9d;
 }
 
-body.training-page .effective-value {
-  display: inline-flex;
-  align-items: center;
-  width: max-content;
-  margin-top: 0.2rem;
-  padding: 0.12rem 0.4rem;
-  border: 1px solid rgba(255, 159, 28, 0.4);
-  border-radius: 999px;
-  background: rgba(255, 159, 28, 0.08);
-  color: #f4b45d;
-  font-size: 0.68rem;
-  font-weight: 700;
-  line-height: 1.2;
-  letter-spacing: 0.02em;
-  cursor: help;
-}
-
 body.training-page .slider-container {
   position: relative;
   display: flex;

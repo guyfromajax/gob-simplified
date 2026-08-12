@@ -1,27 +1,5 @@
 // Training Page JavaScript
 let TOTAL_POINTS = 24; // Will be updated from API for franchise mode
-/** Direct gain percentages; neither table participates in budget spend. */
-let TRAINING_GAIN_PERCENTAGE_MATRIX = null;
-const CLASS_GAIN_PERCENTAGES = {
-  freshman: 100, Freshman: 100, FR: 100,
-  sophomore: 91, Sophomore: 91, SO: 91,
-  junior: 80, Junior: 80, JR: 80,
-  senior: 71, Senior: 71, SR: 71,
-};
-const SLIDER_ATTR_CODES = {
-  'offense-inside': 'SC',
-  'offense-outside': 'SH',
-  'defense-inside': 'ID',
-  'defense-outside': 'OD',
-  'technical-passing': 'PS',
-  'technical-ball-handling': 'BH',
-  'technical-rebounding': 'RB',
-  'weight-strength': 'ST',
-  'weight-agility': 'AG',
-  'general-conditioning': 'ND',
-  'general-free-throws': 'FT',
-  'general-film-study': 'IQ',
-};
 
 // DOM Elements
 const pointsRemainingEl = document.getElementById('points-remaining');
@@ -404,13 +382,6 @@ function setSliderValue(slider, value) {
   updateTrainingSliderValuePosition(slider);
 }
 
-/**
- * Primary development position for a custom-focus roster row.
- */
-function rosterRowPosition(row) {
-  return row.resolved_training_position;
-}
-
 /** Every slider notch costs exactly one whole budget point. */
 function calculateTotalPoints() {
   let total = 0;
@@ -422,49 +393,6 @@ function calculateTotalPoints() {
 
 function formatPointsDisplay(n) {
   return String(Math.round(n));
-}
-
-function classGainMultiplier(year) {
-  const pct = CLASS_GAIN_PERCENTAGES[year] || CLASS_GAIN_PERCENTAGES[String(year || '').toLowerCase()] || 100;
-  return pct / 100;
-}
-
-function effectiveGainRate(row, attr) {
-  if (!TRAINING_GAIN_PERCENTAGE_MATRIX || !attr) return 1;
-  const pos = rosterRowPosition(row);
-  const pct = (TRAINING_GAIN_PERCENTAGE_MATRIX[pos] && TRAINING_GAIN_PERCENTAGE_MATRIX[pos][attr]) || 100;
-  return (pct / 100) * classGainMultiplier(row.year);
-}
-
-function effectiveValueText(minPct, maxPct) {
-  if (minPct !== maxPct) return `Effective value: ${minPct}%–${maxPct}%`;
-  if (minPct === 100) return 'Full value';
-  if (minPct === 50) return 'Half value';
-  if (minPct === 25) return 'Quarter value';
-  return `Effective value: ${minPct}%`;
-}
-
-function renderEffectiveValueLabels() {
-  if (!TRAINING_GAIN_PERCENTAGE_MATRIX || !customFocusRoster.length) return;
-  Object.keys(SLIDER_ATTR_CODES).forEach(function (sliderId) {
-    const slider = document.getElementById(sliderId);
-    const label = slider && slider.closest('.slider-label');
-    if (!label) return;
-    const attr = SLIDER_ATTR_CODES[sliderId];
-    const rates = customFocusRoster.map(function (row) { return effectiveGainRate(row, attr); });
-    const minPct = Math.round(Math.min.apply(null, rates) * 100);
-    const maxPct = Math.round(Math.max.apply(null, rates) * 100);
-    let badge = label.querySelector('.effective-value');
-    if (!badge) {
-      badge = document.createElement('span');
-      badge.className = 'effective-value';
-      const labelText = label.querySelector('.label-text');
-      if (labelText) labelText.insertAdjacentElement('afterend', badge);
-      else label.insertBefore(badge, label.firstChild);
-    }
-    badge.textContent = effectiveValueText(minPct, maxPct);
-    badge.title = `Training gains vary by each player's position fit and class year. This drill delivers ${minPct}%–${maxPct}% of its base gain across your roster.`;
-  });
 }
 
 /**
@@ -1481,16 +1409,12 @@ async function initializeTrainingPoints() {
       if (response.ok) {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
-        if (data.gain_percentage_matrix && typeof data.gain_percentage_matrix === 'object') {
-          TRAINING_GAIN_PERCENTAGE_MATRIX = data.gain_percentage_matrix;
-        }
         currentWeek = Number(data.week || 1);
         currentSeason = Number(data.season || 1);
         currentTeamName = data.user_team_name || currentTeamName || '';
         prefetchTrainingNewswire(franchiseId);
         if (Array.isArray(data.custom_focus_roster)) {
           customFocusRoster = data.custom_focus_roster;
-          renderEffectiveValueLabels();
         }
         if (Array.isArray(data.player_maximizer_ranking_attrs)) {
           customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
