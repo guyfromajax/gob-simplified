@@ -4,11 +4,11 @@
 
 
 ##Full Product Readiness
+1. Copy and paste recruit sets and players to gob. Do we also need to do universal teams?
+2. Fine tune Conference 1 player attributes in universal players collection
 3. Recalibrate Traning Report thresholds
 4. Fine tuen height / weight
-5. Re-evaluate Sim Perf Capstone
-6. Change leader screens and load modals to averages instead of totals
-7. Update team attribute documentation
+5. Change leader screens and load modals to averages instead of totals
 
 
 ##Playtest Launch / In Progress
@@ -656,10 +656,11 @@ The dependency is recorded beside each constant in `constants/eog_attr_bands.py`
 cut against, its measured value at cut time, and that a material shift requires re-running
 `scripts/eog_band_tuner.py`. When either input moves, these cuts invert the problem.
 
-### ~~`rebound_modifier` init 0.2 -> 0.5~~ — ✅ DONE (2026-08-11, commit 305f4c8c1)
+### `rebound_modifier` init 0.2 -> 0.5 — NOT DONE
 
-Done and **verified by a week-3 gate on the verification season: 0 of 130 teams on the rebound
-floor, against 93 of 128 under the old config**, clamp rate 0.0%. Season-end drift -0.0.
+Not a band, so outside the tuner's model. With the new ladder, rebound drift is +0.1/season on
+a 0.0-1.0 range, so 0.5 gives symmetric headroom and should stop the week-3 flooring (93 teams).
+Confirm against a short run rather than assuming.
 
 ## ⚠️ MEASUREMENT FRANCHISES ARE SEEDED BY PROD CODE, MEASURED BY LOCAL CODE (August 2026)
 

@@ -1025,26 +1025,6 @@ function renderPlayersTable() {
     tbody.appendChild(row);
   });
   
-  // Add aggregated row for Training Changes view
-  if (currentView === 'changes' && attributeList.length > 0) {
-    const totalRow = document.createElement('tr');
-    totalRow.className = 'total-row';
-    totalRow.appendChild(createCell('Total'));
-    
-    // Calculate totals for each attribute
-    attributeList.forEach(attr => {
-      let total = 0;
-      reportData.players.forEach(player => {
-        const changes = reportData.player_changes[player.name] || {};
-        total += changes[attr] || 0;
-      });
-      totalRow.appendChild(createChangeCell(total));
-    });
-
-    totalRow.appendChild(createCell('—'));
-    
-    tbody.appendChild(totalRow);
-  }
 }
 
 function getPlayerHighestRt(player) {
@@ -1080,55 +1060,47 @@ function createCell(text) {
 function createAttributeCell(attr, value, change) {
   const td = document.createElement('td');
   td.className = 'attribute-value-cell';
+
+  const attachChangeTooltip = () => {
+    if (!change) return;
+    const arrow = describeTrainingChange(change);
+    td.setAttribute('data-tooltip', arrow.text);
+    td.setAttribute('data-tooltip-class', arrow.className);
+    td.style.cursor = 'help';
+    td.addEventListener('mouseenter', showAttributeTooltip);
+    td.addEventListener('mouseleave', hideAttributeTooltip);
+    td.addEventListener('mousemove', positionAttributeTooltip);
+  };
   
   // Special handling for NG, EM, MO
   if (attr === 'NG') {
     // Display with 2 decimal places
     td.textContent = typeof value === 'number' ? value.toFixed(2) : '1.00';
-    if (change !== 0) {
-      td.setAttribute('data-tooltip', formatChangeForTooltip(change));
-      td.style.cursor = 'help';
-      td.addEventListener('mouseenter', showAttributeTooltip);
-      td.addEventListener('mouseleave', hideAttributeTooltip);
-      td.addEventListener('mousemove', positionAttributeTooltip);
-    }
+    attachChangeTooltip();
   } else if (attr === 'EM') {
     // Display with emoji
     const emoji = getEmotionEmoji(value);
     td.innerHTML = emoji;
     td.style.fontSize = '1.5rem';
     td.style.textAlign = 'center';
-    if (change !== 0) {
-      td.setAttribute('data-tooltip', formatChangeForTooltip(change));
-      td.style.cursor = 'help';
-      td.addEventListener('mouseenter', showAttributeTooltip);
-      td.addEventListener('mouseleave', hideAttributeTooltip);
-      td.addEventListener('mousemove', positionAttributeTooltip);
-    }
+    attachChangeTooltip();
   } else if (attr === 'MO') {
     // Display with red/green pill (no integer on top)
     const pillContainer = createMomentumPill(value);
     td.appendChild(pillContainer);
     td.style.padding = 'var(--spacing-xs)';
-    if (change !== 0) {
-      td.setAttribute('data-tooltip', formatChangeForTooltip(change));
-      td.style.cursor = 'help';
-      td.addEventListener('mouseenter', showAttributeTooltip);
-      td.addEventListener('mouseleave', hideAttributeTooltip);
-      td.addEventListener('mousemove', positionAttributeTooltip);
-    }
+    attachChangeTooltip();
   } else {
-    // Standard integer display with tooltip - show full value (no rounding)
-    // Ensure we display the full integer value, not a rounded version
-    const displayValue = typeof value === 'number' ? Math.floor(value) : (typeof value === 'string' ? parseInt(value, 10) || 0 : 0);
-    td.textContent = displayValue.toString();
-    if (change !== 0) {
-      td.setAttribute('data-tooltip', formatChangeForTooltip(change));
-      td.style.cursor = 'help';
-      td.addEventListener('mouseenter', showAttributeTooltip);
-      td.addEventListener('mouseleave', hideAttributeTooltip);
-      td.addEventListener('mousemove', positionAttributeTooltip);
-    }
+    // Team-page parity: raw 0–100 → single-digit display via floor(/10).
+    const raw =
+      typeof value === 'number'
+        ? value
+        : typeof value === 'string'
+          ? parseFloat(value)
+          : 0;
+    const displayValue = Number.isFinite(raw) ? Math.floor(raw / 10) : 0;
+    td.textContent = String(displayValue);
+    attachChangeTooltip();
   }
   
   return td;
@@ -1199,23 +1171,43 @@ function createMomentumPill(mo) {
   return container;
 }
 
-function formatChangeForTooltip(change, attrKey = null) {
-  // ✅ FIX: Format rebound_modifier changes to 2 decimal places
-  const formattedChange = attrKey === 'rebound_modifier' 
-    ? (change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2))
-    : (change > 0 ? `+${change}` : change.toString());
-  
-  if (change > 0) {
-    return formattedChange;
-  } else if (change < 0) {
-    return formattedChange;
-  } else {
-    return '0';
+/**
+ * Map a raw (0–100 scale) training delta to arrow glyphs.
+ * +1..+4 / −1..−4 → 1 arrow; ±5..±9 → 2; ±10+ → 3.
+ * Triple-up uses RT elite blue; other ups green; downs red; zero grey dash.
+ */
+function describeTrainingChange(change) {
+  const n = Number(change);
+  if (!Number.isFinite(n) || n === 0) {
+    return { text: '–', className: 'change-zero' };
   }
+  const abs = Math.abs(n);
+  const count = abs >= 10 ? 3 : abs >= 5 ? 2 : 1;
+  if (n > 0) {
+    return {
+      text: '▲'.repeat(count),
+      className: count === 3 ? 'change-elite' : 'change-positive',
+    };
+  }
+  return {
+    text: '▼'.repeat(count),
+    className: 'change-negative',
+  };
+}
+
+function formatChangeForTooltip(change, attrKey = null) {
+  // Team attribute tooltips still use numeric labels; player attrs use arrows.
+  if (attrKey === 'rebound_modifier') {
+    return change > 0 ? `+${change.toFixed(2)}` : change.toFixed(2);
+  }
+  if (attrKey) {
+    return change > 0 ? `+${change}` : String(change);
+  }
+  return describeTrainingChange(change).text;
 }
 
 function showAttributeTooltip(event) {
-  const cell = event.target;
+  const cell = event.currentTarget || event.target;
   const changeText = cell.getAttribute('data-tooltip');
   if (!changeText) return;
   
@@ -1227,15 +1219,17 @@ function showAttributeTooltip(event) {
     tooltip.className = 'attribute-tooltip';
     document.body.appendChild(tooltip);
   }
-  
-  // Determine color based on change value
-  const change = parseInt(changeText.replace('+', ''), 10);
-  if (change > 0) {
-    tooltip.className = 'attribute-tooltip attribute-tooltip-positive';
-  } else if (change < 0) {
-    tooltip.className = 'attribute-tooltip attribute-tooltip-negative';
+
+  const tone = cell.getAttribute('data-tooltip-class') || '';
+  tooltip.className = 'attribute-tooltip';
+  if (tone.includes('change-elite')) {
+    tooltip.classList.add('attribute-tooltip-elite');
+  } else if (tone.includes('change-positive')) {
+    tooltip.classList.add('attribute-tooltip-positive');
+  } else if (tone.includes('change-negative')) {
+    tooltip.classList.add('attribute-tooltip-negative');
   } else {
-    tooltip.className = 'attribute-tooltip attribute-tooltip-zero';
+    tooltip.classList.add('attribute-tooltip-zero');
   }
   
   tooltip.textContent = changeText;
@@ -1254,7 +1248,7 @@ function positionAttributeTooltip(event) {
   const tooltip = document.getElementById('attribute-tooltip');
   if (!tooltip || tooltip.style.display === 'none') return;
   
-  const cell = event.target;
+  const cell = event.currentTarget || event.target;
   const rect = cell.getBoundingClientRect();
   
   // Position tooltip above the cell
@@ -1265,22 +1259,10 @@ function positionAttributeTooltip(event) {
 
 function createChangeCell(change) {
   const td = document.createElement('td');
-  const exceptionalThreshold = getExceptionalGainThreshold();
-  
-  if (change >= exceptionalThreshold) {
-    td.textContent = `+${change}`;
-    td.className = 'change-gold';
-  } else if (change > 0) {
-    td.textContent = `+${change}`;
-    td.className = 'change-positive';
-  } else if (change < 0) {
-    td.textContent = change.toString();
-    td.className = 'change-negative';
-  } else {
-    td.textContent = '0';
-    td.className = 'change-zero';
-  }
-  
+  const arrow = describeTrainingChange(change);
+  td.textContent = arrow.text;
+  td.className = arrow.className;
+  td.setAttribute('aria-label', `Training change ${change > 0 ? '+' : ''}${change}`);
   return td;
 }
 

@@ -83,8 +83,9 @@ function renderProjectedStartingFive(rows, containerOrOpts) {
       r.weight != null && r.weight !== '' ? String(r.weight) : '—',
     ];
     SCOUTING_PROJECTED_ATTR_COLS.forEach((k) => {
-      const av = r.attributes && r.attributes[k] != null ? r.attributes[k] : '—';
-      cells.push(String(av));
+      const raw = r.attributes && r.attributes[k] != null ? Number(r.attributes[k]) : NaN;
+      // Display scale 0–10 (team-page parity): floor(raw / 10).
+      cells.push(Number.isFinite(raw) ? String(Math.floor(raw / 10)) : '—');
     });
     cells.push(typeof formatRtDisplay === 'function' ? formatRtDisplay(r.rt) : (r.rt != null ? String(r.rt) : '—'));
     cells.forEach((text) => {

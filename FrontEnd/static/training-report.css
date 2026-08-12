@@ -262,6 +262,10 @@ input[type="reset"] {
   color: var(--color-text);
 }
 
+.attribute-tooltip-elite {
+  color: #4A90D9;
+}
+
 /* Momentum pill in table */
 .momentum-pill-container {
   min-width: 80px;
@@ -1432,11 +1436,13 @@ body.training-report-page .change-zero {
 body.training-report-page .change-positive {
   color: #34EC27;
   font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 body.training-report-page .change-negative {
   color: #ff6d6d;
   font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 body.training-report-page .change-gold {
@@ -1444,26 +1450,45 @@ body.training-report-page .change-gold {
   font-weight: 700;
 }
 
+/* Triple-up training change — same blue as A / A+ / A++ RT */
+body.training-report-page .change-elite {
+  color: #4A90D9;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
 body.training-report-page .players-table td.change-zero {
   color: #9e9d9d;
   font-family: 'Inter', sans-serif;
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 500;
+  text-align: center;
 }
 
 body.training-report-page .players-table td.change-positive {
   color: #34EC27;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
 }
 
 body.training-report-page .players-table td.change-negative {
   color: #ff6d6d;
   font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
 }
 
 body.training-report-page .players-table td.change-gold {
   color: #F5C518;
   font-weight: 700;
+}
+
+body.training-report-page .players-table td.change-elite {
+  color: #4A90D9;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
 }
 
 body.training-report-page .attr-pill {
