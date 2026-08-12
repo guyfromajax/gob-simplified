@@ -619,6 +619,16 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
 - **Play identity in notes:** notes that reference offensive plays display the play **`name`** (user-facing string); any underlying matching/ranking may use `play_id`, but note text stays display-name based. Notes are a reporting/output layer, not a persistence-identity layer. (`training_notes.py` keys `plays_data` by name.)
 - **Placeholder:** If no notes are generated, displays "No training notes for this session." in italic gray text
 - Same horizontal width as Player Report and Team Report sections
+
+**Player award selection — MVP / PPotW and the regression award** (`training_notes.py`, 2026-08 retune)
+
+Each player's **cumulative delta** = sum over the trainable attributes (all except CH/EM/MO/NG) of `anchor_now − anchor_baseline` for the session.
+
+- **Year normalization (symmetric).** Younger players swing wider *both ways* by construction — `training_execution_v2` gives a year-max **gain** bump (FR +5 … SR +1) and a deeper year **decay** (FR/SO vs JR/SR). So a raw ranking just surfaces the youngest player every week. Each delta is divided by a **`YEAR_SWING_FACTOR`** — `FR 1.5 / SO 1.25 / JR 1.1 / SR 1.0` (unknown year → 1.0) — before ranking. This replaces the old up-only 0.7/0.9 discount; the factor now applies to the **loss** award too (the fix — it was raw before), so a senior who regressed a little can outrank a freshman who regressed a lot.
+- **Gates (the only cutoffs):** the top award qualifies on **cumulative gain > 0**, the loss award on **cumulative gain < 0**. Sign is preserved by the divide, so normalization changes the *ranking*, not who qualifies.
+- **In-season:** `Practice Player Of The Week` = highest normalized gain (> 0); `Biggest Regression` = lowest normalized delta (< 0). Ties → co-winners.
+- **Training camp (week 1):** decay is skipped, so nobody truly regresses (`< 0` would be permanently empty). `Training Camp MVP` = highest normalized gain (> 0). **`Biggest Concern`** instead flags the year-normalized **laggard** — the lowest developer, but only if he landed below **`CAMP_CONCERN_MEDIAN_FRACTION` (0.5) × the squad's median normalized gain** (a player the camp's focus/position-fit didn't help). Even-development camps → "None". The threshold is **relative on purpose** so it self-scales with `CAMP_GAIN_SCALE` and needs no calibrated constant.
+- **Walk-ons need no special term:** they swing by their *year* (the model is year+allocation based, not tier based). In-season they sit on the Training Squad — excluded from this pool, with their own report — and at camp they're evaluated by year like everyone else.
 - Dynamic height: Expands automatically with content
 - No internal scrolling: All text is always visible
 

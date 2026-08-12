@@ -7,6 +7,7 @@ conditioning/scrimmage strings from apply_training_points.
 
 from __future__ import annotations
 
+import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
 # Training draws from a DEDICATED stream, not the global module: pymongo consumes
@@ -73,14 +74,28 @@ def _team_attr_delta_sums(players: List[dict], baselines_by_id: Dict[Any, Dict[s
     return sums
 
 
-def _mvp_discounted_total(player: Dict, baselines_by_id: Dict[Any, Dict[str, int]]) -> float:
+# Younger players swing wider BOTH ways by construction: training_execution_v2 gives a
+# year-max GAIN bump (FR +5 … SR +1) and a deeper year DECAY (FR/SO vs JR/SR). Normalise
+# each player's cumulative delta by that year factor so the awards surface a genuinely
+# notable week — not simply the youngest player, who tops both raw gain and raw loss most
+# weeks. Applied SYMMETRICALLY to the gainer (PPotW / Camp MVP) and the loser (Biggest
+# Regression / Concern); the old handicap discounted only the up side. Factors ≈ the
+# year-max gain ratios; unknown year → 1.0 (no normalisation).
+YEAR_SWING_FACTOR = {"freshman": 1.5, "sophomore": 1.25, "junior": 1.1, "senior": 1.0}
+
+# Camp skips the pre-training decay, so no one truly regresses at camp — a `< 0` gate
+# would leave "Biggest Concern" permanently empty. Instead flag the year-normalized
+# LAGGARD: the lowest developer, but only if he landed below this fraction of the squad's
+# MEDIAN normalized gain (a player the camp's focus/position-fit didn't help). Relative on
+# purpose — self-scales with whatever the camp produces, so no scale-calibrated constant to
+# drift when CAMP_GAIN_SCALE or the attribute recal moves the magnitudes.
+CAMP_CONCERN_MEDIAN_FRACTION = 0.5
+
+
+def _year_normalized_total(player: Dict, baselines_by_id: Dict[Any, Dict[str, int]]) -> float:
     total = float(_cumulative_delta(player, baselines_by_id))
     year = str(player.get("year", "") or "").strip().lower()
-    if year == "freshman":
-        return total * 0.7
-    if year == "sophomore":
-        return total * 0.9
-    return total
+    return total / YEAR_SWING_FACTOR.get(year, 1.0)
 
 
 def _readiness_label(s: float) -> str:
@@ -212,12 +227,13 @@ def build_structured_training_report_notes(
 ) -> List[Dict[str, Any]]:
     sections: List[Dict[str, str]] = []
     players_by_name = {_player_name(p): p for p in players}
-    by_name = { _player_name(p): _cumulative_delta(p, original_player_baselines) for p in players }
-    discounted_by_name = { _player_name(p): _mvp_discounted_total(p, original_player_baselines) for p in players }
+    # Year-normalized cumulative delta, used for BOTH awards (gainer + loser). Sign is
+    # preserved (factors > 0), so the > 0 / < 0 qualification gates are unchanged.
+    normalized_by_name = { _player_name(p): _year_normalized_total(p, original_player_baselines) for p in players }
     sums = _team_attr_delta_sums(players, original_player_baselines)
 
     if is_training_camp:
-        pos = [(n, t) for n, t in discounted_by_name.items() if t > 0]
+        pos = [(n, t) for n, t in normalized_by_name.items() if t > 0]
         if pos:
             top = max(t for _, t in pos)
             names = sorted(n for n, t in pos if t == top)
@@ -226,12 +242,17 @@ def build_structured_training_report_notes(
         else:
             sections.append({"title": "Training Camp MVP", "body": NSS})
 
-        under = [(n, t) for n, t in by_name.items() if t < 10]
-        if not under:
+        norm_vals = list(normalized_by_name.values())
+        median_gain = statistics.median(norm_vals) if norm_vals else 0.0
+        concern_threshold = CAMP_CONCERN_MEDIAN_FRACTION * median_gain
+        # Only meaningful when the squad developed (median > 0); flag the laggard(s) below
+        # the relative threshold. Even-development camp → nobody qualifies → "None".
+        laggards = [(n, t) for n, t in normalized_by_name.items() if t < concern_threshold]
+        if median_gain <= 0 or not laggards:
             sections.append({"title": "Biggest Concern", "body": "None"})
         else:
-            worst = min(t for _, t in under)
-            names = sorted(n for n, t in under if t == worst)
+            worst = min(t for _, t in laggards)
+            names = sorted(n for n, t in laggards if t == worst)
             title = "Biggest Concerns" if len(names) > 1 else "Biggest Concern"
             sections.append({"title": title, "body": ", ".join(names)})
 
@@ -243,7 +264,7 @@ def build_structured_training_report_notes(
         lo = sorted(a for a, s in sums.items() if s < 21)
         sections.append({"title": "Concerning Progression", "body": ", ".join(lo) if lo else NSS})
     else:
-        pos = [(n, t) for n, t in discounted_by_name.items() if t > 0]
+        pos = [(n, t) for n, t in normalized_by_name.items() if t > 0]
         if pos:
             top = max(t for _, t in pos)
             names = sorted(n for n, t in pos if t == top)
@@ -252,7 +273,7 @@ def build_structured_training_report_notes(
         else:
             sections.append({"title": "Practice Player Of The Week", "body": NSS})
 
-        neg = [(n, t) for n, t in by_name.items() if t < 0]
+        neg = [(n, t) for n, t in normalized_by_name.items() if t < 0]
         if not neg:
             sections.append({"title": "Biggest Regression", "body": "None"})
         else:
