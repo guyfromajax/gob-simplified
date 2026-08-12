@@ -7,9 +7,13 @@ conditioning/scrimmage strings from apply_training_points.
 
 from __future__ import annotations
 
+import statistics
 from typing import Any, Dict, List, Optional, Tuple
 
-import random
+# Training draws from a DEDICATED stream, not the global module: pymongo consumes
+# the global stream (bulk_write does, even matching zero documents), which made
+# training results depend on unrelated DB activity. See BackEnd/utils/training_random.
+from BackEnd.utils.training_random import training_rng as random
 
 from BackEnd.constants import ALL_ATTRS
 
@@ -70,14 +74,85 @@ def _team_attr_delta_sums(players: List[dict], baselines_by_id: Dict[Any, Dict[s
     return sums
 
 
-def _mvp_discounted_total(player: Dict, baselines_by_id: Dict[Any, Dict[str, int]]) -> float:
+# Team-attribute containers show at most this many attributes. A container that lists six
+# attributes reads as noise, not a finding — the point is the standouts, so the report names
+# only the most extreme few and stops.
+TEAM_ATTR_MAX_SHOWN = 2
+
+
+def _pick_standouts(candidates: Dict[str, int], *, strongest: bool) -> List[str]:
+    """At most ``TEAM_ATTR_MAX_SHOWN`` attribute names, the most extreme team-sums first.
+
+    ``strongest`` picks the highest sums; otherwise the lowest. TIES AT THE CUTOFF BREAK
+    RANDOMLY — a fixed tie-break (alphabetical, attribute order) would surface the same
+    attribute every session for a team that develops evenly, which reads as a pattern that
+    isn't there.
+
+    Draws from ``training_rng`` ONLY when a tie actually straddles the cutoff, so a session
+    with distinct sums leaves the training stream untouched.
+    """
+    items = list(candidates.items())
+    if len(items) <= TEAM_ATTR_MAX_SHOWN:
+        return sorted(a for a, _ in items)
+
+    rank = (lambda kv: -kv[1]) if strongest else (lambda kv: kv[1])
+    ordered = sorted(items, key=rank)
+    cutoff = rank(ordered[TEAM_ATTR_MAX_SHOWN - 1])
+
+    clear = [kv for kv in ordered[:TEAM_ATTR_MAX_SHOWN] if rank(kv) != cutoff]
+    tied = [kv for kv in items if rank(kv) == cutoff]
+    need = TEAM_ATTR_MAX_SHOWN - len(clear)
+    chosen = random.sample(tied, need) if len(tied) > need else tied
+    return sorted(a for a, _ in clear + chosen)
+
+
+def _team_attr_extremes(sums: Dict[str, int]) -> Tuple[List[str], List[str]]:
+    """(strong, laggard) attribute names relative to the session's own attr-sum spread:
+    strong = team-sum > mean + CUT·SD; laggard = team-sum < mean − CUT·SD (population SD over
+    the 12 attr-sums). Even development (SD ≈ 0) → both empty. Self-scaling, so no
+    magnitude-calibrated threshold is needed across camp vs in-season.
+
+    Each list is capped at ``TEAM_ATTR_MAX_SHOWN`` — see ``_pick_standouts``.
+    """
+    vals = list(sums.values())
+    if not vals:
+        return [], []
+    mean = statistics.mean(vals)
+    cut = TEAM_ATTR_STDEV_CUT * statistics.pstdev(vals)
+    strong = _pick_standouts({a: s for a, s in sums.items() if s > mean + cut}, strongest=True)
+    laggard = _pick_standouts({a: s for a, s in sums.items() if s < mean - cut}, strongest=False)
+    return strong, laggard
+
+
+# Younger players swing wider BOTH ways by construction: training_execution_v2 gives a
+# year-max GAIN bump (FR +5 … SR +1) and a deeper year DECAY (FR/SO vs JR/SR). Normalise
+# each player's cumulative delta by that year factor so the awards surface a genuinely
+# notable week — not simply the youngest player, who tops both raw gain and raw loss most
+# weeks. Applied SYMMETRICALLY to the gainer (PPotW / Camp MVP) and the loser (Biggest
+# Regression / Concern); the old handicap discounted only the up side. Factors ≈ the
+# year-max gain ratios; unknown year → 1.0 (no normalisation).
+YEAR_SWING_FACTOR = {"freshman": 1.5, "sophomore": 1.25, "junior": 1.1, "senior": 1.0}
+
+# Camp skips the pre-training decay, so no one truly regresses at camp — a `< 0` gate
+# would leave "Biggest Concern" permanently empty. Instead flag the year-normalized
+# LAGGARD: the lowest developer, but only if he landed below this fraction of the squad's
+# MEDIAN normalized gain (a player the camp's focus/position-fit didn't help). Relative on
+# purpose — self-scales with whatever the camp produces, so no scale-calibrated constant to
+# drift when CAMP_GAIN_SCALE or the attribute recal moves the magnitudes.
+CAMP_CONCERN_MEDIAN_FRACTION = 0.5
+
+# Team attribute containers (Strong Cumulative Increase / Concerning Progression) flag the
+# per-attribute team-sums that stand out from the pack THIS session — beyond ±this many
+# standard deviations of the 12 attr-sums. Relative on purpose (like the player awards): it
+# self-scales across camp (CAMP_GAIN_SCALE) and in-season (IN_SEASON_GAIN_SCALE) magnitudes,
+# and an evenly-developed team (SD ≈ 0) flags nothing.
+TEAM_ATTR_STDEV_CUT = 1.0
+
+
+def _year_normalized_total(player: Dict, baselines_by_id: Dict[Any, Dict[str, int]]) -> float:
     total = float(_cumulative_delta(player, baselines_by_id))
     year = str(player.get("year", "") or "").strip().lower()
-    if year == "freshman":
-        return total * 0.7
-    if year == "sophomore":
-        return total * 0.9
-    return total
+    return total / YEAR_SWING_FACTOR.get(year, 1.0)
 
 
 def _readiness_label(s: float) -> str:
@@ -209,12 +284,13 @@ def build_structured_training_report_notes(
 ) -> List[Dict[str, Any]]:
     sections: List[Dict[str, str]] = []
     players_by_name = {_player_name(p): p for p in players}
-    by_name = { _player_name(p): _cumulative_delta(p, original_player_baselines) for p in players }
-    discounted_by_name = { _player_name(p): _mvp_discounted_total(p, original_player_baselines) for p in players }
+    # Year-normalized cumulative delta, used for BOTH awards (gainer + loser). Sign is
+    # preserved (factors > 0), so the > 0 / < 0 qualification gates are unchanged.
+    normalized_by_name = { _player_name(p): _year_normalized_total(p, original_player_baselines) for p in players }
     sums = _team_attr_delta_sums(players, original_player_baselines)
 
     if is_training_camp:
-        pos = [(n, t) for n, t in discounted_by_name.items() if t > 0]
+        pos = [(n, t) for n, t in normalized_by_name.items() if t > 0]
         if pos:
             top = max(t for _, t in pos)
             names = sorted(n for n, t in pos if t == top)
@@ -223,24 +299,29 @@ def build_structured_training_report_notes(
         else:
             sections.append({"title": "Training Camp MVP", "body": NSS})
 
-        under = [(n, t) for n, t in by_name.items() if t < 10]
-        if not under:
+        norm_vals = list(normalized_by_name.values())
+        median_gain = statistics.median(norm_vals) if norm_vals else 0.0
+        concern_threshold = CAMP_CONCERN_MEDIAN_FRACTION * median_gain
+        # Only meaningful when the squad developed (median > 0); flag the laggard(s) below
+        # the relative threshold. Even-development camp → nobody qualifies → "None".
+        laggards = [(n, t) for n, t in normalized_by_name.items() if t < concern_threshold]
+        if median_gain <= 0 or not laggards:
             sections.append({"title": "Biggest Concern", "body": "None"})
         else:
-            worst = min(t for _, t in under)
-            names = sorted(n for n, t in under if t == worst)
+            worst = min(t for _, t in laggards)
+            names = sorted(n for n, t in laggards if t == worst)
             title = "Biggest Concerns" if len(names) > 1 else "Biggest Concern"
             sections.append({"title": title, "body": ", ".join(names)})
 
         sections.append(_locker_room_note(players))
 
-        hi = sorted(a for a, s in sums.items() if s > 49)
-        sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(hi) if hi else NSS})
-
-        lo = sorted(a for a, s in sums.items() if s < 21)
-        sections.append({"title": "Concerning Progression", "body": ", ".join(lo) if lo else NSS})
+        strong, laggard = _team_attr_extremes(sums)
+        sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(strong) if strong else NSS})
+        # Camp skips decay → attributes PROGRESS (some more than others); flag the laggards
+        # (< mean − 1 SD), the attrs the camp under-developed. Even development → NSS.
+        sections.append({"title": "Concerning Progression", "body": ", ".join(laggard) if laggard else NSS})
     else:
-        pos = [(n, t) for n, t in discounted_by_name.items() if t > 0]
+        pos = [(n, t) for n, t in normalized_by_name.items() if t > 0]
         if pos:
             top = max(t for _, t in pos)
             names = sorted(n for n, t in pos if t == top)
@@ -249,7 +330,7 @@ def build_structured_training_report_notes(
         else:
             sections.append({"title": "Practice Player Of The Week", "body": NSS})
 
-        neg = [(n, t) for n, t in by_name.items() if t < 0]
+        neg = [(n, t) for n, t in normalized_by_name.items() if t < 0]
         if not neg:
             sections.append({"title": "Biggest Regression", "body": "None"})
         else:
@@ -259,11 +340,14 @@ def build_structured_training_report_notes(
 
         sections.append(_locker_room_note(players))
 
-        hi = sorted(a for a, s in sums.items() if s >= 10)
-        sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(hi) if hi else NSS})
-
-        lo = sorted(a for a, s in sums.items() if s <= -10)
-        sections.append({"title": "Concerning Regression", "body": ", ".join(lo) if lo else NSS})
+        strong, _laggard = _team_attr_extremes(sums)
+        sections.append({"title": "Strong Cumulative Increase", "body": ", ".join(strong) if strong else NSS})
+        # In-season decay is live → an attribute can NET decline; flag the ones the team
+        # actually lost ground in (team-sum < 0), the self-evident regression line. Capped the
+        # same way as its camp counterpart ("Concerning Progression") — same container, same
+        # UI slot, so an uncapped list here would defeat the cap on the weekly report.
+        regressed = _pick_standouts({a: s for a, s in sums.items() if s < 0}, strongest=False)
+        sections.append({"title": "Concerning Regression", "body": ", ".join(regressed) if regressed else NSS})
 
     plays_pick = _offensive_play_selection(plays_data)
     sections.append({

@@ -20,6 +20,29 @@ Specialized Handlers (execution)     ←  legacy turns
 
 **Two execution paths.** `AnimationEngine.processTurn` checks for the UESS schema **before** legacy handler routing: turns carrying `animation_steps[]` (everything except Opening Tip, Timeout, and un-migrated FB variants) render via `animationPlayback.playTurn()` and never touch the specialized handlers. The handler layer below is the legacy path, shrinking as migration proceeds (UESS backlog items 14–15). See `Animation_Routing_Reference.md` § Schema playback dispatch and `../00_General_Systems/UESS_System.md` for the schema contract.
 
+### Completion authority and the compatibility validator
+
+For schema playback, backend `advance_trigger`, step clocks, ball/player end
+state, and `end.next` are the completion contract. The frontend waits for the
+authored unit, renders it, snaps to the backend end state, and follows the
+backend-authored next/turn-stop instruction.
+
+`FrontEnd/static/js/phaser/animation/unitCompletionContract.js` is an older,
+still-live compatibility validator around hybrid/legacy animation units. It
+validates two provisional modes:
+
+- `skeleton`: final required offensive movement settled, unless an explicitly
+  shot-terminating unit ended on its shot event.
+- `dynamic_event`: the named authorizing event was received.
+
+Its `unit_id`, `advance_trigger`, `visual_settle_trigger`, and
+`failure_policy` fields drive warnings/throws and telemetry; they are not a
+second gameplay or routing authority and are not part of the canonical backend
+`AnimationStep` schema. Current imports remain in the legacy Fast Break,
+turn-animation, shot, free-throw, AnimationEngine, and turn-batch handlers.
+Retire this compatibility layer unit by unit as those callers become strictly
+schema-rendered; remaining work is tracked in `UESS_Backlog.md`.
+
 ## Core Components
 
 ### 1. AnimationRouter
@@ -162,7 +185,7 @@ Pre-refactor, backend computed `step_clock_seconds[]` from pace constants × gri
 - **Home team on offense:** Use backend positions as-is. Both teams set up on the home side.
 - **Away team on offense:** Backend-authored templates are mirrored with `x_away = 100 - x_home`, with `y` unchanged, before payload emission.
 
-Backend-authoritative gameplay payloads send final display-oriented coordinates. Reusable templates such as HCO string spots may remain home-authored internally, but the backend mirrors them with `x_away = 100 - x_home` before emission when the away team is attacking. Final Turn follows this contract. The frontend converts grid coordinates to pixels and must not infer orientation or mirror gameplay coordinates. Remaining legacy-path migrations are tracked in `../projects/sunset_coords_flipping.md`.
+Backend-authoritative gameplay payloads send final display-oriented coordinates. Reusable templates such as HCO string spots may remain home-authored internally, but the backend mirrors them with `x_away = 100 - x_home` before emission when the away team is attacking. Final Turn follows this contract. The frontend converts grid coordinates to pixels and must not infer orientation or mirror gameplay coordinates. Remaining compatibility-path exceptions are tracked in [`UESS_Backlog.md`](../projects/UESS_Backlog.md) under coordinate-orientation cleanup.
 
 ## Universal Court Clamp Policy
 

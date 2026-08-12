@@ -14,6 +14,18 @@ function canonicalTeamName(name) {
 }
 
 function resolvePrimaryColor(teamObj, fallback = '#1a1a2e') {
+  // Prefer total chrome snapshot — never summary/player-stamped core palette alone.
+  if (typeof lookupTeamChrome === 'function' && teamObj) {
+    const chrome = lookupTeamChrome(
+      teamObj.name || teamObj.team_name || teamObj.display_name || teamObj.team_id,
+      {
+        label: teamObj.display_name || teamObj.name,
+        primary_color: teamObj?.colors?.primary_color || teamObj?.primary_color,
+        secondary_color: teamObj?.colors?.secondary_color || teamObj?.secondary_color,
+      }
+    );
+    if (chrome?.primary_color) return chrome.primary_color;
+  }
   return teamObj?.colors?.primary_color || teamObj?.primary_color || fallback;
 }
 
@@ -24,12 +36,28 @@ function getTeamContext(gameData, scoreOverride = null) {
   const homeTeamObj = homeTeamId && teamsObj[homeTeamId] ? teamsObj[homeTeamId] : (gameData?.home_team || {});
   const awayTeamObj = awayTeamId && teamsObj[awayTeamId] ? teamsObj[awayTeamId] : (gameData?.away_team || {});
 
-  const homeTeamName = homeTeamObj?.name || gameData?.home_team?.name || 'Home Team';
-  const awayTeamName = awayTeamObj?.name || gameData?.away_team?.name || 'Away Team';
+  // Identity for score{} / box_score key matching (core). Not exposed as potg.teamName.
+  const homeCore =
+    homeTeamObj?.name || gameData?.home_team?.name || 'Home Team';
+  const awayCore =
+    awayTeamObj?.name || gameData?.away_team?.name || 'Away Team';
+  // potg.teamName is display-only — snapshot / display_name || name.
+  let homeTeamName =
+    homeTeamObj?.display_name ||
+    gameData?.home_team?.display_name ||
+    homeCore;
+  let awayTeamName =
+    awayTeamObj?.display_name ||
+    gameData?.away_team?.display_name ||
+    awayCore;
+  if (typeof lookupTeamChrome === 'function') {
+    homeTeamName = lookupTeamChrome(homeCore, { label: homeTeamName }).label || homeTeamName;
+    awayTeamName = lookupTeamChrome(awayCore, { label: awayTeamName }).label || awayTeamName;
+  }
 
   const scoreSource = scoreOverride || gameData?.score || {};
-  const homeScore = toNumber(scoreSource[homeTeamName] ?? homeTeamObj?.score ?? 0);
-  const awayScore = toNumber(scoreSource[awayTeamName] ?? awayTeamObj?.score ?? 0);
+  const homeScore = toNumber(scoreSource[homeCore] ?? homeTeamObj?.score ?? 0);
+  const awayScore = toNumber(scoreSource[awayCore] ?? awayTeamObj?.score ?? 0);
 
   let winningTeam = null;
   if (homeScore > awayScore) winningTeam = 'home';
@@ -40,6 +68,8 @@ function getTeamContext(gameData, scoreOverride = null) {
     awayTeamId,
     homeTeamName,
     awayTeamName,
+    homeCore,
+    awayCore,
     homeScore,
     awayScore,
     winningTeam,
@@ -49,16 +79,23 @@ function getTeamContext(gameData, scoreOverride = null) {
 }
 
 function inferTeamFromBoxScoreKey(key, teamCtx) {
+  // Match team_id and core score keys; also accept display labels if present as keys.
   const homeNames = new Set([
     teamCtx.homeTeamId,
+    teamCtx.homeCore,
     teamCtx.homeTeamName,
+    canonicalTeamName(teamCtx.homeCore),
     canonicalTeamName(teamCtx.homeTeamName),
+    normalizeTeamName(teamCtx.homeCore),
     normalizeTeamName(teamCtx.homeTeamName),
   ].filter(Boolean));
   const awayNames = new Set([
     teamCtx.awayTeamId,
+    teamCtx.awayCore,
     teamCtx.awayTeamName,
+    canonicalTeamName(teamCtx.awayCore),
     canonicalTeamName(teamCtx.awayTeamName),
+    normalizeTeamName(teamCtx.awayCore),
     normalizeTeamName(teamCtx.awayTeamName),
   ].filter(Boolean));
 

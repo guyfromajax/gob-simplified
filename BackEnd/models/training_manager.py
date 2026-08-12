@@ -1,6 +1,9 @@
 from enum import Enum
 from typing import List, Dict
-import random
+# Training draws from a DEDICATED stream, not the global module: pymongo consumes
+# the global stream (bulk_write does, even matching zero documents), which made
+# training results depend on unrelated DB activity. See BackEnd/utils/training_random.
+from BackEnd.utils.training_random import training_rng as random
 from pymongo.collection import Collection
 from BackEnd.db import players_collection, teams_collection, training_log_collection  # adjust if needed
 from datetime import datetime

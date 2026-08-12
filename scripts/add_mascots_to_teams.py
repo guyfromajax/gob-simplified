@@ -2,33 +2,14 @@
 Add mascot field to the universal teams collection in both gob and gob-staging.
 Run from repo root: python3 scripts/add_mascots_to_teams.py
 """
-import os
+import argparse
 import sys
+from pathlib import Path
 
 # Project root and env loading (same pattern as migrate_to_ftd.py)
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
-
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 # Mascot mapping (team name -> mascot)
 MASCOTS = {
@@ -43,13 +24,14 @@ MASCOTS = {
 }
 
 
-def add_mascots_to_collection(teams_collection, db_label: str):
+def add_mascots_to_collection(teams_collection, db_label: str, *, apply: bool):
     """Add mascot field to teams in the given teams collection."""
     for team_name, mascot in MASCOTS.items():
-        result = teams_collection.update_one(
-            {"name": team_name},
-            {"$set": {"mascot": mascot}},
-        )
+        existing = teams_collection.find_one({"name": team_name}, {"mascot": 1})
+        if not apply:
+            print(f"  [{db_label}] would set mascot '{mascot}' for {team_name}" if existing else f"  [{db_label}] team '{team_name}' not found")
+            continue
+        result = teams_collection.update_one({"name": team_name}, {"$set": {"mascot": mascot}})
         if result.modified_count > 0:
             print(f"  [{db_label}] ✅ Set mascot '{mascot}' for {team_name}")
         elif result.matched_count > 0:
@@ -59,16 +41,15 @@ def add_mascots_to_collection(teams_collection, db_label: str):
 
 
 def main():
-    if not client:
-        print("❌ MongoDB client not available (MONGO_URI not set or connection failed).")
-        return
-    for db_name in ["gob", "gob-staging"]:
-        print(f"\n📂 Database: {db_name}")
-        teams = client[db_name]["teams"]
-        add_mascots_to_collection(teams, db_name)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=args.apply)
+    add_mascots_to_collection(connection.database["teams"], args.db, apply=args.apply)
+    connection.close()
     print("\n✅ Done.")
 
 
 if __name__ == "__main__":
     main()
-

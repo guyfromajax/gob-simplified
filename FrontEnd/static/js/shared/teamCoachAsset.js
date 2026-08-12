@@ -20,6 +20,9 @@ const TEAM_COACH_ABBR = {
 const GENERIC_SAMMY = '/images/sammy_tutorial.png';
 
 export function getTeamSammyImage(teamName) {
+  if (typeof getTeamCoachAssetPath === 'function') {
+    return getTeamCoachAssetPath(teamName, 'Sammy') || GENERIC_SAMMY;
+  }
   if (!teamName) return GENERIC_SAMMY;
   const abbr = TEAM_COACH_ABBR[teamName];
   if (!abbr) return GENERIC_SAMMY;

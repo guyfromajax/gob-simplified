@@ -31,9 +31,12 @@ def test_select_pass_receiver_allows_backcourt_outlet_after_half_court():
     off_coords = {
         "PG": {"x": 55, "y": 25},
         "SG": {"x": 45, "y": 25},
-        "SF": {"x": 60, "y": 20},
-        "PF": {"x": 58, "y": 30},
-        "C": {"x": 62, "y": 25},
+        # Keep the illegal backcourt option among the two nearest receivers;
+        # selection is nearest-two by design, then over-and-back is classified
+        # after the pass completes.
+        "SF": {"x": 72, "y": 20},
+        "PF": {"x": 75, "y": 30},
+        "C": {"x": 80, "y": 25},
     }
     picks = {
         _select_pass_receiver("PG", off_coords, is_away_offense=False)

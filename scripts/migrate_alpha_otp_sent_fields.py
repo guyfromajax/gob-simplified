@@ -17,17 +17,7 @@ from datetime import datetime, timezone
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-try:
-    from dotenv import load_dotenv
-
-    if os.path.exists(".env.local"):
-        load_dotenv(".env.local")
-    else:
-        load_dotenv()
-except ImportError:
-    pass
-
-from pymongo import MongoClient
+from scripts.db_migration_cli import connect_migration_target
 
 DB_NAME_STAGING = "gob-staging"
 DB_NAME_PRODUCTION = "gob"
@@ -54,17 +44,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     db_name = DB_NAME_STAGING if args.db == "staging" else DB_NAME_PRODUCTION
-    if args.apply and args.db == "production" and not args.confirm_production_write:
-        print("Refusing production write without --confirm-production-write")
-        return 1
-
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set")
-        return 1
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    collection = client[db_name][COLLECTION]
+    connection = connect_migration_target(args.db, write=args.apply)
+    collection = connection.database[COLLECTION]
 
     missing_sent = collection.count_documents({"sent": {"$exists": False}})
     missing_sent_to = collection.count_documents({"sent_to_email": {"$exists": False}})

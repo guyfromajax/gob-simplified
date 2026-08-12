@@ -2,479 +2,309 @@
 
 **Status:** Proposed work plan; implementation not started  
 **Created:** July 24, 2026  
+**Last reviewed against code:** August 2, 2026
 **Scope:** Backend gameplay turn transitions and their frontend contract  
-**Primary context:** [`../06_Gameplay_Systems/Turn_by_Turn_System.md`](../06_Gameplay_Systems/Turn_by_Turn_System.md)  
+**Canonical turn vocabulary:** [`../06_Gameplay_Systems/Turn_by_Turn_System.md`](../06_Gameplay_Systems/Turn_by_Turn_System.md)
+
 **Related systems:**
 
 - [`../06_Gameplay_Systems/Possession_Mgmt_System.md`](../06_Gameplay_Systems/Possession_Mgmt_System.md)
-- [`../05_UESS_System/UESS_System.md`](../05_UESS_System/UESS_System.md)
 - [`../06_Gameplay_Systems/Rebound_System.md`](../06_Gameplay_Systems/Rebound_System.md)
+- [`../05_UESS_System/UESS_System.md`](../05_UESS_System/UESS_System.md)
 - [`Sim_Perf_Capstone.md`](Sim_Perf_Capstone.md)
-- [`Unified_Animation_System.md`](Unified_Animation_System.md)
 
 ---
 
-## 1. Purpose
+## 1. Objective
 
-Centralize the contract that moves the game from one turn to the next without
-rewriting the basketball resolution systems.
+Create one contract that moves the game from a resolved outcome to the next
+turn, without rewriting or retuning basketball resolution.
 
-The current engine generally transitions correctly, but transition authority is
-distributed across outcome handlers, `TurnManager`, `GameManager`, rebound and
-Fast Break integrations, free-throw handling, EOQ utilities, and several
-post-resolution repair blocks. New gameplay features can resolve their immediate
-outcome correctly while omitting one of the downstream requirements:
+Today, outcome handlers generally transition correctly, but they collectively
+coordinate several downstream responsibilities:
 
-- update the backend routing state;
-- publish the matching `next_play_type` / `next_turn`;
-- flip possession at the correct moment;
-- synthesize a DREB, OREB, BIP, SIP, FT, or timeout turn;
-- preserve the offense identity of the turn that just animated;
-- prepare HCO entry/handoff state;
-- terminate a quarter without creating an extra inbound;
-- maintain UESS ball and coordinate ownership.
+- set `game_state["offensive_state"]`;
+- publish `next_play_type` and `next_turn`;
+- flip possession at the correct point;
+- create DREB, OREB, BIP, SIP, free-throw, and timeout turns;
+- preserve the completed turn's offense identity for animation;
+- prepare pressure or HCO entry state;
+- suppress extra turns at the end of a period.
 
-The objective is a single transition-planning contract and a single transition
-execution boundary, introduced incrementally while preserving today's working
-behavior.
+The target is a pure transition planner followed by one transition execution
+boundary. Migration must be incremental and preserve existing runtime behavior.
 
 ---
 
-## 2. Audit Summary
+## 2. Verified Current State
 
-### 2.1 Existing strengths
+### What already works
 
-- `GameManager._append_turn()` is a successful universal funnel for appending
-  turns, stamping common state, checking foul-outs, and syncing coordinates.
-- `GameManager.switch_possession()` is the single primitive that swaps offense
-  and defense.
-- Backend `offense_team_id` is the frontend's possession authority.
-- Frontend `handleTurnTransition()` assigns the backend-provided offense rather
-  than independently calculating possession.
-- The engine already has a transition registry, validator, and event detector
-  that can be modernized rather than starting from nothing.
+- `GameManager._append_turn()` is the universal append and coordinate-sync
+  funnel. Centralization must continue to use it.
+- `GameManager.switch_possession()` is the possession-swap primitive.
+- Backend `offense_team_id` is authoritative for the frontend.
+- Frontend `handleTurnTransition()` consumes backend possession rather than
+  independently calculating gameplay routing.
+- Existing inbound, rebound, free-throw, timeout, and pressure builders can be
+  reused by a centralized executor.
 
-### 2.2 Fragmentation found
+### What remains fragmented
 
-A static audit found:
+Three overlapping representations remain:
 
-- 111 assignments to `game_state["offensive_state"]`;
-- 54 direct subscript assignments to `result["next_play_type"]`, plus many
-  result-dictionary constructions;
-- six active `switch_possession()` calls within `simulate_macro_turn()`;
-- transition writes spread across `phase_resolution.py`, `shot_manager.py`,
-  `turn_manager.py`, `game_manager.py`, pressure-shot modules, Fast Break
-  integrations, rebound handling, and EOQ handling.
+1. `game_state["offensive_state"]` controls the next backend route.
+2. `result["next_play_type"]` publishes the handler-selected route.
+3. `result["next_turn"]` is normalized later by
+   `GameManager.determine_next_turn()`.
 
-Three overlapping representations currently exist:
+`determine_next_turn()` is not the transition authority: for most gameplay
+results it accepts a handler's existing `next_play_type`. It does not itself
+apply `offensive_state`, flip possession, or coordinate synthetic turns.
 
-1. `game_state["offensive_state"]` — actual backend routing authority;
-2. `result["next_play_type"]` — public/informational route;
-3. `result["next_turn"]` — post-resolution normalization.
+Transition writes and repair logic remain distributed across outcome handlers,
+`TurnManager`, `GameManager`, rebound loops, Fast Break and pressure paths,
+free-throw handling, and EOQ utilities.
 
-`TurnManager.run_micro_turn()` explicitly treats handlers as the source of truth
-for `offensive_state`, while `GameManager.determine_next_turn()` is described as
-centralized SS&S. In practice, `determine_next_turn()` normally accepts the
-handler's `next_play_type`, does not apply `offensive_state`, does not execute a
-possession change, and only runs for the main result and batched OREB results.
+### Registry status
 
-### 2.3 Existing registry drift
+`BackEnd/utils/transition_registry.py` is descriptive and non-authoritative. It
+does not yet match the canonical runtime model:
 
-`BackEnd/utils/transition_registry.py` and its validator are not production
-authorities and no longer match the canonical turn model:
-
-- discrete `DREB` is omitted and still described as embedded;
-- `TIMEOUT` is omitted;
-- inbound enum names differ from canonical backend names;
+- discrete `DREB` and `TIMEOUT` are absent;
+- inbound enum names differ from canonical turn names;
+- events are free-form strings rather than stable codes;
 - production routing does not consult the registry;
-- warning output is disabled;
-- validation often lacks enough source-state information and passes;
-- possession flags may already be cleared before validation runs.
+- event-validation warnings are disabled and source context can be incomplete.
 
-The registry should not be made authoritative until it is rebuilt from current
-runtime behavior and verified against all special paths.
+Do not make the registry authoritative until it is rebuilt from verified
+runtime behavior and parity-tested.
+
+### Immediate `offensive_state` guardrail
+
+Before the full planner/executor migration, add a small defense-in-depth check
+for the current handler-owned contract. `offensive_state` is the canonical next
+resolver (`HCO`, `HCT`, `FCP`, `FAST_BREAK`, or `FREE_THROW`);
+`next_play_type` remains informational. `OREB`, `DREB`, and inbound turns are
+coordinated through their existing synthetic-turn and `pending_*` payloads, not
+by adding new `offensive_state` values.
+
+The guard must detect whether a handler explicitly published its next routing
+state, not merely whether the value changed—a valid HCO → HCO transition can
+write the same value. Start with a diagnostic assertion/log in test or debug
+profiles, then cover every legitimate same-state and `pending_*` exception
+before considering production enforcement.
+
+This guardrail addresses two May 2026 After-Steal incidents where MAKE-no-foul
+and MISS-no-foul exits left `offensive_state="FAST_BREAK"`, producing a repeating
+BIP/FB route. The resolver fixes shipped, but the informal contract remains easy
+for a new exit path to violate. Existing `transition_validator.py` does not close
+this gap: it validates the resulting state when enough context exists, does not
+prove the handler wrote it, and its invalid-transition warning in `GameManager`
+is currently disabled.
+
+Do not introduce the full `TransitionPlan` merely to obtain this guardrail. It
+is a bounded precursor to the phased centralization below.
 
 ---
 
-## 3. Architectural Target
-
-Use four explicit layers:
+## 3. Target Architecture
 
 ```text
 Outcome resolver
-    |
-    | basketball facts only
-    v
+    -> normalized basketball facts
 Transition planner
-    |
-    | immutable TransitionPlan
-    v
+    -> immutable TransitionPlan
 Transition executor
-    |
-    | state mutation + synthetic transition turns
-    v
-Universal append funnel
+    -> state mutation and synthetic-turn instructions
+GameManager._append_turn()
+    -> universal append and coordinate sync
 ```
 
-### 3.1 Outcome resolver
+### Outcome resolvers
 
-Existing gameplay resolvers continue to decide basketball facts:
+Existing resolvers continue to decide basketball facts: outcome, rebound type,
+foul and free-throw awards, pressure choice, timeout request, and terminal-clock
+facts. They should eventually stop coordinating the full downstream route.
 
-- make, miss, block;
-- rebound winner and type;
-- foul classification and awarded free throws;
-- steal, dead ball, charge, defensive stop;
-- pressure choice;
-- timeout request;
-- final-turn and EOQ facts.
+### Transition planner
 
-Resolvers should eventually stop coordinating the full downstream transition.
+The planner converts normalized facts into a plan. It must:
 
-### 3.2 Transition planner
-
-A pure, deterministic function converts the source turn plus game-state facts
-into a transition plan. It must:
-
-- perform no database access;
-- perform no RNG draws;
-- perform no animation build;
+- be pure and deterministic;
+- perform no RNG draws, database access, or animation construction;
 - mutate neither the result nor game state;
-- use bounded O(1) field checks;
-- be callable in tests and temporary shadow-parity mode.
+- use bounded field checks suitable for the simulation hot path;
+- support tests and temporary shadow-parity comparison.
 
-### 3.3 Transition executor
+### Transition executor
 
-The executor applies one plan and is the sole eventual authority for:
+The executor is the eventual sole authority for:
 
-- setting `game_state["offensive_state"]`;
-- publishing `next_play_type` and `next_turn`;
-- calling `switch_possession()`;
-- clearing/consuming `possession_flips`;
-- deciding which synthetic transition turn is required;
-- preparing HCO-entry state;
-- respecting terminal quarter boundaries.
+- `offensive_state`, `next_play_type`, and `next_turn`;
+- possession changes and flip timing;
+- synthetic-turn selection and sequencing;
+- pressure/HCO-entry preparation;
+- terminal-period suppression.
 
-It may delegate construction of turn-specific animation payloads to the
-existing BIP, SIP, DREB, OREB, FT, and timeout builders. Centralization does not
-mean one function should contain every turn's animation details.
-
-### 3.4 Append funnel
-
-All produced turns continue through `GameManager._append_turn()`. Transition
-centralization must not create a competing append path or duplicate coordinate
-sync.
+It delegates animation payload construction to existing turn-specific builders.
+All resulting turns continue through `_append_turn()`.
 
 ---
 
-## 4. Proposed TransitionPlan Contract
+## 4. Proposed Contract
 
-The exact implementation type will be aligned before coding. Conceptually, the
-plan should include:
+The exact type remains an implementation decision. The conceptual
+`TransitionPlan` needs only routing data:
 
 | Field | Purpose |
 |---|---|
 | `source_turn` | Canonical turn type that produced the outcome |
-| `source_result` | Canonical outcome/event classification |
-| `next_offensive_state` | State consumed by the next `run_micro_turn()` |
-| `next_play_type` | Public route placed on the source turn |
-| `next_turn` | Public next-row type; normally identical to `next_play_type` |
-| `possession_change` | Whether team possession changes |
-| `flip_timing` | Before synthetic turn, after current turn, already applied, or none |
-| `synthetic_turn` | None, DREB, OREB, BIP, SIP, FREE_THROW, or TIMEOUT |
+| `event_code` | Stable normalized event/reason code |
+| `next_offensive_state` | State consumed by the next micro turn |
+| `next_play_type` | Public route placed on the completed source turn |
+| `next_turn` | Public next-row type |
+| `possession_change` | Whether possession changes |
+| `flip_timing` | None, before/after a synthetic turn, or already applied |
+| `synthetic_turns` | Ordered DREB/OREB/BIP/SIP/FT/TIMEOUT instructions |
 | `pressure_setup` | None, HCO, FCP, or HCT |
-| `hco_entry_mode` | None, inbound setup, DREB outlet, FB bring-up, or other canonical mode |
-| `terminal_period` | Whether the turn terminates the quarter/period |
-| `suppress_inbound` | Prevent BIP/SIP synthesis at EOQ or while FT/timeout is pending |
-| `preserve_source_offense_id` | Keep the just-completed turn's offense identity for animation |
-| `reason` | Stable event/reason code for tests and debugging |
+| `hco_entry_mode` | Inbound, DREB outlet, FB bring-up, or another existing mode |
+| `terminal_period` | Whether this transition terminates the period |
+| `suppress_inbound` | Prevent an inbound while FT/timeout/EOQ state is pending |
+| `preserve_source_offense_id` | Preserve the completed turn's animation identity |
 
-Avoid placing player objects, full lineups, animation structures, or database
+Do not place player objects, lineups, animation structures, or database
 documents in the plan.
 
----
-
-## 5. Canonical Turn and Event Vocabulary
-
-Before implementation, align one canonical enum/value set with the live engine.
-
-### 5.1 Canonical turn types
-
-- `OPENING_TIP`
-- `HCO`
-- `FCP`
-- `HCT`
-- `FAST_BREAK`
-- `OREB`
-- `DREB`
-- `BASELINE_INBOUND`
-- `SIDE_INBOUND`
-- `FREE_THROW`
-- `TIMEOUT`
-
-Terminal outcomes such as `FINAL_HOLD` and `RUN_OUT_CLOCK` are result/event
-types, not routable next turns.
-
-### 5.2 Canonical transition events
-
-Use stable event codes rather than free-form descriptive strings. At minimum:
+Before implementation, define stable event codes for at least:
 
 - made field goal;
-- missed/blocked field goal with OREB;
-- missed/blocked field goal with DREB;
-- putback make/miss;
-- final FT make;
-- final FT miss with OREB/DREB;
-- shooting foul / and-one;
-- non-shooting defensive foul;
-- offensive foul / charge;
-- dead-ball turnover;
-- steal;
-- Fast Break defensive stop;
-- pressure break;
-- timeout;
-- foul-out interruption;
-- terminal EOQ;
-- FLSS continuation.
+- miss/block with OREB or DREB;
+- putback make/miss and OREB kickout;
+- final FT make or miss with OREB/DREB;
+- shooting foul/and-one and non-shooting defensive foul;
+- offensive foul/charge and dead-ball turnover;
+- steal, pressure break, and FB defensive stop;
+- timeout/foul-out interruption;
+- terminal EOQ and FLSS continuation.
 
-The event vocabulary must capture facts needed for planning without duplicating
-shot, foul, rebound, or pressure resolution.
+Use the canonical turn types in `Turn_by_Turn_System.md`; do not introduce a
+second vocabulary in this project.
 
 ---
 
-## 6. Migration Principles
+## 5. Required Invariants
 
-1. **Parity first.** Existing runtime behavior is the initial reference even
-   where the architecture is awkward.
-2. **No big-bang replacement.** Migrate one transition family at a time.
-3. **No basketball retuning.** Transition consolidation must not alter outcome
-   probabilities, shot selection, foul rates, rebound selection, or clock
-   consumption.
-4. **No RNG topology changes.** Planning and execution must not draw RNG or
-   reorder existing resolver draws.
-5. **No database access in the loop.** Follow `Sim_Perf_Capstone.md`.
-6. **No extra animation builds.** Reuse existing turn builders and UESS payloads.
-7. **Backend remains authoritative.** Frontend continues to consume
-   `offense_team_id` and turn payloads; it does not calculate gameplay routing.
-8. **Preserve source-turn identity.** A possession flip must not rewrite the
-   offense identity used to animate the turn that just completed.
-9. **Synthetic turns remain real turns.** DREB, OREB, BIP, SIP, FT, and timeout
-   rows continue through `_append_turn()`.
-10. **EOQ is last.** Terminal clock and FLSS paths migrate only after ordinary
-    transitions have proven parity.
-
----
-
-## 7. Phased Work Plan
-
-## Phase 0 — Freeze and inventory current behavior
-
-**Goal:** Establish a trustworthy current-state transition matrix before moving
-authority.
-
-Tasks:
-
-1. Enumerate every live transition by:
-   - source turn;
-   - result/event;
-   - rebound/foul/pressure context;
-   - possession change;
-   - synthetic turn;
-   - resulting `offensive_state`;
-   - published `next_play_type` / `next_turn`;
-   - quarter/timeout/FT exceptions.
-2. Include separate rows for:
-   - ordinary HCO;
-   - FCP and HCT;
-   - every migrated Fast Break family;
-   - OREB chains;
-   - discrete DREB;
-   - free throws;
-   - BIP/SIP;
-   - timeout and foul-out resume;
-   - EOQ/FLSS.
-3. Compare the matrix with:
-   - `Turn_by_Turn_System.md`;
-   - `Possession_Mgmt_System.md`;
-   - transition registry;
-   - current tests.
-4. Mark documentation or registry entries that are stale; do not silently
-   reinterpret runtime behavior.
-
-**Deliverable:** Reviewed canonical transition matrix and vocabulary.
-
-**Exit criteria:** Every live transition mutation in the audit maps to a matrix
-row or is identified as dead/debug code.
+1. Existing behavior is the initial reference, including documented legacy
+   exceptions.
+2. Migrate one transition family at a time; no big-bang replacement.
+3. Do not change basketball probabilities, clock policy, or RNG draw order.
+4. Planner and executor perform no database access or animation builds.
+5. Backend remains authoritative; frontend continues to consume
+   `offense_team_id` and turn payloads.
+6. A possession flip must not rewrite the completed source turn's offense
+   identity.
+7. Possession changes exactly once per transition sequence.
+8. DREB, OREB, BIP, SIP, FT, and TIMEOUT remain real turns routed through
+   `_append_turn()`.
+9. Do not collapse discrete DREB/OREB/inbound rows to reduce turn count.
+10. Pending free throws prevent premature BIP synthesis.
+11. Pressure selection remains a resolver decision; the planner only routes the
+    selected setup.
+12. EOQ and FLSS migrate last, after ordinary transition families prove parity.
 
 ---
 
-## Phase 1 — Rebuild the registry as a descriptive contract
+## 6. Migration Plan
 
-**Goal:** Make the registry accurately describe the current engine without
-changing runtime routing.
+### Phase 0 — Freeze current behavior
 
-Tasks:
+Build a reviewed transition matrix containing:
 
-1. Replace the stale turn enum with the canonical turn set.
-2. Add discrete DREB and TIMEOUT transitions.
-3. Replace descriptive string matching with stable event codes.
-4. Represent possession change and synthetic-turn requirements explicitly.
-5. Update validation so source turn comes from the actual turn payload rather
-   than inferred stale `_previous_offensive_state`.
-6. Keep the registry non-authoritative during this phase.
+- source turn and normalized event;
+- possession change and exact flip timing;
+- synthetic-turn sequence;
+- resulting `offensive_state`, `next_play_type`, and `next_turn`;
+- pressure/HCO-entry mode;
+- FT, timeout, rebound-loop, and EOQ exceptions.
 
-**Verification:**
+Cover HCO, FCP, HCT, Fast Break, OREB/DREB, FT, BIP/SIP, timeout/foul-out
+resume, and EOQ/FLSS. Compare runtime code, existing tests, the registry,
+`Turn_by_Turn_System.md`, and `Possession_Mgmt_System.md`. Mark disagreements;
+do not silently reinterpret current behavior.
 
-- Registry completeness tests.
-- No duplicate transition keys.
-- Every canonical turn has defined outgoing/terminal behavior.
-- Existing simulation output remains byte-identical.
+**Done when:** every live transition mutation maps to a matrix row or is
+identified as dead/debug code.
 
-**Exit criteria:** Registry and matrix agree, with no production behavior change.
+### Phase 1 — Repair the descriptive registry
 
----
+- Adopt canonical turn names.
+- Add DREB and TIMEOUT.
+- Replace descriptive event strings with stable event codes.
+- Represent possession change and synthetic-turn requirements explicitly.
+- Validate from the actual source-turn payload rather than inferred stale
+  previous state.
+- Keep the registry non-authoritative.
 
-## Phase 2 — Introduce a pure planner in shadow mode
+**Done when:** registry completeness tests pass, the registry agrees with the
+matrix, and simulation output is unchanged.
 
-**Goal:** Calculate the proposed plan alongside existing logic and compare it
-without applying it.
+### Phase 2 — Add a planner in shadow mode
 
-Tasks:
+- Define the immutable plan type and normalized inputs.
+- Calculate a shadow plan at one post-resolution boundary without applying it.
+- Compare it with actual backend state, public route fields, possession, and
+  appended synthetic turns.
+- Keep runtime diagnostics gated off for bulk simulations.
 
-1. Define the immutable `TransitionPlan` contract.
-2. Implement a pure planner from normalized turn facts.
-3. At one post-resolution boundary, calculate the shadow plan.
-4. Compare it with:
-   - actual `offensive_state`;
-   - actual `next_play_type` / `next_turn`;
-   - actual possession state;
-   - appended synthetic turn, if any.
-5. Keep shadow comparison:
-   - test-first;
-   - gated off in bulk simulations if runtime diagnostics are retained;
-   - free of eager report building and database writes.
-6. Resolve mismatches by correcting the matrix/planner or documenting a genuine
-   legacy exception. Do not mutate live behavior in shadow mode.
+**Done when:** representative seeded games and focused scenarios have no
+unexplained shadow mismatches or meaningful performance regression.
 
-**Verification:**
-
-- Focused transition matrix tests.
-- Seeded full-game and multi-game parity.
-- Profile one game to prove no meaningful hot-path regression.
-
-**Exit criteria:** Zero unexplained shadow mismatches across representative
-games and all targeted unit scenarios.
-
----
-
-## Phase 3 — Centralize simple, low-risk transitions
-
-**Goal:** Make the planner/executor authoritative for transitions with minimal
-rebound or clock complexity.
+### Phase 3 — Migrate simple transitions
 
 Suggested order:
 
-1. Opening tip → HCO.
-2. BIP → HCO/FCP/HCT.
-3. SIP → HCO.
-4. Ordinary made FG → BIP.
-5. Ordinary dead-ball turnover / charge → SIP.
-6. Timeout resume to SIP/BIP/FT.
+1. Opening tip -> HCO.
+2. BIP -> HCO/FCP/HCT.
+3. SIP -> HCO.
+4. Ordinary made FG -> BIP.
+5. Dead-ball turnover/charge -> SIP.
+6. Timeout resume -> SIP/BIP/FT.
 
-Tasks per family:
+For each family, make planner/executor output authoritative, prove exact parity,
+then remove the migrated handler's duplicate transition writes.
 
-1. Route through the planner.
-2. Execute state/public-route/flip/synthetic-turn actions once.
-3. Remove migrated handler writes only after parity.
-4. Preserve existing builders and animation payloads.
+### Phase 4 — Migrate fouls and free throws
 
-**Verification:**
+Cover shooting fouls, and-one, bonus/one-and-one, non-shooting fouls,
+offensive fouls, final FT make/miss, and foul-out timeout/resume.
 
-- Seeded exact-diff because no RNG draws should change.
-- Home/away and user/CPU modes.
-- Turn-by-turn and full simulation.
-- Timeout and foul-out interruption coverage.
+Protect these invariants:
 
-**Exit criteria:** Migrated handlers no longer write their own transition state.
+- no BIP before pending free throws;
+- final made FT flips before BIP;
+- final missed FT respects OREB/DREB;
+- timeout/foul-out resume retains shooter and remaining attempts.
 
----
+### Phase 5 — Migrate pressure and Fast Break
 
-## Phase 4 — Centralize foul and free-throw transitions
+Cover BIP pressure setup, FCP/HCT breaks, pressure steals/dead balls/shots,
+Fast Break outcomes and defensive stops, steal-initiated Fast Break, and all
+migrated FB families.
 
-**Goal:** Unify routes into and out of FT/SIP/BIP while preserving foul
-resolution.
+Protect these invariants:
 
-Coverage:
+- FB defensive stop does not flip possession;
+- steal/DREB paths flip exactly once;
+- HCO bring-up is prepared without duplicate setup animation.
 
-- shooting fouls;
-- and-one;
-- bonus and one-and-one;
-- non-shooting defensive fouls;
-- offensive fouls and charges;
-- blocking fouls;
-- final FT make/miss;
-- foul-out timeout and resume.
+### Phase 6 — Migrate rebound sequences
 
-Special invariants:
+Cover miss/block -> OREB/DREB, OREB kickout/putback/chains, discrete DREB from
+all shot families, DREB -> HCO/FB, DREB OTB fouls, and HCO outlet/handoff.
 
-- No BIP before pending free throws.
-- Final made FT flips before BIP.
-- Final missed FT respects OREB/DREB.
-- Timeout/foul-out resumes retain shooter and remaining attempts.
-
-**Exit criteria:** FT state and public routing are produced from one plan, with
-no handler-specific route repair.
-
----
-
-## Phase 5 — Centralize pressure and Fast Break transitions
-
-**Goal:** Consolidate FCP/HCT/FB routing after ordinary possession transitions
-are stable.
-
-Coverage:
-
-- BIP pressure setup;
-- FCP/HCT break to HCO;
-- pressure steals and dead balls;
-- pressure shots and fouls;
-- Fast Break make/miss/block;
-- Fast Break defensive stop → HCO;
-- steal-initiated Fast Break;
-- migrated RR, Triangle, Covert Release, and After-Steal families.
-
-Special invariants:
-
-- Pressure selection remains a basketball decision made before planning.
-- FB defensive stop does not flip possession.
-- Steal/DREB paths flip exactly once.
-- HCO bring-up state is prepared without embedding duplicate setup animation.
-
-**Exit criteria:** Fast Break integrations return normalized outcome facts and
-do not independently coordinate route fields.
-
----
-
-## Phase 6 — Centralize OREB/DREB and batched transitions
-
-**Goal:** Move the most structurally complex ordinary transitions after the
-planner/executor has proven itself.
-
-Coverage:
-
-- miss/block → OREB;
-- OREB kickout;
-- putback make/miss;
-- consecutive OREBs;
-- OREB miss → discrete DREB;
-- HCO/FCP/HCT/FB/FT miss → discrete DREB;
-- DREB → HCO/FB;
-- DREB OTB foul;
-- HCO outlet/handoff preparation.
-
-Design requirement:
-
-The executor must support a transition sequence, not just a single next-state
-string. Example:
+The executor must support ordered sequences rather than only one next-state
+string:
 
 ```text
 SHOT MISS
@@ -484,190 +314,92 @@ SHOT MISS
   -> arm HCO entry
 ```
 
-Do not collapse the discrete DREB row into the shot or HCO turn.
+The source miss/block retains its offense identity, DREB uses post-shot
+coordinates, OREB-loop promotion cannot double flip, and the last batched
+foul/dead-ball result controls SIP synthesis.
 
-Special invariants:
+### Phase 7 — Migrate EOQ and FLSS
 
-- Source MISS/BLOCK keeps its original offense identity.
-- DREB capture uses post-shot coordinates.
-- Possession flips exactly once.
-- OREB-loop DREB does not double flip.
-- Last batched foul/dead-ball outcome controls SIP synthesis.
-- Outlet/handoff is authored once.
+Migrate final shot/rebound behavior, FLSS, BIP runoff, `RUN_OUT_CLOCK`,
+terminal inbound suppression, and quarter-complete payloads.
 
-**Exit criteria:** Main-turn and OREB-loop DREB promotion use one transition
-sequence planner/executor path.
+The final playable turn must animate before quarter completion. Do not create a
+BIP/SIP after a terminal event or introduce an additional clock draw.
 
----
+### Phase 8 — Retire duplicate authority
 
-## Phase 7 — Centralize EOQ and FLSS transitions
+- Remove obsolete transition writes and repair blocks after parity proves them
+  unnecessary.
+- Retire or repurpose `determine_next_turn()`.
+- Make planner output the only authority for route fields and possession-change
+  instructions.
+- Add a test/static guard against new direct transition assignments outside the
+  planner/executor and explicitly approved boot/resume seams.
+- Update canonical system documentation.
 
-**Goal:** Migrate terminal clock behavior last.
-
-Coverage:
-
-- final shot make/miss/block;
-- terminal OREB/DREB;
-- FLSS after DREB/inbound;
-- BIP runoff;
-- `FINAL_HOLD`;
-- `RUN_OUT_CLOCK`;
-- no-inbound terminal suppression;
-- quarter-complete payload behavior.
-
-Special invariants:
-
-- The final playable turn is emitted and animated before quarter completion.
-- No BIP/SIP is synthesized after a terminal period event.
-- Terminal DREB remains visible when required.
-- No extra clock draw/runoff is introduced.
-
-**Exit criteria:** EOQ utilities provide event facts or planner inputs but no
-longer independently rewrite overlapping route fields.
+**Done when:** every resolver returns normalized facts that the planner can
+route, and migrated handlers no longer coordinate transition state.
 
 ---
 
-## Phase 8 — Retire duplicate authority and harden enforcement
+## 7. Verification
 
-**Goal:** Complete the SS&S migration.
+### Matrix tests
 
-Tasks:
+For every transition row, assert:
 
-1. Remove obsolete transition assignments from migrated handlers.
-2. Retire or repurpose `determine_next_turn()`.
-3. Make planner output the only authority for:
-   - `offensive_state`;
-   - `next_play_type`;
-   - `next_turn`;
-   - possession change instructions.
-4. Add a test/static guard preventing new direct transition-state assignments
-   outside the planner/executor and explicitly approved boot/resume seams.
-5. Update all canonical documentation.
-6. Remove stale transition repair blocks only after parity proves them
-   unnecessary.
+- backend state and both public route fields;
+- possession change and flip timing;
+- ordered synthetic turns;
+- preservation of source offense identity;
+- terminal-period handling;
+- pressure/HCO-entry mode.
 
-**Exit criteria:** A new gameplay resolver cannot complete without returning
-normalized facts that the planner can route.
-
----
-
-## 8. Verification Strategy
-
-### 8.1 Transition matrix tests
-
-For every matrix row, assert:
-
-- next backend state;
-- public `next_play_type`;
-- public `next_turn`;
-- possession change;
-- flip timing;
-- synthetic turn;
-- source-turn offense identity;
-- terminal handling;
-- HCO-entry mode.
-
-### 8.2 Sequence integration tests
+### Sequence tests
 
 At minimum:
 
-- make → BIP → HCO;
-- make → BIP → FCP/HCT;
-- dead ball / charge → SIP → HCO;
-- shooting foul → FT sequence → BIP;
-- final FT miss → OREB/DREB;
-- miss → OREB → kickout;
-- miss → OREB → putback miss → DREB → HCO;
-- miss/block → DREB → HCO/FB;
-- steal → HCO/FB;
-- FB defensive stop → HCO without flip;
-- DREB OTB foul → SIP/FT;
+- make -> BIP -> HCO/FCP/HCT;
+- dead ball/charge -> SIP -> HCO;
+- foul -> FT sequence -> BIP;
+- final FT miss -> OREB/DREB;
+- miss -> OREB -> kickout;
+- miss -> OREB -> putback miss -> DREB -> HCO;
+- miss/block -> DREB -> HCO/FB;
+- steal -> HCO/FB;
+- FB defensive stop -> HCO without a flip;
+- DREB OTB foul -> SIP/FT;
 - timeout and foul-out resume;
 - final make/miss/DREB at EOQ.
 
-Run home/away variants where geometry or possession identity differs.
+Run home/away and user/CPU variants where possession identity or geometry may
+differ.
 
-### 8.3 Determinism
+### Determinism and performance
 
-Transition centralization must not change RNG draw count.
-
-- Use `PYTHONHASHSEED=0`.
-- Use seeded exact-diff for behavior-preserving migrations.
-- If a migration unexpectedly changes draws, stop and identify the draw-site
-  difference; do not accept distributional similarity for an intended
-  no-basketball-change refactor.
-
-### 8.4 Performance
-
-Per `Sim_Perf_Capstone.md`:
-
-- no DB calls in planner/executor;
-- no eager debug report construction;
-- no extra animation or defender-grid builds;
-- no full-lineup scans in the planner;
-- diagnostics gated off for full/CPU/PS simulation;
-- profile one full-sim game before and after each material phase;
-- timing claims use repeated/median runs.
-
-### 8.5 Frontend
-
-Verify that:
-
-- frontend continues to read `offense_team_id`;
-- possession-change events fire once;
-- DREB/BIP/SIP/FT schema and legacy playback routes remain unchanged;
-- final turns animate before quarter completion;
-- no frontend gameplay route calculation is introduced.
+- Use seeded exact-diff tests and `PYTHONHASHSEED=0` for behavior-preserving
+  migrations.
+- Stop and locate any changed RNG draw site; distributional similarity is not
+  sufficient for this refactor.
+- Follow `Sim_Perf_Capstone.md`: no DB calls, eager debug reports, animation
+  builds, or full-lineup scans in the planner/executor.
+- Profile repeated full-sim runs before and after each material phase.
+- Verify frontend possession events fire once and final turns animate before
+  quarter completion.
 
 ---
 
-## 9. Risk Register
+## 8. Decisions Required Before Coding
 
-| Risk | Mitigation |
-|---|---|
-| Big-bang transition regression | Shadow mode and family-by-family migration |
-| Double possession flip | Plan carries explicit flip timing; executor applies once |
-| Source turn animated with new offense | Preserve source `offense_team_id`; flip affects following turn |
-| DREB/OREB sequence collapse | Support transition sequences and keep synthetic rows |
-| FT followed by erroneous BIP | Pending-FT invariant in planner |
-| EOQ creates extra inbound | Terminal/suppress-inbound plan fields; EOQ migrates last |
-| Pressure choice lost | Resolver supplies chosen pressure; planner only routes it |
-| RNG drift | Planner/executor draw no RNG; seeded exact-diff |
-| Sim slowdown | O(1) pure planning, no DB/animation work, profile each phase |
-| Registry becomes a second authority | Registry and planner share one canonical definition before runtime cutover |
-| Documentation drift | Update canonical docs at each migrated phase |
+1. Frozen dataclass, typed dictionary, or another immutable plan type.
+2. Whether the registry drives the planner or both are generated from shared
+   canonical definitions.
+3. The single planning boundary: after `run_micro_turn()`, inside a new
+   `GameManager` coordinator, or split between fact normalization and sequence
+   planning.
+4. Whether shadow comparison exists only in tests or temporarily in interactive
+   runtime behind a diagnostic gate.
+5. The first production transition family after shadow parity.
 
----
-
-## 10. Non-Goals
-
-- Do not retune basketball outcome probabilities.
-- Do not redesign shots, fouls, rebounds, steals, pressure, or Fast Break
-  resolution.
-- Do not combine discrete DREB/OREB/inbound rows merely to reduce turn count.
-- Do not move gameplay routing to the frontend.
-- Do not redesign UESS or animation schemas.
-- Do not change quarter duration, shot-clock policy, or EOQ strategy.
-- Do not add transition persistence inside the simulation loop.
-- Do not add default-on bulk-simulation diagnostics.
-
----
-
-## 11. Decisions to Align Before Implementation
-
-1. Whether `TransitionPlan` should be a frozen dataclass, typed dictionary, or
-   another immutable structure.
-2. Whether the canonical registry should directly drive the planner or remain
-   a validation representation generated from the same definitions.
-3. Where the single planning boundary belongs:
-   - immediately after `run_micro_turn()`;
-   - inside a new `GameManager` transition coordinator;
-   - or split between outcome normalization and macro-sequence planning.
-4. Whether shadow comparison should exist only in tests or temporarily in
-   interactive runtime behind a diagnostics gate.
-5. Which low-risk family should be the first production migration after shadow
-   parity.
-
-**Recommended starting alignment:** agree on the normalized event vocabulary,
-the `TransitionPlan` fields, and the exact Phase 0 transition-matrix format
-before writing runtime code.
+**Start with:** agree on normalized event codes, the minimal plan fields, and
+the Phase 0 matrix format before adding runtime code.

@@ -2,7 +2,7 @@
 
 Central registry of tunable game-logic constants — the knobs for balancing gameplay. Each entry lists the constant, its current value, and a one-line effect.
 
-**Workflow:** edit values here first → agents implement in code and keep this file in sync. **Scope:** live game + franchise EOG + training; exclude distant sim. **Geometry** and **`USE_*` feature flags** are out of the main console for now. Inventory by turn type: **HCO → HCT → FCP → FB → OREB → DREB** (Sessions 1–6). Inline literals awaiting named constants are tracked in **Promotion Pass** below (status board); per-turn Inline Magic tables keep file/context detail.
+**Workflow:** edit values here first → agents implement in code and keep this file in sync. **Scope:** live game + franchise EOG + training. **Geometry** and **`USE_*` feature flags** are out of the main console for now. Inventory by turn type: **HCO → HCT → FCP → FB → OREB → DREB** (Sessions 1–6). Inline literals awaiting named constants are tracked in **Promotion Pass** below (status board); per-turn Inline Magic tables keep file/context detail.
 
 ## Promotion Pass
 
@@ -243,7 +243,7 @@ middle band falls back to ordinary shot resolution. The two outcome thresholds a
 | `BLOCK_FIGHT_RANGE_MIN` / `BLOCK_FIGHT_RANGE_MAX` | constants/__init__.py | `0 / 10` | Second trigger, attempted only after aggression misses: `roll <= defense fight`. |
 | Defensive `fight` | team attribute | live team value | Second-trigger comparison value; higher fight produces more reconciliation attempts. |
 | `BLOCK_PLAYER_ROLL_MIN` / `BLOCK_PLAYER_ROLL_MAX` | constants/__init__.py | `1 / 300` | Third trigger, after aggression and fight miss, rolls against `defender ID + defensive_efficiency × height_rating`. Lowering the maximum increases individual rim-protector attempts. |
-| Height rating | shared.py | `≤72:0; 73–81:1–9; ≥82:10` | Feeds both the third attempt trigger and reconciliation. In reconciliation it becomes `height_rating × 10 + randint(-9,9)` and receives 40% weight. |
+| Height rating (`height_to_block_score`) | shared.py | `≤75→0`, `h−75`, `≥85→10` (offsets from `LEAGUE_MEDIAN_HEIGHT_IN`=75; 1 pt/inch — rides the median automatically) | Feeds both the third attempt trigger and reconciliation. In reconciliation it becomes `height_rating × 10 + randint(-9,9)` and receives 40% weight. (Now median 75 after the 2026-08 HS shifts −1 then −2; the code uses the constant, so it moved on its own.) |
 | Defender block composite | shot_manager.py | `height 40% + ID 40% + IQ 20%`, then `× randint(1,6)` | Determines `defense_block_score`; higher attributes or roll make negative reconciliation diff and blocks more likely. |
 | Contest-result eligibility | shot_micro_movements constants | `neutral` or `defense_win`; boundaries `±150` | `offense_win` shots do not enter the block funnel. Changing contest boundaries changes the eligible population. |
 | Shooter finish threshold | shot_manager.py | `250` | When reconciliation lands in the foul band, shooter finish score above 250 makes the basket for an and-one. Does not affect block volume. |
@@ -253,6 +253,14 @@ middle band falls back to ordinary shot resolution. The two outcome thresholds a
 `block_funnel_tracking` is diagnostic-only and reports eligible shots, reconciliation reached,
 foul/fallback/block bands, actual blocks, and foul-owned block contacts in both end-of-game and
 week-aggregate shot reports.
+
+## Height distribution — LEAGUE_MEDIAN_HEIGHT_IN vs the live rostered league
+
+| Constant | File | Value | Effect |
+|---|---|---|---|
+| `LEAGUE_MEDIAN_HEIGHT_IN` | constants/__init__.py | `75` | Base for height bands / block height-rating and team-builder band defaults. (78 → 77 → 75 across the two 2026-08 HS shifts.) |
+
+**Caveat (2026-08-01, grow-into-frame; figures updated 2026-08-04 for the −2in shift):** `75` describes the **adult** height distribution (the §11.2 fitness peaks; mean of the five ideals ≈ 75.2). Since three of four class years have not finished growing (§16.3 grow-into-frame, §11.3 pool stagger), the **live rostered league sits at ~74** (measured on the re-recalibrated pool: FR 72.9 / SO 74.0 / JR 74.9 / SR 75.5; league p50 74). Any band expressed as an offset from `75` is therefore ~1in high relative to the actual population — small and probably invisible, but it is the absolutes-against-an-assumed-distribution pattern in miniature. Documented so it is not rediscovered; not currently worth re-tuning.
 
 ## Dynamic HCO Defense (Pass Interception)
 
@@ -690,12 +698,13 @@ Cross-ref: **HCO Micro Movements** (`PROXIMITY_CONTEST_*`), `CONTEST_EUCLIDEAN_R
 | Constant | File | Value | Affects | Effect |
 |---|---|---|---|---|
 | `OREB_REBOUND_SCORE_DISCOUNT` | constants/__init__.py | `0.8` | oreb | Offensive candidates’ final rebound score ×0.8 in `select_rebounder_by_score` (box-out edge). Tune vs ~30% OREB%; `1.0` = no discount. Applies on all paths using this helper (HCO/FT/FB/HCT + putback-miss chains). |
+| `REBOUND_TEAM_CHEMISTRY_FACTOR` | constants/__init__.py | `0.5` | rebound outcomes | Scales the team component of every eligible player's rebound score: `0.5 × team_chemistry × rebound_modifier`. |
 | `OREB_PUTBACK_ONLY_THRESHOLD` | eoq_clock_progression.py | `6` | volume / possession | `time_remaining < 6` → force putback (no kickout), including chained OREBs. |
 | `OREB_PUTBACK_MIN_TIME_ELAPSED` | constants/__init__.py | `2` | possession | Floor on putback `time_elapsed` after schema burn. Kickout is **not** floored. |
 | `NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE` | shared.py | `20` | oreb | Putback-miss first-pass Euclidean candidate radius; upper-half = `20 × 0.5 = 10`. Also failed-attemptor collect radius (shared with DREB). |
 | `MO_OREB_DELTA` | momentum.py | `1` | other | +MO on OREB once threshold met. |
 | `MO_OREB_THRESHOLD` | momentum.py | `3` | other | +`MO_OREB_DELTA` on a player’s **3rd** OREB and each after. |
-| `TEAM_ATTR_RANGES["rebound_modifier"]` | constants/__init__.py | `(0.0, 0.4)` | oreb | Feeds `team_chemistry × rebound_modifier` into rebound score + first tie-break. |
+| `TEAM_ATTR_RANGES["rebound_modifier"]` | constants/__init__.py | `(0.0, 0.4)` | oreb | Feeds `REBOUND_TEAM_CHEMISTRY_FACTOR × team_chemistry × rebound_modifier` into rebound score + first tie-break. |
 
 ### OREB Inline Magic (proposed names — document only)
 
@@ -732,7 +741,6 @@ Bounce spot / variance, `determine_rebounder` → `select_rebounder_by_score` �
 - Dead: `ReboundManager.handle_rebound`, unused `oreb_shot_attempt()`
 - Tip-out rebound mechanic (does not exist)
 - Zone / inside-distance shot-threshold bonuses — **not applied** on putback path
-- Distant-sim `TEAM_OREB`
 
 ### Unsure / needs judgment (OREB inventory)
 
@@ -788,7 +796,6 @@ Cross-ref: **OREB** shared rebound scoring / bounce / OTB / `OREB_REBOUND_SCORE_
 - Rebounder paint clusters / attemptor jitter (geometry); CR good/bad y-band interiors beyond AG floors
 - Announce suppress / hold_ms / SFX
 - Legacy: `ReboundManager.handle_rebound`, `FB_CUTOFF_*_DREB`, `DEFENSIVE_STOP_Y_RANGE_DREB_OUTLET`
-- Distant-sim `TEAM_DREB`
 
 ### Unsure / needs judgment (DREB inventory)
 
@@ -814,3 +821,336 @@ Playback pacing for the **Sim Full Game / Sim Rest of Game** broadcast overlay (
 | `LINEUP_CHANGE_MS` | simGamePresentation.js | `1000` | playback | Extra hold on a frame where the on-court five changed (foul-out swap / sub) so the swap reads. Overrides the normal per-turn hold on those frames, so a quarter with lineup changes runs slightly over `QUARTER_MS` (≈ `LINEUP_CHANGE_MS − normal per-turn hold` per change). |
 
 **Whole game ≈ ~80–85s** (4 × ~18s + three break cards + tip-off + final). Bars ease via a 0.5s CSS `width` transition between emitted values; reduced-motion fast-forwards (live ~40ms, holds ~400ms).
+
+---
+
+# Player Attribute Recalibration — Levers, Anchors & Reference
+
+The constants in this project split into three categories. **Keep them separated when tuning:**
+
+- **A — LEVERS:** safe to turn, meant to be tuned by feel. Table below (gameplay terms + movement + LIVE/DORMANT).
+- **B — CALIBRATION ANCHORS:** changing one re-scales the whole league. Each states what breaks and what must be re-fitted alongside.
+- **C — OTHER PROJECTS:** everything ABOVE this section (HCO / HCT / FCP / FB / OREB / DREB / shot pipeline / block / sim-experience) plus EOG and older training constants. Kept, separated — not part of this project.
+
+Reasoning and rejected paths: `projects/Z-Completed/Player_Attribute_Recalibration_Design.md`. Raw per-constant values are in the **Reference detail** tables further down.
+
+---
+
+## A — LEVERS (safe to tune by feel)
+
+Effects are stated in gameplay terms; movement figures are where we measured them. **DORMANT** = the knob cannot move anything in gameplay yet (coaching quality does nothing until pillar 3 wires per-player capture — `_coaching_accumulator_for_player` returns None → `f = 1.0` for everyone).
+
+| Lever | now | What it changes in the game | Rough movement | Status |
+|---|---|---|---|---|
+| `OFFSEASON_ATTRACTOR_ALPHA` | **0.0** | **Retired (framework §10.4 / §11).** Offseason is level-only rescale onto the ladder RT target; shape is owned by camp + in-season + weight-scaled floors. Symbol kept so old imports do not crash — do not re-enable without restoring the blend path and the shape-dispersion suite gate. Historical α=0.55 career retention was ~(1−α)³ ≈ 9%. | none (level-only) | **DEAD** |
+| `CAMP_WEEKS` | **1** | Franchise week 1 is training camp (`is_camp_week`): 30-point flat budget, pre-training decay skipped, `CAMP_GAIN_SCALE` applied. Weeks 2–26 use 24; weeks 27+ have no training. | Changing this alters the product schedule | LIVE (`training_shape.py`) |
+| `CAMP_GAIN_SCALE` | **1.4** | Multiplier on positive camp gains (vs `IN_SEASON_GAIN_SCALE` for weeks after camp). | ↑ = louder camp shape/level | LIVE |
+| `IN_SEASON_GAIN_SCALE` | 0.18 | Scales positive weekly gains after camp. Kept low so a reference season stays inside the offseason ladder step (no claw-back). Shape movement is still mostly here + camp (~99% of career shape). | ↑ strands well-coached players above the ladder | LIVE (but see backlog) |
+| `PLAYER_ATTR_GAIN_RANGE_BY_POINTS` | 0:(−2,−1) · 1:(1,3) · 2:(2,3) · 3:(2,4) · 4:(3,5) · 5:(3,6) | Raw gain bands before year-max / scale / remainder. **1–5 must stay distinct** (E[raw\|5]=4.5 held). Re-unifying 1–3 erases slider resolution. | changes strategy spacing | LIVE (`training_execution_v2.py`) |
+| `CLASS_GAIN_PERCENTAGES` | FR **100%** / SO **91%** / JR **80%** / SR **71%** | Direct percentage on positive attribute gain after position fit and before the remainder split. Every class still spends one point per notch. | ↓ upperclass percentage = slower late-career gain | LIVE |
+| `TRAINING_GAIN_PERCENTAGES` | direct position × attribute table below, **25%–100%** | Direct percentage on positive attribute gain. No cost matrix and no reciprocal derivation. | changes off-role gain efficiency without fractional spend | LIVE |
+| Shape floors (P6 + weight scale) | t0 **shape-P6** base; HIGH **0.50** / LOW **0.20** | `need = ceil(P6[pos][attr] × mean(core-12) × floor_mult)`. Full floor at universal or rel≥0.50; minimal (need=1) at rel≤0.20; lerp between. Bind at decay clamp only — **not** at Team Builder Apply (mod teams use attribute totals only). **Never re-derive from a developed snapshot.** | ↓ percentile → weaker floors | LIVE |
+| `PEAK_BONUS` | +0.30 × JH anchor | Size of a "coming-of-age" peak season. Career multiple = 1.7 + 0.30·peaks → 0/1/2/3 peaks give 1.7 / 2.0 / 2.3 / 2.6× the JH anchor. | +0.10 ≈ +3 RT/peak at Average. | LIVE |
+| `STD_RUNG_INCREMENT` | FR.17 SO.20 JR.15 SR.18 | The no-peak career arc — how much RT a peakless player gains each year (Σ .70 → 1.7× at SR). | shifts the per-rung ladder shape | LIVE |
+| `CH_PEAK_LOW`/`_HIGH` | (.38,.52,.10,0)→(.02,.58,.34,.06) | How strongly a player's hidden CH predicts peak count (high-CH → more peaks). Midpoint peak dist 20/55/22/3. | widens/narrows the high-CH advantage | LIVE |
+| `FAMILY_CURVES` | phys-early → mental-late | Per-rung phys/skill/mental weight multipliers. Only referenced by the retired distribution helpers (`_distribution_fractions`); unused under level-only offseason. Kept for call-site compatibility / possible restore. | none today | DEAD (vestigial path) |
+| `HT_TOTAL_MEAN`/`_SD` | 3.2 / 1.9 | Career height gain (~3in median). Drives grow-into-frame and can shift a player's best position. | ±1in shifts position-fit flips | LIVE |
+| `HT_CURVE_BY_TIMING` | 40/30/20/10 (std) | When that height arrives across the four rungs. | front/back-loads growth | LIVE |
+| `TIER_FREQUENCY` | 7/20/40/20/11/2 | The talent pyramid — how many Elite/Great vs Poor players are generated. | more tail ⇒ wider team spread (but see backlog: range is a persistence, not init-spread, problem) | LIVE |
+| `POTENTIAL_FACTOR_BAND` | 0.15 | How much two players of the *same* tier can differ in projected ceiling. At 0.15 an Average recruit projects anywhere from C+ to B; two Averages can show `C+` and `B`, and a high Good is indistinguishable from a low Great. Uniform, so busts and gems are as common as median. It scales the offseason RT target directly (level, not shape). | 0 → every same-tier player shows one grade (tiers leak); 0.25 → tiers blur into each other. Widens each adjacent-tier senior-RT tail overlap ~2–3 RT at 0.15. | LIVE (Phase 3 — wired into `develop_one_offseason`; capped by `RT_SOFT_CAP`) |
+| recruit class size | `RECRUIT_CLASS_SIZE=450` | Recruits generated per season (seasons 2+). Sized so walk-ons settle at the ~20% floor; below graduation demand (~440) → walk-on flood. Matches `set_0001`'s 450-recruit base image set. | 300→400→450 cut walk-ons ~40%→~26%→~20% | LIVE |
+| `COACHING_F_MIN`/`_MAX` | 0.85 / 1.20 | How much good vs bad coaching changes where a player ends up — about **±one tier step** at senior. Level only (`f` scales the RT target). | | **DORMANT** (pillar 3) |
+| `COACHING_F_SENSITIVITY` | 1.00 | Maps quality→f within the band; band edges are the real controllers. | | **DORMANT** (pillar 3) |
+| `OFFSEASON_DISTRIBUTION_BLEND` | 0.70 | **Vestigial — do not tune.** Additive-budget age/position distribution blend. Unused: `develop_one_offseason` is level-only and ignores the accumulator. | none | DEAD |
+| `NON_CORE_GROWTH_MULTIPLIER` | 0.06 | **Vestigial — do not tune.** Floor on per-attr weight in the retired distribution path. Same fate as `OFFSEASON_DISTRIBUTION_BLEND`. | none | DEAD |
+
+### Training gain percentages — primary tuning table
+
+These are the percentages of raw positive attribute gain retained for position fit. Class percentage and session scale multiply this value before the persisted fractional remainder is split from the whole gain. Every selectable target totals **808**, so changing training position redistributes effectiveness without changing total trainability. ND, FT, and IQ are universal at 100%.
+
+| Position | ST | AG | SC | SH | ID | OD | PS | BH | RB | FT | IQ | ND | Row avg |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| PG | 35% | 83% | 40% | 45% | 25% | 70% | 85% | 100% | 25% | 100% | 100% | 100% | 67.3% |
+| SG | 35% | 68% | 55% | 100% | 25% | 60% | 70% | 70% | 25% | 100% | 100% | 100% | 67.3% |
+| SF | 40% | 53% | 82% | 64% | 50% | 91% | 39% | 39% | 50% | 100% | 100% | 100% | 67.3% |
+| PF | 99% | 45% | 55% | 47% | 67% | 35% | 35% | 25% | 100% | 100% | 100% | 100% | 67.3% |
+| C | 77% | 25% | 68% | 40% | 100% | 40% | 33% | 25% | 100% | 100% | 100% | 100% | 67.3% |
+| **Column avg** | **57.2%** | **54.8%** | **60.0%** | **59.2%** | **53.4%** | **59.2%** | **52.4%** | **51.8%** | **60.0%** | **100.0%** | **100.0%** | **100.0%** | **67.3%** |
+
+Class table: **FR 100% · SO 91% · JR 80% · SR 71%**.
+
+Named exceptions read by the invariant tests:
+
+- **Strength ordering:** PF 99% exceeds C 77%, knowingly breaking the intended rise-with-size ordering so the difference can be felt in the prototype.
+- **Nonphysical wall values:** PF and C ball handling are 25% even though neither is a documented physical wall. Decision pending: 28–30% would communicate “very low” without diluting the wall meaning, with returned points reassigned elsewhere to retain the 808 total.
+
+## B — CALIBRATION ANCHORS (turning these re-scales the whole league)
+
+| Anchor | now | What breaks if it changes | Must be re-fitted alongside |
+|---|---|---|---|
+| **`reference_allocation`** (frozen coaching reference) | top-3 primaries @3 pts, other on-position @1, off-position 0 | It is the zero-point: reference-coached = f 1.0 = lands on the validated ladder. Change it and **every player's development re-scales**. | `_CPU_REFERENCE_BASE` (coupled), then re-run `tests/test_cpu_reference_training.py` + re-validate the ladder |
+| **`_CPU_REFERENCE_BASE`** (CPU base allocation) | fitted so base × ~1.65 focus amp scores ~1.0 vs the frozen reference | CPU drifts off the ladder (players swing −10 in-season / +10 offseason, and once quality is live, sink under the ladder). | never change alone — change *with* the reference; **locked by `tests/test_cpu_reference_training.py`** |
+| **`POSITION_WEIGHTS`** (the 5 RT weight vectors) | see reference table | These *define RT*. Changing them re-scales every player's RT and re-sorts positions. | the whole class-year ladder, `HEIGHT_FITNESS`, and a full **pool re-migration** |
+| **`COACHING_SATURATION_CAP`** (a.k.a. QUALITY_CAP) | 4.0 pts/attr | Sets what "good coaching" means (points where an attr saturates). Rescales the quality metric. | the reference (must still score 1.0) + `_CPU_REFERENCE_BASE` + `COACHING_STANDARD_BUDGET`/`COACHING_HEADROOM` |
+| **`LEAGUE_MEDIAN_HEIGHT_IN`** | 75 | Base for every height-offset band (block scoring, weight bands, camp gates). Describes the **adult** distribution; the live rostered league sits ~74 (grow-into-frame), so bands run ~1in high — see the Height-distribution section above. (78 → 77 → 75 across the two 2026-08 HS shifts.) | all `MED±` offset bands that reference it |
+| **`TRAINING_GAIN_PERCENTAGES`** | full table below and in `training_shape.py` | Primary position-fit tuning surface. Changing a cell directly changes retained gain; budget remains flat. | percentage invariants + shape battery (`tests/test_training_shape_framework.py`) |
+| **`SHAPE_P6_FLOOR_BASE`** | frozen t0 shape-P6 | Distributional input to floors. Re-deriving from a developed league refuses creative shapes. | floor battery + TB Apply |
+
+---
+
+## Reference detail (raw per-constant values)
+
+### Pass 1 — position ratings, generation, height re-band
+
+Constants for the RT formula (§3.6), position-intent generation (§11.2), the pool remap (§11.3) and the height re-band (§11.2).
+
+### Position rating formula — `BackEnd/utils/position_ratings.py`
+
+`RT_pos = weighted_attribute_mean(pos) × height_fitness(pos, height)`, clamped lower 1, uncapped above.
+
+| Constant | Value | Effect |
+|---|---|---|
+| `POSITION_WEIGHTS` | 5 vectors, §3.6.1 (each sums to 1.0) | attribute mix per position; one table for players+recruits |
+| `HEIGHT_FITNESS` | (ideal, short/in, tall/in): PG 70.5/.020/.050 · SG 73/.030/.045 · SF 75.5/.035/.035 · PF 77.5/.050/.025 · C 79.5/.060/.010 | multiplicative height gate, all 5 positions. **This is the edit point for `HEIGHT_IDEAL_IN`** (ideals −3in total for the 2026-08 HS shifts: −1 then −2; penalties held). |
+| `HEIGHT_FITNESS_FLOOR` / `_CAP` | 0.50 / 1.15 | fitness clamp (peak 1.0 at ideal; cap is a guard) |
+
+### Interim generation — `BackEnd/utils/player_generation.py`
+
+| Constant | Value | Effect |
+|---|---|---|
+| `JH_ANCHOR_BY_TIER` | Poor 20 · BelowAverage 25 · Average 30 · Good 35 · Great 40 · Elite 50 | JH-rung RT anchor per tier (§4.1) |
+| `TIER_FREQUENCY` | .07 / .20 / .40 / .20 / .11 / .02 | share of generated players per tier (§4.1). Supersedes the 4-value `TIER_FREQUENCY` in design §12. |
+| `RUNG_MULTIPLIERS` | JH 1.00 · FR 1.17 · SO 1.43 · JR 1.80 · SR 2.00 | class-year ladder; target RT = anchor × rung (§4.2) |
+| `POSITION_INTENT_SHARE` | 0.20 | ~even position intent |
+| `HEIGHT_IDEAL_IN` | PG 70.5 · SG 73 · SF 75.5 · PF 77.5 · C 79.5 (in) | **Dual-purpose**: per-position **generation mean** (`draw_height`) AND the **RT height-fitness peak**. ⚠️ **DERIVED — the real edit point is elsewhere.** It's a comprehension over `HEIGHT_FITNESS` in **`BackEnd/utils/position_ratings.py`**; the only value that does anything is the `ideal` in each `HEIGHT_FITNESS` tuple. Editing anything named `HEIGHT_IDEAL_IN`, or this row, **silently does nothing**. Tuning rule below. |
+| `HEIGHT_SD_IN` | 2.1 | per-position height sd (league aggregate ≈ mean 75, sd 3.6). Non-uniform lever — changing it widens/narrows position overlap (tweener rate). |
+| `WEIGHT_AT_MEDIAN` | 198.5 (lb) | Body weight at the league median height (75in). The whole-league weight anchor — raise/lower to make everyone heavier/lighter at their height. **Display/flavor only — RT ignores weight.** (History: 215 → 209.5 (−5.5, −1in shift) → 198.5 (−11, −2in shift). Each drop is slope×Δin so the line moves down WITH the median and BUILD stays constant — same weight-for-height, just lighter absolute. A further cut here = leaner-for-HS, a separate adjustment.) |
+| `WEIGHT_LB_PER_INCH` | 5.5 | Weight **slope** — lb added per inch above the median (subtracted below). Continuous, so no band artifact (a 77→78in inch is +5.5lb, not a ~27lb jump). Lower it to decouple weight from height — slimmer bigs without moving guards. |
+| `WEIGHT_NOISE_LB` | ±12 | Uniform jitter around the line so same-height players differ. One rng draw (stream-preserving). `weight = WEIGHT_AT_MEDIAN + WEIGHT_LB_PER_INCH·(h−75) ± noise`; measured league p10/p50/p90 ≈ 164/195/226, PG p50 168 → C p50 219 (post −2in shift). |
+| `PROFILE_FILLER` | 0.45 | unweighted-attr baseline as fraction of signature attr |
+| `PROFILE_ND_BASE` | 0.60 | ND baseline (ND is not in any RT vector) |
+| `ATTR_NOISE_SD` | 0.13 | per-attribute spread → tweener/tie rate (sharper identities per decision #7; ≥100 ≈ 5.7%) |
+
+**Height/weight tuning rule.** A **uniform** shift of all five `HEIGHT_IDEAL_IN` **plus** `LEAGUE_MEDIAN_HEIGHT_IN` (=75) by the same number of inches is **safe** — RT, position supply, and the fitness curve are all unchanged. Fitness is defined *relative to each ideal* (peak stays at the ideal), the generation mean shifts with it, and the weight line (`WEIGHT_AT_MEDIAN` + `WEIGHT_LB_PER_INCH`·(h − median)) and the height class-year bands are all expressed **relative to `LEAGUE_MEDIAN_HEIGHT_IN`**, so they ride the shift together. A **non-uniform** change — moving one position's ideal relative to the others, or changing `HEIGHT_SD_IN` — is an **anchor edit**: it reshapes position supply (which heights favour which positions) and the fitness curve, and is not neutral.
+
+> ⚠️ **`opening_tip` is the exception.** `opening_tip.get_height_scale_value` uses **absolute inch literals** (`>83`→10, `≥81`→9, `≥79`→8, `78`→7, … `73`→2, `<73`→1) anchored to the centre median, **not** offsets from `LEAGUE_MEDIAN_HEIGHT_IN`. It was manually "+3 re-banded" for the pass-1 recal, then hand-re-banded −1 and −2 for the two 2026-08 HS shifts; it will **not** ride a uniform shift — it must be re-banded by the same amount alongside any height shift, or the tip-off contest desyncs from the new distribution.
+
+### Ongoing intake — steady-state class-year distribution — `BackEnd/models/franchise_manager.py`
+
+These three levers **together** set the league's steady-state class-year mix. The pool age-up
+(active roster 10/20/30/40 FR/SO/JR/SR) and set_0001 (season-1 recruits at 55/15/15/15) fix only the
+**starting point**; class years advance in lockstep, so any seeded distribution **decays toward flat
+within ~4 seasons unless the ongoing intake sustains it.** Read from one place (single source), not
+duplicated at call sites.
+
+| Constant | Value | Effect (gameplay terms) |
+|---|---|---|
+| `RECRUIT_CLASS_SIZE` | 450 | Dynamic recruit pool generated per season (seasons 2+). Matches set_0001's 450 so the class the user recruits from is the same size every year. Read at all three load sites (recruit_sets default + both call sites). |
+| `RECRUIT_YEAR_WEIGHTS` | JH 55 / FR 15 / SO 15 / JR 15 (drawn per recruit) | The age of incoming recruits. **Recruits advance one year on signing**, so this enters the roster as FR 55 / SO 15 / JR 15 / SR 15 — a freshman-heavy but upperclassman-tailed intake. This is the main engine that sustains the skew. Drawn per recruit (per-class variance), not exact counts. |
+| `WALK_ON_YEAR_WEIGHTS` | FR 10 / SO 40 / JR 40 / SR 10 (drawn directly) | The age of walk-ons, who backfill roster seats recruits don't. Drawn **directly as roster years** — no JH, no advance step (a walk-on is never a JH). Sophomore/junior-heavy because walk-ons are the practice-squad/JV pool; the 10% senior share is deliberate (plays one year, may graduate). |
+| `WALK_ON_TIER_WEIGHTS` | Poor 65 / BelowAverage 25 / Average 8 / Good 2 (drawn per walk-on) | The **quality** of walk-ons (was hardcoded 100% Poor). Mostly weak, a meaningful minority ordinary, and roughly **one Good walk-on per team every few seasons** — enough that finding one feels like something. No Great/Elite on purpose: at ~200 walk-ons/season even 0.5% Elite is one per league per season, which a user sees essentially never. Tier already limits ceiling (a Poor walk-on with three peaks + max potential reaches ~RT 60, a useful senior, not a star), so **potential_factor is deliberately NOT skewed** for walk-ons — raising Poor's share is the only knob for "more scrubs," raising Good's the only knob for "more diamonds." Feeds both the generator and the returned `entry_tier` from one draw (never split). |
+
+**Changing one without the others breaks the steady state.** The recruit and walk-on mixes are a
+matched pair: recruits supply the freshman-heavy top of the funnel, walk-ons supply the SO/JR middle
+that recruits under-fill. Skewing recruits younger without adjusting walk-ons (or vice versa) shifts
+the whole distribution.
+
+**Verified compounding** (8-season fractional-flow sim from the current init state, recruits capped at
+the pool ration `450 / 128 teams ≈ 3.5`/team with walk-ons backfilling the rest of each team's
+graduations): converges to **FR 14 / SO 22 / JR 30 / SR 34** by season 8, seniors holding in the
+33–35 band, with a seasons 2–5 oscillation as the init-cohort bulge clears. The recruit:walk-on split
+(~2:1) is **emergent** — the 450 pool is smaller than league-wide graduations (~128 × ~5.25 ≈ 672),
+so recruits are rationed and walk-ons fill the deficit; changing `RECRUIT_CLASS_SIZE` or the league
+size shifts that split.
+
+### Pool remap — `scripts/regenerate_universal_pool.py`
+
+| Constant | Value | Effect |
+|---|---|---|
+| `INTENT_BANDS` | C/PF/SF each 0.20 (tallest→shortest), guards = rest | height-band position-intent assignment (§11.3 step 1) |
+| `IDENTITY_STRENGTH` | 0.15 | how much a player's old attribute shape modulates the new position profile ("a shooter stays a shooter"); 0.35 imported the old SH-spike artifact (≥100 12.6%→6.4% at 0.15) |
+
+### Height re-band (§11.2 — league median 72 → 78)
+
+> **Current value note (2026-08-04):** `LEAGUE_MEDIAN_HEIGHT_IN` is now **75** (78 → 77 → 75 across the two 2026-08 HS shifts, −1 then −2). This section documents the original pass-1 re-band and states `MED=78` as it stood then. Every `MED±` band below is an offset from the constant and rides it automatically, so substitute **MED = 75** for current behaviour; the `≤median` block-score / p90 figures in the Pass-2 watch shift down 3in likewise. `opening_tip` is the one exception (absolute literals, re-banded by hand — now `≥79→8`, see the ⚠️ note above).
+
+| Constant / location | Value | Effect |
+|---|---|---|
+| `LEAGUE_MEDIAN_HEIGHT_IN` (`constants/__init__.py`) | 78 | single home for missing-height fallback (was 72/75/76 scattered) |
+| `height_to_block_score` (`utils/shared.py`) | `≤MED→0`, `h−MED`, `≥MED+10→10` (MED=78) | offsets from `LEAGUE_MEDIAN_HEIGHT_IN`; preserves ~1.68 league-mean block score (measured 1.69) |
+| `get_height_scale_value` (`utils/opening_tip.py`) | thresholds +3 (centre-fed: 82→8) | **left as literals** — anchored to the *centre* median (+3), not the league median; do not re-express against `LEAGUE_MEDIAN_HEIGHT_IN` |
+| `WEIGHT_BY_HEIGHT_BANDS` (`player_generation.py`) | `MED−4 / MED / MED+4` | offsets from `LEAGUE_MEDIAN_HEIGHT_IN`; walk-ons now use the generator (Poor tier) |
+| training-camp weight gates (`training_execution_v2.py`) | `>MED+3`, `>MED` | offsets from `LEAGUE_MEDIAN_HEIGHT_IN` |
+
+> **Pass-2 watch — existing (old-scale) saves lose shot-blocking.** `height_to_block_score` now
+> returns 0 at ≤ median (78), but old-scale rosters top out at **p90 height 78**, so nearly every
+> player on a pre-recalibration franchise scores 0 → blocks collapse toward zero there. **Known and
+> accepted** (recalibration is new-franchises-only; new-pool rosters have the height to block).
+> Recorded so a pass-2 tester report of "no blocks on my existing save" is not misdiagnosed as a bug.
+
+### Deferred to later tasks (documented in design §12, NOT implemented this pass)
+`PEAK_COUNT_DISTRIBUTION`, `PEAK_RUNG_WEIGHTS`, `PEAK_MULTIPLIER`, `CH_PEAK_WEIGHTING`, `FAMILY_TIMING_WEIGHTS`, `FAMILY_CURVES`, `RT_COMPRESSION_THRESHOLD`, `RT_SOFT_CAP`, `NON_CORE_GROWTH_MULTIPLIER`, `WEEKLY_DECAY_BY_YEAR`, `OFFSEASON_INSEASON_SPLIT`, `ACCUMULATOR_WEIGHT`. CH stays flat `randint(1,100)` (§8); `CAMP_BONUS_CH_BANDS` unchanged.
+
+---
+
+### Pass 2 — offseason development & coaching (raw values)
+
+> **CURRENT-BEHAVIOUR NOTE (read before tuning from the tables below).** The offseason is **level-only** (`OFFSEASON_ATTRACTOR_ALPHA` = **0.0**): one rescale onto the ladder RT target (+ HT/WT). Shape is owned by **camp + in-season training** and weight-scaled **P6 floors** (`BackEnd/constants/training_shape.py`). The old additive-budget distribution path and the α-blend are both retired — so `OFFSEASON_DISTRIBUTION_BLEND` and `NON_CORE_GROWTH_MULTIPLIER` below are **vestigial/dead**, not live knobs (they are not “replaced by the attractor”; the attractor itself is retired). Also live and not reflected in the original pass-2 tables: **`entry_tier` is now persisted on the recruit/FPD writes** (and the derive-from-RT fallback is year-aware) — the "legacy-player caveat" at the end applies only to pre-pass-2 saves; and **HT grow-into-frame** now generates players below their adult frame (see Player_Development_System.md). The coaching-quality metric and `f`-band tables below are current (coaching quality itself stays DORMANT until pillar 3 — `f` is level, not shape).
+
+Fitted offline against 10k Monte Carlo careers (`scripts/mc_growth_fit.py`) over the real
+module `BackEnd/utils/player_development.py`; wired into `finish_season` (the season
+rollover), which runs `develop_one_offseason` per player after the year bump and before
+Training Camp. Camp's CH bonus, year bonus and FR/SO HT/WT growth were **deleted** — the
+offseason event owns career HT/WT and level. Camp is week **1** (`CAMP_WEEKS = 1`): 30-point flat budget, decay skipped, gains scaled by `CAMP_GAIN_SCALE` (1.4). Weeks 2–26 use 24 points; weeks 27+ have no training.
+
+### Exposed for tuning
+
+| Constant | Value | Effect |
+|---|---|---|
+| `PEAK_BONUS` | +0.30 × JH anchor (fixed per peak) | career multiple = 1.7 + 0.30·peaks (→ 1.7/2.0/2.3/2.6) |
+| `STD_RUNG_INCREMENT` | FR .17 / SO .20 / JR .15 / SR .18 (Σ .70) | 0-peak ladder shape; no dead rung (min +5 RT) |
+| `CH_PEAK_LOW` / `CH_PEAK_HIGH` | (.38,.52,.10,0) → (.02,.58,.34,.06) | the CH→peak-count spread; midpoint = 20/55/22/3 |
+| `OFFSEASON_DISTRIBUTION_BLEND` | 0.70 | **DEAD / vestigial.** Was the additive-budget age/position distribution blend. Unused under level-only offseason. |
+| `NON_CORE_GROWTH_MULTIPLIER` | 0.06 | **DEAD / vestigial.** Was the non-signature weight floor on that distribution path. |
+| `OFFSEASON_ATTRACTOR_ALPHA` | **0.0** | **DEAD.** Level-only offseason; see A — LEVERS. |
+| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` | 1 / 1.4 | Camp phase length and camp gain scale (`training_shape.py`). |
+| `CLASS_GAIN_PERCENTAGES` | FR 100% · SO 91% · JR 80% · SR 71% | Class percentage on positive gain, applied before the persisted remainder split. |
+| `PLAYER_ATTR_GAIN_RANGE_BY_POINTS` | see A — LEVERS | Distinct 0–5 raw gain bands (`training_execution_v2.py`). |
+| `FAMILY_CURVES` | FR 3.0/1.0/.30 · SO 2.0/1.2/.60 · JR .60/1.3/2.2 · SR .35/1.2/3.2 | per-rung weight multipliers (phys/skill/mental) → physical-early, mental-late |
+| `HT_TOTAL_MEAN` / `HT_TOTAL_SD` | 3.2 / 1.9 (clamp [0,8]) | career HT gain (p10/p50/p90 ≈ 0/3/6 in) |
+| `HT_CURVE_BY_TIMING` | early 55/30/12/3 · standard 40/30/20/10 · late 15/25/35/25 | when HT arrives, by physical timing |
+| `HT_PER_RUNG_CAP` | 2.5 | cap the real-valued per-rung HT want at 2.5in then round → dh ∈ {0..3}, restoring the p90≈6in tail |
+| `COACHING_F_MIN` / `COACHING_F_MAX` | 0.85 / 1.20 | band on the offseason coaching-quality modifier `f`; ±spread of one to a few display buckets at SR |
+| `COACHING_F_SENSITIVITY` | 1.00 | maps quality → `f` within the band. At 1.0, `f == clamp(quality)`; the band edges are the real controllers |
+| `COACHING_SATURATION_CAP` | 4.0 | **points/week** past which an attribute stops benefiting: `contribution_a = w_a × min(points_a/cap, 1)`. High-in-points → saturation is EXPENSIVE, so spreading thin saturates nothing while concentrating saturates the important attrs (this is what makes focus viable) |
+| `COACHING_SLIDER_MAX` | 5.0 | UI cap on one attribute's weekly points (bounds a single-attr spike) |
+| `COACHING_STANDARD_BUDGET` | 24.0 | representative weekly growth-point budget; sets the per-position optimum used for headroom normalization |
+| `COACHING_HEADROOM` | 0.25 | quality the budget optimum reaches above reference. `>F_MAX−1` on purpose, so the best few strategies **plateau at f 1.20** |
+| `COACHING_REFERENCE_BREADTH` | 3 | reference trains this many primaries |
+| `COACHING_REFERENCE_PRIMARY_PTS` / `COACHING_REFERENCE_BASELINE_PTS` | 3.0 / 1.0 | reference points/week on a primary vs. a non-primary on-position attr |
+
+### Coaching quality → offseason modifier `f` (Option 3)
+The offseason target is `jh_anchor × ladder_value × f`. `f` is a bounded function of the player's **cumulative** coaching quality (career average of per-season scores).
+
+**Metric shape — saturating coverage in POINTS, not shares (§9.1).** An allocation is per-attribute **training points per week** (0–5 per the drill sliders), not a fraction of the budget. A season's raw coverage is `Σ_a w_a·min(points_a/cap, 1)`, normalised affinely per position so **reference → 1.0** and the **budget optimum → 1.0 + `COACHING_HEADROOM`**. Because the cap is high in points, saturation is expensive:
+- **Focus is viable** — concentrating points spikes a few attributes to saturation (how a 100+ attribute happens); a designed strategy, not a mistake.
+- **Budget prices itself** — fewer total points saturate fewer attributes → lower quality, so the ~2-point per-player-customization tax costs quality with **no special-casing** (a 2-pt cut at reference ≈ −0.02 to −0.05 q → f ≈ 0.95–0.98).
+- **Points, not shares** — a 22-pt custom and a 24-pt blanket allocation with the same proportions no longer score identically; the efficiency cost is visible to `f`.
+- Headroom is **equalized across positions** (SF no longer gets 2× the upside of SG).
+
+> **The reference is a CALIBRATION ANCHOR — a frozen, deliberately MEDIOCRE baseline; do not change casually.** In points: the position's top-`COACHING_REFERENCE_BREADTH` attributes at `COACHING_REFERENCE_PRIMARY_PTS`/week, every other on-position attribute at `COACHING_REFERENCE_BASELINE_PTS` (token maintenance), off-position 0 — a coach who nudges the primaries and neglects the rest. Scores exactly **1.0** by construction; both focused and broad coaching beat it. **Changing the reference, cap, or budget re-scales every player's development.**
+
+> ✅ **CPU trains the reference (shipped standalone 2026-07-30, ahead of pillar 3).** The normalization assumes CPU ≈ reference, so CPU scores ~1.0 and the league holds on the ladder. `auto_train_one_cpu_team` no longer rolls a random allocation + random focus (that netted ≈ −9 RT/season and scored ~0.85 → the league would drift under the ladder once quality is live). Instead: a **fixed team-wide reference substrate** (`_CPU_REFERENCE_BASE`) + **player-maximizer-custom** focus steering each player to his own position's reference top-3 (positional-focus is misaligned for 4/5 positions). Result: CPU per-position quality **0.984–1.011** (spread 0.027); CPU in-season RT **−9 → −1.2/season** (absorbed by the offseason absolute-target event, so CPU lands on the ladder). Pillar 3 layers archetype variation *around* this baseline, additively.
+>
+> **COUPLED CONSTANTS — neither can change alone.** `_CPU_REFERENCE_BASE` is fitted so effective allocation (base × ~1.65 focus amplifier on each player's reference top-3) scores ~1.0 against the FROZEN `reference_allocation` anchor. Changing the reference (weights, `COACHING_SATURATION_CAP`, `COACHING_REFERENCE_BREADTH`/`_PRIMARY_PTS`) **or** the base without re-fitting silently drifts CPU off the ladder — locked by `tests/test_cpu_reference_training.py`. This does NOT activate coaching quality (`_coaching_accumulator_for_player` still returns None); it fixes *what CPU trains*, not *whether quality is scored*.
+
+**Named-strategy band (q / f), fitted (cap 4 pts, budget 24, headroom 0.25):**
+
+| strategy (points/week) | PG | SG | SF | PF | C |
+|---|---|---|---|---|---|
+| reference (≈CPU) | 1.00/1.00 | 1.00/1.00 | 1.00/1.00 | 1.00/1.00 | 1.00/1.00 |
+| all-in top (1 attr @5) | 0.79/0.85 | 0.82/0.85 | 0.79/0.85 | 0.80/0.85 | 0.80/0.85 |
+| uniform (2 on all 12) | 0.93/0.93 | 0.89/0.89 | 0.97/0.97 | 0.94/0.94 | 0.92/0.92 |
+| off-position | 0.57/0.85 | 0.48/0.85 | 0.66/0.85 | 0.59/0.85 | 0.59/0.85 |
+| 2-attr focus | 1.04/1.04 | 1.09/1.09 | 1.01/1.01 | 1.03/1.03 | 1.02/1.02 |
+| 3-attr focus | 1.12/1.12 | 1.16/1.16 | 1.09/1.09 | 1.12/1.12 | 1.12/1.12 |
+| 4-attr spread | 1.18/1.18 | 1.20/1.20 | 1.17/1.17 | 1.19/1.19 | 1.21/1.20 |
+| broad/proportional | 1.20/1.20 | 1.18/1.18 | 1.22/1.20 | 1.21/1.20 | 1.21/1.20 |
+
+Focus (2–3 attrs) and breadth (4-attr / proportional) both clear the reference, with the strongest strategies plateauing at f 1.20; only genuine waste (all-in one attr, off-position) hits the floor. 2-attr focus is position-scaled — strong for a concentrated SG (1.09), modest for a do-everything SF (1.01) — by design. **Uniform-across-all-12 lands ~0.89–0.97 (below reference, not at the floor):** a pure coverage metric rates it *mediocre*, not garbage, because 2 pts on every attribute still half-covers the important ones. Hard-flooring it would require penalizing off-position waste (an efficiency term) that fights the points-budget mechanic; left mediocre by choice.
+
+**`training_position` (§9.2).** Coaching quality is scored against a player's `training_position` (persisted FPD field, defaults to `position_intent`, forward-copied at rollover), **not** `position_intent`. A user converting a natural SF toward PG is executing a designed strategy the weight tables already discount on the gain side — scoring against `position_intent` would double-charge it with a quality penalty.
+
+> **CURRENTLY TRUE (expires at pillar 3), not a permanent property:** in-season base training points are **team-wide**, with only the coaching-focus amplifier applied per-player. So `f` is near-identical across a user's roster — coaching quality is presently a **program-level** multiplier, not per-player coaching. When per-player training focus ships (pillar 3, alongside the ~2-point customization tax), base points become genuinely per-player and `f` differentiates within the roster. The metric already reads per-attribute points, so no metric change is needed — only the capture.
+
+**Live wiring.** `develop_rollover` takes a `season_allocation` (per-attr **points/week**); `finish_season` reads it via the `_coaching_accumulator_for_player` seam, which returns `None` until the in-season capture lands with the CPU archetype-training rework (pillar 3). `None` → `f = 1.0` (frozen reference), so CPU and the exact-diff baseline stay byte-identical at pass 1. The capture must be **caller-gated to the user training phase only** (the shared engine has no user/CPU flag), so CPU records nothing and stays at the reference. Only the **quality** half is live intent (feeds `f` on the RT target — level, not shape). The **distribution** half is vestigial: still threaded into `develop_one_offseason` for call-signature compatibility, unused there.
+
+### Weekly in-season (§7.2, Option 3): bounded, does NOT outrun the offseason target
+`PRE_TRAINING_DECAY_BY_YEAR` reduced to FR/SO (-2,0), JR/SR (-1,0) (was FR (-5,-2) … SR (-2,0)); `IN_SEASON_GAIN_SCALE` = **0.18** scales positive weekly gains. The offseason target is **absolute** (`jh_anchor × ladder × f`), so in-season gains only help REACH it — they must not outrun it, or a well-coached player strands himself above the ladder mid-season and the offseason event has no budget left (claw-back on the best-coached users). The scale is fitted so a full season of **reference / normal coaching** lands at **~+4-5 RT/season** (measured 2026-07-30: +4.76), well inside the coaching-f band headroom (~+12 at Average) and below the smallest per-rung ladder increment (~+6), so the offseason always tops up to target and the ladder holds.
+
+**Net is allocation-dependent, NOT universally flat** (the earlier "nets ~0" claim was wrong): reference/normal coaching → ~+4.8/season; thin **random/CPU allocation → ~−10/season** (decay dominates), restored by the absolute-target offseason event. This is why CPU auto-train **must** train the reference (see the hard requirement by `reference_allocation`) — otherwise CPU players swing −10 in-season / +10 at rollover (a large-minus-large treadmill) and, once quality is live, drift under the ladder.
+
+**§7.2 "attributes move visibly" is about ATTRIBUTES, not RT.** RT is a weighted mean, so training moves the player page while barely moving RT: measured per-attribute |Δ| ≈ 0.35–0.5/week. **This cuts both ways — RT can hold while attributes rot underneath, and it did:** the gain table's base-1 was `(0,1)`, far too small to offset in-season decay, so a reference player's non-top-3 (base-1) attributes rotted ~−10 RT/season while RT (leaning on the core) held at 41/54/60 and the offseason (RT-targeted) never restored it. It compounded (SC net **−8.33** over a full cycle) and degraded league **FG% 37.5% → 26.5%** — surviving a full validation pass because every top-line metric masked it.
+
+> **INVARIANT (pinned by `tests/test_in_season_invariants.py`): reference primaries (pts=3) hold near flat; baseline (pts=1) may drag mildly; NEGLECT (base-0) declines; FOCUS (base-4/5) gains.** Point bands are **distinct across 1–5** (`PLAYER_ATTR_GAIN_RANGE_BY_POINTS`) with E[raw|5] held at 4.5; positive gains use a per-attribute fractional remainder so sub-integer signal is not rounded away weekly (framework §10.6). A prior unified (2,4) band for pts 1–3 made the reference flat but erased slider resolution — do not re-unify. Four assertions guard level safety: primary flatness, reference RT below the smallest rung increment (no claw-back), base-0 declines, and the **FULL CYCLE (season + rollover)**. Acceptance (perf_sim_baseline, same seed): trained-under-fix **FG% 36.97%** ≈ untrained 37.5% (was 33.1% pre-fix).
+
+> **Focus amp (open after §10.6):** historically the focus amplifier was the only mechanism that made low allocations reliably register (zeros vanished with amp). With remainder + distinct bands, allocation carries real weight — decide whether amp should stay decisive or become secondary.
+
+### Not exposed (fixed / not target-fittable)
+`FAMILY_TIMING_WEIGHTS`, `FAMILY_TIMING_SHIFT`, `INTRA_FAMILY_GAMMA` (0.20), `PEAK_RUNG_WEIGHTS`, `PEAK_COUNT_DISTRIBUTION`, `RT_COMPRESSION_THRESHOLD`/`RT_SOFT_CAP` (95/130, near-inactive guard). (`IN_SEASON_GAIN_SCALE`, camp, cost, floors, and gain bands are exposed in A — LEVERS. `NON_CORE_GROWTH_MULTIPLIER` / `OFFSEASON_DISTRIBUTION_BLEND` are DEAD — listed there, not tunable.)
+
+### Legacy-player caveat (existing saves, not backfilled) — READ BEFORE DEBUGGING
+A player with no `development` subdoc (a save that predates pass 2) is **lazy-backfilled** at his first rollover: a profile rolled once from his live CH (frozen as `ch_seed`), peaks restricted to his remaining rungs, and persisted so it never re-rolls. His `entry_tier` — if absent — is **derived from his current top RT**, which is *systematically low for old-scale bigs* whose RT collapsed under height gating (§3.6.7): a distorted big reads as a lower tier and develops on a lower ladder, compounding the degradation. This is accepted (recalibration is new-franchises-only, §14); new franchises never hit this path (entry_tier is carried pool→FPD). Do not diagnose a stunted legacy big as a bug.
+
+
+---
+
+## Team attribute retune / EOG leveling (August 2026)
+
+All values below are **NAMED CONSTANTS** — never inline a threshold in a branch. Evaluate any
+change with `scripts/eog_band_tuner.py` (offline, seconds) rather than a 2-hour season.
+
+### Scale — `BackEnd/constants/shot_threshold_scale.py`
+
+**ONE KNOB: change `MIN` only.** Everything else derives. Span is always 200.
+
+| constant | value | effect |
+|---|---|---|
+| `MIN` / `MAX` / `MID` | **−30 / 170 / 70** | the storage window; lower raw = easier makes |
+| `FRANCHISE_INIT_LO` / `_HI` | **MID ± 5 → 65 / 75** | mid-centred (was MID−20/MID−10) — init is COUPLED to EOG band position |
+| `BALANCING_TRAILING` / `_LEADING` | −50 / 150 | derived |
+| `TUTORIAL_USER` / `_COMPUTER` | −30 / 70 | derived |
+| `FAST_BREAK_CORNER_THRESHOLD_BASE` | 150 | derived |
+
+Full workflow — including the **mandatory EOG band re-cut** — in
+[`00_Operations/Shot_Threshold_Scale_Tuning.md`](../00_Operations/Shot_Threshold_Scale_Tuning.md).
+
+### EOG bands — `BackEnd/constants/eog_attr_bands.py`
+
+| constant | value | note |
+|---|---|---|
+| `FG_PCT_MID` / `FG_PCT_HIGH` | **26 / 40** | ⚠️ **INTERIM + SCALE-COUPLED** — cut for the −30…170 window at init 65-75. Every `MIN` change requires a re-cut; carrying the old cuts across two window moves drifted teams −28/season. |
+| `OFF_CONC_REWARD` / `_MIDDLE` | **0.23 / 0.30** | ⚠️ **INTERIM** — cut against a distribution the playbook generator caps (20% ceiling per set play at 4+ plays, a deferred fix) |
+| `DEF_MAX_SHARE_REWARD` / `_MIDDLE` | 0.42 / 0.57 | measured p33/p67 |
+| `FB_CONC_REWARD` / `_MIDDLE` | 0.44 / 0.53 | measured p33/p67 |
+| `PT_CONC_REWARD` / `_MIDDLE` | 0.50 / 0.70 | measured p33/p67 |
+| `REBOUND_BIG` / `_MID` / `_EVEN_MARGIN` | 14 / 7 / 3 | widened from 8/4/3 — 65.5% of games were landing in the extreme bands |
+| `FB_OPP_HEALTHY_BAND` | (7, 13) | |
+| `PT_HEALTHY_BAND` | **(9, 20)** | opponent pressure volume is BIMODAL with identity live (press median 15, others 4-6) |
+| `ST_FG_*` deltas | (−6,−2) / (−1,0)\|(0,1) / (2,6) | gain 6; variance-targeted |
+| `CONC_*` / `DEF_*` deltas | (0,2) / (−1,1) / (−2,−1) | shifted up one notch when thresholds moved to even thirds |
+| `DISC_ABOVE` | (−3,−1) | deepened from (−2,−1) |
+| `CHEM_*` | see file | lifted across the board; the old ladder floored all 128 teams by week 2 |
+
+### Training neglect gates — `BackEnd/models/training_execution_v2.py`
+
+| constant | value | effect |
+|---|---|---|
+| bucket-0 range | `(−1, 0)` | was `(−4,−3)` fight/discipline, `(−3,−1)` chemistry |
+| `NEGLECT_DECAY_CHANCE_CHEMISTRY` | **0.10** | ≈ −3/season (was −93.6) |
+| `NEGLECT_DECAY_CHANCE_DEFAULT` | **0.25** | ≈ −7/season (was −91.6 for discipline) |
+| `FIGHT_GAIN_CHANCE` | **0.45** | gates POSITIVE fight deltas; fight's gains multiplied to +44/season |
+| `TEAM_ATTR_CLAMPS` core-8 | **(−20, 20)** | widened from ±10 |
+
+These are probability gates because the attributes are rolled **~4.7x per week** across their
+source categories, and integer weekly rolls cannot express "−3/season" directly.
+
+### Lineup selection — `BackEnd/utils/db_utils.py`
+
+| constant | value | effect |
+|---|---|---|
+| `LINEUP_EFFECTIVE_WEIGHT_DEFAULT` | **0.25** | `score = w·static + (1−w)·effective`; the intended archetype hook via `starter_bench_gap` |
+| `DEFAULT_FOUL_LIMITS_BY_QUARTER` | `{1:1, 2:2, 3:3, 4:3}` | **not applied in the final 4:00 of Q4 or OT** — where 39% of foul-outs occur |
+| NG thresholds | 0.80 / 0.64 late | eligibility floor; governs star minutes |
+
+### CPU team identity + self-regulation
+
+See [`06_Gameplay_Systems/CPU_Team_Identity_System.md`](../06_Gameplay_Systems/CPU_Team_Identity_System.md) § Tunable Constants for the full table (`SIGNAL_SCALE`, residual slopes, `FUEL_CAPACITY_BOUNDS`, `VISION_COST`, `SOFTMAX_TEMPERATURE`, `MOTION_FLAT`/`CONTAIN_FLAT`, `CONSTANTS_VERSION`, and the ten `SELF_REG_*` constants).
+
+### Reproducibility / instrumentation
+
+| constant | location | value |
+|---|---|---|
+| `EOG_BAND_LOG_TTL_DAYS` | `BackEnd/db.py` | **180** (env `GOB_EOG_BAND_TTL_DAYS`) |
+| `_EOG_BAND_BATCH` | `franchise_routes.py` | **500** — each `insert_many` is a ~45 ms Atlas round-trip |
+| `DEFAULT_HASH_SEED` | `BackEnd/utils/repro.py` | `"0"` |

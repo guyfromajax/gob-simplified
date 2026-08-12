@@ -13,8 +13,9 @@ motion's machinery**; only the deltas in **§ Set plays** are new. This file is 
 > resolve inside **one per-step walk** — `_resolve_hco_offense_shot_dynamic(…, is_setplay=)`. The moment
 > is **fused** into that walk (was a separate `_resolve_hco_moment_walk` pass); the interception contest
 > judges against the **rendered** defender grid (resolve-once → freeze → draw). See **§ StepState: one
-> walk, one grid** and the refactor history in [projects/StepState.md](../projects/StepState.md)
-> (historical) + remaining UESS gaps in [projects/stepState_gaps.md](../projects/stepState_gaps.md).
+> walk, one grid** and the archived refactor history in
+> [projects/Z-Completed/StepState.md](../projects/Z-Completed/StepState.md). Remaining upstream
+> StepState ownership work is tracked in [UESS System §12.3](../05_UESS_System/UESS_System.md#123-stepstate-upstream-ownership-gap).
 > Archived build briefs: [Dynamic_HCO_Motion_Brief.md](../projects/Z-Completed/Dynamic_HCO_Motion_Brief.md),
 > [Dynamic_HCO_SP_Brief.md](../projects/Z-Completed/Dynamic_HCO_SP_Brief.md).
 
@@ -97,6 +98,32 @@ Legacy HCO predetermined a motion turn's outcome up front (flat percentile table
 2. **Per-step Moment** — the on-ball defender contests the ball **moment-first on each REACHED step**, before the offense's chosen shot/dish resolves; a hard outcome (steal/foul/turnover) ends the possession there. Migrated from HCT's D8 model, **fused into the walk** (2026-07-12).
 3. **Per-step offense walk** — subtle movement beats, defender freeze reaction, and the Universal Shoot Decision (`should_shoot`) that decides when/what to shoot.
 
+#### Attack-drive contest: shared core, half-court consumption
+
+HCO attack drives share the same `_resolve_moment` contest core used by Fast
+Break and broken HCT/FCP cutoffs, but intentionally do not share their
+post-contest transition behavior. `_resolve_hco_drive_contest()` calls
+`_resolve_moment(..., exclude_steal=True, clean_stop=True,
+neutral_band=DRIVE_NEUTRAL_BAND)` with HCO offensive/defensive efficiency
+modifiers. Help-cutoff geometry reuses `best_cutoff_on_drive()`; a help collision
+is resolved through the same HCO contest helper so its clean-stop band and
+tuning remain identical to the primary matchup.
+
+| Shared outcome | HCO tier / behavior |
+|----------------|---------------------|
+| `POS_O` | Tier A blow-by to the rim, unless a help defender makes a geometric cutoff |
+| `D_FOUL` | Tier A plus defensive-foul contact; existing shooting-foul/and-1 routing owns resolution |
+| `NEUTRAL` | Tier B contested stop at `DRIVE_NEUTRAL_STOP_FRACTION`; re-read pull-up versus dish |
+| `D_STOP` | Tier C early clean stop at the returned ratio; re-enter the half-court read |
+| `O_FOUL` / `DEAD BALL` | Tier C terminal contact through existing foul/turnover routing |
+
+The shared boundary is contest math and outcome vocabulary—not a universal
+reaction to the outcome. Broken HCT/FCP transition stops reset directly to HCO,
+and Fast Break owns its dynamic stop decision; neither should be forced onto the
+HCO pull-up/dish read. Canonical transition mapping lives in
+[`HCT_System.md`](HCT_System.md#the-possession-loop); Fast Break consumption lives
+in [`Fast_Break_System.md`](Fast_Break_System.md#meet-resolution-order-never-double-foul).
+
 ---
 
 ### Where it hooks in
@@ -145,7 +172,7 @@ Two decoupled per-turn rolls in `_resolve_hco_offense_shot_dynamic`:
 **Fused into the walk** (2026-07-12) — the moment rolls **inside** `_resolve_hco_offense_shot_dynamic`, moment-first on each reached step, gated by `roll_moment=True` (only the one authoritative up-front walk rolls it; recalibration + fallback re-walks pass `False`). The standalone `_resolve_hco_moment_walk` is **retired from the spine** but kept as the unit-tested reference spec — keep the two in sync.
 
 1. **Engagement:** rolled ONCE per turn, by defense aggression → % of possessions with any contest (`MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION` = `{0:5, 1:20, 2:35, 3:50, 4:75}`), else no moment this turn. Same gate for man and zone.
-2. **Per REACHED step (moment-first):** before the offense's scripted-pass / shot / dish resolves, resolve the on-ball defender — **man:** the matchup defender (`off_to_def[bh_pos]`); **zone:** the defender whose zone polygon covers the BH's spot (`_zone_bh_defender` → `_zone_boundaries_for_spot` + `_defender_for_zone_point`, nearest-zone centroid fallback, then position-on-position). Fire `_resolve_hco_moment` → `_resolve_moment` (shared HCT D8 contest), scaled by `HCO_MOMENT_SCALAR` (man) / `HCO_ZONE_MOMENT_SCALAR` (zone). **The walk only rolls the moment on steps the offense actually reaches — it can no longer fire on a step the offense skipped by shooting earlier** (the fusion's whole point; per Decision #1: moment-first, first terminal in step order wins).
+2. **Per REACHED step (moment-first):** before the offense's scripted-pass / shot / dish resolves, resolve the on-ball defender — **man:** the matchup defender (`off_to_def[bh_pos]`); **zone:** prefer the renderer's stamped guard map (`step["_step_state"]["guard"]`) and select the defender explicitly assigned to the current ball-handler ID. If that stamp is unavailable, `_zone_bh_defender` falls back to zone-polygon containment, nearest-zone centroid, then position-on-position. Fire `_resolve_hco_moment` → `_resolve_moment` (shared HCT D8 contest), scaled by `HCO_MOMENT_SCALAR` (man) / `HCO_ZONE_MOMENT_SCALAR` (zone). **The walk only rolls the moment on steps the offense actually reaches — it can no longer fire on a step the offense skipped by shooting earlier** (the fusion's whole point; per Decision #1: moment-first, first terminal in step order wins).
 3. **Hard outcome ends the walk here:** `STEAL` / `DEAD_BALL_TURNOVER` / `O_FOUL` / `D_FOUL` → returned as a moment dict with the reached-walk skeleton truncated at this step (`moment_stop_index`); the caller sets `result`, and the **existing** non-shot resolution + `apply_stopper_system_to_skeleton` route/render it (no new emission path). `NEUTRAL` (defender won, no event) / `POS_O` (offense beat defender) → append a reach-in tag, continue the walk.
 4. **Credited defender + stop-index stash:** a hard outcome stashes the contesting defender's id (`game_state["_hco_moment_defender_id"]`) + the step it fired at (`_hco_moment_stop_index`); the non-shot block + `apply_stopper` consume them so the steal credit (`stealer_id`), terminal reach-in, and stopper truncation land on the **actual** defender/step (critical for zone; also kills the old "ball snap-back on a non-shot outcome" teleport by pinning the outcome to its step).
 
@@ -311,7 +338,9 @@ A defender sitting in a passing lane can disrupt an HCO pass. **Contestable:** h
 - **Contest (interception):** when a dish/kickout **is** thrown, run `resolve_pass_contest`; `INTERCEPT`/`BAT_OOB` converts the would-be shot into a turnover, routed through the existing non-shot resolution + stopper system (same path as the per-step Moment). `complete` → the shot resolves as today. `INTERCEPT` → STEAL via `_finalize_hco_pass_interception`; `BAT_OOB` → offense retains (side inbound, no stats) via `_finalize_hco_pass_bat_oob`.
 - **Result-payload gotcha (serialization):** an HCO non-shot finalize must **not** return the raw motion `roles` — its `action_timeline` / `touch_counts` are keyed by **Player objects**, and `JSONResponse` rejects non-str dict keys (`convert_players` coerces values, not keys). Strip both before returning (every HCO *shot* path already does). A key-coercion safety net in `convert_players` backstops any that slip through. (Fixed: BAT_OOB was returning raw roles → `TypeError: keys must be str… not Player`.)
 
-**Defender coords at decision time** — the contest judges against the **rendered** defender grid: the engine stamps `compute_defender_grid` (the animator's own code) on each step *before* the walk (`_stamp_contest_defender_grid`), and `_hco_step_def_xy` reads that stamp (man + zone, one display frame). So the contest sees what gets DRAWN — no separate reconstruction that could drift. See **§ StepState: one walk, one grid**. (Legacy per-mode reconstruction — man `get_defender_coords`, zone `assign_all_zone_defenders` — survives only as the unstamped fallback.)
+**Defender coords and assignments at decision time** — the contest judges against the **rendered** defender grid: the engine stamps `compute_defender_grid` (the animator's own code) on each step *before* the walk (`_stamp_contest_defender_grid`), and `_hco_step_def_xy` reads that stamp (man + zone, one display frame). For zone, the same stamp also carries `assign_all_zone_defenders`'s `{def_pos: guarded_offensive_player_id}` map; moment and pass-contest selection invert that map to identify who the render actually assigned to the BH. So the roll, credit, and animation use one assignment instead of reconstructing it from an idealized spot. (Legacy per-mode reconstruction and polygon selection survive only as unstamped/context fallbacks.)
+
+**Zone guard-map selection status (shipped July 2026):** the prior slot/polygon-only selection made the credited moment defender the raw nearest defender in only about 38% of measurable zone steals. Using the render's guard map raised that diagnostic to about 65% and removed the farthest-defender picks; more importantly, credited defender now matches the rendered guardian by construction. The remaining cases where that guardian is not the physically nearest defender are an intentional consequence of `assign_all_zone_defenders`, not a moment-credit bug. Because changing the selected defender also changes whose attributes resolve the strip, this was a gameplay/draw-moving fix; its recorded distributional multi-seed verification and seeded-reference re-cut remain verification debt.
 
 **Lane distance** (perpendicular, passed as a param to `resolve_pass_contest` so HCT's `8.0` is untouched):
 
@@ -363,10 +392,12 @@ only draws. The unification pulled the HCO turn toward this. Fully-met pieces:
   step-based trajectory was removed (it double-fired with the imperative send — "ball → OOB then bounced
   off the defender").
 
-**Remaining full-UESS gaps** (twice-drawn grid — agree to ~0%; imperative bat-OOB shape; emitter/animator
-still re-derive meet-points + timing) are catalogued in
-[projects/stepState_gaps.md](../projects/stepState_gaps.md). The blow-by-blow refactor history is in
-[projects/StepState.md](../projects/StepState.md) (now a historical record).
+**Remaining actionable UESS work:** StepState is not yet the upstream owner of every game-relevant
+per-step value; emitters still derive some meet-points, timing, advance gates, and interrupts. The
+canonical scope is [UESS System §12.3](../05_UESS_System/UESS_System.md#123-stepstate-upstream-ownership-gap).
+The two-grid ordering constraint and imperative cosmetic bat-OOB shape above are documented behavior,
+not active correctness gaps. The blow-by-blow refactor history is archived in
+[projects/Z-Completed/StepState.md](../projects/Z-Completed/StepState.md).
 
 ---
 
@@ -429,7 +460,7 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 
 | Item | Status / notes |
 |---|---|
-| **Zone-defense moments** | ✅ Shipped (June 2026). On-ball defender resolved by zone polygon (`_zone_bh_defender`); `HCO_ZONE_MOMENT_SCALAR` dial; contest uses the **same D8 weights** as man for v1 (reweighting toward deflections/help is a future tuning pass). |
+| **Zone-defense moments** | ✅ Shipped. On-ball defender prefers the rendered per-step guard assignment, with polygon/centroid/position fallback when unstamped; `HCO_ZONE_MOMENT_SCALAR` dial; contest uses the **same D8 weights** as man for v1 (reweighting toward deflections/help is a future tuning pass). |
 | **Zone contest reweighting** | Deferred — v1 reuses man's D8 steal/dead-ball/charge weights. Zones realistically strip less and force more deflections/help; revisit `HCT_D8_*` weights (or a zone-specific set) + `HCO_ZONE_MOMENT_SCALAR` after live observation. |
 | **Passing lanes & hot-read openness** | ✅ Shipped — needs prototype tuning (see §4). Decision gate ("truly open") + interception contest, **man + zone**, hot-read/kickout dishes only. Gate clears the 0.1–0.9 lane band, so the contest's net-new interceptions are the **receiver's man jumping the entry pass** (t→1.0), gated by passer skill — frequency tunable via `HCO_PASS_LANE_DIST_*` / `HCO_PASS_SAFETY_BASE` / `HCO_PASS_INTERCEPT_TIER_MID`. Intercept → STEAL (`is_interception`) via `_finalize_hco_pass_interception` (resolve_turnover_logic + stopper). |
 | **FCP pass contests @ 8** | 🔨 Planned (§4 stage 3). FCP has **no** pass-disruption today — needs a pass-beat audit (inbound / press-break / advance) before wiring `resolve_pass_contest` with `FCP_PASS_LANE_DIST = 8.0`. (NB: interceptions seen on "FCP" today are the post-steal **rim-runner fast break** mechanic, labeled `FAST_BREAK`, not FCP.) |
@@ -478,7 +509,7 @@ MONGO_URI="" MONGO_DB_NAME="gob-test" python3 dynamic_setplay_prototype.py
 - [projects/Z-Completed/Dynamic_HCO_Motion_Brief.md](../projects/Z-Completed/Dynamic_HCO_Motion_Brief.md) — archived motion build brief
 - [projects/Z-Completed/Dynamic_HCO_SP_Brief.md](../projects/Z-Completed/Dynamic_HCO_SP_Brief.md) — archived set-play build brief
 - [ENV_VARIABLES.md](../ENV_VARIABLES.md) — `GOB_DYNAMIC_HCO_DEFENSE` (motion/set-play flags retired)
-- [projects/StepState.md](../projects/StepState.md) (historical refactor record) · [projects/stepState_gaps.md](../projects/stepState_gaps.md) (remaining UESS gaps)
+- [projects/Z-Completed/StepState.md](../projects/Z-Completed/StepState.md) (historical refactor record) · [UESS System §12.3](../05_UESS_System/UESS_System.md#123-stepstate-upstream-ownership-gap) (remaining upstream-ownership work)
 - [Shot_Micro_Movements_System.md](Shot_Micro_Movements_System.md) — shot-time micros (pump fake, dunk, etc.) — separate from mid-HCO subtle movement
 - [HCO_Turn_Resolution_System.md](HCO_Turn_Resolution_System.md) · [Motion_Offense_Shot_System.md](Motion_Offense_Shot_System.md) · [HCT_System.md](HCT_System.md) · [FCP_System.md](FCP_System.md) · [Stopper_System.md](Stopper_System.md) · [Steal_System.md](Steal_System.md) · [SFX_System.md](../11_Design_Systems/SFX_System.md)
 

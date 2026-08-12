@@ -5,8 +5,7 @@ eog_band_report.py — parse a season's [EOG-BAND] instrumentation into tables.
 Reads the JSONL file written by calculate_attr_changes when GOB_EOG_BAND_LOG=1
 (see BackEnd/api/franchise_routes.py). Each line is `[EOG-BAND] {json}`.
 
-Emits three tables, each split by is_distant_sim (distant games bypass the usage
-logic for six attributes, so their bands are not comparable to live games):
+Emits three tables for the authoritative full-engine EOG records:
 
   1. Branch frequency — per attribute, share of team-games hitting each band.
   2. Saturation       — per attribute, share of team-games with clamped=true,
@@ -33,14 +32,35 @@ HEADER_TAG = "[EOG-BAND-HEADER] "
 
 # Raw inputs to histogram, by the attribute record that carries them.
 HISTOGRAM_INPUTS = [
+    # Post-Structural-Pass measures: concentration (max_share) for offense/fb/pt,
+    # volume for the two opponent modifiers. distinct_plays_run is logged for
+    # reference only (not a gate).
+    ("offensive_efficiency", "max_share", "float"),
     ("offensive_efficiency", "distinct_plays_run", "int"),
-    ("offensive_efficiency", "total_times_run", "int"),
-    ("pt_efficiency", "pt_total_attempts", "int"),
-    ("pt_opp_modifier", "pt_total_attempts", "int"),
-    ("fb_efficiency", "fb_total", "int"),
-    ("fb_opp_modifier", "opponent_fb_total", "int"),
+    ("fb_efficiency", "max_share", "float"),
+    ("fb_efficiency", "volume", "int"),
+    ("pt_efficiency", "max_share", "float"),
+    ("pt_efficiency", "volume", "int"),
+    ("fb_opp_modifier", "opponent_fb_volume", "int"),
+    ("pt_opp_modifier", "opponent_pt_volume", "int"),
     ("defensive_efficiency", "max_share", "float"),
+    # rebound_modifier bands on the DIFFERENTIAL (eog_attr_rules.rebound_modifier_change:
+    # `diff = treb - opp_treb`, cut at +-8 / +-4 / within-3). The instrumentation logs the
+    # two totals, not the difference, so it is DERIVED below — without this the quantity
+    # the ladder actually keys on has no histogram at all.
+    ("rebound_modifier", "differential", "int"),
 ]
+
+# (attr, field) -> f(inputs) -> value | None, for quantities the bands key on but the
+# instrumentation does not log directly.
+DERIVED_INPUTS = {
+    ("rebound_modifier", "differential"): (
+        lambda i: (i["treb"] - i["opp_treb"])
+        if isinstance(i.get("treb"), (int, float))
+        and isinstance(i.get("opp_treb"), (int, float))
+        else None
+    ),
+}
 
 
 def load_records(path: str) -> tuple[list[dict], list[dict]]:
@@ -61,11 +81,20 @@ def load_records(path: str) -> tuple[list[dict], list[dict]]:
                 continue
             payload = line[len(TAG):] if line.startswith(TAG) else line
             try:
-                records.append(json.loads(payload))
+                rec = json.loads(payload)
             except json.JSONDecodeError:
                 bad += 1
+                continue
+            # A record with no `attr` is not a band row (a stray header variant, a
+            # truncated line, a future record_type). Dropping it here keeps one bad
+            # line from killing the whole report after a multi-hour run — every
+            # downstream table groups by attr and sorts the keys.
+            if not isinstance(rec, dict) or not isinstance(rec.get("attr"), str):
+                bad += 1
+                continue
+            records.append(rec)
     if bad:
-        print(f"# warning: skipped {bad} unparseable line(s)", file=sys.stderr)
+        print(f"# warning: skipped {bad} unparseable/non-band line(s)", file=sys.stderr)
     return headers, records
 
 
@@ -82,28 +111,7 @@ def print_headers(headers: list[dict]) -> None:
         flags = h.get("flags", {})
         print(f"{tag}utc={h.get('utc')}  git_sha={h.get('git_sha')}")
         print(f"{'    ' if len(headers) > 1 else '  '}flags: "
-              f"ALL_GAMES_FULL_SIM={flags.get('FRANCHISE_ALL_GAMES_FULL_SIM')}  "
-              f"ALL_TEAMS_AUTOTRAIN={flags.get('FRANCHISE_ALL_TEAMS_AUTOTRAIN')}  "
               f"CPU_SIM_USE_POOL={flags.get('FRANCHISE_CPU_SIM_USE_POOL')}")
-
-
-def check_strict_distant(records: list[dict]) -> list[dict]:
-    """Distant rows in the measured window (weeks 1-26) — these corrupt the six
-    usage-gated attributes (they get randint(-2,1) instead of a real band). Returns
-    the offending records."""
-    return [
-        r for r in records
-        if r.get("is_distant_sim")
-        and isinstance(r.get("week"), int)
-        and 1 <= r["week"] <= REGULAR_SEASON_LAST_WEEK
-    ]
-
-
-def split_by_distant(records: list[dict]) -> dict[bool, list[dict]]:
-    out: dict[bool, list[dict]] = {False: [], True: []}
-    for rec in records:
-        out[bool(rec.get("is_distant_sim"))].append(rec)
-    return out
 
 
 def _pct(n: int, d: int) -> str:
@@ -255,13 +263,15 @@ def saturation(records: list[dict]) -> None:
 # used only to detect unclamped transitions. Keep in sync if clamps change.
 CLAMP_BOUNDS = {
     "shot_threshold": (0, 200),
-    "rebound_modifier": (0.0, 0.4),
+    "rebound_modifier": (0.0, 1.0),
     "team_chemistry": (7, 25),
+    "momentum_score": (-10, 10),
 }
 
 
 def _clamp_bounds(attr: str) -> tuple:
-    return CLAMP_BOUNDS.get(attr, (-10, 10))
+    # Default (-20, 20) is the core-8 clamp; momentum_score keeps its own (-10, 10) above.
+    return CLAMP_BOUNDS.get(attr, (-20, 20))
 
 
 def combined_drift(records: list[dict]) -> None:
@@ -357,13 +367,20 @@ def input_histograms(records: list[dict]) -> None:
 
     print("\n## 3. Input histograms (threshold-setting raw inputs)")
     for attr, field, kind in HISTOGRAM_INPUTS:
-        values = [
-            r["inputs"][field]
-            for r in by_attr.get(attr, [])
-            if isinstance(r.get("inputs"), dict) and field in r["inputs"]
-            and isinstance(r["inputs"][field], (int, float))
-        ]
-        print(f"\n  {attr}.{field}  (n={len(values)})")
+        derive = DERIVED_INPUTS.get((attr, field))
+        values = []
+        for r in by_attr.get(attr, []):
+            inputs = r.get("inputs")
+            if not isinstance(inputs, dict):
+                continue
+            if derive is not None:
+                v = derive(inputs)
+            else:
+                v = inputs.get(field)
+            if isinstance(v, (int, float)):
+                values.append(v)
+        suffix = "  (derived)" if derive is not None else ""
+        print(f"\n  {attr}.{field}  (n={len(values)}){suffix}")
         _histogram(values, is_float=(kind == "float"))
 
 
@@ -389,12 +406,6 @@ def main() -> int:
         default=os.environ.get("GOB_EOG_BAND_LOG_FILE", "eog_band_log.jsonl"),
         help="Path to the [EOG-BAND] JSONL file.",
     )
-    parser.add_argument(
-        "--strict",
-        action="store_true",
-        help="Hard-fail (exit 2) if any distant-sim row appears in weeks 1-26 — "
-             "those corrupt the six usage-gated attributes' thresholds.",
-    )
     args = parser.parse_args()
 
     if not os.path.exists(args.path):
@@ -405,22 +416,7 @@ def main() -> int:
     print(f"# Loaded {len(records)} [EOG-BAND] records from {args.path}")
     print_headers(headers)
 
-    offenders = check_strict_distant(records)
-    if offenders:
-        weeks = sorted({r["week"] for r in offenders})
-        games = sorted({r.get("game_id") for r in offenders})
-        msg = (f"{len(offenders)} distant-sim row(s) in weeks 1-26 "
-               f"(weeks={weeks}, {len(games)} game(s)) — the six usage-gated "
-               f"attributes are GARBAGE for those games. Re-run with "
-               f"FRANCHISE_ALL_GAMES_FULL_SIM=1.")
-        if args.strict:
-            print(f"\n❌ STRICT FAIL: {msg}", file=sys.stderr)
-            return 2
-        print(f"\n⚠️  {msg}", file=sys.stderr)
-
-    by_distant = split_by_distant(records)
-    report_section("LIVE GAMES (is_distant_sim=false)", by_distant[False])
-    report_section("DISTANT-SIM GAMES (is_distant_sim=true)", by_distant[True])
+    report_section("FULL-ENGINE GAMES", records)
     return 0
 
 

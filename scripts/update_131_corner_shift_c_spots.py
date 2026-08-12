@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Update 1-3-1 Zone corner-shift C coverage in gob + gob-staging defenses.
+Update 1-3-1 Zone corner-shift C coverage in one explicit database.
 
 For docs with name "1-3-1 Zone":
   zone_definitions.lower_corner_shift.C →
@@ -24,37 +24,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
-from pymongo import MongoClient
-
 ROOT = Path(__file__).resolve().parents[1]
-TARGET_DBS = ("gob", "gob-staging")
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 DEFENSE_NAME = "1-3-1 Zone"
 
 LOWER_C_REQUIRED = ("lower lowPost", "lower midBaseline", "lower corner")
 UPPER_C_REQUIRED = ("upper lowPost", "upper midBaseline", "upper corner")
-
-
-def _load_env(filepath: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    if not filepath.exists():
-        return values
-    for raw_line in filepath.read_text(encoding="utf-8").splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        values[key.strip()] = value.strip().strip('"').strip("'")
-    return values
-
-
-def _load_mongo_uri() -> str:
-    for env_file in (ROOT / ".env.local", ROOT / ".env"):
-        for key, value in _load_env(env_file).items():
-            os.environ.setdefault(key, value)
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment, .env.local, or .env")
-    return uri
 
 
 def merge_c_spots(existing: Any, required: tuple[str, ...]) -> list[str]:
@@ -70,8 +46,8 @@ def merge_c_spots(existing: Any, required: tuple[str, ...]) -> list[str]:
     return out
 
 
-def _update_db(client: MongoClient, db_name: str, *, apply: bool) -> int:
-    coll = client[db_name]["defenses"]
+def _update_db(database, db_name: str, *, apply: bool) -> int:
+    coll = database["defenses"]
     docs = list(coll.find({"name": DEFENSE_NAME}))
     if not docs:
         print(f"[{db_name}] No defenses doc with name={DEFENSE_NAME!r}")
@@ -130,24 +106,17 @@ def _update_db(client: MongoClient, db_name: str, *, apply: bool) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--dry-run", action="store_true", help="Print planned changes only")
-    mode.add_argument("--yes", action="store_true", help="Apply updates to both DBs")
+    parser.add_argument("--db", choices=("gob-staging", "gob"), required=True)
+    parser.add_argument("--apply", action="store_true", help="Apply updates")
     args = parser.parse_args()
 
-    os.chdir(ROOT)
-    uri = _load_mongo_uri()
-    client = MongoClient(uri, serverSelectionTimeoutMS=15000)
-    client.admin.command("ping")
-
-    apply = bool(args.yes)
+    connection = connect_migration_target(args.db, write=args.apply)
+    apply = bool(args.apply)
     print(f"Mode: {'APPLY' if apply else 'DRY-RUN'}")
-    print(f"Target DBs: {', '.join(TARGET_DBS)}")
+    print(f"Target DB: {args.db}")
     print(f"Filter: name == {DEFENSE_NAME!r}\n")
 
-    total = 0
-    for db_name in TARGET_DBS:
-        total += _update_db(client, db_name, apply=apply)
+    total = _update_db(connection.database, args.db, apply=apply)
 
     print(f"\nDone. Documents modified: {total}")
     return 0

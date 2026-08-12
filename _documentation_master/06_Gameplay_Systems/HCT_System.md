@@ -33,7 +33,10 @@
    - **ATTACK_BASKET_SHOT / ATTACK_BASKET_DRIVE** → `resolve_hct_attack_basket_shot` / `resolve_hct_attack_basket_drive`.
    - **HCO / DEAD BALL / STEAL / FOUL** → wrapper in `_resolve_half_court_trap_dynamic_first_cut` sets possession, `next_play_type`, stats, foul/steal side effects.
    - **Bat-OOB pass** → `result_type = DEAD BALL` + `bat_oob = True` — offense **retains** (side inbound, no TO, no possession flip).
-6. **Emit animation** — `build_dynamic_hct_animation_steps()` → `animation_steps[]` on turn result (UESS schema playback). Post-step hook: `_runHctBatOobBallSend` / `_runSchemaBatOobBallSend` for batted-ball ball flight (`batOobAnimation.js`).
+6. **Emit animation** — `build_dynamic_hct_animation_steps()` → backend-authored
+   `animation_steps[]`, followed by the shared PressureStepState freeze/project
+   bridge. Pass interceptions include flight to the interceptor; batted-OOB
+   includes contact and loose-ball drift to the backend-owned OOB target.
 7. **Record stats** — `_record_hct_stats` + per-play `scouting_data["defense"]["hct_trap_plays"][play_key]`.
 
 ---
@@ -126,7 +129,27 @@ Each loop iteration (after step 0 walk-up):
 
 **Pass receipt (off-ball re-key):** When the pass completes and a new teammate becomes BH (e.g. PG→SG), `_refresh_hct_off_targets_for_bh` rebuilds alias-map spacing for **SG-as-handler** — fresh pos1..pos4 range targets for the other four; the new BH keeps their **catch spot** (no x=44 snap). Teammates sprint toward those targets during pass flight and on subsequent hold/advance beats.
 
-**Broken-cutoff consumption** (shared with FCP via `turn_mode="fcp"`): see [`attack_contest_unification.md`](../projects/attack_contest_unification.md). No dribble-dead RETAIN on meet — stop resets to HCO; beat-the-man continues the drive.
+**Broken-drive cutoff contract** (shared with FCP via `turn_mode="fcp"`):
+
+1. `best_cutoff_on_drive()` / `cutoff_meet_point()` selects the earliest defender
+   who can reach the ball handler's straight-line path. HCT/FCP use standard AG
+   movement rates.
+2. At the meet, `resolve_cutoff_contest(..., exclude_steal=True)` delegates to the
+   shared D8 `_resolve_moment` contest. A full-speed cutoff collision cannot
+   become a pickpocket steal.
+3. `map_cutoff_outcome_to_hct_transition()` applies transition-specific
+   consumption:
+
+| Shared outcome | Broken HCT/FCP result |
+|----------------|-----------------------|
+| `POS_O` | `CONTINUE_ATTACK`: finish from the meet to the y-keyed ABA target, then run the existing HCO-vs-Fast-Break ABA read |
+| `NEUTRAL` / `D_STOP` / unknown non-terminal | `STOP_HCO`: the transition ends and resets to HCO; no half-court pull-up/dish read |
+| `D_FOUL` / `O_FOUL` / `DEAD BALL` | Terminal at the meet through the existing foul/turnover path |
+
+The contest vocabulary and geometry are shared; consumption remains
+context-specific. Fast Break documents its own stop tree in
+[`Fast_Break_System.md`](Fast_Break_System.md), while half-court drives use the
+pull-up/dish behavior in [`Dynamic_HCO_System.md`](Dynamic_HCO_System.md).
 
 ---
 
@@ -186,7 +209,9 @@ On each HCT pass, `_resolve_hct_pass_contest` → `resolve_pass_contest()`:
 
 On-ball defenders within moment range of the passer are **excluded** from the intercept pool (trappers can't peel to steal their own trap outlet).
 
-**Frontend bat-OOB:** `turnData.bat_oob` + `bat_oob_contact` / `bat_oob_deflector_id`; schema steps animate players; imperative overlay flies ball passer → contact → deflected OOB (`FrontEnd/static/js/phaser/animation/batOobAnimation.js`).
+**Frontend bat-OOB:** the dynamic schema path renders passer → contact → OOB
+from backend-authored steps. The older imperative `batOobAnimation.js` send is
+fallback-only when compatible schema trajectory metadata is absent.
 
 ---
 
@@ -234,9 +259,23 @@ Announcements: `"TRAP!"` base text; `"Batted Ball Out Of Bounds!"` for bat-OOB; 
 - **Steps 1..N:** one step per `loop_segment` (converge, advance, hold, pass flight, cutoff drive, etc.).
 - **Turn-stop events:** `DEAD_BALL_TURNOVER`, `STEAL`, `FOUL`, shot handoff — consumed by `animationPlayback.dispatchTurnStop`.
 - **Post-shot:** `_build_post_shot_sub_steps` appended for ABA / FB shot branches.
+- **Pass interception:** `hct_interception` projects a real pass flight to the
+  backend-owned contact point and ends with the stealer owning the ball before
+  any post-steal transition.
+- **Batted OOB:** `hct_bat_oob_contact` and `hct_bat_oob_drift` project contact
+  and loose-ball movement to the backend-owned OOB target; offense retains.
+- **PressureStepState:** TurnManager freezes/project all HCT/FCP steps through
+  `pressure_step_state.py`. Current formal slices cover entry, movement/pass,
+  interception/OOB, terminal, shot-setup, and post-shot steps. Direct upstream
+  StepState builders remain future architecture work.
 - **Legacy path:** if no `animation_steps`, fall back to skeleton + stopper (deprecated for HCT when dynamic flag is on). See `Stopper_System.md`.
 
-Frontend dispatch: `AnimationEngine.runSchemaPlaybackTurn` for HCT turns with steps; HCT bat-OOB post-hook after schema settles.
+Frontend dispatch: `AnimationEngine.runSchemaPlaybackTurn` for HCT turns with
+steps. Schema `STEAL`, `FOUL`, and `DEAD_BALL_TURNOVER` handlers are deliberately
+cleanup-only: backend steps own motion/outcomes and normal turn finalization
+owns announcements and next-turn routing. The historical repeating receive-SFX
+freeze has no confirmed cyclic schema source; the repeated-step Sentry guard is
+tracked in `00_Operations/Bespoke_Sentry.md` pending representative manual QA.
 
 ---
 
@@ -246,6 +285,7 @@ Frontend dispatch: `AnimationEngine.runSchemaPlaybackTurn` for HCT turns with st
 - `BackEnd/engine/phase_resolution.py` — `resolve_half_court_trap_logic`, `_resolve_half_court_trap_dynamic_first_cut`, `USE_DYNAMIC_HCT`
 - `BackEnd/engine/dynamic_hct.py` — `compute_dynamic_hct_turn`, loop, moments, cutoff, pass wiring
 - `BackEnd/engine/dynamic_hct_step_emitter.py` — schema step assembly
+- `BackEnd/engine/pressure_step_state.py` — shared FCP/HCT freeze and projection bridge
 - `BackEnd/engine/dynamic_hct_shot.py` — ABA + broken-HCT shot resolution
 - `BackEnd/engine/hct_trap_plays.py` — `HCTPlay` + three registered plays
 - `BackEnd/constants/hct_trap_play_types.py` — keys, weights, selection
@@ -255,8 +295,8 @@ Frontend dispatch: `AnimationEngine.runSchemaPlaybackTurn` for HCT turns with st
 - `BackEnd/utils/shared_defense.py` — HCT zone centroids, trap formation helpers
 
 **Frontend**
-- `FrontEnd/static/js/phaser/animation/AnimationEngine.js` — schema playback + HCT bat-OOB hooks
-- `FrontEnd/static/js/phaser/animation/batOobAnimation.js` — bat collision + deflected OOB ball path
+- `FrontEnd/static/js/phaser/animation/AnimationEngine.js` — schema playback + legacy bat-OOB fallback gate
+- `FrontEnd/static/js/phaser/animation/batOobAnimation.js` — legacy/missing-schema bat-OOB fallback
 - `FrontEnd/static/js/phaser/animation/animationPlayback.js` — step renderer + turn-stop dispatch
 - `FrontEnd/static/js/phaser/animation/turnAnimation.js` — BIP inbound for HCT
 

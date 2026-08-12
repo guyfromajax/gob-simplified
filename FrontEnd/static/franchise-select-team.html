@@ -9,26 +9,88 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-  <title>Choose Your Program</title>
-  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
+  <title>Who are you coaching?</title>
   <link rel="stylesheet" href="/resource-pages.css">
   <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/css/username-modal.css">
+  <link rel="stylesheet" href="/css/fonts.css">
   <link rel="stylesheet" href="/franchise-select-team.css">
   <script src="/js/shared/pageLoadOverlay.js"></script>
-  <link rel="stylesheet" href="/css/fonts.css">
 </head>
 <body>
   <!-- Google Tag Manager (noscript) -->
   <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
   height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
   <!-- End Google Tag Manager (noscript) -->
-  <div class="team-select-page">
-    <a id="team-select-back-link" class="team-select-back-link" href="/mode-select.html">Back</a>
-    <h1 id="page-title">Who Are You Coaching?</h1>
-    <p id="page-subtitle">You're building this program from the ground up. Choose wisely.</p>
+
+  <a id="team-select-back-link" class="team-select-back-link" href="/mode-select.html">Back</a>
+
+  <div id="mode-banner" class="mbar" hidden>
+    <div class="mbar-in">
+      <span class="mb-k">Team Builder</span>
+      <span class="mb-s">Step 1 of 3</span>
+      <div class="mb-t">Choose whose place your program takes. <b>Nothing is committed yet.</b></div>
+      <button type="button" class="mb-x" id="tb-cancel-builder">Cancel</button>
+    </div>
+  </div>
+
+  <div id="claim-root" class="cl">
+    <div class="hd">
+      <div class="hd-t">
+        <h1 id="page-title">Who are you coaching?</h1>
+        <p id="page-subtitle">Take over one of the 128 programs below.</p>
+      </div>
+    </div>
+
+    <div id="unfinished-draft" class="draft-card" hidden></div>
+
+    <div id="team-builder-entry" class="tbe">
+      <div class="tbe-t">
+        <div class="tbe-h">Or put your own program in the league</div>
+        <p>Your school <b>takes an existing program's place</b> — its conference, its region, its schedule.</p>
+      </div>
+      <div class="tbe-a">
+        <button type="button" class="btn" id="open-team-builder">Open Team Builder</button>
+      </div>
+    </div>
+
     <div id="team-select-error" class="team-select-error" hidden></div>
-    <div id="team-container"></div>
+
+    <div class="fbar" id="filter-bar">
+      <div class="srch">
+        <i></i>
+        <input id="filter-search" type="search" placeholder="Search program, conference or state" autocomplete="off">
+      </div>
+      <div class="fsel" data-filter="talent">
+        <label>Talent</label>
+        <select id="filter-talent"></select>
+      </div>
+      <div class="fsel" data-filter="prestige">
+        <label>Prestige</label>
+        <select id="filter-prestige"></select>
+      </div>
+      <div class="fsel" data-filter="size">
+        <label>Size</label>
+        <select id="filter-size"></select>
+      </div>
+      <div class="fsel" data-filter="experience">
+        <label>Experience</label>
+        <select id="filter-experience"></select>
+      </div>
+      <div class="fsel" data-filter="geo">
+        <label>Geography</label>
+        <select id="filter-geo"></select>
+      </div>
+      <div class="fspace"></div>
+      <div class="fcount"><b id="match-count">0</b> of 128 match</div>
+      <button type="button" class="fclear" id="filter-clear" hidden>Clear</button>
+    </div>
+
+    <div id="conference-grid"></div>
+  </div>
+
+  <div id="action-bar" class="abar" aria-hidden="true">
+    <div class="ab-in" id="action-bar-inner"></div>
   </div>
 
   <div id="team-select-loading" class="team-select-loading" hidden>
@@ -41,9 +103,11 @@
       </div>
     </div>
   </div>
+
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/franchiseLocalStorage.js"></script>
   <script src="/common.js"></script>
+  <script src="/js/shared/teamPicker.js"></script>
   <script src="/franchise-select-team.js"></script>
 </body>
 </html>

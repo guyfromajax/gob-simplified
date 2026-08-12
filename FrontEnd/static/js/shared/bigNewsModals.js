@@ -270,12 +270,7 @@
     if (typeof getRecruitRtBucketClass === 'function') {
       return getRecruitRtBucketClass(rt);
     }
-    var v = Number(rt);
-    if (!isFinite(v)) return '';
-    if (v <= 29) return 'rt-low';
-    if (v <= 39) return 'rt-mid';
-    if (v <= 49) return 'rt-high';
-    return 'rt-elite';
+    return 'rt-unknown';
   }
 
   function formatHt(raw) {
@@ -313,7 +308,9 @@
       rtWrap.className = 'rc__rt';
       var rtNum = document.createElement('div');
       rtNum.className = 'rc__rtnum ' + rtClass(r.rt, r.year);
-      rtNum.textContent = r.rt != null ? String(r.rt) : '--';
+      rtNum.textContent = typeof global.formatRtDisplay === 'function'
+        ? global.formatRtDisplay(r.rt)
+        : (r.rt != null ? String(r.rt) : '--');
       var rtLabel = document.createElement('div');
       rtLabel.className = 'rc__rtlabel';
       rtLabel.textContent = 'RT';

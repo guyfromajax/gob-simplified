@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="/js/shared/gtm-loader.js"></script>
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Team Builder</title>
+  <link rel="stylesheet" href="/resource-pages.css">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="stylesheet" href="/team-builder.css">
+</head>
+<body>
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+  <div id="tb-boot" class="tb-boot">Loading Team Builder…</div>
+  <div id="tb-fatal" class="tb-fatal" hidden role="alert"></div>
+
+  <div id="tb-app" class="shell" hidden>
+    <div id="tb-statebar" class="statebar" hidden></div>
+    <div id="chapter-identity" hidden></div>
+    <div id="chapter-gate" hidden></div>
+    <div id="chapter-roster" hidden></div>
+    <div id="chapter-review" hidden></div>
+    <div id="chapter-establish" hidden></div>
+  </div>
+
+  <script src="/js/config/api-config.js"></script>
+  <script src="/js/shared/franchiseLocalStorage.js"></script>
+  <script src="/common.js"></script>
+  <script src="/js/shared/teamPicker.js"></script>
+  <script src="/js/shared/teamCourtGenerator.js"></script>
+  <script src="/js/shared/teamGeneratedArt.js"></script>
+  <script src="/js/team-builder/constants.js"></script>
+  <script src="/js/team-builder/identity.js"></script>
+  <script src="/js/team-builder/gate.js"></script>
+  <script src="/js/team-builder/roster.js"></script>
+  <script src="/js/team-builder/review.js"></script>
+  <script src="/js/team-builder/establish.js"></script>
+  <script src="/team-builder.js"></script>
+</body>
+</html>

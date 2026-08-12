@@ -37,6 +37,7 @@ Cross-cutting contract:
 """
 
 from typing import Any, Dict, List, Optional
+import copy
 
 from BackEnd.constants import (
     AWAY_RIM_COORDS,
@@ -83,6 +84,87 @@ from BackEnd.utils.animation_step_schema import (
     PlayerArchetype,
 )
 _OFFENSE_POSITIONS = ("PG", "SG", "SF", "PF", "C")
+
+
+def fit_buzzer_putback_steps(
+    steps: List[AnimationStep],
+    *,
+    time_remaining: float,
+) -> List[AnimationStep]:
+    """Fit rebound capture + release inside the remaining game clock.
+
+    A normal putback schema is left untouched when it fits.  Otherwise its
+    capture and shoot beats are proportionally shortened so the ball releases
+    exactly at 0:00; flight/rim/bounce animation remains clock-neutral after
+    release, matching the FLSS contract.
+    """
+    fitted = copy.deepcopy(steps or [])
+    if len(fitted) < 3:
+        return fitted
+    available = max(0.0, float(time_remaining or 0.0))
+    release_steps = fitted[:2]
+    normal_release = sum(
+        max(0.0, float((step.get("end") or {}).get("time_elapsed") or 0.0))
+        for step in release_steps
+    )
+    normal_total = sum(
+        max(0.0, float((step.get("end") or {}).get("time_elapsed") or 0.0))
+        for step in fitted
+    )
+    if available <= 0.0 or normal_total <= available + 1e-6:
+        return fitted
+
+    scale = min(1.0, available / normal_release) if normal_release > 0 else 1.0
+    game_clock = available
+    shot_clock = min(
+        available,
+        max(
+            0.0,
+            float(
+                (((fitted[0].get("start") or {}).get("clock") or {}).get(
+                    "shot_clock_remaining", available
+                ))
+                or 0.0
+            ),
+        ),
+    )
+    for step in release_steps:
+        start = step.get("start") or {}
+        end = step.get("end") or {}
+        duration = max(0.0, float(end.get("time_elapsed") or 0.0)) * scale
+        start_clock = start.setdefault("clock", {})
+        end_clock = end.setdefault("clock", {})
+        start_clock["clock_remaining"] = game_clock
+        start_clock["shot_clock_remaining"] = shot_clock
+        end["time_elapsed"] = duration
+        trigger = start.get("advance_trigger") or {}
+        if isinstance(trigger, dict):
+            trigger["T_game_seconds"] = duration
+        tween_durations = start.get("tween_durations")
+        if isinstance(tween_durations, dict):
+            for player_id in list(tween_durations):
+                tween_durations[player_id] = duration
+        game_clock = max(0.0, game_clock - duration)
+        shot_clock = max(0.0, shot_clock - duration)
+        end_clock["clock_remaining"] = game_clock
+        end_clock["shot_clock_remaining"] = shot_clock
+
+    # The shot has been released. Preserve the full visual resolution, consume
+    # only whatever game time remains, then pin later boundaries at the buzzer.
+    for step in fitted[2:]:
+        start = step.get("start") or {}
+        end = step.get("end") or {}
+        normal_duration = max(0.0, float(end.get("time_elapsed") or 0.0))
+        duration = min(normal_duration, game_clock)
+        start_clock = start.setdefault("clock", {})
+        end_clock = end.setdefault("clock", {})
+        start_clock["clock_remaining"] = game_clock
+        start_clock["shot_clock_remaining"] = shot_clock
+        game_clock = max(0.0, game_clock - duration)
+        end["time_elapsed"] = duration
+        end_clock["clock_remaining"] = game_clock
+        end_clock["shot_clock_remaining"] = shot_clock
+    return fitted
 
 
 # --- Helpers ---------------------------------------------------------------

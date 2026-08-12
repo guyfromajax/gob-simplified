@@ -35,6 +35,7 @@ def test_determine_defensive_pressure_type_stashes_fcp_play():
     game.offense_team.playbook_settings = {}
 
     tm = TurnManager(game)
+    tm._refresh_situational_team_state = MagicMock()
     tm._select_defensive_pressure_type = MagicMock(return_value="FCP")
 
     assert tm.determine_defensive_pressure_type() == "FCP"

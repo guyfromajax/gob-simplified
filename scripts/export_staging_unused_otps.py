@@ -11,43 +11,22 @@ Run from repo root:
 
 from __future__ import annotations
 
-import os
+import argparse
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from pymongo import MongoClient
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
+
 TARGET_DB = "gob-staging"
 COLLECTION = "alpha_otps"
 OUTPUT_PATH = ROOT / "_documentation_master" / "projects" / "staging_otps.md"
 
 
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def _load_mongo_uri() -> str:
-    _load_env_file(ROOT / ".env.local")
-    _load_env_file(ROOT / ".env")
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment/.env files")
-    return uri
-
-
-def fetch_unused_otp_codes(client: MongoClient) -> list[str]:
-    collection = client[TARGET_DB][COLLECTION]
+def fetch_unused_otp_codes(db) -> list[str]:
+    collection = db[COLLECTION]
     cursor = collection.find(
         {"used": False},
         {"otp_code": 1, "_id": 0},
@@ -76,9 +55,12 @@ def write_output(codes: list[str]) -> None:
 
 
 def main() -> int:
-    uri = _load_mongo_uri()
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    codes = fetch_unused_otp_codes(client)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=[TARGET_DB])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    codes = fetch_unused_otp_codes(connection.database)
+    connection.close()
     write_output(codes)
     print(f"[{TARGET_DB}.{COLLECTION}] unused OTPs: {len(codes)}")
     print(f"Wrote {OUTPUT_PATH}")

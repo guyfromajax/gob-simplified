@@ -7,39 +7,19 @@ Update docs/To Do/total_team_attrs.md with rankings and values from gob-staging.
 - Prestige is read from the teams collection in gob-staging.
 - Teams are ranked by total aggregate player attributes (descending).
 
-Run from repo root with MONGO_URI pointing at a cluster that has gob-staging:
-  .venv/bin/python scripts/update_total_team_attrs_doc.py
+Run from repo root with an explicit database target:
+  .venv/bin/python scripts/update_total_team_attrs_doc.py --db gob-staging
 """
 
 from __future__ import annotations
 
-import os
+import argparse
 import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-os.chdir(ROOT)
-
-# Load env before importing BackEnd.db
-def _load_env(filepath: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
-    if filepath.exists():
-        for line in filepath.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for p in [ROOT / ".env.local", ROOT / ".env"]:
-    for k, v in _load_env(p).items():
-        os.environ.setdefault(k, v)
-
-from pymongo import MongoClient
-
-DB_NAME = "gob-staging"
+from scripts.db_migration_cli import connect_migration_target
 # Core 12 attributes used for "total aggregate" (no anchor_* to avoid double-count)
 ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
 DOC_PATH = ROOT / "docs" / "To Do" / "total_team_attrs.md"
@@ -57,13 +37,11 @@ def _player_attr_sum(attrs: dict) -> int:
 
 
 def main() -> int:
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("❌ MONGO_URI not set. Set it in .env or .env.local", file=sys.stderr)
-        return 1
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    db = client[DB_NAME]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    db = connection.database
     players_coll = db["players"]
     teams_coll = db["teams"]
 
@@ -114,7 +92,8 @@ def main() -> int:
         lines.append(f"| {rank} | {team_name} | {prestige} | {total} |")
 
     DOC_PATH.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    print(f"✅ Updated {DOC_PATH} with {len(sorted_by_attrs)} teams (from {DB_NAME})")
+    connection.close()
+    print(f"✅ Updated {DOC_PATH} with {len(sorted_by_attrs)} teams (from {args.db})")
     return 0
 
 

@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Training Load Screen — League News Wire</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:#07080c;color:#fff;font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#4A90D9;text-decoration:none}a:hover{color:#6ba7e6;text-decoration:underline}
+#root{height:100%}
+.wr-overlay{position:fixed;inset:0;display:grid;place-items:center;padding:40px;background:#07080c}
+.wr-shell{width:min(1120px,calc(100vw - 72px));display:flex;flex-direction:column;gap:20px}
+
+.wr-head{display:flex;align-items:center;justify-content:space-between;padding:0 6px}
+.wr-mark{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:.07em;text-transform:uppercase;color:rgba(255,255,255,.82)}
+.wr-head-r{display:flex;align-items:center;gap:24px}
+.wr-ctx{font-size:11px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:rgba(255,255,255,.36)}
+
+.wr-stage{position:relative}
+.wr-card{position:relative;overflow:hidden;min-height:556px;padding:38px 46px 44px;border-radius:24px;border:1px solid rgba(255,255,255,.09);background:linear-gradient(160deg,rgba(255,255,255,.028) 0%,rgba(255,255,255,.014) 18%,transparent 40%),rgba(14,16,24,.96);box-shadow:0 20px 48px rgba(0,0,0,.45),inset 0 1px 0 rgba(255,255,255,.07)}
+.wr-card::after{content:'';position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(132deg,transparent 0 102px,rgba(255,255,255,.012) 102px 103px,transparent 103px 208px)}
+.wr-card>*{position:relative;z-index:1}
+.wr-kicker{margin:0 0 9px;font-size:11.5px;font-weight:700;letter-spacing:.17em;text-transform:uppercase;color:rgba(255,255,255,.4)}
+.wr-title{margin:0 0 28px;font-family:'Bebas Neue',sans-serif;font-size:60px;line-height:.92;letter-spacing:.02em;color:#fff}
+
+.wr-cols{display:grid;grid-template-columns:1fr 1fr}
+.wr-col{padding-right:44px}
+.wr-col+.wr-col{padding-right:0;padding-left:44px;border-left:1px solid rgba(255,255,255,.07)}
+.wr-row{display:grid;align-items:center;height:76px;border-top:1px solid rgba(255,255,255,.055)}
+.wr-row:first-child{border-top:none}
+.wr-row:nth-child(even){background:rgba(255,255,255,.016)}
+.wr-rk{font-family:'Bebas Neue',sans-serif;font-size:26px;line-height:1;color:rgba(255,255,255,.38);text-align:right}
+.wr-bnr{display:block;flex:none;aspect-ratio:400/141;object-fit:cover;border-radius:5px;border:1px solid rgba(255,255,255,.1)}
+
+.wr-row-team{grid-template-columns:30px 1fr auto;gap:18px}
+.wr-row-team .wr-bnr{width:190px}
+.wr-row-team.is-both .wr-bnr{width:146px}
+.wr-row-team.is-both{gap:16px}
+.wr-idy{display:flex;align-items:center;gap:14px;min-width:0}
+.wr-tid{display:flex;flex-direction:column;gap:2px;min-width:0}
+.wr-tid b{font-size:16px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wr-tid em{font-style:normal;font-size:12px;font-weight:500;letter-spacing:.03em;color:rgba(255,255,255,.44);white-space:nowrap}
+.wr-rec{font-size:16px;font-weight:600;letter-spacing:.02em;color:rgba(255,255,255,.72);font-variant-numeric:tabular-nums}
+
+.wr-row-game{grid-template-columns:28px 1fr 20px 1fr 28px;gap:11px}
+.wr-row-game .wr-bnr{width:100%}
+.wr-seed{font-family:'Bebas Neue',sans-serif;font-size:20px;line-height:1;color:rgba(255,255,255,.5);text-align:center}
+.wr-at{font-size:11px;font-weight:700;text-transform:uppercase;color:rgba(255,255,255,.32);text-align:center}
+
+.wr-row-plr{grid-template-columns:30px 46px 1fr auto;gap:16px}
+.wr-row-plr.is-flat{grid-template-columns:30px 1fr auto}
+.wr-row-plr.is-team{grid-template-columns:30px 96px 1fr auto}
+.wr-row-plr.is-team .wr-bnr{width:100%}
+.wr-hs{width:46px;height:46px;border-radius:50%;overflow:hidden;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:grid;place-items:center}
+.wr-hs img{width:100%;height:100%;object-fit:cover}
+.wr-hs svg{width:34px;height:34px;fill:rgba(255,255,255,.24)}
+.wr-plr{display:flex;flex-direction:column;gap:2px;min-width:0}
+.wr-plr b{font-size:17px;font-weight:600;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wr-plr em{font-style:normal;font-size:12.5px;font-weight:500;color:rgba(255,255,255,.45)}
+.wr-val{font-family:'Bebas Neue',sans-serif;font-size:30px;line-height:1;letter-spacing:.02em;color:#fff;min-width:64px;text-align:right}
+
+.wr-sweep{position:absolute;left:0;bottom:0;z-index:2;height:1px;width:0;background:rgba(255,255,255,.2);animation-name:wrSweep;animation-timing-function:linear;animation-fill-mode:forwards}
+@keyframes wrSweep{from{width:0}to{width:100%}}
+
+.wr-foot{display:flex;justify-content:center;min-height:22px}
+.wr-pulse{display:inline-flex;align-items:center;gap:12px}
+.wr-pulse-bar{width:132px;height:6px;border-radius:999px;overflow:hidden;background:rgba(255,255,255,.08);box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+.wr-pulse-bar span{display:block;width:100%;height:100%;border-radius:inherit;background:linear-gradient(90deg,rgba(52,236,39,.35),#34EC27 48%,rgba(52,236,39,.45));transform-origin:left center;animation:wrPulse 1.2s ease-in-out infinite}
+.wr-pulse-copy{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.46)}
+.wr-pulse.is-compact .wr-pulse-bar{width:96px;height:5px}
+.wr-pulse.is-compact .wr-pulse-copy{font-size:9.5px}
+@keyframes wrPulse{0%,100%{opacity:.5;transform:scaleX(.35)}50%{opacity:1;transform:scaleX(1)}}
+
+.wr-card{animation:wrIn .34s cubic-bezier(.2,.7,.3,1) both}
+.tr-slide .wr-card{animation-name:wrInUp}
+.tr-cut .wr-card{animation:none}
+.is-leaving .wr-card{animation:wrOut .26s ease both}
+.tr-slide.is-leaving .wr-card{animation-name:wrOutUp}
+.tr-cut.is-leaving .wr-card{animation:none}
+@keyframes wrIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes wrInUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:none}}
+@keyframes wrOut{to{opacity:0}}
+@keyframes wrOutUp{to{opacity:0;transform:translateY(-18px)}}
+
+.wr-hint{position:fixed;right:18px;bottom:14px;white-space:nowrap;font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.16)}
+@media (max-height:700px){.wr-overlay{padding:22px}.wr-shell{gap:14px}.wr-card{min-height:0;padding:22px 32px 26px}.wr-kicker{font-size:10px;margin-bottom:6px}.wr-title{font-size:38px;margin-bottom:12px}.wr-row{height:50px}.wr-col{padding-right:30px}.wr-col+.wr-col{padding-left:30px}.wr-row-team .wr-bnr{width:132px}.wr-row-team.is-both .wr-bnr{width:104px}.wr-tid b{font-size:14px}.wr-tid em{font-size:10.5px}.wr-hs{width:36px;height:36px}.wr-hs svg{width:26px;height:26px}.wr-row-plr{grid-template-columns:26px 36px 1fr auto;gap:12px}.wr-plr b{font-size:15px}.wr-plr em{font-size:11.5px}.wr-val{font-size:24px;min-width:54px}.wr-rk{font-size:22px}.wr-title{font-size:38px}}
+@media (max-height:820px) and (min-height:701px){.wr-card{min-height:0;padding:30px 40px 36px}.wr-title{font-size:50px;margin-bottom:20px}.wr-row{height:64px}.wr-row-team .wr-bnr{width:158px}.wr-row-team.is-both .wr-bnr{width:124px}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="training-newswire-data.js"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="training-newswire.jsx"></script>
+</body>
+</html>

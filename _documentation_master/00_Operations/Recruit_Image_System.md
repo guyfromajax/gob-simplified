@@ -1,13 +1,13 @@
 # Recruit Image System
 
 > **Status: BUILT (backend) — verifying in staging.** The backend is implemented and merged/in
-> review; `set_0001` (300 recruits) + kits are live in R2 and loaded in staging. Remaining:
+> review; `set_0001` (**450** recruits, regenerated 2026-08) + kits are live in R2 and loaded in staging. Remaining:
 > wire R2 creds on Railway, frontend *rendering* (owner + C+C), and the offline port.
 > **The [As-built architecture](#as-built-architecture-current) section below is authoritative;**
 > the deeper design sections that follow it (build projection, classifier, monetization, Conf1)
 > remain the design rationale and are still accurate.
 
-Every season a franchise generates **300 recruits**. This system gives each a **white-shirt
+Every season a franchise generates **450 recruits** (`RECRUIT_CLASS_SIZE`). This system gives each a **white-shirt
 portrait** during the recruiting season, then **paints their new team's uniform onto that white
 shirt when they sign** (week 35). The same design runs **online today** and in the future
 **downloadable/offline build** — identical recolor logic, different place it executes.
@@ -41,7 +41,7 @@ This serves all three monetization profiles with one mechanism:
 
 | Profile | Each season |
 |---|---|
-| **Never buys packs** | dynamic class + borrowed `set_0001` faces — always has images; the same 300 recur (the intended staleness that drives pack sales) |
+| **Never buys packs** | dynamic class + borrowed `set_0001` faces — always has images; the same 450 recur (the intended staleness that drives pack sales) |
 | **Buys a fresh pack every season** | loads a purchased set — unique art, `image_id = recruit_id` |
 | **Mix** | each season independently loads a set *or* generates + borrows |
 
@@ -275,9 +275,16 @@ Mechanically identical; only storage differs:
 1. **Season-1 init** — `franchise_manager.py:437` (+ FRD insert `:522`): load an unused set;
    use its stable ids.
 2. **Finish-season rollover** — `franchise_routes.py:14079` (+ FRD insert `:14086`): same swap.
-3. **Signing** — `franchise_routes.py:10344`: `player_id = recruit_doc.get("recruit_id") or str(uuid.uuid4())`
-   (real recruits keep their id → image lineage survives; walk-ons — `recruit_id: None`,
-   `franchise_manager.py:224` — still get a fresh id and fall back to the generic headshot).
+3. **Signing** — signed recruits always get a fresh `player_id` (uuid4) so uniform masters never
+   collide across franchises; portrait lineage is `image_id`. Week-35 fill walk-ons also get a
+   fresh `player_id` and usually no `image_id` at signing.
+4. **Walk-on makes the 12** — after last-camp-week cuts, survivors with archetype `Walk On` and no
+   `meta.image_id` borrow from the **71 walk-on kits** at
+   `portrait-kits/walk_on_portraits/` (remapped UUIDs from the retired set_0001 mover archive;
+   manifest `BackEnd/data/walk_on_portraits_manifest.json`). Season de-dupe:
+   `franchises.walk_on_image_ids_used` (cleared at `finish_season`). Paint via
+   `ensure_player_image` / user eager warm — same kit path as recruits once `resolve_kit_keys`
+   resolves the walk-on prefix.
 
 Two properties this buys for free:
 
@@ -362,8 +369,12 @@ recruit renders wrong (e.g. a strong JH prospect reads Soft/undefined; a big JH 
 
 ### Projection 1 — attribute maturity scaling (ST, AG, RT)
 
-Young recruits' attributes are generated on lower bands (`YEAR_TIER_RANGES` in
-`franchise_manager.py`); the classifier thresholds are player-scale. Scale each recruit's
+Young recruits' attributes read lower than mature ones; the classifier thresholds are
+player-scale. **(Stale basis, 2026-08:** the old `YEAR_TIER_RANGES` band machinery this projection
+cited was retired in the recalibration — recruits now come from the shared `generate_player` with
+**grow-into-frame** generation (a JH is generated below his adult frame). The per-year factors
+below were derived from the removed constant and should be re-measured against the current
+generator before relied on.) Scale each recruit's
 **ST, AG, RT up** into a mature-equivalent record by dividing by a per-year factor, then run the
 unchanged classifier. (Scaling *up* — rather than cutting thresholds — is mathematically
 identical but handles the Cut branch, the Soft branch, and the FRAME ST-override in one step,
@@ -371,7 +382,7 @@ and leaves the shared classifier untouched.)
 
 | Recruit year | Factor | Basis |
 |---|---|---|
-| **JH** | **0.55** | `YEAR_TIER_RANGES` JH→Junior midpoint ratio avg = 0.54; matches the "JH ~doubles over career" rule of thumb |
+| **JH** | **0.55** | (historical) `YEAR_TIER_RANGES` JH→Junior midpoint ratio avg = 0.54; matches the "JH ~doubles over career" rule of thumb — re-verify vs the current grow-into-frame generator |
 | **Freshman** | **0.65** | band ratio 0.65 |
 | **Sophomore** | **0.80** | band ratio 0.79 |
 | **Junior** | **1.00** | already ~mature — no scaling |

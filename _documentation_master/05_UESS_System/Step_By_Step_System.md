@@ -248,7 +248,7 @@ Step 1: Branch keyed off outlet contest outcome
 - Distance gate: outlet defender must be within 10 grid Euclidean of the outlet passer to contest; beyond that → auto-success (no roll)
 - `outlet_offense_score = (rebounder.PS×0.5 + rebounder.ST×0.3 + rebounder.IQ×0.2) × random.randint(1,6)`
 - `outlet_defense_score = (defender.IQ×0.5 + defender.OD×0.3 + defender.ST×0.2) × random.randint(1,6)` (0.0 if no defender / out of range)
-- Team FB attributes (each clamped to ±10) enter the final inequality, not the bases: success iff `(1.5 × outlet_offense_score) + (3 × fb_efficiency) > outlet_defense_score + (2 × fb_opp_modifier)`
+- Team FB attributes (each clamped to **±20** — widened from ±10 in the EOG Structural Pass; see `TEAM_ATTR_CLAMPS`) enter the final inequality, not the bases: success iff `(1.5 × outlet_offense_score) + (3 × fb_efficiency) > outlet_defense_score + (2 × fb_opp_modifier)`
 
 | Branch | Steps after Burst | Turn_stop | `schema_rendered_arc` |
 |---|---|---|---|
@@ -266,7 +266,7 @@ Step 2: Branch keyed off RR read result (after successful outlet)
 
 ATs: lane pass = `ball_reaches_player` (RR for shot; primary defender for steal/bat OOB). Shoot motion = `player_reaches_position` (RR reaches shot spot). Shot motion is the terminal step — there is no separate "shot resolution" step; the playback engine's `runShotAttempt` handler renders the release after the shooter snaps to the shot spot at step end.
 
-Lane-pass step per-role movement (shot branch): RR moves toward the pass catch target while the ball flies from the outlet receiver/BH; outlet receiver/BH stationary, releases lane pass; get-back defenders keep their lane-pass getback targets (basket / same-half `midPost`); all other players (including the outlet contest defender) sprint toward offense `basketSpot`. The "Fast Break!" announcement plays on `step.start` (secondary style, offense side, passer headshot, decision-pill payload from the FB play label).
+Lane-pass step per-role movement (shot branch): RR moves toward the pass catch target while the ball flies from the outlet receiver/BH; outlet receiver/BH stationary, releases lane pass; get-back defenders keep their lane-pass getback targets (basket / same-half `midPost`); all other players (including the outlet contest defender) sprint toward offense `basketSpot`. The "Fast Break!" announcement plays on `step.start` (secondary style, offense side, passer headshot, decision-pill payload from the FB play label). If a non-shooter has not reached that semantic destination when the pass arrives, the unfinished destination and movement archetype carry into the shot-motion step; offense continues as `cut`, defense as `guard_offball`, and each ends at its reachable interrupted coordinate for the shot-step duration. The designated shot defender overrides that carry with the geo-contest destination/action.
 
 Interception branch: RR tweens to a partial position (`rr_to.x + 3` toward basket, same y — not the full catch spot); stealer tweens to the interception contact grid at `sprint`; "Interception!" `step.end` announcement (defense side, stealer headshot, `meta.sfx: "steal"`, 1000ms hold).
 
@@ -364,6 +364,8 @@ Step 4: Decision branch keyed off `triangle_branch` (from `decision = randint(1,
 | `triangle_enter_hco` | 7-8 | (no shot; live coords carry forward; if BH ≠ PG, BH → PG pass once PG reaches HCO step 0) | implicit end → next HCO | ✗ |
 
 Triangle branch-step ATs: pass steps (BH → RR / BH → corner) = `ball_reaches_player` (receiver; T = pass flight at `FB_PASS_GRID_SPOTS_PER_GAME_SECOND`, floored at `FB_PASS_MIN_GAME_SECONDS`); drive step (`triangle_bh_drive` / `triangle_drive_rr_feed` / `triangle_drive_corner_kick`) = `player_reaches_position` gated on **BH** reaching `triangle_drive_to` (BH at `sprint` / `handle_ball`, RR rides along at `sprint` / `cut` to `triangle_rr_drive_to`); shot motion = `player_reaches_position` (shooter reaches shot spot).
+
+**Triangle movement continuity:** unfinished setup destinations carry through decision-drive, branch-pass, and shot-motion steps. An explicit mover in a later step overrides its carried intent; the shooter overrides with the authoritative `shot_spot`, and the designated shot defender overrides with the geo-contest destination. Other moving offense/defense retain `cut` / `guard_offball` semantics and advance only as far as the current step's T permits. Players already at their destination hold.
 
 Triangle-specific shot rules inside `[skeleton post-shot chain]`:
 - Corner-3: shot defender only if any defender within Euclidean 6 of shooter
@@ -466,4 +468,4 @@ the result of these stages.)
 
 **Not routed via `offensive_state`:** `OREB`, `DREB`, `BASELINE_INBOUND` — use `pending_*` flags when extra payload is required (`pending_oreb`, `pending_dreb_fb_play_key`, `pending_terminal_ft`, `situational_force_foul_pending`).
 
-**Hardening (open):** log/assert when a turn resolves without updating `offensive_state` — see [`projects/offensive_state_hardening.md`](../projects/offensive_state_hardening.md).
+**Hardening (open):** log/assert when a turn resolves without explicitly publishing `offensive_state` (including valid same-state writes). This is the immediate guardrail in [`step_transition_centralization.md`](../projects/step_transition_centralization.md#immediate-offensive_state-guardrail).

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 from typing import Any, Dict, List, Literal, Optional, Tuple
 
 from BackEnd.constants import (
@@ -332,8 +333,8 @@ def resolve_dunk_micro_stamp(
         return None
 
     if not uncontested:
-        off_fight = float(getattr(off_team, "team_attributes", {}).get("fight", 0) or 0)
-        def_fight = float(getattr(def_team, "team_attributes", {}).get("fight", 0) or 0)
+        off_fight = core8_gameplay(getattr(off_team, "team_attributes", {}).get("fight", 0))
+        def_fight = core8_gameplay(getattr(def_team, "team_attributes", {}).get("fight", 0))
         margin = dunk_in_play_margin(
             shot_score_pre_defense,
             shot_defense_score_raw,
@@ -732,16 +733,26 @@ def worst_case_final_turn_micro_reserve(
 
     worst = 0.0
     for family_id in pool:
-        pre = estimate_micro_pre_release_seconds(
-            family_id,
-            shooter_player=slow,
-            shooter_coord=coord,
-            off_lineup={},
-            all_coords=all_coords,
-            shooter_id=shooter_id,
-            away_offense=is_away_offense,
-        )
-        worst = max(worst, pre)
+        pinned_targets: List[Optional[GridCoord]] = [None]
+        if family_id in OUTSIDE_MOVING_FAMILIES:
+            spot_name = _nearest_arc_spot_name(coord, is_away_offense)
+            candidates = [
+                _arc_spot_display_coord(neighbor, is_away_offense)
+                for neighbor in _adjacent_arc_spots(spot_name) if spot_name
+            ]
+            pinned_targets = [dict(target) for target in candidates if target] or [None]
+        for pinned_target in pinned_targets:
+            pre = estimate_micro_pre_release_seconds(
+                family_id,
+                shooter_player=slow,
+                shooter_coord=coord,
+                off_lineup={},
+                all_coords=all_coords,
+                shooter_id=shooter_id,
+                away_offense=is_away_offense,
+                pinned_move_to=pinned_target,
+            )
+            worst = max(worst, pre)
     return worst
 
 

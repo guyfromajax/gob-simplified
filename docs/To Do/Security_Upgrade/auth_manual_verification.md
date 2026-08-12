@@ -69,4 +69,6 @@ Same expected behavior: 401/403 on `/tournament/command-center/data` → alert a
 
 - Auth guard runs in the browser; direct API calls (e.g. via curl) will bypass it and should return 401 from the backend
 - For local testing: ensure backend and frontend use the same base URL (e.g. both localhost or both staging)
-- **Migration:** Existing franchises/tournaments without `user_id` will return 403. Run `scripts/migrate_add_user_id_to_franchises_tournaments.py --use-first-user --execute` (with staging DB) to backfill
+- **Migration:** Existing franchises/tournaments without `user_id` return 403. The
+  backfill is complete in staging and production; verify it with
+  `scripts/audit_legacy_migrations.py`.

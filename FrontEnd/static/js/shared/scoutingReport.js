@@ -83,10 +83,14 @@ function renderProjectedStartingFive(rows, containerOrOpts) {
       r.weight != null && r.weight !== '' ? String(r.weight) : '—',
     ];
     SCOUTING_PROJECTED_ATTR_COLS.forEach((k) => {
-      const av = r.attributes && r.attributes[k] != null ? r.attributes[k] : '—';
-      cells.push(String(av));
+      const raw = r.attributes && r.attributes[k] != null ? Number(r.attributes[k]) : NaN;
+      // ALREADY on the 0–10 display scale — `compute_projected_starting_five` divides by 10
+      // server-side (`int(raw) // 10`). Dividing again here floored every attribute to 0
+      // (only a perfect 100 survived, as 1), which read as training deltas rather than
+      // totals. Print the value as given.
+      cells.push(Number.isFinite(raw) ? String(raw) : '—');
     });
-    cells.push(r.rt != null ? String(r.rt) : '—');
+    cells.push(typeof formatRtDisplay === 'function' ? formatRtDisplay(r.rt) : (r.rt != null ? String(r.rt) : '—'));
     cells.forEach((text) => {
       const td = document.createElement('td');
       td.textContent = text;
@@ -161,7 +165,11 @@ function renderProjectedStartingFiveCards(rows, opts) {
         : pid && window.API_CONFIG && typeof window.API_CONFIG.getPlayerImageUrl === 'function'
           ? window.API_CONFIG.getPlayerImageUrl(pid, { size: 'card' })
         : genericUrl;
-    const rt = r.rt != null ? r.rt : '—';
+    // Starting-five cards show the CURRENT rating only; the current/potential pair
+    // stays in the attribute grid (roster + scouting tables).
+    const rt = typeof formatRtDisplay === 'function'
+      ? formatRtDisplay(r.rt)
+      : (r.rt != null ? r.rt : '—');
     const rtClass =
       typeof getRtBucketClass === 'function' ? getRtBucketClass(r.rt) : 'rt-unknown';
     const jersey =
@@ -225,6 +233,9 @@ function renderProjectedStartingFiveCards(rows, opts) {
     row.appendChild(article);
   });
   el.appendChild(row);
+  if (typeof window.initAttributeTooltips === 'function') {
+    window.initAttributeTooltips(el, ['[data-tooltip]']);
+  }
 }
 
 /** @deprecated Alias — prefer renderProjectedStartingFiveCards */

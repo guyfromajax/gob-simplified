@@ -7,10 +7,8 @@ loader draws from (a franchise picks a random unused set). This script upserts a
 built set document (set_<id>.json, produced by build_recruit_set.py) into that
 collection, keyed by set_id, and ensures the unique index.
 
-Run WHERE MONGO_URI IS SET (your machine / an env with DB access) — same
-connection as the game (reuses BackEnd.db). Without MONGO_URI it falls back to
-in-memory mongomock, which does NOT persist, so the script refuses unless
---allow-mock.
+The database target is explicit and resolved through the shared maintenance-script
+boundary. Validation/preview is the default; ``--apply`` writes.
 
     # preview, then load one set:
     python3 scripts/recruit_sets/load_recruit_sets.py --set scripts/recruit_sets/set_0001.json --dry-run
@@ -27,10 +25,15 @@ import sys
 import glob
 import json
 import argparse
+from pathlib import Path
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(os.path.dirname(HERE))
 sys.path.insert(0, ROOT)
+
+from scripts.db_migration_cli import connect_migration_target
+from scripts.recruit_sets.bake_home_region import REGION_KEYS, assign_regions
+from scripts.recruit_sets.normalize_recruit_years import normalize_recruits
 
 COLL = "recruit_sets"
 _CORE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]
@@ -56,19 +59,19 @@ def main():
     g.add_argument("--set", help="path to one set_<id>.json")
     g.add_argument("--dir", help="directory of set_*.json to load")
     g.add_argument("--list", action="store_true", help="list sets already in the collection")
-    ap.add_argument("--dry-run", action="store_true", help="validate + preview, no write")
-    ap.add_argument("--allow-mock", action="store_true",
-                    help="proceed even without MONGO_URI (writes to ephemeral mongomock — for testing only)")
+    ap.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    ap.add_argument("--apply", action="store_true", help="write; default validates and previews")
+    ap.add_argument("--normalize-years", action="store_true")
+    ap.add_argument("--bake-home-region", action="store_true")
+    ap.add_argument("--force-region", action="store_true")
+    ap.add_argument("--force", action="store_true",
+                    help="override the revert guard — allow loading a set whose recruit_count is LOWER "
+                         "than what's already in the collection (normally refused, since a stale file "
+                         "would wipe a larger live set, e.g. reverting the 450 regen back to 300).")
     args = ap.parse_args()
 
-    # Import db FIRST — that is what loads .env/.env.local and sets MONGO_URI.
-    # Then decide real-vs-mock from the actual client type, not a raw env read
-    # (the env var isn't populated until this import runs).
-    from BackEnd.db import db, client  # noqa: E402
-    is_mock = "mongomock" in type(client).__module__
-    if is_mock and not args.allow_mock and not args.dry_run:
-        sys.exit("Not connected to a real MongoDB (got mongomock) — refusing to write. "
-                 "Ensure MONGO_URI / .env.local is set, or pass --allow-mock / --dry-run.")
+    connection = connect_migration_target(args.db, write=args.apply)
+    db = connection.database
     coll = db[COLL]
 
     if args.list:
@@ -76,6 +79,7 @@ def main():
         print(f"{len(docs)} set(s) in `{COLL}`:")
         for d in sorted(docs, key=lambda d: d.get("set_id", "")):
             print(f"  {d.get('set_id'):12} v{d.get('version', '?')}  {d.get('recruit_count')} recruits")
+        connection.close()
         return
 
     paths = [args.set] if args.set else sorted(glob.glob(os.path.join(args.dir, "set_*.json")))
@@ -83,25 +87,48 @@ def main():
     if not paths:
         sys.exit("no set files found")
 
-    if not args.dry_run:
+    if args.apply:
         coll.create_index("set_id", unique=True)
 
     ok = fail = 0
     for p in paths:
         try:
             doc = json.load(open(p))
+            if args.normalize_years:
+                changed, _, _ = normalize_recruits(doc.get("recruits") or [])
+                print(f"[prepare] {Path(p).name}: normalized {changed} year value(s)")
+            if args.bake_home_region:
+                baked, skipped = assign_regions(
+                    doc.get("recruits") or [], REGION_KEYS, force=args.force_region
+                )
+                print(f"[prepare] {Path(p).name}: baked {baked}, preserved {skipped}")
             validate(doc)
-            if args.dry_run:
-                print(f"[ok] {os.path.basename(p)}: valid, {doc['recruit_count']} recruits (would upsert {doc['set_id']})")
+            # Revert guard: never let a smaller set-file silently overwrite a larger
+            # live set (e.g. a stale set_0001.json at 300 clobbering the 450 regen).
+            existing = coll.find_one({"set_id": doc["set_id"]}, {"recruit_count": 1})
+            existing_count = (existing or {}).get("recruit_count")
+            shrinking = existing_count is not None and doc["recruit_count"] < existing_count
+            if shrinking and not args.force:
+                print(f"[BLOCKED] {os.path.basename(p)}: {doc['set_id']} would shrink "
+                      f"{existing_count} -> {doc['recruit_count']} recruits. Refusing (revert guard). "
+                      f"Pass --force only if this shrink is intentional.")
+                fail += 1
+                continue
+            if not args.apply:
+                warn = "  ⚠️ SHRINK (allowed via --force)" if shrinking else ""
+                print(f"[ok] {os.path.basename(p)}: valid, {doc['recruit_count']} recruits "
+                      f"(would upsert {doc['set_id']}){warn}")
             else:
                 coll.replace_one({"set_id": doc["set_id"]}, doc, upsert=True)
-                print(f"[ok] upserted {doc['set_id']} ({doc['recruit_count']} recruits)")
+                note = f" (was {existing_count})" if existing_count is not None else ""
+                print(f"[ok] upserted {doc['set_id']} ({doc['recruit_count']} recruits){note}")
             ok += 1
         except Exception as e:
             print(f"[fail] {os.path.basename(p)}: {type(e).__name__}: {str(e)[:160]}")
             fail += 1
     print(f"\n[done] {ok} loaded, {fail} failed"
-          + ("  (DRY RUN — nothing written)" if args.dry_run else f" -> `{COLL}`"))
+          + ("  (DRY RUN — nothing written)" if not args.apply else f" -> `{COLL}`"))
+    connection.close()
     if fail:
         sys.exit(1)
 

@@ -11,17 +11,72 @@ Tests verify:
 - Inbound passes for Q2-Q4 with correct teams
 """
 import pytest
-from BackEnd.models.game_manager import GameManager
-from BackEnd.models.team_manager import TeamManager
+import BackEnd.main as main
 from BackEnd.main import simulate_quarter
-from BackEnd.db import teams_collection, games_collection, tournaments_collection, franchises_collection
+from BackEnd.db import games_collection
+from BackEnd.models.player import Player
+from BackEnd.utils.shared import record_team_points
 from bson import ObjectId
+from tests.test_utils import build_mock_game
 
 
 @pytest.fixture
-def game_manager():
-    """Create a fresh GameManager instance with teams loaded from database"""
-    gm = GameManager("Four Corners", "Morristown")
+def game_manager(monkeypatch):
+    """Create a DB-independent game with complete in-memory lineups."""
+    gm = build_mock_game()
+
+    attributes = {
+        key: 50
+        for key in ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "CH")
+    }
+    attributes["NG"] = 1.0
+    for team in (gm.home_team, gm.away_team):
+        lineup = {}
+        for pos in ("PG", "SG", "SF", "PF", "C"):
+            player = Player({
+                "_id": f"{team.name}-{pos}",
+                "first_name": team.name,
+                "last_name": pos,
+                "team": team.name,
+                "attributes": dict(attributes),
+            })
+            lineup[pos] = player
+        team.lineup = lineup
+        team.players = {player.player_id: player for player in lineup.values()}
+
+    # Full simulations deliberately rebuild both teams when callers omit
+    # explicit lineup ids.  This possession test has no roster database, so
+    # preserve its populated in-memory five at those checkpoints.
+    monkeypatch.setattr(
+        main,
+        "build_lineup_from_mongo",
+        lambda team, _game_state=None: dict(team.lineup),
+    )
+
+    def finish_quarter_with_one_score():
+        scorer = gm.offense_team.lineup["PG"]
+        scorer.record_stat("FGM")
+        record_team_points(gm, gm.offense_team, 2)
+        gm.game_state["time_remaining"] = 0
+        games_collection.update_one(
+            {"_id": gm.game_id},
+            {"$set": {
+                "score": dict(gm.score),
+                "players": [
+                    {
+                        "playerId": player.player_id,
+                        "team": label,
+                        "pos": pos,
+                        "stats": dict(player.stats["game"]),
+                    }
+                    for label, team in (("home", gm.home_team), ("away", gm.away_team))
+                    for pos, player in team.lineup.items()
+                ],
+            }},
+            upsert=True,
+        )
+
+    monkeypatch.setattr(gm, "simulate_macro_turn", finish_quarter_with_one_score)
     
     # Set default strategy settings to avoid KeyError: 'FCP'
     default_strategy = {"defense": 2, "tempo": 2, "aggression": 2, "fast_break": 2}
@@ -356,4 +411,3 @@ def test_stats_persistence_across_quarters(game_manager):
     print(f"   Q1: {q1_score_home} - {q1_score_away}")
     print(f"   Q2: {q2_score_home} - {q2_score_away}")
     print(f"   Final: {final_score_home} - {final_score_away}")
-

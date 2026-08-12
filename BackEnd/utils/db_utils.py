@@ -19,6 +19,7 @@ POSITION_TRAITS = {
 # Q4: applied only when time_remaining > 240 (late Q4 / OT have no extra foul limit).
 DEFAULT_FOUL_LIMITS_BY_QUARTER = {1: 1, 2: 2, 3: 3, 4: 3}
 
+
 def get_player_rating(player, traits: List[str]) -> float:
     total = 0
     for trait in traits:
@@ -164,11 +165,125 @@ def _player_slot_rating(player: Player, pos: str) -> float:
 
 _LINEUP_POSITIONS = ("PG", "SG", "SF", "PF", "C")
 
+# Selector objective blend (Lineup selection):
+#     score = w * static_rating + (1 - w) * effective_rating
+# w = 1.0 is pure static position_ratings (paper talent, fatigue-blind) — the historical
+# behaviour and the current default. w = 0.0 is pure effective rating (who is better RIGHT
+# NOW), which makes rotation EMERGENT: a starter tires, his effective rating falls below a
+# fresh backup's, the next rebuild seats the backup, he recovers on the bench and returns.
+# Intermediate w trades responsiveness against "ride your stars" — a top-heavy roster should
+# keep a tired star on when the alternative is worse across the whole game, not just now.
+# This single weight is the intended home for archetype influence (via starter_bench_gap).
+LINEUP_EFFECTIVE_WEIGHT_DEFAULT = 0.25
+
+
+def _player_effective_slot_rating(player: Player, pos: str) -> float:
+    """Position rating recomputed from NG-RESCALED attributes — what the player is worth right
+    now, not on paper.
+
+    Only MALLEABLE_ATTRS rescale with energy; IQ/CH and height do not, so an IQ-heavy player
+    degrades more slowly than ``rating * NG`` would suggest. That is why this recomputes the
+    rating rather than scaling it.
+
+    Cached on the player object per NG value: NG is the only input that moves within a game.
+    """
+    attrs = getattr(player, "attributes", None) or {}
+    try:
+        ng = float(attrs.get("NG", 1.0) or 1.0)
+    except (TypeError, ValueError):
+        ng = 1.0
+    ng = max(0.0, min(1.0, ng))
+    cache = getattr(player, "_eff_slot_rating_cache", None)
+    if cache is None or cache.get("_ng") != ng:
+        from BackEnd.constants import MALLEABLE_ATTRS
+        from BackEnd.utils.position_ratings import compute_position_ratings
+
+        scaled = {k: (float(v) * ng if k in MALLEABLE_ATTRS else v)
+                  for k, v in attrs.items() if isinstance(v, (int, float))}
+        try:
+            ratings = compute_position_ratings(
+                {"attributes": scaled, "height": getattr(player, "height", None)}
+            )
+        except Exception:
+            ratings = {}
+        cache = {"_ng": ng, **{p: float(ratings.get(p, 0.0)) for p in _LINEUP_POSITIONS}}
+        try:
+            player._eff_slot_rating_cache = cache
+        except Exception:
+            pass
+    val = cache.get(pos)
+    if val is None or val <= 0:
+        # No usable recompute (missing height/attrs) — degrade to the static rating scaled by
+        # NG rather than dropping the player out of contention entirely.
+        return _player_slot_rating(player, pos) * ng
+    return float(val)
+
+
+def _blended_slot_rating(player: Player, pos: str, effective_weight: float) -> float:
+    """score = w * static + (1 - w) * effective. w == 1.0 skips the recompute entirely."""
+    w = LINEUP_EFFECTIVE_WEIGHT_DEFAULT if effective_weight is None else float(effective_weight)
+    if w >= 1.0:
+        return _player_slot_rating(player, pos)
+    static = _player_slot_rating(player, pos)
+    if w <= 0.0:
+        return _player_effective_slot_rating(player, pos)
+    return w * static + (1.0 - w) * _player_effective_slot_rating(player, pos)
+
 # ── Computer-team situational-override tunables (Computer_Team_GamePlan_System.md) ──
 # Conservative strategy (sit on the lead): lead thresholds + the late-Q4 time split.
 CONSERVATIVE_LEAD_THRESHOLD = 20            # Q1–Q3, and Q4+ when > CONSERVATIVE_LATE_Q4_SECONDS remain
 CONSERVATIVE_LATE_Q4_LEAD_THRESHOLD = 15    # Q4+ when ≤ CONSERVATIVE_LATE_Q4_SECONDS remain
 CONSERVATIVE_LATE_Q4_SECONDS = 239
+
+# ── SELF-REGULATION OVERRIDE (foul trouble + fatigue) ────────────────────────────────────
+# A press team backs off when its guards are in foul trouble or gassed, the way a real one
+# does. Sits alongside the sit-on-the-lead override on the same seam (strategy_settings_base
+# stays untouched, so this reverts the moment the trouble clears).
+#
+# COMPLEMENTS the per-quarter foul limits rather than duplicating them: those are a
+# PERSONNEL lever evaluated only at rebuild boundaries, this is a TACTICS lever. And the
+# limits are switched off entirely in the final 4:00 of Q4 and all OT — where 39% of
+# foul-outs occur — so there, this is the only brake that exists.
+QUARTER_SECONDS = 480.0
+REGULATION_SECONDS = QUARTER_SECONDS * 4
+
+# "On pace to foul out": fouls > 5 x fraction of regulation elapsed. End of Q1 -> 2+,
+# half -> 3+, end of Q3 -> 4+. SELF_REG_FOUL_MIN keeps a single early foul from counting,
+# since any foul in the first minutes is technically ahead of pace.
+SELF_REG_FOUL_PACE_MULT = 5.0
+SELF_REG_FOUL_MIN = 2
+# ABSOLUTE floor under the pace test, and it is load-bearing. By late Q4 the pace line has
+# risen to ~4.7, so a player sitting on 4 fouls scores as NOT ahead of pace — exactly where
+# the override matters most (59% of FCP rebuilds in Q4 have a 4-foul player on the floor,
+# and the per-quarter limits are switched off there). Pace measures PROJECTED foul-out; one
+# foul from disqualification is maximal danger whatever the clock says.
+#
+# APPLIED TO ON-FLOOR PLAYERS ONLY. The two tests answer different questions: the pace test
+# is ASSET MANAGEMENT (roster-wide — a player benched at four fouls is exactly the asset
+# being protected, and you want him available in the fourth), while the absolute floor is a
+# RIGHT-NOW concern. A benched four-foul player is not at imminent risk of anything; that is
+# what benching him accomplished.
+SELF_REG_FOUL_ABS = 4
+SELF_REG_FOUL_FULL_COUNT = 3      # players in trouble for full foul severity
+SELF_REG_NG_FLOOR_FRAC = 0.33     # roster fraction below the NG floor where fatigue starts
+SELF_REG_NG_FULL_FRAC = 0.66      # ... and where it saturates
+
+# Per-slider damp weights. `aggression` generates fouls within any defensive turn, so foul
+# trouble drives it hardest; hc_trap/fc_press generate the pressure turns that burn NG at
+# 1.30x the normal rate (apply_energy_decay omit_zeros_for_defense), so fatigue drives those.
+SELF_REG_WEIGHTS_FOUL = {"aggression": 1.00, "hc_trap": 0.50, "fc_press": 0.50}
+SELF_REG_WEIGHTS_FATIGUE = {"aggression": 0.40, "hc_trap": 0.80, "fc_press": 0.80}
+# League baseline means — the damp TARGET and hard floor. Damping is proportional toward
+# these, never to a fixed value and never to zero: a press team backs off to roughly
+# average, it does not stop being a press team.
+SELF_REG_TARGETS = {"aggression": 2.00, "hc_trap": 0.99, "fc_press": 0.99}
+
+# TRAILING LATE — a team down two possessions in the last five minutes should keep pressing
+# despite foul trouble. Suppresses self-regulation entirely rather than inverting it;
+# raising sliders ABOVE the identity base is new behaviour belonging to the deferred
+# mid-game adjustment layer, not to this override.
+SELF_REG_DESPERATION_SECONDS = 300
+SELF_REG_DESPERATION_MARGIN = 6
 # Blowout lineup (rest starters): margin-of-victory thresholds + Q4 time splits.
 BLOWOUT_Q3_MARGIN = 50
 BLOWOUT_Q4_MARGIN_EARLY = 35                # Q4, > BLOWOUT_Q4_EARLY_SECONDS remain
@@ -321,6 +436,135 @@ def _get_or_compute_team_fill_order(team) -> Optional[List[str]]:
     return order
 
 
+def solve_best_assignment(
+    players: List[Player],
+    positions: List[str],
+    *,
+    required_ids: Optional[set] = None,
+    preference_fn=None,
+    effective_weight: float = None,
+    tie_break: str = "shuffle",
+) -> Dict[str, Player]:
+    """EXACT max-weight assignment of ``positions`` over ``players``. Returns {pos: Player}.
+
+    Objective = sum of ``_blended_slot_rating(player, pos, effective_weight)`` across the
+    filled slots, plus an optional ``preference_fn`` bonus. See
+    ``LINEUP_EFFECTIVE_WEIGHT_DEFAULT`` for what the weight means. Solved by DP over position bitmasks: 2^len(positions)
+    states x len(players), so microseconds at five slots and a twelve-man pool. This replaces
+    a greedy position-by-position fill, which could not find the best five — measured at a mean
+    17.5-point shortfall, optimal in only 19% of rebuilds, with a bench player outrating the
+    starter at his own slot in 47% of them.
+
+    TIE-BREAKING is random and free: ``players`` is shuffled up front and the DP improves on
+    strict ``>``, so among equally-optimal assignments the winner is decided by shuffle order.
+    Variation at zero rating cost — unlike the old random fill order, which bought variation by
+    giving up rating.
+
+    ``tie_break`` selects HOW that order is produced, and nothing else:
+
+    * ``"shuffle"`` (default, the GAME path) — ``sim_rng.shuffle``. Unchanged, including the
+      draw itself, so sim draw counts and repro are untouched.
+    * ``"stable"`` (the DISPLAY path) — sort by ``player_id``. Draws NOTHING. Display surfaces
+      run on page loads, OUTSIDE the sim; drawing from ``sim_rng`` there would desync the
+      stream (see the per-subsystem RNG rule), and a random tie-break would also make the
+      projected five flip between page loads for no reason. Equally-optimal assignments have
+      identical total rating, so this changes WHICH five is shown on an exact tie, never how
+      good it is.
+
+    ``required_ids`` players MUST be seated (the locked FT shooter). Enforced as a hard
+    constraint inside the optimisation — the best five CONTAINING them — not by pre-seating
+    them and greedily filling around, which is what the old code did.
+
+    ``preference_fn(player, position) -> float`` is the DELIBERATE-DEVIATION HOOK. Not used
+    yet. See ``build_unified_autoset_lineup_from_eligible`` for what belongs here.
+    """
+    n_pos = len(positions)
+    if n_pos == 0:
+        return {}
+    pool = list(players)
+    if tie_break == "stable":
+        pool.sort(key=lambda p: str(getattr(p, "player_id", "")))   # deterministic, zero draws
+    else:
+        random.shuffle(pool)                  # random tie-break among equal optima
+    required_ids = {str(x) for x in (required_ids or set())}
+
+    def score(p, pos):
+        v = _blended_slot_rating(p, pos, effective_weight)
+        if preference_fn is not None:
+            try:
+                v += float(preference_fn(p, pos) or 0.0)
+            except Exception:
+                pass
+        return v
+
+    full = (1 << n_pos) - 1
+    NEG = float("-inf")
+    n_req = len(required_ids)
+    # LAYERED dp: layers[L][mask][k] = best score using the first L players, having filled
+    # `mask` and seated k of the required ones. Layering is what makes reconstruction safe —
+    # a flat parent table can walk into a predecessor state that a LATER player produced, which
+    # silently seats the same player twice.
+    layers = [[[NEG] * (n_req + 1) for _ in range(full + 1)]]
+    layers[0][0][0] = 0.0
+    for p in pool:
+        is_req = 1 if str(getattr(p, "player_id", "")) in required_ids else 0
+        prev = layers[-1]
+        cur = [row[:] for row in prev]          # option: skip this player
+        for mask in range(full + 1):
+            for k in range(n_req + 1):
+                if prev[mask][k] == NEG:
+                    continue
+                nk = k + is_req
+                if nk > n_req:
+                    continue
+                for i in range(n_pos):
+                    if mask & (1 << i):
+                        continue
+                    nm = mask | (1 << i)
+                    v = prev[mask][k] + score(p, positions[i])
+                    if v > cur[nm][nk]:
+                        cur[nm][nk] = v
+        layers.append(cur)
+
+    final = layers[-1]
+    # Prefer seating every required player; fall back only if the pool cannot accommodate them.
+    want = None
+    for w in range(n_req, -1, -1):
+        if final[full][w] != NEG:
+            want = w
+            break
+    if want is None:
+        raise ValueError("No feasible lineup assignment from the eligible pool")
+
+    out: Dict[str, Player] = {}
+    mask, k = full, want
+    for L in range(len(pool), 0, -1):
+        if mask == 0:
+            break
+        p = pool[L - 1]
+        if layers[L][mask][k] == layers[L - 1][mask][k]:
+            continue                            # player L-1 was skipped
+        is_req = 1 if str(getattr(p, "player_id", "")) in required_ids else 0
+        pk = k - is_req
+        placed = False
+        for i in range(n_pos):
+            if not (mask & (1 << i)):
+                continue
+            pm = mask ^ (1 << i)
+            if pk < 0 or layers[L - 1][pm][pk] == NEG:
+                continue
+            if abs(layers[L - 1][pm][pk] + score(p, positions[i]) - layers[L][mask][k]) < 1e-9:
+                out[positions[i]] = p
+                mask, k = pm, pk
+                placed = True
+                break
+        if not placed:                          # value came from the skip edge after all
+            continue
+    if len(out) != n_pos:
+        raise ValueError("No feasible lineup assignment from the eligible pool")
+    return out
+
+
 def build_unified_autoset_lineup_from_eligible(
     eligible_players: List[Player],
     team_chemistry: float,
@@ -328,79 +572,60 @@ def build_unified_autoset_lineup_from_eligible(
     *,
     prefer_lowest_rt: bool = False,
     position_fill_order: Optional[List[str]] = None,
+    preference_fn=None,
+    effective_weight: float = None,
 ) -> Dict[str, Player]:
     """
-    Canonical autoset selection after eligibility + waterfall: pick the position FILL ORDER,
-    then for each fill slot use team-chemistry pool size N: top N by slot rating, random if
-    N > 1 else top player. Because the fill is greedy, the position filled first gets first
-    pick of the whole eligible pool at that position.
+    Canonical autoset selection after eligibility + waterfall. Seats the EXACT best five by
+    max-weight assignment over the eligible pool (see ``solve_best_assignment``).
 
-    ``position_fill_order`` (shot-weight autoset): order the fill by descending playbook
-    shot-attempt likelihood so the biggest-shooting positions pick their best-fit player first —
-    contested talent flows to the spots that shoot most, and the chemistry random pool lands on
-    the lowest-shot position (fill slot 5). When ``None`` (or unusable) the order is a random
-    shuffle, exactly as before. Ignored under ``prefer_lowest_rt`` (blowout keeps the shuffle).
+    Eligibility (NG threshold, foul limits) and the waterfall relaxation happen UPSTREAM in
+    ``build_lineup_from_mongo`` and are unchanged — this optimises over the eligible pool it is
+    handed, never the whole roster.
 
-    ``prefer_lowest_rt`` (blowout / garbage time): seat the team's WORST players instead — rank
-    by each player's RT (highest slot rating across positions) and take the LOWEST N. Same
-    eligibility waterfall and chemistry pools; only the ranking is inverted. Forced-include
-    players (e.g. a locked FT shooter) still play.
+    ``prefer_lowest_rt`` (blowout / garbage time) INVERTS THE SELECTION, not the seating: take
+    the five LOWEST-RT eligible players (RT = best slot rating across positions, as before),
+    then seat those five optimally. Resting the starters is the intent; fielding them in
+    nonsense positions was not. Forced-include players are retained.
 
-    ``force_include_ids`` lists player ids that MUST appear in the returned five
-    (e.g. the pending free-throw shooter, who cannot be benched while owed FTs —
-    see Timeout_System.md § Designated Free Throw Shooter Lock). Each forced
-    player is seated into their best-rated open slot first; the remaining slots
-    fill normally.
+    ``team_chemistry`` is ACCEPTED AND IGNORED. It used to size a random candidate pool for the
+    last fill slot; measured, that cost a mean 4.39 rating points per rebuild and bought nothing
+    — the variation it produced was indistinguishable from noise. Tie-breaking now supplies
+    variation at zero cost. The parameter stays because callers pass it positionally.
+
+    ``position_fill_order`` is ACCEPTED AND UNUSED — fill order cannot affect an exact
+    assignment. It is NOT dead code: it is the DEVIATION HOOK'S FIRST INTENDED CONSUMER.
+    Shot-weight ordering optimises a genuinely different objective (seat scorers where the
+    playbook shoots most), which can CONFLICT with max-sum-of-position-ratings — a team may
+    rationally field a slightly lower-rated five to get its shooters into high-attempt spots.
+    That tension is exactly what ``preference_fn`` exists to express, and where this parameter
+    should move when the identity work lands.
+
+    ``preference_fn(player, position) -> float`` — deliberate-deviation hook, currently always
+    ``None``. The principle: optimal is the BASELINE, and any deviation must MEAN something
+    (a vision preference, resting a star in a decided game, developing a freshman). The old
+    behaviour deviated via ``random.shuffle``, which meant nothing.
+
+    ``force_include_ids`` players must appear in the five (the pending FT shooter — see
+    Timeout_System.md § Designated Free Throw Shooter Lock). Enforced inside the solve.
     """
-    pool_sizes = _team_chemistry_pool_sizes(team_chemistry)
-    if prefer_lowest_rt or not position_fill_order:
-        position_order = ["PG", "SG", "SF", "PF", "C"]
-        random.shuffle(position_order)
-    else:
-        # Shot-weight order: dedupe to the canonical five, appending any missing in PG..C order.
-        position_order = []
-        for p in position_fill_order:
-            if p in _LINEUP_POSITIONS and p not in position_order:
-                position_order.append(p)
-        for p in _LINEUP_POSITIONS:
-            if p not in position_order:
-                position_order.append(p)
-    assigned_ids = set()
-    lineup: Dict[str, Player] = {}
-
-    # Seat forced-include players first (FT shooter safeguard).
+    positions = list(_LINEUP_POSITIONS)
     force_set = {str(x) for x in (force_include_ids or [])}
-    if force_set:
-        for p in eligible_players:
-            if str(p.player_id) not in force_set or p.player_id in assigned_ids:
-                continue
-            open_positions = [pos for pos in position_order if pos not in lineup]
-            if not open_positions:
-                break
-            best_pos = max(open_positions, key=lambda pos: _player_slot_rating(p, pos))
-            lineup[best_pos] = p
-            assigned_ids.add(p.player_id)
 
-    for fill_idx, pos in enumerate(position_order):
-        if pos in lineup:
-            continue  # pre-seated by force-include
-        n = pool_sizes[fill_idx] if fill_idx < len(pool_sizes) else 2
-        available = [p for p in eligible_players if p.player_id not in assigned_ids]
-        if prefer_lowest_rt:
-            # Blowout: rank by per-player RT (best slot rating across positions), LOWEST first.
-            rated = [(p, _player_rt_max(p)) for p in available]
-            rated.sort(key=lambda t: (t[1], t[0].player_id))
-        else:
-            rated = [(p, _player_slot_rating(p, pos)) for p in available]
-            rated.sort(key=lambda t: (-t[1], t[0].player_id))
-        if not rated:
-            raise ValueError(f"No available players left for autoset at fill index {fill_idx}")
-        take = min(max(1, n), len(rated))
-        candidates = rated[:take]
-        chosen = candidates[0][0] if len(candidates) == 1 else random.choice(candidates)[0]
-        lineup[pos] = chosen
-        assigned_ids.add(chosen.player_id)
-    return lineup
+    if prefer_lowest_rt:
+        forced = [p for p in eligible_players if str(p.player_id) in force_set]
+        rest = [p for p in eligible_players if str(p.player_id) not in force_set]
+        rest.sort(key=lambda p: (_player_rt_max(p), str(p.player_id)))
+        chosen = forced + rest[: max(0, len(positions) - len(forced))]
+        if len(chosen) < len(positions):
+            chosen = (chosen + [p for p in eligible_players if p not in chosen])[: len(positions)]
+        return solve_best_assignment(chosen, positions, preference_fn=preference_fn,
+                                     effective_weight=effective_weight)
+
+    return solve_best_assignment(
+        eligible_players, positions, required_ids=force_set, preference_fn=preference_fn,
+        effective_weight=effective_weight,
+    )
 
 
 def fill_unified_lineup_gaps(
@@ -409,31 +634,35 @@ def fill_unified_lineup_gaps(
     missing_positions: List[str],
     *,
     existing_assignments: Dict[str, Player],
+    preference_fn=None,
+    effective_weight: float = None,
 ) -> Dict[str, Player]:
     """
-    Fill only ``missing_positions`` using the same pool-size bands as full autoset,
-    but with pool_sizes[0..] applied to the shuffled *missing* slots (not all five).
-    Used when a partial lineup already has valid players (e.g. foul-out cleared one slot).
+    Fill only ``missing_positions`` with the EXACT best available players, holding the already-
+    seated slots fixed. Used when a partial lineup survives (e.g. a foul-out cleared one slot).
+
+    This is the FOUL-OUT PATH, and it is the most-watched selection decision in a game: a
+    starter fouls out and the user watches who walks on. It previously used the same greedy
+    fill + chemistry random pool as full autoset, so the worst selector was running at the most
+    visible moment. It now shares ``solve_best_assignment`` with full autoset — over the missing
+    slots only, so the surviving four are never disturbed.
+
+    ``team_chemistry`` is accepted and ignored (see
+    ``build_unified_autoset_lineup_from_eligible``).
     """
-    pool_sizes = _team_chemistry_pool_sizes(team_chemistry)
-    order = list(missing_positions)
-    random.shuffle(order)
-    assigned_ids = {p.player_id for p in existing_assignments.values() if p is not None}
+    order = [p for p in missing_positions if p]
+    if not order:
+        return dict(existing_assignments)
+    assigned_ids = {str(p.player_id) for p in existing_assignments.values() if p is not None}
+    available = [p for p in eligible_players if str(p.player_id) not in assigned_ids]
+    if len(available) < len(order):
+        raise ValueError(
+            f"No eligible players left to fill lineup gaps {order} "
+            f"(available={len(available)}, needed={len(order)})"
+        )
     result: Dict[str, Player] = dict(existing_assignments)
-    for fill_idx, pos in enumerate(order):
-        n = pool_sizes[fill_idx] if fill_idx < len(pool_sizes) else 2
-        available = [p for p in eligible_players if p.player_id not in assigned_ids]
-        rated = [(p, _player_slot_rating(p, pos)) for p in available]
-        rated.sort(key=lambda t: (-t[1], t[0].player_id))
-        if not rated:
-            raise ValueError(
-                f"No eligible players left to fill lineup gap at position {pos} (fill index {fill_idx})"
-            )
-        take = min(max(1, n), len(rated))
-        candidates = rated[:take]
-        chosen = candidates[0][0] if len(candidates) == 1 else random.choice(candidates)[0]
-        result[pos] = chosen
-        assigned_ids.add(chosen.player_id)
+    result.update(solve_best_assignment(available, order, preference_fn=preference_fn,
+                                        effective_weight=effective_weight))
     return result
 
 
@@ -479,6 +708,88 @@ def autoset_lineup_player_ids_from_payload(
         eligible, team_chemistry, position_fill_order=position_fill_order
     )
     return {pos: pl.player_id for pos, pl in lineup_players.items()}
+
+
+# Tip-off game state: what ``build_lineup_from_mongo`` is handed when a game starts. Q1 with a
+# full clock is not late-Q4/OT, so the waterfall opens at the 0.80 NG gate and no per-quarter
+# foul limit binds (nobody has fouled yet).
+PREGAME_STATE = {"quarter": 1, "time_remaining": 480}
+
+
+def projected_starting_five_from_payload(players_payload: List[dict]) -> Dict[str, str]:
+    """The five that AUTOSET WOULD FIELD AT TIP -> { PG/SG/...: player_id }.
+
+    This is the display counterpart of ``autoset_lineup_player_ids_from_payload``, and the
+    single source of truth for every "projected starting five" surface (FCC Scouting Report
+    tab, team roster pages, training report, practice-squad team, tournament). It exists so
+    those surfaces stop disagreeing with the floor.
+
+    PARITY IS STRUCTURAL, not a reimplementation. It runs the same eligibility waterfall, the
+    same ``solve_best_assignment`` DP and the same ``LINEUP_EFFECTIVE_WEIGHT_DEFAULT``
+    objective as the game, over the same full-roster pool. The previous display selector was a
+    separate GREEDY fill on raw ``position_ratings`` — the selector the sim measured and
+    rejected (optimal in 19% of rebuilds, mean 17.5-point shortfall).
+
+    ENERGY-AWARE ON PURPOSE. The objective is 25% paper talent / 75% NG-rescaled effective
+    rating, and NG persists to FPD and is written by the training paths — so a player the
+    week's training left tired legitimately drops out of the projection, because he is also
+    worth less at tip. Showing paper talent here would diverge from the floor for exactly the
+    players the user most needs to see.
+
+    TWO DIFFERENCES REMAIN, both correct:
+      * exact ties resolve deterministically here and randomly in the sim (see
+        ``solve_best_assignment``'s ``tie_break``) — same total rating either way;
+      * a user who sets a lineup manually overrides autoset entirely, so this is what autoset
+        WOULD have picked. CPU teams never override, so for them it is exact.
+
+    Blowout inversion, the FT-shooter force-include and foul-out gap fills are all mid-game
+    mechanics and cannot apply at tip, so none of them are modelled here.
+
+    Degrades to a PARTIAL five (fewer than five slots) on a short or fully-ineligible roster
+    rather than raising — a display surface must still render.
+    """
+    players: List[Player] = []
+    for raw in players_payload or []:
+        data = dict(raw)
+        # ``_id`` FIRST, matching how the display rows key themselves
+        # (``scouting_utils._player_sort_key``). A row carrying both keys under different
+        # values would otherwise seat an id the caller cannot map back, silently dropping a
+        # slot from the rendered five.
+        pid = data.get("_id") if data.get("_id") is not None else data.get("player_id")
+        if pid is not None:
+            pid_s = str(pid)
+            data["player_id"] = pid_s
+            # ``Player`` only reads ``_id`` (else uuid4). Without this, payloads that
+            # carry ``player_id`` only (e.g. training report) seat unmappable ids and
+            # the display five renders empty.
+            data["_id"] = pid_s
+        players.append(Player(data))
+
+    if not players:
+        return {}
+
+    eligible: List[Player] = []
+    for ng_min, foul_limits_by_quarter in _waterfall_eligibility(PREGAME_STATE):
+        eligible = [
+            p
+            for p in players
+            if is_player_eligible_for_lineup(
+                p, PREGAME_STATE, ng_min=ng_min, foul_limits_by_quarter=foul_limits_by_quarter
+            )
+        ]
+        if len(eligible) >= 5:
+            break
+
+    # Short roster: the waterfall cannot manufacture bodies. Seat what exists over as many
+    # slots as it can fill, in the canonical position order.
+    if not eligible:
+        eligible = players
+    positions = list(_LINEUP_POSITIONS)[: min(5, len(eligible))]
+    if not positions:
+        return {}
+
+    seated = solve_best_assignment(eligible, positions, tie_break="stable")
+    return {pos: pl.player_id for pos, pl in seated.items()}
 
 
 def pending_ft_shooter_id(game_state) -> Optional[str]:
@@ -709,42 +1020,171 @@ def _apply_conservative_strategy_override(settings: dict, team: TeamManager, gam
     return settings
 
 
+def _self_reg_elapsed_fraction(game_state) -> float:
+    """Fraction of REGULATION elapsed. OT counts as fully elapsed (1.0), so the
+    on-pace-to-foul-out test stays at its strictest there rather than resetting."""
+    quarter = int(game_state.get("quarter") or 1)
+    if quarter > 4:
+        return 1.0
+    time_remaining = float(game_state.get("time_remaining") or 0)
+    elapsed = (quarter - 1) * QUARTER_SECONDS + (QUARTER_SECONDS - time_remaining)
+    return max(0.0, min(1.0, elapsed / REGULATION_SECONDS))
+
+
+def _self_reg_desperation_active(team, game_state) -> bool:
+    """True when the team is trailing by SELF_REG_DESPERATION_MARGIN+ in the final
+    SELF_REG_DESPERATION_SECONDS of Q4, or at any point in OT. Keep pressing."""
+    quarter = int(game_state.get("quarter") or 1)
+    if quarter < 4:
+        return False
+    if quarter == 4:
+        time_remaining = float(game_state.get("time_remaining") or 0)
+        if time_remaining > SELF_REG_DESPERATION_SECONDS:
+            return False
+    margin = _team_score_margin(team, game_state)
+    if margin is None:
+        return False
+    return margin <= -SELF_REG_DESPERATION_MARGIN
+
+
+def _self_reg_severities(team, game_state):
+    """(foul_severity, fatigue_severity), each 0.0-1.0."""
+    try:
+        players = list(team.get_all_players())
+    except Exception:
+        return 0.0, 0.0
+    if not players:
+        return 0.0, 0.0
+
+    elapsed = _self_reg_elapsed_fraction(game_state)
+    pace_line = SELF_REG_FOUL_PACE_MULT * elapsed
+    lineup = getattr(team, "lineup", None) or {}
+    on_floor_ids = {
+        str(getattr(p, "player_id", "")) for p in lineup.values() if p is not None
+    }
+    trouble = 0
+    for p in players:
+        fouls = p.get_stat("F", "game") or 0
+        if fouls >= 5:
+            continue
+        on_floor = str(getattr(p, "player_id", "")) in on_floor_ids
+        ahead_of_pace = fouls >= SELF_REG_FOUL_MIN and fouls > pace_line
+        one_from_out = on_floor and fouls >= SELF_REG_FOUL_ABS
+        if ahead_of_pace or one_from_out:
+            trouble += 1
+    sev_foul = min(1.0, trouble / float(SELF_REG_FOUL_FULL_COUNT))
+
+    # Same NG floor the lineup gate uses, so both agree about what "tired" means.
+    quarter = int(game_state.get("quarter") or 1)
+    time_remaining = float(game_state.get("time_remaining") or QUARTER_SECONDS)
+    is_late_q4_or_ot = (quarter == 4 and time_remaining < 240) or quarter > 4
+    ng_floor = 0.64 if is_late_q4_or_ot else 0.8
+    blocked = sum(1 for p in players
+                  if float(p.attributes.get("NG", 1.0) or 1.0) < ng_floor)
+    frac = blocked / float(len(players))
+    span = max(1e-9, SELF_REG_NG_FULL_FRAC - SELF_REG_NG_FLOOR_FRAC)
+    sev_fat = max(0.0, min(1.0, (frac - SELF_REG_NG_FLOOR_FRAC) / span))
+    return sev_foul, sev_fat
+
+
+def _apply_self_regulation_override(settings: dict, team, game_state) -> dict:
+    """Damp aggression / hc_trap / fc_press toward the league baseline in proportion to how
+    much foul trouble and fatigue the team is carrying.
+
+    DETERMINISTIC — no RNG draw, deliberately unlike the conservative override. This is a
+    continuous response to a continuous state; a draw would make behaviour jitter between
+    stoppages for no reason, and it keeps the sim's draw count unchanged.
+
+    Sliders are only ever lowered, and never below SELF_REG_TARGETS."""
+    if not isinstance(game_state, dict) or not isinstance(team, TeamManager):
+        return settings
+    if getattr(team, "is_user_team", False):
+        return settings
+    if _self_reg_desperation_active(team, game_state):
+        return settings
+
+    sev_foul, sev_fat = _self_reg_severities(team, game_state)
+    if sev_foul <= 0.0 and sev_fat <= 0.0:
+        return settings
+
+    for slider, target in SELF_REG_TARGETS.items():
+        current = settings.get(slider)
+        if current is None:
+            continue
+        try:
+            current = float(current)
+        except (TypeError, ValueError):
+            continue
+        if current <= target:
+            continue
+        move = max(sev_foul * SELF_REG_WEIGHTS_FOUL.get(slider, 0.0),
+                   sev_fat * SELF_REG_WEIGHTS_FATIGUE.get(slider, 0.0))
+        if move <= 0.0:
+            continue
+        damped = current - move * (current - target)
+        settings[slider] = max(int(round(target)), min(4, int(round(damped))))
+    return settings
+
+
 def autoset_strategy_settings(team: TeamManager, game_state=None):
     """
-    Automatically set strategy settings for a computer team from its active five
-    (Game_Init_System.md § Computer Team Strategy Logic).
+    Ensure a computer team has strategy settings, and apply the situational
+    sit-on-the-lead override (Game_Init_System.md § Computer Team Strategy Logic).
 
-    Regenerates settings during timeouts, quarter breaks, and foul-outs.
-    When ``game_state`` is supplied, Q4+ CPU tempo uses score/time logic.
+    IDEMPOTENT ON THE DERIVATION. A CPU team's game plan is derived ONCE — normally at
+    ``TeamManager.__init__`` from the projected starting five — and then persists as
+    ``team.strategy_settings_base`` for the rest of the game. This function no longer
+    re-derives it at every lineup rebuild.
+
+    WHY: it used to recompute from the CURRENT five at every quarter break / timeout /
+    foul-out, so a team's identity shifted several times a game as players tired, and no
+    per-team slider configuration was reachable at all — anything a caller set was
+    overwritten by the next rebuild. Measured: 52–84% of team-games had every slider
+    changed between tip and final buzzer.
+
+    WHAT STILL HAPPENS EVERY CALL: the sit-on-the-lead override. It is re-evaluated
+    against the live ``game_state`` and applied on top of the persisted base, so a
+    comfortable lead still dials the eight conservative settings down — and, because the
+    base is kept separate, the team reverts to its real game plan if the lead evaporates.
 
     Args:
         team: TeamManager instance (must be a computer team, not user team)
         game_state: Optional live game state (quarter, time_remaining, score)
 
     Returns:
-        dict: New strategy settings
+        dict: The team's effective strategy settings
     """
     # ✅ DEBUG: Log if this is being called on a user team (this would be a bug!)
     if team.is_user_team:
         # logging.warning(f"⚠️ [AUTOSET STRATEGY] ERROR: autoset_strategy_settings() called on USER team: {team.name} (is_user_team={team.is_user_team}). This should NOT happen!")
         # Don't autoset strategy for user teams
         return team.strategy_settings
-    
-    # ✅ DEBUG: Log when autoset is called on computer teams
-    old_inside = team.strategy_settings.get('inside', 'MISSING') if hasattr(team, 'strategy_settings') and team.strategy_settings else 'MISSING'
-    # logging.warning(f"🔍 [AUTOSET STRATEGY] Autosetting strategy for COMPUTER team: {team.name}, old inside: {old_inside}")
-    
-    # Regenerate strategy settings from the team's current five active players
-    # (Game_Init_System.md § Computer Team Strategy Logic). Falls back to the
-    # legacy random init internally if five players can't be resolved.
-    new_strategy_settings = team._compute_strategic_strategy_settings(game_state)
-    # Sit-on-the-lead override: when comfortably ahead, dial the eight conservative settings down
-    # (other settings keep their computed values). Only fires here — i.e. at the quarter-break /
-    # timeout / foul-out instances that call autoset — never at game init (no lead at 0–0).
-    new_strategy_settings = _apply_conservative_strategy_override(new_strategy_settings, team, game_state)
-    team.strategy_settings = new_strategy_settings
-    
-    new_inside = new_strategy_settings.get('inside', 'MISSING')
-    # logging.warning(f"🔍 [AUTOSET STRATEGY] New inside: {new_inside}")
-    
-    return new_strategy_settings
+
+    # Establish the persistent base ONCE. Callers reach here after init, so the settings
+    # already present (init-derived, or supplied by a saved game / gameplan) ARE the game
+    # plan — adopt them rather than recomputing. The _compute_ fallback covers the case
+    # where a caller somehow arrives with no settings at all, preserving the original
+    # "ensure settings exist" guarantee these call sites were providing.
+    base = getattr(team, "strategy_settings_base", None)
+    if not base:
+        current = getattr(team, "strategy_settings", None)
+        if current and isinstance(current, dict) and len(current) > 0:
+            base = dict(current)
+        else:
+            base = team._compute_strategic_strategy_settings(game_state)
+        team.strategy_settings_base = base
+
+    # Sit-on-the-lead override: when comfortably ahead, dial the eight conservative settings
+    # down (all others keep their base values). Applied to a COPY of the base every call, so
+    # it both fires while the lead holds and reverts cleanly once it doesn't.
+    # CONSERVATIVE WINS. Both overrides target aggression / hc_trap / fc_press and the
+    # conservative rolls damp strictly harder, so stacking them would double-count.
+    if _conservative_strategy_active(team, game_state):
+        team.strategy_settings = _apply_conservative_strategy_override(
+            dict(base), team, game_state
+        )
+    else:
+        team.strategy_settings = _apply_self_regulation_override(
+            dict(base), team, game_state
+        )
+    return team.strategy_settings

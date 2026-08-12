@@ -18,6 +18,7 @@ from BackEnd.constants import (
 from BackEnd.constants.fast_break_play_types import RIM_RUNNER, TRIANGLE
 from BackEnd.models.animator import Animator
 from BackEnd.utils.fb_shot_logical_coords import attach_fb_shot_overlay_context
+from BackEnd.utils.team_attr_scale import core8_gameplay
 from BackEnd.utils.shared import (
     apply_coords_from_animations_list,
     calc_ag_segment_seconds,
@@ -434,7 +435,7 @@ def _triangle_build_turn_result(
         from BackEnd.constants.shot_threshold_scale import FAST_BREAK_CORNER_THRESHOLD_BASE
 
         game_state["fast_break_shot_threshold_override"] = FAST_BREAK_CORNER_THRESHOLD_BASE - int(
-            off_team.team_attributes.get("fb_efficiency", 0) or 0
+            core8_gameplay(off_team.team_attributes.get("fb_efficiency", 0))
         )
     elif branch in {"triangle_rr_post", "triangle_drive_rr_feed"} and defender_count == 0:
         game_state["fast_break_shot_threshold_override"] = 1
@@ -910,8 +911,8 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     od_id_s = str(od_id) if od_id is not None else None
     rr_id_s = str(rr_id) if rr_id is not None else ""
 
-    fb_eff = int(off_team.team_attributes.get("fb_efficiency", 0) or 0)
-    fb_opp = int(def_team.team_attributes.get("fb_opp_modifier", 0) or 0)
+    fb_eff = int(core8_gameplay(off_team.team_attributes.get("fb_efficiency", 0)))
+    fb_opp = int(core8_gameplay(def_team.team_attributes.get("fb_opp_modifier", 0)))
     fb_eff = max(-10, min(10, fb_eff))
     fb_opp = max(-10, min(10, fb_opp))
 
@@ -1259,7 +1260,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
         }
         base_threshold = off_team.team_attributes["shot_threshold"]
         def_chemistry = int((def_team.team_attributes.get("team_chemistry") or 0))
-        off_fight = int((off_team.team_attributes.get("fight") or 0) * 2)
+        off_fight = int(core8_gameplay(off_team.team_attributes.get("fight")) * 2)
         dc = fb_roles["defender_count"]
         if dc == 0:
             shot_threshold = 1
@@ -1537,7 +1538,7 @@ def resolve_rim_runner_fast_break(game: Any, fb_play_key: str) -> dict:
     }
     base_threshold = off_team.team_attributes["shot_threshold"]
     def_chemistry = int((def_team.team_attributes.get("team_chemistry") or 0))
-    off_fight = int((off_team.team_attributes.get("fight") or 0) * 2)
+    off_fight = int(core8_gameplay(off_team.team_attributes.get("fight")) * 2)
     game_state["fast_break_shot_threshold_override"] = base_threshold + def_chemistry - off_fight
     animator = Animator(game)
     fb_animations = animator.capture_fast_break_animation(fb_roles, False, None)

@@ -1,5 +1,5 @@
 /**
- * Run Out The Clock — Q4/OT terminal possession animation (EOQ_Perfection_Brief).
+ * Run Out The Clock — terminal no-shot possession animation (EOQ_System.md).
  * Step 1: all players drift to assigned spots at drift archetype rate (8 grid/game-sec).
  * Step 2: scoreboard runs to 0:00, airhorn, brief hold before quarter-end modal.
  */
@@ -28,6 +28,20 @@ function driftDurationMs(sprite, destXPx, destYPx, tickMs) {
 export async function runOutClockSequence({ scene, playerSprites, turnData, onUpdate }) {
   if (scene?.skipToEnd || !turnData) return;
 
+  // The backend uses RUN_OUT_CLOCK as the terminal result family at an
+  // already-expired 0:00 entry. Do not invent drift or clock-running motion.
+  if (turnData.clock_expired_no_action) {
+    if (onUpdate) {
+      onUpdate({ clock: '0:00', time_remaining: 0, shot_clock_remaining: 0 });
+    }
+    signalQuarterEnded(
+      scene,
+      { ...turnData, clock_start: 0, clock_end: 0 },
+      { phase: 'playbackComplete' },
+    );
+    return;
+  }
+
   const oDestinations = turnData.oDestinations || turnData.o_destinations || {};
   const dDestinations = turnData.dDestinations || turnData.d_destinations || {};
   const offenseTeamId = resolveOffenseTeamId({ scene, turnData, playerSprites });
@@ -35,6 +49,36 @@ export async function runOutClockSequence({ scene, playerSprites, turnData, onUp
   const height = scene.game.config.height;
   const tickMs = scene?.gameClock?.getState?.().tickMs || 350;
   const ease = animationConfig?.finalTurn?.alignment?.ease ?? 'Linear';
+
+  // A late OREB run-out begins with the board being visibly secured. The
+  // backend deliberately resolves no putback in this branch.
+  if (turnData.oreb_run_out && turnData.rebounderId && turnData.oreb_capture_coords) {
+    const rebounder = playerSprites?.[String(turnData.rebounderId)];
+    if (rebounder) {
+      const capture = gridToPixels(
+        turnData.oreb_capture_coords.x,
+        turnData.oreb_capture_coords.y,
+        width,
+        height,
+      );
+      await new Promise((resolve) => {
+        scene.tweens.add({
+          targets: rebounder,
+          x: capture.x,
+          y: capture.y,
+          duration: driftDurationMs(rebounder, capture.x, capture.y, tickMs),
+          ease,
+          onComplete: resolve,
+          onStop: resolve,
+        });
+      });
+      if (scene.ballSprite) {
+        scene.ballSprite.setVisible?.(true);
+        scene.ballSprite.x = capture.x;
+        scene.ballSprite.y = capture.y;
+      }
+    }
+  }
 
   const offenseByPos = {};
   const defenseByPos = {};
@@ -53,9 +97,15 @@ export async function runOutClockSequence({ scene, playerSprites, turnData, onUp
     const { x, y } = gridToPixels(coords.x, coords.y, width, height);
     const duration = driftDurationMs(sprite, x, y, tickMs);
     if (scene.tweens) scene.tweens.killTweensOf(sprite);
+    const carriesOrebBall = Boolean(
+      turnData.oreb_run_out
+      && scene.ballSprite
+      && sprite === playerSprites?.[String(turnData.rebounderId)],
+    );
+    if (carriesOrebBall) scene.tweens.killTweensOf(scene.ballSprite);
     return new Promise((resolve) => {
       scene.tweens.add({
-        targets: sprite,
+        targets: carriesOrebBall ? [sprite, scene.ballSprite] : sprite,
         x,
         y,
         duration,

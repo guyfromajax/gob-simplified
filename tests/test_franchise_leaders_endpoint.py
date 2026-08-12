@@ -2,34 +2,40 @@ from fastapi.testclient import TestClient
 
 from BackEnd.api.api import app
 from BackEnd.api.franchise_routes import get_leaders
-from BackEnd.db import db
+from BackEnd.db import db, franchise_players_data_collection
 
 client = TestClient(app)
 
 
 def setup_function(_fn):
     db.franchises.delete_many({})
+    franchise_players_data_collection.delete_many({})
 
 
 def seed_franchise():
-    fid = db.franchises.insert_one(
-        {
-            "players": {
-                "p1": {
-                    "meta": {"first_name": "Ann", "last_name": "Alpha", "team": "A"},
-                    "season": {"totals": {"PTS": 20}},
-                },
-                "p2": {
-                    "meta": {"first_name": "Bob", "last_name": "Beta", "team": "B"},
-                    "season": {"totals": {"PTS": 15}},
-                },
-                "p3": {
-                    "meta": {"first_name": "Cara", "last_name": "Gamma", "team": "C"},
-                    "season": {"totals": {"PTS": 5}},
-                },
-            }
-        }
-    ).inserted_id
+    fid = db.franchises.insert_one({}).inserted_id
+    franchise_players_data_collection.insert_many(
+        [
+            {
+                "franchise_id": str(fid),
+                "player_id": "p1",
+                "meta": {"first_name": "Ann", "last_name": "Alpha", "team": "A"},
+                "season": {"PTS": 20},
+            },
+            {
+                "franchise_id": str(fid),
+                "player_id": "p2",
+                "meta": {"first_name": "Bob", "last_name": "Beta", "team": "B"},
+                "season": {"PTS": 15},
+            },
+            {
+                "franchise_id": str(fid),
+                "player_id": "p3",
+                "meta": {"first_name": "Cara", "last_name": "Gamma", "team": "C"},
+                "season": {"PTS": 5},
+            },
+        ]
+    )
     return str(fid)
 
 

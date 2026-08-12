@@ -166,14 +166,23 @@ function setScoreboardHeaderDefaults(homeTeam, awayTeam) {
   const homeFoulsEl = document.getElementById('home-fouls');
   const awayFoulsEl = document.getElementById('away-fouls');
 
-  if (homeLogoEl && homeTeam) {
+  // Chrome: URL *_display when present (TB overlay); identity params stay for score keys.
+  let homeChrome = homeTeam;
+  let awayChrome = awayTeam;
+  try {
+    const sp = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    homeChrome = sp.get('home_display') || homeTeam;
+    awayChrome = sp.get('away_display') || awayTeam;
+  } catch (e) { /* ignore */ }
+
+  if (homeLogoEl && homeChrome) {
     homeLogoEl.src = typeof getTeamAssetPath === 'function'
-      ? getTeamAssetPath(homeTeam, 'banner_primary')
+      ? getTeamAssetPath(homeChrome, 'banner_primary')
       : '/images/teams/general/general_banner_primary.jpg';
   }
-  if (awayLogoEl && awayTeam) {
+  if (awayLogoEl && awayChrome) {
     awayLogoEl.src = typeof getTeamAssetPath === 'function'
-      ? getTeamAssetPath(awayTeam, 'banner_primary')
+      ? getTeamAssetPath(awayChrome, 'banner_primary')
       : '/images/teams/general/general_banner_primary.jpg';
   }
   if (homeTolEl) homeTolEl.textContent = 'TOL: 4';

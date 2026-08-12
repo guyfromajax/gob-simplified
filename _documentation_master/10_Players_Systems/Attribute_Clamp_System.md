@@ -25,17 +25,18 @@ Applies to all trainable player attributes (SC, SH, ID, OD, PS, BH, RB, ST, AG, 
 
 | Clamp | Value |
 |-------|--------|
-| **Min** | 0 |
-| **Max** | 200 |
+| **Min** | **−30** |
+| **Max** | **170** |
+| MID (pill centre) | **70** |
 
-Source: `BackEnd/constants/shot_threshold_scale.py` via `TEAM_ATTR_RANGES`. Tuning: [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md).
+Source: `BackEnd/constants/shot_threshold_scale.py` via `TEAM_ATTR_RANGES` — **change `MIN` only, everything derives, and a change REQUIRES an EOG band re-cut**. Tuning: [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md).
 
 ### rebound_modifier
 
 | Clamp | Value |
 |-------|--------|
 | **Min** | 0 |
-| **Max** | 0.4 |
+| **Max** | 1.0 |
 
 ### team_chemistry
 
@@ -44,12 +45,19 @@ Source: `BackEnd/constants/shot_threshold_scale.py` via `TEAM_ATTR_RANGES`. Tuni
 | **Min** | 7 |
 | **Max** | 25 |
 
-### Other nine (range -10 to 10)
+### momentum_score (range -10 to 10)
 
 | Clamp | Value |
 |-------|--------|
 | **Min** | -10 |
 | **Max** | 10 |
+
+### Core-8 (range -20 to 20)
+
+| Clamp | Value |
+|-------|--------|
+| **Min** | -20 |
+| **Max** | 20 |
 
 Attributes in this group:
 
@@ -59,6 +67,5 @@ Attributes in this group:
 - `fb_efficiency`
 - `pt_opp_modifier`
 - `fb_opp_modifier`
-- `momentum_score`
 - `fight`
 - `discipline`

@@ -11,15 +11,24 @@ jobs:
         uses: actions/setup-python@v4
         with:
           python-version: 3.12
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
       - name: Install dependencies
         run: |
           pip install -r requirements.txt
           pip install pytest
+          npm ci
+          npx playwright install --with-deps chromium
       - name: Run tests
-        # conftest.py aborts if the resolved DB name is on the safety block-list
-        # ({gob, gob-staging}). With no MONGO_URI, db.py defaults to 'gob', which
-        # blocked the suite from ever running in CI. Pin a throwaway name so the
-        # guard passes; tests run against mongomock (no real MONGO_URI is set).
+        # Select in-memory Mongo explicitly. Missing or failed real Mongo config never
+        # falls back to mongomock.
         env:
+          GOB_DB_MODE: mongomock
+          ENVIRONMENT: test
           MONGO_DB_NAME: gob-test
         run: pytest
+      - name: Enforce environment and database boundaries
+        run: python scripts/check_env_safety.py

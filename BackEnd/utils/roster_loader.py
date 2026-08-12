@@ -24,6 +24,18 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
         # Find the team document by name
         team_query_start = time.time()
         team_doc = teams_collection.find_one({"name": team_name})
+        # Team Builder: custom display name won't match core teams.name — resolve via overlay.
+        if not team_doc and franchise_id:
+            try:
+                from BackEnd.utils.franchise_team_display import get_team_builder_overlay
+
+                overlay = get_team_builder_overlay(franchise_id)
+                if overlay and str(overlay.get("name") or "").strip() == str(team_name or "").strip():
+                    replaced = overlay.get("replaced_object_id")
+                    if replaced:
+                        team_doc = teams_collection.find_one({"_id": ObjectId(str(replaced))})
+            except Exception:
+                pass
         team_query_time = (time.time() - team_query_start) * 1000
         # logger.warning(f"⏱️ [DB TIMING] teams_collection.find_one(name={team_name}): {team_query_time:.2f}ms")
         
@@ -52,7 +64,11 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                     pid_list = [str(pid) for pid in team_player_ids]
                     fpd_docs = list(franchise_players_data_collection.find(
                         {"franchise_id": str(franchise_id), "player_id": {"$in": pid_list}},
-                        {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1}
+                        # entry_tier + potential_factor feed the Potential Rating display
+                        # projection (§Phase 4). A narrow projection here silently dropped
+                        # them before — see the Mongo-projection audit note in the dev docs.
+                        {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1,
+                         "entry_tier": 1, "potential_factor": 1}
                     ))
                     franchise_query_time = (time.time() - franchise_query_start) * 1000
                     # logger.warning(f"⏱️ [DB TIMING] franchise_players_data find (franchise_id={franchise_id}): {franchise_query_time:.2f}ms, found {len(fpd_docs)} FPD docs")
@@ -94,6 +110,10 @@ def _load_from_db(team_name: str, franchise_id: str | None = None) -> Tuple[Dict
                             franchise_position_ratings = franchise_player_data.get("position_ratings", {})
                             if franchise_position_ratings:
                                 base_player["position_ratings"] = franchise_position_ratings
+                            # Carry the Potential Rating fields onto the roster object so the
+                            # /roster payload can compute the projected ceiling (§Phase 4).
+                            base_player["entry_tier"] = franchise_player_data.get("entry_tier")
+                            base_player["potential_factor"] = franchise_player_data.get("potential_factor")
                             if meta.get("height") is not None:
                                 base_player["height"] = meta.get("height")
                             if meta.get("weight") is not None:
@@ -164,7 +184,11 @@ def _team_file_path(team_name: str) -> Path:
     roster file and fall back to the project root if necessary.
     """
 
-    snake = team_name.lower().replace(" ", "_").replace("-", "_")
+    # Core: stored teams.team_id. Custom: derive. Do not derive core slugs —
+    # apostrophe conventions in the 128 are not uniform.
+    from BackEnd.utils.team_slug import path_slug_for_display_name
+
+    snake = path_slug_for_display_name(team_name)
     filename = f"{snake}.json"
     current = Path(__file__).resolve()
 

@@ -16,45 +16,24 @@ SAFETY: Run only against gob-staging. Requires --yes.
 Usage (from repo root):
   MONGO_URI="..." MONGO_DB_NAME=gob-staging python3 scripts/migrate_gob_staging_players_to_string_id.py --yes
 """
-import os
+import argparse
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
-
-# Load env
-for path in [".env.local", ".env"]:
-    if os.path.exists(path):
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-
-from pymongo import MongoClient
 from bson import ObjectId
 
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
+from scripts.db_migration_cli import connect_migration_target
+
 def main():
-    if "--yes" not in sys.argv:
-        print("This script migrates player _id from ObjectId to string and updates teams/FPD.")
-        print("Run with --yes to confirm. Target DB should be gob-staging (MONGO_DB_NAME).")
-        sys.exit(1)
-
-    uri = os.environ.get("MONGO_URI")
-    db_name = os.environ.get("MONGO_DB_NAME", "gob")
-    if not uri:
-        print("MONGO_URI not set.")
-        sys.exit(1)
-    if db_name != "gob-staging":
-        print(f"MONGO_DB_NAME is '{db_name}'. This script is intended for gob-staging.")
-        print("Set MONGO_DB_NAME=gob-staging and re-run.")
-        sys.exit(1)
-
-    client = MongoClient(uri)
-    db = client[db_name]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true", help="Write changes; default is dry-run")
+    args = parser.parse_args()
+    db_name = "gob-staging"
+    connection = connect_migration_target(db_name, write=args.apply)
+    db = connection.database
     players_coll = db["players"]
     teams_coll = db["teams"]
 
@@ -67,10 +46,11 @@ def main():
         new_pids = [str(pid) for pid in pids]
         if new_pids == pids:
             continue
-        teams_coll.update_one(
-            {"_id": t["_id"]},
-            {"$set": {"player_ids": new_pids}},
-        )
+        if args.apply:
+            teams_coll.update_one(
+                {"_id": t["_id"]},
+                {"$set": {"player_ids": new_pids}},
+            )
     print(f"[{db_name}] Updated player_ids (to string) on {len(teams)} team(s).")
 
     # 2) Replace each player doc: new _id (string), player_id, photo
@@ -82,15 +62,16 @@ def main():
         old_id = doc["_id"]
         if isinstance(old_id, str):
             # Already string (e.g. re-run); ensure player_id and photo
-            players_coll.update_one(
-                {"_id": old_id},
-                {
-                    "$set": {
-                        "player_id": old_id,
-                        "photo": f"/static/images/players/{old_id}.png",
+            if args.apply:
+                players_coll.update_one(
+                    {"_id": old_id},
+                    {
+                        "$set": {
+                            "player_id": old_id,
+                            "photo": f"/static/images/players/{old_id}.png",
+                        }
                     }
-                },
-            )
+                )
             continue
         # ObjectId -> string
         new_id = str(old_id)
@@ -102,12 +83,15 @@ def main():
         if "team_id" in new_doc and isinstance(new_doc["team_id"], ObjectId):
             new_doc["team_id"] = str(new_doc["team_id"])
         # Remove the old doc then insert new (avoid duplicate _id key during insert)
-        players_coll.delete_one({"_id": old_id})
-        players_coll.insert_one(new_doc)
+        if args.apply:
+            players_coll.delete_one({"_id": old_id})
+            players_coll.insert_one(new_doc)
         inserted += 1
         deleted += 1
-    print(f"[{db_name}] Players: {deleted} replaced (ObjectId -> string), document shape now matches gob.")
+    action = "replaced" if args.apply else "would replace"
+    print(f"[{db_name}] Players: {deleted} {action} (ObjectId -> string).")
     print("Done.")
+    connection.close()
 
 
 if __name__ == "__main__":

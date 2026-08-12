@@ -21,31 +21,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-os.chdir(ROOT)
-
-
-def _load_env(filepath: Path) -> dict[str, str]:
-    out: dict[str, str] = {}
-    if filepath.exists():
-        for line in filepath.read_text(encoding="utf-8").splitlines():
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for p in [ROOT / ".env.local", ROOT / ".env"]:
-    for k, v in _load_env(p).items():
-        os.environ.setdefault(k, v)
-
 import random
 
-from pymongo import MongoClient, UpdateOne
+from pymongo import UpdateOne
 
+from BackEnd.script_db import STAGING_DB, ScriptDatabaseError, connect_script_database
 from BackEnd.utils.position_ratings import compute_position_ratings
 
-DB_NAME = "gob-staging"
+DB_NAME = STAGING_DB
 RANDOM_SEED = 42
 PROFILE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
 SYNC_KEYS = PROFILE_ATTRS + ["CH"]
@@ -108,15 +91,15 @@ def main() -> int:
         print("Pass --yes to write, or --dry-run to preview.", file=sys.stderr)
         return 1
 
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set", file=sys.stderr)
-        return 1
-
     random.seed(RANDOM_SEED)
 
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    db = client[DB_NAME]
+    connection = connect_script_database(
+        target=DB_NAME,
+        access="write" if args.yes else "read",
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
+    db = connection.database
 
     conf1_names = {
         t["name"] for t in db.teams.find({"conference": 1}, {"name": 1})
@@ -200,4 +183,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        sys.exit(2)

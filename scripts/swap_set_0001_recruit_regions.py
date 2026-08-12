@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Swap two set_0001 recruit Home Regions in gob and gob-staging.
+"""Swap two set_0001 recruit Home Regions in one explicit database.
 
 The migration is deliberately narrow and idempotent:
 
@@ -22,11 +22,9 @@ import os
 import sys
 from pathlib import Path
 
-from pymongo import MongoClient
-
-
 ROOT = Path(__file__).resolve().parents[1]
-DATABASES = ("gob", "gob-staging")
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 COLLECTION = "recruit_sets"
 SET_ID = "set_0001"
 CHANGES = {
@@ -35,31 +33,8 @@ CHANGES = {
 }
 
 
-def load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        text = line.strip()
-        if not text or text.startswith("#") or "=" not in text:
-            continue
-        key, value = text.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def load_mongo_uri() -> str:
-    load_env_file(ROOT / ".env.local")
-    load_env_file(ROOT / ".env")
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment, .env.local, or .env")
-    return uri
-
-
-def inspect_database(client: MongoClient, db_name: str) -> tuple[object, dict[str, str]]:
-    collection = client[db_name][COLLECTION]
+def inspect_database(database, db_name: str) -> tuple[object, dict[str, str]]:
+    collection = database[COLLECTION]
     docs = list(
         collection.find(
             {"set_id": SET_ID},
@@ -90,8 +65,8 @@ def inspect_database(client: MongoClient, db_name: str) -> tuple[object, dict[st
     return doc["_id"], regions
 
 
-def apply_database(client: MongoClient, db_name: str, doc_id: object) -> None:
-    collection = client[db_name][COLLECTION]
+def apply_database(database, db_name: str, doc_id: object) -> None:
+    collection = database[COLLECTION]
     result = collection.update_one(
         {"_id": doc_id, "set_id": SET_ID},
         {
@@ -113,40 +88,34 @@ def apply_database(client: MongoClient, db_name: str, doc_id: object) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--dry-run", action="store_true", help="Verify and report; do not write")
-    mode.add_argument("--apply", action="store_true", help="Apply both region changes")
+    parser.add_argument("--db", choices=("gob-staging", "gob"), required=True)
+    parser.add_argument("--apply", action="store_true", help="Apply region changes")
     args = parser.parse_args()
 
-    client = MongoClient(load_mongo_uri(), serverSelectionTimeoutMS=15000)
-    client.admin.command("ping")
+    connection = connect_migration_target(args.db, write=args.apply)
+    database = connection.database
 
-    inspected: dict[str, tuple[object, dict[str, str]]] = {}
-    for db_name in DATABASES:
-        doc_id, regions = inspect_database(client, db_name)
-        inspected[db_name] = (doc_id, regions)
-        print(f"[before] {db_name}.{COLLECTION} {SET_ID}")
-        for name, current in regions.items():
-            print(f"  {name}: {current} -> {CHANGES[name][1]}")
+    doc_id, regions = inspect_database(database, args.db)
+    print(f"[before] {args.db}.{COLLECTION} {SET_ID}")
+    for name, current in regions.items():
+        print(f"  {name}: {current} -> {CHANGES[name][1]}")
 
-    if args.dry_run:
+    if not args.apply:
         print("[dry-run] Validation passed; no changes made.")
         return 0
 
-    for db_name in DATABASES:
-        apply_database(client, db_name, inspected[db_name][0])
+    apply_database(database, args.db, doc_id)
 
-    for db_name in DATABASES:
-        _, regions = inspect_database(client, db_name)
-        print(f"[after] {db_name}.{COLLECTION} {SET_ID}")
-        for name, current in regions.items():
-            desired = CHANGES[name][1]
-            print(f"  {name}: {current}")
-            if current != desired:
-                raise RuntimeError(
-                    f"{db_name}.{COLLECTION}: verification failed for {name!r}; "
-                    f"expected {desired!r}, found {current!r}"
-                )
+    _, regions = inspect_database(database, args.db)
+    print(f"[after] {args.db}.{COLLECTION} {SET_ID}")
+    for name, current in regions.items():
+        desired = CHANGES[name][1]
+        print(f"  {name}: {current}")
+        if current != desired:
+            raise RuntimeError(
+                f"{args.db}.{COLLECTION}: verification failed for {name!r}; "
+                f"expected {desired!r}, found {current!r}"
+            )
 
     print("[done] Both databases verified.")
     return 0

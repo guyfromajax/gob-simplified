@@ -38,6 +38,9 @@ class _FakeTeamsDb:
     def find(self, *_args, **_kwargs):
         return self.team_docs
 
+    def find_one(self, *_args, **_kwargs):
+        return self.team_docs[0] if self.team_docs else None
+
 
 class _FakeDb:
     def __init__(self, count, team_docs):
@@ -165,7 +168,7 @@ def test_get_recruiting_data_includes_week35_saved_orders_and_spots(monkeypatch)
         "db",
         _FakeDb(
             2,
-            [{"_id": ObjectId(team_id), "name": "Morristown"}],
+            [{"_id": ObjectId(team_id), "name": "Morristown", "region": "C"}],
         ),
     )
     monkeypatch.setattr(franchise_routes, "_calculate_available_roster_spots", lambda _fid, _team_id: 13)
@@ -174,6 +177,7 @@ def test_get_recruiting_data_includes_week35_saved_orders_and_spots(monkeypatch)
     payload = franchise_routes.get_recruiting_data(franchise_id, user={"user_id": "test-user-123"})
 
     assert payload["week"] == 35
+    assert payload["team_region"] == "C"
     assert payload["available_roster_spots"] == 13
     assert payload["available_scholarships"] == 4
     assert payload["saved_orders_week_35"] == {

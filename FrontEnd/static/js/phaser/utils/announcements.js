@@ -528,8 +528,14 @@ export function announceReboundHeadlineIfNeeded(scene, turnData, rebounderSprite
   const rebounderTeamId = rebounderSprite.team_id;
   const homeTeamField = scene.simData?.home_team;
   const awayTeamField = scene.simData?.away_team;
-  const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-  const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+  const teamLabel = (field, fallback) => {
+    if (typeof field === 'object' && field) {
+      return field.display_name || field.name || fallback;
+    }
+    return field || fallback;
+  };
+  const homeTeamName = teamLabel(homeTeamField, scene.homeTeam);
+  const awayTeamName = teamLabel(awayTeamField, scene.awayTeam);
   const rebounderTeamName =
     rebounderTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
 
@@ -663,8 +669,8 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         if (foulPlayerSprite) {
           const homeTeamField = scene.simData?.home_team;
           const awayTeamField = scene.simData?.away_team;
-          const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-          const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+          const homeTeamName = typeof homeTeamField === 'object' ? (homeTeamField?.display_name || homeTeamField?.name) : homeTeamField;
+          const awayTeamName = typeof awayTeamField === 'object' ? (awayTeamField?.display_name || awayTeamField?.name) : awayTeamField;
           const foulPlayerTeamName = foulPlayerSprite.team_id === scene.homeTeamId ? homeTeamName : awayTeamName;
           playerData = {
             playerId: foulerId,
@@ -699,8 +705,8 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         // Handle both new nested structure (object) and old flat structure (string)
         const homeTeamField = scene.simData?.home_team;
         const awayTeamField = scene.simData?.away_team;
-        const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-        const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+        const homeTeamName = typeof homeTeamField === 'object' ? (homeTeamField?.display_name || homeTeamField?.name) : homeTeamField;
+        const awayTeamName = typeof awayTeamField === 'object' ? (awayTeamField?.display_name || awayTeamField?.name) : awayTeamField;
         const foulPlayerTeamName = foulPlayerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
 
         playerData = {
@@ -746,8 +752,8 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         // Handle both new nested structure (object) and old flat structure (string)
         const homeTeamField = scene.simData?.home_team;
         const awayTeamField = scene.simData?.away_team;
-        const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-        const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+        const homeTeamName = typeof homeTeamField === 'object' ? (homeTeamField?.display_name || homeTeamField?.name) : homeTeamField;
+        const awayTeamName = typeof awayTeamField === 'object' ? (awayTeamField?.display_name || awayTeamField?.name) : awayTeamField;
         const stealerTeamName = stealerTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
 
         playerData = {
@@ -799,8 +805,8 @@ export function announceFromTurnData(turnData, timing = 'start', homeTeamId = nu
         // Handle both new nested structure (object) and old flat structure (string)
         const homeTeamField = scene.simData?.home_team;
         const awayTeamField = scene.simData?.away_team;
-        const homeTeamName = typeof homeTeamField === 'object' ? homeTeamField?.name : homeTeamField;
-        const awayTeamName = typeof awayTeamField === 'object' ? awayTeamField?.name : awayTeamField;
+        const homeTeamName = typeof homeTeamField === 'object' ? (homeTeamField?.display_name || homeTeamField?.name) : homeTeamField;
+        const awayTeamName = typeof awayTeamField === 'object' ? (awayTeamField?.display_name || awayTeamField?.name) : awayTeamField;
         const victimTeamName = victimTeamId === scene.homeTeamId ? homeTeamName : awayTeamName;
 
         playerData = {

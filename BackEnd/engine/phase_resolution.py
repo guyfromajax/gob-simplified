@@ -20,6 +20,7 @@ from BackEnd.utils.shared import (
     get_quarter_index_from_game
 )
 from BackEnd.models.shot_manager import ShotManager
+from BackEnd.utils.team_attr_scale import core8_gameplay
 from BackEnd.utils.situational_logic import slow_it_down_defense_setting
 from BackEnd.engine.steal_fast_break_routing import choose_steal_next_offensive_state
 if TYPE_CHECKING:
@@ -1906,7 +1907,7 @@ def resolve_fast_break_logic(game: "GameManager"):
         # All FB variants (CR / RR / Triangle / After-Steal) now emit unified
         # AnimationStep[] via their own emitters; the legacy renderer is only a
         # fallback when an emitter returns None (logged as … EMITTER NULL). See
-        # _documentation_master/projects/FB_UESS_Migration.md.
+        # _documentation_master/06_Gameplay_Systems/Fast_Break_System.md.
         if fb_play_key == "covert_release":
             try:
                 from BackEnd.engine.covert_release_step_emitter import (
@@ -1998,7 +1999,7 @@ def resolve_fast_break_logic(game: "GameManager"):
             effective_defender_count = max(0, defender_count - 1)
         base_threshold = off_team.team_attributes["shot_threshold"]
         def_chemistry = int((def_team.team_attributes.get("team_chemistry") or 0))
-        off_fight = int((off_team.team_attributes.get("fight") or 0) * 2)
+        off_fight = int(core8_gameplay(off_team.team_attributes.get("fight")) * 2)
         if effective_defender_count == 0:
             shot_threshold = 1
         elif effective_defender_count >= 2:
@@ -2182,7 +2183,7 @@ def resolve_fast_break_logic(game: "GameManager"):
     # All FB variants (CR / RR / Triangle / After-Steal) now emit unified
     # AnimationStep[] via their own emitters; the legacy renderer is only a
     # fallback when an emitter returns None (logged as … EMITTER NULL). See
-    # _documentation_master/projects/FB_UESS_Migration.md.
+    # _documentation_master/06_Gameplay_Systems/Fast_Break_System.md.
     if fb_play_key == "covert_release":
         try:
             from BackEnd.engine.covert_release_step_emitter import (
@@ -3163,12 +3164,12 @@ def resolve_hco_outcome(game, skeleton):
     off_attrs = off_team.team_attributes
     def_attrs = def_team.team_attributes
     
-    offensive_efficiency = off_attrs.get("offensive_efficiency", 0)
-    discipline = off_attrs.get("discipline", 0)
-    fight_off = off_attrs.get("fight", 0)
-    
-    defensive_efficiency = def_attrs.get("defensive_efficiency", 0)
-    fight_def = def_attrs.get("fight", 0)
+    offensive_efficiency = core8_gameplay(off_attrs.get("offensive_efficiency", 0))
+    discipline = core8_gameplay(off_attrs.get("discipline", 0))
+    fight_off = core8_gameplay(off_attrs.get("fight", 0))
+
+    defensive_efficiency = core8_gameplay(def_attrs.get("defensive_efficiency", 0))
+    fight_def = core8_gameplay(def_attrs.get("fight", 0))
     
     # Get aggression setting from strategy_calls (strings: "passive", "normal", "aggressive")
     aggression_level = def_team.strategy_calls.get("aggression_call", "normal")
@@ -3607,9 +3608,9 @@ def apply_balancing_system(game, game_state, off_team, def_team):
     
     # Get team attributes
     off_attrs = off_team.team_attributes
-    fight = off_attrs.get("fight", 0)
-    discipline = off_attrs.get("discipline", 0)
-    
+    fight = core8_gameplay(off_attrs.get("fight", 0))
+    discipline = core8_gameplay(off_attrs.get("discipline", 0))
+
     # Get current scores from game.score dict
     offense_score = game.score.get(off_team.name, 0)
     defense_score = game.score.get(def_team.name, 0)
@@ -4576,8 +4577,8 @@ def _hco_recovery_roll(game, rng=None):
     rng = rng or _r
     oa = (getattr(game.offense_team, "team_attributes", {}) or {})
     da = (getattr(game.defense_team, "team_attributes", {}) or {})
-    offense_score = (float(oa.get("team_chemistry", 7) or 7) + float(oa.get("offensive_efficiency", 0) or 0)) * rng.randint(1, 6)
-    defense_score = (float(da.get("team_chemistry", 7) or 7) + float(da.get("defensive_efficiency", 0) or 0)) * rng.randint(1, 6)
+    offense_score = (float(oa.get("team_chemistry", 7) or 7) + core8_gameplay(oa.get("offensive_efficiency", 0))) * rng.randint(1, 6)
+    defense_score = (float(da.get("team_chemistry", 7) or 7) + core8_gameplay(da.get("defensive_efficiency", 0))) * rng.randint(1, 6)
     return offense_score > defense_score
 
 
@@ -4592,8 +4593,8 @@ def _hco_freelance_beats_dead_ball(game, bh, bh_pos, off_lineup, step, blocked_d
     from BackEnd.engine.motion_step_decision import player_read_raw
     oa = (getattr(game.offense_team, "team_attributes", {}) or {})
     da = (getattr(game.defense_team, "team_attributes", {}) or {})
-    off_eff = float(oa.get("offensive_efficiency", 0) or 0)
-    def_eff = float(da.get("defensive_efficiency", 0) or 0)
+    off_eff = core8_gameplay(oa.get("offensive_efficiency", 0))
+    def_eff = core8_gameplay(da.get("defensive_efficiency", 0))
     _blocked = blocked_dish or set()
     _mates = [p for p in off_lineup
               if p != bh_pos and off_lineup.get(p) and p in (step.get("pos_actions") or {})]
@@ -5707,7 +5708,7 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
     defense_modifier = float((game_state or {}).get("_hco_def_efficiency", 0.0) or 0.0)
     result = resolve_pass_contest(
         passer_desc, receiver_xy, PASS_GRID_PER_GAME_SEC, defenders,
-        offense_modifier=offense_modifier, defense_modifier=defense_modifier,
+        offense_modifier_g=offense_modifier, defense_modifier_g=defense_modifier,
         lane_dist=lane_dist, rng=rng, safety_base=HCO_PASS_SAFETY_BASE,
         tier_hi=HCO_PASS_INTERCEPT_TIER_HI, tier_mid=HCO_PASS_INTERCEPT_TIER_MID,
         efficiency_in_composite=True)
@@ -5784,7 +5785,8 @@ def _stamp_contest_defender_grid(skeleton, game, off_lineup, def_lineup):
         # The zone who-guards-whom map is freshly populated on game.zone_defender_assignments_by_step
         # by the compute_defender_grid above (its zone branch). Stamp it per step — ZONE ONLY, since the
         # shared ledger is stale/irrelevant for man — so the on-ball moment + pass-contest read the
-        # render's EXACT assignment instead of reconstructing "who's on the BH" (zone_selection_fix.md).
+        # render's EXACT assignment instead of reconstructing "who's on the BH".
+        # Canonical contract: Dynamic_HCO_System.md, zone guard-map selection.
         from BackEnd.utils.defense_utils import is_zone_defense
         _is_zone_stamp = is_zone_defense((getattr(game, "game_state", {}) or {}).get("defense_playcall"))
         _guard_by_step = (getattr(game, "zone_defender_assignments_by_step", {}) or {}) if _is_zone_stamp else {}
@@ -6198,19 +6200,19 @@ def _resolve_hco_moment(game, ball_handler, bh_defender, event_scalar=None):
     from BackEnd.engine.dynamic_hct import _resolve_moment
     off_team = game.offense_team
     def_team = game.defense_team
-    off_eff = (getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0)
-    def_eff = (getattr(def_team, "team_attributes", {}) or {}).get("defensive_efficiency", 0)
+    off_eff = core8_gameplay((getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0))
+    def_eff = core8_gameplay((getattr(def_team, "team_attributes", {}) or {}).get("defensive_efficiency", 0))
     if event_scalar is None:
         event_scalar = HCO_MOMENT_SCALAR
     return _resolve_moment(off_team, def_team, ball_handler, bh_defender,
-                           def_mod=def_eff, off_mod=off_eff, event_scalar=event_scalar)
+                           def_mod_g=def_eff, off_mod_g=off_eff, event_scalar=event_scalar)
 
 
 def _zone_bh_defender(defense_playcall, bh_location, is_away_offense, def_lineup, bh_pos, step=None, bh_player_id=None):
     """On-ball ZONE defender at a step. PREFERS the render's EXACT guard assignment stamped on the step
     (``step["_step_state"]["guard"]`` = ``{def_pos: guarded_off_player_id}`` from
     ``assign_all_zone_defenders``): the defender whose guarded player == the ball handler — the same
-    who-guards-whom the render draws, frame-independent (zone_selection_fix.md). Falls back to the
+    who-guards-whom the render draws, frame-independent. Falls back to the
     legacy polygon selection (defender whose zone polygon contains the BH spot, then nearest centroid,
     then position) when no guard is stamped. Used by the per-step moment + the pass-contest exclusion."""
     # Guard-map path: the defender the render assigned to the ball handler (exact, no distance guessing).
@@ -6426,9 +6428,9 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
 
     shot_actions = {SHOOT, KICKOUT_SHOOT, HOT_READ_SHOOT}
 
-    off_eff = (getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0)
+    off_eff = core8_gameplay((getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0))
     def_team = game.defense_team
-    def_eff = (getattr(def_team, "team_attributes", {}) or {}).get("defensive_efficiency", 0)
+    def_eff = core8_gameplay((getattr(def_team, "team_attributes", {}) or {}).get("defensive_efficiency", 0))
     tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
     raw_shot_clock_est = game_state.get("shot_clock_remaining")
     shot_clock_est = float(30 if raw_shot_clock_est is None else raw_shot_clock_est)
@@ -7045,7 +7047,7 @@ def _resolve_freelance(skeleton, base_steps, entry_step, bh_pos,
 
     off_team = game.offense_team
     game_state = game.game_state
-    off_eff = (getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0)
+    off_eff = core8_gameplay((getattr(off_team, "team_attributes", {}) or {}).get("offensive_efficiency", 0))
     team_chem = (getattr(off_team, "team_attributes", {}) or {}).get("team_chemistry", 7)
     shot_clock = game_state.get("shot_clock_remaining", 30)
     tempo = (getattr(off_team, "strategy_calls", {}) or {}).get("tempo_call", "normal")
@@ -7322,7 +7324,7 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
 
     time_remaining_now = int(game_state.get("time_remaining") or 0)
     # Final Shot mode cascade (see EOQ_System.md):
-    #   base doesn't fit          → FLSS (late clock) / best-effort (bh=PG, handoff still fires)
+    #   base doesn't fit          → FLSS
     #   PG had the ball           → pg_direct (no handoff)
     #   handoff fits              → handoff (bh=PG, delivered handoff-first)
     #   base fits, handoff doesn't→ skip_handoff (live handler runs it from the PG spot; no FLSS)
@@ -7330,12 +7332,6 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     if not pacing.can_meet_anchor:
         if should_route_final_turn_to_flss(time_remaining_now):
             return {"route_flss": True, "flss_reason": pacing.reason}
-        handoff_mode = "best_effort"
-        log_eoq_step(
-            game, "FINAL_SHOT", "pacing_best_effort", "END",
-            extra={"reason": pacing.reason, "time_remaining": time_remaining_now},
-        )
-        apply_step0_hold_floor(skeleton, 0.0)
     elif pacing.include_entry_pass and not pacing.handoff_fits:
         # Base Final Shot fits but the handoff doesn't → skip it. The live handler
         # runs the shot from the PG's ball-handler spot (BH↔PG spot swap); making him
@@ -7470,10 +7466,10 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
     if final_turn_animations:
         shot_result["animations"] = final_turn_animations
     shot_result["final_turn"] = True
-    # A handoff is emitted only in handoff / best-effort modes (bh stays PG, ball
+    # A handoff is emitted only in handoff mode (BH stays PG and the ball is
     # delivered to him). In skip_handoff the live handler IS the skeleton BH → no
     # handoff; pg_direct never needed one.
-    shot_result["final_turn_include_entry_pass"] = handoff_mode in ("handoff", "best_effort")
+    shot_result["final_turn_include_entry_pass"] = handoff_mode == "handoff"
     shot_result["final_turn_handoff_mode"] = handoff_mode
     shot_result["final_turn_include_walkup"] = pacing.include_walkup
     shot_result["final_turn_anchor_clock"] = pacing.anchor_clock
@@ -7503,8 +7499,8 @@ def resolve_half_court_offense_logic(game):
     # Stash the defending team's defensive_efficiency for the pass-contest Gate 3b modifier
     # (read in _hco_resolve_dish_contest → resolve_pass_contest). Offense uses offensive_efficiency
     # via resolve_offense_pass_modifier at contest time.
-    game_state["_hco_def_efficiency"] = float(
-        (getattr(def_team, "team_attributes", None) or {}).get("defensive_efficiency", 0) or 0)
+    game_state["_hco_def_efficiency"] = core8_gameplay(
+        (getattr(def_team, "team_attributes", None) or {}).get("defensive_efficiency", 0))
 
     # ✅ BALANCING SYSTEM: Apply balancing system at start of HCO turn
     apply_balancing_system(game, game_state, off_team, def_team)
@@ -7678,7 +7674,7 @@ def resolve_half_court_offense_logic(game):
                 cumulative += sec
                 if cumulative >= shot_remaining:
                     chemistry = int(off_team.team_attributes.get("team_chemistry", 7))
-                    discipline = int(off_team.team_attributes.get("discipline", 0))
+                    discipline = int(core8_gameplay(off_team.team_attributes.get("discipline", 0)))
 
                     # Motion recalibration: chance to shoot from step index 2..(i-1) to avoid violation (Shot_Clock_System.md)
                     if is_motion_play and i >= 3:
@@ -8920,7 +8916,7 @@ def calculate_foul_turnover(game, positions, roles):
     from BackEnd.utils.defense_utils import is_zone_defense
     if is_zone_defense(defense_call):
         d_foul_score *= 1.1
-    is_d_foul = d_foul_score < def_team.team_attributes["fight"] * 1.2
+    is_d_foul = d_foul_score < core8_gameplay(def_team.team_attributes["fight"]) * 1.2
 
     # === Offensive Foul ===
     o_pos = positions["o_foul"]
@@ -8935,7 +8931,7 @@ def calculate_foul_turnover(game, positions, roles):
     )
 
     o_foul_score = (o_attr["IQ"] * 0.3 + o_attr["CH"] * 0.3 + o_movement) * random.randint(1, 6)
-    is_o_foul = o_foul_score < off_team.team_attributes["fight"] * 0.8
+    is_o_foul = o_foul_score < core8_gameplay(off_team.team_attributes["fight"]) * 0.8
 
     # === Turnover ===
     t_pos = positions["turnover"]
@@ -8963,7 +8959,7 @@ def calculate_foul_turnover(game, positions, roles):
         pressure *= 0.9
 
     turnover_score = bh_score - pressure
-    is_turnover = turnover_score < off_team.team_attributes["discipline"]
+    is_turnover = turnover_score < core8_gameplay(off_team.team_attributes["discipline"])
 
     # === Decide event type
     decisions = {
@@ -9038,10 +9034,10 @@ def resolve_full_court_press_logic(game: "GameManager"):
     
     off_chemistry = off_attrs.get("team_chemistry", 10)
     def_chemistry = def_attrs.get("team_chemistry", 10)
-    off_pt_opp_modifier = off_attrs.get("pt_opp_modifier", 0)
-    def_pt_efficiency = def_attrs.get("pt_efficiency", 0)
-    def_discipline = def_attrs.get("discipline", 0)
-    off_fight = int(off_attrs.get("fight", 0))
+    off_pt_opp_modifier = core8_gameplay(off_attrs.get("pt_opp_modifier", 0))
+    def_pt_efficiency = core8_gameplay(def_attrs.get("pt_efficiency", 0))
+    def_discipline = core8_gameplay(def_attrs.get("discipline", 0))
+    off_fight = int(core8_gameplay(off_attrs.get("fight", 0)))
     
     # Calculate BSM (Base Success Modifier): 400 + (10 * offense fight), then chemistry adjustments (FCP_HCT_System.md)
     BSM = 400 + (10 * off_fight)
@@ -11194,10 +11190,10 @@ def resolve_half_court_trap_logic(game: "GameManager"):
     
     off_chemistry = off_attrs.get("team_chemistry", 10)
     def_chemistry = def_attrs.get("team_chemistry", 10)
-    off_pt_opp_modifier = off_attrs.get("pt_opp_modifier", 0)
-    def_pt_efficiency = def_attrs.get("pt_efficiency", 0)
-    def_discipline = def_attrs.get("discipline", 0)
-    off_fight = int(off_attrs.get("fight", 0))
+    off_pt_opp_modifier = core8_gameplay(off_attrs.get("pt_opp_modifier", 0))
+    def_pt_efficiency = core8_gameplay(def_attrs.get("pt_efficiency", 0))
+    def_discipline = core8_gameplay(def_attrs.get("discipline", 0))
+    off_fight = int(core8_gameplay(off_attrs.get("fight", 0)))
     
     # Calculate BSM (Base Success Modifier): 200 + (10 * offense fight), then chemistry adjustments (FCP_HCT_System.md)
     BSM = 200 + (10 * off_fight)

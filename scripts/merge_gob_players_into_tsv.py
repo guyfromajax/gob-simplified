@@ -9,37 +9,18 @@ SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, team
 SAFETY: Reads existing file and gob.players, then overwrites the TSV with
 merged content. Does not touch any database except read from gob.players.
 
-Run from repo root: python3 scripts/merge_gob_players_into_tsv.py
+Run from repo root:
+  GOB_DB_ACCESS=read python3 scripts/merge_gob_players_into_tsv.py --db gob
 """
-import os
+import argparse
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
-
-TSV_PATH = os.path.join(_root, "teams", "all_players_with_team_names.txt")
-GOB_DB = "gob"
+TSV_PATH = ROOT / "teams" / "all_players_with_team_names.txt"
 ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
 
 
@@ -95,12 +76,13 @@ def player_doc_to_tsv_row(p):
 
 
 def main():
-    if not os.path.exists(TSV_PATH):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    if not TSV_PATH.exists():
         print(f"❌ File not found: {TSV_PATH}")
         sys.exit(1)
-    if not client:
-        print("❌ MongoDB client not available.")
-        sys.exit(1)
+    connection = connect_migration_target(args.db, write=False)
 
     with open(TSV_PATH) as f:
         lines = [ln.rstrip("\n\r") for ln in f.readlines()]
@@ -113,8 +95,9 @@ def main():
     print(f"Existing rows (after dropping player_type): {len(existing_rows)}")
 
     # 2) Fetch all players from gob.players
-    gob_players = list(client[GOB_DB]["players"].find({}))
-    print(f"[{GOB_DB}] Fetched {len(gob_players)} player(s).")
+    gob_players = list(connection.database["players"].find({}))
+    connection.close()
+    print(f"[{args.db}] Fetched {len(gob_players)} player(s).")
 
     # 3) Build rows for gob players (skip if no team name)
     gob_rows = []

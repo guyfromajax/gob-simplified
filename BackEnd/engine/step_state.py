@@ -1,6 +1,7 @@
 """StepState — Dynamic HCO turn engine, per-step state producer.
 
-Governing law (see _documentation_master/projects/StepState.md):
+Governing law (see _documentation_master/projects/Z-Completed/StepState.md and
+_documentation_master/05_UESS_System/UESS_System.md §12.3):
     resolve once → freeze into StepState → project to the emitter → draw.
 
 **Option A — share the emitter's one draw.** Defender placement uses RNG (a ~2px shade), so two

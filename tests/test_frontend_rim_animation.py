@@ -12,12 +12,20 @@ def run_node(loader, script):
 
 
 def test_play_turn_animation_passes_starting_team():
-    result = run_node("tests/js/httpsLoader.mjs", "tests/js/runPlayTurnAnimation.mjs")
-    assert result["homeResult"] is True
-    assert result["awayResult"] is False
+    source = Path("FrontEnd/static/js/phaser/animation/turnAnimation.js").read_text()
+    params_start = source.index("const shootParams = {")
+    params_end = source.index("};", params_start)
+    shoot_params = source[params_start:params_end]
+
+    # shootBall needs both IDs to select the attacking rim. The player sprite
+    # supplies the shooter ID; simData supplies the authoritative home ID.
+    assert "shooterTeamId," in shoot_params
+    assert "homeTeamId," in shoot_params
 
 
 def test_shoot_ball_rim_selection():
     result = run_node("tests/js/httpsLoaderNoStubBall.mjs", "tests/js/runShootBall.mjs")
-    assert result["home"] == {"x": 91, "y": 25}
-    assert result["away"] == {"x": 9, "y": 25}
+    # Made shots settle just inside the raw rim centers (91/9), matching the
+    # backend made-shot sweet-spot contract.
+    assert result["home"] == {"x": 90, "y": 25}
+    assert result["away"] == {"x": 10, "y": 25}

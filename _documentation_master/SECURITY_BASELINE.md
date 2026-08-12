@@ -1,15 +1,23 @@
 # Security Baseline
 
-**Status:** Alpha launch baseline (January 2026)  
+**Status:** Alpha baseline with environment hardening (August 2026)
 **Related:** `docs/To Do/0_alpha_launch_plan.md` — Phase 5.2 User Data Exposure Prevention
 
-**Related:** `docs/docs_1_systems/ENV_VARIABLES.md` — environment variables documentation (Step 5.3)
+**Related:** `_documentation_master/ENV_VARIABLES.md` and
+`_documentation_master/00_Operations/Environment_Operations.md`
+
+**Environment protections:** production has no repository credential or fallback file;
+database maintenance requires explicit target/access preflight; production read mode
+blocks writes at the operation boundary; tests refuse live databases; CI rejects unsafe
+dotenv and direct-client patterns; Atlas Cloud Backup is the production recovery source.
 
 **Implementation status:**
 - ✅ Auth required on: `POST /franchise/select-team`, `POST /tournament/start`, `POST /franchise/play-next-game`, `GET /franchise/command-center/data`, `GET /tournament/command-center/data`, `GET /api/game/{game_id}`
 - ✅ `user_id` stored on new franchise and tournament documents
 - ✅ Ownership helpers: `verify_franchise_owned_by_user`, `verify_tournament_owned_by_user`, `verify_game_owned_by_user`
-- ✅ **Strict ownership:** Documents without `user_id` are denied (403). Run `scripts/migrate_add_user_id_to_franchises_tournaments.py` to backfill.
+- ✅ **Strict ownership:** Documents without `user_id` are denied (403). The ownership
+  backfill is complete in staging and production; both catalogs are checked by
+  `scripts/audit_legacy_migrations.py`.
 - ✅ Frontend: 401/403 on command-center/data triggers immediate redirect (FCC and TCC)
 - ✅ Logging redaction: `BackEnd.utils.log_redact`
 - ⏳ TODO: Add auth + ownership to remaining franchise/tournament/game endpoints (see lists below)

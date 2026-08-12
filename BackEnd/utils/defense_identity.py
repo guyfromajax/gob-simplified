@@ -13,10 +13,13 @@ via `resolve_to_defense_id` / `canonical_scouting_defense_key`.
 
 from __future__ import annotations
 
+import logging
 import threading
 from typing import Any, Dict, Optional, Tuple
 
 from bson import ObjectId
+
+logger = logging.getLogger(__name__)
 
 # Non-catalog rows used in scouting templates / sim (stable, not Mongo `defense_id`).
 SYNTHETIC_DEFENSE_IDS: frozenset[str] = frozenset({"vs_Fast_Break", "FCP", "HCT"})
@@ -137,14 +140,24 @@ _by_defense_id: Dict[str, Dict[str, Any]] = {}
 _name_to_defense_id: Dict[str, str] = {}
 _oid_to_defense_id: Dict[str, str] = {}
 
+# LOADED-NESS IS TRACKED SEPARATELY FROM CONTENTS, and that separation is load-bearing.
+# `_ensure_cache` used to test `not _by_defense_id`, so an EMPTY catalog was
+# indistinguishable from an unloaded one and every lookup re-read the whole collection.
+# When gob-staging.defenses was emptied by an unguarded test, that turned a cached lookup
+# into 4,664 DB reads per game — 374 s of a 397 s profile, 94.4% of wall time, a ~60x sim
+# slowdown with no error and no log line. See projects/Sim_Perf_Capstone.md.
+_cache_loaded: bool = False
+_empty_catalog_warned: bool = False
+
 
 def clear_defense_identity_cache() -> None:
     """Test helper / rare admin use."""
-    global _by_defense_id, _name_to_defense_id, _oid_to_defense_id
+    global _by_defense_id, _name_to_defense_id, _oid_to_defense_id, _cache_loaded
     with _lock:
         _by_defense_id = {}
         _name_to_defense_id = {}
         _oid_to_defense_id = {}
+        _cache_loaded = False
 
 
 def refresh_defense_identity_cache() -> None:
@@ -171,17 +184,35 @@ def refresh_defense_identity_cache() -> None:
             oid_map[str(oid)] = did
 
     with _lock:
-        global _by_defense_id, _name_to_defense_id, _oid_to_defense_id
+        global _by_defense_id, _name_to_defense_id, _oid_to_defense_id, _cache_loaded
+        _cache_loaded = True
         _by_defense_id = by_id
         _name_to_defense_id = name_map
         _oid_to_defense_id = oid_map
 
 
 def _ensure_cache() -> None:
+    """Load the catalog ONCE. A genuinely empty catalog is a loaded state, not a miss."""
+    global _empty_catalog_warned
     with _lock:
-        empty = not _by_defense_id
-    if empty:
-        refresh_defense_identity_cache()
+        loaded = _cache_loaded
+    if loaded:
+        return
+    refresh_defense_identity_cache()
+    with _lock:
+        still_empty = not _by_defense_id
+        warn = still_empty and not _empty_catalog_warned
+        if warn:
+            _empty_catalog_warned = True
+    if warn:
+        # Loud ONCE. Silence here is what made the perf collapse undiagnosable: the sim
+        # ran correctly, just 60x slower, with nothing in the output to explain it.
+        logger.error(
+            "🛑 [DEFENSE-IDENTITY] Loaded the defense catalog and found ZERO usable "
+            "documents (need a string `defense_id` field). Defense lookups will fall back "
+            "and anything keyed on the catalog will misbehave. This is a DATA problem — "
+            "the `defenses` collection is empty or malformed. Repopulate it."
+        )
 
 
 def get_defense_doc(defense_id: str) -> Optional[Dict[str, Any]]:

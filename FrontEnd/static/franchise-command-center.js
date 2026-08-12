@@ -386,10 +386,33 @@ function renderOneGameCardLockup(slotId, data, gameSummary) {
   });
 }
 
+function resolveFccTeamBanner(data) {
+  if (!data) return '/images/teams/general/general_banner_primary.jpg';
+  // Visual must already be hydrated from the franchise payload (memory), not LS.
+  if (typeof getTeamAssetPath === 'function') {
+    return getTeamAssetPath(data.team, 'banner_primary');
+  }
+  return '/images/teams/general/general_banner_primary.jpg';
+}
+
 function populateTop(data) {
   if (!data) return;
   const formattedTeam = formatTeamName(data.team);
-  const logoSrc = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(data.team, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+  // Hydrate from franchise payload — FranchiseLS is cache only.
+  const visual =
+    typeof hydrateTeamBuilderVisualFromFranchisePayload === 'function'
+      ? hydrateTeamBuilderVisualFromFranchisePayload(
+          data,
+          typeof franchiseId !== 'undefined' ? franchiseId : null
+        )
+      : null;
+  if (window.FranchiseLS && typeof franchiseId !== 'undefined' && franchiseId) {
+    window.FranchiseLS.setTeamContext(franchiseId, {
+      teamName: data.team,
+      primaryColor: data.primary_color,
+    });
+  }
+  const logoSrc = resolveFccTeamBanner(data);
   document.getElementById('team-logo').src = logoSrc;
   renderFccHeaderEmblem(data);
   const seasonLabelEl = document.getElementById('fcc-season-label');
@@ -408,7 +431,18 @@ function populateTop(data) {
   const abbr = teamMap[formattedTeam];
   const sammyEl = document.getElementById('coach-sammy');
   const dukeEl = document.getElementById('coach-duke');
-  if (abbr) {
+  if (typeof getTeamCoachAssetPath === 'function') {
+    const sammySrc = getTeamCoachAssetPath(data.team, 'Sammy', visual || undefined);
+    const dukeSrc = getTeamCoachAssetPath(data.team, 'Duke', visual || undefined);
+    if (sammyEl) {
+      if (sammySrc) sammyEl.src = sammySrc;
+      else sammyEl.removeAttribute('src');
+    }
+    if (dukeEl) {
+      if (dukeSrc) dukeEl.src = dukeSrc;
+      else dukeEl.removeAttribute('src');
+    }
+  } else if (abbr) {
     if (sammyEl) {
       sammyEl.src = `/images/coaches/${abbr}/Sammy-${abbr}.png`;
       console.log('Coach Sammy URL:', sammyEl.src);
@@ -615,6 +649,11 @@ window.addEventListener('gob:account-settings-updated', (event) => {
 
 let standingsDataCache = null;
 
+function standingsTeamLabel(t) {
+  // Render chrome; identity stays on t.name / t.team_id.
+  return (t && (t.display_name || t.name)) || '';
+}
+
 function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
   const returnUrl = encodeURIComponent(getCurrentRelativeUrl());
   return `/team-roster-view.html?mode=franchise&franchise_id=${franchiseId}&team_id=${encodeURIComponent(teamId)}&team_name=${encodeURIComponent(teamName)}&return_tab=${returnTab}&return_url=${returnUrl}`;
@@ -622,10 +661,11 @@ function buildFranchiseTeamPageUrl(teamId, teamName, returnTab) {
 
 function buildTeamLink(t) {
   const teamLink = document.createElement('a');
-  teamLink.href = buildFranchiseTeamPageUrl(t.team_id, t.name, 'standings-tab');
+  const label = standingsTeamLabel(t);
+  teamLink.href = buildFranchiseTeamPageUrl(t.team_id, label, 'standings-tab');
   const rank = Number(t?.natl_rank);
   const rankPrefix = Number.isFinite(rank) && rank >= 1 && rank <= 25 ? `#${rank} ` : '';
-  teamLink.textContent = `${rankPrefix}${t.name}`;
+  teamLink.textContent = `${rankPrefix}${label}`;
   teamLink.style.color = '#4a90e2';
   teamLink.style.textDecoration = 'none';
   teamLink.style.cursor = 'pointer';
@@ -703,7 +743,7 @@ function renderStandings(data, selectedRegion) {
   if (!data) return;
   const list = data.standings || [];
   updateTopRecordLabel();
-  list.forEach(t => { teamIdNameMap[t.team_id] = t.name; });
+  list.forEach(t => { teamIdNameMap[t.team_id] = standingsTeamLabel(t); });
 
   const container = document.getElementById('standings-by-region');
   if (!container) return;
@@ -943,7 +983,7 @@ function renderHomeStandingsCard() {
 
   const rows = teams.map((team) => `
     <div class="fcc-home-standings-row">
-      <span class="fcc-home-standings-team">${escapeHomeHtml(team.name || '')}</span>
+      <span class="fcc-home-standings-team">${escapeHomeHtml(standingsTeamLabel(team))}</span>
       <span class="fcc-home-standings-stat">${escapeHomeHtml(team.W ?? 0)}</span>
       <span class="fcc-home-standings-stat">${escapeHomeHtml(team.L ?? 0)}</span>
       <span class="fcc-home-standings-stat">${escapeHomeHtml(team.PF ?? 0)}</span>
@@ -1279,7 +1319,7 @@ function buildHomeRecruitRowHtml(recruit) {
       <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
       <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
-      <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : ''}">${escapeHomeHtml(recruit.rt ?? '--')}</span>
+      <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : ''}">${escapeHomeHtml(formatRtWithPotentialDisplay(recruit.rt, recruit.potentialRt))}</span>
     </div>
   `;
   if (!isNewLeanRecruit(recruit)) return rowHtml;
@@ -1299,7 +1339,7 @@ function buildFccInviteBlockHtml(recruit, week, wide) {
     : '';
   const weightDisplay = recruit.weight != null ? recruit.weight : '--';
   const meta = `${recruit.archetype || '--'} · ${recruit.height || '--'} / ${weightDisplay}`;
-  const rtDisplay = recruit.rt != null ? recruit.rt : '--';
+  const rtDisplay = formatRtWithPotentialDisplay(recruit.rt, recruit.potential_rt_ratcheted);
   const eyebrow = isAssigned ? 'Recruiting Visit' : `Week ${Number(week)} Invite`;
   const statusHtml = isAssigned
     ? ''
@@ -2096,7 +2136,7 @@ function renderFccRecruits() {
         '<td>' + recruit.attrs.ND + '</td>',
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
-        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>'
+        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + formatRtWithPotentialDisplay(recruit.rt, recruit.potentialRt) + '</td>'
       ].join('');
       tbody.appendChild(tr);
     });
@@ -2146,6 +2186,7 @@ function initFccRecruits(topData) {
       year: player.year || 'JH',
       yearDisplay: RecruitingCommon.formatYearAbbrev(player.year || 'JH'),
       rt: player.rt != null ? Number(player.rt) : null,
+      potentialRt: player.potential_rt_ratcheted != null ? Number(player.potential_rt_ratcheted) : null,
       leanDisplay: '',
       leanSortValue: '',
       attrs: {
@@ -2206,17 +2247,42 @@ async function initializeTeamColorCache() {
   if (teamColorCache) return; // Already initialized
   
   try {
-    const res = await fetch(API_CONFIG.buildUrl('/teams'));
+    const fid =
+      (typeof franchiseId !== 'undefined' && franchiseId) ||
+      new URLSearchParams(window.location.search || '').get('franchise_id') ||
+      '';
+    const teamsUrl = fid
+      ? `${API_CONFIG.buildUrl('/teams')}?franchise_id=${encodeURIComponent(fid)}`
+      : API_CONFIG.buildUrl('/teams');
+    const res = await fetch(teamsUrl);
     const teamData = await res.json();
     teamColorCache = {};
     teamMetaByNameCache = {};
     teamData.forEach(t => {
-      teamColorCache[t.name] = t.primary_color;
-      teamMetaByNameCache[t.name] = {
-        mascot: t.mascot || '',
-        primary_color: t.primary_color || null,
-      };
+      const color = t.primary_color;
+      if (t.name) {
+        teamColorCache[t.name] = color;
+        teamMetaByNameCache[t.name] = {
+          mascot: t.mascot || '',
+          primary_color: color || null,
+        };
+      }
+      // TB overlay: also index by display_name so custom program lookups hit overlay colors.
+      if (t.display_name && t.display_name !== t.name) {
+        teamColorCache[t.display_name] = color;
+        teamMetaByNameCache[t.display_name] = {
+          mascot: t.mascot || '',
+          primary_color: color || null,
+        };
+      }
     });
+    if (typeof getActiveTeamBuilderVisual === 'function') {
+      const visual = getActiveTeamBuilderVisual();
+      if (visual && visual.primary_color) {
+        if (visual.name) teamColorCache[visual.name] = visual.primary_color;
+        if (visual.replaced_name) teamColorCache[visual.replaced_name] = visual.primary_color;
+      }
+    }
   } catch (err) {
     console.warn('Failed to load team colors:', err);
     teamColorCache = {};
@@ -2418,7 +2484,7 @@ function renderRecruits(data) {
       return Math.floor(value / 10);
     };
     
-    tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${formatAttr(a.SC)}</td><td>${formatAttr(a.SH)}</td><td>${formatAttr(a.ID)}</td><td>${formatAttr(a.OD)}</td><td>${formatAttr(a.PS)}</td><td>${formatAttr(a.BH)}</td><td>${formatAttr(a.RB)}</td><td>${formatAttr(a.AG)}</td><td>${formatAttr(a.ST)}</td><td>${formatAttr(a.ND)}</td><td>${formatAttr(a.IQ)}</td><td>${formatAttr(a.FT)}</td><td>${r.rt ?? '-'}</td>`;
+    tr.innerHTML = `<td>${r.name}</td><td>${r.archetype}</td><td>${r.height}</td><td>${r.weight}</td><td>${r.pos}</td><td>${formatAttr(a.SC)}</td><td>${formatAttr(a.SH)}</td><td>${formatAttr(a.ID)}</td><td>${formatAttr(a.OD)}</td><td>${formatAttr(a.PS)}</td><td>${formatAttr(a.BH)}</td><td>${formatAttr(a.RB)}</td><td>${formatAttr(a.AG)}</td><td>${formatAttr(a.ST)}</td><td>${formatAttr(a.ND)}</td><td>${formatAttr(a.IQ)}</td><td>${formatAttr(a.FT)}</td><td>${formatRtDisplay(r.rt)}</td>`;
     tbody.appendChild(tr);
   });
   
@@ -2551,6 +2617,7 @@ function renderPracticeSquad(data) {
         td.textContent = content;
         if (extraClass) td.className = extraClass;
         tr.appendChild(td);
+        return td;
       };
       addCell(best.pos || '--');
       addCell(yearMap[(p.year || '').toLowerCase()] || p.year || '--');
@@ -2564,7 +2631,12 @@ function renderPracticeSquad(data) {
         addCell(displayVal);
       });
       const rt = best.rating;
-      addCell(rt ?? '-', typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : '');
+      const rtCell = addCell(
+        rt == null ? '-' : formatRtWithPotentialDisplay(rt, p.potential_rt_ratcheted),
+        typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : ''
+      );
+      rtCell.setAttribute('data-tooltip', 'current/potential');
+      rtCell.setAttribute('title', 'current/potential');
       tbody.appendChild(tr);
     } catch (e) {
       console.error('Error rendering practice squad player:', p, e);
@@ -2671,6 +2743,7 @@ function renderTeam(data) {
         weight: p.weight ?? '--',
         attributes: p.attributes || {},
         rt: best.rating,
+        potential_rt_ratcheted: p.potential_rt_ratcheted,
         has_playing_time_promise: !!p.has_playing_time_promise,
         is_graduating: !!p.is_graduating,
         walk_on: !!p.walk_on,
@@ -2733,6 +2806,7 @@ function renderTeam(data) {
       td.textContent = content;
       if (extraClass) td.className = extraClass;
       tr.appendChild(td);
+      return td;
     };
 
     addCell(p.pos);
@@ -2751,10 +2825,15 @@ function renderTeam(data) {
       addCell(displayVal);
     });
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
-    addCell(
-      p.rt ?? '-',
+    // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
+    // projected ceiling; header stays "RT", color stays by current rating. This runs in both
+    // Roster-tab render paths (initial renderTeam + post-sort re-render).
+    const rtCell = addCell(
+      formatRtWithPotentialDisplay(p.rt, p.potential_rt_ratcheted),
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
     );
+    rtCell.setAttribute('data-tooltip', 'current/potential');
+    rtCell.setAttribute('title', 'current/potential');
 
     tbody.appendChild(tr);
   });
@@ -3024,6 +3103,7 @@ function sortRosterTable(columnName, direction) {
       td.textContent = content;
       if (extraClass) td.className = extraClass;
       tr.appendChild(td);
+      return td;
     };
 
     addCell(p.pos);
@@ -3040,10 +3120,15 @@ function sortRosterTable(columnName, direction) {
       addCell(displayVal);
     });
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
-    addCell(
-      p.rt ?? '-',
+    // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
+    // projected ceiling; header stays "RT", color stays by current rating. This runs in both
+    // Roster-tab render paths (initial renderTeam + post-sort re-render).
+    const rtCell = addCell(
+      formatRtWithPotentialDisplay(p.rt, p.potential_rt_ratcheted),
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
     );
+    rtCell.setAttribute('data-tooltip', 'current/potential');
+    rtCell.setAttribute('title', 'current/potential');
 
     tbody.appendChild(tr);
   });
@@ -3672,6 +3757,18 @@ function showNewSeasonConfirmModal() {
   return overlay;
 }
 
+// Practice-squad assignment screen URL. Shared by the required-cuts modal CTA and
+// the Green Action Button's 'cut-players' mode so both land on the same screen
+// with the same return path.
+function buildAssignPracticeSquadUrl() {
+  const params = new URLSearchParams();
+  params.set('franchise_id', franchiseId);
+  params.set('team_id', userTeamId);
+  params.set('from', 'fcc');
+  params.set('return_url', getCurrentRelativeUrl());
+  return `/cut-players.html?${params.toString()}`;
+}
+
 function showCutPlayersRequiredModal(cutCount) {
   const overlay = document.createElement('div');
   overlay.className = 'gob-modal-overlay fcc-cut-required-modal is-visible';
@@ -3685,7 +3782,7 @@ function showCutPlayersRequiredModal(cutCount) {
         <p id="fcc-cut-required-copy" class="gob-modal-subtitle">Assign ${cutCount} player${cutCount === 1 ? '' : 's'} to your practice squad. They'll sit out this season, but they'll keep developing and return eligible next year.</p>
       </div>
       <div class="gob-modal-actions">
-        <button type="button" class="gob-modal-btn-dismiss" id="fcc-cut-required-close">Close</button>
+        <button type="button" class="gob-modal-btn-primary is-green" id="fcc-cut-required-close">Assign Practice Squad</button>
       </div>
     </div>
   `;
@@ -3700,8 +3797,13 @@ function showCutPlayersRequiredModal(cutCount) {
     if (event.target === overlay || event.target.classList.contains('gob-modal-backdrop')) close();
   });
   document.addEventListener('keydown', onKeydown);
-  overlay.querySelector('#fcc-cut-required-close')?.addEventListener('click', () => {
+  // Straight to the assignment screen — no extra Green Action Button hop.
+  overlay.querySelector('#fcc-cut-required-close')?.addEventListener('click', async () => {
+    playSound('confirm-1-lowervol.wav');
+    const sfxReady = waitForConfirmSfx();
     close();
+    await sfxReady;
+    window.location.href = buildAssignPracticeSquadUrl();
   });
   document.body.appendChild(overlay);
   overlay.querySelector('#fcc-cut-required-close')?.focus();
@@ -3736,7 +3838,7 @@ function updatePlayButton(data) {
   const eosTournament = data.eos_tournament;
   const week = Number(data.week || 1);
   const trainingDisabledForEos = !!data.training_disabled_for_eos;
-  const trainingDisabledForPostseason = !!data.training_disabled_for_postseason || (week >= 27 && week <= 34);
+  const trainingDisabledForPostseason = !!data.training_disabled_for_postseason || week >= 27;
   const userEliminated = data.user_eliminated != null ? !!data.user_eliminated : null;
   const offerSimRest = data.offer_sim_rest != null ? !!data.offer_sim_rest : null;
   const regionQualified = !!data.region_qualified;
@@ -3799,8 +3901,8 @@ function updatePlayButton(data) {
     const trainingCompleted = data.training_completed || false;
     const sessionType = data.session_type || 'in-season';
     if (!trainingCompleted) {
-      const distantResumeRequired = !!data.distant_training_resume?.required;
-      playNowBtn.textContent = distantResumeRequired
+      const cpuResumeRequired = !!data.cpu_training_resume?.required;
+      playNowBtn.textContent = cpuResumeRequired
         ? 'Resume Training'
         : (sessionType === 'preseason' ? 'Run Training Camp' : 'Run Training');
       playNowBtn.dataset.mode = 'training';
@@ -3998,13 +4100,8 @@ playNowBtn.addEventListener('click', async () => {
   }
 
   if (mode === 'cut-players') {
-    const params = new URLSearchParams();
-    params.set('franchise_id', franchiseId);
-    params.set('team_id', userTeamId);
-    params.set('from', 'fcc');
-    params.set('return_url', getCurrentRelativeUrl());
     await confirmSfxReady;
-    window.location.href = `/cut-players.html?${params.toString()}`;
+    window.location.href = buildAssignPracticeSquadUrl();
     return;
   }
   
@@ -4087,20 +4184,25 @@ playNowBtn.addEventListener('click', async () => {
       body: JSON.stringify({ franchise_id: franchiseId })
     });
     if (!res.ok) throw new Error('Simulation failed');
-    const { home, away, week, home_id, away_id } = await res.json();
+    const { home, away, week, home_id, away_id, home_display, away_display } = await res.json();
     if (!home || !away) throw new Error('Matchup not found');
     try {
       if (franchiseId && window.FranchiseLS) {
         window.FranchiseLS.setWeek(franchiseId, week);
       }
     } catch {}
-    // Same approach as tournament: prefer API-sourced team name (userTeamNameForLeaders from topData), then derive from userTeamId vs home_id/away_id. Avoids reliance on localStorage franchise_user_team which may be missing or stale.
-    let resolvedSide = (userTeamNameForLeaders === home ? 'home' : (userTeamNameForLeaders === away ? 'away' : ''));
-    if (!resolvedSide && userTeamId && home_id != null && away_id != null) {
+    // Prefer ObjectId for side (display names must not drive identity). Core names stay on home/away.
+    let resolvedSide = '';
+    if (userTeamId && home_id != null && away_id != null) {
       if (String(userTeamId) === String(home_id)) resolvedSide = 'home';
       else if (String(userTeamId) === String(away_id)) resolvedSide = 'away';
     }
+    if (!resolvedSide) {
+      resolvedSide = (userTeamNameForLeaders === home ? 'home' : (userTeamNameForLeaders === away ? 'away' : ''));
+    }
     let url = `/set-lineup.html?mode=franchise&franchise_id=${encodeURIComponent(franchiseId)}&week=${week}&home=${encodeURIComponent(home)}&away=${encodeURIComponent(away)}&home_id=${encodeURIComponent(home_id)}&away_id=${encodeURIComponent(away_id)}`;
+    if (home_display) url += `&home_display=${encodeURIComponent(home_display)}`;
+    if (away_display) url += `&away_display=${encodeURIComponent(away_display)}`;
     // ✅ SS&S: Use ObjectId for consistent navigation
     if (userTeamId) url += `&team_id=${encodeURIComponent(userTeamId)}&user_team_id=${encodeURIComponent(userTeamId)}`;
     if (resolvedSide) url += `&my_team=${resolvedSide}`;
@@ -4777,18 +4879,22 @@ function getTeamAttrVisualConfig(attrKey, value) {
     fillPercent = st.pillFillPercent(value);
     pulse = st.shouldPulse(value);
   } else if (attrKey === 'rebound_modifier') {
+    // 0.0-1.0 range. Center = neutral = init = 0.2 (NOT the midpoint). Asymmetric
+    // span: 0.2 of room below, 0.8 above, each mapped to the ±20 normalized scale so
+    // the shared cardTone (±12) / pulse (±14) thresholds apply as for the core-8 span.
     const deviation = value - 0.2;
-    normalized = (deviation / 0.2) * 10;
-    fillPercent = Math.min((Math.abs(deviation) / 0.2) * 50, 50);
-    pulse = Math.abs(deviation) >= 0.06;
+    const halfSpan = deviation < 0 ? 0.2 : 0.8;
+    normalized = (deviation / halfSpan) * 20;
+    fillPercent = Math.min((Math.abs(deviation) / halfSpan) * 50, 50);
+    pulse = Math.abs(normalized) >= 14;
   } else {
-    fillPercent = Math.min((Math.abs(normalized) / 10) * 50, 50);
-    pulse = Math.abs(normalized) >= 7;
+    fillPercent = Math.min((Math.abs(normalized) / 20) * 50, 50);
+    pulse = Math.abs(normalized) >= 14;
   }
 
   let cardTone = '';
-  if (normalized <= -6) cardTone = 'negative';
-  else if (normalized >= 6) cardTone = 'positive';
+  if (normalized <= -12) cardTone = 'negative';
+  else if (normalized >= 12) cardTone = 'positive';
 
   return {
     direction: normalized > 0 ? 'positive' : (normalized < 0 ? 'negative' : 'zero'),
@@ -5159,18 +5265,24 @@ async function resolveUpcomingOpponentFromMatchup(data) {
     upcomingOpponent = null;
     upcomingOpponentId = null;
     if (matchup && matchup.home && matchup.away) {
-      if (resolvedUserTeamName === matchup.home) {
-        upcomingOpponent = matchup.away;
-        upcomingOpponentId = matchup.away_id;
-      } else if (resolvedUserTeamName === matchup.away) {
-        upcomingOpponent = matchup.home;
-        upcomingOpponentId = matchup.home_id;
-      } else if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
+      const awayLabel = matchup.away_display || matchup.away;
+      const homeLabel = matchup.home_display || matchup.home;
+      // Prefer ObjectId (display name ≠ core name under Team Builder).
+      if (userTeamId && matchup.home_id != null && matchup.away_id != null) {
         if (String(userTeamId) === String(matchup.home_id)) {
-          upcomingOpponent = matchup.away;
+          upcomingOpponent = awayLabel;
           upcomingOpponentId = matchup.away_id;
         } else if (String(userTeamId) === String(matchup.away_id)) {
-          upcomingOpponent = matchup.home;
+          upcomingOpponent = homeLabel;
+          upcomingOpponentId = matchup.home_id;
+        }
+      }
+      if (!upcomingOpponent) {
+        if (resolvedUserTeamName === matchup.home || resolvedUserTeamName === homeLabel) {
+          upcomingOpponent = awayLabel;
+          upcomingOpponentId = matchup.away_id;
+        } else if (resolvedUserTeamName === matchup.away || resolvedUserTeamName === awayLabel) {
+          upcomingOpponent = homeLabel;
           upcomingOpponentId = matchup.home_id;
         }
       }
@@ -5384,7 +5496,7 @@ function showDevSimPopup(topData) {
         ">Simulate Regular Season</button>
         <button id="dev-sim-cancel-btn" style="
           padding: 12px 24px;
-          background: #ccc;
+          background: #cdcdcd;
           color: #333;
           border: none;
           border-radius: 5px;
@@ -5392,7 +5504,7 @@ function showDevSimPopup(topData) {
           font-size: 16px;
         ">Cancel</button>
       </div>
-      <p style="color: #999; font-size: 12px; margin-top: 20px;">
+      <p style="color: #9a9a9a; font-size: 12px; margin-top: 20px;">
         ⚠️ Development feature - can be disabled in code
       </p>
     `;
@@ -5611,7 +5723,7 @@ function showDevSimPopup(topData) {
             </p>
             <button id="dev-sim-close-btn" style="
               padding: 12px 24px;
-              background: #ccc;
+              background: #cdcdcd;
               color: #333;
               border: none;
               border-radius: 5px;

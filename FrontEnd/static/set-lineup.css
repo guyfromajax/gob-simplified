@@ -766,13 +766,6 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   padding-left: 16px;
 }
 
-.roster-table th.player-header-cell {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
 .player-name-cell {
   display: flex;
   justify-content: space-between;
@@ -797,17 +790,10 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   text-overflow: ellipsis;
 }
 
-.inline-rt {
-  flex-shrink: 0;
-  color: #F79420;
-  font-size: 13px;
-  font-weight: 700;
-}
-
 /*
  * RT color buckets — canonical scale lives in /css/rt-buckets.css.
  * That stylesheet is loaded on this page in set-lineup.html, so both
- * .inline-rt and .player-rating inherit the bucket colors via the
+ * .rt and .player-rating inherit the bucket colors via the
  * `rt-low / rt-mid / rt-high / rt-elite` class the JS applies.
  */
 
@@ -839,11 +825,9 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 .roster-table tr.selected td:first-child,
 .roster-table tr.selected td:first-child a,
 .roster-table tr.selected td.rt,
-.roster-table tr.selected .inline-rt,
 .roster-stats-table tr.selected td:first-child,
 .roster-stats-table tr.selected td:first-child a,
-.roster-stats-table tr.selected td.rt,
-.roster-stats-table tr.selected .inline-rt {
+.roster-stats-table tr.selected td.rt {
   color: rgba(255,255,255,0.52);
 }
 
@@ -857,11 +841,9 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 .roster-table tr.ineligible td:first-child,
 .roster-table tr.ineligible td:first-child a,
 .roster-table tr.ineligible td.rt,
-.roster-table tr.ineligible .inline-rt,
 .roster-stats-table tr.ineligible td:first-child,
 .roster-stats-table tr.ineligible td:first-child a,
-.roster-stats-table tr.ineligible td.rt,
-.roster-stats-table tr.ineligible .inline-rt {
+.roster-stats-table tr.ineligible td.rt {
   color: rgba(255,255,255,0.9);
 }
 

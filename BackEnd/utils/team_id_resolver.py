@@ -271,14 +271,21 @@ def _resolve_name_to_canonical(team_name: str, collection) -> Optional[str]:
             if canonical_id and _is_canonical_format(canonical_id):
                 return canonical_id
         
-        # Try underscore normalization
-        if "_" not in team_name:
-            # Try converting "Ocean City" -> "OCEAN_CITY" format
-            normalized_name = team_name.replace(" ", "_").upper()
-            # This is a heuristic - we'd need to check if this matches a team_id field
-            # For now, just try the database lookup with the normalized name
-            pass
-        
+        # Display→stored team_id via name map (not derive — apostrophe
+        # conventions in the 128 are not uniform). Custom names fall through.
+        from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
+        slugs = identity_slugs_for_display_name(team_name)
+        if slugs:
+            by_slug = collection.find_one(
+                {"team_id": {"$in": slugs}},
+                {"team_id": 1},
+            )
+            if by_slug:
+                canonical_id = by_slug.get("team_id")
+                if canonical_id and _is_canonical_format(canonical_id):
+                    return canonical_id
+
     except Exception as e:
         logger.debug(f"Error resolving name to canonical: {e}")
     

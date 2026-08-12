@@ -38,7 +38,9 @@ def test_ft_second_chance_make_uses_second_chance_table():
         ft_made_on_second_chance=True,
         rng=_SeqRng(),
     )
-    assert variant == SHOT_VARIANT_HEAVY_RATTLE
+    # The documented second-chance table starts with LITTLE_RATTLE (20%);
+    # _SeqRng deliberately selects the first table entry.
+    assert variant == SHOT_VARIANT_LITTLE_RATTLE
 
 
 def test_ft_miss_near_delta_prefers_little_rattle():

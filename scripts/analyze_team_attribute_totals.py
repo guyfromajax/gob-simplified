@@ -12,35 +12,17 @@ This script:
 """
 
 import os
+import argparse
 import sys
+from pathlib import Path
 from collections import defaultdict
 from typing import Dict, List, Tuple
 
-from dotenv import load_dotenv
-from pymongo import MongoClient
 from pymongo.collection import Collection
 
-
-def load_mongo_uri() -> str:
-    """Load MongoDB URI from environment."""
-    # Try .env.local first (local dev), then .env (Railway/prod)
-    if os.path.exists(".env.local"):
-        load_dotenv(".env.local")
-    else:
-        load_dotenv()
-    
-    mongo_uri = os.getenv("MONGO_URI")
-    if not mongo_uri:
-        raise ValueError("MONGO_URI environment variable not set")
-    return mongo_uri
-
-
-def get_players_collection() -> Collection:
-    """Get MongoDB players collection."""
-    mongo_uri = load_mongo_uri()
-    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-    db = client["gob"]
-    return db["players"]
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 
 def analyze_team_attributes(players_collection: Collection) -> Dict:
@@ -194,12 +176,17 @@ def save_report(report: str, output_file: str = "team_attribute_analysis.txt"):
 
 def main():
     """Main execution function."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
     try:
         print("🔍 Connecting to MongoDB...")
-        players_collection = get_players_collection()
-        
-        print("📊 Analyzing team attributes...")
-        analysis = analyze_team_attributes(players_collection)
+        connection = connect_migration_target(args.db, write=False)
+        try:
+            print("📊 Analyzing team attributes...")
+            analysis = analyze_team_attributes(connection.database.players)
+        finally:
+            connection.close()
         
         if not analysis:
             print("❌ Analysis failed")
@@ -224,4 +211,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

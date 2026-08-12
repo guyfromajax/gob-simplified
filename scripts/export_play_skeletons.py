@@ -21,28 +21,16 @@ four variants. With 7 plays × 4 variants, this yields 28 skeletons for analysis
 """
 
 import json
-import os
+import argparse
+from pathlib import Path
 import sys
 from typing import Any, Dict, List
 
-from dotenv import load_dotenv
-from pymongo import MongoClient
 from pymongo.collection import Collection
 
-
-def load_mongo_uri() -> str:
-    load_dotenv()
-    mongo_uri = os.getenv("MONGO_URI")
-    if not mongo_uri:
-        raise ValueError("MONGO_URI environment variable not set")
-    return mongo_uri
-
-
-def get_plays_collection() -> Collection:
-    mongo_uri = load_mongo_uri()
-    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-    db = client["gob"]
-    return db["plays"]
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 
 def export_play_skeletons(plays_collection: Collection) -> List[Dict[str, Any]]:
@@ -61,12 +49,19 @@ def export_play_skeletons(plays_collection: Collection) -> List[Dict[str, Any]]:
     return exported
 
 
-def main(out_path: str = "play_skeletons_export.json") -> None:
-    plays_collection = get_plays_collection()
-    data = export_play_skeletons(plays_collection)
+def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    parser.add_argument("--output", default="play_skeletons_export.json")
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    try:
+        data = export_play_skeletons(connection.database["plays"])
+    finally:
+        connection.close()
 
     # Write to disk
-    with open(out_path, "w", encoding="utf-8") as f:
+    with open(args.output, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
 
     # Also print to stdout for quick inspection
@@ -75,6 +70,4 @@ def main(out_path: str = "play_skeletons_export.json") -> None:
 
 
 if __name__ == "__main__":
-    out_file = sys.argv[1] if len(sys.argv) > 1 else "play_skeletons_export.json"
-    main(out_file)
-
+    main()

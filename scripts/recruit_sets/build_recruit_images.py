@@ -40,6 +40,7 @@ import argparse
 HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.dirname(HERE)
 ROOT = os.path.dirname(SCRIPTS)
+sys.path.insert(0, HERE)
 sys.path.insert(0, SCRIPTS)
 
 import generate_player_portraits as gen         # noqa: E402  (PROMPT, build_prompt, load_env, MODEL)
@@ -50,23 +51,89 @@ REF_DIR = gen.REF_DIR                            # tmp/portrait-pilot/reference_
 OUT_KIT = "assets_staging/recruits/kit"
 
 
-def strip_watermark(a, alpha, cx=0.95, cy=0.95, r=0.055):
-    """Remove the Gemini bottom-right sparkle by CONTENT-AWARE INPAINTING: mask a
-    small disk over the sparkle and fill it from the surrounding pixels (cv2 Telea).
-    A sparkle-on-skin fills with skin — no seam, no hole. ALPHA is left untouched,
-    so the arm silhouette and transparent background are preserved. `a` = RGB float
-    array (modified in place). cx/cy/r = sparkle center + radius as fractions of the
-    larger dimension. Google's invisible SynthID is untouched."""
+_WM_TEMPLATE = None
+
+
+def _wm_template():
+    """The Gemini sparkle glyph as a mean-subtracted matched filter (cached).
+    Extracted once from a crisp dark-skin example; matched by SHAPE so skin tone
+    doesn't affect localization. Lives beside this script as watermark_template.png."""
+    global _WM_TEMPLATE
+    if _WM_TEMPLATE is None:
+        import numpy as np
+        from PIL import Image
+        t = np.asarray(Image.open(os.path.join(HERE, "watermark_template.png")).convert("L")).astype("float32")
+        _WM_TEMPLATE = t - t.mean()
+    return _WM_TEMPLATE
+
+
+def strip_watermark(a, alpha, cx=0.95, cy=0.95, r=0.03,
+                    score_min=0.50, precise_min=0.82, log=None):
+    """Remove the Gemini bottom-right sparkle by LOCATING it with a shape template and
+    inpainting only over skin. Three regimes by match confidence, so it never leaves the
+    white-blob-over-the-arm the old fixed-disk version produced and never damages a bust:
+
+    1. LOCATE by SHAPE, not brightness. Normalised cross-correlation of the sparkle glyph
+       template over the bottom-right corner BAND (the star's x is stable ≈0.94, its y
+       varies with arm pose) scores how confidently the star is placed. Brightness/top-hat
+       methods miss faint sparkles on light skin and false-match skin highlights — the
+       glyph shape does not.
+
+       • score ≥ precise_min  → PRECISE: tight disk at the matched location (crisp,
+         high-contrast sparkles — mostly medium/dark skin).
+       • score_min ≤ score < precise_min → SWEEP: localisation is unreliable (faint
+         low-contrast sparkles on light skin land the match off-target), so inpaint the
+         whole bottom-right arm CORNER — a smooth-skin region where a broad fill is
+         seamless — removing the star wherever it sits.
+       • score < score_min → SKIP: no confident star; leave the bust untouched (a faint
+         residual beats an artifact — and these are the least-visible sparkles anyway).
+
+    2. FILL FROM SKIN ONLY. Every mask is intersected with the ERODED person mask, so cv2
+       Telea fills from interior skin and never from the anti-aliased arm edge or the
+       white background — the two sources that produced white smears. A mask that lands
+       entirely off-person empties and we no-op (the star was on transparent bg → invisible).
+
+    `a` = RGB float array (modified in place); `alpha` = 0-255 person mask (untouched).
+    cx/cy/r retained for signature compatibility (unused). Returns `a`. Google's invisible
+    SynthID is untouched. `log` (callable) receives a one-line status."""
     import numpy as np
     try:
         import cv2
     except ImportError:
         raise SystemExit("watermark strip needs OpenCV: pip install opencv-python-headless")
     H, W = a.shape[:2]
+    tmpl = _wm_template()
+    half = tmpl.shape[0] // 2
+    lum = (0.299 * a[..., 0] + 0.587 * a[..., 1] + 0.114 * a[..., 2]).clip(0, 255).astype(np.float32)
+
+    y0, x0 = int(0.80 * H), int(0.88 * W)
+    res = cv2.matchTemplate(lum[y0:, x0:], tmpl, cv2.TM_CCOEFF_NORMED)
+    _, score, _, loc = cv2.minMaxLoc(res)
+    if score < score_min:                                # uncertain → never damage, leave it
+        if log:
+            log(f"SKIP  score={score:.2f} (<{score_min}) — sparkle left untouched")
+        return a
+
+    person = cv2.erode((alpha > 128).astype(np.uint8),
+                       cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (11, 11)))
     mask = np.zeros((H, W), np.uint8)
-    cv2.circle(mask, (int(cx * W), int(cy * H)), max(1, int(r * max(H, W))), 255, -1)
+    if score >= precise_min:                             # confident placement → tight disk
+        bx, by = x0 + loc[0] + half, y0 + loc[1] + half
+        cv2.circle(mask, (bx, by), half + 6, 255, -1)
+        mode = "PREC "
+    else:                                                # unreliable loc → blind corner sweep over skin
+        cv2.ellipse(mask, (int(0.955 * W), int(0.905 * H)),
+                    (int(0.060 * W), int(0.075 * H)), 0, 0, 360, 255, -1)
+        mode = "SWEEP"
+    mask[person == 0] = 0
+    if mask.max() == 0:                                  # landed off-person → invisible
+        if log:
+            log(f"BG    score={score:.2f} — off-person, no-op")
+        return a
     rgb = np.clip(a[..., :3], 0, 255).astype(np.uint8)
-    a[..., :3] = cv2.inpaint(rgb, mask, 10, cv2.INPAINT_TELEA).astype(a.dtype)
+    a[..., :3] = cv2.inpaint(rgb, mask, 7, cv2.INPAINT_TELEA).astype(a.dtype)
+    if log:
+        log(f"{mode} score={score:.2f}")
     return a
 
 
@@ -103,15 +170,14 @@ def main():
                     help="NB image model (try gemini-3.1-flash-image to test if it skips the sparkle)")
     ap.add_argument("--strip-watermark", action="store_true",
                     help="erase the Gemini corner sparkle (off by default)")
-    ap.add_argument("--wm-cx", type=float, default=0.94, help="sparkle center x (frac of W)")
-    ap.add_argument("--wm-cy", type=float, default=0.95, help="sparkle center y (frac of H)")
-    ap.add_argument("--wm-r", type=float, default=0.055, help="sparkle inpaint radius (frac)")
+    ap.add_argument("--wm-cx", type=float, default=0.95, help="FALLBACK sparkle center x (frac of W), used only when auto-detect finds nothing")
+    ap.add_argument("--wm-cy", type=float, default=0.95, help="FALLBACK sparkle center y (frac of H), used only when auto-detect finds nothing")
+    ap.add_argument("--wm-r", type=float, default=0.03, help="FALLBACK sparkle inpaint radius (frac), used only when auto-detect finds nothing")
     ap.add_argument("--out-kit", default=OUT_KIT)
     args = ap.parse_args()
 
-    gen.load_env()
     if not os.environ.get("GEMINI_API_KEY"):
-        sys.exit("GEMINI_API_KEY not set (checked env and .env).")
+        sys.exit("GEMINI_API_KEY not set in the invoking process.")
     try:
         from google import genai
         from PIL import Image
@@ -175,18 +241,22 @@ def main():
             alpha = uni.person_alpha(src, np, ndimage)          # 0-255
             person = alpha > 128
             tank = uni._tank(a, person, np, ndimage)            # bool
-            ys, xs = np.where(tank)
-            if len(ys) == 0:
-                print(f"[fail] {rec['name']} ({rid}): no tank found (bad bust) — re-run to re-roll")
+            from mask_validation import assert_tank_mask_usable
+            try:
+                assert_tank_mask_usable(tank, source=rid)
+            except RuntimeError as exc:
+                print(f"[fail] {rec['name']} ({rid}): {exc} — re-run to re-roll")
                 failed += 1
                 os.remove(raw_tmp)
                 continue
+            ys, xs = np.where(tank)
             bbox = [int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())]
             center = int((xs.min() + xs.max()) / 2)
 
             # erase the Gemini corner watermark before saving the kit
             if args.strip_watermark:
-                strip_watermark(a, alpha, cx=args.wm_cx, cy=args.wm_cy, r=args.wm_r)
+                strip_watermark(a, alpha, cx=args.wm_cx, cy=args.wm_cy, r=args.wm_r,
+                                log=lambda m, _n=rec["name"]: print(f"    [wm] {_n:22} {m}"))
 
             # kit: pre-finish white RGBA bust (recolor input) + tank mask + geometry
             rgba = np.dstack([a, alpha]).astype("uint8")

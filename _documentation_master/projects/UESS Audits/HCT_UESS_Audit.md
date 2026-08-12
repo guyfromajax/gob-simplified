@@ -2,7 +2,9 @@
 
 **Verdict: the messiest turn in the sweep — 2 HIGH, 1 MED-HIGH, 5 MED.** Shot logic is exemplary (§1 reference pattern); the problems are the **entry seam** (backfill + ball + detector, some SIP-parity), a **dual clock authority** that diverges, and **trap positioning logic-vs-render** divergence. (2026-07-05, 4-dimension parallel trace; builds on the interception audit below.)
 
-> **Scope note:** the pass-**interception / steal** freeze bug (no pass-flight segment, ball teleport passer→stealer, `runSteal` FE stub) is separately documented in [`../FCPHCT_UESS_Audit.md`](../FCPHCT_UESS_Audit.md) (2026-07-04) — NOT re-covered here.
+> **Scope note:** the pass-interception flight, terminal cleanup, and shared
+> PressureStepState bridge have shipped and are documented canonically in
+> [`../../06_Gameplay_Systems/HCT_System.md`](../../06_Gameplay_Systems/HCT_System.md).
 
 ## Topline (human-scannable)
 - **§1 coord-source:** ✅ **Compliant — reference pattern.** HCT shot decides contest + 2/3 classification from the *exact* `defender_end_coords`/`shot_spot` the emitter renders (no `player.coords`, no re-interpolation) — stronger than the HCO/FCP pre-pass fix. Trouble is trap *defender positioning* (see §8.3), not the shot.

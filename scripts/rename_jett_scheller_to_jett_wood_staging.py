@@ -18,27 +18,10 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-os.chdir(ROOT)
+from BackEnd.script_db import STAGING_DB, ScriptDatabaseError, connect_script_database  # noqa: E402
 
 
-def _load_env(filepath: Path) -> None:
-    if not filepath.exists():
-        return
-    for line in filepath.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-
-
-for env_path in (ROOT / ".env.local", ROOT / ".env"):
-    _load_env(env_path)
-
-from pymongo import MongoClient  # noqa: E402
-
-
-DB_NAME = "gob-staging"
+DB_NAME = STAGING_DB
 COLLECTION = "players"
 OLD_FIRST = "Jett"
 OLD_LAST = "Scheller"
@@ -56,13 +39,13 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> int:
     args = parse_args()
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set", file=sys.stderr)
-        return 1
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    collection = client[DB_NAME][COLLECTION]
+    connection = connect_script_database(
+        target=DB_NAME,
+        access="write" if args.apply else "read",
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
+    collection = connection.database[COLLECTION]
 
     query = {
         "$or": [
@@ -139,4 +122,8 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    try:
+        raise SystemExit(main())
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        raise SystemExit(2)

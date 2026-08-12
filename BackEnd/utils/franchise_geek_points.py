@@ -67,6 +67,22 @@ def teams_match_for_franchise(team_a: Any, team_b: Any) -> bool:
     return bool(oid_a and oid_b and oid_a == oid_b)
 
 
+def gm_team_matches_ref(gm_team: Any, team_ref: Any) -> bool:
+    """True if ``team_ref`` (ObjectId, slug, core name, or display name) identifies ``gm_team``.
+
+    ``TeamManager.name`` is always core; ``display_name`` may be the overlay.
+    Used for playbook / team-pick helpers — not the simulate-quarter matchup gate.
+    """
+    if gm_team is None or team_ref is None:
+        return False
+    ref = str(team_ref)
+    if str(getattr(gm_team, "name", None) or "") == ref:
+        return True
+    if str(getattr(gm_team, "display_name", None) or "") == ref:
+        return True
+    return teams_match_for_franchise(team_ref, getattr(gm_team, "team_id", None))
+
+
 def franchise_win_geek_points_delta(
     week: int,
     eos_game: dict | None,

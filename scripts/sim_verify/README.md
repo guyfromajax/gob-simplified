@@ -4,9 +4,47 @@ Runnable instruments behind the standing verification rules in
 `_documentation_master/projects/Sim_Perf_Capstone.md` → **Verification toolkit**. Promoted from
 session scratchpad so future work can *re-run* the checks, not just read about them.
 
+> ⚙️ **Local runs (laptop → remote Atlas): set `FRANCHISE_CPU_SIM_USE_POOL=0`.** The spawn
+> ProcessPool (`cpu_week_pool.py`, 8 workers each with its own MongoClient) is tuned for the
+> 32-vCPU Railway service next to Atlas; from a laptop the concurrent connections + per-week
+> spawn re-import **stall a multi-season run on season 1 week 1** (workers idle ~3% CPU on the
+> network). The thread engine (`POOL=0`, one shared connection) completes — ~148 min for a
+> 4-season `season_advance_harness.py` run. `season_advance_harness.py` `setdefault`s POOL=1,
+> so you must export POOL=0 explicitly. On Railway, leave the pool on.
+
 All seeded runs pin `PYTHONHASHSEED=0` (determinism contract). The reference anchor is
-`reports/perf/refstats_postB_20260720_20260720_153720.csv` (seed 20260720). Re-cut the anchor only
-after an intentional RNG-stream change (see standing rule 2).
+`reports/perf/refstats_postrecal_20260729_160503.csv` (seed 20260720, `--mode cpu`, 63 games,
+franchise `6a28436c98dbd04e902eee09` week 7). Re-cut the anchor only after an intentional
+RNG-stream change (see standing rule 2), or after a behavior-changing merge.
+
+**Re-cut 2026-07-29** from merged `develop` after two behavior-changing merges — the distant
+sunset and the player-attribute recalibration (new RT formula + regenerated pool) — invalidated
+the prior anchor `refstats_postB_20260720_20260720_153720.csv`. The new anchor is **CPU-only**:
+the old `--mode both` PS reference franchise `6a5e1f0e517ebcc58d981675` no longer exists in
+gob-staging. To restore PS parity, re-cut `--mode both` against a currently-initialized PS
+franchise (and update this pointer + the invocations below).
+
+> ⚠️ **Do NOT diff `refstats_postB_20260720...` against `refstats_postrecal_20260729...`.**
+> They are **not comparable** — ~18 sim-touching commits landed between them, including several
+> explicit shot/block/foul recalibrations (`7d003157d` "fixed block bug and calibrated for 3pt
+> and FG percentages", `b319bdd89` "recalibrated blocks, fts and close FGs", `74a0206f5`,
+> `1405837cb`). A naive diff shows FG% −24%, 3PT% −40%, BLK +371%, AST −44%, PF +52% — those are
+> the shot-system tuning, NOT the attribute recalibration, and will be misattributed. Exact-diff
+> is only meaningful between two anchors on adjacent, draw-preserving codebases.
+
+**Re-cut 2026-08-01** (recal **pass 2** — offseason development fix + height grow-into-frame +
+pool re-migration). New anchor: `reports/perf/refstats_20260801_203626.csv/.json` (same
+franchise `6a28436c98dbd04e902eee09`, seed 20260720, `--mode cpu`, week 7; re-run at settled
+HEAD is byte-identical — pass-2 commits are provably sim-neutral, see below).
+
+> ⚠️ **Do NOT diff `refstats_postrecal_20260729...` against `refstats_20260801...`.**
+> Second non-comparability span. The **team-mod** commits (phase-1 team mod + team-builder
+> fixes) landed between the two anchors and change the sim; a naive diff attributes their drift
+> to pass 2. Pass 2 itself (offseason `develop_*`, generation `draw_height`/`generate_player`,
+> the migration) touches **neither the game-sim path nor its imports** — verified by dependency
+> analysis (zero calls, zero imports into `BackEnd/engine` + `BackEnd/practice_squad`) — so it
+> is sim-neutral; the span's drift is entirely the team-mod work. Same treatment as the
+> 2026-07-20→2026-07-29 span above.
 
 | Script / flag | Capstone toolkit row | Use when | Reads |
 |---|---|---|---|

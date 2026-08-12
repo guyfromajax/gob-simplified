@@ -5,24 +5,12 @@ Pulls version 0 of all variants from Standard skeletons and compares the last tw
 """
 
 import sys
-import os
+import argparse
+from pathlib import Path
 
-# Add parent directory to path for BackEnd imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from pymongo import MongoClient
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
-
-def get_db():
-    """Get MongoDB database connection."""
-    mongo_uri = os.getenv("MONGO_URI")
-    if not mongo_uri:
-        raise ValueError("MONGO_URI environment variable not set")
-    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
-    return client["gob"]
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 def steps_are_identical(step1, step2):
     """Compare two steps to see if they're identical."""
@@ -49,9 +37,8 @@ def steps_are_identical(step1, step2):
     
     return True
 
-def check_skeleton(collection_name, skeleton_name="Standard"):
+def check_skeleton(db, collection_name, skeleton_name="Standard"):
     """Check a skeleton for duplicate final steps in all variants."""
-    db = get_db()
     collection = db[collection_name]
     
     print(f"\n{'='*80}")
@@ -122,13 +109,14 @@ def check_skeleton(collection_name, skeleton_name="Standard"):
         print(f"{'='*80}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
     print("🔍 Checking FCP and HCT skeletons for duplicate final steps...")
-    
-    # Check FCP skeletons
-    check_skeleton("fcp_skeletons", "Standard")
-    
-    # Check HCT skeletons
-    check_skeleton("hct_skeletons", "Standard")
-    
-    print("\n✅ Analysis complete!")
-
+    try:
+        check_skeleton(connection.database, "fcp_skeletons", "Standard")
+        check_skeleton(connection.database, "hct_skeletons", "Standard")
+        print("\n✅ Analysis complete!")
+    finally:
+        connection.close()

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # EOG-band measurement season runner. Sets all env, then drives the target
-# franchise (6a66449127f0298bd27584c5, South Lancaster) through the regular
-# season in-process. Writes the dataset to an ABSOLUTE local path so it survives
+# franchise (default configured in eog_measurement_season.py) through the regular
+# season in-process. Target overrides use GOB_MEASUREMENT_FRANCHISE_ID and
+# GOB_MEASUREMENT_TEAM. Writes the dataset to an ABSOLUTE local path so it survives
 # independent of Railway's ephemeral filesystem.
 #
 # Usage:
@@ -17,10 +18,8 @@ set -euo pipefail
 export PYTHONHASHSEED=0
 export GOB_EOG_BAND_LOG=1
 export GOB_EOG_BAND_LOG_FILE="${GOB_EOG_BAND_LOG_FILE:-$(cd "$(dirname "$0")/.." && pwd)/eog_band_measurement.jsonl}"
-export FRANCHISE_ALL_GAMES_FULL_SIM=1     # REQUIRED: keeps regular-season games off the distant scorer
-export FRANCHISE_ALL_TEAMS_AUTOTRAIN=1    # real CPU training (target-world trajectories)
 export FRANCHISE_CPU_SIM_USE_POOL=1       # fast CPU slate (set 0 to fall back to threads)
 
 echo "Band log  -> $GOB_EOG_BAND_LOG_FILE"
-echo "Flags     -> ALL_GAMES_FULL_SIM=$FRANCHISE_ALL_GAMES_FULL_SIM ALL_TEAMS_AUTOTRAIN=$FRANCHISE_ALL_TEAMS_AUTOTRAIN USE_POOL=$FRANCHISE_CPU_SIM_USE_POOL"
+echo "Pool      -> USE_POOL=$FRANCHISE_CPU_SIM_USE_POOL"
 python scripts/eog_measurement_season.py "$@"

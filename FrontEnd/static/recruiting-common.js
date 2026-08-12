@@ -44,6 +44,14 @@
     return typeof global.getRecruitRtBucketClass === 'function' ? global.getRecruitRtBucketClass(rt) : '';
   }
 
+  // Potential Rating (§Phase 4) display glue. `potentialRt` is the backend's
+  // already-ratcheted ceiling (normalizeRecruits.potentialRt); letters come from the
+  // one letter mapping (formatRtDisplay). Returns "C/B" when a ceiling is present, the
+  // current grade alone otherwise, "--" when there is no rating.
+  function formatRtWithPotential(rt, potentialRt) {
+    return global.formatRtWithPotentialDisplay(rt, potentialRt);
+  }
+
   function fetchJSON(url, options) {
     options = options || {};
     var headers = Object.assign({}, global.API_CONFIG ? API_CONFIG.getAuthHeaders() : {}, options.headers || {});
@@ -187,6 +195,8 @@
         year: normalizeYear(recruit.year || 'JH') || 'JH',
         yearDisplay: formatYearAbbrev(recruit.year || 'JH'),
         rt: best.rating != null ? Number(best.rating) : null,
+        // Potential Rating (§Phase 4): backend-supplied, already-ratcheted projected ceiling.
+        potentialRt: recruit.potential_rt_ratcheted != null ? Number(recruit.potential_rt_ratcheted) : null,
         lean: lean,
         leanDisplay: getLeanDisplay(lean, teamNameMap),
         leanSortValue: getLeanSortValue(lean, teamNameMap),
@@ -311,7 +321,7 @@
         '<td>' + recruit.attrs.ND + '</td>',
         '<td>' + recruit.attrs.IQ + '</td>',
         '<td>' + recruit.attrs.FT + '</td>',
-        '<td class="' + recruitRtClass(recruit.rt, recruit.year) + '">' + (recruit.rt != null ? recruit.rt : '--') + '</td>',
+        '<td class="' + recruitRtClass(recruit.rt, recruit.year) + '" data-tooltip="current/potential" title="current/potential">' + formatRtWithPotential(recruit.rt, recruit.potentialRt) + '</td>',
         useLadder
           ? '<td class="lean-ladder-cell">' + global.RecruitingSpine.Lean.ladderHtml(
               global.RecruitingSpine.Lean.fromBackend({ Lean: recruit.lean }, { userTeamId: userTeamId, teamNameMap: teamNameMap })
@@ -379,6 +389,7 @@
     buildRecruitingUrl: buildRecruitingUrl,
     escapeHtml: escapeHtml,
     fetchJSON: fetchJSON,
+    formatRtWithPotential: formatRtWithPotential,
     getQueryContext: getQueryContext,
     normalizeRecruits: normalizeRecruits,
     playSound: playSound,

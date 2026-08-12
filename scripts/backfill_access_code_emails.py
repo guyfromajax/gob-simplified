@@ -11,26 +11,18 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import os
 import sys
+from pathlib import Path
 from collections import defaultdict
 from datetime import datetime, timezone
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
-try:
-    from dotenv import load_dotenv
-
-    if os.path.exists(".env.local"):
-        load_dotenv(".env.local")
-    else:
-        load_dotenv()
-except ImportError:
-    pass
-
-from pymongo import MongoClient, ReturnDocument
+from pymongo import ReturnDocument
 
 from BackEnd.utils.alpha_access_email import send_alpha_welcome_email
+from scripts.db_migration_cli import connect_migration_target
 
 DB_NAME_STAGING = "gob-staging"
 DB_NAME_PRODUCTION = "gob"
@@ -68,9 +60,9 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--execute", action="store_true", help="Send emails and update DB")
     parser.add_argument(
         "--db",
-        choices=["staging", "production"],
-        default="production",
-        help="Target database (default: production)",
+        choices=["gob-staging", "gob"],
+        required=True,
+        help="Explicit target database",
     )
     parser.add_argument(
         "--confirm-production-write",
@@ -99,18 +91,13 @@ def _dedupe_requests(docs: list[dict]) -> tuple[list[dict], list]:
 
 def main() -> int:
     args = parse_args()
-    db_name = DB_NAME_STAGING if args.db == "staging" else DB_NAME_PRODUCTION
-    if args.execute and args.db == "production" and not args.confirm_production_write:
+    db_name = args.db
+    if args.execute and args.db == DB_NAME_PRODUCTION and not args.confirm_production_write:
         print("Refusing production execute without --confirm-production-write")
         return 1
 
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set")
-        return 1
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    db = client[db_name]
+    connection = connect_migration_target(args.db, write=args.execute)
+    db = connection.database
     requests = db[REQUESTS]
     users = db[USERS]
 
@@ -189,6 +176,7 @@ def main() -> int:
             )
     else:
         print(f"Sent: {send_queue}")
+    connection.close()
     return 0
 
 

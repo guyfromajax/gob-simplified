@@ -20,7 +20,17 @@ const homeTeam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('home'
 const awayTeam = window.StateTelemetry ? window.StateTelemetry.logUrlRead('away', urlParams.get('away')) : urlParams.get('away');
 const homeId = urlParams.get('home_id');
 const awayId = urlParams.get('away_id');
+// Chrome labels (Team Builder overlay). Identity for init/sim remains home/away (core).
+const homeDisplay = urlParams.get('home_display') || homeTeam;
+const awayDisplay = urlParams.get('away_display') || awayTeam;
 let myTeamSide = urlParams.get('my_team');
+
+/** Attach structural ObjectIds when present (Team Builder franchise matchup identity). */
+function attachMatchupTeamIds(payload) {
+  if (homeId) payload.home_id = homeId;
+  if (awayId) payload.away_id = awayId;
+  return payload;
+}
 // FT shooter lock: when the first turn out of Set Lineup is a free throw, the
 // designated shooter cannot be removed from the active lineup (reorder still ok).
 // See Timeout_System.md § Designated Free Throw Shooter Lock.
@@ -88,6 +98,10 @@ async function redirectIfFranchiseGameplayAlreadyCommitted() {
     if (abortIfAccessDenied(response)) return false;
     if (!response.ok) return false;
     const data = await response.json();
+    // Mid-game resume often lands here before court — hydrate same as FCC.
+    if (typeof hydrateTeamBuilderVisualFromFranchisePayload === 'function') {
+      hydrateTeamBuilderVisualFromFranchisePayload(data, franchiseId);
+    }
     const currentWeek = Number(data.week || 1);
     const pageWeek = Number(weekParam || 0);
     if (pageWeek && currentWeek > pageWeek) {
@@ -364,7 +378,12 @@ if (gameId && quarter === 1 && !urlParams.has('resume_from_timeout')) {
   // (Backend will create new game_id via init-game)
   const storedHome = typeof localStorage !== 'undefined' ? localStorage.getItem('game_home') : null;
   const storedAway = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away') : null;
-  const isNewMatchup = storedHome && storedAway && (storedHome !== homeTeam || storedAway !== awayTeam);
+  const storedHomeId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_home_id') : null;
+  const storedAwayId = typeof localStorage !== 'undefined' ? localStorage.getItem('game_away_id') : null;
+  // Prefer ObjectId identity when both sides have ids; fall back to display names.
+  const isNewMatchup = (homeId && awayId && storedHomeId && storedAwayId)
+    ? (storedHomeId !== homeId || storedAwayId !== awayId)
+    : (storedHome && storedAway && (storedHome !== homeTeam || storedAway !== awayTeam));
   
   if (isNewMatchup) {
     // Teams changed = definitely a new matchup, clear game_id from URL
@@ -378,12 +397,16 @@ if (gameId && quarter === 1 && !urlParams.has('resume_from_timeout')) {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('game_home', homeTeam || '');
       localStorage.setItem('game_away', awayTeam || '');
+      if (homeId) localStorage.setItem('game_home_id', homeId);
+      if (awayId) localStorage.setItem('game_away_id', awayId);
     }
   } else {
     // Teams match, update stored teams
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('game_home', homeTeam || '');
       localStorage.setItem('game_away', awayTeam || '');
+      if (homeId) localStorage.setItem('game_home_id', homeId);
+      if (awayId) localStorage.setItem('game_away_id', awayId);
     }
   }
 }
@@ -796,6 +819,7 @@ async function loadRoster() {
         away_team: awayTeam,
         mode: mode
       };
+      attachMatchupTeamIds(initPayload);
       
       // ✅ CRITICAL: Pass user_team_side to init-game so GameManager can set is_user_team flags
       // This ensures user team settings are protected from autoset_strategy_settings()
@@ -826,6 +850,8 @@ async function loadRoster() {
         if (typeof localStorage !== 'undefined') {
           localStorage.setItem('game_home', homeTeam);
           localStorage.setItem('game_away', awayTeam);
+          if (homeId) localStorage.setItem('game_home_id', homeId);
+          if (awayId) localStorage.setItem('game_away_id', awayId);
         }
         
         // ✅ SS&S: URL is the source of truth - update URL with gameId (without page reload)
@@ -1222,6 +1248,7 @@ function renderRosterAttributes() {
       bestPos,
       formatHeight(p.height),
       weightValue,
+      `${Math.round(ngValue * 100)}%`,
       Math.floor((anchorAttrs.anchor_SC ?? anchorAttrs.SC ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_SH ?? anchorAttrs.SH ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_ID ?? anchorAttrs.ID ?? 0) / 10),
@@ -1234,9 +1261,9 @@ function renderRosterAttributes() {
       Math.floor((anchorAttrs.anchor_ND ?? anchorAttrs.ND ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_IQ ?? anchorAttrs.IQ ?? 0) / 10),
       Math.floor((anchorAttrs.anchor_FT ?? anchorAttrs.FT ?? 0) / 10),
-      `${Math.round(ngValue * 100)}%`
+      formatRtDisplay(rt)
     ];
-    const classes = ['', '', 'ht', 'wt', '', '', '', '', '', '', '', '', '', '', '', '', `ng ${getEnergyClass(ngValue)}`];
+    const classes = ['', '', 'ht', 'wt', `ng ${getEnergyClass(ngValue)}`, '', '', '', '', '', '', '', '', '', '', '', '', `rt ${rtBucketClassOrEmpty(rt)}`];
 
     cells.forEach((val, idx) => {
       const td = document.createElement('td');
@@ -1247,11 +1274,7 @@ function renderRosterAttributes() {
         const nameText = document.createElement('span');
         nameText.textContent = val ?? '--';
         nameText.className = 'player-name-link';
-        const rtSpan = document.createElement('span');
-        rtSpan.className = `inline-rt ${rtBucketClassOrEmpty(rt)}`;
-        rtSpan.textContent = rt ?? '--';
         wrap.appendChild(nameText);
-        wrap.appendChild(rtSpan);
         td.appendChild(wrap);
       } else {
         td.textContent = val ?? '--';
@@ -1273,7 +1296,7 @@ function renderRosterAttributes() {
     newHeader.style.cursor = 'pointer';
     newHeader.style.userSelect = 'none';
     newHeader.addEventListener('click', () => {
-      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'NG'];
+      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'NG', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'RT'];
       sortRoster(columnNames[index]);
     });
   });
@@ -1678,7 +1701,7 @@ function updateSlotDisplay(slot) {
       <div class="slot-info">
         <div class="slot-row-1">
           <div class="player-name">${slotDisplayName}</div>
-          <div class="player-rating ${rtBucketClassOrEmpty(rating)}">RT: ${rating}</div>
+          <div class="player-rating ${rtBucketClassOrEmpty(rating)}">RT: ${formatRtDisplay(rating)}</div>
         </div>
         <div class="slot-row-2">
           <div class="slot-stat slot-stat-momentum">
@@ -1873,12 +1896,23 @@ function resolveTeam() {
   // For single game mode, my_team ('home' or 'away') should be in URL
   const storedId = userTeamIdParam || teamIdParam;
   if (storedId) {
-    if (storedId === homeId || storedId === homeTeam) {
+    if (homeId && storedId === homeId) {
       myTeamSide = 'home';
       teamName = homeTeam;
       return true;
     }
-    if (storedId === awayId || storedId === awayTeam) {
+    if (awayId && storedId === awayId) {
+      myTeamSide = 'away';
+      teamName = awayTeam;
+      return true;
+    }
+    // Name fallback for legacy URLs without home_id/away_id
+    if (storedId === homeTeam) {
+      myTeamSide = 'home';
+      teamName = homeTeam;
+      return true;
+    }
+    if (storedId === awayTeam) {
       myTeamSide = 'away';
       teamName = awayTeam;
       return true;
@@ -1900,8 +1934,11 @@ async function setHeader() {
   const playBtn = document.getElementById('play-now');
   if (!quarterValueEl || !timeValueEl) return;
 
+  // Score dict keys = core URL names; chrome labels = display (overlay when present).
   const userTeamName = teamName;
   const opponentTeamName = myTeamSide === 'home' ? awayTeam : homeTeam;
+  const userTeamLabel = myTeamSide === 'home' ? homeDisplay : (myTeamSide === 'away' ? awayDisplay : userTeamName);
+  const opponentTeamLabel = myTeamSide === 'home' ? awayDisplay : homeDisplay;
 
   let userTeamScore = 0;
   let opponentTeamScore = 0;
@@ -1974,11 +2011,11 @@ async function setHeader() {
   }
 
   const bannerSrc = typeof getTeamAssetPath === 'function'
-    ? getTeamAssetPath(teamName, 'banner_primary')
+    ? getTeamAssetPath(userTeamLabel || teamName, 'banner_primary')
     : '/images/teams/general/general_banner_primary.jpg';
   if (banner && bannerFallback) {
     banner.src = bannerSrc;
-    banner.alt = `${teamName} banner`;
+    banner.alt = `${userTeamLabel || teamName} banner`;
     banner.hidden = false;
     bannerFallback.hidden = true;
     banner.onerror = () => {
@@ -1989,8 +2026,8 @@ async function setHeader() {
 
   const isPregame = !(gameId && (resumeFromTimeout || currentQuarter > 1 || userTeamScore > 0 || opponentTeamScore > 0));
   scoreboardEl?.classList.toggle('is-pregame', isPregame);
-  const displayUserTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(userTeamName || 'Home') : (userTeamName || 'Home')).toUpperCase();
-  const displayOpponentTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(opponentTeamName || 'Away') : (opponentTeamName || 'Away')).toUpperCase();
+  const displayUserTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(userTeamLabel || 'Home') : (userTeamLabel || 'Home')).toUpperCase();
+  const displayOpponentTeamName = String(typeof formatTeamName === 'function' ? formatTeamName(opponentTeamLabel || 'Away') : (opponentTeamLabel || 'Away')).toUpperCase();
   if (scoreHomeTeamEl) scoreHomeTeamEl.textContent = displayUserTeamName;
   if (scoreAwayTeamEl) scoreAwayTeamEl.textContent = displayOpponentTeamName;
   if (scoreHomeValueEl) scoreHomeValueEl.textContent = `${userTeamScore}`;
@@ -2092,6 +2129,7 @@ function wireLineupNavButtons() {
         try {
           const mode = modeParam || 'single';
           const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: mode };
+          attachMatchupTeamIds(initPayload);
           if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
           else if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
           const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
@@ -2404,6 +2442,7 @@ async function init() {
           initGameInProgress = true;
           try {
             const initPayload = { home_team: homeTeam, away_team: awayTeam, mode: 'single' };
+            attachMatchupTeamIds(initPayload);
             if (myTeamSide) initPayload.user_team_side = myTeamSide;
             const initRes = await fetch(API_CONFIG.buildUrl('/api/init-game'), {
               method: 'POST',
@@ -2804,13 +2843,13 @@ function createCardFront(player) {
     if (yearText === 'senior') {
       yearColor = '#FFD700'; // Bright gold
     } else if (yearText === 'junior') {
-      yearColor = '#C0C0C0'; // Bright silver
+      yearColor = '#c1c1c1'; // Bright silver
     } else if (yearText === 'sophomore') {
       yearColor = '#32CD32'; // Bright lime green
     } else if (yearText === 'freshman') {
       yearColor = '#FF69B4'; // Bright pink
     } else {
-      yearColor = '#C0C0C0'; // Default to silver
+      yearColor = '#c1c1c1'; // Default to silver
     }
     
     yearDisplay.style.cssText = `
@@ -2933,12 +2972,12 @@ function createPositionRatingCircle(player) {
   const topRating = player.highestRating ?? entries[0][1];
   
   // Display only the highest rating integer value
-  circle.textContent = topRating;
+  circle.textContent = formatRtDisplay(topRating);
   circle.setAttribute('aria-label', 'Position rating');
   
   // Create tooltip content with all 5 position ratings in descending order
   const tooltipContent = entries
-    .map(([pos, rating]) => `${pos}: ${rating}`)
+    .map(([pos, rating]) => `${pos}: ${formatRtDisplay(rating)}`)
     .join('\n');
   
   // Setup tooltip on hover
@@ -3331,7 +3370,15 @@ window.addEventListener('pageshow', (event) => {
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
-  const redirected = await redirectIfFranchiseGameplayAlreadyCommitted();
+  // Resume often lands here before court. Hydrate once via FCC payload when possible.
+  let redirected = false;
+  if (franchiseId && weekParam) {
+    redirected = await redirectIfFranchiseGameplayAlreadyCommitted(); // hydrates from FCC fetch
+  } else if (franchiseId && typeof ensureTeamBuilderVisualHydratedFromFranchise === 'function') {
+    try {
+      await ensureTeamBuilderVisualHydratedFromFranchise(franchiseId);
+    } catch (e) { /* non-fatal */ }
+  }
   if (redirected) return;
   init();
   
@@ -3341,9 +3388,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (typeof initAttributeTooltips !== 'undefined') {
       const thead = document.querySelector('#roster-attributes-pane .roster-table thead');
       if (thead) {
-        // Include [data-attr] so the RT span nested inside the Player Name
-        // header (which would otherwise read as "Player NameRT" and miss the
-        // map) gets its own tooltip wiring.
+        // Include [data-attr] for explicitly keyed attribute headers such as RT.
         initAttributeTooltips(thead, ['th', '[data-attr]']);
       } else {
         console.warn('[TOOLTIP] thead element not found');

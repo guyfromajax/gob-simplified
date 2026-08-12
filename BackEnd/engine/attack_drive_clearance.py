@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 import math
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 from BackEnd.constants import HCO_STRING_SPOTS, HOME_RIM_COORDS, AWAY_RIM_COORDS, CONTEST_EUCLIDEAN_RADIUS
@@ -263,7 +264,7 @@ def _offensive_positions_from_step(
 def _perimeter_offense_threshold(off_team: Any) -> int:
     attrs = getattr(off_team, "team_attributes", {}) or {}
     chem = int(attrs.get("team_chemistry") or 0)
-    off_eff = int(attrs.get("offensive_efficiency") or 0)
+    off_eff = int(core8_gameplay(attrs.get("offensive_efficiency")))
     raw = PERIMETER_OFFENSE_READ_BASE - (chem + off_eff)
     return max(READ_THRESHOLD_FLOOR, raw)
 
@@ -271,7 +272,7 @@ def _perimeter_offense_threshold(off_team: Any) -> int:
 def _perimeter_defense_threshold(def_team: Any) -> int:
     attrs = getattr(def_team, "team_attributes", {}) or {}
     chem = int(attrs.get("team_chemistry") or 0)
-    def_eff = int(attrs.get("defensive_efficiency") or 0)
+    def_eff = int(core8_gameplay(attrs.get("defensive_efficiency")))
     raw = PERIMETER_DEFENSE_READ_BASE - (chem + def_eff)
     return max(READ_THRESHOLD_FLOOR, raw)
 
@@ -279,7 +280,7 @@ def _perimeter_defense_threshold(def_team: Any) -> int:
 def _defender_help_threshold(def_team: Any) -> int:
     attrs = getattr(def_team, "team_attributes", {}) or {}
     chem = int(attrs.get("team_chemistry") or 0)
-    execution = int(attrs.get("defensive_efficiency") or 0)
+    execution = int(core8_gameplay(attrs.get("defensive_efficiency")))
     raw = HELP_READ_BASE - (chem + execution)
     return max(READ_THRESHOLD_FLOOR, raw)
 
@@ -456,8 +457,8 @@ def _compute_drive_scores(
 ) -> Tuple[float, float, bool]:
     off_attrs = getattr(off_team, "team_attributes", {}) or {}
     def_attrs = getattr(def_team, "team_attributes", {}) or {}
-    off_eff = int(off_attrs.get("offensive_efficiency") or 0)
-    def_eff = int(def_attrs.get("defensive_efficiency") or 0)
+    off_eff = int(core8_gameplay(off_attrs.get("offensive_efficiency")))
+    def_eff = int(core8_gameplay(def_attrs.get("defensive_efficiency")))
     def_chem = int(def_attrs.get("team_chemistry") or 0)
 
     off_score = float(calculate_ball_handling_score(driver))
@@ -545,15 +546,15 @@ def _resolve_hco_drive_contest(driver, primary_def, off_team, def_team):
     the stop (1.0 = reaches the rim); contact ∈ {None, 'D_FOUL', 'O_FOUL', 'DEAD BALL'} (routed by S2b).
     `def_mod`/`off_mod` feed HCO team efficiency; `exclude_steal=True` (a drive collision is a
     charge/block/lost-handle, not a pickpocket) + `clean_stop=True` (distinguish the C clean stop from
-    a contested B). See Dynamic_MM_Brief §S2 + projects/attack_contest_unification.md."""
+    a contested B). See Dynamic_HCO_System.md, "Attack-drive contest"."""
     from BackEnd.engine.dynamic_hct import _resolve_moment
     off_attrs = getattr(off_team, "team_attributes", {}) or {}
     def_attrs = getattr(def_team, "team_attributes", {}) or {}
-    off_eff = int(off_attrs.get("offensive_efficiency") or 0)
-    def_eff = int(def_attrs.get("defensive_efficiency") or 0)
+    off_eff = int(core8_gameplay(off_attrs.get("offensive_efficiency")))
+    def_eff = int(core8_gameplay(def_attrs.get("defensive_efficiency")))
     outcome, ratio, _credited = _resolve_moment(
         off_team, def_team, driver, primary_def,
-        exclude_steal=True, clean_stop=True, def_mod=def_eff, off_mod=off_eff,
+        exclude_steal=True, clean_stop=True, def_mod_g=def_eff, off_mod_g=off_eff,
         neutral_band=DRIVE_NEUTRAL_BAND)
     if outcome == "POS_O":
         return "A", 1.0, None
@@ -1008,7 +1009,11 @@ def build_attack_drive_sequence(
         bh_defender_pos = off_to_def.get(ball_handler_pos, ball_handler_pos)
         _help_race_coords = def_positions  # S2c: race the man help defenders to the drive path
 
-        for off_pos in perimeter_moved:
+        # sorted(): perimeter_moved is a SET, so raw iteration follows string-hash order,
+        # which Python randomises per process. This loop consumes RNG draws per element
+        # (player_read, get_defender_coords), so the draw ORDER — and therefore every
+        # subsequent draw in the game — depended on PYTHONHASHSEED. See projects/bugs.md.
+        for off_pos in sorted(perimeter_moved):
             def_pos = off_to_def.get(off_pos)
             if not def_pos or def_pos not in def_lineup:
                 continue
@@ -1237,7 +1242,7 @@ def build_attack_drive_sequence(
     # native `should_shoot` dish read), not the blind `shoot_prob` coin flip: dish to a teammate whose
     # look beats the contested pull-up, else take the pull-up. HCO-native (the stopped BH re-enters the
     # half-court read). Wrapped so a read error can never break the drive. (Full reset/freelance = a
-    # follow-up.) See Dynamic_MM_Brief §S2 / attack_contest_unification.md.
+    # follow-up.) See Dynamic_HCO_System.md, "Attack-drive contest".
     _s2e_dish_pos = None
     if _three_tier and drive_tier in ("B", "C"):
         try:

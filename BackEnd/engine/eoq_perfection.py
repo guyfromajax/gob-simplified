@@ -1,13 +1,15 @@
 """
-End-of-quarter / end-of-game perfection helpers (EOQ_Perfection_Brief.md).
+End-of-quarter / end-of-game helpers (EOQ_System.md).
 
-Run Out The Clock (Q4/OT) and FLSS (Forced Last Second Shot, all quarters).
+Run Out The Clock (Q4/OT strategy plus universal no-shot terminal fallback)
+and FLSS (Forced Last Second Shot, all quarters).
 """
 
 from __future__ import annotations
 
 import logging
 import math
+import copy
 from BackEnd.utils.sim_random import sim_rng as random
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional, Tuple
@@ -196,6 +198,29 @@ def build_run_out_clock_result(game, time_remaining_sec: int) -> dict:
     }
 
 
+def build_clock_expired_result(game, current_state: str) -> dict:
+    """Terminal no-action payload for a live-ball state entered at 0:00.
+
+    This is intentionally distinct from a normal Run Out result: it carries no
+    destinations and tells playback not to invent movement after the buzzer.
+    """
+    return {
+        "result_type": "RUN_OUT_CLOCK",
+        "current_turn": current_state,
+        "time_elapsed": 0,
+        "clock_start": 0,
+        "clock_end": 0,
+        "offense_team_id": game.offense_team.team_id,
+        "possession_flips": False,
+        "next_play_type": None,
+        "next_turn": None,
+        "quarter_ends_after": True,
+        "run_out_clock": True,
+        "clock_expired_no_action": True,
+        "forced_shot": False,
+    }
+
+
 FLSS_BASKET_X_HOME = 91.0
 FLSS_BASKET_X_AWAY = 9.0
 FLSS_SHOT_WINDOW_GAME_SECONDS = 1.0
@@ -208,6 +233,164 @@ def _flss_basket_x(*, is_home_offense: bool) -> float:
 def _flss_toplane_x(*, is_home_offense: bool) -> float:
     home_x = float(HCO_STRING_SPOTS["topLane"]["x"])
     return home_x if is_home_offense else 100.0 - home_x
+
+
+@dataclass(frozen=True)
+class FlssRunwayPlan:
+    """Clock budget shared by every turn that may hand off to FLSS.
+
+    FLSS can release from any live ball-handler location (normal, penalty, or
+    heave zone), so movement toward the basket is optional. The only mandatory
+    game-clock reserve is the terminal shot window; ball flight occurs after
+    release and does not consume game clock.
+    """
+
+    time_remaining: float
+    shot_reserve_seconds: float
+    originating_turn_budget: float
+    projected_originating_turn_seconds: Optional[float]
+    originating_turn_fits: Optional[bool]
+    requires_shortened_turn: bool
+
+
+def calculate_flss_runway(
+    time_remaining: float,
+    *,
+    projected_originating_turn_seconds: Optional[float] = None,
+) -> FlssRunwayPlan:
+    """Return the live-turn budget while preserving an on-time FLSS release.
+
+    When a projected originating-turn duration is supplied, the verdict says
+    whether that complete turn fits before 0:00. A turn that does not fit may
+    animate only through ``originating_turn_budget`` before Task 3 hands its
+    live state to FLSS.
+    """
+    available = max(0.0, float(time_remaining or 0.0))
+    shot_reserve = min(available, float(FLSS_SHOT_WINDOW_GAME_SECONDS))
+    originating_budget = max(0.0, available - shot_reserve)
+
+    projected = None
+    fits = None
+    requires_shortened = False
+    if projected_originating_turn_seconds is not None:
+        projected = max(0.0, float(projected_originating_turn_seconds))
+        fits = projected <= available
+        requires_shortened = not fits
+
+    return FlssRunwayPlan(
+        time_remaining=available,
+        shot_reserve_seconds=shot_reserve,
+        originating_turn_budget=originating_budget,
+        projected_originating_turn_seconds=projected,
+        originating_turn_fits=fits,
+        requires_shortened_turn=requires_shortened,
+    )
+
+
+def animation_schema_game_seconds(steps: List[Dict[str, Any]]) -> float:
+    """Return authoritative game-clock burn represented by an AnimationStep list."""
+    if not steps:
+        return 0.0
+    first = ((steps[0].get("start") or {}).get("clock") or {}).get("clock_remaining")
+    last = ((steps[-1].get("end") or {}).get("clock") or {}).get("clock_remaining")
+    if isinstance(first, (int, float)) and isinstance(last, (int, float)):
+        return max(0.0, float(first) - float(last))
+    return sum(
+        max(0.0, float((step.get("end") or {}).get("time_elapsed") or 0.0))
+        for step in steps
+        if isinstance(step, dict)
+    )
+
+
+def select_eoq_origin_prefix(
+    steps: List[Dict[str, Any]],
+    *,
+    budget_seconds: float,
+) -> Tuple[List[Dict[str, Any]], float]:
+    """Select complete, non-terminal originating steps within the FLSS budget."""
+    selected: List[Dict[str, Any]] = []
+    burned = 0.0
+    budget = max(0.0, float(budget_seconds or 0.0))
+    for step in steps or []:
+        if not isinstance(step, dict):
+            continue
+        end = step.get("end") or {}
+        if (end.get("next") or {}).get("kind") == "turn_stop":
+            break
+        step_seconds = max(0.0, float(end.get("time_elapsed") or 0.0))
+        if burned + step_seconds > budget + 1e-6:
+            break
+        clean = copy.deepcopy(step)
+        clean.pop("_pressure_step_state", None)
+        clean.pop("_fb_step_state", None)
+        selected.append(clean)
+        burned += step_seconds
+    return selected, burned
+
+
+def apply_eoq_prefix_end_state(game: Any, prefix_steps: List[Dict[str, Any]]) -> None:
+    """Commit only the rendered coordinates and ball owner at a safe prefix boundary."""
+    if not prefix_steps:
+        return
+    end = prefix_steps[-1].get("end") or {}
+    coords = end.get("coords") or {}
+    players_by_id: Dict[str, Any] = {}
+    for team in (game.offense_team, game.defense_team):
+        for player in (team.lineup or {}).values():
+            if player is not None and getattr(player, "player_id", None) is not None:
+                players_by_id[str(player.player_id)] = player
+    for player_id, coord in coords.items():
+        player = players_by_id.get(str(player_id))
+        if player is not None and isinstance(coord, dict):
+            player.coords = {"x": float(coord["x"]), "y": float(coord["y"])}
+
+    ball = end.get("ball") or {}
+    owner_id = ball.get("owner_player_id")
+    owner = players_by_id.get(str(owner_id)) if owner_id is not None else None
+    if owner is not None and any(owner is p for p in game.offense_team.lineup.values()):
+        game.game_state["last_ball_handler"] = owner
+
+
+def combine_eoq_origin_prefix(result: Dict[str, Any]) -> None:
+    """Prepend safe pressure/transition steps and rebase emitted FLSS clocks."""
+    prefix = result.pop("eoq_origin_prefix_steps", None) or []
+    flss_steps = result.get("animation_steps") or []
+    if not prefix or not flss_steps:
+        return
+
+    prefix = copy.deepcopy(prefix)
+    flss_steps = copy.deepcopy(flss_steps)
+    prefix_end = prefix[-1].get("end") or {}
+    prefix_game_clock = ((prefix_end.get("clock") or {}).get("clock_remaining"))
+    prefix_shot_clock = ((prefix_end.get("clock") or {}).get("shot_clock_remaining"))
+    first_flss_start = ((flss_steps[0].get("start") or {}).get("clock") or {})
+    source_game_start = first_flss_start.get("clock_remaining")
+    source_shot_start = first_flss_start.get("shot_clock_remaining")
+
+    for step in flss_steps:
+        for boundary in ("start", "end"):
+            clock = ((step.get(boundary) or {}).get("clock") or {})
+            if isinstance(prefix_game_clock, (int, float)) and isinstance(source_game_start, (int, float)):
+                value = clock.get("clock_remaining")
+                if isinstance(value, (int, float)):
+                    clock["clock_remaining"] = max(
+                        0.0, float(prefix_game_clock) - (float(source_game_start) - float(value))
+                    )
+            if isinstance(prefix_shot_clock, (int, float)) and isinstance(source_shot_start, (int, float)):
+                value = clock.get("shot_clock_remaining")
+                if isinstance(value, (int, float)):
+                    clock["shot_clock_remaining"] = max(
+                        0.0, float(prefix_shot_clock) - (float(source_shot_start) - float(value))
+                    )
+
+    combined = prefix + flss_steps
+    for index, step in enumerate(combined):
+        end = step.get("end") or {}
+        if index < len(combined) - 1:
+            end["next"] = {"kind": "next_step", "index": index + 1}
+    result["animation_steps"] = combined
+    result["eoq_origin_prefix_step_count"] = len(prefix)
+    result["eoq_shortened_turn"] = True
 
 
 @dataclass(frozen=True)
@@ -238,7 +421,8 @@ def compute_flss_drive_plan(
 
     sx = float(start_x)
     sy = float(start_y)
-    drive_budget = max(0.0, float(time_remaining) - FLSS_SHOT_WINDOW_GAME_SECONDS)
+    runway = calculate_flss_runway(time_remaining)
+    drive_budget = runway.originating_turn_budget
     sprint_rate = float(_ag_grid_per_game_sec(shooter, "sprint"))
     direction = 1.0 if is_home_offense else -1.0
     basket_x = _flss_basket_x(is_home_offense=is_home_offense)
@@ -272,7 +456,7 @@ def compute_flss_drive_plan(
         end_y=sy,
         drive_budget=drive_budget,
         pull_up_jumper=pull_up,
-        shot_window_seconds=FLSS_SHOT_WINDOW_GAME_SECONDS,
+        shot_window_seconds=runway.shot_reserve_seconds,
     )
 
 
@@ -387,7 +571,12 @@ def _resolve_flss_heave(
     return made, points, shot_score, roll
 
 
-def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
+def resolve_flss_shot_logic(
+    game,
+    current_state: str = "HCO",
+    *,
+    time_remaining_override: Optional[float] = None,
+) -> dict:
     """
     Forced Last Second Shot: shoot from live ball-handler coords when Final Shot
     could not complete before the game clock expired.
@@ -446,7 +635,11 @@ def resolve_flss_shot_logic(game, current_state: str = "HCO") -> dict:
     shooter_coords = getattr(shooter, "coords", None) or {"x": 50, "y": 25}
     sx = float(shooter_coords.get("x", 50))
     sy = float(shooter_coords.get("y", 25))
-    time_remaining = float(game_state.get("time_remaining") or FLSS_SHOT_WINDOW_GAME_SECONDS)
+    time_remaining = float(
+        time_remaining_override
+        if time_remaining_override is not None
+        else (game_state.get("time_remaining") or FLSS_SHOT_WINDOW_GAME_SECONDS)
+    )
     drive_plan = compute_flss_drive_plan(
         shooter,
         sx,

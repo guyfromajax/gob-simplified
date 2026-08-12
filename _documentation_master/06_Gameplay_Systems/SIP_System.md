@@ -101,8 +101,11 @@ Side inbound passes (`SIDE_INBOUND`) occur after dead ball situations such as fo
   - C: x=85, y=28
 
 **Coordinate Flipping:**
-- Away team offense/defense: Coordinates flipped using `getAwayTeamCoords()` function
-- Formula: `x = 101 - x` (flips around midcourt)
+- Backend templates are mirrored before emission with `getAwayTeamCoords()`.
+- Canonical formula: `x_away = 100 - x_home`; y is unchanged.
+- SIP payload fields (`ball_spot`, `oDestinations`, `dDestinations`) therefore
+  arrive in final display orientation. The frontend renders them directly and
+  performs no gameplay-coordinate mirroring.
 
 ### Inbound Pass Execution
 
@@ -138,7 +141,7 @@ Side inbound passes (`SIDE_INBOUND`) occur after dead ball situations such as fo
 - `turn_manager.py` `setup_side_inbound()`: Creates SIDE_INBOUND turn data with `oDestinations`, `dDestinations`, `ball_spot`
   - Generates random offensive positions within defined ranges
   - Sets fixed defensive positions
-  - Handles coordinate flipping for away team
+  - Applies backend display orientation for away offense via `100 - x`
 
 **Frontend:**
 - `AnimationEngine.handleSideInbound()`: Routes SIDE_INBOUND turns

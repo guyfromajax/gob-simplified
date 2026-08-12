@@ -1,99 +1,90 @@
-import random
 import unittest
 from unittest.mock import patch
 
+from BackEnd.models import training_execution_v2
 from BackEnd.models.training_execution_v2 import (
     _apply_player_training_points,
-    _apply_training_camp_bonus,
     _pre_training_decay_range_for_year,
 )
-from BackEnd.eog_attr_rules import calculate_fb_opp_modifier_change, calculate_pt_opp_modifier_change
+# Task 7: the drifted standalone band funcs were deleted. These tests now exercise
+# the SINGLE extracted implementation production runs (volume ladder for the two
+# opponent modifiers).
+from BackEnd.eog_attr_rules import fb_opp_modifier_change, pt_opp_modifier_change
 from BackEnd.eog_attr_rules import (
     build_eog_inputs_from_game_doc,
     calculate_special_situations_from_sources,
     calculate_team_totals_from_sources,
 )
+from BackEnd.constants import eog_attr_bands as B
+
+
+class _FakeRng:
+    """Deterministic rng stub: returns the low or high end of each band."""
+    def __init__(self, end="lo"):
+        self.end = end
+        self.calls = []
+
+    def randint(self, a, b):
+        self.calls.append((a, b))
+        return a if self.end == "lo" else b
 
 
 class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
-    def test_fb_opp_modifier_uses_low_volume_branch(self):
-        calls = []
+    # fb_opp_modifier — volume ladder using the production healthy-band constant.
+    def test_fb_opp_modifier_zero_volume_atrophy(self):
+        rng = _FakeRng("lo")
+        label, delta = fb_opp_modifier_change(0, rng=rng)
+        self.assertEqual(label, "fb_opp_atrophy")
+        self.assertEqual(rng.calls[-1], B.VOL_ATROPHY_DELTA)
 
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return a
+    def test_fb_opp_modifier_under_volume(self):
+        rng = _FakeRng("lo")
+        label, _ = fb_opp_modifier_change(B.FB_OPP_HEALTHY_BAND[0] - 1, rng=rng)
+        self.assertEqual(label, "fb_opp_under")
+        self.assertEqual(rng.calls[-1], B.VOL_UNDER_DELTA)
 
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_fb_opp_modifier_change({"fb_rate": 10, "fb_entries": 5})
-        self.assertEqual(change, 0)
-        self.assertEqual(calls[-1], (0, 1))
+    def test_fb_opp_modifier_healthy_volume(self):
+        rng = _FakeRng("hi")
+        label, delta = fb_opp_modifier_change(B.FB_OPP_HEALTHY_BAND[0], rng=rng)
+        self.assertEqual(label, "fb_opp_healthy")
+        self.assertEqual(rng.calls[-1], B.VOL_HEALTHY_DELTA)
 
-    def test_fb_opp_modifier_uses_high_volume_branch(self):
-        calls = []
+    def test_fb_opp_modifier_over_volume(self):
+        rng = _FakeRng("lo")
+        label, _ = fb_opp_modifier_change(B.FB_OPP_HEALTHY_BAND[1] + 1, rng=rng)
+        self.assertEqual(label, "fb_opp_over")
+        self.assertEqual(rng.calls[-1], B.VOL_OVER_DELTA)
 
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return a
+    # pt_opp_modifier — volume ladder using the remeasured production band (9, 20).
+    def test_pt_opp_modifier_zero_volume_atrophy(self):
+        rng = _FakeRng("lo")
+        label, _ = pt_opp_modifier_change(0, rng=rng)
+        self.assertEqual(label, "pt_opp_atrophy")
 
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_fb_opp_modifier_change({"fb_rate": 40, "fb_entries": 13})
-        self.assertEqual(change, -2)
-        self.assertEqual(calls[-1], (-2, -1))
+    def test_pt_opp_modifier_under_volume(self):
+        rng = _FakeRng("lo")
+        label, _ = pt_opp_modifier_change(B.PT_HEALTHY_BAND[0] - 1, rng=rng)
+        self.assertEqual(label, "pt_opp_under")
 
-    def test_fb_opp_modifier_uses_mid_branch(self):
-        calls = []
+    def test_pt_opp_modifier_healthy_volume(self):
+        rng = _FakeRng("hi")
+        label, _ = pt_opp_modifier_change(B.PT_HEALTHY_BAND[1], rng=rng)
+        self.assertEqual(label, "pt_opp_healthy")
+        self.assertEqual(rng.calls[-1], B.VOL_HEALTHY_DELTA)
 
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return b
-
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_fb_opp_modifier_change({"fb_rate": 35, "fb_entries": 8})
-        self.assertEqual(change, 1)
-        self.assertEqual(calls[-1], (0, 1))
-
-    def test_pt_opp_modifier_uses_low_volume_branch(self):
-        calls = []
-
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return b
-
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_pt_opp_modifier_change({"pt_combined_rate": 10, "pt_total_attempts": 2})
-        self.assertEqual(change, 1)
-        self.assertEqual(calls[-1], (0, 1))
-
-    def test_pt_opp_modifier_uses_high_volume_branch(self):
-        calls = []
-
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return b
-
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_pt_opp_modifier_change({"pt_combined_rate": 35, "pt_total_attempts": 13})
-        self.assertEqual(change, -1)
-        self.assertEqual(calls[-1], (-2, -1))
-
-    def test_pt_opp_modifier_uses_mid_branch(self):
-        calls = []
-
-        def fake_randint(a, b):
-            calls.append((a, b))
-            return a
-
-        with patch.object(random, "randint", side_effect=fake_randint):
-            change = calculate_pt_opp_modifier_change({"pt_combined_rate": 35, "pt_total_attempts": 8})
-        self.assertEqual(change, 0)
-        self.assertEqual(calls[-1], (0, 1))
+    def test_pt_opp_modifier_over_volume(self):
+        rng = _FakeRng("lo")
+        label, _ = pt_opp_modifier_change(B.PT_HEALTHY_BAND[1] + 1, rng=rng)
+        self.assertEqual(label, "pt_opp_over")
 
     def test_pre_training_decay_ranges_match_doc(self):
-        self.assertEqual(_pre_training_decay_range_for_year("freshman"), (-5, -2))
-        self.assertEqual(_pre_training_decay_range_for_year("sophomore"), (-4, -1))
-        self.assertEqual(_pre_training_decay_range_for_year("junior"), (-3, -1))
-        self.assertEqual(_pre_training_decay_range_for_year("senior"), (-2, 0))
-        self.assertEqual(_pre_training_decay_range_for_year("unknown"), (-3, -1))
+        # Reduced substantially (design §7.2) — the offseason event owns career
+        # growth, so in-season decay is now a light drag, not a treadmill.
+        self.assertEqual(_pre_training_decay_range_for_year("freshman"), (-2, 0))
+        self.assertEqual(_pre_training_decay_range_for_year("sophomore"), (-2, 0))
+        self.assertEqual(_pre_training_decay_range_for_year("junior"), (-1, 0))
+        self.assertEqual(_pre_training_decay_range_for_year("senior"), (-1, 0))
+        self.assertEqual(_pre_training_decay_range_for_year("unknown"), (-1, 0))
 
     def test_player_training_points_base_and_year_adjustment(self):
         calls = []
@@ -107,76 +98,29 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
             "attributes": {"anchor_SC": 50, "SC": 50},
         }
 
-        with patch.object(random, "randint", side_effect=fake_randint):
+        # Training RNG isolation deliberately replaced Python's global random stream;
+        # patch the same dedicated stream production uses.
+        with patch.object(training_execution_v2.random, "randint", side_effect=fake_randint):
             _apply_player_training_points(player, "SC", points=2, archetype=None, sub_option=None, multiplier=1.0)
 
+        # Base range for 2 pts is (2,3) + senior max-adjustment (+1) → (2,4);
+        # fake_randint returns the high end (4).
         self.assertEqual(calls[-1], (2, 4))
-        self.assertEqual(player["attributes"]["anchor_SC"], 54)
-        self.assertEqual(player["attributes"]["SC"], 54)
+        # Positive weekly gains scale by session, position fit, and class before
+        # entering the fractional remainder (§10.6 and the discount-model decision).
+        from BackEnd.models.training_execution_v2 import IN_SEASON_GAIN_SCALE
+        from BackEnd.constants.training_shape import player_attr_gain_multiplier
+        scaled = 4 * IN_SEASON_GAIN_SCALE * player_attr_gain_multiplier(player, "SC")
+        expected_whole = int(scaled)
+        expected_rem = scaled - expected_whole
+        self.assertEqual(player["attributes"]["anchor_SC"], 50 + expected_whole)
+        self.assertEqual(player["attributes"]["SC"], 50 + expected_whole)
+        self.assertAlmostEqual(player["training_gain_remainders"]["SC"], expected_rem)
 
-    def test_training_camp_bonus_applies_for_high_ch_pg(self):
-        player = {
-            "_id": "camp_pg",
-            "position_ratings": {"PG": 90, "SG": 80, "SF": 70, "PF": 60, "C": 50},
-            "attributes": {
-                "anchor_CH": 85,
-                "CH": 85,
-                "anchor_PS": 50, "PS": 50,
-                "anchor_BH": 50, "BH": 50,
-                "anchor_IQ": 50, "IQ": 50,
-            },
-        }
-        baselines = {
-            "camp_pg": {
-                "PS": 50,
-                "BH": 50,
-                "IQ": 50,
-                "CH": 85,
-            }
-        }
-        with patch.object(random, "randint", return_value=4) as fake_randint:
-            _apply_training_camp_bonus([player], baselines)
-
-        self.assertEqual(player["attributes"]["anchor_PS"], 54)
-        self.assertEqual(player["attributes"]["anchor_BH"], 54)
-        self.assertEqual(player["attributes"]["anchor_IQ"], 54)
-        self.assertEqual(fake_randint.call_count, 3)
-        for call in fake_randint.call_args_list:
-            self.assertEqual(call.args, (4, 10))
-
-    def test_training_camp_bonus_sf_uses_ag_plus_two_random_attrs(self):
-        player = {
-            "_id": "camp_sf",
-            "position_ratings": {"PG": 70, "SG": 75, "SF": 90, "PF": 60, "C": 55},
-            "attributes": {
-                "anchor_CH": 65,
-                "CH": 65,
-                "anchor_AG": 40, "AG": 40,
-                "anchor_SC": 40, "SC": 40,
-                "anchor_SH": 40, "SH": 40,
-                "anchor_ID": 40, "ID": 40,
-                "anchor_OD": 40, "OD": 40,
-            },
-        }
-        baselines = {
-            "camp_sf": {
-                "AG": 40,
-                "SC": 40,
-                "ID": 40,
-                "CH": 65,
-            }
-        }
-        with patch.object(random, "sample", return_value=["SC", "ID"]), patch.object(random, "randint", return_value=3) as fake_randint:
-            _apply_training_camp_bonus([player], baselines)
-
-        self.assertEqual(player["attributes"]["anchor_AG"], 43)
-        self.assertEqual(player["attributes"]["anchor_SC"], 43)
-        self.assertEqual(player["attributes"]["anchor_ID"], 43)
-        self.assertEqual(player["attributes"]["anchor_SH"], 40)
-        self.assertEqual(player["attributes"]["anchor_OD"], 40)
-        self.assertEqual(fake_randint.call_count, 3)
-        for call in fake_randint.call_args_list:
-            self.assertEqual(call.args, (3, 8))
+    # Training-camp CH/year growth bonuses were deleted in pass 2 step 2 — the
+    # offseason development event (finish_season → develop_one_offseason) owns that
+    # growth now, so camp no longer applies it. The rollover-level behavior is
+    # covered by tests/test_growth_wiring.py.
 
     def test_eog_totals_source_prefers_team_totals_over_box_score(self):
         team_totals_obj = {
@@ -326,7 +270,7 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
                     "name": "Morristown",
                     "scouting": {
                         "offense": {"Fast_Break_Entries": 4, "Fast_Break_Success": 3},
-                        "defense": {"HCT": {"used": 11, "success": 4}, "FCP": {"used": 6, "success": 4}},
+                        "defense": {"HCT": {"used": 15, "success": 4}, "FCP": {"used": 6, "success": 4}},
                     },
                 },
             },
@@ -336,13 +280,13 @@ class TestEOGAndTrainingRuleUpdates(unittest.TestCase):
 
         eog_inputs = build_eog_inputs_from_game_doc(game_doc, "LANCASTER", "MORRISTOWN")
         opponent_scouting = eog_inputs["away"]["scouting"]
-        self.assertGreater(int(opponent_scouting.get("pt_total_attempts", 0)), 16)
+        opponent_pt_volume = int(opponent_scouting.get("pt_total_attempts", 0))
+        # HCT.used 15 + FCP.used 6 = 21 > current PT_HEALTHY_BAND hi (20).
+        self.assertGreater(opponent_pt_volume, B.PT_HEALTHY_BAND[1])
 
-        with patch.object(random, "randint", return_value=-3) as fake_randint:
-            change = calculate_pt_opp_modifier_change(opponent_scouting)
-
-        self.assertEqual(change, -3)
-        fake_randint.assert_called_with(-3, -2)
+        rng = _FakeRng("lo")
+        label, _ = pt_opp_modifier_change(opponent_pt_volume, rng=rng)
+        self.assertEqual(label, "pt_opp_over")
 
     def test_build_eog_inputs_falls_back_to_team_stats_when_teams_scouting_empty(self):
         game_doc = {

@@ -118,4 +118,6 @@ def test_record_shot_split_derives_clock_from_roles_when_not_passed():
             off_lineup={"PG": object()},
         )
 
-    assert state["hco_shot_tier_counts"]["early"] == 1
+    # Shot detaches after 10 seconds: 30 - 10 = 20, the documented mid tier
+    # (15-22 seconds), not early (23-30).
+    assert state["hco_shot_tier_counts"]["mid"] == 1

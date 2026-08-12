@@ -13,28 +13,22 @@ Policy implemented:
 Safety:
 - Dry-run by default.
 - Requires --yes to actually delete.
+- Requires one explicit --db target per invocation.
 """
 
 from __future__ import annotations
 
 import argparse
-import os
 import sys
 from pathlib import Path
 from typing import Any
 
+import os
 
-def load_env_files() -> None:
-    try:
-        from dotenv import load_dotenv  # type: ignore
-    except ImportError:
-        return
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
-    repo_root = Path(__file__).resolve().parent.parent
-    for filename in (".env.production", ".env.local", ".env"):
-        env_path = repo_root / filename
-        if env_path.exists():
-            load_dotenv(env_path, override=False)
+from BackEnd.script_db import ScriptDatabaseError, connect_script_database  # noqa: E402
 
 
 def parse_args() -> argparse.Namespace:
@@ -46,28 +40,13 @@ def parse_args() -> argparse.Namespace:
         help="Execute deletions. Without this flag, script is dry-run.",
     )
     parser.add_argument(
-        "--only-db",
+        "--db",
         choices=["gob", "gob-staging"],
-        default=None,
-        help="Run against one DB only. Default runs both gob and gob-staging.",
+        required=True,
+        help="Explicit database target; the script never runs both targets.",
     )
+    parser.add_argument("--confirm-db", help="Required as '--confirm-db gob' for production deletion.")
     return parser.parse_args()
-
-
-def get_mongo_uri_for_db(db_name: str) -> str:
-    if db_name == "gob":
-        uri = os.environ.get("MONGO_URI_PRODUCTION") or os.environ.get("MONGO_URI")
-    else:
-        uri = os.environ.get("MONGO_URI")
-
-    if not uri:
-        if db_name == "gob":
-            msg = "Missing MONGO_URI_PRODUCTION/MONGO_URI for gob."
-        else:
-            msg = "Missing MONGO_URI for gob-staging."
-        print(f"❌ {msg}", file=sys.stderr)
-        sys.exit(1)
-    return uri
 
 
 def _normalize_id(value: Any) -> str | None:
@@ -132,8 +111,7 @@ def delete_ids(coll, ids: list[Any], chunk_size: int = 1000) -> int:
     return deleted
 
 
-def run_for_db(client, db_name: str, execute: bool) -> None:
-    db = client[db_name]
+def run_for_db(db, db_name: str, execute: bool) -> None:
     games = db["games"]
     games_total = games.count_documents({})
 
@@ -172,28 +150,24 @@ def run_for_db(client, db_name: str, execute: bool) -> None:
 
 def main() -> None:
     args = parse_args()
-    load_env_files()
-
+    connection = connect_script_database(
+        target=args.db,
+        access="write" if args.yes else "read",
+        destructive=args.yes,
+        confirm_db=args.confirm_db,
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
     try:
-        from pymongo import MongoClient
-    except ImportError:
-        print("❌ pymongo not installed. Run: pip install pymongo", file=sys.stderr)
-        sys.exit(1)
-
-    target_dbs = [args.only_db] if args.only_db else ["gob-staging", "gob"]
-
-    for db_name in target_dbs:
-        uri = get_mongo_uri_for_db(db_name)
-        client = MongoClient(uri, serverSelectionTimeoutMS=8000)
-        try:
-            client.admin.command("ping")
-        except Exception as exc:
-            print(f"❌ Could not connect to MongoDB for {db_name}: {exc}", file=sys.stderr)
-            sys.exit(1)
-        run_for_db(client, db_name, execute=args.yes)
-
+        run_for_db(connection.database, args.db, execute=args.yes)
+    finally:
+        connection.close()
     print("\nDone.")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        raise SystemExit(2)

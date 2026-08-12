@@ -121,7 +121,32 @@ def test_finish_season_normalizes_signed_freshman_attributes(monkeypatch):
     )
     monkeypatch.setattr(franchise_manager, "FranchiseManager", lambda _db: dummy_manager)
 
-    def fake_randomize_game_attributes(attrs):
+    # This test owns the recruit-attribute normalization boundary. Offseason
+    # development is covered separately and would intentionally transform the
+    # normalized values before persistence, obscuring this contract.
+    def preserve_normalized_attributes(player_doc, new_year, rng, season_allocation=None):
+        return {
+            "attributes": dict(player_doc["attributes"]),
+            "height": player_doc["meta"]["height"],
+            "weight": player_doc["meta"]["weight"],
+            "position_ratings": dict(player_doc.get("position_ratings") or {}),
+            "development": {},
+            "entry_tier": player_doc.get("entry_tier") or "Great",
+            "position_intent": player_doc.get("position_intent") or "C",
+            "potential_factor": player_doc.get("potential_factor") or 1.0,
+            "training_position": player_doc.get("training_position") or "C",
+            "coaching_quality": player_doc.get("coaching_quality") or 1.0,
+        }
+
+    monkeypatch.setattr(
+        "BackEnd.utils.player_development.develop_rollover",
+        preserve_normalized_attributes,
+    )
+
+    randomize_calls = []
+
+    def fake_randomize_game_attributes(attrs, *, preserve_character=False):
+        randomize_calls.append({"preserve_character": preserve_character})
         attrs["NG"] = 1.0
         attrs["anchor_NG"] = 1.0
         attrs["CH"] = 55
@@ -153,6 +178,7 @@ def test_finish_season_normalizes_signed_freshman_attributes(monkeypatch):
     assert attrs["anchor_MO"] == 0
     assert attrs["NG"] == 1.0
     assert attrs["anchor_NG"] == 1.0
+    assert randomize_calls == [{"preserve_character": True}]
 
 
 def test_finish_season_rejects_duplicate_transition(monkeypatch):

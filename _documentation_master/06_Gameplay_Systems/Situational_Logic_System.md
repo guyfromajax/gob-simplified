@@ -39,7 +39,7 @@ When Score Delta falls in neither Slow It Down nor Quick Shot for that band → 
 ## Slow It Down / Quick Shot Execution
 
 **When Slow It Down applies (per time-band table):**
-- **Force Foul (Quick Foul):** evaluate at BIP/SIP setup time (to build the bespoke formation) and again at the **start of the following HCO turn** (where the foul actually executes). See **Force Foul Execution** below.
+- **Force Foul (Quick Foul):** evaluate at BIP/SIP setup time (to build the bespoke formation) and again at the **start of the following routed possession** (HCO/HCT/FCP/Fast Break), where the foul actually executes. See **Force Foul Execution** below.
 - If Force Foul = False: proceed to next step.
 - **Conservative defense (temp override):** the Slow It Down (leading) team’s `fast_breaks`, `hc_trap`, `fc_press`, and `aggression` are all treated as **0** for as long as they’re in Slow It Down — see **Slow It Down conservative-defense state** below. These are read-time overrides only; the team’s stored `strategy_settings` (and their DB team doc) are never mutated.
 - Next step (if Force Foul = False): offense tempo = `"slow"` (see **Offense tempo overrides** below).
@@ -92,19 +92,19 @@ When **Slow It Down** or **Quick Shot** applies, the offense team’s `tempo_cal
 
 ## Force Foul Execution (Quick Foul)
 
-**Detection.** `quick_foul_in_play(game)` in `BackEnd/utils/quick_foul.py` — pure function of Q4/OT quarter, time band, and score delta (`should_force_foul` ∧ `is_slow_it_down`). Safe to call at BIP/SIP setup or HCO turn start.
+**Detection.** `quick_foul_in_play(game)` in `BackEnd/utils/quick_foul.py` — pure function of Q4/OT quarter, time band, and score delta (`should_force_foul` ∧ `is_slow_it_down`). Safe to call at BIP/SIP setup or possession start.
 
-**Universal execution hook.** The intentional foul always executes at the **start of the offense’s HCO possession**, on the **current ball handler**, via `turn_manager._execute_quick_foul_at_hco_start()`. This single path covers every entry point:
+**Universal execution hook.** The intentional foul executes at the **start of the offense’s routed possession**, before HCO/HCT/FCP/Fast Break resolution, on the **current ball handler**, via `turn_manager._execute_quick_foul_at_possession_start()`. This single path covers every entry point:
 
 | Entry | Victim (ball handler) | Setup step? |
 |-------|----------------------|-------------|
-| BIP → HCO | Dynamic inbound pass receiver (see below) | Yes — bespoke quick-foul BIP formation |
+| BIP → routed state | Dynamic inbound pass receiver (see below) | Yes — bespoke quick-foul BIP formation |
 | SIP → HCO | Dynamic inbound pass receiver | Yes — bespoke quick-foul SIP formation |
-| DREB → HCO | Last rebounder | No — fouler sprints in |
+| DREB → routed state | Last rebounder | No — fouler sprints in |
 | OREB kickout → HCO | Kickout receiver | No — fouler sprints in |
-| Final Turn → HCO | Final Turn ball handler (PG) | No — fouler sprints in |
+| Fast Break / Final Turn | Live ball handler | No — fouler sprints in |
 
-BIP/SIP turns **only position players and animate the inbound pass** — no foul logic or foul animation on the inbound turn itself. The foul is the **first action** of the subsequent HCO turn.
+BIP/SIP turns **only position players and animate the inbound pass** — no foul logic or foul animation occurs on the inbound turn itself. The foul is the **first action** at the next possession boundary, before the selected HCO/HCT/FCP resolver starts.
 
 **Fouler selection.** At foul time: the **defender closest to the victim** (`select_defender_closest_to_victim`). On BIP/SIP setup, foulers are **pre-positioned within 4 Euclidean grid spots** of their paired candidate receiver (see Setup below).
 
@@ -112,7 +112,7 @@ BIP/SIP turns **only position players and animate the inbound pass** — no foul
 
 ### BIP/SIP quick-foul setup (Q4/OT only)
 
-When `quick_foul_in_play()` is true at inbound setup, we **override** any FCP/HCT pressure with the bespoke quick-foul formation (`build_quick_foul_inbound_setup()`). Normal (non–quick-foul) BIP/SIP are unchanged (SF → PG inbound pass).
+When `quick_foul_in_play()` is true at inbound setup, the bespoke quick-foul formation (`build_quick_foul_inbound_setup()`) places the selected receiver and fouler for immediate contact. The selected FCP/HCT route remains in the BIP contract, but its resolver never begins because the foul executes first. Normal (non–quick-foul) BIP/SIP are unchanged (SF → PG inbound pass).
 
 **Offense**
 - **Inbound passer:** always SF.
@@ -132,7 +132,7 @@ When `quick_foul_in_play()` is true at inbound setup, we **override** any FCP/HC
     - else → two defenders chosen at random from the remaining four.
 - **Remaining two defenders:** random distinct spots from: midLane, topLane, upper/lower midPost, upper/lower highPost, upper/lower bird, upper/lower apex. If a bird/apex spot is shared with an offender, the defender’s spot **offsets 2 grid toward the basket**.
 
-**Dynamic inbound receiver.** The BIP/SIP pass step targets the chosen receiver (`receiver_id` param on `build_bip_animation_steps` / `build_sip_animation_steps`). `hco_setup.inbound_pass.to_player_id` is stamped to that receiver so the following HCO turn’s ball handler = foul victim. **Scope:** quick-foul inbounds only; normal BIP/SIP remain SF → PG.
+**Dynamic inbound receiver.** The BIP/SIP pass step targets the chosen receiver (`receiver_id` param on `build_bip_animation_steps` / `build_sip_animation_steps`). `hco_setup.inbound_pass.to_player_id` records that receiver so the following routed possession’s ball handler = foul victim. **Scope:** quick-foul inbounds only; normal BIP/SIP remain SF → PG.
 
 ### DREB routing
 
@@ -147,7 +147,7 @@ The backend emits a 2-step `animation_steps` sequence via `build_quick_foul_anim
 
 `time_elapsed` on the foul turn = converge T only (reach-in is clock-paused). Passed to `resolve_non_shooting_foul(time_elapsed_override=…)`.
 
-**Implementation:** `BackEnd/utils/quick_foul.py`, `BackEnd/models/turn_manager.py` (`_execute_quick_foul_at_hco_start`), `BackEnd/constants/__init__.py` (quick-foul constants block).
+**Implementation:** `BackEnd/utils/quick_foul.py`, `BackEnd/models/turn_manager.py` (`_execute_quick_foul_at_possession_start`), `BackEnd/constants/__init__.py` (quick-foul constants block).
 
 ## Announcement System
 
@@ -156,7 +156,7 @@ Situational and result announcements are driven by a central game announcement s
 - **Fast Break** — when the turn is a fast break (and not steal-initiated).
 - **Press!** / **Trap!** — when a baseline inbound is setting up FCP or HCT (defense).
 - **Slow It Down** / **Quick Shot** — when an HCO turn has Slow It Down or Quick Shot set (offense).
-- **Final Shot** — when the turn is a Final Turn shot attempt (offense). Not shown for FINAL_HOLD (hold until 0).
+- **Final Shot** — when the turn is a Final Turn shot attempt (offense).
 
 At **turn end** (or at specific animation moments), the system announces shot results (e.g. "It's Good!", "Shooting Foul!"), fouls ("Quick Foul!", "CHARGE!", "BLOCKING FOUL!", etc.), rebounds, steals, and turnovers. **Quick Foul** announces via the reach-in schema step (`step.end.announcement`, `non_blocking: true`) — see Force Foul Execution and `Announcement_System.md`.
 
@@ -166,15 +166,15 @@ At **turn end** (or at specific animation moments), the system announces shot re
 
 Final Shot arming, FLSS, EOQ chain flags, post-shot routing (BIP → FLSS, terminal DREB, OREB putback), preflight anchors, observability (`[EOQ-TRACE]`), and debugging checklists are documented in **[`EOQ_System.md`](EOQ_System.md)**.
 
-**Q4/OT-only branches** evaluated inside the Final Shot gate when `quarter >= 4` (before full Final Turn setup):
+**Q4/OT possession-entry priority** at `0 < time_remaining <= 30`, before HCO,
+HCT, FCP, or Fast Break resolution:
 
 | Branch | When |
 |--------|------|
-| **Run Out The Clock** | `should_run_out_clock()` — winning or blowout loss (>18), ≤30s, no force-foul defense |
-| **FINAL_HOLD** | Slow It Down, Force Foul false |
-| **Slow + Force Foul** | Slow It Down + Force Foul — Force Foul execution, no Final Turn alignment |
+| **Force Foul** | Slow It Down + Force Foul — execute before the selected live-ball resolver |
+| **Run Out The Clock** | `should_run_out_clock()` — winning or blowout loss (>18), ≤30s, no force-foul defense; overrides Fast Break/HCT/FCP |
 | **Quick Shot** | Quick Shot band — normal quick-shot HCO (no Final Turn setup); last 30s when trailing by **more than 3** |
-| **Else (trailing/tied)** | Full Final Shot setup |
+| **Else (Final Shot)** | HCO uses structured Final Turn; HCT/FCP/Fast Break preserve a fitting turn or hand a safe movement prefix to FLSS |
 | **Trailing by exactly 3** | Forced Outside three (within Final Turn shot logic) |
 
 Qs 1–3 use the same structured Final Turn as Q4 trailing/tied, without the rows above.

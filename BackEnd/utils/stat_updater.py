@@ -104,8 +104,13 @@ def _build_franchise_team_maps_from_ftd(
 
     Used for finalize_game, play stats, and defense stats. Replaces former
     FTD-based mapping. Returns (team_name_to_id, team_id_to_object_id).
+
+    Core ``teams.name`` seeds the name map. A Team Builder custom display name
+    is added from ``franchises.team_builder`` (one franchise-document read) —
+    not from FTD, which does not store identity.
     """
     from BackEnd.db import franchise_team_data_collection, teams_collection
+    from BackEnd.utils.franchise_team_display import get_team_builder_overlay
 
     doc_id = ObjectId(franchise_id) if isinstance(franchise_id, str) else franchise_id
     team_name_to_id: Dict[str, str] = {}
@@ -144,6 +149,20 @@ def _build_franchise_team_maps_from_ftd(
                 team_name_to_id[name] = team_id_str
             if canonical:
                 team_id_to_object_id[canonical] = team_id_str
+
+    # Custom display name from the overlay only (O(1) franchise read).
+    try:
+        overlay = get_team_builder_overlay(doc_id)
+        if overlay:
+            replaced = overlay.get("replaced_object_id")
+            custom_name = str(overlay.get("name") or "").strip()
+            if replaced and custom_name:
+                team_name_to_id[custom_name] = str(replaced)
+    except Exception as e:
+        logger.warning(
+            "⚠️ [_build_franchise_team_maps_from_ftd] overlay name map failed: %s",
+            e,
+        )
 
     return team_name_to_id, team_id_to_object_id
 
@@ -1475,7 +1494,7 @@ def finalize_game(
         existing_players = tournament_check.get("players", {}) if tournament_check else {}
         
         set_on_insert_doc: Dict[str, Any] = {}
-        for pid_str in processed_player_ids:
+        for pid_str in sorted(processed_player_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             if pid_str not in existing_players:
                 # Get player metadata from players_collection
                 try:
@@ -1585,7 +1604,7 @@ def finalize_game(
             updated_tournament_doc = tournaments_collection.find_one({"_id": tid}, {"players": 1})
             if updated_tournament_doc:
                 stats_doc: Dict[str, Any] = {}
-                for pid_str in processed_player_ids:
+                for pid_str in sorted(processed_player_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
                     pdata = updated_tournament_doc.get("players", {}).get(pid_str, {})
                     season_totals = pdata.get("season", {})
                     if season_totals:
@@ -2090,7 +2109,7 @@ def finalize_game(
         logger.info(f"🔍 [FINALIZE_GAME] Found {len(existing_fpd_ids)} existing players in FPD")
         logger.info(f"🔍 [FINALIZE_GAME] Need to process {len(processed_player_ids)} players from box_score")
 
-        for pid_str in processed_player_ids:
+        for pid_str in sorted(processed_player_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             if pid_str not in existing_fpd_ids:
                 try:
                     player_doc = players_collection.find_one(
@@ -2134,6 +2153,14 @@ def finalize_game(
                             "career": zero_stats.copy(),
                             "attributes": player_doc.get("attributes", {}),
                             "position_ratings": player_doc.get("position_ratings", {}),
+                            # Carry the identity fields so a later rollover never
+                            # re-derives entry_tier from RT (which misclassifies once
+                            # pillar-3 coaching quality pushes RT off the ladder). Base
+                            # rosters carry both from the pass-1 migration; development
+                            # is absent there and lazy-backfills at rollover.
+                            **({"entry_tier": player_doc["entry_tier"]} if player_doc.get("entry_tier") is not None else {}),
+                            **({"position_intent": player_doc["position_intent"]} if player_doc.get("position_intent") is not None else {}),
+                            **({"potential_factor": player_doc["potential_factor"]} if player_doc.get("potential_factor") is not None else {}),
                         })
                         logger.debug(f"🔍 [FINALIZE_GAME] Inserted new FPD doc for player {pid_str}")
                 except Exception as e:
@@ -2147,7 +2174,7 @@ def finalize_game(
         # Sim_Perf_Capstone "CPU-week EOG persistence" and End_of_Game_System). ordered=False
         # is safe (disjoint docs) and lets the server apply them concurrently.
         _fpd_ops: list[UpdateOne] = []
-        for pid_str in processed_player_ids:
+        for pid_str in sorted(processed_player_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             fpd_inc = {k.replace(f"players.{pid_str}.", ""): v for k, v in inc_doc.items() if k.startswith(f"players.{pid_str}.")}
             fpd_set = {k.replace(f"players.{pid_str}.", ""): v for k, v in set_doc.items() if k.startswith(f"players.{pid_str}.")}
             if fpd_inc or fpd_set:

@@ -28,15 +28,15 @@ SECURITY:
 """
 
 import sys
-import os
 import secrets
 import string
 from datetime import datetime, timezone
+from pathlib import Path
 
 # Add parent directory to path so we can import BackEnd
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-from BackEnd.db import alpha_otps_collection, DB_NAME
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 
 # Characters to use for OTP generation (no ambiguous characters)
@@ -51,7 +51,7 @@ def generate_otp_code() -> str:
     return ''.join(secrets.choice(OTP_CHARS) for _ in range(OTP_LENGTH))
 
 
-def generate_otps(count: int, dry_run: bool = False) -> list[dict]:
+def generate_otps(collection, db_name: str, count: int, dry_run: bool = False) -> list[dict]:
     """
     Generate OTP codes and insert into database.
     
@@ -65,7 +65,7 @@ def generate_otps(count: int, dry_run: bool = False) -> list[dict]:
     print("=" * 80)
     print("ALPHA OTP GENERATOR")
     print("=" * 80)
-    print(f"Database: {DB_NAME}")
+    print(f"Database: {db_name}")
     print(f"Count: {count}")
     print(f"Mode: {'DRY RUN (no database changes)' if dry_run else 'LIVE (will insert into database)'}")
     print("=" * 80)
@@ -78,7 +78,7 @@ def generate_otps(count: int, dry_run: bool = False) -> list[dict]:
     # Also check for existing codes in DB to avoid duplicates
     existing_codes = set()
     if not dry_run:
-        existing = alpha_otps_collection.find({}, {"otp_code": 1})
+        existing = collection.find({}, {"otp_code": 1})
         existing_codes = {doc["otp_code"] for doc in existing}
         if existing_codes:
             print(f"⚠️  Found {len(existing_codes)} existing OTPs in database")
@@ -110,7 +110,7 @@ def generate_otps(count: int, dry_run: bool = False) -> list[dict]:
     
     # Insert into database (unless dry run)
     if not dry_run:
-        result = alpha_otps_collection.insert_many(otps)
+        result = collection.insert_many(otps)
         print(f"✅ Inserted {len(result.inserted_ids)} OTPs into database")
     else:
         print("ℹ️  DRY RUN - No OTPs were inserted")
@@ -132,16 +132,16 @@ def generate_otps(count: int, dry_run: bool = False) -> list[dict]:
     return otps
 
 
-def list_otps():
+def list_otps(collection, db_name: str):
     """List all existing OTPs and their status."""
     print("=" * 80)
     print("EXISTING ALPHA OTPS")
     print("=" * 80)
-    print(f"Database: {DB_NAME}")
+    print(f"Database: {db_name}")
     print("=" * 80)
     print()
     
-    otps = list(alpha_otps_collection.find().sort("created_at", 1))
+    otps = list(collection.find().sort("created_at", 1))
     
     if not otps:
         print("No OTPs found in database.")
@@ -170,18 +170,18 @@ def list_otps():
         print()
 
 
-def show_stats():
+def show_stats(collection, db_name: str):
     """Show OTP usage statistics."""
     print("=" * 80)
     print("ALPHA OTP STATISTICS")
     print("=" * 80)
-    print(f"Database: {DB_NAME}")
+    print(f"Database: {db_name}")
     print("=" * 80)
     print()
     
-    total = alpha_otps_collection.count_documents({})
-    used = alpha_otps_collection.count_documents({"used": True})
-    unused = alpha_otps_collection.count_documents({"used": False})
+    total = collection.count_documents({})
+    used = collection.count_documents({"used": True})
+    unused = collection.count_documents({"used": False})
     
     print(f"  Total OTPs:     {total}")
     print(f"  Used:           {used}")
@@ -191,7 +191,7 @@ def show_stats():
     
     if used > 0:
         print("RECENT SIGNUPS:")
-        recent = alpha_otps_collection.find({"used": True}).sort("used_at", -1).limit(5)
+        recent = collection.find({"used": True}).sort("used_at", -1).limit(5)
         for otp in recent:
             email = otp.get("used_by_email", "unknown")
             used_at = otp.get("used_at", "unknown")
@@ -205,6 +205,7 @@ if __name__ == "__main__":
     import argparse
     
     parser = argparse.ArgumentParser(description="Generate alpha OTP codes")
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
     parser.add_argument(
         "--count",
         type=int,
@@ -212,9 +213,9 @@ if __name__ == "__main__":
         help=f"Number of OTPs to generate (default: {DEFAULT_COUNT})"
     )
     parser.add_argument(
-        "--dry-run",
+        "--apply",
         action="store_true",
-        help="Show what would be generated without inserting into database"
+        help="Insert generated OTPs; generation is dry-run by default"
     )
     parser.add_argument(
         "--list",
@@ -229,14 +230,18 @@ if __name__ == "__main__":
     )
     
     args = parser.parse_args()
+    write = args.apply and not (args.list_otps or args.stats)
+    connection = connect_migration_target(args.db, write=write)
+    collection = connection.database["alpha_otps"]
     
     try:
         if args.list_otps:
-            list_otps()
+            list_otps(collection, args.db)
         elif args.stats:
-            show_stats()
+            show_stats(collection, args.db)
         else:
-            generate_otps(args.count, dry_run=args.dry_run)
+            generate_otps(collection, args.db, args.count, dry_run=not args.apply)
+        connection.close()
     except Exception as e:
         print(f"❌ Error: {e}", file=sys.stderr)
         import traceback

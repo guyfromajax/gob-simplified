@@ -1239,8 +1239,8 @@ export async function animateGameTurns({ //hasBallAtStep
       }
     }
 
-    // ✅ Phase 4: Run Out The Clock / FINAL_HOLD — route to AnimationRouter
-    if (turn.result_type === "RUN_OUT_CLOCK" || turn.result_type === "FINAL_HOLD") {
+    // ✅ Phase 4: Run Out The Clock — route to AnimationRouter
+    if (turn.result_type === "RUN_OUT_CLOCK") {
       turn.index = preservedTurnIndex;
       await animationRouter.processTurn(turn);
       continue;

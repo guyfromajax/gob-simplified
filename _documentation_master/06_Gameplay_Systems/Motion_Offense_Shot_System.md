@@ -1,5 +1,61 @@
 ## Motion Offense Shot Resolution System ✅ **COMPLETE** (January 2025; attack-drive expansion June 2026)
 
+## Live shot-type path (post 2026-07-11 unification)
+
+Motion shot type is decided in `BackEnd/engine/motion_step_decision.py`, not by the legacy
+resolver documented further down.
+
+| Step | Where | Inputs |
+|---|---|---|
+| inside vs not-inside | `_evaluate_shot` → `is_inside_location(location)` | shooter's skeleton location |
+| attack vs outside | `_weighted_attack_or_outside` | (AG+SC)/2 vs SH×0.55 — **player only, no slider** |
+| candidate quality | `_evaluate_shot` | read-map mismatch score + openness, × `_focus_emphasis` |
+| best candidate wins | `should_shoot` | BH's own look vs every unblocked teammate |
+
+**Focus emphasis (`_focus_emphasis`, `FOCUS_EMPHASIS_STEP = 0.25`)** — the `inside` /
+`attack` / `outside` sliders scale a candidate's quality 0.5×–1.5× (slider 0–4, 2 = neutral).
+This is the restored form of the legacy `_build_shot_type_weighted_list` intent: before it
+was wired, `inside` reached nothing in motion and only `attack`/`outside` had any effect.
+Applied sign-safely (`_apply_focus_emphasis`) because read scores are differentials and can
+be negative. `is_mismatch` (the hot-read flag) stays on the RAW score — a slider cannot
+manufacture a personnel edge.
+
+**This is the ONLY place team emphasis acts.** The `attack`/`outside` sliders were removed
+from the `_weighted_attack_or_outside` type roll at the same time. Two mechanisms doing one
+job is how `_build_shot_type_weighted_list` became orphaned in the first place — they drift,
+and the docs end up describing whichever one the author remembered. Shot TYPE now reflects
+who the player is (SH vs AG+SC); emphasis decides WHO SHOOTS. The mix still moves with the
+sliders, through selection rather than reclassification.
+
+### Measured lever strengths (5 matched seed sets, 15 quarters/config, `PYTHONHASHSEED=0`)
+
+| lever | swing | note |
+|---|---|---|
+| `attack`/`outside` (4/0 vs 0/4) | **40.6 pts** | consistent across all 5 seed sets |
+| `inside` (4 vs 1) | **~7–10 pts** | see caveat below |
+| ratio | **4.2×** | was 7.9× while the type roll also read the sliders |
+
+⚠️ **Do not quote a single figure for the inside lever.** Removing the slider from the type
+roll moved it from +6.86 to +9.60 across the five seed sets, but the *paired* differences
+were **mixed-sign** (+6.4, +5.8, +0.6, −0.2, +1.1; sd 2.80). "Inside got stronger" is **NOT
+established** — only that it did not get weaker. It is comfortably non-zero in both arms.
+
+**`inside` is the weakest of the three levers** (≈4× weaker than attack/outside), and PF Post
+Motion's `inside` 2→4 swing **shrank from +7.49 to +3.95** (consistent across all 5 sets) when
+the slider left the type roll — fewer candidates are classified inside-adjacent, so the
+quality multiplier has a smaller pool to promote. If that becomes a problem, it is a
+**`FOCUS_EMPHASIS_STEP` tuning question**, NOT a reason to reintroduce the second mechanism.
+
+**Attack dominance is not a slider problem.** At neutral sliders attack is ~77% of motion shot
+types, unchanged by the above (77.02% → 77.11%). That baseline comes from
+`OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.55` discounting outside at the type roll — see the
+backlog ticket in `_documentation_master/projects/bugs.md`.
+
+**Not reachable by design:** `attack` is never inferred from geometry on the motion path —
+there is no drive-detection branch (set plays have one; see `shot_manager.py`). A drive is
+*generated* after the roll picks attack, not detected beforehand.
+
+
 **Base Constants**
 
 1. **Shot Types**: Inside, Outside, Attack
@@ -15,12 +71,12 @@
    - **Lower locations** → `["lower lowPost", "lower midPost", "lower bird", "midLane", "basketSpot"]`
    - **Central locations** → All destinations (both upper and lower)
 6. **Key Functions**:
-   - `resolve_motion_offense_shot()` — Main shot resolution function
+   - `resolve_motion_offense_shot()` — Legacy main shot resolution function (**zero callers**)
    - `build_attack_drive_sequence()` — Full HCO attack drive (clearance, perimeter reads, contest, dish/shoot)
    - `_create_attack_drive_shoot_steps()` — Delegates to `build_attack_drive_sequence()` when `selected_step` + lineups + game are available
    - `_determine_attack_drive_destination()` — Determines valid drive destinations
-   - `_check_inside_shot_possibility()` / `_check_attack_shot_possibility()` / `_check_outside_shot_possibility()`
-   - `_build_shot_type_weighted_list()` — Builds weighted list for shot type selection
+   - `_check_inside_shot_possibility()` / `_check_attack_shot_possibility()` / `_check_outside_shot_possibility()` — **zero callers** (legacy)
+   - `_build_shot_type_weighted_list()` — **zero callers** (legacy); its intent now lives in `motion_step_decision._focus_emphasis`
    - `_apply_attack_penalty()` — Calculates penalty if player stopped short
 7. **Key Files**:
    - `BackEnd/engine/phase_resolution.py` — Motion shot resolution entry
@@ -265,13 +321,20 @@ High-level design knobs for attack-drive logic. **Code lives in** `attack_drive_
 - Look for actions: `handle_ball`, `receive`, or `pass`
 - Extract ball handler position (e.g., "PG", "SG") and location (e.g., "upper wing", "key")
 
-**Phase 3: Check Shot Possibilities**
+> ⚠️ **Phases 3–5 below describe the LEGACY resolver, which is NOT the live path.** The
+> 2026-07-11 motion/set-play unification replaced it with the dynamic HCO resolver
+> (`_resolve_hco_offense_shot_dynamic` → `motion_step_decision.should_shoot`). The
+> functions named in Phases 3–5 — `_check_inside/_attack/_outside_shot_possibility` and
+> `_build_shot_type_weighted_list` — have **zero callers**. They are retained in
+> `phase_resolution.py` but do not execute. See "Live shot-type path" below.
+
+**Phase 3: Check Shot Possibilities** *(legacy — not called)*
 - `_check_inside_shot_possibility()`: Checks if ball handler is at inside location OR if there are available inside receivers
 - `_check_attack_shot_possibility()`: Checks if ball handler is NOT at inside location (attack shots require non-inside starting position)
 - `_check_outside_shot_possibility()`: Checks if ball handler is at outside location OR if there are available outside receivers
 - Each function returns boolean possibility and list of viable receivers/players
 
-**Phase 4: Build Weighted List**
+**Phase 4: Build Weighted List** *(legacy — not called)*
 - Get strategy settings from `off_team.strategy_settings` (`inside`, `attack`, `outside` weights)
 - `_build_shot_type_weighted_list()` creates weighted list based on:
   - Strategy settings (user preferences)

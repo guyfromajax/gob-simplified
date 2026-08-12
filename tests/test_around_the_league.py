@@ -5,6 +5,7 @@ from __future__ import annotations
 from BackEnd.utils.around_the_league import (
     ATL_WEEK_LABELS,
     _apply_reorder,
+    atl_season_progress_label,
     atl_week_label,
 )
 
@@ -45,6 +46,14 @@ def test_apply_reorder_partial_board_newcomer_fills_without_dropping():
 def test_atl_week_label_regular_season():
     assert atl_week_label(12) == "Week 12"
     assert atl_week_label(26) == "Week 26"
+
+
+def test_atl_season_progress_label_includes_season_and_week():
+    assert atl_season_progress_label(2, 13) == "Season 2 · Week 13"
+
+
+def test_atl_season_progress_label_preserves_tournament_copy():
+    assert atl_season_progress_label(3, 34) == "Season 3 · National Championship"
 
 
 def test_atl_week_label_tournament_uses_fcc_copy():

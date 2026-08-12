@@ -18,48 +18,46 @@ def test_opening_tip_generates_turn():
         # Make home team win
         mock_choice.return_value = game.home_team.lineup["C"]  # home center
         
-        tip_turn = execute_opening_tip(game)
+        _offense, _defense, tip_turn = execute_opening_tip(game)
         
         # Verify turn structure
         assert tip_turn["result_type"] == "OPENING_TIP"
         assert "winner" in tip_turn
         assert game.game_state["opening_tip_winner"] in ["home", "away"]
         assert tip_turn["possession_flips"] == False
-        assert 2 <= tip_turn["time_elapsed"] <= 5
+        # The tip burns no game clock (dead ball; ledger zeroes it) — OT-audit change.
+        assert tip_turn["time_elapsed"] == 0
         assert "text" in tip_turn
         assert "animations" in tip_turn
         assert len(tip_turn["animations"]) > 0
 
 
 def test_opening_tip_sets_possession():
-    """Test that opening tip correctly sets team possession"""
+    """Opening tip assigns possession consistently with the winner. The winner is sim_rng-driven
+    (opening_tip draws from sim_rng, not global random — see the module import), so this pins the
+    possession MECHANISM, not a specific team, and is deterministic regardless of the draw."""
     game = build_mock_game()
     game.quarter = 1
-    
-    # Mock randint to make home team always win
-    with patch('random.randint') as mock_randint:
-        mock_randint.return_value = 6  # Maximum roll
-        
-        tip_turn = execute_opening_tip(game)
-        
-        # Home team should win ties (same height, same roll)
-        assert game.game_state["opening_tip_winner"] == "home"
-        assert game.offense_team == game.home_team
-        assert game.defense_team == game.away_team
+
+    _offense, _defense, tip_turn = execute_opening_tip(game)
+
+    winner = game.game_state["opening_tip_winner"]
+    assert winner in ("home", "away")
+    expected_offense = game.home_team if winner == "home" else game.away_team
+    assert game.offense_team is expected_offense
+    assert game.defense_team is not expected_offense
+    assert game.offense_team is not game.defense_team
 
 
 def test_opening_tip_sets_game_state():
-    """Test that opening tip sets opening_tip_winner in game_state"""
+    """Opening tip records the winner in game_state. Winner is sim_rng-driven, so this asserts it
+    is set and valid — not which team (the old random.choice mock never touched sim_rng)."""
     game = build_mock_game()
     game.quarter = 1
-    
-    with patch('random.choice') as mock_choice:
-        # Make away team win
-        mock_choice.return_value = game.away_team.lineup["C"]
-        
-        tip_turn = execute_opening_tip(game)
-        
-        assert game.game_state["opening_tip_winner"] == "away"
+
+    _offense, _defense, tip_turn = execute_opening_tip(game)
+
+    assert game.game_state["opening_tip_winner"] in ("home", "away")
 
 
 def test_opening_tip_animation_structure():
@@ -67,7 +65,7 @@ def test_opening_tip_animation_structure():
     game = build_mock_game()
     game.quarter = 1
     
-    tip_turn = execute_opening_tip(game)
+    _offense, _defense, tip_turn = execute_opening_tip(game)
     
     # Check animations exist
     assert "animations" in tip_turn
@@ -89,22 +87,18 @@ def test_opening_tip_animation_structure():
 
 
 def test_get_height_scale_value():
-    """Test height scale calculation"""
-    # Test very tall player (> 83 inches = 6'11")
-    scale_max = get_height_scale_value(84)
-    assert scale_max == 10
-    
-    # Test tall player (81-82 inches = 6'9"-6'10")
-    scale_tall = get_height_scale_value(81)
-    assert scale_tall == 9
-    
-    # Test mid-range height (78 inches = 6'6")
-    scale_mid = get_height_scale_value(78)
-    assert scale_mid == 7
-    
-    # Test short player (< 73 inches = 6'1")
-    scale_short = get_height_scale_value(70)
-    assert scale_short == 1
+    """Height scale calculation, re-banded +3 in. for the recalibrated
+    distribution (design §11.2): thresholds shifted 83->86, 81->84, 78->81, etc."""
+    # Very tall player (> 86 inches)
+    assert get_height_scale_value(87) == 10
+    # Tall player (84-85 inches)
+    assert get_height_scale_value(84) == 9
+    # New centre median (82 inches) lands mid-upper scale, as the old median did.
+    assert get_height_scale_value(82) == 8
+    # Mid-range height (81 inches)
+    assert get_height_scale_value(81) == 7
+    # Short-for-a-tipper (< 76 inches)
+    assert get_height_scale_value(70) == 1
 
 
 def test_opening_tip_text_generation():
@@ -112,7 +106,7 @@ def test_opening_tip_text_generation():
     game = build_mock_game()
     game.quarter = 1
     
-    tip_turn = execute_opening_tip(game)
+    _offense, _defense, tip_turn = execute_opening_tip(game)
     
     # Text should mention a tip-off
     assert "tip" in tip_turn["text"].lower() or "jump ball" in tip_turn["text"].lower()
@@ -123,7 +117,7 @@ def test_opening_tip_ball_animation():
     game = build_mock_game()
     game.quarter = 1
     
-    tip_turn = execute_opening_tip(game)
+    _offense, _defense, tip_turn = execute_opening_tip(game)
     
     # Check that ball landing coordinates are set
     assert "ball_landing_coords" in tip_turn
@@ -136,7 +130,7 @@ def test_opening_tip_player_convergence():
     game = build_mock_game()
     game.quarter = 1
     
-    tip_turn = execute_opening_tip(game)
+    _offense, _defense, tip_turn = execute_opening_tip(game)
     
     # Count CONVERGE_ON_BALL animations
     converge_count = len([anim for anim in tip_turn["animations"] if anim.get("action") == "CONVERGE_ON_BALL"])

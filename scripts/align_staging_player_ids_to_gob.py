@@ -12,24 +12,15 @@ so the same image files (UUID-named) work for both DBs.
 Requires --yes. Uses MONGO_URI; reads from 'gob', writes to 'gob-staging'.
 Run from repo root: MONGO_DB_NAME=gob-staging python3 scripts/align_staging_player_ids_to_gob.py --yes
 """
+import argparse
 import os
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
-for path in [".env.local", ".env"]:
-    if os.path.exists(path):
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-
-from pymongo import MongoClient
+from BackEnd.script_db import connect_script_database
 
 
 def _key(p):
@@ -41,18 +32,22 @@ def _key(p):
 
 
 def main():
-    if "--yes" not in sys.argv:
-        print("Aligns gob-staging player ids to gob UUIDs for the 96 players with images. Requires --yes.")
-        sys.exit(1)
-
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set.")
-        sys.exit(1)
-
-    client = MongoClient(uri)
-    gob = client["gob"]
-    staging = client["gob-staging"]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true", help="Write staging changes; default is dry-run")
+    args = parser.parse_args()
+    pristine_env = dict(os.environ)
+    production_connection = connect_script_database(
+        target="gob", access="read", pristine_env=pristine_env, repo_root=ROOT
+    )
+    staging_connection = connect_script_database(
+        target="gob-staging",
+        access="write" if args.apply else "read",
+        pristine_env=pristine_env,
+        repo_root=ROOT,
+        force_local_staging=True,
+    )
+    gob = production_connection.database
+    staging = staging_connection.database
     gob_players = list(gob["players"].find({}))
     staging_players = list(staging["players"].find({}))
 
@@ -83,7 +78,15 @@ def main():
 
     if not hex_to_uuid:
         print("No matches. Check first_name, last_name, team alignment between DBs.")
-        sys.exit(0)
+        production_connection.close()
+        staging_connection.close()
+        return
+
+    if not args.apply:
+        print(f"DRY RUN: would align {len(hex_to_uuid)} players and dependent staging references.")
+        production_connection.close()
+        staging_connection.close()
+        return
 
     # 1) Update teams: replace hex with uuid in player_ids
     teams = list(staging["teams"].find({}, {"_id": 1, "player_ids": 1}))
@@ -138,6 +141,8 @@ def main():
         replaced += 1
     print(f"[gob-staging] Players: replaced {replaced} doc(s) with gob UUID _id/player_id/photo.")
     print("Done.")
+    production_connection.close()
+    staging_connection.close()
 
 
 if __name__ == "__main__":

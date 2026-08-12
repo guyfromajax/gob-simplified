@@ -14,7 +14,7 @@ generic here — faces get swapped per player downstream.
 
 Setup (run where you have the paid Gemini key + open network — your machine):
     pip install google-genai pillow
-    # .env:  GEMINI_API_KEY=...   (auto-loaded, never printed)
+    # Supply GEMINI_API_KEY in the invoking process (never printed).
 
     # generate all 5:
     python3 scripts/generate_reference_bodies.py
@@ -111,15 +111,6 @@ FRAMES = {
 }
 
 
-def load_env(path=".env"):
-    if os.path.exists(path):
-        for line in open(path):
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-
-
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--only", help="generate just one frame (e.g. Broad)")
@@ -144,10 +135,8 @@ def main():
             print()
         return
 
-    load_env()
     if not os.environ.get("GEMINI_API_KEY"):
-        sys.exit("GEMINI_API_KEY not set (checked env and .env). "
-                 "Get one in AI Studio -> Get API key, add to .env.")
+        sys.exit("GEMINI_API_KEY not set in the invoking process. Get one in AI Studio.")
     try:
         from google import genai
         from PIL import Image

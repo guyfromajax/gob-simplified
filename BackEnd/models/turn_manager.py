@@ -1,9 +1,10 @@
 from BackEnd.models.logger import Logger
-from BackEnd.models.rebound_manager import ReboundManager
 from BackEnd.models.playbook_manager import PlaybookManager
 from BackEnd.models.animator import Animator
 import math
+import copy
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 import json
 import logging
 import uuid
@@ -33,7 +34,6 @@ from BackEnd.constants import (
 from BackEnd.utils.shared import (
     weighted_random_from_dict,
     generate_pass_chain,
-    get_team_thresholds,
     get_foul_and_turnover_positions,
     get_name_safe,
     get_player_position,
@@ -95,7 +95,6 @@ class TurnManager:
     def __init__(self, game_manager: "GameManager"):
         self.game = game_manager
         self.logger = Logger()
-        self.rebound_manager = ReboundManager(self.game)
         self.playbook_manager = PlaybookManager(self.game.offense_team)
         self.animator = Animator(self.game)
         self._ensure_lineup_fields()
@@ -143,10 +142,6 @@ class TurnManager:
                 # HCO / FCP / HCT: pass or steal 150ms; rim 1000ms on miss only
                 # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
                 fixed_ms = 150 if is_make else 1150
-
-        elif result_type == "FINAL_HOLD":
-            # OPTION_B: add Xms to game_time_elapsed if upgrading to full end-to-end precision (currently excluded to preserve game balance)
-            fixed_ms = 1800  # holdClockOutMs
 
         elif result_type == "RUN_OUT_CLOCK":
             fixed_ms = 4000  # drift movement + clock drain (wall-clock; game time in time_elapsed)
@@ -562,8 +557,8 @@ class TurnManager:
 
         return {}, None
 
-    def _execute_quick_foul_at_hco_start(self):
-        """Execute the situational Force Foul at the start of an HCO possession.
+    def _execute_quick_foul_at_possession_start(self, entry_state: str = "HCO"):
+        """Execute Force Foul before the routed live-ball state begins.
 
         Fouls the current ball handler (resolved from the prior turn's rendered
         seam → its ``final_ball_handler_id``, falling back to PG). The fouling
@@ -571,8 +566,8 @@ class TurnManager:
         sequence (converge sprint → reach-in; clock stops at reach-in) and
         resolves the non-shooting foul with ``time_elapsed`` = the converge burn.
 
-        Returns the foul turn result (short-circuits HCO routing), or ``None`` if
-        participants can't be resolved (falls through to normal HCO play).
+        Returns the foul turn result (short-circuits HCO/HCT/FCP/FB routing), or
+        ``None`` if participants cannot be resolved.
         """
         from BackEnd.engine.phase_resolution import (
             resolve_non_shooting_foul,
@@ -661,15 +656,15 @@ class TurnManager:
         game_state["foul_team"] = "DEFENSE"
         sl.log_force_foul_debug(
             game,
-            "HCO_START_EXECUTE",
+            "POSSESSION_START_EXECUTE",
             time_remaining=clock_r,
             fouler=foul_player,
             victim=victim,
-            note="universal quick-foul HCO-start hook",
+            note=f"universal quick-foul possession-start hook ({entry_state})",
         )
         result = resolve_non_shooting_foul(roles, game, time_elapsed_override=time_elapsed)
         result["offense_team_id"] = game.offense_team.team_id
-        result["current_turn"] = "HCO"
+        result["current_turn"] = str(entry_state or "HCO").upper()
         result["quick_foul"] = True
         result["victim_id"] = victim_id
         if steps:
@@ -1048,18 +1043,15 @@ class TurnManager:
 
         self.logger.log("baselineInbound:start")
 
-        # Situational Force Foul (quick foul): a trailing/close defense fouls
-        # immediately. When active, override any FCP/HCT pressure with the
-        # bespoke quick-foul BIP formation (SF inbounds to one of two candidate
-        # receivers; the paired fouler sets up within 4 grid of his man). The
-        # foul itself executes at the start of the following HCO turn (universal
-        # hook in run_micro_turn). See Situational_Logic_System.md §Force Foul.
+        # Situational Force Foul: retain the selected pressure route, but use a
+        # bespoke BIP formation so the receiver and fouler are ready. The foul
+        # executes before that routed HCO/HCT/FCP state begins.
         from BackEnd.utils.quick_foul import quick_foul_in_play, build_quick_foul_inbound_setup
         quick_foul_receiver_id = None
+        requested_defensive_setup = next_defensive_setup
         qf_active = quick_foul_in_play(self.game)
         qf_out = None
         if qf_active:
-            next_defensive_setup = None  # quick foul overrides FCP/HCT pressure (item 14)
             _off_attrs = offense_team.team_attributes or {}
             _off_chem = int(_off_attrs.get("team_chemistry", 15) or 15)
             _cur_pg = offense_team.lineup.get("PG")
@@ -1077,6 +1069,10 @@ class TurnManager:
                 guard_offset=(3.0, 0.0),  # toward court from the left baseline
             )
             qf_active = bool(qf_out)
+            if qf_active:
+                # Select quick-foul geometry without discarding the defensive
+                # pressure decision carried by the inbound contract.
+                next_defensive_setup = None
 
         # Define ball spot for inbounder (used in payload regardless of pressure type)
         # ✅ FIX: Inbound spot should be at edge of baseline, not center court
@@ -1258,6 +1254,11 @@ class TurnManager:
             self.logger.log("defenseUpdate:end")
 
         from BackEnd.constants import SITUATIONAL_BIP_RECEIVER_POS
+        post_inbound_state = (
+            requested_defensive_setup
+            if qf_active and requested_defensive_setup in ("FCP", "HCT")
+            else (next_defensive_setup or "HCO")
+        )
         payload = {
             "result_type": "BASELINE_INBOUND",
             "time_elapsed": 0,
@@ -1269,13 +1270,14 @@ class TurnManager:
             "turn_type": "BASELINE_INBOUND",  # Back-compat marker for post-BIP pressure slicing.
             "current_turn": "BASELINE_INBOUND",  # ✅ SS&S: Explicit turn type
             "quarter": self.game.quarter,
-            "next_play_type": next_defensive_setup if next_defensive_setup else "HCO",  # ✅ Explicit routing
-            "next_turn": next_defensive_setup if next_defensive_setup else "HCO",  # ✅ SS&S: Explicit next turn
+            "next_play_type": post_inbound_state,
+            "next_turn": post_inbound_state,
         }
         
         # Include next_defensive_setup if provided (for FCP/HCT pressure)
-        if next_defensive_setup:
-            payload["next_defensive_setup"] = next_defensive_setup
+        payload_defensive_setup = requested_defensive_setup if qf_active else next_defensive_setup
+        if payload_defensive_setup:
+            payload["next_defensive_setup"] = payload_defensive_setup
 
             if next_defensive_setup == "HCT":
                 # Dynamic HCT bypasses the MongoDB skeleton entirely — use the
@@ -1422,6 +1424,8 @@ class TurnManager:
 
         if qf_active:
             payload["quick_foul_setup"] = True
+            if requested_defensive_setup in ("FCP", "HCT"):
+                payload["quick_foul_pressure_setup"] = requested_defensive_setup
 
         return payload
 
@@ -1584,9 +1588,25 @@ class TurnManager:
         # ✅ EOQ window / Final Shot ownership (see EOQ_System.md §6):
         # - Clock ≤30 on HCO/HCT/FCP may open the EOQ window (chain).
         # - Full Final Shot execute flags are HCO-only (only HCO runs
-        #   resolve_final_turn_shot). HCT/FCP play normal until ≤8 → FLSS.
+        #   resolve_final_turn_shot). HCT/FCP use measured runway and may hand
+        #   a safe movement prefix to FLSS.
         # - Never leave final_turn_shot_this_turn armed on HCT/FCP.
         time_remaining_sec = game_state.get("time_remaining")
+        eoq_situational_action = sl.get_eoq_situational_action(
+            self.game, time_remaining_sec
+        )
+
+        # Q4/OT situational policy is state-independent. Resolve it before the
+        # HCO/HCT/FCP/FB routers so pressure or transition cannot bypass an
+        # intentional foul or Run Out decision.
+        if state in ("HCO", "HCT", "FCP", "FAST_BREAK"):
+            if eoq_situational_action == "FORCE_FOUL":
+                result = self._execute_quick_foul_at_possession_start(state)
+            elif eoq_situational_action == "RUN_OUT_CLOCK":
+                from BackEnd.engine.eoq_perfection import build_run_out_clock_result
+
+                result = build_run_out_clock_result(self.game, int(time_remaining_sec))
+
         chain_active = is_late_clock_eoq_chain_active(game_state)
         first_gate_open = eoq_first_gate_open(
             state=state,
@@ -1599,36 +1619,16 @@ class TurnManager:
             and int(time_remaining_sec) <= 30
             and state != "FAST_BREAK"
             and state in ("HCO", "HCT", "FCP")
+            and result is None
             and not game_state.get("flss_possession_pending")
             and first_gate_open
         )
         if final_turn_eligible:
             if quarter >= 4:
-                # Q4/OT: decide subtype (FINAL_HOLD, Force Foul, Quick Shot, or normal final shot)
-                slow = sl.is_slow_it_down(self.game, time_remaining_sec)
-                quick = sl.is_quick_shot(self.game, time_remaining_sec)
-                force_foul = sl.should_force_foul(self.game, time_remaining_sec)
-                if sl.should_run_out_clock(self.game, time_remaining_sec):
-                    from BackEnd.engine.eoq_perfection import build_run_out_clock_result
-
-                    result = build_run_out_clock_result(self.game, time_remaining_sec)
-                elif slow and not force_foul:
-                    # Legacy path — superseded by run-out when should_run_out_clock; kept as fallback.
-                    result = self._build_final_hold_result(time_remaining_sec)
-                elif slow and force_foul:
-                    # Phase 6 edge case: Slow It Down + Force Foul — execute Force Foul (existing logic).
-                    # No special Final Turn alignment for this possession; victim = current ball handler / PG.
-                    sl.log_force_foul_debug(
-                        self.game,
-                        "FINAL_TURN_TRIGGER",
-                        time_remaining=time_remaining_sec,
-                        note="slow+force_foul → _execute_final_turn_force_foul",
-                    )
-                    result = self._execute_final_turn_force_foul()
-                elif quick:
+                if eoq_situational_action == "QUICK_SHOT":
                     # Normal Quick Shot turn — fall through to state routing (don't set result)
                     pass
-                else:
+                elif eoq_situational_action == "FINAL_SHOT":
                     # Trailing/tied EOQ window. HCO arms Final Shot; HCT/FCP only
                     # open the window and continue normal pressure.
                     self._enter_eoq_first_gate(
@@ -1653,7 +1653,8 @@ class TurnManager:
                 )
 
         elif (
-            game_state.get("final_shot_ran_this_chain")
+            result is None
+            and game_state.get("final_shot_ran_this_chain")
             and time_remaining_sec is not None
             and int(time_remaining_sec) <= 30
             and state != "FAST_BREAK"
@@ -1700,76 +1701,42 @@ class TurnManager:
                     },
                 )
 
-        # ✅ Situational Logic: Force Foul (quick foul) — universal HCO-start hook.
-        # Executes the intentional foul at the START of the offense's HCO
-        # possession, on the current ball handler, covering every entry point
-        # (BIP/SIP receiver, DREB rebounder, OREB-kickout target, Final Turn PG)
-        # with one code path. The fouler converges (sprint archetype, clock runs)
-        # then reaches in (clock stops) — pure UESS schema animation. Runs before
-        # state routing; setting ``result`` short-circuits the HCO/HCT/FCP paths.
-        #
-        # EOQ priority: armed FLSS wins over quick foul. Pending FLSS is consumed
-        # in the HCO branch below; skipping foul here prevents FOUL→SIP from
-        # stranding ``flss_possession_pending`` across the inbound.
-        from BackEnd.utils.quick_foul import quick_foul_in_play
-        if (
-            result is None
-            and state == "HCO"
-            and not game_state.get("flss_possession_pending")
-            and quick_foul_in_play(self.game)
-        ):
-            result = self._execute_quick_foul_at_hco_start()
-
         clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
 
         low_clock_branch = None
 
+        # Preview late non-HCO turns without mutating the live game. When their
+        # complete schema cannot fit, commit only safe movement steps and hand
+        # the live state to FLSS. A successful preview suppresses the legacy
+        # fixed <=8 fallback; Task 2's measured runway owns the decision.
+        eoq_preview_completed = False
+        if (
+            result is None
+            and state in ("HCT", "FCP", "FAST_BREAK")
+            and 0 < game_clock_remaining <= 30
+            and shot_clock_remaining > 1
+            and self._should_preview_non_hco_eoq_turn(game_clock_remaining)
+        ):
+            eoq_preview_completed, shortened_result = self._preview_non_hco_eoq_turn(
+                state, game_clock_remaining
+            )
+            if shortened_result is not None:
+                result = shortened_result
+                low_clock_branch = "RUNWAY_SHORTENED_FLSS"
+
         if result is not None:
             pass  # Force Foul already handled; skip state routing (HCO/HCT/FCP)
         elif state in clock_enforced_states and game_clock_remaining <= 0:
-            if sl.should_run_out_clock(self.game, game_clock_remaining):
-                from BackEnd.engine.eoq_perfection import build_run_out_clock_result
+            from BackEnd.engine.eoq_perfection import build_clock_expired_result
 
-                result = build_run_out_clock_result(self.game, max(game_clock_remaining, 0))
-                low_clock_branch = "GAME_CLOCK_LE_0_RUN_OUT"
-            elif state == "HCO" and game_state.get("final_turn_shot_this_turn"):
-                # Final Turn wins over FLSS when both would trigger at 0:00 — but
-                # only HCO runs the full Final Turn (via ``resolve_final_turn_shot``
-                # in the HCO ``else`` branch). Non-HCO states (HCT/FCP/FAST_BREAK)
-                # can't consume the flag there, so let them fall through to FLSS.
-                pass
-            elif sl.would_take_final_shot(self.game, game_clock_remaining):
-                from BackEnd.engine.eoq_debug_log import log_eoq_routing_decision, log_eoq_step
-                from BackEnd.engine.eoq_perfection import resolve_flss_shot_logic
-
-                # Consume any armed Final-Turn flag so it can't leak into a later
-                # HCO possession (non-HCO states never popped it themselves).
-                game_state.pop("final_turn_shot_this_turn", None)
-                log_eoq_routing_decision(
-                    self.game,
-                    branch="GAME_CLOCK_LE_0_FLSS",
-                    game_clock_remaining=game_clock_remaining,
-                    would_final_shot=True,
-                )
-                log_eoq_step(self.game, "FLSS", "resolve_flss", "START", extra={"state": state})
-                result = resolve_flss_shot_logic(self.game, state)
-                log_eoq_step(
-                    self.game,
-                    "FLSS",
-                    "resolve_flss",
-                    "END",
-                    extra={
-                        "result_type": result.get("result_type"),
-                        "flss_zone": result.get("flss_zone"),
-                        "shooter_id": result.get("shooter_id"),
-                    },
-                )
-                low_clock_branch = "GAME_CLOCK_LE_0_FLSS"
-            else:
-                result = self._build_final_hold_result(0)
-                result["text"] = "Clock expires before a shot."
-                result["forced_shot"] = False
-                low_clock_branch = "GAME_CLOCK_LE_0_FINAL_HOLD"
+            # At 0:00 no live-ball resolver may begin. In particular, an armed
+            # HCO Final Turn must not resolve a shot and a pending FLSS must not
+            # receive the resolver's one-second default budget.
+            game_state.pop("final_turn_shot_this_turn", None)
+            game_state.pop("flss_possession_pending", None)
+            game_state.pop("final_shot_possession_active", None)
+            result = build_clock_expired_result(self.game, state)
+            low_clock_branch = "GAME_CLOCK_LE_0_TERMINAL"
         elif (
             shot_clock_violations_allowed
             and state in clock_enforced_states
@@ -1792,7 +1759,10 @@ class TurnManager:
             # Force shot-clock attempt at 1 or 0 seconds.
             result = self._execute_forced_shot(state)
             low_clock_branch = "SHOT_CLOCK_LE_1_FORCED_SHOT"
-        elif should_force_eoq_last_shot(self.game, game_clock_remaining, state):
+        elif (
+            not eoq_preview_completed
+            and should_force_eoq_last_shot(self.game, game_clock_remaining, state)
+        ):
             # HCT / FCP / FAST_BREAK possessions that START at low-but-positive
             # clock (0 < t <= FLSS_PREFLIGHT_FALLBACK_MAX_CLOCK) have too little
             # runway for a normal trap/press/fast-break AND their resolvers never
@@ -2125,6 +2095,9 @@ class TurnManager:
                 and result.get("animation_steps")
             ):
                 self._emit_hco_animation_steps(result)
+            from BackEnd.engine.eoq_perfection import combine_eoq_origin_prefix
+
+            combine_eoq_origin_prefix(result)
             self._assert_eoq_animation_steps(
                 result,
                 anim_steps=result.get("animation_steps"),
@@ -2154,6 +2127,9 @@ class TurnManager:
 
             ensure_quarter_end_clock_drain(self.game, result)
             self.update_clock_and_possession(result)
+            from BackEnd.utils.eoq_clock_progression import normalize_quarter_end_after_clock_update
+
+            normalize_quarter_end_after_clock_update(self.game, result)
             if result.get("final_turn") or (
                 result.get("flss") and result.get("final_shot_possession")
             ):
@@ -4199,6 +4175,120 @@ class TurnManager:
                     e,
                 )
 
+    def _should_preview_non_hco_eoq_turn(self, time_remaining: int) -> bool:
+        """Whether this pressure/transition possession should pursue a buzzer shot."""
+        if int(time_remaining or 0) <= 0:
+            return False
+        quarter = getattr(self.game, "quarter", None)
+        if quarter is None or int(quarter) < 4:
+            return True
+        from BackEnd.utils.situational_logic import would_take_final_shot
+
+        return bool(would_take_final_shot(self.game, time_remaining))
+
+    def _preview_non_hco_eoq_turn(
+        self, state: str, time_remaining: int
+    ) -> tuple[bool, Optional[dict]]:
+        """Preview a late HCT/FCP/FB and return a shortened FLSS when required.
+
+        The clone owns all speculative score/stat/possession mutations. The sim
+        RNG is restored after preview so a fitting turn resolves identically on
+        the live game, while an overrun starts FLSS from the unconsumed stream.
+        """
+        from BackEnd.engine.eoq_perfection import (
+            animation_schema_game_seconds,
+            apply_eoq_prefix_end_state,
+            calculate_flss_runway,
+            resolve_flss_shot_logic,
+            select_eoq_origin_prefix,
+        )
+        from BackEnd.utils.sim_random import getstate, setstate
+
+        rng_state = getstate()
+        try:
+            preview_game = copy.deepcopy(self.game)
+            if state == "FAST_BREAK":
+                preview = resolve_fast_break_logic(preview_game)
+            elif state == "FCP":
+                preview = resolve_full_court_press_logic(preview_game)
+                preview_game.turn_manager._emit_pressure_animation_steps(preview, "FCP")
+            elif state == "HCT":
+                preview = resolve_half_court_trap_logic(preview_game)
+                preview_game.turn_manager._emit_pressure_animation_steps(preview, "HCT")
+            else:
+                return False, None
+        except Exception as exc:
+            logging.warning("EOQ non-HCO preview failed for %s: %s", state, exc)
+            return False, None
+        finally:
+            setstate(rng_state)
+
+        steps = preview.get("animation_steps") or [] if isinstance(preview, dict) else []
+        if not steps:
+            return False, None
+        projected = animation_schema_game_seconds(steps)
+        runway = calculate_flss_runway(
+            time_remaining,
+            projected_originating_turn_seconds=projected,
+        )
+        if not runway.requires_shortened_turn:
+            return True, None
+
+        prefix, prefix_burn = select_eoq_origin_prefix(
+            steps,
+            budget_seconds=runway.originating_turn_budget,
+        )
+        apply_eoq_prefix_end_state(self.game, prefix)
+        self._commit_shortened_non_hco_entry_costs(state, preview)
+
+        flss_budget = max(
+            runway.shot_reserve_seconds,
+            runway.time_remaining - prefix_burn,
+        )
+        self.game.game_state.pop("final_turn_shot_this_turn", None)
+        self.game.game_state.pop("flss_possession_pending", None)
+        from BackEnd.utils.eoq_clock_progression import activate_late_clock_eoq_chain
+
+        activate_late_clock_eoq_chain(self.game.game_state)
+        result = resolve_flss_shot_logic(
+            self.game,
+            state,
+            time_remaining_override=flss_budget,
+        )
+        result["eoq_origin_prefix_steps"] = prefix
+        result["eoq_origin_state"] = state
+        result["eoq_origin_projected_seconds"] = projected
+        result["eoq_origin_prefix_seconds"] = prefix_burn
+        result["eoq_flss_budget_seconds"] = flss_budget
+        result["time_elapsed"] = int(time_remaining)
+        return True, result
+
+    def _commit_shortened_non_hco_entry_costs(self, state: str, preview: dict) -> None:
+        """Commit attempt/energy costs for movement that really ran before FLSS."""
+        from BackEnd.engine.phase_resolution import apply_energy_decay
+
+        off_lineup = self.game.offense_team.lineup
+        def_lineup = self.game.defense_team.lineup
+        if state in ("HCT", "FCP"):
+            apply_energy_decay(off_lineup, def_lineup, omit_zeros_for_defense=True)
+            bucket = self.game.defense_team.scouting_data["defense"][state]
+            bucket["used"] += 1
+            return
+
+        apply_energy_decay(off_lineup, def_lineup)
+        from BackEnd.constants.fast_break_play_types import ensure_fast_break_plays
+
+        play_key = preview.get("fast_break_play") or (preview.get("roles") or {}).get(
+            "fast_break_play"
+        )
+        offense = self.game.offense_team.scouting_data["offense"]
+        defense = self.game.defense_team.scouting_data["defense"]
+        plays = ensure_fast_break_plays(offense)
+        if play_key in plays:
+            plays[play_key]["A"] += 1
+        offense["Fast_Break_Entries"] += 1
+        defense["vs_Fast_Break"]["used"] += 1
+
     def _enter_eoq_first_gate(
         self,
         game_state,
@@ -4459,81 +4549,6 @@ class TurnManager:
                 get_away_player_coords(coords) if is_away_offense else dict(coords)
             )
         return (d_destinations, zone_playcall)
-
-    def _build_final_hold_result(self, time_remaining_sec):
-        """Build FINAL_HOLD result: time_elapsed = time_remaining, no shot, no fouls/turnovers. Quarter ends after."""
-        return {
-            "result_type": "FINAL_HOLD",
-            "current_turn": "HCO",
-            "time_elapsed": int(time_remaining_sec),
-            "offense_team_id": self.game.offense_team.team_id,
-            "possession_flips": False,
-            "text": "Hold for final shot.",
-            "next_play_type": None,
-            "next_turn": None,
-        }
-
-    def _execute_final_turn_force_foul(self):
-        """Edge case: Slow It Down + Force Foul at Final Turn time. Victim = PG (ball handler)."""
-        from BackEnd.utils import situational_logic as sl
-        from BackEnd.engine.phase_resolution import (
-            defender_coords_by_pos_from_lineup,
-            grid_coords_from_player,
-            resolve_non_shooting_foul,
-            select_defender_closest_to_victim,
-        )
-        off_lineup = self.game.offense_team.lineup
-        def_lineup = self.game.defense_team.lineup
-        victim = off_lineup.get("PG") or next((p for p in off_lineup.values() if p), None)
-        if not victim or not def_lineup:
-            return None
-        victim_coords = grid_coords_from_player(victim)
-        d_dest = defender_coords_by_pos_from_lineup(def_lineup)
-        foul_player = select_defender_closest_to_victim(victim_coords, def_lineup, d_dest)
-        if not foul_player:
-            return None
-        sl.log_force_foul_debug(
-            self.game,
-            "FINAL_TURN_EXECUTE",
-            time_remaining=self.game.game_state.get("time_remaining"),
-            fouler=foul_player,
-            victim=victim,
-            note="offense has possession (PG victim)",
-        )
-        self.game.game_state["foul_team"] = "DEFENSE"
-        roles = {
-            "ball_handler": victim,
-            "defender": foul_player,
-            "foul_player": foul_player,
-            "shooter": victim,
-            "screener": None,
-            "passer": None,
-        }
-        result = resolve_non_shooting_foul(
-            roles, self.game, time_elapsed_override=sl.force_foul_time_elapsed()
-        )
-        result["offense_team_id"] = self.game.offense_team.team_id
-        result["current_turn"] = "HCO"
-        result["quick_foul"] = True
-        result["force_foul_final_turn"] = True
-        result["victim_id"] = getattr(victim, "player_id", None)
-        victim.coords = dict(victim_coords)
-        attach_position_snapshots(
-            result,
-            [
-                build_phase_post_stopper_snapshot(
-                    self.game,
-                    off_lineup,
-                    def_lineup,
-                    None,
-                    roles,
-                    "HCO",
-                    "non_shooting_foul",
-                    "hco_force_foul_final_turn",
-                )
-            ],
-        )
-        return result
 
     def resolve_fast_break(self):
         return resolve_fast_break_logic(self.game) 
@@ -4946,6 +4961,22 @@ class TurnManager:
             from BackEnd.engine.oreb_step_emitter import build_oreb_animation_steps
             anim_steps = build_oreb_animation_steps(result, self.game)
             if anim_steps is not None:
+                clock_available = float(self.game.game_state.get("time_remaining") or 0)
+                if (
+                    result_type in ("PUTBACK_MAKE", "PUTBACK_MISS")
+                    and clock_available > 0
+                ):
+                    from BackEnd.engine.eoq_perfection import animation_schema_game_seconds
+                    from BackEnd.engine.oreb_step_emitter import fit_buzzer_putback_steps
+
+                    if animation_schema_game_seconds(anim_steps) > clock_available:
+                        anim_steps = fit_buzzer_putback_steps(
+                            anim_steps,
+                            time_remaining=clock_available,
+                        )
+                        result["eoq_shortened_oreb"] = True
+                        result["flss"] = True
+                        result["final_shot_possession"] = True
                 result["animation_steps"] = anim_steps
                 # Align result["time_elapsed"] with the schema's total
                 # game-clock burn (mirrors the HCO/FCP realignment).
@@ -4968,7 +4999,10 @@ class TurnManager:
                         # the FOLLOWING HCO turn's entry orchestrator (kickout/handoff
                         # /walk-up step in skeleton_step_emitter). Flooring it here
                         # would double-count that reset time.
-                        if result_type in ("PUTBACK_MAKE", "PUTBACK_MISS"):
+                        if (
+                            result_type in ("PUTBACK_MAKE", "PUTBACK_MISS")
+                            and not result.get("eoq_shortened_oreb")
+                        ):
                             burn = max(OREB_PUTBACK_MIN_TIME_ELAPSED, burn)
                         result["time_elapsed"] = burn
             # OREB-Task 3 (L-1): [UESS SEAM] entry-seam teleport detection. OREB
@@ -5039,6 +5073,49 @@ class TurnManager:
         
         rebounder = pending_oreb["rebounder"]
         game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(self.game)
+
+        # A leading (or otherwise globally eligible) Q4/OT offense does not
+        # attempt a speculative putback. It secures the rebound and runs out the
+        # remaining clock. This check must precede resolve_offensive_rebound,
+        # which mutates shot/score/foul stats.
+        time_remaining = int(game_state.get("time_remaining") or 0)
+        from BackEnd.utils.situational_logic import should_run_out_clock
+
+        if time_remaining > 0 and should_run_out_clock(self.game, time_remaining):
+            from BackEnd.engine.eoq_perfection import build_run_out_clock_result
+
+            game_state["last_ball_handler"] = rebounder
+            run_out = build_run_out_clock_result(self.game, time_remaining)
+            run_out["current_turn"] = "OREB"
+            run_out["rebounderId"] = getattr(rebounder, "player_id", None)
+            run_out["oreb_run_out"] = True
+            run_out["ball_handler"] = getattr(rebounder, "player_id", None)
+            run_out["text"] = (
+                f"{rebounder_name} secures the rebound and runs out the clock."
+            )
+            run_out["score"] = dict(self.game.score)
+            run_out["deltas"] = {}
+            run_out["home_lineup"] = serialize_lineup(self.game.home_team.lineup)
+            run_out["away_lineup"] = serialize_lineup(self.game.away_team.lineup)
+            run_out["player_energy"] = {
+                player.player_id: {
+                    "NG": player.attributes.get("NG", 1.0),
+                    "team": team.name,
+                }
+                for team in (self.game.home_team, self.game.away_team)
+                for player in team.lineup.values()
+                if player is not None
+            }
+            prior_turn = (getattr(self.game, "turns", None) or [])[-1]
+            if isinstance(prior_turn, dict):
+                bx = prior_turn.get("ball_bounce_x")
+                by = prior_turn.get("ball_bounce_y")
+                if bx is not None and by is not None:
+                    run_out["oreb_capture_coords"] = {
+                        "x": float(bx),
+                        "y": float(by),
+                    }
+            return run_out
 
         # Shot-clock gate (Shot_Clock_System.md § Shot clock 0 → dead-ball turnover):
         # The OREB possession needs enough carried shot clock to reach a shot. If
@@ -6382,16 +6459,16 @@ class TurnManager:
 
                 # Slightly bias toward foul when high activity + tempo
                 foul_margin = o_score - d_score
-                if foul_margin < off_team.team_attributes["fight"] * 0.7:
+                if foul_margin < core8_gameplay(off_team.team_attributes["fight"]) * 0.7:
                     foul_risks.append(("O_FOUL", step_index, offender, defender))
-                elif d_score < def_team.team_attributes["fight"] * 1.3:
+                elif d_score < core8_gameplay(def_team.team_attributes["fight"]) * 1.3:
                     foul_risks.append(("D_FOUL", step_index, offender, defender))
 
         # Step 4: Decide event
         turnover_risks.sort(key=lambda x: x[0])
         foul_risks.sort(key=lambda x: x[1])  # prioritize earlier fouls
 
-        if turnover_risks and turnover_risks[0][0] < off_team.team_attributes["discipline"]:
+        if turnover_risks and turnover_risks[0][0] < core8_gameplay(off_team.team_attributes["discipline"]):
             _, player, defender = turnover_risks[0]
             roles["event_step"] = None  # You could optionally track when
             roles["turnover_player"] = player

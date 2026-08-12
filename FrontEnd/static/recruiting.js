@@ -156,11 +156,11 @@
   }
 
   function appendStandardRow(tbody, row, isWeek36) {
-    // RT color scale: recruit breakpoints for JH, player breakpoints for FR/SO/JR.
+    // Players and recruits of every year share the same RT grade/color scale.
     var rtClass = typeof window.getRecruitRtBucketClassForYear === 'function'
       ? window.getRecruitRtBucketClassForYear(row.rt, row.year)
       : (typeof window.getRecruitRtBucketClass === 'function' ? window.getRecruitRtBucketClass(row.rt) : '');
-    var rtCell = '<td class="' + rtClass + '">' + (row.rt != null ? row.rt : '--') + '</td>';
+    var rtCell = '<td class="' + rtClass + '">' + (row.rt != null ? formatRtDisplay(row.rt) : '--') + '</td>';
     var yearCell = '<td>' + (row.yearDisplay || '--') + '</td>';
     // Walk-ons have no recruit_id and fall back to plain text.
     var nameCell = '<td>' + Recruiting.recruitNameLinkHtml(row.recruitId, context.franchiseId, row.name) + '</td>';

@@ -53,6 +53,12 @@ def atl_week_label(week: int) -> str:
     return f"Week {wk}"
 
 
+def atl_season_progress_label(season: int, week: int) -> str:
+    """Mode-select capsule copy for a franchise's current season position."""
+    current_season = int(season or 1)
+    return f"Season {current_season} · {atl_week_label(week)}"
+
+
 def _natl_rank_display(natl_rank: int | None) -> str | None:
     if natl_rank is None:
         return None
@@ -313,6 +319,7 @@ def _hydrate_slot(stored: dict[str, Any]) -> dict[str, Any] | None:
             pass
 
     week = int(franchise_doc.get("week", 1) or 1)
+    current_season = int(franchise_doc.get("current_season", 1) or 1)
     next_opp = _resolve_next_opponent(franchise_doc, str(user_team_id_str))
     rank_num = _natl_rank_display(natl_rank)
     last_game = stored.get("last_game") if isinstance(stored.get("last_game"), dict) else {}
@@ -328,8 +335,9 @@ def _hydrate_slot(stored: dict[str, Any]) -> dict[str, Any] | None:
         "wins": wins,
         "losses": losses,
         "national_rank": rank_num,
+        "current_season": current_season,
         "week": week,
-        "week_label": atl_week_label(week),
+        "week_label": atl_season_progress_label(current_season, week),
         "is_tournament_week": 27 <= week <= 34,
         "next_opponent": next_opp,
         "last_game": {

@@ -1,74 +1,87 @@
-## Training System (**verified 2026-06-13**)
+## Training System (**verified 2026-08-11**)
 
-> Verified vs code — **accurate & well-maintained**. Spot-checks all pass: training points `30 if is_first_training else 24` (`get_training_points` franchise_routes L10489/L10516, validation L10637); split endpoints `/franchise/run-training/user` (L10556) + `/franchise/run-training/distant-cpu` (L10580); `parse_coaching_focus` (training_execution_v2 L342); focus multiplier `random.choice([1.5,1.6,1.7,1.8])` (7 sites incl. install execution/teamwork); training-camp CH bonus scale `_training_camp_bonus_range_for_ch` (>80→(4,10) / >60→(3,8) / >40→(2,6) / >20→(1,4)) + per-position core attrs all exact; coaching-focus carryover `int(round(prior*0.25))` (see Season_Init). Coaching-focus per-leaf behavior corroborated by `Coaching_Focus_Implementation_Map.md` (code-truth status matrix). Absorbed the former `Training_Notes_System.md` (play-name display rule folded into Training Notes Section).
+> CPU template training is retired. User and CPU teams now share `execute_training`; CPU teams receive generated allocations/focus and use `cpu_autotrain_week` for per-team idempotency. The split endpoints are `/franchise/run-training/user` and `/franchise/run-training/cpu-train`.
 
-This document should reflect the current franchise training implementation in code. If behavior here conflicts with `BackEnd/models/training_execution_v2.py`, `BackEnd/models/training_notes.py`, or `BackEnd/api/franchise_routes.py`, update this doc to match the live implementation.
+This document should reflect the current franchise training implementation in code. If behavior here conflicts with `BackEnd/models/training_execution_v2.py`, `BackEnd/models/training_notes.py`, `BackEnd/api/franchise_routes.py`, or `BackEnd/constants/training_shape.py`, update this doc to match the live implementation.
 
 **Base Constants**
 
-1. **Total Training Points**:
-   - **Training Camp (Week 1, before first games)**: 30 points
-   - **All Other Trainings (Week 1+ after games)**: 24 points per training session
-2. **Slider Range**: 0-5 points per slider (discrete steps)
+1. **Flat integer budget** (`CAMP_POINT_BUDGET` / `IN_SEASON_POINT_BUDGET` in `training_shape.py`):
+   - **Training camp** (`is_camp_week`: franchise week **1**; `CAMP_WEEKS = 1`): **30** points
+   - **In-season** (weeks **2–26**): **24** points
+   - **After week 26:** training is unavailable; budget and submit endpoints reject the request
+   - Every slider notch costs exactly **1 point**, for every drill, player position, and class. Spend is the raw integer slider sum via `training_points_spent`; there is no weighted-price or roster-maximum pricing path.
+2. **Slider Range**: 0-5 points per slider (discrete integer steps)
 3. **Training Page Files**: `FrontEnd/static/training.html`, `FrontEnd/static/training.js`, `FrontEnd/static/training.css`
 4. **Training Report Page**: `FrontEnd/static/training-report.html`
-5. **Backend Execution**: `BackEnd/models/training_execution_v2.py`
+5. **Backend Execution**: `BackEnd/models/training_execution_v2.py`; shape/gain-fit dials in `BackEnd/constants/training_shape.py`
 6. **API Endpoints (franchise training)**:
-   - `GET /franchise/training-points` - Get available training points (30 for training camp, 24 for regular training)
-   - `POST /franchise/run-training/user` - **User phase only**: runs `execute_training` for the user team, persists FPD/FTD + `latest_training`, sets `training_status.user_training_applied_week` and leaves `training_completed` **false** until distant phase completes. Requires auth + franchise ownership. Response includes `training_highlights` (string array) for the loading feed.
-   - `POST /franchise/run-training/distant-cpu` - **Distant phase**: template-based CPU teams, week-1 camp cuts when applicable, then bounded Practice Squad work. During PS weeks it returns `status: "processing"` after at most one PS game plus `retry_after_ms`; the client polls at that interval until the response returns success and a report redirect. A PS game receives three full-engine attempts before an auditable deterministic terminal fallback (standings/brackets only; no fabricated player stats). Body: `{ "franchise_id" }`. Requires auth + ownership.
-   - `POST /franchise/run-training` - **Legacy / full path**: same end state as user + distant in one request; if user phase is already applied for the current week but distant is not, handler runs **distant only** (resume). Does not require auth in the same way as the split routes (existing behavior).
+   - `GET /franchise/training-points` - Budget (30 camp / 24 in-season), `is_camp_week`, `camp_weeks`, and `gain_percentage_matrix` for the client
+   - `POST /franchise/run-training/user` - **User phase only**: runs `execute_training` for the user team, persists FPD/FTD + `latest_training`, sets `training_status.user_training_applied_week` and leaves `training_completed` **false** until CPU training completes. Requires auth + franchise ownership.
+   - `POST /franchise/run-training/cpu-train` - **CPU phase**: runs real auto-training for eligible CPU teams, **last-camp-week** cuts (`week == CAMP_WEEKS`), and bounded Practice Squad work. During PS weeks it may return `status: "processing"` plus progress and `retry_after_ms`; the client polls until success.
+   - `POST /franchise/run-training` - **Legacy/full path**: reaches the same user + CPU end state in one request and resumes the CPU phase when user training is already applied.
    - `GET /franchise/training-report` - Get training report data
+   - `GET /franchise/league-news` - Authenticated, read-only national Top 10, key-games, and league-leader payload for the training load screen
 7. **Coaching Focus Archetypes**: Authoritarian, Systems Coach, Player Maximizer, Culture Builder — per-leaf code behavior: `Coaching_Focus_Implementation_Map.md` in this folder
-8. **Rebound Modifier Range**: 0.0-0.4 (clamped)
+8. **Rebound Modifier Range**: 0.0-1.0 (clamped)
 9. **Pre-Training defense CMD decay**: Scouting defense rows with effectiveness > 0 reduced by `random.randint(5, 15)` before install training. **Offensive** play effectiveness is **not** decayed here; it is reduced at **EOG** from playcall share (see `End_Of_Game_System.md`).
 
-**Training System Flow (16 Steps)**
+### Canonical training position
 
-1. **Page Load**: Frontend fetches training points from `/franchise/training-points` endpoint (30 for training camp, 24 for regular training)
-2. **User Allocates Points**: User distributes training points (30 or 24) across 20 sliders (player drills, team drills, general)
+Every training surface uses `resolve_training_position()` from `training_shape.py`:
+
+```text
+training_position → position_intent → highest current position rating → SF
+```
+
+The backend training-player producer carries `training_position`, `position_intent`, and
+`resolved_training_position`. Browser pricing consumes the server-resolved field; user budget
+validation, execution floors, CPU grouping/reference focus, Team Builder floor validation, and
+offseason development call the same canonical resolver. There is currently no product/UI write
+path that lets a user change `training_position`; generation supplies `position_intent`, and
+rollover defaults a missing `training_position` to that intent and then carries it forward.
+
+Player Maximizer **Positional Focus is intentionally separate**: it selects its fixed attribute
+triple from the player's highest current RT, not from `training_position`.
+
+**Training System Flow (15 Steps)**
+
+1. **Page Load**: Frontend fetches the flat budget + gain-divisor matrix from `/franchise/training-points` (30 in week 1 / 24 in weeks 2–26; rejected after week 26)
+2. **User Allocates Points**: User distributes units across 20 sliders; Points Remaining tracks **cost spend** against the week budget
 3. **User Selects Focus**: User selects one coaching focus archetype and sub-option
-4. **Recruiting Invites Access (Weeks 20-26 only)**: Training page shows a green `Recruiting Invites` button below `Submit Training` that routes to `recruiting-orders.html`
-5. **Submit Training (Franchise)**: Frontend sends `POST /franchise/run-training/user` then `POST /franchise/run-training/distant-cpu` (see **Training loading feed** below). Tournament/single-game modes still use their existing endpoints.
-6. **Backend Validation**: Backend validates total points match expected (30 for training camp, 24 for regular training)
+4. **Recruiting Invites Access (Weeks 20-26 only)**: Training page shows a green `Recruiting Invites` button below `Submit Training` that routes to the phase-aware Recruiting Hub at `recruiting.html`
+5. **Submit Training (Franchise)**: Frontend sends `POST /franchise/run-training/user` then `POST /franchise/run-training/cpu-train` while the independent **League News Wire** load screen rotates.
+6. **Backend Validation**: `training_points_spent(allocations)` must equal the expected flat budget exactly (30 camp / 24 in-season)
    - week 20 special case: if no recruiting orders have ever been saved, training is blocked until the user saves recruiting orders
 7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing; `execute_training` merges any legacy `scouting_data.defense` row keys onto canonical `defense_id` keys before baselines (same remap as gameplay). **Defense and offensive play CMD effectiveness decay from game usage share runs at franchise EOG only** (`End_Of_Game_System.md`); not during training.
-8. **Pre-Training Conditions**: Random decreases applied to player attributes (excluding EM, MO, NG); team attributes are no longer decayed here (skipped for training camp: week 1 before first games)
-9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points
+8. **Pre-Training Conditions**: Random decreases applied to player attributes (excluding EM, MO, NG); team attributes are no longer decayed here (**skipped on camp weeks**: `is_camp_week(week)` → `skip_pre_training_depreciation=True`)
+9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points (camp uses `CAMP_GAIN_SCALE=1.4`; in-season uses `IN_SEASON_GAIN_SCALE=0.18`)
 10. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
-11. **Attribute Clamping**: All values clamped to valid ranges (see **Attribute_Clamp_System.md** for player and team clamp ranges)
+11. **Attribute Clamping**: All values clamped to valid ranges (see **Attribute_Clamp_System.md** for player and team clamp ranges); decay/gains also respect weight-scaled position floors
 12. **Weeks 20-26 Recruiting Invite Processing**: During recruiting invite season, `Submit Training` also runs that week's recruiting invite processing using the user's saved recruiting orders plus CPU weekly recruiting logic
 13. **User team persisted (phase 1)**: User-team training report stored on FTD and in `latest_training`; franchise doc records `user_training_applied_week`. **`training_completed` stays false** until step 14.
-14. **Computer team training (phase 2)**: All non-user teams run **distant training** (template-based updates). FTDs may record `cpu_distant_trained_week` for idempotent retries. Then franchise doc sets `training_completed` and `cpu_distant_complete_week`.
-15. **Post-Training Camp Cuts**: After week 1 training camp, applied during distant phase for CPU teams; user cut flow from FCC when roster > 12.
+14. **Computer team training (phase 2)**: Eligible non-user teams run real auto-training through `execute_training`. FTDs record `cpu_autotrain_week` for idempotent retries. The franchise then records `training_completed` and `cpu_training_complete_week`.
+15. **Post-Training Camp Cuts**: After the **last** camp week (`week == CAMP_WEEKS`), applied during the CPU phase; user cut flow from FCC when roster > 12.
 
-### Training loading feed (franchise, between user and distant phases)
+### Training load League News Wire (franchise, between user and CPU phases)
 
-While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`), the training page keeps a full-screen **pulse** overlay and shows a **stream of highlight lines** derived only from **user-team** training (not from CPU teams).
+While training runs, `PageLoadOverlay` uses its separate `newswire` variant to rotate neutral national league graphics. The retired archetype loading-feed generator is no longer produced or returned by training APIs.
 
-**Backend — highlight list**
-
-- Module: `BackEnd/utils/training_loading_highlights.py` — `build_training_loading_highlights(training_report, ftd_coaching_focus=...)`.
-- Copy comes from `BackEnd/utils/training_feed_lines.py`: archetyped player/team/scrimmage/break lines plus one **`COACHING_FOCUS_FLAVOR`** line per build. Uses `training_report.coaching_focus.archetype` (session) and `training_report.ftd_coaching_focus` (FTD counters; optional kwarg override). See `Training_System_Live_Feed.md`.
-- Returns up to **36** de-duplicated lines for the client to consume.
-
-**Frontend — stream behavior**
-
-- Files: `FrontEnd/static/training.js`, `FrontEnd/static/js/shared/pageLoadOverlay.js`.
-- Phase 1 overlay subtitle: **“Preparing your training…”** (team name as pulse title).
-- After phase 1 succeeds: highlights are **copied, Fisher–Yates shuffled**, and shown **one line at a time** (first line immediately, then every **5 seconds**). When the list is exhausted, the **last line stays** until distant training completes. If there are no highlights, a single fallback line is used: **“Finishing league training…”**.
-- `PageLoadOverlay.updatePulseSubtitle(text)` updates only the subtitle between ticks (avoids re-running full `show()` each time).
-- Phase 1 and phase 2 requests include `API_CONFIG.getAuthHeaders()` (Bearer token).
-- During weeks 2–19, phase 2 is a durable polling workflow. Every response advances at most one full Practice Squad game and reports `completed_games` / `total_games`. Refreshing or revisiting the training page detects an applied user phase with incomplete distant training and resumes polling automatically. Completed PS games are not replayed; an interrupted in-progress game restarts from tip-off.
+- `GET /franchise/league-news` consolidates the national Top 10, current-week key games, and eight qualified leaderboards into pre-ranked lists of exactly ten. In Week 4, standings and leaders are through Week 3 while Key Games are Week 4.
+- Week 1 uses the preseason deck: program-rank Top 10 and season marquee matchups. Preseason Top 10 rows intentionally have no trailing record.
+- `training.js` prefetches and session-caches the payload by franchise, season, and week. At submit, the news request and training request proceed independently.
+- A pending news request shows only the header and green “Training in progress” pulse. A rejected request falls back to the existing team-banner pulse variant.
+- Available graphics rotate in a fixed order every 6000ms. Missing or short lists are omitted. Rotation stops immediately when the overlay hides.
+- During weeks 2–19, phase 2 remains a durable polling workflow. Refreshing or revisiting detects an applied user phase with incomplete CPU training and resumes automatically under the same newswire.
 
 **Franchise training state helpers**
 
-- `BackEnd/utils/franchise_training_state.py` — `franchise_training_fully_complete_for_week`, `franchise_user_training_applied_for_week` (split-phase vs legacy saves). FCC **`training_completed`** reflects “user + distant done for this week,” not user-only.
-- If user training is applied but the distant PS job is unfinished, training APIs and FCC data expose `distant_training_resume`; the FCC CTA reads **Resume Training**. Completion/fallback of every PS game allows distant finalization to set `training_completed` + `cpu_distant_complete_week`, after which the CTA reads **Play Next Game**.
+- `BackEnd/utils/franchise_training_state.py` — `franchise_training_fully_complete_for_week`, `franchise_user_training_applied_for_week`. FCC `training_completed` reflects user + CPU completion.
+- If user training is applied but CPU/PS work is unfinished, APIs expose `cpu_training_resume`; completion sets `training_completed` + `cpu_training_complete_week`.
 
 ### Post-Training Camp Cut Flow
 
-- **Trigger:** Only after franchise week 1 training camp is completed.
+- **Trigger:** After week **1** training completes (`week == CAMP_WEEKS`, currently **1**), during the CPU training phase (`cpu_training_camp_cuts_applied`).
 - **User Team:**
   - If user roster size is greater than 12 when the user returns to FCC from the training report, FCC shows a modal:
     - `You need to cut X players`
@@ -82,7 +95,7 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
     - `{player name}, {player name}, and {player name} have been cut.`
   - After successful cuts, user returns to FCC and normal weekly cadence resumes
 - **CPU Teams:**
-  - After week 1 training camp, any CPU team above 12 players automatically cuts down to 12
+  - After the last camp week, any CPU team above 12 players automatically cuts down to 12
   - Cut rule:
     - lowest RT first
     - RT tie -> older year first (`Senior`, `Junior`, `Sophomore`, `Freshman`)
@@ -92,7 +105,7 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 
 **Table of contents** (Markdown anchor targets; slug style matches common renderers such as GitHub.)
 
-- [Training loading feed (franchise, between user and distant phases)](#training-loading-feed-franchise-between-user-and-distant-phases)
+- [Training load League News Wire (franchise, between user and CPU phases)](#training-load-league-news-wire-franchise-between-user-and-cpu-phases)
 - [Post-Training Camp Cut Flow](#post-training-camp-cut-flow)
 - [Training Page Layout](#training-page-layout)
 - [Slider Behavior](#slider-behavior)
@@ -113,6 +126,7 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 - [Data Flow](#data-flow)
 - [Team ID Resolution](#team-id-resolution)
 - [Computer Team Training (Franchise Mode Only)](#computer-team-training-franchise-mode-only)
+- [Player Development & Coaching Quality](#player-development--coaching-quality)
 - [Data Storage](#data-storage)
 - [Key Files](#key-files)
 - [Current Play / Report Identity Notes](#current-play--report-identity-notes)
@@ -170,15 +184,23 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 
 ### Slider Behavior
 
-- Each slider has discrete steps from 0 to 5
+- Each slider has discrete integer steps from 0 to 5; every notch spends one point
 - Default value for all sliders on page load: 0
-- Total available training points:
-  - **First Training (Franchise Mode)**: 30 points (before first game)
-  - **All Other Trainings**: 24 points
-- Training points are fetched from `/franchise/training-points` endpoint on page load
-- Moving a slider to value N subtracts N from Points Remaining
-- Prevents user from allocating more than available total points (clamps or reverts last interaction)
-- Points Remaining = TOTAL_POINTS - sum(all slider values)
+- Flat point budget from `/franchise/training-points`:
+  - **Camp week** (`is_camp_week`, week 1): **30**
+  - **In-season weeks 2–26**: **24**
+  - **Weeks 27+**: unavailable
+- Franchise client also loads `gain_percentage_matrix` + roster years/positions to display each player drill's effective-value range across the roster
+- Moving any slider by +1 subtracts exactly **1** from Points Remaining
+- Prevents allocating past the budget (clamps or reverts last interaction)
+- Submit requires `Points Remaining == 0`; decimal and unspendable remainders are impossible
+- Player-drill labels show `Effective value: 25%–100%` across the roster, or collapse to a single Full/Half/Quarter/percentage label. The tooltip identifies position fit and class as the causes.
+
+### Position fit and class taper
+
+Position fit and class affect **gain, never price**. They are stored directly as percentages in `TRAINING_GAIN_PERCENTAGES` and `CLASS_GAIN_PERCENTAGES`; there is no cost matrix or reciprocal derivation. Class rates are FR 100%, SO ~91%, JR 80%, SR ~71%. The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`.
+
+This moved the fractional component off the budget so the user always sees and spends whole points while retaining the original cross-position granularity. Shape floors and `resolve_training_position()` are unchanged.
 
 ### Coaching Focus Selection
 
@@ -195,7 +217,7 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 ### Submit Button Behavior
 
 - Disabled / visually muted (reduced opacity, non-clickable) until:
-  1. All training points are allocated (Points Remaining = 0) - 30 for first training, 24 otherwise
+  1. Budget exhausted exactly: remaining `== 0` — 30 camp / 24 in-season
   2. A coaching focus is selected
   3. **Player Maximizer / Choose Attributes:** user has tapped **Assign Focus Attributes** in the modal (or Auto-Train selected a hidden leaf). For **Custom**, every player needs three distinct picks.
 - Becomes active only when all conditions are met
@@ -204,15 +226,11 @@ While **distant CPU training** runs (`POST /franchise/run-training/distant-cpu`)
 
 - **Button:** "Auto-Train" (header, right side)
 - **Behavior when clicked:**
-  - Automatically assigns all training points across the 20 sliders
-    - Sets all 20 sliders to `1` (20 points)
-    - Randomly selects additional sliders to set to `2`:
-      - **24 points**: 4 sliders set to `2` (20 + 4 = 24)
-      - **30 points**: 10 sliders set to `2` (20 + 10 = 30)
-  - Randomly selects a Coaching Focus (one of the existing focus options, not archetype headers)
-  - Shows confirmation popup: `Training Points Assigned` then `Assigned {Focus Name} Focus` (e.g. `Assigned Attributes 4–6 (Player Maximizer) Focus` for hidden PM leaves)
+  - Assigns whole points under the flat budget, then randomly bumps sliders until all points are spent
+  - Randomly selects a Coaching Focus (one of the existing focus options, not archetype headers; Custom excluded)
+  - Shows confirmation popup with the chosen focus (e.g. `Assigned Attributes 4–6 (Player Maximizer) Focus` for hidden PM leaves)
     - Popup has a "Close" button; closing keeps the user on the Training page
-  - After auto-assign, Points Remaining = 0 and Submit becomes eligible (provided focus set by auto-train)
+  - After auto-assign, Submit becomes eligible (provided focus set by auto-train)
 
 ### Backend Training Execution System
 
@@ -235,7 +253,7 @@ The training execution system applies pre-training conditions, allocates trainin
 - **Next franchise game (home crowd roll):** sets **`pending_community_engagement`** on that team’s **FTD** (`franchise_team_data`). When a franchise game is started (`/api/init-game` or new-game `simulate-quarter` path), the engine reads pending flags for **both** teams, resolves a single band shift for the **home crowd weight table** (see `Home_Crowd_System.md`), then clears both teams’ flags.
 - **User home:** shift crowd weights **up** one chemistry band vs the user’s current `team_chemistry` for the home team in that game; if already in **21–25**, use the **Upper Bonus Range** row from `Home_Crowd_System.md` instead.
 - **User away:** shift **down** one band vs the **home opponent’s** `team_chemistry`; if opponent chemistry is in **7–10**, no downward effect.
-- **Computer:** distant training templates may set `community_engagement` on the template; when applied, that CPU team gets `pending_community_engagement` on FTD for the same rules (only CE vs no CE: CPU home → shift up from CPU chemistry; CPU away → shift down from user’s home chemistry).
+- **Computer:** CPU auto-training can select Community Engagement inside the shared engine, but its persistence path does not currently set `pending_community_engagement`; this next-game effect is therefore user-team-only today.
 - **Both teams pending CE** in the same matchup: shifts **cancel** (normal roll from actual home `team_chemistry`).
 - **Bye week:** if no game is played after training, the pending flag stays until the **next** game in that season.
 
@@ -249,11 +267,12 @@ The training execution system applies pre-training conditions, allocates trainin
    - Applies random decreases to player attributes (excluding EM, MO, NG)
    - Player attributes: see pre-training decay section below
    - Team attributes are no longer decayed in training. They are updated at the end of each game based on performance (see End_Of_Game_System.md). For a side-by-side of how each team attribute is changed in EOG vs Training, see `docs/To Do/team_attributes_eog_vs_training_comparison.md`.
-   - **Skipped for training camp in franchise mode** - determined by `week == 1 and not results.get("1")`, no depreciation occurs before first games
+   - **Skipped during camp** — `is_camp_week(week)` sets `skip_pre_training_depreciation=True` for week 1
 
 2. **Training Point Application** (`apply_training_points`)
    - Maps drill allocations to player/team attributes
    - Applies random increases based on points allocated
+   - Scales positive gains by `CAMP_GAIN_SCALE` (1.4) on camp weeks or `IN_SEASON_GAIN_SCALE` (0.18) in-season; the per-attribute fractional remainder is loaded from and persisted back to FPD after both user and CPU training
    - Applies coaching focus amplifiers
    - Handles special cases (conditioning, film study, breaks)
 
@@ -299,13 +318,15 @@ The training execution system applies pre-training conditions, allocates trainin
 
 #### Training Point Ranges
 
-**Player Attributes (Base Ranges):**
+**Player Attributes (Base Ranges)** (`PLAYER_ATTR_GAIN_RANGE_BY_POINTS` in `training_execution_v2.py`; year-max adjustments still apply on the high end only):
 - 0 points: `+= random.randint(-2, -1)`
-- 1 point: `+= random.randint(0, 1)`
+- 1 point: `+= random.randint(1, 3)`
 - 2 points: `+= random.randint(2, 3)`
 - 3 points: `+= random.randint(2, 4)`
 - 4 points: `+= random.randint(3, 5)`
 - 5 points: `+= random.randint(3, 6)`
+
+Positive gains are then scaled by `IN_SEASON_GAIN_SCALE` (0.18) or `CAMP_GAIN_SCALE` (camp), with a per-attribute fractional remainder (`training_gain_remainders`) so sub-integer signal accumulates across weeks instead of rounding away. The sidecar is read from and written to each franchise player document, never the core player, and is carried through season rollover. Attribute and anchor values remain integers.
 
 **High Attribute Gain Reduction**
 - If a player's starting value for a trained attribute at the beginning of the training session is `> 100`, any positive gain to that attribute is reduced by `50%`, using rounded integer value.
@@ -320,62 +341,22 @@ Leave minimums as is, only change maximums
 - **Junior**: 0 to min, 2 to max
 - **Senior**: 0 to min, 1 to max
 
-**Year-Based Pre-Training Decay**
-- **Freshman**: -5  min, -2  max
-- **Sophomore**: -4  min, -1  max
-- **Junior**: -3  min to -1  max
-- **Senior**: -2  min to 0  max
+**Year-Based Pre-Training Decay** (code: `PRE_TRAINING_DECAY_BY_YEAR` in `training_execution_v2.py`; applied only when `skip_pre_training_depreciation` is false — i.e. skipped for training camp):
+- **Freshman / Sophomore**: -2 min, 0 max
+- **Junior / Senior**: -1 min, 0 max
 
-**Training Camp Bonus System**
-For training camp only, the following bonus will be run for each player, based on his CH value and his highest RT position.
-- Core Attributes by position:
-  - PG: PS, BH, IQ
-  - SG: SH, FT, OD
-  - SF: AG, choose 2 of these at random (SC, SH, ID, OD)
-  - PF: RB, ST, ID
-  - C: SC, ST, ID
-- Note: if a player has multiple positions tied for the highest RT, choose one at random
+**Training Camp (what it actually is today)**
 
-Then use the following CH scale for each player:
-- If CH > 80, for each core attribute `+= random.randint(4, 10)`
-- `elif CH > 60`: for each core attribute `+= random.randint(3, 8)`
-- `elif CH > 40`: for each core attribute `+= random.randint(2, 6)`
-- `elif CH > 20`: for each core attribute `+= random.randint(1, 4)`
-- else: no bonus applied
+Training camp is **not** a separate growth event. It is the same `execute_training` → `apply_training_points` path as in-season weeks, for franchise week **1** (`CAMP_WEEKS = 1`). Differences vs in-season:
 
-Then apply a final **Training Camp bonus by year** (runs for every player with a recognized `year`, regardless of CH). **Positive** rolls on an attribute use the same **high-attribute rule** as drill gains: if that attribute’s value **at the start of the training session** is `> 100`, halve the positive gain (rounded). Negative rolls are not halved. After all camp bonuses, player attributes are clamped to a **minimum of 1**.
+1. **Pre-training decay is skipped** (`skip_pre_training_depreciation=True` via `is_camp_week`).
+2. **Flat point budget is 30** (`CAMP_POINT_BUDGET`) instead of 24.
+3. **Gain scale is `CAMP_GAIN_SCALE` (1.4)** instead of `IN_SEASON_GAIN_SCALE` (0.18).
+4. **Camp cuts** run once after week 1 (`week == CAMP_WEEKS`).
 
-- **Top two positions:** Sort `PG`–`C` by RT. If **two** positions tie for highest RT, those are the two. If **more than two** tie for highest, choose **two** at random. If **one** is uniquely first and **two or more** tie for second, use the first and choose **one** of the tied second-tier positions at random. (All five positions are expected to have RT values.)
-- **Attribute set:** Union of core attributes for each of those two positions (same mapping as above; SF still draws two random attrs per SF definition), then add **ND**, **IQ**, **FT**, and **CH** if not already present, then add **exactly one** random attribute from trainable player attrs not in the set, **excluding** EM, MO, NG, and RT.
-- **Rolls:** Each attribute in that final list gets its **own** `random.randint`:
-  - **senior:** `+= random.randint(-5, 10)`
-  - **junior:** `+= random.randint(-5, 10)`
-  - **sophomore:** `+= random.randint(-8, 15)`
-  - **freshman:** `+= random.randint(-10, 22)`
+There is **no** camp-only CH/core-attribute bonus, **no** year-based camp bonus roll, and **no** camp HT/WT growth. Those used to exist; they were removed when the offseason development event took ownership of career physical/level growth (see comment in `apply_training_points` — `training_camp_physique_notes` is always empty). Height and weight growth live in `develop_one_offseason` at season rollover, not at camp.
 
-Traning Camp Height / Weight bonsuses
--senior junior: none
--sophomore:
-  - height
-    - +0: 60% chance
-    - +1: 30% chance
-    - +2: 10% chance
-  - weight (note height filters are applied after the height change noted above)
-    - height > 75: += random.randint(0,10)
-    - else: += random.randint(0,5)
--freshman:
-  - height
-    - +0: 20% chance
-    - +1: 20% chance
-    - +2: 30% chance
-    - +3: 20% chance
-    - +4: 5% chance
-    - +5: 5% chance
-  - weight (note height filters are applied after the height change noted above)
-    - height > 75: += random.randint(10,30)
-    - elif height > 72: += random.randint(5,15)
-    - else: += random.randint(0,10)
-
+*(Older docs described a full Training Camp Bonus System, week-1-only camp, and FR/SO HT/WT camp rolls. That behaviour is gone; do not re-implement from this paragraph's absence — HT/WT/level live in the offseason; shape lives in camp + in-season training.)*
 
 **Team Attributes (training ranges by group):**
 - Standard install attrs (`offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`):
@@ -582,7 +563,7 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
     - Red fill to the left for negative values
     - Proportional fill based on max value
     - No value displayed on top of pill (value shown in change indicator only)
-    - **Shooting (`shot_threshold`):** Golf-score attribute (lower raw value is better). Pill centers at **100** with span **0–200** (better toward the right). See [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md). The **numeric change** next to the label uses **inverted sign** versus the raw delta: raw **−10** displays as **+10** (green); raw **+5** displays as **−5** in red.
+    - **Shooting (`shot_threshold`):** Golf-score attribute (lower raw value is better). Pill centers at **70** with span **−30–170** (better toward the right). See [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md). The **numeric change** next to the label uses **inverted sign** versus the raw delta: raw **−10** displays as **+10** (green); raw **+5** displays as **−5** in red.
   - **Progress Bar:** Team Chemistry (0-25 scale, blue fill)
     - Shows value as "X / 25" centered on bar
     - Only attribute that displays its value
@@ -620,7 +601,7 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
   - **Defense:** Original baseline is post-remap effectiveness at session start (no random pre-training decay). Delta reflects **install training** for that session; usage-share decay is applied at **EOG** (franchise).
   - **Offense (motion/set):** Original baseline is **unchanged** at session start (no random play decay in training). Delta reflects **install training only** for that session. Longer-term CMD drift from game usage is applied at **EOG** (franchise), not on the training report.
   - Minimum displayed effectiveness logic still clamps at 0 in the engine where applicable.
-  - **Training camp:** Pre-training **player** conditions are skipped when `week == 1 and not results.get("1")`; play/defense CMD is unchanged during training regardless.
+  - **Training camp:** Pre-training **player** conditions are skipped on `is_camp_week` (week 1); play/defense CMD is unchanged during training regardless.
 
 **Training Notes Section:**
 - Header: "Training Notes"
@@ -638,6 +619,30 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
 - **Play identity in notes:** notes that reference offensive plays display the play **`name`** (user-facing string); any underlying matching/ranking may use `play_id`, but note text stays display-name based. Notes are a reporting/output layer, not a persistence-identity layer. (`training_notes.py` keys `plays_data` by name.)
 - **Placeholder:** If no notes are generated, displays "No training notes for this session." in italic gray text
 - Same horizontal width as Player Report and Team Report sections
+
+**Player award selection — MVP / PPotW and the regression award** (`training_notes.py`, 2026-08 retune)
+
+Each player's **cumulative delta** = sum over the trainable attributes (all except CH/EM/MO/NG) of `anchor_now − anchor_baseline` for the session.
+
+- **Year normalization (symmetric).** Younger players swing wider *both ways* by construction — `training_execution_v2` gives a year-max **gain** bump (FR +5 … SR +1) and a deeper year **decay** (FR/SO vs JR/SR). So a raw ranking just surfaces the youngest player every week. Each delta is divided by a **`YEAR_SWING_FACTOR`** — `FR 1.5 / SO 1.25 / JR 1.1 / SR 1.0` (unknown year → 1.0) — before ranking. This replaces the old up-only 0.7/0.9 discount; the factor now applies to the **loss** award too (the fix — it was raw before), so a senior who regressed a little can outrank a freshman who regressed a lot.
+- **Gates (the only cutoffs):** the top award qualifies on **cumulative gain > 0**, the loss award on **cumulative gain < 0**. Sign is preserved by the divide, so normalization changes the *ranking*, not who qualifies.
+- **In-season:** `Practice Player Of The Week` = highest normalized gain (> 0); `Biggest Regression` = lowest normalized delta (< 0). Ties → co-winners.
+- **Training camp (week 1):** decay is skipped, so nobody truly regresses (`< 0` would be permanently empty). `Training Camp MVP` = highest normalized gain (> 0). **`Biggest Concern`** instead flags the year-normalized **laggard** — the lowest developer, but only if he landed below **`CAMP_CONCERN_MEDIAN_FRACTION` (0.5) × the squad's median normalized gain** (a player the camp's focus/position-fit didn't help). Even-development camps → "None". The threshold is **relative on purpose** so it self-scales with `CAMP_GAIN_SCALE` and needs no calibrated constant.
+- **Walk-ons need no special term:** they swing by their *year* (the model is year+allocation based, not tier based). In-season they sit on the Training Squad — excluded from this pool, with their own report — and at camp they're evaluated by year like everyone else.
+
+**Team attribute containers — Strong Cumulative Increase / Concerning Progression|Regression** (`training_notes.py`, 2026-08 retune)
+
+These list the *attributes* (not players) the team collectively developed most / least, from the per-attribute **team-sum** of `anchor_now − anchor_baseline` across all players (`_team_attr_delta_sums`). The old absolute cutoffs (`>49 / <21` camp, `≥10 / ≤−10` in-season) were calibrated to the pre-recal magnitudes and don't survive the ~8× gap between camp (`CAMP_GAIN_SCALE`) and in-season (`IN_SEASON_GAIN_SCALE`), so they're now **relative to the session's own spread** (`_team_attr_extremes`, `TEAM_ATTR_STDEV_CUT = 1.0`):
+
+- **Strong Cumulative Increase (both camp & in-season):** attributes whose team-sum is **> mean + 1 SD** of the 12 attr-sums — the standout gainers. Self-scales across regimes; an evenly-developed team (SD ≈ 0) flags nothing.
+- **Concerning — camp ("Concerning Progression"):** camp skips decay, so attributes *progress*; flag the **laggards** — team-sum **< mean − 1 SD** (the attrs the camp under-developed).
+- **Concerning — in-season ("Concerning Regression"):** decay is live, so an attribute can net **decline**; flag the ones the team **actually lost ground in — team-sum < 0**. A low-but-positive laggard is *not* a regression here.
+
+The `1 SD` cut is the only knob (≈ the top/bottom ~2 of 12 attrs). Like the player awards, this is relative on purpose — no magnitude-calibrated constant to re-derive when the training scale moves.
+
+**Hard cap of 2 attributes per container** (`TEAM_ATTR_MAX_SHOWN = 2`, `_pick_standouts`, 2026-08). The SD cut alone is a *threshold*, not a limit — a lopsided session can push five or six attributes past it, and a container listing six attributes reads as noise rather than a finding. All three containers (both Concerning variants included, since they share one UI slot) now name the **most extreme two** and stop.
+
+**Ties at the cutoff break RANDOMLY**, from `training_rng`. A fixed tie-break — alphabetical, or `ALL_ATTRS` order — would surface the same attribute every session for an evenly-developed team, which reads as a pattern that isn't there. The draw happens **only when a tie actually straddles the cutoff**, so a session with distinct team-sums leaves the training stream untouched (asserted in `test_training_notes.py`). Notes are built after all training is applied, so the draw cannot affect that session's results.
 - Dynamic height: Expands automatically with content
 - No internal scrolling: All text is always visible
 
@@ -679,18 +684,18 @@ Training report links appear next to scheduled games on the Franchise Command Ce
 ### Data Flow
 
 1. **Training Submission:**
-   - User allocates 24 training points (or 30 for first training) and selects coaching focus on `training.html`
-   - **Player Maximizer:** `GET /franchise/training-points` includes `custom_focus_roster` (attrs + `position_ratings`) and `player_maximizer_ranking_attrs` for the modal. Submit sends a **resolved** leaf (never bare `player-maximizer-choose-attributes`). Payload includes `coaching_focus_custom_by_player` when `coaching_focus` is `player-maximizer-custom`.
-   - **Franchise:** Frontend sends `POST /franchise/run-training/user` with training data, then `POST /franchise/run-training/distant-cpu` with `{ franchise_id }`, with the loading feed between them (see **Training loading feed**). **Legacy:** `POST /franchise/run-training` still performs a full run or distant-only resume.
+   - User spends the flat integer budget (24 in-season / 30 camp) across sliders and selects coaching focus on `training.html`
+   - **Player Maximizer:** `GET /franchise/training-points` includes `custom_focus_roster` (attrs, `position_ratings`, both position identity fields, and `resolved_training_position`) and `player_maximizer_ranking_attrs` for the modal. Submit sends a **resolved** leaf (never bare `player-maximizer-choose-attributes`). Payload includes `coaching_focus_custom_by_player` when `coaching_focus` is `player-maximizer-custom`.
+   - **Franchise:** Frontend sends `POST /franchise/run-training/user` with training data, then `POST /franchise/run-training/cpu-train` with `{ franchise_id }`, with the independent League News Wire overlay covering both phases. The legacy combined endpoint still reaches the same final state.
    - **Data Initialization (Auto-Population):**
      - If `plays_data` is empty or missing, backend automatically populates it from the universal `plays` collection using `populate_team_plays()`
      - If `scouting_data` is empty or missing the `defense` structure, backend automatically initializes it using `TeamManager._init_scouting_data()`
      - Initialized data is saved to the database before training execution
      - This ensures training works even if game plan or playbooks haven't been submitted yet
    - Backend executes training for user's team (pre-conditions, point allocation, clamping)
-   - Backend stores training report in FTD `training_reports.{week}` and franchise `latest_training` after user phase; distant phase updates CPU FTDs/FPDs from templates (not full `execute_training`).
-   - **Computer Team Training (Franchise Mode Only):** See **Distant Team Training** — template-based, triggered by `POST /franchise/run-training/distant-cpu` or the second half of `POST /franchise/run-training`.
-   - Distant phase returns redirect URL to the training report page (user's team only)
+   - Backend stores the user report in FTD `training_reports.{week}` and franchise `latest_training`; CPU auto-training stores per-team reports on CPU FTDs.
+   - **Computer Team Training:** Triggered by `POST /franchise/run-training/cpu-train` or the second half of the combined endpoint.
+   - The CPU phase returns the redirect URL to the user's training report.
 
 2. **Training Report Display:**
    - Frontend loads training report data from `/franchise/training-report` endpoint
@@ -720,31 +725,82 @@ For player loading, the system:
 
 ### Computer Team Training (Franchise Mode Only)
 
-In Franchise mode, when the user submits training for their team, all non-user teams are updated in the same overall training step, but they do **not** run the full `execute_training()` path. They use the separate **Distant Team Training System**.
+Eligible non-user teams run the same `execute_training()` engine. CPU allocation is **not random**: `auto_train_one_cpu_team` applies a fixed team-wide **base allocation** plus per-player `player-maximizer-custom` focus steering each player toward his own position's reference top-3, tuned so the team scores ≈1.0 against the frozen coaching reference (see **Player Development & Coaching Quality**).
 
-**Current Behavior:**
-- **Automatic Execution**: From the **franchise training page**, distant training runs as soon as the client completes the user phase (second HTTP request). A **legacy** single POST still runs both in one server handler.
-- **Template-Based**: CPU teams pull a random template from the `distant_training` collection for `tc` or `regular` training type
-- **No Full User-Team Logic**: CPU teams do not run the same pre-training **player** conditions, drill-allocation, playbook-training, or report-generation flow as the user team
-- **What Updates**:
-  - team attributes on FTD
-  - player attributes on FPD
-  - player position ratings after attribute changes
-  - optional `pending_community_engagement`
-- **What Does Not Update**:
-  - offensive play effectiveness
-  - defensive set effectiveness
-  - team `plays` data
-  - team `scouting_data`
-  - training reports for CPU teams
-- **EOS Tournament Behavior**: eliminated teams are skipped during EOS tournament weeks
-- **Post-Training Camp Cuts**: after first-training camp, CPU teams still cut down to 12 players if needed
+**Current behavior:**
+- The CPU phase starts after the user phase.
+- `cpu_autotrain_week` claims each FTD before delta writes so retries cannot double-train a team.
+- Player attributes, position ratings, and `training_gain_remainders`; team attributes, plays, scouting data, coaching-focus counters, and `training_reports.{week}` are persisted.
+- EOS-eliminated teams are skipped.
+- After camp (`week == CAMP_WEEKS`, currently week 1), CPU teams are cut to 12 players.
+- CPU auto-training does not currently persist the user-path `pending_community_engagement` next-game flag.
 
 **Franchise Roster Source Of Truth:**
 - User-team training execution and the training report page both use `FTD.players` as the franchise roster membership list
-- CPU distant training also uses `FTD.players` order when available; if absent, it falls back to the core team roster order
+- CPU auto-training uses `FTD.players` as its roster source.
 
 **Note:** Player attributes saved by training are automatically loaded during game initialization — `load_roster(team_name, franchise_id=...)` (`BackEnd/utils/roster_loader.py`) reads FPD and merges trained attributes over the universal player base. See `../01_Game_Mode_Systems/Franchise_Mode_Overview.md` ("How a game consumes franchise state").
+
+### Player Development & Coaching Quality
+
+> **Shape** (relative attribute mix) is owned by **camp + in-season training**. **Level** (ladder RT) and HT/WT are owned by the **offseason** level-only rescale (`BackEnd/utils/player_development.py`). Full derivation archived at `../projects/Z-Completed/Player_Attribute_Recalibration_Design.md` and `../10_Players_Systems/Player_Development_System.md`.
+
+**Division of labor.** Offseason rollover (before Training Camp) rescales current attributes onto an absolute RT target: `jh_anchor × ladder_value × f(coaching_quality)`, plus HT/WT. It does **not** redistribute shape. Camp and weekly training apply the gain bands below; camp uses `CAMP_GAIN_SCALE`, in-season uses `IN_SEASON_GAIN_SCALE`.
+
+**Camp / in-season model.** Gains stay report-visible but scaled. Invariant: **reference allocation holds flat; neglect costs; focus gains.**
+
+| Weekly allocation (per attribute) | Net over a season |
+|---|---|
+| 0 points (neglect) | declines — **but the penalty is PROBABILITY-GATED as of the leveling pass**, see below |
+| reference primaries (pts=3) | ≈ flat |
+| reference baseline (pts=1) | mild drag (bands are distinct; see Player Development § gain bands) |
+| focused (pts=4/5) | gains |
+
+> **⚠️ TEAM-attribute neglect decay is gated (August 2026).** Point-bucket 0 used to charge
+> `−4…−3` (fight/discipline) or `−3…−1` (chemistry) **every week**. Because the CPU reference
+> plan allocates nothing to the chemistry and discipline categories, those attributes decayed
+> **~−3.5/week indefinitely** — measured **team_chemistry −93.6/season** on an 18-point range
+> and **discipline −91.6** on a 40-point range, flooring every team. The bucket-0 range is now
+> `(−1, 0)` and fires on a fraction of weeks: `NEGLECT_DECAY_CHANCE_CHEMISTRY = 0.10`,
+> `NEGLECT_DECAY_CHANCE_DEFAULT = 0.25`. `FIGHT_GAIN_CHANCE = 0.45` gates positive fight deltas
+> for the mirror-image reason. Measured after gating: chemistry **−5.3**, discipline **−6.0**,
+> fight **+3.3**. These attributes are rolled **~4.7x per week** across their source categories,
+> so per-roll intuition is misleading. See
+> [Team_Attribute_System.md](../04_Franchise_Mode_Systems/Team_Attribute_System.md) § Neglect decay.
+
+Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shape attractor (`OFFSEASON_ATTRACTOR_ALPHA=0`). Pre-training decay by year is unchanged (see **Year-Based Pre-Training Decay** above) and never subtracts below the weight-scaled position floor.
+
+**Coaching-quality metric.** A season's allocation is scored in **points per attribute per week, not shares**:
+
+```
+contribution_a = weight_a × min(points_a / COACHING_SATURATION_CAP, 1)
+quality        = Σ contribution / Σ contribution(reference)
+```
+
+- Points (not shares): a smaller budget saturates fewer attributes and scores lower automatically — spreading thin saturates nothing; concentrating saturates what matters.
+- Normalized **affinely per position** so the frozen reference scores exactly **1.0** and a budget optimum scores **1.0 + COACHING_HEADROOM**; headroom is comparable across all five positions.
+
+**The frozen reference.** The allocation that scores 1.0 is a **frozen, named constant**: a deliberately-mediocre, top-3-weighted baseline per position (primary attrs at a higher points value, other on-position attrs at a baseline points value; the tail neglected). It is the calibration anchor — reference-coached development lands exactly on the validated ladder (`f = 1.0`). Test-asserted at all five positions.
+
+**Coaching factor `f`.** Quality maps to a bounded multiplier `f ∈ [COACHING_F_MIN, COACHING_F_MAX]` (≈ 0.85–1.20) on the offseason RT target. Reference → `f = 1.0`; neglect / off-position floors at ~0.85; broad or multi-attribute focus tops out near 1.20. Worth roughly **±1 tier step**; recruiting stays ~2× the lever.
+
+**CPU trains the reference.** `auto_train_one_cpu_team` uses a fixed team-wide base allocation plus per-player `player-maximizer-custom` focus toward each player's position reference top-3, tuned so CPU scores ≈1.0 (measured 0.98–1.01). This holds the CPU league exactly on the ladder. The base allocation and the frozen reference are **coupled** — neither can change alone; `tests/test_cpu_reference_training.py` asserts the relationship.
+
+**STATUS — dormant until pillar 3.** The per-player coaching-quality **capture is not wired up**. `_coaching_accumulator_for_player` returns `None`, so `f = 1.0` for **every** player and the coaching-quality multiplier currently does nothing in gameplay — the league holds exactly at the recalibration pass-1 ladder. Activation requires per-player allocation capture (gated at the calling endpoint, since user and CPU share `execute_training`) and ships with **pillar 3**, alongside the training-position UI and CPU season-start assignment.
+
+**Constants** (values in `../11_Design_Systems/Tunable_Constants.md`):
+
+| Constant | Role |
+|---|---|
+| `COACHING_SATURATION_CAP` | points/attr/week at which a contribution saturates (4) |
+| `COACHING_STANDARD_BUDGET` | reference weekly budget the affine per-position normalization anchors to |
+| `COACHING_HEADROOM` | how far a budget optimum scores above 1.0 |
+| `COACHING_F_MIN` / `COACHING_F_MAX` | offseason multiplier bounds (0.85 / 1.20) |
+| `IN_SEASON_GAIN_SCALE` | in-season gain scale (0.18) |
+| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` / `CAMP_POINT_BUDGET` | camp length (1 week), camp gain scale (1.4), flat camp budget (30) |
+| `IN_SEASON_POINT_BUDGET` | flat in-season budget (24) |
+| `TRAINING_GAIN_PERCENTAGES` / `CLASS_GAIN_PERCENTAGES` | direct position-fit and class-year gain percentages; neither changes budget spend |
+| `OFFSEASON_ATTRACTOR_ALPHA` | **retired (0.0)** — shape attractor removed; offseason is level-only |
 
 ### Data Storage
 
@@ -754,53 +810,110 @@ In Franchise mode, when the user submits training for their team, all non-user t
 - `plays` - User-team plays data after training
 - `scouting_data` - User-team scouting data after training
 - `pending_community_engagement` - Optional flag for next-game crowd impact
-- **`coaching_focus` (user team only, lazy from deploy forward):** object with integer counters for how many times the coach submitted training with each **archetype** in the current franchise season: `authoritarian`, `systems_coach`, `player_maximizer`, `culture_builder`. Incremented on each successful **user** training execution (same moment as FTD `training_reports` / report persistence), normally by **+1** per archetype chosen. **Training camp** (franchise week 1 before the first game): that increment is **`random.randint(2, 4)`** instead of 1 (one roll per submit). **New season** (`POST /franchise/finish-season`): each of the four counters is replaced with **`int(round(prior * 0.25))`** — i.e. a **75% reduction**, carrying over 25% as the starting totals for the new season. Not backfilled for past weeks. CPU FTDs do not use this field. Implementation: `BackEnd/utils/franchise_coaching_focus_counts.py`; rollover applied in `finish_season` when FTDs are rewritten for the new year.
+- **`coaching_focus` (user team only, lazy from deploy forward):** object with integer counters for how many times the coach submitted training with each **archetype** in the current franchise season: `authoritarian`, `systems_coach`, `player_maximizer`, `culture_builder`. Incremented on each successful **user** training execution (same moment as FTD `training_reports` / report persistence), normally by **+1** per archetype chosen. **Camp weeks** (`is_camp_week` / `training_camp_first_week`): that increment is **`random.randint(2, 4)`** instead of 1 (one roll per submit). **New season** (`POST /franchise/finish-season`): each of the four counters is replaced with **`int(round(prior * 0.25))`** — i.e. a **75% reduction**, carrying over 25% as the starting totals for the new season. Not backfilled for past weeks. CPU FTDs do not use this field. Implementation: `BackEnd/utils/franchise_coaching_focus_counts.py`; rollover applied in `finish_season` when FTDs are rewritten for the new year.
 
 **FPD / Franchise Player Data:**
 - `attributes.anchor_{attr}` and `attributes.{attr}` - Updated player attribute values
 - `position_ratings` - Recalculated position ratings after training
+- `training_position`, `position_intent` - Persisted position identity used by the canonical resolver
+- `training_gain_remainders.{attr}` - Fractional positive-gain carry stored beside, never inside, `attributes`; read and written only by franchise training and carried across season rollover through `PLAYER_DEV_CARRY_FIELDS`. It is never stored on universal/core `players`.
 - `attributes.NG` - Updated NG value when conditioning or scrimmages apply energy reduction
-- `meta.height` and `meta.weight` (integer inches / pounds) - **Training camp only** (freshman/sophomore): camp bonuses add to existing values; persisted via `$set`. If `meta` omitted height/weight (legacy or lazy FPD row), `run_franchise_training` backfills missing values from the universal `players` document before camp runs; `finalize_game` lazy FPD inserts also copy height/weight/year/jersey from `players` into `meta`.
+- `meta.height` and `meta.weight` (integer inches / pounds) — carried on the FPD; **career HT/WT growth is applied at offseason rollover** (`develop_one_offseason`), not at training camp. If `meta` omitted height/weight (legacy or lazy FPD row), `run_franchise_training` backfills missing values from the universal `players` document before training runs; `finalize_game` lazy FPD inserts also copy height/weight/year/jersey from `players` into `meta`.
 
 **Franchise Document:**
 - `latest_training` - Most recent training report (backward-compatible quick access)
-- `training_status.training_completed` - Boolean; **true** only after user + distant phases complete (split flow)
+- `training_status.training_completed` - Boolean; true only after user + CPU phases complete
 - `training_status.week` - Week number aligned with last training
 - `training_status.user_training_applied_week` - User phase done for that week (split flow)
-- `training_status.cpu_distant_complete_week` - Distant phase done for that week (split flow)
-- `training_status.cpu_training_camp_cuts_applied` - Week-1 CPU camp cuts have run (when applicable)
+- `training_status.cpu_training_complete_week` - CPU phase done for that week
+- `training_status.cpu_training_camp_cuts_applied` - Final-camp-week CPU cuts have run (when applicable)
 
 **FCC API (`GET /franchise/command-center/data`):**
 - `last_training_report_week` - Integer week for the current **latest** user training report (`latest_training.week`), used to render the Inbox message and link; omitted or null when no report exists yet
 
 **Computer Team Updates (Franchise Mode Only):**
-- CPU distant training updates FTD team attributes and FPD player attributes / position ratings
-- CPU distant training does **not** store training reports and does **not** update team `plays` or `scouting_data`
+- CPU auto-training updates FPD player attributes, position ratings, and gain remainders plus FTD team attributes, plays, scouting data, coaching-focus counters, and training reports.
 
 ### Key Files
 
 **Frontend:**
 - `FrontEnd/static/training.html` - Training allocation page
 - `FrontEnd/static/training.css` - Training page styling
-- `FrontEnd/static/training.js` - Training logic; franchise submit uses user + distant endpoints and highlight stream
-- `FrontEnd/static/js/shared/pageLoadOverlay.js` - Loader; `updatePulseSubtitle` for feed ticks
+- `FrontEnd/static/training.js` - Training logic; franchise submit uses user + CPU endpoints and prefetches the newswire
+- `FrontEnd/static/js/shared/pageLoadOverlay.js` - Shared loader and `newswire` variant host
+- `FrontEnd/static/js/shared/trainingNewswire.js` / `FrontEnd/static/css/training-newswire.css` - League-news rendering, motion, asset fallback, and rotation
 - `FrontEnd/static/training-report.html` - Training report display page
 - `FrontEnd/static/training-report.css` - Report page styling
 - `FrontEnd/static/training-report.js` - Report data loading and rendering
 - `FrontEnd/static/franchise-command-center.js` - Schedule rendering with training report links
 
 **Backend:**
-- `BackEnd/models/training_execution_v2.py` - Core training execution logic
+- `BackEnd/models/training_execution_v2.py` - Core training execution logic (gains, remainder, floor clamp)
+- `BackEnd/constants/training_shape.py` - Camp weeks/flat budgets/gain scale, position-fit divisors, class gain taper, P6 floors, `training_points_spent`
 - `BackEnd/models/training_notes.py` - Structured training-notes generation for report sections
-- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/distant-cpu`, distant helper + idempotency); also `GET /franchise/training-report`, `GET /franchise/schedule`. Training report **recruiting strip**: `_training_report_recruiting_display` (+ `_recruit_display_name_for_training_report`, `_recruit_rt`) and persistence on `training_reports.{week}`.
-- `BackEnd/utils/training_loading_highlights.py` - `training_highlights` for loading feed
+- `BackEnd/api/franchise_routes.py` - Training API endpoints (`run-training`, `run-training/user`, `run-training/cpu-train`) and CPU auto-training/idempotency; also `GET /franchise/training-report`, `GET /franchise/schedule`, and `GET /franchise/league-news`.
+- `BackEnd/utils/franchise_league_news.py` - Consolidated, pre-ranked training newswire payload
 - `BackEnd/utils/franchise_training_state.py` - Split-phase completion helpers for FCC and cuts
 - `BackEnd/utils/franchise_coaching_focus_counts.py` - FTD `coaching_focus` archetype counters (user team)
+- `BackEnd/utils/player_development.py` - Offseason level-only RT rescale + HT/WT (not weekly training)
 
 ### Current Play / Report Identity Notes
 
 - Training report play deltas use `play_id` as the canonical key when available
 - `training_report["plays_effectiveness_changes"]` is keyed by `play_id` for offense and by **canonical defense row keys** (`man`, `2-3-zone`, … — same as `scouting_data["defense"]` after `execute_training`) for defensive sets; the report UI may still show human-readable names via defense display helpers
 - The Training Report frontend resolves offensive deltas by `play_id` first, while still displaying the play `name`
-- **Training loading feed** (`build_training_loading_highlights`) does **not** surface play/defense effectiveness deltas; it uses archetyped copy from `training_feed_lines.py` (see `Training_System_Live_Feed.md`).
+- The training load newswire is league context only; play/defense effectiveness deltas remain in the Training Report.
 - Offensive `playbook_settings` are now expected to be `play_id`-keyed, though runtime compatibility still tolerates older name-keyed maps
+
+---
+
+## Randomness: training draws from its OWN stream (August 2026)
+
+Training draws from **`training_rng`** (`BackEnd/utils/training_random.py`), not the global
+`random` module and **not** `sim_rng`.
+
+**Why it was changed.** Training shared the global stream with `pymongo`, and `bulk_write`
+consumes that stream even when it matches zero documents. So unrelated database activity
+shifted training results. Measured on a 12-man roster over 4 weeks under an identical seed:
+adding a **single no-op `bulk_write`** before training changed the attributes of **all 12
+players** (RB 17→14, SH 69→71, and so on). Training is deterministic in isolation but the
+franchise path does a variable amount of DB work, so **a seeded training run could not be
+replayed.**
+
+**Why a separate stream and not `sim_rng`.** Training runs concurrently with simulation — a
+franchise week sims games and trains teams. Sharing `sim_rng` would reintroduce exactly the
+cross-subsystem coupling both modules exist to remove: the number of games simmed would shift
+training outcomes.
+
+| module | binding |
+|---|---|
+| `models/training_execution_v2.py` | `from BackEnd.utils.training_random import training_rng as random` |
+| `models/training_notes.py` | same |
+| `models/training_manager.py` | same |
+
+**Deliberately NOT converted:** `populate_team_plays` / `populate_scouting_data` in
+`api/gameplan_routes.py` (function-local `import random`, lines 572 and 879). They seed play
+effectiveness/momentum/cloaking at franchise and game **creation**; `run_franchise_training`
+contains no call to either. They belong to whatever stream game setup eventually owns.
+
+**Verification (the check that matters).** Two runs, identical seed, the only difference being
+one no-op `pymongo` write:
+
+| | before | after |
+|---|---|---|
+| BackEnd draws on the GLOBAL stream | 640 | **0** |
+| draws on `training_rng` | 0 | **640** |
+| identical player attributes | **False** (12 of 12 differed) | **True** |
+| identical team attributes | True | True |
+
+**Draw count is unchanged — 640 → 640, site for site**, which is the point: the conversion is a
+pure rebinding, not a behaviour change.
+
+| draws | site |
+|---|---|
+| 624 | `training_execution_v2:apply_pre_training_conditions` |
+| 12 | `training_execution_v2:_apply_team_training_points` |
+| 4 | `training_notes:_locker_room_note` |
+
+Re-check with `BackEnd.utils.sim_random.install_global_draw_guard()` +
+`global_draw_report()`; the tally must stay empty on the training path.

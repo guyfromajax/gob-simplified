@@ -9,10 +9,13 @@ This module implements the new training execution system with:
 """
 
 import math
-import random
+# Training draws from a DEDICATED stream, not the global module: pymongo consumes
+# the global stream (bulk_write does, even matching zero documents), which made
+# training results depend on unrelated DB activity. See BackEnd/utils/training_random.
+from BackEnd.utils.training_random import training_rng as random
 import logging
 from typing import List, Dict, Tuple, Optional, Any
-from BackEnd.constants import ALL_ATTRS
+from BackEnd.constants import ALL_ATTRS, LEAGUE_MEDIAN_HEIGHT_IN
 from BackEnd.constants.momentum import MO_MIN, MO_MAX
 from BackEnd.utils.playbook_settings_utils import resolve_playbook_percentage
 from BackEnd.utils.defense_identity import (
@@ -59,6 +62,7 @@ def execute_training(
     skip_pre_training_depreciation: bool = False,
     coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
     training_playbook_focus: Optional[Dict[str, List[str]]] = None,
+    gain_scale: Optional[float] = None,
 ) -> Tuple[List[dict], dict, Dict, Dict, Dict]:
     """
     Main training execution function.
@@ -75,10 +79,14 @@ def execute_training(
         team: Team dict with team attributes
         allocations: Training point allocations (frontend format)
         coaching_focus: Optional coaching focus selection
+        gain_scale: Multiplier on positive weekly gains. Defaults to
+            ``IN_SEASON_GAIN_SCALE``; camp passes ``CAMP_GAIN_SCALE``.
     
     Returns:
         Tuple of (updated_players, updated_team, training_report_data)
     """
+    if gain_scale is None:
+        gain_scale = IN_SEASON_GAIN_SCALE
     # Store original baselines BEFORE any changes
     original_player_baselines = {
         p["_id"]: {attr: p.get("attributes", {}).get(f"anchor_{attr}", 0) 
@@ -119,11 +127,11 @@ def execute_training(
     # Defense effectiveness share-decay runs at EOG (see build_eog_defensive_effectiveness_decay_ftd_updates); offense CMD at EOG separately.
 
     # Step 1: Apply pre-training conditions
-    # Skip for first training (training camp) in franchise mode
+    # Skip for training camp weeks (framework §10.3)
     if not skip_pre_training_depreciation:
         players, team = apply_pre_training_conditions(players, team)
     else:
-        logger.warning("⏭️ [TRAINING] Skipping pre-training conditions (first training/training camp)")
+        logger.warning("⏭️ [TRAINING] Skipping pre-training conditions (training camp)")
     
     # Step 2: Apply training points (pass original baselines for report calculation)
     players, team, training_report = apply_training_points(
@@ -132,6 +140,7 @@ def execute_training(
         original_baselines=original_player_baselines,
         original_team_baseline=original_team_baseline,
         coaching_focus_custom_by_player=coaching_focus_custom_by_player,
+        gain_scale=gain_scale,
     )
     
     # Step 3: Apply play/defense training
@@ -259,7 +268,7 @@ def normalize_coaching_focus_custom_by_player(
         raise ValueError("No players on roster for custom focus validation.")
 
     out: Dict[str, List[str]] = {}
-    for pid in roster_ids:
+    for pid in sorted(roster_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
         entry = raw.get(pid)
         if entry is None:
             entry = raw.get(str(pid))
@@ -289,19 +298,25 @@ def normalize_coaching_focus_custom_by_player(
 
 
 from BackEnd.constants import TEAM_ATTR_RANGES
+# Core-8 widened to ±20 (EOG Structural Pass, Task 1): the ±10 scale was too narrow
+# for the step sizes and railed every team. momentum_score stays (-10, 10) — it is
+# NOT one of the widened 8, and its own path enforces DISTANT_MOMENTUM_SCORE_MIN/MAX
+# (distant_sim.py), which agree with (-10, 10). team_chemistry (7-25) and
+# shot_threshold (0-200) scales are unchanged; rebound_modifier now 0.0-1.0 via
+# TEAM_ATTR_RANGES (Task 2).
 TEAM_ATTR_CLAMPS = {
     "shot_threshold": TEAM_ATTR_RANGES["shot_threshold"],
-    "discipline": (-10, 10),
-    "fight": (-10, 10),
+    "discipline": (-20, 20),
+    "fight": (-20, 20),
     "rebound_modifier": TEAM_ATTR_RANGES["rebound_modifier"],
     "momentum_score": (-10, 10),
-    "offensive_efficiency": (-10, 10),
+    "offensive_efficiency": (-20, 20),
     "team_chemistry": (7, 25),
-    "defensive_efficiency": (-10, 10),
-    "fb_efficiency": (-10, 10),
-    "pt_efficiency": (-10, 10),
-    "fb_opp_modifier": (-10, 10),
-    "pt_opp_modifier": (-10, 10),
+    "defensive_efficiency": (-20, 20),
+    "fb_efficiency": (-20, 20),
+    "pt_efficiency": (-20, 20),
+    "fb_opp_modifier": (-20, 20),
+    "pt_opp_modifier": (-20, 20),
 }
 
 # Player attribute clamps (lower, upper)
@@ -390,18 +405,86 @@ def _scale_install_training_effectiveness_points(
 
 
 # Year-based pre-training decay (min, max) for random decrease per attribute. See Training_System.md.
+# Weekly pre-training decay, reduced substantially (design §7.2). The offseason
+# development event now owns career growth, so in-season must "stop being where
+# careers are made" — decay shrinks to a light drag so weekly numbers stay
+# visible and net slightly positive against the training-point gains rather than
+# fighting a heavy treadmill. Was freshman (-5,-2) … senior (-2,0).
+# NOTE: the precise ~30% in-season share (OFFSEASON_SPLIT) can only be confirmed
+# in a live 26-week season, not offline — this is the directional reduction; the
+# net-share balance against per-point gains is a live-tuning follow-up.
+# Scales weekly positive training gains so a full season nets ~FLAT in aggregate
+# RT (design §7.2, Option 3): career growth is owned by the offseason event; the
+# offseason target is ABSOLUTE (jh_anchor × ladder × f), so in-season gains only
+# help REACH it — they must not OUTRUN it, or a well-coached player strands himself
+# above the ladder mid-season and the offseason event has no budget left (claw-back
+# hitting exactly the users who coached best). This scale is fitted so a full season
+# of REFERENCE / normal coaching (positional-focus, development allocation) lands at
+# ~+4-5 RT/season — well inside the coaching-f band headroom (~+12 at Average) and
+# below even the smallest per-rung ladder increment (~+6), so the offseason always
+# has room to top up to target and the ladder holds. (Measured 2026-07-30 on the
+# regenerated pool: scale 0.18 → reference +4.76 RT/season.) NOTE: the net is
+# ALLOCATION-DEPENDENT, not universally flat — thin/random CPU allocation nets
+# NEGATIVE (~-10 RT/season here), restored by the absolute-target offseason event;
+# pillar 3 must move CPU auto-train onto the reference so CPU lands ~+4 too (see the
+# CPU-must-train-the-reference hard requirement by reference_allocation).
+# §7.2's visibility claim is about ATTRIBUTES, not RT: even at reference (RT ~flat
+# net of the ladder), per-attribute movement is visible (~0.5/week |Δ|) because the
+# allocation reallocates toward the high-weight core attrs (RT is their weighted
+# mean, so reallocation moves the player page while barely moving RT).
+IN_SEASON_GAIN_SCALE = 0.18
+
+# Per-point raw gain bands for player attributes (before year-max adjustment).
+# Points 1–5 MUST be distinct: a prior retune unified 1–3 at (2,4) so reference
+# held flat, but that erased slider resolution across the bottom half — mild and
+# moderate strategies became indistinguishable after scale+round (framework §10.6).
+# E[raw|5] stays 4.5 ((3,6)) so max-commitment season level does not silently
+# retune while shape resolution is restored.
+PLAYER_ATTR_GAIN_RANGE_BY_POINTS = {
+    0: (-2, -1),  # E = -1.5  neglect
+    1: (1, 3),    # E =  2.0
+    2: (2, 3),    # E =  2.5
+    3: (2, 4),    # E =  3.0
+    4: (3, 5),    # E =  4.0
+    5: (3, 6),    # E =  4.5  held
+}
+
+
+def _player_attr_gain_range(points: int) -> Tuple[int, int]:
+    """Return (min, max) raw gain band for an allocation of ``points`` (0–5)."""
+    bucket = max(0, min(5, int(points)))
+    return PLAYER_ATTR_GAIN_RANGE_BY_POINTS[bucket]
+
+
+def _apply_scaled_gain_with_remainder(
+    player: dict, attr: str, raw_positive: int, gain_scale: float
+) -> int:
+    """Scale a positive raw gain and bank the fractional part per attribute.
+
+    ``int(round(raw × scale))`` zeroed ~19% of 1–3-pt rolls (seniors ~25%).
+    Carrying the sub-integer remainder across weeks lets consistent small
+    investment accumulate into whole points instead of being discarded weekly.
+    """
+    bag = player.setdefault("training_gain_remainders", {})
+    prev = float(bag.get(attr, 0.0) or 0.0)
+    total = (raw_positive * float(gain_scale)) + prev
+    whole = int(total)  # truncate toward 0; positive ⇒ floor
+    bag[attr] = total - whole
+    return whole
+
+
 PRE_TRAINING_DECAY_BY_YEAR = {
-    "freshman": (-5, -2),
-    "sophomore": (-4, -1),
-    "junior": (-3, -1),
-    "senior": (-2, 0),
+    "freshman": (-2, 0),
+    "sophomore": (-2, 0),
+    "junior": (-1, 0),
+    "senior": (-1, 0),
 }
 
 
 def _pre_training_decay_range_for_year(year: str) -> Tuple[int, int]:
     """Return (min, max) for pre-training decay based on player year. Default: junior."""
     key = (year or "").strip().lower()
-    return PRE_TRAINING_DECAY_BY_YEAR.get(key, (-3, -1))
+    return PRE_TRAINING_DECAY_BY_YEAR.get(key, (-1, 0))
 
 
 def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List[dict], dict]:
@@ -414,6 +497,7 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     Pre-training conditions:
     - Player attributes (excluding EM, MO, NG): += randint(min, max) per player/attribute,
       where (min, max) is year-based: Freshman (-5,-1), Sophomore (-4,-1), Junior (-3,0), Senior (-2,0).
+    - Decay never subtracts below the weight-scaled position floor (framework §10.2).
     
     Args:
         players: List of player dicts with attributes
@@ -422,6 +506,8 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     Returns:
         Tuple of (updated_players, unchanged_team)
     """
+    from BackEnd.constants.training_shape import apply_floor_clamp_to_anchors
+
     for player in players:
         attrs = player.get("attributes", {})
         year = player.get("year", "")
@@ -432,6 +518,8 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
                 decrease = random.randint(decay_min, decay_max)
                 attrs[anchor_key] = max(PLAYER_ATTR_CLAMP[0], attrs[anchor_key] + decrease)
                 attrs[attr] = attrs[anchor_key]
+        # Floor bounds decay only — raise any core-12 that fell below need.
+        apply_floor_clamp_to_anchors(player)
     
     return players, team
 
@@ -445,6 +533,7 @@ def apply_training_points(
     original_baselines: Optional[Dict] = None,
     original_team_baseline: Optional[Dict] = None,
     coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
+    gain_scale: Optional[float] = None,
 ) -> Tuple[List[dict], dict, Dict]:
     """
     Apply training points to players and team based on allocations.
@@ -456,10 +545,13 @@ def apply_training_points(
         coaching_focus: Optional coaching focus; radio `value` from training UI (see parse_coaching_focus)
         original_baselines: Optional dict of original player baselines (before pre-training conditions)
         original_team_baseline: Optional dict of original team baseline (before pre-training conditions)
+        gain_scale: Positive-gain multiplier (in-season or camp).
     
     Returns:
         Tuple of (updated_players, updated_team, training_report_data)
     """
+    if gain_scale is None:
+        gain_scale = IN_SEASON_GAIN_SCALE
     # Use provided baselines or calculate from current state
     if original_baselines is None:
         player_baselines = {
@@ -580,6 +672,7 @@ def apply_training_points(
                                 multiplier,
                                 player_baselines.get(player["_id"], {}).get(attr),
                                 coaching_focus_custom_by_player=coaching_focus_custom_by_player,
+                                gain_scale=gain_scale,
                             )
                 
                 # Track team attribute contributions from multipliers
@@ -605,6 +698,7 @@ def apply_training_points(
                             multiplier,
                             player_baselines.get(player["_id"], {}).get(attr),
                             coaching_focus_custom_by_player=coaching_focus_custom_by_player,
+                            gain_scale=gain_scale,
                         )
             
             # Track team attribute contributions from multipliers (single-value categories)
@@ -769,11 +863,13 @@ def apply_training_points(
     else:
         logger.warning(f"🔋 [TRAINING] No conditioning in normalized_allocations: {list(normalized_allocations.keys())}")
 
-    # Training Camp bonus (first training only): CH/highest-RT cores, then year-based bonus.
+    # Training Camp growth (CH/highest-RT core bonus, year bonus, FR/SO HT/WT) is
+    # GONE — the offseason development event (§7.1) now owns all three, and running
+    # them here too would develop every player twice. Camp keeps only its 30-point
+    # allocation and its pre-training decay skip. The deleted year bonus was signed
+    # (a bad camp could cost points) and every camp delta was halved above baseline
+    # 100; both die with it.
     camp_physique_notes: List[str] = []
-    if is_training_camp:
-        _apply_training_camp_bonus(players, player_baselines)
-        camp_physique_notes = _apply_training_camp_height_weight_bonuses(players)
 
     # Clamp all values
     for player in players:
@@ -858,63 +954,39 @@ def _apply_player_training_points(
     multiplier: float = 1.0,
     starting_baseline: Optional[int] = None,
     coaching_focus_custom_by_player: Optional[Dict[str, List[str]]] = None,
+    gain_scale: Optional[float] = None,
 ):
     """
     Apply training points to a single player attribute.
-    
-    Base ranges (Player Attributes). See Training_System.md.
-    - 0 points: += random.randint(-2, -1)
-    - 1 point: += random.randint(0, 1)
-    - 2 points: += random.randint(2, 3)
-    - 3 points: += random.randint(2, 4)
-    - 4 points: += random.randint(3, 5)
-    - 5 points: += random.randint(3, 6)
-    
-    Year-based adjustments: leave minimums as is, only change maximums.
-    - Freshman: +5 to max
-    - Sophomore: +3 to max
-    - Junior: +2 to max
-    - Senior: +1 to max
-    
-    Focus amplifier: Applied based on sub_option selection
-    Multiplier: For attributes like CH that get 0.5 multiplier
+
+    Base ranges: ``PLAYER_ATTR_GAIN_RANGE_BY_POINTS`` (distinct across 1–5;
+    E[raw|5] held at 4.5). Year-max adjustments: Freshman +5 … Senior +1.
+    Positive gains scale by session, position fit, and class year before entering
+    the per-attribute fractional remainder (``training_gain_remainders``).
     """
+    if gain_scale is None:
+        gain_scale = IN_SEASON_GAIN_SCALE
     attrs = player.get("attributes", {})
     anchor_key = f"anchor_{attr}"
-    
+
     # Get player year: only adjust max. Freshman +5, Sophomore +3, Junior +2, Senior +1.
     year = player.get("year", "").lower() if player.get("year") else ""
     max_adjustment = {"freshman": 5, "sophomore": 3, "junior": 2, "senior": 1}.get(year, 2)
-    
-    # Base range (min, max) by points. Doc: 0→(-2,-1), 1→(0,1), 2→(2,3), 3→(2,4), 4→(3,5), 5→(3,6)
-    if points == 0:
-        base_min, base_max = -2, -1
-    elif points == 1:
-        base_min, base_max = 0, 1
-    elif points == 2:
-        base_min, base_max = 2, 3
-    elif points == 3:
-        base_min, base_max = 2, 4
-    elif points == 4:
-        base_min, base_max = 3, 5
-    elif points == 5:
-        base_min, base_max = 3, 6
-    else:
-        base_min, base_max = 3, 6
-    
+
+    base_min, base_max = _player_attr_gain_range(points)
     adjusted_max = base_max + max_adjustment
     increase = random.randint(base_min, adjusted_max)
-    
+
     # Apply multiplier (for CH in conditioning/film_study)
     increase = int(increase * multiplier)
 
     # If the player started training above 100 in this attribute, positive gains are halved.
     if (starting_baseline or 0) > 100 and increase > 0:
         increase = int(math.floor((increase * 0.5) + 0.5))
-    
+
     # Check if this attribute should be amplified based on focus
     should_amplify = False
-    
+
     # Handle Player Maximizer special cases (top 3 / next 3 / positional / custom)
     if sub_option in ["player-maximizer-top-3", "player-maximizer-attributes-4-6"]:
         # Rank by anchor for PLAYER_MAXIMIZER_RANKING_ATTRS (CH excluded; EM/MO/NG not in list)
@@ -923,7 +995,7 @@ def _apply_player_training_points(
             player_attrs.items(),
             key=lambda x: (-(x[1] if isinstance(x[1], (int, float)) else 0), x[0]),
         )
-        
+
         if sub_option == "player-maximizer-top-3":
             # Top 3 attributes
             top_attrs = [a[0] for a in sorted_attrs[:3]]
@@ -942,281 +1014,23 @@ def _apply_player_training_points(
     else:
         # Standard amplification check
         should_amplify = _should_amplify_player_attr(attr, archetype, sub_option)
-    
+
     # Apply focus amplifier if applicable
     if should_amplify:
         focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
         increase = int(increase * focus_multiplier)
-    
+
+    # Scale positive gains (in-season ~0.18; camp ~1.4) with fractional remainder.
+    # Only positive gains scale — the 0-point (-2,-1) drag is unchanged. §10.3 / §10.6.
+    if increase > 0:
+        from BackEnd.constants.training_shape import player_attr_gain_multiplier
+        effective_scale = gain_scale * player_attr_gain_multiplier(player, attr)
+        increase = _apply_scaled_gain_with_remainder(player, attr, increase, effective_scale)
+
     # Apply increase
     current_val = attrs.get(anchor_key, 0)
     attrs[anchor_key] = current_val + increase
     attrs[attr] = attrs[anchor_key]  # Update base attribute too
-
-
-def _training_camp_bonus_range_for_ch(ch_value: int) -> Optional[Tuple[int, int]]:
-    """Return training-camp bonus range based on CH value (Training_System.md)."""
-    if ch_value > 80:
-        return (4, 10)
-    if ch_value > 60:
-        return (3, 8)
-    if ch_value > 40:
-        return (2, 6)
-    if ch_value > 20:
-        return (1, 4)
-    return None
-
-
-def _training_camp_core_attrs_for_position(position: str) -> List[str]:
-    """Return core attributes for a highest-RT position in training camp."""
-    pos = (position or "").upper()
-    if pos == "PG":
-        return ["PS", "BH", "IQ"]
-    if pos == "SG":
-        return ["SH", "FT", "OD"]
-    if pos == "SF":
-        sf_random = random.sample(["SC", "SH", "ID", "OD"], 2)
-        return ["AG"] + sf_random
-    if pos == "PF":
-        return ["RB", "ST", "ID"]
-    if pos == "C":
-        return ["SC", "ST", "ID"]
-    return []
-
-
-def _top_two_rt_positions(player: dict) -> List[str]:
-    """
-    Top two positions by RT for training-camp year bonus.
-    Two tied for first -> those two. More than two tied for first -> pick two at random.
-    Unique first, multiple tied for second -> first + random among second tier.
-    """
-    ratings = player.get("position_ratings") or {}
-    valid_positions = ["PG", "SG", "SF", "PF", "C"]
-    items: List[Tuple[str, int]] = []
-    for pos in valid_positions:
-        raw = ratings.get(pos)
-        if isinstance(raw, (int, float)):
-            r = int(raw)
-        else:
-            try:
-                r = int(raw or 0)
-            except (TypeError, ValueError):
-                r = 0
-        items.append((pos, r))
-    distinct_rts = sorted({r for _, r in items}, reverse=True)
-    max_rt = distinct_rts[0]
-    first_group = [pos for pos, r in items if r == max_rt]
-    if len(first_group) >= 2:
-        if len(first_group) == 2:
-            return first_group
-        return random.sample(first_group, 2)
-    first_pos = first_group[0]
-    second_rt = distinct_rts[1]
-    second_group = [pos for pos, r in items if r == second_rt]
-    return [first_pos, random.choice(second_group)]
-
-
-def _training_camp_core_attrs_union_for_positions(positions: List[str]) -> List[str]:
-    ordered: List[str] = []
-    seen: set[str] = set()
-    for pos in positions:
-        for attr in _training_camp_core_attrs_for_position(pos):
-            if attr not in seen:
-                seen.add(attr)
-                ordered.append(attr)
-    return ordered
-
-
-TRAINING_CAMP_YEAR_BONUS_RANGES = {
-    "senior": (-5, 10),
-    "junior": (-5, 10),
-    "sophomore": (-8, 15),
-    "freshman": (-10, 22),
-}
-
-
-def _apply_training_camp_attribute_delta(
-    player: dict,
-    attr: str,
-    delta: int,
-    player_baselines: Dict[Any, Dict[str, int]],
-) -> None:
-    """Apply a single camp delta; positive gains halved if session-start baseline > 100."""
-    pid = player.get("_id")
-    start = 0
-    if pid is not None and player_baselines:
-        start = int((player_baselines.get(pid) or {}).get(attr, 0) or 0)
-    if delta > 0 and start > 100:
-        delta = int(math.floor((delta * 0.5) + 0.5))
-
-    attrs = player.get("attributes", {})
-    anchor_key = f"anchor_{attr}"
-    if anchor_key not in attrs and attr not in attrs:
-        return
-    current = int(attrs.get(anchor_key, attrs.get(attr, 0)) or 0)
-    attrs[anchor_key] = current + delta
-    attrs[attr] = attrs[anchor_key]
-
-
-def _apply_training_camp_year_bonus(
-    players: List[dict],
-    player_baselines: Dict[Any, Dict[str, int]],
-) -> None:
-    """Second training-camp block: top-two-position cores + ND/IQ/FT/CH + one random (all players)."""
-    extra_pool_exclude = {"EM", "MO", "NG", "RT"}
-
-    for player in players:
-        year = (player.get("year") or "").strip().lower()
-        roll_range = TRAINING_CAMP_YEAR_BONUS_RANGES.get(year)
-        if not roll_range:
-            continue
-
-        two_pos = _top_two_rt_positions(player)
-        if len(two_pos) < 2:
-            continue
-
-        attr_list = _training_camp_core_attrs_union_for_positions(two_pos)
-        seen = set(attr_list)
-        for a in ("ND", "IQ", "FT", "CH"):
-            if a not in seen:
-                seen.add(a)
-                attr_list.append(a)
-
-        pool = [
-            a
-            for a in TRAINABLE_PLAYER_ATTRS
-            if a not in seen and a not in extra_pool_exclude
-        ]
-        if pool:
-            extra = random.choice(pool)
-            attr_list.append(extra)
-
-        lo, hi = roll_range
-        for attr in attr_list:
-            delta = random.randint(lo, hi)
-            _apply_training_camp_attribute_delta(player, attr, delta, player_baselines)
-
-
-def _highest_rt_position(player: dict) -> Optional[str]:
-    """Pick one highest-RT position (random tie-break) from player.position_ratings."""
-    ratings = player.get("position_ratings") or {}
-    if not isinstance(ratings, dict):
-        return None
-    valid_positions = ["PG", "SG", "SF", "PF", "C"]
-    scored_positions = [(pos, ratings.get(pos)) for pos in valid_positions if isinstance(ratings.get(pos), (int, float))]
-    if not scored_positions:
-        return None
-    max_rt = max(score for _, score in scored_positions)
-    tied = [pos for pos, score in scored_positions if score == max_rt]
-    return random.choice(tied) if tied else None
-
-
-_TRAINING_CAMP_PHYSIQUE_CLOSINGS = (
-    "this offseason.",
-    "during the offseason.",
-    "over the summer.",
-    "since last season.",
-    "since last year.",
-)
-
-
-def _training_camp_inch_phrase(n: int) -> str:
-    if n == 1:
-        return "one inch"
-    return f"{n} inches"
-
-
-def _training_camp_pound_phrase(n: int) -> str:
-    if n == 1:
-        return "one pound"
-    return f"{n} pounds"
-
-
-def _roll_training_camp_height_delta(year: str) -> int:
-    if year == "sophomore":
-        return random.choices([0, 1, 2], weights=[60, 30, 10], k=1)[0]
-    if year == "freshman":
-        return random.choices([0, 1, 2, 3, 4, 5], weights=[20, 20, 30, 20, 5, 5], k=1)[0]
-    return 0
-
-
-def _roll_training_camp_weight_delta(year: str, height_after: int) -> int:
-    if year == "sophomore":
-        if height_after > 75:
-            return random.randint(0, 10)
-        return random.randint(0, 5)
-    if year == "freshman":
-        if height_after > 75:
-            return random.randint(10, 30)
-        if height_after > 72:
-            return random.randint(5, 15)
-        return random.randint(0, 10)
-    return 0
-
-
-def _training_camp_physique_line(name: str, dh: int, dw: int) -> str:
-    closing = random.choice(_TRAINING_CAMP_PHYSIQUE_CLOSINGS)
-    if dh and dw:
-        return (
-            f"{name} grew {_training_camp_inch_phrase(dh)} and "
-            f"gained {_training_camp_pound_phrase(dw)} {closing}"
-        )
-    if dh:
-        return f"{name} grew {_training_camp_inch_phrase(dh)} {closing}"
-    return f"{name} gained {_training_camp_pound_phrase(dw)} {closing}"
-
-
-def _apply_training_camp_height_weight_bonuses(players: List[dict]) -> List[str]:
-    """Training camp only: sophomore/freshman height then weight; one report line per player with any gain."""
-    lines: List[str] = []
-    for player in players:
-        meta = player.get("meta")
-        if not isinstance(meta, dict):
-            continue
-        yr_raw = meta.get("year") if meta.get("year") is not None else player.get("year")
-        year = str(yr_raw or "").strip().lower()
-        if year not in ("freshman", "sophomore"):
-            continue
-        try:
-            h0 = int(meta["height"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        try:
-            w0 = int(meta["weight"])
-        except (KeyError, TypeError, ValueError):
-            continue
-        dh = _roll_training_camp_height_delta(year)
-        new_h = h0 + dh
-        dw = _roll_training_camp_weight_delta(year, new_h)
-        if dh == 0 and dw == 0:
-            continue
-        meta["height"] = new_h
-        meta["weight"] = w0 + dw
-        name = f"{player.get('first_name', '')} {player.get('last_name', '')}".strip() or str(
-            player.get("_id", "")
-        )
-        lines.append(_training_camp_physique_line(name, dh, dw))
-    return lines
-
-
-def _apply_training_camp_bonus(
-    players: List[dict],
-    player_baselines: Dict[Any, Dict[str, int]],
-) -> None:
-    """Training camp: (1) CH / highest-RT core bonus, (2) year-based bonus on expanded attr set."""
-    for player in players:
-        attrs = player.get("attributes", {})
-        ch_value = int(attrs.get("anchor_CH", attrs.get("CH", 0)) or 0)
-        bonus_range = _training_camp_bonus_range_for_ch(ch_value)
-        if bonus_range:
-            highest_pos = _highest_rt_position(player)
-            if highest_pos:
-                core_attrs = _training_camp_core_attrs_for_position(highest_pos)
-                for attr in core_attrs:
-                    delta = random.randint(bonus_range[0], bonus_range[1])
-                    _apply_training_camp_attribute_delta(player, attr, delta, player_baselines)
-
-    _apply_training_camp_year_bonus(players, player_baselines)
 
 
 def _normalize_allocations(allocations: Dict) -> Dict:
@@ -1312,6 +1126,26 @@ def _normalize_allocations(allocations: Dict) -> Dict:
     
     return normalized
 
+# Neglect-decay gating — see _apply_team_training_points. Expected season cost is
+# 26 weeks x chance x mean(bucket-0 range), where the range is now (-1, 0), mean -0.5:
+# Calibrated against the MEASURED call frequency of the CPU reference plan, which
+# rolls chemistry ~4.7x and discipline ~4.7x per week across their several source
+# categories — the per-roll value alone is misleading.
+#   chemistry 0.10 -> about -3/season on the 7-25 range   (was -93.6)
+#   default   0.25 -> about -7/season on the +-20 range   (was -91.6 for discipline)
+NEGLECT_DECAY_CHANCE_CHEMISTRY = 0.10
+NEGLECT_DECAY_CHANCE_DEFAULT = 0.25
+
+# Fight has the mirror-image version of the same frequency problem. It is rolled
+# ~4.7x per week (strength + conditioning, buckets 1 and 2 — it essentially never
+# hits bucket 0), so per-roll GAINS multiply the same way neglect penalties did:
+# measured +44.4/season on a +-20 range, which rails in about 12 weeks. EOG cannot
+# offset it — fight's EOG is structurally zero, one winner per game — so combined
+# drift IS training and the fix has to be here. Gating positive fight deltas lands
+# the season total with the other nine attributes.
+FIGHT_GAIN_CHANCE = 0.45
+
+
 def _apply_team_training_points(team: dict, team_attr: str, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):
     """
     Apply training points to a team attribute.
@@ -1330,8 +1164,10 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
         5: (2, 5),
     }
     # Shared by Strength+Conditioning → fight and defense/passing/BH → discipline.
+    # Bucket 0 (= the category received NO allocation) is the NEGLECT DECAY; see
+    # NEGLECT_DECAY_* below for why it is now gated rather than applied every week.
     fight_discipline_training_ranges = {
-        0: (-4, -3),
+        0: (-1, 0),
         1: (-1, 1),
         2: (0, 2),
         3: (1, 3),
@@ -1339,8 +1175,8 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
         5: (3, 5),
     }
     chemistry_ranges = {
-        0: (-3, -1),
-        1: (0, 1),
+        0: (-1, 0),
+        1: (-1, 1),   # 1 point = hold station; chemistry must be invested in to grow
         2: (1, 2),
         3: (2, 3),
         4: (2, 4),
@@ -1358,10 +1194,42 @@ def _apply_team_training_points(team: dict, team_attr: str, points: int, archety
     low, high = ranges[points_bucket]
     delta = random.randint(low, high)
 
-    # Apply focus amplifier if this attribute is amplified by the selected focus
+    # ── NEGLECT DECAY, probability-gated (leveling pass, 2026-08-11) ────────────
+    # Bucket 0 means the coach allocated NOTHING to the categories feeding this
+    # attribute. That should cost something visible over a season — but the old
+    # ranges ((-4,-3) fight/discipline, (-3,-1) chemistry) charged it EVERY week.
+    # Measured on the CPU reference plan (a player-development plan, which
+    # allocates nothing to the chemistry/discipline categories): discipline
+    # -91.6/season on a 40-point range and team_chemistry -93.6 on an 18-point
+    # range — four and a half ranges and five ranges respectively. Every team
+    # floored, and a floored attribute carries no information at all.
+    #
+    # Design target: a season of default training moves a NEGLECTED attribute a
+    # few points, so neglect is visible but EOG (winning, losing, close games) is
+    # what actually drives the attribute across a season.
+    #
+    # Integer weekly rolls cannot express "-3 per season" directly — the smallest
+    # non-zero weekly penalty, -1 at even odds, is already -13/season. So the
+    # penalty is PROBABILITY-GATED: it fires on a fraction of weeks and is zero
+    # otherwise. Expected season cost = 26 x chance x mean(range).
+    if team_attr == "fight" and delta > 0 and random.random() >= FIGHT_GAIN_CHANCE:
+        delta = 0
+
+    if points_bucket == 0 and delta < 0:
+        chance = (NEGLECT_DECAY_CHANCE_CHEMISTRY if team_attr == "team_chemistry"
+                  else NEGLECT_DECAY_CHANCE_DEFAULT)
+        if random.random() >= chance:
+            delta = 0
+
+    # Apply focus amplifier if this attribute is amplified by the selected focus.
+    # Flat 2x, no randomness (EOG Structural Pass, Task 6): the old
+    # int(delta * random.choice([1.5..1.8])) truncated to a no-op at delta=1 (the
+    # most common allocation) and gave identical output for delta 1-4. Doubling
+    # integers stays integral. Positive deltas only — focus accelerates growth, it
+    # does not amplify decay. (The identical bug at _apply_player_training_points is
+    # a separate system, intentionally left this pass.)
     if delta > 0 and _should_amplify_team_attr(team_attr, archetype, sub_option):
-        focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
-        delta = int(delta * focus_multiplier)
+        delta = delta * 2
 
     current_val = team.get(team_attr, 0)
     team[team_attr] = current_val + delta
@@ -1398,19 +1266,20 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
     
     final_increase = increase
     
-    # Apply focus amplifier if rebound_modifier is amplified by the selected focus
+    # Apply focus amplifier if rebound_modifier is amplified by the selected focus.
+    # Flat 2x, no randomness (Task 6 — the "collapse focus multipliers to flat 2x"
+    # decision applies here too, not only where int() truncation bit). Positive only.
     if final_increase > 0 and _should_amplify_team_attr("rebound_modifier", archetype, sub_option):
-        focus_multiplier = random.choice([1.5, 1.6, 1.7, 1.8])
-        final_increase = final_increase * focus_multiplier
+        final_increase = final_increase * 2
     
     # Keep rebound_modifier on the 0.01 grid (never truncate with int()).
     final_increase = round(final_increase, 2)
 
     # Apply to team
-    current_val = float(team.get("rebound_modifier", 0.2))  # Default to 0.2 (center)
+    current_val = float(team.get("rebound_modifier", 0.2))  # init center stays 0.2 on the 0.0-1.0 scale
     team["rebound_modifier"] = round(current_val + final_increase, 2)
-    
-    # Clamp to valid range [0.0, 0.4]
+
+    # Clamp to valid range [0.0, 1.0] (Task 2 rescale; TEAM_ATTR_RANGES)
     team["rebound_modifier"] = round(
         max(
             TEAM_ATTR_CLAMPS["rebound_modifier"][0],

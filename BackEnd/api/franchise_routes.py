@@ -17,7 +17,7 @@ import re
 import uuid
 from copy import deepcopy
 from types import SimpleNamespace
-from typing import Any, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 from datetime import datetime, timedelta
 from collections import defaultdict
 from urllib.parse import urlencode
@@ -38,6 +38,7 @@ from BackEnd.constants.multi_franchise import MAX_FRANCHISES_PER_USER
 # Multi-franchise slots (see _documentation_master/projects/multi_franchises_brief.md).
 # Cap constant lives in BackEnd.constants.multi_franchise.
 from BackEnd.utils.shared import format_height, summarize_game_state
+from BackEnd.utils.rt_display import format_rt_display
 from BackEnd.utils.player_year import format_player_year_display
 from BackEnd.utils import stat_updater
 from BackEnd.utils.team_stats_aggregator import aggregate_team_stats_from_players
@@ -60,7 +61,6 @@ from BackEnd.models.training_execution_v2 import (
     build_eog_defensive_effectiveness_decay_ftd_updates,
     build_eog_offensive_play_effectiveness_decay_ftd_updates,
 )
-from BackEnd.models.distant_game_stats import build_distant_game_summary
 from BackEnd.models.player import Player
 from BackEnd.constants import BOX_SCORE_KEYS
 from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
@@ -73,9 +73,7 @@ from BackEnd.utils.franchise_training_state import (
     franchise_training_fully_complete_for_week,
     franchise_user_training_applied_for_week,
 )
-from BackEnd.utils.training_loading_highlights import build_training_loading_highlights
 from BackEnd.utils.franchise_coaching_focus_counts import (
-    COACHING_FOCUS_FTD_COUNT_KEYS,
     carryover_coaching_focus_counts_for_new_season,
     user_ftd_coaching_focus_increment,
 )
@@ -100,6 +98,7 @@ from BackEnd.utils.team_play_utils import iter_team_plays
 from BackEnd.utils.franchise_ftd_game_seed import prepare_ftd_for_new_game
 from BackEnd.models.game_manager import GameManager
 from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets, generate_walk_on_profile
+from BackEnd.models.franchise_manager import carry_dev_fields
 from BackEnd.utils.franchise_rank_prestige import (
     FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
     SOS_AVG_DEFAULT,
@@ -121,7 +120,7 @@ WEEK_35_RECRUITING_POINTS_BUDGET = 50
 SEASON_TRANSITION_TOKEN_FIELD = "season_transition_token"
 RANK_PRESTIGE_SYSTEM_VERSION_FIELD = "rank_prestige_system_version"
 RANK_PRESTIGE_LAST_APPLIED_WEEK_FIELD = "rank_prestige_last_applied_week"
-POSTSEASON_TRAINING_DISABLED_WEEKS = range(27, 35)
+LAST_TRAINING_WEEK = 26
 POSTSEASON_EOG_TEAM_ATTRS_DISABLED_WEEKS = range(27, 35)
 CPU_SIM_RUNNING_STALE_SECONDS = 180
 # Heartbeat cadence for persisting cpu_sim_job progress during the CPU-week loop.
@@ -139,13 +138,17 @@ def _week_in_policy_range(week: Any, policy_weeks: range) -> bool:
 
 
 def _postseason_training_disabled_for_week(week: Any) -> bool:
-    return _week_in_policy_range(week, POSTSEASON_TRAINING_DISABLED_WEEKS)
+    try:
+        return int(week) > LAST_TRAINING_WEEK
+    except (TypeError, ValueError):
+        return False
 
 
 def _training_status_reset_after_advance_to_week(dest_week: Any) -> dict[str, Any] | None:
     """
     Weekly training applies when entering a normal franchise week.
-    EOS tournament weeks (27-34) do not use training; do not churn training_status there.
+    Weeks after the 26-week regular season do not use training; do not churn
+    training_status there.
     """
     if _postseason_training_disabled_for_week(dest_week):
         return None
@@ -545,22 +548,27 @@ def _extract_game_box_score(game_doc: dict[str, Any]) -> dict[str, Any]:
 
 
 def _infer_box_score_team_side(team_key: str, home_team_id: str, away_team_id: str, home_team_name: str, away_team_name: str) -> Optional[str]:
-    home_names = {
-        str(home_team_id or ""),
-        str(home_team_name or ""),
-        _canonical_team_name(home_team_name),
-        _normalize_team_name(home_team_name),
-    }
-    away_names = {
-        str(away_team_id or ""),
-        str(away_team_name or ""),
-        _canonical_team_name(away_team_name),
-        _normalize_team_name(away_team_name),
-    }
+    from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
+    def _name_tokens(team_id: str, team_name: str) -> set[str]:
+        tokens = {
+            str(team_id or ""),
+            str(team_name or ""),
+            _canonical_team_name(team_name),
+            _normalize_team_name(team_name),
+        }
+        # Stored team_id variants (lookup, not derive).
+        for slug in identity_slugs_for_display_name(team_name):
+            tokens.add(slug)
+        return tokens
+
+    home_names = _name_tokens(home_team_id, home_team_name)
+    away_names = _name_tokens(away_team_id, away_team_name)
     key_normalized = _normalize_team_name(team_key)
-    if team_key in home_names or key_normalized in home_names:
+    key_slugs = set(identity_slugs_for_display_name(team_key))
+    if team_key in home_names or key_normalized in home_names or (key_slugs & home_names):
         return "home"
-    if team_key in away_names or key_normalized in away_names:
+    if team_key in away_names or key_normalized in away_names or (key_slugs & away_names):
         return "away"
     return None
 
@@ -833,6 +841,8 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     team_docs_by_id = {str(team.get("_id")): team for team in team_docs_raw}
 
     def _identifier_tokens(*values: Any) -> set[str]:
+        from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
         tokens: set[str] = set()
         for value in values:
             if value is None:
@@ -843,6 +853,9 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
             tokens.add(raw.casefold())
             tokens.add(raw.replace(" ", "_").casefold())
             tokens.add(raw.replace("_", " ").casefold())
+            # Stored team_id (lookup) or derived custom slug.
+            for slug in identity_slugs_for_display_name(raw):
+                tokens.add(slug.casefold())
         return tokens
 
     def _team_tokens(canonical_id: str) -> set[str]:
@@ -1036,11 +1049,25 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     def _norm_key(value) -> str:
         return str(value or "").strip().lower().replace(" ", "_").replace("-", "_")
 
+    def _norm_keys_with_display_slug(value) -> set[str]:
+        """Identity _norm_key plus stored team_id / custom derive tokens."""
+        from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
+        out = {_norm_key(value)}
+        if value is None or value == "":
+            return out
+        for slug in identity_slugs_for_display_name(str(value)):
+            out.add(slug)
+            out.add(_norm_key(slug))
+        return out
+
     def _find_team_row(teams: dict, *candidates):
         if not isinstance(teams, dict):
             return {}
         raw_candidates = [str(c) for c in candidates if c is not None and str(c) != ""]
-        normalized = {_norm_key(c) for c in raw_candidates}
+        normalized: set[str] = set()
+        for c in raw_candidates:
+            normalized |= _norm_keys_with_display_slug(c)
         for candidate in raw_candidates:
             row = teams.get(candidate)
             if isinstance(row, dict):
@@ -1048,14 +1075,11 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         for key, row in teams.items():
             if not isinstance(row, dict):
                 continue
-            if _norm_key(key) in normalized:
+            if _norm_keys_with_display_slug(key) & normalized:
                 return row
-            row_candidates = {
-                _norm_key(row.get("team_id")),
-                _norm_key(row.get("_id")),
-                _norm_key(row.get("name")),
-                _norm_key(row.get("slug")),
-            }
+            row_candidates: set[str] = set()
+            for field in ("team_id", "_id", "name", "slug"):
+                row_candidates |= _norm_keys_with_display_slug(row.get(field))
             if normalized.intersection(row_candidates):
                 return row
         return {}
@@ -1102,6 +1126,16 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
     }
     home_name = home_row.get("name") or home_team.get("name") or source_doc.get("home_team_name") or team_docs.get(source_home_id, team_docs.get(home_id, home_id))
     away_name = away_row.get("name") or away_team.get("name") or source_doc.get("away_team_name") or team_docs.get(source_away_id, team_docs.get(away_id, away_id))
+    home_display = (
+        home_row.get("display_name")
+        or home_team.get("display_name")
+        or home_name
+    )
+    away_display = (
+        away_row.get("display_name")
+        or away_team.get("display_name")
+        or away_name
+    )
     home_score = _score_from_source(home_row, home_team, score_map, [home_name, source_home_id, home_id], "home_score")
     away_score = _score_from_source(away_row, away_team, score_map, [away_name, source_away_id, away_id], "away_score")
     resume_from_timeout = bool(
@@ -1140,8 +1174,11 @@ def _find_active_user_game_resume(franchise_doc: dict[str, Any], user_team_id_st
         "time_remaining": time_remaining,
         "home_team_id": home_id,
         "away_team_id": away_id,
+        # Core names for identity URL params / score keys; display for chrome only.
         "home_team_name": home_name,
         "away_team_name": away_name,
+        "home_display_name": home_display,
+        "away_display_name": away_display,
         "home_score": home_score,
         "away_score": away_score,
         "user_team_side": "home" if user_team_id_str == home_id else "away",
@@ -1364,14 +1401,48 @@ _EOG_BAND_LOG_LOCK = threading.Lock()
 _EOG_BAND_LOG_FH = None
 _EOG_BAND_LOG_FH_PATH = None
 _EOG_BAND_GIT_SHA = None
+_EOG_BAND_BUFFER: list = []
+# 500, not 50: each insert_many is an Atlas round-trip (~45 ms), so batch 50 cost
+# ~20 ms/game while 500 costs ~2 ms. complete_week flushes at the end of every week, so a
+# hard crash loses at most the current week's tail rather than a season.
+_EOG_BAND_BATCH = 500
+
+
+def _eog_band_log_mode() -> str:
+    """'off' | 'file' | 'mongo'.
+
+    FILE is for local measurement harnesses. It is NOT usable in production: Railway's
+    container filesystem is ephemeral and declares no volume, so the file dies on the next
+    redeploy, each replica writes its own partial, and nothing serves it.
+    MONGO is the production sink — durable, queryable, TTL-expired.
+    """
+    raw = os.environ.get("GOB_EOG_BAND_LOG", "0").strip().lower()
+    if raw == "mongo":
+        return "mongo"
+    if raw in ("1", "true", "yes", "on", "file"):
+        return "file"
+    return "off"
 
 
 def _eog_band_log_enabled() -> bool:
-    return os.environ.get("GOB_EOG_BAND_LOG", "0").strip().lower() in ("1", "true", "yes", "on")
+    return _eog_band_log_mode() != "off"
 
 
 def _eog_band_log_path() -> str:
     return os.environ.get("GOB_EOG_BAND_LOG_FILE", "eog_band_log.jsonl")
+
+
+# Optional RESTRICTION, not a requirement: unset/empty logs EVERY franchise. Tester
+# franchises are created whenever, so naming ids in advance would mean discovering which
+# to log only after the season is half gone.
+def _eog_band_franchise_filter() -> set:
+    raw = (os.environ.get("GOB_EOG_BAND_FRANCHISES") or "").strip()
+    return {p.strip() for p in raw.split(",") if p.strip()} if raw else set()
+
+
+def _eog_band_should_log(franchise_id) -> bool:
+    allow = _eog_band_franchise_filter()
+    return (not allow) or (str(franchise_id) in allow)
 
 
 def _eog_band_git_sha() -> str:
@@ -1401,34 +1472,50 @@ def _eog_band_git_sha() -> str:
 
 
 def _eog_band_header_record() -> dict:
-    """Self-describing header written once per file open: run timestamp, git SHA,
-    and the three sunset flags (resolved bool + raw env). Keeps the dataset
-    interpretable on its own, separate from the app logs."""
+    """Self-describing header written once per file open."""
     return {
         "record_type": "header",
         "utc": datetime.utcnow().isoformat() + "Z",
         "git_sha": _eog_band_git_sha(),
         "flags": {
-            "FRANCHISE_ALL_GAMES_FULL_SIM": _franchise_all_games_full_sim(),
-            "FRANCHISE_ALL_TEAMS_AUTOTRAIN": _franchise_all_teams_autotrain(),
             "FRANCHISE_CPU_SIM_USE_POOL": _franchise_cpu_use_pool(),
         },
         "flags_raw": {
-            "FRANCHISE_ALL_GAMES_FULL_SIM": os.environ.get("FRANCHISE_ALL_GAMES_FULL_SIM"),
-            "FRANCHISE_ALL_TEAMS_AUTOTRAIN": os.environ.get("FRANCHISE_ALL_TEAMS_AUTOTRAIN"),
             "FRANCHISE_CPU_SIM_USE_POOL": os.environ.get("FRANCHISE_CPU_SIM_USE_POOL"),
         },
     }
 
 
 def _emit_eog_band_record(record: dict) -> None:
-    """Append one [EOG-BAND] JSONL record to the dedicated measurement file.
+    """Append one [EOG-BAND] record to the configured sink.
 
-    No-op unless GOB_EOG_BAND_LOG is truthy. Instrumentation must never break a
-    game, so all failures are swallowed.
+    No-op unless GOB_EOG_BAND_LOG is set. Instrumentation must never break a game, so all
+    failures are swallowed. Mongo writes are BUFFERED (insert_many every
+    _EOG_BAND_BATCH rows) — 36,600 individual inserts per franchise-season would be the
+    only part of this instrumentation with a measurable cost.
     """
     global _EOG_BAND_LOG_FH, _EOG_BAND_LOG_FH_PATH
+    mode = _eog_band_log_mode()
+    if mode == "off":
+        return
+    if not _eog_band_should_log(record.get("franchise_id")):
+        return
     try:
+        if mode == "mongo":
+            from BackEnd.db import eog_band_log_collection
+            doc = dict(record)
+            doc["created_at"] = datetime.utcnow()      # TTL anchor
+            doc["git_sha"] = _eog_band_git_sha()
+            with _EOG_BAND_LOG_LOCK:
+                _EOG_BAND_BUFFER.append(doc)
+                if len(_EOG_BAND_BUFFER) >= _EOG_BAND_BATCH:
+                    batch, _EOG_BAND_BUFFER[:] = list(_EOG_BAND_BUFFER), []
+                else:
+                    batch = None
+            if batch:
+                eog_band_log_collection.insert_many(batch, ordered=False)
+            return
+
         line = "[EOG-BAND] " + json.dumps(record, default=str)
         path = _eog_band_log_path()
         with _EOG_BAND_LOG_LOCK:
@@ -1450,6 +1537,24 @@ def _emit_eog_band_record(record: dict) -> None:
             _EOG_BAND_LOG_FH.write(line + "\n")
     except Exception:
         pass
+
+
+def flush_eog_band_buffer() -> int:
+    """Write any buffered Mongo rows. Registered atexit and safe to call anywhere."""
+    try:
+        with _EOG_BAND_LOG_LOCK:
+            if not _EOG_BAND_BUFFER:
+                return 0
+            batch, _EOG_BAND_BUFFER[:] = list(_EOG_BAND_BUFFER), []
+        from BackEnd.db import eog_band_log_collection
+        eog_band_log_collection.insert_many(batch, ordered=False)
+        return len(batch)
+    except Exception:
+        return 0
+
+
+import atexit as _atexit
+_atexit.register(flush_eog_band_buffer)
 
 
 def _finalize_team_attributes_for_game(
@@ -1636,7 +1741,6 @@ def update_team_attributes_after_game(
     away_totals = eog_inputs.get("away", {}).get("totals", {})
     home_scouting = eog_inputs.get("home", {}).get("scouting", {})
     away_scouting = eog_inputs.get("away", {}).get("scouting", {})
-    is_distant_sim = (game_doc.get("simulation_engine") == "distant")
 
     logger.info(
         "🔍 [UPDATE-TEAM-ATTRS] EOG canonical snapshot source=%s home=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s) away=%s[%s] (fb_rate=%.1f, pt_rate=%.1f, pt_attempts=%s)",
@@ -1669,10 +1773,13 @@ def update_team_attributes_after_game(
     def _resolve_game_team_obj(team_id_label: str, team_name: str) -> dict:
         if not isinstance(teams_obj, dict):
             return {}
+        from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
         candidates = [
             team_id_label,
             team_name,
             str(team_name).replace("-", "_").replace(" ", "_").upper() if team_name else None,
+            *identity_slugs_for_display_name(team_name),
         ]
         for key in candidates:
             if key and isinstance(teams_obj.get(key), dict):
@@ -1703,13 +1810,16 @@ def update_team_attributes_after_game(
         total = sum(positive_counts)
         return max(positive_counts) / total if total > 0 else 0.0
 
-    def _offensive_play_usage(team_obj: dict) -> int:
-        total = 0
-        for _play_key, play_data, _display_name in iter_team_plays(team_obj.get("plays", {})):
-            total += int((play_data.get("game_stats", {}) or {}).get("times_run", 0) or 0)
-        return total
+    def _offensive_play_concentration(team_obj: dict) -> tuple[int, float]:
+        # Task 3: concentration (largest play's share), NOT total usage. Total is
+        # returned only to detect the data-integrity zero-usage case.
+        counts = [
+            int((play_data.get("game_stats", {}) or {}).get("times_run", 0) or 0)
+            for _pk, play_data, _dn in iter_team_plays(team_obj.get("plays", {}))
+        ]
+        return sum(counts), _max_share_from_counts(counts)
 
-    def _defensive_play_max_share(team_obj: dict) -> float:
+    def _defensive_play_usage_and_share(team_obj: dict) -> tuple[int, float]:
         defense = (team_obj.get("scouting", {}) or {}).get("defense", {}) or {}
         from BackEnd.utils.defense_identity import CANONICAL_HCO_DEFENSE_ROW_KEYS
 
@@ -1717,15 +1827,33 @@ def update_team_attributes_after_game(
             int((_stat_bucket(defense.get(key, {}))).get("used", 0) or 0)
             for key in CANONICAL_HCO_DEFENSE_ROW_KEYS
         ]
-        return _max_share_from_counts(counts)
+        return sum(counts), _max_share_from_counts(counts)
+
+    # after_steal is a forced event off a steal, not a strategic choice — excluded
+    # from both the fb concentration and the opponent fb volume (Task 4).
+    _FB_STRATEGIC_KEYS = ("covert_release", "rim_runner", "triangle")
 
     def _fast_break_usage(team_obj: dict) -> tuple[int, float]:
         offense = (team_obj.get("scouting", {}) or {}).get("offense", {}) or {}
         fb_plays = offense.get("fast_break_plays", {}) or {}
         counts = [
             int((fb_plays.get(key, {}) or {}).get("A", 0) or 0)
-            for key in ("covert_release", "rim_runner", "triangle", "after_steal")
+            for key in _FB_STRATEGIC_KEYS
         ]
+        return sum(counts), _max_share_from_counts(counts)
+
+    def _pt_concentration(team_obj: dict, fcp_used: int) -> tuple[int, float]:
+        # Concentration over the 4 press/trap plays: 3 HCT variant A counts + fcp_used
+        # (the single live FCP variant). fcp_press_plays[*].A is a DEAD counter (never
+        # incremented in the engine), so fcp_used stands in for the FCP variant. Valid
+        # only while FCP has one live variant — revisit when FCP variants expand.
+        dfn = (team_obj.get("scouting", {}) or {}).get("defense", {}) or {}
+        hct = dfn.get("hct_trap_plays", {}) or {}
+        counts = [
+            int((hct.get(k, {}) or {}).get("A", 0) or 0)
+            for k in ("standard_trap", "straight_pressure", "standard_diamond")
+        ]
+        counts.append(int(fcp_used or 0))
         return sum(counts), _max_share_from_counts(counts)
 
     home_team_obj = _resolve_game_team_obj(canonical_home_team_id, home_team_name)
@@ -1755,12 +1883,15 @@ def update_team_attributes_after_game(
         # Calculate TREB
         treb = team_totals.get("DREB", 0) + team_totals.get("OREB", 0)
         opp_treb = opponent_totals.get("DREB", 0) + opponent_totals.get("OREB", 0)
-        offensive_play_count = _offensive_play_usage(team_obj)
-        defensive_max_share = _defensive_play_max_share(team_obj)
-        _team_fb_total, team_fb_max_share = _fast_break_usage(team_obj)
-        opponent_fb_total, _ = _fast_break_usage(opponent_team_obj)
-        team_pt_total = int(team_scouting.get("pt_total_attempts", 0) or 0)
-        opponent_pt_total = int(opponent_scouting.get("pt_total_attempts", 0) or 0)
+        team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
+        opp_f_plus_to = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0)
+        # Concentration measures (own team) + volume measures (opponent) — see Tasks 3/4/5.
+        off_total, off_max_share = _offensive_play_concentration(team_obj)
+        def_total, def_max_share = _defensive_play_usage_and_share(team_obj)
+        team_fb_total, team_fb_max_share = _fast_break_usage(team_obj)          # after_steal excl
+        opponent_fb_total, _opp_fb_share = _fast_break_usage(opponent_team_obj)  # after_steal excl
+        pt_total, pt_max_share = _pt_concentration(team_obj, team_scouting.get("fcp_used", 0))
+        opponent_pt_total = int(opponent_scouting.get("pt_total_attempts", 0) or 0)  # used-based volume
         
         # ✅ FTD: Get current team attributes from FTD collection (keyed by ObjectId)
         ftd_doc = franchise_team_data_collection.find_one(
@@ -1834,165 +1965,42 @@ def update_team_attributes_after_game(
             },
         )
         
-        # [EOG-BAND] Phase-0 instrumentation. band_log_on is read once; when off,
-        # the only added cost is recording a stable branch label per attr (a dict
-        # write, no I/O, no draws). All extended-input capture + file emit is gated.
+        # Band selection is the single implementation in eog_attr_rules (Task 7);
+        # this dispatches to it and records (label, delta) per attribute. delta None
+        # = data-integrity (mandatory usage was zero) → log, apply no change.
+        from BackEnd import eog_attr_rules as _rules
         band_log_on = _eog_band_log_enabled()
         _band_labels: dict[str, str] = {}
+        _data_integrity_attrs: list[str] = []
 
-        # shot_threshold is a golf score: lower is better, higher is worse.
-        if fg_pct > 50:
-            changes["shot_threshold"] = random.randint(-10, -5)
-            _band_labels["shot_threshold"] = "fg_gt_50"
-        elif fg_pct > 45:
-            _band_labels["shot_threshold"] = "fg_45_to_50"
-            if is_winner:
-                changes["shot_threshold"] = random.randint(-5, 0)
+        def _apply_band(attr: str, result: tuple) -> None:
+            label, delta = result
+            _band_labels[attr] = label
+            if delta is None:
+                _data_integrity_attrs.append(attr)
             else:
-                changes["shot_threshold"] = random.randint(0, 5)
-        else:
-            changes["shot_threshold"] = random.randint(5, 10)
-            _band_labels["shot_threshold"] = "fg_le_45"
+                changes[attr] = delta
 
-        team_f_plus_to = team_totals.get("F", 0) + team_totals.get("TO", 0)
-        opp_f_plus_to = opponent_totals.get("F", 0) + opponent_totals.get("TO", 0)
-        opp_f_plus_to_with_buffer = opp_f_plus_to + 8
-        if team_f_plus_to < opp_f_plus_to_with_buffer:
-            changes["discipline"] = random.randint(1, 2)
-            _band_labels["discipline"] = "below_opp_plus_8"
-        elif team_f_plus_to > opp_f_plus_to_with_buffer:
-            changes["discipline"] = random.randint(-2, -1)
-            _band_labels["discipline"] = "above_opp_plus_8"
-        else:
-            changes["discipline"] = random.randint(-1, 0)
-            _band_labels["discipline"] = "equal_buffered"
+        _apply_band("shot_threshold", _rules.shot_threshold_change(fg_pct, is_winner))
+        _apply_band("discipline", _rules.discipline_change(team_f_plus_to, opp_f_plus_to))
+        _apply_band("fight", _rules.fight_change(is_winner))
+        _apply_band("rebound_modifier", _rules.rebound_modifier_change(treb, opp_treb))
 
-        # fight: winning 0..+2, losing -2..0
-        if is_winner:
-            changes["fight"] = random.randint(0, 2)
-            _band_labels["fight"] = "win"
-        else:
-            changes["fight"] = random.randint(-2, 0)
-            _band_labels["fight"] = "loss"
+        # Own-team efficiency = concentration (offense/fb/pt); opponent modifiers = volume.
+        _apply_band("offensive_efficiency", _rules.offensive_efficiency_change(off_total, off_max_share))
+        _apply_band("defensive_efficiency", _rules.defensive_efficiency_change(def_total, def_max_share))
+        _apply_band("fb_efficiency", _rules.fb_efficiency_change(team_fb_total, team_fb_max_share))
+        _apply_band("fb_opp_modifier", _rules.fb_opp_modifier_change(opponent_fb_total))
+        _apply_band("pt_efficiency", _rules.pt_efficiency_change(pt_total, pt_max_share))
+        _apply_band("pt_opp_modifier", _rules.pt_opp_modifier_change(opponent_pt_total))
 
-        # rebound_modifier
-        if treb > (opp_treb + 8):
-            changes["rebound_modifier"] = random.randint(0, 5) / 100.0
-            _band_labels["rebound_modifier"] = "outrebound_by_8"
-        elif treb < (opp_treb - 8):
-            changes["rebound_modifier"] = -random.randint(5, 10) / 100.0
-            _band_labels["rebound_modifier"] = "outrebounded_by_8"
-        else:
-            changes["rebound_modifier"] = -random.randint(1, 5) / 100.0
-            _band_labels["rebound_modifier"] = "near_even"
+        _apply_band("team_chemistry", _rules.team_chemistry_change(is_winner, team_rank, opponent_rank))
 
-        if is_distant_sim:
-            changes["offensive_efficiency"] = random.randint(-2, 1)
-            changes["defensive_efficiency"] = random.randint(-2, 1)
-            changes["fb_efficiency"] = random.randint(-2, 1)
-            changes["fb_opp_modifier"] = random.randint(-2, 1)
-            changes["pt_efficiency"] = random.randint(-2, 1)
-            changes["pt_opp_modifier"] = random.randint(-2, 1)
-            for _distant_attr in (
-                "offensive_efficiency", "defensive_efficiency", "fb_efficiency",
-                "fb_opp_modifier", "pt_efficiency", "pt_opp_modifier",
-            ):
-                _band_labels[_distant_attr] = "distant_uniform"
+        if _data_integrity_attrs:
             logger.warning(
-                "🧪 [EOG-DISTANT-ATTRS] team=%s off_eff=%s def_eff=%s fb_eff=%s fb_opp=%s pt_eff=%s pt_opp=%s",
-                str(team_id_label),
-                changes.get("offensive_efficiency"),
-                changes.get("defensive_efficiency"),
-                changes.get("fb_efficiency"),
-                changes.get("fb_opp_modifier"),
-                changes.get("pt_efficiency"),
-                changes.get("pt_opp_modifier"),
+                "[EOG-DATA-INTEGRITY] team=%s game_id=%s zero-usage (no change applied) for: %s",
+                str(team_id_label), game_id_str, _data_integrity_attrs,
             )
-        else:
-            if offensive_play_count > 12:
-                changes["offensive_efficiency"] = random.randint(0, 1)
-                _band_labels["offensive_efficiency"] = "plays_gt_12"
-            elif offensive_play_count > 10:
-                changes["offensive_efficiency"] = random.randint(-1, 0)
-                _band_labels["offensive_efficiency"] = "plays_gt_10"
-            else:
-                changes["offensive_efficiency"] = random.randint(-2, -1)
-                _band_labels["offensive_efficiency"] = "plays_le_10"
-
-            if defensive_max_share <= 0.39:
-                changes["defensive_efficiency"] = random.randint(0, 1)
-                _band_labels["defensive_efficiency"] = "max_share_le_39"
-            elif defensive_max_share <= 0.49:
-                changes["defensive_efficiency"] = random.randint(-1, 0)
-                _band_labels["defensive_efficiency"] = "max_share_le_49"
-            else:
-                changes["defensive_efficiency"] = random.randint(-2, -1)
-                _band_labels["defensive_efficiency"] = "max_share_gt_49"
-
-            if team_fb_max_share > 0.60:
-                changes["fb_efficiency"] = random.randint(-2, -1)
-                _band_labels["fb_efficiency"] = "top_share_gt_60"
-            elif team_fb_max_share > 0.50:
-                changes["fb_efficiency"] = random.randint(-1, 0)
-                _band_labels["fb_efficiency"] = "top_share_gt_50"
-            else:
-                changes["fb_efficiency"] = random.randint(0, 1)
-                _band_labels["fb_efficiency"] = "balanced"
-
-            if opponent_fb_total > 15:
-                changes["fb_opp_modifier"] = random.randint(-2, -1)
-                _band_labels["fb_opp_modifier"] = "opp_fb_gt_15"
-            elif opponent_fb_total > 10:
-                changes["fb_opp_modifier"] = random.randint(-1, 0)
-                _band_labels["fb_opp_modifier"] = "opp_fb_gt_10"
-            else:
-                changes["fb_opp_modifier"] = random.randint(0, 1)
-                _band_labels["fb_opp_modifier"] = "opp_fb_le_10"
-
-            if team_pt_total > 20:
-                changes["pt_efficiency"] = random.randint(-2, -1)
-                _band_labels["pt_efficiency"] = "pt_gt_20"
-            elif team_pt_total > 16:
-                changes["pt_efficiency"] = random.randint(-1, 0)
-                _band_labels["pt_efficiency"] = "pt_gt_16"
-            else:
-                changes["pt_efficiency"] = random.randint(0, 1)
-                _band_labels["pt_efficiency"] = "pt_le_16"
-
-            if opponent_pt_total > 16:
-                changes["pt_opp_modifier"] = random.randint(-2, -1)
-                _band_labels["pt_opp_modifier"] = "opp_pt_gt_16"
-            elif opponent_pt_total > 12:
-                changes["pt_opp_modifier"] = random.randint(-1, 0)
-                _band_labels["pt_opp_modifier"] = "opp_pt_gt_12"
-            else:
-                changes["pt_opp_modifier"] = random.randint(0, 1)
-                _band_labels["pt_opp_modifier"] = "opp_pt_le_12"
-
-        # team_chemistry: rank-relative performance. Lower natl_rank integer is better.
-        if is_winner:
-            if opponent_rank > team_rank:
-                changes["team_chemistry"] = random.randint(0, 1)
-                _band_labels["team_chemistry"] = "beat_lower_ranked"
-            elif opponent_rank <= 10:
-                changes["team_chemistry"] = random.randint(2, 4)
-                _band_labels["team_chemistry"] = "beat_top10"
-            else:
-                changes["team_chemistry"] = random.randint(1, 2)
-                _band_labels["team_chemistry"] = "beat_higher_non_top10"
-        else:
-            if opponent_rank < team_rank and opponent_rank <= 10:
-                changes["team_chemistry"] = random.randint(-1, 0)
-                _band_labels["team_chemistry"] = "lose_to_top10"
-            elif opponent_rank < team_rank:
-                changes["team_chemistry"] = random.randint(-2, 0)
-                _band_labels["team_chemistry"] = "lose_to_higher_non_top10"
-            elif 100 <= opponent_rank <= 128:
-                changes["team_chemistry"] = random.randint(-5, -3)
-                _band_labels["team_chemistry"] = "lose_to_100_128"
-            else:
-                changes["team_chemistry"] = random.randint(-3, -2)
-                _band_labels["team_chemistry"] = "lose_to_other_lower"
 
         # [EOG-BAND] Extended per-attribute inputs — computed ONLY when logging is
         # enabled so the disabled path stays free. These are read-only (no draws).
@@ -2001,9 +2009,9 @@ def update_team_attributes_after_game(
             from BackEnd.utils.defense_identity import CANONICAL_HCO_DEFENSE_ROW_KEYS
 
             def _distinct_plays_run(tobj: dict) -> int:
-                # Read-only companion to _offensive_play_usage: count playbook rows
-                # actually run this game (times_run > 0). Logged, NOT used to select
-                # a branch — we need the real distribution before re-gating.
+                # Count playbook rows actually run this game (times_run > 0). Logged
+                # for reference only — the offense measure is concentration (max_share),
+                # NOT distinct-play count (which just tracks playbook size).
                 count = 0
                 for _pk, _pd, _dn in iter_team_plays((tobj or {}).get("plays", {})):
                     if int((_pd.get("game_stats", {}) or {}).get("times_run", 0) or 0) > 0:
@@ -2046,28 +2054,30 @@ def update_team_attributes_after_game(
                 "discipline": {"team_f_plus_to": team_f_plus_to, "opp_f_plus_to": opp_f_plus_to},
                 "fight": {"is_winner": bool(is_winner)},
                 "rebound_modifier": {"treb": treb, "opp_treb": opp_treb},
+                # Measures now drive the bands: concentration (own team) / volume (opp).
                 "offensive_efficiency": {
-                    "total_times_run": offensive_play_count,
-                    "distinct_plays_run": _distinct_plays_run(team_obj),
+                    "max_share": off_max_share,
+                    "total_usage": off_total,
+                    "distinct_plays_run": _distinct_plays_run(team_obj),  # logged, not a gate
                 },
-                "defensive_efficiency": {"max_share": defensive_max_share, **def_row_counts},
+                "defensive_efficiency": {"max_share": def_max_share, "total_usage": def_total, **def_row_counts},
                 "fb_efficiency": {
-                    "max_share": team_fb_max_share,
-                    "fb_total": _team_fb_total,
-                    **team_fb_counts,
+                    "max_share": team_fb_max_share,   # over CR/RR/Triangle (after_steal excl)
+                    "volume": team_fb_total,
+                    **team_fb_counts,                 # includes after_steal for visibility
                 },
-                "fb_opp_modifier": {"opponent_fb_total": opponent_fb_total, **opp_fb_counts},
-                # The branch uses the aggregate pt_total_attempts (hct_used + fcp_used);
-                # per-variant counts are logged alongside for the later concentration
-                # measure (they survive as defense.hct_trap_plays / fcp_press_plays).
+                "fb_opp_modifier": {"opponent_fb_volume": opponent_fb_total, **opp_fb_counts},
+                # Concentration over [3 HCT variant A's + fcp_used]. fcp_variants is the
+                # DEAD fcp_press_plays.A counter (all zero) — logged to document that.
                 "pt_efficiency": {
-                    "pt_total_attempts": team_pt_total,
+                    "max_share": pt_max_share,
+                    "volume": pt_total,
                     "hct_used": int(team_scouting.get("hct_used", 0) or 0),
                     "fcp_used": int(team_scouting.get("fcp_used", 0) or 0),
                     **team_pt_variants,
                 },
                 "pt_opp_modifier": {
-                    "pt_total_attempts": opponent_pt_total,
+                    "opponent_pt_volume": opponent_pt_total,
                     "hct_used": int(opponent_scouting.get("hct_used", 0) or 0),
                     "fcp_used": int(opponent_scouting.get("fcp_used", 0) or 0),
                     **opp_pt_variants,
@@ -2105,7 +2115,6 @@ def update_team_attributes_after_game(
                         "franchise_id": str(franchise_id),
                         "team_id_label": str(team_id_label),
                         "is_winner": bool(is_winner),
-                        "is_distant_sim": bool(is_distant_sim),
                         "attr": attr_name,
                         "inputs": attr_inputs.get(attr_name, {}),
                         "band": _band_labels.get(attr_name),
@@ -2361,6 +2370,70 @@ _AUTOTRAIN_PLAYER_ATTRS = [
     "SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH", "EM", "MO",
 ]
 
+# ── CPU reference training ────────────────────────────────────────────────────
+# CPU auto-train trains the coaching-quality REFERENCE (was: random allocation +
+# random focus, which nets −9 RT/season and scores well below 1.0 → the league
+# drifts under the ladder once quality is live). Position fit now discounts gain,
+# so auto-train groups by development position to preserve each role's intended
+# reference emphasis rather than to make differently priced plans affordable.
+# Each player's own reference top-3 is still amplified via player-maximizer CUSTOM
+# focus. Bases are FITTED so effective allocation (base × _CPU_FOCUS_AMP_MEAN on
+# each player's reference top-3) scores ~1.0 per position against the FROZEN
+# reference_allocation anchor AND fits the flat 24-point budget with the shared
+# team/breaks footprint. Locked by tests/test_cpu_reference_training.py.
+_CPU_FOCUS_AMP_MEAN = 1.65  # season-mean of random.choice([1.5,1.6,1.7,1.8]) in _apply_player_training_points
+_CPU_REFERENCE_BASE_BY_POS = {
+    "PG": {"ST": 0, "AG": 1, "SC": 0, "SH": 0, "ID": 0, "OD": 0, "PS": 2, "BH": 3, "RB": 0, "FT": 1, "IQ": 1, "ND": 1},
+    "SG": {"ST": 0, "AG": 0, "SC": 2, "SH": 2, "ID": 0, "OD": 2, "PS": 0, "BH": 0, "RB": 0, "FT": 0, "IQ": 1, "ND": 1},
+    "SF": {"ST": 0, "AG": 2, "SC": 2, "SH": 0, "ID": 0, "OD": 2, "PS": 0, "BH": 0, "RB": 0, "FT": 1, "IQ": 1, "ND": 1},
+    "PF": {"ST": 2, "AG": 2, "SC": 0, "SH": 0, "ID": 0, "OD": 0, "PS": 0, "BH": 0, "RB": 2, "FT": 0, "IQ": 1, "ND": 1},
+    "C":  {"ST": 2, "AG": 0, "SC": 2, "SH": 0, "ID": 2, "OD": 0, "PS": 0, "BH": 0, "RB": 1, "FT": 0, "IQ": 1, "ND": 1},
+}
+# Legacy alias — tests / callers that still read a single base use SF substrate.
+_CPU_REFERENCE_BASE = _CPU_REFERENCE_BASE_BY_POS["SF"]
+
+
+def _cpu_reference_top3(position: str) -> list[str]:
+    """The player's development-position reference top-3 (the attrs the frozen
+    reference emphasises). Read from reference_allocation so it stays coupled to the
+    anchor — never hardcoded."""
+    from BackEnd.utils.player_development import reference_allocation, COACHING_REFERENCE_PRIMARY_PTS
+    ref = reference_allocation(position or "SF")
+    return [a for a, pts in ref.items() if pts == COACHING_REFERENCE_PRIMARY_PTS]
+
+
+def _cpu_reference_allocation(position: str | None = None) -> dict:
+    """Per-position base substrate (drill-slider format). ``position=None`` → SF."""
+    b = _CPU_REFERENCE_BASE_BY_POS.get(position or "SF") or _CPU_REFERENCE_BASE_BY_POS["SF"]
+    return {
+        "player_drills": {
+            "offense": {"inside": b["SC"], "outside": b["SH"]},
+            "defense": {"inside": b["ID"], "outside": b["OD"]},
+            "technical": {"passing": b["PS"], "ball_handling": b["BH"], "rebounding": b["RB"]},
+            "weight_room": {"strength": b["ST"], "agility": b["AG"]},
+        },
+        "general": {"conditioning": b["ND"], "free_throws": b["FT"], "film_study": b["IQ"], "breaks": 1},
+        "team_drills": {
+            "team_offense": {"install": 1}, "team_defense": {"install": 1},
+            "fast_breaks": {"offense_install": 1, "defense_install": 1}, "scrimmages": 1,
+            "presses_traps": {"defense_install": 1, "offense_install": 1},
+        },
+    }
+
+
+def _cpu_reference_custom_focus(players_for_training: list[dict], fpd_by_player_id: dict) -> dict:
+    """Map every roster player → his development-position reference top-3, so
+    player-maximizer-custom amplifies each player toward his own position. Uses
+    position_intent (always present); falls back to the primary RT position."""
+    from BackEnd.constants.training_shape import resolve_training_position
+    out: dict[str, list[str]] = {}
+    for p in players_for_training:
+        pid = str(p["_id"])
+        fp = fpd_by_player_id.get(pid) or {}
+        pos = resolve_training_position(fp)
+        out[pid] = _cpu_reference_top3(pos)
+    return out
+
 
 def auto_train_one_cpu_team(
     franchise_id: ObjectId,
@@ -2373,10 +2446,9 @@ def auto_train_one_cpu_team(
     ftd_doc: dict | None = None,
     fpd_by_player_id: dict | None = None,
 ) -> dict:
-    """Run REAL auto-train for ONE CPU team — the sunset replacement for distant training.
+    """Run real auto-training for one CPU team using the shared training engine.
 
-    Unlike distant training (canned template deltas, no play/scouting effectiveness), this runs
-    the same ``execute_training`` engine the user's team uses, with a per-team auto-train roll, so
+    This runs the same ``execute_training`` engine the user's team uses, with a per-team auto-train roll, so
     CPU teams train every surface the user does. Pure per-team: reads/writes only this team's FPD +
     FTD (disjoint from every other team), so it parallelizes safely.
 
@@ -2421,6 +2493,8 @@ def auto_train_one_cpu_team(
             )
         }
 
+    from BackEnd.constants.training_shape import training_position_projection
+
     players_for_training: list[dict] = []
     for pid in team_player_ids:
         fp = fpd_by_player_id.get(str(pid))
@@ -2434,16 +2508,28 @@ def auto_train_one_cpu_team(
             "team": str(team_id),
             "attributes": fp.get("attributes", {}),
             "position_ratings": fp.get("position_ratings", {}),
+            **training_position_projection(fp),
+            "training_gain_remainders": dict(fp.get("training_gain_remainders") or {}),
             "year": meta.get("year"),
             "meta": meta,
         })
     if not players_for_training:
         return {"status": "error", "reason": "no_players", "team_id": str(team_id)}
 
-    is_first = is_first_training if is_first_training is not None else (week == 1)
-    points = 30 if is_first else 24
-    allocations = generate_random_training_allocations(points)  # per-team roll
-    coaching_focus = generate_random_coaching_focus()           # per-team roll
+    from BackEnd.constants.training_shape import (
+        CAMP_GAIN_SCALE,
+        is_camp_week,
+        resolve_training_position,
+    )
+    is_camp = (
+        bool(is_first_training)
+        if is_first_training is not None
+        else is_camp_week(week)
+    )
+
+    # Per-position bases + per-player custom focus (gain-side fit model).
+    coaching_focus = "player-maximizer-custom"
+    coaching_focus_custom_by_player = _cpu_reference_custom_focus(players_for_training, fpd_by_player_id)
 
     team_stats = dict(ftd_doc.get("team_attributes") or {})
     plays_data = ftd_doc.get("plays") or {}
@@ -2462,19 +2548,52 @@ def auto_train_one_cpu_team(
     # errors). Quiet just this engine's logger for the call — user-team training, on a
     # different path, stays fully verbose.
     from BackEnd.utils.headless_simulation import quiet_training_engine_logs
+    from collections import defaultdict
+
+    groups: dict[str, list] = defaultdict(list)
+    for p in players_for_training:
+        pos = resolve_training_position(p)
+        groups[pos].append(p)
+
+    updated_players: list = []
+    updated_team = team_stats
+    updated_plays = plays_data
+    updated_scouting = scouting_data
+    training_report: dict = {}
+    gain_scale = CAMP_GAIN_SCALE if is_camp else None
+    apply_team_drills = True
     with quiet_training_engine_logs():
-        updated_players, updated_team, updated_plays, updated_scouting, training_report = execute_training(
-            players_for_training,
-            team_stats,
-            allocations,
-            coaching_focus,
-            plays_data=plays_data,
-            strategy_settings=strategy_settings,
-            playbook_settings=playbook_settings,
-            scouting_data=scouting_data,
-            playbook_training_mode="current-playbooks",
-            skip_pre_training_depreciation=is_first,
-        )
+        for pos, group in groups.items():
+            allocations = _cpu_reference_allocation(pos)
+            if not apply_team_drills:
+                allocations = {
+                    "player_drills": allocations["player_drills"],
+                    "general": {
+                        "conditioning": allocations["general"]["conditioning"],
+                        "free_throws": allocations["general"]["free_throws"],
+                        "film_study": allocations["general"]["film_study"],
+                    },
+                    "team_drills": {},
+                }
+            up, updated_team, updated_plays, updated_scouting, training_report = execute_training(
+                group,
+                updated_team,
+                allocations,
+                coaching_focus,
+                plays_data=updated_plays,
+                strategy_settings=strategy_settings,
+                playbook_settings=playbook_settings,
+                scouting_data=updated_scouting,
+                playbook_training_mode="current-playbooks",
+                skip_pre_training_depreciation=is_camp,
+                coaching_focus_custom_by_player=coaching_focus_custom_by_player,
+                gain_scale=gain_scale,
+            )
+            updated_players.extend(up)
+            apply_team_drills = False
+
+    # Compat: callers still key off is_first for camp-weight coaching-focus counts.
+    is_first = is_camp
 
     position_ratings_updates: dict[str, dict] = {}
     for player in updated_players:
@@ -2523,6 +2642,9 @@ def auto_train_one_cpu_team(
                     fpd_set[f"attributes.{attr}"] = attrs[attr]
             if "NG" in attrs:
                 fpd_set["attributes.NG"] = attrs["NG"]
+            fpd_set["training_gain_remainders"] = dict(
+                player.get("training_gain_remainders") or {}
+            )
             if pid in position_ratings_updates:
                 fpd_set["position_ratings"] = position_ratings_updates[pid]
             if fpd_set:
@@ -2585,6 +2707,50 @@ class TeamSelection(BaseModel):
     team_name: str
     # Optional mode-select slot (1 or 2). Server assigns first free slot if omitted/invalid.
     home_slot: int | None = None
+
+
+class TeamBuilderCourtParams(BaseModel):
+    """Court colour recipe — never a rendered image (§6.3b)."""
+
+    hardwoodStyle: str = "medium_medium"
+    oobColor: str
+    laneColor: str
+    outsideWoodColor: str
+    halfArcFillColor: str
+    # Optional custom inside-the-arcs wood (symmetric with outsideWoodColor).
+    insideWoodColor: str | None = None
+
+
+class TeamBuilderApplyRequest(BaseModel):
+    """Apply Team Builder at franchise creation. Franchise is created only on Apply."""
+
+    replaced_object_id: str
+    home_slot: int | None = None
+    name: str
+    abbreviation: str
+    mascot: str | None = None
+    primary_color: str
+    secondary_color: str
+    # 1 = SOLID, 2 = SOLID WITH TRIM (maps to uniforms body / body+trim)
+    jersey_preset: int | None = 1
+    # Court recipe — nested on franchises.team_builder with primary/secondary.
+    # Never a rendered image; never written to FTD.
+    court: TeamBuilderCourtParams | None = None
+    # edit only — Keep / Generate / import retired (§4.5c / CSV retirement)
+    roster_mode: str = "edit"
+    # capped | uncapped — determines online eligibility (v2 §4)
+    attribute_mode: str = "capped"
+    # Alias accepted from the FE build_mode gate; stored as attribute_mode.
+    build_mode: str | None = None
+    # Authored edit rows for the 15 (diff onto inherited). Not a CSV import path.
+    imported_players: list[dict[str, Any]] | None = None
+    # Optional capped budgets for the authored 15 (wizard walk-on totals included).
+    per_player_budgets: list[int] | None = None
+    # Wizard draft key — used to clear idempotent walk-on storage after Apply.
+    draft_id: str | None = None
+    # Banner composition key (baseline default).
+    banner_variant: str | None = None
+
 
 class PlayGameRequest(BaseModel):
     franchise_id: str
@@ -2885,174 +3051,15 @@ def _build_franchise_game_inbox_entry(
     }
 
 
-def _distant_sim_home_team_chemistry_bonus(home_ftd: dict) -> int:
-    """Home win-roll bonus: 2 × team_chemistry from FTD team_attributes (Distant_Game_Sim_System.md)."""
-    from BackEnd.distant_sim_engine import distant_sim_home_chemistry_bonus
-
-    raw = (home_ftd.get("team_attributes") or {}).get("team_chemistry")
-    return distant_sim_home_chemistry_bonus(raw)
-
-
-def _distant_sim_regular_season_standings(
-    franchise_doc: dict[str, Any],
-    team_ids_map: dict[str, Any],
-) -> dict[str, dict[str, int]]:
-    """
-    W/L/PF/PA from franchise.results for regular season weeks only (same slice as standings W/L
-    when postseason rows live under higher week keys). Uses calculate_franchise_standings.
-    """
-    from BackEnd.utils.franchise_standings import calculate_franchise_standings
-
-    rs_slice: dict[str, Any] = {}
-    for wk, games in (franchise_doc.get("results") or {}).items():
-        try:
-            wi = int(wk)
-        except (TypeError, ValueError):
-            continue
-        if 1 <= wi <= ScheduleManager.REGULAR_SEASON_WEEKS:
-            rs_slice[str(wk)] = games
-    return calculate_franchise_standings(rs_slice, team_ids_map)
-
-
-def _distant_sim_batch_fpd_map(
-    franchise_id: ObjectId,
-    ftd_by_team_id: dict[str, dict],
-) -> dict[str, dict[str, Any]]:
-    """Batch-load FPD attributes for all active rosters in a distant-sim week."""
-    player_ids: list[str] = []
-    seen: set[str] = set()
-    for doc in ftd_by_team_id.values():
-        for pid in doc.get("players") or []:
-            s = str(pid)
-            if s and s not in seen:
-                seen.add(s)
-                player_ids.append(s)
-    if not player_ids:
-        return {}
-    return _load_fpd_map(franchise_id, player_ids)
-
-
-def _distant_sim_momentum_multiplier(team_chemistry_raw: Any) -> int:
-    """Momentum multiplier from team chemistry. Distant_Game_Sim_System.md."""
-    from BackEnd.distant_sim_engine import distant_sim_momentum_multiplier
-
-    return distant_sim_momentum_multiplier(team_chemistry_raw)
-
-
-def _distant_sim_momentum_term(
-    ftd_doc: dict,
-    season_wins: int,
-    season_losses: int,
-) -> int:
-    """DISTANT_MO_MULT × (regular-season wins − losses). Distant_Game_Sim_System.md."""
-    from BackEnd.distant_sim_engine import distant_sim_record_momentum
-
-    raw = (ftd_doc.get("team_attributes") or {}).get("team_chemistry")
-    return distant_sim_record_momentum(
-        raw,
-        season_wins=season_wins,
-        season_losses=season_losses,
-    )
-
-
-def _distant_sim_team_combined(
-    ftd_doc: dict,
-    team_object_id: Any,
-    *,
-    is_home: bool,
-    rs_standings: dict[str, dict[str, int]],
-    fpd_by_player_id: dict[str, dict] | None = None,
-    current_week: int = 0,
-) -> int:
-    """Base + record momentum + season momentum + tier adj + home bonus. See Distant_Game_Sim_System.md."""
-    from BackEnd.distant_sim_engine import distant_sim_team_combined
-
-    tid = str(team_object_id)
-    row = rs_standings.get(tid) or {}
-    wins = int(row.get("W", 0) or 0)
-    losses = int(row.get("L", 0) or 0)
-    return distant_sim_team_combined(
-        ftd_doc,
-        season_wins=wins,
-        season_losses=losses,
-        is_home=is_home,
-        fpd_by_player_id=fpd_by_player_id,
-        current_week=current_week,
-    )
-
-
-def _run_distant_game_sim(home_combined: int, away_combined: int) -> Tuple[int, int]:
-    """
-    Lightweight sim for distant (non-user-conference) games.
-    Uses win probability roll, margin from dominance buckets, and clamped final scores.
-    Returns (home_score, away_score).
-    Callers pass home_combined / away_combined after base + momentum + home chemistry bonus.
-    See _documentation_master/06_GMO_Supporting_Systems/Distant_Game_Sim_System.md
-    """
-    combined_total = home_combined + away_combined
-    if combined_total <= 0:
-        combined_total = 1
-    roll = random.randint(1, combined_total)
-    home_won = roll <= home_combined
-    threshold = home_combined
-
-    # Dominance: 0.0 = nail-biter, 1.0 = blowout
-    if home_won:
-        dominance = (threshold - roll) / threshold if threshold > 0 else 0.0
-    else:
-        denom = combined_total - threshold
-        dominance = (roll - threshold) / denom if denom > 0 else 0.0
-    dominance = max(0.0, min(1.0, dominance))
-
-    # Map dominance to margin bucket (D1 distribution)
-    if dominance < 0.18:
-        margin = random.randint(1, 3)
-    elif dominance < 0.45:
-        margin = random.randint(4, 9)
-    elif dominance < 0.77:
-        margin = random.randint(10, 19)
-    else:
-        margin = random.randint(20, 40)
-
-    # Rating gap modifier
-    gap = abs(home_combined - away_combined) / combined_total
-    if gap > 0.35:
-        margin = int(margin * 1.50)
-    elif gap > 0.20:
-        margin = int(margin * 1.25)
-
-    # Final scores: total_points from normal(138, 15) clamped [78, 220]
-    total_points = int(round(max(78, min(220, random.gauss(138, 15)))))
-    winning_score = math.ceil((total_points + margin) / 2)
-    losing_score = winning_score - margin
-
-    # Clamp losing floor
-    if losing_score < 39:
-        losing_score = 39
-        winning_score = losing_score + margin
-    # Clamp winning ceiling
-    if winning_score > 121:
-        winning_score = 121
-        losing_score = winning_score - margin
-    # If both clamps conflict, margin gives way
-    if losing_score < 39:
-        losing_score = 39
-        margin = winning_score - losing_score
-
-    if home_won:
-        return (winning_score, losing_score)
-    return (losing_score, winning_score)
-
-
-def _distant_sim_persist_momentum_score_updates(
+def _persist_legacy_season_momentum_updates(
     franchise_id: ObjectId,
     *,
     winner_team_object_id: ObjectId,
     loser_team_object_id: ObjectId,
     ftd_cache: dict[str, dict] | None = None,
 ) -> None:
-    """Update FTD momentum_score + distant win/loss streaks after a distant game."""
-    from BackEnd.distant_sim_engine import compute_distant_momentum_score_updates
+    """Preserve the deferred season-momentum update after a full CPU game."""
+    from BackEnd.utils.season_momentum import compute_season_momentum_updates
 
     winner_doc = franchise_team_data_collection.find_one(
         {"franchise_id": franchise_id, "team_id": winner_team_object_id},
@@ -3065,7 +3072,7 @@ def _distant_sim_persist_momentum_score_updates(
     if not winner_doc or not loser_doc:
         return
 
-    winner_updates, loser_updates = compute_distant_momentum_score_updates(
+    winner_updates, loser_updates = compute_season_momentum_updates(
         winner_doc.get("team_attributes"),
         loser_doc.get("team_attributes"),
     )
@@ -3084,82 +3091,6 @@ def _distant_sim_persist_momentum_score_updates(
             if cached is not None:
                 team_attrs = cached.setdefault("team_attributes", {})
                 team_attrs.update(partial)
-
-
-def _distant_sim_apply_result_to_standings_cache(
-    rs_standings: dict[str, dict[str, int]],
-    away_id: Any,
-    home_id: Any,
-    away_score: int,
-    home_score: int,
-) -> None:
-    from BackEnd.distant_sim_engine import distant_sim_apply_result_to_standings_cache
-
-    distant_sim_apply_result_to_standings_cache(
-        rs_standings, away_id, home_id, away_score, home_score
-    )
-
-
-def _persist_distant_franchise_game(
-    *,
-    franchise_id: ObjectId,
-    week: int,
-    away_team_object_id: ObjectId,
-    home_team_object_id: ObjectId,
-    away_score: int,
-    home_score: int,
-    ftd_cache: dict[str, dict] | None = None,
-) -> tuple[dict[str, Any], str]:
-    summary = build_distant_game_summary(
-        franchise_id=str(franchise_id),
-        week=week,
-        home_team_object_id=home_team_object_id,
-        away_team_object_id=away_team_object_id,
-        home_score=home_score,
-        away_score=away_score,
-    )
-    game_id = str(summary["_id"])
-    db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
-    stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
-
-    home_team_id = _normalize_team_id_to_string(home_team_object_id) or str(home_team_object_id)
-    away_team_id = _normalize_team_id_to_string(away_team_object_id) or str(away_team_object_id)
-    if home_score > away_score:
-        winner_id, loser_id = home_team_id, away_team_id
-        winner_oid, loser_oid = home_team_object_id, away_team_object_id
-        winner_score, loser_score = home_score, away_score
-    else:
-        winner_id, loser_id = away_team_id, home_team_id
-        winner_oid, loser_oid = away_team_object_id, home_team_object_id
-        winner_score, loser_score = away_score, home_score
-    _finalize_team_attributes_for_game(
-        game_id=game_id,
-        franchise_id=franchise_id,
-        home_team_id=home_team_id,
-        away_team_id=away_team_id,
-        winner_id=winner_id,
-        loser_id=loser_id,
-        winner_score=winner_score,
-        loser_score=loser_score,
-        week=week,
-    )
-    _distant_sim_persist_momentum_score_updates(
-        franchise_id,
-        winner_team_object_id=winner_oid,
-        loser_team_object_id=loser_oid,
-        ftd_cache=ftd_cache,
-    )
-
-    sim_res = _save_game_result(
-        away_team_object_id,
-        home_team_object_id,
-        away_score,
-        home_score,
-        week,
-        franchise_id=str(franchise_id),
-        game_id=game_id,
-    )
-    return sim_res, game_id
 
 
 def _build_user_eos_sim_scope(
@@ -3203,37 +3134,8 @@ def _should_use_tbt_for_eos_game(
     game_meta: dict[str, Any],
     user_scope: dict[str, Any],
 ) -> bool:
-    """Return True when an EOS matchup should use turn-by-turn sim."""
-    # Distant Sim sunset (flag, default OFF): when full-sim is forced, EVERY EOS
-    # game — not just the user's bracket — runs turn-by-turn. These fall through to
-    # the same full_jobs/pool path the user-bracket EOS games already use, so
-    # bracket advancement is unchanged; it just skips the distant scorer. This is
-    # the EOS half of the sunset (regular season is gated in the is_distant ladder).
-    # See _documentation_master/projects/Distant_Sim_Removal_Plan.md (Phase A).
-    if _franchise_all_games_full_sim():
-        return True
-
-    if not user_scope.get("active"):
-        return False
-
-    if week in ft.EOS_CONFERENCE_WEEKS:
-        conference = game_meta.get("conference")
-        if week in (27, 28):
-            return conference == user_scope.get("conference")
-        if week == 29:
-            return conference in set(user_scope.get("region_conferences") or ())
-        return False
-
-    if week in ft.EOS_REGION_WEEKS:
-        return (
-            game_meta.get("phase") == "region"
-            and game_meta.get("region") == user_scope.get("region")
-        )
-
-    if week in ft.EOS_NATIONAL_WEEKS:
-        return True
-
-    return False
+    """All EOS matchups use the authoritative turn-by-turn simulation engine."""
+    return True
 
 
 def _get_user_eos_phase_status(
@@ -3715,6 +3617,835 @@ def select_team(
         traceback.print_exc(file=sys.stderr)
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
+@router.get("/franchise/team-builder")
+def get_team_builder_page():
+    return FileResponse(STATIC_DIR / "team-builder.html")
+
+
+@router.get("/franchise/team-builder/slot-roster")
+def team_builder_slot_roster_json(
+    object_id: str = Query(..., description="Core team ObjectId for the replaced slot"),
+    user: dict = Depends(get_current_user),
+):
+    """Scholarship roster as JSON for the Team Builder editor (identity-keyed)."""
+    from BackEnd.utils.team_builder_roster import build_slot_roster_players
+
+    _ = user
+    try:
+        team_oid = ObjectId(str(object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="object_id must be a team ObjectId")
+
+    team_doc = db.teams.find_one({"_id": team_oid}, {"name": 1})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Program not found")
+
+    try:
+        players = build_slot_roster_players(db, team_oid)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Program not found")
+
+    return {
+        "replaced_object_id": str(team_oid),
+        "team_name": team_doc.get("name"),
+        "players": players,
+    }
+
+
+@router.get("/franchise/team-builder/league-context")
+def team_builder_league_context(user: dict = Depends(get_current_user)):
+    """
+    Runtime league attribute context for the wizard (Decision #5 / §4.5a).
+
+    Uncapped pool and markers are 15-player franchise totals when available.
+    """
+    _ = user
+    from BackEnd.utils.team_builder_league_context import compute_league_attr_context
+
+    return compute_league_attr_context(db)
+
+
+class TeamBuilderWizardWalkOnsRequest(BaseModel):
+    """Idempotent walk-on draw keyed on draft + replaced slot (§4.5a / Decision #25)."""
+
+    replaced_object_id: str
+    draft_id: str
+
+
+class TeamBuilderPortraitPlayer(BaseModel):
+    """Classifier inputs for one wizard roster slot (§6.5)."""
+
+    first_name: str = ""
+    last_name: str = ""
+    class_year: str | None = None
+    height_in: int | None = None
+    weight_lb: int | None = None
+    attributes: dict[str, Any] | None = None
+    player_id: str | None = None
+    image_id: str | None = None
+    position_ratings: dict[str, Any] | None = None
+
+
+class TeamBuilderPortraitsAssignRequest(BaseModel):
+    replaced_object_id: str
+    draft_id: str
+    players: list[TeamBuilderPortraitPlayer]
+    force_reassign: bool = False
+    # §10.4 — re-run assignment for these slots only (height edit); locked picks omitted by FE.
+    force_reassign_slots: list[int] | None = None
+
+
+class TeamBuilderPortraitRerollRequest(BaseModel):
+    replaced_object_id: str
+    draft_id: str
+    slot: int
+    players: list[TeamBuilderPortraitPlayer]
+
+
+class TeamBuilderPortraitPickRequest(BaseModel):
+    replaced_object_id: str
+    draft_id: str
+    slot: int
+    image_id: str
+    players: list[TeamBuilderPortraitPlayer]
+
+
+# Eleven RT-weighted attributes — ND is intentionally excluded (budget only).
+_TB_RT_ATTR_KEYS = ("AG", "BH", "FT", "ID", "IQ", "OD", "PS", "RB", "SC", "SH", "ST")
+
+
+class TeamBuilderRatingsPlayer(BaseModel):
+    """Nested attributes + height only — one shape, no top-level attr fallback."""
+
+    player_id: str | None = None
+    height: float
+    attributes: dict[str, Any]
+
+
+class TeamBuilderPositionRatingsRequest(BaseModel):
+    """Builder-only; wraps compute_position_ratings. Does not persist."""
+
+    players: list[TeamBuilderRatingsPlayer]
+
+
+class TeamBuilderDraftUpsertRequest(BaseModel):
+    replaced_object_id: str
+    draft_id: str | None = None
+    chapter: str | None = None
+    build_mode: str | None = None
+    identity: dict[str, Any] | None = None
+    roster: dict[str, Any] | None = None
+    portraits: list[dict[str, Any]] | None = None
+    walk_ons: list[dict[str, Any]] | None = None
+    extra: dict[str, Any] | None = None
+
+
+@router.post("/franchise/team-builder/position-ratings")
+def team_builder_position_ratings(
+    body: TeamBuilderPositionRatingsRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Recompute position ratings via ``compute_position_ratings`` only.
+
+    Builder-only, stateless. Refuses missing height or any of the eleven RT
+    attribute keys (no fail-open defaults). Nested ``attributes`` shape only.
+    """
+    from BackEnd.utils.position_ratings import compute_position_ratings
+
+    _ = user  # auth dependency — same as other franchise routes
+    if not body.players:
+        raise HTTPException(status_code=400, detail="players is required")
+    if len(body.players) > 15:
+        raise HTTPException(status_code=400, detail="at most 15 players per request")
+
+    out: list[dict[str, Any]] = []
+    for idx, row in enumerate(body.players):
+        try:
+            height = float(row.height)
+        except (TypeError, ValueError):
+            raise HTTPException(
+                status_code=400,
+                detail=f"players[{idx}].height is required",
+            )
+        if height <= 0:
+            raise HTTPException(
+                status_code=400,
+                detail=f"players[{idx}].height must be positive",
+            )
+        attrs = row.attributes if isinstance(row.attributes, dict) else None
+        if not attrs:
+            raise HTTPException(
+                status_code=400,
+                detail=f"players[{idx}].attributes is required",
+            )
+        missing = [k for k in _TB_RT_ATTR_KEYS if k not in attrs or attrs.get(k) is None]
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"players[{idx}].attributes missing keys: {', '.join(missing)}",
+            )
+        # Nested shape only — do not pass top-level attribute keys.
+        payload = {"height": height, "attributes": {k: attrs[k] for k in _TB_RT_ATTR_KEYS}}
+        ratings = compute_position_ratings(payload)
+        item: dict[str, Any] = {"position_ratings": ratings}
+        if row.player_id:
+            item["player_id"] = row.player_id
+        out.append(item)
+
+    return {"players": out}
+
+
+@router.get("/franchise/team-builder/drafts")
+def team_builder_list_drafts(user: dict = Depends(get_current_user)):
+    """Unfinished programs for Program Select — looked up by user_id, not localStorage."""
+    from BackEnd.utils.team_builder_drafts import list_unfinished_drafts
+
+    drafts = list_unfinished_drafts(db, user_id=str(user.get("user_id") or ""))
+    return {"drafts": drafts}
+
+
+@router.post("/franchise/team-builder/drafts")
+def team_builder_upsert_draft(
+    body: TeamBuilderDraftUpsertRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist one unfinished draft per (user, franchise slot)."""
+    from BackEnd.utils.team_builder_drafts import upsert_draft
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    if not db.teams.find_one({"_id": replaced_oid}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Replaced program not found")
+
+    patch: dict[str, Any] = {}
+    if body.chapter is not None:
+        patch["chapter"] = body.chapter
+    if body.build_mode is not None:
+        patch["build_mode"] = body.build_mode
+    if body.identity is not None:
+        patch["identity"] = body.identity
+    if body.roster is not None:
+        patch["roster"] = body.roster
+    if body.portraits is not None:
+        patch["portraits"] = body.portraits
+    if body.walk_ons is not None:
+        patch["walk_ons"] = body.walk_ons
+    if body.extra is not None:
+        patch["extra"] = body.extra
+
+    try:
+        doc = upsert_draft(
+            db,
+            user_id=str(user.get("user_id") or ""),
+            replaced_object_id=str(replaced_oid),
+            patch=patch,
+            draft_id=body.draft_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"draft": doc}
+
+
+@router.delete("/franchise/team-builder/drafts/{replaced_object_id}")
+def team_builder_discard_draft(
+    replaced_object_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Explicit discard of an unfinished program for one slot."""
+    from BackEnd.utils.team_builder_drafts import delete_draft_for_slot
+
+    try:
+        replaced_oid = ObjectId(str(replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    deleted = delete_draft_for_slot(
+        db,
+        user_id=str(user.get("user_id") or ""),
+        replaced_object_id=str(replaced_oid),
+    )
+    return {"deleted": deleted}
+
+
+@router.post("/franchise/team-builder/wizard-walk-ons")
+def team_builder_wizard_walk_ons(
+    body: TeamBuilderWizardWalkOnsRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Return three walk-ons for the Team Builder wizard (§4.5a).
+
+    Uses generate_walk_on_profile() on first draw for (user, draft_id, slot).
+    Repeat calls with the same key return the same three players (same ids and
+    attributes) so a reload or retry cannot shop for a larger capped budget.
+    """
+    from BackEnd.utils.team_builder_roster import (
+        compute_inherited_shape_budgets,
+        get_or_create_wizard_walk_ons,
+        load_core_roster_rows_for_slot,
+    )
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    draft_id = str(body.draft_id or "").strip()
+    if len(draft_id) < 8 or len(draft_id) > 80:
+        raise HTTPException(status_code=400, detail="draft_id is required")
+
+    if not db.teams.find_one({"_id": replaced_oid}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Replaced program not found")
+
+    try:
+        walk_ons = get_or_create_wizard_walk_ons(
+            db,
+            user_id=str(user.get("user_id") or ""),
+            replaced_object_id=str(replaced_oid),
+            draft_id=draft_id,
+        )
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Unable to resolve wizard walk-ons key")
+
+    core_rows = load_core_roster_rows_for_slot(db, replaced_oid)
+    shape = compute_inherited_shape_budgets(core_rows, walk_ons)
+
+    return {
+        "walk_ons": walk_ons,
+        "draft_id": draft_id,
+        "replaced_object_id": str(replaced_oid),
+        # §10 — domain shipped as data; FE must not derive budgets or class ranks.
+        "height_budget": shape["height_budget"],
+        "class_budget": shape["class_budget"],
+        "class_rank": shape["class_rank"],
+        "height_min_in": shape["height_min_in"],
+        "height_max_in": shape["height_max_in"],
+    }
+
+
+def _tb_portrait_players_payload(
+    rows: list[TeamBuilderPortraitPlayer],
+) -> list[dict[str, Any]]:
+    out: list[dict[str, Any]] = []
+    for row in rows:
+        out.append(
+            {
+                "first_name": row.first_name,
+                "last_name": row.last_name,
+                "class_year": row.class_year,
+                "height_in": row.height_in,
+                "weight_lb": row.weight_lb,
+                "attributes": dict(row.attributes or {}),
+                "player_id": row.player_id,
+                "image_id": row.image_id,
+                "position_ratings": dict(row.position_ratings or {}) or None,
+            }
+        )
+    return out
+
+
+@router.post("/franchise/team-builder/portraits/assign")
+def team_builder_portraits_assign(
+    body: TeamBuilderPortraitsAssignRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Auto-assign all 15 portraits via the existing classifier (§6.5). Idempotent per draft."""
+    from BackEnd.utils.team_builder_portraits import get_or_create_wizard_portraits
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    draft_id = str(body.draft_id or "").strip()
+    if len(draft_id) < 8 or len(draft_id) > 80:
+        raise HTTPException(status_code=400, detail="draft_id is required")
+    if len(body.players) != 15:
+        raise HTTPException(status_code=400, detail="Portrait assignment requires exactly 15 players")
+    if not db.teams.find_one({"_id": replaced_oid}, {"_id": 1}):
+        raise HTTPException(status_code=404, detail="Replaced program not found")
+
+    try:
+        portraits = get_or_create_wizard_portraits(
+            db,
+            user_id=str(user.get("user_id") or ""),
+            replaced_object_id=str(replaced_oid),
+            draft_id=draft_id,
+            players=_tb_portrait_players_payload(body.players),
+            force_reassign=bool(body.force_reassign),
+            force_reassign_slots=body.force_reassign_slots,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return {
+        "portraits": portraits,
+        "draft_id": draft_id,
+        "replaced_object_id": str(replaced_oid),
+        "seed_strategy": "mint_player_id_on_first_assign",
+    }
+
+
+@router.post("/franchise/team-builder/portraits/reroll")
+def team_builder_portraits_reroll(
+    body: TeamBuilderPortraitRerollRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Re-roll one slot; skips the current image_id and prefers unused kits."""
+    from BackEnd.utils.team_builder_portraits import (
+        get_or_create_wizard_portraits,
+        reroll_slot_portrait,
+        update_wizard_portrait_slot,
+    )
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    draft_id = str(body.draft_id or "").strip()
+    if len(body.players) != 15:
+        raise HTTPException(status_code=400, detail="Portrait re-roll requires exactly 15 players")
+    players = _tb_portrait_players_payload(body.players)
+    current = get_or_create_wizard_portraits(
+        db,
+        user_id=str(user.get("user_id") or ""),
+        replaced_object_id=str(replaced_oid),
+        draft_id=draft_id,
+        players=players,
+    )
+    try:
+        assignment = reroll_slot_portrait(
+            players, slot=int(body.slot), current_assignments=current
+        )
+        portraits = update_wizard_portrait_slot(
+            db,
+            user_id=str(user.get("user_id") or ""),
+            replaced_object_id=str(replaced_oid),
+            draft_id=draft_id,
+            assignment=assignment,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"portrait": assignment, "portraits": portraits}
+
+
+@router.post("/franchise/team-builder/portraits/pick")
+def team_builder_portraits_pick(
+    body: TeamBuilderPortraitPickRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Optional picker override for one slot — stores meta.image_id only."""
+    from BackEnd.utils.team_builder_portraits import (
+        get_or_create_wizard_portraits,
+        pick_slot_portrait,
+        update_wizard_portrait_slot,
+    )
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+    draft_id = str(body.draft_id or "").strip()
+    if len(body.players) != 15:
+        raise HTTPException(status_code=400, detail="Portrait pick requires exactly 15 players")
+    players = _tb_portrait_players_payload(body.players)
+    current = get_or_create_wizard_portraits(
+        db,
+        user_id=str(user.get("user_id") or ""),
+        replaced_object_id=str(replaced_oid),
+        draft_id=draft_id,
+        players=players,
+    )
+    pid = ""
+    if 0 <= int(body.slot) < len(current):
+        pid = str(current[int(body.slot)].get("player_id") or "")
+    if not pid and 0 <= int(body.slot) < len(players):
+        pid = str(players[int(body.slot)].get("player_id") or "")
+    try:
+        assignment = pick_slot_portrait(
+            slot=int(body.slot),
+            image_id=str(body.image_id).strip(),
+            player_id=pid,
+            players=players,
+        )
+        portraits = update_wizard_portrait_slot(
+            db,
+            user_id=str(user.get("user_id") or ""),
+            replaced_object_id=str(replaced_oid),
+            draft_id=draft_id,
+            assignment=assignment,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return {"portrait": assignment, "portraits": portraits}
+
+
+@router.get("/franchise/team-builder/portraits/catalog")
+def team_builder_portraits_catalog(
+    skin: str | None = None,
+    frame: str | None = None,
+    definition: str | None = None,
+    user: dict = Depends(get_current_user),
+):
+    """Picker catalog — filter chips carry counts before a filter is applied."""
+    from BackEnd.utils.team_builder_portraits import catalog_for_picker
+
+    _ = user
+    return catalog_for_picker(skin=skin, frame=frame, definition=definition)
+
+
+@router.post("/franchise/team-builder/apply")
+def team_builder_apply(
+    body: TeamBuilderApplyRequest,
+    user: dict = Depends(get_current_user),
+):
+    """
+    Create a franchise with a Team Builder overlay for one replaced slot.
+    Franchise creation begins here — not when the wizard opens.
+    """
+    from BackEnd.constants.team_builder_budget import (
+        normalize_attribute_mode,
+        online_eligible_for_mode,
+    )
+    from BackEnd.utils.franchise_team_display import (
+        INSIDE_WOOD_LINE_CONTRAST_MIN,
+        TEAM_BUILDER_FIELD,
+        contrast_ratio,
+        inside_wood_contrast_ok,
+        normalize_banner_variant,
+        normalize_court_params,
+        normalize_jersey_preset,
+    )
+    from BackEnd.utils.team_builder_league_context import compute_league_attr_context
+
+    existing_franchises = db.franchises.count_documents({"user_id": user.get("user_id")})
+    if existing_franchises >= MAX_FRANCHISES_PER_USER:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"You already have {MAX_FRANCHISES_PER_USER} active franchises. "
+                "Delete one before starting another."
+            ),
+        )
+
+    try:
+        replaced_oid = ObjectId(str(body.replaced_object_id).strip())
+    except Exception:
+        raise HTTPException(status_code=400, detail="replaced_object_id must be a team ObjectId")
+
+    team_doc = db.teams.find_one({"_id": replaced_oid})
+    if not team_doc:
+        raise HTTPException(status_code=404, detail="Replaced program not found")
+
+    custom_name = (body.name or "").strip()
+    if not custom_name:
+        raise HTTPException(status_code=400, detail="School name is required")
+    from BackEnd.constants.team_builder_budget import PROGRAM_NAME_MAX_LEN
+
+    if len(custom_name) > PROGRAM_NAME_MAX_LEN:
+        raise HTTPException(
+            status_code=400,
+            detail=f"School name must be at most {PROGRAM_NAME_MAX_LEN} characters",
+        )
+    abbreviation = (body.abbreviation or "").strip().upper()[:3]
+    if len(abbreviation) != 3:
+        raise HTTPException(status_code=400, detail="Abbreviation must be 3 characters")
+
+    # Abbreviation uniqueness vs abbr_from_name of all 128 names (same derive as chrome).
+    from BackEnd.utils.franchise_team_display import abbr_from_name
+
+    for t in db.teams.find({}, {"name": 1}):
+        other = str(t.get("name") or "")
+        if str(t.get("_id")) == str(replaced_oid):
+            continue
+        if abbr_from_name(other) == abbreviation:
+            raise HTTPException(
+                status_code=400,
+                detail=f"{abbreviation} is already used by {other}. Try another abbreviation.",
+            )
+
+    _ensure_home_slots_for_user(user.get("user_id"))
+    home_slot = _allocate_home_slot(user.get("user_id"), body.home_slot)
+
+    roster_mode = (body.roster_mode or "edit").strip().lower()
+    if roster_mode != "edit":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Roster path must be edit. CSV import, Keep, and Generate are retired — "
+                "author all 15 in the editor."
+            ),
+        )
+    # FE may send build_mode from the gate; attribute_mode is the stored field.
+    attribute_mode = normalize_attribute_mode(
+        body.attribute_mode or body.build_mode or "capped"
+    )
+    # §4.5c: top-up applies on every path; Keep's exemption retired with the path.
+    online_eligible = online_eligible_for_mode(attribute_mode)
+    league_ctx = compute_league_attr_context(db)
+    team_pool = int(league_ctx.get("team_pool") or 0)
+
+    replaced_name = team_doc.get("name") or ""
+    overlay = {
+        "replaced_object_id": str(replaced_oid),
+        "replaced_name": replaced_name,
+        "name": custom_name,
+        "abbreviation": abbreviation,
+        "mascot": (body.mascot or "").strip(),
+        "primary_color": body.primary_color,
+        "secondary_color": body.secondary_color,
+        "jersey_preset": normalize_jersey_preset(body.jersey_preset),
+        "banner_variant": normalize_banner_variant(body.banner_variant),
+        "asset_strategy": "generated",
+        "roster_mode": roster_mode,
+        "attribute_mode": attribute_mode,
+    }
+    if body.court is not None:
+        raw_inside = getattr(body.court, "insideWoodColor", None)
+        if raw_inside not in (None, "") and not inside_wood_contrast_ok(raw_inside):
+            ratio = contrast_ratio(str(raw_inside), "#6e675f")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Inside wood colour contrast against court lines is "
+                    f"{ratio:.2f}:1; need at least {INSIDE_WOOD_LINE_CONTRAST_MIN:.1f}:1"
+                ),
+            )
+
+    court = normalize_court_params(
+        body.court,
+        primary_color=body.primary_color,
+        secondary_color=body.secondary_color,
+    )
+    if court is not None:
+        overlay["court"] = court
+
+    manager = FranchiseManager(db)
+    # Bake custom name into franchise.user_team_id at write time (no news/game docs yet).
+    manager.initialize_season(
+        user_team_id=custom_name,
+        user_team_object_id=str(replaced_oid),
+        user_id=user.get("user_id"),
+    )
+    franchise_id = manager.franchise_id
+
+    # §4.5c: every TB Apply rewrites the slot with minted player_ids (edit + import).
+    from BackEnd.utils.team_builder_roster import (
+        get_or_create_wizard_walk_ons,
+        replace_slot_roster,
+    )
+
+    wizard_walk_ons = None
+    draft_key = str(body.draft_id or "").strip()
+    if draft_key:
+        try:
+            wizard_walk_ons = get_or_create_wizard_walk_ons(
+                db,
+                user_id=str(user.get("user_id") or ""),
+                replaced_object_id=str(replaced_oid),
+                draft_id=draft_key,
+            )
+        except ValueError:
+            wizard_walk_ons = None
+
+    try:
+        replace_slot_roster(
+            franchise_id=franchise_id,
+            team_object_id=replaced_oid,
+            team_name=custom_name,
+            roster_mode=roster_mode,
+            imported_players=body.imported_players,
+            franchise_team_data_collection=franchise_team_data_collection,
+            franchise_players_data_collection=franchise_players_data_collection,
+            attribute_mode=attribute_mode,
+            team_pool=team_pool,
+            per_player_budgets=body.per_player_budgets,
+            players_collection=db.players,
+            wizard_walk_ons=wizard_walk_ons,
+        )
+    except ValueError as exc:
+        msg = str(exc)
+        if msg.startswith("uncapped_pool_exceeded:"):
+            parts = msg.split(":")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Team total {parts[1]} exceeds the league pool "
+                    f"({parts[2]}). Trim attributes or switch modes."
+                ),
+            )
+        if msg.startswith("height_budget_exceeded:"):
+            parts = msg.split(":")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Team height {parts[1]}\" exceeds the inherited total "
+                    f"({parts[2]}\"). Shorten players — under is allowed; over is not."
+                ),
+            )
+        if msg.startswith("class_budget_mismatch:"):
+            parts = msg.split(":")
+            spent = int(parts[1])
+            budget = int(parts[2])
+            delta = spent - budget
+            if delta > 0:
+                detail = (
+                    f"Class total is {delta} over the inherited spend "
+                    f"({spent} vs {budget}). Drop seniority until it matches exactly."
+                )
+            else:
+                detail = (
+                    f"Class total is {-delta} under the inherited spend "
+                    f"({spent} vs {budget}). Add seniority until it matches exactly."
+                )
+            raise HTTPException(status_code=400, detail=detail)
+        if msg.startswith("height_out_of_range:"):
+            parts = msg.split(":")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Height {parts[1]}\" is outside {parts[2]}–{parts[3]} inches."
+                ),
+            )
+        if msg == "class_year_jh_forbidden":
+            raise HTTPException(
+                status_code=400,
+                detail="Junior-high (JH) is not available in Team Builder. Use FR, SO, JR, or SR.",
+            )
+        if msg.startswith("roster_size_invalid:"):
+            parts = msg.split(":")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"A roster holds {parts[2]} players. Your roster has "
+                    f"{parts[1]}. Supply exactly {parts[2]} — not truncated, "
+                    f"not padded."
+                ),
+            )
+        if msg.startswith("capped_roster_too_long:"):
+            parts = msg.split(":")
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"A roster holds {parts[2]} players. Your roster has "
+                    f"{parts[1]}. Supply exactly {parts[2]}."
+                ),
+            )
+        if msg == "capped_roster_empty_slot":
+            raise HTTPException(
+                status_code=400,
+                detail="This program has no roster to edit from.",
+            )
+        logger.exception(
+            "[TEAM-BUILDER] roster replace rejected franchise_id=%s mode=%s",
+            franchise_id,
+            roster_mode,
+        )
+        raise HTTPException(status_code=400, detail="Unable to apply roster changes")
+    except Exception:
+        logger.exception(
+            "[TEAM-BUILDER] roster replace failed franchise_id=%s mode=%s",
+            franchise_id,
+            roster_mode,
+        )
+        raise HTTPException(status_code=500, detail="Unable to apply roster changes")
+
+    # Mode metadata — eligibility is mode-only; soft-budget echo fields retired.
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {
+            "$set": {
+                "home_slot": home_slot,
+                TEAM_BUILDER_FIELD: overlay,
+                "user_team_id": custom_name,
+                "attribute_mode": attribute_mode,
+                # Spec field only. Legacy `online_eligibility` is derived at read edges.
+                "online_eligible": online_eligible,
+            },
+            # Drop v1 twins / unread soft-budget leftovers so names cannot drift.
+            "$unset": {
+                "online_eligibility": "",
+                "hasEverExceededBudget": "",
+                "roster_shape_at_creation": "",
+            },
+        },
+    )
+
+    # Rewrite FPD meta.team for the replaced slot so leaders / baked identity match.
+    try:
+        franchise_players_data_collection.update_many(
+            {
+                "franchise_id": str(franchise_id),
+                "meta.team_id": str(replaced_oid),
+            },
+            {"$set": {"meta.team": custom_name}},
+        )
+        # Also match by core name if team_id wasn't stamped as ObjectId string.
+        franchise_players_data_collection.update_many(
+            {
+                "franchise_id": str(franchise_id),
+                "meta.team": replaced_name,
+            },
+            {"$set": {"meta.team": custom_name}},
+        )
+    except Exception:
+        logger.exception("[TEAM-BUILDER] FPD meta.team rewrite failed")
+
+    # §6.5 / criterion 28: eager-paint uniformed masters in custom colours + mascot.
+    portrait_paint: dict[str, Any] = {
+        "attempted": 0,
+        "painted": 0,
+        "already_existed": 0,
+        "skipped_no_image_id": 0,
+        "skipped_no_kit": [],
+        "failed": [],
+        "r2_configured": False,
+    }
+    try:
+        portrait_paint = _warm_team_builder_roster_masters(
+            franchise_id=franchise_id,
+            team_object_id=replaced_oid,
+            primary_color=body.primary_color,
+            secondary_color=body.secondary_color,
+            mascot=(body.mascot or "").strip(),
+        )
+    except Exception:
+        logger.exception("[TEAM-BUILDER] portrait warm-paint failed")
+        portrait_paint["failed"].append({"error": "warm_paint_aborted"})
+
+    try:
+        from BackEnd.utils.team_builder_drafts import delete_draft_for_slot
+
+        # Drop drafts for this user — Apply completed; budgets are frozen on FPD.
+        delete_draft_for_slot(db, user_id=str(user.get("user_id") or ""))
+    except Exception:
+        logger.exception("[TEAM-BUILDER] wizard walk-on draft cleanup failed")
+
+    eligible = bool(online_eligible)
+    return {
+        "status": "ok",
+        "franchise_id": str(franchise_id),
+        "home_slot": home_slot,
+        "team_builder": overlay,
+        "attribute_mode": attribute_mode,
+        "online_eligible": eligible,
+        # Derived alias for v1 readers — never assigned independently.
+        "online_eligibility": eligible,
+        "portrait_paint": {
+            "painted": int(portrait_paint.get("painted") or 0),
+            "already_existed": int(portrait_paint.get("already_existed") or 0),
+            "attempted": int(portrait_paint.get("attempted") or 0),
+            "skipped_no_image_id": int(portrait_paint.get("skipped_no_image_id") or 0),
+            "skipped_no_kit_count": len(portrait_paint.get("skipped_no_kit") or []),
+            "failed_count": len(portrait_paint.get("failed") or []),
+            "failed": portrait_paint.get("failed") or [],
+            "skipped_no_kit": portrait_paint.get("skipped_no_kit") or [],
+            "r2_configured": bool(portrait_paint.get("r2_configured")),
+        },
+    }
+
+
 @router.get("/franchise/command-center")
 def command_center():
     return FileResponse(STATIC_DIR / "franchise-command-center.html")
@@ -3735,7 +4466,7 @@ def play_next_game(
     user_team_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     if not user_team_name or not user_team_object_id:
         raise HTTPException(status_code=404, detail="User team not found in franchise")
-    
+
     # Resolve user_team_object_id to ObjectId for matching
     try:
         user_team_id = ObjectId(user_team_object_id)
@@ -3786,9 +4517,19 @@ def play_next_game(
                 eos_meta["conference"] = g.get("conference")
             if g.get("region") is not None:
                 eos_meta["region"] = g.get("region")
+            # Identity fields (home/away) = core names for sim/init payloads + matchup gate.
+            # Display fields are chrome-only (resolver at the edge).
+            from BackEnd.utils.franchise_team_display import resolve_team_display
+
+            home_core = home_doc.get("name", "") if home_doc else ""
+            away_core = away_doc.get("name", "") if away_doc else ""
+            home_disp = resolve_team_display(franchise_doc, home_id, core_doc=home_doc)
+            away_disp = resolve_team_display(franchise_doc, away_id, core_doc=away_doc)
             matchup = {
-                "home": home_doc.get("name", "") if home_doc else "",
-                "away": away_doc.get("name", "") if away_doc else "",
+                "home": home_core,
+                "away": away_core,
+                "home_display": home_disp.get("name") or home_core,
+                "away_display": away_disp.get("name") or away_core,
                 "home_id": str(home_id),
                 "away_id": str(away_id),
                 "week": manager.week,
@@ -3802,9 +4543,17 @@ def play_next_game(
                 if away_id == user_team_id or home_id == user_team_id:
                     away_doc = db.teams.find_one({"_id": away_id}, {"name": 1})
                     home_doc = db.teams.find_one({"_id": home_id}, {"name": 1})
+                    from BackEnd.utils.franchise_team_display import resolve_team_display
+
+                    home_core = home_doc.get("name", "") if home_doc else ""
+                    away_core = away_doc.get("name", "") if away_doc else ""
+                    home_disp = resolve_team_display(franchise_doc, home_id, core_doc=home_doc)
+                    away_disp = resolve_team_display(franchise_doc, away_id, core_doc=away_doc)
                     matchup = {
-                        "home": home_doc.get("name", ""),
-                        "away": away_doc.get("name", ""),
+                        "home": home_core,
+                        "away": away_core,
+                        "home_display": home_disp.get("name") or home_core,
+                        "away_display": away_disp.get("name") or away_core,
                         "home_id": str(home_id),
                         "away_id": str(away_id),
                         "week": manager.week,
@@ -4065,30 +4814,6 @@ def _franchise_cpu_use_pool() -> bool:
     per-service with FRANCHISE_CPU_SIM_USE_POOL=1 (no code deploy needed to flip).
     """
     return os.environ.get("FRANCHISE_CPU_SIM_USE_POOL", "0") in ("1", "true", "True")
-
-
-def _franchise_all_games_full_sim() -> bool:
-    """Sunset Distant Sim: route EVERY regular-season CPU game to full Turn-by-Turn.
-
-    FLAG — DEFAULTS OFF, so the deploy is behavior-neutral. When on
-    (FRANCHISE_ALL_GAMES_FULL_SIM=1), the is_distant decision is forced False for
-    regular-season games (EOS already forces full sim), AND the full-sim path
-    applies the post-game momentum update that the distant path used to own — so
-    momentum keeps being game-driven for all teams. Flip to 0 to revert instantly,
-    no deploy. Pair with FRANCHISE_CPU_SIM_USE_POOL=1 so 63 full games stay fast.
-    """
-    return os.environ.get("FRANCHISE_ALL_GAMES_FULL_SIM", "0") in ("1", "true", "True")
-
-
-def _franchise_all_teams_autotrain() -> bool:
-    """Sunset Distant Training: run REAL auto-train (execute_training) for every CPU team.
-
-    FLAG — DEFAULTS OFF, so the deploy is behavior-neutral. When on
-    (FRANCHISE_ALL_TEAMS_AUTOTRAIN=1), _apply_franchise_distant_cpu_training routes to
-    _run_all_cpu_autotrain instead of the template deltas — so CPU teams train play +
-    scouting effectiveness like the user's team does. Flip to 0 to revert instantly.
-    """
-    return os.environ.get("FRANCHISE_ALL_TEAMS_AUTOTRAIN", "0") in ("1", "true", "True")
 
 
 def _utc_now_iso() -> str:
@@ -4594,8 +5319,8 @@ def _run_franchise_cpu_full_simulation_core(
     # gates, pass census/lanes, stepstate, playbook diag, dynamic gates, shot-select,
     # etc.). The "Turn N RESULT" print is separately suppressed by the
     # _headless_simulation flag set above (it bypasses this logging filter). Essential
-    # at 63-games/week: full-sim CPU games used to firehose these where distant sims
-    # emitted almost nothing. ERROR-level lines still pass through.
+    # at 63 games/week: full-sim CPU games would otherwise firehose these.
+    # ERROR-level lines still pass through.
     from BackEnd.utils.headless_simulation import quiet_headless_simulation_logs
 
     with quiet_headless_simulation_logs():
@@ -4833,7 +5558,7 @@ def _user_next_regular_season_opponent_id(
 ) -> str | None:
     """
     Return the other team's id (as str) scheduled vs the user in regular-season week current_week + 1.
-    Used to force full step-by-step CPU sim for that opponent's current-week game instead of distant sim.
+    Used to identify that opponent's current-week game.
     """
     if not user_team_id_str:
         return None
@@ -5813,7 +6538,7 @@ def _finalize_franchise_week_after_cpu_games(
             franchise_id_str, week,
         )
     # Weekly news (upset report + practice-squad all-stars + recruiting leans).
-    # PS game-results news publishes at distant-CPU training, not here.
+    # PS game-results news publishes during the CPU-training phase, not here.
     # Must run before the rank update below so the upset criteria use
     # entering-week natl_rank values.
     try:
@@ -5900,6 +6625,10 @@ def _finalize_franchise_week_after_cpu_games(
     ts_reset = _training_status_reset_after_advance_to_week(update_fields.get("week"))
     if ts_reset:
         update_fields.update(ts_reset)
+    _flushed = flush_eog_band_buffer()
+    if _flushed:
+        logger.info("🧪 [EOG-BAND] flushed %s buffered rows at week end", _flushed)
+
     logger.warning(
         "🧭 [COMPLETE-WEEK-PERSIST] Persisting franchise week/results update. franchise_id=%s completed_week=%s next_week=%s results_count=%s update_keys=%s",
         franchise_id_str,
@@ -6408,12 +7137,10 @@ def _complete_week_finish_cpu_and_persist(
     # Phase 3: deferred full turn-based sims (run in parallel, persist sequentially).
     full_jobs: list[tuple[int, Any, Any, str, str]] = []
 
-    # [CPU-WEEK-TIMING] Quantify the week's CPU-sim cost + full-TbT/distant split.
-    # Pure observability; drives the Distant-Sim sunset decision (Task 1).
+    # [CPU-WEEK-TIMING] Quantify the week's CPU-sim cost.
     _cpu_week_t0 = time.time()
-    _cpu_distant_count = 0
 
-    # Distant game sim: batch-load FTD (prestige, total_player_attrs) and team conferences for partition
+    # Keep a lightweight FTD cache for the deferred post-game momentum update.
     ftd_docs = list(franchise_team_data_collection.find(
         {"franchise_id": franchise_id},
         {
@@ -6432,17 +7159,6 @@ def _complete_week_finish_cpu_and_persist(
         },
     ))
     ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
-    distant_fpd_by_player_id = _distant_sim_batch_fpd_map(franchise_id, ftd_by_team_id)
-    distant_rs_standings = _distant_sim_regular_season_standings(franchise_doc, ftd_by_team_id)
-    team_ids_for_conf = [d["team_id"] for d in ftd_docs if d.get("team_id")]
-    if user_team_id_str and ObjectId.is_valid(user_team_id_str):
-        team_ids_for_conf.append(ObjectId(user_team_id_str))
-    team_conference_docs = list(db.teams.find(
-        {"_id": {"$in": team_ids_for_conf}},
-        {"_id": 1, "conference": 1},
-    ))
-    team_id_to_conference = {str(d["_id"]): d.get("conference") for d in team_conference_docs}
-    user_conference = team_id_to_conference.get(str(user_team_id_str)) if user_team_id_str else None
     
     for idx, (away_id, home_id) in enumerate(week_games):
         if {str(away_id), str(home_id)} == {str(team1_id), str(team2_id)}:
@@ -6544,193 +7260,6 @@ def _complete_week_finish_cpu_and_persist(
                 )
             continue
     
-        if week_games_meta and idx < len(week_games_meta):
-            g = week_games_meta[idx]
-            if not _should_use_tbt_for_eos_game(week, g, user_eos_sim_scope):
-                cpu_job = _persist_cpu_sim_job(
-                    franchise_id,
-                    week,
-                    _cpu_sim_mark_matchup_running(cpu_job, away_id, home_id, engine="distant"),
-                )
-                home_ftd = ftd_by_team_id.get(str(home_id), {})
-                away_ftd = ftd_by_team_id.get(str(away_id), {})
-                home_combined = _distant_sim_team_combined(
-                    home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
-                    fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-                )
-                away_combined = _distant_sim_team_combined(
-                    away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
-                    fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-                )
-                home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
-                try:
-                    sim_res, distant_game_id = _persist_distant_franchise_game(
-                        franchise_id=franchise_id,
-                        week=week,
-                        away_team_object_id=away_id,
-                        home_team_object_id=home_id,
-                        away_score=away_score,
-                        home_score=home_score,
-                        ftd_cache=ftd_by_team_id,
-                    )
-                except Exception:
-                    logger.exception(
-                        "❌ [COMPLETE-WEEK] EOS distant sim persistence failed; falling back to standings-only result. franchise_id=%s week=%s away_id=%s home_id=%s",
-                        franchise_id_str,
-                        week,
-                        away_id,
-                        home_id,
-                    )
-                    sim_res = _save_game_result(
-                        away_id,
-                        home_id,
-                        away_score,
-                        home_score,
-                        week,
-                        franchise_id=franchise_id_str,
-                    )
-                    distant_game_id = ""
-                results.append({
-                    "away_id": sim_res["team1_id"],
-                    "home_id": sim_res["team2_id"],
-                    "away_score": sim_res["team1_score"],
-                    "home_score": sim_res["team2_score"],
-                })
-                cpu_job = _persist_cpu_sim_job(
-                    franchise_id,
-                    week,
-                    _cpu_sim_mark_matchup_complete(
-                        cpu_job,
-                        away_id,
-                        home_id,
-                        engine="distant",
-                        away_score=sim_res["team1_score"],
-                        home_score=sim_res["team2_score"],
-                        game_id=distant_game_id,
-                    ),
-                )
-                winner_id = home_id if home_score > away_score else away_id
-                ftp.record_tournament_game_result(
-                    franchise_doc,
-                    g,
-                    week=week,
-                    franchise_id_str=franchise_id_str,
-                    game_id=distant_game_id or None,
-                    team1_id=away_id,
-                    team2_id=home_id,
-                    team1_score=away_score,
-                    team2_score=home_score,
-                    source="distant",
-                    skip_games_upsert=True,
-                )
-                _award_gp_sim(winner_id, g, (away_id, home_id))
-                _cpu_distant_count += 1  # [CPU-WEEK-TIMING]
-                continue
-
-        # Distant sim: regular season only; neither team in user's conference.
-        away_conf = team_id_to_conference.get(str(away_id))
-        home_conf = team_id_to_conference.get(str(home_id))
-        is_distant = (
-            eos_current_round is None
-            and user_conference is not None
-            and away_conf != user_conference
-            and home_conf != user_conference
-        )
-        # Scout next opponent: always full sim for their game this week (not distant), any conference.
-        next_opp = _user_next_regular_season_opponent_id(
-            franchise_doc,
-            current_week=week,
-            user_team_id_str=user_team_id_str,
-        )
-        if is_distant and next_opp and (
-            str(away_id) == str(next_opp) or str(home_id) == str(next_opp)
-        ):
-            is_distant = False
-        if is_distant:
-            from BackEnd.distant_sim_engine import distant_sim_should_promote_ranked_fullsim
-
-            away_ftd = ftd_by_team_id.get(str(away_id), {})
-            home_ftd = ftd_by_team_id.get(str(home_id), {})
-            if distant_sim_should_promote_ranked_fullsim(away_ftd, home_ftd):
-                is_distant = False
-        # Distant Sim sunset (flag, default OFF): route every remaining regular-season
-        # game to full Turn-by-Turn. Momentum is preserved by the full-sim path below.
-        if is_distant and _franchise_all_games_full_sim():
-            is_distant = False
-        if is_distant:
-            cpu_job = _persist_cpu_sim_job(
-                franchise_id,
-                week,
-                _cpu_sim_mark_matchup_running(cpu_job, away_id, home_id, engine="distant"),
-            )
-            home_ftd = ftd_by_team_id.get(str(home_id), {})
-            away_ftd = ftd_by_team_id.get(str(away_id), {})
-            home_combined = _distant_sim_team_combined(
-                home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-            )
-            away_combined = _distant_sim_team_combined(
-                away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-            )
-            home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
-            _distant_game_id = None
-            try:
-                sim_res, _distant_game_id = _persist_distant_franchise_game(
-                    franchise_id=franchise_id,
-                    week=week,
-                    away_team_object_id=away_id,
-                    home_team_object_id=home_id,
-                    away_score=away_score,
-                    home_score=home_score,
-                    ftd_cache=ftd_by_team_id,
-                )
-            except Exception:
-                logger.exception(
-                    "❌ [COMPLETE-WEEK] Regular-season distant sim persistence failed; falling back to standings-only result. franchise_id=%s week=%s away_id=%s home_id=%s user_conference=%s away_conf=%s home_conf=%s",
-                    franchise_id_str,
-                    week,
-                    away_id,
-                    home_id,
-                    user_conference,
-                    away_conf,
-                    home_conf,
-                )
-                sim_res = _save_game_result(
-                    away_id,
-                    home_id,
-                    away_score,
-                    home_score,
-                    week,
-                    franchise_id=franchise_id_str,
-                )
-            results.append({
-                "away_id": sim_res["team1_id"],
-                "home_id": sim_res["team2_id"],
-                "away_score": sim_res["team1_score"],
-                "home_score": sim_res["team2_score"],
-            })
-            cpu_job = _persist_cpu_sim_job(
-                franchise_id,
-                week,
-                _cpu_sim_mark_matchup_complete(
-                    cpu_job,
-                    away_id,
-                    home_id,
-                    engine="distant",
-                    away_score=sim_res["team1_score"],
-                    home_score=sim_res["team2_score"],
-                    game_id=_distant_game_id,
-                ),
-            )
-            winner_id_rs = home_id if home_score > away_score else away_id
-            _distant_sim_apply_result_to_standings_cache(
-                distant_rs_standings, away_id, home_id, away_score, home_score
-            )
-            _award_gp_sim(winner_id_rs, None, (away_id, home_id))
-            _cpu_distant_count += 1  # [CPU-WEEK-TIMING]
-            continue
-
         away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
         home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
         home_name = home_doc.get("name", "")
@@ -6755,9 +7284,8 @@ def _complete_week_finish_cpu_and_persist(
         _fj_dedup.append(job)
     full_jobs = _fj_dedup
 
-    # Shot-diagnostic summaries from this week's full-sim CPU games (distant sims
-    # carry no game_state and never reach here). Rolled up with the user's own
-    # game into a single week-aggregate report after the full-sim block.
+    # Shot-diagnostic summaries from this week's full-sim CPU games. Rolled up
+    # with the user's own game into one report after the full-sim block.
     _cpu_week_summaries: list[dict] = []
 
     if full_jobs:
@@ -6824,15 +7352,13 @@ def _complete_week_finish_cpu_and_persist(
                     sim_err[sched_idx] = ex
 
         # [CPU-WEEK-TIMING] Headline: how long the week's CPU sim actually took, and
-        # the current full-TbT vs Distant split. `full_sim_block` is the parallel
-        # sim compute; `total_so_far` also includes the distant sims run inline above
-        # (persistence follows and is not counted here). When Distant is sunset,
-        # full_tbt should climb toward the whole slate and distant toward 0.
+        # `full_sim_block` is the parallel simulation compute; persistence follows
+        # and is not counted here.
         _fullsim_secs = time.time() - _cpu_fullsim_t0
         logger.warning(
-            "[CPU-WEEK-TIMING] franchise=%s week=%s | full_tbt=%s distant=%s | "
+            "[CPU-WEEK-TIMING] franchise=%s week=%s | full_tbt=%s | "
             "engine=%s | full_sim_block=%.1fs (%.2fs/full-game) total_so_far=%.1fs | failures=%s",
-            franchise_id_str, week, len(full_jobs), _cpu_distant_count,
+            franchise_id_str, week, len(full_jobs),
             "pool" if _franchise_cpu_use_pool() else "thread",
             _fullsim_secs, _fullsim_secs / max(1, len(full_jobs)),
             time.time() - _cpu_week_t0, len(sim_err),
@@ -6999,18 +7525,17 @@ def _complete_week_finish_cpu_and_persist(
             )
             _sub["team_attrs"] += time.time() - _s
             winner_oid = hid if home_score > away_score else aid
-            # Distant Sim sunset: momentum was game-driven via the distant path. When
-            # all games are full-sim, apply that same (RNG-free, win/loss-driven)
-            # momentum + streak update here so it stays game-driven for every team.
+            # Deferred legacy season-momentum behavior remains game-driven after
+            # full turn-by-turn simulation becomes universal.
             # Reuses the existing engine-agnostic helper; momentum is output-only
             # (the sim never reads it), so post-game application is safe. Wrapped so a
             # momentum error can never fail the week. Regular season only — EOS/tourney
             # games (week_games_meta present) don't carry season momentum streaks.
-            if _franchise_all_games_full_sim() and week not in ft.EOS_WEEKS:
+            if week not in ft.EOS_WEEKS:
                 loser_oid = aid if home_score > away_score else hid
                 _s = time.time()
                 try:
-                    _distant_sim_persist_momentum_score_updates(
+                    _persist_legacy_season_momentum_updates(
                         franchise_id,
                         winner_team_object_id=winner_oid,
                         loser_team_object_id=loser_oid,
@@ -7198,8 +7723,8 @@ def _complete_week_finish_cpu_and_persist(
         }
 
     # One macro shot-diagnostics report for the fully-completed week: the user's
-    # own game rolled up with every full-sim CPU game (distant sims carry no
-    # game_state and are excluded). This is the single end-of-week roll-up, fired
+    # own game rolled up with every full-sim CPU game. This is the single
+    # end-of-week roll-up, fired
     # once here regardless of monolithic vs phased flow. CPU diagnostics come from
     # this call's in-memory summaries (monolithic) or the week stash written by
     # start-cpu-sims (phased); the user game is loaded from db.games. It still
@@ -7255,6 +7780,27 @@ def complete_week(req: CompleteWeekRequest):
         raise HTTPException(status_code=404, detail="Franchise not found")
 
     req = _harden_complete_week_request_week(franchise_doc, req)
+
+    # CPU TEAM IDENTITY — assign/refresh before any game is simmed this week.
+    # Idempotent and season-keyed: it is a no-op once each team's identity matches the
+    # current season and CONSTANTS_VERSION. It lives here because franchise creation
+    # seeds FTD strategy_settings BEFORE rosters are attached, so identity cannot be
+    # computed at that site; this is the first point each season where a projected five
+    # is guaranteed to exist. Without it, FTD supplies flat-neutral all-2s sliders,
+    # TeamManager takes its "settings were supplied" branch, and identity never runs in
+    # franchise mode at all. See BackEnd/utils/franchise_identity.
+    try:
+        from BackEnd.utils.franchise_identity import ensure_franchise_identities
+
+        _identity_summary = ensure_franchise_identities(
+            franchise_id,
+            int(franchise_doc.get("current_season") or 1),
+            int(franchise_doc.get("week") or 1),
+        )
+        if _identity_summary.get("assigned"):
+            logger.warning("🧬 [IDENTITY] franchise=%s %s", req.franchise_id, _identity_summary)
+    except Exception as _identity_err:  # never let identity block a week
+        logger.error("[IDENTITY] assignment failed for %s: %s", req.franchise_id, _identity_err)
 
     _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
     user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
@@ -7438,7 +7984,7 @@ def complete_week_phase_a(req: CompleteWeekRequest):
 @router.post("/franchise/complete-week/start-cpu-sims")
 def complete_week_start_cpu_sims(req: CompleteWeekStartCpuSimsRequest):
     """
-    Run distant + full CPU sims for all **non-user** week matchups and persist ``results.{week}``
+    Run full CPU sims for all **non-user** week matchups and persist ``results.{week}``
     without advancing the franchise week. Idempotent per matchup (skips rows / games already present).
 
     Call when the user begins their franchise game for this week (e.g. first Play Quarter). After the
@@ -7681,22 +8227,14 @@ def complete_week_phase_b(req: CompleteWeekPhaseBRequest):
 
 def _franchise_summary_for_list(doc: dict) -> dict:
     """Compact franchise card payload for mode-select / slot UI."""
+    from BackEnd.utils.franchise_team_display import resolve_team_display
+
     eos = doc.get("eos_tournament") or {}
     team_object_id = doc.get("user_team_object_id")
-    primary_color = None
-    secondary_color = None
-    if team_object_id:
-        try:
-            team_doc = db.teams.find_one(
-                {"_id": ObjectId(str(team_object_id))},
-                {"primary_color": 1, "secondary_color": 1, "name": 1},
-            ) or {}
-            primary_color = team_doc.get("primary_color")
-            secondary_color = team_doc.get("secondary_color")
-        except Exception:
-            team_doc = {}
-    else:
-        team_doc = {}
+    display = resolve_team_display(doc, team_object_id) if team_object_id else {}
+    primary_color = display.get("primary_color")
+    secondary_color = display.get("secondary_color")
+    display_name = display.get("name") or doc.get("user_team_id")
     home_slot = doc.get("home_slot")
     try:
         home_slot = int(home_slot) if home_slot is not None else None
@@ -7706,7 +8244,7 @@ def _franchise_summary_for_list(doc: dict) -> dict:
         home_slot = None
     return {
         "franchise_id": str(doc["_id"]),
-        "user_team_id": doc.get("user_team_id") or team_doc.get("name"),
+        "user_team_id": display_name,
         "user_team_object_id": str(team_object_id) if team_object_id else None,
         "week": doc.get("week", 1),
         "current_season": doc.get("current_season", 1),
@@ -7716,6 +8254,13 @@ def _franchise_summary_for_list(doc: dict) -> dict:
         "eos_current_round": eos.get("current_round", 1),
         "eos_completed": eos.get("completed", False),
         "home_slot": home_slot,
+        "is_custom_team": bool(display.get("is_custom")),
+        "team_builder_replaced_name": display.get("replaced_name"),
+        "abbreviation": display.get("abbreviation"),
+        "mascot": display.get("mascot"),
+        "asset_strategy": display.get("asset_strategy") or "core",
+        "jersey_preset": display.get("jersey_preset") if display.get("is_custom") else None,
+        "court": display.get("court") if display.get("is_custom") else None,
     }
 
 
@@ -7764,6 +8309,8 @@ def _ensure_home_slots_for_user(user_id: str) -> list[dict]:
                 "eos_tournament": 1,
                 "eos_tournament_active": 1,
                 "home_slot": 1,
+                # Required for Team Builder resolve_team_display on list cards.
+                "team_builder": 1,
             },
         ).sort("_id", 1)
     )
@@ -7980,6 +8527,41 @@ def command_center_data(
         response["primary_color"] = team_doc.get("primary_color", "#27408E")
         response["user_conference"] = team_doc.get("conference")
         response["user_region"] = team_doc.get("region", "")
+        # Team Builder overlay — pass-through when absent.
+        if franchise_doc and team_id:
+            try:
+                from BackEnd.utils.franchise_team_display import resolve_team_display
+
+                display = resolve_team_display(franchise_doc, team_id, core_doc=team_doc)
+                response["team"] = display.get("name") or response.get("team")
+                response["primary_color"] = display.get("primary_color") or response["primary_color"]
+                response["secondary_color"] = display.get("secondary_color")
+                response["mascot"] = display.get("mascot")
+                response["abbreviation"] = display.get("abbreviation")
+                response["asset_strategy"] = display.get("asset_strategy") or "core"
+                response["is_custom_team"] = bool(display.get("is_custom"))
+                response["team_builder_replaced_name"] = display.get("replaced_name")
+                # Core palette of the replaced slot — color-leak detector / FE hydrate.
+                if display.get("is_custom"):
+                    response["team_builder_replaced_primary_color"] = team_doc.get("primary_color")
+                    response["team_builder_replaced_secondary_color"] = team_doc.get(
+                        "secondary_color"
+                    )
+                    response["jersey_preset"] = display.get("jersey_preset")
+                    # Court recipe (§6.3b) — parameters only; FE regenerates the surface.
+                    if display.get("court"):
+                        response["court"] = display["court"]
+                response["user_team_object_id"] = str(team_id)
+                # Frozen at Apply (§9.4) — surface as franchise metadata only.
+                from BackEnd.constants.team_builder_budget import resolve_online_eligible
+
+                eligible = resolve_online_eligible(franchise_doc)
+                response["online_eligible"] = eligible
+                response["online_eligibility"] = eligible  # derived alias
+                if "attribute_mode" in franchise_doc:
+                    response["attribute_mode"] = franchise_doc.get("attribute_mode")
+            except Exception:
+                logger.exception("[FCC] team display resolve failed franchise_id=%s", franchise_id)
         # Rankings list for Rankings tab: all FTD teams with natl_rank and team name, sorted by natl_rank
         if franchise_id and franchise_doc:
             try:
@@ -8000,32 +8582,52 @@ def command_center_data(
                         for d in ftd_rank_docs
                         if d.get("team_id") is not None
                     }
+                    # Core names for identity joins; overlay display names applied at this edge only.
+                    from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
                     team_name_by_id = {
                         str(team_id): teams_docs.get(str(team_id), {}).get("name", str(team_id))
                         for team_id in team_ids
                     }
+                    display_name_by_id = resolve_team_name_map(franchise_doc, team_ids)
                     team_list = _ftd_team_list_for_franchise(franchise_id)
                     standings_data = calculate_franchise_standings(
                         franchise_doc.get("results", {}),
                         team_list,
                     )
-                    next_matchup_map = _build_next_matchup_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
-                    previous_week_result_map = _build_previous_week_result_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
-                    rankings = [
-                        {
-                            "team_id": str(d["team_id"]),
-                            "natl_rank": d.get("natl_rank", 128),
-                            "team_name": teams_docs.get(str(d["team_id"]), {}).get("name", "?"),
-                            "primary_color": teams_docs.get(str(d["team_id"]), {}).get("primary_color") or "#000000",
-                            "conference": teams_docs.get(str(d["team_id"]), {}).get("conference"),
-                            "W": int((standings_data.get(str(d["team_id"]), {}) or {}).get("W", 0) or 0),
-                            "L": int((standings_data.get(str(d["team_id"]), {}) or {}).get("L", 0) or 0),
-                            "last_week": (previous_week_result_map.get(str(d["team_id"])) or {}).get("text", ""),
-                            "last_week_result": (previous_week_result_map.get(str(d["team_id"])) or {}).get("result", ""),
-                            "next": next_matchup_map.get(str(d["team_id"]), ""),
-                        }
-                        for d in ftd_rank_docs
-                    ]
+                    next_matchup_map = _build_next_matchup_map(
+                        franchise_doc, display_name_by_id, natl_rank_by_team_id
+                    )
+                    previous_week_result_map = _build_previous_week_result_map(
+                        franchise_doc, display_name_by_id, natl_rank_by_team_id
+                    )
+                    from BackEnd.utils.franchise_team_display import resolve_team_display
+
+                    rankings = []
+                    for d in ftd_rank_docs:
+                        tid = str(d["team_id"])
+                        core_row = teams_docs.get(tid, {})
+                        disp = resolve_team_display(franchise_doc, tid, core_doc=core_row)
+                        rankings.append(
+                            {
+                                "team_id": tid,
+                                "natl_rank": d.get("natl_rank", 128),
+                                "team_name": display_name_by_id.get(
+                                    tid, core_row.get("name", "?")
+                                ),
+                                "primary_color": disp.get("primary_color")
+                                or core_row.get("primary_color")
+                                or "#000000",
+                                "conference": core_row.get("conference"),
+                                "W": int((standings_data.get(tid, {}) or {}).get("W", 0) or 0),
+                                "L": int((standings_data.get(tid, {}) or {}).get("L", 0) or 0),
+                                "last_week": (previous_week_result_map.get(tid) or {}).get("text", ""),
+                                "last_week_result": (previous_week_result_map.get(tid) or {}).get(
+                                    "result", ""
+                                ),
+                                "next": next_matchup_map.get(tid, ""),
+                            }
+                        )
                     rankings.sort(key=lambda x: x["natl_rank"])
                     response["rankings"] = rankings
 
@@ -8043,7 +8645,10 @@ def command_center_data(
                                 "week": next_game.get("week"),
                                 "matchup_label": "vs" if str(next_game.get("home_team_id")) == str(team_id) else "@",
                                 "opponent_team_id": opponent_id,
-                                "opponent_team_name": teams_docs.get(opponent_id, {}).get("name", team_name_by_id.get(opponent_id, "Opponent")),
+                                "opponent_team_name": display_name_by_id.get(
+                                    opponent_id,
+                                    teams_docs.get(opponent_id, {}).get("name", team_name_by_id.get(opponent_id, "Opponent")),
+                                ),
                                 "opponent_team_mascot": teams_docs.get(opponent_id, {}).get("mascot", ""),
                                 "opponent_team_region": teams_docs.get(opponent_id, {}).get("region", ""),
                                 "opponent_team_conference": teams_docs.get(opponent_id, {}).get("conference"),
@@ -8069,13 +8674,23 @@ def command_center_data(
                             away_id = str(last_game.get("away_team_id") or "")
                             home_id = str(last_game.get("home_team_id") or "")
                             game_doc = last_game.get("game_doc") or {}
+                            opp_id = away_id if home_id == str(team_id) else home_id
                             response["last_game_summary"] = {
                                 "week": last_game.get("week"),
                                 "matchup_label": "vs" if home_id == str(team_id) else "@",
-                                "opponent_team_id": away_id if home_id == str(team_id) else home_id,
-                                "opponent_team_name": teams_docs.get(away_id if home_id == str(team_id) else home_id, {}).get("name", team_name_by_id.get(away_id if home_id == str(team_id) else home_id, "Opponent")),
-                                "away_team_name": teams_docs.get(away_id, {}).get("name", team_name_by_id.get(away_id, away_id)),
-                                "home_team_name": teams_docs.get(home_id, {}).get("name", team_name_by_id.get(home_id, home_id)),
+                                "opponent_team_id": opp_id,
+                                "opponent_team_name": display_name_by_id.get(
+                                    opp_id,
+                                    teams_docs.get(opp_id, {}).get("name", team_name_by_id.get(opp_id, "Opponent")),
+                                ),
+                                "away_team_name": display_name_by_id.get(
+                                    away_id,
+                                    teams_docs.get(away_id, {}).get("name", team_name_by_id.get(away_id, away_id)),
+                                ),
+                                "home_team_name": display_name_by_id.get(
+                                    home_id,
+                                    teams_docs.get(home_id, {}).get("name", team_name_by_id.get(home_id, home_id)),
+                                ),
                                 "away_score": int(last_game.get("away_score", 0) or 0),
                                 "home_score": int(last_game.get("home_score", 0) or 0),
                                 "game_id": last_game.get("game_id"),
@@ -8105,7 +8720,7 @@ def command_center_data(
         ps_training_job = dict(
             ((franchise_doc or {}).get("practice_squad") or {}).get("training_job") or {}
         )
-        response["distant_training_resume"] = (
+        response["cpu_training_resume"] = (
             {
                 "required": True,
                 **ps_training_job,
@@ -8172,16 +8787,29 @@ def command_center_data(
                         {"_id": 0, "franchise_id": 0},
                     )
                 )
-                response["team_name_map"] = {
-                    str(team["_id"]): team.get("name", str(team["_id"]))
-                    for team in db.teams.find({}, {"name": 1})
-                }
+                # Projected ceiling per recruit (§Phase 4) — already ratcheted; the FCC
+                # recruit surfaces format current/potential. Recruits with no entry_tier
+                # (season-1 set_0001) resolve to None → the view shows the current grade alone.
+                from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD, potential_rt_for_player
+                for _rec in response["lean_recruits"]:
+                    _rec[POTENTIAL_RT_FIELD] = potential_rt_for_player(
+                        str(_rec.get("recruit_id")), _rec.get("entry_tier"),
+                        _rec.get("potential_factor"), _rec.get("position_ratings") or {})
+                # Display names at the edge (Team Builder overlay); never raw core names.
+                from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+                response["team_name_map"] = resolve_team_name_map(franchise_doc)
                 week_35_results = franchise_doc.get(WEEK_35_RECRUITING_RESULTS_FIELD) or {}
                 response["week_35_user_recruits"] = [
                     player
                     for player in (week_35_results.get("signed_players") or [])
                     if str(player.get("team_id") or "") == str(team_id)
                 ]
+                for _sp in response["week_35_user_recruits"]:
+                    _sp[POTENTIAL_RT_FIELD] = potential_rt_for_player(
+                        str(_sp.get("player_id") or _sp.get("recruit_id")),
+                        _sp.get("entry_tier"), _sp.get("potential_factor"),
+                        _sp.get("position_ratings") or {})
                 response["current_week_invite_recruit"] = _fcc_current_week_invite_recruit(
                     franchise_doc,
                     str(team_id),
@@ -8537,6 +9165,7 @@ def _build_season_schedule_payload(
             "national_tournament": 1,
             "user_team_id": 1,
             "user_team_object_id": 1,
+            "team_builder": 1,
             "_id": 1,
         },
     )
@@ -8563,7 +9192,11 @@ def _build_season_schedule_payload(
 
     team_docs = list(db.teams.find({}, {"_id": 1, "conference": 1, "name": 1, "mascot": 1}))
     team_conferences = {str(t["_id"]): t.get("conference") for t in team_docs}
-    team_name_lookup = {str(t["_id"]): t.get("name", str(t["_id"])) for t in team_docs}
+    # Resolver pass-through when no Team Builder overlay — identical to core names.
+    team_name_lookup = _format_team_name_map(franchise=franchise_doc)
+    # Ensure every core team is present even if the map was filtered.
+    for t in team_docs:
+        team_name_lookup.setdefault(str(t["_id"]), t.get("name", str(t["_id"])))
     game_doc_map = _get_schedule_game_doc_map(franchise_id, 26)
 
     weeks: list[list[dict[str, Any]]] = []
@@ -8693,6 +9326,7 @@ def standings(
                 "region_tournaments": 1,
                 "national_tournament": 1,
                 "results": 1,
+                "team_builder": 1,
                 "_id": 1,
             }
         )
@@ -8713,12 +9347,12 @@ def standings(
             {"team_id": 1, "natl_rank": 1},
         ))
         natl_rank_by_team_id = {str(d["team_id"]): d.get("natl_rank", 999) for d in ftd_rank_docs if d.get("team_id")}
-        team_name_by_id = {
-            str(t["_id"]): t.get("name", "")
-            for t in db.teams.find({}, {"name": 1})
-        }
-        matchup_map = _build_next_matchup_map(franchise_doc, team_name_by_id, natl_rank_by_team_id)
+        # Display names at the edge (Team Builder overlay); standings join keys stay ObjectIds.
+        from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
         team_ids_list = [ObjectId(tid) for tid in team_list.keys()]
+        display_name_by_id = resolve_team_name_map(franchise_doc, team_ids_list)
+        matchup_map = _build_next_matchup_map(franchise_doc, display_name_by_id, natl_rank_by_team_id)
         teams = list(db.teams.find(
             {"_id": {"$in": team_ids_list}},
             {"name": 1, "_id": 1, "region": 1, "conference": 1}
@@ -8735,9 +9369,12 @@ def standings(
             pa = team_standings.get("PA", 0)
             differential = pf - pa
             natl_rank = natl_rank_by_team_id.get(team_id_str, 999)
+            core_name = t.get("name", "")
             output.append({
                 "team_id": team_id_str,
-                "name": t.get("name", ""),
+                # Identity = core; chrome = display_name (never overwrite name).
+                "name": core_name,
+                "display_name": display_name_by_id.get(team_id_str, core_name),
                 "region": t.get("region") or "",
                 "conference": t.get("conference"),
                 "W": wins,
@@ -8805,6 +9442,25 @@ def season_schedule(franchise_id: str, conference: Optional[int] = None, user_te
 @router.get("/franchise/schedule/national")
 def national_schedule(franchise_id: str):
     return _build_season_schedule_payload(franchise_id=franchise_id)
+
+
+@router.get("/franchise/league-news")
+def franchise_league_news(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """One read-only, pre-ranked payload for the training load newswire."""
+    try:
+        franchise_oid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise ID format")
+    verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    franchise_doc = db.franchises.find_one({"_id": franchise_oid})
+    if not franchise_doc:
+        raise HTTPException(status_code=404, detail="Franchise not found")
+    from BackEnd.utils.franchise_league_news import build_franchise_league_news
+
+    return build_franchise_league_news(franchise_doc)
 
 
 def get_leaders(
@@ -9012,7 +9668,12 @@ def team_stats(franchise_id: str, scope: str = "national"):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"results": 1, "user_team_id": 1, "user_team_object_id": 1})
+    from BackEnd.utils.franchise_team_display import TEAM_BUILDER_FIELD, resolve_team_display
+
+    franchise_doc = db.franchises.find_one(
+        {"_id": fid},
+        {"results": 1, "user_team_id": 1, "user_team_object_id": 1, TEAM_BUILDER_FIELD: 1},
+    )
     db_query_time = time.time() - db_query_start
     # logger.info(f"⏱️ [PERF] /franchise/team-stats DB query: {db_query_time:.3f}s")
     if not franchise_doc:
@@ -9083,6 +9744,12 @@ def team_stats(franchise_id: str, scope: str = "national"):
         for t in output:
             t["natl_rank"] = natl_rank_by_team_id.get(t.get("team_id", ""), 999)
 
+    # Chrome team label: overlay display name when TB replaced this slot.
+    for t in output:
+        tid = t.get("team_id")
+        if tid:
+            t["team"] = resolve_team_display(franchise_doc, tid).get("name") or t.get("team")
+
     total_time = time.time() - start_time
     # logger.info(f"⏱️ [PERF] /franchise/team-stats COMPLETE: {total_time:.3f}s")
     return {"teams": output}
@@ -9104,7 +9771,12 @@ def team_traits(franchise_id: str, scope: str = "national"):
         raise HTTPException(status_code=400, detail="Invalid franchise_id")
     
     db_query_start = time.time()
-    franchise_doc = db.franchises.find_one({"_id": fid}, {"_id": 1})
+    from BackEnd.utils.franchise_team_display import TEAM_BUILDER_FIELD, resolve_team_display
+
+    franchise_doc = db.franchises.find_one(
+        {"_id": fid},
+        {"_id": 1, "user_team_id": 1, "user_team_object_id": 1, TEAM_BUILDER_FIELD: 1},
+    )
     db_query_time = time.time() - db_query_start
     # logger.info(f"⏱️ [PERF] /franchise/team-traits DB query: {db_query_time:.3f}s")
     if not franchise_doc:
@@ -9114,7 +9786,7 @@ def team_traits(franchise_id: str, scope: str = "national"):
     team_list = _ftd_team_list_for_franchise(fid)
     user_team_scope = None
     if scope in {"conference", "region"}:
-        user_team_id, user_team_object_id = get_user_team_from_franchise(db.franchises.find_one({"_id": fid}, {"user_team_id": 1, "user_team_object_id": 1}))
+        user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
         if user_team_object_id and ObjectId.is_valid(user_team_object_id):
             user_team_scope = db.teams.find_one({"_id": ObjectId(user_team_object_id)}, {"conference": 1, "region": 1})
     
@@ -9126,17 +9798,21 @@ def team_traits(franchise_id: str, scope: str = "national"):
     
     for team_id_str in team_list.keys():
         try:
-            team_doc = db.teams.find_one({"_id": ObjectId(team_id_str)}, {"name": 1, "primary_color": 1, "conference": 1, "region": 1})
+            team_doc = db.teams.find_one(
+                {"_id": ObjectId(team_id_str)},
+                {"name": 1, "primary_color": 1, "secondary_color": 1, "conference": 1, "region": 1, "mascot": 1, "team_id": 1},
+            )
             if team_doc:
                 if user_team_scope and scope == "conference" and team_doc.get("conference") != user_team_scope.get("conference"):
                     continue
                 if user_team_scope and scope == "region" and team_doc.get("region", "") != user_team_scope.get("region", ""):
                     continue
-                team_name = team_doc.get("name", team_id_str)
+                disp = resolve_team_display(franchise_doc, team_id_str, core_doc=team_doc)
+                team_name = disp.get("name") or team_doc.get("name", team_id_str)
                 team_names[team_id_str] = team_name
                 team_totals[team_id_str] = {
                     "team_name": team_name,
-                    "primary_color": team_doc.get("primary_color", "#000000"),
+                    "primary_color": disp.get("primary_color") or team_doc.get("primary_color", "#000000"),
                     "conference": team_doc.get("conference"),
                     "region": team_doc.get("region", ""),
                     "attributes": {attr: 0 for attr in attributes}
@@ -9395,9 +10071,13 @@ def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
     # Lean maps rank -> team_id (the STRING form of teams._id, which is an
     # ObjectId — a plain {"_id": <str>} lookup silently misses). The page has no
     # team-name map of its own, so resolve the top choice here. "open" = no lean.
+    # Display name must go through the franchise overlay resolver (§3.1a).
     top_lean = (doc.get("Lean") or {}).get("1")
     if top_lean and top_lean != "open":
-        name = _resolve_team_name_from_any(top_lean)
+        from BackEnd.utils.franchise_team_display import resolve_team_display
+
+        display = resolve_team_display(franchise_id, top_lean)
+        name = str(display.get("name") or "").strip() or _resolve_team_name_from_any(top_lean)
         # The shared resolver echoes the raw ref back when it can't find a team;
         # never surface an id to the UI — that reads as a bug to the player.
         doc["lean_display"] = "--" if not name or name == str(top_lean) else name
@@ -9423,8 +10103,18 @@ def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
             by_id = results.get("signed_by_recruit_id") or {}
             signed_info = by_id.get(str(recruit_id)) if isinstance(by_id, dict) else None
             if isinstance(signed_info, dict):
-                team_name = str(signed_info.get("team_name") or "").strip()
+                # Persist may store core team_name; resolve display at the edge by team_id.
+                from BackEnd.utils.franchise_team_display import resolve_team_display
+
                 walk_on = bool(signed_info.get("walk_on"))
+                signed_tid = signed_info.get("team_id")
+                team_name = ""
+                if signed_tid:
+                    team_name = str(
+                        resolve_team_display(franchise_oid, signed_tid).get("name") or ""
+                    ).strip()
+                if not team_name:
+                    team_name = str(signed_info.get("team_name") or "").strip()
                 doc["is_signed"] = True
                 doc["signed_team_name"] = team_name or None
                 if team_name:
@@ -9476,6 +10166,7 @@ def _fcc_recruit_invite_payload(
     status: str,
 ) -> dict[str, Any]:
     weight = recruit_doc.get("weight")
+    from BackEnd.utils.rt_projection import potential_rt_for_player
     return {
         "recruit_id": recruit_id,
         "name": _recruit_display_name_for_training_report(recruit_doc),
@@ -9484,6 +10175,11 @@ def _fcc_recruit_invite_payload(
         "weight": int(weight) if isinstance(weight, (int, float)) else None,
         "year": recruit_doc.get("year") or "JH",
         "rt": _recruit_rt(recruit_doc),
+        # Ratcheted projected ceiling; None (→ current-only) when there is no basis,
+        # e.g. season-1 set_0001 recruits that carry no entry_tier.
+        "potential_rt_ratcheted": potential_rt_for_player(
+            str(recruit_id), recruit_doc.get("entry_tier"),
+            recruit_doc.get("potential_factor"), recruit_doc.get("position_ratings") or {}),
         "status": status,
     }
 
@@ -9610,7 +10306,7 @@ def _training_report_recruiting_display(
             return {"header": "Recruiting Visit", "meta_line": None, "recruits": [], "total": 0}
         nm = _recruit_display_name_for_training_report(recruit)
         rt = _recruit_rt(recruit)
-        return {"header": "Recruiting Visit", "meta_line": f"{nm} - RT: {rt}",
+        return {"header": "Recruiting Visit", "meta_line": f"{nm} - RT: {format_rt_display(rt)}",
                 "recruits": [_rec_item(recruit)], "total": 1}
 
     if (1 <= w <= 19) or (27 <= w <= 34):
@@ -9642,7 +10338,7 @@ def _training_report_recruiting_display(
         rt = _recruit_rt(top)
         return {
             "header": "Top Recruit Leaning Your Way",
-            "meta_line": f"{nm} - RT: {rt}",
+            "meta_line": f"{nm} - RT: {format_rt_display(rt)}",
             "recruits": [_rec_item(top)],
             "total": 1,
         }
@@ -10592,7 +11288,15 @@ def _best_position(position_ratings: dict[str, Any]) -> dict[str, Any]:
     return {"pos": best_pos, "rating": best_rating}
 
 
-def _format_team_name_map(team_ids: list[ObjectId] | None = None) -> dict[str, str]:
+def _format_team_name_map(
+    team_ids: list[ObjectId] | None = None,
+    franchise: Any = None,
+) -> dict[str, str]:
+    """ObjectId → display name. Pass-through core names unless a Team Builder overlay applies."""
+    from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+    if franchise is not None:
+        return resolve_team_name_map(franchise, team_ids)
     query: dict[str, Any] = {}
     if team_ids:
         query = {"_id": {"$in": team_ids}}
@@ -10739,11 +11443,13 @@ def _week_1_cut_requirement(
     fid: ObjectId | None,
     user_team_id: str | None,
 ) -> dict[str, int | bool]:
+    """User camp-cut gate: after the last camp week (``CAMP_WEEKS``) training completes."""
     if not franchise_doc or not fid or not user_team_id:
         return {"roster_count": 0, "cut_count": 0, "cut_required": False}
+    from BackEnd.constants.training_shape import CAMP_WEEKS
     week = int(franchise_doc.get("week", 1) or 1)
     training_status = franchise_doc.get("training_status", {}) or {}
-    if week != 1 or not franchise_training_fully_complete_for_week(training_status, week):
+    if week != CAMP_WEEKS or not franchise_training_fully_complete_for_week(training_status, week):
         return {"roster_count": 0, "cut_count": 0, "cut_required": False}
     try:
         team_object_id = ObjectId(user_team_id)
@@ -10768,13 +11474,14 @@ def _maybe_initialize_practice_squad_week_1(
     """
     Build locked PS rosters after week-1 training camp cuts.
 
-    CPU teams are cut during distant-CPU training; the user assigns their training
+    CPU teams are cut during CPU training; the user assigns their training
     squad via cut-players. Init is deferred until that assignment when
     defer_if_user_cut_pending=True (default). When the user roster is already
-    legal (no cut required), init runs immediately from distant-CPU.
+    legal (no cut required), initialization runs immediately from CPU training.
     """
+    from BackEnd.constants.training_shape import CAMP_WEEKS
     week = int(franchise_doc.get("week", 1) or 1)
-    if week != 1:
+    if week != CAMP_WEEKS:
         return None
     if (franchise_doc.get("practice_squad") or {}).get("initialized"):
         return None
@@ -10812,6 +11519,8 @@ def _maybe_initialize_practice_squad_week_1(
 
 
 def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str | None = None) -> None:
+    from BackEnd.utils.walk_on_roster_identity import assign_walk_ons_making_active_roster
+
     ftd_docs = list(franchise_team_data_collection.find(
         {"franchise_id": franchise_id},
         {"team_id": 1, "players": 1, "scholarship_players": 1, "training_squad_players": 1, "playing_time_promise_players": 1},
@@ -10832,41 +11541,59 @@ def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str 
                 {"franchise_id": franchise_id, "team_id": ftd_doc.get("team_id")},
                 {"$set": {"training_squad_players": [], "updated_at": datetime.utcnow()}},
             )
-            continue
+            remaining_ids = roster_player_ids
+        else:
+            # Lowest-RT players move to the training squad — NOT cut/deleted. They stay
+            # in FPD (ineligible to play) and rejoin the pool at next Training Camp.
+            ts_ids = _choose_cut_player_ids(roster_player_ids, fpd_map, cut_count)
+            ts_set = set(ts_ids)
+            remaining_ids = [player_id for player_id in roster_player_ids if player_id not in ts_set]
+            existing_ts = [
+                str(player_id) for player_id in (ftd_doc.get("training_squad_players") or []) if player_id
+            ]
+            new_training_squad = existing_ts + [pid for pid in ts_ids if pid not in existing_ts]
+            remaining_scholarships = [
+                str(player_id) for player_id in (ftd_doc.get("scholarship_players") or [])
+                if str(player_id) in remaining_ids
+            ]
+            remaining_ptp = [
+                str(player_id) for player_id in (ftd_doc.get("playing_time_promise_players") or [])
+                if str(player_id) in remaining_ids
+            ]
+            total_player_attrs = sum(
+                core_total_player_attrs((fpd_map.get(player_id) or {}).get("attributes") or {})
+                for player_id in remaining_ids
+            )
+            _update_ftd_roster_state(
+                franchise_id,
+                ftd_doc.get("team_id"),
+                {
+                    "players": remaining_ids,
+                    "scholarship_players": remaining_scholarships,
+                    "training_squad_players": new_training_squad,
+                    "playing_time_promise_players": remaining_ptp,
+                    "total_player_attrs": total_player_attrs,
+                    "updated_at": datetime.utcnow(),
+                },
+            )
 
-        # Lowest-RT players move to the training squad — NOT cut/deleted. They stay
-        # in FPD (ineligible to play) and rejoin the pool at next Training Camp.
-        ts_ids = _choose_cut_player_ids(roster_player_ids, fpd_map, cut_count)
-        ts_set = set(ts_ids)
-        remaining_ids = [player_id for player_id in roster_player_ids if player_id not in ts_set]
-        existing_ts = [
-            str(player_id) for player_id in (ftd_doc.get("training_squad_players") or []) if player_id
-        ]
-        new_training_squad = existing_ts + [pid for pid in ts_ids if pid not in existing_ts]
-        remaining_scholarships = [
-            str(player_id) for player_id in (ftd_doc.get("scholarship_players") or [])
-            if str(player_id) in remaining_ids
-        ]
-        remaining_ptp = [
-            str(player_id) for player_id in (ftd_doc.get("playing_time_promise_players") or [])
-            if str(player_id) in remaining_ids
-        ]
-        total_player_attrs = sum(
-            core_total_player_attrs((fpd_map.get(player_id) or {}).get("attributes") or {})
-            for player_id in remaining_ids
-        )
-        _update_ftd_roster_state(
-            franchise_id,
-            ftd_doc.get("team_id"),
-            {
-                "players": remaining_ids,
-                "scholarship_players": remaining_scholarships,
-                "training_squad_players": new_training_squad,
-                "playing_time_promise_players": remaining_ptp,
-                "total_player_attrs": total_player_attrs,
-                "updated_at": datetime.utcnow(),
-            },
-        )
+        # Walk-ons who survive onto the active 12 get jersey + portrait (CPU = lazy paint).
+        try:
+            assign_walk_ons_making_active_roster(
+                franchise_id=franchise_id,
+                team_id=ftd_doc.get("team_id"),
+                active_player_ids=remaining_ids,
+                fpd_map=fpd_map,
+                franchise_players_data_collection=franchise_players_data_collection,
+                franchises_collection=db.franchises,
+                warm=False,
+            )
+        except Exception:
+            logger.exception(
+                "[WALK-ON-ROSTER] CPU assign failed franchise=%s team=%s",
+                str(franchise_id),
+                team_id,
+            )
 
 
 TRAINING_SQUAD_ATTR_KEYS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT", "CH"]
@@ -11154,7 +11881,7 @@ def _build_ps_all_stars_story(
         lines.append(
             f"{g.get('name')}{of_team} increased by {int(g.get('total_gain') or 0)} attribute points this week. "
             f"His strongest gains were in {_join_with_and(top_attrs)}. "
-            f"He's now a {rt if rt is not None else '--'} rated {g.get('pos', '--')}."
+            f"He's now rated {format_rt_display(rt)} at {g.get('pos', '--')}."
         )
     return {
         "story_id": f"w{week}-ps-all-stars",
@@ -11218,7 +11945,7 @@ def _build_recruiting_leans_story(
     for rt, recruit_doc, team_ids in top_entries:
         team_names = _join_with_and([team_name_map.get(tid, tid) for tid in team_ids])
         top_lines.append(
-            f"{recruit_doc.get('name')} who is a {rt} rated {recruit_doc.get('archetype')} "
+            f"{recruit_doc.get('name')}, a {recruit_doc.get('archetype')} rated {format_rt_display(rt)}, "
             f"has announced a lean toward {team_names}."
         )
 
@@ -11229,7 +11956,9 @@ def _build_recruiting_leans_story(
     ):
         entries = sorted(conference_recruits_by_team[team_id], key=lambda e: e[0], reverse=True)
         conference_lines.append(team_name_map.get(team_id, team_id))
-        conference_lines.append(", ".join(f"{name} ({rt})" for rt, name in entries))
+        conference_lines.append(", ".join(
+            f"{name} ({format_rt_display(rt)})" for rt, name in entries
+        ))
 
     if not top_lines and not conference_lines:
         return None
@@ -11309,7 +12038,7 @@ def _append_franchise_week_news(
         if team_id is not None and rank is not None:
             rank_by_team_id[str(team_id)] = int(rank)
 
-    team_name_map = _format_team_name_map()
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
 
     recruiting_leans_story = None
     if new_lean_events:
@@ -11356,7 +12085,7 @@ def _append_franchise_week_news(
             user_conference,
         )
 
-    # PS game-results news publishes at distant-CPU training (see _franchise_training_distant_phase_only).
+    # PS game-results news publishes during the CPU-training completion phase.
     stories = [
         story
         for story in (
@@ -11406,7 +12135,7 @@ def _season_awards_score(season_stats: dict[str, Any]) -> tuple[int, int]:
 
 def _compute_all_american_teams(franchise_doc: dict[str, Any]) -> dict[str, Any]:
     fpd_docs = list(franchise_players_data_collection.find({"franchise_id": str(franchise_doc["_id"])}))
-    team_name_map = _format_team_name_map()
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
     candidates = []
     for doc in fpd_docs:
         meta = doc.get("meta", {})
@@ -11492,6 +12221,10 @@ def _week_35_result_entry_from_recruit(recruit_doc: dict[str, Any], team_doc: di
         "walk_on": bool(walk_on),
         "signed_display": team_doc.get("name", "") + (" (walk on)" if walk_on else ""),
         "jersey": None,
+        # Identity/dev fields carried through signing (single declared set) so authored
+        # position_intent/entry_tier/potential_factor/development reach the FPD player
+        # instead of being re-derived (argmax intent, uuid-hashed potential) at rollover.
+        **carry_dev_fields(recruit_doc),
     }
 
 
@@ -11651,18 +12384,16 @@ def _build_cpu_week_35_orders(
 
 
 def _allowed_jersey_numbers(position: str) -> list[int]:
-    pos = str(position or "").upper()
-    if pos == "PG":
-        return list(range(0, 37))
-    if pos in {"SG", "SF"}:
-        return list(range(0, 46)) + [77]
-    return [number for number in range(0, 56) if number < 20 or number > 29] + [88, 91, 99]
+    from BackEnd.utils.jersey_assignment import allowed_jersey_numbers
+    return allowed_jersey_numbers(position)
 
 
 def _assign_jerseys_to_signed_players(
     signed_players: list[dict[str, Any]],
     franchise_id: str | ObjectId,
 ) -> None:
+    from BackEnd.utils.jersey_assignment import jersey_position_for_player, pick_jersey_number
+
     team_to_existing_numbers: dict[str, set[int]] = defaultdict(set)
     franchise_id_obj = ObjectId(franchise_id) if isinstance(franchise_id, str) else franchise_id
     ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id_obj}, {"team_id": 1, "players": 1}))
@@ -11688,10 +12419,8 @@ def _assign_jerseys_to_signed_players(
 
     for player in signed_players:
         team_id = str(player.get("team_id") or "")
-        allowed = [number for number in _allowed_jersey_numbers(player.get("pos")) if number not in team_to_existing_numbers[team_id]]
-        if not allowed:
-            allowed = _allowed_jersey_numbers(player.get("pos"))
-        jersey = random.choice(allowed)
+        pos = jersey_position_for_player(player)
+        jersey = pick_jersey_number(pos, team_to_existing_numbers[team_id])
         player["jersey"] = jersey
         team_to_existing_numbers[team_id].add(jersey)
 
@@ -11898,6 +12627,12 @@ def get_recruiting_data(
     if not user_team_id:
         raise HTTPException(status_code=404, detail="User team not selected")
 
+    user_team_doc = db.teams.find_one(
+        {"_id": ObjectId(user_team_id)},
+        {"region": 1},
+    )
+    user_team_region = str((user_team_doc or {}).get("region") or "").strip().upper()
+
     ftd_doc = franchise_team_data_collection.find_one(
         {"franchise_id": fid, "team_id": ObjectId(user_team_id)},
         {"Recruits": 1, RECRUITING_ORDERS_WEEK_35_FIELD: 1},
@@ -11912,10 +12647,18 @@ def get_recruiting_data(
             {"_id": 0, "franchise_id": 0},
         )
     )
-    team_name_map = {
-        str(team["_id"]): team.get("name", str(team["_id"]))
-        for team in db.teams.find({}, {"name": 1})
-    }
+    # Projected ceiling per recruit (§Phase 4) — already ratcheted; the Recruiting Hub
+    # formats current/potential. Recruits carry entry_tier + potential_factor (FRD); a
+    # legacy recruit resolves the stable hash value off recruit_id.
+    from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD, potential_rt_for_player
+    for _rec in recruits:
+        _rec[POTENTIAL_RT_FIELD] = potential_rt_for_player(
+            str(_rec.get("recruit_id")), _rec.get("entry_tier"),
+            _rec.get("potential_factor"), _rec.get("position_ratings", {}))
+    # Chrome labels: overlay-aware map (not core teams.name). Same dual-field rule as schedule.
+    from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+    team_name_map = resolve_team_name_map(franchise_doc)
 
     # Recruiting Hub passive "story strip" + row "New" badge: the recruits that recently
     # added the user's team to their lean list. Mirrors the FCC-card computation
@@ -11936,6 +12679,7 @@ def get_recruiting_data(
     return {
         "team": team_name,
         "team_id": user_team_id,
+        "team_region": user_team_region,
         "week": franchise_doc.get("week", 1),
         "new_lean_recruit_ids": new_lean_recruit_ids,
         "current_results_week": franchise_doc.get("week", 1) if str(franchise_doc.get("week", 1)) in (franchise_doc.get("recruiting_results", {}) or {}) else None,
@@ -12092,8 +12836,9 @@ def get_practice_squad_team(
         )
     } if frd_ids else {}
 
-    team_name_map = _format_team_name_map()
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
     players = []
+    from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD, potential_rt_for_player
     for slot in roster_slots:
         pid = str(slot.get("player_id") or "")
         source = slot.get("source")
@@ -12110,6 +12855,10 @@ def get_practice_squad_team(
                 "name": slot.get("name") or f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip(),
                 "parent_team_name": parent_name,
                 "position_ratings": doc.get("position_ratings") or {},
+                POTENTIAL_RT_FIELD: potential_rt_for_player(
+                    pid, doc.get("entry_tier"), doc.get("potential_factor"),
+                    doc.get("position_ratings") or {},
+                ),
                 "attributes": doc.get("attributes") or {},
                 "year": format_player_year_display(meta.get("year")) if meta.get("year") else None,
                 "archetype": meta.get("archetype") or "",
@@ -12127,6 +12876,10 @@ def get_practice_squad_team(
                 "name": slot.get("name") or doc.get("name") or "",
                 "parent_team_name": None,
                 "position_ratings": doc.get("position_ratings") or {},
+                POTENTIAL_RT_FIELD: potential_rt_for_player(
+                    pid, doc.get("entry_tier"), doc.get("potential_factor"),
+                    doc.get("position_ratings") or {},
+                ),
                 "attributes": doc.get("attributes") or {},
                 "year": format_player_year_display(doc.get("year")) if doc.get("year") else None,
                 "archetype": doc.get("archetype") or "",
@@ -12713,8 +13466,29 @@ def cut_franchise_players(
         },
     )
 
+    # Walk-ons who survive onto the active 12: jersey + portrait; eager-warm user team.
+    from BackEnd.constants.training_shape import CAMP_WEEKS
+    walk_on_assign = {}
+    try:
+        from BackEnd.utils.walk_on_roster_identity import assign_walk_ons_making_active_roster
+
+        walk_on_assign = assign_walk_ons_making_active_roster(
+            franchise_id=fid,
+            team_id=team_object_id,
+            active_player_ids=remaining_roster_ids,
+            fpd_map=fpd_map,
+            franchise_players_data_collection=franchise_players_data_collection,
+            franchises_collection=db.franchises,
+            teams_collection=db.teams,
+            franchise_doc=franchise_doc,
+            warm=True,
+        )
+    except Exception:
+        logger.exception("[WALK-ON-ROSTER] user assign failed franchise=%s", str(fid))
+        walk_on_assign = {}
+
     ps_initialized = False
-    if int(franchise_doc.get("week", 1) or 1) == 1:
+    if int(franchise_doc.get("week", 1) or 1) == CAMP_WEEKS:
         ps_initialized = (
             _maybe_initialize_practice_squad_week_1(
                 fid,
@@ -12731,6 +13505,11 @@ def cut_franchise_players(
         "cut_names": cut_names,
         "remaining_roster_count": len(remaining_roster_ids),
         "practice_squad_initialized": ps_initialized,
+        "walk_on_roster_assign": {
+            "jersey_assigned": int(walk_on_assign.get("jersey_assigned") or 0),
+            "image_assigned": int(walk_on_assign.get("image_assigned") or 0),
+            "warmed": int(walk_on_assign.get("warmed") or 0),
+        },
     }
 
 
@@ -13018,7 +13797,7 @@ class FranchiseTrainingRequest(BaseModel):
     training_data: dict  # Contains player_drills, team_drills, general, coaching_focus
 
 
-class FranchiseDistantTrainingRequest(BaseModel):
+class FranchiseCPUTrainingRequest(BaseModel):
     franchise_id: str
 
 
@@ -13031,9 +13810,9 @@ def _run_all_cpu_autotrain(
     is_first_training: bool,
     seed_base: int | None = None,
 ) -> dict:
-    """Sunset replacement for distant training: run REAL per-team auto-train for every CPU team.
+    """Run real per-team auto-training for every eligible CPU team.
 
-    Same team-selection as distant training (skip user team + EOS-eliminated). Each team is
+    Team selection skips the user team and EOS-eliminated teams. Each team is
     idempotency-guarded inside auto_train_one_cpu_team (cpu_autotrain_week), so a partial run is
     resumable and the pool failure-ladder's retries never double-train.
 
@@ -13118,142 +13897,26 @@ def _run_all_cpu_autotrain(
     return {"trained": trained, "skipped": skipped, "errors": errored, "seconds": round(_elapsed, 2)}
 
 
-def _apply_franchise_distant_cpu_training(
+def _apply_franchise_cpu_training(
     franchise_id: ObjectId,
     *,
     franchise_doc: dict,
     user_team_id_str: str,
     week: int,
     is_first_training: bool,
-    franchise_players: dict,
 ) -> None:
-    """Template-based distant CPU training for all non-user FTDs. Idempotent per FTD via cpu_distant_trained_week."""
-    # Sunset switch (default OFF): route to REAL per-team auto-train instead of template deltas.
-    if _franchise_all_teams_autotrain():
-        _run_all_cpu_autotrain(
-            franchise_id,
-            franchise_doc=franchise_doc,
-            user_team_id_str=user_team_id_str,
-            week=week,
-            is_first_training=is_first_training,
-        )
-        return
-    all_ftd_docs = list(franchise_team_data_collection.find({"franchise_id": franchise_id}))
-    training_type = "tc" if is_first_training else "regular"
-    eliminated_team_ids = set()
-    if week > ScheduleManager.REGULAR_SEASON_WEEKS and franchise_doc.get("eos_tournament_active"):
-        eliminated_team_ids = ft.get_eliminated_team_ids(franchise_doc)
-    distant_templates = list(db["distant_training"].find({"training_type": training_type}))
-    if not distant_templates:
-        logger.warning(
-            f"⚠️ [DISTANT TRAINING] No templates found for training_type={training_type}, skipping computer teams"
-        )
-        return
-    for ftd_doc in all_ftd_docs:
-        computer_team_oid = ftd_doc.get("team_id")
-        if computer_team_oid is None:
-            continue
-        computer_team_id_str = str(computer_team_oid)
-        if computer_team_id_str == str(user_team_id_str):
-            continue
-        if computer_team_id_str in eliminated_team_ids:
-            continue
-        if int(ftd_doc.get("cpu_distant_trained_week") or 0) == week:
-            continue
-        try:
-            template = random.choice(distant_templates)
-            team_values = template.get("team_values", {})
-            players_template = template.get("players", {})
-            current_team_attrs = ftd_doc.get("team_attributes", {})
-            ftd_update = {}
-            for attr_name, delta in team_values.items():
-                if attr_name not in TEAM_ATTR_CLAMPS:
-                    continue
-                current = current_team_attrs.get(attr_name, 0)
-                if isinstance(current, (int, float)) and isinstance(delta, (int, float)):
-                    lower, upper = TEAM_ATTR_CLAMPS[attr_name]
-                    delta_val = float(delta) if attr_name == "rebound_modifier" else int(delta)
-                    new_val = current + delta_val
-                    if upper is not None:
-                        new_val = max(lower, min(upper, new_val))
-                    else:
-                        new_val = max(lower, new_val)
-                    if attr_name == "rebound_modifier":
-                        new_val = round(new_val, 2)
-                    else:
-                        new_val = int(round(new_val))
-                    ftd_update[f"team_attributes.{attr_name}"] = new_val
-            set_payload = dict(ftd_update)
-            if template.get("community_engagement"):
-                set_payload["pending_community_engagement"] = True
-            if set_payload:
-                franchise_team_data_collection.update_one(
-                    {"franchise_id": franchise_id, "team_id": computer_team_oid},
-                    {"$set": set_payload},
-                )
-            player_order = ftd_doc.get("players")
-            if not player_order:
-                team_doc = db.teams.find_one({"_id": computer_team_oid}, {"player_ids": 1})
-                player_order = [str(pid) for pid in (team_doc.get("player_ids") or [])] if team_doc else []
-            else:
-                player_order = [str(pid) for pid in player_order]
-            for i in range(min(12, len(player_order))):
-                pid = player_order[i]
-                player_key = f"player_{i}"
-                if player_key not in players_template:
-                    continue
-                fpd = franchise_players.get(pid)
-                if not fpd:
-                    continue
-                deltas = players_template[player_key]
-                current_attrs = fpd.get("attributes", {})
-                fpd_set = {}
-                for attr_name, delta in deltas.items():
-                    if not isinstance(delta, (int, float)):
-                        continue
-                    current = current_attrs.get(attr_name, 0) or current_attrs.get(f"anchor_{attr_name}", 0)
-                    try:
-                        cur = int(current) if isinstance(current, (int, float)) else 0
-                    except (TypeError, ValueError):
-                        cur = 0
-                    new_val = cur + int(delta)
-                    new_val = max(PLAYER_ATTR_CLAMP[0], new_val)
-                    fpd_set[f"attributes.{attr_name}"] = new_val
-                    fpd_set[f"attributes.anchor_{attr_name}"] = new_val
-                if fpd_set:
-                    franchise_players_data_collection.update_one(
-                        {"franchise_id": str(franchise_id), "player_id": pid},
-                        {"$set": fpd_set},
-                    )
-                core_player = db.players.find_one({"_id": pid}, {"height": 1})
-                height = core_player.get("height") if core_player else None
-                updated_attrs = dict(current_attrs)
-                for k, v in fpd_set.items():
-                    if k.startswith("attributes."):
-                        updated_attrs[k.replace("attributes.", "")] = v
-                meta = fpd.get("meta", {})
-                player_for_ratings = {
-                    "attributes": updated_attrs,
-                    "height": height,
-                    "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}",
-                }
-                new_ratings = compute_position_ratings(player_for_ratings)
-                franchise_players_data_collection.update_one(
-                    {"franchise_id": str(franchise_id), "player_id": pid},
-                    {"$set": {"position_ratings": new_ratings}},
-                )
-            franchise_team_data_collection.update_one(
-                {"franchise_id": franchise_id, "team_id": computer_team_oid},
-                {"$set": {"cpu_distant_trained_week": week}},
-            )
-            logger.info(f"✅ [DISTANT TRAINING] Applied template for team_id={computer_team_id_str}")
-        except Exception as e:
-            logger.error(f"❌ [DISTANT TRAINING] Error for team_id={computer_team_id_str}: {e}", exc_info=True)
-            continue
+    """Run authoritative per-team CPU auto-training for all eligible teams."""
+    _run_all_cpu_autotrain(
+        franchise_id,
+        franchise_doc=franchise_doc,
+        user_team_id_str=user_team_id_str,
+        week=week,
+        is_first_training=is_first_training,
+    )
 
 
-def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
-    """Finish franchise week training: distant CPU teams + optional camp cuts + training_completed."""
+def _franchise_training_cpu_phase_only(franchise_id_str: str) -> dict:
+    """Finish franchise week training: CPU teams, camp cuts, PS work, and completion."""
     try:
         franchise_id = ObjectId(franchise_id_str)
     except Exception:
@@ -13265,13 +13928,14 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
 
     training_status = franchise_doc.get("training_status", {}) or {}
     week = int(franchise_doc.get("week", 1) or 1)
-    results = franchise_doc.get("results", {})
-    is_first_training = (week == 1 and not results.get("1"))
+    from BackEnd.constants.training_shape import CAMP_WEEKS, is_camp_week
+    is_first_training = is_camp_week(week)
+    is_last_camp_week = int(week) == CAMP_WEEKS
 
     if _postseason_training_disabled_for_week(week):
         raise HTTPException(
             status_code=400,
-            detail="Training is disabled during postseason tournament weeks.",
+            detail="Training is unavailable after week 26.",
         )
 
     if franchise_training_fully_complete_for_week(training_status, week):
@@ -13289,7 +13953,7 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
             detail="User training has not been applied for this week. Complete the training screen first.",
         )
 
-    if int(training_status.get("cpu_distant_complete_week") or 0) == week:
+    if int(training_status.get("cpu_training_complete_week") or 0) == week:
         db.franchises.update_one(
             {"_id": franchise_id},
             {
@@ -13315,20 +13979,16 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
         raise HTTPException(status_code=404, detail="User team not found in franchise document")
     team_id = user_team_object_id
 
-    fpd_docs = list(franchise_players_data_collection.find({"franchise_id": franchise_id_str}))
-    franchise_players = {d["player_id"]: d for d in fpd_docs}
-
-    _apply_franchise_distant_cpu_training(
+    _apply_franchise_cpu_training(
         franchise_id,
         franchise_doc=franchise_doc,
         user_team_id_str=str(team_id),
         week=week,
         is_first_training=is_first_training,
-        franchise_players=franchise_players,
     )
 
     cuts_ran_this_call = False
-    if is_first_training and not bool(training_status.get("cpu_training_camp_cuts_applied")):
+    if is_last_camp_week and not bool(training_status.get("cpu_training_camp_cuts_applied")):
         _apply_cpu_training_camp_cuts(franchise_id, excluded_team_id=str(team_id))
         cuts_ran_this_call = True
 
@@ -13346,7 +14006,7 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
         if ps_state:
             ps_fields["practice_squad"] = ps_state
 
-    if week >= 2 and week <= 19 and (franchise_doc.get("practice_squad") or {}).get("initialized"):
+    if week > CAMP_WEEKS and week <= 19 and (franchise_doc.get("practice_squad") or {}).get("initialized"):
         from BackEnd.practice_squad.manager import run_practice_squad_week
 
         # Serial poll bounds each request to one full game (manager commits PS state
@@ -13378,18 +14038,18 @@ def _franchise_training_distant_phase_only(franchise_id_str: str) -> dict:
             season_news_prepend.append(ps_results_story)
 
     session_type = training_status.get("session_type", "in-season")
-    distant_update: dict[str, Any] = {
+    cpu_update: dict[str, Any] = {
         "training_status.training_completed": True,
-        "training_status.cpu_distant_complete_week": week,
+        "training_status.cpu_training_complete_week": week,
         "training_status.last_training_date": datetime.now().strftime("%Y-%m-%d"),
     }
     if cuts_ran_this_call:
-        distant_update["training_status.cpu_training_camp_cuts_applied"] = True
-    distant_update.update(ps_fields)
+        cpu_update["training_status.cpu_training_camp_cuts_applied"] = True
+    cpu_update.update(ps_fields)
     if season_news_prepend:
         _prepend_season_news_stories(franchise_doc, season_news_prepend)
-        distant_update["season_news"] = franchise_doc["season_news"]
-    db.franchises.update_one({"_id": franchise_id}, {"$set": distant_update})
+        cpu_update["season_news"] = franchise_doc["season_news"]
+    db.franchises.update_one({"_id": franchise_id}, {"$set": cpu_update})
     return {
         "status": "success",
         "week": week,
@@ -13438,6 +14098,7 @@ def _build_custom_focus_roster_for_franchise(
     Rows for the Player Maximizer Custom modal: same roster order as franchise training execution.
     """
     from BackEnd.models.training_execution_v2 import PLAYER_MAXIMIZER_RANKING_ATTRS
+    from BackEnd.constants.training_shape import training_position_projection
 
     ranking = list(PLAYER_MAXIMIZER_RANKING_ATTRS)
     user_team_id, user_team_object_id = get_user_team_from_franchise(franchise_doc)
@@ -13480,6 +14141,8 @@ def _build_custom_focus_roster_for_franchise(
                 "name": name,
                 "attrs": attr_vals,
                 "position_ratings": position_ratings,
+                "year": meta.get("year"),
+                **training_position_projection(fpd),
                 "_sort_max_rt": _max_position_rating_from_fpd(fpd),
             }
         )
@@ -13510,13 +14173,22 @@ def get_training_points(franchise_id: str):
     if not franchise_doc:
         raise HTTPException(status_code=404, detail="Franchise not found")
 
-    # Check if it's first training (training camp) - week 1 and no results yet
+    # Training camp is week 1; weeks 2–26 are in-season training.
     week = franchise_doc.get("week", 1)
-    results = franchise_doc.get("results", {})
-    is_first_training = (week == 1 and not results.get("1"))
-    
-    # First training (training camp) gets 30 points, otherwise 24
-    training_points = 30 if is_first_training else 24
+    if _postseason_training_disabled_for_week(week):
+        raise HTTPException(
+            status_code=400,
+            detail="Training is unavailable after week 26.",
+        )
+    from BackEnd.constants.training_shape import (
+        CAMP_POINT_BUDGET,
+        CAMP_WEEKS,
+        IN_SEASON_POINT_BUDGET,
+        gain_percentage_matrix,
+        is_camp_week,
+    )
+    is_first_training = is_camp_week(week)
+    training_points = CAMP_POINT_BUDGET if is_first_training else IN_SEASON_POINT_BUDGET
     
     total_time = (time.time() - endpoint_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] get_training_points TOTAL: {total_time:.2f}ms, training_points={training_points}, is_first_training={is_first_training}")
@@ -13528,11 +14200,15 @@ def get_training_points(franchise_id: str):
     return {
         "training_points": training_points,
         "is_first_training": is_first_training,
+        "is_camp_week": is_first_training,
+        "camp_weeks": CAMP_WEEKS,
+        "gain_percentage_matrix": gain_percentage_matrix(),
         "week": week,
+        "season": int(franchise_doc.get("current_season") or 1),
         "user_team_name": franchise_doc.get("user_team_id"),
         "custom_focus_roster": custom_roster,
         "player_maximizer_ranking_attrs": ranking_attrs,
-        "distant_training_resume": (
+        "cpu_training_resume": (
             {
                 "required": True,
                 "week": week,
@@ -13575,7 +14251,7 @@ def run_franchise_training_user(
     user: dict = Depends(get_current_user),
     profile: bool = False,
 ):
-    """Persist user-team training only. Client should call /franchise/run-training/distant-cpu next."""
+    """Persist user-team training only. Client should call the CPU-training phase next."""
     verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
     if profile:
         from BackEnd.utils.profiling import run_profiled
@@ -13593,13 +14269,13 @@ def run_franchise_training_user(
     return _run_franchise_training_impl(req, phase="user_only")
 
 
-@router.post("/franchise/run-training/distant-cpu")
-def run_franchise_training_distant_cpu(
-    req: FranchiseDistantTrainingRequest,
+@router.post("/franchise/run-training/cpu-train")
+def run_franchise_training_cpu_train(
+    req: FranchiseCPUTrainingRequest,
     user: dict = Depends(get_current_user),
     profile: bool = False,
 ):
-    """Apply distant CPU template training, camp cuts (week 1), and set training_completed."""
+    """Run CPU auto-training, camp cuts, Practice Squad work, and mark completion."""
     verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
     if profile:
         from BackEnd.utils.profiling import run_profiled
@@ -13607,14 +14283,14 @@ def run_franchise_training_distant_cpu(
         _out = [None]
 
         def _wrapped():
-            _out[0] = _franchise_training_distant_phase_only(req.franchise_id)
+            _out[0] = _franchise_training_cpu_phase_only(req.franchise_id)
 
         profile_summary = run_profiled(_wrapped, top_n=60)
         result = _out[0]
         if isinstance(result, dict):
             result["profile_summary"] = profile_summary
         return result
-    return _franchise_training_distant_phase_only(req.franchise_id)
+    return _franchise_training_cpu_phase_only(req.franchise_id)
 
 
 def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = "full"):
@@ -13644,12 +14320,22 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     if _postseason_training_disabled_for_week(week):
         raise HTTPException(
             status_code=400,
-            detail="Training is disabled during postseason tournament weeks.",
+            detail="Training is unavailable after week 26.",
         )
     
-    # Check if it's first training (training camp) - week 1 and no results yet
-    is_first_training = (week == 1 and not results.get("1"))
-    expected_points = 30 if is_first_training else 24
+    # Training camp is week 1; weeks 2–26 are in-season training.
+    from BackEnd.constants.training_shape import (
+        CAMP_GAIN_SCALE,
+        CAMP_POINT_BUDGET,
+        CAMP_WEEKS,
+        IN_SEASON_POINT_BUDGET,
+        is_camp_week,
+        training_points_spent,
+        training_position_projection,
+    )
+    is_first_training = is_camp_week(week)
+    is_last_camp_week = int(week) == CAMP_WEEKS
+    expected_points = CAMP_POINT_BUDGET if is_first_training else IN_SEASON_POINT_BUDGET
     recruiting_results = franchise_doc.get("recruiting_results", {}) or {}
 
     if 20 <= week <= 26 and str(week) not in recruiting_results:
@@ -13677,9 +14363,9 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
                 "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={week}&from=training",
             }
         if franchise_user_training_applied_for_week(training_status, week) and int(
-            training_status.get("cpu_distant_complete_week") or 0
+            training_status.get("cpu_training_complete_week") or 0
         ) != week:
-            return _franchise_training_distant_phase_only(req.franchise_id)
+            return _franchise_training_cpu_phase_only(req.franchise_id)
     elif phase == "user_only":
         if franchise_training_fully_complete_for_week(training_status, week):
             user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
@@ -13690,53 +14376,23 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
                 "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={redirect_team_id}&week={week}&from=training",
             }
         if franchise_user_training_applied_for_week(training_status, week):
-            lt = franchise_doc.get("latest_training") or {}
-            user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
-            ftd_override = lt.get("ftd_coaching_focus")
-            if not isinstance(ftd_override, dict):
-                ftd_row = franchise_team_data_collection.find_one(
-                    {"franchise_id": franchise_id, "team_id": ObjectId(user_team_object_id)},
-                    {"coaching_focus": 1},
-                ) or {}
-                raw_cf = ftd_row.get("coaching_focus") or {}
-                ftd_override = {
-                    k: int(raw_cf.get(k, 0) or 0) for k in COACHING_FOCUS_FTD_COUNT_KEYS
-                }
+            _user_team_id_name, user_team_object_id = get_user_team_from_franchise(franchise_doc)
             return {
                 "status": "user_training_already_applied",
                 "week": week,
-                "training_highlights": build_training_loading_highlights(
-                    lt, ftd_coaching_focus=ftd_override
-                ),
                 "team_id": user_team_object_id,
                 "redirect": None,
             }
     else:
         raise HTTPException(status_code=400, detail="Invalid training phase")
     
-    # Validate total training points allocated
+    # Flat budget: every slider notch costs exactly one whole point.
     training_data = req.training_data
     allocations = {
         "player_drills": training_data.get("player_drills", {}),
         "team_drills": training_data.get("team_drills", {}),
         "general": training_data.get("general", {})
     }
-    
-    # Calculate total points allocated
-    total_allocated = 0
-    for category in allocations.values():
-        if isinstance(category, dict):
-            for value in category.values():
-                if isinstance(value, dict):
-                    total_allocated += sum(value.values())
-                elif isinstance(value, (int, float)):
-                    total_allocated += value
-    
-    if total_allocated != expected_points:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Invalid training points allocation. Expected {expected_points} points, got {total_allocated}."
-        )
 
     # ✅ SS&S: Always use user_team_object_id from franchise document as source of truth
     # This ensures we're always using the correct team, even if URL params are wrong
@@ -13821,6 +14477,10 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             "team": team_name or team_id,  # Use team_name if available, otherwise use team_id
             "attributes": franchise_player_data.get("attributes", {}),
             "position_ratings": franchise_player_data.get("position_ratings", {}),
+            **training_position_projection(franchise_player_data),
+            "training_gain_remainders": dict(
+                franchise_player_data.get("training_gain_remainders") or {}
+            ),
             "year": meta.get("year"),
             "meta": meta,
         }
@@ -13828,6 +14488,16 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
 
     if not players_for_training:
         raise HTTPException(status_code=404, detail="No players found for training")
+
+    try:
+        spend = training_points_spent(allocations)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if spend != expected_points:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Training allocation must spend exactly {expected_points} points; received {spend}",
+        )
     
     # Get team stats (team_attributes) from FTD
     team_stats = ftd_doc.get("team_attributes", {}).copy()
@@ -13948,7 +14618,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: Loading {len(players_for_training)} players: {players_load_time:.2f}ms")
     
     # Execute training (applies pre-training conditions, then training points)
-    # Skip pre-training depreciation for first training (training camp) - week 1 before games
+    # Camp weeks: skip decay, CAMP_GAIN_SCALE (framework §10.3)
     training_exec_start = time.time()
     updated_players, updated_team, updated_plays, updated_scouting_data, training_report = execute_training(
         players_for_training,
@@ -13963,6 +14633,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         skip_pre_training_depreciation=is_first_training,
         coaching_focus_custom_by_player=normalized_custom,
         training_playbook_focus=training_playbook_focus_payload,
+        gain_scale=CAMP_GAIN_SCALE if is_first_training else None,
     )
     training_exec_time = (time.time() - training_exec_start) * 1000
     # logger.warning(f"⏱️ [DB TIMING] run_franchise_training: execute_training(): {training_exec_time:.2f}ms")
@@ -14012,6 +14683,9 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
                 fpd_set[f"attributes.{attr}"] = attrs[attr]
         if "NG" in attrs:
             fpd_set["attributes.NG"] = attrs["NG"]
+        fpd_set["training_gain_remainders"] = dict(
+            player.get("training_gain_remainders") or {}
+        )
         if pid in position_ratings_updates:
             fpd_set["position_ratings"] = position_ratings_updates[pid]
         pm = player.get("meta") or {}
@@ -14050,7 +14724,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         logger.info(f"✅ [TRAINING] Saving scouting_data to FTD")
     else:
         logger.warning(f"⚠️ [TRAINING] updated_scouting_data is None, preserving existing scouting_data")
-    if is_first_training:
+    if is_last_camp_week:
         ftd_update["training_squad_players"] = []
 
     # Community Engagement → pending home-crowd band shift for user's next franchise game (consumed at game start)
@@ -14064,14 +14738,6 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             franchise_doc.setdefault("recruiting_results", {})[str(week)] = week_assignments
 
     session_type = training_status.get("session_type", "in-season")
-    ftd_counts_for_highlights: dict[str, int] = {}
-    pre_cf = ftd_doc.get("coaching_focus") or {}
-    for _k in COACHING_FOCUS_FTD_COUNT_KEYS:
-        try:
-            ftd_counts_for_highlights[_k] = int(pre_cf.get(_k, 0) or 0)
-        except (TypeError, ValueError):
-            ftd_counts_for_highlights[_k] = 0
-
     # Persist the `general` allocations (incl. film_study) so the FCC Scouting
     # Report can gate the opponent's Play Usage on Film Study > 0 for this week.
     _general_alloc = training_data.get("general") or {}
@@ -14102,7 +14768,6 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         "defenses_effectiveness_changes": training_report.get("defenses_effectiveness_changes", {}),
         "session_type": session_type,
         "date": datetime.now().strftime("%Y-%m-%d"),
-        "ftd_coaching_focus": ftd_counts_for_highlights,
         "team_drills": training_data.get("team_drills") or {},
         "general": _general_alloc,
     }
@@ -14130,11 +14795,6 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     )
     if cf_inc:
         ftd_ops["$inc"] = cf_inc
-        for _path, _inc in cf_inc.items():
-            _sub = _path.replace("coaching_focus.", "")
-            if _sub in ftd_counts_for_highlights:
-                ftd_counts_for_highlights[_sub] = ftd_counts_for_highlights.get(_sub, 0) + int(_inc)
-        training_report_data["ftd_coaching_focus"] = ftd_counts_for_highlights
     if ftd_ops:
         franchise_team_data_collection.update_one(
             {"franchise_id": franchise_id, "team_id": team_object_id},
@@ -14143,13 +14803,10 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
 
     db.franchises.update_one({"_id": franchise_id}, {"$set": franchise_update_user})
 
-    training_highlights = build_training_loading_highlights(training_report_data)
-
     if phase == "user_only":
         return {
             "status": "success",
             "week": week,
-            "training_highlights": training_highlights,
             "player_changes": player_logs,
             "team_changes": team_log,
             "coaching_focus": training_report.get("coaching_focus", {}),
@@ -14158,33 +14815,31 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             "redirect": None,
         }
 
-    _apply_franchise_distant_cpu_training(
+    _apply_franchise_cpu_training(
         franchise_id,
         franchise_doc=franchise_doc,
         user_team_id_str=str(team_id),
         week=week,
         is_first_training=is_first_training,
-        franchise_players=franchise_players,
     )
 
     cuts_ran_this_call = False
-    if is_first_training and not bool(training_status.get("cpu_training_camp_cuts_applied")):
+    if is_last_camp_week and not bool(training_status.get("cpu_training_camp_cuts_applied")):
         _apply_cpu_training_camp_cuts(franchise_id, excluded_team_id=str(team_id))
         cuts_ran_this_call = True
 
-    distant_update: dict[str, Any] = {
+    cpu_update: dict[str, Any] = {
         "training_status.training_completed": True,
-        "training_status.cpu_distant_complete_week": week,
+        "training_status.cpu_training_complete_week": week,
         "training_status.last_training_date": datetime.now().strftime("%Y-%m-%d"),
     }
     if cuts_ran_this_call:
-        distant_update["training_status.cpu_training_camp_cuts_applied"] = True
-    db.franchises.update_one({"_id": franchise_id}, {"$set": distant_update})
+        cpu_update["training_status.cpu_training_camp_cuts_applied"] = True
+    db.franchises.update_one({"_id": franchise_id}, {"$set": cpu_update})
 
     return {
         "status": "success",
         "week": week,
-        "training_highlights": training_highlights,
         "player_changes": player_logs,
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
@@ -14634,10 +15289,9 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
                 rec_recruits = rec_struct.get("recruits") or []
                 rec_total = int(rec_struct.get("total") or 0)
                 if rec_recruits:
-                    rec_team_name_map = {
-                        str(team["_id"]): team.get("name", str(team["_id"]))
-                        for team in db.teams.find({}, {"name": 1})
-                    }
+                    from BackEnd.utils.franchise_team_display import resolve_team_name_map
+
+                    rec_team_name_map = resolve_team_name_map(doc)
 
         return {
             "status": "success",
@@ -14796,6 +15450,12 @@ def dismiss_championship_moment(
     return {"status": "ok", "removed": bool(removed)}
 
 
+def _mark_completed_full_game_summary_final(summary: dict[str, Any]) -> dict[str, Any]:
+    """Stamp a summary from ``run_simulation`` as final without rewriting its played quarter."""
+    summary["is_final"] = True
+    return summary
+
+
 @router.post("/franchise/sim-rest-of-tournament")
 def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
     """Simulate all games in the current EOS round (when user has no game: bye or did not qualify)."""
@@ -14863,27 +15523,6 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             raise HTTPException(status_code=400, detail="No games in current EOS round.")
 
     _user_team_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
-    user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
-    ftd_docs = list(franchise_team_data_collection.find(
-        {"franchise_id": franchise_id},
-        {
-            "team_id": 1,
-            "players": 1,
-            "prestige": 1,
-            "total_player_attrs": 1,
-            "natl_rank": 1,
-            "team_attributes.team_chemistry": 1,
-            "team_attributes.momentum_score": 1,
-            "team_attributes.distant_win_streak": 1,
-            "team_attributes.distant_loss_streak": 1,
-            "team_attributes.offensive_efficiency": 1,
-            "team_attributes.defensive_efficiency": 1,
-            "team_attributes.shot_threshold": 1,
-        },
-    ))
-    ftd_by_team_id = {str(d["team_id"]): d for d in ftd_docs if d.get("team_id")}
-    distant_fpd_by_player_id = _distant_sim_batch_fpd_map(franchise_id, ftd_by_team_id)
-    distant_rs_standings = _distant_sim_regular_season_standings(franchise_doc, ftd_by_team_id)
 
     results = []
     for g in week_games_meta:
@@ -14893,62 +15532,6 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         away_doc = db.teams.find_one({"_id": away_id}, {"name": 1}) or {}
         home_name = home_doc.get("name", "")
         away_name = away_doc.get("name", "")
-        if not _should_use_tbt_for_eos_game(week, g, user_eos_sim_scope):
-            home_ftd = ftd_by_team_id.get(str(home_id), {})
-            away_ftd = ftd_by_team_id.get(str(away_id), {})
-            home_combined = _distant_sim_team_combined(
-                home_ftd, home_id, is_home=True, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-            )
-            away_combined = _distant_sim_team_combined(
-                away_ftd, away_id, is_home=False, rs_standings=distant_rs_standings,
-                fpd_by_player_id=distant_fpd_by_player_id, current_week=week,
-            )
-            home_score, away_score = _run_distant_game_sim(home_combined, away_combined)
-            winner_id = home_id if home_score > away_score else away_id
-            ftp.record_tournament_game_result(
-                franchise_doc,
-                g,
-                week=week,
-                franchise_id_str=str(franchise_id),
-                game_id=None,
-                team1_id=away_id,
-                team2_id=home_id,
-                team1_score=away_score,
-                team2_score=home_score,
-                source="distant",
-            )
-            results.append({
-                "away_id": str(away_id),
-                "home_id": str(home_id),
-                "away_score": away_score,
-                "home_score": home_score,
-            })
-            maybe_award_franchise_win_geek_points(
-                owner_user_id=franchise_doc.get("user_id"),
-                user_team_id_str=user_team_id_str,
-                winner_team_id=winner_id,
-                week=week,
-                eos_game_meta=g,
-            )
-            maybe_award_franchise_loss_geek_points(
-                owner_user_id=franchise_doc.get("user_id"),
-                user_team_id_str=user_team_id_str,
-                winner_team_id=winner_id,
-                participant_team_ids=(away_id, home_id),
-                week=week,
-                eos_game_meta=g,
-            )
-            maybe_award_franchise_eos_title_championship(
-                owner_user_id=franchise_doc.get("user_id"),
-                user_team_id_str=user_team_id_str,
-                winner_team_id=winner_id,
-                week=week,
-                eos_game_meta=g,
-            )
-            logger.info("✅ [EOS] Distant-simmed %s: %s vs %s", g["phase"], away_id, home_id)
-            continue
-
         if not home_name or not away_name:
             logger.error("❌ [EOS] Missing team names for sim round")
             continue
@@ -14956,7 +15539,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             gm = run_simulation(home_name, away_name)
             home_score = gm.score.get(home_name, 0)
             away_score = gm.score.get(away_name, 0)
-            summary = summarize_game_state(gm)
+            summary = _mark_completed_full_game_summary_final(summarize_game_state(gm))
             game_id = generate_game_id()
             summary["_id"] = game_id
             summary["franchise_id"] = str(franchise_id)
@@ -15074,7 +15657,7 @@ def sim_championship(req: SimChampionshipRequest):
         gm = run_simulation(home_name, away_name)
         home_score = gm.score.get(home_name, 0)
         away_score = gm.score.get(away_name, 0)
-        summary = summarize_game_state(gm)
+        summary = _mark_completed_full_game_summary_final(summarize_game_state(gm))
         game_id = generate_game_id()
         summary["_id"] = game_id
         summary["franchise_id"] = str(franchise_id)
@@ -15156,6 +15739,146 @@ def sim_championship(req: SimChampionshipRequest):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+def _warm_team_builder_roster_masters(
+    *,
+    franchise_id,
+    team_object_id,
+    primary_color: str,
+    secondary_color: str,
+    mascot: str,
+) -> dict[str, Any]:
+    """Paint all TB roster kits into players/master/<player_id>.png at Apply (§6.5).
+
+    Returns a summary so Apply can surface partial failures instead of only
+    leaving meta.image_painted unset.
+    """
+    from BackEnd.services import recruit_image, r2_images
+    from BackEnd.utils.team_builder_portraits import resolve_kit_keys
+
+    summary: dict[str, Any] = {
+        "attempted": 0,
+        "painted": 0,
+        "already_existed": 0,
+        "skipped_no_image_id": 0,
+        "skipped_no_kit": [],
+        "failed": [],
+        "r2_configured": r2_images.is_configured(),
+    }
+    if not r2_images.is_configured():
+        logger.warning(
+            "[TB-PORTRAIT-WARM] R2 not configured — skipped painting franchise_id=%s",
+            str(franchise_id),
+        )
+        return summary
+    ftd = franchise_team_data_collection.find_one(
+        {"franchise_id": franchise_id, "team_id": team_object_id},
+        {"players": 1},
+    ) or {}
+    pids = [str(pid) for pid in (ftd.get("players") or []) if pid]
+    if not pids:
+        return summary
+    for fpd in franchise_players_data_collection.find(
+        {"franchise_id": str(franchise_id), "player_id": {"$in": pids}},
+        {"player_id": 1, "meta.image_id": 1},
+    ):
+        player_id = str(fpd.get("player_id") or "")
+        image_id = str((fpd.get("meta") or {}).get("image_id") or "").strip()
+        if not player_id:
+            continue
+        summary["attempted"] += 1
+        if not image_id:
+            summary["skipped_no_image_id"] += 1
+            logger.warning(
+                "[TB-PORTRAIT-WARM] no image_id franchise_id=%s player_id=%s",
+                str(franchise_id),
+                player_id,
+            )
+            continue
+        master_key = f"players/master/{player_id}.png"
+        try:
+            if r2_images.exists(master_key):
+                summary["already_existed"] += 1
+                continue
+            keys = resolve_kit_keys(image_id)
+            if not keys:
+                summary["skipped_no_kit"].append(
+                    {"player_id": player_id, "image_id": image_id, "reason": "unresolved"}
+                )
+                logger.warning(
+                    "[TB-PORTRAIT-WARM] unresolved kit franchise_id=%s player_id=%s image_id=%s",
+                    str(franchise_id),
+                    player_id,
+                    image_id,
+                )
+                continue
+            kit_key, mask_key = keys
+            if not (r2_images.exists(kit_key) and r2_images.exists(mask_key)):
+                summary["skipped_no_kit"].append(
+                    {
+                        "player_id": player_id,
+                        "image_id": image_id,
+                        "reason": "missing_object",
+                        "kit_key": kit_key,
+                        "mask_key": mask_key,
+                    }
+                )
+                logger.warning(
+                    "[TB-PORTRAIT-WARM] missing kit/mask franchise_id=%s player_id=%s kit=%s mask=%s",
+                    str(franchise_id),
+                    player_id,
+                    kit_key,
+                    mask_key,
+                )
+                continue
+            master = recruit_image.make_signed_master(
+                r2_images.get(kit_key),
+                r2_images.get(mask_key),
+                primary_color,
+                secondary_color,
+                mascot,
+            )
+            r2_images.put(master_key, master)
+            franchise_players_data_collection.update_one(
+                {"franchise_id": str(franchise_id), "player_id": player_id},
+                {"$set": {"meta.image_painted": True}},
+            )
+            summary["painted"] += 1
+        except Exception as exc:
+            summary["failed"].append(
+                {
+                    "player_id": player_id,
+                    "image_id": image_id,
+                    "error": f"{type(exc).__name__}: {str(exc)[:160]}",
+                }
+            )
+            logger.exception(
+                "[TB-PORTRAIT-WARM] paint failed franchise_id=%s player_id=%s",
+                str(franchise_id),
+                player_id,
+            )
+    ok = summary["painted"] + summary["already_existed"]
+    logger.info(
+        "[TB-PORTRAIT-WARM] franchise_id=%s painted=%s/%s already=%s no_kit=%s failed=%s no_image_id=%s",
+        str(franchise_id),
+        summary["painted"],
+        summary["attempted"],
+        summary["already_existed"],
+        len(summary["skipped_no_kit"]),
+        len(summary["failed"]),
+        summary["skipped_no_image_id"],
+    )
+    if summary["failed"] or summary["skipped_no_kit"] or summary["skipped_no_image_id"]:
+        logger.warning(
+            "[TB-PORTRAIT-WARM] partial failure franchise_id=%s ok=%s/%s failed=%s no_kit=%s",
+            str(franchise_id),
+            ok,
+            summary["attempted"],
+            summary["failed"],
+            summary["skipped_no_kit"],
+        )
+    return summary
+
+
 def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players):
     """Eager-paint the USER team's freshly-signed players' uniform masters at
     rollover, so their portraits are already in R2 the instant they open their
@@ -15194,8 +15917,18 @@ def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players
         try:
             if r2_images.exists(master_key):
                 continue
-            kit_key = f"recruits/kit/{image_id}.png"
-            mask_key = f"recruits/kit/{image_id}.mask.png"
+            kit_keys = None
+            try:
+                from BackEnd.utils.team_builder_portraits import resolve_kit_keys
+
+                kit_keys = resolve_kit_keys(image_id)
+            except Exception:
+                kit_keys = None
+            if kit_keys:
+                kit_key, mask_key = kit_keys
+            else:
+                kit_key = f"recruits/kit/{image_id}.png"
+                mask_key = f"recruits/kit/{image_id}.mask.png"
             if not (r2_images.exists(kit_key) and r2_images.exists(mask_key)):
                 continue
             master = recruit_image.make_signed_master(
@@ -15208,6 +15941,59 @@ def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players
     if painted:
         logger.info("[IMG-WARM] pre-painted %s user signings franchise_id=%s",
                     painted, str(franchise_id))
+
+
+# RT jump that reads as a "breakout" in the offseason report. Chosen to surface
+# strong development without exposing peaks — a peak produces a bigger jump, but
+# the flag is on the visible RT delta, not on peak_count (§8: never leak CH).
+_OFFSEASON_BREAKOUT_RT = 8
+
+
+def _build_offseason_report_line(new_doc: dict, prev_doc: dict, dev_result: dict) -> dict:
+    """One offseason-development report row (§7.1 step 7).
+
+    Reports only observable outcomes — RT change, a "broke out" flag on a large
+    visible RT jump, and whether the player's BEST position changed (the HT-driven
+    wing→four moment, ~5% of players). It never exposes peak_count, remaining
+    peaks, ch_seed or anything they can be inferred from (§8)."""
+    def _top(pr):
+        vals = [v for v in (pr or {}).values() if isinstance(v, (int, float))]
+        return max(vals) if vals else 0
+
+    def _argmax(pr):
+        pr = pr or {}
+        return max(pr, key=pr.get) if pr else None
+
+    meta = new_doc.get("meta") or {}
+    before = _top(prev_doc.get("position_ratings"))
+    after = _top(new_doc.get("position_ratings"))
+    prev_best = _argmax(prev_doc.get("position_ratings"))
+    new_best = _argmax(new_doc.get("position_ratings"))
+    return {
+        "player_id": new_doc.get("player_id"),
+        "name": f"{meta.get('first_name', '')} {meta.get('last_name', '')}".strip(),
+        "year": meta.get("year"),
+        "training_position": new_doc.get("position_intent"),
+        "rt_before": before,
+        "rt_after": after,
+        "rt_delta": after - before,
+        "broke_out": (after - before) >= _OFFSEASON_BREAKOUT_RT,
+        "best_position_changed": bool(prev_best and new_best and prev_best != new_best),
+        "new_best_position": new_best,
+    }
+
+
+def _coaching_accumulator_for_player(player_id: str) -> Optional[Dict[str, float]]:
+    """Read the just-finished season's per-player training accumulator (attr →
+    points/week, 0-5 per the drill sliders), the QUALITY-half input to develop_rollover.
+
+    SEAM (pillar 3): the in-season capture that populates this is wired with the
+    CPU archetype-training rework. Until then this returns None for every player,
+    so coaching quality holds at the frozen reference (f = 1.0) — CPU and the
+    exact-diff baseline stay byte-identical at pass-1. When capture lands, this
+    reads the persisted per-player accumulator (and CPU teams, which record none,
+    still resolve to None → reference)."""
+    return None
 
 
 @router.post("/franchise/finish-season")
@@ -15267,13 +16053,19 @@ def finish_season(req: FinishSeasonRequest):
     signed_players = list(week_35_results.get("signed_players") or [])
     zero_stats = _zero_stats_block()
 
+    # Offseason development event (§7.1) runs per rolled-over player below. Uses the
+    # global random stream (this endpoint is not seeded); collects a report list.
+    from BackEnd.utils.player_development import develop_rollover
+    _dev_rng = random
+    _offseason_reports: list[dict[str, Any]] = []
+
     def advance_year(year_value: str | None) -> str:
         year = str(year_value or "").strip().lower()
         mapping = {
             "jh": "Freshman",
-            "freshman": "Sophomore",
-            "sophomore": "Junior",
-            "junior": "Senior",
+            "freshman": "Sophomore", "fr": "Sophomore",   # accept abbrev defensively
+            "sophomore": "Junior", "so": "Junior",
+            "junior": "Senior", "jr": "Senior",
         }
         return mapping.get(year, str(year_value or "Freshman").title())
 
@@ -15312,7 +16104,32 @@ def finish_season(req: FinishSeasonRequest):
                 "career": (fpd_doc.get("career") or zero_stats.copy()),
                 "attributes": (fpd_doc.get("attributes") or {}).copy(),
                 "position_ratings": (fpd_doc.get("position_ratings") or {}).copy(),
+                # Development pointer + identity carried forward (§10, single declared
+                # set). Without this the growth profile would vanish at rollover and the
+                # league would revert to the default curve — the highest-risk failure here.
+                **carry_dev_fields(fpd_doc),
             }
+            # Offseason development event (§7.1): develop the returning player onto
+            # his new year's rung, then recompute ratings (incl. after HT growth).
+            # Lazy-backfills + persists a missing profile once (existing saves).
+            # season_allocation is the season's per-player training accumulator
+            # (attr → points/week); coaching quality is scored against training_position.
+            # None → f 1.0 (frozen reference). CPU teams record no allocation until
+            # the archetype-training rework (pillar 3), so the league holds exactly
+            # at pass-1; the exact-diff baseline is CPU-only and stays byte-identical.
+            _season_alloc = _coaching_accumulator_for_player(player_id_str)
+            _dev = develop_rollover(next_doc, meta["year"], _dev_rng, season_allocation=_season_alloc)
+            next_doc["attributes"] = _dev["attributes"]
+            next_doc["meta"]["height"] = _dev["height"]
+            next_doc["meta"]["weight"] = _dev["weight"]
+            next_doc["position_ratings"] = _dev["position_ratings"]
+            next_doc["development"] = _dev["development"]
+            next_doc["entry_tier"] = _dev["entry_tier"]
+            next_doc["position_intent"] = _dev["position_intent"]
+            next_doc["potential_factor"] = _dev["potential_factor"]
+            next_doc["training_position"] = _dev["training_position"]
+            next_doc["coaching_quality"] = _dev["coaching_quality"]
+            _offseason_reports.append(_build_offseason_report_line(next_doc, fpd_doc, _dev))
             next_fpd_docs.append(next_doc)
             returning_players_by_team[team_id].append(player_id_str)
             if player_id_str in scholarship_players:
@@ -15327,7 +16144,7 @@ def finish_season(req: FinishSeasonRequest):
         name_parts = str(signed_player.get("name") or "").split(" ", 1)
         first_name = name_parts[0] if name_parts else ""
         last_name = name_parts[1] if len(name_parts) > 1 else ""
-        next_fpd_docs.append({
+        signed_doc = {
             "franchise_id": str(franchise_id),
             "player_id": str(signed_player["player_id"]),
             "meta": {
@@ -15353,7 +16170,27 @@ def finish_season(req: FinishSeasonRequest):
                 signed_player.get("attributes") or {}
             ),
             "position_ratings": (signed_player.get("position_ratings") or {}).copy(),
-        })
+            # Identity/dev carry from the recruit/walk-on source (§10, single declared
+            # set); present values now flow through (authored intent/tier/potential),
+            # missing ones lazy-backfill inside develop_rollover.
+            **carry_dev_fields(signed_player),
+        }
+        # Signed players enter advanced one year, so they too walk an offseason rung.
+        # No in-season record yet (just signed) → season_allocation None → f 1.0.
+        _prev = {"position_ratings": signed_doc["position_ratings"]}
+        _dev = develop_rollover(signed_doc, signed_doc["meta"]["year"], _dev_rng, season_allocation=None)
+        signed_doc["attributes"] = _dev["attributes"]
+        signed_doc["meta"]["height"] = _dev["height"]
+        signed_doc["meta"]["weight"] = _dev["weight"]
+        signed_doc["position_ratings"] = _dev["position_ratings"]
+        signed_doc["development"] = _dev["development"]
+        signed_doc["entry_tier"] = _dev["entry_tier"]
+        signed_doc["position_intent"] = _dev["position_intent"]
+        signed_doc["potential_factor"] = _dev["potential_factor"]
+        signed_doc["training_position"] = _dev["training_position"]
+        signed_doc["coaching_quality"] = _dev["coaching_quality"]
+        _offseason_reports.append(_build_offseason_report_line(signed_doc, _prev, _dev))
+        next_fpd_docs.append(signed_doc)
 
     next_fpd_map = {doc["player_id"]: doc for doc in next_fpd_docs}
     existing_ftd_by_team_id = {
@@ -15484,10 +16321,11 @@ def finish_season(req: FinishSeasonRequest):
     fm.franchise_id = franchise_id
     schedule = fm.schedule_manager.generate_schedule()
     from BackEnd.models.recruit_sets import load_unused_set_or_generate
+    from BackEnd.models.franchise_manager import RECRUIT_CLASS_SIZE
     _prev_used = (db.franchises.find_one({"_id": franchise_id}, {"used_recruit_set_ids": 1})
                   or {}).get("used_recruit_set_ids") or []
     recruits, used_recruit_set_id = load_unused_set_or_generate(
-        db, fm.recruit_manager, _prev_used, count=300)
+        db, fm.recruit_manager, _prev_used, count=RECRUIT_CLASS_SIZE)
     region_team_ids = fm._build_region_team_map()
 
     franchise_recruits_data_collection.delete_many({"franchise_id": str(franchise_id)})
@@ -15506,6 +16344,12 @@ def finish_season(req: FinishSeasonRequest):
             "weight": recruit["weight"],
             "archetype": recruit["archetype"],
             "year": recruit["year"],
+            # entry_tier / position_intent / development / potential_factor MUST persist
+            # here. Dropping them (the pre-2026-08-01 bug) forced develop_rollover to
+            # re-derive entry_tier from the recruit's undeveloped JH RT at signing,
+            # down-classifying recruits ~1.5 tiers and collapsing shooting on turnover.
+            # Single declared carry set (§ carry_dev_fields) — cannot silently diverge.
+            **carry_dev_fields(recruit),
             "Home Region": home_region,
             "Lean": fm._build_recruit_lean(home_region, region_team_ids),
             "created_at": recruit.get("created_at") or datetime.utcnow(),
@@ -15547,6 +16391,8 @@ def finish_season(req: FinishSeasonRequest):
             "week_35_recruiting_ran": False,
             WEEK_35_RECRUITING_RESULTS_FIELD: {},
             AWARDS_FIELD: awards_reset,
+            # Fresh walk-on portrait deck each season (camp-cut assign reuses only within a season).
+            "walk_on_image_ids_used": [],
             "training_status.training_completed": False,
             "training_status.session_type": "preseason",
             "training_status.training_disabled_for_eos": False,
@@ -15561,8 +16407,22 @@ def finish_season(req: FinishSeasonRequest):
     )
     
     logger.info(f"✅ [FINISH SEASON] Started season {next_season}")
-    
-    return {"status": "success", "season": next_season, "week": 1}
+
+    logger.info(
+        "🌱 [OFFSEASON DEV] %d players developed; %d broke out; %d changed best position",
+        len(_offseason_reports),
+        sum(1 for r in _offseason_reports if r.get("broke_out")),
+        sum(1 for r in _offseason_reports if r.get("best_position_changed")),
+    )
+
+    return {
+        "status": "success",
+        "season": next_season,
+        "week": 1,
+        # Offseason development report data (§7.1 step 7) — feed for the later
+        # report UI. Contains no peak/CH information (§8).
+        "offseason_development": _offseason_reports,
+    }
 
 
 # ============================================================================

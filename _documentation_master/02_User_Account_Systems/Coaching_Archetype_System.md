@@ -2,6 +2,13 @@
 
 Per-user tracking of a coach's **archetype mix** and **win/loss record**, surfaced as a badge, an explainer page, a one-time reveal, and leaderboards. Franchise-only (tournament mode sunset).
 
+> **NOT the CPU concept.** This is the **USER's** coaching archetype — a classification of the
+> human player's own behaviour, stored on the `users` doc. CPU teams have a separate, unrelated
+> system called **identity** (a vision pair driving their strategy sliders), documented in
+> [`06_Gameplay_Systems/CPU_Team_Identity_System.md`](../06_Gameplay_Systems/CPU_Team_Identity_System.md).
+> The two share no code, no storage and no lifecycle. The naming split is deliberate:
+> "archetype" = user, "identity" = CPU team.
+
 ## Implementation map
 
 | Piece | Location |

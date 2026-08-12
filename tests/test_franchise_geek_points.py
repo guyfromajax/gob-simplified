@@ -126,6 +126,20 @@ class TestFranchiseGeekPoints(unittest.TestCase):
         self.assertEqual(user["geek_points_by_team"]["HOME"], 2)
         self.assertEqual(calls, [(1, 2)])
 
+    def test_gm_team_matches_ref_accepts_object_id_when_display_renamed(self):
+        """Team Builder: GM.name is overlay (Hanson); refs are still Hardwood Fields ObjectId/slug."""
+        from types import SimpleNamespace
+
+        gm_team = SimpleNamespace(name="Hanson", team_id="HOME")
+        self.assertTrue(fgp.gm_team_matches_ref(gm_team, str(self.team_oid)))
+        self.assertTrue(fgp.gm_team_matches_ref(gm_team, "HOME"))
+        self.assertTrue(fgp.gm_team_matches_ref(gm_team, "Hanson"))
+        self.assertTrue(fgp.teams_match_for_franchise("HOME", str(self.team_oid)))
+        # Core name still resolves to same ObjectId as slug even when GM display differs
+        self.db.teams.update_one({"_id": self.team_oid}, {"$set": {"name": "Hardwood Fields"}})
+        self.assertTrue(fgp.teams_match_for_franchise("Hardwood Fields", gm_team.team_id))
+        self.assertFalse(fgp.gm_team_matches_ref(gm_team, "Some Other Team"))
+
 
 if __name__ == "__main__":
     unittest.main()

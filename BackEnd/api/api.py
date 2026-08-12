@@ -46,6 +46,7 @@ try:
         franchise_recruits_data_collection,
     )
     from BackEnd.utils.roster_loader import load_roster
+    from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD, potential_rt_for_player
     from BackEnd.utils.game_summary_builder import build_game_summary
     from BackEnd.utils.shared import (
         clean_mongo_ids,
@@ -234,7 +235,27 @@ try:
                 return resp
 
         return await call_next(request)
-    
+
+    @app.middleware("http")
+    async def team_builder_feature_middleware(request: Request, call_next):
+        """Block Team Builder authoring routes when TEAM_BUILDER_ENABLED is off.
+
+        Does not touch overlay resolution used by live franchises that already
+        have a modded program.
+        """
+        from BackEnd.utils.team_builder_feature import (
+            team_builder_disabled_detail,
+            team_builder_enabled,
+        )
+
+        path = request.url.path or ""
+        if path.startswith("/franchise/team-builder") and not team_builder_enabled():
+            return JSONResponse(
+                status_code=404,
+                content={"detail": team_builder_disabled_detail()},
+            )
+        return await call_next(request)
+
     @app.get("/sentry-debug")
     def sentry_debug():
         """Test endpoint - raises error to verify backend Sentry capture. Remove before public launch."""
@@ -247,11 +268,15 @@ try:
         Returns frontend configuration including alpha status.
         Frontend uses this to conditionally show alpha badge, disclaimers, and OTP field.
         """
+        from BackEnd.utils.team_builder_feature import team_builder_enabled
+
         return {
             "isAlpha": IS_ALPHA,
             "alphaDisclaimer": "This is an alpha release. Data may be wiped without notice. Gameplay balance and features may change." if IS_ALPHA else None,
             "version": "alpha-1.0" if IS_ALPHA else "1.0",
             "sentryDsn": os.getenv("SENTRY_DSN_FRONTEND") or None,
+            # Authoring only — existing TB overlays still resolve when false.
+            "teamBuilderEnabled": team_builder_enabled(),
         }
     
     # CORS Configuration - Must match actual testing domains, not just final ideal
@@ -297,7 +322,17 @@ try:
     
     print(f"🌐 [CORS] Configured with origins: {cors_origins}")
     logging.info(f"🌐 CORS configured with origins: {cors_origins}")
-    
+
+    # Team Builder replaced-name leak detector (dev/staging). Scans franchise-scoped
+    # JSON responses; observe-only (header + log, never fails). See team_builder_leak_detector.py.
+    try:
+        from BackEnd.utils.team_builder_leak_detector import install_team_builder_leak_middleware
+
+        if install_team_builder_leak_middleware(app):
+            print("🛡️ [TB-LEAK] Replaced-name response scanner enabled", file=sys.stderr, flush=True)
+    except Exception as e:
+        print(f"⚠️ [TB-LEAK] Failed to enable leak detector: {e}", file=sys.stderr, flush=True)
+
     # ============================================================================
     # RATE LIMITING (Step 6)
     # ============================================================================
@@ -500,6 +535,7 @@ try:
                 ensure_frd_index,
                 ensure_games_franchise_index,
                 ensure_franchises_user_id_index,
+                ensure_eog_band_log_index,
             )
             ensure_users_username_index()
             ensure_ftd_index()
@@ -507,6 +543,11 @@ try:
             ensure_frd_index()
             ensure_games_franchise_index()
             ensure_franchises_user_id_index()
+            # TTL + (franchise_id, week) for the EOG band instrumentation. Without this the
+            # collection still accepts writes, so logging LOOKS fine while nothing ever
+            # expires and every export is a collection scan — and GOB_EOG_BAND_TTL_DAYS
+            # silently does nothing, because the index it configures does not exist.
+            ensure_eog_band_log_index()
         except Exception as e:
             print(f"⚠️ [WARNING] startup: ensure indexes: {e}", file=sys.stderr, flush=True)
 
@@ -534,6 +575,9 @@ try:
         game_id: str | None = None
         home_team: str
         away_team: str
+        # Franchise structural identity (ObjectId strings). Prefer over display names for matchup checks.
+        home_id: str | None = None
+        away_id: str | None = None
         quarter: int = 1
         home_lineup: dict[str, str] | None = None
         away_lineup: dict[str, str] | None = None
@@ -765,7 +809,7 @@ try:
                             "shot_threshold": SHOT_THRESHOLD_MID,
                             "discipline": 0,
                             "fight": 0,
-                            "rebound_modifier": 1.0,
+                            "rebound_modifier": 0.2,
                             "momentum_score": 0,
                             "offensive_efficiency": 0,
                             "team_chemistry": 8,
@@ -833,17 +877,37 @@ try:
         from bson import ObjectId
         
         try:
-            # Resolve Mongo team _id: explicit team_id (init-game often passes None), invalid ObjectId, or name-only.
+            # Resolve Mongo team _id: explicit team_id (ObjectId), invalid ObjectId, or name-only.
             team_object_id = None
             if team_id:
                 try:
                     team_object_id = ObjectId(team_id)
                 except Exception:
                     team_object_id = None
+                # Slug / non-ObjectId refs (e.g. HARDWOOD_FIELDS)
+                if not team_object_id and team_id:
+                    from BackEnd.utils.franchise_geek_points import _resolve_to_object_id_str
+                    resolved = _resolve_to_object_id_str(team_id)
+                    if resolved:
+                        try:
+                            team_object_id = ObjectId(resolved)
+                        except Exception:
+                            team_object_id = None
             if not team_object_id and team_name:
                 team_doc = teams_collection.find_one({"name": team_name})
                 if team_doc:
                     team_object_id = team_doc.get("_id")
+                else:
+                    # Team Builder: custom display name won't match core teams.name
+                    try:
+                        from BackEnd.utils.franchise_team_display import get_team_builder_overlay
+                        overlay = get_team_builder_overlay(franchise_id)
+                        if overlay and str(overlay.get("name") or "").strip() == str(team_name or "").strip():
+                            replaced = overlay.get("replaced_object_id")
+                            if replaced:
+                                team_object_id = ObjectId(str(replaced))
+                    except Exception:
+                        pass
             if not team_object_id:
                 return None
             
@@ -1313,6 +1377,15 @@ try:
         from bson import ObjectId
         db_summary = summarize_game_state(gm, exclude_animations=True)
         db_summary["timeout_reason"] = timeout_reason
+        identity_source = None
+        try:
+            write_id_peek = resolve_game_write_id(games_collection, game_id)
+            identity_source = games_collection.find_one(
+                {"_id": write_id_peek},
+                {"franchise_id": 1, "mode": 1, "tournament_id": 1, "user_team_side": 1},
+            )
+        except Exception:
+            identity_source = None
         db_summary["resume_anchor"] = _build_resume_anchor(
             db_summary,
             {
@@ -1321,6 +1394,8 @@ try:
                 "resume_from_timeout": True,
             },
             timeout_context=db_summary,
+            identity_source=identity_source,
+            gm=gm,
         )
         trace_id = db_summary.get("timeout_trace_id") or gm.game_state.get("timeout_trace_id")
         game_id_type = type(game_id).__name__
@@ -1706,22 +1781,138 @@ try:
     # We don't need an explicit OPTIONS handler - the middleware does this
     
     @app.get("/teams")
-    def get_team_names():
-        teams = teams_collection.find(
-            {}, {"name": 1, "primary_color": 1, "secondary_color": 1, "mascot": 1, "_id": 0}
-        )
-        return sorted(
-            [
+    def get_team_names(franchise_id: str | None = None):
+        # conference + region are required by the franchise team-select / Team Builder
+        # picker (search, conference grouping, region filter). Additive fields only —
+        # existing consumers that ignore unknown keys keep working.
+        #
+        # object_id = str(Mongo _id). Canonical franchise/schedule/FTD key.
+        # team_id   = slug (e.g. BENTLEY_TRUMAN). Game-doc / TeamManager key.
+        #
+        # Optional franchise_id: chrome colors (and display_name) for the TB
+        # replaced slot via resolve_team_display. Core ``name`` stays identity.
+        #
+        # height_total / class_total: core-12 sums for team-select rank filters
+        # (§10.5). Deliberately not the franchise-15 inherited budget basis.
+        from BackEnd.constants.team_builder_budget import class_rank_from_year
+        from BackEnd.utils.franchise_team_display import resolve_team_display
+
+        teams = list(
+            teams_collection.find(
+                {},
                 {
-                    "name": team.get("name"),
-                    "primary_color": team.get("primary_color"),
-                    "secondary_color": team.get("secondary_color"),
-                    "mascot": team.get("mascot"),
-                }
-                for team in teams
-            ],
-            key=lambda t: t["name"],
+                    "name": 1,
+                    "primary_color": 1,
+                    "secondary_color": 1,
+                    "mascot": 1,
+                    "conference": 1,
+                    "region": 1,
+                    "team_id": 1,
+                    "player_ids": 1,
+                    # Team Builder / franchise select card stats (§5.2).
+                    "total_player_attrs": 1,
+                    "prestige": 1,
+                },
+            )
         )
+
+        # One players scan for all core-12 height/class filter fields.
+        all_pid_variants = []
+        team_pid_keys = []
+        for team in teams:
+            raw_ids = team.get("player_ids") or []
+            keys = []
+            for pid in raw_ids:
+                keys.append(str(pid))
+                all_pid_variants.append(pid)
+                try:
+                    from bson import ObjectId
+
+                    all_pid_variants.append(ObjectId(str(pid)))
+                except Exception:
+                    pass
+                all_pid_variants.append(str(pid))
+            team_pid_keys.append(keys)
+
+        by_id = {}
+        if all_pid_variants:
+            for doc in players_collection.find(
+                {"_id": {"$in": all_pid_variants}},
+                {"height": 1, "year": 1},
+            ):
+                by_id[str(doc.get("_id"))] = doc
+
+        rows = []
+        for team, pid_keys in zip(teams, team_pid_keys):
+            oid = str(team["_id"]) if team.get("_id") is not None else None
+            try:
+                total_attrs = int(team.get("total_player_attrs") or 0)
+            except (TypeError, ValueError):
+                total_attrs = 0
+            try:
+                prestige = int(team.get("prestige") or 0)
+            except (TypeError, ValueError):
+                prestige = 0
+            height_total = 0
+            class_total = 0
+            for key in pid_keys:
+                pdoc = by_id.get(key) or {}
+                try:
+                    height_total += int(pdoc.get("height") or 0)
+                except (TypeError, ValueError):
+                    pass
+                class_total += class_rank_from_year(pdoc.get("year"))
+            entry = {
+                "object_id": oid,
+                "name": team.get("name"),
+                "team_id": team.get("team_id"),
+                "primary_color": team.get("primary_color"),
+                "secondary_color": team.get("secondary_color"),
+                "mascot": team.get("mascot"),
+                "conference": team.get("conference"),
+                "region": team.get("region"),
+                "total_player_attrs": total_attrs,
+                "prestige": prestige,
+                "height_total": height_total,
+                "class_total": class_total,
+            }
+            if franchise_id and oid:
+                try:
+                    disp = resolve_team_display(franchise_id, oid, core_doc=team)
+                    entry["primary_color"] = disp.get("primary_color") or entry["primary_color"]
+                    entry["secondary_color"] = disp.get("secondary_color") or entry["secondary_color"]
+                    entry["mascot"] = (
+                        disp.get("mascot") if disp.get("mascot") is not None else entry["mascot"]
+                    )
+                    if disp.get("is_custom"):
+                        entry["display_name"] = disp.get("name")
+                        entry["abbreviation"] = disp.get("abbreviation")
+                except Exception:
+                    pass
+            rows.append(entry)
+
+        # §10.5 — rank bands are domain data shipped with each team. FE only filters.
+        def _assign_rank_bands(entries, value_key, band_key):
+            cutoffs = ((26, 1), (51, 2), (77, 3), (102, 4), (128, 5))
+            ordered = sorted(
+                entries,
+                key=lambda e: (
+                    -int(e.get(value_key) or 0),
+                    str(e.get("team_id") or e.get("object_id") or e.get("name") or ""),
+                ),
+            )
+            for idx, e in enumerate(ordered):
+                rank = idx + 1
+                band = 5
+                for max_rank, b in cutoffs:
+                    if rank <= max_rank:
+                        band = b
+                        break
+                e[band_key] = band
+
+        _assign_rank_bands(rows, "height_total", "height_band")
+        _assign_rank_bands(rows, "class_total", "class_band")
+        return sorted(rows, key=lambda t: (t["name"] or ""))
     
     
     @app.post("/api/simulate")
@@ -2260,6 +2451,7 @@ try:
                         # TODO: Remove these after frontend is updated to use teams[home_team_id]/teams[away_team_id]
                         "home_team": {
                             "name": home_team_name,
+                            "display_name": home_team_data.get("display_name") or home_team_name,
                             "team_fouls": home_team_data.get("team_fouls", 0),
                             "attributes": home_team_data.get("attributes", {}),  # Team attributes for S3 tab
                             "natl_rank": home_natl,
@@ -2276,6 +2468,7 @@ try:
                         },
                         "away_team": {
                             "name": away_team_name,
+                            "display_name": away_team_data.get("display_name") or away_team_name,
                             "team_fouls": away_team_data.get("team_fouls", 0),
                             "attributes": away_team_data.get("attributes", {}),  # Team attributes for S3 tab
                             "natl_rank": away_natl,
@@ -2377,10 +2570,19 @@ try:
         body,
         timeout_context: dict | None = None,
         anchor_type: str | None = None,
+        identity_source: dict | None = None,
+        gm=None,
     ) -> dict:
+        from BackEnd.utils.resume_anchor_identity import stamp_resume_identity_on_snapshot
+
         home_lineup, away_lineup = _extract_saved_lineups(db_summary)
         snapshot = copy.deepcopy(db_summary)
         snapshot.pop("resume_anchor", None)
+        # Future-proof: stamp identity onto the snapshot so it is self-sufficient.
+        # Merge-on-restore still covers historical anchors that lack these fields.
+        stamp_resume_identity_on_snapshot(
+            snapshot, body=body, identity_source=identity_source, gm=gm
+        )
         timeout_context = timeout_context if isinstance(timeout_context, dict) else {}
         resolved_anchor_type = _infer_resume_anchor_type(body, timeout_context, anchor_type)
         timeout_next_play_type = (
@@ -2447,11 +2649,25 @@ try:
         def _norm_key(value) -> str:
             return str(value or "").strip().lower().replace(" ", "_").replace("-", "_")
 
+        def _norm_keys_with_display_slug(value) -> set[str]:
+            """Identity _norm_key plus stored team_id / custom derive tokens."""
+            from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
+            out = {_norm_key(value)}
+            if value is None or value == "":
+                return out
+            for slug in identity_slugs_for_display_name(str(value)):
+                out.add(slug)
+                out.add(_norm_key(slug))
+            return out
+
         def _find_team_row(teams: dict, *candidates):
             if not isinstance(teams, dict):
                 return {}
             raw_candidates = [str(c) for c in candidates if c is not None and str(c) != ""]
-            normalized = {_norm_key(c) for c in raw_candidates}
+            normalized: set[str] = set()
+            for c in raw_candidates:
+                normalized |= _norm_keys_with_display_slug(c)
             for candidate in raw_candidates:
                 row = teams.get(candidate)
                 if isinstance(row, dict):
@@ -2459,14 +2675,11 @@ try:
             for key, row in teams.items():
                 if not isinstance(row, dict):
                     continue
-                if _norm_key(key) in normalized:
+                if _norm_keys_with_display_slug(key) & normalized:
                     return row
-                row_candidates = {
-                    _norm_key(row.get("team_id")),
-                    _norm_key(row.get("_id")),
-                    _norm_key(row.get("name")),
-                    _norm_key(row.get("slug")),
-                }
+                row_candidates: set[str] = set()
+                for field in ("team_id", "_id", "name", "slug"):
+                    row_candidates |= _norm_keys_with_display_slug(row.get(field))
                 if normalized.intersection(row_candidates):
                     return row
             return {}
@@ -2787,9 +3000,10 @@ try:
             # Game is in memory - return settings from GameManager
             # Determine which team
             target_team = None
-            if gm.home_team.team_id == team_id or gm.home_team.name == team_id:
+            from BackEnd.utils.franchise_geek_points import gm_team_matches_ref
+            if gm_team_matches_ref(gm.home_team, team_id):
                 target_team = gm.home_team
-            elif gm.away_team.team_id == team_id or gm.away_team.name == team_id:
+            elif gm_team_matches_ref(gm.away_team, team_id):
                 target_team = gm.away_team
             
             if target_team and hasattr(target_team, 'playbook_settings') and target_team.playbook_settings:
@@ -2961,18 +3175,22 @@ try:
             # Preserve user_team_side from in-memory game
             if gm and gm.game_state.get("user_team_side"):
                 preserved_user_team_side = gm.game_state.get("user_team_side")
+            # Strict matchup gate: core names only. Display names must never land here
+            # (TeamManager.name is core; FE sends core home_team/away_team + ObjectIds).
             if gm is not None and (
                 body.home_team != gm.home_team.name
                 or body.away_team != gm.away_team.name
             ):
                 if debug:
                     logging.debug(
-                        "simulate_quarter_endpoint team mismatch: game_id=%s expected=%s vs %s got=%s vs %s",
+                        "simulate_quarter_endpoint team mismatch: game_id=%s expected=%s vs %s got=%s vs %s ids=%s vs %s",
                         game_id,
                         gm.home_team.name,
                         gm.away_team.name,
                         body.home_team,
                         body.away_team,
+                        getattr(body, "home_id", None),
+                        getattr(body, "away_id", None),
                     )
                 raise HTTPException(
                     status_code=400,
@@ -3283,18 +3501,25 @@ try:
                 # logging.warning(f"⏱️ [DB TIMING] simulate_quarter: games_collection.find_one(game_id={game_id}): {db_lookup_time:.2f}ms, found={saved is not None}")
                 if saved:
                     if body.resume_from_anchor and isinstance(saved.get("resume_anchor"), dict):
+                        root_doc = saved
                         anchor = saved.get("resume_anchor") or {}
                         anchor_snapshot = anchor.get("snapshot") if isinstance(anchor.get("snapshot"), dict) else None
                         if anchor_snapshot:
-                            saved = anchor_snapshot
+                            # Merge: game state from anchor; franchise_id/mode from root.
+                            # Wholesale replace discarded identity and rebuilt from core rosters.
+                            from BackEnd.utils.resume_anchor_identity import merge_resume_anchor_snapshot
+
+                            saved = merge_resume_anchor_snapshot(root_doc, anchor_snapshot)
                             body.quarter = int(saved.get("quarter") or body.quarter or 1)
                             logging.warning(
-                                "🧭 [RESUME-ANCHOR-RESTORE] using snapshot game_id=%s quarter=%s clock=%s time_remaining=%s next_play=%s",
+                                "🧭 [RESUME-ANCHOR-RESTORE] merged snapshot game_id=%s quarter=%s clock=%s time_remaining=%s next_play=%s root_mode=%s root_franchise_id=%s",
                                 game_id,
                                 saved.get("quarter"),
                                 saved.get("clock"),
                                 saved.get("time_remaining"),
                                 saved.get("timeout_next_play_type"),
+                                root_doc.get("mode"),
+                                root_doc.get("franchise_id"),
                             )
                         else:
                             logging.warning("⚠️ [RESUME-ANCHOR-RESTORE] resume_anchor missing snapshot game_id=%s", game_id)
@@ -3381,10 +3606,29 @@ try:
                             # If request was invalid/missing, home_strategy/away_strategy already contain DB settings
                             # If request was valid, home_strategy/away_strategy contain request settings
                             # GameManager constructor will apply these settings correctly
-                            # ✅ FRANCHISE MODE: Extract franchise_id from saved game document if present
-                            saved_franchise_id = saved.get("franchise_id")
-                            saved_mode = saved.get("mode", "single")
-                            franchise_id_for_roster = saved_franchise_id if saved_mode == "franchise" else None
+                            # ✅ FRANCHISE MODE: Prefer merged saved identity; body is a secondary source.
+                            # Never silently fall open to core rosters when the root said franchise.
+                            from BackEnd.utils.resume_anchor_identity import resolve_franchise_id_for_roster
+
+                            try:
+                                saved_mode, franchise_id_for_roster = resolve_franchise_id_for_roster(
+                                    saved, body
+                                )
+                            except ValueError as roster_guard_err:
+                                logging.error(
+                                    "🚨 [RESUME-ROSTER-GUARD] %s game_id=%s saved_mode=%s "
+                                    "saved_franchise_id=%s body_mode=%s body_franchise_id=%s",
+                                    roster_guard_err,
+                                    game_id,
+                                    (saved or {}).get("mode"),
+                                    (saved or {}).get("franchise_id"),
+                                    getattr(body, "mode", None),
+                                    getattr(body, "franchise_id", None),
+                                )
+                                raise HTTPException(
+                                    status_code=500,
+                                    detail=str(roster_guard_err),
+                                ) from roster_guard_err
                             
                             gm_create_start = time.time()
                             gm = GameManager(
@@ -3855,12 +4099,12 @@ try:
 
                             home_ftd = load_ftd_data_for_team(
                                 body.franchise_id,
-                                None,  # team_id will be resolved from team_name
+                                getattr(body, "home_id", None),
                                 body.home_team
                             )
                             away_ftd = load_ftd_data_for_team(
                                 body.franchise_id,
-                                None,  # team_id will be resolved from team_name
+                                getattr(body, "away_id", None),
                                 body.away_team
                             )
                             home_prepared = prepare_ftd_for_new_game(home_ftd)
@@ -3888,6 +4132,8 @@ try:
                                 body.home_team,
                                 body.away_team,
                                 body.user_team_side,
+                                home_id=getattr(body, "home_id", None),
+                                away_id=getattr(body, "away_id", None),
                             )
                         gm = GameManager(
                             body.home_team, 
@@ -4522,6 +4768,12 @@ try:
                     pre_sim_anchor_summary,
                     body,
                     timeout_context=locals().get("timeout_saved_state"),
+                    identity_source={
+                        "franchise_id": getattr(body, "franchise_id", None),
+                        "mode": getattr(body, "mode", None),
+                        "tournament_id": getattr(body, "tournament_id", None),
+                    },
+                    gm=gm,
                 )
                 pre_sim_anchor_id = resolve_game_write_id(games_collection, game_id)
                 games_collection.update_one(
@@ -4746,7 +4998,7 @@ try:
             if mode == "tournament" and body.tournament_id:
                 db_summary["tournament_id"] = str(body.tournament_id)
 
-            # Box score / analytics: distinguish turn-by-turn vs full-quarter sim (distant uses simulation_engine="distant" elsewhere)
+            # Box score / analytics: identify the authoritative turn-by-turn engine.
             db_summary["simulation_engine"] = (
                 "full_quarter_sim" if body.full_sim else "turn_by_turn"
             )
@@ -5163,7 +5415,18 @@ try:
                     reset_all_player_momentum(gm)
                 except Exception as e:
                     logging.error(f"⚠️ EOG: Player momentum reset failed: {e}")
-            next_quarter = gm.quarter if is_final or gm.quarter > 4 else gm.quarter + 1
+            # Recovery/idempotency path: perform the same EOQ state transition as
+            # normal post-turn completion instead of merely changing the serialized
+            # copy. Tied overtime advances to another OT just like regulation ties.
+            completed_quarter = gm.quarter
+            next_quarter = completed_quarter if is_final else completed_quarter + 1
+            gm.game_state.pop("final_turn_shot_this_turn", None)
+            from BackEnd.utils.eoq_clock_progression import clear_late_clock_eoq_chain
+
+            clear_late_clock_eoq_chain(gm.game_state)
+            if not is_final:
+                gm.quarter = next_quarter
+                gm.game_state["quarter"] = next_quarter
             logging.warning(
                 "🧭 [SIM TURN EARLY RETURN TRACE] reason=quarter_complete game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s pending_terminal_ft=%s",
                 game_id,
@@ -5191,6 +5454,11 @@ try:
                                 "resume_from_timeout": False,
                             },
                             anchor_type="quarter_break",
+                            identity_source=games_collection.find_one(
+                                {"_id": quarter_save_id},
+                                {"franchise_id": 1, "mode": 1, "tournament_id": 1, "user_team_side": 1},
+                            ),
+                            gm=gm,
                         )
                         save_update = {"$set": db_summary}
                         _anchor = db_summary["resume_anchor"]
@@ -5467,7 +5735,8 @@ try:
             
             # Check if quarter is now complete.
             # Edge-case rule: if FT is still pending at 0:00, quarter is NOT complete yet.
-            # Phase 6: Final Turn shot and FINAL_HOLD use time_elapsed = time_remaining, so clock reaches 0
+            # Final Turn and Run Out turns consume their authored clock time; when
+            # that reaches 0 this block advances to Quarter Break / OT / game end.
             # after the turn (or after FTs if shooting foul); this block then sets quarter_complete and
             # advances to Quarter Break / OT / game end via existing logic.
             pending_terminal_ft_after_turn = _has_pending_terminal_free_throw(gm)
@@ -5494,27 +5763,6 @@ try:
                     quarter_complete,
                 )
 
-            # Detect repeated FINAL_HOLD at 0:00 (infinite-loop symptom).
-            if isinstance(latest_turn, dict) and latest_turn.get("result_type") == "FINAL_HOLD" and gm.game_state.get("time_remaining", 0) <= 0:
-                streak = int(gm.game_state.get("_debug_final_hold_streak", 0) or 0) + 1
-                gm.game_state["_debug_final_hold_streak"] = streak
-                if streak >= 2:
-                    logging.error(
-                        "🚨 [ZERO CLOCK LOOP TRACE] repeated FINAL_HOLD streak=%s game_id=%s quarter=%s clock=%s time_remaining=%s shot_clock_remaining=%s pending_terminal_ft=%s free_throws_remaining=%s offensive_state=%s latest_turn_next=%s",
-                        streak,
-                        game_id,
-                        gm.quarter,
-                        gm.game_state.get("clock"),
-                        gm.game_state.get("time_remaining"),
-                        gm.game_state.get("shot_clock_remaining"),
-                        pending_terminal_ft_after_turn,
-                        gm.game_state.get("free_throws_remaining"),
-                        gm.game_state.get("offensive_state"),
-                        latest_turn.get("next_play_type"),
-                    )
-            else:
-                gm.game_state["_debug_final_hold_streak"] = 0
-            
             # Debug logging for quarter completion check
             if quarter_complete:
                 turn_type = latest_turn.get("result_type", "UNKNOWN") if latest_turn else "NONE"
@@ -5634,6 +5882,11 @@ try:
                                 "resume_from_timeout": False,
                             },
                             anchor_type="quarter_break",
+                            identity_source=games_collection.find_one(
+                                {"_id": quarter_save_id},
+                                {"franchise_id": 1, "mode": 1, "tournament_id": 1, "user_team_side": 1},
+                            ),
+                            gm=gm,
                         )
                         save_update = {"$set": db_summary}
                         _anchor = db_summary["resume_anchor"]
@@ -6290,8 +6543,12 @@ try:
                 player_data = build_player_data(team, pos)
                 if player_data:
                     players.append(player_data)
+            # team_name stays core (identity); display_name is chrome for pre-game title etc.
+            core_name = team.name
+            display = getattr(team, "display_name", None) or core_name
             return {
-                "team_name": team.name,
+                "team_name": core_name,
+                "display_name": display,
                 "team_id": getattr(team, "team_id", None) or getattr(team, "id", None),
                 "players": players,
                 "primary_color": getattr(team, "primary_color", "#000000"),
@@ -6577,6 +6834,11 @@ try:
                 "weight": p.get("weight"),
                 "jersey": p.get("jersey"),
                 "position_ratings": position_ratings,
+                # Projected ceiling for display (§Phase 4) — already ratcheted; the view
+                # formats current/potential. Feeds team-roster-view.html AND the FCC roster
+                # tab (shared endpoint). None → view shows the current rating alone.
+                POTENTIAL_RT_FIELD: potential_rt_for_player(
+                    player_id_str, p.get("entry_tier"), p.get("potential_factor"), position_ratings),
                 "attributes": final_attrs,  # Return merged attributes (franchise overrides core)
                 "has_playing_time_promise": player_id_str in pt_promise_ids,
                 "is_graduating": bool(franchise_week == 36 and str(p.get("year") or "").strip().lower() in {"senior", "graduate"}),
@@ -6697,6 +6959,10 @@ try:
                             "jersey": ts_meta.get("jersey"),
                             "archetype": ts_meta.get("archetype"),
                             "position_ratings": d.get("position_ratings") or {},
+                            POTENTIAL_RT_FIELD: potential_rt_for_player(
+                                pid, d.get("entry_tier"), d.get("potential_factor"),
+                                d.get("position_ratings") or {},
+                            ),
                             "attributes": ts_attrs,
                             # Practice Squad season stats (regional PS games).
                             "ps_stats": d.get("ps_season_stats") or {},
@@ -6743,6 +7009,11 @@ try:
                             "jersey": None,
                             "archetype": s.get("archetype"),
                             "position_ratings": s.get("position_ratings") or {},
+                            POTENTIAL_RT_FIELD: potential_rt_for_player(
+                                str(s.get("recruit_id") or s.get("player_id") or ""),
+                                s.get("entry_tier"), s.get("potential_factor"),
+                                s.get("position_ratings") or {},
+                            ),
                             "attributes": r_attrs,
                             "ps_stats": frd_stats.get(s.get("recruit_id"), {}),
                             "is_recruit": True,
@@ -6793,6 +7064,23 @@ try:
             "practice_squad_recruiting_done": practice_squad_recruiting_done,
             "projected_starting_five": projected_starting_five,
         }
+
+        # Team Builder: overlay identity when this roster is loaded in a franchise.
+        if franchise_id and team.get("_id") is not None:
+            try:
+                from BackEnd.utils.franchise_team_display import resolve_team_display
+
+                display = resolve_team_display(franchise_id, team.get("_id"), core_doc=team)
+                response_data["team"] = display.get("name") or response_data["team"]
+                response_data["team_name"] = display.get("name") or response_data["team_name"]
+                response_data["primary_color"] = display.get("primary_color") or response_data["primary_color"]
+                response_data["secondary_color"] = display.get("secondary_color") or response_data["secondary_color"]
+                response_data["mascot"] = display.get("mascot")
+                response_data["abbreviation"] = display.get("abbreviation")
+                response_data["asset_strategy"] = display.get("asset_strategy") or "core"
+                response_data["is_custom_team"] = bool(display.get("is_custom"))
+            except Exception:
+                pass
         
         # ✅ DEBUG: Log response details for box score debugging
         if franchise_id:
@@ -6857,6 +7145,8 @@ try:
 
         home_team = request.get("home_team")
         away_team = request.get("away_team")
+        home_id = request.get("home_id")
+        away_id = request.get("away_id")
         mode = request.get("mode", "single")
         tournament_id = request.get("tournament_id")
         franchise_id = request.get("franchise_id")
@@ -6864,6 +7154,9 @@ try:
         
         if not home_team or not away_team:
             raise HTTPException(status_code=400, detail="home_team and away_team required")
+
+        # home_team/away_team must be core names (identity). Never rewrite via display resolver.
+        # home_id/away_id (ObjectIds) are preferred for FTD load when present.
         
         # ✅ SS&S: Load playbook_settings for single mode only (franchise/tournament mode loads from their documents during gameplay)
         # For franchise/tournament mode, _load_playbook_settings() loads directly from franchise/tournament documents
@@ -6889,6 +7182,7 @@ try:
 
             ce_crowd_shift = consume_franchise_community_engagement_for_matchup(
                 franchise_id, home_team, away_team, user_team_side,
+                home_id=home_id, away_id=away_id,
             )
 
         home_team_attributes = None
@@ -6907,8 +7201,8 @@ try:
 
             _refresh_cpu_playbooks_for_franchise_game_init(str(franchise_id))
 
-            home_ftd_row = load_ftd_data_for_team(franchise_id, None, home_team)
-            away_ftd_row = load_ftd_data_for_team(franchise_id, None, away_team)
+            home_ftd_row = load_ftd_data_for_team(franchise_id, home_id, home_team)
+            away_ftd_row = load_ftd_data_for_team(franchise_id, away_id, away_team)
             if not home_ftd_row:
                 logging.warning(
                     "⚠️ [INIT-GAME] No FTD row for home team=%s franchise_id=%s",
@@ -7026,9 +7320,9 @@ try:
         gm_time = (time.time() - gm_start) * 1000
         
         # Create minimal game document with players
-        # CRITICAL: Ensure scores are zeroed before summarizing
+        # CRITICAL: Ensure scores are zeroed before summarizing (core TeamManager.name keys)
         summary_start = time.time()
-        gm.score = {home_team: 0, away_team: 0}
+        gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}
         summary = summarize_game_state(gm, exclude_animations=True)
         try:
             _ts = summary.get("teams") or {}
@@ -7469,6 +7763,13 @@ try:
                     "position_ratings": p.get("position_ratings", {}),
                     "rt": rt,
                     "rt_value": rt_val if rt_val is not None else -1,
+                    # Projected ceiling for the per-team base-roster pages (§Phase 4). These
+                    # read the pool, where potential_factor is not persisted until Phase 5 —
+                    # resolve_potential_factor derives the stable hash value, and Phase 5
+                    # backfills exactly that value, so the displayed ceiling never changes.
+                    POTENTIAL_RT_FIELD: potential_rt_for_player(
+                        str(p.get("_id")), p.get("entry_tier"),
+                        p.get("potential_factor"), p.get("position_ratings", {})),
                 }
             )
     

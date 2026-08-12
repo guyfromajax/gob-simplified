@@ -166,7 +166,16 @@
       ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'].forEach(function (key) {
         addCell(formatAttr(attrs, key));
       });
-      addCell(player.highestRT != null ? player.highestRT : '-');
+      var rtCell = document.createElement('td');
+      rtCell.textContent = player.highestRT != null
+        ? formatRtWithPotentialDisplay(player.highestRT, player.potentialRtRatcheted)
+        : '-';
+      if (typeof window.getRtBucketClass === 'function') {
+        rtCell.className = window.getRtBucketClass(player.highestRT);
+      }
+      rtCell.setAttribute('data-tooltip', 'current/potential');
+      rtCell.setAttribute('title', 'current/potential');
+      tr.appendChild(rtCell);
 
       var checkTd = document.createElement('td');
       checkTd.className = 'cut-player-checkbox-cell';
@@ -343,6 +352,7 @@
           name: player.name || [player.first_name || '', player.last_name || ''].join(' ').trim(),
           pos: best.pos,
           highestRT: best.rating,
+          potentialRtRatcheted: player.potential_rt_ratcheted,
           year: (typeof GOB_PlayerYear !== 'undefined'
             ? GOB_PlayerYear.formatDisplay(player.year)
             : (typeof yearMap !== 'undefined' && player.year

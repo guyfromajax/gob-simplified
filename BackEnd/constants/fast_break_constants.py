@@ -97,7 +97,7 @@ FB_CUTOFF_PATH_CORRIDOR_STEAL = 11  # Legacy steal-entry path through resolve_fa
 FB_CUTOFF_DEFENDER_TIME_SLACK_DREB = 1.15  # Defenders get 15% arrival-time credit on DREB breaks
 FB_CUTOFF_DEFENDER_TIME_SLACK_STEAL = 1.0
 
-# FB Drive Cutoff & Stop Decision (June 2026 — see FB_Drive_Cutoff_Work_Plan.md)
+# FB Drive Cutoff & Stop Decision (see Fast_Break_System.md)
 FB_DRIVE_CUTOFF_PATH_CORRIDOR = 14
 FB_DRIVE_CUTOFF_TIME_SLACK = 1.0
 FB_SHOOT_GEO_RADIUS = 24  # Euclidean to attacking basket OR shoot spot-label exception

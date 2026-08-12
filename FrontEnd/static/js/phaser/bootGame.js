@@ -129,10 +129,46 @@ const bootGameParams = {
 const tournamentId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('tournament_id', urlParams.get('tournament_id')) : urlParams.get('tournament_id');
 const homeTeam = urlParams.get('home');
 const awayTeam = urlParams.get('away');
+const homeId = urlParams.get('home_id');
+const awayId = urlParams.get('away_id');
+// Chrome labels (overlay). Score keys / init-sim payloads use home/away (core).
+const homeDisplay = urlParams.get('home_display') || homeTeam;
+const awayDisplay = urlParams.get('away_display') || awayTeam;
 // ✅ PHASE 1.1: Remove localStorage fallback - franchise_id must come from URL params only
 const queryFranchiseId = urlParams.get('franchise_id');
 const urlMode = urlParams.get('mode');
 const franchiseId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('franchise_id', queryFranchiseId || null) : (queryFranchiseId || null);
+
+// Resolver-owned hydrate gate + total chrome snapshot. Kick early so
+// court/banner paint does not race the first chrome apply.
+const teamBuilderVisualHydratePromise =
+  typeof ensureTeamBuilderVisualReady === 'function'
+    ? ensureTeamBuilderVisualReady(franchiseId)
+    : Promise.resolve(null);
+const teamBuilderChromeSnapshotPromise =
+  typeof ensureTeamBuilderChromeSnapshot === 'function'
+    ? ensureTeamBuilderChromeSnapshot(franchiseId)
+    : Promise.resolve(null);
+
+function attachMatchupTeamIds(payload) {
+  if (homeId) payload.home_id = homeId;
+  if (awayId) payload.away_id = awayId;
+  return payload;
+}
+
+/** Chrome asset/label name — total snapshot when ready, else hydrate resolver. */
+function courtChromeName(side) {
+  const core = side === 'away' ? awayTeam : homeTeam;
+  const urlDisp = side === 'away' ? awayDisplay : homeDisplay;
+  if (typeof lookupTeamChrome === 'function' && typeof getTeamBuilderChromeSnapshot === 'function' &&
+      getTeamBuilderChromeSnapshot()) {
+    return lookupTeamChrome(core, { label: urlDisp || core }).label || urlDisp || core;
+  }
+  if (typeof resolveTeamBuilderDisplayName === 'function') {
+    return resolveTeamBuilderDisplayName(core, urlDisp || core);
+  }
+  return urlDisp || core;
+}
 
 // ✅ PHASE 1.1: Fail loudly if franchise_id is required but missing
 if (!franchiseId && urlMode === 'franchise') {
@@ -397,6 +433,16 @@ const GameScene = createGameScene(Phaser);
 let game;
 let isSimulating = false;
 
+/** Pause FE TB leak detector during full_sim / presentation (staging measurement). */
+function setTbLeakDetectorBulkSimPaused(paused) {
+  try {
+    if (typeof window !== 'undefined' && window.TeamBuilderLeakDetector &&
+        typeof window.TeamBuilderLeakDetector.setBulkSimPaused === 'function') {
+      window.TeamBuilderLeakDetector.setBulkSimPaused(paused);
+    }
+  } catch (e) { /* ignore */ }
+}
+
 function hasResumeFlowFlags(params) {
   return (
     params.get('active_resume') === 'true' ||
@@ -525,8 +571,9 @@ function redirectResumeAnchorToSetLineup(resumeState) {
   const overrides = {
     home: resumeState.home_team_name || sourceParams.get('home') || homeTeam,
     away: resumeState.away_team_name || sourceParams.get('away') || awayTeam,
-    home_id: resumeState.home_team_id || sourceParams.get('home_id') || resumeState.home_team_name || homeTeam,
-    away_id: resumeState.away_team_id || sourceParams.get('away_id') || resumeState.away_team_name || awayTeam,
+    // Prefer ObjectIds; never fall back structural id slots to display names
+    home_id: resumeState.home_team_id || sourceParams.get('home_id') || homeId || '',
+    away_id: resumeState.away_team_id || sourceParams.get('away_id') || awayId || '',
     mode: sourceParams.get('mode') || mode,
     my_team: sourceParams.get('my_team') || userTeamSide || 'home',
     team_id: sourceParams.get('team_id') || teamId || '',
@@ -613,14 +660,17 @@ function getPublishedCourtResumeState() {
 async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
   console.log('🔍 [SIM QUARTER] showSimQuarterResults called', { quarter, homeTeam, awayTeam });
   
-  // Set scoreboard logos (GameScene doesn't start during Sim Quarter, so set them here)
+  // Set scoreboard logos (GameScene doesn't start during Sim Quarter, so set them here).
+  // Use *_display for chrome so Team Builder generated banners resolve.
   const homeLogoEl = document.getElementById('home-logo');
   const awayLogoEl = document.getElementById('away-logo');
-  if (homeLogoEl && homeTeam) {
-    homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+  const homeChrome = courtChromeName('home');
+  const awayChrome = courtChromeName('away');
+  if (homeLogoEl && homeChrome) {
+    homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeChrome, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   }
-  if (awayLogoEl && awayTeam) {
-    awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+  if (awayLogoEl && awayChrome) {
+    awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayChrome, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
   }
   
   // Hide pre-game container
@@ -686,12 +736,40 @@ async function showSimQuarterResults(lastSummary, quarter, homeTeam, awayTeam) {
     awayTeamObj = typeof lastSummary.away_team === 'object' ? lastSummary.away_team : null;
   }
   
-  // Extract colors (same pattern as gameScene.js line 375-376)
-  const homeColors = homeTeamObj?.colors || lastSummary.home_team_colors;
-  const awayColors = awayTeamObj?.colors || lastSummary.away_team_colors;
-  
+  // Extract colors from total chrome snapshot (never summary/roster colours alone).
+  const homeColorsRaw = homeTeamObj?.colors || lastSummary.home_team_colors;
+  const awayColorsRaw = awayTeamObj?.colors || lastSummary.away_team_colors;
+  const homeSnap =
+    typeof lookupTeamChrome === 'function'
+      ? lookupTeamChrome(courtChromeName('home'), homeColorsRaw)
+      : null;
+  const awaySnap =
+    typeof lookupTeamChrome === 'function'
+      ? lookupTeamChrome(courtChromeName('away'), awayColorsRaw)
+      : null;
+  const homeColors = homeSnap
+    ? { primary_color: homeSnap.primary_color, secondary_color: homeSnap.secondary_color }
+    : typeof resolveTeamBuilderPaletteColors === 'function'
+      ? resolveTeamBuilderPaletteColors(courtChromeName('home'), homeColorsRaw)
+      : homeColorsRaw;
+  const awayColors = awaySnap
+    ? { primary_color: awaySnap.primary_color, secondary_color: awaySnap.secondary_color }
+    : typeof resolveTeamBuilderPaletteColors === 'function'
+      ? resolveTeamBuilderPaletteColors(courtChromeName('away'), awayColorsRaw)
+      : awayColorsRaw;
+
   const homeColor = homeColors?.primary_color || '#ff6200';
   const awayColor = awayColors?.primary_color || '#ff6200';
+  try {
+    if (typeof applyTeamVibrantDocumentVars === 'function') {
+      await applyTeamVibrantDocumentVars(
+        homeSnap?.label || courtChromeName('home'),
+        awaySnap?.label || courtChromeName('away'),
+        homeColors,
+        awayColors
+      );
+    }
+  } catch (e) { /* ignore */ }
   
   console.log('🔍 [SIM QUARTER] Team colors resolved:', {
     homeTeamId,
@@ -2089,6 +2167,7 @@ async function createFreshGameForPreAnchorQ1Refresh() {
     away_team: awayTeam,
     mode,
   };
+  attachMatchupTeamIds(initPayload);
   if (userTeamSide) initPayload.user_team_side = userTeamSide;
   if (mode === 'tournament' && tournamentId) initPayload.tournament_id = tournamentId;
   if (mode === 'franchise' && franchiseId) initPayload.franchise_id = franchiseId;
@@ -2190,23 +2269,62 @@ async function startGame({ homeRoster, awayRoster, animate = true, resumeActive 
   
   gameStore.setTeams({ home: homeTeam, away: awayTeam });
   gameStore.setRosters({ home: homeRoster, away: awayRoster });
+  try {
+    await teamBuilderVisualHydratePromise;
+    await teamBuilderChromeSnapshotPromise;
+  } catch (e) { /* non-fatal */ }
+  if (typeof ensureTeamBuilderChromeSnapshot === 'function') {
+    try {
+      await ensureTeamBuilderChromeSnapshot(franchiseId);
+    } catch (e) {
+      console.warn('⚠️ [bootGame] chrome snapshot failed:', e);
+    }
+  }
+
+  const homeChromeBoot = courtChromeName('home');
+  const awayChromeBoot = courtChromeName('away');
+  const homeSnap =
+    typeof lookupTeamChrome === 'function'
+      ? lookupTeamChrome(homeTeam || homeChromeBoot, homeRoster)
+      : null;
+  const awaySnap =
+    typeof lookupTeamChrome === 'function'
+      ? lookupTeamChrome(awayTeam || awayChromeBoot, awayRoster)
+      : null;
+  const homePalette = homeSnap
+    ? { primary_color: homeSnap.primary_color, secondary_color: homeSnap.secondary_color }
+    : typeof resolveTeamBuilderPaletteColors === 'function'
+      ? resolveTeamBuilderPaletteColors(homeChromeBoot, homeRoster)
+      : homeRoster;
+  const awayPalette = awaySnap
+    ? { primary_color: awaySnap.primary_color, secondary_color: awaySnap.secondary_color }
+    : typeof resolveTeamBuilderPaletteColors === 'function'
+      ? resolveTeamBuilderPaletteColors(awayChromeBoot, awayRoster)
+      : awayRoster;
+
   gameStore.setColors({
     home: {
-      primary_color: homeRoster.primary_color,
-      secondary_color: homeRoster.secondary_color,
+      primary_color: homePalette.primary_color,
+      secondary_color: homePalette.secondary_color,
     },
     away: {
-      primary_color: awayRoster.primary_color,
-      secondary_color: awayRoster.secondary_color,
+      primary_color: awayPalette.primary_color,
+      secondary_color: awayPalette.secondary_color,
     },
   });
 
-  // Keep court-level UI (player/team box score headers, borders, pills) synced to real team colors.
-  // This overrides the legacy 8-team vibrant-color fallback used before roster data is available.
+  // Court chrome CSS vars — snapshot palette (same source as resolveCourtImagePath).
   try {
-    if (typeof document !== 'undefined' && document.documentElement) {
-      document.documentElement.style.setProperty('--home-vibrant-color', homeRoster.primary_color || '#ff6200');
-      document.documentElement.style.setProperty('--away-vibrant-color', awayRoster.primary_color || '#ff6200');
+    if (typeof applyTeamVibrantDocumentVars === 'function') {
+      await applyTeamVibrantDocumentVars(
+        homeSnap?.label || homeChromeBoot,
+        awaySnap?.label || awayChromeBoot,
+        homePalette,
+        awayPalette
+      );
+    } else if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.style.setProperty('--home-vibrant-color', homePalette.primary_color || '#ff6200');
+      document.documentElement.style.setProperty('--away-vibrant-color', awayPalette.primary_color || '#ff6200');
     }
   } catch (err) {
     console.warn('⚠️ [bootGame] Failed to apply real team colors to court UI:', err);
@@ -2221,9 +2339,6 @@ async function startGame({ homeRoster, awayRoster, animate = true, resumeActive 
       backgroundColor: '#1e1e1e',
       parent: 'phaser-container',
       audio: { noAudio: true },
-      render: API_CONFIG?.isCaptureEnv?.()
-        ? { preserveDrawingBuffer: true }
-        : undefined,
       scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.CENTER_HORIZONTALLY,
@@ -2504,6 +2619,7 @@ async function handleSimQuarter() {
     return;
   }
   isSimulating = true;
+  setTbLeakDetectorBulkSimPaused(true);
   const playBtn = document.querySelector('.play-button');
   const simFullBtn = document.querySelector('.sim-full-game-button');
   const simQuarterBtn = document.querySelector('.sim-to-fourth-button');
@@ -2542,6 +2658,7 @@ async function handleSimQuarter() {
       quarter: nextQuarter,
       game_id: gameId, // Always pass gameId for tournament games
     };
+    attachMatchupTeamIds(payload);
     
     // ✅ SS&S: Add mode and mode-specific IDs to payload (matches gameScene.js pattern)
     // This ensures backend sets correct mode on game document for finalize_game() processing
@@ -2713,8 +2830,10 @@ async function handleSimQuarter() {
       const params = new URLSearchParams();
       params.set('home', homeTeam);
       params.set('away', awayTeam);
-      params.set('home_id', urlParams.get('home_id') || homeTeam);
-      params.set('away_id', urlParams.get('away_id') || awayTeam);
+      if (homeDisplay) params.set('home_display', homeDisplay);
+      if (awayDisplay) params.set('away_display', awayDisplay);
+      if (urlParams.get('home_id') || homeId) params.set('home_id', urlParams.get('home_id') || homeId);
+      if (urlParams.get('away_id') || awayId) params.set('away_id', urlParams.get('away_id') || awayId);
       params.set('mode', mode);
       if (franchiseId) params.set('franchise_id', franchiseId);
       if (weekParam && !Number.isNaN(weekParam)) params.set('week', weekParam);
@@ -2736,6 +2855,7 @@ async function handleSimQuarter() {
     alert(`Simulation Error: ${errorMessage}`);
   } finally {
     isSimulating = false;
+    setTbLeakDetectorBulkSimPaused(false);
     if (playBtn) playBtn.disabled = false;
     if (simFullBtn) simFullBtn.disabled = false;
     if (simQuarterBtn) simQuarterBtn.disabled = false;
@@ -2768,6 +2888,7 @@ async function handleSimFullGame() {
     resetGameContext();
   }
   isSimulating = true;
+  setTbLeakDetectorBulkSimPaused(true);
   
   // Remove the pre-game button container from DOM
   const preGameContainer = document.querySelector('.pre-game-container');
@@ -2900,6 +3021,7 @@ async function handleSimFullGame() {
         away_team: awayTeam,
         quarter: currentQ,
       };
+      attachMatchupTeamIds(payload);
       if (gId) payload.game_id = gId;
       
       // ✅ SS&S: Add mode and mode-specific IDs to payload (matches gameScene.js pattern)
@@ -3050,6 +3172,9 @@ async function handleSimFullGame() {
       await preppingCoverPromise;
     } catch (e) { /* covers are self-guarded */ }
     try {
+      if (typeof ensureTeamBuilderChromeSnapshot === 'function') {
+        await ensureTeamBuilderChromeSnapshot(franchiseId);
+      }
       const timeline = buildSimTimeline(quarterSummaries, {
         homeRoster,
         awayRoster,
@@ -3089,6 +3214,7 @@ async function handleSimFullGame() {
     [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = false; });
   } finally {
     isSimulating = false;
+    setTbLeakDetectorBulkSimPaused(false);
   }
 }
 

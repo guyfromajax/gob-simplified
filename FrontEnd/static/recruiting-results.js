@@ -52,7 +52,7 @@
               '<td>' + (teamRow.visit.weight != null ? teamRow.visit.weight : '--') + '</td>',
               '<td>' + (teamRow.visit.pos || '--') + '</td>',
               '<td>' + Recruiting.formatYearAbbrev(teamRow.visit.year || 'JH') + '</td>',
-              '<td class="' + (teamRow.visit.rt != null && typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(teamRow.visit.rt, teamRow.visit.year) : '') + '">' + (teamRow.visit.rt != null ? teamRow.visit.rt : '--') + '</td>'
+              '<td class="' + (teamRow.visit.rt != null && typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(teamRow.visit.rt, teamRow.visit.year) : '') + '">' + (teamRow.visit.rt != null ? formatRtDisplay(teamRow.visit.rt) : '--') + '</td>'
             ].join('');
           } else {
             tr.innerHTML = [

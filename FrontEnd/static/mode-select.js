@@ -7,7 +7,7 @@ function playSound(filename) {
 }
 
 const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_version';
-const ALPHA_DISCLAIMER_VERSION = '2026-07-22-recruiting-defenses-alpha-box';
+const ALPHA_DISCLAIMER_VERSION = '2026-08-12-player-attributes-alpha-box';
 
 const franchiseHomeSlots = document.getElementById('franchise-home-slots');
 const alphaDisclaimer = document.getElementById('alpha-disclaimer');
@@ -59,6 +59,23 @@ const TEAM_LOGO_CODE = {
 function getSquareLogoPath(teamName) {
   if (typeof getTeamAssetPath === 'function') return getTeamAssetPath(teamName, 'banner_primary');
   return '/images/teams/general/general_banner_primary.jpg';
+}
+
+function resolveFranchiseSlotBanner(franchiseData) {
+  const teamName = safeText(franchiseData && franchiseData.user_team_id, 'Program');
+  if (franchiseData && (franchiseData.asset_strategy === 'generated' || franchiseData.is_custom_team)) {
+    return getTeamAssetPath(teamName, 'banner_card', {
+      name: franchiseData.user_team_id,
+      abbreviation: franchiseData.abbreviation,
+      primary_color: franchiseData.primary_color,
+      secondary_color: franchiseData.secondary_color,
+      jersey_preset: franchiseData.jersey_preset,
+      asset_strategy: 'generated',
+      is_custom: true,
+      replaced_name: franchiseData.team_builder_replaced_name,
+    });
+  }
+  return getSquareLogoPath(teamName);
 }
 
 function clearFranchiseLocalStorage() {
@@ -160,22 +177,32 @@ function derivePrestige(teamDoc, commandCenterData) {
   return '-';
 }
 
-function deriveRecord(commandCenterData, teamName) {
+function findRankingsEntry(commandCenterData, franchiseData, teamName) {
   const rankings = (commandCenterData && Array.isArray(commandCenterData.rankings)) ? commandCenterData.rankings : [];
-  const teamEntry = rankings.find(function (entry) {
+  const objectId = franchiseData && franchiseData.user_team_object_id
+    ? String(franchiseData.user_team_object_id)
+    : '';
+  if (objectId) {
+    const byId = rankings.find(function (entry) {
+      return entry && String(entry.team_id) === objectId;
+    });
+    if (byId) return byId;
+  }
+  return rankings.find(function (entry) {
     return entry && entry.team_name === teamName;
-  });
+  }) || null;
+}
+
+function deriveRecord(commandCenterData, teamName, franchiseData) {
+  const teamEntry = findRankingsEntry(commandCenterData, franchiseData, teamName);
   if (!teamEntry) return '0-0';
   const wins = Number.isFinite(teamEntry.W) ? teamEntry.W : parseInt(teamEntry.W || 0, 10) || 0;
   const losses = Number.isFinite(teamEntry.L) ? teamEntry.L : parseInt(teamEntry.L || 0, 10) || 0;
   return wins + '-' + losses;
 }
 
-function deriveNextOpponent(commandCenterData, teamName) {
-  const rankings = (commandCenterData && Array.isArray(commandCenterData.rankings)) ? commandCenterData.rankings : [];
-  const teamEntry = rankings.find(function (entry) {
-    return entry && entry.team_name === teamName;
-  });
+function deriveNextOpponent(commandCenterData, teamName, franchiseData) {
+  const teamEntry = findRankingsEntry(commandCenterData, franchiseData, teamName);
   if (!teamEntry) return 'TBD';
   return safeText(teamEntry.next, 'TBD');
 }
@@ -1053,11 +1080,14 @@ function buildActiveGameCourtUrl(franchiseData, resume) {
   params.set('active_resume', 'true');
   params.set('franchise_id', franchiseData.franchise_id);
   params.set('game_id', resume.game_id);
+  // home/away = core identity names from the game doc; display params are chrome-only.
   params.set('home', resume.home_team_name || 'Home');
   params.set('away', resume.away_team_name || 'Away');
+  if (resume.home_display_name) params.set('home_display', resume.home_display_name);
+  if (resume.away_display_name) params.set('away_display', resume.away_display_name);
   params.set('home_id', resume.home_team_id || resume.home_team_name || 'Home');
   params.set('away_id', resume.away_team_id || resume.away_team_name || 'Away');
-  params.set('team_id', franchiseData.user_team_id || '');
+  params.set('team_id', franchiseData.user_team_object_id || franchiseData.user_team_id || '');
   params.set('my_team', resume.user_team_side || 'home');
   params.set('quarter', String(Number(resume.quarter) || 1));
   params.set('period', formatResumePeriod(resume));
@@ -1143,10 +1173,10 @@ function buildEmptySlotHtml(slotIndex) {
 function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIndex) {
   const franchiseId = String(franchiseData.franchise_id || '');
   const teamName = safeText(franchiseData.user_team_id, 'Program');
-  const bannerUrl = getSquareLogoPath(teamName);
+  const bannerUrl = resolveFranchiseSlotBanner(franchiseData);
   const seasonProgress = deriveSeasonProgress(commandCenterData, franchiseData);
-  const record = deriveRecord(commandCenterData, teamName);
-  const nextOpponent = deriveNextOpponent(commandCenterData, teamName);
+  const record = deriveRecord(commandCenterData, teamName, franchiseData);
+  const nextOpponent = deriveNextOpponent(commandCenterData, teamName, franchiseData);
 
   const activeGameResume = commandCenterData && commandCenterData.active_game_resume
     && commandCenterData.active_game_resume.status === 'stoppage_anchor'
@@ -1158,6 +1188,7 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
 
   slotRuntimeById[franchiseId] = {
     franchise: franchiseData,
+    commandCenter: commandCenterData || null,
     activeGameResume: activeGameResume,
     cpuSimResume: cpuSimResume,
   };
@@ -1167,9 +1198,10 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
   if (activeGameResume) {
     enterLabel = 'Resume Game →';
     const resumeIsAway = String(activeGameResume.user_team_side || 'home').toLowerCase() === 'away';
+    // Payload keeps core *_team_name for URL/score keys; chrome uses *_display_name.
     const resumeOpponent = resumeIsAway
-      ? (activeGameResume.home_team_name || 'Opponent')
-      : (activeGameResume.away_team_name || 'Opponent');
+      ? (activeGameResume.home_display_name || activeGameResume.home_team_name || 'Opponent')
+      : (activeGameResume.away_display_name || activeGameResume.away_team_name || 'Opponent');
     resumeHtml =
       '<div class="franchise-resume-card">' +
         '<div>' +
@@ -1257,7 +1289,7 @@ function assignFranchisesToSlots(franchises) {
   return bySlot;
 }
 
-function renderFranchiseSlots(franchises, teamsByName, commandCenterById) {
+function renderFranchiseSlots(franchises, teamsById, teamsByName, commandCenterById) {
   if (!franchiseHomeSlots) return;
   Object.keys(slotRuntimeById).forEach(function (k) { delete slotRuntimeById[k]; });
 
@@ -1266,8 +1298,16 @@ function renderFranchiseSlots(franchises, teamsByName, commandCenterById) {
   for (let slot = 1; slot <= maxFranchiseSlots; slot++) {
     const franchiseData = bySlot[slot];
     if (franchiseData) {
+      // Join by ObjectId first (Team Builder: user_team_id is display name, not core).
+      const objectId = franchiseData.user_team_object_id
+        ? String(franchiseData.user_team_object_id)
+        : '';
       const teamName = safeText(franchiseData.user_team_id, '');
-      const teamDoc = teamsByName[teamName] || null;
+      const replacedName = safeText(franchiseData.team_builder_replaced_name, '');
+      const teamDoc = (objectId && teamsById[objectId])
+        || teamsByName[replacedName]
+        || teamsByName[teamName]
+        || null;
       const commandCenterData = commandCenterById[String(franchiseData.franchise_id)] || null;
       html += buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slot);
     } else {
@@ -1297,6 +1337,15 @@ function goToFranchiseCommandCenter(franchiseId) {
   if (franchiseData && franchiseData.franchise_id) {
     const resumeUrl = buildActiveGameCourtUrl(franchiseData, runtime.activeGameResume);
     if (resumeUrl) {
+      // Same hydrate producer as FCC — before court reconstructs chrome from URL/sim.
+      try {
+        if (typeof hydrateTeamBuilderVisualFromFranchisePayload === 'function') {
+          hydrateTeamBuilderVisualFromFranchisePayload(
+            runtime.commandCenter || franchiseData,
+            franchiseData.franchise_id
+          );
+        }
+      } catch (e) { /* court will re-fetch */ }
       console.warn('[MODE-RESUME-CLIENT] route resume', {
         franchise_id: franchiseData.franchise_id,
         game_id: runtime.activeGameResume && runtime.activeGameResume.game_id,
@@ -1419,7 +1468,13 @@ async function confirmDeleteFranchise() {
     return;
   }
   const franchiseId = String(target.franchise_id);
+  // Same click as the slot "Delete Franchise" control.
+  playSound('click-beep.wav');
   if (deleteFranchiseModalConfirm) deleteFranchiseModalConfirm.disabled = true;
+  closeDeleteFranchiseModal();
+  if (window.PageLoadOverlay && typeof window.PageLoadOverlay.show === 'function') {
+    window.PageLoadOverlay.show('Deleting franchise…');
+  }
   try {
     const res = await fetch(
       API_CONFIG.buildUrl('/franchise/' + encodeURIComponent(franchiseId)),
@@ -1427,16 +1482,22 @@ async function confirmDeleteFranchise() {
     );
     if (!res.ok) {
       console.warn('[mode-select] delete franchise failed:', res.status);
+      if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
+        window.PageLoadOverlay.hide();
+      }
       alert('Could not delete that franchise. Try again.');
       return;
     }
     if (window.FranchiseLS && typeof window.FranchiseLS.clearAllForFranchise === 'function') {
       window.FranchiseLS.clearAllForFranchise(franchiseId);
     }
-    closeDeleteFranchiseModal();
+    // Reload lands on mode select; initial loading panel covers the refresh.
     window.location.reload();
   } catch (e) {
     console.warn('[mode-select] delete franchise error:', e);
+    if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
+      window.PageLoadOverlay.hide();
+    }
     alert('Could not delete that franchise. Try again.');
   } finally {
     if (deleteFranchiseModalConfirm) deleteFranchiseModalConfirm.disabled = false;
@@ -1590,8 +1651,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
   const teamsData = await safeJsonFetch(API_CONFIG.buildUrl('/teams'), { headers: headers }) || [];
   const teamsByName = {};
+  const teamsById = {};
   teamsData.forEach(function (team) {
-    if (team && team.name) teamsByName[team.name] = team;
+    if (!team) return;
+    if (team.name) teamsByName[team.name] = team;
+    const tid = team.object_id || team._id || team.id || team.team_object_id;
+    if (tid) teamsById[String(tid)] = team;
   });
 
   const commandCenterById = {};
@@ -1610,6 +1675,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     });
   }));
 
-  renderFranchiseSlots(franchisesList, teamsByName, commandCenterById);
+  renderFranchiseSlots(franchisesList, teamsById, teamsByName, commandCenterById);
   revealModeSelect();
 });

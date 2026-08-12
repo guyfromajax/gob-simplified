@@ -15,14 +15,15 @@ This script will:
 
 import sys
 import os
-from pymongo import MongoClient
+import argparse
+from pathlib import Path
 from bson import ObjectId
 import logging
 
 # Add the parent directory to the sys.path to allow importing from BackEnd
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from BackEnd.db import fcp_skeletons_collection, hct_skeletons_collection
+from scripts.db_migration_cli import connect_migration_target
 
 logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
@@ -65,7 +66,7 @@ def add_opp_fields_to_skeleton(skeleton, skeleton_type):
     
     return updated
 
-def migrate_skeletons():
+def migrate_skeletons(fcp_skeletons_collection, hct_skeletons_collection, *, apply: bool):
     logging.info("============================================================")
     logging.info("Adding 'opp' fields to FCP and HCT skeletons")
     logging.info("============================================================")
@@ -81,10 +82,11 @@ def migrate_skeletons():
         logging.info(f"\n🔍 Processing FCP skeleton: {skeleton_id} ({skeleton.get('name', 'Unnamed')})")
         
         if add_opp_fields_to_skeleton(skeleton, "FCP"):
-            fcp_skeletons_collection.update_one(
-                {"_id": ObjectId(skeleton_id)},
-                {"$set": {"variants": skeleton["variants"]}}
-            )
+            if apply:
+                fcp_skeletons_collection.update_one(
+                    {"_id": ObjectId(skeleton_id)},
+                    {"$set": {"variants": skeleton["variants"]}}
+                )
             logging.info(f"  ✅ Updated FCP skeleton: {skeleton_id}")
             updated_fcp_count += 1
         else:
@@ -103,10 +105,11 @@ def migrate_skeletons():
         logging.info(f"\n🔍 Processing HCT skeleton: {skeleton_id} ({skeleton.get('name', 'Unnamed')})")
         
         if add_opp_fields_to_skeleton(skeleton, "HCT"):
-            hct_skeletons_collection.update_one(
-                {"_id": ObjectId(skeleton_id)},
-                {"$set": {"variants": skeleton["variants"]}}
-            )
+            if apply:
+                hct_skeletons_collection.update_one(
+                    {"_id": ObjectId(skeleton_id)},
+                    {"$set": {"variants": skeleton["variants"]}}
+                )
             logging.info(f"  ✅ Updated HCT skeleton: {skeleton_id}")
             updated_hct_count += 1
         else:
@@ -151,5 +154,13 @@ def migrate_skeletons():
     logging.info("\n✅ Migration verification complete!")
 
 if __name__ == "__main__":
-    migrate_skeletons()
-
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", choices=("gob-staging", "gob"), required=True)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=args.apply)
+    migrate_skeletons(
+        connection.database["fcp_skeletons"],
+        connection.database["hct_skeletons"],
+        apply=args.apply,
+    )

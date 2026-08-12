@@ -12,45 +12,32 @@ Conference 1 players and gob-staging needs them.
 SAFETY: This script NEVER deletes any documents. It only inserts/updates.
 Run from repo root: python3 scripts/copy_gob_players_to_staging.py
 """
+import argparse
 import os
 import sys
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
-
-
-def _load_env(filepath):
-    out = {}
-    if os.path.exists(filepath):
-        with open(filepath) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    out[k.strip()] = v.strip().strip('"').strip("'")
-    return out
-
-
-for path in [".env.local", ".env"]:
-    for k, v in _load_env(path).items():
-        os.environ.setdefault(k, v)
-
-from BackEnd.db import client
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from BackEnd.script_db import connect_script_database
 
 SRC_DB = "gob"
 DST_DB = "gob-staging"
 
 
 def main():
-    if not client:
-        print("❌ MongoDB client not available.")
-        sys.exit(1)
-
-    src_players_coll = client[SRC_DB]["players"]
-    dst_players_coll = client[DST_DB]["players"]
-    dst_teams_coll = client[DST_DB]["teams"]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    pristine = dict(os.environ)
+    source = connect_script_database(target=SRC_DB, access="read", pristine_env=pristine, repo_root=ROOT)
+    destination = connect_script_database(
+        target=DST_DB, access="write" if args.apply else "read",
+        pristine_env=pristine, repo_root=ROOT, force_local_staging=True,
+    )
+    src_players_coll = source.database["players"]
+    dst_players_coll = destination.database["players"]
+    dst_teams_coll = destination.database["teams"]
 
     # 1) Load all players from gob
     src_players = list(src_players_coll.find({}))
@@ -88,20 +75,21 @@ def main():
     # 4) Upsert into gob-staging.players (by _id)
     from pymongo import ReplaceOne
     bulk = [ReplaceOne({"_id": d["_id"]}, d, upsert=True) for d in ops]
-    result = dst_players_coll.bulk_write(bulk, ordered=False)
-    print(f"[{DST_DB}] Players: {result.upserted_count} inserted, {result.modified_count} replaced.")
+    result = dst_players_coll.bulk_write(bulk, ordered=False) if args.apply else None
+    print(f"[{DST_DB}] Players: {'would upsert ' + str(len(bulk)) if not args.apply else str(result.upserted_count) + ' inserted, ' + str(result.modified_count) + ' replaced'}.")
 
     # 5) Update staging teams: set player_ids for teams that have any of these players
     updated = 0
     for team_name, player_ids in team_name_to_player_ids.items():
-        r = dst_teams_coll.update_one(
-            {"name": team_name},
-            {"$set": {"player_ids": player_ids}},
-        )
-        if r.modified_count:
+        current = dst_teams_coll.find_one({"name": team_name}, {"player_ids": 1})
+        if args.apply:
+            dst_teams_coll.update_one({"name": team_name}, {"$set": {"player_ids": player_ids}})
+        if current and current.get("player_ids") != player_ids:
             updated += 1
-    print(f"[{DST_DB}] Updated player_ids on {updated} team(s).")
+    print(f"[{DST_DB}] {'Updated' if args.apply else 'Would update'} player_ids on {updated} team(s).")
     print("Done.")
+    source.close()
+    destination.close()
 
 
 if __name__ == "__main__":

@@ -109,10 +109,10 @@ def test_ps_all_stars_qualification_and_line_format():
     assert story["lines"] == [
         "Cy Brown of Lancaster increased by 12 attribute points this week. "
         "His strongest gains were in Scoring, Shooting, and Rebounding. "
-        "He's now a 51 rated PF.",
+        "He's now rated C+ at PF.",
         "Al Smith of Morristown increased by 8 attribute points this week. "
         "His strongest gains were in Scoring. "
-        "He's now a 38 rated SG.",
+        "He's now rated D at SG.",
     ]
 
 
@@ -187,8 +187,8 @@ def test_recruiting_leans_top_rated_section_format_sort_and_rt_boundary():
     # RT descending; Boundary Bob (49) excluded; no conference section appended.
     assert story["lines"] == [
         "Top Rated Recruit Announcements",
-        "Max High who is a 62 rated Floor General has announced a lean toward Beta.",
-        "Mid Guy who is a 50 rated Sharp Shooter has announced a lean toward Alpha.",
+        "Max High, a Floor General rated B, has announced a lean toward Beta.",
+        "Mid Guy, a Sharp Shooter rated C+, has announced a lean toward Alpha.",
     ]
 
 
@@ -205,7 +205,7 @@ def test_recruiting_leans_combines_multiple_teams_for_one_recruit():
     )
 
     assert story["lines"][1] == (
-        "Max High who is a 70 rated Sharp Shooter has announced a lean toward Alpha and Beta."
+        "Max High, a Sharp Shooter rated B+, has announced a lean toward Alpha and Beta."
     )
 
 
@@ -234,14 +234,14 @@ def test_recruiting_leans_conference_section_grouping_and_sorting():
     # there even though his team isn't in the user's conference.
     assert story["lines"] == [
         "Top Rated Recruit Announcements",
-        "Out Of Conf who is a 60 rated Sharp Shooter has announced a lean toward Niner.",
-        "Cy Top who is a 55 rated Sharp Shooter has announced a lean toward Beta.",
+        "Out Of Conf, a Sharp Shooter rated B, has announced a lean toward Niner.",
+        "Cy Top, a Sharp Shooter rated C+, has announced a lean toward Beta.",
         "",
         "Conference 3 Lean Announcements",
         "Beta",  # natl_rank 12 lists before rank 88
-        "Cy Top (55)",
+        "Cy Top (C+)",
         "Alpha",
-        "Bo Mid (41), Al Low (28)",  # recruits sorted by RT descending
+        "Bo Mid (C), Al Low (F)",  # recruits remain sorted by numeric RT descending
     ]
 
 
@@ -256,7 +256,7 @@ def test_recruiting_leans_conference_only_runs_without_top_rated_section():
     assert story["lines"] == [
         "Conference 5 Lean Announcements",
         "Alpha",
-        "Al Low (30)",
+        "Al Low (D)",
     ]
 
 
@@ -309,7 +309,7 @@ def test_append_week_news_resolves_user_conference_from_string_team_id(monkeypat
     monkeypatch.setattr(
         franchise_routes,
         "_format_team_name_map",
-        lambda team_ids=None: {str(rival_oid): "Rival U"},
+        lambda team_ids=None, franchise=None: {str(rival_oid): "Rival U"},
     )
     monkeypatch.setattr(
         franchise_routes,
@@ -334,7 +334,7 @@ def test_append_week_news_resolves_user_conference_from_string_team_id(monkeypat
     assert leans_story["lines"] == [
         "Conference 4 Lean Announcements",
         "Rival U",
-        "Al Low (31)",
+        "Al Low (D)",
     ]
 
 
@@ -353,7 +353,7 @@ def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
     monkeypatch.setattr(
         franchise_routes,
         "_format_team_name_map",
-        lambda team_ids=None: {team_a: "Underdog U", team_b: "Favorite State"},
+        lambda team_ids=None, franchise=None: {team_a: "Underdog U", team_b: "Favorite State"},
     )
 
     franchise_doc = {

@@ -1,0 +1,2710 @@
+{
+  "set_id": "builder_set_0001",
+  "version": 1,
+  "purpose": "Team Builder portrait extension (builder_set_0001) \u2014 NOT in recruit assignment pool",
+  "age_language": "teen",
+  "r2_prefix": "portrait-kits/builder_set_0001/",
+  "count": 150,
+  "entries": [
+    {
+      "image_id": "7ebb48a3-d4c3-99ba-098d-fca98b364876",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a taper fade with a line-up",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, hollow cheeks, a wide-bridged nose, wide-set eyes, and wide lips.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      },
+      "source_player": "Ellis Lee",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "8d6f8323-7eae-9b68-6897-c86d6e4c26bb",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, hollow cheeks, a broad nose, hooded eyes, and wide lips. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a black-and-gray tattoo sleeve on his right arm"
+      },
+      "source_player": "Yadiel Terra",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "05f264d2-00a6-df68-a667-27532eaa85e4",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a rectangular face with a narrow tapered jaw, high prominent cheekbones, a broad nose, wide-set eyes, and wide lips. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": "a gold headband"
+      },
+      "source_player": "Greg Koonce",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "19aeb005-3bf8-806a-003f-847fb9f489eb",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a curly sponge top",
+        "face_prompt": "He has a long oval face with a narrow tapered jaw, high prominent cheekbones, a broad nose, almond-shaped eyes, and full lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Franco Keller",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "b98e3a2e-46ee-6ac5-32b1-496daf233a6c",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "shoulder-length dreadlocks",
+        "face_prompt": "He has an oval face with a sharp angular jaw, full round cheeks, a rounded nose, deep-set eyes, and full lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Nasir Barnes",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "4d4d44f1-e839-7bef-0cf5-476fb78d763c",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a diamond-shaped face with a narrow tapered jaw, full round cheeks, a rounded nose, almond-shaped eyes, and full lips. He has a faint scar through one eyebrow.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": "a large diamond stud earring in his left ear"
+      },
+      "source_player": "Arnulfo Todd",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "35218d4b-7960-987b-3f81-e7108e7578f8",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, wide cheekbones, a broad nose, wide-set eyes, and full lips.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      },
+      "source_player": "Marlon Lewis",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "388c6f78-f23f-d1b6-bbf2-ac96fdfe9e5c",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "flat twists",
+        "face_prompt": "He has an oval face with a strong wide jaw, wide cheekbones, a rounded nose, wide-set eyes, and full lips.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      },
+      "source_player": "Peter Gregory",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "7f766f1d-6ab8-2c11-92e0-aa3aad25f196",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a high-top fade",
+        "face_prompt": "He has a rectangular face with a sharp angular jaw, high prominent cheekbones, a broad nose, almond-shaped eyes, and full lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Orlando Christian",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "69246c67-1aad-571f-d514-90976e1c2918",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has an oval face with a sharp angular jaw, wide cheekbones, a broad nose, almond-shaped eyes, and wide lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a dark green headband"
+      },
+      "source_player": "Lawerence Riddle",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "f1a0db9b-a07c-0463-d883-2b86a3ca6f2f",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "short brown hair",
+        "face_prompt": "He has a square face with a narrow tapered jaw, high prominent cheekbones, a straight nose, deep-set eyes, and medium lips.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": "light stubble"
+      },
+      "source_player": "Nestor Sosnowski",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "22c3469d-ad96-ea9a-846f-1d5f38fc151d",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "short blonde hair",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, high prominent cheekbones, a small upturned nose, almond-shaped eyes, and well-defined lips.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": "a thin mustache"
+      },
+      "source_player": "Brent Garrett",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "4d624715-913d-a1ea-5afd-a5b566557fb0",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "short auburn hair",
+        "face_prompt": "He has a square face with a narrow tapered jaw, wide cheekbones, an aquiline nose, almond-shaped eyes, and thin lips. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Marvin Zitkowski",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "70ef0c26-38e6-63db-fd34-bff9bb3eccb2",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "short auburn hair",
+        "face_prompt": "He has a square face with a slightly weak jaw, flat cheeks, a straight narrow nose, hooded eyes, and medium lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Clarence Varden",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "eba23ad8-74f5-f41b-be9e-8c7e9c963bb9",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "long wavy brown hair",
+        "face_prompt": "He has a square face with a narrow tapered jaw, high prominent cheekbones, a straight nose, deep-set eyes, and medium lips. He has a clearly distinctive, unique face \u2014 not a lookalike of any teammate.",
+        "expression": "a wide open-mouth smile showing teeth, bright happy eyes",
+        "accessories": "light stubble"
+      },
+      "source_player": "Nestor Sosnowski",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "223bb942-fc30-434d-949c-d9f4b767866c",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a mid fade with curls on top",
+        "face_prompt": "He has a long oval face with a narrow tapered jaw, flat cheeks, a straight narrow nose, deep-set eyes, and full lips. He has a faint scar through one eyebrow.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Kenton Breech",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "78c0db23-8461-dc06-d50c-8cba4e4bcba5",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a mid fade with curls on top",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, flat cheeks, an aquiline nose, deep-set eyes, and medium lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "a black headband"
+      },
+      "source_player": "Fernando Montoya",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "c1285a92-5ba2-9a7e-39e7-73c47cc12919",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a side-swept dark quiff with tapered sides",
+        "face_prompt": "He has a heart-shaped face with a strong wide jaw, high prominent cheekbones, a straight nose, almond-shaped eyes, and medium lips.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      },
+      "source_player": "Asahari Cortez",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "b460c64d-d79b-7629-ebdd-fff4572074e6",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "short dreadlocks",
+        "face_prompt": "He has an oval face with a strong wide jaw, hollow cheeks, a rounded nose, wide-set eyes, and wide lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Barrett Richard",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "f9fe8f4c-e943-6d56-0e33-ac5445c8a039",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "cornrows",
+        "face_prompt": "He has a square face with a soft rounded jaw, flat cheeks, a rounded nose, hooded eyes, and wide lips.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": "a white headband"
+      },
+      "source_player": "Courtney Hoover",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "c7805258-d7f8-d423-ffa5-958219407871",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a long oval face with a broad square jaw, full round cheeks, a broad nose, wide-set eyes, and wide lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Carlton Conley",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "9d4a392d-b4e6-f8c2-976a-9ab76368f5a2",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a side-swept blond quiff with tapered sides",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, flat cheeks, a straight narrow nose, hooded eyes, and well-defined lips.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": ""
+      },
+      "source_player": "Ian Lacefield",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "5c6750b5-ee17-5c55-6879-e8e02097c252",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "wavy brown hair",
+        "face_prompt": "He has a long oval face with a slightly weak jaw, wide cheekbones, a straight nose, almond-shaped eyes, and medium lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Thomas Villarreal",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "1ad35866-9a1a-04e2-fc58-074d2bdf5530",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "curly brown hair",
+        "face_prompt": "He has a long oval face with a broad square jaw, full round cheeks, a straight narrow nose, round eyes, and full lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Jeremy Snow",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "58275a1a-6f65-9980-81f8-a2cae7fdb145",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a square face with a sharp angular jaw, flat cheeks, a broad nose, almond-shaped eyes, and wide lips. He has a faint scar through one eyebrow.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Mitchell Dorsey",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "72696bcf-fc39-4b2a-e9c0-72e5e0553e9e",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "twists",
+        "face_prompt": "He has a long oval face with a soft rounded jaw, hollow cheeks, a straight nose, wide-set eyes, and well-defined lips. He has mild facial asymmetry. He has a clearly distinctive, unique face \u2014 not a lookalike of any teammate.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": "a red headband, a small diamond stud earring in his left ear"
+      },
+      "source_player": "Jesse Jamison",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "51999f2e-77b0-c6b9-30b7-91b4c425146d",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has an oval face with a soft rounded jaw, flat cheeks, a broad nose, wide-set eyes, and full lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Cedric Fox",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "c95f18db-0d8e-8ef6-3a60-d7387404b400",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "wavy brown hair",
+        "face_prompt": "He has a square face with a soft rounded jaw, high prominent cheekbones, an aquiline nose, round eyes, and full lips.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": "light stubble"
+      },
+      "source_player": "Isben Curry",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "05f61adf-2418-9da5-7021-3a13e5e671cd",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "slicked-back dark hair",
+        "face_prompt": "He has a round face with a sharp angular jaw, wide cheekbones, a straight narrow nose, round eyes, and full lips. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Steve Frye-Cooke",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "96b7a345-dbb5-0d7c-cc56-f72628f8d3c2",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "curly brown hair",
+        "face_prompt": "He has a long oval face with a strong wide jaw, high prominent cheekbones, a small upturned nose, hooded eyes, and thin lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Michael Garza",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "4c1f7352-8731-fbe4-0d57-3fecdb0d3ba5",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a square face with a broad square jaw, full round cheeks, a straight nose, hooded eyes, and wide lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Noah Hanson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "5c989be6-258d-207a-dce3-c79d19d9758b",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a temple fade with short curls",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, hollow cheeks, a rounded nose, almond-shaped eyes, and full lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "a black headband, thin black-framed glasses"
+      },
+      "source_player": "Robert Pugliese",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "7ec46ff9-a089-6dad-f650-64c98d164bec",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "short twists",
+        "face_prompt": "He has a round face with a slightly weak jaw, full round cheeks, a broad nose, round eyes, and full lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Fletcher Miles",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "7924b982-c10f-f215-e3c5-a28160061b98",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a long oval face with a strong wide jaw, high prominent cheekbones, a straight nose, monolid eyes, and full lips.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      },
+      "source_player": "Braylon Williams",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "ba73aa3f-c655-7888-4929-77e316393f2d",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a textured fringe crop",
+        "face_prompt": "He has a square face with a narrow tapered jaw, hollow cheeks, a small button nose, monolid eyes, and medium lips. He has a faint scar through one eyebrow.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a black headband"
+      },
+      "source_player": "Tomarillo Christian",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "289cc64b-6082-91b4-5948-d539442ad32e",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "short straight black hair",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, flat cheeks, a straight nose, monolid eyes, and medium lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Chaim Kluender",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "17120e85-93c3-fa11-8c40-f013c9161fc9",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a brown mullet, short on top and long in the back",
+        "face_prompt": "He has an oval face with a strong wide jaw, flat cheeks, a straight nose, downturned eyes, and medium lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "light stubble"
+      },
+      "source_player": "Davante Paige",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "cad39ebe-f24e-bcfa-4ed2-415c30d0d46d",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "wavy blonde hair",
+        "face_prompt": "He has a square face with a narrow tapered jaw, high prominent cheekbones, an aquiline nose, almond-shaped eyes, and thin lips. He has a small beauty mark near the lip.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Harvey Holloway",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "4760bbea-1678-5e64-b9cc-b4f876792d28",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a side-swept dark-brown quiff with tapered sides",
+        "face_prompt": "He has a square face with a soft rounded jaw, full round cheeks, a straight narrow nose, round eyes, and medium lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Mason Pierce",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "e1dc87ce-9371-7c01-eb20-2283eac748e6",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a tall boxy hi-top fade",
+        "face_prompt": "He has a round face with a slightly weak jaw, full round cheeks, a rounded nose, deep-set eyes, and wide lips.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      },
+      "source_player": "Tyrone O'Neal",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "aa3464d4-9b23-58d4-3633-51a8741cb9b6",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "flat twists",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, high prominent cheekbones, a rounded nose, round eyes, and full lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Lavern Good",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "42d9fdac-a6bd-4ff7-a242-33a4e80e3938",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "cornrows",
+        "face_prompt": "He has an oval face with a strong wide jaw, hollow cheeks, a broad nose, wide-set eyes, and full lips. He has a clearly distinctive, unique face \u2014 not a lookalike of any teammate.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      },
+      "source_player": "John Baldwin",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "8e17c3bb-6788-91f9-c681-f13985b27026",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "shoulder-length dreadlocks",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, full round cheeks, a wide-bridged nose, deep-set eyes, and full lips. He has a small mole on one cheek.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a thin mustache"
+      },
+      "source_player": "Wilburn Clarke",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "d8c7d2bd-ceef-069f-e30b-881064d2ec6c",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a square face with a strong wide jaw, flat cheeks, a rounded nose, hooded eyes, and full lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Robby Valenzuela",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "d2c879e6-934a-7a19-aa52-1e3cb614a1df",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "shoulder-length dreadlocks",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, full round cheeks, a wide-bridged nose, deep-set eyes, and full lips. He has a small mole on one cheek.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a thin mustache"
+      },
+      "source_player": "Wilburn Clarke",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "618a95db-32b0-9409-9525-4a29505196ba",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a brown mullet, short on top and long in the back",
+        "face_prompt": "He has a square face with a strong wide jaw, high prominent cheekbones, a straight nose, almond-shaped eyes, and medium lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a orange headband"
+      },
+      "source_player": "Major Moss",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "19d0b5ea-6592-c10f-8e6f-273a6f014043",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has a round face with a sharp angular jaw, flat cheeks, a straight nose, deep-set eyes, and full lips. He has a strong prominent brow.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      },
+      "source_player": "Jumpy Knoll",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "1614ffcb-f546-5a72-68f2-ed7061f75899",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a messy dirty-blonde crop",
+        "face_prompt": "He has a round face with a sharp angular jaw, flat cheeks, a straight nose, deep-set eyes, and full lips. He has a strong prominent brow. He has a clearly distinctive, unique face \u2014 not a lookalike of any teammate.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Jumpy Knoll",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "3d8f6f2f-5532-94fd-c6cf-89d117be5191",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a tousled blond crop",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, flat cheeks, a straight narrow nose, deep-set eyes, and thin lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "a white headband, light stubble"
+      },
+      "source_player": "Devin Policastro",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "75e01f75-5066-fdae-ffea-44c5636c8044",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "short blonde hair",
+        "face_prompt": "He has an oval face with a slightly weak jaw, wide cheekbones, a straight narrow nose, almond-shaped eyes, and well-defined lips. He has faint under-eye shadows.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Antonio Andersen",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "96b2fb3b-8035-f251-0eaa-9aec4467b3c8",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a tousled blond crop",
+        "face_prompt": "He has a long oval face with a broad square jaw, wide cheekbones, a straight nose, almond-shaped eyes, and thin lips.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": "a small diamond stud earring in his left ear"
+      },
+      "source_player": "Oswald Spiel",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "175596d3-5a20-bacb-65d5-d05843452db5",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a textured crop with fringe",
+        "face_prompt": "He has an oval face with a soft rounded jaw, hollow cheeks, an aquiline nose, deep-set eyes, and medium lips.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      },
+      "source_player": "Dawson Valencia",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "1255e7d5-b0e0-0a62-8803-cd9865e9261f",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a side-swept blond quiff with tapered sides",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, full round cheeks, an aquiline nose, close-set eyes, and medium lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Christain Doner",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "9a6774b2-2cb3-68ab-b775-37af7e380bcf",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "short brown hair",
+        "face_prompt": "He has an oval face with a slightly weak jaw, flat cheeks, a small upturned nose, round eyes, and full lips. He has faint under-eye shadows.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Pierce Bowman",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "620f4af1-36c4-5381-b9fa-96558d2e14fe",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a blond mullet, short on top and long in the back",
+        "face_prompt": "He has a square face with a strong wide jaw, high prominent cheekbones, a straight nose, downturned eyes, and thin lips. He has a strong prominent brow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Sidney Hess",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "0385f65d-94ec-8e0e-7df8-3cad9a23b9c6",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a tousled blond crop",
+        "face_prompt": "He has a square face with a sharp angular jaw, high prominent cheekbones, a straight narrow nose, almond-shaped eyes, and thin lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Donavan Gaines",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "c7595170-5261-3e14-8000-a0043b9583e8",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "wavy blonde hair",
+        "face_prompt": "He has a square face with a soft rounded jaw, high prominent cheekbones, an aquiline nose, round eyes, and full lips. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Theodore Pratt",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "2c103315-9f89-9373-2667-497f2534aa20",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a heart-shaped face with a sharp angular jaw, flat cheeks, a rounded nose, almond-shaped eyes, and wide lips. He has a subtly crooked nose.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Rene Tallant",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "d3aa95a5-dd06-e93c-c1a4-f7671477fbea",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a curly sponge top",
+        "face_prompt": "He has an oval face with a sharp angular jaw, full round cheeks, a wide-bridged nose, hooded eyes, and full lips. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Tyshawn Manson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "5fa67e3e-2c94-d915-34c2-b070a9352fa6",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a tall boxy hi-top fade",
+        "face_prompt": "He has an oval face with a strong wide jaw, flat cheeks, a broad nose, almond-shaped eyes, and wide lips. He has a subtly crooked nose.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      },
+      "source_player": "Omar Bullock",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "eb5b5e85-bf0e-ff86-18f7-7710f13668e3",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a rectangular face with a sharp angular jaw, flat cheeks, a small upturned nose, downturned eyes, and thin lips.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": "thin black-framed glasses"
+      },
+      "source_player": "Monte Blood",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "9f24f64c-5fbe-ebb9-e08c-fa432d959855",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "short light-brown hair",
+        "face_prompt": "He has an oval face with a strong wide jaw, wide cheekbones, a straight narrow nose, almond-shaped eyes, and medium lips.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": "light stubble"
+      },
+      "source_player": "Marques McCoy",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "ba2496b5-344d-8e33-0adb-708a8377c248",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "short light-brown hair",
+        "face_prompt": "He has a long oval face with a soft rounded jaw, flat cheeks, an aquiline nose, downturned eyes, and thin lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a black headband"
+      },
+      "source_player": "Roy Farrell",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "82741b4e-a1bb-2256-1364-9bf61b15ff6d",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "wavy black hair",
+        "face_prompt": "He has a round face with a broad square jaw, high prominent cheekbones, a straight nose, deep-set eyes, and full lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "clear sports goggles, light stubble"
+      },
+      "source_player": "Collin Cervantes",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "6485d789-bbc9-0087-4458-f85d4901eb2e",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a comb-over fade",
+        "face_prompt": "He has a heart-shaped face with a sharp angular jaw, high prominent cheekbones, a broad nose, almond-shaped eyes, and medium lips. He has a strong prominent brow.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": "light stubble"
+      },
+      "source_player": "Shaun Burnett",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "9562101a-b1db-a486-806f-e0bdf9cd4668",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a mid fade with curls on top",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, wide cheekbones, a straight nose, almond-shaped eyes, and full lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Keith Lawlor",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "c4e2bff6-ca42-84a2-1597-48a0439583af",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "ambiguous",
+        "skin_prompt": "a man of racially ambiguous, mixed ethnicity",
+        "hair": "a short crop",
+        "face_prompt": "He has a diamond-shaped face with a narrow tapered jaw, high prominent cheekbones, a straight nose, monolid eyes, and medium lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Collin Alexander",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "10d0b15c-ea58-f935-5ad4-63d8d35ad737",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "ambiguous",
+        "skin_prompt": "a man of racially ambiguous, mixed ethnicity",
+        "hair": "wavy dark hair",
+        "face_prompt": "He has a rectangular face with a strong wide jaw, full round cheeks, a straight nose, monolid eyes, and thin lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Devyn Graham",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "72867dd6-7166-641b-7042-e2f49680d283",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "ambiguous",
+        "skin_prompt": "a man of racially ambiguous, mixed ethnicity",
+        "hair": "medium curly dark hair",
+        "face_prompt": "He has a square face with a broad square jaw, hollow cheeks, a straight nose, almond-shaped eyes, and thin lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Maurice Price",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "af9f593a-d784-4fc6-941d-687c096bb187",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "ambiguous",
+        "skin_prompt": "a man of racially ambiguous, mixed ethnicity",
+        "hair": "a short afro-textured cut",
+        "face_prompt": "He has an oval face with a sharp angular jaw, full round cheeks, a straight nose, round eyes, and medium lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Curtis Roman",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "b823e022-ed0b-cf25-e82f-174ebf567e69",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "ambiguous",
+        "skin_prompt": "a man of racially ambiguous, mixed ethnicity",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has an oval face with a broad square jaw, high prominent cheekbones, a straight nose, almond-shaped eyes, and thin lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Micheal Lappin",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "f9ee2213-0bcd-2a89-40a1-46cf43d4c29b",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "ambiguous",
+        "skin_prompt": "a man of racially ambiguous, mixed ethnicity",
+        "hair": "a taper fade",
+        "face_prompt": "He has a square face with a strong wide jaw, wide cheekbones, a broad nose, almond-shaped eyes, and medium lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Atticus Haynes",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "b0699436-7057-474f-9261-2040c1601b3d",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "cornrows",
+        "face_prompt": "He has a square face with a narrow tapered jaw, hollow cheeks, a wide-bridged nose, deep-set eyes, and full lips. He has slightly protruding ears.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": ""
+      },
+      "source_player": "Cary Davis",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "4db3bb24-b7ce-e76c-7a16-0220ffb254e3",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has an oval face with a strong wide jaw, full round cheeks, a rounded nose, wide-set eyes, and full lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Wilber Mullen",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "f6584544-8c80-4ea4-4db6-4d4afcd358d4",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a mini afro puff top",
+        "face_prompt": "He has a heart-shaped face with a strong wide jaw, hollow cheeks, a broad nose, round eyes, and well-defined lips. He has a faint scar through one eyebrow.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Jean Holland",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "45916343-2da6-0971-123d-cabf317262a3",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a square face with a soft rounded jaw, hollow cheeks, a broad nose, almond-shaped eyes, and full lips.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      },
+      "source_player": "Wesley Rhodes",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "48b685b8-3769-2956-92c4-cfb6536e6a6d",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a high-top fade",
+        "face_prompt": "He has a round face with a soft rounded jaw, flat cheeks, a broad nose, round eyes, and well-defined lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Sawyer Rasmussen",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "5a2366cd-2706-55a6-6c3d-a22c07159037",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a taper fade with a line-up",
+        "face_prompt": "He has a round face with a soft rounded jaw, flat cheeks, a broad nose, round eyes, and well-defined lips. He has a clearly distinctive, unique face \u2014 not a lookalike of any teammate.",
+        "expression": "a wide open-mouth smile showing teeth, bright happy eyes",
+        "accessories": ""
+      },
+      "source_player": "Sawyer Rasmussen",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "29090844-6e30-be9a-941c-7452f954238e",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a taper fade with a line-up",
+        "face_prompt": "He has a rectangular face with a strong wide jaw, high prominent cheekbones, a rounded nose, wide-set eyes, and well-defined lips. He has mild facial asymmetry.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "light stubble"
+      },
+      "source_player": "Milton Curtis",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "7c94eeae-14b4-6f9e-04cb-ced16da8c6bc",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "an afro with a fade",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, hollow cheeks, a wide-bridged nose, almond-shaped eyes, and wide lips. He has a faint scar through one eyebrow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Declan Estes",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "67679af7-3f8f-394b-9217-90de3f0e8671",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "an afro with a fade",
+        "face_prompt": "He has a heart-shaped face with a narrow tapered jaw, hollow cheeks, a wide-bridged nose, almond-shaped eyes, and wide lips. He has a faint scar through one eyebrow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Declan Estes",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "996eb292-8fb6-07e8-d38a-90fd6a5ed290",
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a blond undercut",
+        "face_prompt": "He has a long oval face with a strong wide jaw, hollow cheeks, an aquiline nose, close-set eyes, and well-defined lips. He has a small mole on one cheek.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Freddie Anderson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "fc090af3-1644-d057-279a-70551f1a650a",
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a blond side-part",
+        "face_prompt": "He has a long oval face with a soft rounded jaw, flat cheeks, an aquiline nose, round eyes, and well-defined lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Marcelino Delorme",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "00872042-5657-5df2-128a-e2e5d197ce30",
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a blond side-part",
+        "face_prompt": "He has a round face with a sharp angular jaw, flat cheeks, a straight nose, deep-set eyes, and medium lips.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      },
+      "source_player": "Shorty Holmstrom",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "e0562ea3-0353-5990-2c45-d54f888f7403",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a side-swept blond quiff with tapered sides",
+        "face_prompt": "He has a round face with a soft rounded jaw, full round cheeks, a straight narrow nose, round eyes, and medium lips.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": "a small diamond stud earring in his left ear"
+      },
+      "source_player": "Russell Andersen",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "a1fa47a5-0dbc-ab4f-cd30-1f8fe237b2f4",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "short red hair",
+        "face_prompt": "He has a round face with a strong wide jaw, hollow cheeks, a straight narrow nose, close-set eyes, and medium lips.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": "light stubble"
+      },
+      "source_player": "Jabril Benitez",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "13a98a66-05ee-14f1-00d5-37305373ab59",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a tousled blond crop",
+        "face_prompt": "He has a square face with a sharp angular jaw, hollow cheeks, a straight narrow nose, downturned eyes, and full lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "light stubble"
+      },
+      "source_player": "GB Selvidge",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "bb8773b1-404b-b8f9-c515-33267ea51b53",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a side-swept blond quiff with tapered sides",
+        "face_prompt": "He has a square face with a soft rounded jaw, flat cheeks, a small upturned nose, hooded eyes, and well-defined lips. He has a subtly crooked nose.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": "clear-framed glasses"
+      },
+      "source_player": "Sean Hooper",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "70074e7d-193e-b37f-93b3-b089e83530d8",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a side-swept blond quiff with tapered sides",
+        "face_prompt": "He has a long oval face with a soft rounded jaw, hollow cheeks, a straight narrow nose, round eyes, and medium lips. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": "a navy headband"
+      },
+      "source_player": "Mervin Dawson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "37563bfe-23b9-bb13-6465-89c3106568c3",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a blond undercut",
+        "face_prompt": "He has a rectangular face with a strong wide jaw, hollow cheeks, a straight narrow nose, round eyes, and thin lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": "clear sports goggles"
+      },
+      "source_player": "Rickey Dearmond",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "5669112c-1f53-bf29-6532-4128eefc8f15",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a slicked-back undercut",
+        "face_prompt": "He has a round face with a soft rounded jaw, full round cheeks, a straight nose, slightly hooded eyes, and thin lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Micah Floor",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "b7bae0ac-d8f0-bfee-cac8-614b24c191b2",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a high skin fade shaved to the base with a thick block of hair on top",
+        "face_prompt": "He has an oval face with a broad square jaw, full round cheeks, a straight nose, round eyes, and full lips.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      },
+      "source_player": "Jamison Moses",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "d1070fa3-2c72-c85d-a9fd-cd3be7891d3d",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a high skin fade shaved to the base with a thick block of hair on top",
+        "face_prompt": "He has an oval face with a broad square jaw, full round cheeks, a straight nose, round eyes, and full lips.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      },
+      "source_player": "Jamison Moses",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "2a80a463-c314-1fb6-2860-ee77f9e9ad35",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a tousled blond crop",
+        "face_prompt": "He has a square face with a sharp angular jaw, high prominent cheekbones, a straight narrow nose, almond-shaped eyes, and thin lips.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": ""
+      },
+      "source_player": "Joshua Heckart",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "ceacaf8d-bfaf-f592-740f-ea513fa08cc6",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a tousled blond crop",
+        "face_prompt": "He has a square face with a sharp angular jaw, high prominent cheekbones, a straight narrow nose, almond-shaped eyes, and thin lips.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": ""
+      },
+      "source_player": "Joshua Heckart",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "010bdfb7-813f-fa59-237f-2c210374c7a3",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "short light-brown hair",
+        "face_prompt": "He has a rectangular face with a sharp angular jaw, hollow cheeks, an aquiline nose, almond-shaped eyes, and full lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "light stubble"
+      },
+      "source_player": "Derrick Bundrick",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "41895692-112a-6a4b-ff07-f79d58c28767",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "short brown hair",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, flat cheeks, a straight narrow nose, round eyes, and medium lips.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": ""
+      },
+      "source_player": "Reuben Brown",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "22f64b35-38e4-a1f4-6ff3-f967a93b1e23",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "a brown mullet, short on top and long in the back",
+        "face_prompt": "He has a round face with a strong wide jaw, full round cheeks, a straight nose, round eyes, and well-defined lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "black-framed sports goggles"
+      },
+      "source_player": "Skyler Pilson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "d2e9d8bd-d68f-8a02-c1d4-f57ddcfa1dfe",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "cornrows",
+        "face_prompt": "He has an oval face with a slightly weak jaw, full round cheeks, a rounded nose, wide-set eyes, and full lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a white headband"
+      },
+      "source_player": "Brevin Jones-Whiteside",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "d9ae6dd8-65a5-723b-9522-889cf9b31c5b",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a round face with a sharp angular jaw, high prominent cheekbones, a rounded nose, round eyes, and wide lips. He has a strong prominent brow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "light stubble"
+      },
+      "source_player": "Sean Villora",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "0d9733bf-88d1-ae5d-93ec-6f4350539a60",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "short neatly side-parted dark-brown hair",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, flat cheeks, a straight narrow nose, downturned eyes, and medium lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "bold-line traditional tattoo sleeves on both arms"
+      },
+      "source_player": "Jewell Bond",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "303c0021-ffa3-65b5-d3fd-fbc96237bb95",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a blond mullet, short on top and long in the back",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, wide cheekbones, an aquiline nose, almond-shaped eyes, and thin lips. He has a strong prominent brow.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      },
+      "source_player": "Maddox Helfrich",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "42c6753c-3b02-2b6e-f904-472538756ca4",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a short afro",
+        "face_prompt": "He has a square face with a narrow tapered jaw, high prominent cheekbones, a broad nose, hooded eyes, and full lips. He has slightly protruding ears.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": ""
+      },
+      "source_player": "Don Lutz",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "35b4ebd9-cc13-f518-b21c-efaf7ca95b1e",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a square face with a narrow tapered jaw, full round cheeks, a rounded nose, hooded eyes, and full lips.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      },
+      "source_player": "Thaddeus Wesson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "f7c7edc9-8463-c578-fe48-7e57ae5b1aeb",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a two-block cut",
+        "face_prompt": "He has a heart-shaped face with a soft rounded jaw, high prominent cheekbones, a small button nose, monolid eyes, and medium lips. He has mild facial asymmetry.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      },
+      "source_player": "LeCharles Marcuson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "c831bfee-60d2-1629-fd84-5cac8351cc2b",
+      "build": {
+        "frame": "Broad",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a textured fringe crop",
+        "face_prompt": "He has a square face with a broad square jaw, hollow cheeks, a broad nose, slightly hooded eyes, and medium lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Porfirio Ferguson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "d422d192-9d55-ed13-6e6d-5f2df6d85aa6",
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a side-swept blond quiff with tapered sides",
+        "face_prompt": "He has a round face with a sharp angular jaw, high prominent cheekbones, an aquiline nose, close-set eyes, and well-defined lips.",
+        "expression": "a menacing hostile glare, furrowed brow, cold hard stare",
+        "accessories": ""
+      },
+      "source_player": "Samuel Greve",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "974c0d79-ceed-6dec-9413-feb71ca890de",
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "messy medium brown hair",
+        "face_prompt": "He has a rectangular face with a sharp angular jaw, high prominent cheekbones, an aquiline nose, close-set eyes, and medium lips.",
+        "expression": "a big beaming open-mouth grin, teeth showing, joyful",
+        "accessories": ""
+      },
+      "source_player": "Grant Klein",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "baa7f29f-d325-2e4d-0b38-8e142ea9bf0a",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "short straight black hair",
+        "face_prompt": "He has a round face with a narrow tapered jaw, full round cheeks, a low-bridged nose, monolid eyes, and thin lips. He has a small mole on one cheek.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "bold-line traditional tattoo sleeves on both arms"
+      },
+      "source_player": "Walker Ansley",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "523dce29-c5a3-3aea-5cfd-f3b3051a0a28",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a two-block cut",
+        "face_prompt": "He has a square face with a strong wide jaw, hollow cheeks, a straight nose, monolid eyes, and medium lips.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      },
+      "source_player": "Eugene Johnston",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "4626378b-14c4-dccd-fa7c-327d562faa53",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "curly black hair",
+        "face_prompt": "He has a square face with a broad square jaw, high prominent cheekbones, a broad nose, deep-set eyes, and medium lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "light stubble"
+      },
+      "source_player": "Tim Nunez",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "81f7d1bc-f7b6-040a-52ef-948d4d48c142",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a mid fade with curls on top",
+        "face_prompt": "He has a rectangular face with a soft rounded jaw, wide cheekbones, a straight nose, almond-shaped eyes, and well-defined lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Duncan Duran",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "389410e2-3e3f-d12e-07f3-f44e4d975b00",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a rectangular face with a narrow tapered jaw, hollow cheeks, a broad nose, almond-shaped eyes, and wide lips. He has a faint scar through one eyebrow.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Wilbert Struthers",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "3ff92af5-7f4d-2ab2-1530-46b2f1ce12f8",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "flat twists",
+        "face_prompt": "He has an oval face with a broad square jaw, high prominent cheekbones, a rounded nose, almond-shaped eyes, and wide lips.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      },
+      "source_player": "Brian O'Donnell",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "1d9b9bfc-2cce-d683-ae03-f1ded94d4efa",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "ambiguous",
+        "skin_prompt": "a man of racially ambiguous, mixed ethnicity",
+        "hair": "wavy dark hair",
+        "face_prompt": "He has a long oval face with a broad square jaw, hollow cheeks, a broad nose, round eyes, and thin lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Timmy Robertson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "12dbcbb1-98e0-2735-cb47-feff3729f773",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "ambiguous",
+        "skin_prompt": "a man of racially ambiguous, mixed ethnicity",
+        "hair": "a short fade",
+        "face_prompt": "He has a rectangular face with a slightly weak jaw, high prominent cheekbones, a straight nose, round eyes, and medium lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Reece Bullock",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "acc9f95a-38df-91db-a1e0-140432814675",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "medium straight black hair",
+        "face_prompt": "He has an oval face with a sharp angular jaw, flat cheeks, a broad nose, monolid eyes, and medium lips.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      },
+      "source_player": "Jeromy Altar",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "86a74e59-336b-1789-6918-639ce07c7012",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a black undercut",
+        "face_prompt": "He has a square face with a strong wide jaw, flat cheeks, a small button nose, monolid eyes, and full lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Luca Betancourt",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "dff1c6d5-5b59-a570-78d0-1fbb6e6721a8",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a high skin fade shaved to the base with a thick block of hair on top",
+        "face_prompt": "He has an oval face with a sharp angular jaw, high prominent cheekbones, a rounded nose, round eyes, and wide lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a navy headband"
+      },
+      "source_player": "Danny Valentine",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "1357ba54-20e9-5b19-acf9-fadc8e62710c",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a high skin fade shaved to the base with a thick block of hair on top",
+        "face_prompt": "He has an oval face with a soft rounded jaw, hollow cheeks, a rounded nose, almond-shaped eyes, and full lips. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Brendon Wedell",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "3ba6fa61-d420-69c2-2b9e-00d718fa817b",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "short straight black hair",
+        "face_prompt": "He has a long oval face with a soft rounded jaw, full round cheeks, a broad nose, almond-shaped eyes, and full lips. He has a strong prominent brow.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Timmy Depaz",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "75943f77-01a1-d534-2c7a-7a3f9d8e8592",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a slicked-back undercut",
+        "face_prompt": "He has a rectangular face with a narrow tapered jaw, high prominent cheekbones, a broad nose, almond-shaped eyes, and medium lips. He has a light spray of freckles across the nose and cheeks. He has a clearly distinctive, unique face \u2014 not a lookalike of any teammate.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": "light stubble"
+      },
+      "source_player": "Lennon Chan",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "30f3664a-00aa-f8ab-c797-59284b204092",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "wavy black hair",
+        "face_prompt": "He has a rectangular face with a narrow tapered jaw, hollow cheeks, an aquiline nose, almond-shaped eyes, and well-defined lips.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      },
+      "source_player": "Dalton Mendez",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "cf77cf77-e795-f2c3-b00e-34844fdb87c4",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a mid fade with curls on top",
+        "face_prompt": "He has a diamond-shaped face with a narrow tapered jaw, wide cheekbones, a broad nose, round eyes, and well-defined lips. He has a small mole on one cheek.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "AB Patrick",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "03f4d3dc-e204-943c-f59f-f378f8414e01",
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a two-block cut",
+        "face_prompt": "He has a rectangular face with a broad square jaw, full round cheeks, a straight nose, monolid eyes, and full lips.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": "a royal blue headband"
+      },
+      "source_player": "Cortez Conway",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "e720340f-e4b9-14f0-6d8e-2c98faa459c9",
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a medium messy textured crop",
+        "face_prompt": "He has a rectangular face with a broad square jaw, full round cheeks, a straight nose, monolid eyes, and full lips. He has a clearly distinctive, unique face \u2014 not a lookalike of any teammate.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "a royal blue headband"
+      },
+      "source_player": "Cortez Conway",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "9574831f-1a9b-64b7-577e-2405e408ec8c",
+      "build": {
+        "frame": "Lean",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a neat black bowl cut",
+        "face_prompt": "He has a long oval face with a narrow tapered jaw, wide cheekbones, a straight nose, almond-shaped eyes, and full lips. He has a light spray of freckles across the nose and cheeks.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": "light stubble"
+      },
+      "source_player": "Elisha Tunstall",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "d69ca400-5136-726c-3b8a-ceb0473892df",
+      "build": {
+        "frame": "Lean",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a buzz cut",
+        "face_prompt": "He has a long oval face with a narrow tapered jaw, wide cheekbones, a straight nose, almond-shaped eyes, and full lips. He has a light spray of freckles across the nose and cheeks. He has a clearly distinctive, unique face \u2014 not a lookalike of any teammate.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "light stubble"
+      },
+      "source_player": "Elisha Tunstall",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "f526986c-7364-321a-57b7-a902bb60c7d8",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "spiky black hair",
+        "face_prompt": "He has a round face with a broad square jaw, hollow cheeks, a small button nose, monolid eyes, and full lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Kent McManus",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "66da8da1-89c4-9099-41a5-5ff6b3afe68a",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "medium straight black hair",
+        "face_prompt": "He has a round face with a slightly weak jaw, full round cheeks, a small button nose, round eyes, and medium lips.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      },
+      "source_player": "Clint Tran",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "6aaa6861-8a8a-4cb8-22dc-cdd779ac6bd2",
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a textured fringe crop",
+        "face_prompt": "He has an oval face with a soft rounded jaw, high prominent cheekbones, a straight nose, monolid eyes, and medium lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Arnav Anderson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "a3bc1cc8-ac2e-942f-355d-6a393112b05d",
+      "build": {
+        "frame": "Lean",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "asian",
+        "skin_prompt": "an East Asian man",
+        "hair": "a short black crew cut",
+        "face_prompt": "He has a square face with a soft rounded jaw, wide cheekbones, a low-bridged nose, almond-shaped eyes, and medium lips.",
+        "expression": "a stern hard expression, slight scowl, intense",
+        "accessories": ""
+      },
+      "source_player": "Braxton Carlson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "59bd9d78-5781-35be-0bda-512a6c6ba5fe",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "messy medium brown hair",
+        "face_prompt": "He has a square face with a sharp angular jaw, high prominent cheekbones, a straight nose, close-set eyes, and medium lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Sanford Larson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "9b537edb-dd3a-92b1-310d-1422d3b4a2d0",
+      "build": {
+        "frame": "Slight",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a blond mullet, short on top and long in the back",
+        "face_prompt": "He has an oval face with a strong wide jaw, flat cheeks, a straight narrow nose, deep-set eyes, and full lips. He has a strong prominent brow.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a black headband"
+      },
+      "source_player": "Derek Bowers",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "fa2c1925-3971-685f-c043-1cc2eeb461ef",
+      "build": {
+        "frame": "Normal",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "wavy brown hair",
+        "face_prompt": "He has a long oval face with a sharp angular jaw, full round cheeks, an aquiline nose, deep-set eyes, and thin lips. He has a subtly crooked nose.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": "clear sports goggles"
+      },
+      "source_player": "Christian O'Donnell",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "5278319c-3611-b29f-3729-188cb763ff09",
+      "build": {
+        "frame": "Slight",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "waves with a low fade",
+        "face_prompt": "He has a diamond-shaped face with a narrow tapered jaw, high prominent cheekbones, a straight nose, almond-shaped eyes, and wide lips.",
+        "expression": "an intense focused game-face, locked-in wide eyes",
+        "accessories": "a thin mustache"
+      },
+      "source_player": "Florentino Downs",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "c7dd1918-d707-3af3-d56c-3a271f5ec47d",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a long oval face with a narrow tapered jaw, flat cheeks, a wide-bridged nose, wide-set eyes, and well-defined lips. He has a faint scar through one eyebrow.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      },
+      "source_player": "Case Jennison",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "d61632ce-1f85-6a69-f154-2a9215ebad38",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-normal",
+        "skin_prompt": "a Black man with medium-brown skin",
+        "hair": "a taper fade with a line-up",
+        "face_prompt": "He has a rectangular face with a broad square jaw, wide cheekbones, a broad nose, hooded eyes, and wide lips. He has a strong prominent brow.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": ""
+      },
+      "source_player": "Eric Frizell",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "564b1469-b175-560d-5dc0-35799ff57d4c",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a crew cut",
+        "face_prompt": "He has an oval face with a strong wide jaw, wide cheekbones, an aquiline nose, downturned eyes, and well-defined lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Hans Hickerson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "44968966-e9ae-3b37-3293-04052ac1732e",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "a short buzz cut",
+        "face_prompt": "He has an oval face with a soft rounded jaw, flat cheeks, a straight nose, close-set eyes, and full lips.",
+        "expression": "a calm neutral expression, relaxed",
+        "accessories": ""
+      },
+      "source_player": "Dave Thomas",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "8469654b-6d9d-fcd5-c7a7-b933a153e8bf",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a big voluminous curly top",
+        "face_prompt": "He has a round face with a broad square jaw, wide cheekbones, a broad nose, almond-shaped eyes, and wide lips.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      },
+      "source_player": "Jerald Ros",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "bfc96993-25bb-3473-b54c-1d235f610b96",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-light",
+        "skin_prompt": "a light-skinned Black man with light-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a long oval face with a strong wide jaw, high prominent cheekbones, a broad nose, almond-shaped eyes, and well-defined lips. He has a small beauty mark near the lip.",
+        "expression": "a cheerful open smile with teeth, bright happy eyes",
+        "accessories": ""
+      },
+      "source_player": "Bryant Almada",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "5ce45b60-aa30-801f-3c31-ebc02a473d51",
+      "build": {
+        "frame": "Normal",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-normal",
+        "skin_prompt": "a white man with fair skin",
+        "hair": "shaggy light-brown hair",
+        "face_prompt": "He has a long oval face with a narrow tapered jaw, full round cheeks, a small upturned nose, round eyes, and thin lips. He has mild facial asymmetry.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "a green headband"
+      },
+      "source_player": "Vince Chase",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "2230ec0b-8c4b-0d89-93ec-38df7cfd4a03",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "messy medium brown hair",
+        "face_prompt": "He has a heart-shaped face with a sharp angular jaw, hollow cheeks, a small upturned nose, hooded eyes, and medium lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": ""
+      },
+      "source_player": "Garrett Buckwheat",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "937175f2-0d68-f29c-bdba-23168a144090",
+      "build": {
+        "frame": "Broad",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a comb-over fade",
+        "face_prompt": "He has a round face with a sharp angular jaw, wide cheekbones, a straight nose, almond-shaped eyes, and well-defined lips.",
+        "expression": "a subtle pleasant closed-mouth smile",
+        "accessories": "a white headband"
+      },
+      "source_player": "Mateo Montgomery",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "2779f895-e1c4-1c69-3b42-03f45c4acfe4",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a clean-shaved bald head",
+        "face_prompt": "He has a rectangular face with a narrow tapered jaw, full round cheeks, a straight nose, almond-shaped eyes, and full lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Felipe Brazzell",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "654251bb-9f7b-7087-ad62-31ebd1535f1a",
+      "build": {
+        "frame": "Doughy",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "other",
+        "skin": "hispanic",
+        "skin_prompt": "a Hispanic Latino man with light-brown skin",
+        "hair": "a textured crop with fringe",
+        "face_prompt": "He has an oval face with a narrow tapered jaw, flat cheeks, a straight nose, almond-shaped eyes, and medium lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": ""
+      },
+      "source_player": "Johnathon Robles",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "8ff09d5e-57d8-3785-96be-c8d10daffe51",
+      "build": {
+        "frame": "Normal",
+        "definition": "Cut"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-tan",
+        "skin_prompt": "a white man with tan olive Mediterranean skin",
+        "hair": "wavy brown hair",
+        "face_prompt": "He has a square face with a soft rounded jaw, high prominent cheekbones, a small upturned nose, deep-set eyes, and medium lips.",
+        "expression": "a confident one-sided smirk, self-assured",
+        "accessories": "tribal tattoo sleeves on both arms"
+      },
+      "source_player": "Lance Michelson",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "88883231-3b8c-ffd0-0308-3d99bfa35090",
+      "build": {
+        "frame": "Slight",
+        "definition": "Toned"
+      },
+      "portrait": {
+        "race": "white",
+        "skin": "white-pale",
+        "skin_prompt": "a white man with very pale fair skin and Scandinavian features",
+        "hair": "a blond undercut",
+        "face_prompt": "He has a diamond-shaped face with a strong wide jaw, high prominent cheekbones, an aquiline nose, deep-set eyes, and medium lips.",
+        "expression": "a warm friendly smile, slight teeth, relaxed eyes",
+        "accessories": "a tribal tattoo sleeve on his left arm"
+      },
+      "source_player": "Reynaldo Curry",
+      "age_language": "teen"
+    },
+    {
+      "image_id": "1ddb85b8-43cb-6df0-ce31-f88fa44004bc",
+      "build": {
+        "frame": "Lean",
+        "definition": "Soft"
+      },
+      "portrait": {
+        "race": "black",
+        "skin": "black-dark",
+        "skin_prompt": "a dark-skinned Black man with deep dark-brown skin",
+        "hair": "a short black fade",
+        "face_prompt": "He has a long oval face with a strong wide jaw, full round cheeks, a wide-bridged nose, hooded eyes, and full lips. He has a subtly crooked nose.",
+        "expression": "a composed stoic expression, mouth closed, no smile",
+        "accessories": ""
+      },
+      "source_player": "Philip Carter",
+      "age_language": "teen"
+    }
+  ]
+}

@@ -49,15 +49,26 @@ CHAMPIONSHIP_MOMENT_TYPES = frozenset(
 )
 
 
-def _team_view(team_id: Any) -> dict[str, Any] | None:
+def _team_view(team_id: Any, franchise: Any = None) -> dict[str, Any] | None:
     """
     Look up minimal display data for a team identifier. Accepts either an
     ObjectId / 24-hex string OR a canonical team_id key (e.g. "HARVEST"); the
     latter is what saved game documents store on ``home_team_id``/``away_team_id``.
+
+    When ``franchise`` is provided, name/primary_color come from
+    ``resolve_team_display`` (Team Builder overlay chrome).
     """
     if team_id is None:
         return None
-    proj = {"name": 1, "primary_color": 1, "conference": 1, "region": 1, "team_id": 1}
+    proj = {
+        "name": 1,
+        "primary_color": 1,
+        "secondary_color": 1,
+        "conference": 1,
+        "region": 1,
+        "team_id": 1,
+        "mascot": 1,
+    }
     team_doc = None
     # Try ObjectId path first (used by EOS bracket meta + franchise docs).
     try:
@@ -71,11 +82,22 @@ def _team_view(team_id: Any) -> dict[str, Any] | None:
         team_doc = db.teams.find_one({"team_id": str(team_id)}, proj)
     if not team_doc:
         return None
+    name = team_doc.get("name") or ""
+    primary = team_doc.get("primary_color") or "#27408E"
+    if franchise is not None:
+        try:
+            from BackEnd.utils.franchise_team_display import resolve_team_display
+
+            disp = resolve_team_display(franchise, team_doc.get("_id"), core_doc=team_doc)
+            name = disp.get("name") or name
+            primary = disp.get("primary_color") or primary
+        except Exception:
+            pass
     return {
         "team_id": str(team_doc.get("_id")),
         "team_id_string": team_doc.get("team_id"),
-        "name": team_doc.get("name") or "",
-        "primary_color": team_doc.get("primary_color") or "#27408E",
+        "name": name,
+        "primary_color": primary,
         "conference": team_doc.get("conference"),
         "region": team_doc.get("region") or "",
     }
@@ -155,7 +177,7 @@ def _user_team_conference_region(franchise_doc: dict) -> tuple[int | None, str |
     _name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
     if not user_team_id_str:
         return (None, None, None)
-    view = _team_view(user_team_id_str)
+    view = _team_view(user_team_id_str, franchise_doc)
     if not view:
         return (None, None, str(user_team_id_str))
     conf = view.get("conference")
@@ -283,8 +305,8 @@ def build_championship_game_moment(
     winner_score = max(int(home_score), int(away_score))
     loser_score = min(int(home_score), int(away_score))
 
-    winner_view = _team_view(winner_id) or {}
-    loser_view = _team_view(loser_id) or {}
+    winner_view = _team_view(winner_id, franchise_doc) or {}
+    loser_view = _team_view(loser_id, franchise_doc) or {}
 
     franchise_id = franchise_doc.get("_id")
     natl_rank = _natl_rank_for_team(franchise_id, winner_view.get("team_id", ""))
@@ -469,7 +491,7 @@ def enqueue_trophy_spotlight_for_user_conference(franchise_doc: dict) -> dict | 
             str(franchise_id),
         )
         return None
-    winner_view = _team_view(one_seed_id_str) or {}
+    winner_view = _team_view(one_seed_id_str, franchise_doc) or {}
     record = _record_for_team(franchise_doc, one_seed_id_str)
     natl_rank = _natl_rank_for_team(franchise_id, one_seed_id_str)
 
@@ -515,7 +537,7 @@ def enqueue_banner_raise_if_user_won_national(franchise_doc: dict) -> dict | Non
     if not winner_str or winner_str != str(user_team_id_str):
         return None
 
-    winner_view = _team_view(user_team_id_str) or {}
+    winner_view = _team_view(user_team_id_str, franchise_doc) or {}
     record = _record_for_team(franchise_doc, user_team_id_str)
     natl_rank = _natl_rank_for_team(franchise_id, str(user_team_id_str))
     score = final_match.get("score") or {}

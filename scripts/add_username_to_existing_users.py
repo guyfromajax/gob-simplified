@@ -3,7 +3,7 @@
 Add username to existing user documents that lack it.
 
 Prompts interactively for each user. Usernames must be unique (case-insensitive).
-Run against the DB specified by MONGO_URI / MONGO_DB_NAME in .env or .env.local.
+Run against an explicit database target through the shared script boundary.
 
 USAGE:
     # Interactive - prompt for each user
@@ -15,11 +15,11 @@ USAGE:
 
 import re
 import sys
-import os
+from pathlib import Path
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
-
-from BackEnd.db import DB_NAME, users_collection
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 
 def validate_username(username: str) -> str | None:
@@ -39,8 +39,11 @@ def validate_username(username: str) -> str | None:
 def main():
     import argparse
     parser = argparse.ArgumentParser()
-    parser.add_argument("--dry-run", action="store_true", help="List users without making changes")
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    parser.add_argument("--apply", action="store_true", help="Prompt and write; default lists only")
     args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=args.apply)
+    users_collection = connection.database["users"]
 
     # Users missing username or username_lower
     query = {"$or": [{"username": {"$exists": False}}, {"username": None}, {"username_lower": {"$exists": False}}]}
@@ -50,7 +53,7 @@ def main():
     print("=" * 60)
     print("Add username to existing users")
     print("=" * 60)
-    print(f"Database: {DB_NAME}")
+    print(f"Database: {args.db}")
     print(f"Users needing username: {len(users)}")
     print("=" * 60)
 
@@ -58,9 +61,10 @@ def main():
         print("No users need a username.")
         return
 
-    if args.dry_run:
+    if not args.apply:
         for u in users:
             print(f"  {u['_id']}  {u.get('email', 'no-email')}")
+        connection.close()
         return
 
     taken = set()
@@ -95,6 +99,7 @@ def main():
             break
 
     print("\nDone.")
+    connection.close()
 
 
 if __name__ == "__main__":

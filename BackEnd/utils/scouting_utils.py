@@ -170,42 +170,32 @@ def _parse_rt(pr: Dict[str, Any], pos: str) -> Optional[float]:
 
 def compute_projected_starting_five(players: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
-    Greedy projected lineup: repeatedly pick the best remaining (player, open position)
-    pair by highest RT; each player and position used at most once.
+    The five AUTOSET WOULD FIELD AT TIP, shaped for display.
 
-    Returns rows in fixed order PG → C for display, omitting unfilled slots.
+    SELECTION IS DELEGATED to ``db_utils.projected_starting_five_from_payload`` — the same
+    eligibility waterfall, the same exact max-weight DP and the same energy-aware objective the
+    game runs. This function only builds the display rows around that answer, so the FCC
+    Scouting Report tab, the team roster pages and the training report show the five that walks
+    onto the floor. See that function for the two remaining (and correct) differences.
+
+    This used to be a private GREEDY fill on raw ``position_ratings`` — a THIRD selector,
+    structurally unable to agree with the floor.
+
+    Returns rows in fixed order PG → C for display, omitting unfilled slots. ``rt`` stays the
+    STATIC stored rating: selection accounts for energy, but the number printed on the card is
+    the player's rating, consistent with every other column beside it.
     """
-    assigned_players: set[str] = set()
+    from BackEnd.utils.db_utils import projected_starting_five_from_payload
+
+    by_id = {_player_sort_key(p): p for p in (players or []) if _player_sort_key(p)}
+    seated = projected_starting_five_from_payload(players or [])
+
     lineup_by_pos: Dict[str, Tuple[Dict[str, Any], float]] = {}
-
-    while len(lineup_by_pos) < 5:
-        best_key: Optional[Tuple[float, str, int]] = None  # (-rt, pid, pos_index) for min()
-        best_player: Optional[Dict[str, Any]] = None
-        best_pos: Optional[str] = None
-
-        for p in players:
-            pid = _player_sort_key(p)
-            if not pid or pid in assigned_players:
-                continue
-            pr = p.get("position_ratings") or {}
-            for pos in SCOUTING_LINEUP_POSITIONS:
-                if pos in lineup_by_pos:
-                    continue
-                rt = _parse_rt(pr, pos)
-                if rt is None:
-                    continue
-                # Minimize (-rt, pid, pos) => max rt, then stable pid, then position order
-                cand = (-rt, pid, SCOUTING_LINEUP_POSITIONS.index(pos))
-                if best_key is None or cand < best_key:
-                    best_key = cand
-                    best_player = p
-                    best_pos = pos
-
-        if best_player is None or best_pos is None:
-            break
-        rt_chosen = _parse_rt(best_player.get("position_ratings") or {}, best_pos) or 0.0
-        lineup_by_pos[best_pos] = (best_player, float(rt_chosen))
-        assigned_players.add(_player_sort_key(best_player))
+    for pos, pid in (seated or {}).items():
+        p = by_id.get(str(pid))
+        if p is None:
+            continue
+        lineup_by_pos[pos] = (p, _parse_rt(p.get("position_ratings") or {}, pos) or 0.0)
 
     rows: List[Dict[str, Any]] = []
     attrs_keys = list(SCOUTING_CORE_ATTR_KEYS)
@@ -239,6 +229,10 @@ def compute_projected_starting_five(players: List[Dict[str, Any]]) -> List[Dict[
                 "height": p.get("height"),
                 "weight": p.get("weight"),
                 "rt": rt_out,
+                # Already-ratcheted display ceiling computed by the roster/recruit
+                # payload builder. Preserve it through this reduced projected-five
+                # DTO; the card renderer performs formatting only.
+                "potential_rt_ratcheted": p.get("potential_rt_ratcheted"),
                 "attributes": attr_display,
             }
         )

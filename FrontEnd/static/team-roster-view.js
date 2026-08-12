@@ -19,8 +19,6 @@ let rosterSortColumn = 'RT';
 let rosterSortDirection = 'desc';
 let statsSortColumn = 'PTS';
 let statsSortDirection = 'desc';
-/** @type {'single' | 'full'} */
-let attrDisplayMode = 'single';
 // True once Week 35 Recruiting Day has run — recruits join the Practice Squad section.
 let practiceSquadRecruitingDone = false;
 
@@ -127,7 +125,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // Setup sorting
   setupRosterSorting();
   setupStatsSorting();
-  setupAttrDisplayToggle();
 });
 
 function setupBackButton() {
@@ -200,6 +197,7 @@ async function loadRoster() {
           weight: p.weight || '--',
           attributes: attrs,
           position_ratings: posRatings,
+          potential_rt_ratcheted: p.potential_rt_ratcheted,
           highestRT: highestRT !== -Infinity ? highestRT : null,
           highestPos: highestPos || '--',
           psStats: p.stats || {},
@@ -278,6 +276,7 @@ async function loadRoster() {
         weight: p.weight || '--',
         attributes: attrs,
         position_ratings: posRatings, // Store full position ratings for player view
+        potential_rt_ratcheted: p.potential_rt_ratcheted,
         highestRT: highestRT !== -Infinity ? highestRT : null,
         highestPos: highestPos || (p.position || '--'),
         photo: p.photo || null,
@@ -309,6 +308,7 @@ async function loadRoster() {
         weight: p.weight || '--',
         attributes: p.attributes || {},
         position_ratings: posRatings,
+        potential_rt_ratcheted: p.potential_rt_ratcheted,
         highestRT: highestRT !== -Infinity ? highestRT : null,
         psStats: p.ps_stats || {},
         isRecruit: !!p.is_recruit,
@@ -498,36 +498,13 @@ function getRawAttrValue(attrs, attr) {
 function formatAttrForDisplay(attrs, attr) {
   const rawVal = getRawAttrValue(attrs, attr);
   if (rawVal == null) return '--';
-  if (attrDisplayMode === 'full') {
-    return String(Math.round(rawVal));
-  }
   return Math.floor(rawVal / 10);
 }
 
 function getAttrSortValue(attrs, attr) {
   const rawVal = getRawAttrValue(attrs, attr);
   if (rawVal == null) return -Infinity;
-  if (attrDisplayMode === 'full') {
-    return rawVal;
-  }
   return Math.floor(rawVal / 10);
-}
-
-function setupAttrDisplayToggle() {
-  const singleBtn = document.getElementById('attr-display-single');
-  const fullBtn = document.getElementById('attr-display-full');
-  if (!singleBtn || !fullBtn) return;
-
-  const setMode = (mode) => {
-    attrDisplayMode = mode;
-    singleBtn.classList.toggle('active', mode === 'single');
-    fullBtn.classList.toggle('active', mode === 'full');
-    renderRoster();
-    renderTrainingSquadView();
-  };
-
-  singleBtn.addEventListener('click', () => setMode('single'));
-  fullBtn.addEventListener('click', () => setMode('full'));
 }
 
 function renderStartingFive() {
@@ -689,6 +666,7 @@ function renderRosterInto(data, tbodyId) {
       td.textContent = content;
       if (extraClass) td.className = extraClass;
       tr.appendChild(td);
+      return td;
     };
 
     addCell(p.pos);
@@ -699,10 +677,17 @@ function renderRosterInto(data, tbodyId) {
       addCell(formatAttrForDisplay(attrs, attr));
     });
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
-    addCell(
-      p.highestRT !== null ? p.highestRT : '-',
+    // Potential Rating (§Phase 4): show current/potential (e.g. C/B) when the backend
+    // supplied a projected ceiling; header stays "RT", color stays by current rating.
+    const _rtText = p.highestRT === null
+      ? '-'
+      : formatRtWithPotentialDisplay(p.highestRT, p.potential_rt_ratcheted);
+    const rtCell = addCell(
+      _rtText,
       typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.highestRT) : ''
     );
+    rtCell.setAttribute('data-tooltip', 'current/potential');
+    rtCell.setAttribute('title', 'current/potential');
     
     tbody.appendChild(tr);
   });

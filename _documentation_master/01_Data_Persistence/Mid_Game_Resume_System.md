@@ -985,7 +985,7 @@ Mid Game Resume owns the user's active game resume path. It does not own compute
 
 Computer games are covered by the adjacent Franchise CPU Sim Resume work stream:
 
-- project plan: `_documentation_master/projects/franchise_cpu_sim_resume_plan.md`
+- archived project plan: `_documentation_master/projects/Z-Completed/franchise_cpu_sim_resume_plan.md`
 - backend entry points:
   - `POST /franchise/complete-week/start-cpu-sims`
   - `POST /franchise/complete-week/phase-b`

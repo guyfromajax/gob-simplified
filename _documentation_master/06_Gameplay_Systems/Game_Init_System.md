@@ -347,7 +347,9 @@ When simulation starts a **new** in-process game for franchise mode (no existing
 
 **Scope:** computer teams only (user game plan is never auto-set). Applied at **game init** and at every **quarter break / timeout / foul-out**. `offense`, `rebounding`, and `play_calling` keep their legacy rolls. **`tempo`** uses the weighted center-2 roll for game init and Q1–Q3, then Q4+ score/time logic when `game_state` is available (timeouts, quarter breaks, foul-outs). **`alterations`** always uses the same weighted center-2 roll as tempo at init/Q1–Q3.
 
-**Active five (point 1):** at game init the lineup isn't built yet, so the five come from the **projected starting five** (greedy best (player, open position) by rating — same selection as the FCC Scouting Report). At in-game events the lineup is already rebuilt first, so the actual five active players are used (no ordering change needed).
+**Active five (point 1):** at game init the lineup isn't built yet, so the five come from `team_identity.projected_starting_five` — a **greedy** best (player, open position) fill by rating. At in-game events the lineup is already rebuilt first, so the actual five active players are used (no ordering change needed).
+
+> ⚠️ This is **no longer the same selection as the FCC Scouting Report.** As of August 2026 the display surfaces run the exact max-weight assignment the game uses (`CPU_Team_Rotation_System.md` §6); this greedy picker was deliberately left alone because the frozen identity constants were calibrated against it. Ticketed in `projects/bugs.md`.
 
 **Attribute source:** cumulative sums use each player's **`anchor_<attr>` baseline** (fallback to raw `<attr>`), matching the Scouting Report tab — so tendencies reflect talent, not transient in-game fatigue/momentum.
 

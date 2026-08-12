@@ -7,7 +7,7 @@
   --fcc-panel-border: rgba(255, 255, 255, 0.18);
   --fcc-text: #f7f9ff;
   --fcc-muted: rgba(255, 255, 255, 0.72);
-  --fcc-metal: #999999;
+  --fcc-metal: #9a9a9a;
   --fcc-shadow: 0 18px 36px rgba(0, 0, 0, 0.26);
 }
 
@@ -212,6 +212,34 @@ body.has-auth-bar #franchise-container {
 #franchise-container .fcc-meta-row #fcc-season-label {
   justify-self: start;
   text-align: left;
+}
+
+#franchise-container .tb-orientation {
+  margin: 6px 0 0;
+  max-width: 520px;
+  font-family: Inter, sans-serif;
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(255, 255, 255, 0.62);
+  font-style: italic;
+}
+
+#franchise-container .tb-eligibility {
+  margin: 4px 0 0;
+  max-width: 520px;
+  font-family: Inter, sans-serif;
+  font-size: 11px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+#franchise-container .tb-eligibility.is-yes {
+  color: rgba(140, 210, 160, 0.9);
+}
+
+#franchise-container .tb-eligibility.is-no {
+  color: rgba(240, 180, 120, 0.95);
 }
 
 #franchise-container .fcc-record-label {

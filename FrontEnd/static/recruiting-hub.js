@@ -20,6 +20,13 @@
   var Spine = window.RecruitingSpine;
   var ATTR_KEYS = Common.ATTR_KEYS;
   var REGION_ORDER = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H'];
+  var YEAR_FILTERS = [
+    { value: 'all', label: 'All' },
+    { value: 'Junior', label: 'JR' },
+    { value: 'Sophomore', label: 'SO' },
+    { value: 'Freshman', label: 'FR' },
+    { value: 'JH', label: 'JH' }
+  ];
   var SORTABLE = { name: 'text', pos: 'text', year: 'text', height: 'num', weight: 'num', rt: 'num' };
   var INVITE_WEEKS = [20, 21, 22, 23, 24, 25, 26];
   var POS_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
@@ -27,10 +34,10 @@
 
   var context = Common.getQueryContext();
   var state = {
-    week: 1, phase: 'passive', userTeamId: null,
+    week: 1, phase: 'passive', userTeamId: null, userRegion: '',
     recruits: [], byId: {}, newLeanIds: new Set(),
     board: [],                       // ordered recruit ids (invite phase)
-    search: '', region: 'all', mineOnly: false,
+    search: '', region: 'all', year: 'all', mineOnly: false,
     sort: { key: 'rt', dir: 'desc' }, collapsed: {},
     drag: { from: null, over: null },
     // Signing Day (wk 35)
@@ -61,6 +68,7 @@
     var q = state.search.trim().toLowerCase();
     return state.recruits.filter(function (r) {
       if (state.region !== 'all' && regionOf(r) !== state.region) return false;
+      if (state.year !== 'all' && r.year !== state.year) return false;
       if (state.mineOnly && !r.leansToUser) return false;
       if (q && String(r.name).toLowerCase().indexOf(q) === -1) return false;
       return true;
@@ -91,7 +99,7 @@
     return '<thead><tr>' +
       (boardActive() ? '<th class="act"></th>' : '') +
       th('name', 'Name', 'name-col') + th('pos', 'Pos') + th('year', 'Yr') + th('height', 'Ht') + th('weight', 'Wt') +
-      attrTh + '<th class="num attr-sep" data-sortkey="rt">RT' + arrow('rt') + '</th>' +
+      attrTh + '<th class="num attr-sep" data-sortkey="rt" data-tooltip="current/potential" title="current/potential">RT' + arrow('rt') + '</th>' +
       '<th class="lean-col">Leans / Your Standing</th></tr></thead>';
   }
   function rowHtml(r) {
@@ -113,7 +121,7 @@
       '<td class="year">' + Common.escapeHtml(r.yearDisplay) + '</td>' +
       '<td class="num">' + Common.escapeHtml(r.height) + '</td>' +
       '<td class="num">' + (r.weight != null ? r.weight : '--') + '</td>' + attrs +
-      '<td class="rt attr-sep"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + (r.rt != null ? r.rt : '--') + '</span></td>' +
+      '<td class="rt attr-sep" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></td>' +
       '<td class="lean-col">' + Spine.Lean.ladderHtml(r.leanModel) + '</td></tr>';
   }
   function poolBodyHtml() {
@@ -136,11 +144,24 @@
     return rows;
   }
   function toolbarHtml(total, shown) {
-    var chips = '<button class="chip' + (state.region === 'all' ? ' is-active' : '') + '" data-region="all">All</button>' +
-      REGION_ORDER.map(function (r) { return '<button class="chip' + (state.region === r ? ' is-active' : '') + '" data-region="' + r + '">' + r + '</button>'; }).join('');
+    var remainingRegions = REGION_ORDER.filter(function (r) { return r !== state.userRegion; });
+    var myRegionChip = function (r) {
+      var classes = 'chip is-my-region' + (state.region === r ? ' is-active' : '');
+      return '<span class="my-region-filter"><span class="my-region-label">my region</span>' +
+        '<button class="' + classes + '" data-region="' + r + '" aria-label="Region ' + r + ', my region">' + r + '</button></span>';
+    };
+    var chips = '<button class="chip' + (state.region === 'all' ? ' is-active' : '') + '" data-region="all">All</button>';
+    if (state.userRegion) chips += myRegionChip(state.userRegion);
+    chips += remainingRegions.map(function (r) {
+      return '<button class="chip' + (state.region === r ? ' is-active' : '') + '" data-region="' + r + '">' + r + '</button>';
+    }).join('');
+    var yearChips = YEAR_FILTERS.map(function (year) {
+      return '<button class="chip' + (state.year === year.value ? ' is-active' : '') + '" data-year="' + year.value + '">' + year.label + '</button>';
+    }).join('');
     return '<div class="pool-toolbar"><div class="ptb-group"><span class="ptb-label">Find</span>' +
       '<input class="ptb-search" id="pool-search" placeholder="Name…" value="' + Common.escapeHtml(state.search) + '"></div>' +
       '<div class="ptb-group"><span class="ptb-label">Region</span>' + chips + '</div>' +
+      '<div class="ptb-group"><span class="ptb-label">Year</span>' + yearChips + '</div>' +
       '<button class="chip mine' + (state.mineOnly ? ' is-active' : '') + '" id="pool-mine">◗ Leaning to me</button>' +
       '<span class="ptb-count">Showing <strong>' + shown + '</strong> of ' + total + '</span></div>';
   }
@@ -155,6 +176,7 @@
     var search = host.querySelector('#pool-search');
     if (search) search.addEventListener('input', function () { state.search = this.value; renderPoolBodyOnly(); updateCount(); });
     host.querySelectorAll('.pool-toolbar .chip[data-region]').forEach(function (b) { b.addEventListener('click', function () { state.region = this.dataset.region; renderPool(); }); });
+    host.querySelectorAll('.pool-toolbar .chip[data-year]').forEach(function (b) { b.addEventListener('click', function () { state.year = this.dataset.year; renderPool(); }); });
     var mine = host.querySelector('#pool-mine'); if (mine) mine.addEventListener('click', function () { state.mineOnly = !state.mineOnly; renderPool(); });
     host.querySelectorAll('th[data-sortkey]').forEach(function (thEl) {
       if (!SORTABLE[thEl.dataset.sortkey]) return;
@@ -209,7 +231,7 @@
       '<span class="islot-grip"><span></span><span></span><span></span><span></span><span></span><span></span></span>' +
       '<div class="islot-body"><div class="islot-name"><span class="nm">' + Common.escapeHtml(r.name) + '</span>' + stand + '</div>' +
         '<div class="islot-meta"><span class="islot-pos">' + Common.escapeHtml(r.pos) + '</span><span>Rgn ' + regionOf(r) + '</span>' +
-        '<span class="islot-rt ' + Spine.rtClassForYear(r.rt, r.year) + '">' + (r.rt != null ? r.rt : '--') + ' RT</span></div></div>' +
+        '<span class="islot-rt ' + Spine.rtClassForYear(r.rt, r.year) + '" data-tooltip="current/potential" title="current/potential">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + ' RT</span></div></div>' +
       '<div class="islot-right"><span class="islot-lists c' + claimed + '" title="' + claimed + ' of 3 lean slots claimed">' +
         '<span class="dots">' + dots + '</span><span class="cap">' + (claimed === 0 ? 'Open list' : claimed + '/3 leans') + '</span></span></div>' +
       '<button class="islot-remove" data-id="' + id + '" title="Remove" type="button">×</button></div>';
@@ -350,7 +372,7 @@
         '<div class="prow-arch">' + Common.escapeHtml(r.archetype) + '</div></div>' +
       '<span class="prow-pos">' + Common.escapeHtml(r.pos) + '</span>' +
       '<span class="prow-region">' + regionOf(r) + '</span>' +
-      '<span class="prow-rt"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + (r.rt != null ? r.rt : '--') + '</span></span>' +
+      '<span class="prow-rt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
       '<span class="prow-leans" title="' + claimed + ' of 3 leans">' + dots + '</span>' +
       '<div><div class="stepper"><button data-step="-1" data-id="' + r.recruitId + '"' + (a.points === 0 ? ' disabled' : '') + '>−</button>' +
         '<span class="val' + (a.points === 0 ? ' zero' : '') + '">' + a.points + '</span>' +
@@ -372,7 +394,7 @@
       : '<div class="rail-list">' + cids.map(function (x) {
           return '<div class="citem" data-jump="' + x.r.recruitId + '" title="Jump to recruit"><div class="citem-body">' +
             '<div class="citem-name"><span class="nm">' + Common.escapeHtml(x.r.name) + '</span>' + (x.a.promise ? '<span class="pmk">· PT</span>' : '') + '</div>' +
-            '<div class="citem-meta"><span class="citem-pts">' + x.a.points + ' pts</span><span>' + Common.escapeHtml(x.r.pos) + ' · ' + (x.r.rt != null ? x.r.rt : '--') + ' RT</span>' +
+            '<div class="citem-meta"><span class="citem-pts">' + x.a.points + ' pts</span><span data-tooltip="current/potential" title="current/potential">' + Common.escapeHtml(x.r.pos) + ' · ' + Common.formatRtWithPotential(x.r.rt, x.r.potentialRt) + ' RT</span>' +
             '<span class="citem-odds" style="color:var(--muted)">' + x.o.pct + '%</span></div></div>' +
             '<button class="citem-x" data-remove="' + x.r.recruitId + '" title="Remove">×</button></div>';
         }).join('') + '</div>';
@@ -487,7 +509,12 @@
     return state.recruits.filter(function (r) { return signed[r.recruitId]; }).map(function (r) {
       var info = signed[r.recruitId] || {};
       var withYou = String(info.team_id) === String(state.userTeamId);
-      return { r: r, team: info.team_name || info.team_id || '—', withYou: withYou };
+      return {
+        r: r,
+        team: info.team_name || info.team_id || '—',
+        team_id: info.team_id,
+        withYou: withYou,
+      };
     }).sort(function (a, b) { return (b.withYou - a.withYou) || ((b.r.rt || 0) - (a.r.rt || 0)); });
   }
   function finalSigningsHtml() {
@@ -499,12 +526,12 @@
       : state.signFilter === 'targets' ? all.filter(function (s) { return s.r.leansToUser; }) : all;
     var chip = function (k, l) { return '<button class="chip' + (state.signFilter === k ? ' on' : '') + '" data-sfilter="' + k + '">' + l + '</button>'; };
     var rowsHtml = rows.map(function (s) {
-      var r = s.r, ab = Spine.Lean.deriveAbbr(s.team);
+      var r = s.r, ab = Spine.Lean.deriveAbbr(s.team, s.teamId || s.team_id);
       return '<div class="srow' + (s.withYou ? ' win' : '') + '">' +
         '<div class="sname"><span class="nm">' + Common.escapeHtml(r.name) + '</span></div>' +
         '<span class="scol spos">' + Common.escapeHtml(r.pos) + '</span>' +
         '<span class="scol sregion">' + regionOf(r) + '</span>' +
-        '<span class="scol srt"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + (r.rt != null ? r.rt : '--') + '</span></span>' +
+        '<span class="scol srt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
         '<span class="scol">' + signStandChip(r) + '</span>' +
         '<div class="ssigned"><span class="logo ' + (s.withYou ? 'you' : 'rival') + '">' + Common.escapeHtml(ab) + '</span>' +
           '<span class="team ' + (s.withYou ? 'you' : 'rival') + '">' + Common.escapeHtml(s.team) + '</span></div>' +
@@ -551,7 +578,7 @@
       var vrec = state.byId[String(yourVisit.recruit_id)];
       var leanNote = vrec && vrec.leansToUser ? 'now leaning you at <b>#' + (vrec.yourRank || 1) + '</b>. Odds up sharply.' : 'visit logged this week.';
       heroVisit = '<div class="wvisit"><span class="wvisit-mark gain">' + ARROW_UP + '</span><div class="wvisit-body">' +
-        '<div class="nm">' + Common.recruitNameLinkHtml(yourVisit.recruit_id, context.franchiseId, yourVisit.name) + '<span class="wmeta"><span class="pos">' + Common.escapeHtml(yourVisit.pos) + '</span>Region ' + Common.escapeHtml(yourVisit.home_region) + ' · ' + Common.escapeHtml(yourVisit.rt) + ' RT</span></div>' +
+        '<div class="nm">' + Common.recruitNameLinkHtml(yourVisit.recruit_id, context.franchiseId, yourVisit.name) + '<span class="wmeta" data-tooltip="current/potential" title="current/potential"><span class="pos">' + Common.escapeHtml(yourVisit.pos) + '</span>Region ' + Common.escapeHtml(yourVisit.home_region) + ' · ' + Common.formatRtWithPotential(yourVisit.rt, yourVisit.potential_rt_ratcheted) + ' RT</span></div>' +
         '<div class="sub">Visit landed — ' + leanNote + '</div></div></div>';
     } else {
       heroVisit = '<div class="wvisit"><div class="wvisit-body"><div class="nm">No visit this week</div><div class="sub">Your program didn\'t land a visit in Week ' + state.week + '.</div></div></div>';
@@ -568,9 +595,9 @@
     var regionHtml = regionsShown.map(function (rg) {
       var visits = byRegion[rg].slice(0, 6).map(function (x) {
         var rivalPart = x.rival
-          ? '<span class="team">' + Common.escapeHtml(Spine.Lean.deriveAbbr(x.rival.team_name)) + '</span><span class="note threat">also visited — contested</span>'
+          ? '<span class="team">' + Common.escapeHtml(Spine.Lean.deriveAbbr(x.rival.team_name, x.rival.team_id)) + '</span><span class="note threat">also visited — contested</span>'
           : '<span class="note">no rival visits — clear lane</span>';
-        return '<div class="wvrow"><span class="team you">' + Common.escapeHtml(Spine.Lean.deriveAbbr(state.teamName || 'You')) + '</span>' +
+        return '<div class="wvrow"><span class="team you">' + Common.escapeHtml(Spine.Lean.deriveAbbr(state.teamName || 'You', state.userTeamId)) + '</span>' +
           '<span class="who">' + Common.escapeHtml(x.r.name) + '</span><span class="arrow">·</span>' + rivalPart + '</div>';
       }).join('');
       return '<div class="wregion-row"><span class="wregion-tag">' + rg + '</span><div class="wregion-visits">' + visits + '</div></div>';
@@ -643,6 +670,8 @@
         state.week = Number(data.week || 1);
         state.phase = Spine.Phase.forWeek(state.week);
         state.userTeamId = data.team_id || context.teamId;
+        state.userRegion = REGION_ORDER.indexOf(String(data.team_region || '').trim().toUpperCase()) !== -1
+          ? String(data.team_region).trim().toUpperCase() : '';
         state.teamName = data.team || 'your program';
         state.currentResultsWeek = data.current_results_week;
         state.week35Results = data.week_35_recruiting_results || {};

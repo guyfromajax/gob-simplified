@@ -23,34 +23,17 @@ from __future__ import annotations
 import argparse
 import copy
 import logging
-import os
 import random
 import sys
 from pathlib import Path
 from typing import Any
 
 from bson import ObjectId
-from pymongo import MongoClient
 
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-os.chdir(ROOT)
-
-
-def _load_env(filepath: Path) -> None:
-    if not filepath.exists():
-        return
-    for line in filepath.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
-
-
-for env_path in (ROOT / ".env.local", ROOT / ".env"):
-    _load_env(env_path)
+from scripts.db_migration_cli import connect_migration_target
 
 
 TEAM_ATTR_CLAMPS: dict[str, tuple[Any, Any]] = {}
@@ -88,79 +71,25 @@ TEAM_REPORT_ATTRS = [
     "rebound_modifier",
 ]
 
-# Outcome bands mirror calculate_attr_changes in franchise_routes.py (non-distant).
-# fight / chemistry mid-band choice is W/L-gated; remaining attrs pick a band at random.
-EOG_BANDS: dict[str, list[tuple[str, tuple[int, int] | tuple[float, float]]]] = {
-    "shot_threshold": [
-        ("fg_gt_50", (-10, -5)),
-        ("fg_45_to_50", (-5, 5)),  # narrowed by W/L at roll time
-        ("fg_le_45", (5, 10)),
-    ],
-    "discipline": [
-        ("below_opp_plus_8", (1, 2)),
-        ("above_opp_plus_8", (-2, -1)),
-        ("equal_buffered", (-1, 0)),
-    ],
-    "rebound_modifier": [
-        ("outrebound_by_8", (0.00, 0.05)),
-        ("outrebounded_by_8", (-0.10, -0.05)),
-        ("near_even", (-0.05, -0.01)),
-    ],
-    "offensive_efficiency": [
-        ("plays_gt_12", (0, 1)),
-        ("plays_gt_10", (-1, 0)),
-        ("plays_le_10", (-2, -1)),
-    ],
-    "defensive_efficiency": [
-        ("max_share_le_39", (0, 1)),
-        ("max_share_le_49", (-1, 0)),
-        ("max_share_gt_49", (-2, -1)),
-    ],
-    "fb_efficiency": [
-        ("top_share_gt_60", (-2, -1)),
-        ("top_share_gt_50", (-1, 0)),
-        ("balanced", (0, 1)),
-    ],
-    "fb_opp_modifier": [
-        ("opp_fb_gt_15", (-2, -1)),
-        ("opp_fb_gt_10", (-1, 0)),
-        ("opp_fb_le_10", (0, 1)),
-    ],
-    "pt_efficiency": [
-        ("pt_gt_20", (-2, -1)),
-        ("pt_gt_16", (-1, 0)),
-        ("pt_le_16", (0, 1)),
-    ],
-    "pt_opp_modifier": [
-        ("opp_pt_gt_16", (-2, -1)),
-        ("opp_pt_gt_12", (-1, 0)),
-        ("opp_pt_le_12", (0, 1)),
-    ],
-}
-
-FIGHT_BANDS = {
-    True: ("win", (0, 2)),
-    False: ("loss", (-2, 0)),
-}
-
-CHEMISTRY_BANDS = {
-    True: [
-        ("beat_lower_ranked", (0, 1)),
-        ("beat_higher_non_top10", (1, 2)),
-        ("beat_top10", (2, 4)),
-    ],
-    False: [
-        ("lose_to_top10", (-1, 0)),
-        ("lose_to_higher_non_top10", (-2, 0)),
-        ("lose_to_100_128", (-5, -3)),
-        ("lose_to_other_lower", (-3, -2)),
-    ],
-}
+# Band vocabulary imported from the SINGLE source of truth (Task 8) so the harness
+# never drifts from production. rebound_modifier bands are stored as cents (int) and
+# divided by 100 at roll time, matching eog_attr_rules. NOTE: this random-pick model
+# ignores thresholds by design; the concentration/volume attrs now carry atrophy
+# bands too, so a uniform pick over-samples atrophy vs the real threshold-gated
+# distribution — the harness models a band vocabulary, not the game (use the real
+# [EOG-BAND] measurement for distributions).
+from BackEnd.constants.eog_attr_bands import (  # noqa: E402
+    EOG_BANDS,
+    FIGHT_BANDS,
+    CHEMISTRY_BANDS,
+    ST_FG_45_TO_50_WIN,
+    ST_FG_45_TO_50_LOSS,
+)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--db", default=os.environ.get("MONGO_DB_NAME", "gob-staging"), help="Mongo database name")
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
     parser.add_argument("--franchise-id", help="Franchise _id. Defaults to most recent franchise with FTD rows.")
     parser.add_argument("--user-team", help="Optional user team selector: ObjectId/string id/name/mascot")
     parser.add_argument("--seed", type=int, default=42, help="Random seed")
@@ -389,11 +318,12 @@ def _roll_eog_deltas(rng: random.Random, is_winner: bool) -> dict[str, Any]:
         label, (lo, hi) = rng.choice(bands)
         if attr == "shot_threshold" and label == "fg_45_to_50":
             if is_winner:
-                label, lo, hi = "fg_45_to_50_win", -5, 0
+                lo, hi = ST_FG_45_TO_50_WIN
             else:
-                label, lo, hi = "fg_45_to_50_loss", 0, 5
+                lo, hi = ST_FG_45_TO_50_LOSS
         if attr == "rebound_modifier":
-            changes[attr] = _roll_float_range(rng, float(lo), float(hi))
+            # Bands are cents in the config; /100 to the 0.0-1.0 scale.
+            changes[attr] = round(_roll_int_range(rng, int(lo), int(hi)) / 100.0, 2)
         else:
             changes[attr] = _roll_int_range(rng, int(lo), int(hi))
         band_labels[attr] = label
@@ -458,13 +388,8 @@ def main() -> int:
     random.seed(args.seed)
     rng = random.Random(args.seed)
 
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set. Add it to .env.local/.env or export it.", file=sys.stderr)
-        return 1
-
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    db = client[args.db]
+    connection = connect_migration_target(args.db, write=False)
+    db = connection.database
     franchise = _find_franchise(db, args.franchise_id)
     franchise_id = franchise["_id"]
     ftd_docs = list(db.franchise_team_data.find({"franchise_id": franchise_id}))
@@ -561,7 +486,7 @@ def main() -> int:
     print(f"Seed: {args.seed}")
     print(f"Weeks: {args.weeks} (camp week 1 @ 30 pts, then 24 pts; no byes)")
     print(f"Record (random W/L): {wins}-{losses}")
-    print("Model: Auto-Train allocations + random EOG outcome bands (non-distant)")
+    print("Model: Auto-Train allocations + full-engine EOG outcome bands")
 
     _print_table(
         "Season Team Attribute Net",
@@ -605,6 +530,7 @@ def main() -> int:
     print("- shot_threshold is golf-score (lower is better).")
     print("- training_sum / eog_sum are post-clamp applied deltas accumulated each week.")
     print("- rebound_modifier net can differ slightly from training_sum+eog_sum due to rounding.")
+    connection.close()
     return 0
 
 

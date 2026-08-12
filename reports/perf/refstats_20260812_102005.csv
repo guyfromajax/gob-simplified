@@ -1,0 +1,7 @@
+kind,matchup,seed,side,team,team_id,final_score,possessions,FGM,FGA,FG_pct,TPM,TPA,TP_pct,FTM,FTA,FT_pct,TO,OREB,DREB,REB,AST,STL,BLK,PF
+cpu_full,Chapel Hill @ South Lancaster,,home,South Lancaster,SOUTH_LANCASTER,79,65.8,29,55,52.73,4,15,26.67,17,20,85.0,12,10,27,37,16,0,3,37
+cpu_full,Chapel Hill @ South Lancaster,,away,Chapel Hill,CHAPEL_HILL,67,68.6,22,56,39.29,3,14,21.43,20,40,50.0,6,11,17,28,17,5,2,22
+cpu_full,Lancaster @ Appalachia,,home,Appalachia,APPALACHIA,61,78.2,17,59,28.81,6,21,28.57,21,30,70.0,17,11,27,38,11,9,1,21
+cpu_full,Lancaster @ Appalachia,,away,Lancaster,LANCASTER,72,84.0,25,69,36.23,4,32,12.5,18,25,72.0,15,11,27,38,10,9,3,24
+cpu_full,Xavien @ Casino Row,,home,Casino Row,CASINO_ROW,62,65.28,24,49,48.98,3,19,15.79,11,12,91.67,14,3,24,27,20,0,2,55
+cpu_full,Xavien @ Casino Row,,away,Xavien,XAVIEN,91,80.0,20,77,25.97,0,15,0.0,51,75,68.0,1,31,19,50,8,7,1,12

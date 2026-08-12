@@ -33,7 +33,14 @@ Schema emitters apply overlays via `_apply_overlay_motion_to_shoot_step` and con
 
 **Backend discrete `DREB` turn** (`result_type` / `current_turn` **`DREB`**, `animation_steps` from `dreb_step_emitter.py`): animates the rebounder moving to the ball at the bounce spot. Non-captor players normally hold their post-shot coordinates, except for backend-stamped failed rebound attemptors (see below), who collapse toward randomized near-bounce spots.
 
-**Half-court outlet** (rebounder dribble / pass to outlet receiver per `dreb_outlet_pass`, teammates moving toward the new offense end — unit **`hco.lead_in.from_dreb_outlet`** in `turnAnimation.js` → `runDefensiveReboundSetup`) **is not** emitted as part of `dreb_step_emitter` steps. For discrete **DREB → HCO/HCT/FCP**, the client runs that setup **after** `AnimationEngine` finishes **`playTurn`** for the DREB row, using the **previous** MISS/BLOCK turn for **`dreb_outlet_pass`** and **`offense_getback`**. Skip when `DREB.next_play_type` is **FAST_BREAK** (fast break owns outlet) or when the shot turn has **`force_foul_after_dreb`**.
+**Half-court outlet** is not emitted as part of the discrete DREB capture step.
+For DREB → HCO/HCT/FCP, the next HCO schema entry orchestrator consumes the
+prior MISS/BLOCK row's `dreb_outlet_pass` contract and renders the ball-handler
+to PG handoff plus walk-up. The former post-DREB frontend
+`runDefensiveReboundSetup` lead-in was removed from schema playback because it
+double-executed the outlet and caused a handoff teleport. DREB → FAST_BREAK
+uses the Fast Break outlet instead; DREB foul and force-foul-after-DREB paths do
+not use this half-court handoff.
 
 **Embedded DREB** (MISS/BLOCK turn still owns rebound, no separate `DREB` row — e.g. many **FREE_THROW** misses, unmigrated FCP / FB variants): outlet still runs from **`ShotAnimationSystem.handleDefensiveRebound`** → **`runDefensiveReboundSetup`** when `next_play_type` is **HCO/HCT/FCP** on that same shot turn. **Rebound!** headline rules (including idempotency with discrete rows): **`Announcement_System.md`**.
 
@@ -163,8 +170,9 @@ OREB turns are UESS-compliant (`oreb_step_emitter.py` → `animation_steps[]`). 
    - Otherwise, lower-half discount is **0.95**.
 5. **Score every eligible rebounder**:
    - `rebound_function = (RB×0.5 + ST×0.3 + IQ×0.1 + CH×0.1) × randint(1, 6)`
-   - Upper-half player final score: `rebound_function + (team_chemistry × rebound_modifier)`
-   - Lower-half player final score: `(rebound_function + (team_chemistry × rebound_modifier)) × lower_half_discount`
+   - Team bonus: `REBOUND_TEAM_CHEMISTRY_FACTOR (0.5) × team_chemistry × rebound_modifier`
+   - Upper-half player final score: `rebound_function + team_bonus`
+   - Lower-half player final score: `(rebound_function + team_bonus) × lower_half_discount`
    - **Offensive-rebounder discount:** offensive players' final score is multiplied by **`OREB_REBOUND_SCORE_DISCOUNT` (0.8)** — modeling the defense's box-out / positioning edge on a miss (offense and defense were otherwise scored identically). Applied in `select_rebounder_by_score`; defense scores untouched. Tune against the week-aggregate **OREB%** (D1 target ~30%; `1.0` = legacy no-discount). Note: a 0.8 *score* discount is **not** a 20% *rate* reduction — the winner is a max-of-`d6` pick, so the OREB% effect is non-linear and tuned empirically.
    - Shooter / putback shooter penalty: after the score above is calculated, apply the existing **20% discount** (`× 0.8`) to the shooter or putback shooter if he is in the eligible pool.
 6. **No eligible rebounder fallback:** if the eligible pool is empty, expand the Euclidean search radius by **5** until at least one rebounder is found. HCO / Free Throw fallback starts at **20**. Geo-gated paths start from their path radius, then expand by 5 from there.

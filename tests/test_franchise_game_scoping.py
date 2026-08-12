@@ -8,6 +8,14 @@ from BackEnd.api.api import app
 from BackEnd.api import franchise_routes
 
 
+def _empty_ftd_collection():
+    """Schedule payload reads both the user row and league rank rows."""
+    return SimpleNamespace(
+        find_one=lambda *args, **kwargs: None,
+        find=lambda *args, **kwargs: [],
+    )
+
+
 def test_schedule_scopes_game_lookup_to_franchise(monkeypatch):
     franchise_id = ObjectId()
     other_franchise_id = ObjectId()
@@ -26,17 +34,11 @@ def test_schedule_scopes_game_lookup_to_franchise(monkeypatch):
 
     games = MagicMock()
 
-    def games_find_one(query, projection=None):
-        has_matchup = (
-            query.get("week") == 1
-            and query.get("team1_id") in (away_id, home_id)
-            and query.get("team2_id") in (away_id, home_id)
-        )
-        if has_matchup and "franchise_id" not in query:
-            return leaked_game_doc
-        return None
+    def games_find(query, projection=None):
+        # A missing franchise predicate would expose the other save's row.
+        return [leaked_game_doc] if "franchise_id" not in query else []
 
-    games.find_one.side_effect = games_find_one
+    games.find.side_effect = games_find
 
     franchises = MagicMock()
     franchises.find_one.return_value = {
@@ -52,7 +54,7 @@ def test_schedule_scopes_game_lookup_to_franchise(monkeypatch):
     monkeypatch.setattr(
         franchise_routes,
         "franchise_team_data_collection",
-        SimpleNamespace(find_one=lambda *args, **kwargs: None),
+        _empty_ftd_collection(),
     )
 
     payload = franchise_routes.season_schedule(str(franchise_id))
@@ -63,7 +65,7 @@ def test_schedule_scopes_game_lookup_to_franchise(monkeypatch):
     assert game["home_score"] is None
     assert game["game_id"] is None
 
-    scoped_queries = [c.args[0] for c in games.find_one.call_args_list if c.args]
+    scoped_queries = [c.args[0] for c in games.find.call_args_list if c.args]
     assert any(q.get("franchise_id") == str(franchise_id) for q in scoped_queries)
 
 
@@ -131,17 +133,10 @@ def test_schedule_endpoint_does_not_leak_cross_franchise_game_docs(monkeypatch):
 
     games = MagicMock()
 
-    def games_find_one(query, projection=None):
-        has_matchup = (
-            query.get("week") == 1
-            and query.get("team1_id") in (away_id, home_id)
-            and query.get("team2_id") in (away_id, home_id)
-        )
-        if has_matchup and "franchise_id" not in query:
-            return leaked_game_doc
-        return None
+    def games_find(query, projection=None):
+        return [leaked_game_doc] if "franchise_id" not in query else []
 
-    games.find_one.side_effect = games_find_one
+    games.find.side_effect = games_find
 
     franchises = MagicMock()
     franchises.find_one.return_value = {
@@ -157,7 +152,7 @@ def test_schedule_endpoint_does_not_leak_cross_franchise_game_docs(monkeypatch):
     monkeypatch.setattr(
         franchise_routes,
         "franchise_team_data_collection",
-        SimpleNamespace(find_one=lambda *args, **kwargs: None),
+        _empty_ftd_collection(),
     )
 
     res = client.get(f"/franchise/schedule?franchise_id={franchise_id}")
@@ -198,7 +193,7 @@ def test_schedule_endpoint_filters_to_requested_conference(monkeypatch):
     monkeypatch.setattr(
         franchise_routes,
         "franchise_team_data_collection",
-        SimpleNamespace(find_one=lambda *args, **kwargs: None),
+        _empty_ftd_collection(),
     )
 
     res = client.get(f"/franchise/schedule?franchise_id={franchise_id}&conference=1")

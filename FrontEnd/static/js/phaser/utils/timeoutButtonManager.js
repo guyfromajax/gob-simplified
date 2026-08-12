@@ -704,9 +704,20 @@ async function showUserTimeoutPopup(timeoutResult, gameId, scene) {
     const awayTeamId = scene.simData?.away_team_id;
     const teamsObj = scene.simData?.teams || {};
 
+    // Render display_name; scene.homeTeam/awayTeam are already chrome labels.
     const userTeamName = myTeamSide === 'home'
-        ? ((homeTeamId && teamsObj[homeTeamId]?.name) || scene.simData?.home_team?.name || scene.homeTeam?.name || 'Your Team')
-        : ((awayTeamId && teamsObj[awayTeamId]?.name) || scene.simData?.away_team?.name || scene.awayTeam?.name || 'Your Team');
+        ? (scene.homeTeam
+            || (homeTeamId && teamsObj[homeTeamId]?.display_name)
+            || (homeTeamId && teamsObj[homeTeamId]?.name)
+            || scene.simData?.home_team?.display_name
+            || scene.simData?.home_team?.name
+            || 'Your Team')
+        : (scene.awayTeam
+            || (awayTeamId && teamsObj[awayTeamId]?.display_name)
+            || (awayTeamId && teamsObj[awayTeamId]?.name)
+            || scene.simData?.away_team?.display_name
+            || scene.simData?.away_team?.name
+            || 'Your Team');
 
     const popup = document.createElement('div');
     popup.className = 'user-timeout-popup';
@@ -833,17 +844,20 @@ export async function showTimeoutPopup(timeoutResult, gameId, scene, computerTim
     const awayTeamId = scene.simData?.away_team_id;
     const teamsObj = scene.simData?.teams || {};
     
-    const homeTeam = (homeTeamId && teamsObj[homeTeamId]?.name) ||  // ✅ Unified structure (preferred)
-                     scene.simData?.home_team?.name ||                // Backward compatibility
+    // Identity names for timeout nav (must be core — URL home/away). Prefer .name over chrome.
+    const homeTeam = (homeTeamId && teamsObj[homeTeamId]?.name) ||
+                     scene.homeTeamCore ||
+                     scene.simData?.home_team?.name ||
                      (typeof scene.homeTeam === 'string' ? scene.homeTeam : scene.homeTeam?.name) ||
                      scene.simData?.homeTeam?.name ||
-                     homeTeamId;  // Last resort: use ID (should log warning if we get here)
+                     homeTeamId;
     
-    const awayTeam = (awayTeamId && teamsObj[awayTeamId]?.name) ||  // ✅ Unified structure (preferred)
-                     scene.simData?.away_team?.name ||                // Backward compatibility
+    const awayTeam = (awayTeamId && teamsObj[awayTeamId]?.name) ||
+                     scene.awayTeamCore ||
+                     scene.simData?.away_team?.name ||
                      (typeof scene.awayTeam === 'string' ? scene.awayTeam : scene.awayTeam?.name) ||
                      scene.simData?.awayTeam?.name ||
-                     awayTeamId;  // Last resort: use ID (should log warning if we get here)
+                     awayTeamId;
     
     // Log warning if we had to use team ID as fallback (indicates missing team name)
     if (homeTeam === homeTeamId || awayTeam === awayTeamId) {

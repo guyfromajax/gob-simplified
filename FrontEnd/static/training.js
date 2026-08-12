@@ -22,6 +22,10 @@ const customFocusAssignBtn = document.getElementById('custom-focus-assign-btn');
 const customFocusCancelBtn = document.getElementById('custom-focus-cancel-btn');
 let currentWeek = 1;
 let currentTeamName = '';
+let currentSeason = 1;
+let trainingNewswirePromise = null;
+let trainingNewswireOverlayActive = false;
+let trainingNewswireError = null;
 
 /** @type {{ player_id: string, name: string, attrs: Record<string, number> }[]} */
 let customFocusRoster = [];
@@ -216,35 +220,59 @@ function resetPlayerMaximizerResolvedState() {
   resetCustomFocusCommitted();
 }
 
-/** Distant-training overlay: rotate user-team highlight lines */
-const TRAINING_DISTANT_HIGHLIGHT_MS = 5000;
-const TRAINING_HIGHLIGHT_FALLBACK = 'Finishing league training…';
-
-function shuffleArrayInPlace(arr) {
-  for (let i = arr.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    const t = arr[i];
-    arr[i] = arr[j];
-    arr[j] = t;
-  }
-  return arr;
+function trainingNewswireCacheKey(franchiseId, season, week) {
+  return `gob_training_newswire_${franchiseId}_s${season}_w${week}`;
 }
 
-/**
- * Non-empty array of strings for the highlight stream (randomized). Uses fallback if API sent none.
- * @param {unknown} trainingHighlights
- * @returns {string[]}
- */
-function buildRandomizedTrainingHighlightLines(trainingHighlights) {
-  const out = [];
-  if (Array.isArray(trainingHighlights)) {
-    trainingHighlights.forEach(function (h) {
-      if (typeof h === 'string' && h.trim()) out.push(h.trim());
-    });
+function prefetchTrainingNewswire(franchiseId) {
+  if (!franchiseId) return null;
+  const key = trainingNewswireCacheKey(franchiseId, currentSeason, currentWeek);
+  try {
+    const cached = JSON.parse(sessionStorage.getItem(key) || 'null');
+    if (cached && Number(cached.season) === currentSeason && Number(cached.current_week) === currentWeek) {
+      trainingNewswireError = null;
+      trainingNewswirePromise = Promise.resolve(cached);
+      return trainingNewswirePromise;
+    }
+  } catch (_cacheError) {}
+  const headers = typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {};
+  trainingNewswireError = null;
+  const url = `${API_CONFIG.buildUrl('/franchise/league-news')}?franchise_id=${encodeURIComponent(franchiseId)}`;
+  trainingNewswirePromise = fetch(url, { headers }).then(async function(response) {
+    if (!response.ok) throw new Error(`League news unavailable (${response.status})`);
+    const payload = await response.json();
+    try { sessionStorage.setItem(key, JSON.stringify(payload)); } catch (_cacheError) {}
+    return payload;
+  }).catch(function(error) {
+    trainingNewswireError = error;
+    return null;
+  });
+  return trainingNewswirePromise;
+}
+
+function showTrainingNewswire(franchiseId) {
+  trainingNewswireOverlayActive = true;
+  const promise = trainingNewswirePromise || prefetchTrainingNewswire(franchiseId);
+  if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+    window.PageLoadOverlay.show({ variant: 'newswire', data: null });
   }
-  if (out.length === 0) return [TRAINING_HIGHLIGHT_FALLBACK];
-  shuffleArrayInPlace(out);
-  return out;
+  if (!promise) return Promise.resolve(null);
+  return promise.then(function(payload) {
+    if (!payload) throw trainingNewswireError || new Error('League news unavailable');
+    if (trainingNewswireOverlayActive && window.PageLoadOverlay && window.PageLoadOverlay.show) {
+      window.PageLoadOverlay.show({ variant: 'newswire', data: payload });
+    }
+    return payload;
+  }).catch(function(error) {
+    console.warn('[TRAINING] League news fallback:', error);
+    if (trainingNewswireOverlayActive && window.PageLoadOverlay && window.PageLoadOverlay.show) {
+      window.PageLoadOverlay.show({
+        variant: 'pulse', title: '', subtitle: 'Training in progress',
+        teamName: currentTeamName || '', assetKey: 'banner_primary'
+      });
+    }
+    return null;
+  });
 }
 
 async function fetchFranchiseCommandCenterData(franchiseId) {
@@ -354,15 +382,17 @@ function setSliderValue(slider, value) {
   updateTrainingSliderValuePosition(slider);
 }
 
-/**
- * Calculate total points allocated across all sliders
- */
+/** Every slider notch costs exactly one whole budget point. */
 function calculateTotalPoints() {
   let total = 0;
   allSliders.forEach(slider => {
-    total += parseInt(slider.value) || 0;
+    total += parseInt(slider.value, 10) || 0;
   });
   return total;
+}
+
+function formatPointsDisplay(n) {
+  return String(Math.round(n));
 }
 
 /**
@@ -562,6 +592,16 @@ function getArchetypeLabelText(radio) {
   return nameEl ? nameEl.textContent.trim() : '';
 }
 
+function canAllocateMore() {
+  const spent = calculateTotalPoints();
+  for (const slider of allSliders) {
+    const cur = parseInt(slider.value, 10) || 0;
+    if (cur >= parseInt(slider.max || '5', 10)) continue;
+    if (spent + 1 <= TOTAL_POINTS) return true;
+  }
+  return false;
+}
+
 /**
  * Update points remaining display and submit button state
  */
@@ -569,18 +609,17 @@ function updatePointsRemaining() {
   const total = calculateTotalPoints();
   const remaining = TOTAL_POINTS - total;
   
-  pointsRemainingEl.textContent = remaining;
+  pointsRemainingEl.textContent = formatPointsDisplay(Math.max(0, remaining));
   const pointsDisplay = pointsRemainingEl.closest('.points-display');
   if (pointsDisplay) {
     pointsDisplay.classList.remove('is-low', 'is-empty');
-    if (remaining === 0) {
+    if (remaining <= 1e-6) {
       pointsDisplay.classList.add('is-empty');
     } else if (remaining <= 5) {
       pointsDisplay.classList.add('is-low');
     }
   }
   
-  // Enable/disable submit button based on points allocation AND coaching focus selection
   const allPointsAllocated = remaining === 0;
   const focusSelected = isCoachingFocusSelected();
   const pmOk = isPlayerMaximizerSubmitReady();
@@ -649,22 +688,44 @@ window.addEventListener('resize', function () {
 });
 
 /**
- * Auto-Train: assign all points and pick a random focus
+ * Auto-Train: assign whole points under the flat budget and pick a random focus
  */
 function autoAssignTraining() {
   playSound('chaotic-choice.wav');
   const sliders = Array.from(allSliders);
   if (sliders.length === 0) return;
 
-  // 1) Set every slider to 1 (guarantees min 1 across 20 sliders = 20 points)
-  sliders.forEach(slider => setSliderValue(slider, 1));
+  sliders.forEach(slider => setSliderValue(slider, 0));
 
-  // 2) Pick random unique sliders to set to 2 (adds remaining points)
-  // For 24 points: 20 + 4 = 24 (pick 4 sliders)
-  // For 30 points: 20 + 10 = 30 (pick 10 sliders)
-  const remainingPoints = TOTAL_POINTS - 20;
-  const shuffled = [...sliders].sort(() => Math.random() - 0.5);
-  shuffled.slice(0, remainingPoints).forEach(slider => setSliderValue(slider, 2));
+  const ranked = sliders.slice();
+
+  // Pass 1: put 1 on as many sliders as fit.
+  ranked.forEach(function (slider) {
+    if (calculateTotalPoints() + 1 <= TOTAL_POINTS) {
+      setSliderValue(slider, 1);
+    }
+  });
+
+  // Pass 2: bump random affordable sliders until the budget is full.
+  const bumpPool = ranked.filter(function (s) {
+    return (parseInt(s.value, 10) || 0) < parseInt(s.max || '5', 10);
+  });
+  for (let guard = 0; guard < 200 && canAllocateMore(); guard++) {
+    const shuffled = bumpPool.slice().sort(function () { return Math.random() - 0.5; });
+    let bumped = false;
+    for (let i = 0; i < shuffled.length; i++) {
+      const slider = shuffled[i];
+      const cur = parseInt(slider.value, 10) || 0;
+      const maxV = parseInt(slider.max || '5', 10);
+      if (cur >= maxV) continue;
+      if (calculateTotalPoints() + 1 <= TOTAL_POINTS) {
+        setSliderValue(slider, cur + 1);
+        bumped = true;
+        break;
+      }
+    }
+    if (!bumped) break;
+  }
 
   // 3) Random coaching focus (only select from focus options, not archetype headers)
   let focusLabel = '';
@@ -1110,9 +1171,9 @@ submitBtn.addEventListener('click', async function() {
   
   const trainingData = collectTrainingData();
   
-  // Validate that all 24 points are allocated
-  const total = calculateTotalPoints();
-  if (total !== TOTAL_POINTS) {
+  // Flat integer budget: every slider notch costs exactly one point.
+  const remaining = TOTAL_POINTS - calculateTotalPoints();
+  if (remaining !== 0) {
     alert(`Please allocate all ${TOTAL_POINTS} training points before submitting.`);
     return;
   }
@@ -1170,14 +1231,10 @@ submitBtn.addEventListener('click', async function() {
   try {
     this.disabled = true;
     this.textContent = 'Submitting...';
-    if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-      window.PageLoadOverlay.show({
-        variant: 'pulse',
-        title: '',
-        subtitle: 'Preparing your training…',
-        teamName: currentTeamName || '',
-        assetKey: 'banner_primary'
-      });
+    if (mode === 'franchise' && franchiseId) {
+      showTrainingNewswire(franchiseId);
+    } else if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+      window.PageLoadOverlay.show({ variant: 'pulse', subtitle: 'Training in progress' });
     }
 
     const jsonHeaders = Object.assign(
@@ -1206,58 +1263,24 @@ submitBtn.addEventListener('click', async function() {
         if (userResult && userResult.detail) detail = userResult.detail;
         throw new Error(detail);
       } else {
-        const lines = buildRandomizedTrainingHighlightLines(
-          userResult && userResult.training_highlights
-        );
-        let highlightStreamId = null;
-        let currentIndex = 0;
-        try {
-          if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-            window.PageLoadOverlay.show({
-              variant: 'pulse',
-              title: '',
-              subtitle: lines[currentIndex],
-              teamName: currentTeamName || '',
-              assetKey: 'banner_primary'
-            });
-          }
-          highlightStreamId = window.setInterval(function () {
-            if (currentIndex < lines.length - 1) {
-              currentIndex += 1;
-              if (window.PageLoadOverlay && window.PageLoadOverlay.updatePulseSubtitle) {
-                window.PageLoadOverlay.updatePulseSubtitle(lines[currentIndex]);
-              }
-            }
-          }, TRAINING_DISTANT_HIGHLIGHT_MS);
-
-          const distantUrl = API_CONFIG.buildUrl('/franchise/run-training/distant-cpu');
+          const cpuTrainingUrl = API_CONFIG.buildUrl('/franchise/run-training/cpu-train');
           do {
-            const distantRes = await fetch(distantUrl, {
+            const cpuTrainingRes = await fetch(cpuTrainingUrl, {
               method: 'POST',
               headers: jsonHeaders,
               body: JSON.stringify({ franchise_id: franchiseId })
             });
             try {
-              result = await distantRes.json();
+              result = await cpuTrainingRes.json();
             } catch (_e) {
               result = null;
             }
-            if (!distantRes.ok) {
-              let detail = `HTTP error! status: ${distantRes.status}`;
+            if (!cpuTrainingRes.ok) {
+              let detail = `HTTP error! status: ${cpuTrainingRes.status}`;
               if (result && result.detail) detail = result.detail;
               throw new Error(detail);
             }
             if (result && result.status === 'processing') {
-              const progress = result.progress || {};
-              const done = Number(progress.completed_games || 0);
-              const totalGames = Number(progress.total_games || 0);
-              if (window.PageLoadOverlay && window.PageLoadOverlay.updatePulseSubtitle) {
-                window.PageLoadOverlay.updatePulseSubtitle(
-                  totalGames > 0
-                    ? `Practice Squad games: ${done} of ${totalGames} complete…`
-                    : 'Finishing Practice Squad games…'
-                );
-              }
               const retryAfterMs = Math.max(250, Number(result.retry_after_ms || 1000));
               await new Promise(resolve => window.setTimeout(resolve, retryAfterMs));
             }
@@ -1265,11 +1288,6 @@ submitBtn.addEventListener('click', async function() {
           if (!result || !['success', 'already_completed'].includes(result.status)) {
             throw new Error((result && result.detail) || 'Training did not reach a terminal state.');
           }
-        } finally {
-          if (highlightStreamId !== null) {
-            window.clearInterval(highlightStreamId);
-          }
-        }
       }
     } else {
       console.log('🔍 [TRAINING] Submitting to endpoint:', endpoint);
@@ -1329,6 +1347,7 @@ submitBtn.addEventListener('click', async function() {
     
   } catch (error) {
     console.error('Failed to submit training:', error);
+    trainingNewswireOverlayActive = false;
     if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
       window.PageLoadOverlay.hide();
     }
@@ -1338,24 +1357,16 @@ submitBtn.addEventListener('click', async function() {
   }
 });
 
-async function resumeDistantTraining(franchiseId) {
+async function resumeCpuTraining(franchiseId) {
   if (!franchiseId) return;
   const headers = Object.assign(
     { 'Content-Type': 'application/json' },
     (typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {})
   );
-  if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
-    window.PageLoadOverlay.show({
-      variant: 'pulse',
-      title: '',
-      subtitle: 'Resuming Practice Squad games…',
-      teamName: currentTeamName || '',
-      assetKey: 'banner_primary'
-    });
-  }
+  showTrainingNewswire(franchiseId);
   let result = null;
   do {
-    const response = await fetch(API_CONFIG.buildUrl('/franchise/run-training/distant-cpu'), {
+    const response = await fetch(API_CONFIG.buildUrl('/franchise/run-training/cpu-train'), {
       method: 'POST',
       headers,
       body: JSON.stringify({ franchise_id: franchiseId })
@@ -1369,16 +1380,6 @@ async function resumeDistantTraining(franchiseId) {
       throw new Error((result && result.detail) || `HTTP error! status: ${response.status}`);
     }
     if (result && result.status === 'processing') {
-      const progress = result.progress || {};
-      const done = Number(progress.completed_games || 0);
-      const totalGames = Number(progress.total_games || 0);
-      if (window.PageLoadOverlay && window.PageLoadOverlay.updatePulseSubtitle) {
-        window.PageLoadOverlay.updatePulseSubtitle(
-          totalGames > 0
-            ? `Practice Squad games: ${done} of ${totalGames} complete…`
-            : 'Finishing Practice Squad games…'
-        );
-      }
       const retryAfterMs = Math.max(250, Number(result.retry_after_ms || 1000));
       await new Promise(resolve => window.setTimeout(resolve, retryAfterMs));
     }
@@ -1409,18 +1410,21 @@ async function initializeTrainingPoints() {
         const data = await response.json();
         TOTAL_POINTS = data.training_points;
         currentWeek = Number(data.week || 1);
+        currentSeason = Number(data.season || 1);
         currentTeamName = data.user_team_name || currentTeamName || '';
+        prefetchTrainingNewswire(franchiseId);
         if (Array.isArray(data.custom_focus_roster)) {
           customFocusRoster = data.custom_focus_roster;
         }
         if (Array.isArray(data.player_maximizer_ranking_attrs)) {
           customFocusRankingAttrs = data.player_maximizer_ranking_attrs;
         }
-        if (data.distant_training_resume && data.distant_training_resume.required) {
+        if (data.cpu_training_resume && data.cpu_training_resume.required) {
           try {
-            await resumeDistantTraining(franchiseId);
+            await resumeCpuTraining(franchiseId);
           } catch (resumeError) {
-            console.error('Failed to resume distant training:', resumeError);
+            console.error('Failed to resume CPU training:', resumeError);
+            trainingNewswireOverlayActive = false;
             if (window.PageLoadOverlay && window.PageLoadOverlay.hide) {
               window.PageLoadOverlay.hide();
             }
@@ -1805,10 +1809,11 @@ function updateRequirementsBar() {
   if (!reqBarEl) return;
   const total = TOTAL_POINTS;
   const used = calculateTotalPoints();
-  const pointsComplete = (total - used) === 0;
+  const remaining = total - used;
+  const pointsComplete = remaining === 0;
 
-  if (reqPointsUsedEl) reqPointsUsedEl.textContent = used;
-  if (reqPointsTotalEl) reqPointsTotalEl.textContent = total;
+  if (reqPointsUsedEl) reqPointsUsedEl.textContent = formatPointsDisplay(used);
+  if (reqPointsTotalEl) reqPointsTotalEl.textContent = formatPointsDisplay(total);
   if (reqPointsMeterEl) {
     const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
     reqPointsMeterEl.style.width = pct + '%';

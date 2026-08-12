@@ -106,7 +106,7 @@ function showMissingPointerError({
       <div class="error-content" style="
         max-width: 600px;
         text-align: center;
-        background: #2a2a2a;
+        background: #2b2b2b;
         padding: 40px;
         border-radius: 8px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -125,7 +125,7 @@ function showMissingPointerError({
           font-size: 16px;
           line-height: 1.6;
           margin-bottom: 30px;
-          color: #ccc;
+          color: #cdcdcd;
         ">${message}</p>
         <div style="
           display: flex;
@@ -271,7 +271,7 @@ function showMissingTruthError({
       <div class="error-content" style="
         max-width: 600px;
         text-align: center;
-        background: #2a2a2a;
+        background: #2b2b2b;
         padding: 40px;
         border-radius: 8px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -290,13 +290,13 @@ function showMissingTruthError({
           font-size: 16px;
           line-height: 1.6;
           margin-bottom: 15px;
-          color: #ccc;
+          color: #cdcdcd;
         ">The ${pointerType.replace('_', ' ')} you're looking for doesn't exist in the database.</p>
         <p style="
           font-size: 14px;
           line-height: 1.6;
           margin-bottom: 30px;
-          color: #999;
+          color: #9a9a9a;
           font-style: italic;
         ">${message}</p>
         <div style="
@@ -404,7 +404,7 @@ function showVersionMismatchError({
       <div class="error-content" style="
         max-width: 600px;
         text-align: center;
-        background: #2a2a2a;
+        background: #2b2b2b;
         padding: 40px;
         border-radius: 8px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
@@ -423,13 +423,13 @@ function showVersionMismatchError({
           font-size: 16px;
           line-height: 1.6;
           margin-bottom: 15px;
-          color: #ccc;
+          color: #cdcdcd;
         ">The cached data is out of date and needs to be refreshed.</p>
         <p style="
           font-size: 14px;
           line-height: 1.6;
           margin-bottom: 30px;
-          color: #999;
+          color: #9a9a9a;
           font-style: italic;
         ">${message}</p>
         <div style="

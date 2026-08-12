@@ -92,6 +92,6 @@ The recruiting experience is a single phase-aware hub (`recruiting.html`) with t
 3. **"Dropped you" story-strip signal:** none exists; passive strip shows gains only.
 
 ## Notes for Prompt 1
-- Recruit attributes are stored 0–1000 (÷10 → 0–100 display); the mock's 0–8 `attrCls` thresholds must be re-scaled for real data in the pool.
+- Recruit attributes are stored on a 0–100 scale (specialists can exceed 100); the pool renders them **÷10 as a 1–10 scale**, so a specialist spikes above 10 (e.g. a shooter's SH shows 16). The mock's 0–8 `attrCls` thresholds must be re-scaled to this real 1–10+ range.
 - Real backend leans emit `"open"` only in slot 1 (never multiple open slots); adapter handles the full range regardless.
 - Hub takeover: `recruiting.html` becomes the hub; `recruiting-invites/orders/results.html` deleted/redirected; FCC links already point at `recruiting.html`.

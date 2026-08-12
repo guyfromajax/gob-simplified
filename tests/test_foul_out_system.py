@@ -23,8 +23,8 @@ from BackEnd.models.turn_manager import TurnManager
 class TestFoulOutPossessionFlip:
     """Test possession flipping logic for foul outs."""
     
-    def test_offensive_foul_flips_possession(self):
-        """Test that offensive foul flips possession immediately."""
+    def test_offensive_foul_defers_possession_flip_to_side_inbound(self):
+        """The resolver flags a flip; GameManager applies it before the SIP."""
         game = build_mock_game()
         original_offense = game.offense_team.name
         original_defense = game.defense_team.name
@@ -50,12 +50,13 @@ class TestFoulOutPossessionFlip:
         # Resolve foul
         result = resolve_non_shooting_foul(roles, game)
         
-        # Verify possession flipped
-        assert game.offense_team.name == original_defense, \
-            f"Expected offense to flip to {original_defense}, got {game.offense_team.name}"
-        assert game.defense_team.name == original_offense, \
-            f"Expected defense to flip to {original_offense}, got {game.defense_team.name}"
+        # The resolver must not mutate possession. The SIDE_INBOUND transition
+        # consumes possession_flips and switches teams once, preventing the old
+        # resolver + transition double-flip.
+        assert game.offense_team.name == original_offense
+        assert game.defense_team.name == original_defense
         assert result["possession_flips"] == True
+        assert result["next_play_type"] == "SIDE_INBOUND"
         assert result["fouled_out"] == True
     
     def test_defensive_foul_no_possession_flip(self):
@@ -290,7 +291,9 @@ class TestFoulOutCheck:
             player.record_stat("F")
         
         # Check foul out (should not be fouled out yet)
-        result = check_and_handle_foul_out(player, game.game_state, game.home_team)
+        result = check_and_handle_foul_out(
+            player, game.game_state, game.home_team, perform_removal=False
+        )
         assert result["fouled_out"] == False
         assert result["foul_count"] == 4
         
@@ -298,7 +301,9 @@ class TestFoulOutCheck:
         player.record_stat("F")
         
         # Check foul out (should be fouled out now)
-        result = check_and_handle_foul_out(player, game.game_state, game.home_team)
+        result = check_and_handle_foul_out(
+            player, game.game_state, game.home_team, perform_removal=False
+        )
         assert result["fouled_out"] == True
         assert result["foul_count"] == 5
         # Lineup removal and sub happen in check_and_handle_foul_out; eligibility is F >= 5 elsewhere
@@ -424,7 +429,9 @@ class TestFouledOutEligibility:
             player.record_stat("F")
 
         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
-        check_and_handle_foul_out(player, game.game_state, game.home_team)
+        check_and_handle_foul_out(
+            player, game.game_state, game.home_team, perform_removal=False
+        )
 
         # Eligibility derived from foul count, not a list
         assert player.get_stat("F", "game") >= 5
@@ -439,10 +446,16 @@ class TestFouledOutEligibility:
         game.game_id = "test_game_456"
 
         player = game.home_team.lineup["PG"]
+        # summarize_game_state serializes TeamManager.players (the canonical
+        # roster), not an ad-hoc lineup-only fixture.
+        player.player_id = "home_pg"
+        game.home_team.players = {player.player_id: player}
         for _ in range(5):
             player.record_stat("F")
 
-        check_and_handle_foul_out(player, game.game_state, game.home_team)
+        check_and_handle_foul_out(
+            player, game.game_state, game.home_team, perform_removal=False
+        )
 
         db_summary = summarize_game_state(game, exclude_animations=True)
         # Player stats (with F) are in summary; eligibility derived from F on load

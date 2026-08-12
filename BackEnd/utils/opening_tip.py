@@ -42,7 +42,14 @@ OPENING_TIP_ENTRANCE_POSITIONS = {
 }
 
 def get_height_scale_value(height):
-    """Convert player height to tip-off scale value"""
+    """Convert player height to tip-off scale value (1-10).
+
+    Re-banded +3 in. for the recalibrated height distribution (design §11.2), then −1in and
+    −2in for the two 2026-08 HS height shifts (−3in total). These are ABSOLUTE inch literals
+    anchored to the centre median, NOT offsets from LEAGUE_MEDIAN_HEIGHT_IN — so they do NOT
+    ride a uniform height shift and must be re-banded by hand alongside one. After the −2:
+    centre median 81→79 still lands mid-scale (79 → 8), preserving the tip-off contest.
+    """
     if height > 83:
         return 10
     elif height >= 81:
@@ -285,26 +292,3 @@ def get_slight_movement_toward_ball(start_coords, ball_coords):
             "x": start_coords["x"] + random.randint(-1, 1),
             "y": start_coords["y"] + random.randint(-1, 1)
         }
-
-def player_tip_score(player):
-    """Legacy function - kept for compatibility"""
-    tip_score = 0
-    height_score_dict = {
-        82: 11,
-        81: 10,
-        80: 9,
-        79: 8,
-        78: 7,
-        77: 6,
-        76: 5,
-        75: 4,
-        74: 3,
-        73: 2,
-    }
-
-    if player.height in height_score_dict:
-        tip_score += height_score_dict[player.height] * random.randint(1, 6)
-    else:
-        tip_score += random.randint(1, 5)
-
-    return tip_score

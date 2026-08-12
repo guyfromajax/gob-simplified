@@ -1,6 +1,6 @@
 # BackEnd/models/player.py
 
-from BackEnd.constants import ALL_ATTRS, BOX_SCORE_KEYS, MALLEABLE_ATTRS
+from BackEnd.constants import ALL_ATTRS, BOX_SCORE_KEYS, LEAGUE_MEDIAN_HEIGHT_IN, MALLEABLE_ATTRS
 from BackEnd.constants.momentum import (
     MO_CONSECUTIVE_THRESHOLD,
     MO_CONSECUTIVE_DELTA,
@@ -29,7 +29,7 @@ def clamp_mo(value):
         return 0
 
 
-# Fatigue (NG) decay tiers by ND (Natural Durability), ordered high-ND → low-ND
+# Fatigue (NG) decay tiers by ND (Endurance), ordered high-ND → low-ND
 # (least → most depletion). A player's tier is the first whose threshold his ND
 # meets (last tier = ND < 9). The MO momentum bonus pulls the decay from the
 # highest tier (index 0, ND>89). See Energy_System.md § Depletion Calculation.
@@ -59,7 +59,7 @@ class Player:
         # tests construct lightweight player dictionaries (or patch lineup
         # builders) that omit a dedicated attribute block, so default to a
         # reasonable value when ``height``/``weight`` are missing.
-        self.height = data.get("height", data.get("HT", 75))
+        self.height = data.get("height", data.get("HT", LEAGUE_MEDIAN_HEIGHT_IN))
         self.weight = data.get("weight", data.get("WT", 200))
         self.attributes = self._extract_attributes(data)
         self.jersey = data.get("jersey", 0)
@@ -197,7 +197,7 @@ class Player:
 
     def get_fatigue_decay_amount(self, omit_zeros=False):
         """
-        Calculate fatigue decay amount based on ND (Natural Durability) attribute.
+        Calculate fatigue decay amount based on ND (Endurance) attribute.
         
         Args:
             omit_zeros: If True, removes all zero values from the depletion list before selection.

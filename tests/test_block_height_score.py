@@ -4,24 +4,27 @@ from BackEnd.constants import BLOCK_RECONCILIATION_BLOCK_THRESHOLD
 from BackEnd.utils.shared import height_to_block_score
 
 
+# Rides LEAGUE_MEDIAN_HEIGHT_IN (offsets from the constant, not literals). After the
+# two 2026-08 HS shifts the median is 75: <=75 -> 0, then h-75, >=85 -> 10. Preserves
+# the ~1.68 league-mean block score against the shifted distribution.
 @pytest.mark.parametrize(
     ("height", "expected"),
     [
         (None, 0),
         ("invalid", 0),
-        (70, 0),
-        (72, 0),
-        (73, 1),
-        (74, 2),
-        (75, 3),
-        (76, 4),
-        (77, 5),
-        (78, 6),
-        (79, 7),
-        (80, 8),
-        (81, 9),
-        (82, 10),
-        (86, 10),
+        (74, 0),
+        (75, 0),
+        (76, 1),
+        (77, 2),
+        (78, 3),
+        (79, 4),
+        (80, 5),
+        (81, 6),
+        (82, 7),
+        (83, 8),
+        (84, 9),
+        (85, 10),
+        (89, 10),
     ],
 )
 def test_height_to_block_score_ascends_and_clamps(height, expected):

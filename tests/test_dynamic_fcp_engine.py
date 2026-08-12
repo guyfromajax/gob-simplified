@@ -116,7 +116,12 @@ def test_fcp_bh_from_final_ball_handler_not_hardcoded_pg():
     game.turns[0]["final_ball_handler_id"] = "off_sg"
 
     dyn = compute_dynamic_fcp_turn(game, StraightPressureFCP())
-    assert dyn.get("bh_pos") == "SG"
+    # ``bh_pos`` on the completed dynamic result is the terminal carrier and
+    # may legitimately change after a pass. The first pressure segment is the
+    # authoritative FCP-entry seam and must use the prior turn's stamped owner.
+    first_segment = dyn["loop_segments"][0]
+    assert first_segment["ball_owner_pos"] == "SG"
+    assert first_segment["gate"] == ["off", "SG"]
 
 
 def test_sf_at_inbound_spot_excluded_from_pass_pool():

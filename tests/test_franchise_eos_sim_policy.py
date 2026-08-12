@@ -6,6 +6,7 @@ from BackEnd.api.franchise_routes import (
     RegionByeModalSeenRequest,
     SimRestOfTournamentRequest,
     _get_user_eos_phase_status,
+    _mark_completed_full_game_summary_final,
     _save_user_eos_bracket_result,
     _should_show_region_bye_modal,
     _should_use_tbt_for_eos_game,
@@ -15,7 +16,7 @@ from BackEnd.api.franchise_routes import (
 from BackEnd.tournament import franchise_tournament as ft
 
 
-def test_conference_weeks_only_user_conference_uses_tbt():
+def test_all_eos_matchups_use_tbt_regardless_of_user_scope():
     user_scope = {
         "active": True,
         "conference": 3,
@@ -24,47 +25,15 @@ def test_conference_weeks_only_user_conference_uses_tbt():
     }
 
     assert _should_use_tbt_for_eos_game(27, {"phase": "conference", "conference": 3}, user_scope) is True
-    assert _should_use_tbt_for_eos_game(28, {"phase": "conference", "conference": 4}, user_scope) is False
-
-
-def test_week_29_uses_user_region_pair_for_tbt():
-    user_scope = {
-        "active": True,
-        "conference": 3,
-        "region": "B",
-        "region_conferences": (3, 4),
-    }
-
-    assert _should_use_tbt_for_eos_game(29, {"phase": "conference", "conference": 3}, user_scope) is True
-    assert _should_use_tbt_for_eos_game(29, {"phase": "conference", "conference": 4}, user_scope) is True
-    assert _should_use_tbt_for_eos_game(29, {"phase": "conference", "conference": 5}, user_scope) is False
-
-
-def test_region_weeks_only_user_region_uses_tbt():
-    user_scope = {
-        "active": True,
-        "conference": 3,
-        "region": "B",
-        "region_conferences": (3, 4),
-    }
-
+    assert _should_use_tbt_for_eos_game(28, {"phase": "conference", "conference": 4}, user_scope) is True
+    assert _should_use_tbt_for_eos_game(29, {"phase": "conference", "conference": 5}, user_scope) is True
     assert _should_use_tbt_for_eos_game(30, {"phase": "region", "region": "B"}, user_scope) is True
-    assert _should_use_tbt_for_eos_game(31, {"phase": "region", "region": "C"}, user_scope) is False
-
-
-def test_national_weeks_use_tbt_when_user_is_active():
-    user_scope = {
-        "active": True,
-        "conference": 3,
-        "region": "B",
-        "region_conferences": (3, 4),
-    }
-
+    assert _should_use_tbt_for_eos_game(31, {"phase": "region", "region": "C"}, user_scope) is True
     assert _should_use_tbt_for_eos_game(32, {"phase": "national"}, user_scope) is True
     assert _should_use_tbt_for_eos_game(34, {"phase": "national"}, user_scope) is True
 
 
-def test_all_eos_games_use_csg_when_user_is_not_active():
+def test_all_eos_matchups_use_tbt_when_user_is_not_active():
     user_scope = {
         "active": False,
         "conference": 3,
@@ -72,9 +41,17 @@ def test_all_eos_games_use_csg_when_user_is_not_active():
         "region_conferences": (3, 4),
     }
 
-    assert _should_use_tbt_for_eos_game(28, {"phase": "conference", "conference": 3}, user_scope) is False
-    assert _should_use_tbt_for_eos_game(30, {"phase": "region", "region": "B"}, user_scope) is False
-    assert _should_use_tbt_for_eos_game(33, {"phase": "national"}, user_scope) is False
+    assert _should_use_tbt_for_eos_game(28, {"phase": "conference", "conference": 3}, user_scope) is True
+    assert _should_use_tbt_for_eos_game(30, {"phase": "region", "region": "B"}, user_scope) is True
+    assert _should_use_tbt_for_eos_game(33, {"phase": "national"}, user_scope) is True
+
+
+def test_completed_full_game_summary_is_final_without_rewriting_played_quarter():
+    regulation = _mark_completed_full_game_summary_final({"quarter": 4, "is_final": False})
+    overtime = _mark_completed_full_game_summary_final({"quarter": 5, "is_final": False})
+
+    assert regulation == {"quarter": 4, "is_final": True}
+    assert overtime == {"quarter": 5, "is_final": True}
 
 
 def test_user_eos_bracket_result_persists_without_game_id():

@@ -2,7 +2,8 @@
 
 > **Canonical scale module:** `BackEnd/constants/shot_threshold_scale.py`  
 > **Frontend mirror:** `FrontEnd/static/js/shared/teamShotThresholdScale.js`  
-> **Current values:** MIN **0**, MAX **200**, MID **100** (span always 200; MID = MIN + 100)
+> **Current values:** MIN **−30**, MAX **170**, MID **70** (span always 200; MID = MIN + 100)  
+> _Changed 2026-08-11 from 0/200/100, then to −30/170/70 on 2026-08-12. Lower raw = easier makes, so shifting the window down raises league FG%._
 
 ## What this attribute is
 
@@ -23,7 +24,56 @@ made = shot_score >= shot_threshold
    ```bash
    pytest tests/test_shot_threshold_scale.py tests/test_mode_init_system.py -q
    ```
-4. Sim / playtest FG%. Adjust **`MIN`** again if needed.
+4. **RE-CUT THE EOG `shot_threshold` BANDS.** ← mandatory, see below
+5. Sim / playtest FG%. Adjust **`MIN`** again if needed (and re-cut the bands again if you do).
+
+### 4. Re-cutting the EOG bands — REQUIRED on every scale move
+
+**Moving the window silently breaks the EOG `shot_threshold` bands.** This is not a
+nice-to-have step; skipping it has already shipped a broken config once.
+
+**Why.** `shot_threshold` is compared ABSOLUTELY in `made = shot_score >= shot_threshold`, so
+the FG%-vs-threshold response is scale-independent — but the **operating point is not**. Move
+the window down 30 and every team sits 30 points lower, shoots better, and the neutral band
+that used to sit *below* the equilibrium FG% is now *above* it. Every team-game takes the
+"shooting well" negative delta and compounds downward.
+
+**Measured instance (2026-08-12):** bands cut at `24/36` for init 95-105 on the old 0-200
+scale, then carried through two window moves to `-30..170` / init 65-75 unchanged. Equilibrium
+FG% rose 37.1% → 41.4%, above the 36 high cut. Result: **-28 drift per season instead of ~0.**
+Re-cut to `26/40` → drift **-0.1**.
+
+**Procedure:**
+
+1. Compute the equilibrium FG% at the new init:
+   `FG% = 51.25 - 0.14126 x init_midpoint` — **re-derive this fit if the engine or rosters have
+   changed**, it is season-specific (see the corollary below).
+2. Position the neutral band so its HIGH cut sits **just below** that equilibrium — roughly
+   `equilibrium - 1.5pp` — so the negative branch carries enough mass to offset training's
+   steady upward push (+56.4/season measured on the CPU reference plan).
+3. Simulate before shipping. 26 weeks x 128 teams from the new init, using the **actual integer
+   band ranges** (not continuous draws). Target: |drift| < ~2, sd 18-25, **zero rails**.
+4. Update the CURRENT CALIBRATION block in `BackEnd/constants/eog_attr_bands.py` with the new
+   numbers, and the band rows in `06_Gameplay_Systems/End_Of_Game_System.md`.
+
+**Reference points for step 2:**
+
+| init midpoint | equilibrium FG% | working band | verified drift |
+|---|---|---|---|
+| 100 (scale 0-200) | 37.1% | 24 / 36 | +5.6 |
+| 70 (scale -30-170) | 41.4% | **26 / 40** | **-0.1** |
+
+**THE COROLLARY — what a future tuner gets wrong first:**
+
+* **GAIN sets SPEED. BAND POSITION sets WHERE TEAMS SETTLE.**
+* The neutral band must sit **BELOW** the equilibrium FG%. Centring it *on* the equilibrium
+  makes training dominate and every team drifts up.
+* The equilibrium is **SEASON-SPECIFIC**: per-season slopes measured -0.1125 / -0.0691 /
+  -0.1413 with non-overlapping 95% CIs, and the LEVEL shifts 6.42pp between code states.
+  **Re-derive before re-cutting and never reuse a previous season's fit.**
+* `shot_threshold` is tuned to a **VARIANCE** target, not a mean one — near-neutral centre,
+  spread that grows, few teams railing. The compounding loop is INTENDED; only its magnitude
+  was ever the defect.
 
 **Note:** Existing saved teams keep their stored values until re-seeded or migrated. Moving the window does not retroactively change Mongo team docs.
 
@@ -35,11 +85,14 @@ made = shot_score >= shot_threshold
 
 **What the agent should do:**
 
+0. Read the "Re-cutting the EOG bands" section above — it is a REQUIRED step, not optional.
 1. Edit **`MIN`** in `BackEnd/constants/shot_threshold_scale.py` (only `MIN` — `MAX`, `MID`, balancing, franchise init, tutorial, tournament seeds re-derive).
 2. Mirror the same **`MIN`** in `FrontEnd/static/js/shared/teamShotThresholdScale.js`.
 3. Run `pytest tests/test_shot_threshold_scale.py tests/test_mode_init_system.py -q`.
 4. Update the **current scale** line at the top of this doc and the reference table in `Team_Attribute_System.md` (Shooting section) if values changed.
-5. Report back: new MIN/MAX/MID, franchise init range, and whether existing Mongo teams need a **+N migration** (see below).
+5. Re-cut the EOG `shot_threshold` bands per the procedure above and report the simulated drift.
+6. Report back: new MIN/MAX/MID, franchise init range, new EOG band cuts + simulated drift, and
+   whether existing Mongo teams need a **+N migration** (see below).
 
 **What you do after:**
 
@@ -49,30 +102,30 @@ made = shot_score >= shot_threshold
 
 **Span rule:** delta between lower and upper is always **200**; MID is always **MIN + 100** (= MAX − 100).
 
-## Wired consumers (current scale: 0–200, MID 100)
+## Wired consumers (current scale: −30–170, MID 70)
 
 When **`MIN`** changes, these values re-derive from `BackEnd/constants/shot_threshold_scale.py` (except items in the manual checklist below).
 
 | Area | Current value | Code / notes |
 |------|---------------|--------------|
-| **Team attribute clamp** (`TEAM_ATTR_RANGES`) | **0 – 200** | Init, training, EOG clamp |
-| **Franchise init** | **80 – 90** | `FRANCHISE_INIT_LO` / `FRANCHISE_INIT_HI` — 10–20 below MID |
-| **Single-game init** | **0 – 200** | Full clamp range, uniform random |
+| **Team attribute clamp** (`TEAM_ATTR_RANGES`) | **−30 – 170** | Init, training, EOG clamp |
+| **Franchise init** | **65 – 75** | `FRANCHISE_INIT_LO` / `FRANCHISE_INIT_HI` — **MID ± 5** since the 2026-08-11 leveling pass (was MID−20/MID−10) |
+| **Single-game init** | **−30 – 170** | Full clamp range, uniform random |
 | **Tournament seeds** | See table below | `TOURNAMENT_SEED_ST_RANGES` |
-| **Score balancing** | Trailing **−20**, leading **180** | `MIN − 20` / `MAX − 20` |
-| **Rim-runner corner FB** | **180 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
-| **Uncontested-3 make bar** | **200 − CH + round(dist × 2.0)** | `SHOT_THRESHOLD_MAX` in `shot_manager.resolve_shot` — always tracks MAX |
-| **FTE tutorial** | User **0**, computer **100** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
-| **UI pills** | Center **100**, span **0–200** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
+| **Score balancing** | Trailing **−50**, leading **150** | `MIN − 20` / `MAX − 20` |
+| **Rim-runner corner FB** | **150 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
+| **Uncontested-3 make bar** | **170 − CH + round(dist × 2.0)** | `SHOT_THRESHOLD_MAX` in `shot_manager.resolve_shot` — always tracks MAX |
+| **FTE tutorial** | User **−30**, computer **70** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
+| **UI pills** | Center **70**, span **−30–170** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
 
 **Tournament seed shot_threshold ranges:**
 
 | Seed | Range | Notes |
 |------|-------|-------|
-| 1 | 0 – 100 | Best shooters |
-| 2 – 4 | 0 – 150 | |
-| 5 – 7 | 50 – 200 | |
-| 8 | 100 – 200 | Worst shooters |
+| 1 | −30 – 70 | Best shooters |
+| 2 – 4 | −30 – 120 | |
+| 5 – 7 | 20 – 170 | |
+| 8 | 70 – 170 | Worst shooters |
 
 ## Frontend files (import shared scale — do not hardcode MID)
 
@@ -101,6 +154,19 @@ When retuning feel beyond moving the storage window, grep and revisit:
 | SFX tiers **101 / 210** on `shot_score_pre_defense` | **Not** team attribute scale — `gameSfx.js`, `ShotAnimationSystem.js` |
 | HCT/FCP read thresholds (110, 175, 200) | Motion reads — unrelated |
 | `SOFT_SHOOTING_FOUL_THRESHOLD = 110` | Foul math — unrelated |
+
+## ⚠️ Moving the scale INVALIDATES the EOG shot_threshold band calibration
+
+`eog_attr_bands.FG_PCT_MID/HIGH` and the `ST_FG_*` deltas are cut against a MEASURED
+FG%-vs-shot_threshold response, and that response is season- and scale-specific. Lowering the
+window raises league FG%, which pushes more team-games into the reward band and drives
+`shot_threshold` further down — the loop compounds.
+
+The band block in `BackEnd/constants/eog_attr_bands.py` is marked ⚠️ INTERIM for exactly this
+reason. **After a scale move, re-derive the slope from a season run under the new scale and
+re-cut** (`scripts/eog_band_tuner.py`); do not reuse the previous fit. The relevant history:
+per-season slopes measured −0.1125 / −0.0691 / −0.1413 with non-overlapping CIs, and the LEVEL
+shifted 6.42pp between code states.
 
 ## Docs to update when scale changes
 

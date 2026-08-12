@@ -3,6 +3,12 @@ import sys
 
 import pytest
 
+# Tests select in-memory Mongo explicitly. This must happen before pytest_configure
+# imports BackEnd.db; missing/failed real Mongo configuration no longer falls back.
+os.environ.setdefault("GOB_DB_MODE", "mongomock")
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("MONGO_DB_NAME", "gob-test")
+
 # Ensure the project root is on sys.path so 'import BackEnd' succeeds
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -22,8 +28,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 # session with a non-zero exit code if ``db.name`` is on the block-list.
 # Tests literally cannot run against ``gob`` or ``gob-staging``.
 #
-# To run tests locally, point .env.local at a throwaway DB whose name is NOT
-# in _BLOCKED_DB_NAMES (e.g. a fresh Atlas M0 cluster named ``gob-test``).
+# To run tests locally, use explicit GOB_DB_MODE=mongomock (the default established
+# above) or a separately configured throwaway DB whose name is not blocked.
 # ---------------------------------------------------------------------------
 _BLOCKED_DB_NAMES = frozenset({"gob", "gob-staging"})
 
@@ -97,5 +103,4 @@ def simulated_game():
     gm = GameManager("Lancaster", "Bentley-Truman")
     gm.simulate_macro_turn()
     return gm
-
 

@@ -240,15 +240,14 @@ per-service with no code deploy. Both paths call the same core function and prod
 - [ ] Capture the **authoritative Railway scaling number** (the real 32-vCPU, colocated-Atlas
       figure that local measurement can't give).
 - [ ] Enable in **production** at a conservative worker count.
-- [ ] Progressively **raise the full-sim computer-game count from ~8 toward 63** — today most games
-      use the lightweight "distant" statistical model; the pool's headroom is what makes full
-      turn-by-turn sim affordable for more of the slate.
+- [x] Full turn-by-turn simulation is authoritative for the complete CPU slate. The retired
+      lightweight model and its semantic routing flag have been removed.
 
 ---
 
 ## CPU-week EOG persistence — the post-rollout bottleneck (2026-07-22)
 
-Completing the rollout above (full turn-by-turn for all 63 games, `full_tbt=63 distant=0`) exposed a
+Completing the rollout above (full turn-by-turn for all 63 games) exposed a
 cost the three phases never touched: **per-game end-of-game persistence, not the sim.**
 
 Measured on Railway (colocated Atlas), a 63-game week:
@@ -403,6 +402,37 @@ surface; every feature that touches the engine must respect these.*
    draws needs the **poison-stash test** (not exact-diff) and a re-cut reference. Balance retunes
    that intentionally move stats get distributional verification + a new anchor. (See *Standing
    rules* and *Verification toolkit* above.)
+
+### Regression case study — missing reference data as a 60x slowdown (2026-08-12)
+
+**Symptom:** a CPU game took **138 s** against the 2.19 s/game single-core figure. One profile
+attributed it immediately:
+
+| phase | self_s | % total | calls (3 games) |
+|---|---|---|---|
+| `db.read.defenses._refresh` | **374.51** | **94.4%** | **13,991** |
+
+~4,664 full-collection reads per game, from a collection that has **six documents**.
+
+**Root cause was two faults stacked.**
+
+1. **Data:** `gob-staging.defenses` was empty. `BackEnd/tests/` had **no `conftest.py`**, so the
+   block-list guard in `tests/conftest.py` did not apply there — and three files in that tree
+   open with unguarded `delete_many({})`. An IDE "run test" click on one of them wipes the
+   collection. It happened **four times in about a month**.
+2. **Code:** `defense_identity._ensure_cache` tested `not _by_defense_id`, so an **empty catalog
+   was indistinguishable from an unloaded one**. Every lookup re-read the whole collection,
+   forever, from a per-turn call site in `turn_manager.py`.
+
+**The transferable lesson — a cache keyed on "is it empty?" has no failure mode between working
+and catastrophic.** Correct output, 60x slower, no error, no log line, nothing in the sim output
+to suggest anything was wrong. Track loaded-ness as its own flag and log ONCE when a catalog
+loads empty. Rule #4 says never do a DB read in the sim loop; nothing in the diff violated that
+deliberately — *missing data created the violation at runtime*.
+
+**Also:** a safety guard that covers some test directories reads as protection everywhere. The
+guard's docstring claimed "tests literally cannot run against gob or gob-staging" while an
+entire test tree was exempt. If you add a test root, give it a guard.
 
 **Fix strategy when a regression is found:** separate *intentional gameplay* additions (which
 legitimately change basketball and may cost some compute — verify distributionally, budget them)

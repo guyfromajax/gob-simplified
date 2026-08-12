@@ -17,7 +17,7 @@ These team traits apply to Franchise mode only.
 - `sos_avg` persists in FTD during the regular season, defaults to `64`, and freezes during tournament play.
 - `total_player_attrs` is calculated at season creation / season rollover and then remains frozen for the rest of that season.
 - Weekly rank/prestige updates run inside `complete_week()` after all user and computer games for that week have completed.
-- **CPU sim depth:** Most non-user-conference games in `complete_week` use **distant** (lightweight) sim; the **user’s next regular-season opponent’s** game that week is forced to **full step-by-step** sim instead. See [Distant_Game_Sim_System.md](./Distant_Game_Sim_System.md) (subsection *Exception — next opponent*).
+- **CPU sim depth:** Every CPU game uses the full turn-by-turn engine. There is no lightweight game-routing alternative.
 
 # Prestige & National Rankings System
 

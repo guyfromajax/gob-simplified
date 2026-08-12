@@ -1,13 +1,27 @@
 # simulate-quarter API + observability cleanup
 
-Backlog of high-leverage cleanups surfaced while wiring the Coaching Archetype System
-(the per-quarter stash hook lives in `simulate_quarter_endpoint`). Captured to
-revisit later — **not** yet actioned. Do this work behind existing tests, and
-verify before deleting (see caveat).
+**Status: ACTIVE BACKLOG — re-audited 2026-08-08. Do not delete.**
 
-## 1. `simulate_quarter_endpoint` bloat (BackEnd/api/api.py ~2206–4085)
+High-leverage cleanups surfaced while wiring the Coaching Archetype System (the
+per-quarter stash hook lives in `simulate_quarter_endpoint`). None of the five
+workstreams below is complete. Some individual logs and exception paths have
+improved since this brief was written, but the structural and observability debt
+remains. Do this work incrementally behind existing tests and verify each removal
+before deleting it (see caveat).
 
-~1,800-line god-function grown by accretion. Signals of dead/stale weight:
+### Re-audit snapshot (2026-08-08)
+
+| Item | Current finding |
+|---|---|
+| Endpoint decomposition | **Open.** `simulate_quarter_endpoint` spans roughly `api.py:3049–5184` (about 2,100 lines). |
+| Exception handling | **Open.** Several broad catch-and-continue paths remain; the Q1/no-id team saves and final Mongo save still print generic failures. |
+| Version visibility | **Open.** No `GET /api/version` route exists. A private git-SHA helper exists for EOG measurement provenance, but it is not deploy-wide API visibility. |
+| Logging cleanup | **Open.** Proper INFO/DEBUG/ERROR calls now coexist with numerous routine `WARNING` diagnostics and commented-out debug statements. |
+| Archetype write-clobber root cause | **Open and load-bearing.** The call-site `archetype_periods` write, `archetype_hook` breadcrumb, and finalize fallback all remain active. |
+
+## 1. `simulate_quarter_endpoint` bloat (`BackEnd/api/api.py`)
+
+Roughly 2,100-line god-function grown by accretion. Signals of dead/stale weight:
 
 | Signal | Example |
 |---|---|
@@ -74,9 +88,14 @@ effect: classified archetypes were computed correctly but never reached
 call site, plus a `finalize` fallback that reads results from the durable
 `archetype_hook` breadcrumb. Both ship today.
 
-**To investigate:** what in the franchise game-doc save path (full_sim loop
-re-save at api.py ~3966, `save-result` / `complete-week` / Phase A/B, cache
-refresh, or game-doc delete/recreate) selectively drops fields written mid-handler
+This is also a load-bearing persistence contract in
+[`Coaching_Archetype_System.md`](../02_User_Account_Systems/Coaching_Archetype_System.md#tracking-rules).
+Do not remove either fallback merely as cleanup; first identify and test the
+later write that clobbers the helper-owned field.
+
+**To investigate:** what in the franchise game-doc save path (the endpoint's
+final summary save, `save-result` / `complete-week` / Phase A/B, cache refresh,
+or game-doc delete/recreate) selectively drops fields written mid-handler
 but keeps fields written at end-of-handler. Likely a read-modify-write that
 snapshots the doc before the stash's write and later writes a stale version back.
 If found, we can drop the b6 workaround (call-site write + breadcrumb fallback)

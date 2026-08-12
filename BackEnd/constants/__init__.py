@@ -15,6 +15,12 @@ ALL_ATTRS = [
     "ND", "IQ", "CH", "EM", "MO"  # static or macro-adjusted
     ]
 
+# League median height (inches) under the recalibrated height distribution
+# (design §11.2, league aggregate ~mean 78, sd 3.6). Single home for the
+# missing-height fallback so this default is not re-scattered as literals across
+# shot_manager / player / quick_foul / team_builder_roster. Was 72-76 pre-recal.
+LEAGUE_MEDIAN_HEIGHT_IN = 75  # 2026-08 uniform HS shifts: 78 → 77 (−1) → 75 (−2); moves WITH HEIGHT_FITNESS ideals
+
 BOX_SCORE_KEYS = [
     "FGA", "FGM", "3PTA", "3PTM", "FTA", "FTM",
     "OREB", "DREB", "REB", "AST", "STL", "BLK", "TO", "F", "MIN", "PTS", "PIP", "FB_PTS", "POT",
@@ -319,7 +325,8 @@ FINAL_TURN_HANDOFF_CONVERGE_GRID = 6.0
 # (`_compute_bh_target` / fb_drive). `compute_fb_shot_geometry` remains for
 # broken-HCT FB (`dynamic_hct_shot.py`) and the after-steal legacy path.
 
-# FB Drive Cutoff & Stop Decision — per-play rollout (see FB_Drive_Cutoff_Work_Plan.md)
+# FB Drive Cutoff & Stop Decision — default-on reversible switches
+# (see Fast_Break_System.md, "FB Drive Cutoff & Stop Decision")
 USE_FB_DRIVE_RESOLUTION_AFTER_STEAL = True
 # After-Steal pass-ahead in transition (Fast_Break_System.md §After-Steal
 # Coordinated Transition). When the BH has a clear lane and an open teammate is
@@ -378,6 +385,10 @@ OREB_PUTBACK_MIN_TIME_ELAPSED = 2
 # defense were scored equally). Lower = fewer offensive rebounds. Tune against the
 # week-aggregate OREB% (D1 target ~30%); 1.0 = no discount (legacy behavior).
 OREB_REBOUND_SCORE_DISCOUNT = 0.8
+
+# Team identity contribution to each eligible player's rebound score:
+# team_chemistry × rebound_modifier × this factor.
+REBOUND_TEAM_CHEMISTRY_FACTOR = 0.5
 
 # Post-shot variant animation timings (SFX_System.md §Ball Resolve
 # Animations). Expressed in game-seconds at the default 350 ms/game-sec
@@ -633,5 +644,9 @@ from BackEnd.constants.shot_threshold_scale import team_attr_range as _shot_thre
 
 TEAM_ATTR_RANGES = {
     "shot_threshold": _shot_threshold_team_attr_range(),
-    "rebound_modifier": (0.0, 0.4),
+    # 0.0-0.4 → 0.0-1.0 (EOG Structural Pass, Task 2): widened so the 5-band EOG
+    # ladder and training have headroom. Live consumption is select_rebounder_by_score
+    # (shared.py, already rescaled by owner). The dead ReboundManager (0-0.4-calibrated,
+    # never called) was deleted in this pass.
+    "rebound_modifier": (0.0, 1.0),
 }

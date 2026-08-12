@@ -30,8 +30,13 @@ def test_scale_invariants():
     assert MID == MIN + HALF_SPAN == MAX - HALF_SPAN
     assert BALANCING_TRAILING == MIN - 20
     assert BALANCING_LEADING == MAX - 20
-    assert FRANCHISE_INIT_LO == MID - 20
-    assert FRANCHISE_INIT_HI == MID - 10
+    # Franchise init is MID-CENTRED as of the 2026-08-11 leveling pass, replacing the old
+    # MID-20 / MID-10 "slightly better than league average" head start. Init is coupled to
+    # the EOG band position — teams settle where the bands put them, so seeding below the
+    # attractor made every team erode all season. See eog_attr_bands.FG_PCT_* and
+    # 00_Operations/Shot_Threshold_Scale_Tuning.md.
+    assert FRANCHISE_INIT_LO == MID - 5
+    assert FRANCHISE_INIT_HI == MID + 5
 
 
 def test_team_attr_range_wired_to_constants():

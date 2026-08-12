@@ -1,9 +1,8 @@
 """FCP SF inbound release target + pass-clear gating."""
 
-import random
+import BackEnd.engine.fcp_inbound_release as inbound_release
 
 from BackEnd.engine.fcp_inbound_release import (
-    ALL_SF_TIERS,
     FCP_SF_RELEASE_X_HOME,
     FCP_SF_TIER_Y,
     compute_sf_inbound_release_target,
@@ -39,32 +38,43 @@ def test_pick_open_tier_random_when_two_open(monkeypatch):
         "SG": {"x": 28, "y": 32},  # upper
         "SF": {"x": 3, "y": 25},
     }
-    monkeypatch.setattr(random, "choice", lambda xs: xs[0])
+    captured = {}
+
+    def choose_first(options):
+        captured["options"] = list(options)
+        return options[0]
+
+    monkeypatch.setattr(inbound_release.random, "choice", choose_first)
     tier = pick_open_sf_tier(off, "PG")
-    assert tier in ALL_SF_TIERS
-    assert tier not in {"center", "upper"}
+    # PG is the ball handler and therefore does not occupy a release tier;
+    # SG occupies upper, leaving center and lower open.
+    assert set(captured["options"]) == {"center", "lower"}
+    assert tier == captured["options"][0]
 
 
-def test_release_target_x34_home():
+def test_release_target_x34_home(monkeypatch):
     off = {
         "PG": {"x": 15, "y": 22},
         "SG": {"x": 28, "y": 32},
         "SF": {"x": 3, "y": 25},
     }
+    monkeypatch.setattr(inbound_release.random, "choice", lambda options: "lower")
     dest = compute_sf_inbound_release_target(off, "PG", is_away_offense=False)
     assert dest["x"] == FCP_SF_RELEASE_X_HOME
     assert dest["y"] == FCP_SF_TIER_Y["lower"]
 
 
-def test_release_target_flipped_away():
+def test_release_target_flipped_away(monkeypatch):
     off = {
         "PG": {"x": 85, "y": 22},
         "SG": {"x": 72, "y": 32},
         "SF": {"x": 97, "y": 25},
     }
+    monkeypatch.setattr(inbound_release.random, "choice", lambda options: "lower")
     dest = compute_sf_inbound_release_target(off, "PG", is_away_offense=True)
     assert dest["x"] == 100 - FCP_SF_RELEASE_X_HOME
-    assert dest["y"] == 100 - FCP_SF_TIER_Y["lower"]
+    # Away orientation mirrors x around half court; vertical tiers do not flip.
+    assert dest["y"] == FCP_SF_TIER_Y["lower"]
 
 
 def test_pass_clear_threshold_home():

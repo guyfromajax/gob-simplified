@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 """Dump FCP and HCT skeleton steps from MongoDB for debugging inbound/step order."""
 import json
+import argparse
 import sys
-import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from pathlib import Path
 
-from BackEnd.db import fcp_skeletons_collection, hct_skeletons_collection
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 def summarize_step(step, i):
     pos_actions = step.get("pos_actions") or {}
@@ -36,5 +38,12 @@ def dump_collection(name, coll):
         break
 
 if __name__ == "__main__":
-    dump_collection("FCP", fcp_skeletons_collection)
-    dump_collection("HCT", hct_skeletons_collection)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    try:
+        dump_collection("FCP", connection.database.fcp_skeletons)
+        dump_collection("HCT", connection.database.hct_skeletons)
+    finally:
+        connection.close()

@@ -82,10 +82,9 @@ def main():
     except ImportError as e:
         print(f"❌ Could not import BackEnd.db: {e}")
         print("💡 Suggestion: Make sure you're running this from the project root")
-        print("   and that MongoDB connection is configured in .env or .env.local")
+        print("   and that local MongoDB is configured in repo-root .env.local")
     except Exception as e:
         print(f"❌ Error connecting to MongoDB: {e}")
 
 if __name__ == "__main__":
     main()
-

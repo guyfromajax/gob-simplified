@@ -17,16 +17,16 @@ Backward Compatibility:
 
 import sys
 import os
+import argparse
 from pathlib import Path
 
 # Add parent directory to path to import BackEnd modules
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from pymongo import MongoClient
 from bson import ObjectId
-from BackEnd.db import get_database
+from scripts.db_migration_cli import connect_migration_target
 
-def migrate_tournament_documents():
+def migrate_tournament_documents(tournaments_collection, *, apply: bool):
     """Migrate all tournament documents from player_stats to players."""
     db = get_database()
     tournaments_collection = db.tournaments
@@ -104,10 +104,11 @@ def migrate_tournament_documents():
                 "$unset": {"player_stats": ""}  # Remove old key
             }
             
-            result = tournaments_collection.update_one(
-                {"_id": tournament_id},
-                update_doc
-            )
+            if not apply:
+                print(f"[dry-run] Tournament {tournament_id_str}: would migrate {len(players)} players")
+                migrated_count += 1
+                continue
+            result = tournaments_collection.update_one({"_id": tournament_id}, update_doc)
             
             if result.modified_count > 0:
                 print(f"✅ Tournament {tournament_id_str}: Migrated {len(players)} players")
@@ -138,7 +139,11 @@ def migrate_tournament_documents():
         print("\n⚠️  Migration completed with some issues. Review errors above.")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", choices=("gob-staging", "gob"), required=True)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=args.apply)
     print("🔄 Starting Tournament player_stats → players migration...")
     print("="*60)
-    migrate_tournament_documents()
-
+    migrate_tournament_documents(connection.database["tournaments"], apply=args.apply)

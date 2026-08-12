@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Team Builder — Structural Read</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@font-face{font-family:'Bebas Neue Pro';src:url('./fonts/BebasNeuePro-Bold.otf') format('opentype');font-weight:700;font-display:swap}
+@font-face{font-family:'Bebas Neue Pro';src:url('./fonts/BebasNeuePro-Regular.otf') format('opentype');font-weight:500;font-display:swap}
+@font-face{font-family:'Bebas Neue Pro';src:url('./fonts/BebasNeuePro-Book.otf') format('opentype');font-weight:400;font-display:swap}
+doc-page:not(:defined){visibility:hidden}
+*{box-sizing:border-box;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+*{animation-delay:-99s !important;animation-duration:.001s !important;animation-iteration-count:1 !important;animation-fill-mode:both !important;animation-play-state:running !important;transition-duration:0s !important}
+:root{--bg:#0b0d14;--panel:rgba(22,26,36,0.97);--panel2:rgba(16,19,30,0.98);--bdr:rgba(255,255,255,0.10);--bdr2:rgba(255,255,255,0.06);--tx:rgba(255,255,255,0.88);--tx2:rgba(255,255,255,0.56);--tx3:rgba(255,255,255,0.36);--org:#F79420;--grn:#34EC27;--blu:#4A90D9;--red:#ff6d6d;--ylw:#FFD700;--disp:'Bebas Neue Pro','Bebas Neue',sans-serif;--body:'Inter',system-ui,sans-serif}
+html,body{margin:0;background:#0b0d14;color:var(--tx);font-family:var(--body);-webkit-font-smoothing:antialiased}
+doc-page{--doc-hdr-pad:0px !important;--doc-ftr-pad:0px !important;background:#0b0d14}
+a{color:var(--org);text-decoration:none}a:hover{color:#ffb257;text-decoration:underline}
+.run-hd,.run-ft{background:#0b0d14;color:var(--tx3);font-family:var(--body);font-size:9px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center;padding:0 60px}
+.run-hd{height:52px;border-bottom:1px solid var(--bdr2)}
+.run-ft{height:46px;border-top:1px solid var(--bdr2)}
+.run-hd b{font-family:var(--disp);font-weight:700;font-size:14px;letter-spacing:.1em;color:rgba(255,255,255,0.7)}
+.doc{background:#0b0d14 repeating-linear-gradient(132deg,transparent 0 102px,rgba(255,255,255,0.014) 102px 103px,transparent 103px 208px);padding:34px 60px 40px}
+.eyebrow{font-family:var(--body);font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--tx3)}
+h1{font-family:var(--disp);font-weight:700;font-size:64px;line-height:.9;letter-spacing:.01em;margin:14px 0 0;text-wrap:balance}
+h1 em{font-style:normal;color:var(--tx3)}
+.sub{font-size:15px;color:var(--tx2);margin:18px 0 0;line-height:1.6;text-wrap:pretty}
+hr{border:0;border-top:1px solid var(--bdr2);margin:40px 0}
+h2{font-family:var(--disp);font-weight:700;font-size:32px;letter-spacing:.02em;margin:0 0 6px;display:flex;align-items:baseline;gap:14px;break-after:avoid}
+h2 .n{font-size:13px;font-family:var(--body);font-weight:700;letter-spacing:.14em;color:var(--org);position:relative;top:-4px}
+h3{font-family:var(--disp);font-weight:700;font-size:21px;letter-spacing:.03em;margin:28px 0 8px;color:#fff;break-after:avoid}
+p{font-size:15px;line-height:1.66;color:var(--tx2);margin:0 0 14px;text-wrap:pretty;orphans:3;widows:3}
+p strong,li strong{color:var(--tx);font-weight:600}
+.lede{font-size:17.5px;line-height:1.56;color:var(--tx)}
+ul{margin:0 0 16px;padding-left:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+li{font-size:15px;line-height:1.6;color:var(--tx2);padding-left:18px;position:relative;text-wrap:pretty;orphans:3;widows:3;break-inside:avoid}
+li::before{content:"";position:absolute;left:0;top:.66em;width:5px;height:5px;background:var(--tx3)}
+.section{margin-top:48px}
+.callout{background:var(--panel);border:1px solid var(--bdr);border-left:3px solid var(--org);border-radius:0 12px 12px 0;padding:18px 22px;margin:20px 0;break-inside:avoid}
+.callout p:last-child{margin-bottom:0}
+.note{display:flex;gap:14px;align-items:flex-start;background:rgba(255,255,255,0.03);border:1px solid var(--bdr2);border-radius:10px;padding:14px 18px;margin:26px 0 0;break-inside:avoid}
+.note p{font-size:13.5px;margin:0;color:var(--tx2)}
+.note .tag{font-family:var(--disp);font-size:15px;letter-spacing:.06em;color:var(--ylw);flex:none;padding-top:1px}
+table{width:100%;border-collapse:collapse;margin:18px 0 6px}
+th{font-size:10.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);text-align:left;padding:0 14px 9px 0;border-bottom:1px solid var(--bdr)}
+td{font-size:13.5px;line-height:1.5;color:var(--tx2);padding:12px 14px 12px 0;border-bottom:1px solid var(--bdr2);vertical-align:top}
+td:first-child{color:#fff;font-weight:600}
+th:last-child,td:last-child{padding-right:0}
+tr{break-inside:avoid}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;letter-spacing:.02em}
+.flow{background:var(--panel2);border:1px solid var(--bdr);border-radius:14px;padding:22px 24px 24px;margin:20px 0;break-inside:avoid}
+.flow + .flow{margin-top:14px}
+.flow .lbl{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px}
+.flow .lbl b{font-family:var(--disp);font-size:17px;letter-spacing:.05em;font-weight:700;color:#fff}
+.flow .lbl span{font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3)}
+.bars{display:flex;gap:6px;align-items:flex-end}
+.bar{border-radius:5px;padding:11px 11px 10px;border:1px solid var(--bdr);background:rgba(255,255,255,0.05);min-width:0}
+.bar .t{font-family:var(--disp);font-size:14.5px;letter-spacing:.04em;color:#fff}
+.bar .d{font-size:10px;line-height:1.38;color:var(--tx3);margin-top:4px}
+.bar.gate{background:rgba(247,148,32,0.14);border-color:rgba(247,148,32,0.45)}
+.bar.gate .t{color:var(--org)}
+.bar.work{background:rgba(74,144,217,0.13);border-color:rgba(74,144,217,0.40)}
+.bar.work .t{color:#9dc6ef}
+.bar.pay{background:rgba(52,236,39,0.10);border-color:rgba(52,236,39,0.34)}
+.bar.pay .t{color:var(--grn)}
+.flow.old .bar{opacity:.6}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:20px 0}
+.card{background:var(--panel);border:1px solid var(--bdr);border-radius:12px;padding:18px 20px;break-inside:avoid}
+.card h4{font-family:var(--disp);font-size:18.5px;letter-spacing:.04em;margin:0 0 8px;color:#fff;font-weight:700}
+.card p{font-size:13.5px;margin:0;line-height:1.58}
+.card .num{font-family:var(--disp);font-size:12.5px;letter-spacing:.1em;color:var(--org);display:block;margin-bottom:6px}
+.move{display:grid;grid-template-columns:40px 1fr;gap:18px;padding:22px 0;border-bottom:1px solid var(--bdr2);break-inside:avoid}
+.move:last-child{border-bottom:0}
+.move .idx{font-family:var(--disp);font-size:36px;line-height:.8;color:rgba(255,255,255,0.14);font-weight:700}
+.move h3{margin:0 0 8px}
+.move p:last-child{margin-bottom:0}
+.verdict{display:inline-block;font-size:9.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 8px;border-radius:4px;margin-left:9px;position:relative;top:-3px}
+.v-agree{background:rgba(52,236,39,0.14);color:var(--grn);border:1px solid rgba(52,236,39,0.3)}
+.v-push{background:rgba(247,148,32,0.14);color:var(--org);border:1px solid rgba(247,148,32,0.3)}
+.v-no{background:rgba(255,109,109,0.13);color:var(--red);border:1px solid rgba(255,109,109,0.3)}
+.strip{background:var(--panel);border:1px solid var(--bdr);border-radius:12px;padding:0;margin:22px 0;overflow:hidden;box-shadow:0 14px 34px rgba(0,0,0,0.4);break-inside:avoid}
+.strip .row{display:flex;align-items:stretch}
+.strip .cell{padding:13px 18px;border-right:1px solid var(--bdr2);min-width:0;flex:0 1 auto}
+.strip .cell:last-child{border-right:0}
+.strip .k{font-size:9px;font-weight:700;letter-spacing:.13em;text-transform:uppercase;color:var(--tx3);margin-bottom:5px}
+.strip .v{font-family:var(--disp);font-size:18px;line-height:1.1;letter-spacing:.04em;color:#fff}
+.strip .v small{display:block;font-family:var(--body);font-size:10.5px;font-weight:500;line-height:1.35;letter-spacing:0;color:var(--tx2);margin-top:3px}
+.strip .cell.act{flex:1 0 auto;display:flex;align-items:center;justify-content:flex-end;padding:10px 12px;background:rgba(255,255,255,0.02)}
+.btn{font-family:var(--disp);font-size:15px;letter-spacing:.08em;font-weight:700;height:40px;min-width:140px;padding:0 16px;border-radius:10px;border:1px solid rgba(255,255,255,0.28);background:var(--grn);color:#0b0d14;box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);display:inline-flex;align-items:center;justify-content:center;cursor:default}
+.dot{width:7px;height:7px;border-radius:50%;display:inline-block;margin-right:7px;position:relative;top:-2px}
+.d-ok{background:var(--grn)}.d-warn{background:var(--org)}.d-off{background:rgba(255,255,255,0.2)}
+.flag{display:grid;grid-template-columns:30px 1fr;gap:14px;padding:20px 0;border-bottom:1px solid var(--bdr2);break-inside:avoid}
+.flag:last-child{border-bottom:0}
+.flag .sev{font-family:var(--disp);font-size:12px;letter-spacing:.08em;padding:4px 0;color:var(--tx3);font-weight:700}
+.flag h3{margin:0 0 6px;font-size:19px}
+.flag .ref{font-size:10.5px;font-weight:700;letter-spacing:.1em;color:var(--org);text-transform:uppercase;margin-bottom:6px}
+.flag p:last-child{margin-bottom:0}
+.q{color:#fff;font-weight:600}
+.end{margin-top:56px;padding-top:30px;border-top:1px solid var(--bdr)}
+</style>
+</head>
+<body>
+<doc-page margin="0">
+<div slot="header" class="run-hd"><b>GOB · Team Builder</b><span>Structural Read · Round 1</span></div>
+<div slot="footer" class="run-ft"><span>Claude Design</span><span>4 August 2026</span></div>
+<div class="doc">
+<div class="eyebrow">Geeked-Out Basketball · Team Builder · Round 1</div>
+<h1>The shape of<br>the flow <em>—</em> before<br>any screen</h1>
+<p class="sub">A structural read on the five-step wizard, plus §5 questions 1 and 4. No screen design here on purpose: if the structure is wrong, good screens make it worse by making it harder to change.</p>
+
+<div class="note"><div class="tag">NOTE</div><p>The brief mentions screenshots of the six screens as they exist today — they aren't in the project, so this read is built from §1–§4 and from GOB's existing surfaces (Mode Select, Set Lineup, FCC roster grid, styleguide). Nothing below depends on seeing them, but I'd want them before the roster deep-dive.</p></div>
+
+<hr>
+
+<div class="section">
+<h2><span class="n">01</span> The answer, up front</h2>
+<p class="lede">A wizard is right for the first two-thirds and wrong for the last third. But the count isn't the defect — <strong>the defect is that all five steps are drawn the same size.</strong></p>
+<p>Today Slot, Identity, Colors, Roster and Review get the same header, the same subhead, the same Back/Next, the same container. That is the visual grammar of a <em>form</em>: a sequence of equal blanks, each one filled and left behind. It's the reason the middle sags — a step that reads as one-of-five implies it is one-fifth of the work, and the roster is not one-fifth of anything. It's also why the ends are flat: the slot choice and the review are given exactly as much ceremony as picking a jersey style.</p>
+<p>So merging Identity and Colors is right, and it doesn't fix this. Four equal blanks is still a form. What the flow needs is <strong>differentiated weight</strong>: a small number of chapters that each look and behave like the kind of act they are.</p>
+<div class="callout"><p><strong>Proposal in one line:</strong> three chapters of unequal size — <span class="mono">CLAIM → FOUND → FIELD</span> — separated by one hard commitment gate, resolved by a curtain rather than a summary. Linear on the way in, navigable after.</p></div>
+</div>
+
+<div class="section">
+<h2><span class="n">02</span> What's actually in the flow</h2>
+<p>Before proposing a shape, here is what each current step actually <em>is</em> — how long it takes, what it depends on, and what kind of human act it is. This table is the whole argument.</p>
+<table>
+<thead><tr><th style="width:15%">Step</th><th style="width:19%">Depends on</th><th style="width:15%">Real duration</th><th>Kind of act</th></tr></thead>
+<tbody>
+<tr><td>Slot</td><td>—</td><td>1–2 min</td><td>Comparison and judgment. Browsing, looking back and forth, reversible until committed.</td></tr>
+<tr><td>Identity</td><td>Slot (loosely — region and conference inform the name)</td><td>1–3 min</td><td>Authoring. Generative, playful, wants immediate visual return.</td></tr>
+<tr><td>Colors</td><td>Identity</td><td>30–90 s</td><td>Authoring. <strong>The same act as the row above.</strong> Split only because it was built separately.</td></tr>
+<tr><td>Mode</td><td>—</td><td>10 s</td><td>Commitment. Binary, consequential, currently a toggle inside the densest screen.</td></tr>
+<tr><td>Roster</td><td>Slot + Mode</td><td><strong>0 seconds to 20 minutes</strong></td><td>Management. Unbounded, re-entrant, tended rather than completed.</td></tr>
+<tr><td>Review</td><td>Everything</td><td>20 s</td><td>Payoff. Should be the only screen with no work on it.</td></tr>
+</tbody>
+</table>
+<p>Three things fall straight out. <strong>Two of the six are the same act</strong> and should be one screen. <strong>One of them has no upper bound</strong> and therefore cannot be a wizard step — a step means "do this, then advance," and there is no state of the roster at which the user is finished. And <strong>the one binary commitment in the whole product</strong> is currently a control on the busiest screen, sitting among editing preferences, which is where users read it as one.</p>
+</div>
+
+<div class="section">
+<h2><span class="n">03</span> The shape</h2>
+<div class="flow old">
+<div class="lbl"><b>Today</b><span>five equal units + a build screen</span></div>
+<div class="bars">
+<div class="bar" style="flex:1"><div class="t">Slot</div><div class="d">grid + filters</div></div>
+<div class="bar" style="flex:1"><div class="t">Identity</div><div class="d">4 fields</div></div>
+<div class="bar" style="flex:1"><div class="t">Colors</div><div class="d">7 pickers</div></div>
+<div class="bar" style="flex:1"><div class="t">Roster</div><div class="d">180 controls</div></div>
+<div class="bar" style="flex:1"><div class="t">Review</div><div class="d">key: value</div></div>
+</div>
+</div>
+<div class="flow">
+<div class="lbl"><b>Proposed</b><span>three chapters, one gate, one curtain</span></div>
+<div class="bars">
+<div class="bar" style="flex:2.4"><div class="t">Ⅰ · Claim</div><div class="d">Browsing. The league in view.</div></div>
+<div class="bar" style="flex:2.6"><div class="t">Ⅱ · Found</div><div class="d">One studio. Artwork live.</div></div>
+<div class="bar gate" style="flex:1.05"><div class="t">Mode</div><div class="d">Capped / Uncapped</div></div>
+<div class="bar work" style="flex:4.2"><div class="t">Ⅲ · The Floor</div><div class="d">A workspace, not a step. No Next — a readiness state.</div></div>
+<div class="bar pay" style="flex:1.5"><div class="t">Take the Floor</div><div class="d">Curtain + build</div></div>
+</div>
+</div>
+<p>Same number of surfaces as the brief's four-step proposal plus the mode gate. The difference isn't arithmetic — it's that <strong>each chapter has its own spatial identity and its own furniture</strong>, so the user always knows what kind of work they're doing:</p>
+<div class="grid3">
+<div class="card"><span class="num">CHAPTER Ⅰ</span><h4>Claim</h4><p>Full-bleed, edge-to-edge, cold and institutional. The league is the page. Sticky action bar on selection, per §4.3 — agreed, for exactly the reason given. This chapter is about <em>everyone else</em>.</p></div>
+<div class="card"><span class="num">CHAPTER Ⅱ</span><h4>Found</h4><p>Centred, contained, warm with the user's own colours the moment they exist. Controls on one side, artwork on the other, always. This chapter is about <em>you</em>, and it should be the only screen in GOB that looks like this.</p></div>
+<div class="card"><span class="num">CHAPTER Ⅲ</span><h4>The Floor</h4><p>Dense, tool-shaped, closest to the shipped product's Set Lineup and FCC surfaces. Persistent chrome, budgets always on screen. This chapter is about <em>the work</em> — and it should feel like the app they're about to play.</p></div>
+</div>
+<p>The wizard header goes away entirely rather than collapsing (§4.7). It is doing one job — telling you where you are — and the chapters do that job better by looking different from each other. What replaces it is the state strip in §05.</p>
+</div>
+
+<div class="section">
+<h2><span class="n">04</span> Four structural moves</h2>
+
+<div class="move"><div class="idx">1</div><div>
+<h3>Identity + Colours become one studio<span class="verdict v-agree">agree with §4.1</span></h3>
+<p>Agreed, and I'd go further than "merge." These aren't two steps stitched together — they're <strong>one act that was never two</strong>: naming a program and choosing its colours is a single imaginative gesture, and every sports fan performs it that way. The screen's organising principle isn't a form with a preview attached; it's <strong>a preview with controls attached</strong>. The banner and court are the content of the page. The fields are its margin.</p>
+<p>One consequence worth stating: this makes the jersey style and the five court inputs part of the same breath rather than a second chore. Court defaults derived from the palette (§4.4) are essential here — the user should never see a hardwood-default court, because the first frame of that preview is the moment that decides whether this screen is fun.</p>
+</div></div>
+
+<div class="move"><div class="idx">2</div><div>
+<h3>Mode leaves the roster screen and becomes the gate into it<span class="verdict v-push">departs from §4.5</span></h3>
+<p>§3.3 says this is the most consequential decision in the flow and cannot be buried. §4.5 then puts it above the roster editor as a persistent control. Those two things are in tension: a control that lives among 180 other controls is read as a preference, however large it is drawn. Persistence isn't prominence.</p>
+<p>So: <strong>a single, unavoidable screen between Found and The Floor.</strong> Two cards, nothing preselected, no Back button doing the deciding for you. The consequence stated in the plainest available language — <em>eligible for online play</em> / <em>not eligible for online play</em> — as the largest text on each card, above any explanation of budgets. It costs the user ten seconds and it's the only ten seconds in the flow that can't be undone by editing.</p>
+<p>After it's chosen, it appears in the state strip as status — not a toggle — with an explicit <em>Change build mode</em> that warns before it re-imposes budgets. That satisfies "cannot be made reversible-feeling" without making it genuinely irreversible, which would be its own kind of hostility. <span class="q">This depends on a question in §07 that I need answered.</span></p>
+</div></div>
+
+<div class="move"><div class="idx">3</div><div>
+<h3>The roster stops being a step, because you don't start from zero<span class="verdict v-push">the important one</span></h3>
+<p>Here's the fact the current flow hides: <strong>the roster is already a real, legal, playable team before the user touches it.</strong> Fifteen players with names, portraits, attributes and ratings, inherited from the program being replaced, and in capped mode already satisfying all three budgets by definition. The user's job is not to fill in 180 fields. It's to decide which of these fifteen men they want to be different.</p>
+<p>Framing it as a wizard step actively destroys that. A step says "complete this to continue," so 180 controls read as 180 obligations, and the screen becomes data entry by implication before a single pixel is designed. The same screen, framed as a workspace you may leave at any time, becomes <em>management</em>: a coach looking at an inherited roster and deciding where to spend.</p>
+<p>Practically, this means the roster has no <span class="mono">Next</span>. It has a <strong>readiness state</strong> — legal or not legal — and a primary action that is live from the moment the user arrives. The flow is genuinely completable in four decisions and infinitely deepenable. That's the honest description of the product, and it answers most of §5 Q4 on its own.</p>
+</div></div>
+
+<div class="move"><div class="idx">4</div><div>
+<h3>Review isn't a step either — it's a curtain<span class="verdict v-push">departs from §4.6</span></h3>
+<p>Full treatment in a later round, but the structural point matters now: Review currently sits in the wizard as step five, with Back/Next, which frames it as a checkpoint. A checkpoint is something you verify and clear. That's why it reads as a state printout — <strong>the layout is telling the truth about its role in the flow.</strong></p>
+<p>Bigger artwork won't fix a checkpoint. Changing its role will. Review should be the first screen with nothing to do on it and no way back into editing except one deliberate link, because that's what makes it read as an ending rather than a gate. (My actual proposal for what goes on it is in §06 and the next round.)</p>
+</div></div>
+</div>
+
+<div class="section">
+<h2><span class="n">05</span> §5 Q1 — What this should feel like</h2>
+<p class="lede">The governing word is <strong>takeover</strong>, not setup. You are not creating a team out of nothing. You are walking into a program that already exists, in a league that has been running without you, and putting your name on the building.</p>
+<p>That single reframe does more for the emotional arc than any amount of polish, because it supplies the thing the flow currently lacks: <em>stakes that exist before the user does any work</em>. "Create your team" has no stakes — it's a character creator. "Take this program's place" has stakes in the first sentence. It also happens to be literally what the feature does (§2), which means the design is finally describing the product rather than dressing it.</p>
+<p>Three principles fall out. I'd hold all three across every screen:</p>
+<div class="grid3">
+<div class="card"><span class="num">PRINCIPLE 1</span><h4>The league is always in the room</h4><p>Every decision shown against what it displaces or joins. You replaced Northlake — say so, permanently. You joined the Ridgeline Conference — show the seven programs you'll face. The 128 aren't a picker; they're the world, and the reason any of this matters.</p></div>
+<div class="card"><span class="num">PRINCIPLE 2</span><h4>You inherit, then you author</h4><p>Never a blank field where an inherited value could sit. Every control starts at something real and defensible, and every edit is visibly a <em>departure</em> from what was there. This turns 180 inputs into a much smaller number of deliberate changes.</p></div>
+<div class="card"><span class="num">PRINCIPLE 3</span><h4>Show it wearing the uniform</h4><p>Preview everything in real product furniture, not on swatch cards. The banner as it appears on Mode Select. The court as it appears in game. The roster as an FCC grid row. The promise is "this will exist" — so show it existing.</p></div>
+</div>
+<h3>And what it should not feel like</h3>
+<p>No confetti, no celebration animation, no "Congratulations!" This audience's pleasure is <strong>competence and specificity</strong>. The payoff for an OOTP or Football Manager player is the moment a thing they made looks indistinguishable from a thing that shipped — a plausible name in a real standings table, a court that looks broadcast-legal. Fireworks read as a mobile game and undercut the register described in §1. The correct emotional note at the end of this flow is not delight; it's <em>gravity</em>. You have taken someone's place.</p>
+<p>Tone follows: institutional-sporting, not playful-configurator. <em>Founded. Charter. Takes the floor in the Ridgeline Conference.</em> The flow's final action is not <span class="mono">Apply</span> — it's <strong>Found the Program</strong>.</p>
+</div>
+
+<div class="section">
+<h2><span class="n">06</span> §5 Q4 — Progress and commitment</h2>
+<p class="lede">Kill the progress bar. It's measuring the wrong thing and it's structurally incapable of measuring the right one.</p>
+<p>A step counter promises a known amount of work remaining. But the roster's work is unbounded by design — "4 of 5" is a lie in both directions, and the user who spends twenty minutes on their roster gets no acknowledgment while the user who spends none gets the same 80%. Worse, a progress bar frames the flow as <em>a task being completed</em>, which is exactly the framing §2 is trying to escape.</p>
+<h3>Replace it with a state readout</h3>
+<p>A persistent strip — status, not progress. It reports what exists rather than what remains, it becomes the navigation once the first pass is done, and it's the only piece of chrome shared across all three chapters. Roughly:</p>
+<div class="strip">
+<div class="row">
+<div class="cell"><div class="k">Replacing</div><div class="v">Northlake State <small>Ridgeline · OR</small></div></div>
+<div class="cell"><div class="k">Program</div><div class="v">Cascade Valley <small>CVU</small></div></div>
+<div class="cell"><div class="k">Build mode</div><div class="v"><span class="dot d-warn"></span>Capped <small>online eligible</small></div></div>
+<div class="cell"><div class="k">Roster</div><div class="v"><span class="dot d-ok"></span>Legal <small>4 edited · height −3″</small></div></div>
+<div class="cell act"><button class="btn">FOUND THE PROGRAM</button></div>
+</div>
+</div>
+<p>Every cell is a link back to its chapter. Every cell states a fact rather than a completion percentage. The green primary action is live from the moment the roster is reachable — which is to say, almost immediately — and that is the point: <strong>the user can always see that they are allowed to finish.</strong> A flow that's escapable at every moment is a flow people stay in.</p>
+<h3>The four sub-questions, answered</h3>
+<ul>
+<li><strong>How should progress be shown?</strong> As state, above. If you want a sense of forward motion, the chapters supply it — three visually distinct places is a stronger sense of "I've come a long way" than a bar moving from 60% to 80%.</li>
+<li><strong>Should any of it be skippable?</strong> Nothing needs skipping, because nothing is empty. Slot must be chosen (it's the premise). Mode must be chosen (§3.3). Identity gets a <em>Surprise Me</em> that generates a plausible name, mascot, abbreviation and palette in one click, fully editable afterwards — not a skip, a <strong>starting point</strong>, and it's also the single best demo of what the studio screen does. Roster is inherited and already legal. The minimum viable path through the whole flow is four decisions.</li>
+<li><strong>Should the user be able to jump around?</strong> Linear on the way in — each chapter genuinely needs the one before it, and a first-timer benefits from the pacing. Non-linear from the moment they reach The Floor: the state strip becomes navigation, edits preserve, no re-confirmation. The one exception is mode, which is a deliberate speed bump on the way back.</li>
+<li><strong>Every step is a place to abandon.</strong> The strongest countermeasure isn't fewer steps — it's making abandonment cheap and returning easy. An unfinished program should persist and reappear as a card on Program Select: <em>Cascade Valley · unfinished · continue.</em> Someone who leaves at the roster has already named a school and picked its colours; that's the most valuable half-built thing in the product and today it evaporates. <span class="q">Server support needed — flagged in §07.</span></li>
+</ul>
+<h3>Commitment</h3>
+<p>One commitment, at the end, named as an act rather than a system operation. <em>Found the Program</em>. The click should be preceded by the one fact that can't be edited afterwards, stated plainly and near the button — online eligibility — and nothing else. No summary of everything, no checklist, no "are you sure." The gravity comes from the sentence, not from a confirmation dialog.</p>
+</div>
+
+<div class="section">
+<h2><span class="n">07</span> Where I'd push on §3</h2>
+<p>Ordered by how much the answer changes the design. The first one materially affects the roster screen and I'd like it resolved before I design it.</p>
+
+<div class="flag"><div class="sev">01</div><div>
+<div class="ref">§3.1 — pure renderer</div>
+<h3>Does summing server-supplied numbers count as business logic?</h3>
+<p>The height budget and class budget are <strong>totals</strong>, not formulas. Every player's height is a value the client already holds; the inherited team total is a value the server sent. Showing "126 of 129 inches used" while a control moves is addition over known data — no game rule is being evaluated, no formula reimplemented, and if the client and server ever disagree the server's number simply overwrites it.</p>
+<p>If that counts as forbidden computation, then §4.5's "a slider shows the cost as you move it" cannot be built, and budget feedback becomes a round-trip per change — which collides with §3.3's requirement that budget state be visible <em>where the user is editing</em>. I don't think both can be true. <span class="q">I'd like a ruling: running totals over server-supplied values — allowed, or not?</span> My design changes materially either way, and I'd rather change it now than after screens.</p>
+<p>Note that position ratings are a different matter entirely — those are genuine formulas, and I'm fully signed up to them arriving on release, from the server. That constraint I'd design <em>with</em>, not around; see the next flag.</p>
+</div></div>
+
+<div class="flag"><div class="sev">02</div><div>
+<div class="ref">§3.3 — mode determines eligibility</div>
+<h3>Can build mode change after the franchise is founded?</h3>
+<p>Everything about how hard the gate should be depends on this. If mode is baked at creation, the gate should be heavier than I've drawn it and the review screen must say <em>this cannot be changed later</em> in those words. If it can be changed in franchise settings, "cannot be made reversible-feeling after the fact" is softer than §3.3 reads, the gate can be lighter, and the strip's <em>Change build mode</em> is honest rather than a half-truth. <span class="q">Which is it?</span></p>
+</div></div>
+
+<div class="flag"><div class="sev">03</div><div>
+<div class="ref">§3.5 — portrait pool</div>
+<h3>Let the filters sort, not filter</h3>
+<p>§3.5 asks for a graceful answer to a nearly-empty grid. The graceful answer is <strong>to never produce one</strong>: skin tone and build reorder the 450-image pool and dim the non-matches rather than removing them. Best matches first, everything else still there and still selectable, grid never reflows, never empties, no empty state to design.</p>
+<p>This is the same rule §4.2 already established for filtered-out programs — dim, don't remove — used a second time. One rule, two places, and the flow gets more coherent for free. <span class="q">The trade: a user can always choose an off-filter portrait. Given the picker is an override on an already-assigned image, I think that's not just acceptable but correct — but it's your call.</span></p>
+</div></div>
+
+<div class="flag"><div class="sev">04</div><div>
+<div class="ref">Not in §3 — scope</div>
+<h3>Draft persistence for unfinished programs</h3>
+<p>The resumable-draft idea in §06 needs somewhere to store a half-built program between sessions. Not a constraint conflict — a scope question, and possibly a large one. If it isn't feasible for this pass, the abandonment answer degrades to warning-on-exit, which is much weaker. <span class="q">Worth knowing early.</span></p>
+</div></div>
+</div>
+
+<div class="section">
+<h2><span class="n">08</span> Two smaller disagreements with §4</h2>
+<div class="grid2">
+<div class="card"><h4>Height as a slider<span class="verdict v-no">§4.5</span></h4><p>I'd make it a stepper, and the reason is §3.1 rather than taste. Height has nineteen legal values displayed in feet and inches, and a slider is poor at hitting an exact one. More importantly, under a pure-renderer architecture a slider's continuous feedback is largely <em>a lie</em> — position ratings won't move until release. A discrete control where each click is a committed change, with the budget bar directly beneath, matches what the system actually does. The architecture is telling us which control to use.</p></div>
+<div class="card"><h4>Rail + single editor<span class="verdict v-push">§4.5</span></h4><p>Right instinct, wrong shape — a 15-item rail still means editing one man at a time in a viewport where you can't see the team. The management feeling comes from seeing the roster <em>as a roster</em>: who's tall, who can shoot, where the holes are. I'd explore a persistent board of 15 that stays legible while an inspector opens beside it, so you never lose sight of the team while editing a player. That's the next round's problem and where I'd like to spend the most time.</p></div>
+</div>
+<p>Everything else in §4.7 I'd just do: the full-bleed white FAQ strip is the loudest element in a dark UI and it's a footer link — it should be a quiet text link in a footer, or gone. The Back/Next rhythm fixes itself once the wizard chrome is replaced by chapters.</p>
+</div>
+
+<div class="end">
+<h2><span class="n">NEXT</span> If this structure holds</h2>
+<p>Then the roster is the next thing, and it's the one worth the most time: fifteen players, twelve attributes, three budgets and an architecture that won't let anything move until the server says so. I'd want the §07/01 ruling and the missing screenshots before starting it — and my working thesis going in is the one in move 3: <strong>the screen's job is not to collect 180 values, it's to show a coach an inherited team and make the departures feel like decisions.</strong></p>
+<p>If the structure doesn't hold, say where and I'll take it again before any of it becomes pixels.</p>
+</div>
+</div>
+</doc-page>
+<script src="doc-page.js"></script>
+</body>
+</html>

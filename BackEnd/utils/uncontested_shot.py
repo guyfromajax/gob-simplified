@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import math
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 from typing import Any, Optional
 
 # Matches CONTEST_EUCLIDEAN_RADIUS — uncontested helper geo gate.
@@ -55,10 +56,12 @@ def compute_uncontested_inside_attack_make_threshold(
     dist = uncontested_inside_attack_distance(shooter_x, shooter_y, basket_x, basket_y)
     if dist > UNCONTESTED_INSIDE_ATTACK_MAX_DIST:
         return None
+    # THE RULE: core-8 attrs (discipline, fight) feed gameplay through core8_gameplay()
+    # so the ±20 stored range plays as the calibrated ±10 swing (floor 79, not 59).
     threshold = (
         UNCONTESTED_MAKE_THRESHOLD_BASE
-        + _team_attr(off_team, "discipline")
-        - _team_attr(def_team, "fight")
+        + core8_gameplay(_team_attr(off_team, "discipline"))
+        - core8_gameplay(_team_attr(def_team, "fight"))
     )
     if dist >= 12:
         threshold -= 2.0 * (dist - 11.0)

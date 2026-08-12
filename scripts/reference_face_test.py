@@ -54,19 +54,9 @@ MATRIX = [
 ]
 
 
-def load_env(path=".env"):
-    if os.path.exists(path):
-        for line in open(path):
-            line = line.strip()
-            if line and not line.startswith("#") and "=" in line:
-                k, v = line.split("=", 1)
-                os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-
-
 def main():
-    load_env()
     if not os.environ.get("GEMINI_API_KEY"):
-        sys.exit("GEMINI_API_KEY not set (checked env and .env).")
+        sys.exit("GEMINI_API_KEY not set in the invoking process.")
     try:
         from google import genai
         from PIL import Image, ImageDraw, ImageFont

@@ -2,21 +2,16 @@
  * Canonical RT color scale — shared CSS classes for colored RT text.
  * Pair with /js/shared/rtBucket.js:
  *
- *   getRtBucketClass(rt)        — player RT (0–40 / 41–60 / 61–80 / 81+)
- *   getRecruitRtBucketClass(rt) — recruit RT (0–29 / 30–39 / 40–49 / 50+)
+ *   getRtBucketClass(rt) — all player and recruit RT displays
  *
- * Colors (both scales):
- *   red    #ff6d6d  → .rt-low
- *   yellow #FFD700  → .rt-mid
- *   green  #34EC27  → .rt-high
- *   blue   #4A90D9  → .rt-elite
+ * Colors: <40 red, 40–59 yellow, 60–79 green, 80+ blue.
  *
  * !important is deliberate — page-local table td { color: ... } rules must not
  * override the canonical scale on elements bearing these classes.
  */
 
-.rt-low      { color: #ff6d6d !important; }
-.rt-mid      { color: #FFD700 !important; }
-.rt-high     { color: #34EC27 !important; }
-.rt-elite    { color: #4A90D9 !important; }
+.rt-low      { color: var(--rt-low-color) !important; }
+.rt-mid      { color: var(--rt-mid-color) !important; }
+.rt-high     { color: var(--rt-high-color) !important; }
+.rt-elite    { color: var(--rt-elite-color) !important; }
 .rt-unknown  { color: rgba(255, 255, 255, 0.4) !important; }

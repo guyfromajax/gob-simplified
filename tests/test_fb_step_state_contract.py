@@ -1,8 +1,7 @@
 """Fast Break UESS / StepState contract tests.
 
-These tests intentionally lock the current Fast Break AnimationStep contract
-before adding the additive FastBreakStepState bridge. They do not change
-runtime behavior and do not require a full game simulation.
+These tests lock the Fast Break AnimationStep contract and verify the additive
+FastBreakStepState bridge without requiring a full game simulation.
 """
 
 import copy
@@ -667,6 +666,8 @@ def test_fb_uess_summary_reports_shared_observability_fields():
         "final_coords_count": 2,
         "fb_step_state_count": 2,
         "fallback_reason": None,
+        "next_play_type": None,
+        "is_full_simulation": False,
     }
 
 

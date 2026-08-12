@@ -76,10 +76,15 @@ Used for TEAM_ATTR_CLAMPS (e.g. training, team init). Min/max clamp for generate
 
 | Key | Current value | Notes |
 |-----|---------------|--------|
-| `shot_threshold_min` | 0 | `BackEnd/constants/shot_threshold_scale.py` |
-| `shot_threshold_max` | 200 | same; span always 200, mid = min + 100 |
+| `shot_threshold_min` | **−30** | `BackEnd/constants/shot_threshold_scale.py` — change `MIN` ONLY, everything derives |
+| `shot_threshold_max` | **170** | same; span always 200, mid = min + 100 (**MID 70**) |
 | `rebound_modifier_min` | 0.0 | |
-| `rebound_modifier_max` | 0.4 | |
+| `rebound_modifier_max` | **1.0** | widened from 0.4 in the EOG Structural Pass so the 5-band ladder and training have headroom. Sunset single-game **init** still spreads 0.0-0.4 deliberately. |
+| core-8 clamp | **−20 to 20** | `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier` — widened from ±10 |
+| `team_chemistry` | 7 to 25 | |
+
+**Changing `shot_threshold` MIN requires an EOG band re-cut** — see
+[`00_Operations/Shot_Threshold_Scale_Tuning.md`](../00_Operations/Shot_Threshold_Scale_Tuning.md).
 
 ---
 

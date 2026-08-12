@@ -12,25 +12,16 @@ that still have 24-char hex ids, so all 1536 use UUIDs and match the id scheme o
 Requires --yes. Writes only to gob-staging.
 Run from repo root: python3 scripts/align_staging_remaining_1440_to_uuid.py --yes
 """
-import os
+import argparse
 import sys
 import uuid as uuid_module
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
+from pathlib import Path
 
-for path in [".env.local", ".env"]:
-    if os.path.exists(path):
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
-from pymongo import MongoClient
+from scripts.db_migration_cli import connect_migration_target
 
 
 def _is_hex_id(val):
@@ -42,17 +33,11 @@ def _is_hex_id(val):
 
 
 def main():
-    if "--yes" not in sys.argv:
-        print("Assigns UUIDs to the 1440 staging players that still have hex ids. Requires --yes.")
-        sys.exit(1)
-
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set.")
-        sys.exit(1)
-
-    client = MongoClient(uri)
-    staging = client["gob-staging"]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--apply", action="store_true", help="Write changes; default is dry-run")
+    args = parser.parse_args()
+    connection = connect_migration_target("gob-staging", write=args.apply)
+    staging = connection.database
     staging_players = list(staging["players"].find({}))
 
     # Only those with 24-char hex _id
@@ -61,9 +46,15 @@ def main():
 
     if not hex_players:
         print("No hex-id players left. Nothing to do.")
-        sys.exit(0)
+        connection.close()
+        return
 
-    # Assign new UUID to each (deterministic order so we can re-run safely: sort by _id)
+    if not args.apply:
+        print(f"DRY RUN: would replace {len(hex_players)} player ids and dependent references.")
+        connection.close()
+        return
+
+    # Assign new UUID to each (stable traversal order within this execution)
     hex_players.sort(key=lambda p: str(p.get("_id", "")))
     hex_to_uuid = {}
     for p in hex_players:
@@ -128,6 +119,7 @@ def main():
         replaced += 1
     print(f"[gob-staging] Players: replaced {replaced} doc(s) with UUID _id/player_id/photo.")
     print("Done.")
+    connection.close()
 
 
 if __name__ == "__main__":

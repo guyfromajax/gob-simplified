@@ -41,6 +41,13 @@ def _find_teams_dict_key(
             if nm:
                 if str(nm) == sid or _norm_slot(nm) == _norm_slot(sid):
                     return k
+                # Display name → stored team_id at this boundary (lookup, not
+                # derive). Do not teach _norm_slot to strip punctuation.
+                from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
+                sid_norm = _norm_slot(sid)
+                if any(_norm_slot(s) == sid_norm for s in identity_slugs_for_display_name(nm)):
+                    return k
 
     if isinstance(legacy_blob, dict):
         lname = legacy_blob.get("name")

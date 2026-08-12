@@ -220,6 +220,7 @@ def test_no_meet_and_one_routes_to_free_throw_not_baseline_inbound(monkeypatch):
             "shot_variant": "SWISH",
             "shot_variant_extras": {},
             "select_and_stamp_shot_micro_kwargs": {
+                "shooter_player": kwargs["shooter"],
                 "shot_type": "attack",
                 "shooter_id": "Lancaster-SG",
                 "shooter_x": float(shot_spot["x"]),

@@ -264,7 +264,10 @@ class TeamManager:
     def __init__(self, name: str, is_home_team=False, strategy_settings=None, team_attributes=None, scouting_data=None, plays_data=None, strategy_calls=None, mode="single", is_user_team=False, franchise_id=None, roster_override=None, synthetic_team_id=None):
         import time
         import logging
+        # Identity: .name is always the core teams.name (score keys, matchup gate, persistence).
+        # Display: .display_name holds Team Builder overlay name for response serializers only.
         self.name = name
+        self.display_name = name
         self.is_home_team = is_home_team
         self.is_user_team = is_user_team  # ✅ SS&S: Track if this is the user's team for override logic
         self.mode = mode  # Store mode for use in _init_scouting_data() and other methods
@@ -288,6 +291,21 @@ class TeamManager:
         # Load BASE team data from universal teams collection (name, team_id, colors, mascot)
         team_doc_start = time.time()
         team_doc = teams_collection.find_one({"name": name}) if roster_override is None else None
+        # Team Builder: if a caller still passes the overlay display name, locate the slot
+        # ObjectId — but identity (.name) remains the core name from that doc.
+        if not team_doc and franchise_id and roster_override is None:
+            try:
+                from BackEnd.utils.franchise_team_display import get_team_builder_overlay
+
+                overlay = get_team_builder_overlay(franchise_id)
+                if overlay and str(overlay.get("name") or "").strip() == str(name or "").strip():
+                    from bson import ObjectId
+
+                    replaced = overlay.get("replaced_object_id")
+                    if replaced:
+                        team_doc = teams_collection.find_one({"_id": ObjectId(str(replaced))})
+            except Exception:
+                pass
         team_doc_time = (time.time() - team_doc_start) * 1000
         if not team_doc and roster_override is None:
             print(f"⚠️ No team document found for team: {name}")
@@ -302,6 +320,34 @@ class TeamManager:
         self.primary_color = team_doc.get("primary_color", "#000000") if team_doc else "#000000"
         self.secondary_color = team_doc.get("secondary_color", "#ffffff") if team_doc else "#ffffff"
         self.mascot = team_doc.get("mascot", "") if team_doc else ""
+
+        # Core identity from the team document (never the overlay string).
+        if team_doc and team_doc.get("name"):
+            self.name = team_doc.get("name")
+            self.display_name = self.name
+
+        # Team Builder overlay: colors/mascot/abbrev + display_name only. Never mutate .name.
+        self.abbreviation = None
+        self.asset_strategy = "core"
+        if franchise_id and team_doc and team_doc.get("_id") is not None:
+            try:
+                from BackEnd.utils.franchise_team_display import (
+                    resolve_team_abbreviation,
+                    resolve_team_display,
+                )
+
+                display = resolve_team_display(franchise_id, team_doc.get("_id"), core_doc=team_doc)
+                self.abbreviation = resolve_team_abbreviation(
+                    franchise_id, team_doc.get("_id"), core_doc=team_doc
+                )
+                if display.get("is_custom"):
+                    self.display_name = display.get("name") or self.name
+                    self.primary_color = display.get("primary_color") or self.primary_color
+                    self.secondary_color = display.get("secondary_color") or self.secondary_color
+                    self.mascot = display.get("mascot") if display.get("mascot") is not None else self.mascot
+                    self.asset_strategy = display.get("asset_strategy") or "generated"
+            except Exception:
+                pass
 
         self.points = 0
         self.points_by_quarter = [0, 0, 0, 0]
@@ -334,11 +380,34 @@ class TeamManager:
             import logging
             if strategy_settings is not None:
                 logging.warning(f"⚠️ [STRATEGY SETTINGS] {self.name} - strategy_settings provided but invalid (type={type(strategy_settings)}, len={len(strategy_settings) if isinstance(strategy_settings, dict) else 'N/A'}), using defaults")
-            # Computer teams derive a strategic game plan from their projected
-            # starting five (Game_Init_System.md § Computer Team Strategy Logic);
+            # Computer teams derive a strategic game plan from their projected starting five;
             # user teams keep the legacy random defaults (never auto-set).
+            #
+            # CPU TEAM IDENTITY (spec: projects/cpu_team_identity_spec.md). The projected five
+            # now yields eight frozen-scale signals -> a vision pair -> the slider draw, instead
+            # of the old per-slider _strategy_roll_* thresholds. Those thresholds were dead in
+            # practice: cum_nd > 350 matched 0 of 128 teams, so the branch that raised
+            # press/trap never fired and 89% of the league fell through to one low-variance
+            # roll. Identity replaces that. Falls back to the legacy derivation when a five
+            # cannot be resolved.
             if not self.is_user_team:
-                self.strategy_settings = self._compute_strategic_strategy_settings()
+                identity = None
+                try:
+                    from BackEnd.utils.team_identity import assign_identity
+
+                    identity = assign_identity(list(self.players.values()))
+                except Exception as e:  # never let identity break team construction
+                    import logging
+                    logging.warning("[IDENTITY] %s: assignment failed (%s); using legacy rolls",
+                                    self.name, e)
+                if identity:
+                    self.strategy_settings = identity["strategy_settings"]
+                    self.offensive_vision = identity["offensive_vision"]
+                    self.defensive_vision = identity["defensive_vision"]
+                    self.identity_signals = identity["signals"]
+                    self.fuel_capacity = identity["fuel_capacity"]
+                else:
+                    self.strategy_settings = self._compute_strategic_strategy_settings()
             else:
                 self.strategy_settings = self._init_strategy_settings()
         
@@ -721,6 +790,8 @@ class TeamManager:
 
         # Tournament seed-based ranges (Mode_Init_System.md): Seed 1 = best, Seed 8 = worst
         if mode == "tournament" and tournament_seed is not None and 1 <= tournament_seed <= 8:
+            # Tournament is a SUNSET mode: rebound cents left on the original 0.0-0.4
+            # spread (harmless + truthful inside the 0.0-1.0 clamp; not re-centered).
             if tournament_seed == 1:
                 a_lo, a_hi = 5, 10
                 tc_lo, tc_hi = 20, 25
@@ -743,12 +814,26 @@ class TeamManager:
             rebound_modifier = round(random.randint(rm_lo, rm_hi) / 100.0, 2)
             shot_threshold = random.randint(st_lo, st_hi)
         else:
-            # Common/single/franchise or tournament without seed (fallback)
-            rm_lo, rm_hi = TEAM_ATTR_RANGES["rebound_modifier"]
+            # Common/single/franchise or tournament without seed (fallback).
+            # Single-game is a SUNSET mode: keep its original 0.0-0.4 rebound spread
+            # (not the widened 0.0-1.0 clamp range) — harmless + not re-centered.
+            rm_lo, rm_hi = 0.0, 0.4
             if mode == "franchise":
                 attr_range = (-2, 0)
-                team_chemistry = random.randint(7, 10)
-                rebound_modifier = 0.2
+                # 8-11, not 7-10: the clamp floor IS 7, so a team rolled at 7 starts
+                # PINNED and cannot register a loss until it first wins something.
+                # Measured on the identity season: 21% of the league began on the floor,
+                # which is missing data rather than a design choice. This does not settle
+                # whether chemistry should BUILD across a season or stay STABLE — see
+                # projects/bugs.md — it just stops teams being born unable to move down.
+                team_chemistry = random.randint(8, 11)
+                # Re-centred 0.2 -> 0.5 (leveling pass, 2026-08-11). On the widened
+                # 0.0-1.0 clamp, 0.2 sits a fifth off the floor while the old EOG ladder
+                # drifted -1.2/season — 93 of 128 teams hit 0.0 by WEEK 3, after which the
+                # attribute carried no information. 0.5 is the midpoint of the live range,
+                # giving symmetric headroom in both directions. The band re-cut alone takes
+                # season drift to +0.1, so this is headroom rather than the fix.
+                rebound_modifier = 0.5
                 shot_threshold = random.randint(FRANCHISE_INIT_LO, FRANCHISE_INIT_HI)
             else:
                 # Single Game or tournament fallback (no seed)

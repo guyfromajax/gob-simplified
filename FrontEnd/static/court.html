@@ -12,11 +12,17 @@
   <script src="/js/config/api-config.js"></script>
   <script src="/js/shared/franchiseLocalStorage.js"></script>
   <script src="/common.js"></script>
+  <script src="/js/shared/teamCourtGenerator.js"></script>
+  <script src="/js/shared/teamGeneratedArt.js"></script>
   <script src="/js/shared/analytics.js"></script>
   <script src="/js/shared/pageLoadOverlay.js"></script>
   <script src="/js/shared/playbookTeamId.js"></script>
   <script src="/js/shared/teamShotThresholdScale.js"></script>
   <script src="/js/shared/tierEmblem.js"></script>
+  <!-- Defines window.formatRtDisplay / getRtColor and sets RT_DISPLAY_MODE='letter'.
+       Required by the Phaser matchup/preview tiles (matchupsUiShared) — without it their
+       formatRtDisplay falls back to "--" for every player's RT. -->
+  <script src="/js/shared/rtBucket.js"></script>
   <script src="/defense-display.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Barlow+Condensed:ital,wght@0,400;0,700;0,900;1,400;1,700;1,900&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="command-center-team-styles.css" />
@@ -356,7 +362,7 @@
     #scoreboard .center .quarter {
       font-size: 24px;
       line-height: 1;
-      color: var(--home-vibrant-color);
+      color: #FFD700;
     }
 
     #scoreboard .center .period-row {
@@ -702,7 +708,7 @@
     .player-name-label {
       font-size: 14px;
       font-weight: bold;
-      color: #C0C0C0; /* Silver */
+      color: #c1c1c1; /* Silver */
       text-align: center;
       text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
       white-space: nowrap;
@@ -1039,7 +1045,7 @@
     .player-box-score td {
       text-align: center;
       padding: 5px 4px;
-      border-bottom: 1px solid #2a2a2a;
+      border-bottom: 1px solid #2b2b2b;
     }
 
     .player-box-score td:first-child {
@@ -1145,14 +1151,14 @@
       border-radius: 8px;
       overflow: hidden;
       position: relative;
-      border: 1px solid #c0c0c0; /* Silver border for contrast */
+      border: 1px solid #c1c1c1; /* Silver border for contrast */
     }
     .team-chemistry-bar {
       width: 110px;        /* Match pill width */
       height: 16px;        /* Match pill height */
       background: rgba(0, 0, 0, 0.3);
       border-radius: 8px;
-      border: 1px solid #c0c0c0; /* Silver border for contrast */
+      border: 1px solid #c1c1c1; /* Silver border for contrast */
       overflow: hidden;
     }
     /* Override command-center-team-styles.css colors for dark theme */
@@ -1545,7 +1551,7 @@
     }
 
     #text-scroll-panel::-webkit-scrollbar-thumb {
-      background: #999;
+      background: #9a9a9a;
       border-radius: 5px;
       border: 2px solid #fff;
     }
@@ -2426,8 +2432,8 @@
     }
 
     .playcall-option.active[data-aggression="normal"] {
-      border: 2px solid #999999 !important;
-      box-shadow: 0 0 10px #999999 !important;
+      border: 2px solid #9a9a9a !important;
+      box-shadow: 0 0 10px #9a9a9a !important;
     }
 
     .playcall-option.active[data-aggression="aggressive"] {
@@ -2887,7 +2893,7 @@
       height: 144px;
       flex-shrink: 0;
       overflow: hidden;
-      background: #111;
+      background: #121212;
     }
     .ann-portrait-zone::after {
       content: '';
@@ -2905,7 +2911,7 @@
       height: 130px;
       flex-shrink: 0;
       overflow: hidden;
-      background: #111;
+      background: #121212;
       border: 3px solid #cc3333;
       box-sizing: border-box;
     }
@@ -3559,7 +3565,7 @@
       top: 0;
       left: 0;
       transform: none;
-      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+      background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
       border: 2px solid #9c27b0;
       border-radius: 8px;
       padding: 8px;
@@ -3602,7 +3608,7 @@
     }
 
     .speed-option.speed-option-superfast:hover {
-      background: linear-gradient(180deg, #f0f0f0 0%, #c0c0c0 50%, #a0a0a0 100%);
+      background: linear-gradient(180deg, #f0f0f0 0%, #c1c1c1 50%, #a0a0a0 100%);
       border-color: #000;
       color: #000;
     }
@@ -3618,7 +3624,7 @@
     #player-tooltip {
       position: fixed;
       display: none;
-      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+      background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
       border: 2px solid #ff6200;
       border-radius: 8px;
       padding: 12px;
@@ -3760,7 +3766,7 @@
     #play-tooltip {
       position: fixed;
       display: none;
-      background: linear-gradient(135deg, #2a2a2a 0%, #1a1a1a 100%);
+      background: linear-gradient(135deg, #2b2b2b 0%, #1a1a1a 100%);
       border: 2px solid #ff6200;
       border-radius: 8px;
       padding: 12px 16px;
@@ -5215,7 +5221,7 @@
 
     // ✅ SS&S: Populate shooter headshots for the 6-play list using intended shooter from play skeletons
     // This runs on all game entry/re-entry instances (game start, quarter breaks, timeouts, foul outs, overtime)
-    // Lineups are locked at timeout navigation points, so we can safely assign images here
+    // Prefer live five from gameScene (currentLineup / homeLineup); URL params are a cold-start fallback only.
     // Uses the same logic as backend: extracts intended shooter from successful skeleton's final step
     async function populatePlayHeadshots() {
       // Ensure API_CONFIG is loaded
@@ -5228,26 +5234,48 @@
       const playOptions = document.querySelectorAll('#offense-play-scroller .play-option');
       const urlParams = new URLSearchParams(window.location.search);
       
-      // Get user team side and lineup from URL params
+      // Get user team side and lineup — live scene first, URL second.
       const userTeamSide = urlParams.get('my_team'); // "home" or "away"
       if (!userTeamSide) {
         console.warn('⚠️ [PLAYCALL HEADSHOTS] No my_team in URL params, cannot populate headshots');
         return;
       }
-      
-      // Build lineup object from URL params
+
+      const positions = ['PG', 'SG', 'SF', 'PF', 'C'];
       const lineup = {};
-      const positions = ['pg', 'sg', 'sf', 'pf', 'c'];
-      positions.forEach(pos => {
-        const paramKey = `${userTeamSide}_${pos}`;
-        const playerId = urlParams.get(paramKey);
-        if (playerId) {
-          lineup[pos.toUpperCase()] = playerId;
-        }
-      });
+      const scene = (typeof window !== 'undefined') ? window.currentGameScene : null;
+      const liveSide =
+        scene && scene.currentLineup && scene.currentLineup[userTeamSide]
+          ? scene.currentLineup[userTeamSide]
+          : null;
+      const bootSide =
+        scene && userTeamSide === 'home' && scene.homeLineup
+          ? scene.homeLineup
+          : scene && userTeamSide === 'away' && scene.awayLineup
+            ? scene.awayLineup
+            : null;
+      const sourceLineup =
+        liveSide && Object.keys(liveSide).length
+          ? liveSide
+          : bootSide && Object.keys(bootSide).length
+            ? bootSide
+            : null;
+
+      if (sourceLineup) {
+        positions.forEach((pos) => {
+          const playerId = sourceLineup[pos] || sourceLineup[pos.toLowerCase()];
+          if (playerId) lineup[pos] = String(playerId);
+        });
+      } else {
+        positions.forEach((pos) => {
+          const paramKey = `${userTeamSide}_${pos.toLowerCase()}`;
+          const playerId = urlParams.get(paramKey);
+          if (playerId) lineup[pos] = playerId;
+        });
+      }
       
       if (Object.keys(lineup).length === 0) {
-        console.warn('⚠️ [PLAYCALL HEADSHOTS] No lineup data in URL params, cannot populate headshots');
+        console.warn('⚠️ [PLAYCALL HEADSHOTS] No lineup data in scene or URL params, cannot populate headshots');
         return;
       }
       
@@ -6010,6 +6038,8 @@
     populatePlayHeadshots().catch(error => {
       console.error('❌ [PLAYCALL HEADSHOTS] Error populating headshots:', error);
     });
+    // Expose for gameScene lineup updates (mid-game sub / resume turn).
+    window.populatePlayHeadshots = populatePlayHeadshots;
     
     // Load and apply Playcall Center ordering from playbooks (debounced; retries after replaceState/game_id)
     schedulePlaycallPlaybookLoad();
@@ -6420,7 +6450,7 @@
       pill.style.background = 'rgba(0, 0, 0, 0.3)';
       pill.style.borderRadius = '8px';
       pill.style.overflow = 'hidden';
-      pill.style.border = '1px solid #c0c0c0'; // Silver border for contrast
+      pill.style.border = '1px solid #c1c1c1'; // Silver border for contrast
 
       const centerLine = document.createElement('div');
       centerLine.className = 'pill-center-line';
@@ -6434,14 +6464,16 @@
       centerLine.style.zIndex = '2';
       pill.appendChild(centerLine);
 
-      let maxValue = 10;
+      let maxValue = 20;
       let value = originalValue;
 
       if (attrKey === 'shot_threshold') {
         ({ maxValue, value } = window.TeamShotThresholdScale.pillFillFromRaw(originalValue));
       } else if (attrKey === 'rebound_modifier') {
-        maxValue = 0.2;
+        // Center = neutral = init = 0.2 (not the range midpoint). Asymmetric span:
+        // 0.2 of room below, 0.8 above, so 0.0-1.0 fills each half correctly.
         value = originalValue - 0.2;
+        maxValue = value < 0 ? 0.2 : 0.8;
       }
 
       if (value > 0) {
@@ -6479,7 +6511,7 @@
       wrapper.style.height = '16px';
       wrapper.style.background = 'rgba(0, 0, 0, 0.3)';
       wrapper.style.borderRadius = '8px';
-      wrapper.style.border = '1px solid #c0c0c0';
+      wrapper.style.border = '1px solid #c1c1c1';
       wrapper.style.overflow = 'hidden';
 
       const fill = document.createElement('div');
@@ -6588,13 +6620,53 @@
           eosUserConference = (userRoster.conference === 0 || userRoster.conference) ? userRoster.conference : null;
           eosUserRegion = userRoster.region || null;
         }
-        const homeColor = homeRoster?.primary_color;
-        const awayColor = awayRoster?.primary_color;
+        const homeUrlDisplay = urlParams.get('home_display') || homeTeamName;
+        const awayUrlDisplay = urlParams.get('away_display') || awayTeamName;
+        if (typeof ensureTeamBuilderVisualReady === 'function') {
+          await ensureTeamBuilderVisualReady(urlParams.get('franchise_id'));
+        }
+        if (typeof ensureTeamBuilderChromeSnapshot === 'function') {
+          await ensureTeamBuilderChromeSnapshot(urlParams.get('franchise_id'));
+        }
+        const homeChromeSnap =
+          typeof lookupTeamChrome === 'function'
+            ? lookupTeamChrome(homeTeamName, homeRoster)
+            : null;
+        const awayChromeSnap =
+          typeof lookupTeamChrome === 'function'
+            ? lookupTeamChrome(awayTeamName, awayRoster)
+            : null;
+        const homeChrome =
+          homeChromeSnap?.label ||
+          (typeof resolveTeamBuilderDisplayName === 'function'
+            ? resolveTeamBuilderDisplayName(homeTeamName, homeUrlDisplay)
+            : homeUrlDisplay);
+        const awayChrome =
+          awayChromeSnap?.label ||
+          (typeof resolveTeamBuilderDisplayName === 'function'
+            ? resolveTeamBuilderDisplayName(awayTeamName, awayUrlDisplay)
+            : awayUrlDisplay);
+        const homePal = homeChromeSnap
+          ? { primary_color: homeChromeSnap.primary_color, secondary_color: homeChromeSnap.secondary_color }
+          : typeof resolveTeamBuilderPaletteColors === 'function'
+            ? resolveTeamBuilderPaletteColors(homeTeamName, homeRoster)
+            : homeRoster;
+        const awayPal = awayChromeSnap
+          ? { primary_color: awayChromeSnap.primary_color, secondary_color: awayChromeSnap.secondary_color }
+          : typeof resolveTeamBuilderPaletteColors === 'function'
+            ? resolveTeamBuilderPaletteColors(awayTeamName, awayRoster)
+            : awayRoster;
+        const homeColor = homePal?.primary_color;
+        const awayColor = awayPal?.primary_color;
         if (!homeColor || !awayColor) return false;
 
-        document.documentElement.style.setProperty('--home-vibrant-color', homeColor);
-        document.documentElement.style.setProperty('--away-vibrant-color', awayColor);
-        applyVibrantRgbCssVarsFromHex(homeColor, awayColor);
+        if (typeof applyTeamVibrantDocumentVars === 'function') {
+          await applyTeamVibrantDocumentVars(homeChrome, awayChrome, homePal, awayPal);
+        } else {
+          document.documentElement.style.setProperty('--home-vibrant-color', homeColor);
+          document.documentElement.style.setProperty('--away-vibrant-color', awayColor);
+          applyVibrantRgbCssVarsFromHex(homeColor, awayColor);
+        }
         try {
           const mt = new URLSearchParams(window.location.search).get('my_team');
           const tri =
@@ -6709,6 +6781,9 @@
     const urlParams = new URLSearchParams(window.location.search);
     const homeTeam = urlParams.get('home');
     const awayTeam = urlParams.get('away');
+    // URL *_display is chrome fallback only — hydrated visual is authority.
+    const homeDisplay = urlParams.get('home_display') || homeTeam;
+    const awayDisplay = urlParams.get('away_display') || awayTeam;
 
     window.addEventListener('pageshow', (event) => {
       if (event.persisted) {
@@ -6718,16 +6793,6 @@
 
     const redirected = await redirectIfFranchiseGameplayAlreadyCommitted(urlParams);
     if (!redirected) {
-      // Update Player Box Score headers with actual team names
-      if (homeTeam) {
-        const homePlayersHeader = document.getElementById('home-players-header');
-        if (homePlayersHeader) homePlayersHeader.textContent = homeTeam;
-      }
-      if (awayTeam) {
-        const awayPlayersHeader = document.getElementById('away-players-header');
-        if (awayPlayersHeader) awayPlayersHeader.textContent = awayTeam;
-      }
-
       if (homeTeam && awayTeam) {
         const appliedRealColors = await hydrateCourtColorsFromRoster(homeTeam, awayTeam);
         if (!appliedRealColors) {
@@ -6740,6 +6805,22 @@
             if (tri) document.documentElement.style.setProperty('--team-rgb', tri);
           } catch (e) { /* ignore */ }
         }
+        // Labels + colours through one producer after hydrate settles.
+        try {
+          if (typeof applyTeamBuilderMatchupChrome === 'function') {
+            await applyTeamBuilderMatchupChrome({
+              homeCore: homeTeam,
+              awayCore: awayTeam,
+              homeUrlDisplay: homeDisplay,
+              awayUrlDisplay: awayDisplay,
+              homeLabelEl: document.getElementById('home-players-header'),
+              awayLabelEl: document.getElementById('away-players-header'),
+              franchiseId: urlParams.get('franchise_id'),
+            });
+          } else if (typeof applyTeamVibrantDocumentVars === 'function') {
+            await applyTeamVibrantDocumentVars(homeDisplay || homeTeam, awayDisplay || awayTeam, null, null);
+          }
+        } catch (e) { /* ignore */ }
       } else {
         console.warn('⚠️ No teams found in URL, using default vibrant colors');
       }
@@ -7474,7 +7555,7 @@
       const isZone = defenseTypeLower.includes('zone');
       defenseEl.textContent = defenseType.toUpperCase();
       // Color: Man = gray, any Zone = purple
-      defenseEl.style.color = isZone ? '#BB86FC' : (defenseTypeLower === 'man' ? '#D0D0D0' : '#999');
+      defenseEl.style.color = isZone ? '#BB86FC' : (defenseTypeLower === 'man' ? '#D0D0D0' : '#9a9a9a');
 
       // ✅ FIX: Offense - Display play name instead of Type → Focus
       const playName = data.offense.name || 'PLAY';

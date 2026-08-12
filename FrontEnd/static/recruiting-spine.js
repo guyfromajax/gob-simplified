@@ -26,26 +26,25 @@
     });
   }
 
-  // Derive a stable 3-letter team token from a team name (fallback when no
-  // canonical abbreviation is available). Your own team is detected by id, not name.
-  function deriveAbbr(name) {
+  // 3-letter team token: overlay abbrev when the franchise has one for this team,
+  // else alnum slice(0,3). Routes through Common.resolveTeamAbbreviation.
+  function deriveAbbr(name, teamId) {
+    if (typeof global.resolveTeamAbbreviation === 'function') {
+      return global.resolveTeamAbbreviation(name, teamId);
+    }
+    if (typeof global.deriveTeamAbbreviationFromName === 'function') {
+      return global.deriveTeamAbbreviationFromName(name);
+    }
     var clean = String(name || '').replace(/[^A-Za-z0-9]/g, '');
-    return (clean.slice(0, 3) || '—').toUpperCase();
+    return (clean.slice(0, 3) || '???').toUpperCase();
   }
 
-  // RT color class, honoring the year-aware recruit/player switch (decision: keep the
-  // existing switch — recruit scale for JH, player scale for FR/SO/JR).
+  // Unified RT color class; the year argument remains for call-site compatibility.
   function rtClassForYear(rt, year) {
     if (typeof global.getRecruitRtBucketClassForYear === 'function') {
       return global.getRecruitRtBucketClassForYear(rt, year);
     }
-    // Fallback (helper absent): recruit scale.
-    var v = Number(rt);
-    if (!isFinite(v)) return 'rt-unknown';
-    if (v <= 29) return 'rt-low';
-    if (v <= 39) return 'rt-mid';
-    if (v <= 49) return 'rt-high';
-    return 'rt-elite';
+    return 'rt-unknown';
   }
 
   // =========================================================================
@@ -74,7 +73,7 @@
       var raw = (recruit && (recruit.Lean || recruit.lean)) || {};
       var teamNameMap = opts.teamNameMap || {};
       var userId = opts.userTeamId != null ? String(opts.userTeamId) : null;
-      var abbrOf = opts.abbrOf || function (name /*, id */) { return deriveAbbr(name); };
+      var abbrOf = opts.abbrOf || function (name, id) { return deriveAbbr(name, id); };
       var leans = [];
       ['1', '2', '3'].forEach(function (rank) {
         var v = raw[rank];

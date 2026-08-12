@@ -104,3 +104,63 @@ Users will now see the live site with the new code.
 
 - Banner dismissal is stored in browser localStorage by `id`; changing `id` in the config makes the banner show again for returning users.
 - Time math is implemented in `FrontEnd/static/js/shared/maintenanceBanner.js`: naive `starts_at_iso` values use **IANA `America/New_York`** (US Eastern, including EST and EDT), not the viewer’s browser local zone and not “UTC only.”
+
+
+---
+
+## Post-deploy verification — `scripts/verify_deploy.py`
+
+**Nothing else on a deploy proves it took.** Production silently diverged from `develop` by
+**158 commits** once, and no surface exposed the running build. `/health` now reports
+`commit`, `hash_seed` and `db_access`.
+
+```bash
+scripts/verify_deploy.py --health-url https://<prod>/health   # A: build
+GOB_DB_ACCESS=read scripts/verify_deploy.py --data            # B: data (prod MONGO_URI)
+scripts/verify_deploy.py --franchise-id <id> --delete         # C: seeding
+```
+
+| check | asserts |
+|---|---|
+| **A. BUILD** | `/health` commit matches what shipped; `PYTHONHASHSEED=0` live; `GOB_DB_ACCESS=write` set |
+| **B. DATA** | copied collections match the shipped staging snapshot by **CONTENT checksum ignoring `_id`** — counts are not enough (`recruit_sets` matched on count while differing by 150 recruits) |
+| **C. SEEDING** | a throwaway **week-1, unplayed** franchise gets identity persisted, sliders varying, and the current init values — then deletes it and its FTD/FPD/FRD rows |
+
+C takes a franchise id rather than creating one: creation needs an authenticated session and
+the script deliberately does not embed auth. **The franchise must be unplayed** — training moves
+the seeded values on the first week.
+
+The check was **negative-controlled**: run against prod before a deploy, B correctly FAILS.
+
+## Deploys that also move DATA
+
+Some deploys need reference collections copied staging → prod. **Back them up first** — the
+code half has a git rollback, the data half has nothing, and `gob.players_backup` is a stale
+snapshot whose `attributes` differ from live on 1440/1536 documents.
+
+**ORDERING IS BACKUP → MERGE → COPY, not copy → merge.** New code reading old data is a
+known-good combination (two full measurement seasons ran on exactly that). **Old code reading
+NEW data is untested.**
+
+Before copying, **checksum content rather than comparing counts**, and note that documents can
+be identical except for `_id` — the skeleton collections hash differently across databases
+while every coordinate matches, so copying them would churn prod for no benefit. **Heuristic:
+same byte size + different hash usually means metadata; a real content change moves the size.**
+
+## ⚠️ The prod/local divergence trap
+
+**A franchise created through the UI is seeded by the DEPLOYED backend and then measured by
+LOCAL code.** Everything set at creation comes from prod; everything computed during a run comes
+from local. **Anything changed since the last deploy seeds wrong, silently, and looks like data
+rather than an error.**
+
+Caught once on `rebound_modifier` (deployed 0.2 vs local 0.5) only because someone was looking
+for it. The worst instance found: **100% of FPD players carried pre-recalibration
+`position_ratings`, median delta 24, max 55** — baked in at creation and never recomputed for
+franchise mode.
+
+Before any measurement season, do ONE of:
+1. **Deploy first**, so seeded and measured code agree (cleanest).
+2. **Normalise after creation** — overwrite everything local would seed differently, including
+   recomputing FPD `position_ratings`.
+3. **Provision locally** rather than through the UI.

@@ -641,6 +641,96 @@ def test_rr_lane_pass_shot_motion_shooter_ends_at_authoritative_shot_spot():
     assert step["end"]["coords"]["d_ball"]["x"] < 40.0
 
 
+def test_rr_shot_motion_carries_unfinished_transition_runs():
+    off = {
+        "PF": _player("rr", 70, 25),
+        "SG": _player("trail", 50, 10),
+    }
+    deff = {
+        "PG": _player("d_ball", 76, 25),
+        "SG": _player("d_trail", 45, 35),
+    }
+    start_coords = {
+        "rr": {"x": 70.0, "y": 25.0},
+        "trail": {"x": 50.0, "y": 10.0},
+        "d_ball": {"x": 76.0, "y": 25.0},
+        "d_trail": {"x": 45.0, "y": 35.0},
+    }
+    previous_step = {
+        "start": {
+            "destination": {
+                "rr": {"x": 87.0, "y": 25.0},
+                "trail": {"x": 87.0, "y": 25.0},
+                "d_ball": {"x": 87.0, "y": 25.0},
+                "d_trail": {"x": 87.0, "y": 25.0},
+            },
+            "archetype": {pid: "sprint" for pid in start_coords},
+        }
+    }
+    fb_roles = {
+        "rim_runner_burst_phase": {"rr_id": "rr"},
+        "shot_spot": {"x": 80.0, "y": 25.0},
+    }
+    step = _build_shot_motion_step(
+        turn_result={"result_type": "MAKE", "defender": deff["PG"]},
+        fb_roles=fb_roles,
+        off_lineup=off,
+        def_lineup=deff,
+        step_start_coords=start_coords,
+        clock_remaining_at_start=300.0,
+        shot_clock_remaining_at_start=18.0,
+        previous_step=previous_step,
+    )
+
+    assert step is not None
+    assert step["start"]["action"]["trail"] == "cut"
+    assert step["start"]["action"]["d_trail"] == "guard_offball"
+    assert step["start"]["destination"]["d_trail"] == {"x": 87.0, "y": 25.0}
+    assert step["end"]["coords"]["d_trail"]["x"] > start_coords["d_trail"]["x"]
+    assert step["start"]["action"]["d_ball"] == "guard_ball"
+    assert step["start"]["destination"]["d_ball"] != {"x": 87.0, "y": 25.0}
+
+
+def test_triangle_shot_motion_carries_unfinished_setup_runs_without_defender():
+    off = {
+        "PG": _player("shooter", 70, 25),
+        "SG": _player("wing", 50, 10),
+    }
+    deff = {"PG": _player("d_trail", 45, 35)}
+    start_coords = {
+        "shooter": {"x": 70.0, "y": 25.0},
+        "wing": {"x": 50.0, "y": 10.0},
+        "d_trail": {"x": 45.0, "y": 35.0},
+    }
+    previous_step = {
+        "start": {
+            "destination": {
+                "shooter": {"x": 80.0, "y": 25.0},
+                "wing": {"x": 87.0, "y": 10.0},
+                "d_trail": {"x": 87.0, "y": 25.0},
+            },
+            "archetype": {pid: "sprint" for pid in start_coords},
+        }
+    }
+    fb_roles = {"shooter": off["PG"], "shot_spot": {"x": 80.0, "y": 25.0}}
+    step = _build_triangle_shot_motion_step(
+        turn_result={"result_type": "MAKE", "shooter": off["PG"]},
+        fb_roles=fb_roles,
+        off_lineup=off,
+        def_lineup=deff,
+        step_start_coords=start_coords,
+        clock_remaining_at_start=300.0,
+        shot_clock_remaining_at_start=18.0,
+        previous_step=previous_step,
+    )
+
+    assert step is not None
+    assert step["start"]["action"]["wing"] == "cut"
+    assert step["start"]["action"]["d_trail"] == "guard_offball"
+    assert step["start"]["destination"]["d_trail"] == {"x": 87.0, "y": 25.0}
+    assert step["end"]["coords"]["d_trail"]["x"] > start_coords["d_trail"]["x"]
+
+
 def _parallel_move_fixture():
     """Gate player has a short run; the pass receiver has a much longer one."""
     off = {

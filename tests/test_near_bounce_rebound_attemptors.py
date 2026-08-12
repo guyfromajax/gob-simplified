@@ -1,4 +1,5 @@
 from BackEnd.utils.shared import (
+    _team_rebound_bonus,
     collect_near_bounce_rebound_attemptors,
     filter_rebound_candidate_lineups_near_bounce,
     select_rebounder_by_score,
@@ -7,6 +8,14 @@ from tests.test_utils import build_mock_game
 
 
 POSITIONS = ["PG", "SG", "SF", "PF", "C"]
+
+
+def test_team_rebound_bonus_uses_half_chemistry_impact():
+    game = build_mock_game()
+    game.offense_team.team_attributes["team_chemistry"] = 25
+    game.offense_team.team_attributes["rebound_modifier"] = 0.4
+
+    assert _team_rebound_bonus(game.offense_team) == 5.0
 
 
 def _sync_lineup_to_roster(game):

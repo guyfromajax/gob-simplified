@@ -1,59 +1,78 @@
+#!/usr/bin/env python3
+"""Load team JSON files into one explicit database target.
 
-import os
+Dry-run is the default. Existing teams are skipped exactly as before.
+"""
+
+from __future__ import annotations
+
+import argparse
 import json
+import sys
+from pathlib import Path
 from uuid import uuid4
-from BackEnd.db import players_collection, teams_collection
+
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+
 from BackEnd.models.player import Player
+from scripts.db_migration_cli import connect_migration_target
 
-# Load all JSON files in /teams directory
-directory = "./teams"
-for filename in os.listdir(directory):
-    if not filename.endswith(".json") or filename.startswith("."):
-        continue
 
-    path = os.path.join(directory, filename)
-    with open(path, "r") as f:
-        team_data = json.load(f)
+def load_teams(database, teams_dir: Path, *, apply: bool) -> tuple[int, int]:
+    players_collection = database["players"]
+    teams_collection = database["teams"]
+    teams_added = 0
+    players_added = 0
 
-    team_name = team_data["name"]
+    for path in sorted(teams_dir.glob("*.json")):
+        team_data = json.loads(path.read_text(encoding="utf-8"))
+        team_name = team_data["name"]
+        if teams_collection.find_one({"name": team_name}, {"_id": 1}):
+            print(f"SKIP {team_name!r}: already exists")
+            continue
 
-    # Insert team ONLY if it doesn't already exist
-    existing_team = teams_collection.find_one({"name": team_name})
-    if existing_team:
-        print(f"⚠️ Team '{team_name}' already exists. Skipping.")
-        continue
+        player_docs = []
+        player_ids = []
+        for raw_player in team_data["players"]:
+            player = Player(raw_player)
+            player_id = str(uuid4())
+            player_ids.append(player_id)
+            player_docs.append({
+                "_id": player_id,
+                "player_id": player_id,
+                "first_name": player.first_name,
+                "last_name": player.last_name,
+                "team": player.team,
+                "attributes": player.attributes,
+                "stats": player.stats,
+                "metadata": player.metadata,
+            })
 
-    player_docs = []
-    player_ids = []
+        if apply:
+            teams_collection.insert_one({"name": team_name, "player_ids": player_ids})
+            if player_docs:
+                players_collection.insert_many(player_docs)
+        teams_added += 1
+        players_added += len(player_docs)
+        print(f"{'INSERTED' if apply else 'WOULD INSERT'} {team_name}: {len(player_docs)} players")
 
-    for raw_player in team_data["players"]:
-        print(f"raw_player: {raw_player}")
-        player_obj = Player(raw_player)
-        uuid_str = str(uuid4())
-        player_data = {
-            "_id": uuid_str,
-            "player_id": uuid_str,
-            "first_name": player_obj.first_name,
-            "last_name": player_obj.last_name,
-            "team": player_obj.team,
-            "attributes": player_obj.attributes,
-            "stats": player_obj.stats,
-            "metadata": player_obj.metadata
-        }
-        # player_id = str(uuid4())
-        # raw_player["_id"] = player_id
-        # raw_player["team"] = team_name
-        player_ids.append(uuid_str)
-        player_docs.append(player_data)
+    return teams_added, players_added
 
-    # Insert team with player_ids
-    teams_collection.insert_one({
-        "name": team_name,
-        "player_ids": player_ids
-    })
 
-    # Insert all players
-    players_collection.insert_many(player_docs)
-    print(f"✅ Inserted team: {team_name} with {len(player_docs)} players")
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    parser.add_argument("--teams-dir", type=Path, default=ROOT / "teams")
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
 
-print("🎉 All teams and players loaded successfully.")
+    connection = connect_migration_target(args.db, write=args.apply)
+    teams, players = load_teams(connection.database, args.teams_dir, apply=args.apply)
+    connection.close()
+    print(f"Done: {teams} teams and {players} players {'written' if args.apply else 'planned'}.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

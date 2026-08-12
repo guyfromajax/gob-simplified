@@ -270,7 +270,7 @@ def _build_loop_step(
     bh_end = end_coords.get(bh_id) or start_coords.get(bh_id)
     if bh_end is not None:
         best = None
-        for did in def_ids:
+        for did in sorted(def_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             if not did:
                 continue
             dc = end_coords.get(did) or start_coords.get(did)

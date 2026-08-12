@@ -20,6 +20,7 @@ import {
   wireUserColumnDrag,
   playMatchupsUiSfx,
   escapeHtml,
+  readableTeamPresentationColor,
 } from "./matchupsUiShared.js";
 
 const DONT_SHOW_KEY_PREFIX = "defenseMatchupsDontShow_";
@@ -264,10 +265,25 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
   const displayOnly = !!(options && options.displayOnly);
 
   const { userTeamSide, homeTeam, awayTeam, currentMatchups, franchiseWeek } = normalized;
-  const homePrimary = homeTeam.primary_color || "#1F8A5B";
-  const awayPrimary = awayTeam.primary_color || "#9E1B32";
-  const homeName = homeTeam.team_name || "Home";
-  const awayName = awayTeam.team_name || "Away";
+  const homeChrome =
+    typeof lookupTeamChrome === "function"
+      ? lookupTeamChrome(homeTeam?.team_name || homeTeam?.name || homeTeam?.display_name, homeTeam)
+      : null;
+  const awayChrome =
+    typeof lookupTeamChrome === "function"
+      ? lookupTeamChrome(awayTeam?.team_name || awayTeam?.name || awayTeam?.display_name, awayTeam)
+      : null;
+  const homePrimary = readableTeamPresentationColor(
+    homeChrome?.primary_color || homeTeam.primary_color || "#1F8A5B",
+    homeChrome?.secondary_color || homeTeam.secondary_color
+  );
+  const awayPrimary = readableTeamPresentationColor(
+    awayChrome?.primary_color || awayTeam.primary_color || "#9E1B32",
+    awayChrome?.secondary_color || awayTeam.secondary_color
+  );
+  // Chrome labels: snapshot / display_name (TB overlay) when present; team_name remains core identity.
+  const homeName = homeChrome?.label || homeTeam.display_name || homeTeam.team_name || "Home";
+  const awayName = awayChrome?.label || awayTeam.display_name || awayTeam.team_name || "Away";
   const userIsHome = userTeamSide === "home";
   const userNatlRank = userIsHome ? homeTeam.natl_rank : awayTeam.natl_rank;
   const opponentNatlRank = userIsHome ? awayTeam.natl_rank : homeTeam.natl_rank;

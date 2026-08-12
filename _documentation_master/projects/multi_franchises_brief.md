@@ -1,6 +1,6 @@
 # Multi-Franchise Slots Brief
 
-> **Status:** Phase 1–3 done; **Phase 2 dual mode-select landed** (2026-07-26). Next: Phase 4 career/ATL polish as needed.  
+> **Status:** Phases 0–4 done and documented; **Phase 5 capacity/retention remains open** (re-audited 2026-08-08).
 > **Goal:** Let each account hold **two** concurrent franchise slots so a user can run two careers at once.  
 > **Constraint:** Protect ownership isolation and session identity. Do not invent soft-archive in v1 unless product demands it.
 
@@ -26,23 +26,25 @@
 
 ---
 
-## 2. Current state (what blocks two slots today)
+## 2. Shipped state
 
 ### Backend
-- **Create:** `count_documents({"user_id"}) >= 1` → 400 (“delete first”).
-- **Current:** `find_one({"user_id"})` — nondeterministic if two docs exist.
-- **Delete-current:** same `find_one` — can wipe the wrong franchise.
-- **Most gameplay routes:** already take `franchise_id` + ownership check (keep this pattern).
+- **Create:** hard cap of two through `MAX_FRANCHISES_PER_USER`; creation allocates a stable `home_slot`.
+- **List:** `GET /franchise/list` returns both owned franchises in slot order.
+- **Current:** transitional `GET /franchise/current` is not used to drive the dual-slot UI.
+- **Delete:** `DELETE /franchise/{franchise_id}` verifies ownership and cascades; legacy delete-current returns 409 when it would be ambiguous.
+- **Gameplay routes:** take explicit `franchise_id` and verify ownership.
 
 ### Frontend
-- Mode-select: single franchise card; “New Franchise” deletes current then creates.
-- Global LS keys (not slot-scoped): `franchise_id` / `franchiseId`, `franchise_week`, `franchise_user_team*`, `franchise_complete_week_pending`, EOG snapshots, `last_game_*`.
-- `API_CONFIG.currentFranchiseId()`: URL first, then LS fallback — silent wrong-franchise risk when URL omits id.
+- Mode Select renders two stable slots with independent enter/create/delete actions.
+- URL `franchise_id` is the identity source for franchise surfaces.
+- `FranchiseLS` namespaces cached week/team/pending/EOG state by franchise id; bare identity fallbacks are retired and cleaned on exit.
 
 ### User-scoped side effects
-- Career merge into `users` (record, geek points, championships, archetypes) if both slots play.
-- `around_the_league` hydration via `find_one({"user_id"})`.
-- Press-conference sessions keyed by user + franchise; delete cascade incomplete.
+- Career record, Geek Points, championships, and archetypes intentionally aggregate across both slots.
+- Per-team GP/title maps use canonical team keys, so the same school in two slots shares one bucket.
+- Around-the-League hydration uses the stored `franchise_id` from the relevant completed game.
+- Press-conference sessions are franchise-scoped and included in deletion cleanup.
 
 ---
 
@@ -65,9 +67,9 @@
 
 ### Phase 0 — Contract (docs + invariants)
 
-- [ ] Document invariant: **URL `franchise_id` is source of truth** for FCC / court / training / recruiting. LS is cache only, namespaced or cleared on switch.
-- [ ] Document cap=2 and delete-by-id.
-- [ ] List every `find_one({"user_id"` franchise lookup; convert or delete.
+- [x] Document invariant: **URL `franchise_id` is source of truth** for FCC / court / training / recruiting. LS is cache only, namespaced or cleared on switch.
+- [x] Document cap=2 and delete-by-id.
+- [x] List every `find_one({"user_id"` franchise lookup; convert or delete.
 
 ### Phase 1 — Backend API (no FE polish yet)
 
@@ -111,10 +113,10 @@ The mode-select **user / franchise home container** must hold **two franchise in
 
 ### Phase 4 — Career / side systems (explicit)
 
-- [ ] Document shared `users.record` / GP / championships / archetypes behavior for dual play.
-- [ ] Confirm geek_points_by_team / championships_by_team behavior when both slots use the same school.
-- [ ] FTE grandfather path: any franchise or `fte_v2_complete` — second create skips funnel.
-- [ ] Recruit set consumption: remains per-franchise (two slots may consume two sets — expected).
+- [x] Document shared `users.record` / GP / championships / archetypes behavior for dual play in `Franchise_Mode_Overview.md`.
+- [x] Confirm `geek_points_by_team` / `championships_by_team`: both key by canonical program, so the same school across slots merges into one program bucket.
+- [x] FTE is user-scoped through `fte_v2_complete`; a second franchise does not restart the funnel.
+- [x] Recruit-set consumption remains per-franchise through `used_recruit_set_ids`.
 
 ### Phase 5 — Capacity / hygiene (before wide rollout)
 

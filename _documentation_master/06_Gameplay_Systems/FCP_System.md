@@ -239,7 +239,7 @@ Companion to the offensive back-movement gate. Once `frontcourt_established`, an
 #### Post-read overrides (shared)
 
 - **D21 — no live dribble:** any `attack` result collapses to `pass`.
-- **Broken + attack:** runs the open-floor cutoff race (`_do_broken_hct_cutoff`) instead of a normal on-ball contest.
+- **Broken + attack:** runs the open-floor cutoff race (`_do_broken_hct_cutoff`) instead of a normal on-ball contest. Geometry, shared D8 outcomes, and transition consumption are canonical in [`HCT_System.md`](HCT_System.md#the-possession-loop): `POS_O` continues to ABA; `NEUTRAL`/`D_STOP` reset to HCO; contact is terminal at the meet.
 - **Straight Pressure FCP:** trap moments downgrade to single-defender `"pressure"` (man-glue); read thresholds unchanged.
 
 #### Goal achievement at x > 64 (shared with HCT §7)
@@ -355,13 +355,22 @@ Recorded via `_record_fcp_stats()` in `phase_resolution.py`.
 
 ---
 
-### Skeleton System
+### Animation and UESS
 
-- **Source:** MongoDB `fcp_skeletons` (`BackEnd/api/skeleton_routes.py`; legacy fallback `playcall_skeletons/fcp_skeletons.py`)
-- **Variants:** `"base"` (non-shot + HCO), `"shot"` (SHOT results)
-- **Version selection:** random non-empty version per variant
-- **UESS:** `build_skeleton_animation_steps(..., turn_type="FCP")` when `animation_steps` present
-- **Builder UI:** `FrontEnd/static/fcp-skeletons.html`
+- **Dynamic path (default):** FCP wraps the shared dynamic HCT loop and emits
+  through `dynamic_fcp_step_emitter` / `dynamic_hct_step_emitter`.
+- **Central orchestration:** `TurnManager._emit_pressure_animation_steps`
+  chooses the dynamic wrapper, derives elapsed time from schema clock burn, and
+  freezes/projects the result through the shared PressureStepState bridge.
+- **Schema-owned terminal motion:** pass interception renders flight to the
+  interceptor; batted-OOB renders contact and drift to the OOB target. Frontend
+  STEAL/FOUL/dead-ball terminal handlers perform cleanup only.
+- **Legacy fallback:** non-dynamic FCP payloads may still use MongoDB
+  `fcp_skeletons` and `build_skeleton_animation_steps(..., turn_type="FCP")`.
+  The builder UI remains `FrontEnd/static/fcp-skeletons.html`.
+- **Open architecture work:** pressure builders still build schema before the
+  StepState freeze/project bridge. Direct upstream `PressureStepState` builders
+  remain deferred until parity and prototype coverage are retained.
 
 ---
 
@@ -372,12 +381,15 @@ Recorded via `_record_fcp_stats()` in `phase_resolution.py`.
 - `BackEnd/engine/fcp_pf_c_zone.py` — FCP Straight Pressure PF/C zone + anchor ladder
 - `BackEnd/engine/fcp_offball_attack.py` — off-ball attack routing on advance beats
 - `BackEnd/engine/dynamic_hct.py` — shared §4 loop, FCP read constants, engagement, Straight Pressure wiring
+- `BackEnd/engine/dynamic_fcp_step_emitter.py` — dynamic FCP schema wrapper
+- `BackEnd/engine/dynamic_hct_step_emitter.py` — shared pressure schema assembly
+- `BackEnd/engine/pressure_step_state.py` — shared pressure freeze/projection bridge
 - `BackEnd/engine/fcp_press_plays.py` — FCP play registry (`StraightPressureFCP`; PR1 only)
 - `BackEnd/constants/fcp_press_play_types.py` — keys, `play_key_for_fcp_press()`
 - `BackEnd/engine/fcp_inbound_release.py` — SF staging + pass-clear gate
 - `BackEnd/engine/phase_resolution.py` — `resolve_full_court_press_logic()`, `USE_DYNAMIC_FCP`, legacy skeleton getters, stopper integration
-- `BackEnd/models/turn_manager.py` — `_build_fcp_setup_positions()`, pressure type + `fcp_press_play` stash
-- `BackEnd/engine/skeleton_step_emitter.py` — FCP schema steps + stopper step handling
+- `BackEnd/models/turn_manager.py` — setup/play selection and centralized pressure emission
+- `BackEnd/engine/skeleton_step_emitter.py` — legacy/non-dynamic FCP fallback and shared post-steal transition
 - `BackEnd/models/animator.py` — legacy skeleton → animations
 
 **Frontend**

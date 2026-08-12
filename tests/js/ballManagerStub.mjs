@@ -12,14 +12,6 @@ export function animateRebound(opts) {
   calls.push({ type: 'rebound', opts });
 }
 
-export function shootBall(opts) {
-  calls.push({ type: 'shootBall', opts });
-  if (opts.result === 'MISS') {
-    return Promise.resolve({ grid: { x: 0, y: 0 } });
-  }
-  return Promise.resolve();
-}
-
 export function animateKickoutReset(scene, ballSprite, rebounderId, pgId, pass, duration) {
   calls.push({ type: 'kickoutReset', scene, ballSprite, rebounderId, pgId, pass, duration });
   return Promise.resolve();

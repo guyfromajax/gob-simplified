@@ -1,7 +1,9 @@
 import math
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 import logging
 
+from BackEnd.constants import LEAGUE_MEDIAN_HEIGHT_IN
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.utils.player_momentum import mo_shot_roll, team_momentum
 from BackEnd.utils.shot_split_tracker import record_shot_split
@@ -16,6 +18,7 @@ from BackEnd.constants import (
     POSITION_LIST,
     HCO_STRING_SPOTS,
     OREB_REBOUND_SCORE_DISCOUNT,
+    REBOUND_TEAM_CHEMISTRY_FACTOR,
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
@@ -910,8 +913,8 @@ def resolve_over_the_back_foul(game, rebounder, rebound_team, opposing_lineup):
     offense_candidate = rebounder if rebound_team == off_team else nearest_opponent
     defense_candidate = rebounder if rebound_team == def_team else nearest_opponent
 
-    offense_threshold = 90 + off_team.team_attributes.get("discipline", 0)
-    defense_threshold = 10 - def_team.team_attributes.get("discipline", 0)
+    offense_threshold = 90 + core8_gameplay(off_team.team_attributes.get("discipline", 0))
+    defense_threshold = 10 - core8_gameplay(def_team.team_attributes.get("discipline", 0))
     otb_roll = random.randint(1, 100)
 
     if otb_roll > offense_threshold:
@@ -1440,10 +1443,19 @@ def calculate_screen_score(screen_attrs):
     return base_score * random.randint(1, 6)
 
 
+BLOCK_SCORE_TOP_OFFSET_IN = 10  # inches above league median that map 0 -> 10 (1 pt/in slope)
+
+
 def height_to_block_score(height_inches):
     """
-    Map player height (inches) to 0-10 for block reconciliation.
-    >=82 -> 10, 81 -> 9, ... 73 -> 1, <=72 -> 0.
+    Map player height (inches) to 0-10 for block reconciliation. At the league
+    median → 0; +BLOCK_SCORE_TOP_OFFSET_IN inches → 10; 1 pt/inch between.
+
+    Expressed as offsets from LEAGUE_MEDIAN_HEIGHT_IN (design §11.2) rather than
+    literals so the next distribution shift is a one-line constant change, not
+    another threshold sweep. At median 78 this is <=78 -> 0, >=88 -> 10, which
+    reproduces the original league-mean block score of ~1.68 (measured 1.69);
+    the pre-recal median-72 bands would have yielded ~5.08.
     """
     if height_inches is None:
         return 0
@@ -1451,11 +1463,11 @@ def height_to_block_score(height_inches):
         h = int(height_inches)
     except (TypeError, ValueError):
         return 0
-    if h >= 82:
+    if h >= LEAGUE_MEDIAN_HEIGHT_IN + BLOCK_SCORE_TOP_OFFSET_IN:
         return 10
-    if h <= 72:
+    if h <= LEAGUE_MEDIAN_HEIGHT_IN:
         return 0
-    return h - 72  # 73->1, 74->2, ..., 81->9
+    return h - LEAGUE_MEDIAN_HEIGHT_IN
 
 
 def calculate_block_spot(shooter_x, shooter_y, is_away_offense):
@@ -1699,6 +1711,14 @@ def _team_chemistry(team):
         return 0.0
 
 
+def _team_rebound_bonus(team):
+    return (
+        REBOUND_TEAM_CHEMISTRY_FACTOR
+        * _team_chemistry(team)
+        * _team_rebound_modifier(team)
+    )
+
+
 def select_rebounder_by_score(
     off_team,
     def_team,
@@ -1760,7 +1780,7 @@ def select_rebounder_by_score(
     for entry in entries:
         player = entry["player"]
         team = entry["team"]
-        value = calculate_rebound_score(player) + (_team_chemistry(team) * _team_rebound_modifier(team))
+        value = calculate_rebound_score(player) + _team_rebound_bonus(team)
         if entry["distance"] > float(upper_half_distance):
             value *= lower_half_discount
         # Offensive rebounders are discounted — defense's box-out / positioning edge on a
@@ -2131,19 +2151,6 @@ def determine_rebounder(
 
     with temp_lineup_court_absolute_for_away_rebound_math(game, is_away_offense):
         return _core()
-
-def get_team_thresholds(game):
-    
-    game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
-
-    off_attr = off_team.team_attributes
-    def_attr = def_team.team_attributes
-
-    return {
-        "discipline": off_attr.get("discipline", 10),
-        "d_fight": def_attr.get("fight", 10),
-        "o_fight": off_attr.get("fight", 10)
-    }
 
 def get_foul_and_turnover_positions(pass_count):
     return {
@@ -2533,7 +2540,7 @@ def summarize_game_state(
     has_fresh_turns = len(game.turns) > 0 and not exclude_animations
     if has_fresh_turns:
         included_ids = {p["playerId"] for p in players}
-        for pid in referenced_ids:
+        for pid in sorted(referenced_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             if pid in included_ids:
                 continue
             player_obj = game.home_team.get_player_by_id(pid) or game.away_team.get_player_by_id(pid)
@@ -2597,10 +2604,22 @@ def summarize_game_state(
     # print(f"Away team primary color: {game.away_team.primary_color}")
     # print(f"Away team secondary color: {game.away_team.secondary_color}")
 
+    # §3.1a: ``name`` is always core identity (score / matchup lookup).
+    # Overlay is additive on ``display_name`` — never overwrite ``name``.
+    _home_core_name = game.home_team.name
+    _away_core_name = game.away_team.name
+    _home_display_name = getattr(game.home_team, "display_name", None) or _home_core_name
+    _away_display_name = getattr(game.away_team, "display_name", None) or _away_core_name
+
+    _home_abbr = getattr(game.home_team, "abbreviation", None)
+    _away_abbr = getattr(game.away_team, "abbreviation", None)
+
     home_team_obj = {
-        "name": game.home_team.name,
+        "name": _home_core_name,
+        "display_name": _home_display_name,
         "team_id": game.home_team.team_id,
-        "score": game.score.get(game.home_team.name, 0),
+        "abbreviation": _home_abbr,
+        "score": game.score.get(_home_core_name, 0),
         # Derived Team Momentum (sum of 5 active MO, −50..+50) for the court bar.
         "team_momentum": team_momentum(game.home_team),
         "colors": {
@@ -2610,9 +2629,11 @@ def summarize_game_state(
     }
 
     away_team_obj = {
-        "name": game.away_team.name,
+        "name": _away_core_name,
+        "display_name": _away_display_name,
         "team_id": game.away_team.team_id,
-        "score": game.score.get(game.away_team.name, 0),
+        "abbreviation": _away_abbr,
+        "score": game.score.get(_away_core_name, 0),
         "team_momentum": team_momentum(game.away_team),
         "colors": {
             "primary_color": game.away_team.primary_color,
@@ -2914,29 +2935,31 @@ def summarize_game_state(
         pass
     
     # ✅ UNIFIED STRUCTURE: All team data in one place (eliminates home_team/away_team duplication)
+    # ``name`` = core identity; ``display_name`` = overlay chrome (additive). Score keys = core.
     teams_obj = {
         home_key: {
-            # Display fields
-            "name": game.home_team.name,
+            "name": _home_core_name,
+            "display_name": _home_display_name,
             "team_id": game.home_team.team_id,
+            "abbreviation": _home_abbr,
             "mascot": game.home_team.mascot,
             "colors": {
                 "primary_color": game.home_team.primary_color,
                 "secondary_color": game.home_team.secondary_color,
             },
-            # Game state fields
-            "score": game.score.get(game.home_team.name, 0),
+            # Game state fields (lookups = core .name)
+            "score": game.score.get(_home_core_name, 0),
             "points_by_quarter": list(
                 getattr(game.home_team, "points_by_quarter", [])
-                or game.game_state.get("points_by_quarter", {}).get(game.home_team.name, [0, 0, 0, 0])
+                or game.game_state.get("points_by_quarter", {}).get(_home_core_name, [0, 0, 0, 0])
             ),
             "team_fouls": game.home_team.team_fouls,
             "timeouts": getattr(game.home_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
             # Data fields (single source of truth)
             "attributes": getattr(game.home_team, 'team_attributes', {}),
             # ✅ SS&S: Use team_id to look up box_score (cumulative_box now uses team_id keys)
-            "box_score": cumulative_box.get(game.home_team.team_id, cumulative_box.get(game.home_team.name, {})),
-            "totals": game.team_totals.get(game.home_team.name, {}),
+            "box_score": cumulative_box.get(game.home_team.team_id, cumulative_box.get(_home_core_name, {})),
+            "totals": game.team_totals.get(_home_core_name, {}),
             # Persistence fields
             "strategy_settings": home_strategy,
             "strategy_calls": getattr(game.home_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
@@ -2945,27 +2968,28 @@ def summarize_game_state(
             "playbook_settings": home_playbook_settings  # ✅ Preserve from database
         },
         away_key: {
-            # Display fields
-            "name": game.away_team.name,
+            "name": _away_core_name,
+            "display_name": _away_display_name,
             "team_id": game.away_team.team_id,
+            "abbreviation": _away_abbr,
             "mascot": game.away_team.mascot,
             "colors": {
                 "primary_color": game.away_team.primary_color,
                 "secondary_color": game.away_team.secondary_color,
             },
-            # Game state fields
-            "score": game.score.get(game.away_team.name, 0),
+            # Game state fields (lookups = core .name)
+            "score": game.score.get(_away_core_name, 0),
             "points_by_quarter": list(
                 getattr(game.away_team, "points_by_quarter", [])
-                or game.game_state.get("points_by_quarter", {}).get(game.away_team.name, [0, 0, 0, 0])
+                or game.game_state.get("points_by_quarter", {}).get(_away_core_name, [0, 0, 0, 0])
             ),
             "team_fouls": game.away_team.team_fouls,
             "timeouts": getattr(game.away_team, 'timeouts', 4),  # Default to 4 if not set (backward compatibility)
             # Data fields (single source of truth)
             "attributes": getattr(game.away_team, 'team_attributes', {}),
             # ✅ SS&S: Use team_id to look up box_score (cumulative_box now uses team_id keys)
-            "box_score": cumulative_box.get(game.away_team.team_id, cumulative_box.get(game.away_team.name, {})),
-            "totals": game.team_totals.get(game.away_team.name, {}),
+            "box_score": cumulative_box.get(game.away_team.team_id, cumulative_box.get(_away_core_name, {})),
+            "totals": game.team_totals.get(_away_core_name, {}),
             # Persistence fields
             "strategy_settings": getattr(game.away_team, 'strategy_settings', {}),
             "strategy_calls": getattr(game.away_team, 'strategy_calls', {}),  # ✅ SS&S: Persist playcall overrides
@@ -3030,7 +3054,7 @@ def summarize_game_state(
         # Game metadata
         "game_id": str(game.game_id) if hasattr(game, 'game_id') else None,
         "quarter": game.quarter,
-        "is_final": game.quarter > 4 and game.score.get(game.home_team.name, 0) != game.score.get(game.away_team.name, 0),
+        "is_final": game.quarter > 4 and game.score.get(_home_core_name, 0) != game.score.get(_away_core_name, 0),
         "opening_tip_winner": game.game_state.get("opening_tip_winner"),
         "opening_lineup": deepcopy(game.game_state["opening_lineup"])
         if isinstance(game.game_state.get("opening_lineup"), dict)
@@ -3075,11 +3099,10 @@ def summarize_game_state(
         "home_team_id": home_key,
         "away_team_id": away_key,
         
-        # Top-level score map for backward compatibility (some code expects summary["score"])
-        # Build from teams object to ensure consistency
+        # Top-level score map: keys are always core identity (never display chrome).
         "score": {
-            teams_obj[home_key]["name"]: teams_obj[home_key]["score"],
-            teams_obj[away_key]["name"]: teams_obj[away_key]["score"]
+            _home_core_name: teams_obj[home_key]["score"],
+            _away_core_name: teams_obj[away_key]["score"],
         },
         
         # ✅ UNIFIED TEAMS OBJECT: Single source of truth for all team data
@@ -3832,7 +3855,7 @@ def calculate_charge(shooter, defender, off_team, def_team):
     def_chemistry = int((def_team.team_attributes.get("team_chemistry", 0) or 0) / 4)
 
     def _discipline_factor(team, chemistry_factor):
-        discipline = team.team_attributes.get("discipline", 0) or 0
+        discipline = core8_gameplay(team.team_attributes.get("discipline", 0))
         if discipline >= 0:
             return discipline * random.randint(0, max(0, chemistry_factor))
         # Invert chemistry factor on 1–6 scale: 1->6, 2->5, 3->4, 4->3, 5->2, 6->1

@@ -1,9 +1,28 @@
 # Shot Relocation Brief
 
-**Status:** Aligned; implementation deferred  
+**Status:** ACTIVE / implementation deferred — re-audited 2026-08-08
 **Created:** July 23, 2026  
 **Scope:** Shot micro-movement release relocation and shot-value preservation  
 **Canonical system reference:** [`../06_Gameplay_Systems/Shot_Micro_Movements_System.md`](../06_Gameplay_Systems/Shot_Micro_Movements_System.md)
+
+## Current-code audit (2026-08-08)
+
+This work has **not** been implemented and the brief must remain active:
+
+| Contract | Current implementation |
+|---|---|
+| Transition-aware outside relocation | Missing. `plan_non_dunk_shot_micro()` still sends every `OUTSIDE_MOVING_FAMILIES` choice to `_pick_outside_dribble_target()`. |
+| 80/20 stay/cross-value roll | Missing. No 3→3, 3→2, 2→2, or 2→3 planner or tuning constants exist. |
+| Destination catalogs | Missing. Only `OUTSIDE_ARC_SPOT_ORDER` and immediate adjacent-arc selection exist. |
+| Inside/attack two-point invariant | Missing for ordinary families. `compute_micro_release_coord()` applies their relative movement and final geometry remains authoritative. |
+| Evidence of the edge case | `TestMicroReleaseClassification::test_fade_away_release_can_cross_into_three` explicitly verifies that a two-point start currently becomes a three after the fade. |
+| Stopped-Attack exception | Implemented separately and still correct: `plan_stopped_attack_pullup()` freezes the wall coordinate and classifies it geometrically. |
+| Relocation telemetry | Missing. The transition/fallback fields and weekly aggregation proposed in §5 Phase 4 do not exist. |
+
+The canonical Shot Micro-Movements document accurately describes the current
+adjacent-arc behavior and release-coordinate classification. It should not be
+rewritten to describe this proposal until the runtime work is authorized and
+implemented.
 
 ## 1. Purpose
 

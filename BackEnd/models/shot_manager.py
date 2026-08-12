@@ -1,4 +1,5 @@
 from BackEnd.utils.sim_random import sim_rng as random
+from BackEnd.utils.team_attr_scale import core8_gameplay
 import logging
 import math
 from BackEnd.constants.momentum import (
@@ -22,7 +23,8 @@ from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
 from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
 from BackEnd.constants.shot_threshold_scale import MAX as SHOT_THRESHOLD_MAX
 from BackEnd.constants import (
-    THREE_POINT_PROBABILITY, 
+    LEAGUE_MEDIAN_HEIGHT_IN,
+    THREE_POINT_PROBABILITY,
     THREE_POINT_SPOTS,
     PAINT_SPOTS,
     PLAYCALL_ATTRIBUTE_WEIGHTS, 
@@ -1186,15 +1188,15 @@ class ShotManager:
                 should_attempt_block_reconciliation = y <= x
                 if not should_attempt_block_reconciliation:
                     z = random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)
-                    defense_fight = def_team.team_attributes.get("fight", 0)
+                    defense_fight = core8_gameplay(def_team.team_attributes.get("fight", 0))
                     should_attempt_block_reconciliation = z <= defense_fight
                 if not should_attempt_block_reconciliation:
                     # Third trigger: the individual shot defender's rim-protection ability —
                     # ID + (team defensive_efficiency × defender height-rating 0-10) vs a 1-300 roll.
                     z3 = random.randint(BLOCK_PLAYER_ROLL_MIN, BLOCK_PLAYER_ROLL_MAX)
-                    def_eff = def_team.team_attributes.get("defensive_efficiency", 0) or 0
+                    def_eff = core8_gameplay(def_team.team_attributes.get("defensive_efficiency", 0))
                     def_height_val = height_to_block_score(
-                        getattr(defender, "height", None) or defender.attributes.get("height") or 76
+                        getattr(defender, "height", None) or defender.attributes.get("height") or LEAGUE_MEDIAN_HEIGHT_IN
                     )
                     player_block_threshold = (defender.attributes.get("ID", 0) or 0) + (def_eff * def_height_val)
                     should_attempt_block_reconciliation = z3 <= player_block_threshold
@@ -1207,7 +1209,7 @@ class ShotManager:
                         shooter_coords_recon.get("x"), shooter_coords_recon.get("y"),
                         getattr(shooter, "player_id", None),
                     )
-                    def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or 76
+                    def_height_inches = getattr(defender, "height", None) or defender.attributes.get("height") or LEAGUE_MEDIAN_HEIGHT_IN
                     def_h = height_to_block_score(def_height_inches)
                     def_scaled_height = (def_h * 10) + random.randint(-9, 9)
                     def_attrs = defender.attributes
@@ -1219,7 +1221,7 @@ class ShotManager:
                         increment_block_funnel(game_state, "foul_band")
                         # Shooting foul from block: shooter_finish_score vs 250
                         # Outcome: AND-1 on make (1 FT), or 2 FTs on miss (shooting foul = 2 FTs on miss).
-                        shoot_h = height_to_block_score(getattr(shooter, "height", None) or shooter.attributes.get("height") or 76)
+                        shoot_h = height_to_block_score(getattr(shooter, "height", None) or shooter.attributes.get("height") or LEAGUE_MEDIAN_HEIGHT_IN)
                         shoot_scaled = (shoot_h * 10) + random.randint(-9, 9)
                         shoot_attrs = shooter.attributes
                         shooter_finish_score = (
@@ -3097,7 +3099,7 @@ class ShotManager:
             return False, None
 
         defense_team = self.game.defense_team
-        discipline = defense_team.team_attributes.get("discipline", 0)
+        discipline = core8_gameplay(defense_team.team_attributes.get("discipline", 0))
 
         # Base thresholds by shot_type
         if shot_type == "inside":

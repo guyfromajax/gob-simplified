@@ -11,6 +11,69 @@
 > - **Item 11 (After-Steal FB migration) — DONE (May 2026).** New resolver `after_steal_fast_break.py` + emitter `after_steal_fast_break_step_emitter.py`; schema steps + shared post-shot chain. §2.7 / §3.2 After-Steal rows below are obsolete.
 > - **Still open:** 5 (backend visual clamping), 7 (`apply_coords_from_animations_list` mid-resolution calls — now 12 sites in phase_resolution + 6 in rim_runner), 8 (clock-authority ordering bug), 9 (`shot_state_snapshot` — still zero grep hits), 10 (Opening Tip emitter — not built), 12 (remaining embedded-DREB paths), 13 (FE pure-renderer cleanup), 14 (ownership fields — still zero grep hits), 15 (static HCT removal — callers still live in phase_resolution), 16 (dead FE code), 17 (UESS §2 doc updates).
 
+## Coordinate-orientation cleanup status (August 2026)
+
+The canonical runtime/payload mirror is backend-only
+`x_away = 100 - x_home`; emitted gameplay coordinates are already in final
+display orientation. The focused migration completed Final Turn alignment,
+general BIP, SIP, OREB kickout, and the Fast Break BLOCK landing correction.
+Those paths no longer require frontend orientation selection.
+
+Remaining exceptions are compatibility/dead-code work under the broader
+frontend pure-renderer backlog:
+
+1. **Legacy Fast Break renderer:** `fastBreak.js::animateDefensiveStop` can
+   still mirror backend animation coordinates for away offense and replace the
+   backend ball-handler endpoint with a frontend top-of-key target. Legacy FB
+   shot/rebound/get-back branches also retain frontend basket selection and
+   random fallback destinations. All four migrated FB families use schema when
+   `animation_steps` exist; remove these coordinate decisions together with the
+   legacy renderer/fallback retirement, not piecemeal.
+2. **Schema no-arc shot fallback:** `animationPlayback.js::runShotAttempt`
+   still infers the attacking rim/sweet spot from the shooter sprite when
+   `schema_rendered_arc` is absent. Supported migrated shot emitters stamp the
+   schema arc; retain this only as an explicit compatibility fallback until all
+   callers are proven covered.
+3. **Generic defensive-stop fallback:**
+   `turnAnimation.js::runDefensiveStopTransition` remains reachable for a
+   non-Fast-Break `DEFENSIVE_STOP` without schema and selects the top-of-key
+   target, nearest defender, and contest offset in the frontend. Replace it
+   with backend endpoints or remove it after supported caller coverage is
+   proven.
+4. **Disabled countdown choreography:** `countdownAnimation.js` still chooses
+   and mirrors random player destinations, but its only callsite is inside the
+   disabled clipboard-countdown block in `gameScene.js`. Treat it as dead
+   coaching-moment code: delete it or redesign it as explicitly cosmetic before
+   re-enabling; it must not become gameplay-coordinate authority.
+5. **Coordinate-contract test drift:** the focused August 2026 audit found a
+   one-grid FCP home/away mismatch in
+   `test_bip_pressure_destinations_have_home_away_parity` and two stale Final
+   Turn expectations (deterministic paired spot selection and resolver-level
+   `time_elapsed`, now owned by post-emit EOQ clock progression). Trace the FCP
+   one-grid delta before changing production geometry; update Final Turn tests
+   only after aligning their RNG/clock fixtures with the current contracts.
+
+No gameplay-facing `101 - x` formula remains in the animation source. Frontend
+grid-to-pixel conversion and render-only offsets remain allowed; any new team-
+side mirror or random gameplay destination in schema playback is a regression.
+
+## Hybrid unit-completion compatibility layer
+
+The March 2026 unified-animation blueprint has been retired as architecture
+guidance. Its remaining implementation artifact,
+`FrontEnd/static/js/phaser/animation/unitCompletionContract.js`, is still
+imported by six hybrid/legacy animation modules and emits validation telemetry
+for provisional `skeleton` and `dynamic_event` units. Runtime flags such as
+`HCO_STEP_MOVEMENT_STRICT_CONTRACT` and the legacy Fast Break contract telemetry
+therefore remain compatibility diagnostics.
+
+Do not extend this layer into schema gameplay. UESS schema steps already carry
+the authoritative completion inputs (`advance_trigger`, clocks, end state, and
+`end.next`). As legacy callers are removed, delete their validator calls,
+strict-mode flags, and branch-specific fallback/clamp/snap telemetry after
+equivalent backend-schema observability is confirmed. The two observed HCO
+clock-overrun failures remain separately tracked in `bugs.md`.
+
 Read-only audit of the UESS (Universal End-State Sync) migration. No code edits. All findings cited file:line.
 
 References: [`UESS_System.md`](../00_General_Systems/UESS_System.md), [`Step_By_Step_System.md`](../00_General_Systems/Step_By_Step_System.md).
@@ -117,7 +180,7 @@ Five themes dominate. Each generates a cluster of bugs.
 | [phase_resolution.py:984-987](../../BackEnd/engine/phase_resolution.py#L984-L987) | `apply_fast_break_cg_time`: `time_elapsed = clamp_turn_time_elapsed(round(distance_seconds + overhead_seconds), cap=30)` — tuned independently | No | 8 call sites (RR/CR/Triangle/DEFENSIVE_STOP). Final ledger overwrites, but `_attach_clock_elapsed_observe_reconciliation` reads this as `legacy_elapsed` for delta reporting. |
 | [turn_manager.py:1377-1393, 3186-3202, 3752-3761](../../BackEnd/models/turn_manager.py#L1377-L3761) | FCP/HCO/OREB schema-game-burn realignment: `schema_game_burn = cs_start - cs_end` from first/last step clocks → overwrites `result["time_elapsed"]`. Derived from per-step clock readings, not from `clock_event_ledger` rows | No | Required to align with `[ball_flight]+[bounce]` sub-step burn; without it FCP/HCO/OREB under-burn game clock by ~1-1.5s. Functionally close to ledger, technically not. |
 | [game_manager.py:781-799](../../BackEnd/models/game_manager.py#L781-L799) | `_build_dreb_turn_from_miss`: `time_elapsed = animation_steps[0]["end"]["time_elapsed"]` — one step's value | No | `update_clock_and_possession(dreb_turn)` later overwrites via ledger; removal would corrupt `real_time_elapsed_ms` due to ordering bug below |
-| [turn_manager.py:3279-3285](../../BackEnd/models/turn_manager.py#L3279-L3285) | `_build_final_hold_result`: `"time_elapsed": int(time_remaining_sec)` — drain quarter clock | No | Final Hold semantics; ledger override explicitly skipped at turn_manager.py:3181-3184 |
+| `BackEnd/engine/eoq_perfection.py` → `build_run_out_clock_result()` | `"time_elapsed": int(time_remaining_sec)` — drain quarter clock | No | Run Out semantics; terminal no-shot EOQ path |
 | [phase_resolution.py:4289](../../BackEnd/engine/phase_resolution.py#L4289) | `resolve_final_turn_shot_logic`: `shot_result["time_elapsed"] = int(time_remaining)` — drain ≤30s Final Shot | No | Only `time_elapsed` source for Final Shot turns; bypasses ledger |
 | [phase_resolution.py:5241-5243](../../BackEnd/engine/phase_resolution.py#L5241-L5243) | `_shot_at_one_second_time_elapsed`: direct write to force `shot_clock_end == 1` | No | Shot-at-1 rule; bypasses ledger by design |
 | [phase_resolution.py:4994/5054/5114/6091-6117/7524-7557](../../BackEnd/engine/phase_resolution.py#L4994-L7557) | HCO turnover/O_FOUL/D_FOUL/FCP wrap/HCT wrap: `turn_result["time_elapsed"] = timing_contract["time_elapsed"]` where helper sums per-step movement seconds — explicitly the "legacy sum" §5.4 forbids | No | Final emitted overwritten by ledger; removal leaves `time_elapsed=0` going into `_compute_real_time_elapsed_ms` |

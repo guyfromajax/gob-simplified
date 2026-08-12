@@ -11,7 +11,7 @@ SPAN. Keep FrontEnd/static/js/shared/teamShotThresholdScale.js in sync.
 SPAN = 200
 HALF_SPAN = SPAN // 2  # 100 — max pill deviation from center in either direction
 
-MIN = 0
+MIN = -30
 MAX = MIN + SPAN  # 200
 MID = MIN + HALF_SPAN  # 100
 
@@ -20,9 +20,14 @@ BALANCING_MARGIN = 20
 BALANCING_TRAILING = MIN - BALANCING_MARGIN  # -20
 BALANCING_LEADING = MAX - BALANCING_MARGIN  # 180
 
-# Franchise new-team init: slightly better than league average (10–20 below MID).
-FRANCHISE_INIT_LO = MID - 20  # 80
-FRANCHISE_INIT_HI = MID - 10  # 90
+# Franchise new-team init. DELIBERATELY MID-CENTRED, overriding the previous "slightly
+# better than league average" intent (MID-20 / MID-10 = 80/90): with all 128 teams seeded
+# the same way, "better than league average" was circular. Init is COUPLED TO THE EOG BAND
+# POSITION — teams settle where the bands put them, so seeding 15 below the attractor makes
+# every team erode all season. 95-105 agrees with the current band calibration
+# (eog_attr_bands.FG_PCT_*, simulated mean 105.8). RE-CHECK BOTH TOGETHER if either moves.
+FRANCHISE_INIT_LO = MID - 5   # 95
+FRANCHISE_INIT_HI = MID + 5   # 105
 
 # FTE tutorial forced make / average opponent (fte_inject_state.md §3).
 TUTORIAL_USER = MIN  # 0 — forced-make-side threshold on the current scale

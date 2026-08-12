@@ -1,4 +1,4 @@
-"""Franchise training split-phase state (user vs distant CPU)."""
+"""Franchise training split-phase state (user team vs CPU teams)."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ def franchise_training_fully_complete_for_week(
     franchise_week: int,
 ) -> bool:
     """
-    True when the franchise week is fully done: user training persisted and distant CPU pass finished.
+    True when the franchise week is fully done: user and CPU training persisted.
 
     Legacy saves have training_completed True and no user_training_applied_week (single-shot path).
     """
@@ -27,10 +27,10 @@ def franchise_training_fully_complete_for_week(
     if "user_training_applied_week" not in training_status:
         return True
     try:
-        distant_week = int(training_status.get("cpu_distant_complete_week") or 0)
+        cpu_week = int(training_status.get("cpu_training_complete_week") or 0)
     except (TypeError, ValueError):
         return False
-    return distant_week == int(franchise_week)
+    return cpu_week == int(franchise_week)
 
 
 def franchise_user_training_applied_for_week(

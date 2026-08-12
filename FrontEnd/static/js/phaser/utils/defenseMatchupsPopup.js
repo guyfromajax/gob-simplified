@@ -20,6 +20,7 @@ import {
   wireUserColumnDrag,
   normalizeMatchupsPayload,
   playMatchupsUiSfx,
+  readableTeamPresentationColor,
 } from "./matchupsUiShared.js";
 
 const SESSION_STORAGE_KEY_PREFIX = "defenseMatchupsDontShow_";
@@ -214,8 +215,24 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
   if (existing) existing.remove();
 
   const { userTeamSide, homeTeam, awayTeam, currentMatchups } = normalized;
-  const homePrimary = homeTeam.primary_color || "#1F8A5B";
-  const awayPrimary = awayTeam.primary_color || "#9E1B32";
+  const homeChrome =
+    typeof lookupTeamChrome === "function"
+      ? lookupTeamChrome(homeTeam?.team_name || homeTeam?.name || homeTeam?.display_name, homeTeam)
+      : null;
+  const awayChrome =
+    typeof lookupTeamChrome === "function"
+      ? lookupTeamChrome(awayTeam?.team_name || awayTeam?.name || awayTeam?.display_name, awayTeam)
+      : null;
+  const homePrimary = readableTeamPresentationColor(
+    homeChrome?.primary_color || homeTeam.primary_color || "#1F8A5B",
+    homeChrome?.secondary_color || homeTeam.secondary_color
+  );
+  const awayPrimary = readableTeamPresentationColor(
+    awayChrome?.primary_color || awayTeam.primary_color || "#9E1B32",
+    awayChrome?.secondary_color || awayTeam.secondary_color
+  );
+  const homeLabel = homeChrome?.label || homeTeam.display_name || homeTeam.team_name || "Home";
+  const awayLabel = awayChrome?.label || awayTeam.display_name || awayTeam.team_name || "Away";
   const userIsHome = userTeamSide === "home";
   let userOrder = userOrderFromMatchups(currentMatchups);
 
@@ -224,9 +241,9 @@ function showInGameMatchupsModal(gameId, scene, normalized, resolve) {
   popup.innerHTML = `
     <div class="defense-matchups-content" role="dialog" aria-label="Defense Matchups">
       <div class="dm-m-heads">
-        <div class="dm-m-head" style="--head-underline:${awayPrimary}">${awayTeam.team_name || "Away"}</div>
+        <div class="dm-m-head" style="--head-underline:${awayPrimary}">${awayLabel}</div>
         <div></div>
-        <div class="dm-m-head" style="--head-underline:${homePrimary}">${homeTeam.team_name || "Home"}</div>
+        <div class="dm-m-head" style="--head-underline:${homePrimary}">${homeLabel}</div>
       </div>
       <div class="dm-rows"></div>
       <div class="dm-m-foot">

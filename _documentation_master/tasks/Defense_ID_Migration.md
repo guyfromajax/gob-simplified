@@ -158,7 +158,7 @@ Use these as **templates** for dual-read / normalization:
 
 - **Renaming defenses in Mongo** before migration completes will still break in-flight games unless dual-read is deployed.
 - **Third-party or cached** frontend bundles may assume string labels — version or feature-flag API responses if needed.
-- **Distant sim / batch paths** (if any duplicate playcall logic) must be included in the same sweep as GP sim.
+- **Full CPU/batch paths** (if any duplicate playcall logic) must be included in the same sweep as the user-game path.
 
 ---
 

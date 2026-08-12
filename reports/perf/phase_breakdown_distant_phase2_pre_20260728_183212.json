@@ -1,0 +1,97 @@
+{
+  "generated_at": "2026-07-28T18:32:47",
+  "git_commit": "9c1032dd68c5e42b8d38ad69e75401713e493fcf",
+  "git_dirty": false,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "cpu",
+  "workers": 1,
+  "seed": 20260720,
+  "probes_installed": 0,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 8,
+        "total_wall_s": 29.832,
+        "sum_game_s": 29.829,
+        "min_s": 3.4256,
+        "median_s": 3.679,
+        "mean_s": 3.729,
+        "p90_s": 4.243,
+        "max_s": 4.2431
+      },
+      "phases": {},
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "Xavien @ Ocean City",
+          "seed": 20260720,
+          "wall_s": 4.2431,
+          "away_score": 62,
+          "home_score": 88
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Little York @ Four Corners",
+          "seed": 20260721,
+          "wall_s": 3.4562,
+          "away_score": 45,
+          "home_score": 80
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Bentley-Truman @ Lancaster",
+          "seed": 20260722,
+          "wall_s": 4.1172,
+          "away_score": 55,
+          "home_score": 61
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Morristown @ South Lancaster",
+          "seed": 20260723,
+          "wall_s": 3.4256,
+          "away_score": 73,
+          "home_score": 77
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Casino Row @ IDA",
+          "seed": 20260724,
+          "wall_s": 3.4374,
+          "away_score": 75,
+          "home_score": 72
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Chapel Hill @ Durham",
+          "seed": 20260725,
+          "wall_s": 3.785,
+          "away_score": 67,
+          "home_score": 72
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Nickel Beach @ Appalachia",
+          "seed": 20260726,
+          "wall_s": 3.5725,
+          "away_score": 73,
+          "home_score": 50
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Cagers World @ Crickstown",
+          "seed": 20260727,
+          "wall_s": 3.7925,
+          "away_score": 47,
+          "home_score": 51
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)         29.83    100.0%\nTOTAL WALL                              29.83    100.0%"
+    }
+  }
+}

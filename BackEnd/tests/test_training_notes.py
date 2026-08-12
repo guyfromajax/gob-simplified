@@ -72,20 +72,22 @@ class TestTrainingNotes(unittest.TestCase):
         self.assertEqual(strong_cumulative["body"], "No Significant Updates")
         self.assertEqual(sections[0]["body"], "No Significant Updates")
 
-    def test_freshman_discount_applies_only_to_mvp_selection(self):
+    def test_year_normalization_applies_to_mvp_selection(self):
+        # Freshman gains +10 raw; Junior gains +14 raw. Year-normalized: FR 10/1.5=6.67
+        # vs JR 14/1.1=12.7 → Junior is the MVP (a freshman's raw gain is expected larger).
         attrs_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"]
         base = {
             "1": {a: 50 for a in attrs_keys},
             "2": {a: 50 for a in attrs_keys},
         }
         freshman_attrs = {f"anchor_{a}": 50 for a in attrs_keys}
-        sophomore_attrs = {f"anchor_{a}": 50 for a in attrs_keys}
+        junior_attrs = {f"anchor_{a}": 50 for a in attrs_keys}
         freshman_attrs["anchor_SC"] = 60
-        sophomore_attrs["anchor_SC"] = 57
-        sophomore_attrs["anchor_SH"] = 57
+        junior_attrs["anchor_SC"] = 57
+        junior_attrs["anchor_SH"] = 57
         players = [
             {"_id": "1", "first_name": "Fresh", "last_name": "Man", "year": "freshman", "attributes": freshman_attrs},
-            {"_id": "2", "first_name": "Junior", "last_name": "Varsity", "year": "junior", "attributes": sophomore_attrs},
+            {"_id": "2", "first_name": "Junior", "last_name": "Varsity", "year": "junior", "attributes": junior_attrs},
         ]
         team = {"fb_efficiency": 0, "fb_opp_modifier": 0, "pt_efficiency": 0, "pt_opp_modifier": 0}
         sections = build_structured_training_report_notes(
@@ -99,6 +101,92 @@ class TestTrainingNotes(unittest.TestCase):
         )
         self.assertEqual(sections[0]["title"], "Training Camp MVP")
         self.assertEqual(sections[0]["body"], "Junior Varsity")
+
+    def test_biggest_regression_uses_year_normalization_symmetrically(self):
+        # The fix: the loser award is year-normalized too (was raw). Freshman loses 15
+        # raw, Senior loses 12 raw. RAW min = freshman; year-normalized FR -15/1.5=-10 vs
+        # SR -12/1.0=-12 → the SENIOR's regression is the notable one and wins the award.
+        attrs_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"]
+        base = {"1": {a: 50 for a in attrs_keys}, "2": {a: 50 for a in attrs_keys}}
+        fr_attrs = {f"anchor_{a}": 50 for a in attrs_keys}
+        sr_attrs = {f"anchor_{a}": 50 for a in attrs_keys}
+        fr_attrs["anchor_SC"] = 35   # -15
+        sr_attrs["anchor_SC"] = 38   # -12
+        players = [
+            {"_id": "1", "first_name": "Fresh", "last_name": "Man", "year": "freshman", "attributes": fr_attrs},
+            {"_id": "2", "first_name": "Old", "last_name": "Guy", "year": "senior", "attributes": sr_attrs},
+        ]
+        team = {"fb_efficiency": 0, "fb_opp_modifier": 0, "pt_efficiency": 0, "pt_opp_modifier": 0}
+        sections = build_structured_training_report_notes(
+            is_training_camp=False,
+            players=players,
+            original_player_baselines=base,
+            team=team,
+            plays_data={},
+            scouting_data={},
+            legacy_energy_notes=[],
+        )
+        by_title = {s["title"]: s for s in sections}
+        self.assertEqual(by_title["Biggest Regression"]["body"], "Old Guy")
+
+    def _camp_sections(self, players):
+        team = {"fb_efficiency": 0, "fb_opp_modifier": 0, "pt_efficiency": 0, "pt_opp_modifier": 0}
+        base = {p["_id"]: {a: 50 for a in
+                           ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"]}
+                for p in players}
+        return build_structured_training_report_notes(
+            is_training_camp=True, players=players, original_player_baselines=base,
+            team={**team}, plays_data={}, scouting_data={}, legacy_energy_notes=[])
+
+    @staticmethod
+    def _jr(pid, sc):
+        keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"]
+        a = {f"anchor_{k}": 50 for k in keys}
+        a["anchor_SC"] = sc
+        return {"_id": str(pid), "first_name": f"P{pid}", "last_name": "X", "year": "junior", "attributes": a}
+
+    def test_camp_biggest_concern_flags_year_normalized_laggard(self):
+        # Camp has no decay, so nobody is negative. Three developers (+20), one laggard (+2).
+        # median normalized gain ≈ 18.2; threshold 0.5×median ≈ 9.1; only the laggard is below.
+        players = [self._jr(1, 70), self._jr(2, 70), self._jr(3, 70), self._jr(4, 52)]
+        by_title = {s["title"]: s for s in self._camp_sections(players)}
+        self.assertEqual(by_title["Biggest Concern"]["body"], "P4 X")
+
+    def test_camp_biggest_concern_none_when_squad_develops_evenly(self):
+        players = [self._jr(1, 70), self._jr(2, 70), self._jr(3, 70)]  # all +20
+        by_title = {s["title"]: s for s in self._camp_sections(players)}
+        self.assertEqual(by_title["Biggest Concern"]["body"], "None")
+
+    def _one_player_container_bodies(self, deltas, is_camp):
+        keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"]
+        base = {"1": {a: 50 for a in keys}}
+        attrs = {f"anchor_{a}": 50 + int(deltas.get(a, 0)) for a in keys}
+        players = [{"_id": "1", "first_name": "A", "last_name": "One", "year": "junior", "attributes": attrs}]
+        team = {"fb_efficiency": 0, "fb_opp_modifier": 0, "pt_efficiency": 0, "pt_opp_modifier": 0}
+        secs = build_structured_training_report_notes(
+            is_training_camp=is_camp, players=players, original_player_baselines=base,
+            team=team, plays_data={}, scouting_data={}, legacy_energy_notes=[])
+        return {s["title"]: s["body"] for s in secs}
+
+    def test_team_strong_container_flags_high_outlier(self):
+        # SC spikes team-wide, all else flat → SC is > mean + 1 SD of the 12 attr-sums.
+        by = self._one_player_container_bodies({"SC": 30}, is_camp=True)
+        self.assertEqual(by["Strong Cumulative Increase"], "SC")
+
+    def test_camp_concerning_progression_flags_low_laggard(self):
+        # 11 attrs +10, SH the laggard at -5 (< mean − 1 SD). Camp flags the least-developed.
+        deltas = {a: 10 for a in ["SC", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"]}
+        deltas["SH"] = -5
+        by = self._one_player_container_bodies(deltas, is_camp=True)
+        self.assertEqual(by["Concerning Progression"], "SH")
+
+    def test_inseason_regression_fires_on_negative_not_on_positive_laggard(self):
+        # In-season Concerning Regression uses the sum < 0 line: a low-but-positive laggard
+        # does NOT count as a regression; a negative one does.
+        by_pos = self._one_player_container_bodies({"SC": 30, "SH": 2}, is_camp=False)
+        self.assertEqual(by_pos["Concerning Regression"], "No Significant Updates")
+        by_neg = self._one_player_container_bodies({"SC": 30, "SH": -8}, is_camp=False)
+        self.assertEqual(by_neg["Concerning Regression"], "SH")
 
     def test_misc_physique_section_before_energy(self):
         attrs_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ", "CH"]
@@ -121,6 +209,52 @@ class TestTrainingNotes(unittest.TestCase):
         misc = next(s for s in sections if s["title"] == "Misc")
         self.assertEqual(misc["body"], physique[0])
         self.assertLess(sections.index(misc), len(sections) - 1)
+
+    # ── Team-attribute containers cap at two ────────────────────────────────────────────
+
+    def test_strong_container_caps_at_two_and_keeps_the_largest(self):
+        # Four attrs clear the cut; only the two biggest are named.
+        by = self._one_player_container_bodies(
+            {"SC": 40, "SH": 35, "ID": 30, "OD": 25}, is_camp=True
+        )
+        self.assertEqual(by["Strong Cumulative Increase"], "SC, SH")
+
+    def test_camp_concerning_progression_caps_at_two_and_keeps_the_lowest(self):
+        deltas = {a: 10 for a in ["SC", "ID", "OD", "PS", "BH", "RB", "ST"]}
+        deltas.update({"SH": -20, "AG": -15, "FT": -10, "ND": -5})
+        by = self._one_player_container_bodies(deltas, is_camp=True)
+        self.assertEqual(by["Concerning Progression"], "AG, SH")
+
+    def test_inseason_regression_caps_at_two(self):
+        by = self._one_player_container_bodies(
+            {"SC": 40, "SH": -20, "AG": -15, "FT": -10, "ND": -5}, is_camp=False
+        )
+        self.assertEqual(by["Concerning Regression"], "AG, SH")
+
+    def test_boundary_tie_breaks_randomly_and_does_not_always_pick_the_same_attr(self):
+        """Three attrs tied at the cut for two slots: the third name must vary across runs.
+
+        A fixed tie-break would name the same attribute every session for an evenly-developed
+        team, reading as a pattern that isn't there.
+        """
+        from BackEnd.models.training_notes import _pick_standouts
+
+        seen = set()
+        for _ in range(60):
+            seen.add(tuple(_pick_standouts({"SC": 9, "SH": 9, "ID": 9}, strongest=True)))
+        self.assertEqual(len(seen), 3, f"expected all three pairs, got {seen}")
+        for pair in seen:
+            self.assertEqual(len(pair), 2)
+
+    def test_distinct_sums_draw_nothing_from_the_training_stream(self):
+        """No tie at the cutoff => no draws, so the training stream is unperturbed."""
+        from BackEnd.models.training_notes import _pick_standouts
+        from BackEnd.utils.training_random import training_rng
+
+        before = training_rng.getstate()
+        picked = _pick_standouts({"SC": 40, "SH": 30, "ID": 20, "OD": 10}, strongest=True)
+        self.assertEqual(picked, ["SC", "SH"])
+        self.assertEqual(training_rng.getstate(), before)
 
 
 if __name__ == "__main__":

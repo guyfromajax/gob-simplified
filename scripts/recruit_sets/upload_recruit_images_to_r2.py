@@ -1,29 +1,34 @@
 #!/usr/bin/env python3
 """
-Upload recruit assets to Cloudflare R2 (bucket: gob-player-images) — Phase 2c.
+Upload portrait-kit / recruit assets to Cloudflare R2 (bucket: gob-player-images).
 
-Two local staging folders map to two R2 key prefixes:
+Local staging folders map to R2 key prefixes:
 
-    assets_staging/recruits/kit/     -> recruits/kit/<id>.{png,json} (sign-time recolor input)
-    assets_staging/recruits/signed/  -> players/master/<id>.png      (post-sign; game resolves this)
+    assets_staging/recruits/kit/                      -> recruits/kit/<id>.{png,json}
+        LEGACY recruit path (recruit_set_0001). Do not migrate; leave existing
+        objects in place. Future recruit classes may keep this prefix or adopt
+        portrait-kits/recruit_set_NNNN/ — document at cutover, don't move the 300.
+
+    assets_staging/portrait-kits/builder_set_0001/    -> portrait-kits/builder_set_0001/<id>.{png,json}
+        Team Builder extension kits (builder_set_0001).
+
+    assets_staging/recruits/signed/                   -> players/master/<id>.png
+        Post-sign uniformed masters (game resolves this).
 
 There is no display master for un-signed recruits: the recruiting board is a
 stats table and un-signed recruits sunset at week 35, so only the kit (recolor
 input) and the post-sign master are ever uploaded.
 
-Reuses the league uploader's helpers (credentials, sha256 idempotency, dry-run),
-so behavior + conventions match exactly. Idempotent: re-running only pushes
-new/changed objects.
+Reuses upload_player_images_to_r2 helpers (credentials, sha256 idempotency,
+dry-run). Idempotent: re-running only pushes new/changed objects.
 
 Typical use:
-    # at set bake time — push kits:
     python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage kit --dry-run
-    python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage kit
-    # at signing — push the uniformed masters:
+    python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage builder_kit
     python3 scripts/recruit_sets/upload_recruit_images_to_r2.py --stage signed
 
-Credentials: scripts/.r2.env (gitignored), same as the league uploader.
-See _documentation_master/00_Operations/Recruit_Image_System.md.
+Credentials: process variables or external ``~/.config/gob/r2.env``.
+See _documentation_master/00_Operations/Recruit_Image_System.md and SCHEMA.md.
 """
 import os
 import sys
@@ -34,12 +39,14 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 SCRIPTS = os.path.dirname(HERE)
 sys.path.insert(0, SCRIPTS)
 
-import upload_player_images_to_r2 as up   # noqa: E402  (load_env, sha256_of, remote_sha256)
+import upload_player_images_to_r2 as up   # noqa: E402  (sha256_of, remote_sha256)
+from script_secrets import ScriptSecretError, load_r2_credentials  # noqa: E402
 
 # stage -> (local dir, R2 key prefix)
 STAGES = {
-    "kit":    ("assets_staging/recruits/kit",    "recruits/kit/"),
-    "signed": ("assets_staging/recruits/signed", "players/master/"),
+    "kit":         ("assets_staging/recruits/kit",                   "recruits/kit/"),
+    "builder_kit": ("assets_staging/portrait-kits/builder_set_0001", "portrait-kits/builder_set_0001/"),
+    "signed":      ("assets_staging/recruits/signed",                "players/master/"),
 }
 CONTENT_TYPE = {".png": "image/png", ".json": "application/json"}
 CACHE_CONTROL = "public, max-age=86400"
@@ -54,7 +61,10 @@ def main():
     args = ap.parse_args()
     stages = list(STAGES) if "all" in args.stage else args.stage
 
-    env = up.load_env(up.ENV_FILE)
+    try:
+        env = load_r2_credentials()
+    except ScriptSecretError as exc:
+        sys.exit(f"ERROR: {exc}")
     import boto3
     s3 = boto3.client("s3", endpoint_url=env["R2_ENDPOINT"],
                       aws_access_key_id=env["R2_ACCESS_KEY_ID"],

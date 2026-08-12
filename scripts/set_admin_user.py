@@ -1,76 +1,62 @@
 #!/usr/bin/env python3
-"""
-Set a user's role to 'admin' by email (Step 12.1).
+"""Set one existing user's role to admin on one explicit database target.
 
-Run from repo root. Uses MONGO_URI from .env (or .env.local).
-Usage:
-    python scripts/set_admin_user.py you@example.com
-    python scripts/set_admin_user.py you@example.com gob-staging   # specify database name
+Dry-run is the default. Staging uses repo-root ``.env.local``. Production requires
+process configuration and matching ``GOB_DB_ACCESS`` authorization.
 """
 
-import os
-import sys
+from __future__ import annotations
+
+import argparse
 from datetime import datetime, timezone
+import os
+from pathlib import Path
+import sys
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
 
-try:
-    from dotenv import load_dotenv
-    if os.path.exists(".env.local"):
-        load_dotenv(".env.local")
-    else:
-        load_dotenv()
-except ImportError:
-    pass  # MONGO_URI can be set in environment
+from BackEnd.script_db import ScriptDatabaseError, connect_script_database  # noqa: E402
 
-from pymongo import MongoClient
-from pymongo.errors import OperationFailure
-from bson import ObjectId
 
-MONGO_URI = os.environ.get("MONGO_URI")
-if not MONGO_URI:
-    print("MONGO_URI not set. Set it in .env or .env.local")
-    sys.exit(1)
-
-# Parse DB name from URI or use default
-db_name = os.environ.get("MONGO_DB_NAME", "gob")
-if not db_name and MONGO_URI:
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("email")
+    parser.add_argument("--db", choices=("gob-staging", "gob"), required=True)
+    parser.add_argument("--apply", action="store_true", help="Persist role=admin.")
+    args = parser.parse_args()
+    email = args.email.strip().lower()
+    connection = connect_script_database(
+        target=args.db,
+        access="write" if args.apply else "read",
+        pristine_env=dict(os.environ),
+        repo_root=ROOT,
+    )
     try:
-        from urllib.parse import urlparse
-        p = urlparse(MONGO_URI)
-        if p.path and p.path != "/":
-            db_name = p.path.lstrip("/")
-    except Exception:
-        pass
-if not db_name:
-    db_name = "gob"
-
-def main():
-    if len(sys.argv) < 2:
-        print("Usage: python scripts/set_admin_user.py <email> [database_name]")
-        print("  e.g. python scripts/set_admin_user.py you@example.com gob-staging")
-        sys.exit(1)
-    email = sys.argv[1].strip().lower()
-    use_db = sys.argv[2].strip() if len(sys.argv) > 2 else db_name
-    try:
-        client = MongoClient(MONGO_URI)
-        db = client[use_db]
-        users = db["users"]
+        users = connection.database["users"]
+        user = users.find_one({"email": email}, {"_id": 1, "email": 1, "role": 1})
+        if not user:
+            print(f"No user found with email {email!r} in {args.db}.", file=sys.stderr)
+            return 1
+        print(f"[PLAN] {args.db} user_id={user['_id']} role={user.get('role')!r} -> 'admin'")
+        if not args.apply:
+            print("[DRY RUN] No data changed.")
+            return 0
         result = users.update_one(
-            {"email": email},
-            {"$set": {"role": "admin", "updated_at": datetime.now(timezone.utc)}}
+            {"_id": user["_id"], "email": email},
+            {"$set": {"role": "admin", "updated_at": datetime.now(timezone.utc)}},
         )
-        if result.matched_count == 0:
-            print(f"No user found with email: {email}")
-            sys.exit(1)
-        print(f"Set role=admin for {email} (database: {use_db})")
-    except OperationFailure as e:
-        if "auth" in str(e).lower() or "8000" in str(e):
-            print("MongoDB authentication failed. Check:")
-            print("  1. MONGO_URI in .env or .env.local (same as your app uses).")
-            print("  2. Atlas user password: special characters must be URL-encoded in the URI.")
-            print("  3. Or set admin manually: Atlas → Browse Collections → users → find the doc by email → set role to 'admin'.")
-        raise
+        if result.matched_count != 1:
+            raise RuntimeError("User changed between preview and update")
+        print(f"[DONE] role=admin set for user_id={user['_id']} in {args.db}")
+        return 0
+    finally:
+        connection.close()
+
 
 if __name__ == "__main__":
-    main()
+    try:
+        raise SystemExit(main())
+    except ScriptDatabaseError as exc:
+        print(f"Refusing unsafe database operation: {exc}", file=sys.stderr)
+        raise SystemExit(2)

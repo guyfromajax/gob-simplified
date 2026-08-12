@@ -509,7 +509,7 @@ function renderRoster() {
         : (rawVal != null ? Math.floor(rawVal / 10) : '--');
       addCell(displayVal);
     });
-    addCell(p.rt ?? '-');
+    addCell(p.rt != null ? formatRtDisplay(p.rt) : '-');
     
     tbody.appendChild(tr);
   });
@@ -2101,14 +2101,16 @@ function createPill(originalValue, attrKey) {
   centerLine.className = 'pill-center-line';
   pill.appendChild(centerLine);
   
-  let maxValue = 10;
+  let maxValue = 20;
   let value = originalValue;
-  
+
   if (attrKey === 'shot_threshold') {
     ({ maxValue, value } = window.TeamShotThresholdScale.pillFillFromRaw(originalValue));
   } else if (attrKey === 'rebound_modifier') {
-    maxValue = 0.2;
-    value = originalValue - 0.2; // Center at 0.2 (new range: 0.0-0.4)
+    // Center = neutral = init = 0.2 (not the range midpoint). Asymmetric span:
+    // 0.2 of room below, 0.8 above, for the 0.0-1.0 range.
+    value = originalValue - 0.2;
+    maxValue = value < 0 ? 0.2 : 0.8;
   }
   
   if (value > 0) {

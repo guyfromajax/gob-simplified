@@ -12,14 +12,67 @@ export const POSITION_COLORS = Object.freeze({
   C: "#D4A017",
 });
 
-/** Attribute Bar Scale for RT (badge bg / edge text). */
+export const DARK_PRESENTATION_BACKGROUND = "#0b0d14";
+export const TEAM_COLOR_TEXT_CONTRAST_MIN = 4.5;
+
+function normalizeHexColor(value) {
+  const text = String(value || "").trim();
+  const short = /^#([0-9a-f]{3})$/i.exec(text);
+  if (short) return `#${short[1].split("").map((c) => c + c).join("")}`;
+  return /^#[0-9a-f]{6}$/i.test(text) ? text : null;
+}
+
+function relativeLuminance(hex) {
+  const color = normalizeHexColor(hex);
+  if (!color) return null;
+  const channels = [1, 3, 5].map((start) => {
+    const srgb = parseInt(color.slice(start, start + 2), 16) / 255;
+    return srgb <= 0.04045 ? srgb / 12.92 : ((srgb + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+}
+
+export function colorContrastRatio(foreground, background = DARK_PRESENTATION_BACKGROUND) {
+  const fg = relativeLuminance(foreground);
+  const bg = relativeLuminance(background);
+  if (fg == null || bg == null) return 0;
+  return (Math.max(fg, bg) + 0.05) / (Math.min(fg, bg) + 0.05);
+}
+
+/**
+ * Primary brand color when it clears the existing presentation threshold.
+ * Otherwise choose the more contrasting of the two brand colors; a secondary
+ * that is even darker than the primary must never make the fallback less legible.
+ */
+export function readableTeamPresentationColor(primary, secondary, options = {}) {
+  const background = options.background || DARK_PRESENTATION_BACKGROUND;
+  const minimum = Number(options.minimum) || TEAM_COLOR_TEXT_CONTRAST_MIN;
+  const normalizedPrimary = normalizeHexColor(primary);
+  const normalizedSecondary = normalizeHexColor(secondary);
+  const primaryContrast = normalizedPrimary
+    ? colorContrastRatio(normalizedPrimary, background)
+    : 0;
+  if (normalizedPrimary && primaryContrast >= minimum) {
+    return normalizedPrimary;
+  }
+  if (!normalizedPrimary) return normalizedSecondary || "#ffffff";
+  if (!normalizedSecondary) return normalizedPrimary;
+  const secondaryContrast = colorContrastRatio(normalizedSecondary, background);
+  return secondaryContrast > primaryContrast ? normalizedSecondary : normalizedPrimary;
+}
+
+/** RT color from the shared grade presentation. */
 export function rtBadgeBg(rt) {
-  const v = Number(rt);
-  if (!Number.isFinite(v)) return "#c8ccd6";
-  if (v <= 40) return "#ff6d6d";
-  if (v <= 60) return "#FFD700";
-  if (v <= 80) return "#34EC27";
-  return "#4A90D9";
+  return typeof window !== "undefined" && typeof window.getRtColor === "function"
+    ? window.getRtColor(rt)
+    : "#c8ccd6";
+}
+
+export function formatRtDisplay(rt) {
+  if (typeof window !== "undefined" && typeof window.formatRtDisplay === "function") {
+    return window.formatRtDisplay(rt);
+  }
+  return "--";
 }
 
 export function hexToRgb(hex) {
@@ -90,7 +143,6 @@ export function buildPlayerTileHtml(player, {
   slotIndex = null,
 } = {}) {
   const rt = Number(player?.rt ?? 0);
-  const rtRounded = Math.round(rt);
   const jersey = player?.jersey != null && player.jersey !== "" ? String(player.jersey) : "—";
   const height = player?.height || "—";
   const weight = player?.weight != null && player.weight !== "" ? `${player.weight} lb` : "—";
@@ -106,7 +158,7 @@ export function buildPlayerTileHtml(player, {
 
   const gutterHtml =
     rtMode === "edge"
-      ? `<div class="dm-rtgutter" aria-hidden="true"><div class="dm-rtedge" style="color:${rtBadgeBg(rt)}">${escapeHtml(String(rtRounded))}</div></div>`
+      ? `<div class="dm-rtgutter"><div class="dm-rtedge" style="color:${rtBadgeBg(rt)}" aria-label="RT ${escapeHtml(formatRtDisplay(rt))}">${escapeHtml(formatRtDisplay(rt))}</div></div>`
       : `<div class="dm-rtgutter" aria-hidden="true"></div>`;
 
   return `

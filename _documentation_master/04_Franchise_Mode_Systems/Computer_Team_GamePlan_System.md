@@ -29,7 +29,30 @@ When leading, re-roll these **eight** strategy settings low (sit on the lead). W
 | Q4+ (incl. OT), `time_remaining` > 239s | lead **> 20** |
 | Q4+ (incl. OT), `time_remaining` ≤ 239s | lead **> 15** |
 
-**Code:** `_conservative_strategy_active()` → `_apply_conservative_strategy_override()`, called from `autoset_strategy_settings()` right after `_compute_strategic_strategy_settings()`.
+**Code:** `_conservative_strategy_active()` → `_apply_conservative_strategy_override()`, called from `autoset_strategy_settings()`.
+
+> **UPDATED August 2026 — two changes to how this composes.**
+>
+> **1. `autoset_strategy_settings` is now IDEMPOTENT ON THE DERIVATION.** A CPU team's game plan
+> is derived ONCE (at `TeamManager.__init__`) and persists as `team.strategy_settings_base` for
+> the rest of the game. It used to recompute from the CURRENT five at every quarter break,
+> timeout and foul-out, so a team's identity shifted several times a game as players tired —
+> and no per-team slider configuration was reachable at all, because anything a caller set was
+> overwritten by the next rebuild. Measured: **52-84% of team-games had every slider changed
+> between tip and final buzzer.** What still happens every call is the situational override,
+> re-evaluated against live `game_state` and applied **on top of the persisted base** — so a
+> team reverts to its real game plan when the situation clears.
+>
+> **2. There is now a SECOND situational override on the same seam:** foul-trouble / fatigue
+> self-regulation. **Conservative wins** — if sit-on-the-lead is active, self-regulation is
+> skipped entirely, since both target `aggression` / `hc_trap` / `fc_press` and conservative
+> damps harder. See
+> [`06_Gameplay_Systems/CPU_Team_Identity_System.md`](../../06_Gameplay_Systems/CPU_Team_Identity_System.md) § Self-regulation override.
+>
+> **3. The base itself is no longer `_compute_strategic_strategy_settings()` for franchise CPU
+> teams** — it is the identity-derived slider draw persisted on `ftd.identity`. The old
+> per-slider `_strategy_roll_*` thresholds were dead in practice (`cum_nd > 350` matched 0 of
+> 128 teams). Same document.
 
 ---
 

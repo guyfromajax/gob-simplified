@@ -73,7 +73,8 @@ def assign_regions(recruits, region_keys, force=False):
 
 def main():
     parser = argparse.ArgumentParser(description="Freeze Home Region into recruit_sets.")
-    parser.add_argument("--commit", action="store_true",
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    parser.add_argument("--apply", action="store_true",
                         help="Actually write. Without this the script only reports the plan (dry-run).")
     parser.add_argument("--force", action="store_true",
                         help="Re-randomize recruits that ALREADY have a Home Region. "
@@ -82,18 +83,13 @@ def main():
                         help="Limit to a single set_id (default: all sets in the collection).")
     args = parser.parse_args()
 
-    # Import after arg parsing so --help works without a DB. BackEnd.db reads
-    # MONGO_URI (or falls back to mongomock) exactly like the loader.
-    from BackEnd.db import db, client
-
-    is_mock = "mongomock" in type(client).__module__
-    banner = f"DB: {db.name} | conn: {'MOCK (no MONGO_URI)' if is_mock else 'REAL'}"
+    from scripts.db_migration_cli import connect_migration_target
+    connection = connect_migration_target(args.db, write=args.apply)
+    db = connection.database
+    banner = f"DB: {db.name}"
     print("=" * len(banner))
     print(banner)
     print("=" * len(banner))
-    if is_mock:
-        print("⚠️  Connected to mongomock — MONGO_URI is not set. Nothing real will be written.",
-              file=sys.stderr)
 
     query = {"set_id": args.set_id} if args.set_id else {}
     sets = list(db.recruit_sets.find(query))
@@ -108,10 +104,10 @@ def main():
         baked, skipped = assign_regions(recruits, REGION_KEYS, force=args.force)
         total_baked += baked
         total_skipped += skipped
-        action = "would bake" if not args.commit else "baked"
+        action = "baked" if args.apply else "would bake"
         print(f"  {set_id}: {action} {baked}, left {skipped} already-frozen "
               f"({len(recruits)} recruits total)")
-        if args.commit and baked:
+        if args.apply and baked:
             new_version = int(set_doc.get("version", 1) or 1) + 1
             db.recruit_sets.update_one(
                 {"_id": set_doc["_id"]},
@@ -122,10 +118,11 @@ def main():
 
     print("-" * 40)
     print(f"Sets: {len(sets)} | recruits baked: {total_baked} | already-frozen: {total_skipped}")
-    if args.commit:
+    if args.apply:
         print(f"Committed: {total_written} set doc(s) updated.")
     else:
-        print("DRY-RUN — nothing written. Re-run with --commit to persist.")
+        print("DRY-RUN — nothing written. Re-run with --apply to persist.")
+    connection.close()
 
 
 if __name__ == "__main__":

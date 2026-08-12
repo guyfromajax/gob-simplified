@@ -401,30 +401,41 @@ def simulate_quarter(
         gm.away_team.lineup = build_lineup_from_mongo(gm.away_team, gm.game_state)
         logging.info(f"✅ simulate_quarter: Built away lineup from MongoDB: {list(gm.away_team.lineup.keys())}")
     
-    # Rebuild the computer team's lineup only at explicit lineup checkpoints
-    # (Set Lineup return) or full-sim paths. Plain court refreshes should keep
-    # the persisted active lineup to avoid dead sprites and hidden state drift.
+    # Full simulations rebuild every lineup that was not explicitly supplied.
+    # Turn-by-turn remains computer-only at explicit lineup checkpoints (Set
+    # Lineup return); plain court refreshes keep the persisted active lineup.
+    # Explicit IDs always win because their branches above run first and the
+    # corresponding team is excluded here.
     computer_team = gm.away_team if not gm.away_team.is_user_team else gm.home_team
-    should_rebuild_computer_lineup = lineup_checkpoint or not turn_by_turn_mode
-    if (
-        should_rebuild_computer_lineup
-        and not computer_team.is_user_team
-        and not (away_lineup_ids if computer_team == gm.away_team else home_lineup_ids)
-    ):
-        # Only rebuild if no explicit lineup was provided and this is the computer team
+    rebuild_targets = []
+    if not turn_by_turn_mode:
+        if not home_lineup_ids:
+            rebuild_targets.append(gm.home_team)
+        if not away_lineup_ids:
+            rebuild_targets.append(gm.away_team)
+    elif lineup_checkpoint and not computer_team.is_user_team:
+        computer_lineup_ids = (
+            away_lineup_ids if computer_team == gm.away_team else home_lineup_ids
+        )
+        if not computer_lineup_ids:
+            rebuild_targets.append(computer_team)
+
+    for team in rebuild_targets:
         try:
             from BackEnd.utils.db_utils import autoset_strategy_settings
-            computer_team.lineup = build_lineup_from_mongo(computer_team, gm.game_state)
-            # Autoset strategy settings for computer team
-            autoset_strategy_settings(computer_team, gm.game_state)
+            team.lineup = build_lineup_from_mongo(team, gm.game_state)
+            if not team.is_user_team:
+                autoset_strategy_settings(team, gm.game_state)
             logging.info(
-                "✅ LINEUP CHECKPOINT: Rebuilt computer team (%s) lineup for Q%s "
-                "with energy/foul filtering and autoset strategy settings",
-                computer_team.name,
+                "✅ LINEUP CHECKPOINT: Rebuilt %s team (%s) lineup for Q%s "
+                "with energy/foul filtering%s",
+                "user" if team.is_user_team else "computer",
+                team.name,
                 gm.quarter,
+                "" if team.is_user_team else " and autoset strategy settings",
             )
         except Exception as e:
-            logging.error(f"⚠️ LINEUP CHECKPOINT: Failed to rebuild computer team lineup: {e}")
+            logging.error(f"⚠️ LINEUP CHECKPOINT: Failed to rebuild {team.name} lineup: {e}")
             # Don't fail quarter start if lineup rebuild fails - use existing lineup
 
     # ✅ Player Momentum reset at quarter breaks (Q2+; Q3 start = halftime).

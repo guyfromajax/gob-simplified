@@ -117,6 +117,12 @@ def test_free_throw_miss_rebound_uses_coords_synced_from_ft_animation(monkeypatc
         lambda a, b: 100 if (a, b) == (1, 100) else 1,
     )
     monkeypatch.setattr(phase_resolution_module.random, "random", lambda: 1.0)
+    # This test exercises the live-ball rebound branch, not the independent 2%
+    # airball variant (which correctly produces a dead-ball inbound).
+    monkeypatch.setattr(
+        "BackEnd.constants.shot_variants.select_ft_shot_variant",
+        lambda *args, **kwargs: "FREE_THROW_MISS",
+    )
 
     def _fake_determine_rebounder(
         game,

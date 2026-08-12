@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Fix contested v1/v8 step 7 on Double Screen Three - Wing in gob and gob-staging.
+Fix contested v1/v8 step 7 on Double Screen Three - Wing in one explicit database.
 
 Step 7 incorrectly re-passed to target_shooter at low post after the wing pass.
 Changes:
@@ -13,40 +13,17 @@ Run from repo root:
 
 from __future__ import annotations
 
+import argparse
 import os
 import sys
 from pathlib import Path
 
-from pymongo import MongoClient
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 PLAY_NAME = "Double Screen Three - Wing"
-TARGET_DBS = ("gob", "gob-staging")
 TARGET_VERSIONS = ("v1", "v8")
 STEP_INDEX = 7
-
-
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def _load_mongo_uri() -> str:
-    _load_env_file(ROOT / ".env.local")
-    _load_env_file(ROOT / ".env")
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment/.env files")
-    return uri
 
 
 def _step7_actions(play: dict, version: str) -> dict | None:
@@ -78,8 +55,7 @@ def _needs_update(actions: dict | None) -> bool:
     return ts.get("action") == "receive" and pos2.get("action") == "pass"
 
 
-def update_database(client: MongoClient, db_name: str) -> tuple[int, int]:
-    collection = client[db_name]["plays"]
+def update_database(collection, db_name: str, *, apply: bool) -> tuple[int, int]:
     play = collection.find_one({"name": PLAY_NAME})
     if not play:
         print(f"[{db_name}] play not found: {PLAY_NAME!r}")
@@ -101,6 +77,10 @@ def update_database(client: MongoClient, db_name: str) -> tuple[int, int]:
             )
             continue
 
+        if not apply:
+            print(f"[{db_name}] {version}: would update (dry-run)")
+            matched += 1
+            continue
         result = collection.update_one(
             {"name": PLAY_NAME, "skeletons.contested.versions.version": version},
             {
@@ -127,15 +107,14 @@ def update_database(client: MongoClient, db_name: str) -> tuple[int, int]:
 
 
 def main() -> int:
-    uri = _load_mongo_uri()
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-
-    total_matched = 0
-    total_modified = 0
-    for db_name in TARGET_DBS:
-        matched, modified = update_database(client, db_name)
-        total_matched += matched
-        total_modified += modified
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", choices=("gob-staging", "gob"), required=True)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=args.apply)
+    total_matched, total_modified = update_database(
+        connection.database["plays"], args.db, apply=args.apply
+    )
 
     print(f"[done] matched={total_matched} modified={total_modified}")
     return 0 if total_modified > 0 or total_matched > 0 else 1

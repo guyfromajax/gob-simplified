@@ -4,10 +4,16 @@ Top-level map of the MongoDB layer: every collection, what owns it, and the iden
 
 ## Environment & Connection
 
-- `BackEnd/db.py` defines nearly all collection handles; all code imports them from there. Two exceptions are created at point of use: `feedback_submissions` (`BackEnd/api/feedback_routes.py`) and `distant_training` (read via `db["distant_training"]` in `BackEnd/api/franchise_routes.py`).
-- `MONGO_URI` selects the cluster; the database name comes from `MONGO_DB_NAME`, else the URI path (e.g. `/gob-staging`), else defaults to `gob` (prod).
-- `.env.local` (if present) overrides `.env` for local dev.
-- If `MONGO_URI` is unset or the client fails to init, `db.py` falls back to **mongomock** (used by tests).
+- `BackEnd/db.py` defines nearly all collection handles; point-of-use exceptions are documented beside their callers.
+- `BackEnd/env_config.py` resolves the application environment before `db.py` opens a client.
+- Real Mongo requires both `MONGO_URI` and `MONGO_DB_NAME`; the explicit name must match the URI path and the `ENVIRONMENT` target.
+- Ordinary local startup requires repository-root `.env.local` and permits `gob-staging` only. There is no `.env` fallback and no implicit production default.
+- Railway uses injected process variables and does not load a repository env file.
+- Tests select in-memory Mongo explicitly with `GOB_DB_MODE=mongomock`, `ENVIRONMENT=test`, and a non-live database name such as `gob-test`.
+- Missing, malformed, or failed real Mongo configuration does not fall back to mongomock.
+- Maintenance scripts use `BackEnd/script_db.py`, require an explicit target and access
+  intent, and enforce read-only mode at the operation boundary. See
+  [Environment_Operations.md](../00_Operations/Environment_Operations.md).
 
 ## Collection Inventory
 
@@ -18,10 +24,9 @@ Top-level map of the MongoDB layer: every collection, what owns it, and the iden
 | `teams` | 128 base teams: name (school), mascot, colors, `conference`, `region`, prestige baselines |
 | `players` | Baseline player pool keyed to base teams |
 | `plays` | Canonical offensive play docs (skeletons, baselines) — see `O_&_D_Plays_Collections.md` |
-| `defenses` | Canonical defenses (`defense_id`, `defense_type`, `zone_definitions`, `shift_triggers`) — seeded by `scripts/init_defenses_collection.py` and siblings |
+| `defenses` | Canonical defenses (`defense_id`, `defense_type`, `zone_definitions`, `shift_triggers`) — maintained and published by `scripts/publish_defenses.py` |
 | `fcp_skeletons` | Fast Court Press setup/animation skeletons |
 | `hct_skeletons` | Half-court transition skeletons |
-| `distant_training` | CPU-team training templates (`training_type`: tc/regular), seeded by `scripts/generate_distant_training_templates.py` |
 
 ### Mode state (created and written at runtime)
 
@@ -31,8 +36,8 @@ Top-level map of the MongoDB layer: every collection, what owns it, and the iden
 | `tournaments` | Tournament-mode master docs |
 | `franchises` | Franchise master doc: week, schedule `results`, `season_news`, `season_inbox`, recruiting flags, user team fields; **`applied_games`** (finalized game `_id` strings) and **`applied_matchups`** (franchise-week matchup keys for stat rollup idempotency — see `Box_Score_System.md` §5) |
 | `franchise_team_data` (FTD) | Per-franchise, per-team state: plays copies, playbook settings, scouting, `natl_rank`, recruiting orders |
-| `franchise_players_data` (FPD) | Per-franchise player docs: meta, attributes, position ratings, season/career stats |
-| `franchise_recruits_data` (FRD) | Per-franchise recruit pool: attributes, archetype, `year`, `Home Region`, `Lean` |
+| `franchise_players_data` (FPD) | Per-franchise player docs: meta, attributes, position ratings, season/career stats, and the top-level identity/development carry — `entry_tier`, `position_intent`, `potential_factor`, plus the `development` subdoc (`peak_count`, `peak_rungs`, `family_timing`, `ch_seed`, `ht_total`) and `training_position`/`coaching_quality` (see `PLAYER_DEV_CARRY_FIELDS`) |
+| `franchise_recruits_data` (FRD) | Per-franchise recruit pool: attributes, `entry_tier`, `position_intent`, `potential_factor`, `development`, `year`, `Home Region`, `Lean`. `archetype` is a **derived display label** (from position_intent+tier), not a generation input |
 | `franchise_state` | **Deprecated** single-state doc; only read as a backward-compat fallback for user-team resolution |
 | `training_sessions` | Training run log |
 
@@ -67,6 +72,7 @@ Note: Mongo creates collections lazily on first write. As of 2026-06, `training_
 - `first_name`, `last_name`, `team`
 - attributes (`SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT`); anchor values set equal to these. `EM`, `MO`, `CH` initialized at 0 (game/mode init overwrites `CH` and `EM` 1–100, `MO` stays 0)
 - `jersey`, `year`, `height`, `weight`
+- the identity/development carry — `entry_tier`, `position_intent`, `potential_factor`, and a `development` profile (the generator logs loudly when `potential_factor`/`entry_tier` are missing, and `develop_rollover` lazy-backfills a missing `development` once). Prefer generating via `generate_player` so these are populated correctly rather than hand-seeding.
 - headshot: until specified otherwise, all new players use `/static/images/players/generic_headshot.png` (set `photo` to that path)
 
 ## Indexes (ensured at startup, idempotent)

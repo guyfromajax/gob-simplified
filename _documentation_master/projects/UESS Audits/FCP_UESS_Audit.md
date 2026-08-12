@@ -2,7 +2,7 @@
 
 **Verdict: cleaner than HCT on clock/§1, but the §8.3 press-positioning divergence is WORSE.** Two low-risk entry-seam fixes (FCP never got the HCT-Task 2/3 parity), plus the HCT #6/#7 "engine reads full-snap, emitter renders interrupted" divergence — amplified because FCP skips the walk-up. (2026-07-05, 4-dimension parallel trace; deltas-from-HCT only.)
 
-> **Shared with HCT (not re-covered):** FCP = dynamic press via `compute_dynamic_hct_turn(turn_mode="fcp")` + the shared emitter (`skip_walk_up=True`). HCT-shared findings (post-steal clock, interception freeze) are in [`HCT_UESS_Audit.md`](HCT_UESS_Audit.md) / [`../FCPHCT_UESS_Audit.md`](../FCPHCT_UESS_Audit.md). The HCT-Task 1 **backfill fix covers FCP** (runs before the `skip_walk_up` branch — verified).
+> **Shared with HCT (not re-covered):** FCP = dynamic press via `compute_dynamic_hct_turn(turn_mode="fcp")` + the shared emitter (`skip_walk_up=True`). The interception/terminal schema fixes and current shared PressureStepState bridge are documented canonically in [`../../06_Gameplay_Systems/HCT_System.md`](../../06_Gameplay_Systems/HCT_System.md). The HCT-Task 1 **backfill fix covers FCP** (runs before the `skip_walk_up` branch — verified).
 
 ## Topline
 - **§5 clock:** ✅ **Compliant** — and *free* of HCT's walk-up-blindness (HIGH #1): FCP's `fcp_engagement` is a real committed loop segment, decremented from the engine shot clock. New-possession shot clock correctly reset upstream.

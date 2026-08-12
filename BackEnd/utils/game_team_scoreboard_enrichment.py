@@ -246,15 +246,15 @@ def teams_row_for_team_id(teams: Any, tid: Any) -> dict[str, Any] | None:
 
 
 def team_scoreboard_meta_for_pair(
-    home_display_name: str,
-    away_display_name: str,
+    home_core_name: str,
+    away_core_name: str,
     home_row: Any,
     away_row: Any,
     home_natl: Any,
     away_natl: Any,
 ) -> dict[str, dict[str, Any]]:
     """
-    Court scoreboard: same keys as ``score`` / box score (display team names).
+    Court scoreboard meta: keys match ``score`` / box-score lookup (core names).
     Each value: natl_rank, wins, losses (optional team_wins / team_losses mirrors).
     """
 
@@ -269,8 +269,8 @@ def team_scoreboard_meta_for_pair(
         }
 
     return {
-        str(home_display_name): one(home_row, home_natl),
-        str(away_display_name): one(away_row, away_natl),
+        str(home_core_name): one(home_row, home_natl),
+        str(away_core_name): one(away_row, away_natl),
     }
 
 
@@ -305,6 +305,7 @@ def attach_home_away_team_scoreboard_shards(summary: dict[str, Any]) -> None:
             return None
         return {
             "name": row.get("name"),
+            "display_name": row.get("display_name") or row.get("name"),
             "team_id": row.get("team_id"),
             "attributes": row.get("attributes") or {},
             "natl_rank": row.get("natl_rank"),
@@ -323,7 +324,7 @@ def attach_home_away_team_scoreboard_shards(summary: dict[str, Any]) -> None:
 
 
 def attach_team_scoreboard_meta_by_name_for_simulate(summary: dict[str, Any], gm: Any) -> None:
-    """Set ``team_scoreboard_meta`` on simulate response; keys match ``summary[\"score\"]`` (display names)."""
+    """Set ``team_scoreboard_meta`` on simulate response; keys match ``summary[\"score\"]`` (core names)."""
     if not isinstance(summary, dict) or gm is None:
         return
     teams = summary.get("teams") or {}

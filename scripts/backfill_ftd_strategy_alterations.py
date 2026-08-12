@@ -5,9 +5,8 @@ Backfill strategy_settings.alterations on franchise_team_data (FTD) documents.
 Default value: 2 (Normal). Does not modify games or tournament documents.
 
 Usage:
-  python scripts/backfill_ftd_strategy_alterations.py --dry-run
   python scripts/backfill_ftd_strategy_alterations.py --db gob-staging
-  python scripts/backfill_ftd_strategy_alterations.py --db gob
+  python scripts/backfill_ftd_strategy_alterations.py --db gob-staging --apply
 """
 
 from __future__ import annotations
@@ -17,39 +16,15 @@ import os
 import sys
 from pathlib import Path
 
-from pymongo import MongoClient
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 DEFAULT_VALUE = 2
 
 
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def _load_mongo_uri() -> str:
-    _load_env_file(ROOT / ".env.local")
-    _load_env_file(ROOT / ".env")
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment/.env files")
-    return uri
-
-
 def backfill_ftd_alterations(*, db_name: str, dry_run: bool) -> dict[str, int]:
-    uri = _load_mongo_uri()
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
-    collection = client[db_name]["franchise_team_data"]
+    connection = connect_migration_target(db_name, write=not dry_run)
+    collection = connection.database["franchise_team_data"]
 
     stats = {
         "total_docs": 0,
@@ -95,15 +70,16 @@ def main() -> int:
         help="Target database (default: gob-staging)",
     )
     parser.add_argument(
-        "--dry-run",
+        "--apply",
         action="store_true",
-        help="Report changes without writing",
+        help="Write changes; default is dry-run",
     )
     args = parser.parse_args()
 
-    mode = "DRY RUN" if args.dry_run else "WRITE"
+    dry_run = not args.apply
+    mode = "DRY RUN" if dry_run else "WRITE"
     print(f"[{mode}] backfill FTD strategy_settings.alterations on db={args.db!r} default={DEFAULT_VALUE}")
-    stats = backfill_ftd_alterations(db_name=args.db, dry_run=args.dry_run)
+    stats = backfill_ftd_alterations(db_name=args.db, dry_run=dry_run)
     print(
         f"total_docs={stats['total_docs']} "
         f"already_has_alterations={stats['already_has_alterations']} "

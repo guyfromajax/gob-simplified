@@ -533,11 +533,13 @@ Current summary fields:
 Visual source: `projects/Scouting - Projected Five (Images).html`.
 
 - Lazy-rendered on tab open via `renderScoutingTab()` → `renderFccScoutingProjectedLineup()` → `renderProjectedStartingFiveCards()` in `js/shared/scoutingReport.js`. Does **not** touch FCC initial load / page-load overlay.
+- **Selection is the five autoset would field at tip** — same eligibility waterfall, exact max-weight DP and energy-aware objective as the game, via `db_utils.projected_starting_five_from_payload()`. See `06_Gameplay_Systems/CPU_Team_Rotation_System.md` §6. Opponents are CPU teams and never override their lineup, so this tab is an **exact** match for what walks onto the floor. Was a separate greedy fill until August 2026.
 - Cards ordered PG → SG → SF → PF → C.
 - Each card: square headshot (`API_CONFIG.getPlayerImageUrl(player_id, { size: 'card' })`, `loading="lazy"`, explicit 240×240, `onerror` → generic headshot), white position badge, RT badge colored with `getRtBucketClass` / `rt-buckets.css`, name + `#jersey`, year · height · weight, boxed PPG / RPG / APG / DEF%.
 - Per-game stats and DEF% are **server-enriched** on each `projected_starting_five` row (`ppg`, `rpg`, `apg`, `def_pct`) via shared `build_enriched_projected_starting_five()` (`scouting_utils.py`) using FPD `season` totals (`PTS`, `TREB`/`OREB`+`DREB`, `AST`, `GP`, `DEF_S`/`DEF_A`). DEF% is a whole percent (`round(DEF_S/DEF_A*100)` when `DEF_A > 0`, else `0`).
 - The same card renderer and enrichment helper power **team roster Starting 5** (`team-roster-view.html`) from `GET /roster/...` / Practice Squad team payloads (header label **Starting 5**; FCC keeps **Projected Starting Five**).
 - Core attribute columns are **not** shown in this section anymore (team attributes remain under Team Measures / team page).
+- ⚠️ **The attribute values on `projected_starting_five` rows are ALREADY on the 0–10 display scale** — `compute_projected_starting_five()` applies `int(raw) // 10` server-side (pinned by `test_attributes_floor_ten_in_output`). The table renderer (`renderProjectedStartingFive`, used by the Training Report and tournament scouting) must print them as-is. It divided by 10 a second time until 2026-08, flooring every attribute to `0` — only a perfect 100 survived, as `1` — which read as training deltas rather than totals.
 
 Important note:
 

@@ -12,14 +12,14 @@ Safety:
 from __future__ import annotations
 
 import os
+import argparse
+import sys
 from pathlib import Path
 
-from pymongo import MongoClient
-
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 TXT_PATH = ROOT / "teams" / "all_players_with_team_names.txt"
-TARGET_DBS = ("gob", "gob-staging")
 TARGET_PLAYERS = (
     "Antoine Ellington",
     "Lucky Forte",
@@ -35,29 +35,6 @@ TARGET_PLAYERS = (
 )
 ATTR_KEYS = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT")
 IDX = {"first_name": 0, "last_name": 1, "team": 18}
-
-
-def _load_env(filepath: Path) -> dict[str, str]:
-    values: dict[str, str] = {}
-    if not filepath.exists():
-        return values
-    for raw_line in filepath.read_text().splitlines():
-        line = raw_line.strip()
-        if not line or line.startswith("#") or "=" not in line:
-            continue
-        key, value = line.split("=", 1)
-        values[key.strip()] = value.strip().strip('"').strip("'")
-    return values
-
-
-def _load_mongo_uri() -> str:
-    for env_file in (ROOT / ".env.local", ROOT / ".env"):
-        for key, value in _load_env(env_file).items():
-            os.environ.setdefault(key, value)
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment, .env.local, or .env")
-    return uri
 
 
 def _parse_targets() -> dict[str, dict[str, str]]:
@@ -84,15 +61,17 @@ def _parse_targets() -> dict[str, dict[str, str]]:
 
 
 def main() -> int:
-    uri = _load_mongo_uri()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", choices=("gob-staging", "gob"), required=True)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
     targets = _parse_targets()
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
+    connection = connect_migration_target(args.db, write=args.apply)
 
     total_modified = 0
-    for db_name in TARGET_DBS:
-        coll = client[db_name]["players"]
-        print(f"[info] Updating {db_name}.players anchor attrs")
-        for full_name in TARGET_PLAYERS:
+    coll = connection.database["players"]
+    print(f"[info] {'Updating' if args.apply else 'Checking'} {args.db}.players anchor attrs")
+    for full_name in TARGET_PLAYERS:
             row = targets[full_name]
             query = {
                 "first_name": row["first_name"],
@@ -101,17 +80,20 @@ def main() -> int:
             }
             doc = coll.find_one(query, {"attributes": 1})
             if not doc:
-                raise RuntimeError(f"{db_name}.players missing target player: {full_name} ({row['team']})")
+                raise RuntimeError(f"{args.db}.players missing target player: {full_name} ({row['team']})")
             attrs = doc.get("attributes") or {}
             set_doc = {
                 f"attributes.anchor_{key}": attrs.get(key, 0)
                 for key in ATTR_KEYS
             }
-            result = coll.update_one({"_id": doc["_id"]}, {"$set": set_doc})
-            total_modified += result.modified_count
-            print(f"  - {full_name} ({row['team']}): matched={result.matched_count} modified={result.modified_count}")
+            if args.apply:
+                result = coll.update_one({"_id": doc["_id"]}, {"$set": set_doc})
+                total_modified += result.modified_count
+                print(f"  - {full_name} ({row['team']}): matched={result.matched_count} modified={result.modified_count}")
+            else:
+                print(f"  - {full_name} ({row['team']}): would sync {len(set_doc)} anchors")
 
-    print(f"[done] Total modified documents across both DBs: {total_modified}")
+    print(f"[done] Total modified documents: {total_modified}")
     return 0
 
 

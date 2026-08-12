@@ -26,6 +26,7 @@
  */
 
 import { calculatePotgPoints } from '../../shared/potg.js';
+import { readableTeamPresentationColor } from './matchupsUiShared.js';
 
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const MO_GLYPH_THRESHOLD = 4; // |MO| >= 4 → hot/cold glyph — matches existing MO_GLYPH_THRESHOLD (gameScene.js:221), the ±5-scale box-score convention
@@ -61,15 +62,25 @@ function buildDirectory(summary) {
   return dir;
 }
 
-/** Short abbreviation fallback from a team name ("Four Corners" → "FC"). */
-function abbrFromName(name) {
-  const words = String(name || '').trim().split(/\s+/).filter(Boolean);
-  if (!words.length) return '';
-  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
-  return words.map((w) => w[0]).join('').slice(0, 3).toUpperCase();
+/** Short abbreviation fallback — overlay-aware via resolveTeamAbbreviation. */
+function abbrFromName(name, teamId) {
+  if (typeof resolveTeamAbbreviation === 'function') {
+    return resolveTeamAbbreviation(name, teamId);
+  }
+  if (typeof deriveTeamAbbreviationFromName === 'function') {
+    return deriveTeamAbbreviationFromName(name);
+  }
+  const clean = String(name || '').replace(/[^A-Za-z0-9]/g, '');
+  return (clean.slice(0, 3) || '???').toUpperCase();
 }
 
-/** Build the `T` team object (away/home meta) from a summary + rosters. */
+/**
+ * Build presentation team meta + core identity for score sampling.
+ *
+ * Dual-use (§3.1a): score{} / box keys stay on core ``name``; chrome fields
+ * (teamName, name, abbr, color) come from the total chrome snapshot
+ * (lookupTeamChrome) — never summary.teams[].colors / roster.primary_color.
+ */
 function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName) {
   const teamsObj = (summary && summary.teams) || {};
   const homeId = nid(summary && summary.home_team_id);
@@ -77,12 +88,43 @@ function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName)
   const homeT = teamsObj[homeId] || {};
   const awayT = teamsObj[awayId] || {};
 
-  const nameOf = (t, fallback) => t.name || fallback || 'Team';
-  const colorOf = (t, roster, fallback) =>
-    (t.colors && t.colors.primary_color) ||
-    t.primary_color ||
-    (roster && roster.primary_color) ||
-    fallback;
+  const coreOf = (t, fallback) => t.name || fallback || 'Team';
+  const hCore = coreOf(homeT, homeTeamName);
+  const aCore = coreOf(awayT, awayTeamName);
+
+  const chromeOf = (core, teamRec, roster) => {
+    const fb = {
+      label: teamRec.display_name || core,
+      primary_color:
+        (roster && (roster.primary_color || roster.primary)) ||
+        (teamRec.colors && teamRec.colors.primary_color) ||
+        teamRec.primary_color,
+      secondary_color:
+        (roster && (roster.secondary_color || roster.secondary)) ||
+        (teamRec.colors && teamRec.colors.secondary_color) ||
+        teamRec.secondary_color,
+      abbreviation: teamRec.abbreviation || teamRec.abbr,
+      team_id: teamRec.team_id,
+      object_id: teamRec.object_id || teamRec.team_object_id,
+    };
+    if (typeof lookupTeamChrome === 'function') {
+      return lookupTeamChrome(core, fb);
+    }
+    return {
+      core_name: core,
+      label: fb.label || core,
+      abbreviation:
+        fb.abbreviation ||
+        (typeof abbrFromName === 'function' ? abbrFromName(fb.label || core) : '???'),
+      primary_color: fb.primary_color || null,
+      secondary_color: fb.secondary_color || null,
+      is_overlay: false,
+    };
+  };
+
+  const hChrome = chromeOf(hCore, homeT, homeRoster);
+  const aChrome = chromeOf(aCore, awayT, awayRoster);
+
   const rankOf = (t, roster) => num(t.natl_rank ?? (roster && roster.natl_rank) ?? 0);
   const recOf = (t, roster) => {
     const w = num(t.wins ?? (roster && roster.wins) ?? 0);
@@ -90,25 +132,33 @@ function buildTeams(summary, homeRoster, awayRoster, homeTeamName, awayTeamName)
     return `${w}–${l}`;
   };
 
-  const hName = nameOf(homeT, homeTeamName);
-  const aName = nameOf(awayT, awayTeamName);
   return {
-    home: {
-      teamName: hName,
-      name: hName,
-      abbr: homeT.abbr || abbrFromName(hName),
-      color: colorOf(homeT, homeRoster, '#1F8A5B'),
-      rank: rankOf(homeT, homeRoster),
-      rec: recOf(homeT, homeRoster),
+    teams: {
+      home: {
+        teamName: hChrome.label,
+        name: hChrome.label,
+        abbr: hChrome.abbreviation,
+        color: readableTeamPresentationColor(
+          hChrome.primary_color || '#1F8A5B',
+          hChrome.secondary_color
+        ),
+        rank: rankOf(homeT, homeRoster),
+        rec: recOf(homeT, homeRoster),
+      },
+      away: {
+        teamName: aChrome.label,
+        name: aChrome.label,
+        abbr: aChrome.abbreviation,
+        color: readableTeamPresentationColor(
+          aChrome.primary_color || '#9E1B32',
+          aChrome.secondary_color
+        ),
+        rank: rankOf(awayT, awayRoster),
+        rec: recOf(awayT, awayRoster),
+      },
     },
-    away: {
-      teamName: aName,
-      name: aName,
-      abbr: awayT.abbr || abbrFromName(aName),
-      color: colorOf(awayT, awayRoster, '#9E1B32'),
-      rank: rankOf(awayT, awayRoster),
-      rec: recOf(awayT, awayRoster),
-    },
+    homeCore: hCore,
+    awayCore: aCore,
   };
 }
 
@@ -136,20 +186,22 @@ function defPct(stats) {
 export function buildSimTimeline(quarterSummaries, ctx = {}) {
   const summaries = (quarterSummaries || []).filter((s) => s && typeof s === 'object');
   const last = summaries[summaries.length - 1] || {};
-  const teams = buildTeams(
+  const built = buildTeams(
     last,
     ctx.homeRoster,
     ctx.awayRoster,
     ctx.homeTeamName,
     ctx.awayTeamName
   );
+  const teams = built.teams;
   // Directory grows across quarters (bench players appear as they check in).
   // RT rides on each player entry (payload `rt`, backend Chunk 0).
   const directory = {};
   summaries.forEach((s) => Object.assign(directory, buildDirectory(s)));
 
-  const homeName = teams.home.teamName;
-  const awayName = teams.away.teamName;
+  // Core identity for score{} sampling only — never render these.
+  const homeName = built.homeCore;
+  const awayName = built.awayCore;
 
   // Running, DISPLAY-ONLY cumulative per player: { playerId: { STAT: value } }.
   const cum = {};

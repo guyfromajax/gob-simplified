@@ -10,25 +10,14 @@ Reports:
 
 Run from repo root: python3 scripts/review_staging_players_collection.py
 """
-import os
+import argparse
 import sys
 from collections import defaultdict
+from pathlib import Path
 
-_script_dir = os.path.dirname(os.path.abspath(__file__))
-_root = os.path.dirname(_script_dir)
-sys.path.insert(0, _root)
-os.chdir(_root)
-
-for path in [".env.local", ".env"]:
-    if os.path.exists(path):
-        with open(path) as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith("#") and "=" in line:
-                    k, v = line.split("=", 1)
-                    os.environ.setdefault(k.strip(), v.strip().strip('"').strip("'"))
-
-from pymongo import MongoClient
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 
 
 def _is_hex_id(val):
@@ -39,19 +28,17 @@ def _is_hex_id(val):
 
 
 def main():
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        print("MONGO_URI not set.")
-        sys.exit(1)
-
-    client = MongoClient(uri)
-    staging = client["gob-staging"]
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging", "gob"])
+    args = parser.parse_args()
+    connection = connect_migration_target(args.db, write=False)
+    staging = connection.database
     players = list(staging["players"].find({}))
     teams = list(staging["teams"].find({}, {"_id": 1, "name": 1, "player_ids": 1}))
 
     total = len(players)
     expected = 128 * 12
-    print(f"=== gob-staging.players ===\n")
+    print(f"=== {args.db}.players ===\n")
     print(f"Total player docs:     {total}")
     print(f"Expected (128*12):     {expected}")
     print(f"Difference:            {total - expected} extra\n")
@@ -112,6 +99,7 @@ def main():
             print(f"  {fn} {ln} @ {team}: {len(ids)} docs -> {[(id_, 'hex' if h else 'uuid') for id_, h in ids[:5]]}{'...' if len(ids) > 5 else ''}")
 
     print("\nDone.")
+    connection.close()
 
 
 if __name__ == "__main__":

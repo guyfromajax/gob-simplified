@@ -24,12 +24,23 @@ Env (set by scripts/run_eog_measurement.sh, validated here):
   MONGO_URI                     must contain 'gob-staging'
   GOB_EOG_BAND_LOG=1            band capture on
   GOB_EOG_BAND_LOG_FILE=<abs>   durable local path for the dataset
-  FRANCHISE_ALL_GAMES_FULL_SIM=1  REQUIRED — else regular-season games go distant
-                                  and the six usage-gated attributes are garbage
-  FRANCHISE_ALL_TEAMS_AUTOTRAIN=1 (recommended) real CPU training
   FRANCHISE_CPU_SIM_USE_POOL=1     (recommended) fast CPU slate
 """
+
 from __future__ import annotations
+
+# Pin PYTHONHASHSEED before anything else: unpinned runs are not reproducible and
+# have produced false measurement conclusions. See BackEnd/utils/repro.
+# Loaded BY PATH so this does not import the BackEnd.utils package, whose __init__
+# pulls in stat_updater -> db and would open a Mongo connection twice across the
+# re-exec.
+import os as _os, sys as _sys, importlib.util as _ilu
+_GOB_ROOT = _os.path.dirname(_os.path.dirname(_os.path.abspath(__file__)))
+_sys.path.insert(0, _GOB_ROOT)
+_spec = _ilu.spec_from_file_location(
+    "_gob_repro", _os.path.join(_GOB_ROOT, "BackEnd", "utils", "repro.py"))
+_repro = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_repro)
+_repro.pin_hash_seed()
 
 import argparse
 import os
@@ -41,10 +52,12 @@ _REPO = Path(__file__).resolve().parent.parent
 if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
-# Hardcoded target — do NOT resolve "most recent franchise"; that stops being
-# true the moment another franchise exists.
-TARGET_FRANCHISE_ID = "6a66449127f0298bd27584c5"
-EXPECTED_USER_TEAM = "South Lancaster"
+# Explicit target — never "most recent franchise" (stops being true the moment
+# another exists). Overridable via env for a freshly-provisioned franchise.
+# Arms franchise (provisioned week-1). The old measurement franchise
+# 6a66449127f0298bd27584c5 is at week 27 — its band log is the baseline; leave it.
+TARGET_FRANCHISE_ID = os.environ.get("GOB_MEASUREMENT_FRANCHISE_ID", "6a67882a2b2eb443f8c7789f")
+EXPECTED_USER_TEAM = os.environ.get("GOB_MEASUREMENT_TEAM", "South Lancaster")
 EXPECTED_DB_MARKER = "gob-staging"
 REGULAR_SEASON_LAST_WEEK = 26
 
@@ -56,19 +69,32 @@ def _abort(msg: str) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", required=True, choices=["gob-staging"])
+    parser.add_argument("--apply", action="store_true", help="Required: advances and mutates the franchise")
     parser.add_argument(
         "--stop-after-week", type=int, default=REGULAR_SEASON_LAST_WEEK,
         help="Advance until franchise week exceeds this (default 26). Use 1 for the "
-             "week-1 capture gate, then re-run with 26 for the rest.",
+             "week-1 capture gate, then re-run with 26 for the rest. For the "
+             "distributional arms use a SHORT length (e.g. 5).",
+    )
+    parser.add_argument(
+        "--seed", type=int, default=None,
+        help="Seed sim_rng + global random for a REPRODUCIBLE arm (re-run same code "
+             "+ same seed + same restored start → same result). Requires the thread "
+             "path (FRANCHISE_CPU_SIM_USE_POOL=0) — spawned pool workers can't be "
+             "seeded deterministically. NOT a paired-comparison tool: Task 6 removes "
+             "a draw, so seeded baseline vs changed desync at the first focus call.",
     )
     args = parser.parse_args()
+    if not args.apply:
+        parser.error("this harness mutates a franchise; re-run with --apply")
     stop_after = min(int(args.stop_after_week), REGULAR_SEASON_LAST_WEEK)
 
-    # ---- Safety gate 1: environment (before importing anything DB-bound) -------
-    mongo_uri = os.environ.get("MONGO_URI", "")
-    if EXPECTED_DB_MARKER not in mongo_uri.lower():
-        _abort(f"MONGO_URI does not point at '{EXPECTED_DB_MARKER}'. Refusing to run "
-               f"(guards against prod / an empty local DB). Got: {mongo_uri[:40]}...")
+    # Validate the repo-root staging write configuration before importing application
+    # routes, whose module-level collections are intentionally owned by BackEnd.db.
+    from scripts.db_migration_cli import connect_migration_target
+    preflight = connect_migration_target(args.db, write=True)
+    preflight.close()
 
     # Imports are deferred until AFTER the MONGO_URI guard so a misconfigured run
     # can't connect anywhere first.
@@ -87,15 +113,28 @@ def main() -> int:
         FranchiseTrainingRequest,
         _eog_band_log_enabled,
         _eog_band_log_path,
-        _franchise_all_games_full_sim,
     )
 
     # ---- Safety gate 2: capture + clean-data flags ----------------------------
     if not _eog_band_log_enabled():
         _abort("GOB_EOG_BAND_LOG is not on — nothing would be captured.")
-    if not _franchise_all_games_full_sim():
-        _abort("FRANCHISE_ALL_GAMES_FULL_SIM is not 1 — regular-season games would go "
-               "distant and the six usage-gated attributes would be GARBAGE. Set it.")
+    # ---- Optional reproducibility: seed BOTH streams, require single-process ----
+    if args.seed is not None:
+        from BackEnd.api.franchise_routes import _franchise_cpu_use_pool
+        if _franchise_cpu_use_pool():
+            _abort("--seed requires FRANCHISE_CPU_SIM_USE_POOL=0 (spawned pool workers "
+                   "re-seed per process and can't be made deterministic). Set it to 0.")
+        import random as _random
+        from BackEnd.utils import sim_random, training_random
+        _random.seed(args.seed)          # EOG band deltas draw from global random
+        sim_random.seed(args.seed)       # the engine draws from the isolated sim_rng
+        # Training moved to its OWN stream (BackEnd/utils/training_random). Seeding
+        # global random no longer reaches it, so a seeded arm would otherwise run
+        # UNSEEDED training — and this harness trains every one of 26 weeks.
+        training_random.seed(args.seed)
+        print(f"🎲 Seeded arm: sim_rng + training_rng + global random = {args.seed} "
+              f"(single-process). Reproducible given the SAME restored start + "
+              f"PYTHONHASHSEED=0.")
 
     # ---- Safety gate 3: the franchise is who we think it is --------------------
     fid = ObjectId(TARGET_FRANCHISE_ID)
@@ -186,7 +225,7 @@ def main() -> int:
         with open(path) as fh:
             lines = sum(1 for _ in fh)
     print(f"\nWeeks advanced this run: {weeks_done}. Band-log file: {path} ({lines} lines).")
-    print("Next: python scripts/eog_band_report.py --strict "
+    print("Next: python scripts/eog_band_report.py "
           f"{path}")
     return 0
 

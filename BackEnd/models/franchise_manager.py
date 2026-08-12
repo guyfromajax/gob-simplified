@@ -155,11 +155,48 @@ def get_franchise_name_assets() -> tuple[tuple[str, ...], tuple[str, ...], tuple
 
 # Recruit/walk-on year progression. JH never appears on an active roster:
 # signed recruits and walk-ons advance one step when they enter a roster.
+# Fields copied verbatim from a pool player into the franchise player doc (FPD) at
+# franchise init. POOL_TO_FPD_PROJECTION is BUILT from this list, so a field can never be
+# in the carry but missing from the projection — the Mongo-projection silent-loss trap that
+# has bitten this codebase three times (see Player_Development_System.md). The read-side
+# resolver masks a dropped field on screen, so the guarantee is structural + tested
+# (test_franchise_manager_pool_carry.py), not visual.
+POOL_TO_FPD_CARRY_FIELDS = ("entry_tier", "position_intent", "potential_factor")
+POOL_TO_FPD_PROJECTION = {
+    "first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1,
+    "position_ratings": 1, "height": 1, "weight": 1, "year": 1, "jersey": 1,
+    **{_f: 1 for _f in POOL_TO_FPD_CARRY_FIELDS},
+}
+
+# ── Player identity/development carry — single source of truth ────────────────
+# The identity + development fields that must survive EVERY player-doc hop:
+# recruit → signed_player → FPD, and FPD → FPD at each season rollover. Declared
+# ONCE; every hop builds its carry via carry_dev_fields(), so a field added here
+# propagates to all hops and no hand-maintained cherry-pick can silently drop it
+# again — the drop that re-derived entry_tier/position_intent/potential_factor at
+# signing (see Player_Development_System.md). POOL_TO_FPD_CARRY_FIELDS above is the
+# pool-sourced subset (a pool row has no development/training_position/coaching_quality).
+PLAYER_DEV_CARRY_FIELDS = (
+    "entry_tier", "position_intent", "potential_factor",
+    "development", "training_position", "coaching_quality",
+    "training_gain_remainders",
+)
+assert set(POOL_TO_FPD_CARRY_FIELDS) <= set(PLAYER_DEV_CARRY_FIELDS)
+
+
+def carry_dev_fields(src: dict) -> dict:
+    """Cherry-pick the canonical dev-carry fields from any recruit/player-shaped
+    source, omitting absent ones (develop_rollover backfills a missing field). A
+    PRESENT value is carried, so authored intent/tier/potential survive signing
+    instead of being re-derived from argmax RT / a fresh uuid."""
+    return {f: src[f] for f in PLAYER_DEV_CARRY_FIELDS if src.get(f) is not None}
+
+
 RECRUIT_YEAR_ADVANCE = {
     "jh": "Freshman",
-    "freshman": "Sophomore",
-    "sophomore": "Junior",
-    "junior": "Senior",
+    "freshman": "Sophomore", "fr": "Sophomore",   # accept abbrev defensively
+    "sophomore": "Junior", "so": "Junior",
+    "junior": "Senior", "jr": "Senior",
 }
 
 
@@ -168,27 +205,48 @@ def advance_recruit_year(year: str | None) -> str:
     return RECRUIT_YEAR_ADVANCE.get(str(year or "").strip().lower(), "Freshman")
 
 
-# Walk-on year roll weights and per-year generation ranges:
-# (attr_max, attr_cap, height_range, weight_range) — at most 3 attributes may exceed attr_cap.
-WALK_ON_YEAR_WEIGHTS = [("JH", 60), ("Freshman", 20), ("Sophomore", 10), ("Junior", 10)]
-WALK_ON_YEAR_PROFILES = {
-    "JH": (32, 29, (66, 72), (155, 179)),
-    "Freshman": (42, 39, (66, 74), (155, 189)),
-    "Sophomore": (52, 44, (67, 75), (165, 199)),
-    "Junior": (62, 49, (68, 77), (175, 209)),
-}
+# ── Ongoing-intake levers (steady-state class-year distribution) ──────────────
+# These three TOGETHER determine the league's steady-state class-year mix. The pool
+# age-up and set_0001 fix only the STARTING point; class years advance in lockstep,
+# so the distribution decays toward flat unless the ongoing dynamic recruit classes
+# and the walk-on stream sustain it. Changing one without the others breaks the steady
+# state. Documented in Tunable_Constants.md → "Ongoing intake". Read from here, not
+# duplicated at call sites.
+RECRUIT_CLASS_SIZE = 450   # dynamic recruit pool per season (matches set_0001's 450)
+
+# Recruit year mix — DRAWN PER RECRUIT (per-class variance, not exact counts). Recruits
+# advance one year on signing, so a JH recruit enters the roster as a Freshman, an FR
+# recruit as a Sophomore, etc. — the mechanism that sustains the upperclassman skew.
+RECRUIT_YEAR_WEIGHTS = [("JH", 55), ("Freshman", 15), ("Sophomore", 15), ("Junior", 15)]
+
+# Walk-on year mix — DRAWN DIRECTLY as roster years (no JH, no advance step; a walk-on
+# can never be a JH). Walk-ons populate the practice squad (the JV): mostly SO/JR who
+# haven't made varsity. The 10% senior share is deliberate (may play one season and
+# graduate). Attributes/height/weight come from the shared position-intent generator at
+# Poor tier — walk-ons are on the same class-year ladder as everyone else (§4.1/§11.2).
+WALK_ON_YEAR_WEIGHTS = [("Freshman", 10), ("Sophomore", 40), ("Junior", 40), ("Senior", 10)]
+
+# Walk-on TIER mix — DRAWN PER WALK-ON (replaces the old hardcoded Poor). Walk-ons are
+# mostly weak, a meaningful minority ordinary, and ~one Good per team every few seasons —
+# enough that finding one feels like something. No Great/Elite: at ~200 walk-ons/season
+# even 0.5% Elite is one per league per season, which a user sees essentially never. Tier
+# already limits them (a Poor walk-on with 3 peaks + max potential reaches ~RT 60, a useful
+# senior not a star), so potential_factor is NOT skewed — see generate_walk_on_profile.
+WALK_ON_TIER_WEIGHTS = [("Poor", 65), ("BelowAverage", 25), ("Average", 8), ("Good", 2)]
 
 
 def generate_walk_on_profile() -> dict:
     """Generate a single walk-on player profile.
 
     Shared by season-1 franchise init (3/team) and the week-35 roster fill.
-    Year rolls JH 60% / Freshman 20% / Sophomore 10% / Junior 10%; attribute,
-    height, and weight ranges scale with the rolled year. At most 3 attributes
-    may exceed the year's cap; archetype "Walk On".
+    Year is drawn DIRECTLY as a roster year from WALK_ON_YEAR_WEIGHTS (FR 10 / SO 40 /
+    JR 40 / SR 10 — no JH, no advance step; callers use ``year`` as-is). A position
+    intent is drawn and the shared generator produces a Poor-tier player on the
+    class-year ladder. CH is flat randint(1,100) like everyone else (§8) — no walk-on
+    cap, so a high-CH walk-on can still develop.
     """
-    from BackEnd.models.player import Player
-    from BackEnd.utils.position_ratings import compute_position_ratings
+    from BackEnd.utils.player_generation import draw_position_intent, generate_player
+    from BackEnd.utils.player_development import roll_growth_profile, remaining_rungs_for_year
 
     first_names, last_names, first_name_weights = get_franchise_name_assets()
     year = random.choices(
@@ -196,39 +254,38 @@ def generate_walk_on_profile() -> dict:
         weights=[w for _, w in WALK_ON_YEAR_WEIGHTS],
         k=1,
     )[0]
-    attr_max, attr_cap, height_range, weight_range = WALK_ON_YEAR_PROFILES[year]
-    attr_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "IQ", "FT"]
-    attrs: dict = {}
-    over_cap = 0
-    for key in attr_keys:
-        value = random.randint(1, attr_max)
-        if value > attr_cap and over_cap >= 3:
-            value = random.randint(1, attr_cap)
-        if value > attr_cap:
-            over_cap += 1
-        attrs[key] = value
-    attrs = Player.randomize_game_attributes(attrs)
-    # Walk-ons get a tighter CH init (1–90) than the default 1–100; other ranges unchanged.
-    attrs["CH"] = random.randint(1, 90)
-    attrs["anchor_CH"] = attrs["CH"]
+    tier = random.choices(
+        [t for t, _ in WALK_ON_TIER_WEIGHTS],
+        weights=[w for _, w in WALK_ON_TIER_WEIGHTS],
+        k=1,
+    )[0]
     first_name = choose_franchise_first_name(first_names, first_name_weights)
     last_name = random.choice(last_names).title()
     name = f"{first_name} {last_name}"
-    height = random.randint(height_range[0], height_range[1])
-    weight = random.randint(weight_range[0], weight_range[1])
-    position_ratings = compute_position_ratings(
-        {"attributes": attrs, "height": height, "name": name},
-        profile="recruit",
-    )
+
+    intent = draw_position_intent(random)
+    # Tier drawn per walk-on; the SAME value feeds the generator and the returned
+    # entry_tier so the player is generated and labelled on one ladder (never split).
+    gp = generate_player(intent, year, tier, random, name=name)
+    # Peaks restricted to the rungs still ahead of this roster year (§11.3) — a senior
+    # walk-on correctly ends with zero peaks rather than phantom ones behind him.
+    development = roll_growth_profile(int(gp["attributes"].get("CH", 50)), random,
+                                     eligible_peak_rungs=remaining_rungs_for_year(year))
     return {
         "recruit_id": None,
         "name": name,
-        "attributes": attrs,
-        "position_ratings": position_ratings,
-        "height": height,
-        "weight": weight,
+        "attributes": gp["attributes"],
+        "position_ratings": gp["position_ratings"],
+        "height": gp["height"],
+        "weight": gp["weight"],
+        # archetype stays the "Walk On" SENTINEL (not the derived 5-label): roster
+        # display gating, the walk_on flag and band resampling all key off it.
         "archetype": "Walk On",
         "year": year,
+        "entry_tier": tier,
+        "position_intent": intent,
+        "development": development,
+        "potential_factor": gp["potential_factor"],
         "Home Region": "",
     }
 
@@ -333,9 +390,9 @@ class FranchiseManager:
 
         _t0 = time.time()
         # Load all players with their full attributes for franchise-specific storage
-        players = self.db.players.find(
-            {}, {"first_name": 1, "last_name": 1, "team": 1, "team_id": 1, "attributes": 1, "position_ratings": 1, "height": 1, "weight": 1, "year": 1, "jersey": 1}
-        )
+        # Projection is BUILT from POOL_TO_FPD_CARRY_FIELDS (module top), so it can never
+        # drop a field the carry below reads — the fix for the 3rd Mongo-projection loss.
+        players = self.db.players.find({}, POOL_TO_FPD_PROJECTION)
         for p in players:
             from BackEnd.models.player import Player
             pid = str(p.get("_id"))
@@ -364,13 +421,19 @@ class FranchiseManager:
                 "career": career,
                 "attributes": attrs,  # Franchise-specific attributes with randomized EM/CH/MO
                 "position_ratings": p.get("position_ratings", {}).copy(),  # Clone position ratings for this franchise
+                # Carry the pool→FPD identity/development fields (§10) from the SAME list the
+                # projection is built from: entry_tier + position_intent (pass-1 migration) and
+                # potential_factor (Potential Rating §Phase 2). Pre-Phase-5 pool rows without a
+                # value resolve deterministically from player_id at the first offseason rollover.
+                **{_f: p.get(_f) for _f in POOL_TO_FPD_CARRY_FIELDS},
             }
         _perf["players_find_and_loop"] = (time.time() - _t0) * 1000
 
         # ✅ Season 1 walk-ons: every team carries 3 walk-ons so each roster sits at
-        # 15. During week-1 Training Camp each team assigns 3 to the training squad
-        # (user picks; CPU auto-picks lowest RT), leaving 12 active. Generated here
-        # under the franchise-creation load screen so the FCC lands lag-free.
+        # 15. After the last camp week (CAMP_WEEKS) each team assigns extras to the
+        # training squad (user picks; CPU auto-picks lowest RT), leaving 12 active.
+        # Survivors get jersey + walk-on portrait at that cut. Generated here under
+        # the franchise-creation load screen so the FCC lands lag-free.
         _t0 = time.time()
         for team in self.teams:
             team_obj_id = team.get("_id")
@@ -388,10 +451,9 @@ class FranchiseManager:
                         "team_id": str(team_obj_id) if team_obj_id is not None else None,
                         "height": wo["height"],
                         "weight": wo["weight"],
-                        # Season-1 walk-ons land directly on an active roster, so the
-                        # rolled year is instantly upgraded one step (JH→Freshman, ...,
-                        # Junior→Senior); attributes were rolled from the pre-upgrade year.
-                        "year": advance_recruit_year(wo.get("year")),
+                        # Walk-on year is drawn DIRECTLY as a roster year (WALK_ON_YEAR_WEIGHTS,
+                        # FR/SO/JR/SR) — no advance step; a walk-on can never be a JH.
+                        "year": wo.get("year"),
                         "jersey": None,
                         "archetype": "Walk On",
                     },
@@ -399,6 +461,10 @@ class FranchiseManager:
                     "career": zero_stats.copy(),
                     "attributes": wo["attributes"],
                     "position_ratings": wo["position_ratings"],
+                    "entry_tier": wo.get("entry_tier"),
+                    "position_intent": wo.get("position_intent"),
+                    "development": wo.get("development"),
+                    "potential_factor": wo.get("potential_factor"),
                 }
                 walk_on_ids.append(wid)
             team["player_ids"] = [str(pid) for pid in team.get("player_ids", [])] + walk_on_ids
@@ -437,7 +503,7 @@ class FranchiseManager:
         from BackEnd.models.recruit_sets import load_unused_set_or_generate
         # Draw a pre-built image-backed set if any are loaded; else generate dynamically.
         recruits, used_recruit_set_id = load_unused_set_or_generate(
-            self.db, self.recruit_manager, [], count=300)
+            self.db, self.recruit_manager, [], count=RECRUIT_CLASS_SIZE)
         _perf["generate_recruits"] = (time.time() - _t0) * 1000
 
         # ✅ FPD/FRD: Store players and recruits in standalone collections; keep franchise doc lean
@@ -510,6 +576,11 @@ class FranchiseManager:
                 "career": data["career"],
                 "attributes": data["attributes"],
                 "position_ratings": data["position_ratings"],
+                # Development pointer (§10). entry_tier/position_intent carried from
+                # the pool or the walk-on roll; development present for walk-ons,
+                # else lazy-backfilled at the first offseason event.
+                # Identity/dev carry from the single declared set (§ carry_dev_fields).
+                **carry_dev_fields(data),
             }
             for pid, data in players_map.items()
         ]
@@ -536,6 +607,9 @@ class FranchiseManager:
                 "weight": recruit["weight"],
                 "archetype": recruit["archetype"],
                 "year": recruit["year"],
+                # Development pointer (§10) so it survives signing → FPD. Single
+                # declared carry set (§ carry_dev_fields) — no per-field hand-list.
+                **carry_dev_fields(recruit),
                 "Home Region": home_region,
                 "Lean": self._build_recruit_lean(home_region, region_team_ids),
                 "created_at": recruit.get("created_at") or datetime.utcnow(),
@@ -994,72 +1068,80 @@ class RecruitManager:
             logger.error(f"Fallback names: {len(self.first_names)} first, {len(self.last_names)} last")
             self.first_name_weights = [1.0] * len(self.first_names)
 
-    def _roll_year_distribution(self, count):
-        """Roll the per-pool recruit year counts and return a shuffled list of years.
+    def generate_recruits_list(self, count=RECRUIT_CLASS_SIZE):
+        """Generate and return a list of recruits (does not save to DB).
 
-        Junior = randint(5,15), Sophomore = randint(5,15), Freshman = randint(10,30),
-        JH = remainder of the pool. Sized for the canonical 300 pool but degrades
-        gracefully for smaller counts.
+        Position-intent-first generation (design §11.2, interim §11.1): draw a
+        position intent (~20% each) and a tier (§4.1), then let the shared
+        generator draw height from that position's distribution and scale
+        attributes so the recruit's RT at his intended position lands on the
+        §4.2 ladder for his class year. RT no longer changes at signing — there
+        is one table for recruits and players (§3.3). Archetype is now a derived
+        display label; the old 20-archetype attribute machinery is replaced.
         """
-        junior = random.randint(5, 15)
-        sophomore = random.randint(5, 15)
-        freshman = random.randint(10, 30)
-        years = (
-            ["Junior"] * junior
-            + ["Sophomore"] * sophomore
-            + ["Freshman"] * freshman
+        from BackEnd.utils.player_generation import (
+            draw_position_intent,
+            draw_tier,
+            generate_player,
         )
-        if len(years) >= count:
-            random.shuffle(years)
-            return years[:count]
-        years += ["JH"] * (count - len(years))
-        random.shuffle(years)
-        return years
+        from BackEnd.utils.player_development import roll_growth_profile, remaining_rungs_for_year
 
-    def generate_recruits_list(self, count=40):
-        """Generate and return a list of recruits (does not save to DB)."""
-        from BackEnd.utils.position_ratings import compute_position_ratings
-
-        years = self._roll_year_distribution(count)
+        # Year DRAWN PER RECRUIT from RECRUIT_YEAR_WEIGHTS (per-class variance, not exact
+        # counts). Sustains the class-year distribution seeded by set_0001; seasons 2+ used
+        # to revert to JH-dominant entry via the old _roll_year_distribution.
+        _ry = [y for y, _w in RECRUIT_YEAR_WEIGHTS]
+        _rw = [_w for _y, _w in RECRUIT_YEAR_WEIGHTS]
         recruits = []
-        for year in years:
+        for _ in range(count):
+            year = random.choices(_ry, weights=_rw, k=1)[0]
             first_name = choose_franchise_first_name(self.first_names, self.first_name_weights)
-            last_name = random.choice(self.last_names)
-            # Format last name to title case (only first letter capitalized)
-            last_name_formatted = last_name.title()
-            name = f"{first_name} {last_name_formatted}"
-            
-            # Select archetype with weighted probabilities
-            archetype = self._select_archetype()
-            
-            # Generate attributes, height, and weight based on archetype + year tiers
-            attributes, height, weight = self._generate_recruit_profile(archetype, year)
-            attributes["CH"] = self._roll_recruit_character(archetype, year)
+            last_name = random.choice(self.last_names).title()
+            name = f"{first_name} {last_name}"
 
-            # Init NG/MO/EM; preserve recruit CH (Intangibles floor or uniform 1-100).
-            from BackEnd.models.player import Player
-            attributes = Player.randomize_game_attributes(attributes, preserve_character=True)
-            
-            # Calculate position ratings for the recruit
-            recruit_for_ratings = {
-                "attributes": attributes,
-                "height": height,
-                "name": name
-            }
-            position_ratings = compute_position_ratings(recruit_for_ratings, profile="recruit")
-            
+            intent = draw_position_intent(random)
+            tier = draw_tier(random)
+            # Shared generator draws height + target-scaled attributes + CH/EM/MO/NG.
+            gp = generate_player(intent, year, tier, random, name=name)
+            # Growth profile frozen at generation from the (flat) CH seed (§5, §10).
+            # Peaks restricted to the rungs still ahead of the recruit (§11.3): he signs
+            # advanced one year, so a peak on a rung already behind him would never fire.
+            ch_seed = int(gp["attributes"].get("CH", 50))
+            development = roll_growth_profile(ch_seed, random,
+                                              eligible_peak_rungs=remaining_rungs_for_year(year))
+
             recruits.append({
-                "name": name, 
-                "attributes": attributes,
-                "position_ratings": position_ratings,
-                "height": height,
-                "weight": weight,
-                "archetype": archetype,
+                "name": name,
+                "attributes": gp["attributes"],
+                "position_ratings": gp["position_ratings"],
+                "height": gp["height"],
+                "weight": gp["weight"],
+                "archetype": self._recruit_display_archetype(intent, tier),
                 "year": year,
-                "created_at": datetime.utcnow()
+                "entry_tier": tier,
+                "position_intent": intent,
+                "development": development,
+                "potential_factor": gp["potential_factor"],
+                "created_at": datetime.utcnow(),
             })
-        
+
         return recruits
+
+    @staticmethod
+    def _recruit_display_archetype(intent: str, tier: str) -> str:
+        """Cosmetic recruit label derived from (position intent, tier).
+
+        Reuses the existing archetype vocabulary so recruiting surfaces keep a
+        familiar string until the display sweep (a later task) revisits them.
+        """
+        if tier == "Elite":
+            return "Five-Star"
+        if tier == "Great":
+            return "Four-Star"
+        if tier == "Poor":
+            return "Below Average"
+        if tier == "BelowAverage":
+            return "Average"
+        return f"Classic {intent}"
     
     def generate_recruits(self, count=40):
         """Legacy method: Generate recruits and save to global recruits collection.
@@ -1070,124 +1152,8 @@ class RecruitManager:
             self.db.recruits.delete_many({})
             self.db.recruits.insert_many(recruits)
     
-    def _select_archetype(self):
-        """Select a recruit archetype with weighted probabilities."""
-        # Define archetypes with their selection weights
-        # Five-Star and Four-Star are rare, others are equally common
-        archetypes_weights = [
-            ("Five-Star", 1),
-            ("Four-Star", 4),
-            ("Defensive Wizard", 3.6),
-            ("All-Around Scorer", 3.6),
-            ("Classic PG", 3.6),
-            ("Classic SG", 3.6),
-            ("Classic SF", 3.6),
-            ("Classic PF", 3.6),
-            ("Classic C", 3.6),
-            ("Pure Shooter", 3.6),
-            ("Intangibles", 3.6),
-            ("Athlete", 3.6),
-            ("Inside Defender", 3.6),
-            ("Outside Defender", 3.6),
-            ("Average", 13.6),
-            ("Below Average", 13.6),
-            ("Outside Dual Threat", 3.6),
-            ("Driver", 3.6),
-            ("Outside C", 3.6),
-            ("Three & D", 3.6),
-        ]
-        
-        archetypes = [a[0] for a in archetypes_weights]
-        weights = [a[1] for a in archetypes_weights]
-        
-        return random.choices(archetypes, weights=weights, k=1)[0]
-    
-    # Attribute tier ranges by recruit year: (STRONG, SECONDARY, STANDARD, WEAK).
-    # Older recruits roll higher floors and ceilings; heights stay archetype-based.
-    YEAR_TIER_RANGES = {
-        "JH": ((20, 80), (10, 60), (1, 40), (1, 20)),
-        "Freshman": ((30, 80), (20, 60), (10, 40), (10, 20)),
-        "Sophomore": ((40, 85), (30, 70), (10, 50), (10, 30)),
-        "Junior": ((60, 95), (40, 80), (10, 60), (10, 50)),
-    }
-
-    @classmethod
-    def _roll_recruit_character(cls, archetype: str, year: str) -> int:
-        """Roll CH for a recruit.
-
-        Intangibles: randint(year STRONG minimum, 100).
-        All other archetypes: randint(1, 100).
-        """
-        if archetype == "Intangibles":
-            strong, _, _, _ = cls.YEAR_TIER_RANGES.get(year, cls.YEAR_TIER_RANGES["JH"])
-            return random.randint(strong[0], 100)
-        return random.randint(1, 100)
-
-    def _generate_recruit_profile(self, archetype, year="JH"):
-        """Generate attributes, height, and weight for a recruit based on archetype and year."""
-        STRONG, SECONDARY, STANDARD, WEAK = self.YEAR_TIER_RANGES.get(
-            year, self.YEAR_TIER_RANGES["JH"]
-        )
-        
-        # Core profile attrs (CH rolled separately in generate_recruits_list).
-        PROFILE_ATTRS = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "AG", "ST", "ND", "IQ", "FT"]
-        
-        # Define archetype configurations: (strong_attrs, secondary_attrs, height_range)
-        archetype_configs = {
-            "Five-Star": (PROFILE_ATTRS, [], (69, 80)),
-            "Four-Star": ([], PROFILE_ATTRS, (66, 78)),
-            "Defensive Wizard": (["ID", "OD"], ["ST", "AG"], (66, 75)),
-            "All-Around Scorer": (["SH", "SC"], ["ST", "AG"], (66, 75)),
-            "Classic PG": (["BH", "PS"], ["OD", "IQ"], (66, 72)),
-            "Classic SG": (["SH"], ["OD"], (66, 74)),
-            "Classic SF": (["SC", "OD"], ["AG"], (69, 75)),
-            "Classic PF": (["RB"], ["ST"], (70, 76)),
-            "Classic C": (["ID", "ST"], ["RB", "SC"], (72, 78)),
-            "Pure Shooter": (["SH", "FT"], [], (66, 73)),
-            "Intangibles": (["IQ", "ND"], [], (66, 75)),
-            "Athlete": (["AG", "ST", "ND"], [], (66, 75)),
-            "Inside Defender": (["ST", "ID"], [], (71, 80)),
-            "Outside Defender": (["AG", "OD"], [], (66, 74)),
-            "Average": ([], [], (66, 75)),
-            "Below Average": ([], [], (66, 74)),  # All weak
-            "Outside Dual Threat": (["SH", "AG"], [], (66, 75)),
-            "Driver": (["SC", "AG"], [], (66, 75)),
-            "Outside C": (["ST", "SH"], [], (72, 77)),
-            "Three & D": (["SH"], ["ID", "OD"], (69, 75)),
-        }
-        
-        strong_attrs, secondary_attrs, height_range = archetype_configs[archetype]
-        
-        # Generate height first (needed for weight calculation)
-        height = random.randint(height_range[0], height_range[1])
-        
-        # Generate weight based on height
-        weight = self._generate_weight(height)
-        
-        # Generate attributes
-        attributes = {}
-        for attr in PROFILE_ATTRS:
-            if archetype == "Below Average":
-                # All attributes are weak for Below Average
-                value = random.randint(WEAK[0], WEAK[1])
-            elif attr in strong_attrs:
-                value = random.randint(STRONG[0], STRONG[1])
-            elif attr in secondary_attrs:
-                value = random.randint(SECONDARY[0], SECONDARY[1])
-            else:
-                value = random.randint(STANDARD[0], STANDARD[1])
-            
-            attributes[attr] = value
-        
-        return attributes, height, weight
-    
-    def _generate_weight(self, height):
-        """Generate weight based on height."""
-        if height < 72:
-            return random.randint(150, 181)
-        elif 72 <= height <= 75:
-            return random.randint(170, 194)
-        elif 76 <= height <= 80:
-            return random.randint(195, 231)
-        else:  # > 80
-            return random.randint(209, 260)
+    # Recruit attribute/height/archetype generation is now position-intent-first
+    # via BackEnd.utils.player_generation (design §11.2). The former 20-archetype
+    # attribute machinery (_select_archetype, YEAR_TIER_RANGES,
+    # _roll_recruit_character, _generate_recruit_profile, _generate_weight) has
+    # been replaced. CH is flat randint(1,100) inside the shared generator (§8).

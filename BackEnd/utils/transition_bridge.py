@@ -309,7 +309,7 @@ def build_walk_up_step(
         else:
             gate_slowest_id, slowest_t = None, 0.0
         mandatory_ids = {str(p) for p in (gate_mandatory_player_ids or []) if p}
-        for pid in mandatory_ids:
+        for pid in sorted(mandatory_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
             mandatory_t = offense_arrivals.get(pid, natural_t.get(pid, 0.0))
             if mandatory_t > slowest_t:
                 slowest_t = mandatory_t

@@ -1,63 +1,68 @@
 import random
 from BackEnd.utils.shared_defense import (
-    assign_non_bh_defender_coords,
-    assign_bh_defender_coords,
     get_spacing,
     verify_defender_closer_to_basket,
     calculate_defender_coords,
     get_defender_coords,
 )
 from BackEnd.utils.shared import get_away_player_coords
+from BackEnd.utils.sim_random import sim_rng
 from BackEnd.constants import HOME_RIM_COORDS, AWAY_RIM_COORDS
 
 
-def test_assign_non_bh_defender_coords_away_mirrors_home_spacing():
-    random.seed(0)
+def test_get_defender_coords_non_bh_away_mirrors_home_spacing():
     o_coords = {"x": 60, "y": 30}
     ball_home = {"x": 70, "y": 25}
+    o_away = get_away_player_coords(o_coords)
     ball_away = get_away_player_coords(ball_home)
 
-    home_def = assign_non_bh_defender_coords(o_coords, ball_home, "normal", False)
-    away_def = assign_non_bh_defender_coords(o_coords, ball_away, "normal", True)
+    sim_rng.seed(0)
+    home_def = get_defender_coords(
+        o_coords, False, "normal", "lower wing", ball_home, False, "key"
+    )
+    sim_rng.seed(0)
+    away_def = get_defender_coords(
+        o_away, True, "normal", "lower wing", ball_away, False, "key"
+    )
 
-    home_diff = home_def["x"] - o_coords["x"]
-    away_def_flipped = get_away_player_coords(away_def)
-    away_o_flipped = get_away_player_coords(o_coords)
-    away_diff = away_def_flipped["x"] - away_o_flipped["x"]
-
-    assert abs(abs(home_diff) - abs(away_diff)) <= 1
-    assert home_diff == -away_diff
+    assert get_away_player_coords(away_def) == home_def
 
 
-def test_assign_bh_defender_coords_away_mirrors_home_spacing():
-    random.seed(0)
+def test_get_defender_coords_bh_away_mirrors_home_spacing():
     ball_home = {"x": 70, "y": 25}
     ball_away = get_away_player_coords(ball_home)
 
-    home_def = assign_bh_defender_coords(ball_home, "normal", False)
-    away_def = assign_bh_defender_coords(ball_away, "normal", True)
+    sim_rng.seed(0)
+    home_def = get_defender_coords(
+        ball_home, False, "normal", "key", is_ball_handler=True
+    )
+    sim_rng.seed(0)
+    away_def = get_defender_coords(
+        ball_away, True, "normal", "key", is_ball_handler=True
+    )
 
-    home_diff_x = home_def["x"] - ball_home["x"]
-    away_ball_flipped = get_away_player_coords(ball_away)
-    away_diff_x = away_def["x"] - away_ball_flipped["x"]
-
-    assert home_diff_x == away_diff_x
+    assert get_away_player_coords(away_def) == home_def
 
 
 def test_baseline_defense_vertical_not_flipped():
-    random.seed(0)
     o_coords = {"x": 88, "y": 6}
     ball_home = {"x": 70, "y": 25}
+    o_away = get_away_player_coords(o_coords)
     ball_away = get_away_player_coords(ball_home)
 
-    home_def = assign_non_bh_defender_coords(o_coords, ball_home, "normal", False)
-    away_def = assign_non_bh_defender_coords(o_coords, ball_away, "normal", True)
+    sim_rng.seed(0)
+    home_def = get_defender_coords(
+        o_coords, False, "normal", "lower corner", ball_home, False, "key"
+    )
+    sim_rng.seed(0)
+    away_def = get_defender_coords(
+        o_away, True, "normal", "lower corner", ball_away, False, "key"
+    )
 
     away_def_flipped = get_away_player_coords(away_def)
-    away_o_flipped = get_away_player_coords(o_coords)
 
     home_delta_y = home_def["y"] - o_coords["y"]
-    away_delta_y = away_def_flipped["y"] - away_o_flipped["y"]
+    away_delta_y = away_def_flipped["y"] - o_coords["y"]
 
     assert home_delta_y == away_delta_y
 
@@ -255,8 +260,10 @@ def test_get_defender_coords_home_offense_bh():
     # Should return coords in home orientation (same as input)
     assert "x" in result
     assert "y" in result
-    # Defender should be closer to away basket (x=10) than ball handler
-    assert abs(result["x"] - 10) < abs(bh_coords["x"] - 10)
+    # The current coordinate contract has home offense attacking HOME_RIM_COORDS.
+    assert abs(result["x"] - HOME_RIM_COORDS["x"]) < abs(
+        bh_coords["x"] - HOME_RIM_COORDS["x"]
+    )
 
 
 def test_get_defender_coords_away_offense_bh():

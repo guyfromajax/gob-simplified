@@ -130,7 +130,12 @@ def test_non_fcp_bip_step2_still_gates_on_sf_and_pg():
 
 def test_fcp_bip_step3_sf_holds_while_others_continue_to_setup():
     off, defn = _lineups()
+    # Leave one non-passer genuinely behind the 4-of-5 setup gate so this test
+    # exercises the continued-movement branch instead of an already-complete
+    # formation where every other player should correctly be stationary.
+    off["C"].attributes["AG"] = 1
     prior, setup, ids = _prior_and_setup(off, defn)
+    prior[ids["C"]] = {"x": 0.0, "y": 0.0}
 
     steps = build_bip_animation_steps(
         off_lineup=off,
@@ -156,7 +161,7 @@ def test_fcp_bip_step3_sf_holds_while_others_continue_to_setup():
         for pid, action in actions.items()
         if pid != sf_id and action in ("cut", "guard_offball")
     ]
-    assert len(movers) >= 1
+    assert ids["C"] in movers
     assert step3["start"]["advance_trigger"]["metadata"]["reason"] == "bip_fcp_passer_hold"
 
 

@@ -149,8 +149,13 @@ function hexToRgbTripletString(hex) {
   return `${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}`;
 }
 
-function applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors) {
+async function applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors, homeName, awayName) {
   if (typeof document === 'undefined') return;
+  // Prefer the shared hydrated palette (same source as resolveCourtImagePath).
+  if (typeof applyTeamVibrantDocumentVars === 'function' && (homeName || awayName)) {
+    await applyTeamVibrantDocumentVars(homeName || '', awayName || '', homeColors, awayColors);
+    return;
+  }
   const hh = hexToRgbTripletString(resolvePrimaryHexFromTeamColors(homeColors));
   const ah = hexToRgbTripletString(resolvePrimaryHexFromTeamColors(awayColors));
   if (hh) {
@@ -615,11 +620,44 @@ function isHcoTurnContext(turn) {
 
 function resolveCourtImagePath(teamNameOrSlug) {
   const fallbackPath = '/images/teams/general/general_court.jpg';
-  const preferredPath = typeof getTeamAssetPath === 'function'
-    ? getTeamAssetPath(teamNameOrSlug, 'court')
-    : fallbackPath;
+  const visual =
+    typeof getActiveTeamBuilderVisual === 'function' ? getActiveTeamBuilderVisual() : null;
+  const isCustomCourt =
+    visual &&
+    typeof teamBuilderVisualMatchesName === 'function' &&
+    teamBuilderVisualMatchesName(visual, teamNameOrSlug);
 
-  if (!preferredPath || preferredPath === fallbackPath) {
+  if (isCustomCourt) {
+    const courtUrlFn =
+      (typeof window !== 'undefined' &&
+        window.TeamGeneratedArt &&
+        typeof window.TeamGeneratedArt.courtObjectUrl === 'function' &&
+        window.TeamGeneratedArt.courtObjectUrl) ||
+      (typeof window !== 'undefined' &&
+        window.TeamCourtGenerator &&
+        typeof window.TeamCourtGenerator.courtObjectUrl === 'function' &&
+        window.TeamCourtGenerator.courtObjectUrl);
+    if (courtUrlFn) {
+      const primary = visual.primary_color || visual.primary || '#27408E';
+      const secondary = visual.secondary_color || visual.secondary || '#15181f';
+      const courtOpts = Object.assign(
+        {
+          primary,
+          secondary,
+          court: visual.court || null,
+        },
+        visual.court || {}
+      );
+      return courtUrlFn(courtOpts).catch(() => fallbackPath);
+    }
+  }
+
+  const preferredPath =
+    typeof getTeamAssetPath === 'function'
+      ? getTeamAssetPath(teamNameOrSlug, 'court')
+      : fallbackPath;
+
+  if (!preferredPath || preferredPath === fallbackPath || /^data:/i.test(String(preferredPath))) {
     return Promise.resolve(fallbackPath);
   }
 
@@ -939,7 +977,27 @@ export function createGameScene(Phaser) {
         this.load.image("ball", "/images/ball.png");
         const { home } = gameStore.getTeams();
         const courtPath = await resolveCourtImagePath(home);
-        this.load.image("court-bg", courtPath);
+        // Phaser Loader historically rejects data: URIs. Blob/object URLs are the
+        // Team Builder path — load via Image + textures.addImage so court-bg is
+        // never silently swapped for general_court.jpg.
+        if (/^blob:/i.test(String(courtPath))) {
+          await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+              try {
+                if (this.textures.exists("court-bg")) this.textures.remove("court-bg");
+                this.textures.addImage("court-bg", img);
+                resolve();
+              } catch (err) {
+                reject(err);
+              }
+            };
+            img.onerror = () => reject(new Error("blob court image failed to decode"));
+            img.src = courtPath;
+          });
+        } else {
+          this.load.image("court-bg", courtPath);
+        }
       }
 
     }
@@ -1067,6 +1125,10 @@ export function createGameScene(Phaser) {
       }
       
       const payload = { home_team: homeTeam, away_team: awayTeam, quarter: this.quarter };
+      const urlHomeId = urlParams.get('home_id');
+      const urlAwayId = urlParams.get('away_id');
+      if (urlHomeId) payload.home_id = urlHomeId;
+      if (urlAwayId) payload.away_id = urlAwayId;
       const hRim = urlParams.get('home_rim_runner_player_id');
       const aRim = urlParams.get('away_rim_runner_player_id');
       if (hRim) payload.home_rim_runner_player_id = hRim;
@@ -1356,29 +1418,80 @@ export function createGameScene(Phaser) {
         });
       }
       
-      // Extract team names (unified structure preferred, fallback to old structure)
-      const logHome = homeTeamObj?.name || simData.home_team || simData.homeTeam?.name;
-      const logAway = awayTeamObj?.name || simData.away_team || simData.awayTeam?.name;
+      // §3.1a: lookup/score by core ``name``; render ``display_name``.
+      const homeCore =
+        homeTeamObj?.name ||
+        (typeof homeTeam === 'string' ? homeTeam : null) ||
+        simData.home_team?.name ||
+        simData.home_team;
+      const awayCore =
+        awayTeamObj?.name ||
+        (typeof awayTeam === 'string' ? awayTeam : null) ||
+        simData.away_team?.name ||
+        simData.away_team;
+      const logHome = homeTeamObj?.display_name || homeCore || simData.homeTeam?.name;
+      const logAway = awayTeamObj?.display_name || awayCore || simData.awayTeam?.name;
       
       // Extract team IDs
       const homeId = homeTeamId || homeTeamObj?.team_id || simData.home_team_id || simData.homeTeam?.team_id;
       const awayId = awayTeamId || awayTeamObj?.team_id || simData.away_team_id || simData.awayTeam?.team_id;
       
-      // ✅ TIMEOUT: Store team names in scene for timeout button manager
-      this.homeTeam = logHome;
-      this.awayTeam = logAway;
-      
-      // Extract team colors (unified structure preferred)
+      // Chrome: hydrated visual is authority; URL *_display / sim display are fallbacks.
+      let urlHomeDisplay = null;
+      let urlAwayDisplay = null;
+      try {
+        const spChrome = new URLSearchParams(window.location.search);
+        urlHomeDisplay = spChrome.get('home_display');
+        urlAwayDisplay = spChrome.get('away_display');
+      } catch (e) { /* ignore */ }
+      const homeFallbackDisplay = urlHomeDisplay || homeTeamObj?.display_name || logHome || homeCore;
+      const awayFallbackDisplay = urlAwayDisplay || awayTeamObj?.display_name || logAway || awayCore;
       const homeColors = homeTeamObj?.colors || simData.home_team_colors;
       const awayColors = awayTeamObj?.colors || simData.away_team_colors;
       const homePlayersHeaderEl = document.getElementById('home-players-header');
       const awayPlayersHeaderEl = document.getElementById('away-players-header');
-      if (homePlayersHeaderEl) {
-        homePlayersHeaderEl.textContent = logHome || '';
+      let homeChromeLabel = homeFallbackDisplay;
+      let awayChromeLabel = awayFallbackDisplay;
+      if (typeof applyTeamBuilderMatchupChrome === 'function') {
+        const chrome = await applyTeamBuilderMatchupChrome({
+          homeCore,
+          awayCore,
+          homeUrlDisplay: homeFallbackDisplay,
+          awayUrlDisplay: awayFallbackDisplay,
+          homeColors,
+          awayColors,
+          homeLabelEl: homePlayersHeaderEl,
+          awayLabelEl: awayPlayersHeaderEl,
+        });
+        homeChromeLabel = chrome.homeLabel;
+        awayChromeLabel = chrome.awayLabel;
+      } else {
+        if (typeof ensureTeamBuilderVisualReady === 'function') {
+          await ensureTeamBuilderVisualReady();
+        }
+        homeChromeLabel =
+          typeof resolveTeamBuilderDisplayName === 'function'
+            ? resolveTeamBuilderDisplayName(homeCore, homeFallbackDisplay)
+            : homeFallbackDisplay;
+        awayChromeLabel =
+          typeof resolveTeamBuilderDisplayName === 'function'
+            ? resolveTeamBuilderDisplayName(awayCore, awayFallbackDisplay)
+            : awayFallbackDisplay;
+        if (homePlayersHeaderEl) homePlayersHeaderEl.textContent = homeChromeLabel || '';
+        if (awayPlayersHeaderEl) awayPlayersHeaderEl.textContent = awayChromeLabel || '';
+        await applyVibrantRgbDocumentVarsFromTeamColors(
+          homeColors,
+          awayColors,
+          homeChromeLabel,
+          awayChromeLabel
+        );
       }
-      if (awayPlayersHeaderEl) {
-        awayPlayersHeaderEl.textContent = logAway || '';
-      }
+
+      // Scene chrome labels (display). Score / sim identity = core.
+      this.homeTeam = homeChromeLabel;
+      this.awayTeam = awayChromeLabel;
+      this.homeTeamCore = homeCore;
+      this.awayTeamCore = awayCore;
       
       if (DEBUG_TEAMS) {
         console.log('Resolved team IDs:', { home_team_id: homeId, away_team_id: awayId });
@@ -1401,11 +1514,28 @@ export function createGameScene(Phaser) {
       // Set team IDs on scene for animation systems
       this.homeTeamId = homeId;
       this.awayTeamId = awayId;
+      const homeSnap =
+        typeof lookupTeamChrome === 'function'
+          ? lookupTeamChrome(homeCore || homeChromeLabel, homeColors)
+          : null;
+      const awaySnap =
+        typeof lookupTeamChrome === 'function'
+          ? lookupTeamChrome(awayCore || awayChromeLabel, awayColors)
+          : null;
+      const homePalette = homeSnap
+        ? { primary_color: homeSnap.primary_color, secondary_color: homeSnap.secondary_color }
+        : typeof resolveTeamBuilderPaletteColors === 'function'
+          ? resolveTeamBuilderPaletteColors(homeCore, homeColors)
+          : homeColors;
+      const awayPalette = awaySnap
+        ? { primary_color: awaySnap.primary_color, secondary_color: awaySnap.secondary_color }
+        : typeof resolveTeamBuilderPaletteColors === 'function'
+          ? resolveTeamBuilderPaletteColors(awayCore, awayColors)
+          : awayColors;
       gameStore.setColors({
-        home: homeColors,
-        away: awayColors,
+        home: homePalette,
+        away: awayPalette,
       });
-      applyVibrantRgbDocumentVarsFromTeamColors(homeColors, awayColors);
       this.isFinal = simData.is_final;
       
       // ⏸️ TABLED: Resume Last Game feature - Exact game state restoration
@@ -1450,8 +1580,10 @@ export function createGameScene(Phaser) {
 
       const homeLogoEl = document.getElementById('home-logo');
       const awayLogoEl = document.getElementById('away-logo');
-      if (homeLogoEl) homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
-      if (awayLogoEl) awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayTeam, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+      const homeChrome = homeChromeLabel;
+      const awayChrome = awayChromeLabel;
+      if (homeLogoEl) homeLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(homeChrome, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
+      if (awayLogoEl) awayLogoEl.src = typeof getTeamAssetPath === 'function' ? getTeamAssetPath(awayChrome, 'banner_primary') : '/images/teams/general/general_banner_primary.jpg';
 
       const homeScoreEl = document.getElementById('home-score');
       const awayScoreEl = document.getElementById('away-score');
@@ -1998,6 +2130,12 @@ export function createGameScene(Phaser) {
             stats.nameCell = row.nameCell; // Store name cell for energy color coding
           }
         });
+        // Keep Playcall Center headshots on the live five (not stale URL starters).
+        try {
+          if (typeof window.populatePlayHeadshots === 'function') {
+            window.populatePlayHeadshots();
+          }
+        } catch (e) { /* ignore */ }
       };
 
       const hydrateBoxScore = () => {
@@ -2443,9 +2581,9 @@ export function createGameScene(Phaser) {
         if (turn.team) {
           const teamName =
             turn.team === 'home'
-              ? homeTeam
+              ? logHome
               : turn.team === 'away'
-              ? awayTeam
+              ? logAway
               : turn.team;
           parts.push(teamName);
         }
@@ -2455,12 +2593,14 @@ export function createGameScene(Phaser) {
 
       // Live scoreboard state - force to 0 for new games
       // Only use persisted scores if continuing an existing game
-      // ✅ TIMEOUT RESUME: Check team objects first (same pattern as timeouts) for consistency
-      const homeScoreFromData = homeTeamObj?.score ?? simData.score?.[homeTeam];
-      const awayScoreFromData = awayTeamObj?.score ?? simData.score?.[awayTeam];
+      // Score map keys are always core identity (URL / teams[].name), never display_name.
+      const homeScoreKey = homeCore || homeTeam;
+      const awayScoreKey = awayCore || awayTeam;
+      const homeScoreFromData = homeTeamObj?.score ?? simData.score?.[homeScoreKey];
+      const awayScoreFromData = awayTeamObj?.score ?? simData.score?.[awayScoreKey];
       const liveScore = {
-        [homeTeam]: isNewGame ? 0 : (homeScoreFromData ?? 0),
-        [awayTeam]: isNewGame ? 0 : (awayScoreFromData ?? 0),
+        [homeScoreKey]: isNewGame ? 0 : (homeScoreFromData ?? 0),
+        [awayScoreKey]: isNewGame ? 0 : (awayScoreFromData ?? 0),
       };
       
         // Explicitly reset scoreboard UI for new games
@@ -2486,18 +2626,18 @@ export function createGameScene(Phaser) {
       const isNoImpactShotClockTurn = (turn = {}) => noImpactShotClockTypes.has(turn?.result_type);
 
       const updateScoreboard = (turn = {}) => {
-        const prevHome = liveScore[homeTeam];
-        const prevAway = liveScore[awayTeam];
+        const prevHome = liveScore[homeScoreKey];
+        const prevAway = liveScore[awayScoreKey];
         
         // ✅ TIMEOUT: Track if we're updating from initial values (not a turn)
         const isInitialUpdate = turn.score && !turn.index && !turn.result_type;
 
         // ``turn.score`` is authoritative. ``turn.points`` may appear in the
         // payload for context but must **not** be re-applied here to avoid
-        // double counting.
+        // double counting. Keys = core names.
         if (turn.score) {
-          if (typeof turn.score[homeTeam] === 'number') liveScore[homeTeam] = turn.score[homeTeam];
-          if (typeof turn.score[awayTeam] === 'number') liveScore[awayTeam] = turn.score[awayTeam];
+          if (typeof turn.score[homeScoreKey] === 'number') liveScore[homeScoreKey] = turn.score[homeScoreKey];
+          if (typeof turn.score[awayScoreKey] === 'number') liveScore[awayScoreKey] = turn.score[awayScoreKey];
         }
 
         // ✅ TIMEOUT: Update fouls from turn data (exact same pattern as scores)
@@ -2625,14 +2765,14 @@ export function createGameScene(Phaser) {
           evaluateGameplayTrack({
             quarter: liveQuarter,
             clock: this.gameClock?.getState?.()?.timeRemaining,
-            homeScore: liveScore[homeTeam],
-            awayScore: liveScore[awayTeam],
+            homeScore: liveScore[homeScoreKey],
+            awayScore: liveScore[awayScoreKey],
           });
         }
 
         // ✅ REFACTOR: Direct DOM updates for all scoreboard items (consistent pattern)
-        if (homeScoreEl) homeScoreEl.textContent = liveScore[homeTeam];
-        if (awayScoreEl) awayScoreEl.textContent = liveScore[awayTeam];
+        if (homeScoreEl) homeScoreEl.textContent = liveScore[homeScoreKey];
+        if (awayScoreEl) awayScoreEl.textContent = liveScore[awayScoreKey];
         if (homeFoulsEl) homeFoulsEl.textContent = `F: ${liveHomeFouls}`;
         if (awayFoulsEl) awayFoulsEl.textContent = `F: ${liveAwayFouls}`;
         if (homeTolEl) homeTolEl.textContent = `TOL: ${liveHomeTimeouts}`;
@@ -4132,7 +4272,7 @@ export function createGameScene(Phaser) {
           
           // ✅ FIX: Check if quarter is complete AFTER animating the turn
           // This ensures the final turn of the quarter is animated before handling quarter completion.
-          // Phase 6: Final Turn shot and FINAL_HOLD are covered — backend sets quarter_complete when
+          // Final Turn and Run Out are covered — backend sets quarter_complete when
           // time_remaining hits 0 (after the turn or after FTs); we advance to Quarter Break / game end here.
           if (turnData.quarter_complete) {
             console.log('✅ [FINAL TURN DEBUG] Quarter complete! (after final turn animation)', {

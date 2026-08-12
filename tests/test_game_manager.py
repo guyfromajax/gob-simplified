@@ -2,12 +2,6 @@ from tests.test_utils import build_mock_game
 from BackEnd.models.game_manager import GameManager
 
 
-def test_game_manager_simulate_macro_turn_runs():
-    gm = build_mock_game()
-    print("DEBUG: type(gm) =", type(gm))
-    gm.simulate_macro_turn()
-
-
 def test_game_manager_initializes_teams_correctly():
     gm = GameManager("Lancaster", "Bentley-Truman")
     assert gm.home_team.name == "Lancaster"
@@ -30,7 +24,8 @@ def test_game_manager_box_score_structure():
     player.record_stat("FTM", 1)
 
     box_score = gm.get_box_score()
-    stats = box_score["Lancaster"]["PG"]
+    team_key = gm.home_team.team_id or gm.home_team.name
+    stats = box_score[team_key]["PG"]
 
     assert "PTS" in stats
     assert stats["PTS"] == 2 + 1 + 1

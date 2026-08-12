@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Backfill `target_shooter` on play documents in both `gob` and `gob-staging`.
+Backfill `target_shooter` on play documents in one explicit database.
 
 Source of truth:
 - docs/Playbooks_Rework/playbooks_summary.md
@@ -12,39 +12,16 @@ left unchanged.
 
 from __future__ import annotations
 
+import argparse
 import os
+import sys
 from pathlib import Path
 
-from pymongo import MongoClient
-
-
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from scripts.db_migration_cli import connect_migration_target
 SUMMARY_PATH = ROOT / "docs" / "Playbooks_Rework" / "playbooks_summary.md"
-TARGET_DBS = ("gob", "gob-staging")
 VALID_SHOOTERS = {"PG", "SG", "SF", "PF", "C"}
-
-
-def _load_env_file(path: Path) -> None:
-    if not path.exists():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        stripped = line.strip()
-        if not stripped or stripped.startswith("#") or "=" not in stripped:
-            continue
-        key, value = stripped.split("=", 1)
-        key = key.strip()
-        value = value.strip().strip('"').strip("'")
-        if key and key not in os.environ:
-            os.environ[key] = value
-
-
-def _load_mongo_uri() -> str:
-    _load_env_file(ROOT / ".env.local")
-    _load_env_file(ROOT / ".env")
-    uri = os.environ.get("MONGO_URI")
-    if not uri:
-        raise RuntimeError("MONGO_URI not found in environment/.env files")
-    return uri
 
 
 def load_summary_mapping() -> dict[str, str]:
@@ -99,38 +76,38 @@ def validate_set_plays(collection, summary_mapping: dict[str, str], db_name: str
         )
 
 
-def update_database(client: MongoClient, db_name: str, summary_mapping: dict[str, str]) -> tuple[int, int]:
-    collection = client[db_name]["plays"]
+def update_database(collection, db_name: str, summary_mapping: dict[str, str], *, apply: bool) -> tuple[int, int]:
     validate_set_plays(collection, summary_mapping, db_name)
 
     matched = 0
     modified = 0
 
     for play_name, target_shooter in sorted(summary_mapping.items()):
-        result = collection.update_one(
-            {"name": play_name},
-            {"$set": {"target_shooter": target_shooter}},
-        )
-        matched += result.matched_count
-        modified += result.modified_count
+        matched += collection.count_documents({"name": play_name}, limit=1)
+        if apply:
+            result = collection.update_one(
+                {"name": play_name},
+                {"$set": {"target_shooter": target_shooter}},
+            )
+            modified += result.modified_count
 
     return matched, modified
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--db", choices=("gob-staging", "gob"), required=True)
+    parser.add_argument("--apply", action="store_true")
+    args = parser.parse_args()
     summary_mapping = load_summary_mapping()
-    uri = _load_mongo_uri()
-    client = MongoClient(uri, serverSelectionTimeoutMS=10000)
+    connection = connect_migration_target(args.db, write=args.apply)
 
     print(f"[plan] parsed {len(summary_mapping)} plays from {SUMMARY_PATH}")
 
-    total_matched = 0
-    total_modified = 0
-    for db_name in TARGET_DBS:
-        matched, modified = update_database(client, db_name, summary_mapping)
-        total_matched += matched
-        total_modified += modified
-        print(f"[{db_name}.plays] matched={matched} modified={modified}")
+    total_matched, total_modified = update_database(
+        connection.database["plays"], args.db, summary_mapping, apply=args.apply
+    )
+    print(f"[{args.db}.plays] matched={total_matched} modified={total_modified}")
 
     print(f"[done] total matched={total_matched} total modified={total_modified}")
     return 0

@@ -2,15 +2,25 @@
   "generated_count": 1,
   "assignments": [
     {
-      "slug": "grupenberg",
-      "hardwood_variant": "medium_light",
-      "inside_tone": "medium",
-      "outside_tone": "light",
-      "lane_fill": "primary",
-      "half_circle_fill": "primary",
-      "oob_fill": "black",
-      "line_fill": "black",
-      "output": "/Users/jamesdavies/gob-simplified/FrontEnd/static/images/teams/grupenberg/grupenberg_court.jpg"
+      "slug": "ada",
+      "hardwood_variant": "light_medium",
+      "inside_tone": "light",
+      "outside_tone": "medium",
+      "lane_fill": "secondary",
+      "half_circle_fill": "inside_hardwood",
+      "oob_fill": "primary",
+      "line_fill": "primary",
+      "output": "/Users/jamesdavies/gob-simplified/FrontEnd/static/images/teams/ada/ada_court.jpg",
+      "resolved": {
+        "primary": "#264653",
+        "secondary": "#e76f51",
+        "inside_wood": "#EAD8C6",
+        "outside_wood": "#DBB891",
+        "lane_color": "#e76f51",
+        "half_circle_color": "#EAD8C6",
+        "oob_color": "#264653",
+        "line_color": "#264653"
+      }
     }
   ]
 }
