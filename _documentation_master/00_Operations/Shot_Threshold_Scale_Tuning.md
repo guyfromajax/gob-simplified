@@ -2,7 +2,8 @@
 
 > **Canonical scale module:** `BackEnd/constants/shot_threshold_scale.py`  
 > **Frontend mirror:** `FrontEnd/static/js/shared/teamShotThresholdScale.js`  
-> **Current values:** MIN **0**, MAX **200**, MID **100** (span always 200; MID = MIN + 100)
+> **Current values:** MIN **−50**, MAX **150**, MID **50** (span always 200; MID = MIN + 100)  
+> _Changed 2026-08-11 from 0/200/100 to shift the whole window down — lower raw = easier makes, so this raises league FG%._
 
 ## What this attribute is
 
@@ -49,30 +50,30 @@ made = shot_score >= shot_threshold
 
 **Span rule:** delta between lower and upper is always **200**; MID is always **MIN + 100** (= MAX − 100).
 
-## Wired consumers (current scale: 0–200, MID 100)
+## Wired consumers (current scale: −50–150, MID 50)
 
 When **`MIN`** changes, these values re-derive from `BackEnd/constants/shot_threshold_scale.py` (except items in the manual checklist below).
 
 | Area | Current value | Code / notes |
 |------|---------------|--------------|
-| **Team attribute clamp** (`TEAM_ATTR_RANGES`) | **0 – 200** | Init, training, EOG clamp |
-| **Franchise init** | **80 – 90** | `FRANCHISE_INIT_LO` / `FRANCHISE_INIT_HI` — 10–20 below MID |
-| **Single-game init** | **0 – 200** | Full clamp range, uniform random |
+| **Team attribute clamp** (`TEAM_ATTR_RANGES`) | **−50 – 150** | Init, training, EOG clamp |
+| **Franchise init** | **45 – 55** | `FRANCHISE_INIT_LO` / `FRANCHISE_INIT_HI` — **MID ± 5** since the 2026-08-11 leveling pass (was MID−20/MID−10) |
+| **Single-game init** | **−50 – 150** | Full clamp range, uniform random |
 | **Tournament seeds** | See table below | `TOURNAMENT_SEED_ST_RANGES` |
-| **Score balancing** | Trailing **−20**, leading **180** | `MIN − 20` / `MAX − 20` |
-| **Rim-runner corner FB** | **180 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
-| **Uncontested-3 make bar** | **200 − CH + round(dist × 2.0)** | `SHOT_THRESHOLD_MAX` in `shot_manager.resolve_shot` — always tracks MAX |
-| **FTE tutorial** | User **0**, computer **100** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
-| **UI pills** | Center **100**, span **0–200** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
+| **Score balancing** | Trailing **−70**, leading **130** | `MIN − 20` / `MAX − 20` |
+| **Rim-runner corner FB** | **130 − fb_efficiency** | `FAST_BREAK_CORNER_THRESHOLD_BASE` (`MAX − 20`) |
+| **Uncontested-3 make bar** | **150 − CH + round(dist × 2.0)** | `SHOT_THRESHOLD_MAX` in `shot_manager.resolve_shot` — always tracks MAX |
+| **FTE tutorial** | User **−50**, computer **50** | `TUTORIAL_USER` (= MIN), `TUTORIAL_COMPUTER` (= MID) |
+| **UI pills** | Center **50**, span **−50–150** | `teamShotThresholdScale.js` → FCC, training report, tournament, court, box score |
 
 **Tournament seed shot_threshold ranges:**
 
 | Seed | Range | Notes |
 |------|-------|-------|
-| 1 | 0 – 100 | Best shooters |
-| 2 – 4 | 0 – 150 | |
-| 5 – 7 | 50 – 200 | |
-| 8 | 100 – 200 | Worst shooters |
+| 1 | −50 – 50 | Best shooters |
+| 2 – 4 | −50 – 100 | |
+| 5 – 7 | 0 – 150 | |
+| 8 | 50 – 150 | Worst shooters |
 
 ## Frontend files (import shared scale — do not hardcode MID)
 
@@ -101,6 +102,19 @@ When retuning feel beyond moving the storage window, grep and revisit:
 | SFX tiers **101 / 210** on `shot_score_pre_defense` | **Not** team attribute scale — `gameSfx.js`, `ShotAnimationSystem.js` |
 | HCT/FCP read thresholds (110, 175, 200) | Motion reads — unrelated |
 | `SOFT_SHOOTING_FOUL_THRESHOLD = 110` | Foul math — unrelated |
+
+## ⚠️ Moving the scale INVALIDATES the EOG shot_threshold band calibration
+
+`eog_attr_bands.FG_PCT_MID/HIGH` and the `ST_FG_*` deltas are cut against a MEASURED
+FG%-vs-shot_threshold response, and that response is season- and scale-specific. Lowering the
+window raises league FG%, which pushes more team-games into the reward band and drives
+`shot_threshold` further down — the loop compounds.
+
+The band block in `BackEnd/constants/eog_attr_bands.py` is marked ⚠️ INTERIM for exactly this
+reason. **After a scale move, re-derive the slope from a season run under the new scale and
+re-cut** (`scripts/eog_band_tuner.py`); do not reuse the previous fit. The relevant history:
+per-season slopes measured −0.1125 / −0.0691 / −0.1413 with non-overlapping CIs, and the LEVEL
+shifted 6.42pp between code states.
 
 ## Docs to update when scale changes
 

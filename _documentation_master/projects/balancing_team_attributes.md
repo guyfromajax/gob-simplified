@@ -33,7 +33,7 @@ There is no alternate lightweight game progression branch and no template-traini
 
 | Attribute | Range | Better direction | Primary role |
 |---|---:|---|---|
-| `shot_threshold` | 0–200 | Lower | Shooting difficulty/quality |
+| `shot_threshold` | −50–150 | Lower | Shooting difficulty/quality |
 | `discipline` | -20–20 | Higher | Fouls, turnovers, pressure checks |
 | `fight` | -20–20 | Higher | Physicality and resilience |
 | `rebound_modifier` | 0.0–1.0 | Higher | Team rebounding modifier |

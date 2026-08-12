@@ -563,7 +563,7 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
     - Red fill to the left for negative values
     - Proportional fill based on max value
     - No value displayed on top of pill (value shown in change indicator only)
-    - **Shooting (`shot_threshold`):** Golf-score attribute (lower raw value is better). Pill centers at **100** with span **0–200** (better toward the right). See [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md). The **numeric change** next to the label uses **inverted sign** versus the raw delta: raw **−10** displays as **+10** (green); raw **+5** displays as **−5** in red.
+    - **Shooting (`shot_threshold`):** Golf-score attribute (lower raw value is better). Pill centers at **50** with span **−50–150** (better toward the right). See [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md). The **numeric change** next to the label uses **inverted sign** versus the raw delta: raw **−10** displays as **+10** (green); raw **+5** displays as **−5** in red.
   - **Progress Bar:** Team Chemistry (0-25 scale, blue fill)
     - Shows value as "X / 25" centered on bar
     - Only attribute that displays its value
