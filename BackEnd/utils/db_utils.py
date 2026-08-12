@@ -757,7 +757,12 @@ def projected_starting_five_from_payload(players_payload: List[dict]) -> Dict[st
         # slot from the rendered five.
         pid = data.get("_id") if data.get("_id") is not None else data.get("player_id")
         if pid is not None:
-            data["player_id"] = str(pid)
+            pid_s = str(pid)
+            data["player_id"] = pid_s
+            # ``Player`` only reads ``_id`` (else uuid4). Without this, payloads that
+            # carry ``player_id`` only (e.g. training report) seat unmappable ids and
+            # the display five renders empty.
+            data["_id"] = pid_s
         players.append(Player(data))
 
     if not players:

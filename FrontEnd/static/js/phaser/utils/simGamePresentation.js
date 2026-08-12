@@ -201,7 +201,6 @@ function buildSkeleton(teams) {
       <div class="ov-worm">
         <div class="wl-head"><span class="wl-cap">LEAD MARGIN</span><span class="wl-team"></span></div>
         <div class="worm-host"></div>
-        <div class="wl-axis"><span>TIP</span><span>Q1</span><span>Q2</span><span>HALF</span><span>Q3</span><span>Q4</span></div>
       </div>
       <div class="pretip-lbl">STARTING LINEUPS · TIP-OFF</div>
       <div class="rows">${rows}</div>

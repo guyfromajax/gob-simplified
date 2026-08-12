@@ -49,6 +49,27 @@ def test_assigns_each_player_once():
     assert by_pos["PG"]["rt"] == 99.0
 
 
+def test_player_id_only_payload_maps_back_to_display_rows():
+    """Training-report players carry ``player_id`` without ``_id``.
+
+    ``Player`` only reads ``_id`` (else uuid4). Normalization must stamp ``_id`` so seated
+    ids match display-row keys — otherwise the five is computed then silently dropped.
+    """
+    players = [
+        _p("1", {"PG": 99, "SG": 10}),
+        _p("2", {"SG": 98, "PG": 10}),
+        _p("3", {"SF": 97}),
+        _p("4", {"PF": 96}),
+        _p("5", {"C": 95}),
+    ]
+    for p in players:
+        p["player_id"] = p.pop("_id")
+    rows = compute_projected_starting_five(players)
+    assert len(rows) == 5
+    by_pos = {r["position"]: r["player_id"] for r in rows}
+    assert by_pos == {"PG": "1", "SG": "2", "SF": "3", "PF": "4", "C": "5"}
+
+
 def test_two_slot_star_takes_the_slot_that_maximises_the_pair():
     """P1 rates at both PG and SG, but P2 can only play SG — so seating P1 at PG is the
     higher-scoring pair, not merely the greedier first pick."""
