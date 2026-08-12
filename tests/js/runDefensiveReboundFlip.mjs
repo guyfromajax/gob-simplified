@@ -1,5 +1,16 @@
-import { playTurnAnimation } from '../../FrontEnd/static/js/phaser/animation/turnAnimation.js';
-import { getCurrentOwner } from '../../FrontEnd/static/js/phaser/ball/ballController.js';
+import { animateRebound } from '../../FrontEnd/static/js/phaser/animation/ballManager.js';
+import {
+  getCurrentOwner,
+  initializeBallController,
+} from '../../FrontEnd/static/js/phaser/animation/BallControllerAdapter.js';
+
+globalThis.Audio = class {
+  constructor() { this.dataset = {}; this.readyState = 4; this.currentTime = 0; }
+  play() { return Promise.resolve(); }
+  pause() {}
+  addEventListener() {}
+  removeEventListener() {}
+};
 
 function makeScene() {
   const log = {};
@@ -13,11 +24,15 @@ function makeScene() {
       killTweensOf: () => {}
     },
     time: { delayedCall: (ms, fn) => fn() },
-    events: { emit: (evt, payload) => { if (evt === 'possessionChange') log.event = payload.offenseTeamId; } },
+    events: {
+      emit: (evt, payload) => { if (evt === 'possessionChange') log.event = payload.offenseTeamId; },
+      on: () => {},
+      off: () => {},
+    },
     game: { config: { width: 100, height: 50 }, loop: { frame: 0 } },
     playerSprites: {
-      pg: { x: 0, y: 0, team: 'home', team_id: 'HOME' },
-      pgA: { x: 0, y: 0, team: 'away', team_id: 'AWAY' }
+      pg: { x: 0, y: 0, playerId: 'pg', team: 'home', team_id: 'HOME' },
+      pgA: { x: 0, y: 0, playerId: 'pgA', team: 'away', team_id: 'AWAY' }
     },
     playerInfo: {
       pg: { pos: 'PG', team_id: 'HOME', name: 'PG' },
@@ -30,24 +45,19 @@ function makeScene() {
 
 const scene = makeScene();
 const ballSprite = { setPosition(){}, setVisible(){}, setDepth(){} };
-const simData = { home_team_id: 'HOME', away_team_id: 'AWAY', players: [] };
-const turnData = {
-  starting_possession_team_id: 'HOME',
-  possession_team_id: 'HOME',
-  result_type: 'MISS',
-  rebounder_player_id: 'pgA',
-  animations: [
-    {
-      playerId: 'pg',
-      movement: [
-        { timestamp: 0, action: 'handle', coords: { x: 0, y: 0 } },
-        { timestamp: 1, action: 'shoot', coords: { x: 0, y: 0 } }
-      ],
-      hasBallAtStep: [true, false]
-    }
-  ]
-};
-
-await playTurnAnimation({ scene, simData, playerSprites: scene.playerSprites, turnData, ballSprite });
+for (const [playerId, sprite] of Object.entries(scene.playerSprites)) {
+  Object.assign(sprite, { playerId, scene, active: true, depth: 1 });
+}
+initializeBallController(scene, ballSprite);
+scene.offenseTeamId = 'HOME';
+await animateRebound({
+  scene,
+  ballSprite,
+  playerSprites: scene.playerSprites,
+  animations: [],
+  rebounderId: 'pgA',
+  ballSpot: { x: 9, y: 25 },
+  shooterId: 'pg',
+});
 
 console.log(JSON.stringify({ newOffense: scene.offenseTeamId, eventOffense: scene.possessionLog.event, attached: getCurrentOwner(scene) }));

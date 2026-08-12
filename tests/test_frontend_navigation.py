@@ -47,12 +47,14 @@ def test_bootgame_includes_game_id_for_franchise_and_tournament_reads():
     load_gameplan_block = script[load_gameplan_start:load_playbook_start]
     load_playbook_block = script[load_playbook_start:load_playbook_end]
 
-    assert "if (gameId) {" in load_gameplan_block
-    assert "params.set('game_id', gameId);" in load_gameplan_block
-    assert "if (mode === 'franchise' && franchiseId)" in load_gameplan_block
-    assert "else if (mode === 'single' && gameId)" not in load_gameplan_block
+    # These reads intentionally resolve fresh URL values at call time; matching
+    # the live* variables protects against regressing to cached navigation state.
+    assert "if (liveGameId) {" in load_gameplan_block
+    assert "params.set('game_id', liveGameId);" in load_gameplan_block
+    assert "if (liveMode === 'franchise' && liveFranchiseId)" in load_gameplan_block
+    assert "else if (liveMode === 'single' && liveGameId)" not in load_gameplan_block
 
-    assert "if (gameId) {" in load_playbook_block
-    assert "params.set('game_id', gameId);" in load_playbook_block
-    assert "if (mode === 'franchise' && franchiseId)" in load_playbook_block
-    assert "else if (mode === 'single' && gameId)" not in load_playbook_block
+    assert "if (liveGameId) {" in load_playbook_block
+    assert "params.set('game_id', liveGameId);" in load_playbook_block
+    assert "if (liveMode === 'franchise' && liveFranchiseId)" in load_playbook_block
+    assert "else if (liveMode === 'single' && liveGameId)" not in load_playbook_block

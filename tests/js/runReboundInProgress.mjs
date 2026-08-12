@@ -1,6 +1,17 @@
 import { attachBallToPlayer, animateRebound } from '../../FrontEnd/static/js/phaser/animation/ballManager.js';
 import { createGameStateMachine, States } from '../../FrontEnd/static/js/phaser/state/gameStateMachine.js';
-import { getCurrentOwner } from '../../FrontEnd/static/js/phaser/ball/ballController.js';
+import {
+  getCurrentOwner,
+  initializeBallController,
+} from '../../FrontEnd/static/js/phaser/animation/BallControllerAdapter.js';
+
+globalThis.Audio = class {
+  constructor() { this.dataset = {}; this.readyState = 4; this.currentTime = 0; }
+  play() { return Promise.resolve(); }
+  pause() {}
+  addEventListener() {}
+  removeEventListener() {}
+};
 
 function makeScene() {
   return {
@@ -21,7 +32,7 @@ function makeScene() {
       a: { x: 0, y: 0, playerId: 'a', team: 'home', team_id: 'HOME' },
       b: { x: 0, y: 0, playerId: 'b', team: 'home', team_id: 'HOME' }
     },
-    events: { emit: () => {} },
+    events: { emit: () => {}, on: () => {}, off: () => {} },
     rebounderId: 'a',
     stateMachine: createGameStateMachine(States.Rebound)
   };
@@ -29,6 +40,10 @@ function makeScene() {
 
 const scene = makeScene();
 const ballSprite = { setPosition(){}, setVisible(){}, setDepth(){} };
+for (const sprite of Object.values(scene.playerSprites)) {
+  Object.assign(sprite, { scene, active: true, depth: 1 });
+}
+initializeBallController(scene, ballSprite);
 
 // Attempt to attach to non-rebounder while rebound in progress
 attachBallToPlayer(scene, ballSprite, scene.playerSprites.b);

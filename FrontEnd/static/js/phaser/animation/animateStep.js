@@ -240,7 +240,12 @@ export function animateStep({ scene, sprite, step, duration, ballSprite, current
         tweenTargetsCount: tweenTargets.length,
         validTargetsCount: validTargets.length,
         spriteValid: sprite && sprite.scene && sprite.active !== false && !sprite.destroyed,
-        ballValid: ballIsValid
+        ballValid: !!(
+          ballSprite &&
+          ballSprite.scene &&
+          ballSprite.active !== false &&
+          !ballSprite.destroyed
+        )
       });
       tweenCompleted = true;
       clearTimeout(timeoutId);
