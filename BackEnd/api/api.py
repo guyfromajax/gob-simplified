@@ -235,7 +235,27 @@ try:
                 return resp
 
         return await call_next(request)
-    
+
+    @app.middleware("http")
+    async def team_builder_feature_middleware(request: Request, call_next):
+        """Block Team Builder authoring routes when TEAM_BUILDER_ENABLED is off.
+
+        Does not touch overlay resolution used by live franchises that already
+        have a modded program.
+        """
+        from BackEnd.utils.team_builder_feature import (
+            team_builder_disabled_detail,
+            team_builder_enabled,
+        )
+
+        path = request.url.path or ""
+        if path.startswith("/franchise/team-builder") and not team_builder_enabled():
+            return JSONResponse(
+                status_code=404,
+                content={"detail": team_builder_disabled_detail()},
+            )
+        return await call_next(request)
+
     @app.get("/sentry-debug")
     def sentry_debug():
         """Test endpoint - raises error to verify backend Sentry capture. Remove before public launch."""
@@ -248,11 +268,15 @@ try:
         Returns frontend configuration including alpha status.
         Frontend uses this to conditionally show alpha badge, disclaimers, and OTP field.
         """
+        from BackEnd.utils.team_builder_feature import team_builder_enabled
+
         return {
             "isAlpha": IS_ALPHA,
             "alphaDisclaimer": "This is an alpha release. Data may be wiped without notice. Gameplay balance and features may change." if IS_ALPHA else None,
             "version": "alpha-1.0" if IS_ALPHA else "1.0",
             "sentryDsn": os.getenv("SENTRY_DSN_FRONTEND") or None,
+            # Authoring only — existing TB overlays still resolve when false.
+            "teamBuilderEnabled": team_builder_enabled(),
         }
     
     # CORS Configuration - Must match actual testing domains, not just final ideal

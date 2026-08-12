@@ -1,6 +1,6 @@
 # Screenshot Tool Build Plan
 
-**Status:** IN PROGRESS — TASK 6 AUTOMATED SUITE COMPLETE; LIVE ACCEPTANCE PENDING  
+**Status:** PAUSED AT TASK 6 STOP CONDITION — PHASER WEBGL CAPTURE BLANK
 **Created:** 2026-08-12  
 **Objective:** Retire the non-working in-browser `html2canvas` screenshot tool and
 replace it with a development-only Playwright workflow that captures the browser's
@@ -260,7 +260,7 @@ any court-specific code.
 
 ## Task 4 — Authentication Without Credential Sprawl
 
-**Status:** IMPLEMENTED — LIVE STAGING LOGIN ACCEPTANCE PENDING OPERATOR
+**Status:** COMPLETE — LIVE STAGING SESSION ACCEPTED
 
 Some useful screens require an authenticated franchise session. Support this with a
 separate local setup command or documented Playwright workflow that writes storage state
@@ -290,6 +290,9 @@ Prefer an interactive headed login/save helper over username/password CLI flags.
 
 - Added `scripts/save_screenshot_session.mjs`, a headed, manual-login helper restricted
   to localhost and staging/test hosts. Production login URLs are rejected.
+- The default login target is the verified active staging frontend,
+  `https://gob-test.netlify.app/login.html`; the older
+  `staging.geekedoutbasketball.com` hostname does not currently resolve.
 - The helper accepts no username, password, token, cookie, database credential, or
   arbitrary header. It waits only for the boolean presence of the application's
   `auth_token` and `auth_user` browser keys and never prints their values.
@@ -356,7 +359,7 @@ an in-app capture engine.
 
 ## Task 6 — Tests and Verification
 
-**Status:** AUTOMATED SUITE COMPLETE — LIVE AUTHENTICATED/COURT ACCEPTANCE PENDING
+**Status:** AUTOMATED SUITE COMPLETE — LIVE COURT ACCEPTANCE FAILED
 
 Add focused tests for:
 
@@ -406,13 +409,19 @@ Manual acceptance matrix:
 | Surface | Status | Evidence / next requirement |
 |---|---|---|
 | Pure DOM | PASS | Native homepage PNG visually inspected; typography, images, gradients, and layout render together correctly. |
-| FCC radar/SVG | PENDING | Requires a real staging login state and franchise URL. |
-| Set Lineup | PENDING | Requires a real staging login state and initialized franchise/game URL. |
-| Court | PENDING | Requires a valid initialized game URL; do not substitute a static unauthenticated court shell. |
-| Authenticated staging | PENDING | `~/.config/gob/playwright-storage-state.json` is not present on this machine yet. Run the Task 4 helper and complete login. |
+| FCC | PASS | Authenticated staging FCC rendered data, team art, typography, panels, and layout correctly. Radar-specific tab acceptance remains optional follow-up coverage. |
+| Set Lineup | PASS | Authenticated staging roster, banner, lineup controls, and all visible columns rendered correctly. |
+| Game Preview | PASS WITH EXPECTED LIMIT | Authenticated pregame DOM presentation rendered correctly; Phaser canvas does not exist until Play Quarter is selected. |
+| Court | FAIL — STOP CONDITION | After an acceptance-only Play Quarter click, the Phaser canvas existed and DOM game state initialized, but its WebGL pixels captured as a blank dark rectangle. Scoreboard, rosters, team branding, and controls rendered correctly around it. |
+| Authenticated staging | PASS | Private `0600` storage state loaded FCC, Set Lineup, and Court without exposing credentials. |
 
-Task 6 is not marked fully complete until the pending live surfaces are captured and
-manually inspected. This is an acceptance dependency, not an implementation defect.
+The court result triggers the plan's explicit stop condition: native Playwright court
+capture omits the WebGL render surface. Do not add application-side render flags,
+canvas copying, compositing, or gameplay hooks under Task 6. The project remains paused
+until a new bounded technical investigation selects a solution.
+
+The acceptance-only helper used to click Play Quarter was deleted after the test and
+was never added to the generic command or recipe catalog.
 
 ## Task 7 — Documentation and Closeout
 

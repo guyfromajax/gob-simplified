@@ -136,14 +136,14 @@ const API_CONFIG = {
         const response = await fetch(url);
         if (!response.ok) {
           console.error('[API_CONFIG] Failed to load app config:', response.status, response.statusText);
-          return { isAlpha: false, alphaDisclaimer: null, version: '1.0' };
+          return { isAlpha: false, alphaDisclaimer: null, version: '1.0', teamBuilderEnabled: true };
         }
         this._appConfig = await response.json();
         console.log('[API_CONFIG] app-config loaded:', this._appConfig); // DEBUG: remove after troubleshooting
         return this._appConfig;
       } catch (error) {
         console.error('[API_CONFIG] Error loading app config:', error.message, error);
-        return { isAlpha: false, alphaDisclaimer: null, version: '1.0' };
+        return { isAlpha: false, alphaDisclaimer: null, version: '1.0', teamBuilderEnabled: true };
       } finally {
         this._appConfigLoading = null;
       }
@@ -152,6 +152,19 @@ const API_CONFIG = {
     return this._appConfigLoading;
   },
   
+  /**
+   * Check if Team Builder authoring is enabled (synchronous — uses cached value).
+   * IMPORTANT: Call loadAppConfig() first on page load to populate cache.
+   * Defaults to true when config is missing (matches backend default).
+   * @returns {boolean}
+   */
+  isTeamBuilderEnabled() {
+    if (this._appConfig && typeof this._appConfig.teamBuilderEnabled === 'boolean') {
+      return this._appConfig.teamBuilderEnabled;
+    }
+    return true;
+  },
+
   /**
    * Check if app is in alpha mode (synchronous - uses cached value)
    * IMPORTANT: Call loadAppConfig() first on page load to populate cache

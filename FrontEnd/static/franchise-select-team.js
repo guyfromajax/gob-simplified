@@ -27,6 +27,7 @@
 
   var state = {
     builder: BUILDER_PARAM && !TUTORIAL_MODE,
+    teamBuilderEnabled: true,
     teams: [],
     talentBands: {},
     prestigeBands: {},
@@ -136,7 +137,7 @@
   }
 
   function setBuilderMode(on) {
-    state.builder = !!on && !TUTORIAL_MODE;
+    state.builder = !!on && !TUTORIAL_MODE && !!state.teamBuilderEnabled;
     if (els.modeBanner) els.modeBanner.hidden = !state.builder;
     if (els.root) els.root.classList.toggle('building', state.builder);
     if (els.title) {
@@ -165,7 +166,7 @@
       window.history.replaceState({}, '', url.pathname + url.search);
     } catch (e) {}
     // Draft card ↔ Open Team Builder exclusivity lives in renderDraftCard.
-    if (TUTORIAL_MODE) {
+    if (TUTORIAL_MODE || !state.teamBuilderEnabled) {
       if (els.tbEntry) els.tbEntry.hidden = true;
       if (els.draftHost) {
         els.draftHost.hidden = true;
@@ -249,8 +250,8 @@
   function renderDraftCard() {
     if (!els.draftHost) return;
 
-    // Builder / tutorial: neither draft card nor (for tutorial) Open Team Builder.
-    if (TUTORIAL_MODE || state.builder) {
+    // Builder / tutorial / feature-flag off: hide draft + Open Team Builder.
+    if (TUTORIAL_MODE || state.builder || !state.teamBuilderEnabled) {
       els.draftHost.hidden = true;
       els.draftHost.innerHTML = '';
       if (els.tbEntry) els.tbEntry.hidden = true;
@@ -767,6 +768,24 @@
       lobbyMusic.volume = 0.4;
       lobbyMusic.play().catch(function () {});
     } catch (e) {}
+
+    // Feature flag — hide Team Builder authoring when disabled (prod can ship code dark).
+    if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.loadAppConfig === 'function') {
+      try {
+        await API_CONFIG.loadAppConfig();
+        state.teamBuilderEnabled = API_CONFIG.isTeamBuilderEnabled();
+      } catch (e) {
+        state.teamBuilderEnabled = true;
+      }
+    }
+    if (!state.teamBuilderEnabled) {
+      state.builder = false;
+      try {
+        var clearUrl = new URL(window.location.href);
+        clearUrl.searchParams.delete('builder');
+        window.history.replaceState({}, '', clearUrl.pathname + clearUrl.search);
+      } catch (e2) {}
+    }
 
     // Hydration gate — protects non-TB users on this rewritten entry path too.
     if (typeof ensureTeamBuilderChromeSnapshot === 'function') {

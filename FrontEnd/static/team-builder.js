@@ -975,6 +975,16 @@
     els.review = document.getElementById('chapter-review');
     els.establish = document.getElementById('chapter-establish');
 
+    if (typeof API_CONFIG !== 'undefined' && typeof API_CONFIG.loadAppConfig === 'function') {
+      try {
+        await API_CONFIG.loadAppConfig();
+        if (!API_CONFIG.isTeamBuilderEnabled()) {
+          window.location.replace('/franchise-select-team.html');
+          return;
+        }
+      } catch (_) {}
+    }
+
     if (!REPLACED_OID) {
       window.location.replace(claimUrl());
       return;

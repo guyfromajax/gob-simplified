@@ -9,7 +9,7 @@ import { chromium } from '@playwright/test';
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(SCRIPT_DIR, '..');
-const DEFAULT_LOGIN_URL = 'https://staging.geekedoutbasketball.com/login.html';
+const DEFAULT_LOGIN_URL = 'https://gob-test.netlify.app/login.html';
 const DEFAULT_STATE_PATH = path.join(os.homedir(), '.config', 'gob', 'playwright-storage-state.json');
 const LOGIN_TIMEOUT_MS = 10 * 60 * 1000;
 
@@ -23,7 +23,7 @@ Usage:
 
 Options:
   --url URL       Localhost or staging/test login URL
-                  (default: https://staging.geekedoutbasketball.com/login.html)
+                  (default: https://gob-test.netlify.app/login.html)
   --state PATH    Destination outside the repository
                   (default: ~/.config/gob/playwright-storage-state.json)
   --help          Show this help without launching Chromium
