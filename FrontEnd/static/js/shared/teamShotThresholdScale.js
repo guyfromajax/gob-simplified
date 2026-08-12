@@ -5,11 +5,14 @@
  * Lower raw = better shooting. Pills center at MID; fill right when raw decreases.
  */
 (function (global) {
+  // Mirror of BackEnd/constants/shot_threshold_scale.py. Change MIN there first, then
+  // restate MAX and MID here as LITERALS — tests/test_shot_threshold_scale.py greps for
+  // `const MAX = <n>` so the values stay eyeballable against the Python side.
   const SPAN = 200;
   const HALF_SPAN = SPAN / 2;
-  const MIN = 0;
-  const MAX = 200;
-  const MID = 100;
+  const MIN = -50;
+  const MAX = 150;
+  const MID = 50;
 
   function pillDeviation(raw) {
     return MID - Number(raw);

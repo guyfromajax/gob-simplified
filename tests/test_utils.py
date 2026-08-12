@@ -1,7 +1,7 @@
 from BackEnd.models.game_manager import GameManager
 from BackEnd.models.turn_manager import TurnManager
 
-from BackEnd.constants import POSITION_LIST
+from BackEnd.constants import BOX_SCORE_KEYS, POSITION_LIST
 
 class MockPlayer:
     def __init__(self, player_dict):
@@ -12,7 +12,16 @@ class MockPlayer:
             k: v for k, v in player_dict.items()
             if k not in {"first_name", "last_name", "team", "height"}
         }
-        self.stats = {"game": {}}
+        # Match Player._init_stats so simulation tests exercise the real stats
+        # contract instead of failing when active code increments a known key.
+        self.stats = {
+            "game": {stat: 0 for stat in BOX_SCORE_KEYS},
+            "season": {stat: 0 for stat in BOX_SCORE_KEYS},
+            "career": {stat: 0 for stat in BOX_SCORE_KEYS},
+        }
+        for level in ("game", "season", "career"):
+            self.stats[level]["Outlet_Score_List"] = []
+        self.stats["game"]["Shot_Result_List"] = []
         self.team = player_dict["team"]
         self.height = player_dict.get("height", 78)  # Default 6'6" (78 inches)
         self.jersey = player_dict.get("jersey", 0)  # Default jersey number
