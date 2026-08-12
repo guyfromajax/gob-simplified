@@ -75,6 +75,9 @@ so it received the exact solve with no separate change.
 - **Random tie-break among equal optima**: the pool is shuffled up front and the DP improves
   on strict `>`, so equally-optimal assignments are chosen at random. Variation at zero rating
   cost — unlike the old random fill order, which bought variation by giving up rating.
+  The `tie_break` parameter selects only HOW that order is produced: `"shuffle"` (default,
+  the game, `sim_rng`) or `"stable"` (sort by `player_id`, zero draws) for the display path
+  in §6. Same total rating either way.
 
 ### What was removed
 
@@ -197,11 +200,68 @@ should not be quoted alone.
 
 ---
 
-## 6. Tunable Constants
+## 6. Projected five — the display surfaces ✅ **SHIPPED** (August 2026)
+
+**Every "projected starting five" in the UI is now the five autoset would field at tip.**
+`projected_starting_five_from_payload(players_payload)` in `db_utils.py` is the single source
+of truth; `scouting_utils.compute_projected_starting_five` delegates to it and only shapes the
+display rows.
+
+**Surfaces, all inherited with no route changes:**
+
+| surface | route |
+|---|---|
+| FCC Scouting Report tab | `/franchise/scouting-report` |
+| Team roster pages | `/api/roster/{id}` |
+| Training report | franchise training-report route |
+| Practice-squad team | `/franchise/practice-squad/team` |
+| Tournament scouting | `tournament_routes` |
+
+**Parity is structural, not a reimplementation** — same waterfall, same
+`solve_best_assignment` DP, same `LINEUP_EFFECTIVE_WEIGHT_DEFAULT` objective, same full-roster
+pool, against a fixed tip-off state (`PREGAME_STATE` = Q1, 480s → the 0.80 NG gate, no foul
+limit binding).
+
+**What it replaced:** a private GREEDY fill on raw `position_ratings` — the selector §5
+measured at 19.1% optimality and a 47.1% visible-failure rate. There were **three** five-pickers
+in the codebase; this removes one.
+
+**It is energy-aware on purpose.** NG persists to FPD and is written by the training paths, so
+a player the week's training left tired legitimately drops out of the projection — he is also
+worth less at tip. Expect the training report's five to SHIFT as training load is applied.
+That is the projection being live, not drift. Note the `rt` printed on the card stays the
+STATIC stored rating: selection accounts for energy, the number beside it is the player's
+rating, consistent with every other column.
+
+**Two differences from the floor remain, both correct:**
+
+| difference | why it is right |
+|---|---|
+| exact ties resolve deterministically, not randomly | equally-optimal ⇒ identical total rating; a random tie-break would flip the five between page loads, and drawing from `sim_rng` on a page load would desync the stream |
+| a user-set lineup overrides autoset entirely | it is a *projection* — what autoset WOULD pick. CPU teams never override, so for them it is exact |
+
+Blowout inversion, the FT force-include and foul-out gap fills are mid-game mechanics and
+cannot apply at tip, so none are modelled. Short or fully-ineligible rosters degrade to a
+PARTIAL five rather than raising — a display surface must still render.
+
+**No new DB calls and no sim coupling.** It is pure computation over player data the routes
+already load, on page loads only. `tests/test_scouting_projected_lineup.py` asserts parity
+with the game path, the NG gate, determinism, and a zero-draw check on `sim_rng.getstate()`.
+
+**Still out of sync: `team_identity.projected_starting_five`** — a third greedy picker that
+feeds CPU signals → vision → strategy sliders. It was NOT re-pointed here, because
+`SIGNAL_SCALE`, `RESIDUAL_SLOPE_VS_STRENGTH` and `STARTER_STRENGTH_MEAN` were calibrated
+against 128 teams *using the greedy five*. Swapping the picker shifts `starter_strength` and
+every residualised signal off their calibrated means. Ticketed in `projects/bugs.md`.
+
+---
+
+## 7. Tunable Constants
 
 | constant | location | value | effect |
 |---|---|---|---|
-| `LINEUP_EFFECTIVE_WEIGHT_DEFAULT` | `db_utils.py` | **0.25** | objective blend; 1.0 = paper talent, 0.0 = pure right-now. Archetype hook via `starter_bench_gap` |
+| `LINEUP_EFFECTIVE_WEIGHT_DEFAULT` | `db_utils.py` | **0.25** | objective blend; 1.0 = paper talent, 0.0 = pure right-now. Archetype hook via `starter_bench_gap`. Also governs the §6 display projection — changing it moves every projected five in the UI |
+| `PREGAME_STATE` | `db_utils.py` | `{quarter: 1, time_remaining: 480}` | tip-off state the §6 display projection is evaluated against; fixes it to the 0.80 NG gate with no foul limit binding |
 | NG standard threshold | `is_player_eligible_for_lineup` | **0.80** | eligibility floor; governs star minutes and rotation depth |
 | NG late-game threshold | `is_player_eligible_for_lineup` | **0.64** | final 4:00 of Q4 and OT |
 | NG waterfall step | `_waterfall_eligibility` | **0.20** | relaxation per step when <5 eligible |
@@ -217,7 +277,7 @@ EOG bands too.
 
 ---
 
-## 7. Open items
+## 8. Open items
 
 - **Rotation is ~7 deep (6.69 above 8% of minutes) against a real 8-9.** Whether that is a
   defect or a design choice is unsettled; it follows from the fatigue economy, not the selector.

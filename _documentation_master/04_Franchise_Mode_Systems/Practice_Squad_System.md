@@ -168,8 +168,9 @@ walk-on fill = 15, then Training Camp re-trims to 12 + 3.
 
 - **`/roster` endpoint** (`BackEnd/api/api.py`) returns a separate **`training_squad`**
   array (attrs, no season stats) alongside the 12 active `players`, plus enriched
-  **`projected_starting_five`** (same greedy RT five + PPG/RPG/APG/DEF% helper as FCC
-  scouting; omitted when `tournament_id` is present).
+  **`projected_starting_five`** (same five + PPG/RPG/APG/DEF% helper as FCC scouting; omitted
+  when `tournament_id` is present). Selection is the five autoset would field at tip, not a
+  greedy RT fill — see `06_Gameplay_Systems/CPU_Team_Rotation_System.md` §6.
 - **FCC Roster tab** — `renderTrainingSquad` (`franchise-command-center.js`) renders a
   "Training Squad" section below the active roster (hidden when empty).
 - **Team roster page** (`team-roster-view.html` / `.js`) — **Starting 5** image cards at the

@@ -29,6 +29,12 @@ roster signals  →  fit scores  →  vision pair  →  four surfaces
 Eight signals, all computed over the **projected starting five**, using `anchor_<attr>`
 with `<attr>` fallback.
 
+> ⚠️ "Projected starting five" here means `team_identity.projected_starting_five` — a **greedy**
+> fill, and now a DIFFERENT five from the one the UI displays. The display surfaces moved to
+> the exact max-weight assignment in August 2026 (`06_Gameplay_Systems/CPU_Team_Rotation_System.md`
+> §6); this one deliberately did not, because the frozen constants in §3 were calibrated
+> against the greedy five. Re-pointing it requires re-deriving them. Ticketed in `bugs.md`.
+
 | Signal | Definition | Notes |
 |---|---|---|
 | `fuel` | `min ND` | weakest-link: one gassed defender kills a press |

@@ -75,16 +75,25 @@ Design notes (see EOG Structural Pass):
 # curve. Binning by shot_threshold shows the LEVEL shifts too: mean cross-season spread
 # 6.42pp, max 9.15pp (at S=80-99: baseline 43.7%, identity 40.1%, verification 39.0%).
 #
-# CURRENT CALIBRATION (verification season, 2026-08-11)
-#   basis      FG% = 51.25 - 0.14126 * shot_threshold, residual sd 7.67pp  => 37.1% at S=100
-#   simulated  26 weeks x 128 teams x 12 trials from init 95-105:
-#              mean 105.8, sd 22.3, p10 79, p90 135, drift +5.8, ZERO teams at either rail
+# CURRENT CALIBRATION (re-cut 2026-08-12 for the -30..170 scale)
+#   basis      FG% = 51.25 - 0.14126 * shot_threshold, residual sd 7.67pp. The fit is
+#              SCALE-INDEPENDENT — shot_threshold is compared absolutely in
+#              `made = shot_score >= shot_threshold` — but the OPERATING POINT is not:
+#              at the current init 65-75 the equilibrium is 41.4% FG, not the 37.1% that
+#              init 95-105 produced on the old 0-200 scale.
+#   ⚠️ THIS IS WHY A SCALE MOVE FORCES A BAND RE-CUT. Cut at 24/36 for init 95-105, then
+#      left alone across the two scale moves, these bands drifted teams -28/season instead
+#      of ~0: FG at the new init sat ABOVE the high cut, so most team-games took the
+#      negative delta and compounded downward. Verified, then fixed to 26/40 (drift -0.1).
+#      See the scale-change checklist in 00_Operations/Shot_Threshold_Scale_Tuning.md.
+#   simulated  26 weeks x 128 teams, ACTUAL integer band ranges, from init 65-75:
+#              mean 69.9, sd 21.2, p10 43, p90 98, drift -0.1, ZERO teams at either rail
 #   chosen deliberately CONSERVATIVE over a wider-spread option (24/38 gain 8: sd 34.0 but
 #   0.3 teams railing) because the fit is thinnest exactly where new bands push teams —
 #   n=256 at S=100-119 against n=1008 at 80-99. Re-fit from the next season, where teams
 #   will actually sit, and widen from a basis that covers the target range.
-FG_PCT_HIGH = 36
-FG_PCT_MID = 24
+FG_PCT_HIGH = 40
+FG_PCT_MID = 26
 
 # discipline — team (F+TO) vs opponent (F+TO) + buffer
 DISCIPLINE_OPP_BUFFER = 8

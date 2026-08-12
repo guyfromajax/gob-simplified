@@ -101,7 +101,7 @@ This system documents data persistence across all three game modes when users ar
 - `shot_threshold`: 65 to 75 in franchise init (center 70 for pill display)
 - `discipline`: -2 to 0 (formerly `turnover_modifier`)
 - `fight`: -2 to 0 (formerly `foul_modifier`)
-- `rebound_modifier`: 0.2 (fixed center value for Franchise mode)
+- `rebound_modifier`: **0.5** (fixed, midpoint of the 0.0-1.0 clamp; was 0.2, which floored 93/128 teams by week 3 — see Team_Attribute_System.md)
 - `defensive_efficiency`: -2 to 0
 - `fb_efficiency`: -2 to 0
 - `pt_efficiency`: -2 to 0
@@ -214,7 +214,7 @@ This system documents data persistence across all three game modes when users ar
 - `shot_threshold`: −30 to 170 (randomized, center at 70 for pill display)
 - `discipline`: -10 to +10 (formerly `turnover_modifier`)
 - `fight`: -10 to +10 (formerly `foul_modifier`)
-- `rebound_modifier`: 0.0-0.4 (random in 0.01 increments; sunset-mode init, unchanged)
+- `rebound_modifier`: 0.0-0.4 (random in 0.01 increments; **sunset-mode init, deliberately NOT widened to the 0.0-1.0 clamp**)
 - `defensive_efficiency`: -10 to +10
 - `fb_efficiency`: -10 to +10
 - `pt_efficiency`: -10 to +10
@@ -290,7 +290,7 @@ This system documents data persistence across all three game modes when users ar
 - `shot_threshold`: −30 to 170 (randomized, center at 70 for pill display)
 - `discipline`: -10 to +10 (formerly `turnover_modifier`)
 - `fight`: -10 to +10 (formerly `foul_modifier`)
-- `rebound_modifier`: 0.0-0.4 (random in 0.01 increments; sunset-mode init, unchanged)
+- `rebound_modifier`: 0.0-0.4 (random in 0.01 increments; **sunset-mode init, deliberately NOT widened to the 0.0-1.0 clamp**)
 - `defensive_efficiency`: -10 to +10
 - `fb_efficiency`: -10 to +10
 - `pt_efficiency`: -10 to +10

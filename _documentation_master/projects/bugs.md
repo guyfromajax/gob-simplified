@@ -1,17 +1,24 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
+2. Pregame UX stats wiring is inconsistent
 
 
 ##Full Product Readiness
-1. Downloadable game vs Live game dynamics
-2. College and Pro setup
-3. Make sure scouting report tab and team roster pages are wired with the team's preset starting lineups instead of our previous formula for displaying them
+3. Recalibrate Traning Report thresholds
+4. Fine tuen height / weight
+5. Re-evaluate Sim Perf Capstone
+6. Change leader screens and load modals to averages instead of totals
+7. Update team attribute documentation
+
 
 ##Playtest Launch / In Progress
 1. Steam
-2. Balance Team attributes
 -----
-3. PvP sim -- playtest post-launch / immediate parallel task
+2. PvP sim -- playtest post-launch / immediate parallel task
+3. Downloadable game vs Live game dynamics
+4. College and Pro setup
+5. UX upgrade -- particularly around tabs and scrolling and back buttons (relative to browser back button), load screens
+6. UI Design upgrade, what is this game's personality?
 
 
 ##Full Product Perfection
@@ -34,6 +41,11 @@
 137. Watermark free version of player headshots
 138. College & Pro game system
 139. Mod system for uploading custom teams
+140. Better logic and impact to player EM
+141. Training Report player attribute calibration -- 1 or 10 scale
+142. Logic and impact for play scores
+143. Nail player plumbing for Mod TEams
+144. Nail mod team balance, league-wide
 
 199. Mobile
 200. PvP live
@@ -815,3 +827,39 @@ training. The real distinction is which QUESTION the data answers:
 
 So tester seasons answer the question we need and not the other one. Re-derive the slope from
 them; do not re-derive the training constants from them.
+
+### CPU strategy still derives from a THIRD starting-five picker (August 2026) [CODE-CLEANUP]
+
+The display surfaces were synced to the game's selector in August 2026 — FCC Scouting Report
+tab, team roster pages, training report, practice-squad team and tournament scouting all now
+run `db_utils.projected_starting_five_from_payload`, the exact max-weight assignment autoset
+uses at tip (`06_Gameplay_Systems/CPU_Team_Rotation_System.md` §6).
+
+**`team_identity.projected_starting_five` was deliberately NOT re-pointed.** It is a separate
+**greedy** fill on raw `position_ratings`, and it feeds eight signals → vision pair → strategy
+sliders → `ftd.identity`. So every CPU team's game plan is still derived from a five that is
+not the five it fields.
+
+**Why it was left alone — this is the whole ticket.** `SIGNAL_SCALE`,
+`RESIDUAL_SLOPE_VS_STRENGTH` and `STARTER_STRENGTH_MEAN` in `team_identity.py` are FROZEN
+constants calibrated once against 128 measured teams **using the greedy five**. Swapping the
+picker changes `starter_strength` and shifts every residualised signal off its calibrated
+mean. Vision assignment across the league would drift by an unmeasured amount, silently,
+because the scale would no longer mean what it was calibrated to mean.
+
+**To finish it:**
+
+1. Re-point `team_identity.projected_starting_five` at `solve_best_assignment`
+   (`tie_break="stable"` — identity assignment must not consume sim RNG either).
+2. Re-derive the frozen constants against a fresh 128-team pool under the new picker.
+3. Bump `CONSTANTS_VERSION` so `ensure_franchise_identities` reassigns existing franchises
+   rather than reusing pairs derived under the old scale.
+4. Re-run the week-1 measurement gate (`franchise_identity_summary`) — vision distribution
+   and slider variance. Zero variance means the treatment is not active.
+
+**Not a perf item.** 128 teams × a 32-state DP once per season is nothing. The cost is the
+measurement pass, not the compute.
+
+**Trigger to do it:** the next time the identity constants are being re-derived anyway. Doing
+it standalone means paying for a full recalibration to fix a consistency defect no user sees
+directly.

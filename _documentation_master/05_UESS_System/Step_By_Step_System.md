@@ -248,7 +248,7 @@ Step 1: Branch keyed off outlet contest outcome
 - Distance gate: outlet defender must be within 10 grid Euclidean of the outlet passer to contest; beyond that → auto-success (no roll)
 - `outlet_offense_score = (rebounder.PS×0.5 + rebounder.ST×0.3 + rebounder.IQ×0.2) × random.randint(1,6)`
 - `outlet_defense_score = (defender.IQ×0.5 + defender.OD×0.3 + defender.ST×0.2) × random.randint(1,6)` (0.0 if no defender / out of range)
-- Team FB attributes (each clamped to ±10) enter the final inequality, not the bases: success iff `(1.5 × outlet_offense_score) + (3 × fb_efficiency) > outlet_defense_score + (2 × fb_opp_modifier)`
+- Team FB attributes (each clamped to **±20** — widened from ±10 in the EOG Structural Pass; see `TEAM_ATTR_CLAMPS`) enter the final inequality, not the bases: success iff `(1.5 × outlet_offense_score) + (3 × fb_efficiency) > outlet_defense_score + (2 × fb_opp_modifier)`
 
 | Branch | Steps after Burst | Turn_stop | `schema_rendered_arc` |
 |---|---|---|---|

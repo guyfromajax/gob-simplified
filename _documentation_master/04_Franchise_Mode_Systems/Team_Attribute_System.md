@@ -1,6 +1,6 @@
 # Team Attribute Management System (**verified 2026-06-13**)
 
-> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise **creation**: attr `(-2,0)`, `team_chemistry` 7-10, `rebound_modifier` 0.2 fixed, `shot_threshold` 80-90; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). **Season rollover** (new season in an existing franchise) does NOT carry team_attributes: non-core fields re-init like creation and the 8 core attrs re-roll on a carryover-scaled range — see § Season Rollover Re-Roll. All franchise games now use the full turn-by-turn engine and the normal usage/scouting-driven EOG rules. **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
+> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise **creation**: attr `(-2,0)`, `team_chemistry` 8-11, `rebound_modifier` 0.5 fixed, `shot_threshold` 65-75; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). **Season rollover** (new season in an existing franchise) does NOT carry team_attributes: non-core fields re-init like creation and the 8 core attrs re-roll on a carryover-scaled range — see § Season Rollover Re-Roll. All franchise games now use the full turn-by-turn engine and the normal usage/scouting-driven EOG rules. **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
 
 ## Base Constants
 
@@ -18,8 +18,8 @@
    - `pt_opp_modifier` - Press/Trap opponent modifier
 
 2. **Mode-Specific Attribute Ranges**:
-   - **Single Game & Tournament**: Most attributes use `random.randint(-10, 10)`, `team_chemistry=random(7-25)`, `rebound_modifier=random(0.0-0.4)`
-   - **Franchise (creation)**: Most attributes use `random.randint(-2, 0)`, `team_chemistry=random(7-10)`, `rebound_modifier=0.2` (fixed)
+   - **Single Game & Tournament**: Most attributes use `random.randint(-10, 10)`, `team_chemistry=random(7-25)`, `rebound_modifier=random(0.0-0.4)` (sunset modes keep the original narrow rebound spread)
+   - **Franchise (creation)**: Most attributes use `random.randint(-2, 0)`, `team_chemistry=random(8-11)`, `rebound_modifier=0.5` (fixed)
    - **Franchise (season rollover)**: team_attributes do not carry over; the 8 core attrs re-roll on a carryover-scaled range (§ Season Rollover Re-Roll), other fields re-init like creation
 
 3. **Initialization Source**: Universal `teams` collection in MongoDB → Team objects → Fallback to `TeamManager.init_team_attributes()`
@@ -80,8 +80,8 @@ All team attributes are stored in team objects across all game modes:
 - Attribute range: `random.randint(-2, 0)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
 - `shot_threshold`: `random.randint(65, 75)` (MID ± 5; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
-- `team_chemistry`: `random.randint(7, 10)` (tighter range for more controlled progression)
-- `rebound_modifier`: `0.2` (fixed center value)
+- `team_chemistry`: `random.randint(8, 11)` — **8, not 7**: the clamp FLOOR is 7, so a team rolled at 7 starts pinned and cannot register a loss until it first wins. 21% of the league began on the floor before this change.
+- `rebound_modifier`: `0.5` (fixed — the MIDPOINT of the 0.0-1.0 clamp, giving symmetric headroom. At 0.2 with the old EOG ladder, 93 of 128 teams hit 0.0 by week 3.)
 
 **Franchise Mode (season rollover):** see § Season Rollover Re-Roll — team_attributes do **not** carry over; the 8 core attrs re-roll on a carryover-scaled range, other fields re-init like creation.
 
