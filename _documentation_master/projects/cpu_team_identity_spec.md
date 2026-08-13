@@ -295,9 +295,55 @@ the starter at 0.67 needing a long rest. The margin is set by `starter_bench_gap
 | 13–19 | normal |
 | > 19 | ride the starters, the bench is a real downgrade |
 
-Replace the single `NG ≥ 0.8` gate with a **pull/return pair** — pull at the margin,
-return higher. One threshold means a player bounces at the boundary; hysteresis makes a
-substitution buy a real rest, which is what makes "sub more often" mean anything.
+> ### ⛔ SUPERSEDED 2026-08-12 — the mechanism below was tried and REJECTED
+>
+> **Original proposal, struck:** *"Replace the single `NG ≥ 0.8` gate with a pull/return
+> pair — pull at the margin, return higher. One threshold means a player bounces at the
+> boundary; hysteresis makes a substitution buy a real rest."*
+>
+> **That exact mechanism was implemented, swept and stripped** before this spec was written.
+> See `projects/bugs.md` § "MEASURED AND REJECTED: NG pull/return hysteresis pair" and
+> `06_Gameplay_Systems/CPU_Team_Rotation_System.md` §4:
+>
+> | pair | record vs control | mean margin |
+> |---|---|---|
+> | 0.75/0.85 | 14-18 | **−1.81** |
+> | 0.70/0.90 | 15-17 | **−1.66** |
+> | 0.65/0.90 | 16-16 | −0.56 |
+>
+> It cut churn 20–33% and lengthened stints 41%, but **cost ~1 point per game and did not
+> move star minutes at all**. The sweep covered pull 0.60–0.80 against return 0.80–0.95 and
+> was monotonic throughout. **Do not revisit by searching for a better threshold pair.**
+>
+> **Why it fails, and why that does not condemn the archetype idea:** holding a tired player
+> past PULL is *by construction* fielding someone worse than the best available alternative.
+> The gate governs **eligibility** — it cannot express "this tired starter is still better
+> than his backup," which is exactly what a large `starter_bench_gap` means.
+>
+> **Use the objective weight `w` instead.** `db_utils.py` already blends
+> `score = w · static_rating + (1 − w) · effective_rating`, already implements the
+> NG-rescaled `_player_effective_slot_rating` this section describes, and its own comment
+> names this seam: *"This single weight is the intended home for archetype influence (via
+> starter_bench_gap)."* It is currently a global constant
+> (`LINEUP_EFFECTIVE_WEIGHT_DEFAULT = 0.25`, adopted in `c2570c5aa`) and has never been
+> varied per team.
+>
+> `w` changes **who the selector considers better**, rather than holding anyone past a gate —
+> so it can express the gap table above without paying the hysteresis cost:
+>
+> | `starter_bench_gap` | behaviour wanted | `w` |
+> |---|---|---|
+> | < 13 | sub early and freely | **low** — responsive, rotation emergent |
+> | 13–19 | normal | 0.25 (today's global constant) |
+> | > 19 | ride the starters | **high** — fatigue-blind, paper talent wins |
+>
+> **The mechanical floor above this box is NOT superseded** — it was never tested. It is a
+> different rule from hysteresis, and `_player_effective_slot_rating` already computes what
+> it needs.
+>
+> Open before building: whether `w` is plumbed per-call or read from the module constant at
+> the selection site, and what a `w` sweep does to margin (0.25 was adopted after an
+> evaluation whose scope is not yet established here).
 
 ### User teams
 
