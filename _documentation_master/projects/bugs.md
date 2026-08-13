@@ -411,6 +411,60 @@ being quoted again.
   focus-slider work. Needs its own before/after across those four rates, and it will interact
   with the 3PT-rate calibration.
 
+### MEASURED, NO EFFECT FOUND: archetype-varying objective weight `w` (2026-08-12)
+
+**The second attempt at archetype-driven substitution, and the second one that does not pay.**
+
+After the hysteresis pair below was rejected, `cpu_team_identity_spec.md` §7's archetype idea
+was redirected from the NG gate to the selector objective weight `w`
+(`score = w·static + (1−w)·effective`), which `db_utils.py:176` already names as *"the
+intended home for archetype influence (via starter_bench_gap)"*. That redirect was right in
+principle — `w` changes who the selector considers better rather than holding anyone past a
+gate — but the effect is not there.
+
+**The hypothesis, stated precisely.** `c2570c5aa` swept `w` LEAGUE-WIDE and found lower is
+better (every value beat `w=1.0`; >10 effective-talent gap 20.8% → 0.7% going 1.0 → 0.25).
+The spec wants `w` to go UP for top-heavy rosters. That is only defensible if the optimum
+DIFFERS BY ROSTER SHAPE and the league-wide sweep averaged the difference away. So the test
+is not "is high `w` good" — it is **"does the optimum differ by band."**
+
+**Method** (`scripts/lineup_w_conditional_sweep.py`, read-only): within-game pairing — one
+team gets `w=0.60`, its opponent `w=0.05`, same seed/venue/opponent, with the high arm
+alternating home/away. One observation per GAME (the design is zero-sum, so per-team-game
+arms are perfect negatives and a two-sample SE over them is meaningless). Matchups restricted
+to a single `starter_bench_gap` band, because the bands are 96/23/9 teams and random pairing
+spends ~93% of games where the answer is already known.
+
+| gap band | games | high-`w` margin | SE | \|t\| |
+|---|---|---|---|---|
+| top-heavy (>19) | 32 | **−1.56** | 2.70 | 0.6 |
+| shallow (<13) | 32 | **−1.22** | 2.50 | 0.5 |
+
+**Verdict — no conditional effect.** The spec predicts these bands should have OPPOSITE
+signs. They have the same sign, similar magnitude, and differ by **0.34 points — about
+one-eighth of a single SE**. Both are consistent with the league-wide result that lower `w`
+is better; neither supports varying it by roster shape.
+
+**Honest limits.** 32 games/band cannot resolve a ~1.5-point effect on its own (|t| ≈ 0.5–0.6),
+so this does not *prove* no effect. What it does is bound the conditional effect as small and
+provide zero support for its existence, against a prior that already measured higher `w` as
+worse. Single franchise, week-2 rosters, two `w` arms rather than a full sweep.
+
+**Where `starter_bench_gap` came from.** It is not defined anywhere in the codebase — only
+named in the `db_utils` comment. The sweep defines it as the mean over the five lineup slots
+of (best static slot rating − second best). Static not effective (it is a roster property,
+not a fatigue state); second-best per slot not "the bench" (that is who actually replaces the
+starter); mean not max (one thin position should not read as top-heavy). Observed on the
+identity league: min 2.0, max 29.2, mean 11.1 — so the spec's 13/19 band edges put **75% of
+the league in one bucket** and were evidently cut against a different population, the same
+failure as the `RT ≥ 50` bar and the frozen `SIGNAL_SCALE` constants.
+
+**When to revisit:** a different `w` grid is not the answer — the league-wide sweep already
+mapped that curve and it is monotonic. Like hysteresis, the case for reopening is a change to
+the **fatigue economy**, not a better parameter.
+
+---
+
 ### MEASURED AND REJECTED: NG pull/return hysteresis pair (August 2026)
 
 Implemented, swept, head-to-head'd, then **stripped** rather than left as inert plumbing —
