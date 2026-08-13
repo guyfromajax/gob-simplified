@@ -759,16 +759,20 @@ Eligible non-user teams run the same `execute_training()` engine. CPU allocation
 
 ### Player Development & Coaching Quality
 
-> **Shape** (relative attribute mix) is owned by **camp + in-season training**. **Level** (ladder RT) and HT/WT are owned by the **offseason** level-only rescale (`BackEnd/utils/player_development.py`). Full derivation archived at `../projects/Z-Completed/Player_Attribute_Recalibration_Design.md` and `../10_Players_Systems/Player_Development_System.md`.
+> **Shape** (relative attribute mix) is owned by **camp + in-season training**. **Level** is built **additively** (free-will, 2026-08): camp + in-season gains **persist**, and the **offseason** adds a *reduced* increment on top — it is no longer a level-only rescale onto an absolute ladder. HT/WT still ride the offseason curve (`BackEnd/utils/player_development.py`). Full derivation archived at `../projects/Z-Completed/Player_Attribute_Recalibration_Design.md` and `../10_Players_Systems/Player_Development_System.md`.
 
-**Division of labor.** Offseason rollover (before Training Camp) rescales current attributes onto an absolute RT target: `jh_anchor × ladder_value × f(coaching_quality)`, plus HT/WT. It does **not** redistribute shape. Camp and weekly training apply the gain bands below; camp uses `CAMP_GAIN_SCALE`, in-season uses `IN_SEASON_GAIN_SCALE`.
+**Division of labor (free-will, 2026-08).** Offseason rollover (before Training Camp) **adds** a reduced increment to the player's *current* RT — it no longer rescales him onto an absolute ladder, so camp + in-season training persist across his career. The increment is `jh_anchor × (STD_RUNG_INCREMENT[rung] × OFFSEASON_BASE_RETENTION + peak) × potential_factor`, then `target = _compress_rt(rt_now + increment)` (soft-capped at `RT_SOFT_CAP = 130`).
+- `OFFSEASON_BASE_RETENTION = 0.125` — the offseason auto-delivers ~12.5% of the standard rung; the remaining ~87.5% is earned through persisting camp + in-season training (a neglected player still creeps up via this floor).
+- A **peak** rung adds `PEAK_BONUS × OFFSEASON_PEAK_RETENTION` (0.30 × 0.50) on top — half the peak fires at the rollover, half rides the amplified training that year.
+- `coaching_f` is **retired** (Decision 0.5): coaching matters because training persists, not via an offseason multiplier. It does **not** redistribute shape and does **not** claw back in-season gains.
+- Camp and weekly training apply the gain bands below; camp uses `CAMP_GAIN_SCALE` (0.70), in-season `IN_SEASON_GAIN_SCALE` (0.28).
 
-**Camp / in-season model.** Gains stay report-visible but scaled. Invariant: **reference allocation holds flat; neglect costs; focus gains.**
+**Camp / in-season model (free-will).** Gains stay report-visible, scaled, and now **PERSIST** into the career (the offseason no longer absorbs them). Invariant: **reference allocation holds-or-GROWS; neglect costs; focus gains.**
 
 | Weekly allocation (per attribute) | Net over a season |
 |---|---|
-| 0 points (neglect) | declines — **but the penalty is PROBABILITY-GATED as of the leveling pass**, see below |
-| reference primaries (pts=3) | ≈ flat |
+| 0 points (neglect) | declines — **penalty is PROBABILITY-GATED**, see below |
+| reference primaries (pts=3) | **holds or grows, and persists** (was "≈ flat" under predestination) |
 | reference baseline (pts=1) | mild drag (bands are distinct; see Player Development § gain bands) |
 | focused (pts=4/5) | gains |
 
@@ -786,23 +790,13 @@ Eligible non-user teams run the same `execute_training()` engine. CPU allocation
 
 Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shape attractor (`OFFSEASON_ATTRACTOR_ALPHA=0`). Pre-training decay by year is unchanged (see **Year-Based Pre-Training Decay** above) and never subtracts below the weight-scaled position floor.
 
-**Coaching-quality metric.** A season's allocation is scored in **points per attribute per week, not shares**:
+**Coaching quality lives in persisting training, not a multiplier (free-will).** Under predestination, a season's allocation was scored (points-per-attribute-per-week) into a bounded `f ∈ [0.85, 1.20]` that scaled the offseason RT target. Under free-will that multiplier is **retired** — a well-coached player ends higher because his camp + in-season gains **persist and compound**, and a neglected player's don't. The scoring helpers (`season_coaching_quality`, `coaching_f`, `COACHING_F_MIN/MAX`) still exist in `player_development.py` but are **inert**: `develop_one_offseason` no longer applies `coaching_f_value` to the increment. Remove in a later cleanup or leave for reference.
 
-```
-contribution_a = weight_a × min(points_a / COACHING_SATURATION_CAP, 1)
-quality        = Σ contribution / Σ contribution(reference)
-```
+**The frozen reference (still live).** The named per-position allocation that defines "reference coaching" remains the calibration anchor **and** the CPU's training target: a deliberately-mediocre, top-3-weighted baseline (primaries at 3 pts, other on-position attrs at 1 pt, tail neglected). Reference-coached development lands on the validated **~+22-RT career arc**. Test-asserted at all five positions.
 
-- Points (not shares): a smaller budget saturates fewer attributes and scores lower automatically — spreading thin saturates nothing; concentrating saturates what matters.
-- Normalized **affinely per position** so the frozen reference scores exactly **1.0** and a budget optimum scores **1.0 + COACHING_HEADROOM**; headroom is comparable across all five positions.
+**CPU trains the reference.** `auto_train_one_cpu_team` uses a fixed team-wide base allocation plus per-player `player-maximizer-custom` focus toward each player's position reference top-3, tuned so CPU scores ≈1.0 against the frozen reference (measured 0.98–1.01). This holds the CPU league on the **free-will ~+22 arc**. The base allocation and the frozen reference are **coupled** — neither can change alone; `tests/test_cpu_reference_training.py` asserts the relationship.
 
-**The frozen reference.** The allocation that scores 1.0 is a **frozen, named constant**: a deliberately-mediocre, top-3-weighted baseline per position (primary attrs at a higher points value, other on-position attrs at a baseline points value; the tail neglected). It is the calibration anchor — reference-coached development lands exactly on the validated ladder (`f = 1.0`). Test-asserted at all five positions.
-
-**Coaching factor `f`.** Quality maps to a bounded multiplier `f ∈ [COACHING_F_MIN, COACHING_F_MAX]` (≈ 0.85–1.20) on the offseason RT target. Reference → `f = 1.0`; neglect / off-position floors at ~0.85; broad or multi-attribute focus tops out near 1.20. Worth roughly **±1 tier step**; recruiting stays ~2× the lever.
-
-**CPU trains the reference.** `auto_train_one_cpu_team` uses a fixed team-wide base allocation plus per-player `player-maximizer-custom` focus toward each player's position reference top-3, tuned so CPU scores ≈1.0 (measured 0.98–1.01). This holds the CPU league exactly on the ladder. The base allocation and the frozen reference are **coupled** — neither can change alone; `tests/test_cpu_reference_training.py` asserts the relationship.
-
-**STATUS — dormant until pillar 3.** The per-player coaching-quality **capture is not wired up**. `_coaching_accumulator_for_player` returns `None`, so `f = 1.0` for **every** player and the coaching-quality multiplier currently does nothing in gameplay — the league holds exactly at the recalibration pass-1 ladder. Activation requires per-player allocation capture (gated at the calling endpoint, since user and CPU share `execute_training`) and ships with **pillar 3**, alongside the training-position UI and CPU season-start assignment.
+**STATUS — coaching-`f` multiplier retired; coaching now lives in persisting training.** The old plan was to activate per-player coaching-quality capture in pillar 3 to drive `f`; free-will makes that multiplier unnecessary (`_coaching_accumulator_for_player` / `coaching_f` are inert). The league holds on the ~+22 free-will arc, with coaching's above/below coming from **where training points are spent** (which now persists). What still remains for **pillar 3**: the training-position UI and CPU season-start position assignment.
 
 **Constants** (values in `../11_Design_Systems/Tunable_Constants.md`):
 
@@ -816,7 +810,7 @@ quality        = Σ contribution / Σ contribution(reference)
 | `CAMP_WEEKS` / `CAMP_GAIN_SCALE` / `CAMP_POINT_BUDGET` | camp length (1 week), camp gain scale (0.70), flat camp budget (30) |
 | `IN_SEASON_POINT_BUDGET` | flat in-season budget (24) |
 | `TRAINING_GAIN_PERCENTAGES` / `CLASS_GAIN_PERCENTAGES` | direct position-fit and class-year gain percentages; neither changes budget spend |
-| `OFFSEASON_ATTRACTOR_ALPHA` | **retired (0.0)** — shape attractor removed; offseason is level-only |
+| `OFFSEASON_ATTRACTOR_ALPHA` | **retired (0.0)** — shape attractor removed; offseason changes level only, not shape |
 
 ### Data Storage
 
@@ -871,7 +865,7 @@ quality        = Σ contribution / Σ contribution(reference)
 - `BackEnd/utils/franchise_league_news.py` - Consolidated, pre-ranked training newswire payload
 - `BackEnd/utils/franchise_training_state.py` - Split-phase completion helpers for FCC and cuts
 - `BackEnd/utils/franchise_coaching_focus_counts.py` - FTD `coaching_focus` archetype counters (user team)
-- `BackEnd/utils/player_development.py` - Offseason level-only RT rescale + HT/WT (not weekly training)
+- `BackEnd/utils/player_development.py` - Offseason additive RT increment (free-will) + HT/WT (not weekly training)
 
 ### Current Play / Report Identity Notes
 
