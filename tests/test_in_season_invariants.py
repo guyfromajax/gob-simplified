@@ -78,49 +78,63 @@ def _train_net(players, alloc, weeks=WEEKS, focus=None):
     return {a: statistics.mean(v) for a, v in net.items()}
 
 
-def test_reference_holds_flat_in_season():
-    """INVARIANT 1: reference primaries (pts=3) hold near flat; baseline (pts=1) may
-    drift mildly negative now that point bands are distinct (§10.6), but must not
-    collapse. Neglect is covered separately."""
+def test_reference_primaries_hold_or_grow_in_season():
+    """INVARIANT 1 (FREE-WILL): reference primaries (pts=3) hold or GROW in-season. Under the
+    additive offseason, in-season no longer has to stay flat (it persists now), but primaries
+    must not collapse or explode. Neglect is covered separately (INVARIANT 3)."""
     for pos in POSITIONS:
         random.seed(7)
         ref = dev.reference_allocation(pos)          # {top-3: 3.0, other on-position: 1.0}
         net = _train_net(_players(position=pos), _alloc({a: int(p) for a, p in ref.items()}))
         primaries = [a for a, p in ref.items() if int(p) >= 3]
-        baselines = [a for a, p in ref.items() if int(p) == 1]
         for attr in primaries:
-            assert abs(net[attr]) < 8.0, (
-                f"{pos}/{attr}: primary in-season net {net[attr]:+.1f} exploded — "
-                f"|net| must be < 8.")
+            # Free-will primaries GROW and persist, so the bound is looser than the old flat
+            # world — it only catches pathological runaway (a well-fit primary at pts=3 legitimately
+            # gains ~10-14/season now).
+            assert abs(net[attr]) < 20.0, (
+                f"{pos}/{attr}: primary in-season net {net[attr]:+.1f} runaway (|net| must be < 20).")
         primary_mean = statistics.mean(net[a] for a in primaries)
-        assert abs(primary_mean) < FLAT_TOL, (
-            f"{pos}: primary mean net {primary_mean:+.1f} not flat — "
-            f"|mean| must be < {FLAT_TOL}.")
-        if baselines:
-            base_mean = statistics.mean(net[a] for a in baselines)
-            assert base_mean > -10.0, (
-                f"{pos}: baseline attrs mean net {base_mean:+.1f} collapsed "
-                f"(expected mild drag, not rot).")
-            assert base_mean < 3.0, (
-                f"{pos}: baseline attrs mean net {base_mean:+.1f} unexpectedly gained.")
+        assert primary_mean > -FLAT_TOL, (
+            f"{pos}: primary mean net {primary_mean:+.1f} collapsed — reference primaries "
+            f"must hold or grow (> -{FLAT_TOL}).")
 
 
-def test_reference_rt_below_rung_increment():
-    """INVARIANT 2: reference RT net/season holds and stays below the smallest rung increment
-    (so the offseason absorbs it and there is no claw-back)."""
-    smallest_rung = 6  # FR->SO / JR->SR ladder step (mc_growth_fit: 35→41, 54→60)
-    for pos in POSITIONS:
-        random.seed(7)
-        ref = dev.reference_allocation(pos)
-        players = _players(position=pos)
-        rt0 = [compute_position_ratings({"attributes": p["attributes"], "height": p["height"]})[pos] for p in players]
+def _full_cycle(pos, n=24):
+    """A reference-coached freshman: full season of training, then roll to sophomore.
+    Returns (rt_nets, primary_attr_nets) across n players — the full-cycle deltas."""
+    random.seed(11)
+    ref = dev.reference_allocation(pos)
+    ref_pts = {a: int(p) for a, p in ref.items()}
+    primaries = [a for a, p in ref.items() if int(p) >= 3]
+    rt_nets, prim_nets = [], []
+    for i in range(n):
+        pl = dev.init_career(pos, "Average", 40 + i, random.Random(100 + i))[0]
+        rt0 = compute_position_ratings({"attributes": pl["attributes"], "height": pl["height"]})[pos]
+        base = {a: pl["attributes"].get(a, 0) for a in primaries}
+        tr = {"_id": "c", "attributes": dict(pl["attributes"]), "year": "freshman",
+              "height": pl["height"], "position_intent": pos, "training_position": pos}
         for _ in range(WEEKS):
-            execute_training(players, {}, _alloc({a: int(p) for a, p in ref.items()}), coaching_focus=None)
-        rt1 = [compute_position_ratings({"attributes": p["attributes"], "height": p["height"]})[pos] for p in players]
-        rt_net = statistics.mean(b - a for a, b in zip(rt0, rt1))
-        # holds (mildly-negative is fine — the offseason restores it) AND below the rung increment
-        # (no claw-back). The upper bound is the real invariant.
-        assert -5.0 < rt_net < smallest_rung, f"{pos}: reference RT net {rt_net:+.1f} outside (-5, {smallest_rung})"
+            execute_training([tr], {}, _alloc(ref_pts), coaching_focus=None)
+        fpd = {"player_id": "c", "meta": {"height": tr["height"], "weight": pl["weight"], "year": "sophomore"},
+               "attributes": tr["attributes"], "position_ratings": pl["position_ratings"],
+               "development": pl["development"], "entry_tier": "Average", "position_intent": pos}
+        out = dev.develop_rollover(fpd, "sophomore", random.Random(200 + i), season_allocation=None)
+        rt1 = compute_position_ratings({"attributes": out["attributes"], "height": out["height"]})[pos]
+        rt_nets.append(rt1 - rt0)
+        prim_nets.append(statistics.mean(out["attributes"].get(a, 0) - base[a] for a in primaries))
+    return rt_nets, prim_nets
+
+
+def test_in_season_persists_through_offseason():
+    """INVARIANT 2 (FREE-WILL): a reference-trained season PERSISTS through the offseason — the
+    offseason ADDS a reduced increment on top and does NOT claw the in-season gain back (the
+    defining free-will property, replacing the old 'in-season stays below the rung' claw-back
+    invariant). Full-cycle RT nets positive league-wide; no position is significantly clawed back."""
+    per_pos = {pos: statistics.mean(_full_cycle(pos)[0]) for pos in POSITIONS}
+    for pos, m in per_pos.items():
+        assert m > -3.0, f"{pos}: full-cycle RT net {m:+.1f} — offseason clawed back in-season (must be > -3)."
+    league = statistics.mean(per_pos.values())
+    assert league > 2.0, f"league full-cycle RT net {league:+.1f} — training must PERSIST and grow (> +2)."
 
 
 def test_neglect_declines():
@@ -132,40 +146,12 @@ def test_neglect_declines():
     assert net["SC"] < -5, f"neglected base-0 SC net {net['SC']:+.1f} — neglect must cost (< -5)"
 
 
-def test_reference_holds_flat_full_cycle():
-    """INVARIANT 4: reference training + rollover keeps primaries from eroding across
-    a FULL CYCLE. Baseline (pts=1) may drag under distinct bands + level-only
-    offseason (§10.4/§10.6); neglect is covered separately."""
-    for pos in POSITIONS:
-        random.seed(11)
-        ref = dev.reference_allocation(pos)
-        ref_pts = {a: int(p) for a, p in ref.items()}
-        primaries = [a for a, p in ref.items() if int(p) >= 3]
-        eroded = []
-        for i in range(24):
-            pl = dev.init_career(pos, "Average", 40 + i, random.Random(100 + i))[0]
-            base = {a: pl["attributes"].get(a, 0) for a in primaries}
-            trainee = {
-                "_id": "c",
-                "attributes": dict(pl["attributes"]),
-                "year": "freshman",
-                "height": pl["height"],
-                "position_intent": pos,
-                "training_position": pos,
-            }
-            for _ in range(WEEKS):
-                execute_training([trainee], {}, _alloc(ref_pts), coaching_focus=None)
-            fpd = {"player_id": "c", "meta": {"height": trainee["height"], "weight": pl["weight"], "year": "sophomore"},
-                   "attributes": trainee["attributes"], "position_ratings": pl["position_ratings"],
-                   "development": pl["development"], "entry_tier": "Average", "position_intent": pos}
-            out = dev.develop_rollover(fpd, "sophomore", random.Random(200 + i), season_allocation=None)
-            for a in primaries:
-                eroded.append((a, out["attributes"].get(a, 0) - base[a]))
-        by_attr = defaultdict(list)
-        for a, d in eroded:
-            by_attr[a].append(d)
-        for a, ds in by_attr.items():
-            m = statistics.mean(ds)
-            assert m > -FLAT_TOL, (
-                f"{pos}/{a}: full-cycle primary net {m:+.1f} — the offseason did not restore "
-                f"what the season eroded (must be > -{FLAT_TOL}).")
+def test_full_cycle_grows():
+    """INVARIANT 4 (FREE-WILL): reference training + rollover NET GROWS primaries across a full
+    cycle — training persists and the offseason adds, so a season is no longer erased (the old
+    invariant only asked that it 'not erode'; free-will asks that it GROW)."""
+    per_pos = {pos: statistics.mean(_full_cycle(pos)[1]) for pos in POSITIONS}
+    for pos, m in per_pos.items():
+        assert m > -2.0, f"{pos}: full-cycle primary net {m:+.1f} eroded (must be > -2)."
+    league = statistics.mean(per_pos.values())
+    assert league > 2.0, f"league full-cycle primary net {league:+.1f} — primaries must grow (> +2)."

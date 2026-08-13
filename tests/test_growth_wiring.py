@@ -66,22 +66,32 @@ def test_lazy_backfill_rolls_once_on_remaining_rungs():
     assert r2["development"]["peak_rungs"] == r1["development"]["peak_rungs"]
 
 
-def test_offseason_hits_ladder_not_doubled():
-    """The offseason event is the SOLE grower: a 0-peak Average player rolling onto
-    each rung lands on the ladder RT, not the ladder + a leftover camp bonus."""
+def test_offseason_adds_reduced_increment_not_the_ladder():
+    """FREE-WILL: the offseason no longer rescales onto the ladder (it used to be the sole
+    grower, landing a 0-peak SR at ~1.70× the anchor). It now ADDS a REDUCED increment per
+    rung on top of the player's current RT — a small positive step each rung — so training
+    can carry the career. A 0-peak player driven through develop_one_offseason ends FAR below
+    the old ladder (a regression to the absolute rescale reappears as SR ≈ 1.70× anchor)."""
     rng = random.Random(0)
-    # Force 0 peaks by driving develop_one_offseason directly on a fresh JH player.
-    pl = dev.init_career("SG", "Average", 3, rng)[0]  # low CH → likely 0-1 peaks
+    pl = dev.init_career("SG", "Average", 3, rng)[0]  # low CH → 0-1 peaks
     profile = dict(pl["development"]); profile["peak_rungs"] = []  # pin 0-peak
     anchor = JH_ANCHOR_BY_TIER["Average"]
-    ladder = {"FR": anchor * 1.17, "SO": anchor * 1.37, "JR": anchor * 1.52, "SR": anchor * 1.70}
     player = {"attributes": dict(pl["attributes"]), "height": pl["height"], "weight": pl["weight"],
               "position": "SG", "training_position": "SG", "jh_anchor": anchor,
               "position_ratings": dict(pl["position_ratings"])}
+    start = player["position_ratings"]["SG"]
+    prev = start
     for rung in dev.RUNG_TRANSITIONS:
         dev.develop_one_offseason(player, rung, profile, random.Random(9))
-        # within a couple RT of the 0-peak ladder — no doubled growth on top
-        assert abs(player["position_ratings"]["SG"] - round(ladder[rung])) <= 3, rung
+        now = player["position_ratings"]["SG"]
+        # non-decreasing per rung (the reduced increment can be sub-1-RT and round to 0)
+        assert now >= prev, f"{rung}: offseason must not REMOVE RT (was {prev:.1f}, now {now:.1f})."
+        prev = now
+    assert player["position_ratings"]["SG"] > start, (
+        "offseason must net-ADD across the career (additive increment).")
+    assert player["position_ratings"]["SG"] < anchor * 1.40, (
+        f"0-peak offseason-only SR {player['position_ratings']['SG']:.1f} reached the old ladder "
+        f"(~{anchor * 1.70:.0f}) — the absolute-target rescale has regressed. Free-will adds a reduced increment.")
 
 
 def test_camp_growth_calls_removed_from_training_path():
@@ -172,9 +182,10 @@ def test_season_allocation_scored_against_training_position():
     assert out2["training_position"] == "SF"
 
 
-def test_coaching_f_modulates_offseason_and_no_history_is_reference():
-    """f scales the offseason target: f>1 lands above the ladder, f<1 below; a doc
-    with no coaching history develops at f=1.0 (reference)."""
+def test_coaching_f_retired_no_longer_modulates_offseason():
+    """FREE-WILL (decision 0.5): coaching_f is RETIRED — the additive offseason no longer
+    scales by a coaching-quality factor (in-season training IS the coaching lever now). A
+    doc's coaching_quality history must therefore NOT change its offseason outcome."""
     base = {"player_id": "q", "meta": {"height": 76, "weight": 190, "year": "sophomore"},
             "attributes": {f"anchor_{a}": 40 for a in dev.GROWTH_ATTRS}
                           | {a: 40 for a in dev.GROWTH_ATTRS} | {"CH": 50, "anchor_CH": 50},
@@ -187,4 +198,6 @@ def test_coaching_f_modulates_offseason_and_no_history_is_reference():
     hi = dev.develop_rollover(copy.deepcopy(base) | {"coaching_quality": {"avg": 1.20, "n": 4}}, "sophomore", random.Random(1))
     lo = dev.develop_rollover(copy.deepcopy(base) | {"coaching_quality": {"avg": 0.80, "n": 4}}, "sophomore", random.Random(1))
     none = dev.develop_rollover(copy.deepcopy(base), "sophomore", random.Random(1))  # no history
-    assert hi["position_ratings"]["SG"] > none["position_ratings"]["SG"] > lo["position_ratings"]["SG"]
+    assert hi["position_ratings"]["SG"] == none["position_ratings"]["SG"] == lo["position_ratings"]["SG"], (
+        "coaching_f is retired under free-will — the offseason outcome must not depend on "
+        "coaching_quality history.")
