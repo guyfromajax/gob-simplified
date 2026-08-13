@@ -44,6 +44,11 @@ The rung a player takes at the *end* of a played season is reduced, so his in-se
 | 0.7 | RT ceiling | ✅ keep `RT_SOFT_CAP = 130`; prove it bounds a well-coached elite over 4 years in Phase 3 (higher stakes now that the arc rises) |
 | 0.8 | Save migration | ✅ **roll onto new logic** — mid-career players additive-develop from where they are next offseason; no migration pass |
 
+**Option D calibration parameters (LOCKED 2026-08).** The offseason splits each year's growth budget with the two training phases (Camp + in-season), peaks preserved at full scale:
+- **Offseason base retention = 25%** — offseason auto-delivers 25% of standard growth; 75% is earned through persisting Camp + in-season training (a neglected player still creeps up via the 25% floor).
+- **Peak split = 50% offseason / 50% training** — a peak year keeps full magnitude: half fires at the rollover, half as amplified Camp + in-season gains during the peak year.
+- **Camp vs in-season = proportional** — the training share (and peak amplification) hits Camp and in-season in proportion to the gains they already produce.
+
 **New `entry_tier` contract (0.6).** Tier sets (a) the player's **starting RT** at generation and (b) his **standard career growth rate** (the reduced rung he takes under reference coaching). It is **not a ceiling**: good in-season coaching (user or CPU) compounds a player **above** his tier's standard arc, neglect leaves him **below** it. "Elite" now means "starts high and grows fast under good coaching," not "caps at 100."
 
 ## Phase 1 — Implementation
@@ -67,6 +72,9 @@ The rung a player takes at the *end* of a played season is reduced, so his in-se
 - `Player_Development_System.md` — **thesis rewrite** (predestination→free-will; offseason additive; in-season persists). Core rewrite, not a line edit.
 - `player-development-framework.md`, `Tunable_Constants.md` (new retention knobs; fix the stale "+4.76 RT/season" line), `Training_System.md`.
 - Add the per-year × channel chart with live numbers once landed.
+
+## Phase 4b — Capstone infographic (requested)
+Once the system is final, produce a holistic **player-development infographic** (hand-off prompt for the design tool *or* built directly): player init (tier/anchor, RT, position intent, potential_factor, CH, peaks + family timing frozen at gen), the load-bearing fields (`entry_tier`, `position_intent`, `potential_factor`, `development` subdoc, `training_position`), and the full growth map — Camp / in-season / offseason by class year (JH→SR) with peaks riding across the training phases. For the user to study the whole system at a glance.
 
 ## Phase 5 — Rollout
 - Stage on gob-staging → validate a live season → commit + deploy as one coherent unit.
