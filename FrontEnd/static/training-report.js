@@ -1178,9 +1178,13 @@ function createMomentumPill(mo) {
 }
 
 /**
- * Map a raw (0–100 scale) training delta to arrow glyphs.
- * +1..+4 / −1..−4 → 1 arrow; ±5..±9 → 2; ±10+ → 3.
- * Triple-up uses RT elite blue; other ups green; downs red; zero grey dash.
+ * Map a training delta to arrow glyphs (2026-08 rescale — symmetric bands):
+ *   exactly 0           → grey dash
+ *   0 < |n| < 2         → 1 arrow
+ *   2 ≤ |n| ≤ 5         → 2 arrows
+ *   |n| > 5             → 3 arrows
+ * Triple-UP uses RT-elite blue; all other ups green; all downs red; zero grey dash.
+ * Down arrows are the exact inverse of the up bands.
  */
 function describeTrainingChange(change) {
   const n = Number(change);
@@ -1188,7 +1192,7 @@ function describeTrainingChange(change) {
     return { text: '–', className: 'change-zero' };
   }
   const abs = Math.abs(n);
-  const count = abs >= 10 ? 3 : abs >= 5 ? 2 : 1;
+  const count = abs > 5 ? 3 : abs >= 2 ? 2 : 1;
   if (n > 0) {
     return {
       text: '▲'.repeat(count),

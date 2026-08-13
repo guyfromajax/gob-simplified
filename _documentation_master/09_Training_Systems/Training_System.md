@@ -55,7 +55,7 @@ triple from the player's highest current RT, not from `training_position`.
    - week 20 special case: if no recruiting orders have ever been saved, training is blocked until the user saves recruiting orders
 7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing; `execute_training` merges any legacy `scouting_data.defense` row keys onto canonical `defense_id` keys before baselines (same remap as gameplay). **Defense and offensive play CMD effectiveness decay from game usage share runs at franchise EOG only** (`End_Of_Game_System.md`); not during training.
 8. **Pre-Training Conditions**: Random decreases applied to player attributes (excluding EM, MO, NG); team attributes are no longer decayed here (**skipped on camp weeks**: `is_camp_week(week)` → `skip_pre_training_depreciation=True`)
-9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points (camp uses `CAMP_GAIN_SCALE=1.4`; in-season uses `IN_SEASON_GAIN_SCALE=0.18`)
+9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points (camp uses `CAMP_GAIN_SCALE=0.70`; in-season uses `IN_SEASON_GAIN_SCALE=0.28`)
 10. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
 11. **Attribute Clamping**: All values clamped to valid ranges (see **Attribute_Clamp_System.md** for player and team clamp ranges); decay/gains also respect weight-scaled position floors
 12. **Weeks 20-26 Recruiting Invite Processing**: During recruiting invite season, `Submit Training` also runs that week's recruiting invite processing using the user's saved recruiting orders plus CPU weekly recruiting logic
@@ -272,7 +272,7 @@ The training execution system applies pre-training conditions, allocates trainin
 2. **Training Point Application** (`apply_training_points`)
    - Maps drill allocations to player/team attributes
    - Applies random increases based on points allocated
-   - Scales positive gains by `CAMP_GAIN_SCALE` (1.4) on camp weeks or `IN_SEASON_GAIN_SCALE` (0.18) in-season; the per-attribute fractional remainder is loaded from and persisted back to FPD after both user and CPU training
+   - Scales positive gains by `CAMP_GAIN_SCALE` (0.70) on camp weeks or `IN_SEASON_GAIN_SCALE` (0.28) in-season; the per-attribute fractional remainder is loaded from and persisted back to FPD after both user and CPU training
    - Applies coaching focus amplifiers
    - Handles special cases (conditioning, film study, breaks)
 
@@ -326,7 +326,7 @@ The training execution system applies pre-training conditions, allocates trainin
 - 4 points: `+= random.randint(3, 5)`
 - 5 points: `+= random.randint(3, 6)`
 
-Positive gains are then scaled by `IN_SEASON_GAIN_SCALE` (0.18) or `CAMP_GAIN_SCALE` (camp), with a per-attribute fractional remainder (`training_gain_remainders`) so sub-integer signal accumulates across weeks instead of rounding away. The sidecar is read from and written to each franchise player document, never the core player, and is carried through season rollover. Attribute and anchor values remain integers.
+Positive gains are then scaled by `IN_SEASON_GAIN_SCALE` (0.28) or `CAMP_GAIN_SCALE` (0.70 at camp), with a per-attribute fractional remainder (`training_gain_remainders`) so sub-integer signal accumulates across weeks instead of rounding away. The sidecar is read from and written to each franchise player document, never the core player, and is carried through season rollover. Attribute and anchor values remain integers.
 
 **High Attribute Gain Reduction**
 - If a player's starting value for a trained attribute at the beginning of the training session is `> 100`, any positive gain to that attribute is reduced by `50%`, using rounded integer value.
@@ -351,7 +351,7 @@ Training camp is **not** a separate growth event. It is the same `execute_traini
 
 1. **Pre-training decay is skipped** (`skip_pre_training_depreciation=True` via `is_camp_week`).
 2. **Flat point budget is 30** (`CAMP_POINT_BUDGET`) instead of 24.
-3. **Gain scale is `CAMP_GAIN_SCALE` (1.4)** instead of `IN_SEASON_GAIN_SCALE` (0.18).
+3. **Gain scale is `CAMP_GAIN_SCALE` (0.70)** instead of `IN_SEASON_GAIN_SCALE` (0.28).
 4. **Camp cuts** run once after week 1 (`week == CAMP_WEEKS`).
 
 There is **no** camp-only CH/core-attribute bonus, **no** year-based camp bonus roll, and **no** camp HT/WT growth. Those used to exist; they were removed when the offseason development event took ownership of career physical/level growth (see comment in `apply_training_points` — `training_camp_physique_notes` is always empty). Height and weight growth live in `develop_one_offseason` at season rollover, not at camp.
@@ -491,6 +491,22 @@ After training is submitted, users are automatically redirected to the training 
 - **Top-right header control** (behavior depends on `from` query parameter):
   - **`from=inbox` (franchise):** **Back** → Franchise Command Center, Inbox tab
   - **Otherwise (e.g. `from=training` or absent):** Orange **Go To Locker Room** → Franchise or Tournament Command Center (existing behavior)
+
+#### Attribute-change arrows (legend)
+
+Each player-attribute cell shows the week's raw delta as arrow glyphs (no number). Bands are symmetric — **down arrows are the exact inverse of up** — set by `describeTrainingChange` in `training-report.js`. Rescaled **2026-08** (was `±1..4 → 1`, `±5..9 → 2`, `±10+ → 3`) so a maxed drill visibly pops under the smaller free-will gain scales.
+
+| Weekly delta | Glyph | Color |
+|---|---|---|
+| exactly 0 | `–` | grey dash |
+| `0 < gain < 2` | ▲ | green |
+| `2 ≤ gain ≤ 5` | ▲▲ | green |
+| `gain > 5` | ▲▲▲ | RT-elite blue |
+| `0 < loss < 2` | ▼ | red |
+| `2 ≤ loss ≤ 5` | ▼▼ | red |
+| `loss > 5` | ▼▼▼ | red |
+
+Boundaries: `< 2` → 1, `[2, 5]` → 2, `> 5` → 3 (so exactly 2 and exactly 5 are double; 5.01 is triple). At **camp** there is no pre-training decay, so untouched attrs show a grey dash (0), never a red down-arrow; red only appears in-season when decay outruns training.
 
 #### Recruiting summary (Franchise only)
 
@@ -796,8 +812,8 @@ quality        = Σ contribution / Σ contribution(reference)
 | `COACHING_STANDARD_BUDGET` | reference weekly budget the affine per-position normalization anchors to |
 | `COACHING_HEADROOM` | how far a budget optimum scores above 1.0 |
 | `COACHING_F_MIN` / `COACHING_F_MAX` | offseason multiplier bounds (0.85 / 1.20) |
-| `IN_SEASON_GAIN_SCALE` | in-season gain scale (0.18) |
-| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` / `CAMP_POINT_BUDGET` | camp length (1 week), camp gain scale (1.4), flat camp budget (30) |
+| `IN_SEASON_GAIN_SCALE` | in-season gain scale (0.28) |
+| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` / `CAMP_POINT_BUDGET` | camp length (1 week), camp gain scale (0.70), flat camp budget (30) |
 | `IN_SEASON_POINT_BUDGET` | flat in-season budget (24) |
 | `TRAINING_GAIN_PERCENTAGES` / `CLASS_GAIN_PERCENTAGES` | direct position-fit and class-year gain percentages; neither changes budget spend |
 | `OFFSEASON_ATTRACTOR_ALPHA` | **retired (0.0)** — shape attractor removed; offseason is level-only |
