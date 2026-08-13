@@ -90,7 +90,10 @@ SHAPE_P6_FLOOR_BASE: Dict[str, Dict[str, float]] = {
 
 # ── Camp ────────────────────────────────────────────────────────────────────
 CAMP_WEEKS = 1
-CAMP_GAIN_SCALE = 1.4
+CAMP_GAIN_SCALE = 0.70   # free-will recalibration (2026-08): halved from 1.4. Under the
+                         # additive offseason, camp gains PERSIST into the career, so the
+                         # burst is scaled down; camp + in-season + reduced offseason land
+                         # career RT ≈ 21 (the pre-free-will arc). See free_will_offseason_work_plan.
 CAMP_POINT_BUDGET = 30
 IN_SEASON_POINT_BUDGET = 24
 

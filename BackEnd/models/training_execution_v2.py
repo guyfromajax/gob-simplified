@@ -432,7 +432,11 @@ def _scale_install_training_effectiveness_points(
 # net of the ladder), per-attribute movement is visible (~0.5/week |Δ|) because the
 # allocation reallocates toward the high-weight core attrs (RT is their weighted
 # mean, so reallocation moves the player page while barely moving RT).
-IN_SEASON_GAIN_SCALE = 0.18
+IN_SEASON_GAIN_SCALE = 0.28   # free-will recalibration (2026-08): 0.18 → 0.28. Under the
+                              # additive offseason, in-season gains PERSIST (no claw-back), and
+                              # the offseason is now a small remainder, so in-season carries most
+                              # of the career arc. Calibrated so camp + in-season + reduced
+                              # offseason ≈ +20 career RT. See free_will_offseason_work_plan.
 
 # Per-point raw gain bands for player attributes (before year-max adjustment).
 # Points 1–5 MUST be distinct: a prior retune unified 1–3 at (2,4) so reference
