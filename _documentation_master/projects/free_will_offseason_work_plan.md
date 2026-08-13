@@ -63,7 +63,23 @@ The rung a player takes at the *end* of a played season is reduced, so his in-se
 | `test_offseason_attractor` | revisit / likely retire |
 | **new** | reference-coached career arc; well-coached > reference > neglected across a career; RT stays under cap; no runaway |
 
-## Phase 3 — Multi-season league validation (the real gate)
+## Phase 3 — RESULTS (PASSED, 2026-08)
+
+Full JH→SR career sim (camp + in-season + rollover each year), free-will model:
+
+| tier | JH RT | ref career SR | gain | neglect SR | coaching spread | max SR |
+|---|--:|--:|--:|--:|--:|--:|
+| Poor | 20 | 40 | +20 | 7 | +33 | 56 |
+| Average | 30 | 54 | +24 | 9 | +44 | 75 |
+| Good | 35 | 58 | +23 | 10 | +48 | 84 |
+| Elite | 50 | 73 | +23 | 11 | +62 | 99 |
+
+- **No runaway** — best Elite career tops at 99 RT (< 130 soft cap). Reference arc ~+22 (on target). Stable by construction: each generation starts fresh at its anchor, no cross-generation compounding.
+- **Coaching has permanent impact** — reference-vs-neglect spread +33 to +62 RT (a well-coached Average beats a neglected Elite). Free will confirmed.
+- **Tier = starting point** — coaching moves players far off their anchor.
+- Flip-side: badly-neglected players rot (SR 7-11); CPU trains at reference so the league sits on the +22 arc.
+
+## Phase 3 (method) — Multi-season league validation (the real gate)
 - Sim N seasons on a full league (`scripts/season_advance_harness.py`).
 - Measure: RT distribution drift, tier→final-RT correlation (should loosen, intentionally), CPU program persistence, top-end (no elite runaway), user-vs-CPU coaching spread.
 - Accept when: reference league stays anchored, coaching produces the intended above/below, no runaway.
