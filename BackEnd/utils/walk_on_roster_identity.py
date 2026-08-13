@@ -210,7 +210,13 @@ def _warm_walk_on_masters(
         logger.exception("[WALK-ON-ROSTER] warm imports failed")
         return 0
 
-    if not r2_images.is_configured() or not entries or not teams_collection:
+    # `teams_collection is None`, NOT `not teams_collection`: pymongo's Collection raises
+    # NotImplementedError on bool(), so the truthiness form threw out of a function whose
+    # docstring promises it never raises. `or` short-circuits, so it only fired when R2 was
+    # configured AND there were entries — i.e. exactly when there was work to do. The user
+    # team's eager warm (warm=True, franchise_routes.py:13485) therefore never painted a
+    # single master; the caller's try/except swallowed it into a logged traceback.
+    if not r2_images.is_configured() or not entries or teams_collection is None:
         return 0
 
     team = None
