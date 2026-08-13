@@ -475,7 +475,10 @@ def _apply_scaled_gain_with_remainder(
 
 PRE_TRAINING_DECAY_BY_YEAR = {
     "freshman": (-2, 0),
-    "sophomore": (-2, 0),
+    "sophomore": (-1, 0),   # 2026-08: -2..0 → -1..0. SO carried FR-level decay but (lower
+                            # class-gain + higher starting level) couldn't offset it, so its
+                            # in-season net sat ~5 RT below the other years; this aligns it
+                            # with JR/SR. Only true freshmen keep the widest swing.
     "junior": (-1, 0),
     "senior": (-1, 0),
 }
@@ -496,7 +499,8 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     
     Pre-training conditions:
     - Player attributes (excluding EM, MO, NG): += randint(min, max) per player/attribute,
-      where (min, max) is year-based: Freshman (-5,-1), Sophomore (-4,-1), Junior (-3,0), Senior (-2,0).
+      where (min, max) is year-based: Freshman (-2,0), Sophomore/Junior/Senior (-1,0)
+      (see PRE_TRAINING_DECAY_BY_YEAR — younger swings wider; SO aligned to JR/SR 2026-08).
     - Decay never subtracts below the weight-scaled position floor (framework §10.2).
     
     Args:

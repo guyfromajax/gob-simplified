@@ -342,8 +342,8 @@ Leave minimums as is, only change maximums
 - **Senior**: 0 to min, 1 to max
 
 **Year-Based Pre-Training Decay** (code: `PRE_TRAINING_DECAY_BY_YEAR` in `training_execution_v2.py`; applied only when `skip_pre_training_depreciation` is false — i.e. skipped for training camp):
-- **Freshman / Sophomore**: -2 min, 0 max
-- **Junior / Senior**: -1 min, 0 max
+- **Freshman**: -2 min, 0 max
+- **Sophomore / Junior / Senior**: -1 min, 0 max (SO aligned to JR/SR 2026-08 — it carried FR-level decay it couldn't offset, sinking its in-season net ~5 RT below the other years)
 
 **Training Camp (what it actually is today)**
 
