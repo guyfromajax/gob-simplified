@@ -21,7 +21,7 @@ from BackEnd.utils import player_development as dev
 from BackEnd.utils import player_generation as gen
 from BackEnd.utils.position_ratings import compute_position_ratings
 from BackEnd.models.training_execution_v2 import execute_training
-from BackEnd.api.franchise_routes import _cpu_reference_allocation, _cpu_reference_top3
+from BackEnd.api.franchise_routes import _coaching_quality_reference_allocation, _cpu_reference_top3
 
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 GROWTH = list(dev.GROWTH_ATTRS)
@@ -34,7 +34,7 @@ def _cpu_train_week(fpd, year, weeks=26):
     pl = [{"_id": "x", "attributes": fpd["attributes"], "year": year, "height": fpd["meta"]["height"],
            "meta": fpd["meta"], "position_intent": fpd["position_intent"], "first_name": "A", "last_name": "B"}]
     top3 = _cpu_reference_top3(fpd["position_intent"])
-    alloc = _cpu_reference_allocation(fpd["position_intent"])
+    alloc = _coaching_quality_reference_allocation(fpd["position_intent"])
     with contextlib.redirect_stdout(_NULL):
         for wk in range(1, weeks + 1):
             camp = is_camp_week(wk)

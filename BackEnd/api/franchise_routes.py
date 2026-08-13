@@ -2402,8 +2402,22 @@ def _cpu_reference_top3(position: str) -> list[str]:
     return [a for a, pts in ref.items() if pts == COACHING_REFERENCE_PRIMARY_PTS]
 
 
-def _cpu_reference_allocation(position: str | None = None) -> dict:
-    """Per-position base substrate (drill-slider format). ``position=None`` → SF."""
+def _coaching_quality_reference_allocation(position: str | None = None) -> dict:
+    """The per-position coaching-quality YARDSTICK — **not** what CPU teams train.
+
+    Renamed from ``_cpu_reference_allocation`` (2026-08-12) because that name read as live
+    CPU behaviour long after it stopped being one. CPU auto-train now submits a single
+    team-wide plan (``_cpu_team_allocation``), the same shape a user does; see
+    ``projects/cpu_identity_training_design.md`` §1.
+
+    What this still IS: the frozen per-position substrate whose values are FITTED so
+    ``base × _CPU_FOCUS_AMP_MEAN`` scores ~1.0 against ``reference_allocation``. That makes it
+    the reference point for coaching quality and the offseason measurement harnesses
+    (``tests/test_offseason_attractor.py``, ``scripts/s11_framework_baseline_measure.py``),
+    which are its only remaining callers.
+
+    ``position=None`` → SF.
+    """
     b = _CPU_REFERENCE_BASE_BY_POS.get(position or "SF") or _CPU_REFERENCE_BASE_BY_POS["SF"]
     return {
         "player_drills": {
@@ -2419,6 +2433,62 @@ def _cpu_reference_allocation(position: str | None = None) -> dict:
             "presses_traps": {"defense_install": 1, "offense_install": 1},
         },
     }
+
+
+# ── CPU team-wide allocation (step 1 of the identity-training rework) ────────────────────
+# WHY THIS REPLACES THE PER-POSITION PLANS. CPU auto-train used to group the roster by
+# development position and run execute_training once per group, each with its own
+# _coaching_quality_reference_allocation(pos). A USER assigns ONE plan across the whole roster, so most of
+# their players train attributes their position discounts. CPU players each got the plan fitted
+# to their exact position: fewer points (~17 vs 24) but ZERO fit waste — an advantage no human
+# can replicate, and the inverse of "the user's edge comes from out-coaching the reference."
+#
+# PLACEHOLDER, DELIBERATELY IDENTITY-BLIND. This is §3.2 "Base" of
+# projects/cpu_identity_training_design.md and nothing more: the 12 never-zero floors at 1,
+# every team drill at 1, and the 4 spare points parked on the four universally-useful slots.
+# Step 3 replaces the parking with per-vision emphasis; the floor structure stays.
+#
+# THE FLOORS ARE NOT STYLE. PLAYER_ATTR_GAIN_RANGE_BY_POINTS pays 0 points at (-2,-1) — a
+# guaranteed -1 to -2 EVERY week, no probability gate, ~-26 to -52 a season. 0->1 is worth
+# +3.5 while the whole 1->5 span is worth +2.5. So every slot that feeds a PLAYER attribute
+# (the 9 player_drills plus conditioning/free_throws/film_study) must never be 0. Only `breaks`
+# and the 7 team_drills may be zeroed — those take the team-attribute path, where neglect is
+# probability-gated at 25% and deliberately mild.
+_CPU_SPARE_PARK = ("conditioning", "film_study")  # +1 each; the other 2 go to the two installs
+
+
+def _cpu_team_allocation(is_camp: bool = False) -> dict:
+    """One team-wide plan for a CPU team — the same shape a user submits.
+
+    24 points in season, 30 at camp. Identity-blind until step 3 of the design.
+    """
+    from BackEnd.constants.training_shape import CAMP_POINT_BUDGET, IN_SEASON_POINT_BUDGET
+
+    alloc = {
+        "player_drills": {
+            "offense": {"inside": 1, "outside": 1},
+            "defense": {"inside": 1, "outside": 1},
+            "technical": {"passing": 1, "ball_handling": 1, "rebounding": 1},
+            "weight_room": {"strength": 1, "agility": 1},
+        },
+        "general": {"conditioning": 1, "free_throws": 1, "film_study": 1, "breaks": 1},
+        "team_drills": {
+            "team_offense": {"install": 1}, "team_defense": {"install": 1},
+            "fast_breaks": {"offense_install": 1, "defense_install": 1}, "scrimmages": 1,
+            "presses_traps": {"defense_install": 1, "offense_install": 1},
+        },
+    }
+    # 20 slots x 1 = 20. Park the remaining 4 (10 at camp) so the plan spends its full budget —
+    # unspent points are pure waste, and the CPU was leaving 7-8 on the table every week.
+    spare = (CAMP_POINT_BUDGET if is_camp else IN_SEASON_POINT_BUDGET) - 20
+    for _ in range(spare // 4):
+        for key in _CPU_SPARE_PARK:
+            alloc["general"][key] += 1
+        alloc["team_drills"]["team_offense"]["install"] += 1
+        alloc["team_drills"]["team_defense"]["install"] += 1
+    for i in range(spare % 4):  # camp's odd remainder
+        alloc["general"][_CPU_SPARE_PARK[i % len(_CPU_SPARE_PARK)]] += 1
+    return alloc
 
 
 def _cpu_reference_custom_focus(players_for_training: list[dict], fpd_by_player_id: dict) -> dict:
@@ -2550,47 +2620,33 @@ def auto_train_one_cpu_team(
     from BackEnd.utils.headless_simulation import quiet_training_engine_logs
     from collections import defaultdict
 
-    groups: dict[str, list] = defaultdict(list)
-    for p in players_for_training:
-        pos = resolve_training_position(p)
-        groups[pos].append(p)
-
     updated_players: list = []
     updated_team = team_stats
     updated_plays = plays_data
     updated_scouting = scouting_data
     training_report: dict = {}
     gain_scale = CAMP_GAIN_SCALE if is_camp else None
-    apply_team_drills = True
+    # ONE plan for the whole roster, exactly as a user submits — not one per position group.
+    # The old loop called execute_training up to 5x with a per-position allocation, which let
+    # every CPU player train his ideal attributes while a user's roster shares one compromise
+    # plan. See _cpu_team_allocation and projects/cpu_identity_training_design.md §1.
+    allocations = _cpu_team_allocation(is_camp)
     with quiet_training_engine_logs():
-        for pos, group in groups.items():
-            allocations = _cpu_reference_allocation(pos)
-            if not apply_team_drills:
-                allocations = {
-                    "player_drills": allocations["player_drills"],
-                    "general": {
-                        "conditioning": allocations["general"]["conditioning"],
-                        "free_throws": allocations["general"]["free_throws"],
-                        "film_study": allocations["general"]["film_study"],
-                    },
-                    "team_drills": {},
-                }
-            up, updated_team, updated_plays, updated_scouting, training_report = execute_training(
-                group,
-                updated_team,
-                allocations,
-                coaching_focus,
-                plays_data=updated_plays,
-                strategy_settings=strategy_settings,
-                playbook_settings=playbook_settings,
-                scouting_data=updated_scouting,
-                playbook_training_mode="current-playbooks",
-                skip_pre_training_depreciation=is_camp,
-                coaching_focus_custom_by_player=coaching_focus_custom_by_player,
-                gain_scale=gain_scale,
-            )
-            updated_players.extend(up)
-            apply_team_drills = False
+        up, updated_team, updated_plays, updated_scouting, training_report = execute_training(
+            players_for_training,
+            updated_team,
+            allocations,
+            coaching_focus,
+            plays_data=updated_plays,
+            strategy_settings=strategy_settings,
+            playbook_settings=playbook_settings,
+            scouting_data=updated_scouting,
+            playbook_training_mode="current-playbooks",
+            skip_pre_training_depreciation=is_camp,
+            coaching_focus_custom_by_player=coaching_focus_custom_by_player,
+            gain_scale=gain_scale,
+        )
+        updated_players.extend(up)
 
     # Compat: callers still key off is_first for camp-weight coaching-focus counts.
     is_first = is_camp
