@@ -7108,6 +7108,32 @@ def _complete_week_finish_cpu_and_persist(
             eos_game_meta=eos_meta,
         )
 
+    # CPU TEAM IDENTITY — assign/refresh before any game is simmed this week.
+    #
+    # THIS LIVES HERE, NOT ON A ROUTE, BECAUSE THREE ENDPOINTS REACH THE SIM BLOCK:
+    # /complete-week, /complete-week/start-cpu-sims and /complete-week/phase-b. It was
+    # originally called only from /complete-week, which the UI takes only as a fallback
+    # branch (box-score.js) — the live flow is phase-a -> start-cpu-sims -> phase-b. So
+    # identity never ran in normal play: gob-staging had 0/128 teams with an identity and
+    # every team's sliders flat at 2, on a franchise created two days AFTER identity
+    # shipped. Assigning at the single point all three paths converge on is what makes
+    # that unreachable-by-construction; a fourth entry point cannot reintroduce the gap.
+    #
+    # Idempotent and season-keyed, so running on both start-cpu-sims and phase-b is a
+    # no-op the second time. See BackEnd/utils/franchise_identity.
+    try:
+        from BackEnd.utils.franchise_identity import ensure_franchise_identities
+
+        _identity_summary = ensure_franchise_identities(
+            franchise_id,
+            int(franchise_doc.get("current_season") or 1),
+            int(franchise_doc.get("week") or week or 1),
+        )
+        if _identity_summary.get("assigned"):
+            logger.warning("🧬 [IDENTITY] franchise=%s %s", franchise_id_str, _identity_summary)
+    except Exception as _identity_err:  # never let identity block a week
+        logger.error("[IDENTITY] assignment failed for %s: %s", franchise_id_str, _identity_err)
+
     # Phase 2: stable matchup keys + dedupe so phase-B retries / merged rows cannot double-count games.
     results = _dedupe_franchise_week_results_by_matchup([dict(r) for r in results])
     cpu_job_phase = "start_cpu_sims" if persist_cpu_results_only else "phase_b"
@@ -7781,26 +7807,10 @@ def complete_week(req: CompleteWeekRequest):
 
     req = _harden_complete_week_request_week(franchise_doc, req)
 
-    # CPU TEAM IDENTITY — assign/refresh before any game is simmed this week.
-    # Idempotent and season-keyed: it is a no-op once each team's identity matches the
-    # current season and CONSTANTS_VERSION. It lives here because franchise creation
-    # seeds FTD strategy_settings BEFORE rosters are attached, so identity cannot be
-    # computed at that site; this is the first point each season where a projected five
-    # is guaranteed to exist. Without it, FTD supplies flat-neutral all-2s sliders,
-    # TeamManager takes its "settings were supplied" branch, and identity never runs in
-    # franchise mode at all. See BackEnd/utils/franchise_identity.
-    try:
-        from BackEnd.utils.franchise_identity import ensure_franchise_identities
-
-        _identity_summary = ensure_franchise_identities(
-            franchise_id,
-            int(franchise_doc.get("current_season") or 1),
-            int(franchise_doc.get("week") or 1),
-        )
-        if _identity_summary.get("assigned"):
-            logger.warning("🧬 [IDENTITY] franchise=%s %s", req.franchise_id, _identity_summary)
-    except Exception as _identity_err:  # never let identity block a week
-        logger.error("[IDENTITY] assignment failed for %s: %s", req.franchise_id, _identity_err)
+    # CPU TEAM IDENTITY is assigned in _complete_week_finish_cpu_and_persist, the single
+    # point all three complete-week entry points converge on before the sim block. It used
+    # to be called here, which meant it never ran on the live phase-a/start-cpu-sims/phase-b
+    # flow. Do not re-add a per-route call.
 
     _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
     user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)

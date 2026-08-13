@@ -1147,6 +1147,20 @@ source categories, and integer weekly rolls cannot express "−3/season" directl
 
 See [`06_Gameplay_Systems/CPU_Team_Identity_System.md`](../06_Gameplay_Systems/CPU_Team_Identity_System.md) § Tunable Constants for the full table (`SIGNAL_SCALE`, residual slopes, `FUEL_CAPACITY_BOUNDS`, `VISION_COST`, `SOFTMAX_TEMPERATURE`, `MOTION_FLAT`/`CONTAIN_FLAT`, `CONSTANTS_VERSION`, and the ten `SELF_REG_*` constants).
 
+**Also there, added 2026-08-12:**
+
+| block | location | value | effect |
+|---|---|---|---|
+| `OFFENSIVE_SLIDERS` / `DEFENSIVE_SLIDERS` | `team_identity.py` | weight vectors over `[0,1,2,3,4]` | per-vision play-type mix. **Scale is a literal ratio**: `offense` 0 = 100% motion → 4 = 100% set plays; `defense` 0 = 100% man → 4 = 100% zone. A slider mean therefore reads directly as a league play-type mix. |
+| `LEAGUE_BASELINE` | `team_identity.py` | see doc | any slider a vision does NOT name draws from here, never a generic 2.0 — `hc_trap`/`fc_press` baseline at mean 0.99, so a generic neutral would ~double league-wide pressing |
+| `_set_play_percentages` schedule | `cpu_playbook_customization.py` | 1 play→100%, 2→55%, 3→45%, **4+→20%** | top-play concentration. **Intended ceiling 25% for normal (4+) books; NOT to be lifted** — spec §5's proposal to raise it is rejected. Books of 1–3 plays structurally exceed 25% and no cap can prevent that. |
+| `_random_capped_three(max_pct=50)` | `cpu_playbook_customization.py` | `50` | caps each of three play-family shares |
+
+⚠️ `SIGNAL_SCALE` and `FUEL_CAPACITY_BOUNDS` are **frozen against the pool they were measured
+from**, which predates the attribute recalibration and the second −2in height shift. Re-derive
+before trusting the vision distribution. Same class of hazard as an absolute `RT ≥ 50` bar —
+prefer within-team differences to absolute thresholds anywhere either can be used.
+
 ### Reproducibility / instrumentation
 
 | constant | location | value |
