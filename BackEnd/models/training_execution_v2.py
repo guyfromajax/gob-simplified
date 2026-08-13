@@ -574,7 +574,18 @@ def apply_training_points(
         team_baseline = {k: team.get(k, 0) for k in TEAM_ATTR_CLAMPS.keys()}
     else:
         team_baseline = original_team_baseline
-    
+
+    # Snapshot the PRE-gain fractional remainders (carried in from prior weeks; pre-training
+    # decay does not touch them) so the report delta can reflect the TRUE fractional gain,
+    # not just the whole-integer anchor move. Without this, a sub-1 gain — common at camp
+    # where effective_scale = CAMP_GAIN_SCALE (0.70) × position_fit × class_gain drops an
+    # allocated attr below +1 whole — banks entirely into training_gain_remainders and the
+    # report shows a phantom dash on an attribute the user actually trained.
+    remainder_baselines = {
+        p["_id"]: dict(p.get("training_gain_remainders", {}) or {})
+        for p in players
+    }
+
     archetype, sub_option = parse_coaching_focus(coaching_focus)
     
     # Normalize allocations from frontend structure to flat structure
@@ -901,10 +912,17 @@ def apply_training_points(
         pid = player["_id"]
         name = f"{player.get('first_name', '')} {player.get('last_name', '')}".strip()
         changes = {}
+        rem_now = player.get("training_gain_remainders", {}) or {}
+        rem_base = remainder_baselines.get(pid, {})
         for attr in TRAINABLE_PLAYER_ATTRS:
             old_val = player_baselines[pid].get(attr, 0)
             new_val = player.get("attributes", {}).get(f"anchor_{attr}", 0)
-            delta = new_val - old_val
+            # True gain = whole-anchor move + net change in the banked fraction, so a sub-1
+            # camp gain (banked, anchor unmoved) reports as e.g. +0.6 → one green arrow
+            # instead of a phantom dash. Rounded to 2dp to keep storage/float noise clean.
+            old_rem = float(rem_base.get(attr, 0.0) or 0.0)
+            new_rem = float(rem_now.get(attr, 0.0) or 0.0)
+            delta = round((new_val + new_rem) - (old_val + old_rem), 2)
             if delta != 0:
                 changes[attr] = delta
         if changes:
