@@ -21,6 +21,68 @@ measured and rejected, that is stated as such.
 
 ---
 
+## ▶ SURFACE STATUS — read this before building or shipping
+
+`cpu_team_identity_spec.md` names **four surfaces** the vision was meant to drive. Two are
+live. The table below is the single source of truth for which; everything else on this page
+describes the mechanism, not the coverage.
+
+| # | Surface | State | Where |
+|---|---|---|---|
+| 1 | **Game plans** (strategy sliders) | ✅ **LIVE** — verified **+5.0% pts/team-game**, 3.2 SE | §3, §7 |
+| 2 | **Starting five** | ✅ **LIVE** — shared user/CPU selector | `CPU_Team_Rotation_System.md` |
+| 3 | **Substitution policy** | ⛔ **CLOSED — measured, no effect** | `projects/bugs.md` |
+| 4 | **Playbooks** | ⚠️ **NOT identity-driven** | see below |
+| 5 | **Rotation size** | ❌ **UNBUILT** | spec §7 |
+| 6 | **Training** | ❌ **UNBUILT** | spec §6 |
+| 7 | **5-week re-evaluation** | ❌ **UNBUILT** | spec §8 |
+
+**Two live of seven. Anything claiming "CPU Identity is wired" is wrong.**
+
+### Notes that change what you would build
+
+**#3 substitution is closed, and TWO mechanisms were tried.** The NG pull/return hysteresis
+pair cost ~1 point a game and was stripped. The redirect to the selector objective weight `w`
+was then tested conditioned on `starter_bench_gap` — the top-heavy and shallow bands came back
+at **−1.56 and −1.22** points, same sign, differing by 0.34 (≈ ⅛ of one SE), where the spec
+predicts *opposite* signs. Both writeups land on the same conclusion: **the lever for changing
+CPU rotation behaviour is the FATIGUE ECONOMY, not the selector or the gate.** Do not reopen
+this by trying another parameter grid.
+
+**#4 playbooks are a pre-existing system identity does not touch.**
+`cpu_playbook_customization.py` contains **zero** references to identity or vision — it builds
+from `_classify_focus_strengths(position_players)`, i.e. roster shape. Coverage is also scoped
+to *the teams the user is scheduled to play* (`build_user_schedule_cpu_playbook_groups`), so
+CPU-vs-CPU games use default playbooks: **8/128 teams customized at week 2, 19/128 at week 15**.
+That scoping is deliberate, not a bug. Spec §5 (vision → play families, concentration by
+`breadth`) is entirely unbuilt.
+
+**#5 rotation size may not be buildable in isolation.** Current depth is 6.69 players above 8%
+of minutes against a target of 8–11, but `CPU_Team_Rotation_System.md` §8 attributes that to the
+fatigue economy rather than the selector — so a `rotation_size` parameter may not move minutes.
+`starter_bench_gap`, which it depends on, **is not defined anywhere in the codebase**; a working
+definition and its arguable choices are in `projects/bugs.md`, and the spec's 13/19 band edges
+put **75% of the league in one band** on the current pool.
+
+**#6 training's spec rationale is stale.** Spec §6 excludes player development to protect a
+coaching-quality normalization that free-will retired. That exclusion needs re-deciding before
+the surface is designed, not after.
+
+### Where the rest of the documentation lives
+
+| | |
+|---|---|
+| [`projects/cpu_team_identity_spec.md`](../projects/cpu_team_identity_spec.md) | The DESIGN. Contains unbuilt proposals — check against this table before implementing any of it. |
+| [`projects/bugs.md`](../projects/bugs.md) | Mechanisms measured and rejected, with their numbers. |
+| [`CPU_Team_Rotation_System.md`](./CPU_Team_Rotation_System.md) | Lineup selection, the NG gate, the void-minutes-metric warning. |
+| [`11_Design_Systems/Tunable_Constants.md`](../11_Design_Systems/Tunable_Constants.md) | Constants index; the full identity table is in §9 here. |
+
+⚠️ **The spec is not authoritative about what is live.** It specified a substitution mechanism
+that had already been measured and stripped, because nothing reconciled the two documents. That
+is what this table is for.
+
+---
+
 ## Why it exists
 
 The previous CPU derivation used per-slider `_strategy_roll_*` thresholds that were **dead in
