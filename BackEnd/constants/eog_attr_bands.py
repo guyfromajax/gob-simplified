@@ -75,25 +75,23 @@ Design notes (see EOG Structural Pass):
 # curve. Binning by shot_threshold shows the LEVEL shifts too: mean cross-season spread
 # 6.42pp, max 9.15pp (at S=80-99: baseline 43.7%, identity 40.1%, verification 39.0%).
 #
-# CURRENT CALIBRATION (re-cut 2026-08-12 for the -30..170 scale)
+# CURRENT CALIBRATION (re-cut 2026-08-14 for the -10..190 scale)
 #   basis      FG% = 51.25 - 0.14126 * shot_threshold, residual sd 7.67pp. The fit is
 #              SCALE-INDEPENDENT — shot_threshold is compared absolutely in
 #              `made = shot_score >= shot_threshold` — but the OPERATING POINT is not:
-#              at the current init 65-75 the equilibrium is 41.4% FG, not the 37.1% that
-#              init 95-105 produced on the old 0-200 scale.
+#              at the current init 85-95 the fitted equilibrium is 38.5% FG.
 #   ⚠️ THIS IS WHY A SCALE MOVE FORCES A BAND RE-CUT. Cut at 24/36 for init 95-105, then
 #      left alone across the two scale moves, these bands drifted teams -28/season instead
 #      of ~0: FG at the new init sat ABOVE the high cut, so most team-games took the
-#      negative delta and compounded downward. Verified, then fixed to 26/40 (drift -0.1).
+#      negative delta and compounded downward. The -30..170 calibration was 26/40.
 #      See the scale-change checklist in 00_Operations/Shot_Threshold_Scale_Tuning.md.
-#   simulated  26 weeks x 128 teams, ACTUAL integer band ranges, from init 65-75:
-#              mean 69.9, sd 21.2, p10 43, p90 98, drift -0.1, ZERO teams at either rail
-#   chosen deliberately CONSERVATIVE over a wider-spread option (24/38 gain 8: sd 34.0 but
-#   0.3 teams railing) because the fit is thinnest exactly where new bands push teams —
-#   n=256 at S=100-119 against n=1008 at 80-99. Re-fit from the next season, where teams
-#   will actually sit, and widen from a basis that covers the target range.
-FG_PCT_HIGH = 40
-FG_PCT_MID = 26
+#   simulated  1,000 x (26 weeks x 128 teams), ACTUAL integer band ranges and clamps,
+#              from init 85-95, bootstrapping the 3,330 measured residuals:
+#              mean 90.0, sd 20.5, drift -0.05, ZERO rails across 128,000 team-seasons.
+#   chosen      22/37. Nearby 23/37 drifted +1.01 with one rail; 24/37 drifted +2.43
+#              with eight rails. Re-fit from a fresh season if engine/roster inputs change.
+FG_PCT_HIGH = 37
+FG_PCT_MID = 22
 
 # discipline — team (F+TO) vs opponent (F+TO) + buffer
 DISCIPLINE_OPP_BUFFER = 8

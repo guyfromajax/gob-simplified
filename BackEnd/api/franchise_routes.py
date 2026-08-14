@@ -2568,11 +2568,34 @@ _FOCUS_WEEK_SHARE = 0.5                      # the dial future logic turns (desi
 _REACTIVE_INSTALLS = ("FB_DEF", "PT_OFF")
 
 # VARIANCE IS THE POINT. A flat baseline would leave all 128 teams identical on exactly the two
-# attributes this is meant to un-flatten. Weights over 0-3 points (mean 1.43): measured across
-# 128 teams x 25 weeks it lands 0pt 14% / 1pt 43% / 2pt 28% / 3pt 15% — most weeks a little,
-# some weeks nothing, occasionally a lot. Derived per (team, week, slot) so it varies BOTH
+# attributes this is meant to un-flatten. Derived per (team, week, slot) so it varies BOTH
 # across teams within a week and across weeks for one team, and replays identically.
-_REACTIVE_BASELINE_WEIGHTS = (0, 1, 1, 1, 2, 2, 3)
+#
+# RESCALED 2026-08-14 from (0,1,1,1,2,2,3) — mean 1.43 — after a half-season measurement.
+# At 1.43/week both reactive attributes ran far too hot: fb_opp_modifier reached mean +12.0
+# with 74 of 128 teams in the top bucket and NONE below −4, and pt_opp_modifier +10.4 with
+# none below −4. Nearly every team positive is not the intended shape; more teams positive
+# than not is.
+#
+# Now mean 1.00 with a wider zero share (43% of weeks vs 14%), so a team that keeps drawing
+# blanks genuinely falls behind instead of everyone converging on the same total.
+# PERSISTENT PER-TEAM TENDENCY. A single weekly draw, however wide, converges: every team
+# samples the same distribution, so sd grows as sqrt(weeks) while the mean grows linearly and
+# the league bunches up again by season's end. Week-to-week variance is transient; what the
+# distribution needs is a trait that does not average out.
+#
+# So each team gets a tendency tier per (season, slot) and keeps it all year — a team that
+# neglects transition defence keeps neglecting it, and separates permanently rather than
+# regressing to the league mean. Tiers are drawn per SLOT, so a team can prioritise
+# fast-break defence while ignoring press-break offence.
+#
+# League mean stays ~1.0: 0.25(0.57) + 0.50(1.00) + 0.25(1.57).
+_REACTIVE_TENDENCY_TIERS = (
+    ((0, 0, 0, 0, 1, 1, 2), 25),   # neglects it       mean 0.57
+    ((0, 0, 0, 1, 1, 2, 3), 50),   # league default    mean 1.00
+    ((0, 0, 1, 2, 2, 3, 3), 25),   # prioritises it    mean 1.57
+)
+_REACTIVE_BASELINE_WEIGHTS = _REACTIVE_TENDENCY_TIERS[1][0]   # the default tier
 
 _FOCUS_SKILL_COUNT = 1
 _FOCUS_LIFT_POINTS = 2       # was ND2/IQ2; same points, now rotated like the roster lift
@@ -2618,9 +2641,20 @@ def _reactive_baseline(franchise_id, team_id, season: int, week: int, slot: str)
     """
     import hashlib
 
+    # Tier is keyed WITHOUT the week, so it holds for the whole season.
+    tkey = f"tendency:{franchise_id}:{team_id}:{season}:{slot}".encode("utf-8")
+    roll = int.from_bytes(hashlib.sha256(tkey).digest()[:8], "big") % 100
+    weights = _REACTIVE_TENDENCY_TIERS[-1][0]
+    acc = 0
+    for w, share in _REACTIVE_TENDENCY_TIERS:
+        acc += share
+        if roll < acc:
+            weights = w
+            break
+
     key = f"reactive:{franchise_id}:{team_id}:{season}:{week}:{slot}".encode("utf-8")
     n = int.from_bytes(hashlib.sha256(key).digest()[:8], "big")
-    return _REACTIVE_BASELINE_WEIGHTS[n % len(_REACTIVE_BASELINE_WEIGHTS)]
+    return weights[n % len(weights)]
 
 
 # The twelve player-attribute slots the rotating lift walks. Order is fixed; the STARTING
