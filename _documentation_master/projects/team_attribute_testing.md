@@ -124,6 +124,42 @@ than never installed.
 
 ---
 
+## Franchise `6a7f4a88…` week 13 — the BEFORE baseline for two later changes
+
+Second franchise, created 2026-08-14 on the rotating-lift build. Played to week 13 and then
+retired. Recorded because it is the *before* state for two changes shipped on 2026-08-14, and
+those changes cannot be judged without it.
+
+**Reactive attributes — before the baseline rescale + tendency tiers**
+
+| attribute | mean | min | max | teams ≥ +17 |
+|---|--:|--:|--:|--:|
+| `fb_opp_modifier` | **+12.0** | −5 | 20 | **30** |
+| `pt_opp_modifier` | **+10.4** | −1 | 20 | 14 |
+
+Both ran far too hot: 74 of 128 teams in the top bucket for `fb_opp_modifier`, **none below −4**.
+The weekly baseline was mean 1.43 with no persistent per-team trait, so every team converged on
+roughly the same total (sd/mean decaying toward 0.14 by week 25). Fixed by rescaling to mean 1.00
+and adding tendency tiers — see `acd439110`.
+
+**`rebound_modifier` — before the EOG band narrowing**
+
+| bucket | 0.0–0.2 | 0.2–0.4 | 0.4–0.6 | 0.6–0.8 | 0.8–1.0 | mean |
+|---|--:|--:|--:|--:|--:|--:|
+| teams | 30 | 17 | 9 | 10 | **62** | +0.6 |
+
+Bimodal with a hollow middle — **28 teams at exactly 1.0 and 17 at exactly 0.0**. The old EOG
+ladder moved up to ±0.14 in a single game against training's ~0.04 per week, so ~40% of the
+league railed. Fixed in `ecd844af6`.
+
+**Also captured from this franchise** (weeks 2–13, 1,524 players): the first measurement of the
+rotating lift, which equalised allocation (skills 1.38 vs universals 1.37 pts/week, a 0.99x
+ratio) **without** equalising outcomes — skills still −1.34 at 31% of players up, universals
++2.50 at 85%. That is the evidence that the allocation was never the cause and the in-season
+economy is. See `In_Season_Training_Summary.md`.
+
+---
+
 ## Method
 
 Read directly from `ftd.team_attributes` across all 128 FTD docs — a point-in-time snapshot, not
