@@ -2519,6 +2519,17 @@ _EMPHASIS_POINTS = 3
 _ROSTER_LIFT = {"ND": 3, "IQ": 3, "FT": 2}   # roster week: Bucket 3, reaches every player
 _FOCUS_WEEK_SHARE = 0.5                      # the dial future logic turns (design §3.4)
 
+# ONE skill emphasis per focus week, not two. Measured live over weeks 5-6 (1,536 vs 1,512
+# players): focus weeks ran -0.42/player against roster weeks' -0.06, a real -0.36 gap. The
+# cause is fit, not the emphasis idea — two skills at 3 buy +0.32 of value over the floors
+# while the same 4 points spent as one skill at 3 PLUS ND/IQ at 2 buy +0.44, because ND/IQ are
+# fit 1.00 for every position and skills average 0.56.
+#
+# Same budget, ~+0.12/player/focus-week, and the team still has one sharp, legible emphasis.
+# Camp is exempt (it skips decay and runs at 0.70, so every allocation gains there).
+_FOCUS_SKILL_COUNT = 1
+_FOCUS_BUCKET3_LIFT = {"ND": 2, "IQ": 2}
+
 # Saturation taper. The clamp already makes a maxed attribute gain nothing, so this only stops
 # WASTING points on it. Allocation-side only — no engine change, EOG bands undisturbed.
 _SATURATION_FULL = 17     # below this, full weight
@@ -2608,16 +2619,25 @@ def _cpu_team_allocation(
     dfn = _VISION_DEFENSE.get(defensive_vision or "", ((), ()))
 
     if focus_week:
-        # Two skill emphases at 3. Dedupe: Zone+Man Lockdown both name ID, and paying twice
-        # for one slot would silently eat another vision's emphasis.
+        # Dedupe: Zone+Man Lockdown both name ID, and paying twice for one slot would silently
+        # eat the other vision's emphasis.
         seen = []
         for slot in list(off[0]) + list(dfn[0]):
             if slot not in seen:
                 seen.append(slot)
-        for slot in seen[:2] if not is_camp else seen:
+        n_emph = len(seen) if is_camp else _FOCUS_SKILL_COUNT
+        for slot in seen[:n_emph]:
             cost = _EMPHASIS_POINTS - _get_slot(alloc, slot)
             if 0 < cost <= spare:
                 _set_slot(alloc, slot, _EMPHASIS_POINTS)
+                spare -= cost
+        # Whatever a narrower emphasis frees goes to Bucket 3, NOT to a second skill. ND/IQ are
+        # fit 1.00 for every position while skills average 0.56, so 2 points here are worth
+        # ~1.8x the same 2 points on a second skill emphasis — measured, see design §3.4.
+        for slot, val in _FOCUS_BUCKET3_LIFT.items():
+            cost = val - _get_slot(alloc, slot)
+            if 0 < cost <= spare:
+                _set_slot(alloc, slot, val)
                 spare -= cost
     else:
         for slot, val in _ROSTER_LIFT.items():

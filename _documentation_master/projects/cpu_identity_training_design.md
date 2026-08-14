@@ -153,8 +153,19 @@ and the split becomes the single dial future logic turns.
 **FOCUS WEEK — sharp, reaches the players who fit the vision**
 
 * 12 floors at 1
-* **two** skill attributes at **3 points** (never 2 — see §3.3)
+* **ONE** skill attribute at **3 points** (never 2 — see §3.3)
+* **ND and IQ lifted to 2** with the points a second emphasis would have cost
 * the vision's team installs
+
+> **Why one skill, not two — MEASURED live, weeks 5-6.** Focus weeks ran **−0.42**/player
+> against roster weeks' **−0.06**, a real **−0.36** gap (n = 1,536 vs 1,512, |t| = 3.6). The
+> cause is fit, not the emphasis idea: two skills at 3 buy **+0.32** of value over the floors,
+> while the same 4 points as *one* skill at 3 **plus ND/IQ at 2** buy **+0.44** — ND/IQ are fit
+> 1.00 for every position, skills average 0.56.
+>
+> Same budget, **~+0.12/player/focus-week by arithmetic, +0.26 ± 0.14 by dry run**, and the
+> team keeps one sharp, legible emphasis. Camp is exempt — it skips decay and runs at 0.70, so
+> every allocation gains there.
 
 **ROSTER WEEK — efficient, reaches everyone**
 
