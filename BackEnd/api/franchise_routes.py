@@ -13946,17 +13946,27 @@ def cut_franchise_players(
         logger.exception("[WALK-ON-ROSTER] user assign failed franchise=%s", str(fid))
         walk_on_assign = {}
 
+    # Roster assignment is already committed above. PS init must not fail the
+    # request — a 500 here left the client on cut-players with no FCC navigation
+    # even though cuts were saved (and retries then 400 because cut_required is false).
     ps_initialized = False
     if int(franchise_doc.get("week", 1) or 1) == CAMP_WEEKS:
-        ps_initialized = (
-            _maybe_initialize_practice_squad_week_1(
-                fid,
-                franchise_doc,
-                user_team_object_id=user_team_object_id,
-                defer_if_user_cut_pending=False,
+        try:
+            ps_initialized = (
+                _maybe_initialize_practice_squad_week_1(
+                    fid,
+                    franchise_doc,
+                    user_team_object_id=user_team_object_id,
+                    defer_if_user_cut_pending=False,
+                )
+                is not None
             )
-            is not None
-        )
+        except Exception:
+            logger.exception(
+                "[PRACTICE-SQUAD] week-1 init failed after cut-players franchise=%s",
+                str(fid),
+            )
+            ps_initialized = False
 
     return {
         "status": "success",

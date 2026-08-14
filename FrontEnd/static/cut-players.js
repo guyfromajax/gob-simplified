@@ -36,6 +36,13 @@
     return '/franchise-command-center.html?' + params.toString();
   }
 
+  function closeModal() {
+    var backdrop = document.getElementById('cut-modal-backdrop');
+    if (!backdrop) return;
+    backdrop.classList.remove('is-visible');
+    backdrop.setAttribute('aria-hidden', 'true');
+  }
+
   function showModal(config) {
     var backdrop = document.getElementById('cut-modal-backdrop');
     var accent = document.getElementById('cut-modal-accent');
@@ -56,15 +63,32 @@
         ? 'gob-modal-btn-primary'
         : 'gob-modal-btn-secondary';
       btn.textContent = action.label;
+      btn.disabled = !!action.disabled;
       btn.addEventListener('click', function () {
-        backdrop.classList.remove('is-visible');
-        backdrop.setAttribute('aria-hidden', 'true');
-        if (action.onClick) action.onClick();
+        // Dismiss-only actions close here. Actions with onClick own the next
+        // step (replace modal, navigate, etc.) so Confirm is not dumped back
+        // onto the assign table while the POST is in flight.
+        if (action.onClick) {
+          action.onClick();
+          return;
+        }
+        closeModal();
       });
       actions.appendChild(btn);
     });
     backdrop.classList.add('is-visible');
     backdrop.setAttribute('aria-hidden', 'false');
+  }
+
+  function setSubmitBusy(busy) {
+    var submitBtn = document.getElementById('submit-btn');
+    if (!submitBtn) return;
+    if (busy) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('is-dead');
+      return;
+    }
+    updateStatus();
   }
 
   function formatAttr(attrs, key) {
@@ -243,6 +267,13 @@
           label: 'Confirm',
           variant: 'gob-modal-btn-primary',
           onClick: function () {
+            setSubmitBusy(true);
+            showModal({
+              title: 'Assigning Practice Squad',
+              message: 'Saving your practice squad assignment…',
+              accent: 'is-green',
+              actions: []
+            });
             fetch(API_CONFIG.buildUrl('/franchise/cut-players'), {
               method: 'POST',
               headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -262,10 +293,14 @@
               })
               .catch(function (err) {
                 console.error(err);
+                setSubmitBusy(false);
                 showModal({
                   title: 'Assignment Failed',
                   message: 'Unable to assign players to the practice squad.',
-                  actions: [{ label: 'Close', variant: 'gob-modal-btn-secondary' }]
+                  actions: [
+                    { label: 'Close', variant: 'gob-modal-btn-secondary' },
+                    { label: 'Back To Locker Room', variant: 'gob-modal-btn-primary', onClick: navigateBack }
+                  ]
                 });
               });
           }
