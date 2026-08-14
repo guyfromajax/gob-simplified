@@ -824,14 +824,14 @@ def apply_training_points(
     # Handle special team attributes
     # Rebound modifier (from technical_drills rebounding)
     # Docs: Rebounding gives rebound_modifier 0.5 points per drill point.
-    if "technical_drills" in normalized_allocations:
-        rebounding_points = normalized_allocations["technical_drills"].get("rebounding", 0)
-        if rebounding_points is not None:
-            # Convert to effective team-attribute points using 0.5x accrual, then round half-up.
-            effective_points = int((rebounding_points * 0.5) + 0.5)
-            _apply_rebound_modifier_training(
-                team, effective_points, archetype, sub_option, source="technical_drills"
-            )
+    # rebound_modifier is applied ONCE from the COMBINED rebounding + scrimmages allocation.
+    # See _apply_rebound_modifier_training for why (double-fire + phantom scrimmages=0 penalty).
+    _reb_pts = int(normalized_allocations.get("technical_drills", {}).get("rebounding", 0) or 0)
+    _scrim_for_reb = normalized_allocations.get("scrimmages", 0)
+    _reb_pts += int(_scrim_for_reb or 0) if isinstance(_scrim_for_reb, int) else 0
+    _apply_rebound_modifier_training(
+        team, _reb_pts, archetype, sub_option, source="combined"
+    )
     
     # Handle scrimmages (if scrimmages category exists in allocations)
     # Scrimmages: Team Chemistry (0.5x multiplier), Shot Threshold (1 point), Rebounding (0.5x)
@@ -845,11 +845,8 @@ def apply_training_points(
                     team_attr_contributions[team_attr] += scrimmage_points * mult
             # Apply to Shot Threshold (decreases)
             _apply_shot_threshold_training(team, scrimmage_points, archetype, sub_option)
-            # Apply to Rebounding (rebound_modifier) with 0.5x accrual, rounded half-up.
-            effective_points = int((scrimmage_points * 0.5) + 0.5)
-            _apply_rebound_modifier_training(
-                team, effective_points, archetype, sub_option, source="scrimmages"
-            )
+            # rebound_modifier is NOT applied here — it is handled once above from the
+            # combined rebounding + scrimmages total.
     
     # Apply team attribute contributions from multipliers
     # Sum all contributions, round (0.5 rounds up, <0.5 rounds down), then apply
@@ -1300,21 +1297,35 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
         sub_option: Optional coaching focus sub-option
         source: "technical_drills" or "scrimmages" - determines which range to use
     
-    Technical Drills / Scrimmages ranges (in 0.01 increments).
-    - <1 effective point: -0.05 to -0.03
-    - 1-2 effective points: +0.03 to +0.05
-    - 3-4 effective points: +0.03 to +0.07
-    - 5+ effective points: +0.03 to +0.10
+    ``points`` is the COMBINED rebounding + scrimmages allocation, applied ONCE.
+
+    Previously this ran TWICE a week — once from technical_drills.rebounding and once from
+    scrimmages — each with its own band roll, and each halving its own input first. Two
+    problems fell out of that:
+      * ~80% of team-weeks had scrimmages=0, and that call still fired, hitting the <1 band
+        for -0.04 EVERY WEEK. A penalty for not scrimmaging, on a 1.0-wide scale.
+      * halving each source separately then rolling twice is not the same as summing once;
+        the double roll doubled the step size.
+    The halving is also gone: at realistic allocations (rebounding ~1.5 + scrimmages 1) it
+    never changed which band was selected, so it was an invisible discount that only
+    surprised anyone allocating heavily. Bands below are cut for UN-halved combined points.
+
+    Ranges re-cut 2026-08-14 for the single un-halved application (0.01 increments):
+    - 0 points:    -0.03 to -0.01
+    - 1-2 points:  +0.005 to +0.02
+    - 3-4 points:  +0.01 to +0.03
+    - 5+ points:   +0.02 to +0.05
+    At the league's typical 2-3 combined points this nets ~+0.17/season against the EOG
+    ladder's -0.35, landing near the 0.5 init instead of railing at 1.0.
     """
-    # Both technical drills and scrimmages use the same effective-point tuning.
     if points < 1:
-        increase = random.randint(-5, -3) / 100.0
+        increase = random.randint(-3, -1) / 100.0
     elif points in (1, 2):
-        increase = random.randint(3, 5) / 100.0
+        increase = random.randint(1, 4) / 200.0     # +0.005 .. +0.02
     elif points in (3, 4):
-        increase = random.randint(3, 7) / 100.0
+        increase = random.randint(1, 3) / 100.0
     else:
-        increase = random.randint(3, 10) / 100.0
+        increase = random.randint(2, 5) / 100.0
     
     final_increase = increase
     

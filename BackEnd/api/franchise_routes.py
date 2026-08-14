@@ -2500,7 +2500,7 @@ _VISION_OFFENSE = {
     "Run and Gun": (("ND", "AG"), ("FB_OFF",)),
     "Spread":      (("SH", "BH"), ("T_OFF",)),
     "Inside-Out":  (("SC", "ST"), ("T_OFF",)),
-    "Attack":      (("BH", "SC"), ("SCRIM",)),
+    "Attack":      (("BH", "SC"), ("T_OFF",)),
     "Motion":      (("PS", "SH"), ("T_OFF",)),
 }
 _VISION_DEFENSE = {
@@ -2566,6 +2566,21 @@ _FOCUS_WEEK_SHARE = 0.5                      # the dial future logic turns (desi
 # deferred opponent game-planning surface (design §6, ~75/25 identity/opponent); this is the
 # interim that stops the one-way decline without pretending vision drives them.
 _REACTIVE_INSTALLS = ("FB_DEF", "PT_OFF")
+
+# SCRIMMAGES IS UNIVERSAL, NOT AN IDENTITY CHOICE. It was installed by the Attack vision alone,
+# which meant ~80% of team-weeks ran scrimmages=0 — and 0 points is a +5..+15 shot_threshold
+# PENALTY every week (golf score: higher is worse). Measured at +191/season against an EOG
+# ladder that contributes -69, so the league drifted to the ceiling: 85% of teams above MID,
+# median 158.5 against MID 90, and the 70-110 bucket containing the 85-95 init range EMPTY.
+#
+# The EOG bands were not at fault. Their fit simulated 128,000 team-seasons and predicted mean
+# 90.0 with ZERO rails — correct for EOG in isolation, and blind to a +191 training term.
+#
+# ONE point is the equilibrium: +2.5/wk training against -2.64/wk EOG nets -4/season. Zero
+# gives +191 and two gives -212 — there is no soft landing, so this is a FIXED baseline rather
+# than a varying one like FB_DEF/PT_OFF. If it ever needs to vary, flatten the training bands
+# in _apply_shot_threshold_training first.
+_SCRIMMAGE_BASELINE = 1
 
 # VARIANCE IS THE POINT. A flat baseline would leave all 128 teams identical on exactly the two
 # attributes this is meant to un-flatten. Derived per (team, week, slot) so it varies BOTH
@@ -2759,7 +2774,12 @@ def _cpu_team_allocation(
     dfn = _VISION_DEFENSE.get(defensive_vision or "", ((), ()))
     lift_offset = int(lift_offset or 0)
 
-    # Reactive installs first — every team, no vision, varying week to week. Taken off the top
+    # Scrimmages: fixed baseline for every team, off the top. See _SCRIMMAGE_BASELINE.
+    if _SCRIMMAGE_BASELINE > 0 and spare >= _SCRIMMAGE_BASELINE:
+        _set_slot(alloc, "SCRIM", _SCRIMMAGE_BASELINE)
+        spare -= _SCRIMMAGE_BASELINE
+
+    # Reactive installs next — every team, no vision, varying week to week. Taken off the top
     # so identity spends what is left rather than these scavenging leftovers; a season proved
     # that anything relying on leftovers here gets nothing at all.
     for slot in _REACTIVE_INSTALLS:
