@@ -15112,6 +15112,9 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     training_report_data = {
         "week": week,
         "player_logs": player_logs,
+        "player_attribute_display_movements": training_report.get(
+            "player_attribute_display_movements", {}
+        ),
         "team_log": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "training_notes": _training_notes,
@@ -15654,6 +15657,9 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             "coaching_focus": report_data.get("coaching_focus", {}),
             # Support both old field names (player_changes, team_changes) and new standardized names (player_logs, team_log)
             "player_changes": report_data.get("player_logs") or report_data.get("player_changes", {}),
+            "player_attribute_display_movements": report_data.get(
+                "player_attribute_display_movements", {}
+            ),
             "team_changes": report_data.get("team_log") or report_data.get("team_changes", {}),
             "training_notes": report_data.get("training_notes", []),
             "plays_data": report_data.get("plays_data", {}),

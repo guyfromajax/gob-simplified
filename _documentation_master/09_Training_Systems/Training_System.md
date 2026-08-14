@@ -548,7 +548,8 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
   - **Attribute Order:** Attributes displayed in exact order: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM, RT
   - **Note:** MO (Momentum) is excluded from Training Report display
   - **Attribute Formatting:**
-    - **SC through FT (first 12):** Displayed as integer values
+    - **SC through FT (first 12):** Raw 0–100 anchors are displayed on the 0–10 scale with `floor(anchor / 10)`.
+    - **Weekly display-tier movement:** When the current training session moves one of those displayed values into a higher tier, the new number is green; when it moves into a lower tier, the new number is red. Values that did not cross a displayed tier retain the normal text color. The direction is saved with that week's report, so the color applies only to the report for the week in which the tier changed.
     - **NG:** Displayed with 2 decimal places (e.g., 1.00, 0.99, 0.98, 0.90)
     - **EM:** Displayed with emoji based on value:
       - >= 80: 😎 (Sunglasses)

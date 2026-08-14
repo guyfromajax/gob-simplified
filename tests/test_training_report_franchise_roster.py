@@ -16,6 +16,9 @@ def test_franchise_training_report_uses_ftd_players_for_player_list(monkeypatch)
             "training_reports": {
                 "1": {
                     "player_logs": {},
+                    "player_attribute_display_movements": {
+                        "Fresh Recruit": {"SC": 1, "SH": -1}
+                    },
                     "team_log": {},
                     "coaching_focus": {},
                     "training_notes": [],
@@ -76,3 +79,6 @@ def test_franchise_training_report_uses_ftd_players_for_player_list(monkeypatch)
     assert len(payload["players"]) == 1
     assert payload["players"][0]["id"] == recruit_player_id
     assert payload["players"][0]["name"] == "Fresh Recruit"
+    assert payload["player_attribute_display_movements"] == {
+        "Fresh Recruit": {"SC": 1, "SH": -1}
+    }

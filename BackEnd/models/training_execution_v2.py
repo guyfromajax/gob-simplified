@@ -196,6 +196,24 @@ def execute_training(
 # Player attributes excluding EM, MO, NG
 TRAINABLE_PLAYER_ATTRS = [attr for attr in ALL_ATTRS if attr not in ["EM", "MO", "NG"]]
 
+
+def training_report_display_bucket(value: Any) -> int:
+    """Return the 0-10 attribute value shown on the Training Report."""
+    try:
+        return int(float(value) // 10)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def training_report_display_movement(old_value: Any, new_value: Any) -> int:
+    """Return -1/0/1 when this session moved the displayed attribute tier."""
+    old_display = training_report_display_bucket(old_value)
+    new_display = training_report_display_bucket(new_value)
+    if new_display == old_display:
+        return 0
+    return 1 if new_display > old_display else -1
+
+
 # Player Maximizer (top 3 / attributes 4–6 / custom picks): rank by anchor; CH excluded (team chemistry not a maximizer target)
 PLAYER_MAXIMIZER_RANKING_ATTRS = tuple(a for a in TRAINABLE_PLAYER_ATTRS if a != "CH")
 
@@ -908,10 +926,12 @@ def apply_training_points(
     
     # Calculate changes for training report
     player_changes = {}
+    player_attribute_display_movements = {}
     for player in players:
         pid = player["_id"]
         name = f"{player.get('first_name', '')} {player.get('last_name', '')}".strip()
         changes = {}
+        display_movements = {}
         rem_now = player.get("training_gain_remainders", {}) or {}
         rem_base = remainder_baselines.get(pid, {})
         for attr in TRAINABLE_PLAYER_ATTRS:
@@ -925,11 +945,16 @@ def apply_training_points(
             delta = round((new_val + new_rem) - (old_val + old_rem), 2)
             if delta != 0:
                 changes[attr] = delta
+            display_movement = training_report_display_movement(old_val, new_val)
+            if display_movement:
+                display_movements[attr] = display_movement
         if changes:
             yr = player.get("year")
             if yr is not None and str(yr).strip():
                 changes["year"] = str(yr).strip().lower()
             player_changes[name] = changes
+        if display_movements:
+            player_attribute_display_movements[name] = display_movements
     
     team_changes = {}
     for attr_name in TEAM_ATTR_CLAMPS.keys():
@@ -958,6 +983,7 @@ def apply_training_points(
     
     training_report = {
         "player_changes": player_changes,
+        "player_attribute_display_movements": player_attribute_display_movements,
         "team_changes": team_changes,
         "coaching_focus": {
             "archetype": archetype,

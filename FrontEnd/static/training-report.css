@@ -235,6 +235,16 @@ input[type="reset"] {
   position: relative;
 }
 
+body.training-report-page .players-table td.attribute-display-increase {
+  color: #34EC27;
+  font-weight: 700;
+}
+
+body.training-report-page .players-table td.attribute-display-decrease {
+  color: #ff6d6d;
+  font-weight: 700;
+}
+
 .attribute-tooltip {
   position: fixed;
   display: none;

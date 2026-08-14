@@ -1009,7 +1009,9 @@ function renderPlayersTable() {
         const value = player.attributes[attr] || (attr === 'NG' ? 1.0 : attr === 'EM' ? 50 : attr === 'MO' ? 0 : 0);
         const changes = reportData.player_changes[player.name] || {};
         const change = changes[attr] || 0;
-        row.appendChild(createAttributeCell(attr, value, change));
+        const displayMovements = reportData.player_attribute_display_movements?.[player.name] || {};
+        const displayMovement = Number(displayMovements[attr]) || 0;
+        row.appendChild(createAttributeCell(attr, value, change, displayMovement));
       });
     } else {
       // Show changes for this player (0 if no change)
@@ -1063,7 +1065,7 @@ function createCell(text) {
   return td;
 }
 
-function createAttributeCell(attr, value, change) {
+function createAttributeCell(attr, value, change, displayMovement = 0) {
   const td = document.createElement('td');
   td.className = 'attribute-value-cell';
 
@@ -1106,6 +1108,11 @@ function createAttributeCell(attr, value, change) {
           : 0;
     const displayValue = Number.isFinite(raw) ? Math.floor(raw / 10) : 0;
     td.textContent = String(displayValue);
+    if (displayMovement > 0) {
+      td.classList.add('attribute-display-increase');
+    } else if (displayMovement < 0) {
+      td.classList.add('attribute-display-decrease');
+    }
     attachChangeTooltip();
   }
   
