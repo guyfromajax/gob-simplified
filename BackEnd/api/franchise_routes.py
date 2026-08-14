@@ -2504,7 +2504,11 @@ _VISION_OFFENSE = {
     "Motion":      (("PS", "SH"), ("T_OFF",)),
 }
 _VISION_DEFENSE = {
-    "Full-Court Press": (("ND",),       ("PT_DEF", "PT_OFF")),
+    # PT_OFF deliberately NOT here. It trains pt_opp_modifier — the ability to handle BEING
+    # pressed — and was attached to this vision only because both live under `presses_traps`.
+    # A press team needs press-break offence no more than anyone else, arguably less. Reactive
+    # attributes get the baseline below instead. See _REACTIVE_INSTALLS.
+    "Full-Court Press": (("ND",),       ("PT_DEF",)),
     "Man Lockdown":     (("OD", "ID"),  ("T_DEF",)),
     "Zone":             (("ID", "IQ"),  ("T_DEF",)),
     "Multiple":         (("ID", "OD"),  ("T_DEF",)),
@@ -2527,6 +2531,31 @@ _FOCUS_WEEK_SHARE = 0.5                      # the dial future logic turns (desi
 #
 # Same budget, ~+0.12/player/focus-week, and the team still has one sharp, legible emphasis.
 # Camp is exempt (it skips decay and runs at 0.70, so every allocation gains there).
+# ── Reactive attributes — every team, no vision ──────────────────────────────────────────
+# fb_opp_modifier and pt_opp_modifier are REACTIVE: they measure how a team handles what the
+# OPPONENT does to it, not what it chooses to do. The engine reads them that way
+# (fb_opp_modifier off the DEFENDING team in the fast-break resolver, pt_opp_modifier off the
+# OFFENSE to resist turnovers under pressure) and so does the EOG band, which scores
+# fb_opp_modifier on `opponent_fb_volume`.
+#
+# Vision has nothing to say about them. Tying PT_OFF to Full-Court Press was pattern-matching
+# on the `presses_traps` prefix, and FB_DEF had no vision to pattern-match onto at all — so it
+# went UNINSTALLED BY EVERY TEAM for a whole season. Measured end of season: fb_opp_modifier
+# had ZERO teams above +17 and a mean of -10.8, the only attribute with no upside. EOG pushed
+# it down every week and nothing pushed it back.
+#
+# So both get a baseline install for every team, independent of identity. They belong to the
+# deferred opponent game-planning surface (design §6, ~75/25 identity/opponent); this is the
+# interim that stops the one-way decline without pretending vision drives them.
+_REACTIVE_INSTALLS = ("FB_DEF", "PT_OFF")
+
+# VARIANCE IS THE POINT. A flat baseline would leave all 128 teams identical on exactly the two
+# attributes this is meant to un-flatten. Weights over 0-3 points (mean 1.43): measured across
+# 128 teams x 25 weeks it lands 0pt 14% / 1pt 43% / 2pt 28% / 3pt 15% — most weeks a little,
+# some weeks nothing, occasionally a lot. Derived per (team, week, slot) so it varies BOTH
+# across teams within a week and across weeks for one team, and replays identically.
+_REACTIVE_BASELINE_WEIGHTS = (0, 1, 1, 1, 2, 2, 3)
+
 _FOCUS_SKILL_COUNT = 1
 _FOCUS_BUCKET3_LIFT = {"ND": 2, "IQ": 2}
 
@@ -2562,6 +2591,20 @@ def _is_focus_week(franchise_id, team_id, season: int, week: int) -> bool:
     return (n % 1000) < int(_FOCUS_WEEK_SHARE * 1000)
 
 
+def _reactive_baseline(franchise_id, team_id, season: int, week: int, slot: str) -> int:
+    """Points this team puts into a reactive install this week. Derived, not drawn.
+
+    Same replay reasoning as _cpu_weekly_coaching_focus: pool workers each seed their own
+    training_rng, so a draw would depend on which worker claimed the team. Salted per slot so
+    a team's fast-break defence and press-break offence vary independently of each other.
+    """
+    import hashlib
+
+    key = f"reactive:{franchise_id}:{team_id}:{season}:{week}:{slot}".encode("utf-8")
+    n = int.from_bytes(hashlib.sha256(key).digest()[:8], "big")
+    return _REACTIVE_BASELINE_WEIGHTS[n % len(_REACTIVE_BASELINE_WEIGHTS)]
+
+
 def _set_slot(alloc: dict, slot: str, value: int) -> None:
     path = _SLOT[slot]
     node = alloc[path[0]]
@@ -2585,6 +2628,7 @@ def _cpu_team_allocation(
     defensive_vision: str | None = None,
     team_attrs: dict | None = None,
     focus_week: bool = True,
+    reactive_baseline: dict | None = None,
 ) -> dict:
     """One team-wide plan for a CPU team — the same shape a user submits.
 
@@ -2617,6 +2661,19 @@ def _cpu_team_allocation(
 
     off = _VISION_OFFENSE.get(offensive_vision or "", ((), ()))
     dfn = _VISION_DEFENSE.get(defensive_vision or "", ((), ()))
+
+    # Reactive installs first — every team, no vision, varying week to week. Taken off the top
+    # so identity spends what is left rather than these scavenging leftovers; a season proved
+    # that anything relying on leftovers here gets nothing at all.
+    for slot in _REACTIVE_INSTALLS:
+        pts = reactive_baseline.get(slot, 0) if reactive_baseline else 0
+        if pts <= 0:
+            continue
+        cap = 5 * _install_weight(team_attrs or {}, slot)
+        pts = min(pts, int(cap))            # saturated? do not spend into the clamp
+        if 0 < pts <= spare:
+            _set_slot(alloc, slot, pts)
+            spare -= pts
 
     if focus_week:
         # Dedupe: Zone+Man Lockdown both name ID, and paying twice for one slot would silently
@@ -2904,6 +2961,12 @@ def auto_train_one_cpu_team(
         focus_week=_is_focus_week(
             franchise_id, team_id, int((ftd_doc.get("season") or 1)), int(week)
         ),
+        reactive_baseline={
+            slot: _reactive_baseline(
+                franchise_id, team_id, int((ftd_doc.get("season") or 1)), int(week), slot
+            )
+            for slot in _REACTIVE_INSTALLS
+        },
     )
     with quiet_training_engine_logs():
         up, updated_team, updated_plays, updated_scouting, training_report = execute_training(
