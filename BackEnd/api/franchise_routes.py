@@ -2789,7 +2789,14 @@ def auto_train_one_cpu_team(
         return {"status": "skipped_already_trained", "team_id": str(team_id), "week": week}
 
     if seed is not None:
+        # BOTH streams. `random` here is the GLOBAL module, but the training engine draws from
+        # `training_rng` (BackEnd/utils/training_random) — so seeding only the global one left
+        # every gain roll unseeded and this argument's reproducibility claim false. It also made
+        # paired A/B of allocations impossible: two arms for the same team drew different rolls,
+        # giving per-team deltas an sd of ~2.6 that buried the ~0.3 effects being measured.
         random.seed(seed)
+        from BackEnd.utils import training_random
+        training_random.seed(seed)
 
     team_player_ids = ftd_doc.get("players") or []
     if fpd_by_player_id is None:
