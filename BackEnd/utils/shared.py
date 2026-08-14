@@ -1180,7 +1180,13 @@ def resolve_offensive_rebound(game, rebounder):
             defender_distance=nearest_distance,
             contest_factor=putback_proximity_factor,
         )
-        rebounder.record_stat("FGA")
+        from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
+
+        record_official_field_goal_attempt(
+            rebounder,
+            made=made,
+            shooting_foul=bool(d_foul),
+        )
 
         # Shot_Result_List: record make (True) / clean miss (False); skip a miss
         # that drew a shooting foul (Player_Momentum_System.md).

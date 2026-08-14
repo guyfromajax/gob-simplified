@@ -346,6 +346,7 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         get_name_safe,
         increment_no_defender_shot_breakdown,
     )
+    from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
     from BackEnd.constants.shot_variants import (
         SHOT_VARIANT_AIRBALL,
         select_shot_variant,
@@ -601,8 +602,13 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
     rebounder_pid: Optional[str] = None
     rebound_ball_spot: Optional[Dict[str, float]] = None
     rebound_attemptors: Optional[Dict[str, List[str]]] = None
+    record_official_field_goal_attempt(
+        stealer,
+        made=made,
+        shooting_foul=bool(d_foul),
+        is_three=is_three,
+    )
     if made:
-        stealer.record_stat("FGA")
         apply_scoring(game, off_team, stealer, 2, ["FGM"])
         # Fast-break make stat policy (parity with shot_manager FB path):
         # FB_PTS for any fast-break make, POT because After Steal is always
@@ -614,7 +620,6 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         )
         possession_flips = not has_and_one
     else:
-        stealer.record_stat("FGA")
         # MISS path. Foul-on-miss goes straight to FT; non-foul miss
         # resolves the rebound chain here so the next turn is a proper
         # OREB (putback / kickout decision made in resolve_offensive_rebound)

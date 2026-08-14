@@ -135,6 +135,7 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         get_name_safe,
         increment_no_defender_shot_breakdown,
     )
+    from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
     from BackEnd.constants.shot_variants import (
         SHOT_VARIANT_AIRBALL,
         select_shot_variant,
@@ -342,13 +343,17 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
     rebound_attemptors: Optional[Dict[str, List[str]]] = None
     # Shot diagnostics: HCT fast-break drive is always a 2pt at-rim attempt.
     record_shot_split(game, is_three=is_three, defended=contested, made=made, turn_type="HCT")
+    record_official_field_goal_attempt(
+        shooter,
+        made=made,
+        shooting_foul=bool(d_foul),
+        is_three=is_three,
+    )
     if made:
-        shooter.record_stat("FGA")
         apply_scoring(game, off_team, shooter, 2, ["FGM"])
         text_outcome = "and scores, gets fouled!" if has_and_one else "and finishes!"
         possession_flips = not has_and_one
     else:
-        shooter.record_stat("FGA")
         possession_flips = False
         if not d_foul:
             if shot_variant == SHOT_VARIANT_AIRBALL:
@@ -764,6 +769,7 @@ def _finalize_ab_shot(
         determine_rebounder,
         get_name_safe,
     )
+    from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
     from BackEnd.constants.shot_variants import (
         SHOT_VARIANT_AIRBALL,
         select_shot_variant,
@@ -861,17 +867,17 @@ def _finalize_ab_shot(
     rebound_attemptors: Optional[Dict[str, List[str]]] = None
     # Shot diagnostics: HCT attack-basket shot (can be 2pt or 3pt).
     record_shot_split(game, is_three=is_three, defended=contested, made=made, turn_type="HCT")
+    record_official_field_goal_attempt(
+        shooter,
+        made=made,
+        shooting_foul=bool(d_foul),
+        is_three=is_three,
+    )
     if made:
-        shooter.record_stat("FGA")
-        if is_three:
-            shooter.record_stat("3PTA")
         apply_scoring(game, off_team, shooter, 3 if is_three else 2, ["FGM", "3PTM"] if is_three else ["FGM"])
         text_outcome = "and scores, gets fouled!" if has_and_one else "and scores!"
         possession_flips = not has_and_one
     else:
-        shooter.record_stat("FGA")
-        if is_three:
-            shooter.record_stat("3PTA")
         possession_flips = False
         if not d_foul:
             if shot_variant == SHOT_VARIANT_AIRBALL:

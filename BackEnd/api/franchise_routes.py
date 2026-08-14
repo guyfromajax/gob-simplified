@@ -2520,7 +2520,25 @@ _VISION_DEFENSE = {
 # that fit 2 points is still below break-even in-season. ND/IQ/FT are fit 1.00 so they hold at
 # 1 — which is the whole reason the roster mode exists. Design §3.3.
 _EMPHASIS_POINTS = 3
-_ROSTER_LIFT = {"ND": 3, "IQ": 3, "FT": 2}   # roster week: Bucket 3, reaches every player
+# ROSTER-WEEK LIFT — spread across ALL TWELVE player attributes, rotating, NOT parked on
+# ND/IQ/FT.
+#
+# The first version lifted ND3/IQ3/FT2: 8 points onto the three attributes that are fit 1.00
+# for every position. It was the point-efficient choice and it worked exactly as intended,
+# which turned out to be the problem. Measured over a full 26-week season (1,523 players):
+#
+#   ND +15.33  IQ +14.03  FT +8.66     100% / 100% / 99% of players UP
+#   the nine skills  -1.27 to -2.84     only 30-40% of players up
+#
+# Roster weeks were handing every skill exactly 1 point — the bare floor, below the
+# minimum-fit line for most classes — while the three universals sat at 2.67 each. Chasing
+# efficiency meant only the already-winning attributes ever won.
+#
+# Now the same lift points rotate across all twelve, so per-attribute allocation is equal in
+# expectation (~1.4 each) instead of 2.67 vs 1.00. Skills still do not fully hold at that level
+# — that needs the in-season economy, which is the player-development system's lever, not this
+# one — but the allocation is no longer the cause.
+_ROSTER_LIFT_POINTS = 5      # what ND3/IQ3/FT2 used to cost; unchanged, just redistributed
 _FOCUS_WEEK_SHARE = 0.5                      # the dial future logic turns (design §3.4)
 
 # ONE skill emphasis per focus week, not two. Measured live over weeks 5-6 (1,536 vs 1,512
@@ -2557,7 +2575,7 @@ _REACTIVE_INSTALLS = ("FB_DEF", "PT_OFF")
 _REACTIVE_BASELINE_WEIGHTS = (0, 1, 1, 1, 2, 2, 3)
 
 _FOCUS_SKILL_COUNT = 1
-_FOCUS_BUCKET3_LIFT = {"ND": 2, "IQ": 2}
+_FOCUS_LIFT_POINTS = 2       # was ND2/IQ2; same points, now rotated like the roster lift
 
 # Saturation taper. The clamp already makes a maxed attribute gain nothing, so this only stops
 # WASTING points on it. Allocation-side only — no engine change, EOG bands undisturbed.
@@ -2605,6 +2623,35 @@ def _reactive_baseline(franchise_id, team_id, season: int, week: int, slot: str)
     return _REACTIVE_BASELINE_WEIGHTS[n % len(_REACTIVE_BASELINE_WEIGHTS)]
 
 
+# The twelve player-attribute slots the rotating lift walks. Order is fixed; the STARTING
+# POINT rotates per (team, week), so across a season every attribute gets the same share.
+_LIFT_SLOTS = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "FT", "IQ")
+
+
+def _apply_rotating_lift(alloc: dict, points: int, spare: int, offset: int) -> int:
+    """Spend ``points`` lifting player attributes by +1 each, starting at ``offset``.
+
+    Rotating rather than fixed is the whole point. A fixed lift on ND/IQ/FT was
+    point-efficient — they are fit 1.00 for every position — and that is exactly why it
+    produced a season where those three rose 99-100% of the time and the nine skills fell
+    for two thirds of players. Efficiency alone concentrates every gain on whatever is
+    already winning.
+
+    Caps each slot at 3 so a lift cannot quietly become an emphasis, and never pushes a slot
+    past the 5-point slider ceiling.
+    """
+    n = len(_LIFT_SLOTS)
+    for i in range(n):
+        if points <= 0 or spare <= 0:
+            break
+        slot = _LIFT_SLOTS[(offset + i) % n]
+        if _get_slot(alloc, slot) < 3:
+            _set_slot(alloc, slot, _get_slot(alloc, slot) + 1)
+            points -= 1
+            spare -= 1
+    return spare
+
+
 def _set_slot(alloc: dict, slot: str, value: int) -> None:
     path = _SLOT[slot]
     node = alloc[path[0]]
@@ -2629,6 +2676,7 @@ def _cpu_team_allocation(
     team_attrs: dict | None = None,
     focus_week: bool = True,
     reactive_baseline: dict | None = None,
+    lift_offset: int = 0,
 ) -> dict:
     """One team-wide plan for a CPU team — the same shape a user submits.
 
@@ -2661,6 +2709,7 @@ def _cpu_team_allocation(
 
     off = _VISION_OFFENSE.get(offensive_vision or "", ((), ()))
     dfn = _VISION_DEFENSE.get(defensive_vision or "", ((), ()))
+    lift_offset = int(lift_offset or 0)
 
     # Reactive installs first — every team, no vision, varying week to week. Taken off the top
     # so identity spends what is left rather than these scavenging leftovers; a season proved
@@ -2688,20 +2737,9 @@ def _cpu_team_allocation(
             if 0 < cost <= spare:
                 _set_slot(alloc, slot, _EMPHASIS_POINTS)
                 spare -= cost
-        # Whatever a narrower emphasis frees goes to Bucket 3, NOT to a second skill. ND/IQ are
-        # fit 1.00 for every position while skills average 0.56, so 2 points here are worth
-        # ~1.8x the same 2 points on a second skill emphasis — measured, see design §3.4.
-        for slot, val in _FOCUS_BUCKET3_LIFT.items():
-            cost = val - _get_slot(alloc, slot)
-            if 0 < cost <= spare:
-                _set_slot(alloc, slot, val)
-                spare -= cost
+        spare = _apply_rotating_lift(alloc, _FOCUS_LIFT_POINTS, spare, lift_offset)
     else:
-        for slot, val in _ROSTER_LIFT.items():
-            cost = val - _get_slot(alloc, slot)
-            if 0 < cost <= spare:
-                _set_slot(alloc, slot, val)
-                spare -= cost
+        spare = _apply_rotating_lift(alloc, _ROSTER_LIFT_POINTS, spare, lift_offset)
 
     # Remaining points to this vision pair's installs. The taper is a per-slot CAP, not just
     # an on/off filter: weight 1.0 allows the full 5, 0.67 allows 3, 0.33 allows 1, 0.0 drops
@@ -2967,6 +3005,11 @@ def auto_train_one_cpu_team(
             )
             for slot in _REACTIVE_INSTALLS
         },
+        # Rotate the lift start per (team, week) so every attribute gets its turn across a
+        # season, and no two teams lift the same set in the same week.
+        lift_offset=_reactive_baseline(
+            franchise_id, team_id, int((ftd_doc.get("season") or 1)), int(week), "lift"
+        ) * 7 + int(week),
     )
     with quiet_training_engine_logs():
         up, updated_team, updated_plays, updated_scouting, training_report = execute_training(

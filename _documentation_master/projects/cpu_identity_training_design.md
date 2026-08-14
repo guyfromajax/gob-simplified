@@ -167,11 +167,30 @@ and the split becomes the single dial future logic turns.
 > team keeps one sharp, legible emphasis. Camp is exempt — it skips decay and runs at 0.70, so
 > every allocation gains there.
 
-**ROSTER WEEK — efficient, reaches everyone**
+**ROSTER WEEK — reaches everyone**
 
 * 12 floors at 1
-* ND / IQ / FT lifted
+* a **rotating +1 lift across all twelve** player attributes, starting point derived per
+  (team, week)
 * the vision's team installs
+
+> **REVISED 2026-08-14 after a measured season.** The lift used to be fixed on ND/IQ/FT — the
+> point-efficient choice, since those three are fit 1.00 for every position. It worked exactly
+> as designed, which was the problem. Over 26 weeks (1,523 players):
+>
+> | | cumulative | % of players up |
+> |---|--:|--:|
+> | ND / IQ / FT | +15.3 / +14.0 / +8.7 | **100 / 100 / 99%** |
+> | the nine skills | −1.3 to −2.8 | **30–40%** |
+>
+> Roster weeks gave every skill exactly **1 point — the bare floor** — while the three
+> universals sat at **2.67**. Chasing point-efficiency meant only the already-winning
+> attributes ever won. Rotating the same lift points across all twelve makes per-attribute
+> allocation equal in expectation: **1.38 vs 1.37, a ratio of 0.99x where it was 2.02x**.
+>
+> Skills still do not fully hold at ~1.4 points — that needs the in-season economy
+> (`IN_SEASON_GAIN_SCALE`, decay ranges, `TRAINING_GAIN_PERCENTAGES`), which belongs to the
+> player-development system. **The allocation is no longer the cause.**
 
 **Split: 50/50 for now.** Later driven by team performance, roster makeup, star-player form and
 the upcoming opponent — one number, many inputs, which is why it is worth isolating now.

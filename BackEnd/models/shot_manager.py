@@ -76,6 +76,7 @@ from BackEnd.utils.shared import (
     increment_motion_attack_shot_tracker,
     format_motion_attack_shot_tracker,
 )
+from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
 from BackEnd.engine.shot_micro_movements import resolve_contest, select_and_stamp_shot_micro
 from BackEnd.utils.defense_utils import (
     defender_player_from_random_slot_fallback,
@@ -1245,9 +1246,12 @@ class ShotManager:
                             self.game_state["one_and_one"] = False
                         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
                         block_recon_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team, perform_removal=False)
-                        shooter.record_stat("FGA")
-                        if is_three:
-                            shooter.record_stat("3PTA")
+                        record_official_field_goal_attempt(
+                            shooter,
+                            made=made_from_foul,
+                            shooting_foul=True,
+                            is_three=is_three,
+                        )
                         # Shot diagnostics (block-recon AND-1 path is always defended).
                         self._record_shot_diagnostics(
                             roles, off_lineup, shot_step_index,
@@ -1707,9 +1711,12 @@ class ShotManager:
                 self.game_state.get("offensive_state"),
                 shot_type,
             )
-        shooter.record_stat("FGA")
-        if is_three:
-            shooter.record_stat("3PTA")
+        record_official_field_goal_attempt(
+            shooter,
+            made=made,
+            shooting_foul=bool(d_foul),
+            is_three=is_three,
+        )
 
         # Shot diagnostics: 2/3pt × defended/undefended × make/miss, + FGA by turn type.
         self._record_shot_diagnostics(

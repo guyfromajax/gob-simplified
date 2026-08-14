@@ -61,8 +61,10 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 **Player-Level Stats:**
 
 **Standard Stats Tracked:**
-- **FGA** (Field Goal Attempts): Incremented for shooter on all shot attempts
-- **3PTA** (Three-Point Attempts): Incremented for shooter if shot is a three-pointer
+- **FGA** (Field Goal Attempts): Incremented for makes and for misses without a
+  shooting foul. A miss with a shooting foul is not an attempt; an and-one make is.
+- **3PTA** (Three-Point Attempts): Uses the same official-attempt rule when the
+  shot is a three-pointer.
 - **FGM** (Field Goals Made): Incremented for shooter when shot is made (via `apply_scoring()`)
 - **3PTM** (Three-Pointers Made): Incremented for shooter when three-pointer is made (via `apply_scoring()`)
 - **PTS** (Points): Automatically calculated from FGM, 3PTM, FTM
@@ -183,7 +185,8 @@ The Statistics System tracks comprehensive player-level and team-level statistic
 - **OREB** (Offensive Rebounds): Incremented for rebounder when offensive rebound is secured
 - **DREB** (Defensive Rebounds): Incremented for rebounder when defensive rebound is secured
 - **REB** (Total Rebounds): Automatically calculated as `OREB + DREB`
-- **FGA** (Field Goal Attempts): Incremented for rebounder on putback attempts
+- **FGA** (Field Goal Attempts): Incremented for putback makes and clean misses,
+  but not for a putback miss accompanied by a shooting foul
 - **FGM** (Field Goals Made): Incremented for rebounder when putback is made (via `apply_scoring()`)
 - **PTS** (Points): Automatically calculated from FGM, 3PTM, FTM
 - **PIP** (Points in Paint): Incremented for rebounder when putback is made (always 2 points, putbacks are from paint)

@@ -36,6 +36,7 @@ from BackEnd.engine.phase_resolution import (
 )
 from BackEnd.utils.fb_geo_helpers import stamp_fb_miss_bounce_coords
 from BackEnd.utils.shared import apply_scoring, get_name_safe
+from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
 
 
 def _rendered_starts_by_pos(
@@ -422,14 +423,17 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
         made = shot["made"]
         d_foul = shot["d_foul"]
         rebound_type = rebound_ball_spot = rebound_attemptors = rebounder_pid = None
+        record_official_field_goal_attempt(
+            shooter,
+            made=made,
+            shooting_foul=bool(d_foul),
+        )
         if made:
-            shooter.record_stat("FGA")
             apply_scoring(game, off_team, shooter, 2, ["FGM"])
             shooter.record_stat("FB_PTS", amount=2)
             text_tail = "and scores!"
             possession_flips = not shot["has_and_one"]
         else:
-            shooter.record_stat("FGA")
             possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid = (
                 _resolve_rebound_on_miss(
                     game=game,
@@ -522,8 +526,12 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
     d_foul = shot["d_foul"]
     pressure_type = None
     rebound_type = rebound_ball_spot = rebound_attemptors = rebounder_pid = None
+    record_official_field_goal_attempt(
+        ball_handler,
+        made=made,
+        shooting_foul=bool(d_foul),
+    )
     if made:
-        ball_handler.record_stat("FGA")
         apply_scoring(game, off_team, ball_handler, 2, ["FGM"])
         ball_handler.record_stat("FB_PTS", amount=2)
         text_tail = "and finishes!"
@@ -535,7 +543,6 @@ def resolve_covert_release_fast_break(game: Any) -> Dict[str, Any]:
                 pressure_type = "HCO"
             game_state["offensive_state"] = pressure_type or "HCO"
     else:
-        ball_handler.record_stat("FGA")
         possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid = (
             _resolve_rebound_on_miss(
                 game=game,

@@ -173,8 +173,9 @@
    - if calibration roll triggers: made = False
 
 11. Record Shot Attempt Stats
-    - shooter.record_stat("FGA")
-    - if is_three: shooter.record_stat("3PTA")
+    - Record `FGA` (and `3PTA` for a three) for a make or a miss without a shooting foul.
+    - A missed shot with a shooting foul records neither `FGA` nor `3PTA`.
+    - A made shot with a shooting foul is an and-one and records the attempt normally.
 
 12. Final Result
     - result["result_type"] = "MAKE" if made else "MISS"
@@ -308,7 +309,8 @@ sum(shooter_attrs[attr] * (weight / 10) for attr, weight in shot_type_weights.it
 - If d_foul: 3pt=40% miss chance, 2pt=20% miss chance
 
 #### Step 11: Record Stats
-- `shooter.record_stat("FGA")`, `shooter.record_stat("3PTA")` if is_three
+- Use the official-attempt rule: record `FGA` / applicable `3PTA` unless the shot
+  misses with a shooting foul. And-one makes still count as attempts.
 
 #### Step 12: Final Result
 - If made: Record FGM, 3PTM, PIP, AST, SCR_S, set up AND-1 if d_foul

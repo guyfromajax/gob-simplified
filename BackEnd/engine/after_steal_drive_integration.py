@@ -713,6 +713,7 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
     """After-steal FB via unified ``resolve_fb_drive_step`` (Phase 2)."""
     from BackEnd.engine.shot_micro_movements import select_and_stamp_shot_micro
     from BackEnd.utils.shared import apply_scoring, get_name_safe
+    from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
 
     game_state = game.game_state
     off_team = game.offense_team
@@ -1006,15 +1007,18 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
         )
         made = shot["made"]
         d_foul = shot["d_foul"]
+        record_official_field_goal_attempt(
+            shooter,
+            made=made,
+            shooting_foul=bool(d_foul),
+        )
         if made:
-            shooter.record_stat("FGA")
             apply_scoring(game, off_team, shooter, 2, ["FGM"])
             shooter.record_stat("FB_PTS", amount=2)
             shooter.record_stat("POT", amount=2)
             text_tail = "and scores, gets fouled!" if shot["has_and_one"] else "and hits the pull-up!"
             possession_flips = not shot["has_and_one"]
         else:
-            shooter.record_stat("FGA")
             possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid = (
                 _resolve_rebound_on_miss(
                     game=game,
@@ -1121,8 +1125,12 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
     )
     made = shot["made"]
     d_foul = shot["d_foul"]
+    record_official_field_goal_attempt(
+        stealer,
+        made=made,
+        shooting_foul=bool(d_foul),
+    )
     if made:
-        stealer.record_stat("FGA")
         apply_scoring(game, off_team, stealer, 2, ["FGM"])
         stealer.record_stat("FB_PTS", amount=2)
         stealer.record_stat("POT", amount=2)
@@ -1136,7 +1144,6 @@ def resolve_after_steal_with_drive_resolution(game: Any) -> Dict[str, Any]:
                 pressure_type = "HCO"
             game_state["offensive_state"] = pressure_type or "HCO"
     else:
-        stealer.record_stat("FGA")
         possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid = (
             _resolve_rebound_on_miss(
                 game=game,
