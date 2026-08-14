@@ -107,7 +107,7 @@ def _block_reconciliation_threshold(defensive_efficiency):
     """Return the block-band ceiling using the normalized core-8 team value."""
     return (
         BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE
-        - core8_gameplay(defensive_efficiency)
+        + core8_gameplay(defensive_efficiency)
     )
 
 
@@ -121,9 +121,9 @@ def _calculate_defense_block_score(
     """Calculate the defensive reconciliation score from one already-drawn roll."""
     return (
         scaled_height * 0.4
-        - inside_defense * 0.4
-        - iq * 0.2
-        - core8_gameplay(defensive_efficiency)
+        + inside_defense * 0.4
+        + iq * 0.2
+        + core8_gameplay(defensive_efficiency)
     ) * multiplier
 
 

@@ -63,3 +63,43 @@ body {
   background: rgba(52, 236, 39, 0.14);
   color: #d9ffd6;
 }
+
+.gob-modal-actions[hidden] {
+  display: none;
+}
+
+/* Same green pulse bar as page-load overlays (pageLoadOverlay.js). */
+.cut-modal-pulse {
+  display: flex;
+  justify-content: center;
+  padding: 0 28px 24px;
+}
+
+.cut-modal-pulse[hidden] {
+  display: none;
+}
+
+.cut-modal-pulse-indicator {
+  width: min(220px, 100%);
+  height: 8px;
+  margin: 0 auto;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.cut-modal-pulse-indicator span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(52, 236, 39, 0.35), #34EC27 48%, rgba(52, 236, 39, 0.45));
+  transform-origin: left center;
+  animation: cutModalPulseBar 1.2s ease-in-out infinite;
+}
+
+@keyframes cutModalPulseBar {
+  0%, 100% { opacity: 0.5; transform: scaleX(0.35); }
+  50% { opacity: 1; transform: scaleX(1); }
+}

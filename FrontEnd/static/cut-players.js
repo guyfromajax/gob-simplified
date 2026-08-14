@@ -49,14 +49,22 @@
     var title = document.getElementById('cut-modal-title');
     var message = document.getElementById('cut-modal-message');
     var actions = document.getElementById('cut-modal-actions');
+    var pulse = document.getElementById('cut-modal-pulse');
     title.textContent = config.title || 'Assign Practice Squad';
     message.textContent = config.message || '';
     if (accent) {
       accent.className = 'gob-modal-accent';
       accent.classList.add(config.accent || 'is-red');
     }
+    if (pulse) {
+      var showPulse = !!config.pulse;
+      pulse.hidden = !showPulse;
+      pulse.setAttribute('aria-hidden', showPulse ? 'false' : 'true');
+    }
     actions.innerHTML = '';
-    (config.actions || []).forEach(function (action) {
+    var actionList = config.actions || [];
+    actions.hidden = actionList.length === 0;
+    actionList.forEach(function (action) {
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = action.variant === 'gob-modal-btn-primary'
@@ -272,6 +280,7 @@
               title: 'Assigning Practice Squad',
               message: 'Saving your practice squad assignment…',
               accent: 'is-green',
+              pulse: true,
               actions: []
             });
             fetch(API_CONFIG.buildUrl('/franchise/cut-players'), {

@@ -135,11 +135,11 @@ BLOCK_PROBABILITY = {
 
 # Block reconciliation (blocks on shot attempts): diff = shot_score_pre_defense - defense_block_score
 # If diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD → shooting foul; if diff <
-# (BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE - normalized defensive_efficiency) → block;
+# (BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE + normalized defensive_efficiency) → block;
 # else → standard shot.
 # Thresholds are independent: adjust either without affecting the other.
 BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 150
-BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE = 40
+BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE = 70
 # Block attempt roll: y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX); attempt when y <= aggression
 BLOCK_Y_ROLL_MIN = 0
 BLOCK_Y_ROLL_MAX = 4

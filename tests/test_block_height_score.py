@@ -36,12 +36,12 @@ def test_height_to_block_score_ascends_and_clamps(height, expected):
 
 
 def test_block_reconciliation_threshold_base_is_recalibrated():
-    assert BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE == 40
+    assert BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE == 70
 
 
 @pytest.mark.parametrize(
     ("stored_defensive_efficiency", "expected"),
-    [(20, 30), (0, 40), (-20, 50)],
+    [(20, 80), (0, 70), (-20, 60)],
 )
 def test_block_reconciliation_threshold_uses_normalized_defensive_efficiency(
     stored_defensive_efficiency,
@@ -50,6 +50,6 @@ def test_block_reconciliation_threshold_uses_normalized_defensive_efficiency(
     assert _block_reconciliation_threshold(stored_defensive_efficiency) == expected
 
 
-def test_defense_block_score_uses_requested_subtractive_composite():
+def test_defense_block_score_uses_requested_additive_composite():
     # Stored core-8 +10 normalizes to gameplay +5 before entering the formula.
-    assert _calculate_defense_block_score(50, 8, 6, 10, 4) == pytest.approx(42.4)
+    assert _calculate_defense_block_score(50, 8, 6, 10, 4) == pytest.approx(117.6)

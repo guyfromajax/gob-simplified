@@ -236,7 +236,7 @@ middle band falls back to ordinary shot resolution. The two outcome thresholds a
 
 | Constant / variable | File | Value | Effect |
 |---|---|---|---|
-| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE` | constants/__init__.py | `40` | The live block threshold is `40 - normalized defensive_efficiency`; reconciliation blocks when `diff` is below it. |
+| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE` | constants/__init__.py | `70` | The live block threshold is `70 + normalized defensive_efficiency`; reconciliation blocks when `diff` is below it. |
 | `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` | constants/__init__.py | `150` | A reconciliation creates a shooting foul when `diff > 150`. Independent of the block threshold. |
 | `BLOCK_Y_ROLL_MIN` / `BLOCK_Y_ROLL_MAX` | constants/__init__.py | `0 / 4` | First trigger rolls this inclusive range against defensive aggression; `roll <= aggression` reaches reconciliation. Default aggression 2 therefore passes 60%. |
 | Defensive `aggression` | team strategy | `0–4` | First-trigger comparison value. Higher aggression sends more eligible shots into reconciliation. Slow-It-Down can temporarily force this to 0. |
@@ -244,7 +244,7 @@ middle band falls back to ordinary shot resolution. The two outcome thresholds a
 | Defensive `fight` | team attribute | normalized gameplay value | Second-trigger comparison value; `core8_gameplay()` normalizes the stored core-8 value before comparison. Higher fight produces more reconciliation attempts. |
 | `BLOCK_PLAYER_ROLL_MIN` / `BLOCK_PLAYER_ROLL_MAX` | constants/__init__.py | `1 / 300` | Third trigger, after aggression and fight miss, rolls against `defender ID + normalized defensive_efficiency × height_rating`. Lowering the maximum increases individual rim-protector attempts. |
 | Height rating (`height_to_block_score`) | shared.py | `≤75→0`, `h−75`, `≥85→10` (offsets from `LEAGUE_MEDIAN_HEIGHT_IN`=75; 1 pt/inch — rides the median automatically) | Feeds both the third attempt trigger and reconciliation. In reconciliation it becomes `height_rating × 10 + randint(-9,9)` and receives 40% weight. (Now median 75 after the 2026-08 HS shifts −1 then −2; the code uses the constant, so it moved on its own.) |
-| Defender block composite | shot_manager.py | `(scaled height × 40% - ID × 40% - IQ × 20% - normalized defensive_efficiency) × randint(1,6)` | Determines `defense_block_score` under the August 2026 block-volume tuning. Core-8 defensive efficiency is normalized before both this calculation and the dynamic threshold calculation. |
+| Defender block composite | shot_manager.py | `(scaled height × 40% + ID × 40% + IQ × 20% + normalized defensive_efficiency) × randint(1,6)` | Determines `defense_block_score` under the August 2026 block-volume tuning. Core-8 defensive efficiency is normalized before both this calculation and the dynamic threshold calculation. |
 | Contest-result eligibility | shot_micro_movements constants | `neutral` or `defense_win`; boundaries `±150` | `offense_win` shots do not enter the block funnel. Changing contest boundaries changes the eligible population. |
 | Shooter finish threshold | shot_manager.py | `250` | When reconciliation lands in the foul band, shooter finish score above 250 makes the basket for an and-one. Does not affect block volume. |
 | `MO_BLOCK_DELTA` | constants/momentum.py | `1` | Actual block gives blocker +1 player momentum and blocked shooter −1. Does not affect block probability. |
@@ -445,7 +445,7 @@ Literals awaiting promotion. **Status board + values:** [Promotion Pass](#promot
 | `DRIVE_EFF_ROLL_RANGE` | attack_drive_clearance.py legacy drive score | `randint(1,3)` | drive | Legacy drive score team-eff multiplier. |
 | `MOTION_DEFENSE_BONUS_SHOT_SCALE` | shot_manager.py | `0.2` | FG% | `shot_score -= motion_defense_bonus × 0.2`. |
 | `CONTEST_LOSS_SHOT_PENALTY` | shot_manager.py | `100` | FG% / contest | Flat subtract on contest-loss path (context-gated). |
-| `BLOCK_COMPOSITE_HEIGHT_W` / `_ID_W` / `_IQ_W` | shot_manager.py block recon | `+0.4` / `−0.4` / `−0.2` | contest / foul | Block reconciliation defender composite; normalized defensive efficiency is also subtracted before the roll multiplier. |
+| `BLOCK_COMPOSITE_HEIGHT_W` / `_ID_W` / `_IQ_W` | shot_manager.py block recon | `+0.4` / `+0.4` / `+0.2` | contest / foul | Block reconciliation defender composite; normalized defensive efficiency is also added before the roll multiplier. |
 | `BLOCK_COMPOSITE_ROLL` | shot_manager.py | `randint(1,6)` | contest / foul | Multiplier on that composite. |
 | `AND_ONE_FINISH_THRESHOLD` | shot_manager.py | `250` | foul / FG% | Finish score > 250 → and-one make. *(Named in Block prose only.)* |
 | `AND_ONE_FINISH_ST_W` / `_SC_W` / `_HEIGHT_W` / `_IQ_W` | shot_manager.py | `0.4` / `0.3` / `0.2` / `0.1` | foul / FG% | And-one finish composite weights. |
