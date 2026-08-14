@@ -284,8 +284,9 @@ def build_structured_training_report_notes(
 ) -> List[Dict[str, Any]]:
     sections: List[Dict[str, str]] = []
     players_by_name = {_player_name(p): p for p in players}
-    # Year-normalized cumulative delta, used for BOTH awards (gainer + loser). Sign is
-    # preserved (factors > 0), so the > 0 / < 0 qualification gates are unchanged.
+    # Year-normalized cumulative delta, used for BOTH awards (top performer + loser).
+    # In-season PPotW ranks the full player pool regardless of sign; Biggest Regression
+    # retains its < 0 qualification gate. Camp MVP retains its > 0 gate separately below.
     normalized_by_name = { _player_name(p): _year_normalized_total(p, original_player_baselines) for p in players }
     sums = _team_attr_delta_sums(players, original_player_baselines)
 
@@ -321,10 +322,10 @@ def build_structured_training_report_notes(
         # (< mean − 1 SD), the attrs the camp under-developed. Even development → NSS.
         sections.append({"title": "Concerning Progression", "body": ", ".join(laggard) if laggard else NSS})
     else:
-        pos = [(n, t) for n, t in normalized_by_name.items() if t > 0]
-        if pos:
-            top = max(t for _, t in pos)
-            names = sorted(n for n, t in pos if t == top)
+        ranked = list(normalized_by_name.items())
+        if ranked:
+            top = max(t for _, t in ranked)
+            names = sorted(n for n, t in ranked if t == top)
             title = "Practice Players Of The Week" if len(names) > 1 else "Practice Player Of The Week"
             sections.append(_note_with_player_ids(title, names, players_by_name, NSS))
         else:
