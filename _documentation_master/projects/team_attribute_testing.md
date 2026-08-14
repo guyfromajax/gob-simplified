@@ -57,11 +57,70 @@ flattening, not waste. May self-limit; unknown.
 
 ## Week 26 — end of regular season
 
-*Pending. Same table, same franchise, so the two snapshots are directly comparable.*
-
 | attribute | ≤ −20 | −19..−17 | +17..19 | ≥ +20 | mean |
 |---|--:|--:|--:|--:|--:|
-| | | | | | |
+| `offensive_efficiency` | 22 | 5 | 35 | **40** | +7.5 |
+| `defensive_efficiency` | 14 | 2 | 38 | **46** | +10.3 |
+| `pt_efficiency` | **32** | 5 | 17 | 28 | +1.3 |
+| `discipline` | 12 | 12 | 19 | 33 | +4.7 |
+| `fb_efficiency` | **31** | **22** | 16 | 14 | −5.6 |
+| `fight` | 10 | 3 | 19 | 30 | +7.0 |
+| `pt_opp_modifier` | 2 | 8 | 25 | 19 | +0.2 |
+| `fb_opp_modifier` | 4 | 11 | **0** | **0** | **−10.8** |
+
+**Totals:** bottom (≤ −17) **195/1024 = 19%** · top (≥ +17) **379/1024 = 37%**
+**127 floored at −20 · 210 maxed at +20**
+
+### Week 13 → 26: the league SPREAD, it did not converge
+
+| | wk 13 | wk 26 | change |
+|---|--:|--:|--:|
+| bottom (≤ −17) | 57 (6%) | **195 (19%)** | **3.4x** |
+| top (≥ +17) | 261 (25%) | 379 (37%) | 1.5x |
+| floored at −20 | 37 | **127** | **3.4x** |
+| maxed at +20 | 146 | 210 | 1.4x |
+
+**The midseason risk did not materialise.** The week-13 watch was that 146 maxed might reach
+300+ and flatten identity — every press team equally pinned at the ceiling. Instead the top grew
+only 1.4x while **the bottom tripled**. Teams are separating in BOTH directions, which is the
+personality outcome the system exists to produce.
+
+`pt_efficiency` remains the most bipolar attribute (32 floored, 28 maxed) — press teams build it,
+everyone else abandons it. `discipline` and `fight` developed real spread in the back half
+(5 → 33 and 4 → 30 maxed), so authoritarian-family focuses are landing.
+
+### 🐛 `fb_opp_modifier` is untrainable — CONFIRMED BUG
+
+Zero teams above +17 at BOTH snapshots, and the mean fell −5.3 → **−10.8** across the season.
+It is the only attribute with no upside at all.
+
+**Cause: no vision installs it.** `fast_breaks.defense_install` → `fb_opp_modifier` appears in
+**zero** entries of the §3.5 vision table, while every other core-8 attribute has at least one:
+
+| install slot | attribute | visions installing it |
+|---|---|--:|
+| `T_DEF` | defensive_efficiency | 4 |
+| `T_OFF` | offensive_efficiency | 3 |
+| `FB_OFF` | fb_efficiency | 1 |
+| `PT_DEF` | pt_efficiency | 1 |
+| `PT_OFF` | pt_opp_modifier | 1 |
+| **`FB_DEF`** | **fb_opp_modifier** | **0** |
+
+So no CPU team ever trains fast-break defense. EOG moves the attribute down; nothing moves it
+up. A full season of data made this obvious in a way reading the table did not — the week-13
+snapshot already showed it (0 above +17) and it was logged as an open question rather than
+chased.
+
+**Proposed fix (not applied):** give `FB_DEF` to **Contain**, whose identity is conservative
+transition defence — getting back rather than gambling. It currently installs `T_DEF` + `BREAKS`.
+Needs a decision, because changing the vision table shifts every downstream number in this doc.
+
+### Also worth noting
+
+`fb_efficiency` inverted in the back half — mean −0.8 → **−5.6**, with 53 teams at or near the
+floor against 30 at the top. Only Run and Gun installs it (1 vision), so most of the league
+lets it rot. Same shape as `fb_opp_modifier` but one degree less severe: thinly installed rather
+than never installed.
 
 ---
 
