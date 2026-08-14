@@ -2491,6 +2491,51 @@ def _cpu_team_allocation(is_camp: bool = False) -> dict:
     return alloc
 
 
+# ── CPU weekly coaching focus (step 2 of the identity-training rework) ───────────────────
+# The 16 real leaves: 4 archetype families x 4 sub-options. `execute_training` takes the leaf
+# string and splits it via parse_coaching_focus, so no extra plumbing is needed.
+#
+# NOT 17. `player-maximizer-choose-attributes` appears in COACHING_FOCUS_LEAF_DISPLAY_NAME but
+# is not handled in _should_amplify_player_attr or _should_amplify_team_attr, so drawing it
+# would be a silent no-op week — a focus that does nothing, indistinguishable from a bug.
+CPU_COACHING_FOCUS_LEAVES = (
+    "authoritarian-discipline", "authoritarian-rebounding",
+    "authoritarian-teamwork", "authoritarian-execution",
+    "systems-coach-offense", "systems-coach-defense",
+    "systems-coach-fast-breaks", "systems-coach-press-trap",
+    "player-maximizer-top-3", "player-maximizer-attributes-4-6",
+    "player-maximizer-custom", "player-maximizer-positional-focus",
+    "culture-builder-inspire", "culture-builder-community",
+    "culture-builder-teamwork", "culture-builder-confidence",
+)
+
+
+def _cpu_weekly_coaching_focus(franchise_id, team_id, season: int, week: int) -> str:
+    """Pick one of the 16 leaves for this team this week.
+
+    DERIVED, NOT DRAWN — and deliberately so. CPU teams train inside a ProcessPool, and each
+    spawned worker builds its own ``training_rng`` from OS entropy, so an RNG draw would make
+    a team's focus depend on WHICH WORKER happened to claim it. That is unreplayable by
+    construction: re-running the same week could hand a team a different focus, which then
+    moves every attribute on its roster. (The ``seed`` argument on auto_train_one_cpu_team
+    cannot rescue it either — it seeds the GLOBAL random module while the engine draws from
+    ``training_rng``, so it never reaches these decisions.)
+
+    Hashing (franchise, team, season, week) is uniform across teams and weeks, identical on
+    every replay, and indifferent to worker scheduling. Uses sha256 rather than ``hash()``
+    because the builtin is only stable while PYTHONHASHSEED is pinned — a dependency this
+    project has already been bitten by.
+
+    Deliberately dumb for now: strategy in focus selection, and a per-team coach identity
+    with a major and a minor, are later phases. See projects/cpu_identity_training_design.md §2.
+    """
+    import hashlib
+
+    key = f"{franchise_id}:{team_id}:{season}:{week}".encode("utf-8")
+    idx = int.from_bytes(hashlib.sha256(key).digest()[:8], "big")
+    return CPU_COACHING_FOCUS_LEAVES[idx % len(CPU_COACHING_FOCUS_LEAVES)]
+
+
 def _cpu_reference_custom_focus(players_for_training: list[dict], fpd_by_player_id: dict) -> dict:
     """Map every roster player → his development-position reference top-3, so
     player-maximizer-custom amplifies each player toward his own position. Uses
@@ -2597,9 +2642,22 @@ def auto_train_one_cpu_team(
         else is_camp_week(week)
     )
 
-    # Per-position bases + per-player custom focus (gain-side fit model).
-    coaching_focus = "player-maximizer-custom"
-    coaching_focus_custom_by_player = _cpu_reference_custom_focus(players_for_training, fpd_by_player_id)
+    # One of the 16 leaves, same menu a user picks from. Was hardcoded to
+    # player-maximizer-custom, which amplified every player's own position top-3 by 2x EVERY
+    # week — the optimal choice, permanently, which no user gets. That is the same class of
+    # advantage as the per-position allocation removed in step 1.
+    #
+    # EXPECT DEVELOPMENT TO DROP. custom now comes up ~1 week in 16; the other 15 amplify
+    # things a given player may not have. That cost is the point, not a regression.
+    coaching_focus = _cpu_weekly_coaching_focus(
+        franchise_id, team_id, int((ftd_doc.get("season") or 1)), int(week)
+    )
+    # Only the custom leaf consumes this, and building it walks the whole roster — skip the
+    # work on the other 15.
+    coaching_focus_custom_by_player = (
+        _cpu_reference_custom_focus(players_for_training, fpd_by_player_id)
+        if coaching_focus == "player-maximizer-custom" else None
+    )
 
     team_stats = dict(ftd_doc.get("team_attributes") or {})
     plays_data = ftd_doc.get("plays") or {}
