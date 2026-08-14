@@ -76,7 +76,14 @@ Re-cut to `26/40` → drift **-0.1**.
   spread that grows, few teams railing. The compounding loop is INTENDED; only its magnitude
   was ever the defect.
 
-**Note:** Existing saved teams keep their stored values until re-seeded or migrated. Moving the window does not retroactively change Mongo team docs.
+**Current calibration (2026-08-14):** the `-10..190` move initializes franchises at
+`85..95`. Using the verification season's 3,330 measured FG% residuals and fitted
+response (`FG% = 51.24726 - 0.14126 × shot_threshold`), 1,000 modeled seasons with
+the actual integer EOG rolls and clamps selected `FG_PCT_MID=22` /
+`FG_PCT_HIGH=37`: mean 90.0, drift **-0.05**, sd **20.5**, and zero rails across
+128,000 team-seasons. Re-fit after a material engine or roster change.
+
+**Note:** Existing saved teams keep their stored values until re-seeded or migrated. Moving the window does not retroactively change Mongo team docs. To preserve the same relative position after this `+20` window shift, existing stored `shot_threshold` values require a **+20 migration**; otherwise their absolute shot difficulty is unchanged while the new scale's center moves around them.
 
 ## How to experiment (your workflow)
 

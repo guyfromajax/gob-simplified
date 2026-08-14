@@ -402,7 +402,7 @@ AND contest_result ∈ {neutral, defense_win}
 | CHARGE / blocking foul early return | **No** | — |
 | Outside shot | Micro yes; **no block attempt** (unchanged) |
 
-Block reconciliation math (`shot_score_pre_defense − defense_block_score`, ±150 thresholds) is **unchanged** when eligible.
+When eligible, block reconciliation uses `diff = shot_score_pre_defense − defense_block_score`, where `defense_block_score = (scaled height × 0.4 − ID × 0.4 − IQ × 0.2 − normalized defensive efficiency) × randint(1,6)`. A shooting foul occurs above `150`; a block occurs below `40 − normalized defensive efficiency`; the middle band returns to standard shot resolution.
 
 ---
 

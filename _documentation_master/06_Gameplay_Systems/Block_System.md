@@ -24,7 +24,7 @@ Gating: requires `has_contest`, a shot defender, `shot_type` in (`inside`, `atta
 
 1. **Aggression roll:** **x** = defense team’s aggression level (numeric **0–4**): `def_team.strategy_settings["aggression"]` (default 2). **y** = `random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)` (currently **0–4**). If **y <= x** → block attempt → run block reconciliation.
 2. **Fight roll (secondary trigger):** if the aggression roll fails, **z** = `random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)` (currently **0–10**); if **z <= defense `team_attributes["fight"]`** → block attempt anyway.
-3. **Player roll (third trigger):** if the aggression and fight rolls fail, **z** = `random.randint(BLOCK_PLAYER_ROLL_MIN, BLOCK_PLAYER_ROLL_MAX)` (currently **1–300**); if **z <= shot defender's `attributes["ID"]` + (defense team's `defensive_efficiency` × defender's height-rating 0–10)** → block attempt anyway. (Lets an individual rim protector go up on his own when the team rolls miss.)
+3. **Player roll (third trigger):** if the aggression and fight rolls fail, **z** = `random.randint(BLOCK_PLAYER_ROLL_MIN, BLOCK_PLAYER_ROLL_MAX)` (currently **1–300**); if **z <= shot defender's `attributes["ID"]` + (defense team's normalized `defensive_efficiency` × defender's height-rating 0–10)** → block attempt anyway. (Lets an individual rim protector go up on his own when the team rolls miss.)
 
 If neither roll triggers → skip to standard shot reconciliation. Roll ranges are constants in `BackEnd/constants/__init__.py`.
 
@@ -44,15 +44,15 @@ If neither roll triggers → skip to standard shot reconciliation. Roll ranges a
 **Defender block score:**
 
 - Defender **height_score** (0–10) from table above; then **scaled height term** = `(height_score * 10) + random.randint(-9, 9)`.
-- `defense_block_score = (scaled_height_term * 0.4 + defender_ID * 0.4 + defender_IQ * 0.2) * random.randint(1, 6)`  
-  - So the height contribution uses the scaled value `(height_score * 10) + random.randint(-9, 9)`; attributes ID and IQ are the raw defender values.
+- `defense_block_score = (scaled_height_term * 0.4 - defender_ID * 0.4 - defender_IQ * 0.2 - normalized_defensive_efficiency) * random.randint(1, 6)`
+  - The height contribution uses `(height_score * 10) + random.randint(-9, 9)`; ID and IQ are raw defender attributes. Defensive efficiency is the core-8 stored value normalized through `core8_gameplay()` before use.
 
 **Comparison:**
 
 - Use **shot_score before defense penalty** (the offensive component only). In block reconciliation, **defense_block_score is the defense component**; we do not apply the normal shot defense penalty here.
-- **Constants** (in `BackEnd/constants/__init__.py`): `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` (currently **150**), `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` (currently **-50**). They are **independent**: adjust one without affecting the other.
+- **Thresholds:** the shooting-foul threshold is `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` (**150**). The block threshold is dynamic: `BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE` (**40**) minus normalized defensive efficiency. The two outcome thresholds remain independently tunable.
 - If **diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD** → **shooting foul** (see below).
-- Elif **diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD** → **block** (no basket; rebound).
+- Elif **diff < 40 - normalized defensive efficiency** → **block** (no basket; rebound).
 - Else → **no block, no shooting foul** → proceed with **standard shot logic** (make/miss using existing threshold and shot_score, including normal defense penalty).
 
 ### 1.5 Shooting Foul in Block Reconciliation
@@ -142,7 +142,7 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 
 2. **Backend: block attempt and reconciliation**
    - Add **block attempt** step in `resolve_shot()`: after `shot_type` and **pre–defense-penalty** shot_score (and motion attack penalty) are available. If `shot_type` in (`"inside"`, `"attack"`): x = `def_team.strategy_settings["aggression"]` (0–4), y = `random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX)` (currently 0–4), if y <= x run block reconciliation. If that fails, run the secondary fight roll: z = `random.randint(BLOCK_FIGHT_RANGE_MIN, BLOCK_FIGHT_RANGE_MAX)` (currently 0–10); if z <= defense `team_attributes["fight"]`, run block reconciliation.
-   - **Block reconciliation:** Use **shot_score before defense penalty**. Inputs = that shot score, shooter, defender, roles. Compute defender scaled height term, defense_block_score; **diff** = shot_score − defense_block_score. Compare using **`BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD`** and **`BLOCK_RECONCILIATION_BLOCK_THRESHOLD`** from `BackEnd/constants/__init__.py`. If **diff > shooting-foul threshold**: shooting foul; if **diff < block threshold**: block; else: fall back to standard shot (with normal defense penalty and threshold). Thresholds are independent (block threshold **-50**, recalibrated from -100 in July 2026).
+   - **Block reconciliation:** Use **shot_score before defense penalty**. Inputs = that shot score, shooter, defender, roles. Compute the defender score as `(scaled height × 0.4 - ID × 0.4 - IQ × 0.2 - normalized defensive efficiency) × random integer 1–6`; then **diff** = shot_score − defense_block_score. If **diff > 150**: shooting foul; if **diff < 40 - normalized defensive efficiency**: block; else: fall back to standard shot (with normal defense penalty and threshold).
    - **Height score:** One shared helper for “height inches → 0–10”; use `(height_score * 10) + random.randint(-9, 9)` for defender block score (and shooter_finish if confirmed).
    - **Block outcome:** Set result_type or flag so frontend does block animation (no shot arc). Compute block spot; call existing rebound flow with that spot; record BLK; FGA (and 3PTA if applicable) for shooter; no FGM; no points; momentum defense +1 / offense −1. **Possession flips only on DREB** (OREB does not flip possession). Reuse result shape (`ball_bounce_x`/`ball_bounce_y`, `rebounder_id`, `rebound_type`, etc.).
    - **Shooting foul from block:** Reuse existing shooting-foul and free-throw handling (game_state, next_play_type, stats, foul recording). Only the trigger is “block reconciliation said shooting foul”; the rest is existing paths.
@@ -184,15 +184,15 @@ From here, existing shooting-foul and free-throw flows (stats, next_play_type, g
 ## 5. Summary
 
 - **Eligibility:** Inside and attack only (contested, with a shot defender); outside unchanged.
-- **Block attempt (any of 3 triggers, in order):** (1) aggression — y = random 0–4 ≤ `aggression` (0–4); (2) fight — z = random 0–10 ≤ defense team `fight`; (3) player — z = random 1–300 ≤ shot defender `ID` + (`defensive_efficiency` × defender height-rating 0–10). First pass → block reconciliation; all miss → standard shot.
-- **Block reconciliation:** Use **shot_score before defense penalty**; defense_block_score uses scaled height `(height_score * 10) + random(-9, 9)` plus ID/IQ. shot_score − defense_block_score: > 150 → shooting foul; < −50 → block; else → standard shot.
+- **Block attempt (any of 3 triggers, in order):** (1) aggression — y = random 0–4 ≤ `aggression` (0–4); (2) fight — z = random 0–10 ≤ normalized defense team `fight`; (3) player — z = random 1–300 ≤ shot defender `ID` + (normalized `defensive_efficiency` × defender height-rating 0–10). First pass → block reconciliation; all miss → standard shot.
+- **Block reconciliation:** Use **shot_score before defense penalty**. Defense score is `(scaled height × 0.4 - ID × 0.4 - IQ × 0.2 - normalized defensive efficiency) × random integer 1–6`. For `shot_score − defense_block_score`: > 150 → shooting foul; < `40 - normalized defensive efficiency` → block; else → standard shot.
 - **Block outcome:** No shot animation; block spot 2–15 back from shooter, y ±6; standard rebound; **possession flips only on DREB** (OREB does not flip); defense +1 / offense −1 momentum; BLK and FGA recorded.
 - **Animation:** Dedicated `result_type: "BLOCK"` in backend and frontend. BLOCK is treated like MISS everywhere except: (1) ball animation (block anim, no shot arc), (2) announcement ("BLOCK!" + blocker image via Announcement System). Audit: wherever code checks for MISS for non-animation behavior, include BLOCK.
 - **Announcement:** On block, Announcement System announces "BLOCK!" and shows blocker's image.
 - **Reuse:** Same shot_type, pre-penalty shot_score from calculate_shot_score (block uses it before penalty), aggression 0–4, rebound flow, result shape, persistence, foul/FT handling.
 
 **Implementation notes (post-implementation):**
-- Block-volume recalibration (July 2026): `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` first moved from `-150` to `-100`, then to `-50` after a fresh three-week sample still averaged about 0.97 blocks per team-game. A `block_funnel_tracking` diagnostic follows eligible shots through trigger, reconciliation foul/fallback/block bands, actual blocks, and foul-owned block contacts; it is included in per-game and week-aggregate shot diagnostics.
+- Historical block-volume recalibration (July 2026): the former fixed threshold moved from `-150` to `-100`, then to `-50`. Superseded August 2026 by the dynamic `40 - normalized defensive efficiency` threshold and subtractive defensive composite. A `block_funnel_tracking` diagnostic follows eligible shots through trigger, reconciliation foul/fallback/block bands, actual blocks, and foul-owned block contacts; it is included in per-game and week-aggregate shot diagnostics.
 - Height mapping (July 2026 correction; re-anchored 2026-08): `height_to_block_score()` is `h − LEAGUE_MEDIAN_HEIGHT_IN`, clamped 0 at the median and 10 at `median + BLOCK_SCORE_TOP_OFFSET_IN`. It moved from literal 73–81 bands to median-relative offsets in the 2026-08 −2 height shift, so at median 75 the scale is ≤75 → 0 … ≥85 → 10 (was the ≤72 → 0 … ≥82 → 10 literal band). The original July fix was correcting an accidentally-reversed `82 - height` expression.
 - Block announcement order: "BLOCK!" is fired from `ShotAnimationSystem.handleMissedShot` when `result_type === 'BLOCK'` (turnData._blockAnnounced set); `finalizeTurnAfterAnimation` only announces BLOCK if `!turn._blockAnnounced` (fallback).
 - Ball snap fix: `executeCompleteShotSequence` uses block spot (`ball_bounce_x`/`ball_bounce_y`) as `rimCoords` for BLOCK so the miss path (bounce, rebound) never references the rim for blocks.

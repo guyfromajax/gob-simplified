@@ -29,7 +29,7 @@ from BackEnd.constants import (
     PAINT_SPOTS,
     PLAYCALL_ATTRIBUTE_WEIGHTS, 
     BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD,
-    BLOCK_RECONCILIATION_BLOCK_THRESHOLD,
+    BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE,
     BLOCK_Y_ROLL_MIN,
     BLOCK_Y_ROLL_MAX,
     BLOCK_FIGHT_RANGE_MIN,
@@ -101,6 +101,30 @@ INSIDE_SHOT_MID_THRESHOLD_BONUS = -20
 
 # DREB→HCO outlet: rebounder.coords can lag defensive shell vs. actual board (see ball_bounce).
 DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD = 12.0
+
+
+def _block_reconciliation_threshold(defensive_efficiency):
+    """Return the block-band ceiling using the normalized core-8 team value."""
+    return (
+        BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE
+        - core8_gameplay(defensive_efficiency)
+    )
+
+
+def _calculate_defense_block_score(
+    scaled_height,
+    inside_defense,
+    iq,
+    defensive_efficiency,
+    multiplier,
+):
+    """Calculate the defensive reconciliation score from one already-drawn roll."""
+    return (
+        scaled_height * 0.4
+        - inside_defense * 0.4
+        - iq * 0.2
+        - core8_gameplay(defensive_efficiency)
+    ) * multiplier
 
 
 def _hco_zone_shot_threshold_delta(defense_playcall, shot_type):
@@ -1214,10 +1238,18 @@ class ShotManager:
                     def_h = height_to_block_score(def_height_inches)
                     def_scaled_height = (def_h * 10) + random.randint(-9, 9)
                     def_attrs = defender.attributes
-                    defense_block_score = (
-                        def_scaled_height * 0.4 + def_attrs.get("ID", 0) * 0.4 + def_attrs.get("IQ", 0) * 0.2
-                    ) * random.randint(1, 6)
+                    raw_def_eff = def_team.team_attributes.get("defensive_efficiency", 0)
+                    defense_block_score = _calculate_defense_block_score(
+                        def_scaled_height,
+                        def_attrs.get("ID", 0),
+                        def_attrs.get("IQ", 0),
+                        raw_def_eff,
+                        random.randint(1, 6),
+                    )
                     diff = shot_score_pre_defense - defense_block_score
+                    block_reconciliation_threshold = _block_reconciliation_threshold(
+                        raw_def_eff
+                    )
                     if diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD:
                         increment_block_funnel(game_state, "foul_band")
                         # Shooting foul from block: shooter_finish_score vs 250
@@ -1361,7 +1393,7 @@ class ShotManager:
                                 result, roles, shooter, off_team,
                             )
                         return result
-                    elif diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
+                    elif diff < block_reconciliation_threshold:
                         increment_block_funnel(game_state, "block_band")
                         is_away_offense = off_team.team_id == self.game.away_team.team_id
                         # Use explicit shot_spot from caller when present (same data as animation); else fall back to shooter.coords
