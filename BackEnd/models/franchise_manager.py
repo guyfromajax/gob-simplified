@@ -1,5 +1,6 @@
 import random
 import time
+from copy import deepcopy
 from collections import Counter
 from datetime import datetime
 from functools import lru_cache
@@ -472,7 +473,13 @@ class FranchiseManager:
 
         # Initialize franchise-specific team stats using mode initialization system
         from BackEnd.models.team_manager import TeamManager
-        from BackEnd.api.gameplan_routes import populate_team_plays, populate_scouting_data, _get_cached_playbook_settings
+        from BackEnd.api.gameplan_routes import (
+            USER_FRANCHISE_PC_DEFENSE_ORDER,
+            USER_FRANCHISE_PC_OFFENSE_ORDER,
+            _get_cached_playbook_settings,
+            populate_scouting_data,
+            populate_team_plays,
+        )
 
         _t0 = time.time()
         populated_plays = populate_team_plays(mode="franchise")
@@ -665,6 +672,19 @@ class FranchiseManager:
         _t0 = time.time()
         for team in self.teams:
             team_object_id = team["_id"]
+            is_user_team = bool(
+                user_team_object_id
+                and str(team_object_id) == str(user_team_object_id)
+            )
+            team_playbook_settings = deepcopy(playbook_settings)
+            if is_user_team:
+                # Seed only the user's Playcall Center. The underlying play
+                # percentages and each copied play's preset motion focus /
+                # target shooter remain untouched.
+                team_playbook_settings["pc_order"] = {
+                    "offense": list(USER_FRANCHISE_PC_OFFENSE_ORDER),
+                    "defense": list(USER_FRANCHISE_PC_DEFENSE_ORDER),
+                }
             team_attrs = TeamManager.init_team_attributes(mode="franchise")
             team_attributes = {
                 "shot_threshold": team_attrs["shot_threshold"],
@@ -719,7 +739,7 @@ class FranchiseManager:
                 "recruit_visit": None,
                 "team_attributes": team_attributes,
                 "strategy_settings": strategy_settings,
-                "playbook_settings": playbook_settings.copy(),
+                "playbook_settings": team_playbook_settings,
                 "plays": populated_plays.copy(),
                 "scouting_data": scouting_data.copy(),
                 "training_reports": {},

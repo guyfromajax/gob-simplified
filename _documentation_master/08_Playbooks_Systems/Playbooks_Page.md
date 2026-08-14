@@ -71,6 +71,19 @@ Play-level metadata is stored on the team `plays` objects:
 - motion plays use `motion_focus`
 - set plays use `target_shooter`
 
+### New-franchise user Playcall Center seed
+
+Franchise initialization pre-populates `pc_order` only on the user team's FTD
+row. Offense slots are, in order: `3-2 Motion`, `4-1 Motion`, `Base Post Play`,
+`Movement Post Play`, `Iso`, `Pick & Roll - Entry Pass`, `Misdirection Three`,
+and `Double Screen Three - Wing`. Defense slots are `Base Man`, `Deny Man`,
+`Loose Man`, `2-3 Zone`, `3-2 Zone`, and `1-3-1 Zone`. CPU-team Playcall
+Center orders remain empty at initialization.
+
+The seed changes ordering only. It uses stable play/defense identity and leaves
+the copied play metadata intact, so motion focus and set-play target shooter use
+their catalog presets.
+
 ### Locks (durable)
 
 `locks` marks plays exempt from enforced redistribution on the Playbooks redesign UI. They are **persisted** with `playbook_settings` (not session-only).

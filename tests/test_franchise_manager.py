@@ -3,6 +3,10 @@ from bson import ObjectId
 
 from BackEnd.models.franchise_manager import FranchiseManager, ScheduleManager
 from BackEnd.db import db, franchise_team_data_collection
+from BackEnd.api.gameplan_routes import (
+    USER_FRANCHISE_PC_DEFENSE_ORDER,
+    USER_FRANCHISE_PC_OFFENSE_ORDER,
+)
 
 
 def _region_for_conference(c):
@@ -92,3 +96,18 @@ def test_initialize_season_with_128_teams_generates_26_week_schedule():
     assert manager.franchise_id is not None
     ftd_count = franchise_team_data_collection.count_documents({"franchise_id": manager.franchise_id})
     assert ftd_count == 128, f"FTD should have 128 docs, got {ftd_count}"
+
+    user_ftd = franchise_team_data_collection.find_one(
+        {"franchise_id": manager.franchise_id, "team_id": team_ids[0]}
+    )
+    cpu_ftd = franchise_team_data_collection.find_one(
+        {"franchise_id": manager.franchise_id, "team_id": team_ids[1]}
+    )
+    assert user_ftd["playbook_settings"]["pc_order"] == {
+        "offense": USER_FRANCHISE_PC_OFFENSE_ORDER,
+        "defense": USER_FRANCHISE_PC_DEFENSE_ORDER,
+    }
+    assert cpu_ftd["playbook_settings"]["pc_order"] == {
+        "offense": [],
+        "defense": [],
+    }
