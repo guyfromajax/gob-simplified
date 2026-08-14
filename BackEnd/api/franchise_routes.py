@@ -2657,9 +2657,23 @@ def _reactive_baseline(franchise_id, team_id, season: int, week: int, slot: str)
     return weights[n % len(weights)]
 
 
-# The twelve player-attribute slots the rotating lift walks. Order is fixed; the STARTING
-# POINT rotates per (team, week), so across a season every attribute gets the same share.
-_LIFT_SLOTS = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "ND", "FT", "IQ")
+# The slots the rotating lift walks. Order is fixed; the STARTING POINT rotates per
+# (team, week), so across a season every listed attribute gets the same share.
+#
+# THE NINE SKILLS ONLY — ND/IQ/FT are deliberately absent (2026-08-14). They are fit 1.00
+# for every position while the skills average 0.56, so any lift they receive compounds into
+# the split measured across two full seasons: ND/IQ/FT ~+2.5 each at 85-89% of players up,
+# the nine skills -0.8 to -1.7 at 27-39% up. Rotating evenly across all twelve equalised
+# ALLOCATION (0.97x) without equalising OUTCOMES — fit decides those, not points.
+#
+# Excluding them pushes the universal:skill ratio to ~0.72. That is the FLOOR under this
+# structure: universals cannot drop below their 1-point floor and skills cannot absorb more
+# than the available lift, so 0.72 is the most tilt available without either cutting team
+# installs or dropping a floor to 0 (which costs -1.5/week, ungated — never do that).
+#
+# Universals still grow: at fit 1.00 a single point nets +0.20..+0.39/week by class. They
+# just grow far slower, which is the point.
+_LIFT_SLOTS = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG")
 
 
 def _apply_rotating_lift(alloc: dict, points: int, spare: int, offset: int) -> int:

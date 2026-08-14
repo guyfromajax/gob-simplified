@@ -170,8 +170,8 @@ and the split becomes the single dial future logic turns.
 **ROSTER WEEK — reaches everyone**
 
 * 12 floors at 1
-* a **rotating +1 lift across all twelve** player attributes, starting point derived per
-  (team, week)
+* a **rotating +1 lift across the NINE SKILLS ONLY** — `ND`/`IQ`/`FT` excluded, starting
+  point derived per (team, week)
 * the vision's team installs
 
 > **REVISED 2026-08-14 after a measured season.** The lift used to be fixed on ND/IQ/FT — the
@@ -191,6 +191,26 @@ and the split becomes the single dial future logic turns.
 > Skills still do not fully hold at ~1.4 points — that needs the in-season economy
 > (`IN_SEASON_GAIN_SCALE`, decay ranges, `TRAINING_GAIN_PERCENTAGES`), which belongs to the
 > player-development system. **The allocation is no longer the cause.**
+>
+> **TILTED FURTHER 2026-08-14 — universals removed from the lift.** Rotating evenly equalised
+> allocation (0.97x) but a second measured season showed it did NOT equalise outcomes:
+> ND/IQ/FT ~+2.5 each at 85-89% of players up, the nine skills −0.8 to −1.7 at 27-39% up. Fit
+> decides outcomes, not points. `ND`/`IQ`/`FT` now sit flat at their 1-point floor and the
+> nine skills absorb every lift point:
+>
+> | | skills | universals | ratio |
+> |---|--:|--:|--:|
+> | fixed ND/IQ/FT lift (original) | 1.09 | 2.20 | 2.02x |
+> | rotating across all twelve | 1.38 | 1.35 | 0.97x |
+> | **rotating across the nine skills** | **1.48** | **1.07** | **0.72x** |
+>
+> **0.72 is the floor under this structure.** Universals cannot go below their 1-point floor
+> and skills cannot absorb more than the available lift. Going lower needs either a cut to
+> team installs (~2 points would reach 0.62) or dropping a floor to 0 — which costs −1.5/week
+> ungated and should never be done.
+>
+> Universals still grow, just slowly: at fit 1.00 a single point nets +0.20..+0.39/week by
+> class.
 
 **Split: 50/50 for now.** Later driven by team performance, roster makeup, star-player form and
 the upcoming opponent — one number, many inputs, which is why it is worth isolating now.
