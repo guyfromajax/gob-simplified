@@ -2454,13 +2454,136 @@ def _coaching_quality_reference_allocation(position: str | None = None) -> dict:
 # (the 9 player_drills plus conditioning/free_throws/film_study) must never be 0. Only `breaks`
 # and the 7 team_drills may be zeroed — those take the team-attribute path, where neglect is
 # probability-gated at 25% and deliberately mild.
-_CPU_SPARE_PARK = ("conditioning", "film_study")  # +1 each; the other 2 go to the two installs
+# Slot addresses. Each is (block, *path) into the allocation dict, so emphasis can be applied
+# without another nested-dict literal per vision.
+_SLOT = {
+    "SC": ("player_drills", "offense", "inside"),
+    "SH": ("player_drills", "offense", "outside"),
+    "ID": ("player_drills", "defense", "inside"),
+    "OD": ("player_drills", "defense", "outside"),
+    "PS": ("player_drills", "technical", "passing"),
+    "BH": ("player_drills", "technical", "ball_handling"),
+    "RB": ("player_drills", "technical", "rebounding"),
+    "ST": ("player_drills", "weight_room", "strength"),
+    "AG": ("player_drills", "weight_room", "agility"),
+    "ND": ("general", "conditioning"),
+    "FT": ("general", "free_throws"),
+    "IQ": ("general", "film_study"),
+    "BREAKS": ("general", "breaks"),
+    "T_OFF": ("team_drills", "team_offense", "install"),
+    "T_DEF": ("team_drills", "team_defense", "install"),
+    "FB_OFF": ("team_drills", "fast_breaks", "offense_install"),
+    "FB_DEF": ("team_drills", "fast_breaks", "defense_install"),
+    "SCRIM": ("team_drills", "scrimmages"),
+    "PT_DEF": ("team_drills", "presses_traps", "defense_install"),
+    "PT_OFF": ("team_drills", "presses_traps", "offense_install"),
+}
+
+# Team-drill slot -> the core-8 attribute it trains (team_category_map in
+# training_execution_v2). Drives the saturation taper: points aimed at a maxed attribute are
+# silently discarded by the clamp today, so we stop spending them.
+_INSTALL_ATTR = {
+    "T_OFF": "offensive_efficiency", "T_DEF": "defensive_efficiency",
+    "FB_OFF": "fb_efficiency", "FB_DEF": "fb_opp_modifier",
+    "PT_DEF": "pt_efficiency", "PT_OFF": "pt_opp_modifier",
+    "SCRIM": None,   # chemistry / shot_threshold / rebound_modifier — never saturates the same way
+    "BREAKS": None,
+}
+
+# Vision -> (focus-week skill emphases, team installs). See
+# projects/cpu_identity_training_design.md §3.5.
+#
+# ND and IQ are fit 1.00 for EVERY position, so Run and Gun, Full-Court Press and Zone reach
+# their whole roster even on a focus week. That started as a flavour choice and turned out to
+# be the efficient one — do not "fix" it by swapping them for a skill attribute.
+_VISION_OFFENSE = {
+    "Run and Gun": (("ND", "AG"), ("FB_OFF",)),
+    "Spread":      (("SH", "BH"), ("T_OFF",)),
+    "Inside-Out":  (("SC", "ST"), ("T_OFF",)),
+    "Attack":      (("BH", "SC"), ("SCRIM",)),
+    "Motion":      (("PS", "SH"), ("T_OFF",)),
+}
+_VISION_DEFENSE = {
+    "Full-Court Press": (("ND",),       ("PT_DEF", "PT_OFF")),
+    "Man Lockdown":     (("OD", "ID"),  ("T_DEF",)),
+    "Zone":             (("ID", "IQ"),  ("T_DEF",)),
+    "Multiple":         (("ID", "OD"),  ("T_DEF",)),
+    "Contain":          (("ID", "OD"),  ("T_DEF", "BREAKS")),
+}
+
+# A skill emphasis is 3 points or it is not an emphasis. Roster-wide average fit for every
+# skill attribute is ~0.52-0.60 (each is strong for two positions and weak for three), and at
+# that fit 2 points is still below break-even in-season. ND/IQ/FT are fit 1.00 so they hold at
+# 1 — which is the whole reason the roster mode exists. Design §3.3.
+_EMPHASIS_POINTS = 3
+_ROSTER_LIFT = {"ND": 3, "IQ": 3, "FT": 2}   # roster week: Bucket 3, reaches every player
+_FOCUS_WEEK_SHARE = 0.5                      # the dial future logic turns (design §3.4)
+
+# Saturation taper. The clamp already makes a maxed attribute gain nothing, so this only stops
+# WASTING points on it. Allocation-side only — no engine change, EOG bands undisturbed.
+_SATURATION_FULL = 17     # below this, full weight
+_SATURATION_DEAD = 20     # at/above this, drop the slot entirely
 
 
-def _cpu_team_allocation(is_camp: bool = False) -> dict:
+def _install_weight(team_attrs: dict, slot: str) -> float:
+    """1.0 below +17, tapering to 0 at +20. Slots with no core-8 target never taper."""
+    attr = _INSTALL_ATTR.get(slot)
+    if not attr:
+        return 1.0
+    try:
+        val = float(team_attrs.get(attr, 0) or 0)
+    except (TypeError, ValueError):
+        return 1.0
+    if val < _SATURATION_FULL:
+        return 1.0
+    if val >= _SATURATION_DEAD:
+        return 0.0
+    return round(1.0 - (val - _SATURATION_FULL) / (_SATURATION_DEAD - _SATURATION_FULL), 2)
+
+
+def _is_focus_week(franchise_id, team_id, season: int, week: int) -> bool:
+    """Focus week or roster week — derived, not drawn, for the same pool-replay reason as
+    _cpu_weekly_coaching_focus. Salted differently so mode and focus do not correlate."""
+    import hashlib
+
+    key = f"mode:{franchise_id}:{team_id}:{season}:{week}".encode("utf-8")
+    n = int.from_bytes(hashlib.sha256(key).digest()[:8], "big")
+    return (n % 1000) < int(_FOCUS_WEEK_SHARE * 1000)
+
+
+def _set_slot(alloc: dict, slot: str, value: int) -> None:
+    path = _SLOT[slot]
+    node = alloc[path[0]]
+    for k in path[1:-1]:
+        node = node[k]
+    node[path[-1]] = value
+
+
+def _get_slot(alloc: dict, slot: str) -> int:
+    path = _SLOT[slot]
+    node = alloc[path[0]]
+    for k in path[1:-1]:
+        node = node[k]
+    return node[path[-1]]
+
+
+def _cpu_team_allocation(
+    is_camp: bool = False,
+    *,
+    offensive_vision: str | None = None,
+    defensive_vision: str | None = None,
+    team_attrs: dict | None = None,
+    focus_week: bool = True,
+) -> dict:
     """One team-wide plan for a CPU team — the same shape a user submits.
 
-    24 points in season, 30 at camp. Identity-blind until step 3 of the design.
+    24 points in season, 30 at camp. Identity-driven: the vision pair picks which slots get
+    emphasis, and the week's mode picks whether that emphasis lands on SKILLS (focus week,
+    sharp, reaches the players who fit it) or on ND/IQ/FT (roster week, reaches everyone).
+
+    THE 12 FLOORS HOLD IN BOTH MODES. A 0 on any player-attribute slot costs -1 to -2 every
+    week with no probability gate; the modes differ only in where the SPARE points go. Design
+    §3.1 and §3.4.
     """
     from BackEnd.constants.training_shape import CAMP_POINT_BUDGET, IN_SEASON_POINT_BUDGET
 
@@ -2473,21 +2596,73 @@ def _cpu_team_allocation(is_camp: bool = False) -> dict:
         },
         "general": {"conditioning": 1, "free_throws": 1, "film_study": 1, "breaks": 1},
         "team_drills": {
-            "team_offense": {"install": 1}, "team_defense": {"install": 1},
-            "fast_breaks": {"offense_install": 1, "defense_install": 1}, "scrimmages": 1,
-            "presses_traps": {"defense_install": 1, "offense_install": 1},
+            "team_offense": {"install": 0}, "team_defense": {"install": 0},
+            "fast_breaks": {"offense_install": 0, "defense_install": 0}, "scrimmages": 0,
+            "presses_traps": {"defense_install": 0, "offense_install": 0},
         },
     }
-    # 20 slots x 1 = 20. Park the remaining 4 (10 at camp) so the plan spends its full budget —
-    # unspent points are pure waste, and the CPU was leaving 7-8 on the table every week.
-    spare = (CAMP_POINT_BUDGET if is_camp else IN_SEASON_POINT_BUDGET) - 20
-    for _ in range(spare // 4):
-        for key in _CPU_SPARE_PARK:
-            alloc["general"][key] += 1
-        alloc["team_drills"]["team_offense"]["install"] += 1
-        alloc["team_drills"]["team_defense"]["install"] += 1
-    for i in range(spare % 4):  # camp's odd remainder
-        alloc["general"][_CPU_SPARE_PARK[i % len(_CPU_SPARE_PARK)]] += 1
+    budget = CAMP_POINT_BUDGET if is_camp else IN_SEASON_POINT_BUDGET
+    spare = budget - 13          # 12 player-attribute floors + breaks at 1
+
+    off = _VISION_OFFENSE.get(offensive_vision or "", ((), ()))
+    dfn = _VISION_DEFENSE.get(defensive_vision or "", ((), ()))
+
+    if focus_week:
+        # Two skill emphases at 3. Dedupe: Zone+Man Lockdown both name ID, and paying twice
+        # for one slot would silently eat another vision's emphasis.
+        seen = []
+        for slot in list(off[0]) + list(dfn[0]):
+            if slot not in seen:
+                seen.append(slot)
+        for slot in seen[:2] if not is_camp else seen:
+            cost = _EMPHASIS_POINTS - _get_slot(alloc, slot)
+            if 0 < cost <= spare:
+                _set_slot(alloc, slot, _EMPHASIS_POINTS)
+                spare -= cost
+    else:
+        for slot, val in _ROSTER_LIFT.items():
+            cost = val - _get_slot(alloc, slot)
+            if 0 < cost <= spare:
+                _set_slot(alloc, slot, val)
+                spare -= cost
+
+    # Remaining points to this vision pair's installs. The taper is a per-slot CAP, not just
+    # an on/off filter: weight 1.0 allows the full 5, 0.67 allows 3, 0.33 allows 1, 0.0 drops
+    # the slot. Without the cap a team at +18 would still take full points into an attribute
+    # three off its ceiling, which is most of what the taper exists to stop.
+    # A team with no identity has no vision installs, and without a fallback every spare point
+    # cascades into the overflow below and piles onto ND/IQ/FT — 14 points on three attributes
+    # and 1 on team drills. Degenerate, and it only shows up for teams identity has not reached.
+    install_slots = list(off[1]) + list(dfn[1])
+    if not install_slots:
+        install_slots = ["T_OFF", "T_DEF", "FB_OFF", "FB_DEF", "SCRIM", "PT_DEF", "PT_OFF"]
+
+    caps = {}
+    for slot in install_slots:
+        w = _install_weight(team_attrs or {}, slot)
+        if w > 0:
+            caps[slot] = max(1, int(round(5 * w)))
+    installs = list(caps)
+    while spare > 0 and installs:
+        placed = False
+        for slot in installs:
+            if spare <= 0:
+                break
+            if _get_slot(alloc, slot) < caps[slot]:
+                _set_slot(alloc, slot, _get_slot(alloc, slot) + 1)
+                spare -= 1
+                placed = True
+        if not placed:
+            break   # every install is at its cap; the overflow below takes the rest
+
+    # Anything still unspent (every install saturated, or a vision with none) goes to Bucket 3
+    # then the skill floors. Never leave points unspent — the old path wasted 7-8 a week.
+    for slot in ("ND", "IQ", "FT", "SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG"):
+        while spare > 0 and _get_slot(alloc, slot) < 5:
+            _set_slot(alloc, slot, _get_slot(alloc, slot) + 1)
+            spare -= 1
+        if spare <= 0:
+            break
     return alloc
 
 
@@ -2688,7 +2863,21 @@ def auto_train_one_cpu_team(
     # The old loop called execute_training up to 5x with a per-position allocation, which let
     # every CPU player train his ideal attributes while a user's roster shares one compromise
     # plan. See _cpu_team_allocation and projects/cpu_identity_training_design.md §1.
-    allocations = _cpu_team_allocation(is_camp)
+    #
+    # Step 3: the plan is now driven by the team's IDENTITY. `ftd.identity` is written by
+    # ensure_franchise_identities before any game is simmed; a team without one (identity
+    # inert, or a franchise mid-migration) falls through to the vision-blind base rather
+    # than failing — the floors still hold, so nobody takes the -1.5 neglect drag.
+    _identity = ftd_doc.get("identity") or {}
+    allocations = _cpu_team_allocation(
+        is_camp,
+        offensive_vision=_identity.get("offensive_vision"),
+        defensive_vision=_identity.get("defensive_vision"),
+        team_attrs=team_stats,
+        focus_week=_is_focus_week(
+            franchise_id, team_id, int((ftd_doc.get("season") or 1)), int(week)
+        ),
+    )
     with quiet_training_engine_logs():
         up, updated_team, updated_plays, updated_scouting, training_report = execute_training(
             players_for_training,

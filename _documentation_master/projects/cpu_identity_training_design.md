@@ -220,11 +220,17 @@ Each team-drill slot maps 1:1 to a core-8 attribute (`team_category_map`):
 
 Before allocating, read `ftd.team_attributes[attr]` and taper:
 
-| current value | slot treatment |
-|---|---|
-| ≤ +16 | full points |
-| +17 to +19 | taper 0.75 / 0.5 / 0.25 |
-| **≥ +20** | drop the slot, redirect every point |
+| current value | weight | slot cap (of 5) |
+|---|--:|--:|
+| ≤ +17 | 1.00 | 5 |
+| +18 | 0.67 | 3 |
+| +19 | 0.33 | 2 |
+| **≥ +20** | **0.00** | **dropped, every point redirected** |
+
+Implemented as a linear ramp (§`_install_weight`) rather than the drafted 0.75/0.5/0.25, which
+was flagged as a proposal. The weight is a per-slot **cap**, not just an on/off filter — as a
+filter alone, a team at +18 still took full points into an attribute two off its ceiling, which
+is most of what the taper exists to stop.
 
 Freed points cascade: next-priority slot in the same vision → `scrimmages` → raise a player-drill
 floor 1→2 (never wasted; +2.0 → +2.5 expected is still positive).
