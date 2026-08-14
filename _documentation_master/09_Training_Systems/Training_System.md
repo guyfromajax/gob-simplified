@@ -494,19 +494,29 @@ After training is submitted, users are automatically redirected to the training 
 
 #### Attribute-change arrows (legend)
 
-Each player-attribute cell shows the week's raw delta as arrow glyphs (no number). Bands are symmetric — **down arrows are the exact inverse of up** — set by `describeTrainingChange` in `training-report.js`. Rescaled **2026-08** (was `±1..4 → 1`, `±5..9 → 2`, `±10+ → 3`) so a maxed drill visibly pops under the smaller free-will gain scales.
+Each player-attribute cell shows the week's true (fractional) net delta as arrow glyphs (no number), set by `describeTrainingChange` in `training-report.js`. **Two regimes** by report week — the display keys off `getReportWeekNumber() === 1`:
 
-| Weekly delta | Glyph | Color |
+**Camp (week 1) — symmetric bands, grey dash at exactly 0.** No pre-training decay at camp, so untouched attrs read as a dash (0), never red.
+
+| Camp delta | Glyph | Color |
 |---|---|---|
 | exactly 0 | `–` | grey dash |
-| `0 < gain < 2` | ▲ | green |
-| `2 ≤ gain ≤ 5` | ▲▲ | green |
-| `gain > 5` | ▲▲▲ | RT-elite blue |
-| `0 < loss < 2` | ▼ | red |
-| `2 ≤ loss ≤ 5` | ▼▼ | red |
-| `loss > 5` | ▼▼▼ | red |
+| `0 < |Δ| < 2` | ▲ / ▼ | green up · red down |
+| `2 ≤ |Δ| ≤ 5` | ▲▲ / ▼▼ | green up · red down |
+| `|Δ| > 5` | ▲▲▲ / ▼▼▼ | blue up · red down |
 
-Boundaries: `< 2` → 1, `[2, 5]` → 2, `> 5` → 3 (so exactly 2 and exactly 5 are double; 5.01 is triple). At **camp** there is no pre-training decay, so untouched attrs show a grey dash (0), never a red down-arrow; red only appears in-season when decay outruns training.
+**In-season (weeks 2–26) — asymmetric, NO dash.** In-season decay makes tiny negatives normal, so the *up* band deliberately absorbs small dips **down to −0.5** and reads them as "holding" — this keeps the report from screaming red on an unlucky −0.4 week for a well-invested attribute. Only a genuine slide (< −0.5) shows red.
+
+| In-season delta | Glyph | Color |
+|---|---|---|
+| `Δ ≥ 3` | ▲▲▲ | RT-elite blue |
+| `1.0 ≤ Δ < 3` | ▲▲ | green |
+| `−0.5 ≤ Δ < 1.0` | ▲ | green (absorbs 0 and small dips) |
+| `−1.5 < Δ < −0.5` (−0.51…−1.49) | ▼ | red |
+| `−2.5 < Δ ≤ −1.5` (−1.5…−2.49) | ▼▼ | red |
+| `Δ ≤ −2.5` | ▼▼▼ | red |
+
+Note: in-season there are **no grey dashes** — an unchanged (0) attribute falls in the `−0.5 ≤ Δ < 1.0` band and shows a single green up-arrow. This is intentional: after the free-will retune, in-season "holding" is a good outcome and reads green rather than neutral.
 
 #### Recruiting summary (Franchise only)
 
