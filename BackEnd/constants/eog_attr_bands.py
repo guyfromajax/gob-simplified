@@ -180,14 +180,27 @@ FIGHT_WIN = (0, 2)
 FIGHT_LOSS = (-2, 0)
 
 # rebound_modifier (5-band ladder; values are hundredths, applied as /100)
-# Rebalanced for the widened margins above. With the extremes now ~21% per tail
-# instead of 33%, the deep negative band no longer dominates; the ladder nets
-# +0.1/season on the 0.0-1.0 range instead of -1.2.
-REB_OUTREBOUND_GT_8 = (4, 14)       # +0.04 .. +0.14
-REB_OUTREBOUND_4_7 = (0, 6)         # 0.00 .. +0.06
-REB_WITHIN_3 = (-3, 3)              # -0.03 .. +0.03
-REB_OUTREBOUNDED_4_7 = (-8, -2)     # -0.02 .. -0.08
-REB_OUTREBOUNDED_GT_8 = (-12, -4)   # -0.04 .. -0.12
+#
+# NAMES ARE DELIBERATELY THRESHOLD-FREE. The previous set (REB_OUTREBOUND_GT_8,
+# REB_OUTREBOUND_4_7 ...) baked margins into the identifiers and then went stale:
+# `outrebound_gt_8` actually fired at a differential of 14 and `outrebound_4_7` at
+# 7-13. Same failure as `fg_gt_50` firing at 40% FG. The margins live in
+# REBOUND_BIG_MARGIN / REBOUND_MID_MARGIN / REBOUND_EVEN_MARGIN and are meant to be
+# re-tuned; the names must survive that.
+#
+# NARROWED 2026-08-14. On a 0.0-1.0 scale the old ranges moved up to 0.14 in a single
+# game against training's ~0.04 per WEEK, so EOG was the dominant term and a short
+# rebounding run could cross half the range. Measured at week 13-27 of two seasons:
+# 28-31 teams sat at exactly 1.0 and 17-30 at exactly 0.0 — roughly 40% of the league
+# railed, after which the attribute carries no information.
+#
+# Each band is now tighter and the two outer bands no longer overlap the middle ones,
+# so a blowout is still worth more than a solid edge but cannot lurch the attribute.
+REB_DOMINANT = (5, 10)        # +0.05 .. +0.10   outrebounded them by BIG_MARGIN+
+REB_STRONG = (1, 5)           # +0.01 .. +0.05   by MID_MARGIN..BIG_MARGIN
+REB_EVEN = (-3, 3)            # -0.03 .. +0.03   within EVEN_MARGIN
+REB_WEAK = (-8, -4)           # -0.08 .. -0.04   outrebounded by MID..BIG
+REB_DOMINATED = (-12, -8)     # -0.12 .. -0.08   outrebounded by BIG_MARGIN+
 
 # concentration bands shared by offense / fb / pt
 # Shifted up one notch. At the OLD thresholds these averaged -0.5/game; once the
@@ -239,11 +252,11 @@ EOG_BANDS = {
         ("equal_buffered", DISC_EQUAL),
     ],
     "rebound_modifier": [
-        ("outrebound_gt_8", REB_OUTREBOUND_GT_8),
-        ("outrebound_4_7", REB_OUTREBOUND_4_7),
-        ("within_3", REB_WITHIN_3),
-        ("outrebounded_4_7", REB_OUTREBOUNDED_4_7),
-        ("outrebounded_gt_8", REB_OUTREBOUNDED_GT_8),
+        ("reb_dominant", REB_DOMINANT),
+        ("reb_strong", REB_STRONG),
+        ("reb_even", REB_EVEN),
+        ("reb_weak", REB_WEAK),
+        ("reb_dominated", REB_DOMINATED),
     ],
     "offensive_efficiency": [
         ("conc_le_30", CONC_REWARD_DELTA),
