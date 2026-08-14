@@ -2818,7 +2818,10 @@ def _cpu_team_allocation(
     # and 1 on team drills. Degenerate, and it only shows up for teams identity has not reached.
     install_slots = list(off[1]) + list(dfn[1])
     if not install_slots:
-        install_slots = ["T_OFF", "T_DEF", "FB_OFF", "FB_DEF", "SCRIM", "PT_DEF", "PT_OFF"]
+        # SCRIM is DELIBERATELY ABSENT — it has a fixed baseline of 1 above, and adding it to
+        # the round-robin here pushed identity-less teams to 2, which is worth -212/season of
+        # shot_threshold. One point is the only stable value; nothing else may touch this slot.
+        install_slots = ["T_OFF", "T_DEF", "FB_OFF", "FB_DEF", "PT_DEF", "PT_OFF"]
 
     caps = {}
     for slot in install_slots:
