@@ -1,6 +1,7 @@
 # CPU Identity-Driven Training — DESIGN (not built)
 
-**Status: design only, 2026-08-12. No code written.** Review this before implementing.
+**Status: steps 1-2 SHIPPED, step 3 designed (last revised 2026-08-14).** See §7 for what has
+landed. Sections describing unbuilt work say so.
 
 Supersedes `cpu_team_identity_spec.md` §6, which was written against a CPU training path that
 does not work the way the spec assumed.
@@ -50,8 +51,13 @@ after the capture seam lands. CPU never feeds `season_coaching_quality`, so `coa
 
 ## 2. Weekly coaching focus — RANDOM for now
 
-Each CPU team draws **one of 16** leaves per week, from **`training_rng`** (never the global
-stream — see the per-subsystem RNG rule).
+✅ **SHIPPED `d3efecd1b`.** Each CPU team gets **one of 16** leaves per week.
+
+**DERIVED from a hash of (franchise, team, season, week) — NOT drawn from an RNG.** The first
+draft said `training_rng`, which was wrong: CPU teams train inside a ProcessPool and each
+spawned worker builds its own `training_rng` from OS entropy, so a draw would make a team's
+focus depend on WHICH WORKER claimed it, and re-running a week could hand it a different focus.
+sha256, not `hash()` — the builtin is only stable while `PYTHONHASHSEED` is pinned.
 
 | Family | Sub-options |
 |---|---|
@@ -72,8 +78,12 @@ would be a silent no-op. 16 real leaves, not 17.
 
 > **Deliberately dumb for now.** Strategy in focus selection — and a per-team *coach identity*
 > with a major and a minor (a discipline-major/systems-minor team is a Bobby Knight) — is
-> planned, not scoped here. Focus choice is random so the ALLOCATION logic below can be
+> planned, not scoped here. Focus choice is arbitrary so the ALLOCATION logic below can be
 > measured without a second moving part.
+>
+> **Measured cost of giving up the always-optimal leaf: −0.14 ± 0.14 per player per week over
+> 60 teams / 720 players — not distinguishable from zero.** I predicted a meaningful drop; there
+> isn't one. (An earlier 24-team run read +0.22 and was noise.)
 
 ---
 
@@ -111,42 +121,86 @@ no cross-week state.
 
 All 12 never-zero slots start at **1** (= 12 pts). `breaks` and the 7 team drills start at **0**.
 
-### 3.3 Offensive vision spends 6
+### 3.3 Why the first draft's `+2 / +1` pattern was wrong
 
-| Vision | +2 | +1 | +3 (team drill) |
-|---|---|---|---|
-| Run and Gun | conditioning | agility | fast_breaks.offense_install |
-| Spread | offense.outside | ball_handling | team_offense.install |
-| Inside-Out | offense.inside | strength | team_offense.install |
-| Attack | ball_handling | offense.inside | scrimmages |
-| Motion | passing | offense.outside | team_offense.install |
+**One plan covers the whole roster, so what matters is a attribute's AVERAGE fit across the
+five positions — not its fit for the player it suits.** Every skill attribute is strong for two
+positions and weak for three, so they all land in a narrow band:
 
-### 3.4 Defensive vision spends 6
+| attribute | avg fit | points needed to HOLD roster-wide (JR/SR) |
+|---|--:|---|
+| **ND, IQ, FT** | **1.00** | **1** |
+| SC, RB | 0.60 | 2 |
+| SH, OD, ST, AG, ID, PS, BH | 0.52–0.59 | **3** |
 
-| Vision | +2 | +1 | +3 (team drill) |
-|---|---|---|---|
-| Full-Court Press | presses.offense_install (+2) | conditioning | presses.defense_install |
-| Man Lockdown | defense.outside | defense.inside | team_defense.install |
-| Zone | defense.inside, film_study | — | team_defense.install (+2) |
-| Multiple | — | defense.inside, defense.outside, film_study | team_defense.install |
-| Contain | team_defense.install, breaks | defense.inside, defense.outside | — |
+`BH` is 1.00 for a PG and 0.25 for a PF/C; `ID` is 1.00 for a C and 0.25 for a PG. The averages
+collapse to ~0.55 for all nine.
 
-### 3.5 Worked examples
+**So a skill emphasis must be 3 points or it is not an emphasis.** The draft's `+1` slot landed
+on 2 points — below break-even for every skill attribute — meaning **seven of ten visions had a
+secondary emphasis that still declined**, and Contain and Multiple had none that held at all.
+A point spent to slow a decline reads as identity in the table and does nothing on the roster.
 
-**Inside-Out / Zone** — a post team that packs the paint
-`SC 3 · ID 3 · film_study 3 · team_off 3 · ST 2 · team_def 2`, all else 1, fb/scrimmages/presses/breaks 0 = **24**
+**Bucket 3 is ~3x more point-efficient than Bucket 2**, because ND/IQ/FT are fit 1.00 for
+everyone. That is arithmetic, not preference, and it is what the two modes below exploit.
 
-**Run and Gun / Full-Court Press** — the most physically demanding pairing
-`conditioning 4 · fb.off 3 · presses.def 3 · presses.off 2 · AG 2`, all player drills 1, team_off/team_def 0 = **24**
+### 3.4 TWO MODES — the roster/skill split
 
-That `conditioning 4` is the **only** 4 the table can produce, and only for this pairing — which
-is exactly when it is earned. That team never installs team offense or defense: a legible
-weakness, entirely inside the safe-to-zero block.
+Neither lever alone is right: skill emphasis is characterful but only reaches the two positions
+that fit it; Bucket 3 reaches everyone but says little about identity. So a CPU team alternates,
+and the split becomes the single dial future logic turns.
+
+**FOCUS WEEK — sharp, reaches the players who fit the vision**
+
+* 12 floors at 1
+* **two** skill attributes at **3 points** (never 2 — see §3.3)
+* the vision's team installs
+
+**ROSTER WEEK — efficient, reaches everyone**
+
+* 12 floors at 1
+* ND / IQ / FT lifted
+* the vision's team installs
+
+**Split: 50/50 for now.** Later driven by team performance, roster makeup, star-player form and
+the upcoming opponent — one number, many inputs, which is why it is worth isolating now.
+
+⚠️ **THE 12 FLOORS HOLD IN BOTH MODES.** If a roster week drops a skill to 0 to fund Bucket 3,
+that attribute takes the −1.5 neglect drag *plus* year decay, and alternating becomes a sawtooth
+worse than either mode alone. **The modes differ only in where the SPARE points go**, never in
+whether the floors exist.
+
+⚠️ **Accepted cost: 50/50 halves how fast identity expresses itself.** A Spread team emphasising
+shooting every other week develops its SG's `SH` at half the rate of one that always does. That
+is the price of hedging, taken deliberately.
+
+### 3.5 Vision → emphasis targets
+
+Focus-week skill emphases (3 pts each) and the team installs both modes carry:
+
+| Vision | focus-week skills (3pt) | team installs |
+|---|---|---|
+| Run and Gun | conditioning*, agility | fast_breaks.offense_install |
+| Spread | offense.outside, ball_handling | team_offense.install |
+| Inside-Out | offense.inside, strength | team_offense.install |
+| Attack | ball_handling, offense.inside | scrimmages |
+| Motion | passing, offense.outside | team_offense.install |
+| Full-Court Press | conditioning* | presses.defense_install, presses.offense_install |
+| Man Lockdown | defense.outside, defense.inside | team_defense.install |
+| Zone | defense.inside, film_study* | team_defense.install |
+| Multiple | defense.inside, defense.outside | team_defense.install |
+| Contain | defense.inside, defense.outside | team_defense.install, breaks |
+
+\* **conditioning (ND) and film_study (IQ) are fit-1.00**, so Run and Gun, Full-Court Press and
+Zone reach their whole roster even on a focus week. In the first draft that was luck — the
+attributes were picked for flavour. It is now the reason those three visions are the most
+efficiently expressed, and worth preserving.
 
 ### 3.6 Camp week (30 points)
 
-Each vision spends **9** instead of 6, same shape scaled. Floors stay at 1 so camp keeps its
-identity flavour rather than flattening into development.
+Same two modes, +6 points. Floors stay at 1 so camp keeps its identity flavour rather than
+flattening into pure development. Camp runs at `CAMP_GAIN_SCALE` 0.70 and skips decay, so every
+allocation gains there — the fit constraints in §3.3 are an IN-SEASON phenomenon only.
 
 ---
 
@@ -214,17 +268,26 @@ not done — whether a CPU team can even see its next opponent's tendencies at t
 
 ## 7. Build order
 
-1. Collapse CPU training to one team-wide plan (deletes the position-group loop)
-2. Random focus from the 16, on `training_rng`
-3. Identity → allocation table (§3) + saturation taper (§4)
+1. ✅ **SHIPPED** `840c685a2` — one team-wide plan (deleted the position-group loop)
+2. ✅ **SHIPPED** `d3efecd1b` — 1 of 16 coaching focuses, derived per (franchise, team, season,
+   week) rather than drawn, because pool workers each seed their own `training_rng` and an RNG
+   draw would not replay. Measured cost −0.14 ± 0.14/player/week: **not distinguishable from
+   zero**, contrary to my prediction that it would meaningfully hurt.
+3. Identity → allocation, TWO MODES (§3.4) + saturation taper (§4)
 4. Re-measure CPU player development — the ~+38.7 arc will have moved
 5. Re-check EOG bands against a season of the new allocation
 6. *Later:* coach identity (major/minor), then opponent game-planning
 
 ## 8. Open questions
 
-1. **Roughly half of each vision's emphasis lands on team drills** (the +3s). Team attributes
-   are probability-gated, player attributes are not, so those points are "cheaper" in expected
-   value. Is identity better expressed through *systems* than *bodies*?
-2. Camp at 9+9 (§3.6) — confirmed, or raise floors to 2 instead?
+1. ~~Is identity better expressed through systems than bodies?~~ **RESOLVED by §3.4** — both,
+   alternating. The two modes exist because neither lever alone reaches the whole roster AND
+   says something about identity.
+2. Camp at +6 (§3.6) — confirmed, or raise floors to 2 instead?
 3. The taper curve in §4 (0.75/0.5/0.25 across +17/+18/+19) is a proposal, not measured.
+4. **The 50/50 mode split is arbitrary.** It is the dial future logic turns (performance,
+   makeup, star form, opponent), so it should be a single named constant from day one.
+5. **Does alternating beat a steady middle?** A skill attribute gets 3pt half the time and 1pt
+   the other half; whether that outperforms a steady 2pt is measurable and untested. The
+   floors mean neither option risks the −1.5 neglect drag, so this is a tuning question, not
+   a safety one.
