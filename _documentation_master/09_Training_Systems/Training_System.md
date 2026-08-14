@@ -198,7 +198,7 @@ While training runs, `PageLoadOverlay` uses its separate `newswire` variant to r
 
 ### Position fit and class taper
 
-Position fit and class affect **gain, never price**. They are stored directly as percentages in `TRAINING_GAIN_PERCENTAGES` and `CLASS_GAIN_PERCENTAGES`; there is no cost matrix or reciprocal derivation. Class rates are FR 100%, SO ~91%, JR 80%, SR ~71%. The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`.
+Position fit and class affect **gain, never price**. They are stored directly as percentages in `TRAINING_GAIN_PERCENTAGES` and `CLASS_GAIN_PERCENTAGES`; there is no cost matrix or reciprocal derivation. Class rates are FR 100%, SO 91%, JR 95%, SR 100% (JR/SR raised from 80/71 on 2026-08-14 — flat decay was making upperclassmen regress in-season; the bump flips JR/SR net positive without touching FR/SO or decay). The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`.
 
 This moved the fractional component off the budget so the user always sees and spends whole points while retaining the original cross-position granularity. Shape floors and `resolve_training_position()` are unchanged.
 
