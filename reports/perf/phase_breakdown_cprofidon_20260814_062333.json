@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-08-14T06:23:46",
+  "git_commit": "840c685a2e7d32441f9018b6b333cdd58b6e882b",
+  "git_dirty": true,
+  "franchise_id": "6a7e582a1198ae826b124c82",
+  "week": 4,
+  "mode": "cpu",
+  "workers": 1,
+  "seed": 20260720,
+  "probes_installed": 0,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 1,
+        "total_wall_s": 7.156,
+        "sum_game_s": 7.155,
+        "min_s": 7.1555,
+        "median_s": 7.155,
+        "mean_s": 7.155,
+        "p90_s": null,
+        "max_s": 7.1555
+      },
+      "phases": {},
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "South Lancaster @ Morristown",
+          "seed": 20260720,
+          "wall_s": 7.1555,
+          "away_score": 43,
+          "home_score": 57
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)          7.16    100.0%\nTOTAL WALL                               7.16    100.0%"
+    }
+  }
+}

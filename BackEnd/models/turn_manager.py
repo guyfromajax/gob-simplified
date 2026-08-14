@@ -9,6 +9,7 @@ import json
 import logging
 import uuid
 from BackEnd.db import players_collection, teams_collection, plays_collection
+from BackEnd.utils import plays_catalog
 from BackEnd.models.player import Player, player_to_dict
 
 # ✅ PERFORMANCE: Cache plays by (play_type, play_focus) so we don't hit DB every turn (~200+ turns/quarter)
@@ -24,7 +25,6 @@ from BackEnd.constants import (
     POSITION_LIST,
     STRATEGY_CALL_DICTS,
     STRATEGY_DEFENSE_ZONE_SENTINEL,
-    TEMPO_PASS_DICT,
     MALLEABLE_ATTRS,
     HOME_RIM_COORDS,
     AWAY_RIM_COORDS,
@@ -2770,9 +2770,9 @@ class TurnManager:
                 offense_override_cleared = True
             self.game.game_state["user_offense_override"] = None  # Legacy clear
             
-            # Lookup play details from database to get play_type and play_focus (cached by name)
+            # Lookup play details to get play_type and play_focus (cached by name)
             if chosen_playcall not in _play_doc_by_name_cache:
-                _play_doc_by_name_cache[chosen_playcall] = plays_collection.find_one({"name": chosen_playcall})
+                _play_doc_by_name_cache[chosen_playcall] = plays_catalog.doc_by_name(chosen_playcall)
             play_doc = _play_doc_by_name_cache[chosen_playcall]
             
             # 🔍 DEBUG: Log play document lookup for override
@@ -3215,11 +3215,13 @@ class TurnManager:
         """Cached plays query; motion ignores play_focus."""
         cache_key = (play_type, play_focus if play_type != "motion" else None)
         if cache_key not in _plays_by_type_focus_cache:
-            if play_type == "motion":
-                query = {"play_type": play_type}
-            else:
-                query = {"play_type": play_type, "play_focus": play_focus}
-            _plays_by_type_focus_cache[cache_key] = list(plays_collection.find(query))
+            # Filtered in memory from the catalog, in catalog order — the same documents in
+            # the same order the equivalent `find(query)` returned, which matters because a
+            # caller picks from this list with the sim RNG.
+            docs = [d for d in plays_catalog.all_docs() if d.get("play_type") == play_type]
+            if play_type != "motion":
+                docs = [d for d in docs if d.get("play_focus") == play_focus]
+            _plays_by_type_focus_cache[cache_key] = docs
         return _plays_by_type_focus_cache[cache_key]
 
     def _select_motion_play_situational_slow(self, matching_plays: list) -> dict:
@@ -3573,7 +3575,7 @@ class TurnManager:
         
         # Step 1: Get play type and focus from playcall (cached by name)
         if offensive_playcall not in _play_doc_by_name_cache:
-            _play_doc_by_name_cache[offensive_playcall] = plays_collection.find_one({"name": offensive_playcall})
+            _play_doc_by_name_cache[offensive_playcall] = plays_catalog.doc_by_name(offensive_playcall)
         play_doc = _play_doc_by_name_cache[offensive_playcall]
         if not play_doc:
             return 0.0
@@ -4186,12 +4188,49 @@ class TurnManager:
 
         return bool(would_take_final_shot(self.game, time_remaining))
 
+    def _clone_game_for_preview(self):
+        """Deep-clone the live game so an EOQ preview can mutate something safe.
+
+        The clone is load-bearing: the HCT/FCP/Fast Break resolvers mutate score,
+        stats, possession, coordinates and clock, and the only way to learn how many
+        game-seconds a turn consumes is to resolve it and measure the emitted schema.
+        Its *scope* is not. The already-emitted turn log is append-only presentation
+        history that no resolver needs a private copy of, and it is the bulk of the
+        object graph — a Q3 clone copied ~1.9M objects (~0.6s), ~80% of it the log,
+        growing quarter over quarter because `gm.turns` is never cleared in a full sim.
+
+        So the log is shared by reference with a deep-copied tail:
+
+        * the clone gets its own list object, so appends and replacements cannot leak;
+        * the last ``EOQ_PREVIEW_TURN_TAIL`` rows are private copies — every in-place
+          mutation of an existing turn in the engine writes to ``turns[-1]`` or
+          ``turns[-2]`` (``game_manager._append_turn``), and the deepest tail any code
+          *reads* is 10;
+        * length and order are preserved, because turn numbering (``len(game.turns) + 1``)
+          and several guards read the length.
+
+        Isolation, RNG neutrality and the surviving preview steps are all unchanged;
+        only what gets copied is narrower. Verified by seeded exact-diff — deepcopy
+        consumes no draws, so this cannot move the stream.
+        """
+        from BackEnd.engine.eoq_perfection import EOQ_PREVIEW_TURN_TAIL
+
+        memo: dict = {}
+        turns = getattr(self.game, "turns", None)
+        if isinstance(turns, list) and len(turns) > EOQ_PREVIEW_TURN_TAIL:
+            shared = list(turns)
+            for i in range(len(shared) - EOQ_PREVIEW_TURN_TAIL, len(shared)):
+                shared[i] = copy.deepcopy(shared[i], memo)
+            memo[id(turns)] = shared
+        return copy.deepcopy(self.game, memo)
+
     def _preview_non_hco_eoq_turn(
         self, state: str, time_remaining: int
     ) -> tuple[bool, Optional[dict]]:
         """Preview a late HCT/FCP/FB and return a shortened FLSS when required.
 
-        The clone owns all speculative score/stat/possession mutations. The sim
+        The clone owns all speculative score/stat/possession mutations (see
+        ``_clone_game_for_preview`` for what it copies and what it shares). The sim
         RNG is restored after preview so a fitting turn resolves identically on
         the live game, while an overrun starts FLSS from the unconsumed stream.
         """
@@ -4206,7 +4245,7 @@ class TurnManager:
 
         rng_state = getstate()
         try:
-            preview_game = copy.deepcopy(self.game)
+            preview_game = self._clone_game_for_preview()
             if state == "FAST_BREAK":
                 preview = resolve_fast_break_logic(preview_game)
             elif state == "FCP":

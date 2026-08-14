@@ -14,7 +14,7 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 ## 1. Design principles
 
 1. **Quarter end is clock-driven.** A period ends when `game_state.time_remaining` reaches **0**, not when a possession flag fires alone.
-2. **Every live entry is runway-protected.** HCO retains its structured Final Turn gate. HCT, FCP, and every migrated Fast Break are previewed on an RNG-neutral deep clone; if the complete turn does not fit while reserving the one-second FLSS release window, only complete non-terminal movement steps that fit are retained before FLSS.
+2. **Every live entry is runway-protected.** HCO retains its structured Final Turn gate. HCT, FCP, and every migrated Fast Break are previewed on an RNG-neutral deep clone (scope-limited — §6b); if the complete turn does not fit while reserving the one-second FLSS release window, only complete non-terminal movement steps that fit are retained before FLSS.
 3. **Backend owns routing.** The frontend renders turn payloads (`animation_steps`, flags). It must not decide EOQ branches locally.
 4. **OREB ≠ EOQ chain start.** Offensive rebounds happen all game. They route to putback turns but **do not** start the EOQ chain unless clock ≤ 30 **and** a chain is already active (see §5). A short-clock putback preserves capture and release; a Q4/OT offense eligible for Run Out because it is leading or trailing by more than 18 secures the board and drains the clock instead.
 5. **Zero is terminal everywhere.** After every clock mutation, the universal finalizer clamps backend/schema clocks, removes next-play/setup/possession-flip continuation, and clears pending EOQ state. Unfinished free throws are the sole exception.
@@ -48,6 +48,7 @@ This document is the **canonical reference** for end-of-quarter gameplay logic a
 | `POST_DREB_FLSS_MIN_CLOCK` | 2 | Post-DREB FLSS when chain active and clock **> 2s**; terminal DREB at ≤ 2s |
 | `LATE_CLOCK_BIP_RUNOFF_SECONDS` | 2 | Game-clock burn on BIP after late-clock make or `late_clock_ft_resolution` |
 | `FINAL_TURN_HANDOFF_CONVERGE_GRID` | 6.0 | Final Turn handoff **receive radius** — the PG converges to within this many grid of the live handler before the pass (in `constants/__init__.py`). NB: preflight sizes the handoff by the *real* PG→handler travel, not this radius. |
+| `EOQ_PREVIEW_TURN_TAIL` | 12 | Turns the preview clone copies privately; the rest of the turn log is shared by reference (in `eoq_perfection.py`). Perf-only — see §6b. |
 
 ---
 
@@ -221,6 +222,24 @@ then uses `evaluate_final_turn_pacing()` for its structured alignment/handoff
 decision. If the structured Final Turn cannot release inside the available
 clock, it routes to FLSS at every positive clock value. The measured preview
 rule provides the equivalent overrun protection for HCT/FCP/Fast Break.
+
+**What the clone copies.** The clone exists so impure resolvers can run
+speculatively; it does not need a private copy of the already-emitted turn log,
+which is append-only history and the bulk of the object graph. Scope was narrowed
+in `_clone_game_for_preview()`: the clone gets its **own list object** holding
+deep copies of the last `EOQ_PREVIEW_TURN_TAIL` (12) turns and **shared references**
+to everything older, with length and order preserved. That is safe by inspection —
+every in-place mutation of an existing turn writes to `turns[-1]` / `turns[-2]`,
+the deepest tail any code *reads* is 10 (`turns[-10:]` in the animator,
+`max_turns=10` in `_find_most_recent_shot_turn`), and turn numbering reads
+`len(game.turns)`. **If you add a site that mutates a turn older than the tail, or
+reads deeper than 12 back, raise the constant.** Isolation, RNG neutrality and the
+surviving preview steps are unchanged.
+
+*Perf note:* the full clone cost ~1.65 s/game (4.7 previews/game, 178 ms at 91
+turns rising to 615 ms at 295 — it grew through the game because `gm.turns` is
+never cleared in a full sim). Narrowing the scope cut that ~79% and took a seeded
+63-game CPU week from 47.4 s to 37.7 s, refstats byte-identical across all 126 rows.
 
 **SFX:** First full Final Turn plays the Final Shot stinger (once per quarter dedupe). Follow-up full Final Turns stamp `suppress_final_shot_sfx` — FE shows the “Final Shot” headline but skips the court stinger. FLSS never shows the headline; penalty/heave zones play coach VO via backend-stamped `sfx_on_step_start` on the terminal shoot step. Presentation rules do **not** drive routing.
 

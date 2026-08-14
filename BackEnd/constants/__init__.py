@@ -1,9 +1,10 @@
-import random  # NOTE: constants only draws at IMPORT time (TEMPO_PASS_DICT below),
-# once per process before any game is seeded — so it must NOT import the sim RNG.
-# Doing so created a circular import (constants -> utils.sim_random -> utils/__init__
-# -> stat_updater -> constants) that silently killed FastAPI startup. See git history
-# for commit b269732fa. Leaf modules under constants/ still use sim_rng safely because
-# they load after this package __init__ has finished.
+# NOTE: this module must NOT import the sim RNG. Doing so creates a circular import
+# (constants -> utils.sim_random -> utils/__init__ -> stat_updater -> constants) that
+# silently killed FastAPI startup; see commit b269732fa. Leaf modules under constants/
+# still use sim_rng safely because they load after this package __init__ has finished.
+# It must not draw from the stdlib `random` either: a module-level draw runs once per
+# process before any game is seeded, which the global-draw guard reports as an RNG leak
+# (it failed scripts/sim_verify/kill_worker_test.py from 2026-07-21 to 2026-08-14).
 import os
 
 # Debug flag - set DISABLE_DEBUG=1 environment variable to suppress verbose output
@@ -177,12 +178,6 @@ STRATEGY_CALL_DICTS = {
         3: ["normal", "aggressive"],
         4: ["aggressive"],
     },
-}
-
-TEMPO_PASS_DICT = {
-    "slow": random.randint(1,6),
-    "normal": random.randint(2,4),
-    "fast": random.randint(1,3)
 }
 
 TURNOVER_CALC_DICT = {

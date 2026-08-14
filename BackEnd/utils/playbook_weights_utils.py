@@ -13,7 +13,6 @@ import json
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Tuple
 
-from bson import ObjectId
 
 from BackEnd.utils.playbook_settings_utils import build_simplified_playbook_settings
 from BackEnd.utils.team_play_utils import build_team_play_indexes
@@ -238,28 +237,19 @@ def _round_weights_to_100(weight_map: Dict[str, float]) -> Dict[str, int]:
 
 
 def _fetch_universal_play_docs_by_id(play_ids: Iterable[str]) -> Dict[str, Dict[str, Any]]:
-    from BackEnd.db import plays_collection
+    # Served from the process-level catalog, which keys by ``str(_id)`` and so needs no
+    # ObjectId/string split. This previously ran a projected collection scan per call
+    # (~157 ms each on a non-colocated Atlas) for documents that never change during a run.
+    from BackEnd.utils import plays_catalog
 
-    object_ids = []
-    string_ids = []
+    docs = {}
     for play_id in sorted(play_ids, key=str):  # sorted(): set iteration is hash-ordered; see projects/bugs.md (PYTHONHASHSEED)
         if not play_id:
             continue
-        try:
-            object_ids.append(ObjectId(str(play_id)))
-        except Exception:
-            string_ids.append(str(play_id))
-
-    query = {"$or": []}
-    if object_ids:
-        query["$or"].append({"_id": {"$in": object_ids}})
-    if string_ids:
-        query["$or"].append({"_id": {"$in": string_ids}})
-    if not query["$or"]:
-        return {}
-
-    docs = list(plays_collection.find(query, {"name": 1, "play_type": 1, "target_shooter": 1, "pos1": 1, "pos2": 1, "pos3": 1, "pos4": 1, "skeletons": 1}))
-    return {str(doc.get("_id")): doc for doc in docs if doc.get("_id") is not None}
+        doc = plays_catalog.doc_by_id(play_id)
+        if doc and doc.get("_id") is not None:
+            docs[str(doc.get("_id"))] = doc
+    return docs
 
 
 def compute_position_shot_weights(

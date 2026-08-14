@@ -4862,6 +4862,15 @@ def _franchise_cpu_full_sim_max_workers() -> int:
         return 4
 
 
+def _franchise_cpu_pool_workers_for_log(thread_max_workers: int) -> int:
+    """Worker count the CPU-week sim block actually used, for the timing line."""
+    if _franchise_cpu_use_pool():
+        from BackEnd.utils.cpu_week_pool import pool_worker_count
+
+        return pool_worker_count()
+    return thread_max_workers
+
+
 def _franchise_cpu_use_pool() -> bool:
     """Phase 3b: use the spawn-based ProcessPoolExecutor for the CPU week.
 
@@ -7437,11 +7446,15 @@ def _complete_week_finish_cpu_and_persist(
         # `full_sim_block` is the parallel simulation compute; persistence follows
         # and is not counted here.
         _fullsim_secs = time.time() - _cpu_fullsim_t0
+        # `workers` is here because it was the one number this line never carried: a week
+        # that runs slow because the pool is contended looks identical to one that is slow
+        # because the engine got heavier. Pair it with [POOL-EFFICIENCY] / [POOL-OVERLAP].
         logger.warning(
             "[CPU-WEEK-TIMING] franchise=%s week=%s | full_tbt=%s | "
-            "engine=%s | full_sim_block=%.1fs (%.2fs/full-game) total_so_far=%.1fs | failures=%s",
+            "engine=%s workers=%s | full_sim_block=%.1fs (%.2fs/full-game) total_so_far=%.1fs | failures=%s",
             franchise_id_str, week, len(full_jobs),
             "pool" if _franchise_cpu_use_pool() else "thread",
+            _franchise_cpu_pool_workers_for_log(max_workers),
             _fullsim_secs, _fullsim_secs / max(1, len(full_jobs)),
             time.time() - _cpu_week_t0, len(sim_err),
         )

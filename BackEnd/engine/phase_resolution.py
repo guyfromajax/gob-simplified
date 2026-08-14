@@ -9915,26 +9915,19 @@ def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
     Resolve a possibly stale ``current_playcall`` string to the current ``plays.name``
     using the team's ``play_id`` when the name no longer exists in the universal collection.
 
-    The universal lookups here are memoized per game (see ``_playcall_memo``) because this runs on
-    every ``get_hco_skeleton`` call — the dominant source of Mongo round-trips during a sim.
+    The universal lookups here run on every ``get_hco_skeleton`` call — historically the
+    dominant source of Mongo round-trips during a sim. They are served from the
+    process-level ``plays_catalog`` (was: a per-game memo over per-game DB reads).
     """
     if not game_context or not playcall or not isinstance(playcall, str):
         return playcall
 
-    from bson import ObjectId
-
-    from BackEnd.db import games_collection, plays_collection
+    from BackEnd.db import games_collection
+    from BackEnd.utils import plays_catalog
     from BackEnd.utils.team_play_utils import resolve_team_play
 
-    name_exists = _playcall_memo(game_context, "name_exists")
-
     try:
-        if playcall in name_exists:
-            found = name_exists[playcall]
-        else:
-            found = bool(plays_collection.find_one({"name": playcall}, {"_id": 1}))
-            name_exists[playcall] = found
-        if found:
+        if plays_catalog.name_exists(playcall):
             return playcall
     except Exception:
         # Unchanged semantics: on lookup failure do NOT memoize, and fall through to the
@@ -9962,17 +9955,8 @@ def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
     if play_obj:
         pid = play_obj.get("play_id")
         if pid:
-            id_to_name = _playcall_memo(game_context, "id_to_name")
-            key = str(pid)
             try:
-                if key in id_to_name:
-                    name = id_to_name[key]
-                else:
-                    doc = plays_collection.find_one({"_id": ObjectId(key)}, {"name": 1})
-                    name = doc.get("name") if doc else None
-                    if not (isinstance(name, str) and name):
-                        name = None
-                    id_to_name[key] = name
+                name = plays_catalog.name_for_id(pid)
                 if name:
                     return name
             except Exception:
@@ -9980,12 +9964,7 @@ def _canonical_offensive_playcall_name(game_context, playcall: str) -> str:
         embedded = play_obj.get("name")
         if isinstance(embedded, str) and embedded:
             try:
-                if embedded in name_exists:
-                    found = name_exists[embedded]
-                else:
-                    found = bool(plays_collection.find_one({"name": embedded}, {"_id": 1}))
-                    name_exists[embedded] = found
-                if found:
+                if plays_catalog.name_exists(embedded):
                     return embedded
             except Exception:
                 pass
@@ -10020,7 +9999,7 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
     Returns:
         dict: Selected skeleton with steps
     """
-    from BackEnd.db import plays_collection, games_collection, tournaments_collection, franchises_collection
+    from BackEnd.db import games_collection, tournaments_collection, franchises_collection
 
     if game_context:
         _sync_current_playcall_to_canonical_name(game_context)
@@ -10037,15 +10016,18 @@ def get_hco_skeleton(result_type, game_context, lean_score=None):
     if skeleton:
         return skeleton
     
-    # Fallback to universal plays collection. Memoized per game for the same reason as the
-    # canonical-name lookups above: this fires on every turn whose playcall misses the team-plays
-    # path, and the universal doc is immutable for the duration of a game. Mirrors the existing
-    # `_skeleton_cache` in `_get_skeleton_from_team_plays`, which already caches full play docs.
+    # Fallback to the universal plays catalog. The per-game memo stays: skeleton selection
+    # below mutates the document it is handed (`skeleton["_variant"]`, `skeleton["steps"]`),
+    # so each GAME must keep its own copy for the whole game — which is what a per-game memo
+    # over `plays_catalog.doc_by_name` (a fresh deep copy per call) reproduces exactly.
+    # Only the Mongo round trip is gone.
+    from BackEnd.utils import plays_catalog
+
     _doc_memo = _playcall_memo(game_context, "doc_by_name") if game_context else {}
     if playcall in _doc_memo:
         play_doc = _doc_memo[playcall]
     else:
-        play_doc = plays_collection.find_one({"name": playcall})
+        play_doc = plays_catalog.doc_by_name(playcall)
         _doc_memo[playcall] = play_doc
 
     if play_doc and "skeletons" in play_doc:
@@ -10138,7 +10120,7 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
     Returns:
         dict: Selected skeleton, or None if not found
     """
-    from BackEnd.db import games_collection, tournaments_collection, franchises_collection, plays_collection
+    from BackEnd.db import games_collection, tournaments_collection, franchises_collection
     from bson import ObjectId
     from BackEnd.utils.team_play_utils import resolve_team_play
     
@@ -10180,9 +10162,13 @@ def _get_skeleton_from_team_plays(playcall, team_id, game_context, lean_score=No
         play_doc = game_context._skeleton_cache[cache_key]
         # print(f"🔍 CACHE HIT: '{playcall}' (play_id: {play_id})")
     else:
-        # STEP 3: Fetch full play document from universal collection
+        # STEP 3: Fetch full play document from the universal catalog. `_skeleton_cache` is
+        # per game and stays that way — the selected skeleton is mutated in place downstream,
+        # so the copy the catalog hands back must not outlive this game.
         try:
-            play_doc = plays_collection.find_one({"_id": ObjectId(play_id)})
+            from BackEnd.utils import plays_catalog
+
+            play_doc = plays_catalog.doc_by_id(play_id)
             if not play_doc:
                 # print(f"🔍 NOT FOUND: No play document for play_id '{play_id}'")
                 return None
