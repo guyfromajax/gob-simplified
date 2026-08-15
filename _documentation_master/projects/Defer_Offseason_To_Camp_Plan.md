@@ -40,9 +40,21 @@ TARGET:
 | `season++`, `advance_year` (`:16608/16644/16705`) | returning-player `develop_rollover` (`:16667`) |
 | graduation (`_is_graduating_year`, `:16642`) | recruit JH→FR `develop_rollover` (`:16727`) |
 | recruiting / signings structure | `_build_offseason_report_line` generation |
-| (roster shows correct **years** immediately) | then existing camp `execute_training` (unchanged) |
+| roster/scholarship display **order** (cosmetic — greedy best-RT lineup is order-independent) | then existing camp `execute_training` (unchanged) |
+| (roster shows correct **years** immediately) | **`total_player_attrs` recompute + preseason `natl_rank`** — see must-handle |
 
 Benign accepted window: after wk-36 transition and before wk-1 Run Training, players show correct **year** with **un-developed attributes** (a sophomore with freshman-end attributes). This is intended — it's what makes the camp reveal an event.
+
+### Must-handle (from the wk-36→wk-1 consumer trace)
+
+The offseason window (Zone B — FCC, lineup autoset, roster/player card, recruiting hub) is **display-only safe**: every read is cosmetic, nothing bakes a decision. **But two computations inside `finish_season` run AFTER today's develop and compute-and-FREEZE off developed rosters** — if develop moves and they don't, the whole season's rankings lock to pre-camp attributes:
+
+1. **`total_player_attrs`** (`:16771-16774`, persisted `:16844`) — **season-FROZEN** under prestige v2 (`_update_ftd_roster_state` strips it from all in-season writes, `:202-213`; `finish_season` is the *sole* unfrozen writer). Feeds `calculate_ranking_score` (weight 0.10 wk0 → 0 by wk5).
+2. **Preseason `natl_rank`** via `rank_teams_for_week(..., week=0)` (`:16803-16826`, persisted `:16849`) — seeds early SOS, tournament seeding tiebreaks, PGPC opponent context.
+
+→ **Both must be computed AFTER Week-1 camp development applies**, not in the year-advance step. Recompute totals + re-rank + re-persist at end of camp.
+
+Roster/scholarship **order** (item above) is genuinely cosmetic — no handling.
 
 ---
 
@@ -69,6 +81,7 @@ Benign accepted window: after wk-36 transition and before wk-1 Run Training, pla
 ## Invariants / must-not-break
 
 1. **Pipeline order** — offseason must run before camp in the same handler; never camp-then-offseason.
+1b. **No wk-1 game before training** — team **identity/strategy** (`:7643`) and **team attributes** (`:1631`) derive from roster RT at sim/post-game. They capture *developed* RT today only because camp gates the week ahead of any game. Deferring must preserve that ordering (camp runs before any wk-1 game), or those bake off undeveloped RT.
 2. **Values unchanged** — final Week-1 attributes must equal today's (offseason-then-camp). Poison-test, don't diff exact draws.
 3. **Inputs available at TC** — the returning path uses the just-finished season's training accumulator (`_season_alloc`, quality-half; dormant but wired). Ensure it (and `entry_tier`, `potential_factor`, `development` subdoc) survive from finish_season to Week-1 Run Training.
 4. **Run once** — offseason apply is idempotent per player/season.
@@ -77,7 +90,7 @@ Benign accepted window: after wk-36 transition and before wk-1 Run Training, pla
 
 ## Risks / open questions
 
-- **Does anything in the wk-36→wk-1 window need developed RT?** (offseason recruiting valuations, roster RT displays). If yes and it must reflect post-development, revisit — but current read is the window is display-only. **Verify before Phase 1.**
+- ~~Does anything in the wk-36→wk-1 window need developed RT?~~ **RESOLVED by trace (2026-08-15):** the window is display-only safe (Zone B). But the trace surfaced **two must-handle frozen computations inside `finish_season`** (`total_player_attrs`, preseason `natl_rank`) — see Must-handle above; these move to end-of-camp with the develop.
 - **CPU timing** (Phase 4) — must not double-apply if CPU autotrain and this share code.
 - **Save migration** — mid-transition franchises already past finish_season this season: one-time, define behavior (likely: already-applied, skip defer this cycle).
 
