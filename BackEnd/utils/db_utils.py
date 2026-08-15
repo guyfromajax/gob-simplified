@@ -319,11 +319,24 @@ def _team_score_margin(team, game_state) -> Optional[int]:
 
 
 def _blowout_lineup_active(team, game_state) -> bool:
-    """True when a comfortably-winning COMPUTER team should rest its starters (garbage time) and
-    build the lineup from its LOWEST-RT players. Margin-of-victory thresholds by quarter/time
+    """True when a comfortably-winning team should rest its starters (garbage time) and build the
+    lineup from its LOWEST-RT players. Margin-of-victory thresholds by quarter/time
     (Computer_Team_GamePlan_System.md §Blowout Situation). Never Q1/Q2/OT; re-checked at every
-    lineup set, so it reverts automatically once the margin drops back under threshold."""
-    if not isinstance(team, TeamManager) or getattr(team, "is_user_team", False):
+    lineup set, so it reverts automatically once the margin drops back under threshold.
+
+    APPLIES TO USER TEAMS IN FULL SIM ONLY (PR0.5). The user team used to be excluded
+    unconditionally, which meant the blowout systems were never applied to the team doing the
+    blowing out. Matched pair on the prod season: Rushmore (user) and Couer d'Alene (CPU), talent
+    563.8 vs 564, both 26-0, same vision pair — level through halftime (18.2 vs 17.6) and then
+    +15.1 vs +2.3 in the second half, diverging exactly as the lead crosses 20.
+
+    Turn-by-turn is still excluded: in Play Quarter the user owns substitutions, and overriding
+    them there would take away a decision they are actively making (governor spec A2). The flag
+    is set at main.py:902 and cleared at :951/:969.
+    """
+    if not isinstance(team, TeamManager):
+        return False
+    if getattr(team, "is_user_team", False) and not (game_state or {}).get("_is_full_simulation"):
         return False
     margin = _team_score_margin(team, game_state)
     if margin is None:
@@ -1154,10 +1167,18 @@ def autoset_strategy_settings(team: TeamManager, game_state=None):
     Returns:
         dict: The team's effective strategy settings
     """
-    # ✅ DEBUG: Log if this is being called on a user team (this would be a bug!)
-    if team.is_user_team:
-        # logging.warning(f"⚠️ [AUTOSET STRATEGY] ERROR: autoset_strategy_settings() called on USER team: {team.name} (is_user_team={team.is_user_team}). This should NOT happen!")
-        # Don't autoset strategy for user teams
+    # USER TEAMS: full sim only (PR0.5). Outside full sim the user owns their playcalls and this
+    # must not touch them (governor spec A2). Inside full sim the sit-on-the-lead damping applies
+    # to them exactly as it does to a CPU team — see _blowout_lineup_active for the evidence.
+    #
+    # SAFE BY CONSTRUCTION, not by avoidance: `strategy_settings_base` below holds the pristine
+    # plan and `strategy_settings` is a per-call damped VIEW recomputed on every lineup rebuild.
+    # The user's saved gameplan lives in the FTD document and is never written from here (the only
+    # FTD write of strategy_settings is gameplan_routes.py:1186, which writes DEFAULTS when the
+    # field is missing). The games-doc snapshot now persists `strategy_settings_base` — see
+    # api.py — so both of its consumers (the Gameplan UI at gameplan_routes.py:1625 and
+    # timeout-resume via extract_team_settings) read the PLAN rather than a damped view.
+    if team.is_user_team and not (game_state or {}).get("_is_full_simulation"):
         return team.strategy_settings
 
     # Establish the persistent base ONCE. Callers reach here after init, so the settings
