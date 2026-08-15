@@ -23,7 +23,7 @@ measured and rejected, that is stated as such.
 
 ## ▶ SURFACE STATUS — read this before building or shipping
 
-`cpu_team_identity_spec.md` names **four surfaces** the vision was meant to drive. Two are
+`cpu_identity_design.md` names **four surfaces** the vision was meant to drive. Two are
 live. The table below is the single source of truth for which; everything else on this page
 describes the mechanism, not the coverage.
 
@@ -33,11 +33,11 @@ describes the mechanism, not the coverage.
 | 2 | **Starting five** | ✅ **LIVE** — shared user/CPU selector | `CPU_Team_Rotation_System.md` |
 | 3 | **Substitution policy** | ⛔ **CLOSED — measured, no effect** | `projects/bugs.md` |
 | 4 | **Playbooks** | ⚠️ **NOT identity-driven** | see below |
-| 5 | **Rotation size** | ❌ **UNBUILT** | spec §7 |
-| 6 | **Training** | ❌ **UNBUILT** | spec §6 |
-| 7 | **5-week re-evaluation** | ❌ **UNBUILT** | spec §8 |
+| 5 | **Training** | ✅ **LIVE** — identity-driven allocation, two modes | `cpu_identity_design.md` Part A |
+| 6 | **Rotation size** | ❌ **UNBUILT** | design §B2 |
+| 7 | **5-week re-evaluation** | ❌ **UNBUILT** | design §B4 |
 
-**Two live of seven. Anything claiming "CPU Identity is wired" is wrong.**
+**Three live of seven. Anything claiming "CPU Identity is fully wired" is wrong.**
 
 ### Notes that change what you would build
 
@@ -54,32 +54,34 @@ this by trying another parameter grid.
 from `_classify_focus_strengths(position_players)`, i.e. roster shape. Coverage is also scoped
 to *the teams the user is scheduled to play* (`build_user_schedule_cpu_playbook_groups`), so
 CPU-vs-CPU games use default playbooks: **8/128 teams customized at week 2, 19/128 at week 15**.
-That scoping is deliberate, not a bug. Spec §5 (vision → play families, concentration by
+That scoping is deliberate, not a bug. Design §B1 (vision → play families, concentration by
 `breadth`) is entirely unbuilt.
 
 **#5 rotation size may not be buildable in isolation.** Current depth is 6.69 players above 8%
 of minutes against a target of 8–11, but `CPU_Team_Rotation_System.md` §8 attributes that to the
 fatigue economy rather than the selector — so a `rotation_size` parameter may not move minutes.
 `starter_bench_gap`, which it depends on, **is not defined anywhere in the codebase**; a working
-definition and its arguable choices are in `projects/bugs.md`, and the spec's 13/19 band edges
-put **75% of the league in one band** on the current pool.
+definition and its arguable choices are in `projects/bugs.md`, and the 13/19 band edges put
+**75% of the league in one band** on the current pool.
 
-**#6 training's spec rationale is stale.** Spec §6 excludes player development to protect a
-coaching-quality normalization that free-will retired. That exclusion needs re-deciding before
-the surface is designed, not after.
+**#5 training SHIPPED 2026-08-14** — one team-wide plan (not per-position), 1-of-16 weekly
+coaching focus, and a two-mode identity-driven allocation. Full design and measured results in
+`cpu_identity_design.md` Part A. The original spec excluded player development to protect a
+coaching-quality normalization; that turned out to be moot — CPU teams never feed
+`season_coaching_quality` at all.
 
 ### Where the rest of the documentation lives
 
 | | |
 |---|---|
-| [`projects/cpu_team_identity_spec.md`](../projects/cpu_team_identity_spec.md) | The DESIGN. Contains unbuilt proposals — check against this table before implementing any of it. |
+| [`projects/cpu_identity_design.md`](../projects/cpu_identity_design.md) | The DESIGN — Part A training (shipped), Part B unbuilt surfaces. Check against this table before implementing any of it. |
 | [`projects/bugs.md`](../projects/bugs.md) | Mechanisms measured and rejected, with their numbers. |
 | [`CPU_Team_Rotation_System.md`](./CPU_Team_Rotation_System.md) | Lineup selection, the NG gate, the void-minutes-metric warning. |
 | [`11_Design_Systems/Tunable_Constants.md`](../11_Design_Systems/Tunable_Constants.md) | Constants index; the full identity table is in §9 here. |
 
-⚠️ **The spec is not authoritative about what is live.** It specified a substitution mechanism
-that had already been measured and stripped, because nothing reconciled the two documents. That
-is what this table is for.
+⚠️ **The design doc is not authoritative about what is live — this table is.** The original spec
+specified a substitution mechanism that had already been measured and stripped, because nothing
+reconciled the two documents. That is what this table exists to prevent.
 
 ---
 
@@ -219,7 +221,7 @@ frozen scale constants in §1 were measured **before** the attribute recalibrati
 second −2in height shift, so the z-scores feeding selection are being taken against a pool
 that has since moved.
 
-Per `cpu_team_identity_spec.md` §9, **this cannot be settled distributionally** — different
+Per `cpu_identity_design.md` §B5, **this cannot be settled distributionally** — different
 aggregation forms produce near-identical population splits while disagreeing about a third of
 the teams. Validation is downstream: do press-identity teams actually press effectively, and
 do outside-identity teams out-shoot the league? Treat the table above as a baseline to detect
@@ -492,7 +494,7 @@ larger number.
 
 `OFFENSIVE_SLIDERS`, `DEFENSIVE_SLIDERS` and `LEAGUE_BASELINE` in `team_identity.py` are weight
 vectors over values `[0,1,2,3,4]`. They were originally authored as a proposal ("§4 is my
-proposal, not measured" — `cpu_team_identity_spec.md`). **Reviewed and accepted 2026-08-12** as
+proposal, not measured" — `cpu_identity_design.md`). **Reviewed and accepted 2026-08-12** as
 the play-type mixes they produce:
 
 | Offensive vision | mean `offense` | mix |
@@ -518,7 +520,7 @@ an explicit decision; it looks like a bug and is not one.
 
 ### Playbook concentration ceiling — 25%, NOT to be lifted (2026-08-12)
 
-`cpu_team_identity_spec.md` §5 called for the concentration caps to be **raised** so Inside-Out
+`cpu_identity_design.md` §B1 called for the concentration caps to be **raised** so Inside-Out
 and Attack could funnel harder. **That proposal is REJECTED.** The intended ceiling for a single
 play's share of a normal playbook is **25%**.
 
@@ -560,7 +562,7 @@ concentration penalty continues to apply, so specialization remains a real cost.
 |---|---|---|
 | 1 | Slider scale semantics | **Ratios, confirmed.** `offense` 0=100% motion → 4=100% set plays; `defense` 0=100% man → 4=100% zone; 1/3 are 75/25 splits, 2 is 50/50. Code already matched. See §3. |
 | 2 | Slider weight vectors | **Accepted as authored**, including the Motion-ordering quirk. See §9. |
-| 3 | Playbook concentration caps | **Stay at 25%**; spec §5's "lift the caps" is rejected. See §9. |
+| 3 | Playbook concentration caps | **Stay at 25%**; design §B1's "lift the caps" is rejected. See §9. |
 | 4 | Backup-quality bar for rotation size | **Within-team comparison**, not an absolute RT bar. See below. |
 | 5 | Do user teams get an identity? | **No.** The user sets their own sliders; an auto-assigned identity would fight them. |
 

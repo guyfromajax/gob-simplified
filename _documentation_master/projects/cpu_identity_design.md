@@ -1,14 +1,27 @@
-# CPU Identity-Driven Training — DESIGN (not built)
+# CPU Identity — DESIGN
 
-**Status: steps 1-2 SHIPPED, step 3 designed (last revised 2026-08-14).** See §7 for what has
-landed. Sections describing unbuilt work say so.
+**The design doc for CPU team identity.** For what is actually LIVE, read
+[`06_Gameplay_Systems/CPU_Team_Identity_System.md`](../06_Gameplay_Systems/CPU_Team_Identity_System.md)
+first — its ▶ SURFACE STATUS table is authoritative and this document is not.
 
-Supersedes `cpu_team_identity_spec.md` §6, which was written against a CPU training path that
-does not work the way the spec assumed.
+**Last revised 2026-08-15.** Parts A (training) and B (unbuilt surfaces) below.
+
+> **Merged 2026-08-15 from `cpu_team_identity_spec.md`**, which was ~60% superseded: its model,
+> signals, fit function and slider sections describe shipped behaviour now documented in the
+> system doc; its §6 training design was replaced wholesale by Part A here; its §7 substitution
+> proposal was measured and rejected. What survived — the genuinely unbuilt surface designs —
+> is Part B. The originals of the superseded sections are in git history
+> (`cpu_team_identity_spec.md`, last content at `a6d909095`).
 
 ---
 
-## 1. The defect this fixes
+---
+
+# PART A — TRAINING
+
+Steps 1-3 SHIPPED. See §7 for the build log.
+
+## A1. The defect this fixes
 
 CPU auto-train does **not** train the way a user does. `franchise_routes.py` groups the roster
 by development position and calls `execute_training` **once per position group**, each with its
@@ -49,7 +62,7 @@ after the capture seam lands. CPU never feeds `season_coaching_quality`, so `coa
 
 ---
 
-## 2. Weekly coaching focus — RANDOM for now
+## A2. Weekly coaching focus — RANDOM for now
 
 ✅ **SHIPPED `d3efecd1b`.** Each CPU team gets **one of 16** leaves per week.
 
@@ -87,9 +100,9 @@ would be a silent no-op. 16 real leaves, not 17.
 
 ---
 
-## 3. Allocation — 12 floors + 6 offensive + 6 defensive = 24
+## A3. Allocation — 12 floors + 6 offensive + 6 defensive = 24
 
-### 3.1 Why floors exist (this is the load-bearing constraint)
+### A3.1 Why floors exist (this is the load-bearing constraint)
 
 `PLAYER_ATTR_GAIN_RANGE_BY_POINTS` is not linear:
 
@@ -117,11 +130,11 @@ Because the 12 floors never drop below 1, **no legal plan ever zeroes a penalise
 the "don't zero the same thing two weeks running" rule can never fire, and the allocator needs
 no cross-week state.
 
-### 3.2 Base
+### A3.2 Base
 
 All 12 never-zero slots start at **1** (= 12 pts). `breaks` and the 7 team drills start at **0**.
 
-### 3.3 Why the first draft's `+2 / +1` pattern was wrong
+### A3.3 Why the first draft's `+2 / +1` pattern was wrong
 
 **One plan covers the whole roster, so what matters is a attribute's AVERAGE fit across the
 five positions — not its fit for the player it suits.** Every skill attribute is strong for two
@@ -144,7 +157,7 @@ A point spent to slow a decline reads as identity in the table and does nothing 
 **Bucket 3 is ~3x more point-efficient than Bucket 2**, because ND/IQ/FT are fit 1.00 for
 everyone. That is arithmetic, not preference, and it is what the two modes below exploit.
 
-### 3.4 TWO MODES — the roster/skill split
+### A3.4 TWO MODES — the roster/skill split
 
 Neither lever alone is right: skill emphasis is characterful but only reaches the two positions
 that fit it; Bucket 3 reaches everyone but says little about identity. So a CPU team alternates,
@@ -153,7 +166,7 @@ and the split becomes the single dial future logic turns.
 **FOCUS WEEK — sharp, reaches the players who fit the vision**
 
 * 12 floors at 1
-* **ONE** skill attribute at **3 points** (never 2 — see §3.3)
+* **ONE** skill attribute at **3 points** (never 2 — see §A3.3)
 * **ND and IQ lifted to 2** with the points a second emphasis would have cost
 * the vision's team installs
 
@@ -224,7 +237,7 @@ whether the floors exist.
 shooting every other week develops its SG's `SH` at half the rate of one that always does. That
 is the price of hedging, taken deliberately.
 
-### 3.5 Vision → emphasis targets
+### A3.5 Vision → emphasis targets
 
 Focus-week skill emphases (3 pts each) and the team installs both modes carry:
 
@@ -246,15 +259,15 @@ Zone reach their whole roster even on a focus week. In the first draft that was 
 attributes were picked for flavour. It is now the reason those three visions are the most
 efficiently expressed, and worth preserving.
 
-### 3.6 Camp week (30 points)
+### A3.6 Camp week (30 points)
 
 Same two modes, +6 points. Floors stay at 1 so camp keeps its identity flavour rather than
 flattening into pure development. Camp runs at `CAMP_GAIN_SCALE` 0.70 and skips decay, so every
-allocation gains there — the fit constraints in §3.3 are an IN-SEASON phenomenon only.
+allocation gains there — the fit constraints in §A3.3 are an IN-SEASON phenomenon only.
 
 ---
 
-## 4. Diminishing returns on saturated team attributes
+## A4. Diminishing returns on saturated team attributes
 
 Each team-drill slot maps 1:1 to a core-8 attribute (`team_category_map`):
 
@@ -296,7 +309,7 @@ static table.
 
 ---
 
-## 5. Drawbacks are EMERGENT — no explicit penalties
+## A5. Drawbacks are EMERGENT — no explicit penalties
 
 A Bobby Knight team is bad in freelance because he never coaches it and neglect erodes what is
 untended — not because a malus is applied. Decided 2026-08-12.
@@ -304,14 +317,14 @@ untended — not because a malus is applied. Decided 2026-08-12.
 ⚠️ **Calibrated consequence:** on the *team*-attribute side, neglect is deliberately mild
 (a few points a season, probability-gated) because an earlier version floored every team
 (discipline −91.6/season). So team-drill drawbacks are a subtle tilt, and EOG results dominate.
-On the *player* side a 0 is genuinely punishing (§3.1) — but the floors mean CPU teams never
+On the *player* side a 0 is genuinely punishing (§A3.1) — but the floors mean CPU teams never
 take that hit. **Net: identity reads mainly as what a team is GOOD at.** If drawbacks need more
 bite later, raise `NEGLECT_DECAY_CHANCE_DEFAULT` for CPU teams only — still emergent, no
 explicit penalty.
 
 ---
 
-## 6. Deferred — opponent game-planning
+## A6. Deferred — opponent game-planning
 
 Teams should also plan for the opponent: dial up fast-break defense against a running team,
 outside defense against shooters. Target blend ≈ **75% identity / 25% opponent**.
@@ -322,28 +335,170 @@ not done — whether a CPU team can even see its next opponent's tendencies at t
 
 ---
 
-## 7. Build order
+## A7. Build order
 
 1. ✅ **SHIPPED** `840c685a2` — one team-wide plan (deleted the position-group loop)
 2. ✅ **SHIPPED** `d3efecd1b` — 1 of 16 coaching focuses, derived per (franchise, team, season,
    week) rather than drawn, because pool workers each seed their own `training_rng` and an RNG
    draw would not replay. Measured cost −0.14 ± 0.14/player/week: **not distinguishable from
    zero**, contrary to my prediction that it would meaningfully hurt.
-3. Identity → allocation, TWO MODES (§3.4) + saturation taper (§4)
+3. Identity → allocation, TWO MODES (§A3.4) + saturation taper (§A4)
 4. Re-measure CPU player development — the ~+38.7 arc will have moved
 5. Re-check EOG bands against a season of the new allocation
 6. *Later:* coach identity (major/minor), then opponent game-planning
 
-## 8. Open questions
+## A8. Open questions
 
-1. ~~Is identity better expressed through systems than bodies?~~ **RESOLVED by §3.4** — both,
+1. ~~Is identity better expressed through systems than bodies?~~ **RESOLVED by §A3.4** — both,
    alternating. The two modes exist because neither lever alone reaches the whole roster AND
    says something about identity.
-2. Camp at +6 (§3.6) — confirmed, or raise floors to 2 instead?
-3. The taper curve in §4 (0.75/0.5/0.25 across +17/+18/+19) is a proposal, not measured.
+2. Camp at +6 (§A3.6) — confirmed, or raise floors to 2 instead?
+3. The taper curve in §A4 (0.75/0.5/0.25 across +17/+18/+19) is a proposal, not measured.
 4. **The 50/50 mode split is arbitrary.** It is the dial future logic turns (performance,
    makeup, star form, opponent), so it should be a single named constant from day one.
 5. **Does alternating beat a steady middle?** A skill attribute gets 3pt half the time and 1pt
    the other half; whether that outperforms a steady 2pt is measurable and untested. The
    floors mean neither option risks the −1.5 neglect drag, so this is a tuning question, not
    a safety one.
+
+---
+
+# PART B — UNBUILT SURFACES
+
+Migrated from `cpu_team_identity_spec.md` 2026-08-15. **None of this is implemented.** Check the
+system doc's ▶ SURFACE STATUS table before building any of it — two proposals in the original
+spec had already been measured and rejected by the time anyone read them.
+
+## B1. Playbooks — NOT identity-driven today
+
+⚠️ **`cpu_playbook_customization.py` contains ZERO references to identity or vision.** It builds
+from `_classify_focus_strengths(position_players)` — roster shape alone. Coverage is also scoped
+to *the teams the user is scheduled to play* (`build_user_schedule_cpu_playbook_groups`), so
+CPU-vs-CPU games use default playbooks: **8/128 teams customised at week 2, 19/128 at week 15**.
+That scoping is deliberate, not a bug.
+
+Two things per vision: **which play families** and **how concentrated**. Concentration from the
+`breadth` signal in three bands — low breadth → few plays funnelled to the focal scorer.
+
+| Vision | Play families | Concentration |
+|---|---|---|
+| Run and Gun | fast breaks weighted, motion base | medium |
+| Spread | outside sets, motion | **low** (many plays) |
+| Inside-Out | post family — Base, Movement, Flash | **high** personnel, **low** play conc. |
+| Attack | drives, iso, pick-and-roll | medium-high |
+| Motion | motion base, balanced sets | medium |
+
+**Inside-Out is the important case** — concentrated personnel, diverse *plays*: feed one post
+scorer through five different actions, reaching the EOG `offensive_efficiency` reward tier
+instead of paying a permanent scouting tax.
+
+Defensive visions also carry play sets — Full-Court Press should hold 3–4 press variants, since
+the EOG concentration penalty applies to press plays too.
+
+> ⛔ **The spec's "concentration caps must be lifted" is REJECTED** (decided 2026-08-12). The
+> intended ceiling for a single play's share of a normal playbook stays at **25%**. See the
+> system doc §9 for the schedule (`_set_play_percentages`: 1 play→100%, 2→55%, 3→45%, **4+→20%**)
+> and why a literal 25% cap cannot hold below 4 plays.
+
+## B2. Rotation size — UNBUILT
+
+No `rotation_size` exists anywhere in `BackEnd/`. Driven by **depth**, not vision, with one
+vision override:
+
+| Capable backups | Rotation |
+|---|---|
+| 0–2 | ~8 players |
+| 3–4 | ~9 |
+| 5–6 | ~10–11 |
+
+Full-Court Press forces a minimum of 9 regardless — you cannot press forty minutes off seven
+men. That is the vision's cost appearing on a third surface.
+
+⚠️ **`starter_bench_gap` IS NOT DEFINED IN THE CODEBASE** — it appears only in a `db_utils`
+comment. A working definition and its three arguable choices are in `bugs.md`. Measured on a
+live league it runs 2.0–29.2 (mean 11.1), so the spec's 13/19 band edges put **75% of the league
+in one band** and were cut against a different population.
+
+> **Decided 2026-08-12:** use a **within-team** comparison — how many bench players are within X
+> of the starter they would replace — not an absolute `RT ≥ 50` bar. A gap between two players on
+> one roster survives any recalibration; an absolute threshold does not. **Cadence: every five
+> weeks**, aligned to the §B4 re-evaluation, so there is one clock rather than two.
+
+⚠️ May not be buildable in isolation: `CPU_Team_Rotation_System.md` §8 attributes current depth
+(6.69 players above 8% of minutes, against a target of 8–11) to the **fatigue economy**, not the
+selector. A `rotation_size` parameter may not move minutes at all.
+
+## B3. Starting five and user teams — UNBUILT
+
+**Starting five:** established at training camp, **persisted**, used every game. This is new
+state — today the five is re-derived from eligibility at each rebuild.
+
+> **The frontend also needs handling.** Browser bulk sims call `/api/autoset-lineup` for both
+> teams on every quarter after the first, so a designated five currently survives only one
+> quarter. The override has to reach that path, not just the backend selector.
+
+**User teams:** the effective-talent floor applies to the user too — automatically in sim, and as
+a **warning** in turn-by-turn. Crossover is the right trigger precisely because it is rare: it
+fires only when something is objectively wrong rather than nagging.
+
+> ⛔ **Substitution policy is CLOSED — two mechanisms measured, neither pays.** The NG pull/return
+> hysteresis pair cost ~1 point a game and was stripped. The redirect to the selector objective
+> weight `w` was then tested conditioned on `starter_bench_gap`: top-heavy and shallow bands came
+> back at **−1.56 and −1.22**, same sign, differing by 0.34 (≈ ⅛ of one SE), where the spec
+> predicts *opposite* signs. Both writeups land in the same place: **the lever for changing CPU
+> rotation behaviour is the FATIGUE ECONOMY, not the selector or the gate.** Full numbers in
+> `bugs.md`. Do not reopen this with another parameter grid.
+
+## B4. Five-week re-evaluation — UNBUILT
+
+`identity_is_current` keys on `assigned_season` only — no week term — so a team keeps its vision
+all season even as its roster drifts. `assigned_week` is already persisted for whenever this is
+built.
+
+Every five weeks. Switching requires something **compelling**, from two inputs:
+
+```
+results     are we failing?            1-9 switches even if fit is fine
+fit gap     is another vision better?  covers roster drift AND a bad initial pick
+```
+
+**The switch threshold rises with the week.** A week-5 change costs five weeks of training; a
+week-20 change is nearly pointless with six weeks left. A rising bar kills late switches without
+a special rule and captures the sunk cost directly — collapsing commitment and hysteresis into
+one thing.
+
+**Penalties are emergent, not designed.** Player attributes do not transfer, and team attributes
+built under the old identity decay once unused.
+
+⚠️ **Weakest-specified surface here** — two named inputs and no formula. Needs design, not just
+implementation.
+
+## B5. Implementation notes
+
+**Tunable Constants — document as one coupled block:** fit weights (both tables), frozen scale
+constants, flat constants (Motion +0.60, Contain −0.50), fuel costs and capacity terciles,
+softmax temperature, slider weight vectors. All are calibrated against the pool the signals were
+measured from, so **a pool migration should break a regression test, not drift the league
+quietly** — same pattern as `_CPU_REFERENCE_BASE` / `test_cpu_reference_training.py`.
+
+⚠️ That risk is now REAL: `SIGNAL_SCALE` and `FUEL_CAPACITY_BOUNDS` were fitted before the
+attribute recalibration and the second −2in height shift. Re-derive before trusting the vision
+distribution.
+
+**Validation is downstream, not distributional.** Different aggregation forms produce
+near-identical population splits while disagreeing about a third of the teams. The real test is
+behavioural: do press-identity teams actually press effectively, and do outside-identity teams
+outshoot the league?
+
+✅ **Done since the spec was written:** `autoset_strategy_settings` frozen at roster level
+(`36964422d`); the unreachable `cum_nd > 350` branch removed.
+
+## B6. Open items from the original spec
+
+| # | item | status |
+|---|---|---|
+| 1 | Slider semantics — is `offense` motion↔set, `defense` man↔zone? | ✅ **RESOLVED** — ratios confirmed, code already matched. System doc §3 |
+| 2 | Slider weight vectors ("my proposal, not measured") | ✅ **ACCEPTED as authored** 2026-08-12, including the Motion-ordering quirk |
+| 3 | Playbook concentration caps | ✅ **RESOLVED** — stay at 25%, lift rejected |
+| 4 | Backup-quality bar | ✅ **RESOLVED** — within-team comparison, 5-week cadence |
+| 5 | Vision persistence, and do users get one? | ✅ **RESOLVED** — `ftd.identity`; users get **no** identity |

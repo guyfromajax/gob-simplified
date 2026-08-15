@@ -415,7 +415,7 @@ being quoted again.
 
 **The second attempt at archetype-driven substitution, and the second one that does not pay.**
 
-After the hysteresis pair below was rejected, `cpu_team_identity_spec.md` §7's archetype idea
+After the hysteresis pair below was rejected, `cpu_identity_design.md` §B3's archetype idea
 was redirected from the NG gate to the selector objective weight `w`
 (`score = w·static + (1−w)·effective`), which `db_utils.py:176` already names as *"the
 intended home for archetype influence (via starter_bench_gap)"*. That redirect was right in

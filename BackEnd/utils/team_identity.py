@@ -3,7 +3,7 @@ CPU Team Identity — signals, vision selection, and the slider draw.
 
 Thin slice: SLIDERS ONLY. Playbook composition, training allocation and the five-week
 re-evaluation are designed but deliberately not built — see
-_documentation_master/projects/cpu_team_identity_spec.md.
+_documentation_master/projects/cpu_identity_design.md.
 
 A team holds a VISION PAIR (one offensive, one defensive). The roster determines which
 visions are PLAUSIBLE via eight signals computed from the projected starting five; a softmax

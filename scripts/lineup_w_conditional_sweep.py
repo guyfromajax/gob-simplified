@@ -10,7 +10,7 @@ THE QUESTION THIS EXISTS TO ANSWER. `w` blends the selector objective:
 margin (+2.50 to +3.09), and the effective-talent gap fell monotonically as w fell
 (>10 gap: 20.8% at w=1.0 -> 0.7% at w=0.25 -> 0.5% at w=0.0).
 
-`cpu_team_identity_spec.md` §7 wants w to VARY by team: low w for teams with a shallow
+`cpu_identity_design.md` §B3 wants w to VARY by team: low w for teams with a shallow
 starter/bench drop ("sub freely"), high w for top-heavy teams ("ride the starters").
 That asks w to move UP for some teams — the direction the league-wide sweep measured as
 worse — so it is only defensible if the optimum DIFFERS BY ROSTER SHAPE and the
