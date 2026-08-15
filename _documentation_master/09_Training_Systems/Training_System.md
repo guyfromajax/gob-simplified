@@ -300,7 +300,7 @@ The training execution system applies pre-training conditions, allocates trainin
 - Outside Defense → OD, (Discipline: 0.25 points)
 - Ball Handling → BH, (Discipline: 0.25 points)
 - Passing → PS, (Discipline, 0.25 points)
-- Rebounding → RB (Rebound Modifier: 0.5 points)
+- Rebounding → RB, (Rebound Modifier: combined with Scrimmages, no accrual — see below)
 - Strength Training → ST, (Fight, 0.5 points)
 - Agility Training → AG
 - Free Throws → FT, (Team Chemistry: 0.25 points)
@@ -314,7 +314,8 @@ The training execution system applies pre-training conditions, allocates trainin
 - Fast Break Defense Install → `fb_opp_modifier`
 - P/T Defense Install → `pt_efficiency`
 - P/T Offense Install → `pt_opp_modifier`
-- Scrimmages → Team Chemistry: 0.25 points, Shot Threshold: 1 point, Rebound Modifier: 0.5 points, NG Reduction (if 3-5 points)
+- Scrimmages → Team Chemistry: 0.25 points, Shot Threshold: 1 point, NG Reduction (if 3-5 points)
+- Rebound Modifier ← **Technical-Drills Rebounding + Scrimmages COMBINED**, applied once (see below)
 
 #### Training Point Ranges
 
@@ -369,17 +370,34 @@ There is **no** camp-only CH/core-attribute bonus, **no** year-based camp bonus 
   `0 -> -3 to -1`, `1 -> 0 to +1`, `2 -> +1 to +2`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`
   - Free Throws × **0.25** + Film Study × **0.25** + Scrimmages × **0.25**, half-up → `_apply_team_training_points(..., "team_chemistry", ...)`.
 
-**Rebound Modifier (Technical Drills - in 0.01 increments):**
-- `<1 effective point -> -0.05 to -0.03`
-- `1-2 effective points -> +0.03 to +0.05`
-- `3-4 effective points -> +0.03 to +0.07`
-- `5+ effective points -> +0.03 to +0.10`
+**Rebound Modifier — ONE application from the COMBINED total (in 0.01 increments):**
 
-**Rebound Modifier (Scrimmages - in 0.01 increments):**
-- `<1 effective point -> -0.05 to -0.03`
-- `1-2 effective points -> +0.03 to +0.05`
-- `3-4 effective points -> +0.03 to +0.07`
-- `5+ effective points -> +0.03 to +0.10`
+Input is `technical_drills.rebounding + scrimmages`, summed and applied **once**. There is no
+0.5x accrual: the points are used as-is.
+
+- `0 points   -> -0.03 to -0.01`
+- `1-2 points -> +0.005 to +0.02`
+- `3-4 points -> +0.01 to +0.03`
+- `5+ points  -> +0.02 to +0.05`
+
+> **REWRITTEN 2026-08-14.** This previously ran **TWICE a week** — once from
+> `technical_drills.rebounding`, once from `scrimmages` — each with its own band roll and its own
+> 0.5x halving. Two defects followed:
+>
+> * **A phantom penalty.** ~80% of team-weeks had `scrimmages = 0`, and that second call still
+>   fired, hitting the `<1` band for **-0.04 every week**. Teams were penalised for not
+>   scrimmaging, on a scale only 1.0 wide.
+> * **Double step size.** Halving each source separately and rolling twice is not the same as
+>   summing once.
+>
+> The **halving is also gone**: at realistic allocations (rebounding ~1.4 + scrimmages 1) it never
+> changed which band was selected, so it was an invisible discount that only surprised anyone
+> allocating heavily. Bands above are cut for un-halved combined points, and the table now means
+> what it says.
+>
+> Measured over a full season after the change: mean **0.54** from a 0.5 init. Before, it was
+> headed for 1.19 with ~40% of the league railed. See
+> `projects/team_player_attribute_tuning.md`.
 
 **Shot Threshold:**
 - 0 points: `+= random.randint(5, 15)`
@@ -938,3 +956,37 @@ pure rebinding, not a behaviour change.
 
 Re-check with `BackEnd.utils.sim_random.install_global_draw_guard()` +
 `global_draw_report()`; the tally must stay empty on the training path.
+
+---
+
+## CPU teams do NOT use this allocator
+
+⚠️ **Everything above describes the USER's training.** CPU teams run a separate allocator —
+`_cpu_team_allocation` in `BackEnd/api/franchise_routes.py` — and it does not behave like the UI.
+Reading this page and assuming it describes the league is how the per-position defect below
+survived unnoticed.
+
+| | User team | CPU team |
+|---|---|---|
+| plans per week | 1, chosen in the UI | 1, derived from the team's **identity** |
+| coaching focus | chosen | **1 of 16, derived** per (franchise, team, season, week) |
+| allocation | free within 24 / 30 points | 12 floors + emphasis + installs, budget-exact |
+| scrimmages | free | **fixed at 1**, always |
+
+**What CPU allocation guarantees**, all of it load-bearing:
+
+* **Twelve player-attribute slots never drop below 1** — the 9 skills plus conditioning,
+  free throws and film study. A 0 costs −1 to −2 *every week* with no probability gate, so the
+  floors are what keep CPU rosters from bleeding out.
+* **`scrimmages` is pinned to 1 for every team, every week.** 0 gives **+191** shot_threshold per
+  season and 2 gives **−212** on a 200-point scale — one point is the only stable value, so
+  nothing may touch that slot. It was previously installed by the Attack vision alone, which put
+  ~80% of the league on the +191 path.
+* **Two weekly modes**, ~50/50: a FOCUS week (one skill emphasis at 3 points) and a ROSTER week
+  (a rotating +1 lift across the nine skills). `ND`/`IQ`/`FT` are excluded from the lift.
+* **Reactive installs** (`fast_breaks.defense_install`, `presses_traps.offense_install`) get a
+  baseline with a persistent per-team tendency, independent of vision — they answer what the
+  *opponent* does, not what the team chooses.
+
+Full design and measured results: [`../projects/cpu_identity_design.md`](../projects/cpu_identity_design.md) Part A.
+Season outcomes: [`../projects/team_player_attribute_tuning.md`](../projects/team_player_attribute_tuning.md).
