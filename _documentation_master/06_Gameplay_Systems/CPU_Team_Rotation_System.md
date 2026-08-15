@@ -275,7 +275,7 @@ every residualised signal off their calibrated means. Ticketed in `projects/bugs
 | `_ND_DECAY_TIERS` | `models/player.py` | ~0.01-0.02 / possession | on-floor fatigue, ND-dependent |
 | bench recovery | `phase_resolution.py` | 20% none / 70% +0.01 / 10% +0.02 | ~0.009 / possession |
 | `_team_chemistry_pool_sizes` | `db_utils.py` | `[1,1,1,1,2]` / `[1,1,1,1,3]` | **NO LONGER USED by the selectors** — legacy callers only |
-| `BLOWOUT_*` margins | `db_utils.py` | Q3 50, Q4 35/25/20 | when `prefer_lowest_rt` engages |
+| `BLOWOUT_*` margins | `db_utils.py` | Q3 40, Q4 35/25/20 | when `prefer_lowest_rt` engages |
 
 **The decay:recovery ratio (~1.7:1) sets rotation depth and star minutes.** It is the real
 lever on both, and it is NOT in the selector. Changing it moves pace, foul trouble and the

@@ -285,7 +285,7 @@ SELF_REG_TARGETS = {"aggression": 2.00, "hc_trap": 0.99, "fc_press": 0.99}
 SELF_REG_DESPERATION_SECONDS = 300
 SELF_REG_DESPERATION_MARGIN = 6
 # Blowout lineup (rest starters): margin-of-victory thresholds + Q4 time splits.
-BLOWOUT_Q3_MARGIN = 50
+BLOWOUT_Q3_MARGIN = 40                      # was 50: out of line with the Q4 ladder below
 BLOWOUT_Q4_MARGIN_EARLY = 35                # Q4, > BLOWOUT_Q4_EARLY_SECONDS remain
 BLOWOUT_Q4_MARGIN_MID = 25                  # Q4, > BLOWOUT_Q4_MID_SECONDS remain
 BLOWOUT_Q4_MARGIN_LATE = 20                 # Q4, > 0 remain
