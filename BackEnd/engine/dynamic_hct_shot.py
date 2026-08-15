@@ -388,7 +388,6 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
                         exclude_player_ids,
                         penalize_player_ids,
                         max_distance_from_bounce=20,
-                        upper_half_distance=10,
                         offense_candidate_lineup=off_lineup,
                         defense_candidate_lineup=def_lineup,
                     )
@@ -911,7 +910,6 @@ def _finalize_ab_shot(
                         set(),
                         penalize_player_ids,
                         max_distance_from_bounce=20,
-                        upper_half_distance=10,
                         offense_candidate_lineup=game.offense_team.lineup or {},
                         defense_candidate_lineup=game.defense_team.lineup or {},
                     )

@@ -67,7 +67,7 @@ triple from the player's highest current RT, not from `training_position`.
 
 While training runs, `PageLoadOverlay` uses its separate `newswire` variant to rotate neutral national league graphics. The retired archetype loading-feed generator is no longer produced or returned by training APIs.
 
-- `GET /franchise/league-news` consolidates the national Top 10, current-week key games, and eight qualified leaderboards into pre-ranked lists of exactly ten. In Week 4, standings and leaders are through Week 3 while Key Games are Week 4.
+- `GET /franchise/league-news` consolidates the national Top 10, current-week key games, and eight qualified leaderboards into pre-ranked lists of exactly ten. Points, rebounds, and assists are ranked and displayed as per-game averages with one decimal; the other five boards retain their existing measures. In Week 4, standings and leaders are through Week 3 while Key Games are Week 4.
 - Week 1 uses the preseason deck: program-rank Top 10 and season marquee matchups. Preseason Top 10 rows intentionally have no trailing record.
 - `training.js` prefetches and session-caches the payload by franchise, season, and week. At submit, the news request and training request proceed independently.
 - A pending news request shows only the header and green “Training in progress” pulse. A rejected request falls back to the existing team-banner pulse variant.

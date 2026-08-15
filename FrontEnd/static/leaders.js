@@ -42,6 +42,9 @@
     if (category === 'FG%') {
       return `${Number.isFinite(numeric) ? numeric.toFixed(1) : '0.0'}%`;
     }
+    if (category === 'PTS' || category === 'REB' || category === 'AST') {
+      return Number.isFinite(numeric) ? numeric.toFixed(1) : '0.0';
+    }
     return Number.isFinite(numeric) ? numeric.toFixed(1).replace(/\.0$/, '') : String(value);
   }
 

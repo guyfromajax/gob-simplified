@@ -649,7 +649,6 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
                         exclude_player_ids,
                         penalize_player_ids,
                         max_distance_from_bounce=FAST_BREAK_REBOUND_GEO_DISTANCE,
-                        upper_half_distance=FAST_BREAK_REBOUND_GEO_DISTANCE * 0.5,
                         offense_candidate_lineup=off_lineup,
                         defense_candidate_lineup=def_lineup,
                     )

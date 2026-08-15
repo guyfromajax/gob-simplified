@@ -117,9 +117,6 @@ Central registry of tunable game-logic constants — the knobs for balancing gam
 | `OTB_FINAL_CALL_SIDES` | `50%` (`randint(1,2)`) | foul | pending |
 | `REBOUND_ATTR_RB_W` / `_ST_W` / `_IQ_W` / `_CH_W` | `0.5` / `0.3` / `0.1` / `0.1` | oreb | pending |
 | `REBOUND_SCORE_ROLL` | `randint(1,6)` | oreb | pending |
-| `REBOUND_UPPER_HALF_DEFAULT` | `12` | oreb | pending |
-| `REBOUND_LOWER_DISCOUNT_STRONG` / `_WEAK` | `0.7` / `0.95` | oreb | pending |
-| `REBOUND_UPPER_COUNT_FOR_STRONG` | `2` | oreb | pending |
 | `REBOUND_SHOOTER_PUTBACK_SCORE_PENALTY` | `0.8` | oreb | pending |
 | `REBOUND_FALLBACK_START` / `_STEP` / `_MAX` | `20` / `5` / `150` | oreb | pending |
 | `OFFENSE_GETBACK_CHANCES` | `{0:1; 1:.5/.5; 2:.25/.75; 3:.1/.8/.1; 4:0/.5/.5}` | oreb | pending |
@@ -699,9 +696,10 @@ Cross-ref: **HCO Micro Movements** (`PROXIMITY_CONTEST_*`), `CONTEST_EUCLIDEAN_R
 |---|---|---|---|---|
 | `OREB_REBOUND_SCORE_DISCOUNT` | constants/__init__.py | `0.8` | oreb | Offensive candidates’ final rebound score ×0.8 in `select_rebounder_by_score` (box-out edge). Tune vs ~30% OREB%; `1.0` = no discount. Applies on all paths using this helper (HCO/FT/FB/HCT + putback-miss chains). |
 | `REBOUND_TEAM_CHEMISTRY_FACTOR` | constants/__init__.py | `0.5` | rebound outcomes | Scales the team component of every eligible player's rebound score: `0.5 × team_chemistry × rebound_modifier`. |
+| `REBOUND_DISTANCE_SCALE` | constants/__init__.py | `8.0` | rebound outcomes | Smooth distance discount in `select_rebounder_by_score`: `× 1 / (1 + distance / D)`. Same D on all paths. Half strength at ~8 grids from bounce. |
 | `OREB_PUTBACK_ONLY_THRESHOLD` | eoq_clock_progression.py | `6` | volume / possession | `time_remaining < 6` → force putback (no kickout), including chained OREBs. |
 | `OREB_PUTBACK_MIN_TIME_ELAPSED` | constants/__init__.py | `2` | possession | Floor on putback `time_elapsed` after schema burn. Kickout is **not** floored. |
-| `NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE` | shared.py | `20` | oreb | Putback-miss first-pass Euclidean candidate radius; upper-half = `20 × 0.5 = 10`. Also failed-attemptor collect radius (shared with DREB). |
+| `NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE` | shared.py | `20` | oreb | Putback-miss first-pass Euclidean candidate radius. Also failed-attemptor collect radius (shared with DREB). |
 | `MO_OREB_DELTA` | momentum.py | `1` | other | +MO on OREB once threshold met. |
 | `MO_OREB_THRESHOLD` | momentum.py | `3` | other | +`MO_OREB_DELTA` on a player’s **3rd** OREB and each after. |
 | `TEAM_ATTR_RANGES["rebound_modifier"]` | constants/__init__.py | `(0.0, 0.4)` | oreb | Feeds `REBOUND_TEAM_CHEMISTRY_FACTOR × team_chemistry × rebound_modifier` into rebound score + first tie-break. |
@@ -721,9 +719,6 @@ Cross-ref: **HCO Micro Movements** (`PROXIMITY_CONTEST_*`), `CONTEST_EUCLIDEAN_R
 | `OTB_FINAL_CALL_SIDES` | same | `randint(1,2) == 1` | foul | Final 50% call after IQ gate. |
 | `REBOUND_ATTR_RB_W` / `_ST_W` / `_IQ_W` / `_CH_W` | shared.py `calculate_rebound_score` | `0.5 / 0.3 / 0.1 / 0.1` | oreb | Base rebound composite before d6. **Shared with DREB.** |
 | `REBOUND_SCORE_ROLL` | same | `randint(1, 6)` | oreb | Multiplier on composite. **Shared with DREB.** |
-| `REBOUND_UPPER_HALF_DEFAULT` | `select_rebounder_by_score` | `12` | oreb | Default upper-half distance (HCO/FT when not overridden). **Shared.** |
-| `REBOUND_LOWER_DISCOUNT_STRONG` / `_WEAK` | same | `0.7` / `0.95` | oreb | Lower-half score mult when ≥2 / &lt;2 players in upper half. **Shared.** |
-| `REBOUND_UPPER_COUNT_FOR_STRONG` | same | `2` | oreb | Threshold for strong vs weak lower-half discount. **Shared.** |
 | `REBOUND_SHOOTER_PUTBACK_SCORE_PENALTY` | same | `0.8` | oreb | Penalized shooter / putback-shooter final score ×0.8. **Shared.** |
 | `REBOUND_FALLBACK_START` / `_STEP` / `_MAX` | same | `20` / `5` / `150` | oreb | Empty pool → expand Euclidean radius until a winner. **Shared.** |
 | `OFFENSE_GETBACK_CHANCES` | getback_selection.py | `{0: none1; 1: .5/.5; 2: .25/.75; 3: .1/.8/.1; 4: 0/.5/.5}` | oreb | HCO get-back slider shrinks who crashes for OREB on HCO misses. |
@@ -733,7 +728,7 @@ Cross-ref: **HCO Micro Movements** (`PROXIMITY_CONTEST_*`), `CONTEST_EUCLIDEAN_R
 
 ### Shared with DREB (detail in DREB session)
 
-Bounce spot / variance, `determine_rebounder` → `select_rebounder_by_score` → `calculate_rebound_score`, `OREB_REBOUND_SCORE_DISCOUNT` (OREB% on every miss path), `NEAR_BOUNCE_*`, OTB foul resolver, team `rebound_modifier` / chem tie-breaks.
+Bounce spot / variance, `determine_rebounder` → `select_rebounder_by_score` → `calculate_rebound_score`, `REBOUND_DISTANCE_SCALE` (smooth distance discount), `OREB_REBOUND_SCORE_DISCOUNT` (OREB% on every miss path), `NEAR_BOUNCE_*`, OTB foul resolver, team `rebound_modifier` / chem tie-breaks.
 
 ### Omitted
 
@@ -759,7 +754,7 @@ Cross-ref: **OREB** shared rebound scoring / bounce / OTB / `OREB_REBOUND_SCORE_
 | Constant | File | Value | Affects | Effect |
 |---|---|---|---|---|
 | `DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD` | shot_manager.py | `12.0` | possession | DREB→HCO outlet: if rebounder `coords.x` vs bounce x differs by >12, passer is re-anchored near bounce before receiver target. |
-| `FAST_BREAK_REBOUND_GEO_DISTANCE` | shared.py | `25` | dreb | FB-miss (and after-steal FB miss) first-pass Euclidean candidate radius; upper-half = `12.5`. Who wins the board on FB miss. |
+| `FAST_BREAK_REBOUND_GEO_DISTANCE` | shared.py | `25` | dreb | FB-miss (and after-steal FB miss) first-pass Euclidean candidate radius. Who wins the board on FB miss. |
 | `FREE_THROW_REBOUND_MAX_X_DELTA` | shared.py | `20` | dreb | Last-FT miss: only players with `\|x − bounce_x\| ≤ 20` eligible (then shared score). |
 | `FT_DREB_FB_GETBACK_COUNT` | dreb_fast_break_arming.py | `1` | contest / drive | FT→Covert: up to 1 getback nearest center. *(Also under FB initiation.)* |
 | `FB_MISS_DREB_FB_GETBACK_COUNT` | dreb_fast_break_arming.py | `2` | contest / drive | FB-miss→Covert: up to 2 getbacks already beating the outlet toward the new rim. *(Also under FB.)* |
@@ -785,7 +780,7 @@ Cross-ref: **OREB** shared rebound scoring / bounce / OTB / `OREB_REBOUND_SCORE_
 
 ### Cross-ref (do not retune here)
 
-- **Board win:** OREB section shared scoring (`REBOUND_ATTR_*`, discounts, bounce tiers, `NEAR_BOUNCE_*`).
+- **Board win:** OREB section shared scoring (`REBOUND_ATTR_*`, `REBOUND_DISTANCE_SCALE`, discounts, bounce tiers, `NEAR_BOUNCE_*`).
 - **OTB on discrete DREB turn:** OREB `OTB_*` stack — cancels outlet / FB continuation.
 - **FB vs HCO:** `SLIDER_TO_FAST_BREAK_PROB`; Slow-It-Down / Force Foul can suppress FB after DREB.
 - **Getbacks (pool + OREB%):** OREB `OFFENSE_GETBACK_CHANCES`.

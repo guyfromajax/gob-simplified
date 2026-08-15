@@ -15302,6 +15302,17 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         )
         if pid in position_ratings_updates:
             fpd_set["position_ratings"] = position_ratings_updates[pid]
+        if _offseason_pending:
+            # We ran the deferred offseason on the loaded FPD doc this run — persist the dev
+            # fields it wrote (development/entry_tier/potential/…), matching what the old
+            # finish_season flow saved. Common case they're unchanged (carried); the case
+            # that MATTERS is a legacy player whose profile was backfilled here — without
+            # this it re-rolls every season.
+            _dev_src = franchise_players.get(str(pid)) or {}
+            for _f in ("development", "entry_tier", "position_intent",
+                       "potential_factor", "training_position", "coaching_quality"):
+                if _f in _dev_src:
+                    fpd_set[_f] = _dev_src[_f]
         pm = player.get("meta") or {}
         if isinstance(pm, dict):
             if "height" in pm:

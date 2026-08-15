@@ -387,6 +387,11 @@ OREB_REBOUND_SCORE_DISCOUNT = 0.8
 # team_chemistry × rebound_modifier × this factor.
 REBOUND_TEAM_CHEMISTRY_FACTOR = 0.5
 
+# Smooth distance scale for rebound scoring in select_rebounder_by_score:
+# final_score *= 1 / (1 + distance_to_bounce / REBOUND_DISTANCE_SCALE).
+# Half strength at distance ≈ D; same D on all rebound paths (HCO/FB/FT/OREB).
+REBOUND_DISTANCE_SCALE = 8.0
+
 # Post-shot variant animation timings (SFX_System.md §Ball Resolve
 # Animations). Expressed in game-seconds at the default 350 ms/game-sec
 # clock so FE wall-clock matches the legacy reference timings.

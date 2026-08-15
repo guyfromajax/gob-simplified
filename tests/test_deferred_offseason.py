@@ -155,3 +155,96 @@ def test_finish_season_defers_develop_and_arms_marker(monkeypatch):
 
     # 3) offseason report is NOT revealed at finish (deferred to TC)
     assert result.get("offseason_development") == []
+
+
+# ── Integration: Week-1 training CONSUMES the deferred offseason (consumer side) ──
+def _fpd_full(pid="ret-1", year="Sophomore"):
+    """FPD doc as it sits between finish_season and TC: year advanced, un-developed."""
+    d = _fpd_doc(pos="C", tier="Average", seed=7, year=year, pid=pid)
+    d["meta"]["team_id"] = None
+    for a in CORE:                      # ensure all 12 present as anchors
+        d["attributes"].setdefault(a, 50)
+        d["attributes"].setdefault(f"anchor_{a}", d["attributes"][a])
+    d["attributes"].setdefault("CH", 55); d["attributes"].setdefault("anchor_CH", 55)
+    return d
+
+
+def _run_consumer(monkeypatch, *, marker, current_season, week=1):
+    """Drive _run_franchise_training_impl at `week` with execute_training mocked, returning
+    (result, ftd_update_calls, fpd_update_calls)."""
+    fid = ObjectId(); tid = ObjectId()
+    fpd = _fpd_full()
+    ftd_calls = []; fpd_calls = []
+
+    franchise_doc = {
+        "_id": fid, "week": week, "current_season": current_season,
+        "training_status": {}, "results": {},
+        "user_team_id": "Town", "user_team_object_id": str(tid),
+    }
+    monkeypatch.setattr(franchise_routes, "db", SimpleNamespace(
+        franchises=MagicMock(find_one=MagicMock(return_value=franchise_doc), update_one=MagicMock()),
+        teams=MagicMock(find_one=MagicMock(return_value={"_id": tid, "player_ids": ["ret-1"]})),
+        players=MagicMock(find=MagicMock(return_value=[]), find_one=MagicMock(return_value={"height": 80})),
+    ))
+    ftd_doc = {"franchise_id": str(fid), "team_id": tid, "players": ["ret-1"]}
+    if marker is not None:
+        ftd_doc["offseason_dev_pending_season"] = marker
+    monkeypatch.setattr(franchise_routes, "franchise_team_data_collection", MagicMock(
+        find_one=MagicMock(return_value=ftd_doc),
+        update_one=MagicMock(side_effect=lambda *a, **k: ftd_calls.append((a, k))),
+    ))
+    monkeypatch.setattr(franchise_routes, "franchise_players_data_collection", MagicMock(
+        find=MagicMock(return_value=[fpd]),
+        update_one=MagicMock(side_effect=lambda *a, **k: fpd_calls.append((a, k))),
+    ))
+    monkeypatch.setattr(franchise_routes, "_training_report_recruiting_display",
+                        lambda *a, **k: None)
+    # Satisfy the exact-budget guard without hand-building a 30/24-point allocation
+    # (impl imports training_points_spent from the source module at call time).
+    monkeypatch.setattr("BackEnd.constants.training_shape.training_points_spent",
+                        lambda *a, **k: 30 if week == 1 else 24)
+
+    def fake_execute_training(players, team, allocations, coaching_focus, **kw):
+        # bypass the camp engine — just echo players so the consumer wiring is what's tested
+        return players, team, kw.get("plays_data"), kw.get("scouting_data"), {
+            "player_changes": {}, "team_changes": {}, "coaching_focus": {},
+        }
+    monkeypatch.setattr("BackEnd.models.training_execution_v2.execute_training",
+                        fake_execute_training)
+
+    req = franchise_routes.FranchiseTrainingRequest(
+        franchise_id=str(fid),
+        training_data={"player_drills": {}, "team_drills": {}, "general": {}, "coaching_focus": None},
+    )
+    result = franchise_routes._run_franchise_training_impl(req, phase="user_only")
+    return result, ftd_calls, fpd_calls
+
+
+def _marker_cleared(ftd_calls):
+    for a, _k in ftd_calls:
+        setdoc = (a[1] if len(a) > 1 else {}).get("$set", {})
+        if "offseason_dev_pending_season" in setdoc and setdoc["offseason_dev_pending_season"] is None:
+            return True
+    return False
+
+
+def test_week1_consumes_offseason_when_marker_armed(monkeypatch):
+    result, ftd_calls, fpd_calls = _run_consumer(monkeypatch, marker=2, current_season=2)
+    assert result["status"] == "success"
+    # develop ran → an offseason report row surfaced in the response
+    assert result.get("offseason_development"), "offseason not developed/revealed at Week-1"
+    assert result["offseason_development"][0]["player_id"] == "ret-1"
+    # marker disarmed in a persisted FTD $set
+    assert _marker_cleared(ftd_calls), "offseason_dev_pending_season was not cleared"
+
+
+def test_week1_noop_when_no_marker(monkeypatch):
+    result, ftd_calls, fpd_calls = _run_consumer(monkeypatch, marker=None, current_season=2)
+    assert result["status"] == "success"
+    assert result.get("offseason_development") == [], "developed despite no armed marker"
+
+
+def test_week2_never_consumes_offseason(monkeypatch):
+    # marker armed but it's not camp week → must not develop
+    result, ftd_calls, fpd_calls = _run_consumer(monkeypatch, marker=2, current_season=2, week=2)
+    assert result.get("offseason_development") == [], "developed outside Week-1 camp"

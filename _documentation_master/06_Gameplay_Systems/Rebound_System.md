@@ -69,7 +69,7 @@ When the **last** free throw is missed, rebound selection runs in `resolve_free_
 
 - **Constant:** `FREE_THROW_REBOUND_MAX_X_DELTA = 20` (x grid units) in `BackEnd/utils/shared.py`.
 - **Rule:** Before scoring rebound candidates, the pool is filtered to players with **|coords.x − bounce_x| ≤ 20**. Players farther than **20** x-spots from the bounce (using coords at FT attempt time) are not in the first-pass candidate pool.
-- **Y:** The gate uses **x only** for first-pass eligibility; final scoring still uses Euclidean distance to decide upper-half vs lower-half discount.
+- **Y:** The gate uses **x only** for first-pass eligibility; final scoring uses Euclidean distance via the smooth `REBOUND_DISTANCE_SCALE` discount.
 - **Fallback:** If no one on **either** team passes the filter, the engine logs a warning and runs **`determine_rebounder`** again on **full lineups** (no x gate) so a rebound is always assigned.
 - **Scope:** Only **missed last FT** passes `max_x_delta_from_bounce` into `determine_rebounder`. HCO, fast break, and OREB putback-miss rebounds do **not** use this gate unless called with the same keyword explicitly in the future.
 
@@ -161,24 +161,16 @@ OREB turns are UESS-compliant (`oreb_step_emitter.py` → `animation_steps[]`). 
    - **else** (deep heaves): x `randint(8, min(40, int(0.55·d)))`, y `±14`
    - no shooter spot → medium default `(2, 8, ±8)`. Bounce clamped to court bounds (x 0–100, y 0–50). See [Tunable_Constants.md](../11_Design_Systems/Tunable_Constants.md) Promotion Pass `BOUNCE_VAR_*`.
 2. **Identify eligible rebounders** (per turn type — see the prefilter grid below). HCO removes get-back / release players; Fast Break paths use the frontcourt-half x filter plus the **25-grid** Euclidean near-bounce candidate filter; Dynamic HCT / OREB putback misses use the **20-grid** Euclidean near-bounce candidate filter; FT uses the `max_x_delta_from_bounce` x-gate.
-3. **Identify upper-half rebounders** from that eligible pool:
-   - Fast Break: upper half is Euclidean distance to bounce **≤ 12.5** (`0.5 × FAST_BREAK_REBOUND_GEO_DISTANCE`).
-   - Dynamic HCT / OREB: upper half is Euclidean distance to bounce **≤ 10** (`0.5 × 20`).
-   - HCO / Free Throw: upper half is Euclidean distance to bounce **≤ 12**.
-4. **Set the lower-half discount:**
-   - If at least **2** eligible players are in the upper half, lower-half discount is **0.7**.
-   - Otherwise, lower-half discount is **0.95**.
-5. **Score every eligible rebounder**:
+3. **Score every eligible rebounder**:
    - `rebound_function = (RB×0.5 + ST×0.3 + IQ×0.1 + CH×0.1) × randint(1, 6)`
    - Team bonus: `REBOUND_TEAM_CHEMISTRY_FACTOR (0.5) × team_chemistry × rebound_modifier`
-   - Upper-half player final score: `rebound_function + team_bonus`
-   - Lower-half player final score: `(rebound_function + team_bonus) × lower_half_discount`
+   - **Smooth distance discount:** `(rebound_function + team_bonus) × 1 / (1 + distance / REBOUND_DISTANCE_SCALE)` where `REBOUND_DISTANCE_SCALE = 8` (same on all paths). Closer to the bounce → stronger score; half strength at ~8 grids, ~⅓ at 16.
    - **Offensive-rebounder discount:** offensive players' final score is multiplied by **`OREB_REBOUND_SCORE_DISCOUNT` (0.8)** — modeling the defense's box-out / positioning edge on a miss (offense and defense were otherwise scored identically). Applied in `select_rebounder_by_score`; defense scores untouched. Tune against the week-aggregate **OREB%** (D1 target ~30%; `1.0` = legacy no-discount). Note: a 0.8 *score* discount is **not** a 20% *rate* reduction — the winner is a max-of-`d6` pick, so the OREB% effect is non-linear and tuned empirically.
    - Shooter / putback shooter penalty: after the score above is calculated, apply the existing **20% discount** (`× 0.8`) to the shooter or putback shooter if he is in the eligible pool.
-6. **No eligible rebounder fallback:** if the eligible pool is empty, expand the Euclidean search radius by **5** until at least one rebounder is found. HCO / Free Throw fallback starts at **20**. Geo-gated paths start from their path radius, then expand by 5 from there.
+4. **No eligible rebounder fallback:** if the eligible pool is empty, expand the Euclidean search radius by **5** until at least one rebounder is found. HCO / Free Throw fallback starts at **20**. Geo-gated paths start from their path radius, then expand by 5 from there.
    - Path-specific prefilters may define the first-pass candidate pool, but fallback pools must use the full active lineups for that turn context. Otherwise a strict prefilter (for example the Fast Break frontcourt-half x filter) can leave the expansion step with no players to recover.
-7. **Determine the rebounder:** highest final score wins. If only one player is eligible, that player automatically gets the rebound.
-8. **Tie breakers:** if multiple players tie for highest final score:
+5. **Determine the rebounder:** highest final score wins. If only one player is eligible, that player automatically gets the rebound.
+6. **Tie breakers:** if multiple players tie for highest final score:
    - team with higher `rebound_modifier`
    - player with higher `MO`
    - team with higher `team_chemistry`
@@ -227,7 +219,7 @@ Notes:
 - HCT / FCP do not currently share one unified prefilter. Treat the grid above as current code, not target design.
 - HCO retains its existing prefilter — the get-back / release mechanic is HCO-specific.
 - The near-bounce candidate filter is gameplay-side and position-key preserving. It is separate from `collect_near_bounce_rebound_attemptors()`, which is post-winner animation support.
-- `select_rebounder_by_score` is the winner-selection primitive. It evaluates every eligible player in the caller-supplied pools, applies upper/lower-half scoring, applies the shooter/putback discount, then uses the documented tie breakers.
+- `select_rebounder_by_score` is the winner-selection primitive. It evaluates every eligible player in the caller-supplied pools, applies the smooth distance discount (`REBOUND_DISTANCE_SCALE`), applies OREB / shooter-putback discounts, then uses the documented tie breakers.
 
 ## Geo-Based Helper Applied
 
