@@ -69,10 +69,6 @@
       "source_retired_id": "18879347-fce0-4a17-a5a5-80460eec1ea0"
     },
     {
-      "image_id": "600a3123-48ab-5c86-a30d-8da9af8a25e7",
-      "source_retired_id": "698360aa-63da-4297-917f-dba81837e3d3"
-    },
-    {
       "image_id": "ddbbbe24-f81f-53d4-b058-47a0c6666aa1",
       "source_retired_id": "ec983767-d373-4a50-9771-7c53cd0a84b1"
     },
@@ -287,6 +283,10 @@
     {
       "image_id": "bcd2498e-6c22-5a2a-88ad-d11fb4aeaccb",
       "source_retired_id": "0f8b54c7-1839-4821-8c90-277e9a2e3b76"
+    },
+    {
+      "image_id": "b90fcfeb-3c46-5626-a7bc-3b705e2d29d5",
+      "source_retired_id": "chapel_hill_ch_norm:e297fdab-a3da-45d0-af00-1742e371915d"
     }
   ]
 }

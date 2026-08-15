@@ -129,6 +129,55 @@ class TestTrainingNotes(unittest.TestCase):
         by_title = {s["title"]: s for s in sections}
         self.assertEqual(by_title["Biggest Regression"]["body"], "Old Guy")
 
+    def test_inseason_practice_player_ranks_full_pool_when_every_total_is_negative(self):
+        """The least-negative normalized total still earns the weekly top award."""
+        attrs_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"]
+        base = {"1": {a: 50 for a in attrs_keys}, "2": {a: 50 for a in attrs_keys}}
+        better_attrs = {f"anchor_{a}": 50 for a in attrs_keys}
+        worse_attrs = {f"anchor_{a}": 50 for a in attrs_keys}
+        better_attrs["anchor_SC"] = 48  # JR normalized total: -2 / 1.1
+        worse_attrs["anchor_SC"] = 44   # JR normalized total: -6 / 1.1
+        players = [
+            {"_id": "1", "first_name": "Least", "last_name": "Negative", "year": "junior", "attributes": better_attrs},
+            {"_id": "2", "first_name": "Most", "last_name": "Negative", "year": "junior", "attributes": worse_attrs},
+        ]
+        sections = build_structured_training_report_notes(
+            is_training_camp=False,
+            players=players,
+            original_player_baselines=base,
+            team={"fb_efficiency": 0, "fb_opp_modifier": 0, "pt_efficiency": 0, "pt_opp_modifier": 0},
+            plays_data={},
+            scouting_data={},
+            legacy_energy_notes=[],
+        )
+        by_title = {s["title"]: s for s in sections}
+        self.assertEqual(by_title["Practice Player Of The Week"]["body"], "Least Negative")
+        self.assertEqual(by_title["Practice Player Of The Week"]["player_id"], "1")
+        self.assertEqual(by_title["Biggest Regression"]["body"], "Most Negative")
+
+    def test_inseason_practice_player_allows_zero_and_preserves_co_winner_ties(self):
+        attrs_keys = ["SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG", "FT", "ND", "IQ"]
+        base = {pid: {a: 50 for a in attrs_keys} for pid in ("1", "2")}
+        unchanged = {f"anchor_{a}": 50 for a in attrs_keys}
+        players = [
+            {"_id": "1", "first_name": "A", "last_name": "Zero", "year": "senior", "attributes": dict(unchanged)},
+            {"_id": "2", "first_name": "B", "last_name": "Zero", "year": "freshman", "attributes": dict(unchanged)},
+        ]
+        sections = build_structured_training_report_notes(
+            is_training_camp=False,
+            players=players,
+            original_player_baselines=base,
+            team={"fb_efficiency": 0, "fb_opp_modifier": 0, "pt_efficiency": 0, "pt_opp_modifier": 0},
+            plays_data={},
+            scouting_data={},
+            legacy_energy_notes=[],
+        )
+        by_title = {s["title"]: s for s in sections}
+        award = by_title["Practice Players Of The Week"]
+        self.assertEqual(award["body"], "A Zero, B Zero")
+        self.assertEqual(award["player_ids"], ["1", "2"])
+        self.assertEqual(by_title["Biggest Regression"]["body"], "None")
+
     def _camp_sections(self, players):
         team = {"fb_efficiency": 0, "fb_opp_modifier": 0, "pt_efficiency": 0, "pt_opp_modifier": 0}
         base = {p["_id"]: {a: 50 for a in

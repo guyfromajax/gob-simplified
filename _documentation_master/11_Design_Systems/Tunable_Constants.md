@@ -117,9 +117,6 @@ Central registry of tunable game-logic constants — the knobs for balancing gam
 | `OTB_FINAL_CALL_SIDES` | `50%` (`randint(1,2)`) | foul | pending |
 | `REBOUND_ATTR_RB_W` / `_ST_W` / `_IQ_W` / `_CH_W` | `0.5` / `0.3` / `0.1` / `0.1` | oreb | pending |
 | `REBOUND_SCORE_ROLL` | `randint(1,6)` | oreb | pending |
-| `REBOUND_UPPER_HALF_DEFAULT` | `12` | oreb | pending |
-| `REBOUND_LOWER_DISCOUNT_STRONG` / `_WEAK` | `0.7` / `0.95` | oreb | pending |
-| `REBOUND_UPPER_COUNT_FOR_STRONG` | `2` | oreb | pending |
 | `REBOUND_SHOOTER_PUTBACK_SCORE_PENALTY` | `0.8` | oreb | pending |
 | `REBOUND_FALLBACK_START` / `_STEP` / `_MAX` | `20` / `5` / `150` | oreb | pending |
 | `OFFENSE_GETBACK_CHANCES` | `{0:1; 1:.5/.5; 2:.25/.75; 3:.1/.8/.1; 4:0/.5/.5}` | oreb | pending |
@@ -236,15 +233,15 @@ middle band falls back to ordinary shot resolution. The two outcome thresholds a
 
 | Constant / variable | File | Value | Effect |
 |---|---|---|---|
-| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` | constants/__init__.py | `-50` | A reconciliation blocks when `diff < -50`. Raising toward zero creates more blocks; lowering creates fewer. Recalibrated from `-100` after the three-week sample averaged about 0.97 blocks per team-game. |
+| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE` | constants/__init__.py | `70` | The live block threshold is `70 + normalized defensive_efficiency`; reconciliation blocks when `diff` is below it. |
 | `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` | constants/__init__.py | `150` | A reconciliation creates a shooting foul when `diff > 150`. Independent of the block threshold. |
 | `BLOCK_Y_ROLL_MIN` / `BLOCK_Y_ROLL_MAX` | constants/__init__.py | `0 / 4` | First trigger rolls this inclusive range against defensive aggression; `roll <= aggression` reaches reconciliation. Default aggression 2 therefore passes 60%. |
 | Defensive `aggression` | team strategy | `0–4` | First-trigger comparison value. Higher aggression sends more eligible shots into reconciliation. Slow-It-Down can temporarily force this to 0. |
 | `BLOCK_FIGHT_RANGE_MIN` / `BLOCK_FIGHT_RANGE_MAX` | constants/__init__.py | `0 / 10` | Second trigger, attempted only after aggression misses: `roll <= defense fight`. |
-| Defensive `fight` | team attribute | live team value | Second-trigger comparison value; higher fight produces more reconciliation attempts. |
-| `BLOCK_PLAYER_ROLL_MIN` / `BLOCK_PLAYER_ROLL_MAX` | constants/__init__.py | `1 / 300` | Third trigger, after aggression and fight miss, rolls against `defender ID + defensive_efficiency × height_rating`. Lowering the maximum increases individual rim-protector attempts. |
+| Defensive `fight` | team attribute | normalized gameplay value | Second-trigger comparison value; `core8_gameplay()` normalizes the stored core-8 value before comparison. Higher fight produces more reconciliation attempts. |
+| `BLOCK_PLAYER_ROLL_MIN` / `BLOCK_PLAYER_ROLL_MAX` | constants/__init__.py | `1 / 300` | Third trigger, after aggression and fight miss, rolls against `defender ID + normalized defensive_efficiency × height_rating`. Lowering the maximum increases individual rim-protector attempts. |
 | Height rating (`height_to_block_score`) | shared.py | `≤75→0`, `h−75`, `≥85→10` (offsets from `LEAGUE_MEDIAN_HEIGHT_IN`=75; 1 pt/inch — rides the median automatically) | Feeds both the third attempt trigger and reconciliation. In reconciliation it becomes `height_rating × 10 + randint(-9,9)` and receives 40% weight. (Now median 75 after the 2026-08 HS shifts −1 then −2; the code uses the constant, so it moved on its own.) |
-| Defender block composite | shot_manager.py | `height 40% + ID 40% + IQ 20%`, then `× randint(1,6)` | Determines `defense_block_score`; higher attributes or roll make negative reconciliation diff and blocks more likely. |
+| Defender block composite | shot_manager.py | `(scaled height × 40% + ID × 40% + IQ × 20% + normalized defensive_efficiency) × randint(1,6)` | Determines `defense_block_score` under the August 2026 block-volume tuning. Core-8 defensive efficiency is normalized before both this calculation and the dynamic threshold calculation. |
 | Contest-result eligibility | shot_micro_movements constants | `neutral` or `defense_win`; boundaries `±150` | `offense_win` shots do not enter the block funnel. Changing contest boundaries changes the eligible population. |
 | Shooter finish threshold | shot_manager.py | `250` | When reconciliation lands in the foul band, shooter finish score above 250 makes the basket for an and-one. Does not affect block volume. |
 | `MO_BLOCK_DELTA` | constants/momentum.py | `1` | Actual block gives blocker +1 player momentum and blocked shooter −1. Does not affect block probability. |
@@ -445,7 +442,7 @@ Literals awaiting promotion. **Status board + values:** [Promotion Pass](#promot
 | `DRIVE_EFF_ROLL_RANGE` | attack_drive_clearance.py legacy drive score | `randint(1,3)` | drive | Legacy drive score team-eff multiplier. |
 | `MOTION_DEFENSE_BONUS_SHOT_SCALE` | shot_manager.py | `0.2` | FG% | `shot_score -= motion_defense_bonus × 0.2`. |
 | `CONTEST_LOSS_SHOT_PENALTY` | shot_manager.py | `100` | FG% / contest | Flat subtract on contest-loss path (context-gated). |
-| `BLOCK_COMPOSITE_HEIGHT_W` / `_ID_W` / `_IQ_W` | shot_manager.py block recon | `0.4` / `0.4` / `0.2` | contest / foul | Block reconciliation defender composite. |
+| `BLOCK_COMPOSITE_HEIGHT_W` / `_ID_W` / `_IQ_W` | shot_manager.py block recon | `+0.4` / `+0.4` / `+0.2` | contest / foul | Block reconciliation defender composite; normalized defensive efficiency is also added before the roll multiplier. |
 | `BLOCK_COMPOSITE_ROLL` | shot_manager.py | `randint(1,6)` | contest / foul | Multiplier on that composite. |
 | `AND_ONE_FINISH_THRESHOLD` | shot_manager.py | `250` | foul / FG% | Finish score > 250 → and-one make. *(Named in Block prose only.)* |
 | `AND_ONE_FINISH_ST_W` / `_SC_W` / `_HEIGHT_W` / `_IQ_W` | shot_manager.py | `0.4` / `0.3` / `0.2` / `0.1` | foul / FG% | And-one finish composite weights. |
@@ -699,9 +696,10 @@ Cross-ref: **HCO Micro Movements** (`PROXIMITY_CONTEST_*`), `CONTEST_EUCLIDEAN_R
 |---|---|---|---|---|
 | `OREB_REBOUND_SCORE_DISCOUNT` | constants/__init__.py | `0.8` | oreb | Offensive candidates’ final rebound score ×0.8 in `select_rebounder_by_score` (box-out edge). Tune vs ~30% OREB%; `1.0` = no discount. Applies on all paths using this helper (HCO/FT/FB/HCT + putback-miss chains). |
 | `REBOUND_TEAM_CHEMISTRY_FACTOR` | constants/__init__.py | `0.5` | rebound outcomes | Scales the team component of every eligible player's rebound score: `0.5 × team_chemistry × rebound_modifier`. |
+| `REBOUND_DISTANCE_SCALE` | constants/__init__.py | `8.0` | rebound outcomes | Smooth distance discount in `select_rebounder_by_score`: `× 1 / (1 + distance / D)`. Same D on all paths. Half strength at ~8 grids from bounce. |
 | `OREB_PUTBACK_ONLY_THRESHOLD` | eoq_clock_progression.py | `6` | volume / possession | `time_remaining < 6` → force putback (no kickout), including chained OREBs. |
 | `OREB_PUTBACK_MIN_TIME_ELAPSED` | constants/__init__.py | `2` | possession | Floor on putback `time_elapsed` after schema burn. Kickout is **not** floored. |
-| `NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE` | shared.py | `20` | oreb | Putback-miss first-pass Euclidean candidate radius; upper-half = `20 × 0.5 = 10`. Also failed-attemptor collect radius (shared with DREB). |
+| `NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE` | shared.py | `20` | oreb | Putback-miss first-pass Euclidean candidate radius. Also failed-attemptor collect radius (shared with DREB). |
 | `MO_OREB_DELTA` | momentum.py | `1` | other | +MO on OREB once threshold met. |
 | `MO_OREB_THRESHOLD` | momentum.py | `3` | other | +`MO_OREB_DELTA` on a player’s **3rd** OREB and each after. |
 | `TEAM_ATTR_RANGES["rebound_modifier"]` | constants/__init__.py | `(0.0, 0.4)` | oreb | Feeds `REBOUND_TEAM_CHEMISTRY_FACTOR × team_chemistry × rebound_modifier` into rebound score + first tie-break. |
@@ -721,9 +719,6 @@ Cross-ref: **HCO Micro Movements** (`PROXIMITY_CONTEST_*`), `CONTEST_EUCLIDEAN_R
 | `OTB_FINAL_CALL_SIDES` | same | `randint(1,2) == 1` | foul | Final 50% call after IQ gate. |
 | `REBOUND_ATTR_RB_W` / `_ST_W` / `_IQ_W` / `_CH_W` | shared.py `calculate_rebound_score` | `0.5 / 0.3 / 0.1 / 0.1` | oreb | Base rebound composite before d6. **Shared with DREB.** |
 | `REBOUND_SCORE_ROLL` | same | `randint(1, 6)` | oreb | Multiplier on composite. **Shared with DREB.** |
-| `REBOUND_UPPER_HALF_DEFAULT` | `select_rebounder_by_score` | `12` | oreb | Default upper-half distance (HCO/FT when not overridden). **Shared.** |
-| `REBOUND_LOWER_DISCOUNT_STRONG` / `_WEAK` | same | `0.7` / `0.95` | oreb | Lower-half score mult when ≥2 / &lt;2 players in upper half. **Shared.** |
-| `REBOUND_UPPER_COUNT_FOR_STRONG` | same | `2` | oreb | Threshold for strong vs weak lower-half discount. **Shared.** |
 | `REBOUND_SHOOTER_PUTBACK_SCORE_PENALTY` | same | `0.8` | oreb | Penalized shooter / putback-shooter final score ×0.8. **Shared.** |
 | `REBOUND_FALLBACK_START` / `_STEP` / `_MAX` | same | `20` / `5` / `150` | oreb | Empty pool → expand Euclidean radius until a winner. **Shared.** |
 | `OFFENSE_GETBACK_CHANCES` | getback_selection.py | `{0: none1; 1: .5/.5; 2: .25/.75; 3: .1/.8/.1; 4: 0/.5/.5}` | oreb | HCO get-back slider shrinks who crashes for OREB on HCO misses. |
@@ -733,7 +728,7 @@ Cross-ref: **HCO Micro Movements** (`PROXIMITY_CONTEST_*`), `CONTEST_EUCLIDEAN_R
 
 ### Shared with DREB (detail in DREB session)
 
-Bounce spot / variance, `determine_rebounder` → `select_rebounder_by_score` → `calculate_rebound_score`, `OREB_REBOUND_SCORE_DISCOUNT` (OREB% on every miss path), `NEAR_BOUNCE_*`, OTB foul resolver, team `rebound_modifier` / chem tie-breaks.
+Bounce spot / variance, `determine_rebounder` → `select_rebounder_by_score` → `calculate_rebound_score`, `REBOUND_DISTANCE_SCALE` (smooth distance discount), `OREB_REBOUND_SCORE_DISCOUNT` (OREB% on every miss path), `NEAR_BOUNCE_*`, OTB foul resolver, team `rebound_modifier` / chem tie-breaks.
 
 ### Omitted
 
@@ -759,7 +754,7 @@ Cross-ref: **OREB** shared rebound scoring / bounce / OTB / `OREB_REBOUND_SCORE_
 | Constant | File | Value | Affects | Effect |
 |---|---|---|---|---|
 | `DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD` | shot_manager.py | `12.0` | possession | DREB→HCO outlet: if rebounder `coords.x` vs bounce x differs by >12, passer is re-anchored near bounce before receiver target. |
-| `FAST_BREAK_REBOUND_GEO_DISTANCE` | shared.py | `25` | dreb | FB-miss (and after-steal FB miss) first-pass Euclidean candidate radius; upper-half = `12.5`. Who wins the board on FB miss. |
+| `FAST_BREAK_REBOUND_GEO_DISTANCE` | shared.py | `25` | dreb | FB-miss (and after-steal FB miss) first-pass Euclidean candidate radius. Who wins the board on FB miss. |
 | `FREE_THROW_REBOUND_MAX_X_DELTA` | shared.py | `20` | dreb | Last-FT miss: only players with `\|x − bounce_x\| ≤ 20` eligible (then shared score). |
 | `FT_DREB_FB_GETBACK_COUNT` | dreb_fast_break_arming.py | `1` | contest / drive | FT→Covert: up to 1 getback nearest center. *(Also under FB initiation.)* |
 | `FB_MISS_DREB_FB_GETBACK_COUNT` | dreb_fast_break_arming.py | `2` | contest / drive | FB-miss→Covert: up to 2 getbacks already beating the outlet toward the new rim. *(Also under FB.)* |
@@ -785,7 +780,7 @@ Cross-ref: **OREB** shared rebound scoring / bounce / OTB / `OREB_REBOUND_SCORE_
 
 ### Cross-ref (do not retune here)
 
-- **Board win:** OREB section shared scoring (`REBOUND_ATTR_*`, discounts, bounce tiers, `NEAR_BOUNCE_*`).
+- **Board win:** OREB section shared scoring (`REBOUND_ATTR_*`, `REBOUND_DISTANCE_SCALE`, discounts, bounce tiers, `NEAR_BOUNCE_*`).
 - **OTB on discrete DREB turn:** OREB `OTB_*` stack — cancels outlet / FB continuation.
 - **FB vs HCO:** `SLIDER_TO_FAST_BREAK_PROB`; Slow-It-Down / Force Foul can suppress FB after DREB.
 - **Getbacks (pool + OREB%):** OREB `OFFENSE_GETBACK_CHANCES`.
@@ -844,10 +839,10 @@ Effects are stated in gameplay terms; movement figures are where we measured the
 |---|---|---|---|---|
 | `OFFSEASON_ATTRACTOR_ALPHA` | **0.0** | **Retired (framework §10.4 / §11).** Offseason is level-only rescale onto the ladder RT target; shape is owned by camp + in-season + weight-scaled floors. Symbol kept so old imports do not crash — do not re-enable without restoring the blend path and the shape-dispersion suite gate. Historical α=0.55 career retention was ~(1−α)³ ≈ 9%. | none (level-only) | **DEAD** |
 | `CAMP_WEEKS` | **1** | Franchise week 1 is training camp (`is_camp_week`): 30-point flat budget, pre-training decay skipped, `CAMP_GAIN_SCALE` applied. Weeks 2–26 use 24; weeks 27+ have no training. | Changing this alters the product schedule | LIVE (`training_shape.py`) |
-| `CAMP_GAIN_SCALE` | **1.4** | Multiplier on positive camp gains (vs `IN_SEASON_GAIN_SCALE` for weeks after camp). | ↑ = louder camp shape/level | LIVE |
-| `IN_SEASON_GAIN_SCALE` | 0.18 | Scales positive weekly gains after camp. Kept low so a reference season stays inside the offseason ladder step (no claw-back). Shape movement is still mostly here + camp (~99% of career shape). | ↑ strands well-coached players above the ladder | LIVE (but see backlog) |
+| `CAMP_GAIN_SCALE` | **0.70** | Multiplier on positive camp gains (vs `IN_SEASON_GAIN_SCALE` for weeks after camp). Halved from 1.4 in the free-will recalibration (2026-08) — camp gains now persist into the career under the additive offseason. | ↑ = louder camp shape/level | LIVE |
+| `IN_SEASON_GAIN_SCALE` | 0.28 | Scales positive weekly gains after camp (0.18→0.28, free-will 2026-08). Under free-will in-season **persists** — this is the main dial for in-season "feel," but raising it globally over-inflates freshmen (the +5 year-max bump compounds) and runs the career arc away, so tune upperclass regression via `CLASS_GAIN_PERCENTAGES` instead. | ↑ = more in-season growth, but FR explodes / arc inflates | LIVE |
 | `PLAYER_ATTR_GAIN_RANGE_BY_POINTS` | 0:(−2,−1) · 1:(1,3) · 2:(2,3) · 3:(2,4) · 4:(3,5) · 5:(3,6) | Raw gain bands before year-max / scale / remainder. **1–5 must stay distinct** (E[raw\|5]=4.5 held). Re-unifying 1–3 erases slider resolution. | changes strategy spacing | LIVE (`training_execution_v2.py`) |
-| `CLASS_GAIN_PERCENTAGES` | FR **100%** / SO **91%** / JR **80%** / SR **71%** | Direct percentage on positive attribute gain after position fit and before the remainder split. Every class still spends one point per notch. | ↓ upperclass percentage = slower late-career gain | LIVE |
+| `CLASS_GAIN_PERCENTAGES` | FR **100%** / SO **91%** / JR **95%** / SR **100%** | Direct percentage on positive attribute gain after position fit and before the remainder split. Every class still spends one point per notch. **JR/SR raised from 80/71 on 2026-08-14:** under free-will the flat pre-training decay outran their discounted gains, so reference-coached juniors barely held and seniors REGRESSED in-season (~−2 RT/yr); the bump flips JR/SR in-season net positive (JR +0.8→+3.1, SR −2.3→+0.7) without touching FR/SO or removing decay, arc +27→+32. | ↓ upperclass percentage = slower late-career gain (but too low = in-season regression) | LIVE |
 | `TRAINING_GAIN_PERCENTAGES` | direct position × attribute table below, **25%–100%** | Direct percentage on positive attribute gain. No cost matrix and no reciprocal derivation. | changes off-role gain efficiency without fractional spend | LIVE |
 | Shape floors (P6 + weight scale) | t0 **shape-P6** base; HIGH **0.50** / LOW **0.20** | `need = ceil(P6[pos][attr] × mean(core-12) × floor_mult)`. Full floor at universal or rel≥0.50; minimal (need=1) at rel≤0.20; lerp between. Bind at decay clamp only — **not** at Team Builder Apply (mod teams use attribute totals only). **Never re-derive from a developed snapshot.** | ↓ percentile → weaker floors | LIVE |
 | `PEAK_BONUS` | +0.30 × JH anchor | Size of a "coming-of-age" peak season. Career multiple = 1.7 + 0.30·peaks → 0/1/2/3 peaks give 1.7 / 2.0 / 2.3 / 2.6× the JH anchor. | +0.10 ≈ +3 RT/peak at Average. | LIVE |
@@ -1066,7 +1061,7 @@ Focus (2–3 attrs) and breadth (4-attr / proportional) both clear the reference
 **Live wiring.** `develop_rollover` takes a `season_allocation` (per-attr **points/week**); `finish_season` reads it via the `_coaching_accumulator_for_player` seam, which returns `None` until the in-season capture lands with the CPU archetype-training rework (pillar 3). `None` → `f = 1.0` (frozen reference), so CPU and the exact-diff baseline stay byte-identical at pass 1. The capture must be **caller-gated to the user training phase only** (the shared engine has no user/CPU flag), so CPU records nothing and stays at the reference. Only the **quality** half is live intent (feeds `f` on the RT target — level, not shape). The **distribution** half is vestigial: still threaded into `develop_one_offseason` for call-signature compatibility, unused there.
 
 ### Weekly in-season (§7.2, Option 3): bounded, does NOT outrun the offseason target
-`PRE_TRAINING_DECAY_BY_YEAR` reduced to FR/SO (-2,0), JR/SR (-1,0) (was FR (-5,-2) … SR (-2,0)); `IN_SEASON_GAIN_SCALE` = **0.18** scales positive weekly gains. The offseason target is **absolute** (`jh_anchor × ladder × f`), so in-season gains only help REACH it — they must not outrun it, or a well-coached player strands himself above the ladder mid-season and the offseason event has no budget left (claw-back on the best-coached users). The scale is fitted so a full season of **reference / normal coaching** lands at **~+4-5 RT/season** (measured 2026-07-30: +4.76), well inside the coaching-f band headroom (~+12 at Average) and below the smallest per-rung ladder increment (~+6), so the offseason always tops up to target and the ladder holds.
+**FREE-WILL model (2026-08).** `PRE_TRAINING_DECAY_BY_YEAR` = FR (-2,0), SO/JR/SR (-1,0). Training scales: `CAMP_GAIN_SCALE` = **0.70** (was 1.4), `IN_SEASON_GAIN_SCALE` = **0.28** (was 0.18). Offseason retentions (`player_development.py`): `OFFSEASON_BASE_RETENTION` = **0.125**, `OFFSEASON_PEAK_RETENTION` = **0.50**; `coaching_f` **retired**. The offseason is now **additive** (`RT_now + reduced rung`), so in-season gains **PERSIST** — the old absolute-target claw-back is gone. Calibrated so a reference-coached career gains **~+22 RT over four years** (same destination as the old ladder, now training-driven), with coaching spread +33 to +62 RT and no runaway (best Elite career ~99 < 130 cap). Full derivation + validation: [`../projects/free_will_offseason_work_plan.md`](../projects/free_will_offseason_work_plan.md).
 
 **Net is allocation-dependent, NOT universally flat** (the earlier "nets ~0" claim was wrong): reference/normal coaching → ~+4.8/season; thin **random/CPU allocation → ~−10/season** (decay dominates), restored by the absolute-target offseason event. This is why CPU auto-train **must** train the reference (see the hard requirement by `reference_allocation`) — otherwise CPU players swing −10 in-season / +10 at rollover (a large-minus-large treadmill) and, once quality is live, drift under the ladder.
 
@@ -1096,11 +1091,11 @@ change with `scripts/eog_band_tuner.py` (offline, seconds) rather than a 2-hour 
 
 | constant | value | effect |
 |---|---|---|
-| `MIN` / `MAX` / `MID` | **−30 / 170 / 70** | the storage window; lower raw = easier makes |
-| `FRANCHISE_INIT_LO` / `_HI` | **MID ± 5 → 65 / 75** | mid-centred (was MID−20/MID−10) — init is COUPLED to EOG band position |
-| `BALANCING_TRAILING` / `_LEADING` | −50 / 150 | derived |
-| `TUTORIAL_USER` / `_COMPUTER` | −30 / 70 | derived |
-| `FAST_BREAK_CORNER_THRESHOLD_BASE` | 150 | derived |
+| `MIN` / `MAX` / `MID` | **−10 / 190 / 90** | the storage window; lower raw = easier makes |
+| `FRANCHISE_INIT_LO` / `_HI` | **MID ± 5 → 85 / 95** | mid-centred (was MID−20/MID−10) — init is COUPLED to EOG band position |
+| `BALANCING_TRAILING` / `_LEADING` | −30 / 170 | derived |
+| `TUTORIAL_USER` / `_COMPUTER` | −10 / 90 | derived |
+| `FAST_BREAK_CORNER_THRESHOLD_BASE` | 170 | derived |
 
 Full workflow — including the **mandatory EOG band re-cut** — in
 [`00_Operations/Shot_Threshold_Scale_Tuning.md`](../00_Operations/Shot_Threshold_Scale_Tuning.md).
@@ -1109,7 +1104,7 @@ Full workflow — including the **mandatory EOG band re-cut** — in
 
 | constant | value | note |
 |---|---|---|
-| `FG_PCT_MID` / `FG_PCT_HIGH` | **26 / 40** | ⚠️ **INTERIM + SCALE-COUPLED** — cut for the −30…170 window at init 65-75. Every `MIN` change requires a re-cut; carrying the old cuts across two window moves drifted teams −28/season. |
+| `FG_PCT_MID` / `FG_PCT_HIGH` | **22 / 37** | ⚠️ **INTERIM + SCALE-COUPLED** — cut for the −10…190 window at init 85-95. Empirical-residual model: drift −0.05, sd 20.5, zero rails across 128,000 team-seasons. Re-fit after material engine/roster changes. |
 | `OFF_CONC_REWARD` / `_MIDDLE` | **0.23 / 0.30** | ⚠️ **INTERIM** — cut against a distribution the playbook generator caps (20% ceiling per set play at 4+ plays, a deferred fix) |
 | `DEF_MAX_SHARE_REWARD` / `_MIDDLE` | 0.42 / 0.57 | measured p33/p67 |
 | `FB_CONC_REWARD` / `_MIDDLE` | 0.44 / 0.53 | measured p33/p67 |
@@ -1146,6 +1141,20 @@ source categories, and integer weekly rolls cannot express "−3/season" directl
 ### CPU team identity + self-regulation
 
 See [`06_Gameplay_Systems/CPU_Team_Identity_System.md`](../06_Gameplay_Systems/CPU_Team_Identity_System.md) § Tunable Constants for the full table (`SIGNAL_SCALE`, residual slopes, `FUEL_CAPACITY_BOUNDS`, `VISION_COST`, `SOFTMAX_TEMPERATURE`, `MOTION_FLAT`/`CONTAIN_FLAT`, `CONSTANTS_VERSION`, and the ten `SELF_REG_*` constants).
+
+**Also there, added 2026-08-12:**
+
+| block | location | value | effect |
+|---|---|---|---|
+| `OFFENSIVE_SLIDERS` / `DEFENSIVE_SLIDERS` | `team_identity.py` | weight vectors over `[0,1,2,3,4]` | per-vision play-type mix. **Scale is a literal ratio**: `offense` 0 = 100% motion → 4 = 100% set plays; `defense` 0 = 100% man → 4 = 100% zone. A slider mean therefore reads directly as a league play-type mix. |
+| `LEAGUE_BASELINE` | `team_identity.py` | see doc | any slider a vision does NOT name draws from here, never a generic 2.0 — `hc_trap`/`fc_press` baseline at mean 0.99, so a generic neutral would ~double league-wide pressing |
+| `_set_play_percentages` schedule | `cpu_playbook_customization.py` | 1 play→100%, 2→55%, 3→45%, **4+→20%** | top-play concentration. **Intended ceiling 25% for normal (4+) books; NOT to be lifted** — spec §5's proposal to raise it is rejected. Books of 1–3 plays structurally exceed 25% and no cap can prevent that. |
+| `_random_capped_three(max_pct=50)` | `cpu_playbook_customization.py` | `50` | caps each of three play-family shares |
+
+⚠️ `SIGNAL_SCALE` and `FUEL_CAPACITY_BOUNDS` are **frozen against the pool they were measured
+from**, which predates the attribute recalibration and the second −2in height shift. Re-derive
+before trusting the vision distribution. Same class of hazard as an absolute `RT ≥ 50` bar —
+prefer within-team differences to absolute thresholds anywhere either can be used.
 
 ### Reproducibility / instrumentation
 

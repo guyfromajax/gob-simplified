@@ -31,10 +31,16 @@ TRAINING_GAIN_PERCENTAGES: Dict[str, Dict[str, float]] = {
     "C": {"ST": 77, "AG": 25, "SC": 68, "SH": 40, "ID": 100, "OD": 40, "PS": 33, "BH": 25, "RB": 100, "FT": 100, "IQ": 100, "ND": 100},
 }
 
+# Per-point gain multiplier by class year. Upperclassmen raised 2026-08-14 (JR 80→95,
+# SR 71→100): under free-will the flat pre-training decay outran their discounted gains,
+# so a reference-coached JR barely held and a SR REGRESSED in-season (net ~−2 RT/yr).
+# Bumping only JR/SR flips their in-season net positive (JR +0.8→+3.1, SR −2.3→+0.7)
+# without touching FR/SO (already healthy) or removing decay — the surgical fix from the
+# free-will work plan. Reference career arc rises modestly (~+27→+32), no runaway.
 CLASS_GAIN_PERCENTAGES: Dict[str, float] = {
-    "freshman": 100, "sophomore": 91, "junior": 80, "senior": 71,
-    "Freshman": 100, "Sophomore": 91, "Junior": 80, "Senior": 71,
-    "FR": 100, "SO": 91, "JR": 80, "SR": 71,
+    "freshman": 100, "sophomore": 91, "junior": 95, "senior": 100,
+    "Freshman": 100, "Sophomore": 91, "Junior": 95, "Senior": 100,
+    "FR": 100, "SO": 91, "JR": 95, "SR": 100,
 }
 
 # Named exceptions to table invariants. Tests assert this exact list so an
@@ -90,7 +96,10 @@ SHAPE_P6_FLOOR_BASE: Dict[str, Dict[str, float]] = {
 
 # ── Camp ────────────────────────────────────────────────────────────────────
 CAMP_WEEKS = 1
-CAMP_GAIN_SCALE = 1.4
+CAMP_GAIN_SCALE = 0.70   # free-will recalibration (2026-08): halved from 1.4. Under the
+                         # additive offseason, camp gains PERSIST into the career, so the
+                         # burst is scaled down; camp + in-season + reduced offseason land
+                         # career RT ≈ 21 (the pre-free-will arc). See free_will_offseason_work_plan.
 CAMP_POINT_BUDGET = 30
 IN_SEASON_POINT_BUDGET = 24
 

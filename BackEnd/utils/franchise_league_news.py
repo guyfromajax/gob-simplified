@@ -22,6 +22,8 @@ LEADER_SPECS: tuple[tuple[str, str, str | None, float | None], ...] = (
     ("fg_pct", "FGM", "FGA", 7.0),
 )
 
+PER_GAME_LEADER_BOARDS = frozenset({"pts", "treb", "ast"})
+
 
 def _int(value: Any, default: int = 0) -> int:
     try:
@@ -190,6 +192,11 @@ def _build_leaders(
                     continue
                 value = numerator_value / denominator_value * 100.0
                 tiebreak = denominator_value
+            elif board_id in PER_GAME_LEADER_BOARDS:
+                if gp <= 0:
+                    continue
+                value = numerator_value / gp
+                tiebreak = numerator_value
             else:
                 value = numerator_value
                 tiebreak = 0.0
@@ -209,8 +216,14 @@ def _build_leaders(
                     "name": name,
                     "team_slug": _team_slug(core),
                     "team_name": names.get(team_id) or str(core.get("name") or "Team"),
-                    "value": round(value, 1) if denominator else int(value),
-                    "display": f"{value:.1f}%" if denominator else str(int(value)),
+                    "value": round(value, 1) if denominator or board_id in PER_GAME_LEADER_BOARDS else int(value),
+                    "display": (
+                        f"{value:.1f}%"
+                        if denominator
+                        else f"{value:.1f}"
+                        if board_id in PER_GAME_LEADER_BOARDS
+                        else str(int(value))
+                    ),
                     "_tiebreak": tiebreak,
                 }
             )

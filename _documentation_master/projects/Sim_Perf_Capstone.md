@@ -178,6 +178,37 @@ Add `--poison-stash` for a draw-count change; swap `--workers 1` for `--pool 8` 
 pool. Fixtures are `gob-staging` docs — swap for any franchise with a populated week-7 schedule +
 initialized practice squad.
 
+### Benchmark on an identity-ON franchise (2026-08-14)
+
+**`6a28436c98dbd04e902eee09` no longer represents live play.** It has **0/128 teams with a CPU
+identity** and every strategy slider flat at `2`, because identity never ran on the live route until
+`0cf484604` (2026-08-13). Live franchises now carry a real `aggression` / `fc_press` / `hc_trap`
+spread, which is what drives HCT / FCP / Fast-Break entries — and therefore EOQ previews, transition
+turns and pressure resolution, the most expensive paths in the engine. The flat fixture measured the
+2026-08-14 regression ~40% smaller than the live franchise did.
+
+| fixture | identity | measured s/game (same commit) |
+|---|---|---|
+| `6a28436c…` week 7 (flat) | 0/128 | 5.15 |
+| `6a7e582a…` week 4 (identity-ON) | 128/128 | 5.91 |
+
+**Use an identity-ON franchise for perf work; keep the flat fixture only when you need continuity
+with the pre-08-13 numbers above.** Confirm before trusting a run:
+
+```bash
+python3 - <<'PY'
+import sys; sys.path.insert(0,'.')
+from bson import ObjectId
+from BackEnd.db import db
+fid = ObjectId("6a7e582a1198ae826b124c82")
+docs = list(db.franchise_team_data.find({"franchise_id": fid}, {"identity":1, "strategy_settings":1}))
+print("identity:", sum(1 for d in docs if d.get("identity")), "/", len(docs))
+print("fc_press spread:", sorted({(d.get("strategy_settings") or {}).get("fc_press") for d in docs}))
+PY
+```
+
+A single spread value (`[2]`) means the fixture is flat and the run understates pressure-path cost.
+
 ---
 
 ## Standing rules
@@ -205,6 +236,15 @@ initialized practice squad.
   builds its **own** client — per-process Mongo isolation is automatic, not caller-wired.
 - **Worker count** — `FRANCHISE_CPU_SIM_POOL_WORKERS`, default **8**. Chosen from the scaling curve:
   6.51× at 81% efficiency, near-peak, while leaving headroom so live user games never contend.
+  `PS_SIM_POOL_WORKERS` sizes the Practice-Squad pool separately (falls back to the CPU value, so
+  the default is unchanged) — the lever for when PS and the CPU week overlap on a small box.
+- **Concurrency is now visible** — three pooled paths share this module (CPU week, autotrain, PS) and
+  each sized itself independently, so two live at once silently asked for 2× the intended workers.
+  `[POOL-OVERLAP]` warns and names them; `[POOL-EFFICIENCY]` reports
+  `wall / worker_cpu / efficiency` per pool. **Low efficiency with no overlap warning = the box is
+  busy with something else** (live user game, dev server), not the engine. Worker CPU-time is
+  process-wide, so overlapping pools cross-contaminate each other's efficiency figure — which is
+  exactly when the overlap warning tells you not to trust it.
 - **Canonical output** — results keyed by game index; caller consumes `sorted()`. Pooled output is
   byte-identical to sequential regardless of completion order.
 
@@ -293,9 +333,11 @@ from persistence — it's the live-game lever.
 + a one-snapshot EOG orchestrator to drop the redundant game-doc re-reads. Design +
 instrumentation-first plan: `_documentation_master/projects/EOG_Persistence_Tier3_Plan.md`.
 
-**Instrumentation (all WARNING-level):** `[CPU-WEEK-TIMING]` (sim block), `[CPU-PERSIST-TIMING]`
-(persist total), `[CPU-PERSIST-SUBTIMING]` (per-op split), `[EOG-IDGUARD-FIRED]` (dead-guard counter)
-— in `BackEnd/api/franchise_routes.py` and `BackEnd/utils/stat_updater.py`.
+**Instrumentation (all WARNING-level):** `[CPU-WEEK-TIMING]` (sim block, now carrying `workers=`),
+`[CPU-PERSIST-TIMING]` (persist total), `[CPU-PERSIST-SUBTIMING]` (per-op split),
+`[EOG-IDGUARD-FIRED]` (dead-guard counter), `[POOL-EFFICIENCY]` + `[POOL-OVERLAP]` (per-pool
+wall/CPU/efficiency and concurrent-pool warning) — in `BackEnd/api/franchise_routes.py`,
+`BackEnd/utils/stat_updater.py` and `BackEnd/utils/cpu_week_pool.py`.
 
 ---
 
@@ -343,7 +385,8 @@ explicitly perf-only and forbade basketball-logic changes.
 
 ### Key code
 - `BackEnd/utils/sim_random.py` — dedicated RNG + global-draw guard
-- `BackEnd/utils/cpu_week_pool.py` — process pool + failure ladder
+- `BackEnd/utils/cpu_week_pool.py` — process pool + failure ladder + pool overlap/efficiency logging
+- `BackEnd/utils/plays_catalog.py` — process-level `plays` cache (copy-on-return; loaded-ness flag)
 - `scripts/perf_sim_baseline.py` — verification + benchmark harness (`--seed`, `--pool N`, `--workers`, `--poison-stash`)
 - `BackEnd/utils/sim_profiler.py` — pure-monkeypatch phase timer (`GOB_SIM_PROFILE=1`)
 - `scripts/sim_verify/` — the verification toolkit (diffstats, distcompare, kill_worker_test, p2_rng_audit, bench_pool) + README mapping each to the toolkit table above
@@ -402,6 +445,62 @@ surface; every feature that touches the engine must respect these.*
    draws needs the **poison-stash test** (not exact-diff) and a re-cut reference. Balance retunes
    that intentionally move stats get distributional verification + a new anchor. (See *Standing
    rules* and *Verification toolkit* above.)
+
+### Regression case study — a correct clone with the wrong scope (2026-08-14)
+
+**Symptom:** a 63-game CPU week logging 121–146 s. Per-turn *compute* had tripled while turn
+count stayed flat — so "games got longer" (the first hypothesis, from an attribute batch edit)
+was wrong, and the committed `reports/perf/` history said so in one table:
+
+| | 08-01 | 08-13 perf fixture | 08-13 live franchise |
+|---|---|---|---|
+| turns/game | 214 | 201 | 218 |
+| `core.micro_turn` **self ms/turn** | **2.73** | **7.06** | **8.05** |
+
+**Root cause:** `_preview_non_hco_eoq_turn` (added `327c59581`, 08-06) resolves a late HCT/FCP/FB
+turn speculatively on `copy.deepcopy(self.game)`. The clone is required — those resolvers are
+impure and the turn's duration is only knowable by resolving it. But it copied the **append-only
+turn log**, which is never cleared in a full sim: 4.7 previews/game, ~1.9M objects each, 178 ms at
+91 turns rising to **615 ms at 295 turns**, ~1.65 s/game total. Only **53 class instances** were in
+that graph; the rest was history.
+
+**Fix:** pre-seed the deepcopy memo so the clone gets its own list object with a deep-copied tail
+(`EOQ_PREVIEW_TURN_TAIL = 12`) and shared references to older turns — length and order preserved.
+Every in-place mutation of an existing turn writes to `[-1]`/`[-2]`; the deepest tail read anywhere
+is 10. Non-drawing change, so **seeded exact-diff was the valid instrument**: 126/126 rows
+byte-identical.
+
+**Second fix, same session — the `plays` catalog.** With the clone cost gone, the next phase was
+Mongo: **45 round trips / 2.4 s per game** against a 23-document universal collection, memoized only
+*per game* (`_playcall_memo`, `_skeleton_cache`) so every game re-paid the same lookups. Attribution
+first, because the obvious suspect was wrong — `get_hco_skeleton`'s memo was 3 of the 136 reads,
+while `_canonical_offensive_playcall_name` (45) and `_get_skeleton_from_team_plays` (45) were the
+real cost. `BackEnd/utils/plays_catalog.py` loads the collection **once per process**: 136 reads → 2.
+
+The catch that makes this non-trivial: skeleton selection **mutates the document it is handed**
+(`skeleton["_variant"]`, `skeleton["steps"]`). A per-game DB read gave each game its own copy by
+accident. So every catalog function that returns a *document* returns a deep copy (~0.4–1.7 ms vs a
+~48 ms round trip) and only `name_exists` / `name_for_id` are served from shared state. Sharing the
+documents instead would make a game's result depend on which games ran before it in the same worker.
+
+| | 08-13 start | + EOQ clone scope | + plays catalog |
+|---|---|---|---|
+| pooled 63-game week (median of 3) | 47.0 s | 37.7 s | **29.0 s** |
+| median s/game (single worker) | 5.91 | 5.22 | **3.36** |
+| `core.micro_turn` self ms/turn | 8.05 | 4.07 | 4.07 |
+| `db.read.plays._refresh` per game | 30 | 30 | **0** |
+
+Both changes are non-drawing: **126/126 rows byte-identical** at each step, and the worker-kill
+ladder still reproduces the clean sequential reference. Worker CPU-time is now **2.53 s/game**
+against the Phase-3 reference of 2.19.
+
+**Two transferable lessons.** (1) *Isolation is load-bearing; its scope usually isn't.* Ask what the
+speculative code can actually touch before cloning a whole object graph — a memo-seeded deepcopy
+buys 79% here with no semantic change. (2) **Benchmark fixtures rot.** The canonical perf franchise
+`6a28436c…` has 0/128 teams with a CPU identity and every strategy slider flat at 2; the live
+franchise has 128/128 and a real `fc_press`/`hc_trap` spread, which is what drives HCT/FCP/FB entries
+and therefore preview frequency. The fixture understated this regression by ~40% and could not have
+found it. **Re-benchmark on an identity-ON franchise.**
 
 ### Regression case study — missing reference data as a 60x slowdown (2026-08-12)
 

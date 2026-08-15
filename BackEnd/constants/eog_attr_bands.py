@@ -75,25 +75,23 @@ Design notes (see EOG Structural Pass):
 # curve. Binning by shot_threshold shows the LEVEL shifts too: mean cross-season spread
 # 6.42pp, max 9.15pp (at S=80-99: baseline 43.7%, identity 40.1%, verification 39.0%).
 #
-# CURRENT CALIBRATION (re-cut 2026-08-12 for the -30..170 scale)
+# CURRENT CALIBRATION (re-cut 2026-08-14 for the -10..190 scale)
 #   basis      FG% = 51.25 - 0.14126 * shot_threshold, residual sd 7.67pp. The fit is
 #              SCALE-INDEPENDENT — shot_threshold is compared absolutely in
 #              `made = shot_score >= shot_threshold` — but the OPERATING POINT is not:
-#              at the current init 65-75 the equilibrium is 41.4% FG, not the 37.1% that
-#              init 95-105 produced on the old 0-200 scale.
+#              at the current init 85-95 the fitted equilibrium is 38.5% FG.
 #   ⚠️ THIS IS WHY A SCALE MOVE FORCES A BAND RE-CUT. Cut at 24/36 for init 95-105, then
 #      left alone across the two scale moves, these bands drifted teams -28/season instead
 #      of ~0: FG at the new init sat ABOVE the high cut, so most team-games took the
-#      negative delta and compounded downward. Verified, then fixed to 26/40 (drift -0.1).
+#      negative delta and compounded downward. The -30..170 calibration was 26/40.
 #      See the scale-change checklist in 00_Operations/Shot_Threshold_Scale_Tuning.md.
-#   simulated  26 weeks x 128 teams, ACTUAL integer band ranges, from init 65-75:
-#              mean 69.9, sd 21.2, p10 43, p90 98, drift -0.1, ZERO teams at either rail
-#   chosen deliberately CONSERVATIVE over a wider-spread option (24/38 gain 8: sd 34.0 but
-#   0.3 teams railing) because the fit is thinnest exactly where new bands push teams —
-#   n=256 at S=100-119 against n=1008 at 80-99. Re-fit from the next season, where teams
-#   will actually sit, and widen from a basis that covers the target range.
-FG_PCT_HIGH = 40
-FG_PCT_MID = 26
+#   simulated  1,000 x (26 weeks x 128 teams), ACTUAL integer band ranges and clamps,
+#              from init 85-95, bootstrapping the 3,330 measured residuals:
+#              mean 90.0, sd 20.5, drift -0.05, ZERO rails across 128,000 team-seasons.
+#   chosen      22/37. Nearby 23/37 drifted +1.01 with one rail; 24/37 drifted +2.43
+#              with eight rails. Re-fit from a fresh season if engine/roster inputs change.
+FG_PCT_HIGH = 37
+FG_PCT_MID = 22
 
 # discipline — team (F+TO) vs opponent (F+TO) + buffer
 DISCIPLINE_OPP_BUFFER = 8
@@ -182,14 +180,27 @@ FIGHT_WIN = (0, 2)
 FIGHT_LOSS = (-2, 0)
 
 # rebound_modifier (5-band ladder; values are hundredths, applied as /100)
-# Rebalanced for the widened margins above. With the extremes now ~21% per tail
-# instead of 33%, the deep negative band no longer dominates; the ladder nets
-# +0.1/season on the 0.0-1.0 range instead of -1.2.
-REB_OUTREBOUND_GT_8 = (4, 14)       # +0.04 .. +0.14
-REB_OUTREBOUND_4_7 = (0, 6)         # 0.00 .. +0.06
-REB_WITHIN_3 = (-3, 3)              # -0.03 .. +0.03
-REB_OUTREBOUNDED_4_7 = (-8, -2)     # -0.02 .. -0.08
-REB_OUTREBOUNDED_GT_8 = (-12, -4)   # -0.04 .. -0.12
+#
+# NAMES ARE DELIBERATELY THRESHOLD-FREE. The previous set (REB_OUTREBOUND_GT_8,
+# REB_OUTREBOUND_4_7 ...) baked margins into the identifiers and then went stale:
+# `outrebound_gt_8` actually fired at a differential of 14 and `outrebound_4_7` at
+# 7-13. Same failure as `fg_gt_50` firing at 40% FG. The margins live in
+# REBOUND_BIG_MARGIN / REBOUND_MID_MARGIN / REBOUND_EVEN_MARGIN and are meant to be
+# re-tuned; the names must survive that.
+#
+# NARROWED 2026-08-14. On a 0.0-1.0 scale the old ranges moved up to 0.14 in a single
+# game against training's ~0.04 per WEEK, so EOG was the dominant term and a short
+# rebounding run could cross half the range. Measured at week 13-27 of two seasons:
+# 28-31 teams sat at exactly 1.0 and 17-30 at exactly 0.0 — roughly 40% of the league
+# railed, after which the attribute carries no information.
+#
+# Each band is now tighter and the two outer bands no longer overlap the middle ones,
+# so a blowout is still worth more than a solid edge but cannot lurch the attribute.
+REB_DOMINANT = (5, 10)        # +0.05 .. +0.10   outrebounded them by BIG_MARGIN+
+REB_STRONG = (1, 5)           # +0.01 .. +0.05   by MID_MARGIN..BIG_MARGIN
+REB_EVEN = (-3, 3)            # -0.03 .. +0.03   within EVEN_MARGIN
+REB_WEAK = (-8, -4)           # -0.08 .. -0.04   outrebounded by MID..BIG
+REB_DOMINATED = (-12, -8)     # -0.12 .. -0.08   outrebounded by BIG_MARGIN+
 
 # concentration bands shared by offense / fb / pt
 # Shifted up one notch. At the OLD thresholds these averaged -0.5/game; once the
@@ -241,11 +252,11 @@ EOG_BANDS = {
         ("equal_buffered", DISC_EQUAL),
     ],
     "rebound_modifier": [
-        ("outrebound_gt_8", REB_OUTREBOUND_GT_8),
-        ("outrebound_4_7", REB_OUTREBOUND_4_7),
-        ("within_3", REB_WITHIN_3),
-        ("outrebounded_4_7", REB_OUTREBOUNDED_4_7),
-        ("outrebounded_gt_8", REB_OUTREBOUNDED_GT_8),
+        ("reb_dominant", REB_DOMINANT),
+        ("reb_strong", REB_STRONG),
+        ("reb_even", REB_EVEN),
+        ("reb_weak", REB_WEAK),
+        ("reb_dominated", REB_DOMINATED),
     ],
     "offensive_efficiency": [
         ("conc_le_30", CONC_REWARD_DELTA),

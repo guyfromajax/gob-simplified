@@ -51,7 +51,7 @@ from BackEnd.models.training_execution_v2 import (  # noqa: E402
     execute_training,
 )
 from BackEnd.api.franchise_routes import (  # noqa: E402
-    _cpu_reference_allocation,
+    _coaching_quality_reference_allocation,
     _cpu_reference_top3,
 )
 from BackEnd.constants.training_shape import (  # noqa: E402
@@ -176,7 +176,7 @@ def _strategy(pos: str, mode: str) -> tuple[dict, str | None, dict | None, list[
 
     if mode == "reference":
         # Reinforce strengths — production CPU path.
-        alloc = _cpu_reference_allocation(pos)
+        alloc = _coaching_quality_reference_allocation(pos)
         focus = "player-maximizer-custom"
         custom = {"x": list(top3)}
         coach_dir = [3.0 if a in top3 else 1.0 for a in GROWTH]

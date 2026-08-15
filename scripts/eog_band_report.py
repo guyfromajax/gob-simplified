@@ -27,6 +27,28 @@ import statistics
 import sys
 from collections import Counter, defaultdict
 
+# Mirrors BackEnd/models/training_execution_v2.TEAM_ATTR_CLAMPS. Held as a local copy on
+# purpose: this script parses a JSONL file and must stay importable without pulling in
+# BackEnd.db. KEEP IN SYNC — same convention as eog_band_tuner.py's own band-config copy.
+#
+# These spans differ by 200x, which is why every cross-attribute comparison here is
+# normalized. shot_threshold moving 22 points and discipline moving 22 points are not
+# remotely the same event.
+ATTR_RANGE = {
+    "shot_threshold": 200.0,      # (-30, 170)
+    "team_chemistry": 18.0,       # (7, 25)
+    "rebound_modifier": 1.0,      # (0.0, 1.0)
+    "momentum_score": 20.0,       # (-10, 10)
+    # the core 8, all (-20, 20)
+    "discipline": 40.0, "fight": 40.0,
+    "offensive_efficiency": 40.0, "defensive_efficiency": 40.0,
+    "fb_efficiency": 40.0, "pt_efficiency": 40.0,
+    "fb_opp_modifier": 40.0, "pt_opp_modifier": 40.0,
+}
+
+# Attributes whose large net season drift is INTENDED, not a band miscalibration.
+BY_DESIGN_DRIFT = {"team_chemistry"}
+
 TAG = "[EOG-BAND] "
 HEADER_TAG = "[EOG-BAND-HEADER] "
 
@@ -286,6 +308,18 @@ def combined_drift(records: list[dict]) -> None:
     tune; stability means combined ≈ 0, i.e. EOG ≈ −(training input). (Week-1's
     30-pt training isn't measurable here — no prior game — so training is the
     25×24-pt rate; the true season figure is marginally larger.)
+
+    ⚠️ `combined ≈ 0` IS NOT THE TARGET FOR EVERY ATTRIBUTE. `team_chemistry` is
+    DESIGNED to climb: teams start a season with low chemistry and build it, so a
+    large positive net drift and floor-clamping in the opening weeks are both
+    CORRECT and expected — not a band miscalibration. Confirmed 2026-08-12.
+    Re-cutting chemistry toward zero would flatten the intended season arc.
+
+    COMPARE ATTRIBUTES AS A SHARE OF THEIR RANGE, NOT IN RAW POINTS. The clamps
+    differ by 200x: shot_threshold spans 200 (-30..170), the core-8 span 40
+    (±20), team_chemistry spans 18 (7..25) and rebound_modifier spans 1.0
+    (0.0..1.0). A raw-points ranking makes shot_threshold look like a runaway
+    when it is mid-pack proportionally.
     """
     eog_sum: dict[str, float] = defaultdict(float)
     eog_n: Counter = Counter()
@@ -320,11 +354,16 @@ def combined_drift(records: list[dict]) -> None:
         tr = (tr_sum[a] / tr_n[a]) * 26 if tr_n[a] else float("nan")
         comb = eog + (tr if tr == tr else 0.0)
         rows.append((a, eog, tr, comb))
-    rows.sort(key=lambda x: -abs(x[3]))  # worst combined drift first
+    # Rank by SHARE OF RANGE, not raw points. Sorting on raw drift put
+    # shot_threshold (span 200) at the top and team_chemistry (span 18) mid-table,
+    # which is backwards: proportionally chemistry moves ~4x further. Ranking on raw
+    # points sent one reader off re-cutting the wrong constant.
+    rows.sort(key=lambda x: -abs(x[3]) / ATTR_RANGE.get(x[0], 40.0))
 
     print("\n## 2b. Net drift per SEASON — EOG + training = combined "
-          "(tuning target: combined ≈ 0, i.e. EOG ≈ −training)")
-    print(f"  {'attr':<22}{'EOG':>9}{'training':>10}{'COMBINED':>10}   {'driver':<16}")
+          "(target: combined ≈ 0 for MOST attrs — see the chemistry note below)")
+    print(f"  {'attr':<22}{'EOG':>9}{'training':>10}{'COMBINED':>10}"
+          f"{'range':>7}{'%range':>8}   {'driver':<16}")
     for a, eog, tr, comb in rows:
         if tr == tr and abs(tr) > abs(eog) * 1.5:
             driver = "training-driven"
@@ -333,7 +372,25 @@ def combined_drift(records: list[dict]) -> None:
         else:
             driver = "both"
         trs = f"{tr:>+10.1f}" if tr == tr else f"{'n/a':>10}"
-        print(f"  {a:<22}{eog:>+9.1f}{trs}{comb:>+10.1f}   {driver:<16}")
+        rng = ATTR_RANGE.get(a, 40.0)
+        pct = comb / rng * 100
+        flag = "  ← BY DESIGN" if a in BY_DESIGN_DRIFT else ""
+        print(f"  {a:<22}{eog:>+9.1f}{trs}{comb:>+10.1f}{rng:>7.0f}{pct:>+7.0f}%"
+              f"   {driver:<16}{flag}")
+    print("\n  team_chemistry is SUPPOSED to climb — teams start a season with low "
+          "chemistry\n  and build it. Large positive net drift and floor-clamping in the "
+          "opening weeks\n  are correct, not a miscalibration. Do not tune it toward zero.")
+
+    # Training is recovered from post(week N) -> pre(week N+1) gaps, so it needs at least
+    # two CONSECUTIVE weeks. With one week it is unmeasurable and COMBINED collapses to
+    # EOG-only — which reads as a huge one-sided drift and invites re-cutting a constant
+    # that is actually fine. shot_threshold showed -78/season this way; its real training
+    # counterpart is about +56, so the true combined figure is roughly -22.
+    unmeasured = [a for a, _e, tr, _c in rows if tr != tr]
+    if unmeasured:
+        print(f"\n  ⚠️  TRAINING UNMEASURABLE for {len(unmeasured)}/{len(rows)} attrs "
+              f"— needs 2+ CONSECUTIVE weeks.\n      COMBINED and %range above are "
+              f"EOG-ONLY and are NOT the drift figure. Do not tune off this.")
 
 
 def _histogram(values: list, is_float: bool) -> None:

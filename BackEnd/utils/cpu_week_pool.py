@@ -36,6 +36,10 @@ from __future__ import annotations
 import logging
 import multiprocessing as mp
 import os
+import resource
+import threading
+import time
+from contextlib import contextmanager
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from concurrent.futures.process import BrokenProcessPool
 
@@ -43,18 +47,90 @@ logger = logging.getLogger(__name__)
 
 DEFAULT_POOL_WORKERS = 8
 
+# ---------------------------------------------------------------------------
+# Concurrency + efficiency observability
+#
+# Three pooled paths live in this module — CPU week, autotrain, Practice Squad —
+# and one advance-week can run more than one. Each sizes itself independently
+# from FRANCHISE_CPU_SIM_POOL_WORKERS, so two live at once request 2x the workers
+# the setting intends, oversubscribe the box, and both run slow. Nothing in the
+# logs said whether that was happening, which is what this exists to answer:
+# a WARNING names the overlapping pools, and every pool reports the parallel
+# efficiency it actually achieved (worker CPU-time / (wall x workers)).
+#
+# Low efficiency with no overlap warning means the box is busy with something
+# else (a live user game, the dev server). NB: child CPU-time is process-wide,
+# so when pools DO overlap their efficiency figures cross-contaminate — the
+# warning tells you when not to trust them.
+# ---------------------------------------------------------------------------
+_live_pools_lock = threading.Lock()
+_live_pools: dict[str, int] = {}
 
-def pool_worker_count() -> int:
+
+@contextmanager
+def _pool_span(label: str, workers: int, jobs: int):
+    with _live_pools_lock:
+        others = {k: v for k, v in _live_pools.items() if v}
+        _live_pools[label] = _live_pools.get(label, 0) + workers
+        total = sum(_live_pools.values())
+    if others:
+        logger.warning(
+            "[POOL-OVERLAP] %s starting %s workers while %s already live — %s workers "
+            "requested across %s pools on %s cpus. They will contend; consider serializing "
+            "them or lowering the worker count.",
+            label, workers, others, total, len(_live_pools), os.cpu_count(),
+        )
+
+    t0 = time.time()
+    cpu0 = resource.getrusage(resource.RUSAGE_CHILDREN)
+    try:
+        yield
+    finally:
+        wall = time.time() - t0
+        cpu1 = resource.getrusage(resource.RUSAGE_CHILDREN)
+        cpu = (cpu1.ru_utime - cpu0.ru_utime) + (cpu1.ru_stime - cpu0.ru_stime)
+        with _live_pools_lock:
+            _live_pools[label] = max(0, _live_pools.get(label, 0) - workers)
+        denom = wall * max(1, workers)
+        logger.warning(
+            "[POOL-EFFICIENCY] %s | jobs=%s workers=%s | wall=%.1fs worker_cpu=%.1fs "
+            "efficiency=%.0f%% | cpus=%s",
+            label, jobs, workers, wall, cpu,
+            (100.0 * cpu / denom) if denom else 0.0, os.cpu_count(),
+        )
+
+
+def pool_worker_count(env_var: str = "FRANCHISE_CPU_SIM_POOL_WORKERS") -> int:
     """Worker count from FRANCHISE_CPU_SIM_POOL_WORKERS (default 8).
 
     Default leaves headroom on the 32-vCPU Railway service so live user-game
     requests never contend with a background week.
+
+    ``env_var`` lets a second pooled path size itself separately — see
+    ``ps_pool_worker_count`` — so the two can be de-conflicted from the
+    environment without a deploy.
     """
     try:
-        n = int(os.environ.get("FRANCHISE_CPU_SIM_POOL_WORKERS", DEFAULT_POOL_WORKERS))
+        n = int(os.environ.get(env_var, DEFAULT_POOL_WORKERS))
         return max(1, n)
     except (TypeError, ValueError):
         return DEFAULT_POOL_WORKERS
+
+
+def ps_pool_worker_count() -> int:
+    """Worker count for the Practice-Squad pool.
+
+    Falls back to the CPU-week setting, so the default is unchanged. Set
+    ``PS_SIM_POOL_WORKERS`` when PS runs alongside the CPU week (watch for
+    ``[POOL-OVERLAP]``) and the box cannot afford both at full width.
+    """
+    raw = os.environ.get("PS_SIM_POOL_WORKERS")
+    if raw is None:
+        return pool_worker_count()
+    try:
+        return max(1, int(raw))
+    except (TypeError, ValueError):
+        return pool_worker_count()
 
 
 def _worker(task: tuple) -> tuple:
@@ -188,26 +264,27 @@ def simulate_cpu_week_pooled(
     def _remaining():
         return [j for j in jobs if j[0] not in results]
 
-    # Tier 1 — pooled
-    per_game_errors, broke = _run_one_pool(
-        _remaining(), seed_base, max_workers, collect_guard, results, leaks)
-
-    # Tier 2 — rebuild the pool once for whatever did not complete
-    if broke:
-        remaining = _remaining()
-        logger.warning("[CPU-POOL] rebuilding pool once for %d incomplete game(s)",
-                       len(remaining))
+    with _pool_span("cpu_week", min(max_workers, len(jobs)), len(jobs)):
+        # Tier 1 — pooled
         per_game_errors, broke = _run_one_pool(
-            remaining, seed_base, max_workers, collect_guard, results, leaks)
+            _remaining(), seed_base, max_workers, collect_guard, results, leaks)
 
-    # Tier 3 — sequential in-process for the remainder
-    if broke:
-        remaining = _remaining()
-        logger.warning("[CPU-POOL] pool unusable; running %d game(s) sequentially "
-                       "in-process (correct + seeded, slower)", len(remaining))
-        seq_errors = _run_sequential_inprocess(
-            remaining, seed_base, results, leaks, collect_guard)
-        per_game_errors = seq_errors
+        # Tier 2 — rebuild the pool once for whatever did not complete
+        if broke:
+            remaining = _remaining()
+            logger.warning("[CPU-POOL] rebuilding pool once for %d incomplete game(s)",
+                           len(remaining))
+            per_game_errors, broke = _run_one_pool(
+                remaining, seed_base, max_workers, collect_guard, results, leaks)
+
+        # Tier 3 — sequential in-process for the remainder
+        if broke:
+            remaining = _remaining()
+            logger.warning("[CPU-POOL] pool unusable; running %d game(s) sequentially "
+                           "in-process (correct + seeded, slower)", len(remaining))
+            seq_errors = _run_sequential_inprocess(
+                remaining, seed_base, results, leaks, collect_guard)
+            per_game_errors = seq_errors
 
     # Tier 4 — genuine per-game failures (bad data, engine bug) survive to the caller
     for idx, ex_ in per_game_errors.items():
@@ -302,21 +379,22 @@ def simulate_autotrain_pooled(
             return True
         return False
 
-    broke = _run_pool(jobs)
-    if broke:
-        rem = _remaining()
-        logger.warning("[AUTOTRAIN-POOL] rebuilding pool once for %d incomplete team(s)", len(rem))
-        broke = _run_pool(rem)
-    if broke:
-        rem = _remaining()
-        logger.warning("[AUTOTRAIN-POOL] running %d team(s) in-process (claim-first idempotent)", len(rem))
-        from BackEnd.api.franchise_routes import auto_train_one_cpu_team
-        for (idx, fid, tid, wk, isf) in rem:
-            try:
-                seed = None if seed_base is None else seed_base + idx
-                results[idx] = auto_train_one_cpu_team(fid, tid, wk, is_first_training=isf, seed=seed)
-            except Exception as ex_:  # noqa: BLE001
-                errors[idx] = ex_
+    with _pool_span("autotrain", min(max_workers, len(jobs)), len(jobs)):
+        broke = _run_pool(jobs)
+        if broke:
+            rem = _remaining()
+            logger.warning("[AUTOTRAIN-POOL] rebuilding pool once for %d incomplete team(s)", len(rem))
+            broke = _run_pool(rem)
+        if broke:
+            rem = _remaining()
+            logger.warning("[AUTOTRAIN-POOL] running %d team(s) in-process (claim-first idempotent)", len(rem))
+            from BackEnd.api.franchise_routes import auto_train_one_cpu_team
+            for (idx, fid, tid, wk, isf) in rem:
+                try:
+                    seed = None if seed_base is None else seed_base + idx
+                    results[idx] = auto_train_one_cpu_team(fid, tid, wk, is_first_training=isf, seed=seed)
+                except Exception as ex_:  # noqa: BLE001
+                    errors[idx] = ex_
 
     for idx in list(errors):
         if idx in results:
@@ -397,7 +475,7 @@ def simulate_ps_games_pooled(
     the 3-attempt fallback). No sequential-in-process tier here on purpose.
     """
     if max_workers is None:
-        max_workers = pool_worker_count()
+        max_workers = ps_pool_worker_count()
     if not jobs:
         return {}, {}, {}
 
@@ -439,11 +517,12 @@ def simulate_ps_games_pooled(
             return True
         return False
 
-    broke = _run_pool(jobs)
-    if broke:
-        rem = _remaining()
-        logger.warning("[PS-POOL] rebuilding pool once for %d incomplete game(s)", len(rem))
-        _run_pool(rem)
+    with _pool_span("practice_squad", min(max_workers, len(jobs)), len(jobs)):
+        broke = _run_pool(jobs)
+        if broke:
+            rem = _remaining()
+            logger.warning("[PS-POOL] rebuilding pool once for %d incomplete game(s)", len(rem))
+            _run_pool(rem)
 
     for idx in list(errors):
         if idx in results:

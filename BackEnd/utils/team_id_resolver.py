@@ -65,7 +65,11 @@ def resolve_team_id_to_canonical(
     team_identifier = str(team_identifier).strip()
     
     # Use override if provided, otherwise use module-level collection
-    collection = teams_collection_override or teams_collection
+    # NOT `override or teams_collection`: `or` calls bool() on the left operand, which a
+    # pymongo Collection refuses with NotImplementedError. Passing a real Collection as the
+    # test override would have raised here instead of being used.
+    collection = (teams_collection_override if teams_collection_override is not None
+                  else teams_collection)
     
     # Step 1: For single mode, ALWAYS resolve from game document first (don't trust input format)
     # This ensures we get the actual canonical team_id from the document, not just assume input is correct
@@ -168,7 +172,9 @@ def _resolve_from_franchise_tournament_document(
                 return canonical_id
         
         # Fallback: if user_team_id is a team name, try to resolve it
-        if user_team_id and HAS_DB and collection:
+        # `collection is not None` — bool() on a pymongo Collection raises
+        # NotImplementedError. Line 164 above already had it right; this one did not.
+        if user_team_id and HAS_DB and collection is not None:
             canonical_id = _resolve_name_to_canonical(user_team_id, collection)
             if canonical_id:
                 return canonical_id
@@ -322,7 +328,11 @@ def resolve_team_id_to_object_id(
     )
     
     # Then look up ObjectId from canonical team_id
-    collection = teams_collection_override or teams_collection
+    # NOT `override or teams_collection`: `or` calls bool() on the left operand, which a
+    # pymongo Collection refuses with NotImplementedError. Passing a real Collection as the
+    # test override would have raised here instead of being used.
+    collection = (teams_collection_override if teams_collection_override is not None
+                  else teams_collection)
     
     if HAS_DB and collection is not None:
         try:

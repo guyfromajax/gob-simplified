@@ -10,9 +10,9 @@
   // `const MAX = <n>` so the values stay eyeballable against the Python side.
   const SPAN = 200;
   const HALF_SPAN = SPAN / 2;
-  const MIN = -30;
-  const MAX = 170;
-  const MID = 70;
+  const MIN = -10;
+  const MAX = 190;
+  const MID = 90;
 
   function pillDeviation(raw) {
     return MID - Number(raw);

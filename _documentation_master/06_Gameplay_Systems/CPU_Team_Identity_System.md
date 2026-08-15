@@ -21,6 +21,70 @@ measured and rejected, that is stated as such.
 
 ---
 
+## ▶ SURFACE STATUS — read this before building or shipping
+
+`cpu_identity_design.md` names **four surfaces** the vision was meant to drive. Two are
+live. The table below is the single source of truth for which; everything else on this page
+describes the mechanism, not the coverage.
+
+| # | Surface | State | Where |
+|---|---|---|---|
+| 1 | **Game plans** (strategy sliders) | ✅ **LIVE** — verified **+5.0% pts/team-game**, 3.2 SE | §3, §7 |
+| 2 | **Starting five** | ✅ **LIVE** — shared user/CPU selector | `CPU_Team_Rotation_System.md` |
+| 3 | **Substitution policy** | ⛔ **CLOSED — measured, no effect** | `projects/bugs.md` |
+| 4 | **Playbooks** | ⚠️ **NOT identity-driven** | see below |
+| 5 | **Training** | ✅ **LIVE** — identity-driven allocation, two modes | `cpu_identity_design.md` Part A |
+| 6 | **Rotation size** | ❌ **UNBUILT** | design §B2 |
+| 7 | **5-week re-evaluation** | ❌ **UNBUILT** | design §B4 |
+
+**Three live of seven. Anything claiming "CPU Identity is fully wired" is wrong.**
+
+### Notes that change what you would build
+
+**#3 substitution is closed, and TWO mechanisms were tried.** The NG pull/return hysteresis
+pair cost ~1 point a game and was stripped. The redirect to the selector objective weight `w`
+was then tested conditioned on `starter_bench_gap` — the top-heavy and shallow bands came back
+at **−1.56 and −1.22** points, same sign, differing by 0.34 (≈ ⅛ of one SE), where the spec
+predicts *opposite* signs. Both writeups land on the same conclusion: **the lever for changing
+CPU rotation behaviour is the FATIGUE ECONOMY, not the selector or the gate.** Do not reopen
+this by trying another parameter grid.
+
+**#4 playbooks are a pre-existing system identity does not touch.**
+`cpu_playbook_customization.py` contains **zero** references to identity or vision — it builds
+from `_classify_focus_strengths(position_players)`, i.e. roster shape. Coverage is also scoped
+to *the teams the user is scheduled to play* (`build_user_schedule_cpu_playbook_groups`), so
+CPU-vs-CPU games use default playbooks: **8/128 teams customized at week 2, 19/128 at week 15**.
+That scoping is deliberate, not a bug. Design §B1 (vision → play families, concentration by
+`breadth`) is entirely unbuilt.
+
+**#5 rotation size may not be buildable in isolation.** Current depth is 6.69 players above 8%
+of minutes against a target of 8–11, but `CPU_Team_Rotation_System.md` §8 attributes that to the
+fatigue economy rather than the selector — so a `rotation_size` parameter may not move minutes.
+`starter_bench_gap`, which it depends on, **is not defined anywhere in the codebase**; a working
+definition and its arguable choices are in `projects/bugs.md`, and the 13/19 band edges put
+**75% of the league in one band** on the current pool.
+
+**#5 training SHIPPED 2026-08-14** — one team-wide plan (not per-position), 1-of-16 weekly
+coaching focus, and a two-mode identity-driven allocation. Full design and measured results in
+`cpu_identity_design.md` Part A. The original spec excluded player development to protect a
+coaching-quality normalization; that turned out to be moot — CPU teams never feed
+`season_coaching_quality` at all.
+
+### Where the rest of the documentation lives
+
+| | |
+|---|---|
+| [`projects/cpu_identity_design.md`](../projects/cpu_identity_design.md) | The DESIGN — Part A training (shipped), Part B unbuilt surfaces. Check against this table before implementing any of it. |
+| [`projects/bugs.md`](../projects/bugs.md) | Mechanisms measured and rejected, with their numbers. |
+| [`CPU_Team_Rotation_System.md`](./CPU_Team_Rotation_System.md) | Lineup selection, the NG gate, the void-minutes-metric warning. |
+| [`11_Design_Systems/Tunable_Constants.md`](../11_Design_Systems/Tunable_Constants.md) | Constants index; the full identity table is in §9 here. |
+
+⚠️ **The design doc is not authoritative about what is live — this table is.** The original spec
+specified a substitution mechanism that had already been measured and stripped, because nothing
+reconciled the two documents. That is what this table exists to prevent.
+
+---
+
 ## Why it exists
 
 The previous CPU derivation used per-slider `_strategy_roll_*` thresholds that were **dead in
@@ -125,6 +189,44 @@ defensive score.
 
 Do not read a vision-count change as a statement about that vision.
 
+### Measured population split (2026-08-12)
+
+Dry-run over a live 128-team franchise on `gob-staging` (franchise `6a7c5a00…f5f29`, week 15,
+post-recalibration pool). All 128 teams resolved a five; `no_five = 0`, 1,536/1,536 roster
+players matched in FPD.
+
+| Offensive vision | Teams | | Defensive vision | Teams |
+|---|---:|---|---|---:|
+| Inside-Out | **98 (77%)** | | Zone | **69 (54%)** |
+| Motion | 10 | | Contain | 39 |
+| Run and Gun | 10 | | Full-Court Press | 16 |
+| Spread | 6 | | Multiple | 3 |
+| Attack | 4 | | Man Lockdown | 1 |
+
+Resulting slider spread — the quantity the inertness gate checks:
+
+| Slider | distinct | variance | range |
+|---|---:|---:|---|
+| `aggression` | 5 | 1.046 | 0–4 |
+| `hc_trap` | 5 | 1.025 | 0–4 |
+| `fc_press` | 5 | 1.361 | 0–4 |
+| `tempo` | 5 | 0.799 | 0–4 |
+| `inside` | 4 | 0.689 | 1–4 |
+| `outside` | 5 | 0.578 | 0–4 |
+
+⚠️ **The offensive split is heavily concentrated and has NOT been validated.** 77% on one
+vision may be correct — a post-recalibration pool of similar rosters will concentrate under
+softmax — or it may mean the offensive fit function is under-discriminating on this pool. The
+frozen scale constants in §1 were measured **before** the attribute recalibration and the
+second −2in height shift, so the z-scores feeding selection are being taken against a pool
+that has since moved.
+
+Per `cpu_identity_design.md` §B5, **this cannot be settled distributionally** — different
+aggregation forms produce near-identical population splits while disagreeing about a third of
+the teams. Validation is downstream: do press-identity teams actually press effectively, and
+do outside-identity teams out-shoot the league? Treat the table above as a baseline to detect
+drift against, not as evidence the fit function is right.
+
 ---
 
 ## 3. Slider draw
@@ -136,7 +238,27 @@ neutral.** `hc_trap` / `fc_press` baseline at `[34,40,20,5,1]` (mean 0.99); hand
 generic 2.0 would roughly **double league-wide pressing** as a side effect of wiring identity.
 
 Tables live in `team_identity.OFFENSIVE_SLIDERS` / `DEFENSIVE_SLIDERS` / `LEAGUE_BASELINE`.
-`offense` is motion(0) ↔ set-play(4); `defense` is man(0) ↔ zone(4).
+
+### Scale semantics — CONFIRMED (2026-08-12)
+
+The two axis sliders are **play-type mixes**, not intensities. Each value is a literal ratio:
+
+| value | `offense` (motion ↔ set play) | `defense` (man ↔ zone) |
+|---|---|---|
+| 0 | 100% motion | 100% man |
+| 1 | 75/25 motion | 75/25 man |
+| 2 | 50/50 | 50/50 |
+| 3 | 75/25 set plays | 75/25 zone |
+| 4 | 100% set plays | 100% zone |
+
+Verified against every vector: Motion draws mean **1.45**, Spread 1.25, Run and Gun 1.05
+(all motion-leaning); Inside-Out **2.75** and Attack 1.75 lean set-play. Man Lockdown draws
+**0.50**, Zone **3.05**, Multiple 2.00 wide, Contain 1.65. Full-Court Press **does not name
+`defense`** — press is orthogonal to the man/zone axis and is expressed through `fc_press`.
+
+Because the scale is a ratio and not a preference, **a slider mean is directly readable as a
+league play-type mix** — `defense` mean 2.0 across the league means half of all defensive
+possessions are zone.
 
 Measured means actually drawn, by vision:
 
@@ -207,6 +329,40 @@ existing branch does the right thing unchanged.
 **`scripts/eog_gate_check.py` exists because of this.** It asserts the treatment, not just the
 data: every team carries a persisted identity, and sliders **vary** across the league. Zero
 variance on `aggression` / `hc_trap` / `fc_press` exits non-zero.
+
+### It then went inert a SECOND time, by a different route (found 2026-08-12)
+
+The fix above was correct and still is. It was attached to the wrong place.
+
+`ensure_franchise_identities` was called from the `/franchise/complete-week` route only. But
+**three** endpoints reach the CPU sim block, and the live UI takes the other two:
+
+| Endpoint | Called by | Assigned identity? |
+|---|---|---|
+| `/complete-week` | `box-score.js` fallback branch only | ✅ |
+| `/complete-week/start-cpu-sims` | `franchiseStartCpuSimsClient.js` | ❌ |
+| `/complete-week/phase-b` | `franchisePhaseBClient.js` | ❌ |
+
+So identity never ran in normal play. `gob-staging` carried **0/128 teams with an identity and
+every slider flat at 2**, on a franchise created two days *after* identity shipped, on a build
+containing it.
+
+**The fix: assign at `_complete_week_finish_cpu_and_persist`**, the single function all three
+entry points converge on, ahead of the sim block. A per-route call is what made this
+reintroducible; the choke point makes it unreachable by construction.
+
+**The lesson is about verification, not about routing.** The gate that catches this exists and
+has existed since the first incident — `franchise_identity_summary` reported
+`teams_with_identity: 0` the moment it was asked. Nobody asked. A gate is only a control if
+something runs it; **run `scripts/eog_gate_check.py` after any change to the complete-week
+call graph**, and treat "identity is documented as shipped" as an unverified claim until it
+does.
+
+⚠️ **Consequence for anything calibrated during the gap.** The EOG attribute bands were re-cut
+against an identity-**ON** measurement season (harnesses call identity directly, so the gate
+passed there) while live franchise play ran identity-**OFF**. Live play was therefore scoring
+~4.4% below the league the bands assume. Re-check the bands against an identity-ON franchise
+season before treating them as tuned.
 
 ---
 
@@ -334,6 +490,58 @@ larger number.
 | `SELF_REG_TARGETS` | `db_utils.py` | `2.00 / 0.99 / 0.99` | damp floor = league baseline means |
 | `SELF_REG_DESPERATION_SECONDS` / `_MARGIN` | `db_utils.py` | `300` / `6` | trailing-late suppression |
 
+### Slider draw vectors — CONFIRMED AS INTENDED (2026-08-12)
+
+`OFFENSIVE_SLIDERS`, `DEFENSIVE_SLIDERS` and `LEAGUE_BASELINE` in `team_identity.py` are weight
+vectors over values `[0,1,2,3,4]`. They were originally authored as a proposal ("§4 is my
+proposal, not measured" — `cpu_identity_design.md`). **Reviewed and accepted 2026-08-12** as
+the play-type mixes they produce:
+
+| Offensive vision | mean `offense` | mix |
+|---|---:|---|
+| Run and Gun | 1.05 | 74% motion / 26% set |
+| Spread | 1.25 | 69% / 31% |
+| Motion | 1.45 | 64% / 36% |
+| Attack | 1.75 | 56% / 44% |
+| Inside-Out | 2.75 | 31% motion / **69% set** |
+
+| Defensive vision | mean `defense` | mix |
+|---|---:|---|
+| Man Lockdown | 0.50 | 88% man / 12% zone |
+| Contain | 1.65 | 59% / 41% |
+| Multiple | 2.00 | 50/50 (deliberately wide — width IS the identity) |
+| Full-Court Press | 2.00 | 50/50 — **does not name `defense`**; press is orthogonal, expressed via `fc_press` |
+| Zone | 3.05 | 24% man / **76% zone** |
+
+⚠️ **The "Motion" vision is only the third-most motion-heavy**, behind Run and Gun (74%) and
+Spread (69%). This was surfaced at review and **accepted as intended** — the vision names an
+offensive *philosophy*, not a possession-type maximum. Do not "correct" the ordering without
+an explicit decision; it looks like a bug and is not one.
+
+### Playbook concentration ceiling — 25%, NOT to be lifted (2026-08-12)
+
+`cpu_identity_design.md` §B1 called for the concentration caps to be **raised** so Inside-Out
+and Attack could funnel harder. **That proposal is REJECTED.** The intended ceiling for a single
+play's share of a normal playbook is **25%**.
+
+The ceiling is not a constant — it is a schedule in `_set_play_percentages`
+(`cpu_playbook_customization.py`), and it depends on how many set plays the book holds:
+
+| set plays in book | top play share |
+|---|---:|
+| 1 | 100% |
+| 2 | 55% |
+| 3 | 45% |
+| **4+ (normal)** | **20%** |
+
+So the 25% ceiling binds only for 4+ play books; **a book with 1–3 plays structurally exceeds it**
+and no cap can prevent that (three shares cannot each be ≤25% and sum to 100). `_random_capped_three`
+separately caps each of three family shares at `max_pct=50`.
+
+**Consequence accepted:** Inside-Out's spec design — concentrated personnel fed through diverse
+actions — stays expressible on the *personnel* axis but not as extreme play funneling. The EOG
+concentration penalty continues to apply, so specialization remains a real cost.
+
 ---
 
 ## 10. Open items
@@ -347,6 +555,34 @@ larger number.
 * **Single-mode measurements do not describe franchise.** Everything in §7 was measured in
   `mode="single"`. A fresh franchise matches single-mode closely at week 1 (all signals within
   ±0.05 sd), but the populations diverge as a season runs.
+
+### Decisions taken 2026-08-12 — CLOSED, do not re-litigate
+
+| # | Question | Decision |
+|---|---|---|
+| 1 | Slider scale semantics | **Ratios, confirmed.** `offense` 0=100% motion → 4=100% set plays; `defense` 0=100% man → 4=100% zone; 1/3 are 75/25 splits, 2 is 50/50. Code already matched. See §3. |
+| 2 | Slider weight vectors | **Accepted as authored**, including the Motion-ordering quirk. See §9. |
+| 3 | Playbook concentration caps | **Stay at 25%**; design §B1's "lift the caps" is rejected. See §9. |
+| 4 | Backup-quality bar for rotation size | **Within-team comparison**, not an absolute RT bar. See below. |
+| 5 | Do user teams get an identity? | **No.** The user sets their own sliders; an auto-assigned identity would fight them. |
+
+**#4 in detail.** Rotation size counts "how many bench players are good enough to play." The
+spec's `RT ≥ 50` is an **absolute** bar and does not survive a pool change — the spec itself
+warns a pool migration moved the bench median 5 points and emptied the deep band. Since then the
+attribute recalibration and a second −2in height shift both landed, so the bar is already stale.
+
+**Replace it with a within-team difference: how many bench players are within X of the starter
+they would replace.** A gap between two players on the same roster is invariant to any
+recalibration; an absolute threshold is not. This is the same failure mode as the frozen
+`SIGNAL_SCALE` constants in §1 — record it once, apply it everywhere.
+
+**Cadence: re-derive every five weeks, aligned to the §8 identity re-evaluation.** Weekly was
+considered and rejected: it creates a second cadence to reason about for no benefit, since the
+bar moves on roster composition (recruiting, redshirts, transfers), not on week-to-week fatigue.
+One clock for identity and its dependent surfaces.
+
+⚠️ Rotation size is **not built** — no `rotation_size` exists anywhere in `BackEnd/`. This
+decision is recorded for whoever builds it.
 
 ## Related docs
 

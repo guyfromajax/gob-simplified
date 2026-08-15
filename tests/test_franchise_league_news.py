@@ -83,6 +83,10 @@ def test_in_season_payload_uses_completed_week_for_results_and_current_week_for_
     assert len(payload["key_games"]) == 10
     assert set(payload["leaders"]) == {spec[0] for spec in news.LEADER_SPECS}
     assert all(len(rows) == 10 for rows in payload["leaders"].values())
+    assert payload["leaders"]["pts"][0]["value"] == 30.0
+    assert payload["leaders"]["pts"][0]["display"] == "30.0"
+    assert payload["leaders"]["treb"][0]["display"] == "16.7"
+    assert payload["leaders"]["ast"][0]["display"] == "13.3"
 
 
 def test_preseason_top10_omits_trailing_record(monkeypatch):

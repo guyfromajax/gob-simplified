@@ -21,7 +21,7 @@ from BackEnd.utils import player_development as dev
 from BackEnd.utils import player_generation as gen
 from BackEnd.utils.position_ratings import compute_position_ratings
 from BackEnd.models.training_execution_v2 import execute_training
-from BackEnd.api.franchise_routes import _cpu_reference_allocation, _cpu_reference_top3
+from BackEnd.api.franchise_routes import _coaching_quality_reference_allocation, _cpu_reference_top3
 
 POSITIONS = ("PG", "SG", "SF", "PF", "C")
 GROWTH = list(dev.GROWTH_ATTRS)
@@ -34,7 +34,7 @@ def _cpu_train_week(fpd, year, weeks=26):
     pl = [{"_id": "x", "attributes": fpd["attributes"], "year": year, "height": fpd["meta"]["height"],
            "meta": fpd["meta"], "position_intent": fpd["position_intent"], "first_name": "A", "last_name": "B"}]
     top3 = _cpu_reference_top3(fpd["position_intent"])
-    alloc = _cpu_reference_allocation(fpd["position_intent"])
+    alloc = _coaching_quality_reference_allocation(fpd["position_intent"])
     with contextlib.redirect_stdout(_NULL):
         for wk in range(1, weeks + 1):
             camp = is_camp_week(wk)
@@ -86,32 +86,28 @@ def test_partA_writes_both_and_full_cycle_preserves_growth():
         f"develop must write anchor_ (Part A), and in-season must build on it.")
 
 
-def test_developed_seniors_land_on_tier_anchors():
-    """LEVEL invariant (2026-08 attractor-level fix). The offseason claimed 'RT lands on
-    the ladder by construction'; for years it did not — the α-step undershot a rising
-    target and developed seniors landed at ~0.91× the anchor (Elite 91, not 100), masked
-    because GENERATION held the anchors and only cohort turnover exposed the drift. This
-    pins the claim: a developed senior's median dev-position RT lands on his tier anchor.
-
-    Distributional (peak/HT variance per career) — the MEDIAN career (1 peak → exactly
-    2.0×) must sit on the anchor; a regression to the α-governed-level bug reappears as a
-    uniform ~9% shortfall, far outside tolerance."""
-    anchors = {"Poor": 40, "BelowAverage": 50, "Average": 60,
-               "Good": 70, "Great": 80, "Elite": 100}
-    TOL = 2.5
-    for tier, anchor in anchors.items():
+def test_offseason_alone_is_a_reduced_additive_remainder():
+    """FREE-WILL LEVEL invariant (2026-08, predestination → free will). The offseason no
+    longer rescales a player onto an absolute ladder (which used to land a developed senior
+    at 2.0× his JH anchor by construction). It now ADDS a REDUCED increment, so career growth
+    is training-driven. A career walked through the OFFSEASON ONLY (`simulate_career` does no
+    in-season training) therefore lands only MODESTLY above the JH anchor (~1.2-1.5×), not the
+    old 2.0× ladder. A regression to the absolute-target rescale reappears as SR ≈ 2× the anchor."""
+    from BackEnd.utils.player_generation import JH_ANCHOR_BY_TIER
+    for tier in ("Poor", "Average", "Elite"):
+        jh_anchor = JH_ANCHOR_BY_TIER[tier]
         rng = random.Random(4242)
         srs = []
-        for _ in range(4000):
+        for _ in range(2000):
             ch = rng.randint(1, 100)
             pos = POSITIONS[rng.randrange(len(POSITIONS))]
             pl = dev.simulate_career(pos, tier, ch, rng)
             srs.append(pl["snapshots"]["SR"][pos])
-        med = statistics.median(srs)
-        assert abs(med - anchor) <= TOL, (
-            f"{tier}: developed senior median RT {med:.1f} off anchor {anchor} "
-            f"(>|{TOL}|). The offseason is not landing on the ladder — the α-governed-level "
-            f"undershoot has regressed.")
+        ratio = statistics.median(srs) / jh_anchor
+        assert 1.15 < ratio < 1.6, (
+            f"{tier}: offseason-only SR median {statistics.median(srs):.1f} = {ratio:.2f}× JH "
+            f"anchor {jh_anchor} — expected a reduced additive remainder (~1.2-1.5×), not the "
+            f"old 2.0× ladder. Has the absolute-target rescale regressed?")
 
 
 def test_cpu_path_preserves_shape():
@@ -152,9 +148,11 @@ def test_cpu_path_preserves_shape():
                 f"{neg_mean:.0f} — coaching must still move shape."
             )
         if pos == "C":
-            # Collapse-guard: reference CPU keeps a token SC unit so scoring
-            # does not rot to the old 26 live bug under level-only offseason.
-            assert mean_attr["SC"] > 35, f"C mean scoring {mean_attr['SC']:.0f}"
+            # Collapse-guard: reference CPU keeps a token SC unit so scoring does not rot to
+            # the old ~26 live bug. Bound relaxed 35 → 30 for free-will (the additive offseason
+            # no longer inflates attributes onto the 2× ladder, so absolute levels sit lower;
+            # 30 still catches a genuine collapse well above the 26 floor).
+            assert mean_attr["SC"] > 30, f"C mean scoring {mean_attr['SC']:.0f}"
 
 
 def test_decay_clamps_to_weight_scaled_floor():

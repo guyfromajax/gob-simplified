@@ -224,7 +224,13 @@ async def delete_play(play_id: str, _user=Depends(require_admin_for_builder)):
         result = plays_collection.delete_one({"_id": ObjectId(play_id)})
         if result.deleted_count == 0:
             raise HTTPException(status_code=404, detail="Play not found")
-        
+
+        # The sim serves plays from a process-level catalog; this is the only writer to
+        # the live collection, so it owns the invalidation.
+        from BackEnd.utils import plays_catalog
+
+        plays_catalog.invalidate()
+
         return {"message": "Play deleted successfully"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))

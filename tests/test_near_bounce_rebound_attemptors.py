@@ -128,7 +128,6 @@ def test_select_rebounder_by_score_checks_all_eligible_players_not_just_closest(
         {"PG": low_close, "SG": high_far},
         {"PG": defender},
         bounce,
-        upper_half_distance=12,
     )
 
     assert rebounder is high_far
@@ -160,9 +159,40 @@ def test_select_rebounder_by_score_uses_rebound_modifier_tiebreaker(monkeypatch)
         {"PG": off_player},
         {"PG": def_player},
         bounce,
-        upper_half_distance=12,
     )
 
     assert rebounder is def_player
+    assert team is game.defense_team
+    assert stat == "DREB"
+
+
+def test_select_rebounder_by_score_prefers_closer_equal_attrs(monkeypatch):
+    """Equal attributes: smooth distance discount awards the closer player."""
+    game = build_mock_game()
+    _sync_lineup_to_roster(game)
+    bounce = {"x": 89, "y": 25}
+
+    close = game.defense_team.lineup["PG"]
+    far = game.defense_team.lineup["SG"]
+    close.coords = {"x": 89, "y": 25}  # distance 0
+    far.coords = {"x": 73, "y": 25}    # distance 16 → ×1/(1+16/8)=1/3
+    close.attributes.update({"RB": 50, "ST": 50, "IQ": 50, "CH": 50, "MO": 0})
+    far.attributes.update({"RB": 50, "ST": 50, "IQ": 50, "CH": 50, "MO": 0})
+    game.offense_team.team_attributes["team_chemistry"] = 0
+    game.defense_team.team_attributes["team_chemistry"] = 0
+    game.offense_team.team_attributes["rebound_modifier"] = 0.0
+    game.defense_team.team_attributes["rebound_modifier"] = 0.0
+
+    monkeypatch.setattr("BackEnd.utils.shared.random.randint", lambda a, b: 6)
+
+    rebounder, team, stat = select_rebounder_by_score(
+        game.offense_team,
+        game.defense_team,
+        {},
+        {"PG": close, "SG": far},
+        bounce,
+    )
+
+    assert rebounder is close
     assert team is game.defense_team
     assert stat == "DREB"

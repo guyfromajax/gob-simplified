@@ -62,6 +62,19 @@ STD_RUNG_INCREMENT = {"FR": 0.17, "SO": 0.20, "JR": 0.15, "SR": 0.18}  # Σ .70
 # rung" cannot hit both the career multiples and §4.2; a fixed bonus does.)
 PEAK_BONUS = 0.30
 
+# ── Free-will offseason (Option D) — additive, not absolute-target ─────────────
+# The offseason no longer rescales a player onto an absolute ladder (predestination);
+# it ADDS a REDUCED increment for the current rung on top of where camp + in-season
+# training left him, so training PERSISTS into his career (§free_will_offseason_work_plan).
+# Retention = the offseason's share of each component; the training phases (now
+# persisting, at halved scales) deliver the rest. Values are post-"halve all three
+# phases" starting points — CALIBRATION-PENDING (tuned by the validation sim to land
+# career RT ≈ today's ~21). coaching_f is retired under free-will (0.5) — training is
+# the coaching lever now; potential_factor still scales the increment (§0.3).
+OFFSEASON_BASE_RETENTION = 0.125   # offseason keeps this fraction of the standard rung
+OFFSEASON_PEAK_RETENTION = 0.50    # offseason keeps this fraction of a peak bonus (1a: peaks
+                                   # stay in the offseason; 1c moves half to training amplification)
+
 # ── Ceiling (§4.3) ────────────────────────────────────────────────────────────
 RT_COMPRESSION_THRESHOLD = 95
 RT_SOFT_CAP = 130
@@ -406,12 +419,14 @@ def develop_one_offseason(player: dict, rung: str, profile: dict,
     # potential_factor (Potential Rating §Phase 3). Both are pure multipliers on the
     # scalar target, so they change the level, not the profile shape; _compress_rt then
     # soft-caps the very top (Elite × 3-peak × 1.15 = 149.5 → 137.3).
-    cum = 0.0
-    for r in RUNG_TRANSITIONS:
-        cum += STD_RUNG_INCREMENT[r] + (PEAK_BONUS if r in profile["peak_rungs"] else 0.0)
-        if r == rung:
-            break
-    target_rt = _compress_rt(anchor * (1.0 + cum) * coaching_f_value * potential_factor)
+    # Free-will additive offseason (Option D): the increment for THIS rung only, REDUCED
+    # by the retention constants, scaled by the career-static potential_factor. It is
+    # ADDED to the player's current RT below (not used to rescale onto an absolute
+    # ladder), which is what makes camp + in-season training persist into his career.
+    # coaching_f is retired under free-will and no longer scales the target.
+    rung_base = STD_RUNG_INCREMENT[rung] * OFFSEASON_BASE_RETENTION
+    rung_peak = (PEAK_BONUS * OFFSEASON_PEAK_RETENTION) if rung in profile["peak_rungs"] else 0.0
+    increment_rt = anchor * (rung_base + rung_peak) * potential_factor
 
     # HT first (own declining curve, never rung-locked), magnitude-capped. Each
     # rung gets its curve share of the career HT gain, integer-rounded
@@ -450,6 +465,10 @@ def develop_one_offseason(player: dict, rung: str, profile: dict,
     weights = POSITION_WEIGHTS[position]
     fit = height_fitness(position, player["height"]) or 1.0
     rt_now = fit * sum(weights.get(a, 0.0) * float(attrs.get(a, 0) or 0) for a in GROWTH_ATTRS)
+    # ADDITIVE target: current RT (carrying persisted camp + in-season gains) + the
+    # reduced offseason increment. Soft-capped at the top. This replaces the absolute
+    # `anchor × ladder × f × pf` target that used to claw back all in-season movement.
+    target_rt = _compress_rt(rt_now + increment_rt)
     s = (target_rt / rt_now) if rt_now > 0 else 1.0
     st_gain = 0
     for a in GROWTH_ATTRS:

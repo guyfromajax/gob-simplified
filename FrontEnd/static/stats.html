@@ -321,7 +321,10 @@
       list.forEach((p, idx) => {
         const row = document.createElement('div');
         row.className = 'leader-row' + (idx === 0 ? ' rank-1' : '') + (idx >= limit ? ' beyond-limit' : '');
-        row.innerHTML = '<span class="leader-rank">' + (idx + 1) + '</span><div class="leader-name-team"><span class="name">' + (p.name || '') + '</span><span class="team">' + (p.team || '') + '</span></div><span class="leader-value">' + (p.value ?? '') + '</span>';
+        const value = ['PTS', 'REB', 'AST'].includes(cat) && Number.isFinite(Number(p.value))
+          ? Number(p.value).toFixed(1)
+          : (p.value ?? '');
+        row.innerHTML = '<span class="leader-rank">' + (idx + 1) + '</span><div class="leader-name-team"><span class="name">' + (p.name || '') + '</span><span class="team">' + (p.team || '') + '</span></div><span class="leader-value">' + value + '</span>';
         listEl.appendChild(row);
       });
       card.appendChild(listEl);

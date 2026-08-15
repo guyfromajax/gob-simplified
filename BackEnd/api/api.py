@@ -95,6 +95,31 @@ try:
     
     logger = logging.getLogger(__name__)
 
+    _MATCHUP_LINEUP_POSITIONS = ("PG", "SG", "SF", "PF", "C")
+
+
+    def _resolve_matchup_display_lineup(team, opening_lineups=None):
+        """Resolve the five serialized by the matchup/pregame payload."""
+        current = team.lineup or {}
+        if not opening_lineups:
+            return {pos: current.get(pos) for pos in _MATCHUP_LINEUP_POSITIONS}
+
+        opening_ids = opening_lineups.get(str(getattr(team, "team_id", ""))) or []
+        roster_by_id = {
+            str(getattr(player, "player_id", "")): player
+            for player in team.get_all_players()
+            if getattr(player, "player_id", None)
+        }
+        resolved = {}
+        for idx, pos in enumerate(_MATCHUP_LINEUP_POSITIONS):
+            opening_player = (
+                roster_by_id.get(str(opening_ids[idx]))
+                if idx < len(opening_ids)
+                else None
+            )
+            resolved[pos] = opening_player or current.get(pos)
+        return resolved
+
 
     def _refresh_cpu_playbooks_for_franchise_game_init(franchise_id_str: str) -> list[str]:
         """Refresh this week's scheduled CPU playbook group before FTD is snapshotted into a game."""
@@ -6380,6 +6405,17 @@ try:
         if franchise_id is not None:
             franchise_id = str(franchise_id)
 
+        # Resolve the exact five this response will display once, before loading
+        # season stats. Sim Full Game asks for the immutable opening five after Q1
+        # has already simulated; querying the mutable current lineup here used to
+        # omit substituted opening starters and silently render their season line
+        # as zero. Keep one batched FPD read over the same ten players we serialize.
+        _opening = gm.game_state.get("opening_lineup") if prefer_opening else None
+        _POS_ORDER = _MATCHUP_LINEUP_POSITIONS
+
+        home_display_lineup = _resolve_matchup_display_lineup(home_team, _opening)
+        away_display_lineup = _resolve_matchup_display_lineup(away_team, _opening)
+
         franchise_week = None
         season_by_pid: dict[str, dict] = {}
         if franchise_id:
@@ -6394,9 +6430,9 @@ try:
                 franchise_week = None
             try:
                 pids = []
-                for team in (home_team, away_team):
-                    for pos in ("PG", "SG", "SF", "PF", "C"):
-                        pl = (team.lineup or {}).get(pos)
+                for display_lineup in (home_display_lineup, away_display_lineup):
+                    for pos in _POS_ORDER:
+                        pl = display_lineup.get(pos)
                         if pl and getattr(pl, "player_id", None):
                             pids.append(str(pl.player_id))
                 if pids:
@@ -6433,28 +6469,8 @@ try:
             except (TypeError, ValueError):
                 return 0
 
-        # Sim Full Game reveal: resolve the OPENING five (immutable tip-off snapshot =
-        # the lineup the user set), not the current (post-Q1) lineup. Gated by
-        # ?prefer_opening=1 so the Play-Quarter pre-game (default) is unchanged.
-        _opening = gm.game_state.get("opening_lineup") if prefer_opening else None
-        _POS_ORDER = ["PG", "SG", "SF", "PF", "C"]
-
-        def _player_by_id(team, pid):
-            for p in team.get_all_players():
-                if str(getattr(p, "player_id", "")) == str(pid):
-                    return p
-            return None
-
-        def build_player_data(team, position: str):
-            player = None
-            if _opening:
-                ids = _opening.get(str(getattr(team, "team_id", "")))
-                if ids and position in _POS_ORDER:
-                    idx = _POS_ORDER.index(position)
-                    if idx < len(ids):
-                        player = _player_by_id(team, ids[idx])
-            if not player:
-                player = team.lineup.get(position)
+        def build_player_data(team, position: str, display_lineup: dict):
+            player = display_lineup.get(position)
             if not player:
                 return None
 
@@ -6537,10 +6553,10 @@ try:
                 },
             }
 
-        def build_team_block(team):
+        def build_team_block(team, display_lineup):
             players = []
             for pos in ("PG", "SG", "SF", "PF", "C"):
-                player_data = build_player_data(team, pos)
+                player_data = build_player_data(team, pos, display_lineup)
                 if player_data:
                     players.append(player_data)
             # team_name stays core (identity); display_name is chrome for pre-game title etc.
@@ -6558,8 +6574,8 @@ try:
                 "losses": 0,
             }
 
-        home_block = build_team_block(home_team)
-        away_block = build_team_block(away_team)
+        home_block = build_team_block(home_team, home_display_lineup)
+        away_block = build_team_block(away_team, away_display_lineup)
 
         # Franchise meta for pre-game records strip: FTD natl_rank + standings W-L
         if franchise_id:

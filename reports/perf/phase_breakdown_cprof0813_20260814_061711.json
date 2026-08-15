@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-08-14T06:17:21",
+  "git_commit": "840c685a2e7d32441f9018b6b333cdd58b6e882b",
+  "git_dirty": true,
+  "franchise_id": "6a28436c98dbd04e902eee09",
+  "week": 7,
+  "mode": "cpu",
+  "workers": 1,
+  "seed": 20260720,
+  "probes_installed": 0,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 1,
+        "total_wall_s": 4.682,
+        "sum_game_s": 4.682,
+        "min_s": 4.6822,
+        "median_s": 4.682,
+        "mean_s": 4.682,
+        "p90_s": null,
+        "max_s": 4.6822
+      },
+      "phases": {},
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "Xavien @ Ocean City",
+          "seed": 20260720,
+          "wall_s": 4.6822,
+          "away_score": 51,
+          "home_score": 87
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)          4.68    100.0%\nTOTAL WALL                               4.68    100.0%"
+    }
+  }
+}

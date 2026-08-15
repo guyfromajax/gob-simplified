@@ -20,19 +20,19 @@ def seed_franchise():
                 "franchise_id": str(fid),
                 "player_id": "p1",
                 "meta": {"first_name": "Ann", "last_name": "Alpha", "team": "A"},
-                "season": {"PTS": 20},
+                "season": {"GP": 4, "PTS": 20},
             },
             {
                 "franchise_id": str(fid),
                 "player_id": "p2",
                 "meta": {"first_name": "Bob", "last_name": "Beta", "team": "B"},
-                "season": {"PTS": 15},
+                "season": {"GP": 2, "PTS": 15},
             },
             {
                 "franchise_id": str(fid),
                 "player_id": "p3",
                 "meta": {"first_name": "Cara", "last_name": "Gamma", "team": "C"},
-                "season": {"PTS": 5},
+                "season": {"GP": 1, "PTS": 5},
             },
         ]
     )
@@ -43,11 +43,13 @@ def test_get_leaders_and_endpoint():
     fid = seed_franchise()
 
     top = get_leaders(fid, stat="PTS", limit=2)
-    assert [p["player_id"] for p in top] == ["p1", "p2"]
+    assert [p["player_id"] for p in top] == ["p2", "p1"]
+    assert [p["value"] for p in top] == [7.5, 5.0]
 
     resp = client.get(f"/franchise/leaders?franchise_id={fid}")
     assert resp.status_code == 200
     data = resp.json()
-    assert data["PTS"][0]["name"] == "Ann Alpha"
-    assert data["PTS"][0]["value"] == 20
-    assert data["PTS"][1]["name"] == "Bob Beta"
+    assert data["PTS"][0]["name"] == "Bob Beta"
+    assert data["PTS"][0]["value"] == 7.5
+    assert data["PTS"][1]["name"] == "Ann Alpha"
+    assert data["PTS"][1]["value"] == 5.0

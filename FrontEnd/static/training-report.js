@@ -1009,7 +1009,9 @@ function renderPlayersTable() {
         const value = player.attributes[attr] || (attr === 'NG' ? 1.0 : attr === 'EM' ? 50 : attr === 'MO' ? 0 : 0);
         const changes = reportData.player_changes[player.name] || {};
         const change = changes[attr] || 0;
-        row.appendChild(createAttributeCell(attr, value, change));
+        const displayMovements = reportData.player_attribute_display_movements?.[player.name] || {};
+        const displayMovement = Number(displayMovements[attr]) || 0;
+        row.appendChild(createAttributeCell(attr, value, change, displayMovement));
       });
     } else {
       // Show changes for this player (0 if no change)
@@ -1063,7 +1065,7 @@ function createCell(text) {
   return td;
 }
 
-function createAttributeCell(attr, value, change) {
+function createAttributeCell(attr, value, change, displayMovement = 0) {
   const td = document.createElement('td');
   td.className = 'attribute-value-cell';
 
@@ -1106,6 +1108,11 @@ function createAttributeCell(attr, value, change) {
           : 0;
     const displayValue = Number.isFinite(raw) ? Math.floor(raw / 10) : 0;
     td.textContent = String(displayValue);
+    if (displayMovement > 0) {
+      td.classList.add('attribute-display-increase');
+    } else if (displayMovement < 0) {
+      td.classList.add('attribute-display-decrease');
+    }
     attachChangeTooltip();
   }
   
@@ -1178,27 +1185,46 @@ function createMomentumPill(mo) {
 }
 
 /**
- * Map a raw (0–100 scale) training delta to arrow glyphs.
- * +1..+4 / −1..−4 → 1 arrow; ±5..±9 → 2; ±10+ → 3.
- * Triple-up uses RT elite blue; other ups green; downs red; zero grey dash.
+ * Map a training delta to arrow glyphs. Two regimes by report week (2026-08):
+ *
+ * CAMP (week 1) — symmetric bands, keeps the grey dash at exactly 0:
+ *   0 → dash · 0<|n|<2 → 1 · 2≤|n|≤5 → 2 · |n|>5 → 3
+ *
+ * IN-SEASON (weeks 2–26) — asymmetric, NO dash. In-season decay makes tiny
+ * negatives normal, so the "up" band absorbs small dips (down to −0.5) and reads
+ * them as holding, keeping the report from screaming red on an unlucky −0.4 week:
+ *   n ≥ 3          → ▲▲▲ blue
+ *   1.0 ≤ n < 3    → ▲▲ green
+ *   −0.5 ≤ n < 1.0 → ▲ green   (absorbs 0 and small dips)
+ *   −1.5 < n < −0.5 → ▼ red    (−0.51 … −1.49)
+ *   −2.5 < n ≤ −1.5 → ▼▼ red   (−1.5 … −2.49)
+ *   n ≤ −2.5       → ▼▼▼ red
+ * Triple-UP uses RT-elite blue; all other ups green; all downs red.
  */
 function describeTrainingChange(change) {
   const n = Number(change);
-  if (!Number.isFinite(n) || n === 0) {
+  if (!Number.isFinite(n)) {
     return { text: '–', className: 'change-zero' };
   }
-  const abs = Math.abs(n);
-  const count = abs >= 10 ? 3 : abs >= 5 ? 2 : 1;
-  if (n > 0) {
-    return {
-      text: '▲'.repeat(count),
-      className: count === 3 ? 'change-elite' : 'change-positive',
-    };
+  const up = (count) => ({
+    text: '▲'.repeat(count),
+    className: count === 3 ? 'change-elite' : 'change-positive',
+  });
+  const down = (count) => ({ text: '▼'.repeat(count), className: 'change-negative' });
+
+  // Camp (week 1): symmetric 0/2/5 bands with a grey dash at exactly 0.
+  if (getReportWeekNumber() === 1) {
+    if (n === 0) return { text: '–', className: 'change-zero' };
+    const abs = Math.abs(n);
+    const count = abs > 5 ? 3 : abs >= 2 ? 2 : 1;
+    return n > 0 ? up(count) : down(count);
   }
-  return {
-    text: '▼'.repeat(count),
-    className: 'change-negative',
-  };
+
+  // In-season (weeks 2–26): no dash; the up band absorbs dips down to −0.5.
+  if (n >= -0.5) {
+    return up(n >= 3 ? 3 : n >= 1 ? 2 : 1);
+  }
+  return down(n <= -2.5 ? 3 : n <= -1.5 ? 2 : 1);
 }
 
 function formatChangeForTooltip(change, attrKey = null) {

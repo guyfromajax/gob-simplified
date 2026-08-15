@@ -11,14 +11,14 @@ SPAN. Keep FrontEnd/static/js/shared/teamShotThresholdScale.js in sync.
 SPAN = 200
 HALF_SPAN = SPAN // 2  # 100 — max pill deviation from center in either direction
 
-MIN = -30
-MAX = MIN + SPAN  # 200
-MID = MIN + HALF_SPAN  # 100
+MIN = -10
+MAX = MIN + SPAN  # 190
+MID = MIN + HALF_SPAN  # 90
 
 # Score-balancing one-turn overrides. Lower = easier, higher = harder.
 BALANCING_MARGIN = 20
-BALANCING_TRAILING = MIN - BALANCING_MARGIN  # -20
-BALANCING_LEADING = MAX - BALANCING_MARGIN  # 180
+BALANCING_TRAILING = MIN - BALANCING_MARGIN  # -30
+BALANCING_LEADING = MAX - BALANCING_MARGIN  # 170
 
 # Franchise new-team init. DELIBERATELY MID-CENTRED, overriding the previous "slightly
 # better than league average" intent (MID-20 / MID-10 = 80/90): with all 128 teams seeded
@@ -26,15 +26,15 @@ BALANCING_LEADING = MAX - BALANCING_MARGIN  # 180
 # POSITION — teams settle where the bands put them, so seeding 15 below the attractor makes
 # every team erode all season. 95-105 agrees with the current band calibration
 # (eog_attr_bands.FG_PCT_*, simulated mean 105.8). RE-CHECK BOTH TOGETHER if either moves.
-FRANCHISE_INIT_LO = MID - 5   # 95
-FRANCHISE_INIT_HI = MID + 5   # 105
+FRANCHISE_INIT_LO = MID - 5   # 85
+FRANCHISE_INIT_HI = MID + 5   # 95
 
 # FTE tutorial forced make / average opponent (fte_inject_state.md §3).
-TUTORIAL_USER = MIN  # 0 — forced-make-side threshold on the current scale
-TUTORIAL_COMPUTER = MID  # 100 — winnable opponent
+TUTORIAL_USER = MIN  # -10 — forced-make-side threshold on the current scale
+TUTORIAL_COMPUTER = MID  # 90 — winnable opponent
 
 # Rim-runner custom corner FB threshold base.
-FAST_BREAK_CORNER_THRESHOLD_BASE = MAX - BALANCING_MARGIN  # 180
+FAST_BREAK_CORNER_THRESHOLD_BASE = MAX - BALANCING_MARGIN  # 170
 
 # Tournament seed shot_threshold ranges (seed 1 = best shooters, 8 = worst).
 TOURNAMENT_SEED_ST_RANGES = {

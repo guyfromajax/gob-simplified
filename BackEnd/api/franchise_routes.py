@@ -2402,8 +2402,22 @@ def _cpu_reference_top3(position: str) -> list[str]:
     return [a for a, pts in ref.items() if pts == COACHING_REFERENCE_PRIMARY_PTS]
 
 
-def _cpu_reference_allocation(position: str | None = None) -> dict:
-    """Per-position base substrate (drill-slider format). ``position=None`` → SF."""
+def _coaching_quality_reference_allocation(position: str | None = None) -> dict:
+    """The per-position coaching-quality YARDSTICK — **not** what CPU teams train.
+
+    Renamed from ``_cpu_reference_allocation`` (2026-08-12) because that name read as live
+    CPU behaviour long after it stopped being one. CPU auto-train now submits a single
+    team-wide plan (``_cpu_team_allocation``), the same shape a user does; see
+    ``projects/cpu_identity_training_design.md`` §1.
+
+    What this still IS: the frozen per-position substrate whose values are FITTED so
+    ``base × _CPU_FOCUS_AMP_MEAN`` scores ~1.0 against ``reference_allocation``. That makes it
+    the reference point for coaching quality and the offseason measurement harnesses
+    (``tests/test_offseason_attractor.py``, ``scripts/s11_framework_baseline_measure.py``),
+    which are its only remaining callers.
+
+    ``position=None`` → SF.
+    """
     b = _CPU_REFERENCE_BASE_BY_POS.get(position or "SF") or _CPU_REFERENCE_BASE_BY_POS["SF"]
     return {
         "player_drills": {
@@ -2419,6 +2433,468 @@ def _cpu_reference_allocation(position: str | None = None) -> dict:
             "presses_traps": {"defense_install": 1, "offense_install": 1},
         },
     }
+
+
+# ── CPU team-wide allocation (step 1 of the identity-training rework) ────────────────────
+# WHY THIS REPLACES THE PER-POSITION PLANS. CPU auto-train used to group the roster by
+# development position and run execute_training once per group, each with its own
+# _coaching_quality_reference_allocation(pos). A USER assigns ONE plan across the whole roster, so most of
+# their players train attributes their position discounts. CPU players each got the plan fitted
+# to their exact position: fewer points (~17 vs 24) but ZERO fit waste — an advantage no human
+# can replicate, and the inverse of "the user's edge comes from out-coaching the reference."
+#
+# PLACEHOLDER, DELIBERATELY IDENTITY-BLIND. This is §3.2 "Base" of
+# projects/cpu_identity_training_design.md and nothing more: the 12 never-zero floors at 1,
+# every team drill at 1, and the 4 spare points parked on the four universally-useful slots.
+# Step 3 replaces the parking with per-vision emphasis; the floor structure stays.
+#
+# THE FLOORS ARE NOT STYLE. PLAYER_ATTR_GAIN_RANGE_BY_POINTS pays 0 points at (-2,-1) — a
+# guaranteed -1 to -2 EVERY week, no probability gate, ~-26 to -52 a season. 0->1 is worth
+# +3.5 while the whole 1->5 span is worth +2.5. So every slot that feeds a PLAYER attribute
+# (the 9 player_drills plus conditioning/free_throws/film_study) must never be 0. Only `breaks`
+# and the 7 team_drills may be zeroed — those take the team-attribute path, where neglect is
+# probability-gated at 25% and deliberately mild.
+# Slot addresses. Each is (block, *path) into the allocation dict, so emphasis can be applied
+# without another nested-dict literal per vision.
+_SLOT = {
+    "SC": ("player_drills", "offense", "inside"),
+    "SH": ("player_drills", "offense", "outside"),
+    "ID": ("player_drills", "defense", "inside"),
+    "OD": ("player_drills", "defense", "outside"),
+    "PS": ("player_drills", "technical", "passing"),
+    "BH": ("player_drills", "technical", "ball_handling"),
+    "RB": ("player_drills", "technical", "rebounding"),
+    "ST": ("player_drills", "weight_room", "strength"),
+    "AG": ("player_drills", "weight_room", "agility"),
+    "ND": ("general", "conditioning"),
+    "FT": ("general", "free_throws"),
+    "IQ": ("general", "film_study"),
+    "BREAKS": ("general", "breaks"),
+    "T_OFF": ("team_drills", "team_offense", "install"),
+    "T_DEF": ("team_drills", "team_defense", "install"),
+    "FB_OFF": ("team_drills", "fast_breaks", "offense_install"),
+    "FB_DEF": ("team_drills", "fast_breaks", "defense_install"),
+    "SCRIM": ("team_drills", "scrimmages"),
+    "PT_DEF": ("team_drills", "presses_traps", "defense_install"),
+    "PT_OFF": ("team_drills", "presses_traps", "offense_install"),
+}
+
+# Team-drill slot -> the core-8 attribute it trains (team_category_map in
+# training_execution_v2). Drives the saturation taper: points aimed at a maxed attribute are
+# silently discarded by the clamp today, so we stop spending them.
+_INSTALL_ATTR = {
+    "T_OFF": "offensive_efficiency", "T_DEF": "defensive_efficiency",
+    "FB_OFF": "fb_efficiency", "FB_DEF": "fb_opp_modifier",
+    "PT_DEF": "pt_efficiency", "PT_OFF": "pt_opp_modifier",
+    "SCRIM": None,   # chemistry / shot_threshold / rebound_modifier — never saturates the same way
+    "BREAKS": None,
+}
+
+# Vision -> (focus-week skill emphases, team installs). See
+# projects/cpu_identity_training_design.md §3.5.
+#
+# ND and IQ are fit 1.00 for EVERY position, so Run and Gun, Full-Court Press and Zone reach
+# their whole roster even on a focus week. That started as a flavour choice and turned out to
+# be the efficient one — do not "fix" it by swapping them for a skill attribute.
+_VISION_OFFENSE = {
+    "Run and Gun": (("ND", "AG"), ("FB_OFF",)),
+    "Spread":      (("SH", "BH"), ("T_OFF",)),
+    "Inside-Out":  (("SC", "ST"), ("T_OFF",)),
+    "Attack":      (("BH", "SC"), ("T_OFF",)),
+    "Motion":      (("PS", "SH"), ("T_OFF",)),
+}
+_VISION_DEFENSE = {
+    # PT_OFF deliberately NOT here. It trains pt_opp_modifier — the ability to handle BEING
+    # pressed — and was attached to this vision only because both live under `presses_traps`.
+    # A press team needs press-break offence no more than anyone else, arguably less. Reactive
+    # attributes get the baseline below instead. See _REACTIVE_INSTALLS.
+    "Full-Court Press": (("ND",),       ("PT_DEF",)),
+    "Man Lockdown":     (("OD", "ID"),  ("T_DEF",)),
+    "Zone":             (("ID", "IQ"),  ("T_DEF",)),
+    "Multiple":         (("ID", "OD"),  ("T_DEF",)),
+    "Contain":          (("ID", "OD"),  ("T_DEF", "BREAKS")),
+}
+
+# A skill emphasis is 3 points or it is not an emphasis. Roster-wide average fit for every
+# skill attribute is ~0.52-0.60 (each is strong for two positions and weak for three), and at
+# that fit 2 points is still below break-even in-season. ND/IQ/FT are fit 1.00 so they hold at
+# 1 — which is the whole reason the roster mode exists. Design §3.3.
+_EMPHASIS_POINTS = 3
+# ROSTER-WEEK LIFT — spread across ALL TWELVE player attributes, rotating, NOT parked on
+# ND/IQ/FT.
+#
+# The first version lifted ND3/IQ3/FT2: 8 points onto the three attributes that are fit 1.00
+# for every position. It was the point-efficient choice and it worked exactly as intended,
+# which turned out to be the problem. Measured over a full 26-week season (1,523 players):
+#
+#   ND +15.33  IQ +14.03  FT +8.66     100% / 100% / 99% of players UP
+#   the nine skills  -1.27 to -2.84     only 30-40% of players up
+#
+# Roster weeks were handing every skill exactly 1 point — the bare floor, below the
+# minimum-fit line for most classes — while the three universals sat at 2.67 each. Chasing
+# efficiency meant only the already-winning attributes ever won.
+#
+# Now the same lift points rotate across all twelve, so per-attribute allocation is equal in
+# expectation (~1.4 each) instead of 2.67 vs 1.00. Skills still do not fully hold at that level
+# — that needs the in-season economy, which is the player-development system's lever, not this
+# one — but the allocation is no longer the cause.
+_ROSTER_LIFT_POINTS = 5      # what ND3/IQ3/FT2 used to cost; unchanged, just redistributed
+_FOCUS_WEEK_SHARE = 0.5                      # the dial future logic turns (design §3.4)
+
+# ONE skill emphasis per focus week, not two. Measured live over weeks 5-6 (1,536 vs 1,512
+# players): focus weeks ran -0.42/player against roster weeks' -0.06, a real -0.36 gap. The
+# cause is fit, not the emphasis idea — two skills at 3 buy +0.32 of value over the floors
+# while the same 4 points spent as one skill at 3 PLUS ND/IQ at 2 buy +0.44, because ND/IQ are
+# fit 1.00 for every position and skills average 0.56.
+#
+# Same budget, ~+0.12/player/focus-week, and the team still has one sharp, legible emphasis.
+# Camp is exempt (it skips decay and runs at 0.70, so every allocation gains there).
+# ── Reactive attributes — every team, no vision ──────────────────────────────────────────
+# fb_opp_modifier and pt_opp_modifier are REACTIVE: they measure how a team handles what the
+# OPPONENT does to it, not what it chooses to do. The engine reads them that way
+# (fb_opp_modifier off the DEFENDING team in the fast-break resolver, pt_opp_modifier off the
+# OFFENSE to resist turnovers under pressure) and so does the EOG band, which scores
+# fb_opp_modifier on `opponent_fb_volume`.
+#
+# Vision has nothing to say about them. Tying PT_OFF to Full-Court Press was pattern-matching
+# on the `presses_traps` prefix, and FB_DEF had no vision to pattern-match onto at all — so it
+# went UNINSTALLED BY EVERY TEAM for a whole season. Measured end of season: fb_opp_modifier
+# had ZERO teams above +17 and a mean of -10.8, the only attribute with no upside. EOG pushed
+# it down every week and nothing pushed it back.
+#
+# So both get a baseline install for every team, independent of identity. They belong to the
+# deferred opponent game-planning surface (design §6, ~75/25 identity/opponent); this is the
+# interim that stops the one-way decline without pretending vision drives them.
+_REACTIVE_INSTALLS = ("FB_DEF", "PT_OFF")
+
+# SCRIMMAGES IS UNIVERSAL, NOT AN IDENTITY CHOICE. It was installed by the Attack vision alone,
+# which meant ~80% of team-weeks ran scrimmages=0 — and 0 points is a +5..+15 shot_threshold
+# PENALTY every week (golf score: higher is worse). Measured at +191/season against an EOG
+# ladder that contributes -69, so the league drifted to the ceiling: 85% of teams above MID,
+# median 158.5 against MID 90, and the 70-110 bucket containing the 85-95 init range EMPTY.
+#
+# The EOG bands were not at fault. Their fit simulated 128,000 team-seasons and predicted mean
+# 90.0 with ZERO rails — correct for EOG in isolation, and blind to a +191 training term.
+#
+# ONE point is the equilibrium: +2.5/wk training against -2.64/wk EOG nets -4/season. Zero
+# gives +191 and two gives -212 — there is no soft landing, so this is a FIXED baseline rather
+# than a varying one like FB_DEF/PT_OFF. If it ever needs to vary, flatten the training bands
+# in _apply_shot_threshold_training first.
+_SCRIMMAGE_BASELINE = 1
+
+# VARIANCE IS THE POINT. A flat baseline would leave all 128 teams identical on exactly the two
+# attributes this is meant to un-flatten. Derived per (team, week, slot) so it varies BOTH
+# across teams within a week and across weeks for one team, and replays identically.
+#
+# RESCALED 2026-08-14 from (0,1,1,1,2,2,3) — mean 1.43 — after a half-season measurement.
+# At 1.43/week both reactive attributes ran far too hot: fb_opp_modifier reached mean +12.0
+# with 74 of 128 teams in the top bucket and NONE below −4, and pt_opp_modifier +10.4 with
+# none below −4. Nearly every team positive is not the intended shape; more teams positive
+# than not is.
+#
+# Now mean 1.00 with a wider zero share (43% of weeks vs 14%), so a team that keeps drawing
+# blanks genuinely falls behind instead of everyone converging on the same total.
+# PERSISTENT PER-TEAM TENDENCY. A single weekly draw, however wide, converges: every team
+# samples the same distribution, so sd grows as sqrt(weeks) while the mean grows linearly and
+# the league bunches up again by season's end. Week-to-week variance is transient; what the
+# distribution needs is a trait that does not average out.
+#
+# So each team gets a tendency tier per (season, slot) and keeps it all year — a team that
+# neglects transition defence keeps neglecting it, and separates permanently rather than
+# regressing to the league mean. Tiers are drawn per SLOT, so a team can prioritise
+# fast-break defence while ignoring press-break offence.
+#
+# League mean stays ~1.0: 0.25(0.57) + 0.50(1.00) + 0.25(1.57).
+_REACTIVE_TENDENCY_TIERS = (
+    ((0, 0, 0, 0, 1, 1, 2), 25),   # neglects it       mean 0.57
+    ((0, 0, 0, 1, 1, 2, 3), 50),   # league default    mean 1.00
+    ((0, 0, 1, 2, 2, 3, 3), 25),   # prioritises it    mean 1.57
+)
+_REACTIVE_BASELINE_WEIGHTS = _REACTIVE_TENDENCY_TIERS[1][0]   # the default tier
+
+_FOCUS_SKILL_COUNT = 1
+_FOCUS_LIFT_POINTS = 2       # was ND2/IQ2; same points, now rotated like the roster lift
+
+# Saturation taper. The clamp already makes a maxed attribute gain nothing, so this only stops
+# WASTING points on it. Allocation-side only — no engine change, EOG bands undisturbed.
+_SATURATION_FULL = 17     # below this, full weight
+_SATURATION_DEAD = 20     # at/above this, drop the slot entirely
+
+
+def _install_weight(team_attrs: dict, slot: str) -> float:
+    """1.0 below +17, tapering to 0 at +20. Slots with no core-8 target never taper."""
+    attr = _INSTALL_ATTR.get(slot)
+    if not attr:
+        return 1.0
+    try:
+        val = float(team_attrs.get(attr, 0) or 0)
+    except (TypeError, ValueError):
+        return 1.0
+    if val < _SATURATION_FULL:
+        return 1.0
+    if val >= _SATURATION_DEAD:
+        return 0.0
+    return round(1.0 - (val - _SATURATION_FULL) / (_SATURATION_DEAD - _SATURATION_FULL), 2)
+
+
+def _is_focus_week(franchise_id, team_id, season: int, week: int) -> bool:
+    """Focus week or roster week — derived, not drawn, for the same pool-replay reason as
+    _cpu_weekly_coaching_focus. Salted differently so mode and focus do not correlate."""
+    import hashlib
+
+    key = f"mode:{franchise_id}:{team_id}:{season}:{week}".encode("utf-8")
+    n = int.from_bytes(hashlib.sha256(key).digest()[:8], "big")
+    return (n % 1000) < int(_FOCUS_WEEK_SHARE * 1000)
+
+
+def _reactive_baseline(franchise_id, team_id, season: int, week: int, slot: str) -> int:
+    """Points this team puts into a reactive install this week. Derived, not drawn.
+
+    Same replay reasoning as _cpu_weekly_coaching_focus: pool workers each seed their own
+    training_rng, so a draw would depend on which worker claimed the team. Salted per slot so
+    a team's fast-break defence and press-break offence vary independently of each other.
+    """
+    import hashlib
+
+    # Tier is keyed WITHOUT the week, so it holds for the whole season.
+    tkey = f"tendency:{franchise_id}:{team_id}:{season}:{slot}".encode("utf-8")
+    roll = int.from_bytes(hashlib.sha256(tkey).digest()[:8], "big") % 100
+    weights = _REACTIVE_TENDENCY_TIERS[-1][0]
+    acc = 0
+    for w, share in _REACTIVE_TENDENCY_TIERS:
+        acc += share
+        if roll < acc:
+            weights = w
+            break
+
+    key = f"reactive:{franchise_id}:{team_id}:{season}:{week}:{slot}".encode("utf-8")
+    n = int.from_bytes(hashlib.sha256(key).digest()[:8], "big")
+    return weights[n % len(weights)]
+
+
+# The slots the rotating lift walks. Order is fixed; the STARTING POINT rotates per
+# (team, week), so across a season every listed attribute gets the same share.
+#
+# THE NINE SKILLS ONLY — ND/IQ/FT are deliberately absent (2026-08-14). They are fit 1.00
+# for every position while the skills average 0.56, so any lift they receive compounds into
+# the split measured across two full seasons: ND/IQ/FT ~+2.5 each at 85-89% of players up,
+# the nine skills -0.8 to -1.7 at 27-39% up. Rotating evenly across all twelve equalised
+# ALLOCATION (0.97x) without equalising OUTCOMES — fit decides those, not points.
+#
+# Excluding them pushes the universal:skill ratio to ~0.72. That is the FLOOR under this
+# structure: universals cannot drop below their 1-point floor and skills cannot absorb more
+# than the available lift, so 0.72 is the most tilt available without either cutting team
+# installs or dropping a floor to 0 (which costs -1.5/week, ungated — never do that).
+#
+# Universals still grow: at fit 1.00 a single point nets +0.20..+0.39/week by class. They
+# just grow far slower, which is the point.
+_LIFT_SLOTS = ("SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG")
+
+
+def _apply_rotating_lift(alloc: dict, points: int, spare: int, offset: int) -> int:
+    """Spend ``points`` lifting player attributes by +1 each, starting at ``offset``.
+
+    Rotating rather than fixed is the whole point. A fixed lift on ND/IQ/FT was
+    point-efficient — they are fit 1.00 for every position — and that is exactly why it
+    produced a season where those three rose 99-100% of the time and the nine skills fell
+    for two thirds of players. Efficiency alone concentrates every gain on whatever is
+    already winning.
+
+    Caps each slot at 3 so a lift cannot quietly become an emphasis, and never pushes a slot
+    past the 5-point slider ceiling.
+    """
+    n = len(_LIFT_SLOTS)
+    for i in range(n):
+        if points <= 0 or spare <= 0:
+            break
+        slot = _LIFT_SLOTS[(offset + i) % n]
+        if _get_slot(alloc, slot) < 3:
+            _set_slot(alloc, slot, _get_slot(alloc, slot) + 1)
+            points -= 1
+            spare -= 1
+    return spare
+
+
+def _set_slot(alloc: dict, slot: str, value: int) -> None:
+    path = _SLOT[slot]
+    node = alloc[path[0]]
+    for k in path[1:-1]:
+        node = node[k]
+    node[path[-1]] = value
+
+
+def _get_slot(alloc: dict, slot: str) -> int:
+    path = _SLOT[slot]
+    node = alloc[path[0]]
+    for k in path[1:-1]:
+        node = node[k]
+    return node[path[-1]]
+
+
+def _cpu_team_allocation(
+    is_camp: bool = False,
+    *,
+    offensive_vision: str | None = None,
+    defensive_vision: str | None = None,
+    team_attrs: dict | None = None,
+    focus_week: bool = True,
+    reactive_baseline: dict | None = None,
+    lift_offset: int = 0,
+) -> dict:
+    """One team-wide plan for a CPU team — the same shape a user submits.
+
+    24 points in season, 30 at camp. Identity-driven: the vision pair picks which slots get
+    emphasis, and the week's mode picks whether that emphasis lands on SKILLS (focus week,
+    sharp, reaches the players who fit it) or on ND/IQ/FT (roster week, reaches everyone).
+
+    THE 12 FLOORS HOLD IN BOTH MODES. A 0 on any player-attribute slot costs -1 to -2 every
+    week with no probability gate; the modes differ only in where the SPARE points go. Design
+    §3.1 and §3.4.
+    """
+    from BackEnd.constants.training_shape import CAMP_POINT_BUDGET, IN_SEASON_POINT_BUDGET
+
+    alloc = {
+        "player_drills": {
+            "offense": {"inside": 1, "outside": 1},
+            "defense": {"inside": 1, "outside": 1},
+            "technical": {"passing": 1, "ball_handling": 1, "rebounding": 1},
+            "weight_room": {"strength": 1, "agility": 1},
+        },
+        "general": {"conditioning": 1, "free_throws": 1, "film_study": 1, "breaks": 1},
+        "team_drills": {
+            "team_offense": {"install": 0}, "team_defense": {"install": 0},
+            "fast_breaks": {"offense_install": 0, "defense_install": 0}, "scrimmages": 0,
+            "presses_traps": {"defense_install": 0, "offense_install": 0},
+        },
+    }
+    budget = CAMP_POINT_BUDGET if is_camp else IN_SEASON_POINT_BUDGET
+    spare = budget - 13          # 12 player-attribute floors + breaks at 1
+
+    off = _VISION_OFFENSE.get(offensive_vision or "", ((), ()))
+    dfn = _VISION_DEFENSE.get(defensive_vision or "", ((), ()))
+    lift_offset = int(lift_offset or 0)
+
+    # Scrimmages: fixed baseline for every team, off the top. See _SCRIMMAGE_BASELINE.
+    if _SCRIMMAGE_BASELINE > 0 and spare >= _SCRIMMAGE_BASELINE:
+        _set_slot(alloc, "SCRIM", _SCRIMMAGE_BASELINE)
+        spare -= _SCRIMMAGE_BASELINE
+
+    # Reactive installs next — every team, no vision, varying week to week. Taken off the top
+    # so identity spends what is left rather than these scavenging leftovers; a season proved
+    # that anything relying on leftovers here gets nothing at all.
+    for slot in _REACTIVE_INSTALLS:
+        pts = reactive_baseline.get(slot, 0) if reactive_baseline else 0
+        if pts <= 0:
+            continue
+        cap = 5 * _install_weight(team_attrs or {}, slot)
+        pts = min(pts, int(cap))            # saturated? do not spend into the clamp
+        if 0 < pts <= spare:
+            _set_slot(alloc, slot, pts)
+            spare -= pts
+
+    if focus_week:
+        # Dedupe: Zone+Man Lockdown both name ID, and paying twice for one slot would silently
+        # eat the other vision's emphasis.
+        seen = []
+        for slot in list(off[0]) + list(dfn[0]):
+            if slot not in seen:
+                seen.append(slot)
+        n_emph = len(seen) if is_camp else _FOCUS_SKILL_COUNT
+        for slot in seen[:n_emph]:
+            cost = _EMPHASIS_POINTS - _get_slot(alloc, slot)
+            if 0 < cost <= spare:
+                _set_slot(alloc, slot, _EMPHASIS_POINTS)
+                spare -= cost
+        spare = _apply_rotating_lift(alloc, _FOCUS_LIFT_POINTS, spare, lift_offset)
+    else:
+        spare = _apply_rotating_lift(alloc, _ROSTER_LIFT_POINTS, spare, lift_offset)
+
+    # Remaining points to this vision pair's installs. The taper is a per-slot CAP, not just
+    # an on/off filter: weight 1.0 allows the full 5, 0.67 allows 3, 0.33 allows 1, 0.0 drops
+    # the slot. Without the cap a team at +18 would still take full points into an attribute
+    # three off its ceiling, which is most of what the taper exists to stop.
+    # A team with no identity has no vision installs, and without a fallback every spare point
+    # cascades into the overflow below and piles onto ND/IQ/FT — 14 points on three attributes
+    # and 1 on team drills. Degenerate, and it only shows up for teams identity has not reached.
+    install_slots = list(off[1]) + list(dfn[1])
+    if not install_slots:
+        # SCRIM is DELIBERATELY ABSENT — it has a fixed baseline of 1 above, and adding it to
+        # the round-robin here pushed identity-less teams to 2, which is worth -212/season of
+        # shot_threshold. One point is the only stable value; nothing else may touch this slot.
+        install_slots = ["T_OFF", "T_DEF", "FB_OFF", "FB_DEF", "PT_DEF", "PT_OFF"]
+
+    caps = {}
+    for slot in install_slots:
+        w = _install_weight(team_attrs or {}, slot)
+        if w > 0:
+            caps[slot] = max(1, int(round(5 * w)))
+    installs = list(caps)
+    while spare > 0 and installs:
+        placed = False
+        for slot in installs:
+            if spare <= 0:
+                break
+            if _get_slot(alloc, slot) < caps[slot]:
+                _set_slot(alloc, slot, _get_slot(alloc, slot) + 1)
+                spare -= 1
+                placed = True
+        if not placed:
+            break   # every install is at its cap; the overflow below takes the rest
+
+    # Anything still unspent (every install saturated, or a vision with none) goes to Bucket 3
+    # then the skill floors. Never leave points unspent — the old path wasted 7-8 a week.
+    for slot in ("ND", "IQ", "FT", "SC", "SH", "ID", "OD", "PS", "BH", "RB", "ST", "AG"):
+        while spare > 0 and _get_slot(alloc, slot) < 5:
+            _set_slot(alloc, slot, _get_slot(alloc, slot) + 1)
+            spare -= 1
+        if spare <= 0:
+            break
+    return alloc
+
+
+# ── CPU weekly coaching focus (step 2 of the identity-training rework) ───────────────────
+# The 16 real leaves: 4 archetype families x 4 sub-options. `execute_training` takes the leaf
+# string and splits it via parse_coaching_focus, so no extra plumbing is needed.
+#
+# NOT 17. `player-maximizer-choose-attributes` appears in COACHING_FOCUS_LEAF_DISPLAY_NAME but
+# is not handled in _should_amplify_player_attr or _should_amplify_team_attr, so drawing it
+# would be a silent no-op week — a focus that does nothing, indistinguishable from a bug.
+CPU_COACHING_FOCUS_LEAVES = (
+    "authoritarian-discipline", "authoritarian-rebounding",
+    "authoritarian-teamwork", "authoritarian-execution",
+    "systems-coach-offense", "systems-coach-defense",
+    "systems-coach-fast-breaks", "systems-coach-press-trap",
+    "player-maximizer-top-3", "player-maximizer-attributes-4-6",
+    "player-maximizer-custom", "player-maximizer-positional-focus",
+    "culture-builder-inspire", "culture-builder-community",
+    "culture-builder-teamwork", "culture-builder-confidence",
+)
+
+
+def _cpu_weekly_coaching_focus(franchise_id, team_id, season: int, week: int) -> str:
+    """Pick one of the 16 leaves for this team this week.
+
+    DERIVED, NOT DRAWN — and deliberately so. CPU teams train inside a ProcessPool, and each
+    spawned worker builds its own ``training_rng`` from OS entropy, so an RNG draw would make
+    a team's focus depend on WHICH WORKER happened to claim it. That is unreplayable by
+    construction: re-running the same week could hand a team a different focus, which then
+    moves every attribute on its roster. (The ``seed`` argument on auto_train_one_cpu_team
+    cannot rescue it either — it seeds the GLOBAL random module while the engine draws from
+    ``training_rng``, so it never reaches these decisions.)
+
+    Hashing (franchise, team, season, week) is uniform across teams and weeks, identical on
+    every replay, and indifferent to worker scheduling. Uses sha256 rather than ``hash()``
+    because the builtin is only stable while PYTHONHASHSEED is pinned — a dependency this
+    project has already been bitten by.
+
+    Deliberately dumb for now: strategy in focus selection, and a per-team coach identity
+    with a major and a minor, are later phases. See projects/cpu_identity_training_design.md §2.
+    """
+    import hashlib
+
+    key = f"{franchise_id}:{team_id}:{season}:{week}".encode("utf-8")
+    idx = int.from_bytes(hashlib.sha256(key).digest()[:8], "big")
+    return CPU_COACHING_FOCUS_LEAVES[idx % len(CPU_COACHING_FOCUS_LEAVES)]
 
 
 def _cpu_reference_custom_focus(players_for_training: list[dict], fpd_by_player_id: dict) -> dict:
@@ -2479,7 +2955,14 @@ def auto_train_one_cpu_team(
         return {"status": "skipped_already_trained", "team_id": str(team_id), "week": week}
 
     if seed is not None:
+        # BOTH streams. `random` here is the GLOBAL module, but the training engine draws from
+        # `training_rng` (BackEnd/utils/training_random) — so seeding only the global one left
+        # every gain roll unseeded and this argument's reproducibility claim false. It also made
+        # paired A/B of allocations impossible: two arms for the same team drew different rolls,
+        # giving per-team deltas an sd of ~2.6 that buried the ~0.3 effects being measured.
         random.seed(seed)
+        from BackEnd.utils import training_random
+        training_random.seed(seed)
 
     team_player_ids = ftd_doc.get("players") or []
     if fpd_by_player_id is None:
@@ -2492,6 +2975,23 @@ def auto_train_one_cpu_team(
                 {"franchise_id": str(franchise_id), "player_id": {"$in": _pid_strs}}
             )
         }
+
+    # DEFERRED offseason (Week-1 TC), CPU parity: develop this team's roster once before camp
+    # when the season transition armed the FTD marker. Mirrors the user path (in place on the
+    # loaded FPD docs, so the player list + camp build on developed values). The marker is
+    # CLEARED only in the success-path FTD write below (after FPD persist), so a mid-write
+    # rollback leaves it set and a retry re-develops from the un-developed docs. (Plan doc.)
+    from BackEnd.constants.training_shape import is_camp_week as _is_camp_week_gate
+    _cpu_is_camp = bool(is_first_training) if is_first_training is not None else _is_camp_week_gate(week)
+    _cpu_offseason_pending = bool(_cpu_is_camp and ftd_doc.get("offseason_dev_pending_season"))
+    if _cpu_offseason_pending:
+        _cpu_season = int(ftd_doc.get("offseason_dev_pending_season") or 0)
+        _cpu_to_dev = [
+            fpd_by_player_id[str(pid)]
+            for pid in team_player_ids
+            if fpd_by_player_id.get(str(pid))
+        ]
+        _apply_deferred_offseason(_cpu_to_dev, _cpu_season)
 
     from BackEnd.constants.training_shape import training_position_projection
 
@@ -2527,9 +3027,22 @@ def auto_train_one_cpu_team(
         else is_camp_week(week)
     )
 
-    # Per-position bases + per-player custom focus (gain-side fit model).
-    coaching_focus = "player-maximizer-custom"
-    coaching_focus_custom_by_player = _cpu_reference_custom_focus(players_for_training, fpd_by_player_id)
+    # One of the 16 leaves, same menu a user picks from. Was hardcoded to
+    # player-maximizer-custom, which amplified every player's own position top-3 by 2x EVERY
+    # week — the optimal choice, permanently, which no user gets. That is the same class of
+    # advantage as the per-position allocation removed in step 1.
+    #
+    # EXPECT DEVELOPMENT TO DROP. custom now comes up ~1 week in 16; the other 15 amplify
+    # things a given player may not have. That cost is the point, not a regression.
+    coaching_focus = _cpu_weekly_coaching_focus(
+        franchise_id, team_id, int((ftd_doc.get("season") or 1)), int(week)
+    )
+    # Only the custom leaf consumes this, and building it walks the whole roster — skip the
+    # work on the other 15.
+    coaching_focus_custom_by_player = (
+        _cpu_reference_custom_focus(players_for_training, fpd_by_player_id)
+        if coaching_focus == "player-maximizer-custom" else None
+    )
 
     team_stats = dict(ftd_doc.get("team_attributes") or {})
     plays_data = ftd_doc.get("plays") or {}
@@ -2550,47 +3063,58 @@ def auto_train_one_cpu_team(
     from BackEnd.utils.headless_simulation import quiet_training_engine_logs
     from collections import defaultdict
 
-    groups: dict[str, list] = defaultdict(list)
-    for p in players_for_training:
-        pos = resolve_training_position(p)
-        groups[pos].append(p)
-
     updated_players: list = []
     updated_team = team_stats
     updated_plays = plays_data
     updated_scouting = scouting_data
     training_report: dict = {}
     gain_scale = CAMP_GAIN_SCALE if is_camp else None
-    apply_team_drills = True
-    with quiet_training_engine_logs():
-        for pos, group in groups.items():
-            allocations = _cpu_reference_allocation(pos)
-            if not apply_team_drills:
-                allocations = {
-                    "player_drills": allocations["player_drills"],
-                    "general": {
-                        "conditioning": allocations["general"]["conditioning"],
-                        "free_throws": allocations["general"]["free_throws"],
-                        "film_study": allocations["general"]["film_study"],
-                    },
-                    "team_drills": {},
-                }
-            up, updated_team, updated_plays, updated_scouting, training_report = execute_training(
-                group,
-                updated_team,
-                allocations,
-                coaching_focus,
-                plays_data=updated_plays,
-                strategy_settings=strategy_settings,
-                playbook_settings=playbook_settings,
-                scouting_data=updated_scouting,
-                playbook_training_mode="current-playbooks",
-                skip_pre_training_depreciation=is_camp,
-                coaching_focus_custom_by_player=coaching_focus_custom_by_player,
-                gain_scale=gain_scale,
+    # ONE plan for the whole roster, exactly as a user submits — not one per position group.
+    # The old loop called execute_training up to 5x with a per-position allocation, which let
+    # every CPU player train his ideal attributes while a user's roster shares one compromise
+    # plan. See _cpu_team_allocation and projects/cpu_identity_training_design.md §1.
+    #
+    # Step 3: the plan is now driven by the team's IDENTITY. `ftd.identity` is written by
+    # ensure_franchise_identities before any game is simmed; a team without one (identity
+    # inert, or a franchise mid-migration) falls through to the vision-blind base rather
+    # than failing — the floors still hold, so nobody takes the -1.5 neglect drag.
+    _identity = ftd_doc.get("identity") or {}
+    allocations = _cpu_team_allocation(
+        is_camp,
+        offensive_vision=_identity.get("offensive_vision"),
+        defensive_vision=_identity.get("defensive_vision"),
+        team_attrs=team_stats,
+        focus_week=_is_focus_week(
+            franchise_id, team_id, int((ftd_doc.get("season") or 1)), int(week)
+        ),
+        reactive_baseline={
+            slot: _reactive_baseline(
+                franchise_id, team_id, int((ftd_doc.get("season") or 1)), int(week), slot
             )
-            updated_players.extend(up)
-            apply_team_drills = False
+            for slot in _REACTIVE_INSTALLS
+        },
+        # Rotate the lift start per (team, week) so every attribute gets its turn across a
+        # season, and no two teams lift the same set in the same week.
+        lift_offset=_reactive_baseline(
+            franchise_id, team_id, int((ftd_doc.get("season") or 1)), int(week), "lift"
+        ) * 7 + int(week),
+    )
+    with quiet_training_engine_logs():
+        up, updated_team, updated_plays, updated_scouting, training_report = execute_training(
+            players_for_training,
+            updated_team,
+            allocations,
+            coaching_focus,
+            plays_data=updated_plays,
+            strategy_settings=strategy_settings,
+            playbook_settings=playbook_settings,
+            scouting_data=updated_scouting,
+            playbook_training_mode="current-playbooks",
+            skip_pre_training_depreciation=is_camp,
+            coaching_focus_custom_by_player=coaching_focus_custom_by_player,
+            gain_scale=gain_scale,
+        )
+        updated_players.extend(up)
 
     # Compat: callers still key off is_first for camp-weight coaching-focus counts.
     is_first = is_camp
@@ -2663,6 +3187,11 @@ def auto_train_one_cpu_team(
         if updated_scouting is not None:
             ftd_update["scouting_data"] = updated_scouting
         ftd_update[f"training_reports.{week}"] = training_report
+        if _cpu_offseason_pending:
+            # Consumed the deferred offseason — disarm. Safe here: this runs only after the
+            # FPD develop+camp persisted above; on a mid-write failure we hit `except` first
+            # and leave the marker set so a retry re-develops from the un-developed docs.
+            ftd_update["offseason_dev_pending_season"] = None
 
         ftd_ops: dict[str, Any] = {"$set": ftd_update}
         cf_inc = user_ftd_coaching_focus_increment(coaching_focus, training_camp_first_week=is_first)
@@ -4804,6 +5333,15 @@ def _franchise_cpu_full_sim_max_workers() -> int:
         return max(1, int(os.environ.get("FRANCHISE_CPU_SIM_MAX_WORKERS", "4")))
     except (TypeError, ValueError):
         return 4
+
+
+def _franchise_cpu_pool_workers_for_log(thread_max_workers: int) -> int:
+    """Worker count the CPU-week sim block actually used, for the timing line."""
+    if _franchise_cpu_use_pool():
+        from BackEnd.utils.cpu_week_pool import pool_worker_count
+
+        return pool_worker_count()
+    return thread_max_workers
 
 
 def _franchise_cpu_use_pool() -> bool:
@@ -7108,6 +7646,32 @@ def _complete_week_finish_cpu_and_persist(
             eos_game_meta=eos_meta,
         )
 
+    # CPU TEAM IDENTITY — assign/refresh before any game is simmed this week.
+    #
+    # THIS LIVES HERE, NOT ON A ROUTE, BECAUSE THREE ENDPOINTS REACH THE SIM BLOCK:
+    # /complete-week, /complete-week/start-cpu-sims and /complete-week/phase-b. It was
+    # originally called only from /complete-week, which the UI takes only as a fallback
+    # branch (box-score.js) — the live flow is phase-a -> start-cpu-sims -> phase-b. So
+    # identity never ran in normal play: gob-staging had 0/128 teams with an identity and
+    # every team's sliders flat at 2, on a franchise created two days AFTER identity
+    # shipped. Assigning at the single point all three paths converge on is what makes
+    # that unreachable-by-construction; a fourth entry point cannot reintroduce the gap.
+    #
+    # Idempotent and season-keyed, so running on both start-cpu-sims and phase-b is a
+    # no-op the second time. See BackEnd/utils/franchise_identity.
+    try:
+        from BackEnd.utils.franchise_identity import ensure_franchise_identities
+
+        _identity_summary = ensure_franchise_identities(
+            franchise_id,
+            int(franchise_doc.get("current_season") or 1),
+            int(franchise_doc.get("week") or week or 1),
+        )
+        if _identity_summary.get("assigned"):
+            logger.warning("🧬 [IDENTITY] franchise=%s %s", franchise_id_str, _identity_summary)
+    except Exception as _identity_err:  # never let identity block a week
+        logger.error("[IDENTITY] assignment failed for %s: %s", franchise_id_str, _identity_err)
+
     # Phase 2: stable matchup keys + dedupe so phase-B retries / merged rows cannot double-count games.
     results = _dedupe_franchise_week_results_by_matchup([dict(r) for r in results])
     cpu_job_phase = "start_cpu_sims" if persist_cpu_results_only else "phase_b"
@@ -7355,11 +7919,15 @@ def _complete_week_finish_cpu_and_persist(
         # `full_sim_block` is the parallel simulation compute; persistence follows
         # and is not counted here.
         _fullsim_secs = time.time() - _cpu_fullsim_t0
+        # `workers` is here because it was the one number this line never carried: a week
+        # that runs slow because the pool is contended looks identical to one that is slow
+        # because the engine got heavier. Pair it with [POOL-EFFICIENCY] / [POOL-OVERLAP].
         logger.warning(
             "[CPU-WEEK-TIMING] franchise=%s week=%s | full_tbt=%s | "
-            "engine=%s | full_sim_block=%.1fs (%.2fs/full-game) total_so_far=%.1fs | failures=%s",
+            "engine=%s workers=%s | full_sim_block=%.1fs (%.2fs/full-game) total_so_far=%.1fs | failures=%s",
             franchise_id_str, week, len(full_jobs),
             "pool" if _franchise_cpu_use_pool() else "thread",
+            _franchise_cpu_pool_workers_for_log(max_workers),
             _fullsim_secs, _fullsim_secs / max(1, len(full_jobs)),
             time.time() - _cpu_week_t0, len(sim_err),
         )
@@ -7781,26 +8349,10 @@ def complete_week(req: CompleteWeekRequest):
 
     req = _harden_complete_week_request_week(franchise_doc, req)
 
-    # CPU TEAM IDENTITY — assign/refresh before any game is simmed this week.
-    # Idempotent and season-keyed: it is a no-op once each team's identity matches the
-    # current season and CONSTANTS_VERSION. It lives here because franchise creation
-    # seeds FTD strategy_settings BEFORE rosters are attached, so identity cannot be
-    # computed at that site; this is the first point each season where a projected five
-    # is guaranteed to exist. Without it, FTD supplies flat-neutral all-2s sliders,
-    # TeamManager takes its "settings were supplied" branch, and identity never runs in
-    # franchise mode at all. See BackEnd/utils/franchise_identity.
-    try:
-        from BackEnd.utils.franchise_identity import ensure_franchise_identities
-
-        _identity_summary = ensure_franchise_identities(
-            franchise_id,
-            int(franchise_doc.get("current_season") or 1),
-            int(franchise_doc.get("week") or 1),
-        )
-        if _identity_summary.get("assigned"):
-            logger.warning("🧬 [IDENTITY] franchise=%s %s", req.franchise_id, _identity_summary)
-    except Exception as _identity_err:  # never let identity block a week
-        logger.error("[IDENTITY] assignment failed for %s: %s", req.franchise_id, _identity_err)
+    # CPU TEAM IDENTITY is assigned in _complete_week_finish_cpu_and_persist, the single
+    # point all three complete-week entry points converge on before the sim block. It used
+    # to be called here, which meant it never ran on the live phase-a/start-cpu-sims/phase-b
+    # flow. Do not re-add a per-route call.
 
     _u_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
     user_eos_sim_scope = _build_user_eos_sim_scope(franchise_doc, user_team_id_str)
@@ -9500,6 +10052,7 @@ def get_leaders(
             team_filters.append({"meta.team": {"$in": list(allowed_team_names)}})
         pipeline.append({"$match": {"$or": team_filters}})
 
+    per_game_stats = {"PTS", "REB", "AST"}
     if stat in {"FG%", "DEF%"}:
         numerator_field = "FGM" if stat == "FG%" else "DEF_S"
         denominator_field = "FGA" if stat == "FG%" else "DEF_A"
@@ -9540,6 +10093,28 @@ def get_leaders(
             {"$sort": {"value": -1, "tiebreak_volume": -1}},
             {"$limit": limit},
         ])
+    elif stat in per_game_stats:
+        pipeline.extend([
+            {
+                "$project": {
+                    "player_id": 1,
+                    "meta": 1,
+                    "gp": {"$ifNull": [f"${scope}.GP", 0]},
+                    "total": {"$ifNull": [f"${scope}.{stat_field}", 0]},
+                }
+            },
+            {"$match": {"gp": {"$gt": 0}}},
+            {
+                "$project": {
+                    "player_id": 1,
+                    "meta": 1,
+                    "value": {"$divide": ["$total", "$gp"]},
+                    "tiebreak_total": "$total",
+                }
+            },
+            {"$sort": {"value": -1, "tiebreak_total": -1}},
+            {"$limit": limit},
+        ])
     else:
         pipeline.extend([
             {
@@ -9560,7 +10135,9 @@ def get_leaders(
     for p in agg:
         meta = p.get("meta", {})
         value = p.get("value", 0)
-        if stat == "FG%":
+        if stat in per_game_stats:
+            value = round(float(value or 0), 1)
+        elif stat == "FG%":
             value = round(float(value or 0), 1)
         elif stat == "DEF%":
             value = int(round(float(value or 0)))
@@ -13487,17 +14064,27 @@ def cut_franchise_players(
         logger.exception("[WALK-ON-ROSTER] user assign failed franchise=%s", str(fid))
         walk_on_assign = {}
 
+    # Roster assignment is already committed above. PS init must not fail the
+    # request — a 500 here left the client on cut-players with no FCC navigation
+    # even though cuts were saved (and retries then 400 because cut_required is false).
     ps_initialized = False
     if int(franchise_doc.get("week", 1) or 1) == CAMP_WEEKS:
-        ps_initialized = (
-            _maybe_initialize_practice_squad_week_1(
-                fid,
-                franchise_doc,
-                user_team_object_id=user_team_object_id,
-                defer_if_user_cut_pending=False,
+        try:
+            ps_initialized = (
+                _maybe_initialize_practice_squad_week_1(
+                    fid,
+                    franchise_doc,
+                    user_team_object_id=user_team_object_id,
+                    defer_if_user_cut_pending=False,
+                )
+                is not None
             )
-            is not None
-        )
+        except Exception:
+            logger.exception(
+                "[PRACTICE-SQUAD] week-1 init failed after cut-players franchise=%s",
+                str(fid),
+            )
+            ps_initialized = False
 
     return {
         "status": "success",
@@ -14452,6 +15039,33 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         ):
             core_physique_by_id[str(doc["_id"])] = doc
 
+    # DEFERRED offseason development (Week-1 TC): if the season transition armed the marker,
+    # develop this team's roster ONCE, before camp, so the user sees offseason + camp as one
+    # jump. Runs in place on the loaded FPD docs → the player list below (and camp) build on
+    # the developed values, and the post-camp FPD persist writes offseason+camp together.
+    # See Defer_Offseason_To_Camp_Plan.md.
+    current_season = int(franchise_doc.get("current_season", 1) or 1)
+    _offseason_reports: list[dict] = []
+    _offseason_pending = (
+        is_first_training
+        and int(ftd_doc.get("offseason_dev_pending_season") or 0) == current_season
+    )
+    if _offseason_pending:
+        _to_develop = []
+        for pid in team_player_ids:
+            doc = franchise_players.get(str(pid))
+            if not doc:
+                continue
+            _meta = doc.setdefault("meta", {})
+            if _meta.get("height") is None:
+                _core = core_physique_by_id.get(str(pid)) or {}
+                if _core.get("height") is not None:
+                    _meta["height"] = _core["height"]
+                if _core.get("weight") is not None:
+                    _meta["weight"] = _core["weight"]
+            _to_develop.append(doc)
+        _offseason_reports = _apply_deferred_offseason(_to_develop, current_season)
+
     # Build player list with franchise-specific attributes
     players_load_start = time.time()
     players_for_training = []
@@ -14688,6 +15302,17 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         )
         if pid in position_ratings_updates:
             fpd_set["position_ratings"] = position_ratings_updates[pid]
+        if _offseason_pending:
+            # We ran the deferred offseason on the loaded FPD doc this run — persist the dev
+            # fields it wrote (development/entry_tier/potential/…), matching what the old
+            # finish_season flow saved. Common case they're unchanged (carried); the case
+            # that MATTERS is a legacy player whose profile was backfilled here — without
+            # this it re-rolls every season.
+            _dev_src = franchise_players.get(str(pid)) or {}
+            for _f in ("development", "entry_tier", "position_intent",
+                       "potential_factor", "training_position", "coaching_quality"):
+                if _f in _dev_src:
+                    fpd_set[_f] = _dev_src[_f]
         pm = player.get("meta") or {}
         if isinstance(pm, dict):
             if "height" in pm:
@@ -14759,6 +15384,9 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     training_report_data = {
         "week": week,
         "player_logs": player_logs,
+        "player_attribute_display_movements": training_report.get(
+            "player_attribute_display_movements", {}
+        ),
         "team_log": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "training_notes": _training_notes,
@@ -14785,6 +15413,9 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     }
 
     ftd_update[f"training_reports.{week}"] = training_report_data
+    if _offseason_pending:
+        # Consumed the deferred offseason this run — disarm so it never re-applies.
+        ftd_update["offseason_dev_pending_season"] = None
 
     ftd_ops: dict[str, Any] = {}
     if ftd_update:
@@ -14812,6 +15443,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             "coaching_focus": training_report.get("coaching_focus", {}),
             "session_type": session_type,
             "team_id": team_id,
+            "offseason_development": _offseason_reports,
             "redirect": None,
         }
 
@@ -14844,6 +15476,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "session_type": session_type,
+        "offseason_development": _offseason_reports,
         "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={week}&from=training",
     }
 
@@ -15301,6 +15934,9 @@ def get_training_report(franchise_id: str = None, tournament_id: str = None, tea
             "coaching_focus": report_data.get("coaching_focus", {}),
             # Support both old field names (player_changes, team_changes) and new standardized names (player_logs, team_log)
             "player_changes": report_data.get("player_logs") or report_data.get("player_changes", {}),
+            "player_attribute_display_movements": report_data.get(
+                "player_attribute_display_movements", {}
+            ),
             "team_changes": report_data.get("team_log") or report_data.get("team_changes", {}),
             "training_notes": report_data.get("training_notes", []),
             "plays_data": report_data.get("plays_data", {}),
@@ -15983,6 +16619,42 @@ def _build_offseason_report_line(new_doc: dict, prev_doc: dict, dev_result: dict
     }
 
 
+def _apply_deferred_offseason(fpd_docs: list[dict], season: int) -> list[dict]:
+    """Apply the DEFERRED offseason `develop_rollover` to each FPD doc IN PLACE and return
+    offseason report lines. Called at Week-1 Training Camp (before camp training) by both
+    the user and CPU paths; the caller GATES on the FTD `offseason_dev_pending_season`
+    marker and CLEARS it after. See Defer_Offseason_To_Camp_Plan.md.
+
+    develop_rollover is a RESCALE, not idempotent — running it twice double-applies. Safety
+    is the caller's marker + once-guards (user_training_applied_week / cpu_autotrain_week),
+    which clear only after a successful persist; on a pre-persist failure the un-developed doc
+    is re-read and the per-(player, season) deterministic seed reproduces the same result.
+    The doc already carries entry_tier/potential/development/… (finish_season used
+    carry_dev_fields); develop_rollover backfills any missing one. season_allocation is None —
+    coaching-quality capture is dormant (pillar 3), matching pre-defer behaviour exactly."""
+    from BackEnd.utils.player_development import develop_rollover
+    reports: list[dict] = []
+    for doc in fpd_docs:
+        meta = doc.get("meta") or {}
+        year = meta.get("year")
+        prev = {"position_ratings": dict(doc.get("position_ratings") or {})}
+        rng = random.Random(f"offseason:{doc.get('player_id')}:{season}")
+        dev = develop_rollover(doc, year, rng, season_allocation=None)
+        doc["attributes"] = dev["attributes"]
+        doc.setdefault("meta", {})
+        doc["meta"]["height"] = dev["height"]
+        doc["meta"]["weight"] = dev["weight"]
+        doc["position_ratings"] = dev["position_ratings"]
+        doc["development"] = dev["development"]
+        doc["entry_tier"] = dev["entry_tier"]
+        doc["position_intent"] = dev["position_intent"]
+        doc["potential_factor"] = dev["potential_factor"]
+        doc["training_position"] = dev["training_position"]
+        doc["coaching_quality"] = dev["coaching_quality"]
+        reports.append(_build_offseason_report_line(doc, prev, dev))
+    return reports
+
+
 def _coaching_accumulator_for_player(player_id: str) -> Optional[Dict[str, float]]:
     """Read the just-finished season's per-player training accumulator (attr →
     points/week, 0-5 per the drill sliders), the QUALITY-half input to develop_rollover.
@@ -16053,10 +16725,10 @@ def finish_season(req: FinishSeasonRequest):
     signed_players = list(week_35_results.get("signed_players") or [])
     zero_stats = _zero_stats_block()
 
-    # Offseason development event (§7.1) runs per rolled-over player below. Uses the
-    # global random stream (this endpoint is not seeded); collects a report list.
-    from BackEnd.utils.player_development import develop_rollover
-    _dev_rng = random
+    # Offseason development is DEFERRED to Week-1 TC (see per-player note below and
+    # Defer_Offseason_To_Camp_Plan.md). finish_season only advances YEAR + carries dev
+    # fields; develop_rollover runs at "Run Training". This report list stays empty here
+    # (the offseason report is emitted with the Week-1 training report instead).
     _offseason_reports: list[dict[str, Any]] = []
 
     def advance_year(year_value: str | None) -> str:
@@ -16109,27 +16781,12 @@ def finish_season(req: FinishSeasonRequest):
                 # league would revert to the default curve — the highest-risk failure here.
                 **carry_dev_fields(fpd_doc),
             }
-            # Offseason development event (§7.1): develop the returning player onto
-            # his new year's rung, then recompute ratings (incl. after HT growth).
-            # Lazy-backfills + persists a missing profile once (existing saves).
-            # season_allocation is the season's per-player training accumulator
-            # (attr → points/week); coaching quality is scored against training_position.
-            # None → f 1.0 (frozen reference). CPU teams record no allocation until
-            # the archetype-training rework (pillar 3), so the league holds exactly
-            # at pass-1; the exact-diff baseline is CPU-only and stays byte-identical.
-            _season_alloc = _coaching_accumulator_for_player(player_id_str)
-            _dev = develop_rollover(next_doc, meta["year"], _dev_rng, season_allocation=_season_alloc)
-            next_doc["attributes"] = _dev["attributes"]
-            next_doc["meta"]["height"] = _dev["height"]
-            next_doc["meta"]["weight"] = _dev["weight"]
-            next_doc["position_ratings"] = _dev["position_ratings"]
-            next_doc["development"] = _dev["development"]
-            next_doc["entry_tier"] = _dev["entry_tier"]
-            next_doc["position_intent"] = _dev["position_intent"]
-            next_doc["potential_factor"] = _dev["potential_factor"]
-            next_doc["training_position"] = _dev["training_position"]
-            next_doc["coaching_quality"] = _dev["coaching_quality"]
-            _offseason_reports.append(_build_offseason_report_line(next_doc, fpd_doc, _dev))
+            # Offseason development is DEFERRED to Week-1 Training Camp (see
+            # projects/Defer_Offseason_To_Camp_Plan.md). The player rolls over with his
+            # new YEAR and carried dev fields (entry_tier/potential/development/… via
+            # carry_dev_fields) but UN-developed attributes. The offseason develop_rollover
+            # runs at TC "Run Training" (before camp) so the user sees offseason + camp as
+            # one jump. `offseason_dev_pending_season` on the new FTD arms that step.
             next_fpd_docs.append(next_doc)
             returning_players_by_team[team_id].append(player_id_str)
             if player_id_str in scholarship_players:
@@ -16175,21 +16832,9 @@ def finish_season(req: FinishSeasonRequest):
             # missing ones lazy-backfill inside develop_rollover.
             **carry_dev_fields(signed_player),
         }
-        # Signed players enter advanced one year, so they too walk an offseason rung.
-        # No in-season record yet (just signed) → season_allocation None → f 1.0.
-        _prev = {"position_ratings": signed_doc["position_ratings"]}
-        _dev = develop_rollover(signed_doc, signed_doc["meta"]["year"], _dev_rng, season_allocation=None)
-        signed_doc["attributes"] = _dev["attributes"]
-        signed_doc["meta"]["height"] = _dev["height"]
-        signed_doc["meta"]["weight"] = _dev["weight"]
-        signed_doc["position_ratings"] = _dev["position_ratings"]
-        signed_doc["development"] = _dev["development"]
-        signed_doc["entry_tier"] = _dev["entry_tier"]
-        signed_doc["position_intent"] = _dev["position_intent"]
-        signed_doc["potential_factor"] = _dev["potential_factor"]
-        signed_doc["training_position"] = _dev["training_position"]
-        signed_doc["coaching_quality"] = _dev["coaching_quality"]
-        _offseason_reports.append(_build_offseason_report_line(signed_doc, _prev, _dev))
+        # Offseason development DEFERRED to Week-1 TC (see returning-players note above).
+        # Signed recruit rolls in with his new YEAR + carried dev fields but UN-developed
+        # attributes; the JH→FR (etc.) develop_rollover runs at TC before camp.
         next_fpd_docs.append(signed_doc)
 
     next_fpd_map = {doc["player_id"]: doc for doc in next_fpd_docs}
@@ -16247,6 +16892,14 @@ def finish_season(req: FinishSeasonRequest):
                 existing_ftd.get("coaching_focus")
             ),
             "total_player_attrs": total_player_attrs,
+            # Arms the DEFERRED offseason develop: Week-1 TC "Run Training" develops every
+            # player once when this equals current_season, then clears it. Set only by a
+            # real season transition, so a freshly-created franchise (no flag) never
+            # double-develops its generated roster. (See Defer_Offseason_To_Camp_Plan.md.)
+            # NOTE (1b, accepted): total_player_attrs above is now summed off PRE-camp
+            # rosters — bounded impact (relative order ~preserved; ranking weight decays to
+            # 0 by wk5). Revisit if preseason ranking needs post-camp totals.
+            "offseason_dev_pending_season": next_season,
             "prestige": int(existing_ftd.get("prestige", 0) or 0),
             "sos_avg": SOS_AVG_DEFAULT,
             "sos_rank_sum": 0.0,
@@ -16296,6 +16949,10 @@ def finish_season(req: FinishSeasonRequest):
                     "training_reports": state["training_reports"],
                     "coaching_focus": state["coaching_focus"],
                     "total_player_attrs": state["total_player_attrs"],
+                    # Arms the DEFERRED offseason develop at Week-1 TC. MUST be persisted
+                    # here — this $set enumerates fields, so a state-dict-only entry would
+                    # silently never reach the FTD and the develop would never fire.
+                    "offseason_dev_pending_season": state["offseason_dev_pending_season"],
                     "sos_avg": state["sos_avg"],
                     "sos_rank_sum": state["sos_rank_sum"],
                     "sos_games_played": state["sos_games_played"],

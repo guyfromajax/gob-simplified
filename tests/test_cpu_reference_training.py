@@ -5,7 +5,15 @@ on the ladder once quality is live. Bases must also fit the flat player-point
 share after the shared team/breaks footprint. A change to either the reference or a
 base, without re-fitting, breaks a test here instead of silently drifting the
 league. Models the effective allocation as base × mean-focus-amplifier on each
-player's reference top-3 (what player-maximizer-custom produces at CPU scale)."""
+player's reference top-3 (what player-maximizer-custom produces at CPU scale).
+
+⚠️ **THIS NO LONGER DESCRIBES WHAT CPU TEAMS TRAIN (2026-08-12).** CPU auto-train now
+submits ONE team-wide plan (`_cpu_team_allocation`), the same shape a user does, rather
+than a per-position plan per group. `_CPU_REFERENCE_BASE_BY_POS` and
+`_coaching_quality_reference_allocation` survive as the coaching-quality YARDSTICK and are
+still worth locking — but a green run here says nothing about CPU training behaviour, and
+this file kept passing straight through the change that decoupled them. If you are looking
+for what CPU teams actually train, see `projects/cpu_identity_training_design.md`."""
 from BackEnd.utils import player_development as dev
 
 POS = ("PG", "SG", "SF", "PF", "C")

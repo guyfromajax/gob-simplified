@@ -117,5 +117,59 @@ class AssignWalkOnRosterTests(unittest.TestCase):
         self.assertEqual(add, [set_doc["meta.image_id"]])
 
 
+class TestCollectionTruthiness(unittest.TestCase):
+    """Guards a bug class the rest of this suite structurally CANNOT catch.
+
+    `bool(pymongo.Collection)` raises NotImplementedError; `bool(mongomock.Collection)`
+    returns True. Every test here runs on mongomock, so a `not some_collection` check
+    passes locally and throws only in production. That is exactly how
+    `_warm_walk_on_masters` shipped with `not teams_collection` on line 213 — the user
+    team's eager portrait warm never painted a master, and the caller's try/except turned
+    it into a logged traceback nobody read.
+
+    So do not assert against a mock here. Simulate the REAL pymongo contract.
+    """
+
+    class _PymongoLike:
+        """Stands in for pymongo.Collection's refusal to be truth-tested."""
+
+        def __bool__(self):
+            raise NotImplementedError(
+                "Collection objects do not implement truth value testing or bool(). "
+                "Please compare with None instead: collection is not None")
+
+    def test_warm_does_not_truth_test_the_collection(self):
+        """The guard clause must survive a collection that refuses bool()."""
+        from BackEnd.utils.walk_on_roster_identity import _warm_walk_on_masters
+
+        # entries non-empty so the `or` cannot short-circuit before the collection check.
+        # If line 213 ever regresses to `not teams_collection`, this raises instead of
+        # returning, and the failure names the exact contract that was broken.
+        try:
+            painted = _warm_walk_on_masters(
+                franchise_id="f1",
+                franchise_doc=None,
+                team_id="not-an-objectid",
+                entries=[{"player_id": "w1", "image_id": "i1", "team_id": "t1"}],
+                teams_collection=self._PymongoLike(),
+            )
+        except NotImplementedError as e:
+            self.fail(f"truth-tested a Collection instead of comparing to None: {e}")
+        self.assertEqual(painted, 0)
+
+    def test_resolver_does_not_truth_test_the_collection(self):
+        """team_id_resolver had the same bug twice; keep it fixed."""
+        import inspect
+        from BackEnd.utils import team_id_resolver
+
+        src = inspect.getsource(team_id_resolver)
+        self.assertNotIn(
+            "teams_collection_override or teams_collection", src,
+            "`or` calls bool() on a Collection — use an explicit `is not None` ternary")
+        self.assertNotIn(
+            "and collection:", src,
+            "truth-testing a Collection — compare with `collection is not None`")
+
+
 if __name__ == "__main__":
     unittest.main()

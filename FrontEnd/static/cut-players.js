@@ -36,35 +36,67 @@
     return '/franchise-command-center.html?' + params.toString();
   }
 
+  function closeModal() {
+    var backdrop = document.getElementById('cut-modal-backdrop');
+    if (!backdrop) return;
+    backdrop.classList.remove('is-visible');
+    backdrop.setAttribute('aria-hidden', 'true');
+  }
+
   function showModal(config) {
     var backdrop = document.getElementById('cut-modal-backdrop');
     var accent = document.getElementById('cut-modal-accent');
     var title = document.getElementById('cut-modal-title');
     var message = document.getElementById('cut-modal-message');
     var actions = document.getElementById('cut-modal-actions');
+    var pulse = document.getElementById('cut-modal-pulse');
     title.textContent = config.title || 'Assign Practice Squad';
     message.textContent = config.message || '';
     if (accent) {
       accent.className = 'gob-modal-accent';
       accent.classList.add(config.accent || 'is-red');
     }
+    if (pulse) {
+      var showPulse = !!config.pulse;
+      pulse.hidden = !showPulse;
+      pulse.setAttribute('aria-hidden', showPulse ? 'false' : 'true');
+    }
     actions.innerHTML = '';
-    (config.actions || []).forEach(function (action) {
+    var actionList = config.actions || [];
+    actions.hidden = actionList.length === 0;
+    actionList.forEach(function (action) {
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.className = action.variant === 'gob-modal-btn-primary'
         ? 'gob-modal-btn-primary'
         : 'gob-modal-btn-secondary';
       btn.textContent = action.label;
+      btn.disabled = !!action.disabled;
       btn.addEventListener('click', function () {
-        backdrop.classList.remove('is-visible');
-        backdrop.setAttribute('aria-hidden', 'true');
-        if (action.onClick) action.onClick();
+        // Dismiss-only actions close here. Actions with onClick own the next
+        // step (replace modal, navigate, etc.) so Confirm is not dumped back
+        // onto the assign table while the POST is in flight.
+        if (action.onClick) {
+          action.onClick();
+          return;
+        }
+        closeModal();
       });
       actions.appendChild(btn);
     });
     backdrop.classList.add('is-visible');
     backdrop.setAttribute('aria-hidden', 'false');
+  }
+
+  function setSubmitBusy(busy) {
+    var submitBtn = document.getElementById('submit-btn');
+    if (!submitBtn) return;
+    if (busy) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add('is-dead');
+      return;
+    }
+    updateStatus();
   }
 
   function formatAttr(attrs, key) {
@@ -243,6 +275,14 @@
           label: 'Confirm',
           variant: 'gob-modal-btn-primary',
           onClick: function () {
+            setSubmitBusy(true);
+            showModal({
+              title: 'Assigning Practice Squad',
+              message: 'Saving your practice squad assignment…',
+              accent: 'is-green',
+              pulse: true,
+              actions: []
+            });
             fetch(API_CONFIG.buildUrl('/franchise/cut-players'), {
               method: 'POST',
               headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
@@ -262,10 +302,14 @@
               })
               .catch(function (err) {
                 console.error(err);
+                setSubmitBusy(false);
                 showModal({
                   title: 'Assignment Failed',
                   message: 'Unable to assign players to the practice squad.',
-                  actions: [{ label: 'Close', variant: 'gob-modal-btn-secondary' }]
+                  actions: [
+                    { label: 'Close', variant: 'gob-modal-btn-secondary' },
+                    { label: 'Back To Locker Room', variant: 'gob-modal-btn-primary', onClick: navigateBack }
+                  ]
                 });
               });
           }

@@ -93,7 +93,18 @@ Default offense seed behavior:
 - **`zone_defense`**: even split across `zone_23`, `zone_32`, `zone_131`.
 - **`man_defense`**: `man_normal` 100 / `man_tight` 0 / `man_loose` 0 (first-class Base/Deny/Loose Man; `man_pressure` folds to `man_tight` on save).
 - **`position_filters`**: `standard` + `PG/SG/SF/PF/C`, each storing `play_id` arrays (filtered to plays that exist in the universal collection); legacy-curated, not yet metadata-generated.
-- **`pc_order`**: starts empty (`offense: []`, `defense: []`).
+- **`pc_order`**: generic defaults start empty. At franchise creation, only the
+  user team's FTD row is seeded with the Playcall Center package below; all CPU
+  FTD rows remain empty.
+  - offense, slots 1–8: `3-2 Motion`, `4-1 Motion`, `Base Post Play`,
+    `Movement Post Play`, `Iso`, `Pick & Roll - Entry Pass`,
+    `Misdirection Three`, `Double Screen Three - Wing`
+  - defense, slots 1–6: `Base Man`, `Deny Man`, `Loose Man`, `2-3 Zone`,
+    `3-2 Zone`, `1-3-1 Zone`
+  - offense is stored as stable play IDs and defense as canonical playbook
+    defense IDs. The seed does not override team-play metadata: motion plays
+    keep their preset Balanced focus and set plays keep their catalog
+    `target_shooter` positions.
 - **`locks`**: empty per-section lists (Playbooks redesign durable lock state; UI-only arithmetic).
 - **`even_distribution_all`**: macro toggle defaults to `True`.
 

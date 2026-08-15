@@ -35,7 +35,7 @@ This document lists all constants and variables that were previously on the depr
 | Key | Current value | Notes |
 |-----|---------------|--------|
 | `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` | 150 | diff above this → shooting foul |
-| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD` | -50 | diff below this → block |
+| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE` | 70 | Live threshold is `70 + normalized defensive_efficiency`; diff below it → block |
 | `BLOCK_Y_ROLL_MIN` | 0 | Y random range min (block attempt roll) |
 | `BLOCK_Y_ROLL_MAX` | 4 | Y random range max |
 | `BLOCK_FIGHT_RANGE_MIN` | 0 | Z random range min (secondary fight block attempt roll) |
@@ -76,8 +76,8 @@ Used for TEAM_ATTR_CLAMPS (e.g. training, team init). Min/max clamp for generate
 
 | Key | Current value | Notes |
 |-----|---------------|--------|
-| `shot_threshold_min` | **−30** | `BackEnd/constants/shot_threshold_scale.py` — change `MIN` ONLY, everything derives |
-| `shot_threshold_max` | **170** | same; span always 200, mid = min + 100 (**MID 70**) |
+| `shot_threshold_min` | **−10** | `BackEnd/constants/shot_threshold_scale.py` — change `MIN` ONLY, everything derives |
+| `shot_threshold_max` | **190** | same; span always 200, mid = min + 100 (**MID 90**) |
 | `rebound_modifier_min` | 0.0 | |
 | `rebound_modifier_max` | **1.0** | widened from 0.4 in the EOG Structural Pass so the 5-band ladder and training have headroom. Sunset single-game **init** still spreads 0.0-0.4 deliberately. |
 | core-8 clamp | **−20 to 20** | `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier` — widened from ±10 |

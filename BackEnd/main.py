@@ -15,7 +15,6 @@ from BackEnd.constants import (
     BLOCK_PROBABILITY,
     MALLEABLE_ATTRS,
     STRATEGY_CALL_DICTS,
-    TEMPO_PASS_DICT,
     TURNOVER_CALC_DICT,
     POSITION_LIST,
 )

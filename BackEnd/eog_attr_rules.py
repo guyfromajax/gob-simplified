@@ -371,16 +371,19 @@ def rebound_modifier_change(treb, opp_treb, rng=random):
     zero-sum between the two teams, so symmetric bands would net exactly zero
     drift. Returns a 2-decimal delta (cents /100)."""
     diff = treb - opp_treb
-    if diff >= _B.REBOUND_BIG_MARGIN:              # outrebound by >= 8
-        label, band = "outrebound_gt_8", _B.REB_OUTREBOUND_GT_8
-    elif diff >= _B.REBOUND_MID_MARGIN:            # 4..7
-        label, band = "outrebound_4_7", _B.REB_OUTREBOUND_4_7
-    elif diff >= -_B.REBOUND_EVEN_MARGIN:          # within +-3
-        label, band = "within_3", _B.REB_WITHIN_3
-    elif diff > -_B.REBOUND_BIG_MARGIN:            # -7..-4
-        label, band = "outrebounded_4_7", _B.REB_OUTREBOUNDED_4_7
-    else:                                          # outrebounded by >= 8
-        label, band = "outrebounded_gt_8", _B.REB_OUTREBOUNDED_GT_8
+    # Labels carry no numbers on purpose — the margins below are tuned and the old
+    # names (outrebound_gt_8 etc) had drifted to describe thresholds that no longer
+    # existed. Comments state the LIVE values; the constants remain the source.
+    if diff >= _B.REBOUND_BIG_MARGIN:              # >= +14
+        label, band = "reb_dominant", _B.REB_DOMINANT
+    elif diff >= _B.REBOUND_MID_MARGIN:            # +7 .. +13
+        label, band = "reb_strong", _B.REB_STRONG
+    elif diff >= -_B.REBOUND_EVEN_MARGIN:          # -3 .. +6
+        label, band = "reb_even", _B.REB_EVEN
+    elif diff > -_B.REBOUND_BIG_MARGIN:            # -13 .. -4
+        label, band = "reb_weak", _B.REB_WEAK
+    else:                                          # <= -14
+        label, band = "reb_dominated", _B.REB_DOMINATED
     return label, round(_roll(rng, band) / 100.0, 2)
 
 

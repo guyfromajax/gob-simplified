@@ -225,6 +225,13 @@ FLSS_BASKET_X_HOME = 91.0
 FLSS_BASKET_X_AWAY = 9.0
 FLSS_SHOT_WINDOW_GAME_SECONDS = 1.0
 
+# How many already-emitted turns the EOQ preview clone copies privately. The rest
+# of the turn log is shared by reference (see TurnManager._clone_game_for_preview).
+# 12 covers the deepest tail any engine code reads — `turns[-10:]` in the animator
+# and `max_turns=10` in both `_find_most_recent_shot_turn` — with margin, while every
+# in-place mutation of an existing turn writes to `turns[-1]` or `turns[-2]`.
+EOQ_PREVIEW_TURN_TAIL = 12
+
 
 def _flss_basket_x(*, is_home_offense: bool) -> float:
     return FLSS_BASKET_X_HOME if is_home_offense else FLSS_BASKET_X_AWAY

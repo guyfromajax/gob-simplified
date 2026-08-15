@@ -113,6 +113,30 @@ SEEDED_OFFENSE_PLAY_IDS = {
     "695ac732ffd7a778902eb7c7",  # SF Misdirection Three
 }
 
+# New-franchise Playcall Center defaults for the user team only. Keep these as
+# stable catalog ids so display-name punctuation/renames cannot alter slot
+# identity or order. Play-level motion_focus / target_shooter remain the
+# catalog presets copied into the team's ``plays`` field.
+USER_FRANCHISE_PC_OFFENSE_ORDER = [
+    "68fa43953a0eec681847f8e4",  # 3-2 Motion
+    "68f919f9065f78d452557809",  # 4-1 Motion
+    "68fa7cc53a0eec6818481681",  # Base Post Play
+    "695abf8effd7a778902eb447",  # Movement Post Play
+    "695ac373ffd7a778902eb5fe",  # Iso
+    "68fa7b883a0eec68184815dc",  # Pick & Roll - Entry Pass
+    "695ac732ffd7a778902eb7c7",  # Misdirection Three
+    "68fa7c513a0eec681848164f",  # Double Screen Three - Wing
+]
+
+USER_FRANCHISE_PC_DEFENSE_ORDER = [
+    "man_normal",  # Base Man
+    "man_tight",   # Deny Man
+    "man_loose",   # Loose Man
+    "zone_23",     # 2-3 Zone
+    "zone_32",     # 3-2 Zone
+    "zone_131",    # 1-3-1 Zone
+]
+
 POSITION_FILTER_PLAY_IDS = {
     "standard": [
         "68fa43953a0eec681847f8e4",  # 3-2 Motion

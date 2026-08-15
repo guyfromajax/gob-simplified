@@ -237,9 +237,9 @@ Rows: 76px tall, `border-top:1px solid rgba(255,255,255,.055)` (none on `:first-
 |---|---|---|
 | `top10` | National Top 10 | League standings · through week {W} |
 | `key_games` | Upcoming Key Games | Week {W+1} · ranked by combined national rank |
-| `pts` | National Scoring Leaders | Season totals · through week {W} |
-| `treb` | National Rebounding Leaders | Season totals · through week {W} |
-| `ast` | National Assist Leaders | Season totals · through week {W} |
+| `pts` | National Scoring Leaders | Per-game average (one decimal) · through week {W} |
+| `treb` | National Rebounding Leaders | Per-game average (one decimal) · through week {W} |
+| `ast` | National Assist Leaders | Per-game average (one decimal) · through week {W} |
 | `def_pct` | National Defense Leaders | Minimum 6.0 DEFA per game to qualify |
 | `stl` | National Steal Leaders | Season totals · through week {W} |
 | `blk` | National Block Leaders | Season totals · through week {W} |

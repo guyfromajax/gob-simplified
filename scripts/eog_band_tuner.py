@@ -89,9 +89,9 @@ AS_LOGGED = {
     "ST_FG_45_TO_50_LOSS": (0, 5), "ST_FG_LE_45": (5, 10),
     "DISC_BELOW": (1, 2), "DISC_ABOVE": (-2, -1), "DISC_EQUAL": (-1, 0),
     "FIGHT_WIN": (0, 2), "FIGHT_LOSS": (-2, 0),
-    "REB_OUTREBOUND_GT_8": (2, 12), "REB_OUTREBOUND_4_7": (0, 5),
-    "REB_WITHIN_3": (-8, -2), "REB_OUTREBOUNDED_4_7": (-10, -5),
-    "REB_OUTREBOUNDED_GT_8": (-25, -15),
+    "REB_DOMINANT": (2, 12), "REB_STRONG": (0, 5),
+    "REB_EVEN": (-8, -2), "REB_WEAK": (-10, -5),
+    "REB_DOMINATED": (-25, -15),
     "CONC_REWARD_DELTA": (0, 1), "CONC_MIDDLE_DELTA": (-1, 0),
     "CONC_PENALTY_DELTA": (-2, -1), "CONC_ATROPHY_DELTA": (-1, 0),
     "DEF_REWARD_DELTA": (0, 1), "DEF_MIDDLE_DELTA": (-1, 0),
@@ -162,14 +162,14 @@ def band_for(attr, rec, C):
             return None
         d = t - o
         if d >= C["REBOUND_BIG_MARGIN"]:
-            return "outrebound_gt_8", C["REB_OUTREBOUND_GT_8"]
+            return "reb_dominant", C["REB_DOMINANT"]
         if d >= C["REBOUND_MID_MARGIN"]:
-            return "outrebound_4_7", C["REB_OUTREBOUND_4_7"]
+            return "reb_strong", C["REB_STRONG"]
         if d >= -C["REBOUND_EVEN_MARGIN"]:
-            return "within_3", C["REB_WITHIN_3"]
+            return "reb_even", C["REB_EVEN"]
         if d > -C["REBOUND_BIG_MARGIN"]:
-            return "outrebounded_4_7", C["REB_OUTREBOUNDED_4_7"]
-        return "outrebounded_gt_8", C["REB_OUTREBOUNDED_GT_8"]
+            return "reb_weak", C["REB_WEAK"]
+        return "reb_dominated", C["REB_DOMINATED"]
     if attr == "offensive_efficiency":
         if (i.get("total_usage") or 0) <= 0:
             return None

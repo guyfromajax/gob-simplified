@@ -29,7 +29,7 @@ from BackEnd.constants import (
     PAINT_SPOTS,
     PLAYCALL_ATTRIBUTE_WEIGHTS, 
     BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD,
-    BLOCK_RECONCILIATION_BLOCK_THRESHOLD,
+    BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE,
     BLOCK_Y_ROLL_MIN,
     BLOCK_Y_ROLL_MAX,
     BLOCK_FIGHT_RANGE_MIN,
@@ -76,6 +76,7 @@ from BackEnd.utils.shared import (
     increment_motion_attack_shot_tracker,
     format_motion_attack_shot_tracker,
 )
+from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
 from BackEnd.engine.shot_micro_movements import resolve_contest, select_and_stamp_shot_micro
 from BackEnd.utils.defense_utils import (
     defender_player_from_random_slot_fallback,
@@ -100,6 +101,30 @@ INSIDE_SHOT_MID_THRESHOLD_BONUS = -20
 
 # DREB→HCO outlet: rebounder.coords can lag defensive shell vs. actual board (see ball_bounce).
 DREB_OUTLET_PASSER_BOUNCE_MISMATCH_THRESHOLD = 12.0
+
+
+def _block_reconciliation_threshold(defensive_efficiency):
+    """Return the block-band ceiling using the normalized core-8 team value."""
+    return (
+        BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE
+        + core8_gameplay(defensive_efficiency)
+    )
+
+
+def _calculate_defense_block_score(
+    scaled_height,
+    inside_defense,
+    iq,
+    defensive_efficiency,
+    multiplier,
+):
+    """Calculate the defensive reconciliation score from one already-drawn roll."""
+    return (
+        scaled_height * 0.4
+        + inside_defense * 0.4
+        + iq * 0.2
+        + core8_gameplay(defensive_efficiency)
+    ) * multiplier
 
 
 def _hco_zone_shot_threshold_delta(defense_playcall, shot_type):
@@ -1213,10 +1238,18 @@ class ShotManager:
                     def_h = height_to_block_score(def_height_inches)
                     def_scaled_height = (def_h * 10) + random.randint(-9, 9)
                     def_attrs = defender.attributes
-                    defense_block_score = (
-                        def_scaled_height * 0.4 + def_attrs.get("ID", 0) * 0.4 + def_attrs.get("IQ", 0) * 0.2
-                    ) * random.randint(1, 6)
+                    raw_def_eff = def_team.team_attributes.get("defensive_efficiency", 0)
+                    defense_block_score = _calculate_defense_block_score(
+                        def_scaled_height,
+                        def_attrs.get("ID", 0),
+                        def_attrs.get("IQ", 0),
+                        raw_def_eff,
+                        random.randint(1, 6),
+                    )
                     diff = shot_score_pre_defense - defense_block_score
+                    block_reconciliation_threshold = _block_reconciliation_threshold(
+                        raw_def_eff
+                    )
                     if diff > BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD:
                         increment_block_funnel(game_state, "foul_band")
                         # Shooting foul from block: shooter_finish_score vs 250
@@ -1245,9 +1278,12 @@ class ShotManager:
                             self.game_state["one_and_one"] = False
                         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
                         block_recon_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team, perform_removal=False)
-                        shooter.record_stat("FGA")
-                        if is_three:
-                            shooter.record_stat("3PTA")
+                        record_official_field_goal_attempt(
+                            shooter,
+                            made=made_from_foul,
+                            shooting_foul=True,
+                            is_three=is_three,
+                        )
                         # Shot diagnostics (block-recon AND-1 path is always defended).
                         self._record_shot_diagnostics(
                             roles, off_lineup, shot_step_index,
@@ -1357,7 +1393,7 @@ class ShotManager:
                                 result, roles, shooter, off_team,
                             )
                         return result
-                    elif diff < BLOCK_RECONCILIATION_BLOCK_THRESHOLD:
+                    elif diff < block_reconciliation_threshold:
                         increment_block_funnel(game_state, "block_band")
                         is_away_offense = off_team.team_id == self.game.away_team.team_id
                         # Use explicit shot_spot from caller when present (same data as animation); else fall back to shooter.coords
@@ -1707,9 +1743,12 @@ class ShotManager:
                 self.game_state.get("offensive_state"),
                 shot_type,
             )
-        shooter.record_stat("FGA")
-        if is_three:
-            shooter.record_stat("3PTA")
+        record_official_field_goal_attempt(
+            shooter,
+            made=made,
+            shooting_foul=bool(d_foul),
+            is_three=is_three,
+        )
 
         # Shot diagnostics: 2/3pt × defended/undefended × make/miss, + FGA by turn type.
         self._record_shot_diagnostics(
@@ -2342,7 +2381,6 @@ class ShotManager:
                             exclude_player_ids,
                             penalize_player_ids,
                             max_distance_from_bounce=FAST_BREAK_REBOUND_GEO_DISTANCE,
-                            upper_half_distance=FAST_BREAK_REBOUND_GEO_DISTANCE * 0.5,
                             fallback_off_lineup=off_lineup,
                             fallback_def_lineup=def_lineup,
                         )
@@ -2466,7 +2504,6 @@ class ShotManager:
                             bounce_spot,
                             exclude_player_ids,
                             penalize_player_ids,
-                            upper_half_distance=12,
                             fallback_off_lineup=off_lineup,
                             fallback_def_lineup=def_lineup,
                             fallback_start_distance=20,
@@ -3421,7 +3458,6 @@ class ShotManager:
                     bounce_spot,
                     exclude_player_ids,
                     penalize_player_ids,
-                    upper_half_distance=12,
                     fallback_off_lineup={},
                     fallback_def_lineup=defender_lineup,
                     fallback_start_distance=20,

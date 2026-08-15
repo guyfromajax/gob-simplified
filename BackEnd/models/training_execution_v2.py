@@ -196,6 +196,24 @@ def execute_training(
 # Player attributes excluding EM, MO, NG
 TRAINABLE_PLAYER_ATTRS = [attr for attr in ALL_ATTRS if attr not in ["EM", "MO", "NG"]]
 
+
+def training_report_display_bucket(value: Any) -> int:
+    """Return the 0-10 attribute value shown on the Training Report."""
+    try:
+        return int(float(value) // 10)
+    except (TypeError, ValueError, OverflowError):
+        return 0
+
+
+def training_report_display_movement(old_value: Any, new_value: Any) -> int:
+    """Return -1/0/1 when this session moved the displayed attribute tier."""
+    old_display = training_report_display_bucket(old_value)
+    new_display = training_report_display_bucket(new_value)
+    if new_display == old_display:
+        return 0
+    return 1 if new_display > old_display else -1
+
+
 # Player Maximizer (top 3 / attributes 4–6 / custom picks): rank by anchor; CH excluded (team chemistry not a maximizer target)
 PLAYER_MAXIMIZER_RANKING_ATTRS = tuple(a for a in TRAINABLE_PLAYER_ATTRS if a != "CH")
 
@@ -432,7 +450,11 @@ def _scale_install_training_effectiveness_points(
 # net of the ladder), per-attribute movement is visible (~0.5/week |Δ|) because the
 # allocation reallocates toward the high-weight core attrs (RT is their weighted
 # mean, so reallocation moves the player page while barely moving RT).
-IN_SEASON_GAIN_SCALE = 0.18
+IN_SEASON_GAIN_SCALE = 0.28   # free-will recalibration (2026-08): 0.18 → 0.28. Under the
+                              # additive offseason, in-season gains PERSIST (no claw-back), and
+                              # the offseason is now a small remainder, so in-season carries most
+                              # of the career arc. Calibrated so camp + in-season + reduced
+                              # offseason ≈ +20 career RT. See free_will_offseason_work_plan.
 
 # Per-point raw gain bands for player attributes (before year-max adjustment).
 # Points 1–5 MUST be distinct: a prior retune unified 1–3 at (2,4) so reference
@@ -475,7 +497,10 @@ def _apply_scaled_gain_with_remainder(
 
 PRE_TRAINING_DECAY_BY_YEAR = {
     "freshman": (-2, 0),
-    "sophomore": (-2, 0),
+    "sophomore": (-1, 0),   # 2026-08: -2..0 → -1..0. SO carried FR-level decay but (lower
+                            # class-gain + higher starting level) couldn't offset it, so its
+                            # in-season net sat ~5 RT below the other years; this aligns it
+                            # with JR/SR. Only true freshmen keep the widest swing.
     "junior": (-1, 0),
     "senior": (-1, 0),
 }
@@ -496,7 +521,8 @@ def apply_pre_training_conditions(players: List[dict], team: dict) -> Tuple[List
     
     Pre-training conditions:
     - Player attributes (excluding EM, MO, NG): += randint(min, max) per player/attribute,
-      where (min, max) is year-based: Freshman (-5,-1), Sophomore (-4,-1), Junior (-3,0), Senior (-2,0).
+      where (min, max) is year-based: Freshman (-2,0), Sophomore/Junior/Senior (-1,0)
+      (see PRE_TRAINING_DECAY_BY_YEAR — younger swings wider; SO aligned to JR/SR 2026-08).
     - Decay never subtracts below the weight-scaled position floor (framework §10.2).
     
     Args:
@@ -566,7 +592,18 @@ def apply_training_points(
         team_baseline = {k: team.get(k, 0) for k in TEAM_ATTR_CLAMPS.keys()}
     else:
         team_baseline = original_team_baseline
-    
+
+    # Snapshot the PRE-gain fractional remainders (carried in from prior weeks; pre-training
+    # decay does not touch them) so the report delta can reflect the TRUE fractional gain,
+    # not just the whole-integer anchor move. Without this, a sub-1 gain — common at camp
+    # where effective_scale = CAMP_GAIN_SCALE (0.70) × position_fit × class_gain drops an
+    # allocated attr below +1 whole — banks entirely into training_gain_remainders and the
+    # report shows a phantom dash on an attribute the user actually trained.
+    remainder_baselines = {
+        p["_id"]: dict(p.get("training_gain_remainders", {}) or {})
+        for p in players
+    }
+
     archetype, sub_option = parse_coaching_focus(coaching_focus)
     
     # Normalize allocations from frontend structure to flat structure
@@ -787,14 +824,14 @@ def apply_training_points(
     # Handle special team attributes
     # Rebound modifier (from technical_drills rebounding)
     # Docs: Rebounding gives rebound_modifier 0.5 points per drill point.
-    if "technical_drills" in normalized_allocations:
-        rebounding_points = normalized_allocations["technical_drills"].get("rebounding", 0)
-        if rebounding_points is not None:
-            # Convert to effective team-attribute points using 0.5x accrual, then round half-up.
-            effective_points = int((rebounding_points * 0.5) + 0.5)
-            _apply_rebound_modifier_training(
-                team, effective_points, archetype, sub_option, source="technical_drills"
-            )
+    # rebound_modifier is applied ONCE from the COMBINED rebounding + scrimmages allocation.
+    # See _apply_rebound_modifier_training for why (double-fire + phantom scrimmages=0 penalty).
+    _reb_pts = int(normalized_allocations.get("technical_drills", {}).get("rebounding", 0) or 0)
+    _scrim_for_reb = normalized_allocations.get("scrimmages", 0)
+    _reb_pts += int(_scrim_for_reb or 0) if isinstance(_scrim_for_reb, int) else 0
+    _apply_rebound_modifier_training(
+        team, _reb_pts, archetype, sub_option, source="combined"
+    )
     
     # Handle scrimmages (if scrimmages category exists in allocations)
     # Scrimmages: Team Chemistry (0.5x multiplier), Shot Threshold (1 point), Rebounding (0.5x)
@@ -808,11 +845,8 @@ def apply_training_points(
                     team_attr_contributions[team_attr] += scrimmage_points * mult
             # Apply to Shot Threshold (decreases)
             _apply_shot_threshold_training(team, scrimmage_points, archetype, sub_option)
-            # Apply to Rebounding (rebound_modifier) with 0.5x accrual, rounded half-up.
-            effective_points = int((scrimmage_points * 0.5) + 0.5)
-            _apply_rebound_modifier_training(
-                team, effective_points, archetype, sub_option, source="scrimmages"
-            )
+            # rebound_modifier is NOT applied here — it is handled once above from the
+            # combined rebounding + scrimmages total.
     
     # Apply team attribute contributions from multipliers
     # Sum all contributions, round (0.5 rounds up, <0.5 rounds down), then apply
@@ -889,21 +923,35 @@ def apply_training_points(
     
     # Calculate changes for training report
     player_changes = {}
+    player_attribute_display_movements = {}
     for player in players:
         pid = player["_id"]
         name = f"{player.get('first_name', '')} {player.get('last_name', '')}".strip()
         changes = {}
+        display_movements = {}
+        rem_now = player.get("training_gain_remainders", {}) or {}
+        rem_base = remainder_baselines.get(pid, {})
         for attr in TRAINABLE_PLAYER_ATTRS:
             old_val = player_baselines[pid].get(attr, 0)
             new_val = player.get("attributes", {}).get(f"anchor_{attr}", 0)
-            delta = new_val - old_val
+            # True gain = whole-anchor move + net change in the banked fraction, so a sub-1
+            # camp gain (banked, anchor unmoved) reports as e.g. +0.6 → one green arrow
+            # instead of a phantom dash. Rounded to 2dp to keep storage/float noise clean.
+            old_rem = float(rem_base.get(attr, 0.0) or 0.0)
+            new_rem = float(rem_now.get(attr, 0.0) or 0.0)
+            delta = round((new_val + new_rem) - (old_val + old_rem), 2)
             if delta != 0:
                 changes[attr] = delta
+            display_movement = training_report_display_movement(old_val, new_val)
+            if display_movement:
+                display_movements[attr] = display_movement
         if changes:
             yr = player.get("year")
             if yr is not None and str(yr).strip():
                 changes["year"] = str(yr).strip().lower()
             player_changes[name] = changes
+        if display_movements:
+            player_attribute_display_movements[name] = display_movements
     
     team_changes = {}
     for attr_name in TEAM_ATTR_CLAMPS.keys():
@@ -932,6 +980,7 @@ def apply_training_points(
     
     training_report = {
         "player_changes": player_changes,
+        "player_attribute_display_movements": player_attribute_display_movements,
         "team_changes": team_changes,
         "coaching_focus": {
             "archetype": archetype,
@@ -1248,21 +1297,35 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
         sub_option: Optional coaching focus sub-option
         source: "technical_drills" or "scrimmages" - determines which range to use
     
-    Technical Drills / Scrimmages ranges (in 0.01 increments).
-    - <1 effective point: -0.05 to -0.03
-    - 1-2 effective points: +0.03 to +0.05
-    - 3-4 effective points: +0.03 to +0.07
-    - 5+ effective points: +0.03 to +0.10
+    ``points`` is the COMBINED rebounding + scrimmages allocation, applied ONCE.
+
+    Previously this ran TWICE a week — once from technical_drills.rebounding and once from
+    scrimmages — each with its own band roll, and each halving its own input first. Two
+    problems fell out of that:
+      * ~80% of team-weeks had scrimmages=0, and that call still fired, hitting the <1 band
+        for -0.04 EVERY WEEK. A penalty for not scrimmaging, on a 1.0-wide scale.
+      * halving each source separately then rolling twice is not the same as summing once;
+        the double roll doubled the step size.
+    The halving is also gone: at realistic allocations (rebounding ~1.5 + scrimmages 1) it
+    never changed which band was selected, so it was an invisible discount that only
+    surprised anyone allocating heavily. Bands below are cut for UN-halved combined points.
+
+    Ranges re-cut 2026-08-14 for the single un-halved application (0.01 increments):
+    - 0 points:    -0.03 to -0.01
+    - 1-2 points:  +0.005 to +0.02
+    - 3-4 points:  +0.01 to +0.03
+    - 5+ points:   +0.02 to +0.05
+    At the league's typical 2-3 combined points this nets ~+0.17/season against the EOG
+    ladder's -0.35, landing near the 0.5 init instead of railing at 1.0.
     """
-    # Both technical drills and scrimmages use the same effective-point tuning.
     if points < 1:
-        increase = random.randint(-5, -3) / 100.0
+        increase = random.randint(-3, -1) / 100.0
     elif points in (1, 2):
-        increase = random.randint(3, 5) / 100.0
+        increase = random.randint(1, 4) / 200.0     # +0.005 .. +0.02
     elif points in (3, 4):
-        increase = random.randint(3, 7) / 100.0
+        increase = random.randint(1, 3) / 100.0
     else:
-        increase = random.randint(3, 10) / 100.0
+        increase = random.randint(2, 5) / 100.0
     
     final_increase = increase
     

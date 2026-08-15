@@ -35,6 +35,7 @@ from BackEnd.utils.fb_geo_helpers import (
     stamp_fb_miss_bounce_coords,
 )
 from BackEnd.utils.shared import apply_scoring, get_name_safe
+from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
 from BackEnd.utils.position_snapshot_ledger import attach_position_snapshots, build_fast_break_pre_shot_snapshot
 
 
@@ -428,8 +429,12 @@ def resolve_attack_drive_finisher_turn(
         d_foul = shot["d_foul"]
         rebound_type = rebound_ball_spot = rebound_attemptors = rebounder_pid = None
         pressure_type = None
+        record_official_field_goal_attempt(
+            shot_shooter,
+            made=made,
+            shooting_foul=bool(d_foul),
+        )
         if made:
-            shot_shooter.record_stat("FGA")
             apply_scoring(game, off_team, shot_shooter, 2, ["FGM"])
             shot_shooter.record_stat("FB_PTS", amount=2)
             text_tail = "and scores!"
@@ -446,7 +451,6 @@ def resolve_attack_drive_finisher_turn(
                     pressure_type = "HCO"
                 game_state["offensive_state"] = pressure_type or "HCO"
         else:
-            shot_shooter.record_stat("FGA")
             possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid = (
                 _resolve_rebound_on_miss(
                     game=game,
@@ -542,8 +546,12 @@ def resolve_attack_drive_finisher_turn(
     d_foul = shot["d_foul"]
     rebound_type = rebound_ball_spot = rebound_attemptors = rebounder_pid = None
     pressure_type = None
+    record_official_field_goal_attempt(
+        shooter,
+        made=made,
+        shooting_foul=bool(d_foul),
+    )
     if made:
-        shooter.record_stat("FGA")
         apply_scoring(game, off_team, shooter, 2, ["FGM"])
         shooter.record_stat("FB_PTS", amount=2)
         text_tail = "and finishes!"
@@ -558,7 +566,6 @@ def resolve_attack_drive_finisher_turn(
                 pressure_type = "HCO"
             game_state["offensive_state"] = pressure_type or "HCO"
     else:
-        shooter.record_stat("FGA")
         possession_flips, rebound_type, rebound_ball_spot, rebound_attemptors, rebounder_pid = (
             _resolve_rebound_on_miss(
                 game=game,

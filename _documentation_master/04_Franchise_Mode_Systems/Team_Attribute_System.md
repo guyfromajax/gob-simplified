@@ -1,11 +1,11 @@
 # Team Attribute Management System (**verified 2026-06-13**)
 
-> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise **creation**: attr `(-2,0)`, `team_chemistry` 8-11, `rebound_modifier` 0.5 fixed, `shot_threshold` 65-75; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). **Season rollover** (new season in an existing franchise) does NOT carry team_attributes: non-core fields re-init like creation and the 8 core attrs re-roll on a carryover-scaled range — see § Season Rollover Re-Roll. All franchise games now use the full turn-by-turn engine and the normal usage/scouting-driven EOG rules. **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
+> Verified vs code — **substance accurate**. `init_team_attributes` mode ranges match `team_manager.py` exactly (franchise **creation**: attr `(-2,0)`, `team_chemistry` 8-11, `rebound_modifier` 0.5 fixed, `shot_threshold` 85-95; single/tournament-fallback: attr `(-10,10)`, chemistry 7-25, rebound 0.0-0.4, shot_threshold from `TEAM_ATTR_RANGES`). **Season rollover** (new season in an existing franchise) does NOT carry team_attributes: non-core fields re-init like creation and the 8 core attrs re-roll on a carryover-scaled range — see § Season Rollover Re-Roll. All franchise games now use the full turn-by-turn engine and the normal usage/scouting-driven EOG rules. **Note:** Single Game & Tournament mode ranges are documented for completeness but those modes are **(sunset)**; franchise is the live path.
 
 ## Base Constants
 
 1. **Core Team Attributes**:
-   - `shot_threshold` - Shot attempt threshold (range: −30 to 170; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+   - `shot_threshold` - Shot attempt threshold (range: −10 to 190; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
    - `discipline` - Turnover modifier (formerly `turnover_modifier`)
    - `fight` - Foul modifier (formerly `foul_modifier`)
    - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-1.0)
@@ -49,7 +49,7 @@ The Team Attribute Management System handles the initialization, storage, and up
 All team attributes are stored in team objects across all game modes:
 
 **Core Attributes:**
-- `shot_threshold` - Shot attempt threshold (range: −30 to 170, center at 70 for pill display; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+- `shot_threshold` - Shot attempt threshold (range: −10 to 190, center at 90 for pill display; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
 - `discipline` - Turnover modifier (formerly `turnover_modifier`)
 - `fight` - Foul modifier (formerly `foul_modifier`)
 - `rebound_modifier` - Rebound effectiveness modifier (range: 0.0-1.0, center at 0.5 for pill display)
@@ -72,14 +72,14 @@ All team attributes are stored in team objects across all game modes:
 **Single Game & Tournament Mode:**
 - Attribute range: `random.randint(-10, 10)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `shot_threshold`: `random.randint(0, 200)` (from `TEAM_ATTR_RANGES`; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+- `shot_threshold`: `random.randint(-10, 190)` (from `TEAM_ATTR_RANGES`; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
 - `team_chemistry`: `random.randint(7, 25)`
 - `rebound_modifier`: `random.randint(0, 40) / 100.0` (random 0.0-0.4 in 0.01 increments)
 
 **Franchise Mode (creation):**
 - Attribute range: `random.randint(-2, 0)` for:
   - `discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`
-- `shot_threshold`: `random.randint(65, 75)` (MID ± 5; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
+- `shot_threshold`: `random.randint(85, 95)` (MID ± 5; see [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md))
 - `team_chemistry`: `random.randint(8, 11)` — **8, not 7**: the clamp FLOOR is 7, so a team rolled at 7 starts pinned and cannot register a loss until it first wins. 21% of the league began on the floor before this change.
 - `rebound_modifier`: `0.5` (fixed — the MIDPOINT of the 0.0-1.0 clamp, giving symmetric headroom. At 0.2 with the old EOG ladder, 93 of 128 teams hit 0.0 by week 3.)
 
@@ -91,7 +91,7 @@ All team attributes are stored in team objects across all game modes:
 
 When an existing franchise advances to a new season, `finish_season` (`BackEnd/api/franchise_routes.py`) **re-rolls** each team's `team_attributes` — nothing carries over. Implemented by `TeamManager.init_franchise_rollover_team_attributes(carryover_count)` (`team_manager.py`).
 
-- **Non-core fields** re-init exactly like franchise creation: `shot_threshold` `randint(65,75)`, `rebound_modifier` `0.5`, `team_chemistry` `randint(8,11)`, `momentum_score`/`distant_win_streak`/`distant_loss_streak` `0`.
+- **Non-core fields** re-init exactly like franchise creation: `shot_threshold` `randint(85,95)`, `rebound_modifier` `0.5`, `team_chemistry` `randint(8,11)`, `momentum_score`/`distant_win_streak`/`distant_loss_streak` `0`.
 - **The 8 core attrs** (`discipline`, `fight`, `offensive_efficiency`, `defensive_efficiency`, `fb_efficiency`, `pt_efficiency`, `fb_opp_modifier`, `pt_opp_modifier`) re-roll with `randint(lo, hi)` where `(lo,hi)` is scaled by **carryover count**.
 
 **Carryover count** = returning players from the prior season (active roster **+** training/practice squad, graduating seniors excluded), counted **before** this season's signed recruits are added. Source: `len(returning_players_by_team[team_id])`.
@@ -165,7 +165,7 @@ Franchise FTD team attributes update in two places: **EOG** (`update_team_attrib
 | **Fight** | **Up** if win (**0…+2**); **down** if lose (**−2…0**) | Margin does not change fight; only W/L. **Nets structurally zero league-wide** — one winner per game — so fight's season drift is entirely training-driven. |
 | **Discipline** | Buffered comparison | **+1…+2** if your **F + TO** < opponent **F + TO + 8**; **−3…−1** if higher; **−1…0** if equal. |
 | **Team chemistry** | Rank-relative | Beat lower-ranked **0…+2**; beat higher non-top-10 **+1…+3**; beat top-10 **+2…+5**. Lose to top-10 **0…+1**; lose to higher non-top-10 **−1…+1**; lose to rank 100-128 **−4…−2**; lose to other lower **−2…−1**. Lifted across the board — the old ladder floored **all 128 teams by week 2**. |
-| **Shot threshold** | Golf score | **FG% > 40** → **−6…−2** both. **FG% > 26 and ≤ 40** → winner **−1…0**, loser **0…+1**. **FG% ≤ 26** → **+2…+6** both. ⚠️ **SCALE-COUPLED** — valid only for the current −30…170 window; every `MIN` change requires a re-cut. |
+| **Shot threshold** | Golf score | **FG% > 37** → **−6…−2** both. **FG% > 22 and ≤ 37** → winner **−1…0**, loser **0…+1**. **FG% ≤ 22** → **+2…+6** both. ⚠️ **SCALE-COUPLED** — valid only for the current −10…190 window; every `MIN` change requires a re-cut. |
 | **Rebound modifier** | 5-band ladder (cents /100) | Outrebound by **≥14** → **+0.04…+0.14**; **7–13** → **0.00…+0.06**; **−3…+6** → **−0.03…+0.03**; outrebounded **4–13** → **−0.08…−0.02**; **≥14** → **−0.12…−0.04**. Asymmetric on purpose: rebound differential is zero-sum, so symmetric bands net zero drift. |
 
 Full band definitions, thresholds and the reasoning behind each re-cut live in
@@ -297,23 +297,23 @@ neglect gates above are calibrated for the neglect case only.
 - **Training amplifiers:** Matching coaching focus can amplify positive training gains. `breaks` can also multiply positive session gains; it directly adds extra changes to `team_chemistry`, `discipline`, and `fight` at 3+ points.
 - **CPU teams:** When the user runs training, eligible non-user teams run the shared `execute_training` engine with generated allocations and coaching focus. Per-team retries are guarded by `cpu_autotrain_week`.
 
-### Shooting (`shot_threshold`) (range: −30 to 170)
+### Shooting (`shot_threshold`) (range: −10 to 190)
 
 This is the team's intangible mindset to convert baskets. Their overall belief in their identity as a basketball team who scores points. This is a compounding attribute, it compounds both upward and downward, based on the team's in-game performance and training activities.
 
-**Scale reference (−30–170, MID 70):** To change the scale, see **[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)** (agent workflow + manual checklist).
+**Scale reference (−10–190, MID 90):** To change the scale, see **[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)** (agent workflow + manual checklist).
 
 | Area | Current value |
 |------|---------------|
-| Team attribute clamp (`TEAM_ATTR_RANGES`) | **−30 – 170** |
-| Franchise init | **65 – 75** (MID ± 5) |
-| Tournament seeds | 1: **0–100** · 2–4: **0–150** · 5–7: **50–200** · 8: **100–200** |
-| Score balancing (one turn) | Trailing **−20**, leading **180** (`MIN−20` / `MAX−20`) |
-| Rim-runner corner FB | **180 − fb_efficiency** |
-| FTE tutorial | User **0**, computer **100** |
-| UI pills | Center **100**, span **0–200** → FCC, training report, tournament, court, box score |
+| Team attribute clamp (`TEAM_ATTR_RANGES`) | **−10 – 190** |
+| Franchise init | **85 – 95** (MID ± 5) |
+| Tournament seeds | 1: **−10–90** · 2–4: **−10–140** · 5–7: **40–190** · 8: **90–190** |
+| Score balancing (one turn) | Trailing **−30**, leading **170** (`MIN−20` / `MAX−20`) |
+| Rim-runner corner FB | **170 − fb_efficiency** |
+| FTE tutorial | User **−10**, computer **90** |
+| UI pills | Center **90**, span **−10–190** → FCC, training report, tournament, court, box score |
 
-- Initial seed: Franchise creation / missing-FTD creation (`range: 80 to 90`, random). Season rollover re-inits identically (does not carry over).
+- Initial seed: Franchise creation / missing-FTD creation (`range: 85 to 95`, random). Season rollover re-inits identically (does not carry over).
 - Faucet: Training System / Scrimmages.
   Condition: `scrimmages` slider at `0`.
   Range: `0 pts -> +5 to +15` (worse shooting attribute).

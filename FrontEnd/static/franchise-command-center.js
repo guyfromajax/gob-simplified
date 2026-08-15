@@ -1627,6 +1627,9 @@ function formatLeaderValue(category, value) {
     return `${Number.isFinite(numeric) ? numeric.toFixed(1) : '0.0'}%`;
   }
   const numeric = Number(value);
+  if (category === 'PTS' || category === 'REB' || category === 'AST') {
+    return Number.isFinite(numeric) ? numeric.toFixed(1) : '0.0';
+  }
   return Number.isFinite(numeric) ? numeric.toFixed(1).replace(/\.0$/, '') : String(value);
 }
 
@@ -2382,7 +2385,7 @@ function renderLeaders(data, scope) {
       const teamCell = document.createElement('td');
       teamCell.textContent = p.team;
       const valueCell = document.createElement('td');
-      valueCell.textContent = p.value;
+      valueCell.textContent = formatLeaderValue(cat, p.value);
       
       // Apply bold and color if user team player
       if (isUserTeam && primaryColor) {

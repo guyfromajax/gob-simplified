@@ -383,7 +383,7 @@ class TeamManager:
             # Computer teams derive a strategic game plan from their projected starting five;
             # user teams keep the legacy random defaults (never auto-set).
             #
-            # CPU TEAM IDENTITY (spec: projects/cpu_team_identity_spec.md). The projected five
+            # CPU TEAM IDENTITY (design: projects/cpu_identity_design.md). The projected five
             # now yields eight frozen-scale signals -> a vision pair -> the slider draw, instead
             # of the old per-slider _strategy_roll_* thresholds. Those thresholds were dead in
             # practice: cum_nd > 350 matched 0 of 128 teams, so the branch that raised

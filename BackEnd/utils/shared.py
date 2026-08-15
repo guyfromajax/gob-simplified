@@ -19,6 +19,7 @@ from BackEnd.constants import (
     HCO_STRING_SPOTS,
     OREB_REBOUND_SCORE_DISCOUNT,
     REBOUND_TEAM_CHEMISTRY_FACTOR,
+    REBOUND_DISTANCE_SCALE,
     CHARGE_THRESHOLD,
     BLOCKING_FOUL_THRESHOLD,
     PASS_GRID_SPOTS_PER_GAME_SECOND,
@@ -1180,7 +1181,13 @@ def resolve_offensive_rebound(game, rebounder):
             defender_distance=nearest_distance,
             contest_factor=putback_proximity_factor,
         )
-        rebounder.record_stat("FGA")
+        from BackEnd.utils.field_goal_attempt import record_official_field_goal_attempt
+
+        record_official_field_goal_attempt(
+            rebounder,
+            made=made,
+            shooting_foul=bool(d_foul),
+        )
 
         # Shot_Result_List: record make (True) / clean miss (False); skip a miss
         # that drew a shooting foul (Player_Momentum_System.md).
@@ -1367,7 +1374,6 @@ def resolve_offensive_rebound(game, rebounder):
                 exclude_player_ids,
                 penalize_player_ids,
                 max_distance_from_bounce=NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE,
-                upper_half_distance=NEAR_BOUNCE_REBOUND_ATTEMPTOR_DISTANCE * 0.5,
                 offense_candidate_lineup=off_lineup,
                 defense_candidate_lineup=def_lineup,
             )
@@ -1729,7 +1735,6 @@ def select_rebounder_by_score(
     penalize_player_ids=None,
     *,
     max_distance_from_bounce=None,
-    upper_half_distance=12,
     fallback_off_lineup=None,
     fallback_def_lineup=None,
     fallback_start_distance=20,
@@ -1739,7 +1744,8 @@ def select_rebounder_by_score(
 
     Eligibility is still owned by the caller/path. This helper evaluates every
     player left in those pools instead of first reducing each team to the
-    closest player.
+    closest player. Distance to the bounce scales the score smoothly via
+    ``1 / (1 + distance / REBOUND_DISTANCE_SCALE)``.
     """
     exclude_player_ids = exclude_player_ids or set()
     penalized = {str(pid) for pid in (penalize_player_ids or set()) if pid is not None}
@@ -1773,16 +1779,15 @@ def select_rebounder_by_score(
         winner = entries[0]
         return winner["player"], winner["team"], winner["stat"]
 
-    upper_count = sum(1 for entry in entries if entry["distance"] <= float(upper_half_distance))
-    lower_half_discount = 0.7 if upper_count >= 2 else 0.95
-
+    distance_scale = float(REBOUND_DISTANCE_SCALE) if REBOUND_DISTANCE_SCALE else 8.0
     off_team_id = getattr(off_team, "team_id", None)
     for entry in entries:
         player = entry["player"]
         team = entry["team"]
         value = calculate_rebound_score(player) + _team_rebound_bonus(team)
-        if entry["distance"] > float(upper_half_distance):
-            value *= lower_half_discount
+        # Smooth distance discount — closer to bounce → stronger score; replaces
+        # the former blunt upper-/lower-half multiplier.
+        value *= 1.0 / (1.0 + float(entry["distance"]) / distance_scale)
         # Offensive rebounders are discounted — defense's box-out / positioning edge on a
         # miss (otherwise offense and defense were scored equally). See OREB_REBOUND_SCORE_DISCOUNT.
         if off_team_id is not None and getattr(team, "team_id", None) == off_team_id:
@@ -2049,7 +2054,6 @@ def determine_rebounder(
     *,
     max_x_delta_from_bounce=None,
     max_distance_from_bounce=None,
-    upper_half_distance=12,
     offense_candidate_lineup=None,
     defense_candidate_lineup=None,
 ):
@@ -2067,9 +2071,6 @@ def determine_rebounder(
         max_distance_from_bounce: If set, only players within this Euclidean
             radius are initial candidates. If none qualify, the radius expands
             by 5 until at least one candidate exists.
-        upper_half_distance: Euclidean distance threshold for upper-half
-            rebounder scoring. Players outside it receive the lower-half
-            discount.
         offense_candidate_lineup / defense_candidate_lineup: Optional position-keyed
             candidate pools supplied by path-specific logic before winner
             selection. Defaults to the active offense/defense lineups.
@@ -2143,7 +2144,6 @@ def determine_rebounder(
             exclude_player_ids,
             penalize_player_ids,
             max_distance_from_bounce=max_distance_from_bounce,
-            upper_half_distance=upper_half_distance,
             fallback_off_lineup=fallback_off_lineup,
             fallback_def_lineup=fallback_def_lineup,
             fallback_start_distance=20,

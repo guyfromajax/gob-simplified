@@ -55,7 +55,7 @@ triple from the player's highest current RT, not from `training_position`.
    - week 20 special case: if no recruiting orders have ever been saved, training is blocked until the user saves recruiting orders
 7. **Data Auto-Population**: Backend initializes `plays_data` and `scouting_data` if missing; `execute_training` merges any legacy `scouting_data.defense` row keys onto canonical `defense_id` keys before baselines (same remap as gameplay). **Defense and offensive play CMD effectiveness decay from game usage share runs at franchise EOG only** (`End_Of_Game_System.md`); not during training.
 8. **Pre-Training Conditions**: Random decreases applied to player attributes (excluding EM, MO, NG); team attributes are no longer decayed here (**skipped on camp weeks**: `is_camp_week(week)` → `skip_pre_training_depreciation=True`)
-9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points (camp uses `CAMP_GAIN_SCALE=1.4`; in-season uses `IN_SEASON_GAIN_SCALE=0.18`)
+9. **Training Point Application**: Drill allocations mapped to attributes, random increases applied based on points (camp uses `CAMP_GAIN_SCALE=0.70`; in-season uses `IN_SEASON_GAIN_SCALE=0.28`)
 10. **Coaching Focus Amplifiers**: Selected focus amplifies specific attribute gains
 11. **Attribute Clamping**: All values clamped to valid ranges (see **Attribute_Clamp_System.md** for player and team clamp ranges); decay/gains also respect weight-scaled position floors
 12. **Weeks 20-26 Recruiting Invite Processing**: During recruiting invite season, `Submit Training` also runs that week's recruiting invite processing using the user's saved recruiting orders plus CPU weekly recruiting logic
@@ -67,7 +67,7 @@ triple from the player's highest current RT, not from `training_position`.
 
 While training runs, `PageLoadOverlay` uses its separate `newswire` variant to rotate neutral national league graphics. The retired archetype loading-feed generator is no longer produced or returned by training APIs.
 
-- `GET /franchise/league-news` consolidates the national Top 10, current-week key games, and eight qualified leaderboards into pre-ranked lists of exactly ten. In Week 4, standings and leaders are through Week 3 while Key Games are Week 4.
+- `GET /franchise/league-news` consolidates the national Top 10, current-week key games, and eight qualified leaderboards into pre-ranked lists of exactly ten. Points, rebounds, and assists are ranked and displayed as per-game averages with one decimal; the other five boards retain their existing measures. In Week 4, standings and leaders are through Week 3 while Key Games are Week 4.
 - Week 1 uses the preseason deck: program-rank Top 10 and season marquee matchups. Preseason Top 10 rows intentionally have no trailing record.
 - `training.js` prefetches and session-caches the payload by franchise, season, and week. At submit, the news request and training request proceed independently.
 - A pending news request shows only the header and green “Training in progress” pulse. A rejected request falls back to the existing team-banner pulse variant.
@@ -198,7 +198,7 @@ While training runs, `PageLoadOverlay` uses its separate `newswire` variant to r
 
 ### Position fit and class taper
 
-Position fit and class affect **gain, never price**. They are stored directly as percentages in `TRAINING_GAIN_PERCENTAGES` and `CLASS_GAIN_PERCENTAGES`; there is no cost matrix or reciprocal derivation. Class rates are FR 100%, SO ~91%, JR 80%, SR ~71%. The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`.
+Position fit and class affect **gain, never price**. They are stored directly as percentages in `TRAINING_GAIN_PERCENTAGES` and `CLASS_GAIN_PERCENTAGES`; there is no cost matrix or reciprocal derivation. Class rates are FR 100%, SO 91%, JR 95%, SR 100% (JR/SR raised from 80/71 on 2026-08-14 — flat decay was making upperclassmen regress in-season; the bump flips JR/SR net positive without touching FR/SO or decay). The execution path applies `session_gain_scale × position_fit × class_gain` to the raw positive roll **before** splitting whole gain from `training_gain_remainders`.
 
 This moved the fractional component off the budget so the user always sees and spends whole points while retaining the original cross-position granularity. Shape floors and `resolve_training_position()` are unchanged.
 
@@ -272,7 +272,7 @@ The training execution system applies pre-training conditions, allocates trainin
 2. **Training Point Application** (`apply_training_points`)
    - Maps drill allocations to player/team attributes
    - Applies random increases based on points allocated
-   - Scales positive gains by `CAMP_GAIN_SCALE` (1.4) on camp weeks or `IN_SEASON_GAIN_SCALE` (0.18) in-season; the per-attribute fractional remainder is loaded from and persisted back to FPD after both user and CPU training
+   - Scales positive gains by `CAMP_GAIN_SCALE` (0.70) on camp weeks or `IN_SEASON_GAIN_SCALE` (0.28) in-season; the per-attribute fractional remainder is loaded from and persisted back to FPD after both user and CPU training
    - Applies coaching focus amplifiers
    - Handles special cases (conditioning, film study, breaks)
 
@@ -300,7 +300,7 @@ The training execution system applies pre-training conditions, allocates trainin
 - Outside Defense → OD, (Discipline: 0.25 points)
 - Ball Handling → BH, (Discipline: 0.25 points)
 - Passing → PS, (Discipline, 0.25 points)
-- Rebounding → RB (Rebound Modifier: 0.5 points)
+- Rebounding → RB, (Rebound Modifier: combined with Scrimmages, no accrual — see below)
 - Strength Training → ST, (Fight, 0.5 points)
 - Agility Training → AG
 - Free Throws → FT, (Team Chemistry: 0.25 points)
@@ -314,7 +314,8 @@ The training execution system applies pre-training conditions, allocates trainin
 - Fast Break Defense Install → `fb_opp_modifier`
 - P/T Defense Install → `pt_efficiency`
 - P/T Offense Install → `pt_opp_modifier`
-- Scrimmages → Team Chemistry: 0.25 points, Shot Threshold: 1 point, Rebound Modifier: 0.5 points, NG Reduction (if 3-5 points)
+- Scrimmages → Team Chemistry: 0.25 points, Shot Threshold: 1 point, NG Reduction (if 3-5 points)
+- Rebound Modifier ← **Technical-Drills Rebounding + Scrimmages COMBINED**, applied once (see below)
 
 #### Training Point Ranges
 
@@ -326,7 +327,7 @@ The training execution system applies pre-training conditions, allocates trainin
 - 4 points: `+= random.randint(3, 5)`
 - 5 points: `+= random.randint(3, 6)`
 
-Positive gains are then scaled by `IN_SEASON_GAIN_SCALE` (0.18) or `CAMP_GAIN_SCALE` (camp), with a per-attribute fractional remainder (`training_gain_remainders`) so sub-integer signal accumulates across weeks instead of rounding away. The sidecar is read from and written to each franchise player document, never the core player, and is carried through season rollover. Attribute and anchor values remain integers.
+Positive gains are then scaled by `IN_SEASON_GAIN_SCALE` (0.28) or `CAMP_GAIN_SCALE` (0.70 at camp), with a per-attribute fractional remainder (`training_gain_remainders`) so sub-integer signal accumulates across weeks instead of rounding away. The sidecar is read from and written to each franchise player document, never the core player, and is carried through season rollover. Attribute and anchor values remain integers.
 
 **High Attribute Gain Reduction**
 - If a player's starting value for a trained attribute at the beginning of the training session is `> 100`, any positive gain to that attribute is reduced by `50%`, using rounded integer value.
@@ -342,8 +343,8 @@ Leave minimums as is, only change maximums
 - **Senior**: 0 to min, 1 to max
 
 **Year-Based Pre-Training Decay** (code: `PRE_TRAINING_DECAY_BY_YEAR` in `training_execution_v2.py`; applied only when `skip_pre_training_depreciation` is false — i.e. skipped for training camp):
-- **Freshman / Sophomore**: -2 min, 0 max
-- **Junior / Senior**: -1 min, 0 max
+- **Freshman**: -2 min, 0 max
+- **Sophomore / Junior / Senior**: -1 min, 0 max (SO aligned to JR/SR 2026-08 — it carried FR-level decay it couldn't offset, sinking its in-season net ~5 RT below the other years)
 
 **Training Camp (what it actually is today)**
 
@@ -351,7 +352,7 @@ Training camp is **not** a separate growth event. It is the same `execute_traini
 
 1. **Pre-training decay is skipped** (`skip_pre_training_depreciation=True` via `is_camp_week`).
 2. **Flat point budget is 30** (`CAMP_POINT_BUDGET`) instead of 24.
-3. **Gain scale is `CAMP_GAIN_SCALE` (1.4)** instead of `IN_SEASON_GAIN_SCALE` (0.18).
+3. **Gain scale is `CAMP_GAIN_SCALE` (0.70)** instead of `IN_SEASON_GAIN_SCALE` (0.28).
 4. **Camp cuts** run once after week 1 (`week == CAMP_WEEKS`).
 
 There is **no** camp-only CH/core-attribute bonus, **no** year-based camp bonus roll, and **no** camp HT/WT growth. Those used to exist; they were removed when the offseason development event took ownership of career physical/level growth (see comment in `apply_training_points` — `training_camp_physique_notes` is always empty). Height and weight growth live in `develop_one_offseason` at season rollover, not at camp.
@@ -369,17 +370,34 @@ There is **no** camp-only CH/core-attribute bonus, **no** year-based camp bonus 
   `0 -> -3 to -1`, `1 -> 0 to +1`, `2 -> +1 to +2`, `3 -> +2 to +3`, `4 -> +2 to +4`, `5 -> +2 to +5`
   - Free Throws × **0.25** + Film Study × **0.25** + Scrimmages × **0.25**, half-up → `_apply_team_training_points(..., "team_chemistry", ...)`.
 
-**Rebound Modifier (Technical Drills - in 0.01 increments):**
-- `<1 effective point -> -0.05 to -0.03`
-- `1-2 effective points -> +0.03 to +0.05`
-- `3-4 effective points -> +0.03 to +0.07`
-- `5+ effective points -> +0.03 to +0.10`
+**Rebound Modifier — ONE application from the COMBINED total (in 0.01 increments):**
 
-**Rebound Modifier (Scrimmages - in 0.01 increments):**
-- `<1 effective point -> -0.05 to -0.03`
-- `1-2 effective points -> +0.03 to +0.05`
-- `3-4 effective points -> +0.03 to +0.07`
-- `5+ effective points -> +0.03 to +0.10`
+Input is `technical_drills.rebounding + scrimmages`, summed and applied **once**. There is no
+0.5x accrual: the points are used as-is.
+
+- `0 points   -> -0.03 to -0.01`
+- `1-2 points -> +0.005 to +0.02`
+- `3-4 points -> +0.01 to +0.03`
+- `5+ points  -> +0.02 to +0.05`
+
+> **REWRITTEN 2026-08-14.** This previously ran **TWICE a week** — once from
+> `technical_drills.rebounding`, once from `scrimmages` — each with its own band roll and its own
+> 0.5x halving. Two defects followed:
+>
+> * **A phantom penalty.** ~80% of team-weeks had `scrimmages = 0`, and that second call still
+>   fired, hitting the `<1` band for **-0.04 every week**. Teams were penalised for not
+>   scrimmaging, on a scale only 1.0 wide.
+> * **Double step size.** Halving each source separately and rolling twice is not the same as
+>   summing once.
+>
+> The **halving is also gone**: at realistic allocations (rebounding ~1.4 + scrimmages 1) it never
+> changed which band was selected, so it was an invisible discount that only surprised anyone
+> allocating heavily. Bands above are cut for un-halved combined points, and the table now means
+> what it says.
+>
+> Measured over a full season after the change: mean **0.54** from a 0.5 init. Before, it was
+> headed for 1.19 with ~40% of the league railed. See
+> `projects/team_player_attribute_tuning.md`.
 
 **Shot Threshold:**
 - 0 points: `+= random.randint(5, 15)`
@@ -492,6 +510,32 @@ After training is submitted, users are automatically redirected to the training 
   - **`from=inbox` (franchise):** **Back** → Franchise Command Center, Inbox tab
   - **Otherwise (e.g. `from=training` or absent):** Orange **Go To Locker Room** → Franchise or Tournament Command Center (existing behavior)
 
+#### Attribute-change arrows (legend)
+
+Each player-attribute cell shows the week's true (fractional) net delta as arrow glyphs (no number), set by `describeTrainingChange` in `training-report.js`. **Two regimes** by report week — the display keys off `getReportWeekNumber() === 1`:
+
+**Camp (week 1) — symmetric bands, grey dash at exactly 0.** No pre-training decay at camp, so untouched attrs read as a dash (0), never red.
+
+| Camp delta | Glyph | Color |
+|---|---|---|
+| exactly 0 | `–` | grey dash |
+| `0 < |Δ| < 2` | ▲ / ▼ | green up · red down |
+| `2 ≤ |Δ| ≤ 5` | ▲▲ / ▼▼ | green up · red down |
+| `|Δ| > 5` | ▲▲▲ / ▼▼▼ | blue up · red down |
+
+**In-season (weeks 2–26) — asymmetric, NO dash.** In-season decay makes tiny negatives normal, so the *up* band deliberately absorbs small dips **down to −0.5** and reads them as "holding" — this keeps the report from screaming red on an unlucky −0.4 week for a well-invested attribute. Only a genuine slide (< −0.5) shows red.
+
+| In-season delta | Glyph | Color |
+|---|---|---|
+| `Δ ≥ 3` | ▲▲▲ | RT-elite blue |
+| `1.0 ≤ Δ < 3` | ▲▲ | green |
+| `−0.5 ≤ Δ < 1.0` | ▲ | green (absorbs 0 and small dips) |
+| `−1.5 < Δ < −0.5` (−0.51…−1.49) | ▼ | red |
+| `−2.5 < Δ ≤ −1.5` (−1.5…−2.49) | ▼▼ | red |
+| `Δ ≤ −2.5` | ▼▼▼ | red |
+
+Note: in-season there are **no grey dashes** — an unchanged (0) attribute falls in the `−0.5 ≤ Δ < 1.0` band and shows a single green up-arrow. This is intentional: after the free-will retune, in-season "holding" is a good outcome and reads green rather than neutral.
+
 #### Recruiting summary (Franchise only)
 
 The Notes block no longer shows a static **Internal** label. Instead, **franchise** training reports show week-specific recruiting copy (right-aligned), driven by the API and persisted on the user-team FTD snapshot for that week.
@@ -522,7 +566,8 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
   - **Attribute Order:** Attributes displayed in exact order: SC, SH, ID, OD, PS, BH, RB, ST, AG, ND, IQ, FT, NG, EM, RT
   - **Note:** MO (Momentum) is excluded from Training Report display
   - **Attribute Formatting:**
-    - **SC through FT (first 12):** Displayed as integer values
+    - **SC through FT (first 12):** Raw 0–100 anchors are displayed on the 0–10 scale with `floor(anchor / 10)`.
+    - **Weekly display-tier movement:** When the current training session moves one of those displayed values into a higher tier, the new number is green; when it moves into a lower tier, the new number is red. Values that did not cross a displayed tier retain the normal text color. The direction is saved with that week's report, so the color applies only to the report for the week in which the tier changed.
     - **NG:** Displayed with 2 decimal places (e.g., 1.00, 0.99, 0.98, 0.90)
     - **EM:** Displayed with emoji based on value:
       - >= 80: 😎 (Sunglasses)
@@ -563,7 +608,7 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
     - Red fill to the left for negative values
     - Proportional fill based on max value
     - No value displayed on top of pill (value shown in change indicator only)
-    - **Shooting (`shot_threshold`):** Golf-score attribute (lower raw value is better). Pill centers at **70** with span **−30–170** (better toward the right). See [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md). The **numeric change** next to the label uses **inverted sign** versus the raw delta: raw **−10** displays as **+10** (green); raw **+5** displays as **−5** in red.
+    - **Shooting (`shot_threshold`):** Golf-score attribute (lower raw value is better). Pill centers at **90** with span **−10–190** (better toward the right). See [Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md). The **numeric change** next to the label uses **inverted sign** versus the raw delta: raw **−10** displays as **+10** (green); raw **+5** displays as **−5** in red.
   - **Progress Bar:** Team Chemistry (0-25 scale, blue fill)
     - Shows value as "X / 25" centered on bar
     - Only attribute that displays its value
@@ -625,8 +670,8 @@ The Notes block no longer shows a static **Internal** label. Instead, **franchis
 Each player's **cumulative delta** = sum over the trainable attributes (all except CH/EM/MO/NG) of `anchor_now − anchor_baseline` for the session.
 
 - **Year normalization (symmetric).** Younger players swing wider *both ways* by construction — `training_execution_v2` gives a year-max **gain** bump (FR +5 … SR +1) and a deeper year **decay** (FR/SO vs JR/SR). So a raw ranking just surfaces the youngest player every week. Each delta is divided by a **`YEAR_SWING_FACTOR`** — `FR 1.5 / SO 1.25 / JR 1.1 / SR 1.0` (unknown year → 1.0) — before ranking. This replaces the old up-only 0.7/0.9 discount; the factor now applies to the **loss** award too (the fix — it was raw before), so a senior who regressed a little can outrank a freshman who regressed a lot.
-- **Gates (the only cutoffs):** the top award qualifies on **cumulative gain > 0**, the loss award on **cumulative gain < 0**. Sign is preserved by the divide, so normalization changes the *ranking*, not who qualifies.
-- **In-season:** `Practice Player Of The Week` = highest normalized gain (> 0); `Biggest Regression` = lowest normalized delta (< 0). Ties → co-winners.
+- **Qualification rules:** the in-season top award has **no sign gate**; every player is ranked, including when the best cumulative result is zero or negative. The loss award retains its **cumulative delta < 0** gate. Training Camp MVP separately retains its **> 0** gate. Sign is preserved by year normalization, so normalization changes ranking but not the camp/loss qualification rules.
+- **In-season (weeks 2–26):** `Practice Player Of The Week` = highest normalized cumulative delta across the full player pool, even if that winning value is zero or negative; `Biggest Regression` = lowest normalized delta (< 0). Ties → co-winners. This guarantees a weekly Practice Player selection whenever the report has players.
 - **Training camp (week 1):** decay is skipped, so nobody truly regresses (`< 0` would be permanently empty). `Training Camp MVP` = highest normalized gain (> 0). **`Biggest Concern`** instead flags the year-normalized **laggard** — the lowest developer, but only if he landed below **`CAMP_CONCERN_MEDIAN_FRACTION` (0.5) × the squad's median normalized gain** (a player the camp's focus/position-fit didn't help). Even-development camps → "None". The threshold is **relative on purpose** so it self-scales with `CAMP_GAIN_SCALE` and needs no calibrated constant.
 - **Walk-ons need no special term:** they swing by their *year* (the model is year+allocation based, not tier based). In-season they sit on the Training Squad — excluded from this pool, with their own report — and at camp they're evaluated by year like everyone else.
 
@@ -743,16 +788,20 @@ Eligible non-user teams run the same `execute_training()` engine. CPU allocation
 
 ### Player Development & Coaching Quality
 
-> **Shape** (relative attribute mix) is owned by **camp + in-season training**. **Level** (ladder RT) and HT/WT are owned by the **offseason** level-only rescale (`BackEnd/utils/player_development.py`). Full derivation archived at `../projects/Z-Completed/Player_Attribute_Recalibration_Design.md` and `../10_Players_Systems/Player_Development_System.md`.
+> **Shape** (relative attribute mix) is owned by **camp + in-season training**. **Level** is built **additively** (free-will, 2026-08): camp + in-season gains **persist**, and the **offseason** adds a *reduced* increment on top — it is no longer a level-only rescale onto an absolute ladder. HT/WT still ride the offseason curve (`BackEnd/utils/player_development.py`). Full derivation archived at `../projects/Z-Completed/Player_Attribute_Recalibration_Design.md` and `../10_Players_Systems/Player_Development_System.md`.
 
-**Division of labor.** Offseason rollover (before Training Camp) rescales current attributes onto an absolute RT target: `jh_anchor × ladder_value × f(coaching_quality)`, plus HT/WT. It does **not** redistribute shape. Camp and weekly training apply the gain bands below; camp uses `CAMP_GAIN_SCALE`, in-season uses `IN_SEASON_GAIN_SCALE`.
+**Division of labor (free-will, 2026-08).** Offseason rollover (before Training Camp) **adds** a reduced increment to the player's *current* RT — it no longer rescales him onto an absolute ladder, so camp + in-season training persist across his career. The increment is `jh_anchor × (STD_RUNG_INCREMENT[rung] × OFFSEASON_BASE_RETENTION + peak) × potential_factor`, then `target = _compress_rt(rt_now + increment)` (soft-capped at `RT_SOFT_CAP = 130`).
+- `OFFSEASON_BASE_RETENTION = 0.125` — the offseason auto-delivers ~12.5% of the standard rung; the remaining ~87.5% is earned through persisting camp + in-season training (a neglected player still creeps up via this floor).
+- A **peak** rung adds `PEAK_BONUS × OFFSEASON_PEAK_RETENTION` (0.30 × 0.50) on top — half the peak fires at the rollover, half rides the amplified training that year.
+- `coaching_f` is **retired** (Decision 0.5): coaching matters because training persists, not via an offseason multiplier. It does **not** redistribute shape and does **not** claw back in-season gains.
+- Camp and weekly training apply the gain bands below; camp uses `CAMP_GAIN_SCALE` (0.70), in-season `IN_SEASON_GAIN_SCALE` (0.28).
 
-**Camp / in-season model.** Gains stay report-visible but scaled. Invariant: **reference allocation holds flat; neglect costs; focus gains.**
+**Camp / in-season model (free-will).** Gains stay report-visible, scaled, and now **PERSIST** into the career (the offseason no longer absorbs them). Invariant: **reference allocation holds-or-GROWS; neglect costs; focus gains.**
 
 | Weekly allocation (per attribute) | Net over a season |
 |---|---|
-| 0 points (neglect) | declines — **but the penalty is PROBABILITY-GATED as of the leveling pass**, see below |
-| reference primaries (pts=3) | ≈ flat |
+| 0 points (neglect) | declines — **penalty is PROBABILITY-GATED**, see below |
+| reference primaries (pts=3) | **holds or grows, and persists** (was "≈ flat" under predestination) |
 | reference baseline (pts=1) | mild drag (bands are distinct; see Player Development § gain bands) |
 | focused (pts=4/5) | gains |
 
@@ -770,23 +819,13 @@ Eligible non-user teams run the same `execute_training()` engine. CPU allocation
 
 Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shape attractor (`OFFSEASON_ATTRACTOR_ALPHA=0`). Pre-training decay by year is unchanged (see **Year-Based Pre-Training Decay** above) and never subtracts below the weight-scaled position floor.
 
-**Coaching-quality metric.** A season's allocation is scored in **points per attribute per week, not shares**:
+**Coaching quality lives in persisting training, not a multiplier (free-will).** Under predestination, a season's allocation was scored (points-per-attribute-per-week) into a bounded `f ∈ [0.85, 1.20]` that scaled the offseason RT target. Under free-will that multiplier is **retired** — a well-coached player ends higher because his camp + in-season gains **persist and compound**, and a neglected player's don't. The scoring helpers (`season_coaching_quality`, `coaching_f`, `COACHING_F_MIN/MAX`) still exist in `player_development.py` but are **inert**: `develop_one_offseason` no longer applies `coaching_f_value` to the increment. Remove in a later cleanup or leave for reference.
 
-```
-contribution_a = weight_a × min(points_a / COACHING_SATURATION_CAP, 1)
-quality        = Σ contribution / Σ contribution(reference)
-```
+**The frozen reference (still live).** The named per-position allocation that defines "reference coaching" remains the calibration anchor **and** the CPU's training target: a deliberately-mediocre, top-3-weighted baseline (primaries at 3 pts, other on-position attrs at 1 pt, tail neglected). Reference-coached development lands on the validated **~+22-RT career arc**. Test-asserted at all five positions.
 
-- Points (not shares): a smaller budget saturates fewer attributes and scores lower automatically — spreading thin saturates nothing; concentrating saturates what matters.
-- Normalized **affinely per position** so the frozen reference scores exactly **1.0** and a budget optimum scores **1.0 + COACHING_HEADROOM**; headroom is comparable across all five positions.
+**CPU trains the reference.** `auto_train_one_cpu_team` uses a fixed team-wide base allocation plus per-player `player-maximizer-custom` focus toward each player's position reference top-3, tuned so CPU scores ≈1.0 against the frozen reference (measured 0.98–1.01). This holds the CPU league on the **free-will ~+22 arc**. The base allocation and the frozen reference are **coupled** — neither can change alone; `tests/test_cpu_reference_training.py` asserts the relationship.
 
-**The frozen reference.** The allocation that scores 1.0 is a **frozen, named constant**: a deliberately-mediocre, top-3-weighted baseline per position (primary attrs at a higher points value, other on-position attrs at a baseline points value; the tail neglected). It is the calibration anchor — reference-coached development lands exactly on the validated ladder (`f = 1.0`). Test-asserted at all five positions.
-
-**Coaching factor `f`.** Quality maps to a bounded multiplier `f ∈ [COACHING_F_MIN, COACHING_F_MAX]` (≈ 0.85–1.20) on the offseason RT target. Reference → `f = 1.0`; neglect / off-position floors at ~0.85; broad or multi-attribute focus tops out near 1.20. Worth roughly **±1 tier step**; recruiting stays ~2× the lever.
-
-**CPU trains the reference.** `auto_train_one_cpu_team` uses a fixed team-wide base allocation plus per-player `player-maximizer-custom` focus toward each player's position reference top-3, tuned so CPU scores ≈1.0 (measured 0.98–1.01). This holds the CPU league exactly on the ladder. The base allocation and the frozen reference are **coupled** — neither can change alone; `tests/test_cpu_reference_training.py` asserts the relationship.
-
-**STATUS — dormant until pillar 3.** The per-player coaching-quality **capture is not wired up**. `_coaching_accumulator_for_player` returns `None`, so `f = 1.0` for **every** player and the coaching-quality multiplier currently does nothing in gameplay — the league holds exactly at the recalibration pass-1 ladder. Activation requires per-player allocation capture (gated at the calling endpoint, since user and CPU share `execute_training`) and ships with **pillar 3**, alongside the training-position UI and CPU season-start assignment.
+**STATUS — coaching-`f` multiplier retired; coaching now lives in persisting training.** The old plan was to activate per-player coaching-quality capture in pillar 3 to drive `f`; free-will makes that multiplier unnecessary (`_coaching_accumulator_for_player` / `coaching_f` are inert). The league holds on the ~+22 free-will arc, with coaching's above/below coming from **where training points are spent** (which now persists). What still remains for **pillar 3**: the training-position UI and CPU season-start position assignment.
 
 **Constants** (values in `../11_Design_Systems/Tunable_Constants.md`):
 
@@ -796,11 +835,11 @@ quality        = Σ contribution / Σ contribution(reference)
 | `COACHING_STANDARD_BUDGET` | reference weekly budget the affine per-position normalization anchors to |
 | `COACHING_HEADROOM` | how far a budget optimum scores above 1.0 |
 | `COACHING_F_MIN` / `COACHING_F_MAX` | offseason multiplier bounds (0.85 / 1.20) |
-| `IN_SEASON_GAIN_SCALE` | in-season gain scale (0.18) |
-| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` / `CAMP_POINT_BUDGET` | camp length (1 week), camp gain scale (1.4), flat camp budget (30) |
+| `IN_SEASON_GAIN_SCALE` | in-season gain scale (0.28) |
+| `CAMP_WEEKS` / `CAMP_GAIN_SCALE` / `CAMP_POINT_BUDGET` | camp length (1 week), camp gain scale (0.70), flat camp budget (30) |
 | `IN_SEASON_POINT_BUDGET` | flat in-season budget (24) |
 | `TRAINING_GAIN_PERCENTAGES` / `CLASS_GAIN_PERCENTAGES` | direct position-fit and class-year gain percentages; neither changes budget spend |
-| `OFFSEASON_ATTRACTOR_ALPHA` | **retired (0.0)** — shape attractor removed; offseason is level-only |
+| `OFFSEASON_ATTRACTOR_ALPHA` | **retired (0.0)** — shape attractor removed; offseason changes level only, not shape |
 
 ### Data Storage
 
@@ -855,7 +894,7 @@ quality        = Σ contribution / Σ contribution(reference)
 - `BackEnd/utils/franchise_league_news.py` - Consolidated, pre-ranked training newswire payload
 - `BackEnd/utils/franchise_training_state.py` - Split-phase completion helpers for FCC and cuts
 - `BackEnd/utils/franchise_coaching_focus_counts.py` - FTD `coaching_focus` archetype counters (user team)
-- `BackEnd/utils/player_development.py` - Offseason level-only RT rescale + HT/WT (not weekly training)
+- `BackEnd/utils/player_development.py` - Offseason additive RT increment (free-will) + HT/WT (not weekly training)
 
 ### Current Play / Report Identity Notes
 
@@ -917,3 +956,37 @@ pure rebinding, not a behaviour change.
 
 Re-check with `BackEnd.utils.sim_random.install_global_draw_guard()` +
 `global_draw_report()`; the tally must stay empty on the training path.
+
+---
+
+## CPU teams do NOT use this allocator
+
+⚠️ **Everything above describes the USER's training.** CPU teams run a separate allocator —
+`_cpu_team_allocation` in `BackEnd/api/franchise_routes.py` — and it does not behave like the UI.
+Reading this page and assuming it describes the league is how the per-position defect below
+survived unnoticed.
+
+| | User team | CPU team |
+|---|---|---|
+| plans per week | 1, chosen in the UI | 1, derived from the team's **identity** |
+| coaching focus | chosen | **1 of 16, derived** per (franchise, team, season, week) |
+| allocation | free within 24 / 30 points | 12 floors + emphasis + installs, budget-exact |
+| scrimmages | free | **fixed at 1**, always |
+
+**What CPU allocation guarantees**, all of it load-bearing:
+
+* **Twelve player-attribute slots never drop below 1** — the 9 skills plus conditioning,
+  free throws and film study. A 0 costs −1 to −2 *every week* with no probability gate, so the
+  floors are what keep CPU rosters from bleeding out.
+* **`scrimmages` is pinned to 1 for every team, every week.** 0 gives **+191** shot_threshold per
+  season and 2 gives **−212** on a 200-point scale — one point is the only stable value, so
+  nothing may touch that slot. It was previously installed by the Attack vision alone, which put
+  ~80% of the league on the +191 path.
+* **Two weekly modes**, ~50/50: a FOCUS week (one skill emphasis at 3 points) and a ROSTER week
+  (a rotating +1 lift across the nine skills). `ND`/`IQ`/`FT` are excluded from the lift.
+* **Reactive installs** (`fast_breaks.defense_install`, `presses_traps.offense_install`) get a
+  baseline with a persistent per-team tendency, independent of vision — they answer what the
+  *opponent* does, not what the team chooses.
+
+Full design and measured results: [`../projects/cpu_identity_design.md`](../projects/cpu_identity_design.md) Part A.
+Season outcomes: [`../projects/team_player_attribute_tuning.md`](../projects/team_player_attribute_tuning.md).
