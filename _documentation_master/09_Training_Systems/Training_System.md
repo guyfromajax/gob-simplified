@@ -69,7 +69,8 @@ While training runs, `PageLoadOverlay` uses its separate `newswire` variant to r
 
 - `GET /franchise/league-news` consolidates the national Top 10, current-week key games, and eight qualified leaderboards into pre-ranked lists of exactly ten. Points, rebounds, and assists are ranked and displayed as per-game averages with one decimal; the other five boards retain their existing measures. In Week 4, standings and leaders are through Week 3 while Key Games are Week 4.
 - Week 1 uses the preseason deck: program-rank Top 10 and season marquee matchups. Preseason Top 10 rows intentionally have no trailing record.
-- `training.js` prefetches and session-caches the payload by franchise, season, and week. At submit, the news request and training request proceed independently.
+- `training.js` prefetches and session-caches the payload by franchise, season, and week under a versioned cache key. Any display-contract change must advance that version so an earlier same-week payload cannot survive a deployment. At submit, the news request and training request proceed independently.
+- Per-game leader ranking uses the unrounded quotient; rounding to one decimal happens only after rank order is established. This matches `/franchise/leaders` and prevents close averages from being reordered by display rounding.
 - A pending news request shows only the header and green “Training in progress” pulse. A rejected request falls back to the existing team-banner pulse variant.
 - Available graphics rotate in a fixed order every 6000ms. Missing or short lists are omitted. Rotation stops immediately when the overlay hides.
 - During weeks 2–19, phase 2 remains a durable polling workflow. Refreshing or revisiting detects an applied user phase with incomplete CPU training and resumes automatically under the same newswire.

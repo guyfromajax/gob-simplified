@@ -88,7 +88,7 @@ let userConference = null; // User team's conference (for Stats/Traits scope)
 let userRegion = null;    // User team's region (for Stats/Traits scope)
 let teamColorCache = null; // Cache for team primary colors
 let teamMetaByNameCache = null;
-let leadersDataCache = null;
+const leadersDataCache = new Map();
 let teamStatsDataCache = null;
 let teamTraitsDataCache = null;
 let leanRecruitsDataCache = [];
@@ -1642,19 +1642,22 @@ function escapeFccLeaderHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
-async function ensureConferenceLeaders() {
-  if (leadersDataCache || !franchiseId) return leadersDataCache;
-  leadersDataCache = await fetchJSON(
-    `${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${encodeURIComponent(franchiseId)}&scope=season&view_scope=conference&limit=5`
+async function ensureLeaders(scope = 'conference', limit = 10) {
+  if (!franchiseId) return null;
+  const cacheKey = `${scope}:${limit}`;
+  if (leadersDataCache.has(cacheKey)) return leadersDataCache.get(cacheKey);
+  const data = await fetchJSON(
+    `${API_CONFIG.buildUrl('/franchise/leaders')}?franchise_id=${encodeURIComponent(franchiseId)}&scope=season&view_scope=${encodeURIComponent(scope)}&limit=${limit}`
   );
-  return leadersDataCache;
+  if (data) leadersDataCache.set(cacheKey, data);
+  return data;
 }
 
 async function renderFccLeadersSummary() {
   const grid = document.getElementById('fcc-leaders-grid');
   if (!grid) return;
   grid.innerHTML = '<div class="fcc-leader-card"><div class="fcc-leader-card-empty">Loading leaders...</div></div>';
-  const data = await ensureConferenceLeaders();
+  const data = await ensureLeaders('conference', 5);
   if (!data) {
     grid.innerHTML = '<div class="fcc-leader-card"><div class="fcc-leader-card-empty">Failed to load leaders.</div></div>';
     return;
@@ -2059,10 +2062,11 @@ function bindStatsAndTraitsScopeButtons() {
   document.querySelectorAll('.stats-scope-btn').forEach(btn => {
     if (btn.dataset.bound) return;
     btn.dataset.bound = '1';
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       statsScope = btn.getAttribute('data-scope') || 'conference';
       document.querySelectorAll('.stats-scope-btn').forEach(b => b.classList.toggle('active', b.getAttribute('data-scope') === statsScope));
-      if (leadersDataCache) renderLeaders(leadersDataCache, statsScope);
+      const leaders = await ensureLeaders(statsScope, 10);
+      if (leaders) renderLeaders(leaders, statsScope);
       if (teamStatsDataCache) renderTeamStats(teamStatsDataCache, statsScope);
     });
   });

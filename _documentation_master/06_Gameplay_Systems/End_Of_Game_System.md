@@ -360,7 +360,7 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
 
 ### Player Of The Game (POTG)
 
-**Implemented** in `FrontEnd/static/js/shared/potg.js` (`calculatePlayerOfTheGame(gameData, options)`). Used by the EOG completion popup (`gameCompletionPopup.js`) and the Box Score page (`box-score.js`).
+**Canonical implementation** is `FrontEnd/static/js/shared/potg.js` (`calculatePlayerOfTheGame(gameData, options)`). It is used by the EOG completion popup (`gameCompletionPopup.js`) and Box Score page (`box-score.js`). The FCC Last Game backend summary mirrors this exact contract in `_calculate_potg_summary()`; `tests/test_potg_surface_parity.py` passes one game document through both languages and requires identical player and stat output.
 
 **POTG point scale (per player, both teams):**
 1. **2 POTG points** for each point scored, assist, rebound (TREB = OREB + DREB), block, and steal.
@@ -378,7 +378,9 @@ Canonical franchise week completion is a **two-step HTTP flow** so the user’s 
   - Otherwise (same team, or no clear winner): **equal weight** across contenders.
   - The random pick is **deterministic per game** — seeded from `gameId` (`"{gameId}:potg"`) so the same game always yields the same POTG.
 
-**Candidate sourcing:** merges `gameData.players` and `gameData.box_score` (team inferred from box-score key); stats read from `stats.game` / `stats`.
+**Candidate sourcing:** merges `gameData.players` and `gameData.box_score` (team inferred from box-score key); later box-score fields merge over an existing player candidate rather than being discarded. Stats read from `stats.game` / `stats`; rebounds use `REB`, falling back to `OREB + DREB`.
+
+**Snapshot contract:** for franchise games, the completion modal fetches and prefers the finalized persisted game document after phase A, falling back to the supplied live snapshot only if that read is unavailable. FCC Last Game reads the same persisted document. This prevents the same algorithm from receiving two different stat snapshots.
 
 **EOG completion popup layout** (`gameCompletionPopup.js`):
 - Header: "Game Complete!"

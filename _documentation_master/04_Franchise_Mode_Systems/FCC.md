@@ -257,6 +257,7 @@ It renders an eight-card summary grid:
 #### Last Game
 
 - built from `topData.last_game_summary`
+- POTG is calculated from the finalized persisted game document using the canonical EOG-modal rules: identical scoring, `REB` fallback, merged candidate sources, 16-point separation rule, and game-id-seeded 67/33 contender selection. Cross-language parity is enforced by `tests/test_potg_surface_parity.py`.
 - shows:
   - matchup label
   - opponent banner
@@ -667,7 +668,7 @@ Current request:
 
 Cache:
 
-- `leadersDataCache`
+- `leadersDataCache`, keyed by server scope and limit. Conference remains the summary default. Any conference/region/national scope control requests that exact `view_scope`; it does not attempt to reconstruct a broader leaderboard by filtering an already conference-limited response.
 
 Footer link:
 
