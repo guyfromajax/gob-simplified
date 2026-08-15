@@ -36,12 +36,12 @@ def test_height_to_block_score_ascends_and_clamps(height, expected):
 
 
 def test_block_reconciliation_threshold_base_is_recalibrated():
-    assert BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE == 70
+    assert BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE == 60
 
 
 @pytest.mark.parametrize(
     ("stored_defensive_efficiency", "expected"),
-    [(20, 80), (0, 70), (-20, 60)],
+    [(20, 70), (0, 60), (-20, 50)],
 )
 def test_block_reconciliation_threshold_uses_normalized_defensive_efficiency(
     stored_defensive_efficiency,

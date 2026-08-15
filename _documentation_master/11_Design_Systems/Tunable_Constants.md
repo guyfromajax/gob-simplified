@@ -233,7 +233,7 @@ middle band falls back to ordinary shot resolution. The two outcome thresholds a
 
 | Constant / variable | File | Value | Effect |
 |---|---|---|---|
-| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE` | constants/__init__.py | `70` | The live block threshold is `70 + normalized defensive_efficiency`; reconciliation blocks when `diff` is below it. |
+| `BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE` | constants/__init__.py | `60` | The live block threshold is `60 + normalized defensive_efficiency`; reconciliation blocks when `diff` is below it. |
 | `BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD` | constants/__init__.py | `150` | A reconciliation creates a shooting foul when `diff > 150`. Independent of the block threshold. |
 | `BLOCK_Y_ROLL_MIN` / `BLOCK_Y_ROLL_MAX` | constants/__init__.py | `0 / 4` | First trigger rolls this inclusive range against defensive aggression; `roll <= aggression` reaches reconciliation. Default aggression 2 therefore passes 60%. |
 | Defensive `aggression` | team strategy | `0–4` | First-trigger comparison value. Higher aggression sends more eligible shots into reconciliation. Slow-It-Down can temporarily force this to 0. |

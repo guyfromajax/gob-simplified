@@ -139,7 +139,7 @@ BLOCK_PROBABILITY = {
 # else → standard shot.
 # Thresholds are independent: adjust either without affecting the other.
 BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 150
-BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE = 70
+BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE = 60
 # Block attempt roll: y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX); attempt when y <= aggression
 BLOCK_Y_ROLL_MIN = 0
 BLOCK_Y_ROLL_MAX = 4

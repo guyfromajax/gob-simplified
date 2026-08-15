@@ -597,8 +597,7 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
     away_score = int(score_map.get(away_team_name, away_team_obj.get("score", 0)) or 0)
     winning_team = "home" if home_score > away_score else ("away" if away_score > home_score else None)
 
-    candidates: list[dict[str, Any]] = []
-    seen_keys: set[str] = set()
+    candidates_by_key: dict[str, dict[str, Any]] = {}
     players_source_count = 0
     box_score_source_count = 0
 
@@ -609,24 +608,24 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
         stats = raw.get("stats", {}).get("game") if isinstance(raw.get("stats"), dict) and isinstance(raw.get("stats", {}).get("game"), dict) else raw.get("stats", raw)
         if not isinstance(stats, dict):
             stats = raw
-        name = str(raw.get("name") or "").strip()
-        if not name:
-            return
-        player_id = str(raw.get("playerId") or raw.get("player_id") or raw.get("_id") or f"{fallback_team or 'unknown'}:{name}")
-        dedupe_key = f"{player_id}:{fallback_team or raw.get('team') or 'unknown'}"
-        if dedupe_key in seen_keys:
-            return
-        seen_keys.add(dedupe_key)
+        raw_name = str(raw.get("name") or "").strip()
+        fallback_name = raw_name or "Unknown"
+        player_id = str(raw.get("playerId") or raw.get("player_id") or raw.get("_id") or f"{fallback_team or 'unknown'}:{fallback_name}")
+        resolved_team = fallback_team or raw.get("team") or "unknown"
+        dedupe_key = f"{player_id}:{resolved_team}"
+        existing = candidates_by_key.get(dedupe_key, {})
         if fallback_team:
             box_score_source_count += 1
         else:
             players_source_count += 1
-        candidates.append({
+        merged_stats = dict(existing.get("stats") or {})
+        merged_stats.update(stats)
+        candidates_by_key[dedupe_key] = {
             "player_id": player_id,
-            "name": name,
-            "team": fallback_team or raw.get("team") or "",
-            "stats": stats,
-        })
+            "name": raw_name or existing.get("name") or "Unknown",
+            "team": resolved_team,
+            "stats": merged_stats,
+        }
 
     players = game_doc.get("players")
     if isinstance(players, list):
@@ -643,6 +642,7 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
             if isinstance(player_data, dict):
                 upsert_player(player_data, inferred_team)
 
+    candidates = list(candidates_by_key.values())
     logger.warning(
         "🧭 [FCC-POTG] Selected game_id=%s home=%s away=%s has_players=%s top_box_score=%s nested_teams=%s candidate_count=%s from_players=%s from_box_score=%s",
         selected_game_id,
@@ -665,12 +665,13 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
         stats = player.get("stats") or {}
         pts = int(stats.get("PTS", 0) or 0)
         ast = int(stats.get("AST", 0) or 0)
-        reb = int(stats.get("TREB", (stats.get("OREB", 0) or 0) + (stats.get("DREB", 0) or 0)) or 0)
+        reb = int(stats.get("REB", 0) or ((stats.get("OREB", 0) or 0) + (stats.get("DREB", 0) or 0)))
         stl = int(stats.get("STL", 0) or 0)
         blk = int(stats.get("BLK", 0) or 0)
         def_a = int(stats.get("DEF_A", 0) or 0)
         def_s = int(stats.get("DEF_S", 0) or 0)
-        def_pct = round((def_s / def_a) * 100) if def_a > 0 else 0
+        # Match JavaScript Math.round() for the canonical frontend POTG contract.
+        def_pct = int(math.floor(((def_s / def_a) * 100) + 0.5)) if def_a > 0 else 0
         score = 2 * (pts + ast + reb + stl + blk)
         if def_a > 10:
             if def_pct > 80:
@@ -679,9 +680,8 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
                 score += 10
             elif def_pct > 40:
                 score += 5
-        if winning_team and player.get("team") == winning_team:
-            score += 3
         scored.append({
+            "player_id": player.get("player_id"),
             "name": player["name"],
             "team": player.get("team"),
             "score": score,
@@ -695,8 +695,45 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
             },
         })
 
-    scored.sort(key=lambda item: (-item["score"], -item["stats"]["pts"], -item["stats"]["reb"], -item["stats"]["ast"]))
+    # Canonical modal algorithm: stable score ordering, then a deterministic
+    # weighted choice whenever first and second are fewer than 16 points apart.
+    scored.sort(key=lambda item: -item["score"])
     top = scored[0]
+    second = scored[1] if len(scored) > 1 else None
+    selected = top
+    if second and (top["score"] - second["score"]) < 16:
+        contenders = [item for item in scored if item["score"] >= second["score"]]
+        winners = [item for item in contenders if item.get("team") == winning_team]
+        losers = [item for item in contenders if item.get("team") and item.get("team") != winning_team]
+        if winning_team and winners and losers:
+            weighted = [
+                *((item, 0.67 / len(winners)) for item in winners),
+                *((item, 0.33 / len(losers)) for item in losers),
+            ]
+        else:
+            weighted = [(item, 1.0 / len(contenders)) for item in contenders]
+
+        seed_text = f"{selected_game_id or 'no-game-id'}:potg"
+        state = 2166136261
+        for char in seed_text:
+            state ^= ord(char)
+            state = (state * 16777619) & 0xFFFFFFFF
+        state = state or 1
+        state = (state + 0x6D2B79F5) & 0xFFFFFFFF
+        value = state
+        value = (((value ^ (value >> 15)) * (value | 1)) & 0xFFFFFFFF)
+        value ^= (value + ((((value ^ (value >> 7)) * (value | 61)) & 0xFFFFFFFF))) & 0xFFFFFFFF
+        target = (((value ^ (value >> 14)) & 0xFFFFFFFF) / 4294967296) * sum(weight for _, weight in weighted)
+        running = 0.0
+        for contender, weight in weighted:
+            running += weight
+            if target <= running:
+                selected = contender
+                break
+        else:
+            selected = weighted[-1][0]
+
+    top = selected
     logger.warning(
         "🧭 [FCC-POTG] POTG resolved for game_id=%s winner=%s pts=%s reb=%s ast=%s stl=%s blk=%s defPct=%s",
         selected_game_id,
@@ -709,6 +746,7 @@ def _calculate_potg_summary(game_doc: dict[str, Any]) -> Optional[dict[str, Any]
         top["stats"]["defPct"],
     )
     return {
+        "player_id": top.get("player_id"),
         "name": top["name"],
         "stats": top["stats"],
     }

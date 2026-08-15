@@ -216,13 +216,23 @@ export async function showGameCompletionPopup({ gameId, mode, tournamentId, fran
     : ((typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static' : '');
   try {
     const { calculatePlayerOfTheGame } = await import((staticBase || '') + '/js/shared/potg.js');
-    if (!resolvedGameDoc && gameId && typeof fetch === 'function' && typeof API_CONFIG !== 'undefined') {
+    // Franchise POTG must use the finalized persisted document—the same snapshot
+    // the FCC Last Game card reads. Fall back to the supplied live snapshot only
+    // when that read is unavailable.
+    if (mode === 'franchise' && gameId && typeof fetch === 'function' && typeof API_CONFIG !== 'undefined') {
+      try {
+        const resp = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`), {
+          headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
+        });
+        if (resp.ok) resolvedGameDoc = await resp.json();
+      } catch (persistedGameError) {
+        console.warn('[gameCompletionPopup] finalized POTG snapshot unavailable; using live snapshot:', persistedGameError);
+      }
+    } else if (!resolvedGameDoc && gameId && typeof fetch === 'function' && typeof API_CONFIG !== 'undefined') {
       const resp = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}`), {
         headers: API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {},
       });
-      if (resp.ok) {
-        resolvedGameDoc = await resp.json();
-      }
+      if (resp.ok) resolvedGameDoc = await resp.json();
     }
     const scoreOverride = finalScore ? {
       [finalScore.homeTeam || homeTeam || 'Home Team']: Number(finalScore.homeScore || 0),
