@@ -667,7 +667,7 @@ Current request:
 
 Cache:
 
-- `leadersDataCache`
+- `leadersDataCache`, keyed by server scope and limit. Conference remains the summary default. Any conference/region/national scope control requests that exact `view_scope`; it does not attempt to reconstruct a broader leaderboard by filtering an already conference-limited response.
 
 Footer link:
 

@@ -224,15 +224,17 @@ def _build_leaders(
                         if board_id in PER_GAME_LEADER_BOARDS
                         else str(int(value))
                     ),
+                    "_sort_value": value,
                     "_tiebreak": tiebreak,
                 }
             )
-        candidates.sort(key=lambda row: (-float(row["value"]), -row["_tiebreak"], row["name"].casefold()))
+        candidates.sort(key=lambda row: (-row["_sort_value"], -row["_tiebreak"], row["name"].casefold()))
         top = candidates[:10]
         if len(top) != 10:
             continue
         for rank, row in enumerate(top, start=1):
             row["rank"] = rank
+            row.pop("_sort_value", None)
             row.pop("_tiebreak", None)
         boards[board_id] = top
     return boards
