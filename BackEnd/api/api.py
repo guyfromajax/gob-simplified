@@ -21,6 +21,29 @@ if _sentry_dsn:
 # Bootstrap: get app with /health so server starts even if rest fails
 from BackEnd.api._bootstrap import app
 import traceback
+
+def _persisted_strategy_settings(team) -> dict:
+    """The team's PLAN for the games-doc snapshot — never the damped in-game view.
+
+    `strategy_settings` is a per-call view: autoset_strategy_settings recomputes it on every
+    lineup rebuild, applying sit-on-the-lead or self-regulation damping when the margin calls for
+    it. `strategy_settings_base` is the pristine plan. Persisting the view was harmless while only
+    CPU teams were damped and nothing read it back as a plan — neither is true now:
+
+      * PR0.5 damps a leading USER team in full sim, so the view can hold 0/1 sliders.
+      * The snapshot has two consumers and BOTH want the plan — the Gameplan UI
+        (gameplan_routes.py:1625, which shows these sliders back to the user) and timeout-resume
+        (team_settings_manager.extract_team_settings -> gm.<team>.strategy_settings).
+      * On resume, autoset adopts whatever `strategy_settings` holds as the new `base` when base
+        is absent — so persisting a damped view would PROMOTE it to the plan permanently.
+
+    Falls back to the live settings when no base exists (a team that never reached autoset).
+    """
+    base = getattr(team, "strategy_settings_base", None)
+    if isinstance(base, dict) and base:
+        return base
+    return getattr(team, "strategy_settings", {}) or {}
+
 _startup_error = None
 try:
     from fastapi import Depends, FastAPI, HTTPException, Query, Response
@@ -4297,12 +4320,12 @@ try:
                             # Create team objects with plays and playbook_settings for skeleton lookup
                             teams_obj = {
                                 gm.home_team.team_id: {
-                                    "strategy_settings": getattr(gm.home_team, 'strategy_settings', {}),
+                                    "strategy_settings": _persisted_strategy_settings(gm.home_team),
                                     "plays": home_plays_for_game,
                                     "playbook_settings": home_playbook_settings
                                 },
                                 gm.away_team.team_id: {
-                                    "strategy_settings": getattr(gm.away_team, 'strategy_settings', {}),
+                                    "strategy_settings": _persisted_strategy_settings(gm.away_team),
                                     "plays": away_plays_for_game,
                                     "playbook_settings": away_playbook_settings
                                 }
@@ -4681,12 +4704,12 @@ try:
                 # Create team objects with plays and playbook_settings for skeleton lookup
                 teams_obj = {
                     gm.home_team.team_id: {
-                        "strategy_settings": getattr(gm.home_team, 'strategy_settings', {}),
+                        "strategy_settings": _persisted_strategy_settings(gm.home_team),
                         "plays": populated_plays.copy(),
                         "playbook_settings": home_playbook_settings
                     },
                     gm.away_team.team_id: {
-                        "strategy_settings": getattr(gm.away_team, 'strategy_settings', {}),
+                        "strategy_settings": _persisted_strategy_settings(gm.away_team),
                         "plays": populated_plays.copy(),
                         "playbook_settings": away_playbook_settings
                     }
@@ -8328,3 +8351,5 @@ except Exception as e:
     @app.get("/startup-error")
     def _startup_error_route():
         return {"status": "error", "error": str(e), "type": type(e).__name__}
+
+

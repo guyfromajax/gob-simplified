@@ -58,6 +58,13 @@ When leading, re-roll these **eight** strategy settings low (sit on the lead). W
 
 ## 2. Blowout Lineup Adjustments (rest starters later)
 
+> **WHO THIS APPLIES TO (changed PR0.5, 2026-08-15).** Both margin systems — this one and the
+> conservative strategy override in §1 — used to skip a **user** team entirely, so they had never
+> once been applied to the team doing the blowing out. They now apply to a user team **in full
+> simulation**. **Turn-by-turn (Play Quarter) is unchanged and still exempt:** there the user owns
+> substitutions and playcalls, and overriding them would take away a decision they are actively
+> making. See [`../projects/Blowout_Governor_Spec.md`](../projects/Blowout_Governor_Spec.md) §9.
+
 When the lead becomes a true blowout, build the lineup with the **same autobuild logic and eligibility waterfall**, but **invert the ranking** — seat the **lowest-RT** players (garbage time). A player's **RT = his highest slot rating across the five positions** (`_player_rt_max`). Forced-include players (e.g. a locked FT shooter) still play. Same team-chemistry pools, so there's still variety among the benched-tier players.
 
 **Conditions (margin of victory):**
@@ -65,7 +72,7 @@ When the lead becomes a true blowout, build the lineup with the **same autobuild
 | Situation | Trigger |
 |---|---|
 | Q1 / Q2 / Overtime | **never** |
-| Q3 | margin **> 50** |
+| Q3 | margin **> 40** |
 | Q4, `time_remaining` > 239s | margin **> 35** |
 | Q4, `time_remaining` > 59s | margin **> 25** |
 | Q4, `time_remaining` > 0s | margin **> 20** |
@@ -103,7 +110,7 @@ Lower-skewed weights = more aggressively scaled-back play when leading. Eight se
 
 | Constant | Value | Effect |
 |---|---|---|
-| `BLOWOUT_Q3_MARGIN` | 50 | Margin to rest starters in Q3. |
+| `BLOWOUT_Q3_MARGIN` | 40 | Margin to rest starters in Q3. Was 50 — an unexplained outlier against the Q4 ladder, which steps 35/25/20 as time runs down. A Q3 lead needs *more* margin to be safe than a Q4 lead, not 15 more than the tier right after it. |
 | `BLOWOUT_Q4_MARGIN_EARLY` | 35 | Q4 margin, > early time split remaining. |
 | `BLOWOUT_Q4_MARGIN_MID` | 25 | Q4 margin, > mid time split remaining. |
 | `BLOWOUT_Q4_MARGIN_LATE` | 20 | Q4 margin, any time remaining. |

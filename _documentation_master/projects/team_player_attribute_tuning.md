@@ -1,20 +1,13 @@
 # Team & Player Attribute Tuning — measured season
 
-**Latest run completed 2026-08-15.** Full 26-week regular season, simmed in-process via
-`scripts/eog_measurement_season.py`.
+**Latest run: 2026-08-15, PRODUCTION (`gob`).** Full 26-week regular season plus postseason,
+played through the UI — not simmed.
 
-**Franchise** `6a7faae1e124f3d78f7d63f0` · user team **South Lancaster** · 128 teams ·
-1,524 players · 26 weeks on one unchanged configuration.
+**Franchise** `6a8073d78294292a794bec4c` · user team **HA Rushmore** (26-0 regular season, 33-0
+including postseason) · 128 teams · 1,524 players · AutoTrain run every week.
 
-**Configuration under test** — everything shipped 2026-08-14:
-
-| change | effect |
-|---|---|
-| `scrimmages` universal baseline of 1 | was Attack-vision only; 80% of teams ran 0 |
-| rebound applied ONCE, un-halved, bands re-cut | was two rolls/week with a phantom penalty |
-| EOG rebound bands narrowed | max single-game swing 0.14 → 0.10 |
-| reactive baseline mean 1.43 → 1.00 + tendency tiers | `fb_opp_modifier` / `pt_opp_modifier` |
-| rotating lift on the **nine skills only** | universal:skill ratio 0.97x → 0.72x |
+⚠️ **This is the first PROD dataset here.** Earlier entries in this file were staging sims. Read
+via the read-only guard (`GOB_DB_ACCESS=read`, `PRODUCTION 'gob' opened READ-ONLY`).
 
 ---
 
@@ -22,106 +15,69 @@
 
 Range `(-20, 20)`, buckets of 8. 128 teams × 8 attributes = 1,024 slots.
 
-| attribute | −20~−12 | −12~−4 | −4~4 | 4~12 | 12~20 | mean | railed |
-|---|--:|--:|--:|--:|--:|--:|--:|
-| `offensive_efficiency` | 14 | 2 | 10 | 8 | **94** | +11.9 | 63 |
-| `defensive_efficiency` | 27 | 21 | 9 | 10 | **61** | +4.5 | 44 |
-| `fb_efficiency` | **61** | 27 | 13 | 1 | 26 | −6.7 | 36 |
-| `fb_opp_modifier` | 0 | 0 | 20 | 41 | **67** | +11.4 | 15 |
-| `pt_efficiency` | 35 | 18 | 23 | 11 | 41 | +0.1 | 45 |
-| `pt_opp_modifier` | 0 | 9 | 31 | 35 | **53** | +8.6 | 10 |
-| `discipline` | 18 | 9 | 7 | 10 | **84** | +9.7 | 65 |
-| `fight` | 27 | 22 | 12 | 18 | **49** | +2.3 | 34 |
+| attribute | −20~−12 | −12~−4 | −4~4 | 4~12 | 12~20 | mean | @−20 | @+20 |
+|---|--:|--:|--:|--:|--:|--:|--:|--:|
+| `offensive_efficiency` | 19 | 2 | 4 | 8 | **95** | +11.4 | 16 | **45** |
+| `defensive_efficiency` | 20 | 17 | 5 | 5 | **81** | +8.7 | 8 | **55** |
+| `fb_efficiency` | **59** | 26 | 11 | 5 | 27 | −5.9 | 26 | 13 |
+| `fb_opp_modifier` | 0 | 3 | 17 | 39 | **69** | +11.7 | **0** | 19 |
+| `pt_efficiency` | **43** | 11 | 21 | 15 | 38 | −0.8 | 29 | 17 |
+| `pt_opp_modifier` | 0 | 4 | 18 | 42 | **64** | +11.2 | **0** | 15 |
+| `discipline` | 23 | 5 | 7 | 11 | **82** | +9.2 | 11 | **55** |
+| `fight` | 33 | 19 | 15 | 20 | 41 | +0.9 | 11 | 14 |
+| **TOTAL** | | | | | | | **101** | **233** |
 
-### Rails split by direction
+**334 of 1,024 slots railed (33%) — 233 at the CEILING against 101 at the floor.** The league
+drifts upward. The reactive pair (`fb_opp_modifier`, `pt_opp_modifier`) remain the healthiest:
+**zero teams at the floor**, 15–19 rails each.
 
-| attribute | mean | at **−20** | at **+20** | total |
-|---|--:|--:|--:|--:|
-| `discipline` | +9.7 | 8 | **57** | 65 |
-| `offensive_efficiency` | +11.9 | 12 | **51** | 63 |
-| `pt_efficiency` | +0.1 | **25** | 20 | 45 |
-| `defensive_efficiency` | +4.5 | 8 | **36** | 44 |
-| `fb_efficiency` | −6.7 | **25** | 11 | 36 |
-| `fight` | +2.3 | 12 | 22 | 34 |
-| `fb_opp_modifier` | +11.4 | **0** | 15 | 15 |
-| `pt_opp_modifier` | +8.6 | **0** | 10 | 10 |
-| **TOTAL** | | **90** | **222** | **312** |
+## `shot_threshold` — no rails, but the strongest non-talent predictor of winning
 
-**312 of 1,024 slots railed (30%), and 71% of those are at the CEILING.** The league drifts
-upward, it does not merely spread. Accepted as intended — teams should have distinct identities
-after 26 games.
+Range `-10–190` (MID 90), mean **59.5**, median 56.0, **actual spread 10 → 124**.
 
-**The reactive pair are the healthiest in the table**: `fb_opp_modifier` and `pt_opp_modifier`
-have **zero teams at the floor** and only 10–15 rails each. That is the tendency-tier design
-producing a real distribution rather than a converged one.
+| tier | teams | share | |
+|---|--:|--:|---|
+| −10 – 30 | 8 | 6% | `███` |
+| **30 – 70** | **90** | **70%** | `███████████████████████████████████` |
+| 70 – 110 | 25 | 20% | `██████████` |
+| 110 – 150 | 5 | 4% | `██` |
+| 150 – 190 | 0 | 0% | |
 
-**Genuinely bipolar**: `pt_efficiency` (25 down / 20 up) and `fb_efficiency` (25 down / 11 up) —
-press and fast-break teams build them while everyone else lets them rot. Identity working.
+Floor 0 · ceiling 0. ✅ The scrimmages baseline is holding — no rails in either direction.
 
----
+⚠️ **`corr(shot_threshold, wins) = −0.495`** — second only to talent. And the league uses just
+**57% of the 200-point range** (10–124), so *narrowing the scale would not help*: it would
+compress the same 114-point competitive gap into fewer points and make each point hurt more.
+**The issue is that EOG rewards the already-good, not that the range is wide.**
 
 ## `rebound_modifier` — U-shaped, hollow middle
 
-Range `0.0–1.0`, mean **0.54**, median 0.60.
+Mean **0.52**, median 0.55. Floor 28 · ceiling 35.
 
 | tier | teams | share | |
 |---|--:|--:|---|
-| 0.0 – 0.2 | **46** | 36% | `██████████████████████` |
-| 0.2 – 0.4 | 7 | 5% | `███` |
-| 0.4 – 0.6 | 11 | 9% | `█████` |
+| 0.0 – 0.2 | **51** | 40% | `████████████████████` |
+| 0.2 – 0.4 | 5 | 4% | `██` |
+| 0.4 – 0.6 | 11 | 9% | `████` |
 | 0.6 – 0.8 | 7 | 5% | `███` |
-| 0.8 – 1.0 | **57** | 45% | `███████████████████████████` |
+| 0.8 – 1.0 | **54** | 42% | `█████████████████████` |
 
-Floor 32 · ceiling 34.
+**82% in the two extreme tiers, 18% across the middle three.** Being *average* at rebounding is
+nearly impossible. Training drift is fixed; EOG step size is not — ±0.10 in one game against
++0.0125 per week of training.
 
-⚠️ **81% of teams sit in the two extreme tiers; 19% occupy the middle three.** The mean of 0.54
-is two crowds cancelling, not a league centred on 0.5 — being *average* at rebounding is nearly
-impossible. The training fix removed the drift but not EOG's step size: **±0.10 in a single
-game against training's +0.0125 per week**, so one rebounding run still crosses the range.
+## `team_chemistry` — one-way ramp
 
----
-
-## `shot_threshold` — tight, single-peaked, ZERO rails
-
-Range `-10–190` (MID 90, init 85–95), mean **57.7**, median 54.5.
+Mean **19.7**, median 22.5. Floor 3 · ceiling **37**.
 
 | tier | teams | share | |
 |---|--:|--:|---|
-| −10 – 30 | 3 | 2% | `█` |
-| **30 – 70** | **98** | **77%** | `██████████████████████████████████████████████` |
-| 70 – 110 | 24 | 19% | `███████████` |
-| 110 – 150 | 3 | 2% | `█` |
-| 150 – 190 | 0 | 0% | |
-
-Floor 0 · ceiling 0.
-
-✅ **The scrimmages fix worked.** Prior season: mean +135.8, 23 rails, 104 of 128 teams in the
-top bucket, and the tier containing the init range EMPTY. Now zero rails in either direction and
-a genuine centre — **the only attribute in the system with no rails at all**.
-
-⚠️ Two residual issues, opposite to the rebounding problem: **77% of teams sit in one tier** (so
-shooting barely differentiates), and the league settled **~32 below MID**, meaning everyone
-shoots better than the scale's centre assumes.
-
----
-
-## `team_chemistry` — a one-way ramp
-
-Range `7–25` (init 8–11), mean **19.7**, median 21.0.
-
-| tier | teams | share | |
-|---|--:|--:|---|
-| 7 – 10 | 8 | 6% | `████` |
-| 10 – 13 | 10 | 8% | `█████` |
-| 13 – 16 | 14 | 11% | `███████` |
-| 16 – 19 | 15 | 12% | `███████` |
-| 19 – 22 | 19 | 15% | `█████████` |
-| **22 – 25** | **62** | **48%** | `█████████████████████████████` |
-
-Floor 6 · ceiling 38.
-
-Monotonically increasing into the top tier. Every tier is populated — healthier than the other
-two — but it is a one-way climb from an 8–11 init rather than a spread.
+| 7 – 10 | 10 | 8% | `████` |
+| 10 – 13 | 14 | 11% | `█████` |
+| 13 – 16 | 11 | 9% | `████` |
+| 16 – 19 | 9 | 7% | `████` |
+| 19 – 22 | 15 | 12% | `██████` |
+| **22 – 25** | **69** | **54%** | `███████████████████████████` |
 
 ---
 
@@ -131,63 +87,95 @@ Raw attribute points, **not RT**. Every `TOTAL` row is the sum of 12 attribute d
 
 | attr | TC (wk 1) | wks 2–26 | % up | TC + season | % up |
 |---|--:|--:|--:|--:|--:|
-| **ND** | +1.69 | **+5.45** | 92% | **+7.14** | 97% |
-| **IQ** | +1.78 | +4.05 | 87% | **+5.83** | 94% |
-| **FT** | +1.75 | +3.95 | 86% | **+5.70** | 94% |
-| SC | +1.07 | −1.69 | 34% | −0.62 | 43% |
-| RB | +1.15 | −1.57 | 39% | −0.42 | 42% |
-| SH | +1.12 | −2.10 | 26% | −0.98 | 32% |
-| ST | +1.06 | −2.20 | 32% | −1.14 | 37% |
-| OD | +1.08 | −2.45 | 30% | −1.37 | 39% |
-| ID | +1.06 | −2.96 | 29% | −1.90 | 34% |
-| AG | +1.02 | −3.24 | 26% | −2.22 | 35% |
-| PS | +0.99 | −3.24 | 26% | −2.25 | 31% |
-| BH | +1.02 | −3.27 | 27% | −2.25 | 32% |
-| **TOTAL** | **+14.78** | **−9.27** | 32% | **+5.51** | **58%** |
+| **ND** | +1.68 | **+6.21** | 94% | **+7.89** | 97% |
+| **IQ** | +1.81 | +4.51 | 88% | **+6.32** | 95% |
+| **FT** | +1.73 | +4.41 | 89% | **+6.14** | 95% |
+| SC | +1.07 | −1.54 | 34% | −0.47 | 42% |
+| RB | +1.19 | −1.53 | 40% | −0.34 | 43% |
+| SH | +1.09 | −2.01 | 28% | −0.93 | 33% |
+| ST | +1.06 | −2.33 | 32% | −1.28 | 36% |
+| OD | +1.07 | −2.42 | 30% | −1.35 | 39% |
+| ID | +1.07 | −3.10 | 28% | −2.03 | 34% |
+| PS | +0.97 | −3.14 | 28% | −2.17 | 33% |
+| BH | +0.97 | −3.29 | 29% | −2.31 | 32% |
+| AG | +1.00 | −3.33 | 27% | −2.33 | 34% |
+| **TOTAL** | **+14.71** | **−7.57** | 35% | **+7.15** | **60%** |
 
 ## Player attributes — by class year
 
 | year | n | camp (wk 1) | in-season | **total** |
 |---|--:|--:|--:|--:|
-| freshman | 89 | +24.19 | **−46.52** | **−22.33** |
-| sophomore | 276 | +16.41 | +14.93 | **+31.34** |
-| junior | 527 | +14.84 | −2.33 | +12.51 |
-| senior | 632 | +12.68 | **−20.38** | **−7.70** |
+| freshman | 81 | +24.21 | **−43.79** | **−19.57** |
+| sophomore | 285 | +16.29 | +16.67 | **+32.96** |
+| junior | 527 | +14.73 | −1.34 | +13.39 |
+| senior | 631 | +12.77 | **−19.07** | **−6.30** |
 
-### ⚠️ This is materially worse than the previous configuration
+**Two of four class years finish net negative.** Freshmen lose nearly double what camp gave them.
+The universals (`ND`/`IQ`/`FT`) gain 88–94% of the time; the nine skills fall for 60–73% of
+players. Fit dominates — this is unchanged from the staging measurement and confirms it on prod.
 
-| | previous | **this run** |
-|---|--:|--:|
-| in-season total | −4.59 (12 wks) | **−9.27** (25 wks) |
-| season total | +19.53 | **+5.51** |
-| players net up | 79% | **58%** |
-| freshman total | −8.54 | **−22.33** |
-| senior total | +5.52 | **−7.70** |
+---
 
-**Two of four class years now finish net negative.** Freshmen lose all of camp and more; seniors
-flipped from +5.5 to −7.7.
+## Findings from this season
 
-**The cause is the deliberate tilt.** Removing `ND`/`IQ`/`FT` from the rotating lift moved points
-onto skills at fit ~0.56, where they buy far less than the same points at fit 1.00. The ratio hit
-its 0.72x target — but universals still gained (`ND +5.45`) while skills fell *further* than
-before. **Fit dominates: the allocation change could not overcome it and made the league poorer
-in the attempt.**
+### AutoTrain is NOT overpowered — winning is
 
-Holding all twelve needs 2 points each = 24 = the entire budget with nothing for team drills. The
-remaining lever is the in-season economy — `IN_SEASON_GAIN_SCALE` (0.28), the year decay ranges,
-and `TRAINING_GAIN_PERCENTAGES` — which belongs to the player-development system.
+The user's allocation is **identical to the CPU's**: all team drills at 1, `scrimmages: 1`,
+general at 1, with `shot_threshold +3` from training in week 26 — same direction and magnitude as
+CPU teams.
+
+| | HA Rushmore | CPU mean | CPU best | pctile |
+|---|--:|--:|--:|--:|
+| player attrs / player | 563.8 | 508.0 | 608.9 | **94%** |
+| top-8 position rating | 68.8 | 64.4 | 76.8 | 86% |
+| **`shot_threshold`** | **10** | **59.5** | 10 *(user)* | **best in league** |
+| `offensive_efficiency` | −10 | +11.4 | +20 | **15%** |
+
+94th percentile on talent — strong, **not** the strongest — and *below average* on offensive
+efficiency. **The `shot_threshold` gap is the whole advantage, and winning caused it**: EOG pays
+`−6…−2` for shooting above 37%, so 26 straight blowouts took the reward band nearly every game.
+Win big → threshold drops → shoot better → win bigger.
+
+**Confirmation it is not the user:** `Couer d'Alene` also went **26-0** with the same Run and Gun
+/ Full-Court Press identity and `shot_threshold` 49, without AutoTrain.
+
+### Losing teams: talent, not identity
+
+**`corr(talent, wins) = +0.750`** — dominates everything. Bottom 12 average ~462 total
+attributes, top 12 ~558.
+
+Identity is a real but second-order effect:
+
+| defensive vision | n | mean wins | | offensive vision | n | mean wins |
+|---|--:|--:|---|---|--:|--:|
+| Multiple | 17 | **16.2** | | Attack | 17 | **14.8** |
+| Man Lockdown | 17 | 14.7 | | Run and Gun | 28 | 14.3 |
+| Full-Court Press | 38 | 13.6 | | Motion | 16 | 12.6 |
+| Zone | 40 | 11.8 | | Spread | 31 | 12.4 |
+| **Contain** | 16 | **9.3** | | Inside-Out | 36 | 11.8 |
+
+⚠️ **`Contain` costs ~7 wins against `Multiple`** — the clearest identity signal in the data and
+the one worth investigating. The bottom 12 skew `Zone` (5/12) and `Inside-Out` (5/12), both
+below-average visions, but their talent deficit is the larger factor.
+
+### Drift: a CEILING problem on team attributes, a FLOOR problem on player skills
+
+* **Team:** 233 ceiling rails vs 101 floor. `offensive_efficiency`, `defensive_efficiency` and
+  `discipline` each have 45–55 teams pinned at +20; `team_chemistry` has 37 at its ceiling.
+* **Player:** the opposite — nine of twelve attributes decline for most players, and only the
+  three fit-1.00 universals reliably grow.
 
 ---
 
 ## Method
 
 Team attributes are point-in-time snapshots of `ftd.team_attributes`. Player attributes are
-summed from `ftd.training_reports[week].player_changes`. Read-only; no sim or dry run, so none of
-the measurement caveats that apply to dry-run A/Bs apply here.
+summed from `ftd.training_reports[week].player_changes`. Read-only against production; the write
+guard was verified engaged (`ProdWriteBlocked`) before any query ran.
 
 ## Related
 
-* [`team_attribute_testing.md`](./team_attribute_testing.md) — earlier franchises, same rail methodology
-* [`cpu_identity_training_design.md`](./cpu_identity_training_design.md) — the allocation system
+* [`team_attribute_testing.md`](./team_attribute_testing.md) — earlier staging franchises, same rail methodology
+* [`cpu_identity_design.md`](./cpu_identity_design.md) — the allocation system
 * [`../09_Training_Systems/In_Season_Training_Summary.md`](../09_Training_Systems/In_Season_Training_Summary.md) — the fit model these numbers test
 * [`../06_Gameplay_Systems/End_Of_Game_System.md`](../06_Gameplay_Systems/End_Of_Game_System.md) — the EOG bands
