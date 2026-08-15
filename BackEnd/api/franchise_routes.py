@@ -2976,6 +2976,23 @@ def auto_train_one_cpu_team(
             )
         }
 
+    # DEFERRED offseason (Week-1 TC), CPU parity: develop this team's roster once before camp
+    # when the season transition armed the FTD marker. Mirrors the user path (in place on the
+    # loaded FPD docs, so the player list + camp build on developed values). The marker is
+    # CLEARED only in the success-path FTD write below (after FPD persist), so a mid-write
+    # rollback leaves it set and a retry re-develops from the un-developed docs. (Plan doc.)
+    from BackEnd.constants.training_shape import is_camp_week as _is_camp_week_gate
+    _cpu_is_camp = bool(is_first_training) if is_first_training is not None else _is_camp_week_gate(week)
+    _cpu_offseason_pending = bool(_cpu_is_camp and ftd_doc.get("offseason_dev_pending_season"))
+    if _cpu_offseason_pending:
+        _cpu_season = int(ftd_doc.get("offseason_dev_pending_season") or 0)
+        _cpu_to_dev = [
+            fpd_by_player_id[str(pid)]
+            for pid in team_player_ids
+            if fpd_by_player_id.get(str(pid))
+        ]
+        _apply_deferred_offseason(_cpu_to_dev, _cpu_season)
+
     from BackEnd.constants.training_shape import training_position_projection
 
     players_for_training: list[dict] = []
@@ -3170,6 +3187,11 @@ def auto_train_one_cpu_team(
         if updated_scouting is not None:
             ftd_update["scouting_data"] = updated_scouting
         ftd_update[f"training_reports.{week}"] = training_report
+        if _cpu_offseason_pending:
+            # Consumed the deferred offseason — disarm. Safe here: this runs only after the
+            # FPD develop+camp persisted above; on a mid-write failure we hit `except` first
+            # and leave the marker set so a retry re-develops from the un-developed docs.
+            ftd_update["offseason_dev_pending_season"] = None
 
         ftd_ops: dict[str, Any] = {"$set": ftd_update}
         cf_inc = user_ftd_coaching_focus_increment(coaching_focus, training_camp_first_week=is_first)
@@ -10030,6 +10052,7 @@ def get_leaders(
             team_filters.append({"meta.team": {"$in": list(allowed_team_names)}})
         pipeline.append({"$match": {"$or": team_filters}})
 
+    per_game_stats = {"PTS", "REB", "AST"}
     if stat in {"FG%", "DEF%"}:
         numerator_field = "FGM" if stat == "FG%" else "DEF_S"
         denominator_field = "FGA" if stat == "FG%" else "DEF_A"
@@ -10070,6 +10093,28 @@ def get_leaders(
             {"$sort": {"value": -1, "tiebreak_volume": -1}},
             {"$limit": limit},
         ])
+    elif stat in per_game_stats:
+        pipeline.extend([
+            {
+                "$project": {
+                    "player_id": 1,
+                    "meta": 1,
+                    "gp": {"$ifNull": [f"${scope}.GP", 0]},
+                    "total": {"$ifNull": [f"${scope}.{stat_field}", 0]},
+                }
+            },
+            {"$match": {"gp": {"$gt": 0}}},
+            {
+                "$project": {
+                    "player_id": 1,
+                    "meta": 1,
+                    "value": {"$divide": ["$total", "$gp"]},
+                    "tiebreak_total": "$total",
+                }
+            },
+            {"$sort": {"value": -1, "tiebreak_total": -1}},
+            {"$limit": limit},
+        ])
     else:
         pipeline.extend([
             {
@@ -10090,7 +10135,9 @@ def get_leaders(
     for p in agg:
         meta = p.get("meta", {})
         value = p.get("value", 0)
-        if stat == "FG%":
+        if stat in per_game_stats:
+            value = round(float(value or 0), 1)
+        elif stat == "FG%":
             value = round(float(value or 0), 1)
         elif stat == "DEF%":
             value = int(round(float(value or 0)))
@@ -14992,6 +15039,33 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         ):
             core_physique_by_id[str(doc["_id"])] = doc
 
+    # DEFERRED offseason development (Week-1 TC): if the season transition armed the marker,
+    # develop this team's roster ONCE, before camp, so the user sees offseason + camp as one
+    # jump. Runs in place on the loaded FPD docs → the player list below (and camp) build on
+    # the developed values, and the post-camp FPD persist writes offseason+camp together.
+    # See Defer_Offseason_To_Camp_Plan.md.
+    current_season = int(franchise_doc.get("current_season", 1) or 1)
+    _offseason_reports: list[dict] = []
+    _offseason_pending = (
+        is_first_training
+        and int(ftd_doc.get("offseason_dev_pending_season") or 0) == current_season
+    )
+    if _offseason_pending:
+        _to_develop = []
+        for pid in team_player_ids:
+            doc = franchise_players.get(str(pid))
+            if not doc:
+                continue
+            _meta = doc.setdefault("meta", {})
+            if _meta.get("height") is None:
+                _core = core_physique_by_id.get(str(pid)) or {}
+                if _core.get("height") is not None:
+                    _meta["height"] = _core["height"]
+                if _core.get("weight") is not None:
+                    _meta["weight"] = _core["weight"]
+            _to_develop.append(doc)
+        _offseason_reports = _apply_deferred_offseason(_to_develop, current_season)
+
     # Build player list with franchise-specific attributes
     players_load_start = time.time()
     players_for_training = []
@@ -15328,6 +15402,9 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     }
 
     ftd_update[f"training_reports.{week}"] = training_report_data
+    if _offseason_pending:
+        # Consumed the deferred offseason this run — disarm so it never re-applies.
+        ftd_update["offseason_dev_pending_season"] = None
 
     ftd_ops: dict[str, Any] = {}
     if ftd_update:
@@ -15355,6 +15432,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
             "coaching_focus": training_report.get("coaching_focus", {}),
             "session_type": session_type,
             "team_id": team_id,
+            "offseason_development": _offseason_reports,
             "redirect": None,
         }
 
@@ -15387,6 +15465,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
         "team_changes": team_log,
         "coaching_focus": training_report.get("coaching_focus", {}),
         "session_type": session_type,
+        "offseason_development": _offseason_reports,
         "redirect": f"/training-report.html?mode=franchise&franchise_id={req.franchise_id}&team_id={team_id}&week={week}&from=training",
     }
 
@@ -16529,6 +16608,42 @@ def _build_offseason_report_line(new_doc: dict, prev_doc: dict, dev_result: dict
     }
 
 
+def _apply_deferred_offseason(fpd_docs: list[dict], season: int) -> list[dict]:
+    """Apply the DEFERRED offseason `develop_rollover` to each FPD doc IN PLACE and return
+    offseason report lines. Called at Week-1 Training Camp (before camp training) by both
+    the user and CPU paths; the caller GATES on the FTD `offseason_dev_pending_season`
+    marker and CLEARS it after. See Defer_Offseason_To_Camp_Plan.md.
+
+    develop_rollover is a RESCALE, not idempotent — running it twice double-applies. Safety
+    is the caller's marker + once-guards (user_training_applied_week / cpu_autotrain_week),
+    which clear only after a successful persist; on a pre-persist failure the un-developed doc
+    is re-read and the per-(player, season) deterministic seed reproduces the same result.
+    The doc already carries entry_tier/potential/development/… (finish_season used
+    carry_dev_fields); develop_rollover backfills any missing one. season_allocation is None —
+    coaching-quality capture is dormant (pillar 3), matching pre-defer behaviour exactly."""
+    from BackEnd.utils.player_development import develop_rollover
+    reports: list[dict] = []
+    for doc in fpd_docs:
+        meta = doc.get("meta") or {}
+        year = meta.get("year")
+        prev = {"position_ratings": dict(doc.get("position_ratings") or {})}
+        rng = random.Random(f"offseason:{doc.get('player_id')}:{season}")
+        dev = develop_rollover(doc, year, rng, season_allocation=None)
+        doc["attributes"] = dev["attributes"]
+        doc.setdefault("meta", {})
+        doc["meta"]["height"] = dev["height"]
+        doc["meta"]["weight"] = dev["weight"]
+        doc["position_ratings"] = dev["position_ratings"]
+        doc["development"] = dev["development"]
+        doc["entry_tier"] = dev["entry_tier"]
+        doc["position_intent"] = dev["position_intent"]
+        doc["potential_factor"] = dev["potential_factor"]
+        doc["training_position"] = dev["training_position"]
+        doc["coaching_quality"] = dev["coaching_quality"]
+        reports.append(_build_offseason_report_line(doc, prev, dev))
+    return reports
+
+
 def _coaching_accumulator_for_player(player_id: str) -> Optional[Dict[str, float]]:
     """Read the just-finished season's per-player training accumulator (attr →
     points/week, 0-5 per the drill sliders), the QUALITY-half input to develop_rollover.
@@ -16599,10 +16714,10 @@ def finish_season(req: FinishSeasonRequest):
     signed_players = list(week_35_results.get("signed_players") or [])
     zero_stats = _zero_stats_block()
 
-    # Offseason development event (§7.1) runs per rolled-over player below. Uses the
-    # global random stream (this endpoint is not seeded); collects a report list.
-    from BackEnd.utils.player_development import develop_rollover
-    _dev_rng = random
+    # Offseason development is DEFERRED to Week-1 TC (see per-player note below and
+    # Defer_Offseason_To_Camp_Plan.md). finish_season only advances YEAR + carries dev
+    # fields; develop_rollover runs at "Run Training". This report list stays empty here
+    # (the offseason report is emitted with the Week-1 training report instead).
     _offseason_reports: list[dict[str, Any]] = []
 
     def advance_year(year_value: str | None) -> str:
@@ -16655,27 +16770,12 @@ def finish_season(req: FinishSeasonRequest):
                 # league would revert to the default curve — the highest-risk failure here.
                 **carry_dev_fields(fpd_doc),
             }
-            # Offseason development event (§7.1): develop the returning player onto
-            # his new year's rung, then recompute ratings (incl. after HT growth).
-            # Lazy-backfills + persists a missing profile once (existing saves).
-            # season_allocation is the season's per-player training accumulator
-            # (attr → points/week); coaching quality is scored against training_position.
-            # None → f 1.0 (frozen reference). CPU teams record no allocation until
-            # the archetype-training rework (pillar 3), so the league holds exactly
-            # at pass-1; the exact-diff baseline is CPU-only and stays byte-identical.
-            _season_alloc = _coaching_accumulator_for_player(player_id_str)
-            _dev = develop_rollover(next_doc, meta["year"], _dev_rng, season_allocation=_season_alloc)
-            next_doc["attributes"] = _dev["attributes"]
-            next_doc["meta"]["height"] = _dev["height"]
-            next_doc["meta"]["weight"] = _dev["weight"]
-            next_doc["position_ratings"] = _dev["position_ratings"]
-            next_doc["development"] = _dev["development"]
-            next_doc["entry_tier"] = _dev["entry_tier"]
-            next_doc["position_intent"] = _dev["position_intent"]
-            next_doc["potential_factor"] = _dev["potential_factor"]
-            next_doc["training_position"] = _dev["training_position"]
-            next_doc["coaching_quality"] = _dev["coaching_quality"]
-            _offseason_reports.append(_build_offseason_report_line(next_doc, fpd_doc, _dev))
+            # Offseason development is DEFERRED to Week-1 Training Camp (see
+            # projects/Defer_Offseason_To_Camp_Plan.md). The player rolls over with his
+            # new YEAR and carried dev fields (entry_tier/potential/development/… via
+            # carry_dev_fields) but UN-developed attributes. The offseason develop_rollover
+            # runs at TC "Run Training" (before camp) so the user sees offseason + camp as
+            # one jump. `offseason_dev_pending_season` on the new FTD arms that step.
             next_fpd_docs.append(next_doc)
             returning_players_by_team[team_id].append(player_id_str)
             if player_id_str in scholarship_players:
@@ -16721,21 +16821,9 @@ def finish_season(req: FinishSeasonRequest):
             # missing ones lazy-backfill inside develop_rollover.
             **carry_dev_fields(signed_player),
         }
-        # Signed players enter advanced one year, so they too walk an offseason rung.
-        # No in-season record yet (just signed) → season_allocation None → f 1.0.
-        _prev = {"position_ratings": signed_doc["position_ratings"]}
-        _dev = develop_rollover(signed_doc, signed_doc["meta"]["year"], _dev_rng, season_allocation=None)
-        signed_doc["attributes"] = _dev["attributes"]
-        signed_doc["meta"]["height"] = _dev["height"]
-        signed_doc["meta"]["weight"] = _dev["weight"]
-        signed_doc["position_ratings"] = _dev["position_ratings"]
-        signed_doc["development"] = _dev["development"]
-        signed_doc["entry_tier"] = _dev["entry_tier"]
-        signed_doc["position_intent"] = _dev["position_intent"]
-        signed_doc["potential_factor"] = _dev["potential_factor"]
-        signed_doc["training_position"] = _dev["training_position"]
-        signed_doc["coaching_quality"] = _dev["coaching_quality"]
-        _offseason_reports.append(_build_offseason_report_line(signed_doc, _prev, _dev))
+        # Offseason development DEFERRED to Week-1 TC (see returning-players note above).
+        # Signed recruit rolls in with his new YEAR + carried dev fields but UN-developed
+        # attributes; the JH→FR (etc.) develop_rollover runs at TC before camp.
         next_fpd_docs.append(signed_doc)
 
     next_fpd_map = {doc["player_id"]: doc for doc in next_fpd_docs}
@@ -16793,6 +16881,14 @@ def finish_season(req: FinishSeasonRequest):
                 existing_ftd.get("coaching_focus")
             ),
             "total_player_attrs": total_player_attrs,
+            # Arms the DEFERRED offseason develop: Week-1 TC "Run Training" develops every
+            # player once when this equals current_season, then clears it. Set only by a
+            # real season transition, so a freshly-created franchise (no flag) never
+            # double-develops its generated roster. (See Defer_Offseason_To_Camp_Plan.md.)
+            # NOTE (1b, accepted): total_player_attrs above is now summed off PRE-camp
+            # rosters — bounded impact (relative order ~preserved; ranking weight decays to
+            # 0 by wk5). Revisit if preseason ranking needs post-camp totals.
+            "offseason_dev_pending_season": next_season,
             "prestige": int(existing_ftd.get("prestige", 0) or 0),
             "sos_avg": SOS_AVG_DEFAULT,
             "sos_rank_sum": 0.0,
@@ -16842,6 +16938,10 @@ def finish_season(req: FinishSeasonRequest):
                     "training_reports": state["training_reports"],
                     "coaching_focus": state["coaching_focus"],
                     "total_player_attrs": state["total_player_attrs"],
+                    # Arms the DEFERRED offseason develop at Week-1 TC. MUST be persisted
+                    # here — this $set enumerates fields, so a state-dict-only entry would
+                    # silently never reach the FTD and the develop would never fire.
+                    "offseason_dev_pending_season": state["offseason_dev_pending_season"],
                     "sos_avg": state["sos_avg"],
                     "sos_rank_sum": state["sos_rank_sum"],
                     "sos_games_played": state["sos_games_played"],
