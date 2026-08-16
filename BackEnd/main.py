@@ -289,7 +289,7 @@ def _ensure_complete_lineup(
         )
     
     # Fill gaps with unified autoset (position_ratings + chemistry pools; same family as build_lineup_from_mongo)
-    from BackEnd.utils.db_utils import fill_unified_lineup_gaps
+    from BackEnd.utils.db_utils import fill_unified_lineup_gaps, _blowout_lineup_active
 
     tc = 15.0
     if getattr(team, "team_attributes", None):
@@ -298,11 +298,15 @@ def _ensure_complete_lineup(
         except (TypeError, ValueError):
             tc = 15.0
     existing = {pos: team.lineup.get(pos) for pos in POSITION_LIST if team.lineup.get(pos)}
+    # Garbage time: a foul-out here used to seat the BEST available player, undoing the
+    # blowout lineup one slot at a time. `_blowout_lineup_active` carries its own gating —
+    # never before Q3, and never for a user team in turn-by-turn, where the user owns subs.
     filled = fill_unified_lineup_gaps(
         available_players,
         tc,
         missing,
         existing_assignments=existing,
+        prefer_lowest_rt=_blowout_lineup_active(team, game_state),
     )
     for pos in missing:
         team.lineup[pos] = filled[pos]

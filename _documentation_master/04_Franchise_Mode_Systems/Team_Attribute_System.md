@@ -317,21 +317,52 @@ This is the team's intangible mindset to convert baskets. Their overall belief i
 - Faucet: Training System / Scrimmages.
   Condition: `scrimmages` slider at `0`.
   Range: `0 pts -> +5 to +15` (worse shooting attribute).
-- Faucet / slight sink: Training System / Scrimmages.
-  Condition: `scrimmages` at `1` pt.
-  Range: `+= random.randint(0, 5)` (neutral to slight worsening).
+- **Neutral (the hold rung): Training System / Scrimmages.**
+  Condition: `scrimmages` at `1` pt — which is where **every team sits**, always (`_SCRIMMAGE_BASELINE = 1`).
+  Range: `+= random.randint(-5, 5)` — **mean zero**. Changed 2026-08-15 from `randint(0, 5)`
+  (mean +2.5), which quietly degraded the whole league; see § The 1-point rung below.
 - Sink: Training System / Scrimmages.
   Condition: `scrimmages` at `2+` pts.
   Range: `2 pts -> -3 to -8`, `3 pts -> -5 to -11`, `4 pts -> -5 to -15`, `5+ pts -> -5 to -20`.
-- Faucet: End Of Game System.
-  Condition: team FG% `<= 45%`.
-  Range: **both** teams `+5 to +10`.
-- Mixed EOG: End Of Game System.
-  Condition: team FG% `> 45%` and `≤ 50%`.
-  Range: winner `+= random.randint(-5, 0)`; loser `+= random.randint(0, 5)`.
 - Sink: End Of Game System.
-  Condition: team FG% `> 50%`.
-  Range: **both** teams `+= random.randint(-10, -5)`.
+  Condition: team FG% `> FG_PCT_HIGH` (**45**).
+  Range: `+= random.randint(-6, -2)` (band id `fg_gt_50` — an instrumentation label, not a threshold).
+- Mixed EOG: End Of Game System.
+  Condition: `FG_PCT_MID` (**40**) `< FG% <=` `FG_PCT_HIGH` (**45**).
+  Range: winner `+= random.randint(-1, 0)`; loser `+= random.randint(0, 1)` (band id `fg_45_to_50`).
+- Faucet: End Of Game System.
+  Condition: team FG% `<=` `FG_PCT_MID` (**40**).
+  Range: `+= random.randint(2, 6)` (band id `fg_le_45`).
+
+#### The 1-point rung, and why the EOG cuts moved with it (2026-08-15)
+
+Measured across the finished PROD season (franchise `6a8073d78294292a794bec4c`):
+
+| force | per team-season | how it was measured |
+|---|--:|---|
+| training | **+57.2** | `training_reports[wk].team_changes`, ~+2.9/week for 26 weeks |
+| EOG (under the old 22/37 cut) | **−87.7** | `games.team_attribute_changes` |
+| **net** | **−30.5** | init 90.0 → measured 59.5 — the decomposition closes exactly |
+
+**2,518 of 2,518 team-weeks landed on the 1-point rung.** Not one team in 127 ever allocated
+0 or 2+ scrimmage points, all season. So a rung with mean +2.5 was degrading the entire
+league every week, and EOG's reward branch existed largely to absorb it rather than to shape
+shooting mindset. The ladder offered no hold: 0 → +10, 1 → +2.5, 2 → −5.5, i.e. a choice
+between roughly **+65/season and −143/season** with nothing between.
+
+Two changes shipped together:
+
+1. **1-point rung → `randint(-5, 5)`**, mean zero. Training's league-wide contribution goes
+   to ~0 and the ladder becomes monotone with a real hold.
+2. **EOG cuts 22/37 → 40/45.** The old cuts were measured against a league shooting **45.16%**
+   (mean team-game FG%), which put `FG_PCT_HIGH = 37` at the 18th percentile and
+   `FG_PCT_MID = 22` at the **0.2nd** — the penalty branch caught 8 team-games out of 4,220
+   and was effectively dead. Branch mass went 82.7/17.1/**0.2** → 49.7/20.5/**29.8**.
+
+Projected net after both: **≈ −21/season** (EOG −21.3, training ~0), versus +35.9 had only
+the cuts moved. ⚠️ This is **not** drift-neutral and that is deliberate — the drift-neutral
+pair was **35/40**, and it is the fallback if the league rails at either end. Full derivation
+and the caveats in `BackEnd/constants/eog_attr_bands.py`.
 
 **UI (Shooting pill and deltas):** Raw `shot_threshold` is a golf score (lower is better). Horizontal pills use **100** as center, **0** at the favorable end and **200** at the unfavorable end. Shared helpers: `FrontEnd/static/js/shared/teamShotThresholdScale.js`. **Training report** and **box score attribute-change** copy invert the numeric delta for display: a raw **−10** shows as **+10** in green; a raw **+5** shows as **−5** in red. See **[Shot_Threshold_Scale_Tuning.md](../00_Operations/Shot_Threshold_Scale_Tuning.md)**.
 

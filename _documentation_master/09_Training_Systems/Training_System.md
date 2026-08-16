@@ -979,10 +979,16 @@ survived unnoticed.
 * **Twelve player-attribute slots never drop below 1** — the 9 skills plus conditioning,
   free throws and film study. A 0 costs −1 to −2 *every week* with no probability gate, so the
   floors are what keep CPU rosters from bleeding out.
-* **`scrimmages` is pinned to 1 for every team, every week.** 0 gives **+191** shot_threshold per
-  season and 2 gives **−212** on a 200-point scale — one point is the only stable value, so
+* **`scrimmages` is pinned to 1 for every team, every week** (`_SCRIMMAGE_BASELINE = 1`), and
+  that rung is now a **true hold**: `randint(-5, 5)`, mean zero. 0 points gives roughly
+  **+260**/season and 2 points **−143**/season, so one point remains the only stable value and
   nothing may touch that slot. It was previously installed by the Attack vision alone, which put
-  ~80% of the league on the +191 path.
+  ~80% of the league on the 0-point path.
+  ⚠️ **Until 2026-08-15 the 1-point rung was `randint(0, 5)`, mean +2.5 — not a hold.** Measured
+  on the prod season, **2,518 of 2,518 team-weeks** sat on this rung (no team in 127 ever picked
+  0 or 2+), so the whole league degraded **+57.2 shot_threshold/season** and the EOG reward band
+  was absorbing it. Fixed together with the EOG band re-cut (22/37 → 40/45). Derivation:
+  [`../04_Franchise_Mode_Systems/Team_Attribute_System.md`](../04_Franchise_Mode_Systems/Team_Attribute_System.md) § The 1-point rung.
 * **Two weekly modes**, ~50/50: a FOCUS week (one skill emphasis at 3 points) and a ROSTER week
   (a rotating +1 lift across the nine skills). `ND`/`IQ`/`FT` are excluded from the lift.
 * **Reactive installs** (`fast_breaks.defense_install`, `presses_traps.offense_install`) get a

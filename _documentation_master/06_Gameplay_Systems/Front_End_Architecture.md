@@ -50,6 +50,7 @@ All major regions are defined by one grid container.
 | Variable               | Value   | Purpose |
 |------------------------|---------|---------|
 | `--scoreboard-height`  | 120px   | Row 1 height. |
+| `--score-col`          | 124px   | Fixed, mirrored away/home score tracks; reserves room for three-digit scores without moving or overlapping neighboring cells. |
 | `--player-stats-width`  | 280px   | Left/right column width. |
 | `--side-padding`       | 10px    | Horizontal padding (e.g. scoreboard). |
 | `--pbp-height`         | 120px   | Play-by-play (if used). |
@@ -73,6 +74,7 @@ All major regions are defined by one grid container.
 2. **No JS layout positioning:** JS must not set `top`/`left`/`width`/`height` for layout-critical elements. Overlays (modals, tooltips, HUD) may stay `position: fixed`.
 3. **Shrinking:** Grid/flex children that must shrink have `min-height: 0` and/or `min-width: 0` (e.g. court, stats panels, playcall).
 4. **Playcall width:** Playcall lives in center column only; side panels extend to bottom of viewport.
+5. **Scoreboard mirror:** The team clusters remain fixed inverse pairs: `away logo → away score → away TOL/F → away strategy` and `home strategy → home TOL/F → home score → home logo`. Both score tracks use the same fixed `--score-col`; score content never determines track width.
 
 ---
 

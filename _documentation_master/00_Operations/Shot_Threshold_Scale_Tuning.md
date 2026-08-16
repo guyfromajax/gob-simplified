@@ -62,11 +62,18 @@ Re-cut to `26/40` → drift **-0.1**.
 |---|---|---|---|
 | 100 (scale 0-200) | 37.1% | 24 / 36 | +5.6 |
 | 70 (scale -30-170) | 41.4% | **26 / 40** | **-0.1** |
-| 90 (scale -10-190) | 38.5% | **22 / 37** | **-0.05 modeled** |
+| 90 (scale -10-190) | 38.5% *(modeled)* | 22 / 37 | -0.05 modeled → **-30.5 ACTUAL** |
+| 90 (scale -10-190) | **45.16% MEASURED** | **40 / 45** | **≈ -21 projected** |
 
 **THE COROLLARY — what a future tuner gets wrong first:**
 
 * **GAIN sets SPEED. BAND POSITION sets WHERE TEAMS SETTLE.**
+* ⚠️ **The 2026-08-14 row is the cautionary one.** Its equilibrium was *modeled* at 38.5% and
+  the real league shot **45.16%**; drift came in at **-30.5/season** against a modeled -0.05.
+  Trust a measured league FG%, never a fitted one. And check BOTH cuts for live mass —
+  `FG_PCT_MID = 22` sat at the **0.2nd percentile** and caught 8 team-games in 4,220.
+* The 40/45 row is **deliberately not drift-neutral** (owner decision); 35/40 was the neutral
+  pair and is the documented fallback.
 * The neutral band must sit **BELOW** the equilibrium FG%. Centring it *on* the equilibrium
   makes training dominate and every team drifts up.
 * The equilibrium is **SEASON-SPECIFIC**: per-season slopes measured -0.1125 / -0.0691 /
@@ -82,6 +89,20 @@ response (`FG% = 51.24726 - 0.14126 × shot_threshold`), 1,000 modeled seasons w
 the actual integer EOG rolls and clamps selected `FG_PCT_MID=22` /
 `FG_PCT_HIGH=37`: mean 90.0, drift **-0.05**, sd **20.5**, and zero rails across
 128,000 team-seasons. Re-fit after a material engine or roster change.
+
+**Superseded 2026-08-15 — now `FG_PCT_MID=40` / `FG_PCT_HIGH=45`.** The 2026-08-14 cut
+went stale exactly as this doc warns: measured against the finished PROD season (4,220
+team-games), league FG% came in at mean **45.16**, so `FG_PCT_HIGH=37` sat near the 18th
+percentile and `FG_PCT_MID=22` near the 0.2nd — the penalty branch caught 8 team-games out
+of 4,220 and was dead. Observed league mean landed at **59.5** against the modeled 90.
+
+The 40/45 re-cut is an **owner decision and is deliberately not drift-neutral**: it
+straddles the league mean, which is the centring case `eog_attr_bands.py` warns against.
+Projected net **+35.9/season (upward)**, versus **35/40** which projected −5.0.
+
+**Measured decomposition** (persisted records, not modelled): training **+57.2**/team-season, EOG **−87.7**, net **−30.5** — init 90.0 → 59.5, closing exactly. Training pushes shot_threshold *up* (worse) because `_SCRIMMAGE_BASELINE = 1` and `_apply_shot_threshold_training` scores one scrimmage point at `+0..+5`; two points jumps straight to `−3..−8`. No allocation holds still: +65/season or −143/season. **That discontinuity is what these bands are compensating for, and fixing it at the training end would be the more direct repair.** If the league
+rails at the 190 ceiling, 35/40 is the fallback. See the band-mass table in
+`BackEnd/constants/eog_attr_bands.py`.
 
 **Note:** Existing saved teams keep their stored values until re-seeded or migrated. Moving the window does not retroactively change Mongo team docs. To preserve the same relative position after this `+20` window shift, existing stored `shot_threshold` values require a **+20 migration**; otherwise their absolute shot difficulty is unchanged while the new scale's center moves around them.
 

@@ -1355,13 +1355,32 @@ def _apply_rebound_modifier_training(team: dict, points: int, archetype: Optiona
 def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[str] = None, sub_option: Optional[str] = None):
     """
     Apply training points to shot_threshold (doc ranges).
-    
+
     - 0 points: += random.randint(5, 15)
-    - 1 point: += random.randint(0, 5)
+    - 1 point:  += random.randint(-5, 5)   <- MEAN ZERO: a true hold
     - 2 points: -= random.randint(3, 8)
     - 3 points: -= random.randint(5, 11)
     - 4 points: -= random.randint(5, 15)
     - 5+ points: -= random.randint(5, 20)
+
+    THE 1-POINT RUNG IS MEAN-ZERO ON PURPOSE (2026-08-15). It was `randint(0, 5)`, mean
+    +2.5 -- so one point still made a team WORSE, on a golf score where lower is better.
+    That mattered far more than it looks, because `_SCRIMMAGE_BASELINE = 1` and BOTH
+    AutoTrain and the CPU allocator pick it: measured across the prod season (franchise
+    6a8073d78294292a794bec4c), 2,518 of 2,518 team-weeks landed in this rung. Not one team
+    in 127 ever allocated 0 or 2+ scrimmage points, all season. So the entire league was
+    degrading ~+2.9/week -> +57.2/team-season, and EOG's reward branch existed largely to
+    absorb it rather than to shape shooting mindset.
+
+    The ladder was also non-monotone in effect: 0 -> +10, 1 -> +2.5, 2 -> -5.5 gave teams a
+    choice between drifting +65/season and -143/season with nothing in between. Mean-zero at
+    1 point restores a real hold rung and lets the EOG bands be tuned against the game
+    instead of against this leak. See BackEnd/constants/eog_attr_bands.py.
+
+    Costs, both accepted: per-week sd on this rung rises 1.71 -> 3.16 (~8.3 -> ~15.4 points
+    of season sd, which suits shot_threshold's variance target), and this is one RNG draw
+    either way -- draw COUNT is unchanged, but the VALUES move, so seeded reference anchors
+    in reports/perf/ shift by construction. Compare distributions, not byte-diffs.
     """
     lower, upper = TEAM_ATTR_CLAMPS["shot_threshold"]
     current_val = team.get("shot_threshold", lower)
@@ -1372,7 +1391,7 @@ def _apply_shot_threshold_training(team: dict, points: int, archetype: Optional[
         return
 
     if points == 1:
-        increase = random.randint(0, 5)
+        increase = random.randint(-5, 5)
         team["shot_threshold"] = max(lower, min(upper, current_val + increase))
         return
 

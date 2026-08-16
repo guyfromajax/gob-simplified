@@ -42,6 +42,9 @@
       --scoreboard-height: 120px;
       --clock-col: 190px;
       --strat-col: 200px;
+      /* Fixed, mirrored score tracks sized for 000–999. Score content must not
+         change the scoreboard geometry or paint into the neighboring TOL/F cells. */
+      --score-col: 124px;
       /* muted strategy tier hues (low saturation on purpose — not the old carnival) */
       --tier-yellow: #C9A24E;  /* slow / passive / fewer */
       --tier-green:  #5FA86B;  /* normal */
@@ -149,7 +152,7 @@
         var(--side-padding)
         auto
         var(--scoreboard-gap)
-        70px
+        var(--score-col)
         var(--scoreboard-gap)
         max-content
         minmax(0, 1fr)
@@ -161,7 +164,7 @@
         minmax(0, 1fr)
         max-content
         var(--scoreboard-gap)
-        70px
+        var(--score-col)
         var(--scoreboard-gap)
         auto
         var(--side-padding);
@@ -192,7 +195,7 @@
        1. Left padding
        2. Away logo stack (logo + rank/record under, auto width)
        3. Gap
-       4. Away score (70px)
+       4. Away score (fixed --score-col; supports three digits)
        5. Gap
        6. Away TOL/F (max-content — one line per stat)
        7. Gap → flex toward center … clock (absolute) …
@@ -3963,7 +3966,7 @@
     0px
     auto
     var(--scoreboard-gap)
-    70px
+    var(--score-col)
     var(--scoreboard-gap)
     max-content
     minmax(0, 1fr)
@@ -3975,7 +3978,7 @@
     minmax(0, 1fr)
     max-content
     var(--scoreboard-gap)
-    70px
+    var(--score-col)
     var(--scoreboard-gap)
     auto
     0px !important;
@@ -4108,10 +4111,16 @@
   font-size: var(--sb-score-font-size) !important;
   line-height: 0.92 !important;
   font-weight: 800 !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  font-variant-numeric: tabular-nums !important;
 }
 #scoreboard #away-score {
   grid-column: 4 !important;
-  margin-left: 16px !important;
   text-decoration: underline !important;
   text-decoration-color: var(--away-vibrant-color) !important;
   text-decoration-thickness: 3px !important;
@@ -4119,7 +4128,6 @@
 }
 #scoreboard #home-score {
   grid-column: 16 !important;
-  margin-right: 16px !important;
   text-decoration: underline !important;
   text-decoration-color: var(--home-vibrant-color) !important;
   text-decoration-thickness: 3px !important;
@@ -7270,7 +7278,7 @@
     // Load bootGame.js with environment-aware path
     const bootGameScript = document.createElement('script');
     bootGameScript.type = 'module';
-    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js?v=mgr-court-entry-1`;
+    bootGameScript.src = `${staticPrefix}/js/phaser/bootGame.js?v=sim-full-bridge-1`;
     document.head.appendChild(bootGameScript);
   </script>
   <script>
