@@ -9,6 +9,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/franchise-command-center.css">
   <link rel="stylesheet" href="/resource-pages.css">
+  <!-- RT bucket classes; the custom properties they read are set by rtBucket.js. -->
+  <link rel="stylesheet" href="/css/rt-buckets.css">
   <style>
     .news-page-header {
       display: grid;
@@ -146,6 +148,53 @@
       line-height: 1.55;
     }
 
+    /* player_table rich line — roster-format table (Walk Ons Announced).
+       Scrolls inside its own container so the story card never scrolls sideways. */
+    .news-pt-wrap {
+      margin: 4px 0 10px;
+      overflow-x: auto;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    table.news-pt {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-family: 'Inter', sans-serif;
+      font-size: 12.5px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    table.news-pt th {
+      font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+      font-weight: 400;
+      font-size: 13px;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.45);
+      padding: 9px 5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      white-space: nowrap;
+    }
+
+    table.news-pt td {
+      padding: 9px 5px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      white-space: nowrap;
+      color: rgba(255, 255, 255, 0.86);
+    }
+
+    table.news-pt tr:last-child td { border-bottom: 0; }
+    table.news-pt th.news-pt-num,
+    table.news-pt td.news-pt-num { text-align: right; }
+    table.news-pt th.news-pt-name { text-align: left; }
+    table.news-pt td.news-pt-name {
+      font-weight: 600;
+      color: #fff;
+      padding-right: 12px;
+    }
+
     .news-story-line:last-child {
       margin-bottom: 0;
     }
@@ -201,6 +250,9 @@
   </div>
   <script src="/js/config/api-config.js"></script>
   <script src="/common.js"></script>
+  <!-- Canonical RT letter-grade + year-abbreviation formatters for player_table lines. -->
+  <script src="/js/shared/rtBucket.js"></script>
+  <script src="/js/shared/playerYear.js"></script>
   <script src="/news.js"></script>
   <script type="module">
     import { resumeFranchiseTrack } from '/js/musicController.js';

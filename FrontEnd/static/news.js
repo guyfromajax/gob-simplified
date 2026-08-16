@@ -57,6 +57,76 @@
     container.innerHTML = '<div class="news-week-card"><div class="news-empty">' + escapeHtml(message) + '</div></div>';
   }
 
+  // Roster-page column order (team-roster-view.js ROSTER_ATTR_KEYS).
+  var PLAYER_TABLE_ATTRS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
+
+  function formatTableHeight(inches) {
+    var raw = Number(inches);
+    if (!raw || isNaN(raw)) return '--';
+    return Math.floor(raw / 12) + "'" + (raw % 12) + '"';
+  }
+
+  // Roster page shows attributes on the 0-10 scale and prefers the anchor value.
+  function formatTableAttr(attrs, key) {
+    var raw = (attrs || {})['anchor_' + key];
+    if (raw == null || raw === '') raw = (attrs || {})[key];
+    if (raw == null || raw === '') return '--';
+    var num = Number(raw);
+    return isNaN(num) ? '--' : String(Math.floor(num / 10));
+  }
+
+  function formatTableYear(year) {
+    if (window.GOB_PlayerYear && typeof window.GOB_PlayerYear.formatDisplay === 'function') {
+      return window.GOB_PlayerYear.formatDisplay(year);
+    }
+    return year || '--';
+  }
+
+  /**
+   * Roster-format player table. Same columns and display rules as the roster page
+   * and the Walk-On Welcome modal: 0-10 attributes, two-letter year, RT as a
+   * letter grade in its bucket color.
+   */
+  function renderPlayerTable(players) {
+    if (!players.length) return '';
+    var head = ['<th class="news-pt-name">Name</th>', '<th>Pos</th>', '<th>Yr</th>', '<th>Ht</th>',
+      '<th class="news-pt-num">Wt</th>'];
+    PLAYER_TABLE_ATTRS.forEach(function (key) {
+      head.push('<th class="news-pt-num">' + escapeHtml(key) + '</th>');
+    });
+    head.push('<th class="news-pt-num">RT</th>');
+
+    var rows = players.map(function (p) {
+      var attrs = p.attributes || {};
+      var cells = [
+        '<td class="news-pt-name">' + escapeHtml(p.name || '--') + '</td>',
+        '<td>' + escapeHtml(p.pos || '--') + '</td>',
+        '<td>' + escapeHtml(formatTableYear(p.year)) + '</td>',
+        '<td>' + escapeHtml(formatTableHeight(p.height)) + '</td>',
+        '<td class="news-pt-num">' + escapeHtml(p.weight == null ? '--' : String(p.weight)) + '</td>'
+      ];
+      PLAYER_TABLE_ATTRS.forEach(function (key) {
+        cells.push('<td class="news-pt-num">' + escapeHtml(formatTableAttr(attrs, key)) + '</td>');
+      });
+      var rt = p.rt;
+      var rtText = (rt == null)
+        ? '--'
+        : (typeof formatRtDisplay === 'function' ? formatRtDisplay(rt) : String(rt));
+      var rtClass = (typeof getRtBucketClass === 'function') ? getRtBucketClass(rt) : '';
+      cells.push('<td class="news-pt-num ' + escapeHtml(rtClass) + '">' + escapeHtml(rtText) + '</td>');
+      return '<tr>' + cells.join('') + '</tr>';
+    });
+
+    return [
+      '<div class="news-pt-wrap">',
+      '<table class="news-pt">',
+      '<thead><tr>' + head.join('') + '</tr></thead>',
+      '<tbody>' + rows.join('') + '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
   function renderRichLines(richLines) {
     if (!richLines || !richLines.length) return '';
     return richLines.map(function (item) {
@@ -77,6 +147,9 @@
           '</p>',
           '<p class="news-story-line news-story-players">' + escapeHtml(item.players_line) + '</p>'
         ].join('');
+      }
+      if (type === 'player_table') {
+        return renderPlayerTable(item.players || []);
       }
       if (type === 'game_result') {
         var line = escapeHtml(item.text);

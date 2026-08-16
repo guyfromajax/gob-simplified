@@ -99,6 +99,7 @@ from BackEnd.utils.franchise_ftd_game_seed import prepare_ftd_for_new_game
 from BackEnd.models.game_manager import GameManager
 from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets, generate_walk_on_profile
 from BackEnd.models.franchise_manager import carry_dev_fields
+from BackEnd.models.franchise_manager import build_walk_ons_news_story, walk_on_news_row
 from BackEnd.utils.franchise_rank_prestige import (
     FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
     SOS_AVG_DEFAULT,
@@ -16951,26 +16952,36 @@ def finish_season(req: FinishSeasonRequest):
     # "Walk On" archetype no longer distinguishes THIS season's arrivals from
     # walk-ons still rostered from earlier seasons. Mirrors the pending-payload
     # pattern used by FCC_PENDING_NEW_LEAN_RECRUITS_FIELD.
-    _, _welcome_user_team_id = get_user_team_from_franchise(franchise_doc)
+    _welcome_user_team_name, _welcome_user_team_id = get_user_team_from_franchise(franchise_doc)
     pending_walk_on_welcome: list[dict[str, Any]] = []
     if _welcome_user_team_id:
         for signed_player in signed_players_by_team.get(str(_welcome_user_team_id), []):
             if not signed_player.get("walk_on"):
                 continue
-            pending_walk_on_welcome.append({
-                "player_id": str(signed_player.get("player_id")),
-                "name": signed_player.get("name") or "--",
-                "pos": signed_player.get("pos") or "--",
+            row = walk_on_news_row(
+                name=signed_player.get("name") or "--",
+                pos=signed_player.get("pos") or "--",
                 # Advanced to the roster year the player actually carries next season,
                 # so the modal matches the roster page rather than the pre-signing year.
-                "year": advance_year(signed_player.get("year")),
-                "height": signed_player.get("height"),
-                "weight": signed_player.get("weight"),
-                "attributes": _normalize_new_franchise_player_attributes(
+                year=advance_year(signed_player.get("year")),
+                height=signed_player.get("height"),
+                weight=signed_player.get("weight"),
+                attributes=_normalize_new_franchise_player_attributes(
                     signed_player.get("attributes") or {}
                 ),
-                "rt": signed_player.get("rt"),
-            })
+                rt=signed_player.get("rt"),
+            )
+            row["player_id"] = str(signed_player.get("player_id"))
+            pending_walk_on_welcome.append(row)
+
+    # Same rows also seed the season's "<Team> Walk Ons Announced" story. The modal
+    # is dismissed and gone; this is the permanent record, and it runs every season
+    # (season 1's equivalent is written at franchise creation).
+    next_season_news: list[dict[str, Any]] = []
+    if pending_walk_on_welcome and _welcome_user_team_name:
+        next_season_news.append(
+            build_walk_ons_news_story(_welcome_user_team_name, pending_walk_on_welcome)
+        )
 
     next_fpd_map = {doc["player_id"]: doc for doc in next_fpd_docs}
     existing_ftd_by_team_id = {
@@ -17169,7 +17180,9 @@ def finish_season(req: FinishSeasonRequest):
             "used_recruit_set_ids": _prev_used + ([used_recruit_set_id] if used_recruit_set_id else []),
             "results": {},
             "season_inbox": [],
-            "season_news": [],
+            # Cleared for the new season, then seeded with this season's Walk Ons
+            # Announced story (empty list when the class filled the roster).
+            "season_news": next_season_news,
             "practice_squad": {},
             "schedule": schedule,
             "eos_tournament_active": False,

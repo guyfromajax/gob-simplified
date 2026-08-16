@@ -6,6 +6,7 @@ from datetime import datetime
 from functools import lru_cache
 from itertools import combinations, permutations
 from pathlib import Path
+from typing import Any
 import json
 import logging
 import os
@@ -291,6 +292,59 @@ def generate_walk_on_profile() -> dict:
     }
 
 
+def walk_on_news_row(
+    name: str,
+    pos: str,
+    year: str,
+    height: Any,
+    weight: Any,
+    attributes: dict[str, Any],
+    rt: Any,
+) -> dict[str, Any]:
+    """One walk-on row for the Walk-Ons Announced story / welcome modal.
+
+    Stores raw values only — the 0-10 attribute scale, the year abbreviation and
+    the RT letter grade are all applied at the display boundary so the story
+    never bakes in a presentation format that later drifts from the roster page.
+    """
+    return {
+        "name": name or "--",
+        "pos": pos or "--",
+        "year": year,
+        "height": height,
+        "weight": weight,
+        "attributes": dict(attributes or {}),
+        "rt": rt,
+    }
+
+
+def build_walk_ons_news_story(team_name: str, walk_ons: list[dict[str, Any]]) -> dict[str, Any]:
+    """"<Team> Walk Ons Announced" — the week-1 record of who joined the roster.
+
+    Written every season: at franchise creation for season 1, at finish_season for
+    season 2+. The season-2+ welcome modal shows the same rows; this story is the
+    permanent copy that survives dismissing it. season_news is cleared each
+    rollover, so the un-seasoned story_id stays unique.
+    """
+    return {
+        "story_id": "w1-walk-ons",
+        "week": 1,
+        "type": "walk_ons_announced",
+        "headline": f"{team_name} Walk Ons Announced",
+        "rich_lines": [
+            {
+                "type": "text",
+                "text": (
+                    "Walk-ons round out the roster to 15. They compete in Training Camp "
+                    "like everyone else."
+                ),
+            },
+            {"type": "player_table", "players": list(walk_ons or [])},
+        ],
+        "created_at": datetime.utcnow(),
+    }
+
+
 class FranchiseManager:
     def __init__(self, db):
         self.db = db
@@ -436,9 +490,20 @@ class FranchiseManager:
         # Survivors get jersey + walk-on portrait at that cut. Generated here under
         # the franchise-creation load screen so the FCC lands lag-free.
         _t0 = time.time()
+        # Season-1 "<Team> Walk Ons Announced" story rows, collected for the user's
+        # team as they're generated. Season 2+ builds the same story in
+        # finish_season from the week-35 backfill.
+        season_1_walk_on_rows: list[dict[str, Any]] = []
+        user_walk_on_team_name = ""
         for team in self.teams:
             team_obj_id = team.get("_id")
             team_name = team.get("name", "")
+            is_user_team = bool(
+                (user_team_object_id and str(team_obj_id) == str(user_team_object_id))
+                or (user_team_id and str(team_obj_id) == str(user_team_id))
+            )
+            if is_user_team:
+                user_walk_on_team_name = team_name
             walk_on_ids = []
             for _ in range(3):
                 wo = generate_walk_on_profile()
@@ -468,6 +533,25 @@ class FranchiseManager:
                     "potential_factor": wo.get("potential_factor"),
                 }
                 walk_on_ids.append(wid)
+                if is_user_team:
+                    _ratings = wo.get("position_ratings") or {}
+                    _best_pos, _best_rt = "--", None
+                    for _pos, _value in _ratings.items():
+                        try:
+                            _rating = int(_value)
+                        except Exception:
+                            continue
+                        if _best_rt is None or _rating > _best_rt:
+                            _best_pos, _best_rt = _pos, _rating
+                    season_1_walk_on_rows.append(walk_on_news_row(
+                        name=wo.get("name") or "--",
+                        pos=_best_pos,
+                        year=wo.get("year"),
+                        height=wo.get("height"),
+                        weight=wo.get("weight"),
+                        attributes=wo.get("attributes") or {},
+                        rt=_best_rt,
+                    ))
             team["player_ids"] = [str(pid) for pid in team.get("player_ids", [])] + walk_on_ids
         _perf["generate_walkons"] = (time.time() - _t0) * 1000
 
@@ -521,6 +605,13 @@ class FranchiseManager:
             # recruit sets consumed by this franchise (never reused); empty if generated dynamically
             "used_recruit_set_ids": [used_recruit_set_id] if used_recruit_set_id else [],
             "season_inbox": [],
+            # Season-1 Walk Ons Announced story. Season 2+ gets the equivalent from
+            # finish_season, which also clears season_news for the new season.
+            "season_news": (
+                [build_walk_ons_news_story(user_walk_on_team_name, season_1_walk_on_rows)]
+                if season_1_walk_on_rows and user_walk_on_team_name
+                else []
+            ),
             "recruiting_results": {},
             "recruiting_lean_updates_applied": {},
             "recruiting_performance_lean_applied": {},

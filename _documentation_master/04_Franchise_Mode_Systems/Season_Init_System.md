@@ -41,9 +41,28 @@ Season init does not intentionally wipe:
 - **`training_reports`** are cleared for the new season, but **`coaching_focus`** archetype totals are **carried over** with a **75% reduction**: each of `authoritarian`, `systems_coach`, `player_maximizer`, `culture_builder` becomes **`int(round(old_value × 0.25))`** when `finish_season` writes the next-season FTD row (see `carryover_coaching_focus_counts_for_new_season` in `BackEnd/utils/franchise_coaching_focus_counts.py`).
 - During **week 1 training camp** (first training before any `results["1"]`), new increments use weight **`random.randint(2, 4)`** per submit instead of `+1`. Full detail: `Training_System.md` → Data Storage → FTD `coaching_focus`.
 
-## Walk-On Welcome Modal
+## Walk-On Announcement
 
-Season-start reveal of the walk-ons who backfilled the user's roster at the prior season's Week 35. **Season 2+ only** — Season 1 is left to the first-time-experience flow.
+Two surfaces, one data shape. Both are written when the walk-ons are created, never derived later.
+
+| Surface | Seasons | Written by |
+|---|---|---|
+| **"\<Team\> Walk Ons Announced"** news story | **1 and up** | `FranchiseManager.initialize_season` (S1) / `finish_season` (S2+) |
+| **Walk-On Welcome modal** | **2 and up** | `finish_season` only |
+
+Season 1 gets the story but not the modal — the first-time-experience flow owns that landing.
+
+Shared row shape is `walk_on_news_row()` (`franchise_manager.py`): `name`, `pos`, `year`, `height`, `weight`, `attributes`, `rt`. Raw values only — the 0–10 attribute scale, two-letter year and RT letter grade are applied at the display boundary, so neither surface bakes in a format that can drift from the roster page.
+
+### News Story
+
+`build_walk_ons_news_story(team_name, rows)` returns a standard `season_news` story (`story_id` `w1-walk-ons`, `week` 1, `type` `walk_ons_announced`). Its body uses a **`player_table` rich line** — a line type added for this story, rendered by `news.js` as a roster-format table. `season_news` is cleared each rollover, so the un-seasoned `story_id` stays unique.
+
+`news.html` loads `rtBucket.js`, `playerYear.js` and `css/rt-buckets.css` for the table. Note the `--rt-*-color` custom properties that stylesheet reads are set at runtime by `rtBucket.js`, not declared in any CSS file — loading the stylesheet alone would render the grades uncolored.
+
+### Welcome Modal
+
+Season-start reveal of the walk-ons who backfilled the user's roster at the prior season's Week 35. **Season 2+ only.**
 
 **Why a snapshot and not a query.** The walk-ons are only identifiable during `finish_season`. `week_35_recruiting_results` is cleared in the same function, and once the players land in FPD the `"Walk On"` archetype no longer separates *this* season's arrivals from walk-ons still rostered from earlier seasons. So `finish_season` writes a display-ready payload before the wipe, mirroring `fcc_pending_new_lean_recruit_ids`.
 
@@ -77,6 +96,7 @@ Season-start reveal of the walk-ons who backfilled the user's roster at the prio
 | `PENDING_WALK_ON_WELCOME_FIELD` | `franchise_routes.py` | `pending_walk_on_welcome` | Franchise-doc key holding the snapshot |
 | `WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD` | `franchise_routes.py` | `walk_on_welcome_modal_seen_season` | Once-per-season gate key |
 | `MAX_RETRIES` | `walkOnWelcomeModal.js` | `300` | 1s-interval deferrals while another overlay is up (~5 min) before giving up |
+| `story_id` | `build_walk_ons_news_story` | `w1-walk-ons` | News story key; unique because `season_news` clears each rollover |
 | `.sammy-modal.is-wide` | `css/sammy-modal.css` | `720px` | Modal width; the 520px default cannot hold the 18-column table |
 
 ## Rename / Identity Note

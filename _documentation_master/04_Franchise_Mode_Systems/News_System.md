@@ -11,7 +11,15 @@
 - When a new season is complete, the news page clears and starts to repopulate upon init of the next season.
 
 **News Moments**
+- Season init (week 1)
 - Regular Season (weeks 1-26) games run
+
+
+**Season Init**
+##Headline: "{Team Name} Walk Ons Announced"
+- Criteria: the user team's walk-ons for the season. Written every season — at franchise creation for season 1, at `finish_season` for season 2+. Not generated when a full signing class left no walk-ons to add.
+- Content: a `player_table` rich line — the roster-format table (name, pos, year, height, weight, the 12 attributes, RT), same columns and display rules as the roster page.
+- Seasons 2+ additionally get the Walk-On Welcome modal on the first FCC landing; the story is the permanent record that outlives dismissing it. Full rules: `Season_Init_System.md` → Walk-On Announcement.
 
 
 **Regular Season Games Run**

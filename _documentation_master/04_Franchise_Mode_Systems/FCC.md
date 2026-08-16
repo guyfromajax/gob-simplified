@@ -921,7 +921,9 @@ Season-start reveal of the walk-ons who joined the roster, shown on the first FC
 - Dismissed via `PATCH /franchise/walk-on-welcome-modal-seen`
 - Registered in `fccHasCompetingModal()` so archetype-evolution yields to it
 
-Cannot collide with **Cut Players Required** — that needs training complete for week 1, which the rollover leaves false. Full rules: [Season_Init_System.md](Season_Init_System.md) → Walk-On Welcome Modal.
+Cannot collide with **Cut Players Required** — that needs training complete for week 1, which the rollover leaves false.
+
+Every season (including season 1, which gets no modal) also writes a **"{Team} Walk Ons Announced"** news story carrying the same table. Full rules: [Season_Init_System.md](Season_Init_System.md) → Walk-On Announcement.
 
 ---
 
