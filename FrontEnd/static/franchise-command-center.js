@@ -98,6 +98,10 @@ let newLeanRecruitIdsCache = [];
 let recruitTeamNameMapCache = {};
 let fccTeamStatsSummaryCache = null;
 let commandCenterTopDataCache = null;
+// One page-lifecycle promise shared by restored tabs. URL tab restoration is
+// synchronous, while FCC identity/top-data hydration is asynchronous; renderers
+// that require that state must await this instead of racing init() or polling.
+let fccInitializationPromise = null;
 let playbooksWeekSavedCache = null;
 let fccPlaybooksSummaryCache = null;
 let userRosterPlayersCache = [];
@@ -4310,7 +4314,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  init();
+  fccInitializationPromise = init();
 
   // ✅ Phase 4.4: Shared tab management (commandCenterTabs.js)
   if (typeof CommandCenterTabs !== 'undefined') {
@@ -5346,6 +5350,20 @@ async function renderScoutingTab() {
   status.style.display = 'block';
   content.style.display = 'none';
   status.textContent = 'Loading scouting report...';
+
+  // A return URL can activate coaches-tab in the same event turn that starts
+  // init(). Wait for the FCC's authoritative team identity and top data before
+  // resolving the matchup. Ordinary tab clicks after startup pass through an
+  // already-settled promise, so this adds no repeat fetch or artificial delay.
+  if (fccInitializationPromise) {
+    try {
+      await fccInitializationPromise;
+    } catch (error) {
+      console.error('Error initializing FCC before scouting report:', error);
+      status.textContent = 'Unable to initialize scouting report.';
+      return;
+    }
+  }
 
   const opponent = await resolveUpcomingOpponentFromMatchup(commandCenterTopDataCache);
   if (!opponent) {

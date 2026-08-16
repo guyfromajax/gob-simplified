@@ -553,6 +553,28 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
 }
 
 /**
+ * Opaque full-viewport bridge for Sim Full Game: covers court + scoreboard from
+ * the moment Sim Full Game is pressed until Act 1 (`showPreGameExperience`) mounts
+ * (or until cleared before Act 2 if Act 1 is skipped). Same `.pgxp-root` shell /
+ * background as Act 1 — no copy (bridge only). `showPreGameExperience` removes any
+ * existing `.pgxp-root` before appending Act 1, so the handoff stays in one paint.
+ */
+export function showOpaqueSimBridgeCover() {
+  ensureStyles();
+  if (document.querySelector(".pgxp-root.pgxp-bridge")) return;
+  document.querySelectorAll(".pgxp-root").forEach((n) => n.remove());
+  const root = document.createElement("div");
+  root.className = "pgxp-root pgxp-bridge";
+  root.setAttribute("aria-hidden", "true");
+  document.body.appendChild(root);
+}
+
+/** Remove leftover Sim Full Game bridge covers (no-op if Act 1 already replaced them). */
+export function clearOpaqueSimBridgeCover() {
+  document.querySelectorAll(".pgxp-root.pgxp-bridge").forEach((n) => n.remove());
+}
+
+/**
  * "Prepping Sim" cover for Sim Rest of Game (Q2+): reuses the pre-game tip-off veil
  * with different copy (no reveal/lineup — the game is already underway). Shows
  * immediately, holds until the sim finishes (`waitForSim`), then dissolves.

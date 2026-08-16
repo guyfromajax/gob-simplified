@@ -506,6 +506,8 @@ FCC resolves the upcoming opponent by:
 
 Scouting remains available in **regular season and EOS tournament weeks 27–34** (while the user team is still alive). The same FCC tab + `/franchise/scouting-report` path is used; there is no separate tournament scouting surface for franchise EOS.
 
+**Restored-tab lifecycle:** Returning from another screen with `?tab=coaches-tab` activates the tab immediately, but its renderer awaits the single FCC initialization promise before resolving the matchup. This guarantees that `commandCenterTopDataCache`, the authoritative user team id, and user-team name are available. A normal post-load tab click observes the already-settled promise. Do not replace this contract with timing delays or duplicate post-init fetches.
+
 **Film Study gating:**
 
 - Regular-season weeks: opponent Play Usage is gated by the user's current-week **Film Study** training allocation. HCO play usage unlocks at Film Study `> 0`; Fast Break and Half-Court Trap usage unlock at Film Study `> 1`.

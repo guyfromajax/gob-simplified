@@ -11,7 +11,12 @@ import { preloadGameSfx, startPregameBed } from './utils/gameSfx.js';
 import { getGameMode } from '../shared/getGameMode.js';
 import { buildSimTimeline } from './utils/simTimelineAssembler.js';
 import { showSimGamePresentation } from './utils/simGamePresentation.js';
-import { showPreGameExperience, showPreppingSimCover } from './utils/preGameExperience.js';
+import {
+  showPreGameExperience,
+  showPreppingSimCover,
+  showOpaqueSimBridgeCover,
+  clearOpaqueSimBridgeCover,
+} from './utils/preGameExperience.js';
 import { normalizeMatchupsPayload } from './utils/matchupsUiShared.js';
 import {
   COURT_BOOT_MODES,
@@ -2889,6 +2894,14 @@ async function handleSimFullGame() {
   }
   isSimulating = true;
   setTbLeakDetectorBulkSimPaused(true);
+
+  // Sim Full Game vs Sim Rest — needed before tearing down the button modal so we can
+  // cover court+scoreboard immediately (Act 1 still launches after Q1 for lineup data).
+  const isSimFullGame = Math.max(0, quarter) < 2;
+  if (isSimFullGame) {
+    showOpaqueSimBridgeCover();
+    resetPreAnchorScoreChrome();
+  }
   
   // Remove the pre-game button container from DOM
   const preGameContainer = document.querySelector('.pre-game-container');
@@ -2936,7 +2949,7 @@ async function handleSimFullGame() {
   // Q1's response so /lineup-for-matchups returns the populated lineup — mirroring
   // how Play Quarter's first simulate-quarter sets up the game (most SS&S). Sim Rest
   // of Game skips it. Fully guarded — any failure degrades to straight-to-Act-2.
-  const isSimFullGame = Math.max(0, quarter) < 2;
+  // Opaque bridge (above) stays up until Act 1 mounts and replaces `.pgxp-root`.
   // Broadcast (Act 2) starts at the quarter we begin simming — captured NOW because
   // `quarter` gets reassigned to the final quarter after the loop. Sim Full Game = 1
   // (whole game); Sim Rest of Game = the current quarter (join at Q2+, no replay).
@@ -2965,6 +2978,8 @@ async function handleSimFullGame() {
       } catch (coverErr) {
         console.warn('⚠️ [SIM-PRES] Act 1 cover skipped:', coverErr);
         document.querySelectorAll('.pgxp-root').forEach((n) => n.remove());
+        // Restore bridge so the live scoreboard stays covered until Act 2.
+        showOpaqueSimBridgeCover();
       }
     })();
   };
@@ -3171,6 +3186,9 @@ async function handleSimFullGame() {
       await act1CoverPromise;
       await preppingCoverPromise;
     } catch (e) { /* covers are self-guarded */ }
+    // Act 1 replaces the bridge on success; if Act 1 was skipped/failed the bridge
+    // may still be up — clear it before Act 2 (which drives the real scoreboard).
+    clearOpaqueSimBridgeCover();
     try {
       if (typeof ensureTeamBuilderChromeSnapshot === 'function') {
         await ensureTeamBuilderChromeSnapshot(franchiseId);
@@ -3212,6 +3230,7 @@ async function handleSimFullGame() {
     const simFullBtn = document.querySelector('.sim-full-game-button');
     const sim4Btn = document.querySelector('.sim-to-fourth-button');
     [playBtn, simFullBtn, sim4Btn].forEach(btn => { if (btn) btn.disabled = false; });
+    clearOpaqueSimBridgeCover();
   } finally {
     isSimulating = false;
     setTbLeakDetectorBulkSimPaused(false);
