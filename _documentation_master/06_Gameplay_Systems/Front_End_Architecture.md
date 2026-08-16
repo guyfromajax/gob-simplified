@@ -75,6 +75,7 @@ All major regions are defined by one grid container.
 3. **Shrinking:** Grid/flex children that must shrink have `min-height: 0` and/or `min-width: 0` (e.g. court, stats panels, playcall).
 4. **Playcall width:** Playcall lives in center column only; side panels extend to bottom of viewport.
 5. **Scoreboard mirror:** The team clusters remain fixed inverse pairs: `away logo → away score → away TOL/F → away strategy` and `home strategy → home TOL/F → home score → home logo`. Both score tracks use the same fixed `--score-col`; score content never determines track width.
+6. **Compact desktop scoreboard:** At `≤1700px`, both logo cells contract equally to `210px` and all four scoreboard gaps contract equally to `8px`. Each logo cell owns its banner plus the national-rank/record meta row, so the entire outer stack remains inside the viewport. The three-digit score tracks, strategy tracks, and center clock retain their fixed sizes; no one-sided adjustment is permitted.
 
 ---
 

@@ -4210,6 +4210,22 @@
   margin-right: 16px !important;
 }
 
+/* Compact desktop width budget. The 124px score tracks are intentionally kept
+   intact for three-digit scores; reclaim space symmetrically from both outer
+   logo cells and all four fixed gaps so the right logo cannot be pushed beyond
+   the viewport. Values remain fixed within the breakpoint (content never
+   changes geometry). */
+@media (max-width: 1700px) {
+  #scoreboard {
+    --scoreboard-gap: 8px !important;
+  }
+  #scoreboard #away-logo-container,
+  #scoreboard #home-logo-container {
+    width: 210px !important;
+    max-width: 210px !important;
+  }
+}
+
 /* Rank + record under logo: one row, rank then record (L→R); padding clears bottom hairline */
 #scoreboard #away-logo-container .sb-team-meta,
 #scoreboard #home-logo-container .sb-team-meta {

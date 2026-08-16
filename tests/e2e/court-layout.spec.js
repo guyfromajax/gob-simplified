@@ -121,7 +121,9 @@ test.describe('Court Layout - Viewport Stability', () => {
 
 test.describe('Court Layout - No Overlapping Elements', () => {
   test('three-digit scores stay inside fixed mirrored score tracks', async ({ page }) => {
-    await page.setViewportSize({ width: 1920, height: 1080 });
+    // 1536 CSS px reproduces the compact-desktop/device-scale viewport where
+    // expanding the score tracks previously pushed the home logo off-screen.
+    await page.setViewportSize({ width: 1536, height: 960 });
     await page.goto('/static/court.html?home=Lancaster&away=Four-Corners');
     await page.waitForLoadState('networkidle');
 
@@ -134,6 +136,8 @@ test.describe('Court Layout - No Overlapping Elements', () => {
     const homeTol = await page.locator('.tol-fouls.home').boundingBox();
     const homeScore = await page.locator('#home-score').boundingBox();
     const homeLogo = await page.locator('#home-logo-container').boundingBox();
+    const homeRank = await page.locator('#home-rank').boundingBox();
+    const homeRecord = await page.locator('#home-record').boundingBox();
 
     expect(awayScore.width).toBeCloseTo(homeScore.width, 1);
     expect(awayScore.width).toBeGreaterThanOrEqual(120);
@@ -141,6 +145,10 @@ test.describe('Court Layout - No Overlapping Elements', () => {
     expect(awayTol.x).toBeGreaterThanOrEqual(awayScore.x + awayScore.width);
     expect(homeScore.x).toBeGreaterThanOrEqual(homeTol.x + homeTol.width);
     expect(homeLogo.x).toBeGreaterThanOrEqual(homeScore.x + homeScore.width);
+    expect(awayLogo.x).toBeGreaterThanOrEqual(0);
+    expect(homeLogo.x + homeLogo.width).toBeLessThanOrEqual(1536);
+    expect(homeRank.x + homeRank.width).toBeLessThanOrEqual(1536);
+    expect(homeRecord.x + homeRecord.width).toBeLessThanOrEqual(1536);
 
     const scoreMetrics = await page.locator('#away-score').evaluate((node) => ({
       clientWidth: node.clientWidth,
