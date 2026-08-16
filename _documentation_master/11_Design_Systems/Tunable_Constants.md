@@ -185,7 +185,7 @@ the configured value. Subtle-movement precedence may suppress the evaluation on 
 | `RANDOM_TIER_SHOOT_PCT[late]` | motion_step_decision.py | `{slow:95, normal:95, fast:95}` | Conditional percentage in the 6–14s tier. Effective direct-shot rate is 31.7% for every tempo. |
 | `RANDOM_TIER_SHOOT_PCT[very_late]` | motion_step_decision.py | `{slow:95, normal:95, fast:95}` | Conditional percentage in the 1–5s tier. Effective direct-shot rate is 31.7% for every tempo. |
 | `SM_PRECEDENCE_TEMPOS` | motion_step_decision.py | `early: all; mid: slow+normal; late: slow; very_late: none` | On an `offense_reads` turn, these tempos run subtle movement before evaluating a shot at that tier. |
-| `OPTIMAL_BAR_STEEPNESS` | motion_step_decision.py | `2.0` | Multiplier in `optimal bar = shot clock × steepness × tempo multiplier`; higher values demand stronger looks or later shots. |
+| `OPTIMAL_BAR_STEEPNESS` | motion_step_decision.py | `1.9` | Multiplier in `optimal bar = shot clock × steepness × tempo multiplier`; higher values demand stronger looks or later shots. Eased from `2.0` → `1.9` for ~+6% FGA (earlier HCO looks). |
 | `OPTIMAL_BAR_TEMPO_MULT` | motion_step_decision.py | `{slow:1.2, normal:1.0, fast:0.8}` | Slow raises the optimal-look bar; fast lowers it. |
 | `SHOT_CLOCK_START` | motion_step_decision.py | `30` | Clamp ceiling for shot-clock-scaled optimal bar. |
 | `SHOOT_READ_RIGHT` | motion_step_decision.py | `200` | Read tier above this → “right” (take optimal look / dish). |

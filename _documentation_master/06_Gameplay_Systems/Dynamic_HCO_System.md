@@ -39,10 +39,10 @@ Shared by the random-% grid and the SM-precedence grid.
 ### Optimal-look bar (`_shoot_threshold`)
 A look's 0–100 mismatch quality must clear the bar to be **optimal**. Continuous:
 `bar = clock × OPTIMAL_BAR_STEEPNESS × OPTIMAL_BAR_TEMPO_MULT[tempo]`
-- `OPTIMAL_BAR_STEEPNESS = 2.0` — self-shot and hot-read dish share it.
+- `OPTIMAL_BAR_STEEPNESS = 1.9` — self-shot and hot-read dish share it.
 - `OPTIMAL_BAR_TEMPO_MULT = {slow: 1.2, normal: 1.0, fast: 0.8}`
 
-Higher bar = fewer/later shots; slow tempo demands a better look (work the ball), fast shoots sooner. Self stays slightly favored over the dish via the self-only openness bonus + self-wins-ties tiebreaker (not the bar). Illustrative values (normal tempo): 30s → 60, 22s → 44, 15s → 30, 8s → 16.
+Higher bar = fewer/later shots; slow tempo demands a better look (work the ball), fast shoots sooner. Self stays slightly favored over the dish via the self-only openness bonus + self-wins-ties tiebreaker (not the bar). Illustrative values (normal tempo): 30s → 57, 22s → 41.8, 15s → 28.5, 8s → 15.2.
 
 ### Random-tier shoot % (`RANDOM_TIER_SHOOT_PCT`)
 Non-strategic ("random") read tier: `randint(1,100) ≤ %` → shoot (self only). Low early, high late.
@@ -439,7 +439,7 @@ Per agents.md best-practice #3, every knob is a named constant. To retune freque
 #### Shoot decision
 | Constant | File | Default | Effect |
 |---|---|---|---|
-| `OPTIMAL_BAR_STEEPNESS` | motion_step_decision.py | `2.0` | Optimal-look bar = `clock × steepness × tempo mult`. |
+| `OPTIMAL_BAR_STEEPNESS` | motion_step_decision.py | `1.9` | Optimal-look bar = `clock × steepness × tempo mult`. |
 | `OPTIMAL_BAR_TEMPO_MULT` | motion_step_decision.py | `{slow:1.2, normal:1.0, fast:0.8}` | Slow raises the bar; fast lowers it. |
 | `SHOOT_READ_RIGHT` / `SHOOT_READ_SAFE` | motion_step_decision.py | `200` / `125` | Read tiers: right = optimal decision, safe = progress. |
 | `READ_THRESHOLD` | motion_read_map.py | `15` | Mismatch score above which a shot-type read is an "edge". |

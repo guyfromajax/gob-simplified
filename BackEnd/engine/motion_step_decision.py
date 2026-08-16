@@ -215,9 +215,10 @@ def _shot_clock_tier(shot_clock):
 # 0–100 mismatch quality must clear the bar to be "optimal" — higher = fewer /
 # later shots. Self-shot and hot-read dish share the same steepness; tempo scales
 # the bar (slow demands a better look — work the ball; fast shoots sooner).
-# Raised 1.6→2.0 to push more HCO shots from the Mid (15-22s) tier into Late
-# (6-14s) and cut total FGA. See Dynamic_HCO_System.md §Tunable Constants.
-OPTIMAL_BAR_STEEPNESS = 2.0
+# History: raised 1.6→2.0 to push more HCO shots from Mid (15-22s) into Late
+# (6-14s) and cut total FGA; eased 2.0→1.9 for ~+6% shot volume (earlier looks).
+# See Dynamic_HCO_System.md §Tunable Constants.
+OPTIMAL_BAR_STEEPNESS = 1.9
 OPTIMAL_BAR_TEMPO_MULT = {"slow": 1.2, "normal": 1.0, "fast": 0.8}
 
 # Non-strategic ("random") read-tier shoot probability (1–100) by shot-clock tier
@@ -249,8 +250,8 @@ OUTSIDE_SHOT_SELECTION_MULTIPLIER = 0.55
 
 # Focus-emphasis: how far one point of the inside/attack/outside strategy slider moves a
 # candidate's shot quality. Slider 0–4 with 2 == neutral, so the multiplier spans
-# 0.5x (slider 0) .. 1.5x (slider 4). Sized against the optimal bar (clock x 2.0 x tempo:
-# ~60 early, ~20 late) and read scores in the +/-50 range, so it is a real lever late in
+# 0.5x (slider 0) .. 1.5x (slider 4). Sized against the optimal bar (clock x 1.9 x tempo:
+# ~57 early, ~19 late) and read scores in the +/-50 range, so it is a real lever late in
 # the clock without swamping the mismatch read itself.
 #
 # WHY THIS EXISTS: `attack` and `outside` already steered motion via
