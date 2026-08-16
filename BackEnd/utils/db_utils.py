@@ -649,6 +649,7 @@ def fill_unified_lineup_gaps(
     existing_assignments: Dict[str, Player],
     preference_fn=None,
     effective_weight: float = None,
+    prefer_lowest_rt: bool = False,
 ) -> Dict[str, Player]:
     """
     Fill only ``missing_positions`` with the EXACT best available players, holding the already-
@@ -659,6 +660,20 @@ def fill_unified_lineup_gaps(
     fill + chemistry random pool as full autoset, so the worst selector was running at the most
     visible moment. It now shares ``solve_best_assignment`` with full autoset — over the missing
     slots only, so the surviving four are never disturbed.
+
+    ``prefer_lowest_rt`` (blowout / garbage time) mirrors
+    ``build_unified_autoset_lineup_from_eligible``: narrow the candidate pool to the LOWEST-RT
+    available players, then seat those optimally. Without it this function had no notion of a
+    blowout at all, so a foul-out in garbage time seated the BEST available player — undoing,
+    one slot at a time, the exact thing the blowout lineup exists to do.
+
+    Note where that actually bit, because it is narrower than it looks: the primary full-sim
+    foul-out path never reaches here (game_manager.py:692 skips it and defers to
+    ``_rebuild_both_lineups_for_full_sim_break``, which is blowout-aware). The live exposures
+    were turn-by-turn CPU foul-outs and the ``_check_lineups_for_foul_out`` safety-net sweep —
+    the only call site in the codebase that lets ``perform_removal`` default to True, and not
+    gated on sim mode. Self-correcting at the next lineup rebuild either way, so the old
+    exposure was one starter for part of one stint, not a whole garbage-time lineup.
 
     ``team_chemistry`` is accepted and ignored (see
     ``build_unified_autoset_lineup_from_eligible``).
@@ -673,6 +688,11 @@ def fill_unified_lineup_gaps(
             f"No eligible players left to fill lineup gaps {order} "
             f"(available={len(available)}, needed={len(order)})"
         )
+    if prefer_lowest_rt:
+        # Same shape as the full-autoset inversion: pick WHO plays by lowest RT, then seat
+        # them optimally. Resting the starters is the intent; fielding the scrubs in nonsense
+        # positions was not. Tie-break on player_id so the choice is deterministic.
+        available = sorted(available, key=lambda p: (_player_rt_max(p), str(p.player_id)))[: len(order)]
     result: Dict[str, Player] = dict(existing_assignments)
     result.update(solve_best_assignment(available, order, preference_fn=preference_fn,
                                         effective_weight=effective_weight))

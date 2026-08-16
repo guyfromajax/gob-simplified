@@ -90,8 +90,57 @@ Design notes (see EOG Structural Pass):
 #              mean 90.0, sd 20.5, drift -0.05, ZERO rails across 128,000 team-seasons.
 #   chosen      22/37. Nearby 23/37 drifted +1.01 with one rail; 24/37 drifted +2.43
 #              with eight rails. Re-fit from a fresh season if engine/roster inputs change.
-FG_PCT_HIGH = 37
-FG_PCT_MID = 22
+#
+# RE-CUT 2026-08-15 -> 40/45. Measured against the finished PROD season (franchise
+# 6a8073d78294292a794bec4c, 4,220 team-games, post-recal and post-height-shift):
+#
+#   league team-game FG%   mean 45.16  median 44.90  sd 8.80
+#                          p05 31.2  p25 39.0  p75 51.0  p95 60.0
+#
+# The 22/37 cut was badly stale against that. 37 sat at roughly the 18th percentile, so
+# 82.7% of team-games took the reward branch, and 22 sat at the 0.2nd percentile -- the
+# penalty branch caught 8 team-games out of 4,220 and was effectively dead. EOG contributed
+# -107.8/team-season against training's ~+77, for a net -30.5 (init ~90 -> measured 59.5).
+#
+#   branch mass    22/37 (old)              40/45 (now)
+#     reward       82.7%                    49.7%
+#     neutral      17.1%                    20.5%
+#     penalty       0.2%   <- dead          29.8%   <- live
+#   EOG/season     -107.8                   -26.2
+#
+# ⚠️ THIS CUT IS DELIBERATELY NOT DRIFT-NEUTRAL, AND THAT IS AN OWNER DECISION.
+# 40/45 straddles the 45.16 league mean, which is the centring case the corollary above
+# warns about. 35/40 was the drift-neutral pair and was NOT chosen. If the league rails
+# high, this is the cause and 35/40 is the fallback -- do not re-derive from scratch.
+#
+# MEASURED DECOMPOSITION of the same season (both halves read from persisted records, not
+# modelled -- games.team_attribute_changes and training_reports[wk].team_changes):
+#
+#     training  +57.2 / team-season      (+2.9/week, all 26 weeks)
+#     EOG       -87.7 / team-season      (under the old 22/37 cut)
+#     NET       -30.5                    init 90.0 -> measured 59.5  [closes exactly]
+#
+# WHY TRAINING PUSHES *UP* ON A GOLF SCORE. It is not a bug and not an EOG problem:
+# `_apply_shot_threshold_training` (training_execution_v2.py:1355) gives +0..+5 for ONE
+# scrimmage point and -3..-8 for TWO. `_SCRIMMAGE_BASELINE = 1`, so every team in the
+# league sits in the band that makes it WORSE, every week. There is no allocation that
+# holds still -- the ladder jumps from +2.5/week to -5.5/week with nothing between, i.e.
+# +65/season or -143/season. THAT discontinuity is what these bands are compensating for.
+# Fixing it at the training end would be the more direct repair.
+#
+# PROJECTIONS. The band-mass arithmetic below reproduces the measured season at 22/37 to
+# within 19% (-107.8 modelled vs -87.7 actual), so projections are scaled by 0.814:
+#
+#     cuts     EOG (corrected)   + training   = net/season
+#     22/37         -87.7          +57.2         -30.5   (measured, drifts down)
+#     40/45         -21.3          +57.2         +35.9   (CHOSEN, drifts UP)
+#     35/40         -62.2          +57.2          -5.0   (drift-neutral, not chosen)
+#
+# At +35.9/season from init 90 the league approaches the 190 ceiling in roughly three
+# seasons. These projections also IGNORE the feedback loop, which amplifies whichever
+# direction the drift starts in -- so treat +35.9 as a floor on the true upward rate.
+FG_PCT_HIGH = 45
+FG_PCT_MID = 40
 
 # discipline — team (F+TO) vs opponent (F+TO) + buffer
 DISCIPLINE_OPP_BUFFER = 8

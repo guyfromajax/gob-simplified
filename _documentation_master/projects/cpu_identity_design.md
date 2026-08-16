@@ -281,6 +281,11 @@ Each team-drill slot maps 1:1 to a core-8 attribute (`team_category_map`):
 | presses_traps.offense_install | pt_opp_modifier |
 | scrimmages | team_chemistry + shot_threshold + rebound_modifier |
 
+> `scrimmages` is pinned at **1 point** for every team (`_SCRIMMAGE_BASELINE = 1`), and that rung
+> is a **mean-zero hold** for `shot_threshold` as of 2026-08-15 (`randint(-5, 5)`; was `randint(0, 5)`,
+> mean +2.5, which degraded the whole league +57.2/season). See
+> [`../04_Franchise_Mode_Systems/Team_Attribute_System.md`](../04_Franchise_Mode_Systems/Team_Attribute_System.md) § The 1-point rung.
+
 Before allocating, read `ftd.team_attributes[attr]` and taper:
 
 | current value | weight | slot cap (of 5) |
