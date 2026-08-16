@@ -20,6 +20,8 @@
  *     dismissOnCta: true,                      // close after onCta (default true)
  *     input: null,                             // optional input config (see below)
  *     imageSrc: '/images/sammy_tutorial.png',  // override Sammy image if needed
+ *     modalClass: 'is-wide',                   // extra class on .sammy-modal
+ *     primaryClass: 'is-orange',               // extra class on the primary button
  *   });
  *
  *   // Input config (used by username modal in PR 2b):
@@ -67,6 +69,8 @@ function buildBodyNode(body) {
  * @param {boolean} [opts.dismissOnCta=true]
  * @param {Object} [opts.input]            - { placeholder, hint, initialValue, validate }
  * @param {string} [opts.imageSrc]
+ * @param {string} [opts.modalClass]       - extra class on the modal box (e.g. 'is-wide')
+ * @param {string} [opts.primaryClass]     - extra class on the primary button (e.g. 'is-orange')
  * @returns {{ close: Function, setError: Function, setBusy: Function, element: HTMLElement }}
  */
 export function showSammyModal(opts) {
@@ -84,7 +88,7 @@ export function showSammyModal(opts) {
   backdrop.setAttribute('role', 'presentation');
 
   const modal = document.createElement('div');
-  modal.className = 'sammy-modal';
+  modal.className = 'sammy-modal' + (opts.modalClass ? ' ' + opts.modalClass : '');
   modal.setAttribute('role', 'dialog');
   modal.setAttribute('aria-modal', 'true');
 
@@ -154,7 +158,8 @@ export function showSammyModal(opts) {
 
   const primaryBtn = document.createElement('button');
   primaryBtn.type = 'button';
-  primaryBtn.className = 'sammy-modal-btn sammy-modal-btn-primary';
+  primaryBtn.className = 'sammy-modal-btn sammy-modal-btn-primary'
+    + (opts.primaryClass ? ' ' + opts.primaryClass : '');
   primaryBtn.textContent = opts.ctaLabel;
   actions.appendChild(primaryBtn);
 

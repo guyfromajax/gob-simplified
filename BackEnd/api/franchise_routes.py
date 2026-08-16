@@ -115,6 +115,10 @@ STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
 FCC_PENDING_NEW_LEAN_RECRUITS_FIELD = "fcc_pending_new_lean_recruit_ids"
 WEEK_35_RECRUITING_RESULTS_FIELD = "week_35_recruiting_results"
+# Walk-On Welcome modal payload, snapshotted at season rollover (finish_season)
+# because week_35_recruiting_results is cleared there and FPD carries no
+# "joined this season" marker. Consumed on the first FCC landing of the new season.
+PENDING_WALK_ON_WELCOME_FIELD = "pending_walk_on_welcome"
 AWARDS_FIELD = "awards"
 WEEK_35_RECRUITING_POINTS_BUDGET = 50
 SEASON_TRANSITION_TOKEN_FIELD = "season_transition_token"
@@ -3789,6 +3793,7 @@ REGION_BYE_MODAL_SEEN_SEASON_FIELD = "region_bye_modal_seen_season"
 BRACKET_REVEAL_SEEN_FIELD = "bracket_reveal_seen"
 BRACKET_UPDATE_SEEN_FIELD = "bracket_update_seen"
 RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_season"
+WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD = "walk_on_welcome_modal_seen_season"
 
 BRACKET_REVEAL_WEEKS = {
     27: ("conference", "Conference Tournament · Weeks 27–29", "full"),
@@ -3993,6 +3998,10 @@ def _build_recruiting_results_modal_payload(
         player
         for player in (week_35_results.get("signed_players") or [])
         if str(player.get("team_id") or "") == str(team_id)
+        # Walk-ons are roster backfill, not a signing outcome. They get their own
+        # reveal on the next season's first FCC landing (Walk-On Welcome modal),
+        # so excluding them here keeps each player to a single introduction.
+        and not player.get("walk_on")
     ]
     if not signed:
         return None
@@ -4015,6 +4024,37 @@ def _build_recruiting_results_modal_payload(
         "eligible": True,
         "recruits": recruits,
         "count": len(recruits),
+        # NOTE: count reflects the capped list above, not the full signing class.
+    }
+
+
+def _build_walk_on_welcome_modal_payload(
+    franchise_doc: dict[str, Any] | None,
+) -> dict[str, Any] | None:
+    """Walk-On Welcome modal: first FCC entry of a newly-initialized season.
+
+    Season 2+ only, by construction — the pending payload is written exclusively by
+    finish_season, so a Season 1 franchise never has one and the modal cannot fire
+    during the crowded first-time-experience flow.
+
+    Suppressed when the season produced no walk-ons (a full signing class filled the
+    roster); the caller still stamps the season as seen so it never fires late.
+    """
+    if not franchise_doc:
+        return None
+    season = _franchise_current_season(franchise_doc)
+    if int(franchise_doc.get(WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD, 0) or 0) == season:
+        return None
+
+    walk_ons = list(franchise_doc.get(PENDING_WALK_ON_WELCOME_FIELD) or [])
+    if not walk_ons:
+        return None
+
+    return {
+        "eligible": True,
+        "season": season,
+        "walk_ons": walk_ons,
+        "count": len(walk_ons),
     }
 
 
@@ -9596,6 +9636,9 @@ def command_center_data(
             _build_recruiting_results_modal_payload(franchise_doc, str(team_id) if team_id else None)
             if franchise_doc
             else None
+        )
+        response["walk_on_welcome_modal"] = (
+            _build_walk_on_welcome_modal_payload(franchise_doc) if franchise_doc else None
         )
         return response
     if profile:
@@ -16082,6 +16125,33 @@ def mark_recruiting_results_modal_seen(
     return {"seen": True, "season": current_season}
 
 
+class WalkOnWelcomeModalSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/walk-on-welcome-modal-seen")
+def mark_walk_on_welcome_modal_seen(
+    req: WalkOnWelcomeModalSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist that the Walk-On Welcome modal was dismissed, and drop its payload.
+
+    Clearing the pending list here is what makes the zero-walk-on season a no-op:
+    the season is stamped seen either way, so an empty season never leaves the
+    modal armed to fire on a later visit.
+    """
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    current_season = _franchise_current_season(franchise_doc)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {
+            WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD: current_season,
+            PENDING_WALK_ON_WELCOME_FIELD: [],
+        }},
+    )
+    return {"seen": True, "season": current_season}
+
+
 @router.get("/franchise/championship-moments/context")
 def championship_moment_context(
     franchise_id: str,
@@ -16875,6 +16945,33 @@ def finish_season(req: FinishSeasonRequest):
         # attributes; the JH→FR (etc.) develop_rollover runs at TC before camp.
         next_fpd_docs.append(signed_doc)
 
+    # Walk-On Welcome modal (§Season_Init_System): snapshot the user team's incoming
+    # walk-ons NOW. They are only identifiable here — week_35_recruiting_results is
+    # cleared at the bottom of this function, and once these land in FPD the
+    # "Walk On" archetype no longer distinguishes THIS season's arrivals from
+    # walk-ons still rostered from earlier seasons. Mirrors the pending-payload
+    # pattern used by FCC_PENDING_NEW_LEAN_RECRUITS_FIELD.
+    _, _welcome_user_team_id = get_user_team_from_franchise(franchise_doc)
+    pending_walk_on_welcome: list[dict[str, Any]] = []
+    if _welcome_user_team_id:
+        for signed_player in signed_players_by_team.get(str(_welcome_user_team_id), []):
+            if not signed_player.get("walk_on"):
+                continue
+            pending_walk_on_welcome.append({
+                "player_id": str(signed_player.get("player_id")),
+                "name": signed_player.get("name") or "--",
+                "pos": signed_player.get("pos") or "--",
+                # Advanced to the roster year the player actually carries next season,
+                # so the modal matches the roster page rather than the pre-signing year.
+                "year": advance_year(signed_player.get("year")),
+                "height": signed_player.get("height"),
+                "weight": signed_player.get("weight"),
+                "attributes": _normalize_new_franchise_player_attributes(
+                    signed_player.get("attributes") or {}
+                ),
+                "rt": signed_player.get("rt"),
+            })
+
     next_fpd_map = {doc["player_id"]: doc for doc in next_fpd_docs}
     existing_ftd_by_team_id = {
         str(doc.get("team_id")): doc
@@ -17085,6 +17182,9 @@ def finish_season(req: FinishSeasonRequest):
             FCC_PENDING_NEW_LEAN_RECRUITS_FIELD: [],
             "week_35_recruiting_ran": False,
             WEEK_35_RECRUITING_RESULTS_FIELD: {},
+            # Consumed by the Walk-On Welcome modal on the first FCC landing of the
+            # new season; captured above, before the week-35 results are cleared.
+            PENDING_WALK_ON_WELCOME_FIELD: pending_walk_on_welcome,
             AWARDS_FIELD: awards_reset,
             # Fresh walk-on portrait deck each season (camp-cut assign reuses only within a season).
             "walk_on_image_ids_used": [],

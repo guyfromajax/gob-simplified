@@ -1,0 +1,81 @@
+/*
+ * Walk-On Welcome modal — season-start reveal of the walk-ons who joined the
+ * user's roster. Moment Modal (Styleguide §Modal System), built on the shared
+ * Sammy chrome (/css/sammy-modal.css) with .is-wide + .is-orange modifiers.
+ *
+ * Everything here is the table body only; the surface, portrait, entrance and
+ * button shape all come from sammy-modal.css.
+ */
+
+.wow-headline {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-weight: 700;
+  font-size: 30px;
+  line-height: 1.02;
+  letter-spacing: 0.02em;
+  margin: 0 0 8px;
+  color: #fff;
+  text-wrap: balance;
+}
+
+.wow-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.62);
+  margin: 0;
+}
+
+/* Table scrolls inside its own container so the modal never scrolls sideways. */
+.wow-tablewrap {
+  width: 100%;
+  margin-top: 16px;
+  overflow-x: auto;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+}
+
+table.wow-roster {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-family: 'Inter', sans-serif;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+table.wow-roster th {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-weight: 400;
+  font-size: 13px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.45);
+  padding: 9px 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.10);
+  white-space: nowrap;
+}
+
+table.wow-roster td {
+  padding: 9px 5px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  white-space: nowrap;
+  color: rgba(255, 255, 255, 0.86);
+}
+
+table.wow-roster tr:last-child td { border-bottom: 0; }
+
+table.wow-roster th.wow-num,
+table.wow-roster td.wow-num { text-align: right; }
+
+table.wow-roster th.wow-name { text-align: left; }
+table.wow-roster td.wow-name {
+  font-weight: 600;
+  color: #fff;
+  text-align: left;
+  padding-right: 12px;
+}
+
+@media (max-width: 760px) {
+  .wow-headline { font-size: 25px; }
+}

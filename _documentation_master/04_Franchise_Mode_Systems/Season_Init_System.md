@@ -41,6 +41,44 @@ Season init does not intentionally wipe:
 - **`training_reports`** are cleared for the new season, but **`coaching_focus`** archetype totals are **carried over** with a **75% reduction**: each of `authoritarian`, `systems_coach`, `player_maximizer`, `culture_builder` becomes **`int(round(old_value × 0.25))`** when `finish_season` writes the next-season FTD row (see `carryover_coaching_focus_counts_for_new_season` in `BackEnd/utils/franchise_coaching_focus_counts.py`).
 - During **week 1 training camp** (first training before any `results["1"]`), new increments use weight **`random.randint(2, 4)`** per submit instead of `+1`. Full detail: `Training_System.md` → Data Storage → FTD `coaching_focus`.
 
+## Walk-On Welcome Modal
+
+Season-start reveal of the walk-ons who backfilled the user's roster at the prior season's Week 35. **Season 2+ only** — Season 1 is left to the first-time-experience flow.
+
+**Why a snapshot and not a query.** The walk-ons are only identifiable during `finish_season`. `week_35_recruiting_results` is cleared in the same function, and once the players land in FPD the `"Walk On"` archetype no longer separates *this* season's arrivals from walk-ons still rostered from earlier seasons. So `finish_season` writes a display-ready payload before the wipe, mirroring `fcc_pending_new_lean_recruit_ids`.
+
+| Aspect | Behavior |
+|---|---|
+| Written | `finish_season`, before `week_35_recruiting_results` is cleared |
+| Read | `_build_walk_on_welcome_modal_payload` → FCC `walk_on_welcome_modal` |
+| Trigger | First FCC landing of the new season (week 1, pre-Training-Camp) |
+| Gate | `walk_on_welcome_modal_seen_season == current_season` |
+| Dismiss | `PATCH /franchise/walk-on-welcome-modal-seen` — stamps season **and** clears the payload |
+| Season 1 | Impossible by construction — only `finish_season` writes the payload |
+| Zero walk-ons | No payload → no modal; season still stamped seen so it can't fire late |
+
+**Fields**
+
+| Field | Collection | Purpose |
+|---|---|---|
+| `pending_walk_on_welcome` | `franchises` | Display-ready walk-on rows: `player_id`, `name`, `pos`, `year` (already advanced), `height`, `weight`, `attributes`, `rt` |
+| `walk_on_welcome_modal_seen_season` | `franchises` | Once-per-season gate |
+
+**Sequencing.** No competing modal can be eligible on the same visit. The cut-required modal needs `week == CAMP_WEEKS` **and** training complete for that week (`_week_1_cut_requirement`); the rollover leaves training incomplete, so it only arms *after* Training Camp runs. Region-bye is a week-30 state. The modal still defers through `blockerVisible()` and registers in `fccHasCompetingModal()` so the archetype-evolution modal yields to it.
+
+**Week 35 interaction.** Walk-ons are excluded from `_build_recruiting_results_modal_payload` — they are roster backfill, not a signing outcome, and now get their own reveal. Each player is introduced exactly once.
+
+**UI.** Moment Modal on the shared Sammy chrome (`walkOnWelcomeModal.js`, `css/walk-on-welcome.css`). Team-uniform Sammy for the 8 Conference 1 programs via `getTeamSammyImage()`, generic otherwise. Table matches the roster page: name, pos, year, height, weight, 12 attributes on the 0–10 scale, RT as a letter grade. CTA "Go To Locker Room" scrolls to the FCC Home locker-room card.
+
+### Tunable Constants
+
+| Constant | Location | Value | Effect |
+|---|---|---|---|
+| `PENDING_WALK_ON_WELCOME_FIELD` | `franchise_routes.py` | `pending_walk_on_welcome` | Franchise-doc key holding the snapshot |
+| `WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD` | `franchise_routes.py` | `walk_on_welcome_modal_seen_season` | Once-per-season gate key |
+| `MAX_RETRIES` | `walkOnWelcomeModal.js` | `300` | 1s-interval deferrals while another overlay is up (~5 min) before giving up |
+| `.sammy-modal.is-wide` | `css/sammy-modal.css` | `720px` | Modal width; the 520px default cannot hold the 18-column table |
+
 ## Rename / Identity Note
 
 Because the current rollout moved playbook settings to `play_id`, season-init continuity should treat:

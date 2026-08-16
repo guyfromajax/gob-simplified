@@ -55,6 +55,12 @@
   text-align: center;
 }
 
+/* Wider variant for modals carrying tabular content that cannot compress to the
+   520px default (e.g. a roster-format table). Opt-in via opts.modalClass. */
+.sammy-modal.is-wide {
+  width: min(720px, 100%);
+}
+
 .sammy-modal-eyebrow {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
   font-size: 18px;
@@ -174,6 +180,15 @@
   background: rgba(255, 255, 255, 0.08);
   color: rgba(255, 255, 255, 0.85);
   border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* Orange primary — Styleguide "primary non-gating action". The green above is
+   reserved for GATING actions (advancing state); modals whose CTA merely
+   navigates must use this modifier instead of overriding the green locally. */
+.sammy-modal-btn-primary.is-orange {
+  background: #F79420;
+  color: #15181f;
+  border-color: rgba(247, 148, 32, 0.5);
 }
 
 @media (max-width: 760px) {

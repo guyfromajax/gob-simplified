@@ -395,6 +395,11 @@ Used for emotionally significant events — game results, training report reveal
 - Primary button height: `44px`. Secondary button height: `44px`.
 - Entrance: subtle scale from `0.96` to `1.0` over `200ms ease`
 
+##### Documented width exception — Walk-On Welcome
+The Walk-On Welcome modal (`walkOnWelcomeModal.js`, season-start walk-on reveal) is a Moment Modal that runs at **`720px`** via `.sammy-modal.is-wide`, not the 560px cap. Its content is a roster-format table — name, position, year, height, weight, 12 attributes, RT — which is unreadable at 560px. The table scrolls inside its own `overflow-x: auto` container so the modal itself never scrolls sideways. Widen a Moment Modal only for genuinely tabular content, and record the exception here.
+
+Its CTA ("Go To Locker Room") uses `.sammy-modal-btn-primary.is-orange` — navigation is a **non-gating** action, so orange applies, not the green used by gating confirms. The base `.sammy-modal-btn-primary` is green; use the modifier rather than a page-local override.
+
 #### Strategic Modals
 Used during active gameplay at decision points — quarter breaks, timeouts, foul-outs, any moment where the coach must make a tactical adjustment before play resumes. Goal is fast, confident decision-making under mild pressure. Data-dense but not celebratory.
 

@@ -3490,6 +3490,11 @@ async function init() {
   }
   championshipMomentsDone.then(() => {
     if (window.RegionByeModal) window.RegionByeModal.maybeShow(topData);
+    // Season-start walk-on reveal. Self-gates on its own payload and defers via
+    // blockerVisible() while any other overlay is up, so ordering here is safe:
+    // the two cannot be eligible on the same visit (a region bye is a week-30
+    // state, this is a week-1 pre-Training-Camp one).
+    if (window.WalkOnWelcomeModal) window.WalkOnWelcomeModal.maybeShow(topData);
     if (window.BigNewsModals) {
       window.BigNewsModals.maybeShow(topData, {
         userTeamId,
@@ -3695,6 +3700,7 @@ function fccHasCompetingModal(topData) {
   if (Array.isArray(topData?.pending_championship_moments) && topData.pending_championship_moments.length) return true;
   if (topData?.region_bye_modal_eligible) return true;
   if (topData?.bracket_reveal_modal?.eligible || topData?.bracket_update_modal?.eligible || topData?.recruiting_results_modal?.eligible) return true;
+  if (topData?.walk_on_welcome_modal?.eligible) return true;
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) return true;
   const me = window.__gobAuthMeData;
   if (me) {

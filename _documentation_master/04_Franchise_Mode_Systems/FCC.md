@@ -912,6 +912,17 @@ Confirmation modal shown before calling:
 
 - `/franchise/finish-season`
 
+### Walk-On Welcome
+
+Season-start reveal of the walk-ons who joined the roster, shown on the first FCC landing of a new season (week 1, before Training Camp). Season 2+ only.
+
+- `topData.walk_on_welcome_modal.eligible`
+- Rendered by `window.WalkOnWelcomeModal` (`js/shared/walkOnWelcomeModal.js`)
+- Dismissed via `PATCH /franchise/walk-on-welcome-modal-seen`
+- Registered in `fccHasCompetingModal()` so archetype-evolution yields to it
+
+Cannot collide with **Cut Players Required** — that needs training complete for week 1, which the rollover leaves false. Full rules: [Season_Init_System.md](Season_Init_System.md) → Walk-On Welcome Modal.
+
 ---
 
 ## FCC Page Load
