@@ -498,9 +498,11 @@ class FranchiseManager:
         for team in self.teams:
             team_obj_id = team.get("_id")
             team_name = team.get("name", "")
+            # user_team_object_id is the ObjectId string; user_team_id is the
+            # human-readable team NAME (see select_team / team-builder apply).
             is_user_team = bool(
                 (user_team_object_id and str(team_obj_id) == str(user_team_object_id))
-                or (user_team_id and str(team_obj_id) == str(user_team_id))
+                or (user_team_id and team_name == str(user_team_id))
             )
             if is_user_team:
                 user_walk_on_team_name = team_name
