@@ -223,32 +223,9 @@
       background: transparent;
     }
 
-    .roster-table tbody tr:nth-child(odd),
-    .stats-table tbody tr:nth-child(odd) {
-      background: rgba(255, 255, 255, 0.03) !important;
-      background-color: rgba(255, 255, 255, 0.03) !important;
-    }
-
-    .roster-table tbody tr:nth-child(even),
-    .stats-table tbody tr:nth-child(even) {
-      background: transparent !important;
-      background-color: transparent !important;
-    }
-
-    .roster-table tbody tr:nth-child(odd) td,
-    .stats-table tbody tr:nth-child(odd) td {
-      background: rgba(255, 255, 255, 0.03) !important;
-    }
-
-    .roster-table tbody tr:nth-child(even) td,
-    .stats-table tbody tr:nth-child(even) td {
-      background: transparent !important;
-    }
-
-    .roster-table tbody tr:hover td,
-    .stats-table tbody tr:hover td {
-      background: rgba(255, 255, 255, 0.04) !important;
-    }
+    /* Row banding lives in the single-surface block below, on <tr> only.
+       It must not be set on <td>: the sticky identity column needs an opaque
+       background of its own, and a td-level !important would show through it. */
 
     .roster-table th:first-child,
     .stats-table th:first-child,
@@ -329,6 +306,85 @@
         font-size: 1.9rem;
       }
     }
+
+    /* ========== Single data surface (Scope x View) ========== */
+    .team-roster-shell {
+      border-radius: 24px;
+      border: 1px solid rgba(255,255,255,.09);
+      background:
+        linear-gradient(160deg, rgba(255,255,255,.028), rgba(255,255,255,.014) 18%, transparent 40%),
+        linear-gradient(132deg, rgba(255,255,255,.014) 0 1px, transparent 1px 7px),
+        rgba(14,16,24,.96);
+      box-shadow: 0 20px 48px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.07);
+      padding: 22px 24px 26px;
+    }
+
+    /* Identity lockup */
+    .tr-lockup { display: flex; align-items: center; gap: 18px; margin-bottom: 18px; }
+    .tr-lockup__banner {
+      width: 224px; height: 79px; object-fit: cover; flex: 0 0 auto;
+      border-radius: 10px; border: 1px solid rgba(255,255,255,.16);
+    }
+    .tr-lockup__eyebrow {
+      font: 700 9px/1 'Inter', sans-serif; letter-spacing: .13em; text-transform: uppercase;
+      color: rgba(255,255,255,.4); margin-bottom: 6px;
+    }
+    .tr-lockup__name {
+      font: 400 34px/1 'Bebas Neue Pro','Bebas Neue',sans-serif; letter-spacing: .02em; color: #f7f9ff;
+    }
+    .tr-lockup__stats { margin-left: auto; display: flex; gap: 26px; text-align: right; }
+    .tr-stat { display: flex; flex-direction: column; gap: 4px; }
+    .tr-stat__v { font: 400 24px/1 'Bebas Neue Pro','Bebas Neue',sans-serif; color: #f7f9ff; }
+    .tr-stat__l {
+      font: 700 9px/1 'Inter', sans-serif; letter-spacing: .13em; text-transform: uppercase;
+      color: rgba(255,255,255,.4);
+    }
+
+    /* Projected five eyebrow */
+    .tr-p5 { margin-bottom: 18px; }
+    .tr-eyebrow-rule { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+    .tr-eyebrow-rule span {
+      font: 400 17px/1 'Bebas Neue Pro','Bebas Neue',sans-serif; letter-spacing: .09em;
+      color: rgba(255,255,255,.62); white-space: nowrap;
+    }
+    .tr-eyebrow-rule::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.09); }
+
+    .tr-toolbar__sep { width: 1px; height: 22px; background: rgba(255,255,255,.09); }
+
+    /* Scroll container owns the scroll so the header can stick. */
+    #tr-scroll { max-height: calc(100vh - 340px); overflow: auto; }
+
+    /* Sticky header — both rows in the stats view, single row in attributes. */
+    #roster-table thead th {
+      position: sticky; z-index: 3;
+      background: #191d27;                       /* opaque, or rows bleed through */
+    }
+    #roster-table thead tr:first-child th { top: 0; }
+    #roster-table thead tr.tr-colrow th { top: 26px; }
+    #roster-table thead th.c-ident { left: 0; z-index: 5; }
+
+    /* Sticky identity column, solid per row state (zebra + hover). */
+    #roster-table td.c-ident {
+      position: sticky; left: 0; z-index: 2; text-align: left;
+      background: #12141c;
+    }
+    #roster-table tbody tr:nth-child(even) td.c-ident { background: #16181f; }
+    #roster-table tbody tr:hover td.c-ident { background: #1b1e27; }
+
+    /* Zebra banding — this surface only; the FCC tabs keep their own. */
+    #roster-table tbody tr:nth-child(even) { background: rgba(255,255,255,.022); }
+    #roster-table tbody tr:hover { background: rgba(255,255,255,.05); }
+
+    /* Season-stat group header tier */
+    #roster-table th.tr-grp {
+      font: 700 9px/1 'Inter', sans-serif; letter-spacing: .13em; text-transform: uppercase;
+      color: rgba(255,255,255,.26); text-align: center; padding-bottom: 6px;
+    }
+    #roster-table th.tr-groupstart, #roster-table td.tr-groupstart {
+      border-left: 1px solid rgba(255,255,255,.055);
+    }
+    #roster-table th.tr-grp + th.tr-grp { border-left: 1px solid rgba(255,255,255,.055); }
+    .tr-empty { padding: 24px; text-align: center; color: rgba(255,255,255,.4); }
   </style>
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
@@ -345,147 +401,47 @@
       <img id="team-banner" src="/images/teams/general/general_banner_primary.jpg" alt="Team banner">
     </div>
 
-    <!-- Starting 5 (projected) — franchise / base / practice_squad; omitted for tournament -->
-    <div id="starting-five-section" class="team-roster-section" style="display:none;">
-      <div class="fcc-scouting-card-head p5-head">
-        <h3>Starting 5</h3>
+    <!-- Identity lockup: banner card, team name, record + conference standing.
+         No scholarship count — scholarships are sunset. -->
+    <div class="tr-lockup">
+      <img id="team-banner-card" class="tr-lockup__banner" src="/images/teams/general/general_banner_primary.jpg" alt="">
+      <div class="tr-lockup__id">
+        <div class="tr-lockup__eyebrow">Team Roster</div>
+        <div class="tr-lockup__name" id="tr-team-name">--</div>
       </div>
-      <div class="fcc-data-card">
-        <div class="fcc-data-card-body fcc-scouting-p5-body">
-          <div id="roster-starting-five" class="scouting-projected-lineup-wrap"></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Roster Grid -->
-    <div id="roster-table-container" class="team-roster-section">
-      <div class="roster-section-header">
-        <div class="section-title">Player Attributes</div>
-      </div>
-      <div class="fcc-data-card">
-        <div class="fcc-data-card-body">
-          <div class="scroll-x">
-            <table class="roster-table" id="roster-table">
-            <thead>
-              <tr>
-                <th data-sort="name">Name</th>
-                <th data-sort="pos">POS</th>
-                <th data-sort="year">Year</th>
-                <th data-sort="height">Height</th>
-                <th data-sort="weight">Weight</th>
-                <th class="attr-tiles-head">Attributes</th>
-                <th data-sort="RT" data-tooltip="current/potential">RT</th>
-              </tr>
-            </thead>
-            <tbody id="roster-body">
-              <tr><td colspan="18" class="loading">Loading roster...</td></tr>
-            </tbody>
-          </table>
-          </div>
-        </div>
+      <div class="tr-lockup__stats" id="tr-record-block">
+        <div class="tr-stat"><span class="tr-stat__v" id="tr-record">--</span><span class="tr-stat__l">Record</span></div>
+        <div class="tr-stat"><span class="tr-stat__v" id="tr-standing">--</span><span class="tr-stat__l">Conference</span></div>
       </div>
     </div>
 
-    <!-- Season Statistics -->
-    <div id="stats-section" class="team-roster-section">
-      <div class="section-title">Season Statistics</div>
-      <div class="fcc-data-card">
-        <div class="fcc-data-card-body">
-          <div class="scroll-x">
-            <table class="stats-table" id="stats-table">
-            <thead>
-              <tr>
-                <th data-sort="name">Name</th>
-                <th data-sort="PTS">PTS</th>
-                <th data-sort="FGM">FGM</th>
-                <th data-sort="FGA">FGA</th>
-                <th data-sort="FG%">FG%</th>
-                <th data-sort="3PTM">3PTM</th>
-                <th data-sort="3PTA">3PTA</th>
-                <th data-sort="3PT%">3PT%</th>
-                <th data-sort="FTM">FTM</th>
-                <th data-sort="FTA">FTA</th>
-                <th data-sort="FT%">FT%</th>
-                <th data-sort="DREB">DREB</th>
-                <th data-sort="OREB">OREB</th>
-                <th data-sort="TREB">TREB</th>
-                <th data-sort="AST">AST</th>
-                <th data-sort="STL">STL</th>
-                <th data-sort="BLK">BLK</th>
-                <th data-sort="F">F</th>
-                <th data-sort="TO">TO</th>
-                <th data-sort="DEFA">DEFA</th>
-                <th data-sort="DEF%">DEF%</th>
-                <th data-sort="SCRA">SCRA</th>
-                <th data-sort="SCR%">SCR%</th>
-              </tr>
-            </thead>
-            <tbody id="stats-body">
-              <tr><td colspan="23" class="loading">Loading stats...</td></tr>
-            </tbody>
-          </table>
-          </div>
-        </div>
-      </div>
+    <!-- Projected starting five — the existing shared card component, headshots and all.
+         Always per game, regardless of the table's Per game / Totals toggle. -->
+    <div id="starting-five-section" class="tr-p5" style="display:none;">
+      <div class="tr-eyebrow-rule"><span>Projected Starting Five</span></div>
+      <div id="roster-starting-five" class="scouting-projected-lineup-wrap"></div>
     </div>
 
-    <!-- Practice Squad (the 3 cut players; + Recruits after Week 35 Recruiting Day) -->
-    <div id="ts-roster-section" class="team-roster-section" style="display:none;">
-      <div class="section-title" id="ps-section-title">Practice Squad</div>
-      <div class="fcc-data-card">
-        <div class="fcc-data-card-body">
-          <div class="scroll-x">
-            <table class="roster-table" id="ts-roster-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>POS</th>
-                <th>Year</th>
-                <th>Height</th>
-                <th>Weight</th>
-                <th class="attr-tiles-head">Attributes</th>
-                <th data-tooltip="current/potential">RT</th>
-              </tr>
-            </thead>
-            <tbody id="ts-roster-body"></tbody>
+    <!-- One data surface, two switches. Replaces four stacked tables. -->
+    <div class="attr-toolbar tr-toolbar">
+      <button type="button" class="scope-btn" data-tr-scope="varsity" aria-pressed="true">Varsity<span class="n" data-tr-count="varsity">0</span></button>
+      <button type="button" class="scope-btn" data-tr-scope="practice" aria-pressed="false">Practice Squad<span class="n" data-tr-count="practice">0</span></button>
+      <span class="tr-toolbar__sep" aria-hidden="true"></span>
+      <button type="button" class="scope-btn" data-tr-view="attributes" aria-pressed="true">Attributes</button>
+      <button type="button" class="scope-btn" data-tr-view="stats" aria-pressed="false">Season Stats</button>
+      <span class="seg-track tr-per" id="tr-per-track" style="display:none;">
+        <button type="button" data-tr-per="game" aria-pressed="true">Per game</button>
+        <button type="button" data-tr-per="total" aria-pressed="false">Totals</button>
+      </span>
+      <span class="attr-rowcount" id="tr-rowcount"></span>
+    </div>
+    <div class="fcc-data-card">
+      <div class="fcc-data-card-body">
+        <div class="scroll-x" id="tr-scroll">
+          <table class="roster-table" id="roster-table">
+            <thead id="tr-head"></thead>
+            <tbody id="roster-body"></tbody>
           </table>
-          </div>
-        </div>
-      </div>
-      <div class="fcc-data-card" style="margin-top:12px;">
-        <div class="fcc-data-card-body">
-          <div class="scroll-x">
-            <table class="stats-table" id="ps-stats-table">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>PTS</th>
-                <th>FGM</th>
-                <th>FGA</th>
-                <th>FG%</th>
-                <th>3PTM</th>
-                <th>3PTA</th>
-                <th>3PT%</th>
-                <th>FTM</th>
-                <th>FTA</th>
-                <th>FT%</th>
-                <th>DREB</th>
-                <th>OREB</th>
-                <th>TREB</th>
-                <th>AST</th>
-                <th>STL</th>
-                <th>BLK</th>
-                <th>F</th>
-                <th>TO</th>
-                <th>DEFA</th>
-                <th>DEF%</th>
-                <th>SCRA</th>
-                <th>SCR%</th>
-              </tr>
-            </thead>
-            <tbody id="ps-stats-body"></tbody>
-          </table>
-          </div>
         </div>
       </div>
     </div>

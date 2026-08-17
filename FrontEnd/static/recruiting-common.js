@@ -386,14 +386,15 @@
           (subParts.length ? '<span class="ident-sub">' + subParts.join(' · ') + '</span>' : '') +
         '</span></div></td>';
 tr.innerHTML = [
-        // Column order: Recruit | RT | POS | HT | WT | Attributes | Current Lean.
-        // Home Region and Archetype fold into the identity cell as a sub-line — as
-        // separate columns the table overflowed the panel and pushed Current Lean,
-        // the column this table exists to be scanned for, off-screen.
+        // Column order: Recruit | RT | POS | YR | HT | WT | Attributes | Current Lean —
+        // the Roster tab's order, so the two tables read the same way. Home Region and
+        // Archetype fold into the identity cell as a sub-line: as separate columns the
+        // table overflowed the panel and pushed Current Lean, the column this table
+        // exists to be scanned for, off-screen.
         identityCell,
-        '<td>' + escapeHtml(recruit.yearDisplay || '--') + '</td>',
         '<td class="c-rt">' + rtLockupHtml(recruit.rt, recruit.potentialRt, recruit.year) + '</td>',
         '<td>' + posChipHtml(recruit.pos) + '</td>',
+        '<td>' + escapeHtml(recruit.yearDisplay || '--') + '</td>',
         '<td>' + recruit.height + '</td>',
         '<td>' + (recruit.weight != null ? recruit.weight : '--') + '</td>',
         '<td class="attr-tiles-cell">' + global.GOB_AttrTiles.groupedTilesHtml(recruit.rawAttrs) + '</td>',

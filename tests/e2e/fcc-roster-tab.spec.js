@@ -192,24 +192,37 @@ test.describe('FCC Recruiting tab', () => {
       <div id="franchise-container"><div id="tournament-tabs">${RECRUITS_TAB}</div></div>`);
     await page.addScriptTag({ content: read('js/shared/rtBucket.js') });
     await page.addScriptTag({ content: read('js/shared/attrTiles.js') });
+    await page.addScriptTag({ content: read('js/shared/playerYear.js') });
+    // Production script order: common.js supplies getBestPosition/formatHeight.
+    await page.addScriptTag({ content: read('common.js') });
+    await page.addScriptTag({ content: read('recruiting-common.js') });
+    await page.addScriptTag({ content: read('recruiting-spine.js') });
+    // Rows come from the real renderRecruitTableRows, not a hand-built copy of it:
+    // a stand-in cannot catch the header/body order drift these tests exist to catch.
     await page.evaluate(() => {
       const A = ['SC','SH','ID','OD','PS','BH','RB','AG','ST','ND','IQ','FT'];
-      const mk = (i) => { const a={}; A.forEach((k,j)=>a[k]=((i*7+j*13)%95+5)); return a; };
+      const raw = [0, 1, 2].map((i) => {
+        const attributes = {}; A.forEach((k, j) => attributes[k] = ((i * 7 + j * 13) % 95 + 5));
+        return {
+          recruit_id: 'r' + i, name: 'Isaiah Frame', 'Home Region': 'A', archetype: 'Slasher',
+          height: 76, weight: 190, year: 'Junior', attributes,
+          position_ratings: { SG: 82 - i }, potential_rt_ratcheted: 90 - i,
+          Lean: { '1': 'tXAV', '2': 'tLAN' },
+        };
+      });
       document.getElementById('fcc-recruits-attr-head').innerHTML =
         window.GOB_AttrTiles.groupedHeaderHtml({ key: 'rt', dir: 'desc' });
-      document.getElementById('fcc-recruits-body').innerHTML = [0,1,2].map((i) =>
-        '<tr><td class="c-ident"><div class="ident"><span class="ident-body">' +
-        '<span class="ident-name"><a href="#">Isaiah Frame</a></span>' +
-        '<span class="ident-sub">Region A · <b>Slasher</b></span></span></div></td>' +
-        '<td>JR</td>' +
-        '<td class="c-rt"><span class="rt-lockup"><b class="rt-high">B</b><i class="rt-elite">A</i></span></td>' +
-        '<td><span class="pos-chip">SG</span></td><td>6\'4"</td><td>190</td>' +
-        '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(mk(i)) + '</td>' +
-        '<td class="lean-ladder-cell">lean</td></tr>').join('');
+      // userTeamId present => the ranked-ladder lean cell, as the FCC renders it.
+      const teamNameMap = { tXAV: 'Xavier', tLAN: 'Lancaster' };
+      window.RecruitingCommon.renderRecruitTableRows(
+        document.getElementById('fcc-recruits-body'),
+        window.RecruitingCommon.normalizeRecruits(raw, teamNameMap),
+        { userTeamId: 'tLAN', teamNameMap },
+      );
     });
   }
 
-  test('column order is Recruit RT POS HT WT Attributes Current Lean', async ({ page }) => {
+  test('column order matches the Roster tab: Recruit RT POS YR HT WT', async ({ page }) => {
     await mountRecruits(page);
     // The attributes cell holds the grouped header grid, so identify it by class
     // rather than by text.
@@ -218,7 +231,7 @@ test.describe('FCC Recruiting tab', () => {
         t.classList.contains('attr-tiles-head')
           ? 'ATTRS'
           : t.firstChild.textContent.trim()));
-    expect(labels).toEqual(['Recruit', 'YR', 'RT', 'POS', 'HT', 'WT', 'ATTRS', 'Current Lean']);
+    expect(labels).toEqual(['Recruit', 'RT', 'POS', 'YR', 'HT', 'WT', 'ATTRS', 'Current Lean']);
   });
 
   test('Region and Archetype fold into the identity sub-line', async ({ page }) => {
@@ -231,15 +244,52 @@ test.describe('FCC Recruiting tab', () => {
     expect(m.opacity).toBe('rgba(255, 255, 255, 0.62)');   // AA floor, not lighter
   });
 
-  test('both folded columns keep a sort control', async ({ page }) => {
+  test('each body cell sits under its own header — order agrees, not just count', async ({ page }) => {
     await mountRecruits(page);
-    const keys = await page.evaluate(() =>
-      [...document.querySelectorAll('#fcc-recruits-table [data-sub-sort]')].map((b) => ({
-        key: b.dataset.subSort, first: b.dataset.firstDir })));
-    expect(keys).toEqual([
-      { key: 'homeRegion', first: 'asc' },
-      { key: 'archetype', first: 'asc' },
-    ]);
+    const m = await page.evaluate(() => {
+      const heads = [...document.querySelectorAll('#fcc-recruits-table thead th')].map((t) =>
+        t.classList.contains('attr-tiles-head') ? 'ATTRS' : t.firstChild.textContent.trim());
+      const cells = [...document.querySelectorAll('#fcc-recruits-body tr:first-child td')];
+      const at = (label) => cells[heads.indexOf(label)];
+      return {
+        rt: !!at('RT').querySelector('.rt-lockup'),
+        pos: at('POS').querySelector('.pos-chip')?.textContent.trim(),
+        yr: at('YR').textContent.trim(),
+        ht: at('HT').textContent.trim(),
+        wt: at('WT').textContent.trim(),
+        attrs: at('ATTRS').querySelectorAll('.attr-tile').length,
+        lean: at('Current Lean').querySelectorAll('.lb-slot').length,
+      };
+    });
+    expect(m.rt).toBe(true);
+    expect(m.pos).toBe('SG');
+    expect(m.yr).toBe('JR');
+    expect(m.ht).toBe('6\'4"');
+    expect(m.wt).toBe('190');
+    expect(m.attrs).toBe(12);
+    expect(m.lean).toBe(2);        // the two ranked slots from the mock's Lean
+  });
+
+  test('the header carries no Region/Archetype sub-sort controls', async ({ page }) => {
+    await mountRecruits(page);
+    const m = await page.evaluate(() => ({
+      subSorts: document.querySelectorAll('#fcc-recruits-table [data-sub-sort]').length,
+      headerText: document.querySelector('#fcc-recruits-table thead th.c-ident').textContent.trim(),
+    }));
+    expect(m.subSorts).toBe(0);
+    expect(m.headerText).toBe('Recruit');
+  });
+
+  test('the name sits on its own line above Region / Archetype', async ({ page }) => {
+    await mountRecruits(page);
+    const m = await page.evaluate(() => {
+      const cell = document.querySelector('#fcc-recruits-body .c-ident');
+      const name = cell.querySelector('.ident-name').getBoundingClientRect();
+      const sub = cell.querySelector('.ident-sub').getBoundingClientRect();
+      return { nameBottom: name.bottom, subTop: sub.top, nameLeft: name.left, subLeft: sub.left };
+    });
+    expect(m.subTop).toBeGreaterThanOrEqual(m.nameBottom - 1);   // stacked, not run together
+    expect(Math.abs(m.subLeft - m.nameLeft)).toBeLessThan(1);    // and left-aligned with it
   });
 
   test('all 12 attributes sort, and the header lays out six across', async ({ page }) => {

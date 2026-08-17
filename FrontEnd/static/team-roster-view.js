@@ -122,9 +122,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadRoster();
   await loadStats();
   
-  // Setup sorting
-  setupRosterSorting();
-  setupStatsSorting();
+  // One table, one sort path.
+  trBindToolbar();
+  renderTrTable();
 });
 
 function setupBackButton() {
@@ -210,7 +210,7 @@ async function loadRoster() {
         ? data.projected_starting_five
         : [];
       renderStartingFive();
-      renderRoster();
+      renderTrTable();
       return;
     }
 
@@ -326,9 +326,9 @@ async function loadRoster() {
     projectedStartingFive = (mode === 'tournament')
       ? []
       : (Array.isArray(data.projected_starting_five) ? data.projected_starting_five : []);
+    trRenderLockup(data);
     renderStartingFive();
-    renderRoster();
-    renderTrainingSquadView();
+    renderTrTable();
   } catch (error) {
     console.error('Error loading roster:', error);
     document.getElementById('roster-body').innerHTML = `<tr><td colspan="18">Error loading roster: ${error.message}</td></tr>`;
@@ -343,7 +343,7 @@ async function loadStats() {
         name: p.name,
         stats: p.psStats || {},
       }));
-      renderStats();
+      renderTrTable();
       return;
     }
 
@@ -469,7 +469,7 @@ async function loadStats() {
       });
     }
     
-    renderStats();
+    renderTrTable();
   } catch (error) {
     console.error('Error loading stats:', error);
     document.getElementById('stats-body').innerHTML = `<tr><td colspan="23">Error loading stats: ${error.message}</td></tr>`;
@@ -526,411 +526,274 @@ function renderStartingFive() {
   });
 }
 
-function renderRoster() {
-  renderRosterInto(rosterData, 'roster-body');
+// ===================== One data surface, two switches =====================
+// Replaces the four stacked tables (attributes / stats / PS attributes / PS stats) with
+// a single table driven by Scope (Varsity | Practice Squad) and View (Attributes |
+// Season Stats). The old render*/setup*Sorting functions targeted elements that no
+// longer exist; everything below is the live path.
+
+// The four stacked tables (roster / stats / practice roster / practice stats) collapsed
+// into one Scope x View surface; their renderers and sort handlers were removed with
+// them. See the TR_* block below.
+const TR_STATE = { scope: 'varsity', view: 'attributes', per: 'game', sortKey: 'RT', sortDir: 'desc' };
+
+/** Season-stat columns grouped so the table reads like a box score.
+ *  Columns are REORDERED within the existing set so each group is contiguous — DEFENSE
+ *  was previously split by F/TO. The set itself is unchanged.
+ *  `pct: true` columns are ratios, so the Per game / Totals toggle does not touch them. */
+const TR_STAT_GROUPS = [
+  { label: 'SCORING',      cols: [{ k: 'PTS' }] },
+  { label: 'FIELD GOALS',  cols: [{ k: 'FGM' }, { k: 'FGA' }, { k: 'FG%', pct: true }] },
+  { label: '3-POINT',      cols: [{ k: '3PTM' }, { k: '3PTA' }, { k: '3PT%', pct: true }] },
+  { label: 'FREE THROWS',  cols: [{ k: 'FTM' }, { k: 'FTA' }, { k: 'FT%', pct: true }] },
+  { label: 'REBOUNDING',   cols: [{ k: 'DREB' }, { k: 'OREB' }, { k: 'TREB' }] },
+  { label: 'PLAYMAKING',   cols: [{ k: 'AST' }] },
+  { label: 'DEFENSE',      cols: [{ k: 'STL' }, { k: 'BLK' }, { k: 'DEFA' }, { k: 'DEF%', pct: true }] },
+  { label: 'SCREENS',      cols: [{ k: 'SCRA' }, { k: 'SCR%', pct: true }] },
+  { label: 'MISTAKES',     cols: [{ k: 'F' }, { k: 'TO' }] },
+];
+
+function trPosChipHtml(pos) {
+  return '<span class="pos-chip">' + escapeTrHtml(pos || '--') + '</span>';
 }
 
-function renderTrainingSquadView() {
-  const section = document.getElementById('ts-roster-section');
-  if (!section) return;
-  if (!trainingSquadData || !trainingSquadData.length) {
-    section.style.display = 'none';
-    return;
-  }
-  const titleEl = document.getElementById('ps-section-title');
-  if (titleEl) {
-    titleEl.textContent = 'Practice Squad';
-  }
-  renderRosterInto(trainingSquadData, 'ts-roster-body');
-  renderPracticeSquadStats();
-  section.style.display = '';
+function escapeTrHtml(v) {
+  return String(v == null ? '' : v)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
-// Practice Squad stats subsection — mirrors the Season Statistics table, fed by
-// each player's ps_season_stats (regional Practice Squad games). Percentages are
-// computed client-side from made/attempted, same as renderStats().
-function renderPracticeSquadStats() {
-  const tbody = document.getElementById('ps-stats-body');
-  if (!tbody) return;
-  tbody.innerHTML = '';
-  trainingSquadData.forEach(p => {
-    const stats = p.psStats || {};
-    const tr = document.createElement('tr');
+/** RT current -> potential lockup. Colours from the shared bucket helper. */
+function trRtLockupHtml(rt, potentialRt) {
+  const cls = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : '';
+  const cur = typeof formatRtDisplay === 'function' ? formatRtDisplay(rt) : (rt == null ? '--' : String(rt));
+  let html = '<span class="rt-lockup"><b class="' + cls + '">' + escapeTrHtml(cur) + '</b>';
+  if (potentialRt != null) {
+    const pcls = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(potentialRt) : '';
+    const pot = typeof formatRtDisplay === 'function' ? formatRtDisplay(potentialRt) : String(potentialRt);
+    html += '<i class="' + pcls + '">' + escapeTrHtml(pot) + '</i>';
+  }
+  return html + '</span>';
+}
 
-    const nameTd = document.createElement('td');
-    if (p.isRecruit) {
-      nameTd.textContent = p.name;
-    } else {
-      const nameLink = document.createElement('a');
-      nameLink.href = buildPlayerDetailUrl(p._id);
-      nameLink.textContent =
-        typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
-      nameLink.style.color = 'inherit';
-      nameLink.style.textDecoration = 'none';
-      nameLink.addEventListener('mouseenter', () => { nameLink.style.textDecoration = 'underline'; });
-      nameLink.addEventListener('mouseleave', () => { nameLink.style.textDecoration = 'none'; });
-      nameTd.appendChild(nameLink);
+function trIdentityCellHtml(p, opts) {
+  const o = opts || {};
+  const nameHtml = o.link === false
+    ? escapeTrHtml(p.name || '--')
+    : '<a href="' + escapeTrHtml(buildPlayerDetailUrl(p._id)) + '">' + escapeTrHtml(p.name || '--') + '</a>';
+  let flags = '';
+  if (p.hasPlayingTimePromise) flags += '<span class="ident-flag"> (PTP)</span>';
+  if (p.isGraduating) flags += '<span class="ident-flag"> (GR)</span>';
+  return '<td class="c-ident"><div class="ident">' +
+    '<span class="ident-jersey">' + escapeTrHtml(p.jersey == null ? '' : p.jersey) + '</span>' +
+    '<span class="ident-body"><span class="ident-name">' + nameHtml + flags + '</span></span>' +
+    '</div></td>';
+}
+
+function trRowsForScope() {
+  return TR_STATE.scope === 'practice' ? (trainingSquadData || []) : (rosterData || []);
+}
+
+// ---------- Attributes view ----------
+function trAttrHeadHtml() {
+  const grouped = window.GOB_AttrTiles.groupedHeaderHtml({ key: TR_STATE.sortKey, dir: TR_STATE.sortDir });
+  const th = (key, label, cls) =>
+    '<th' + (cls ? ' class="' + cls + '"' : '') + ' data-tr-sort="' + key + '">' + label + '</th>';
+  return '<tr>' +
+    th('name', 'Player', 'c-ident') +
+    '<th class="c-rt" data-tr-sort="RT">RT<span class="rt-caption">cur &rarr; pot</span></th>' +
+    th('pos', 'POS') + th('year', 'YR') + th('height', 'HT') + th('weight', 'WT') +
+    '<th class="attr-tiles-head">' + grouped + '</th></tr>';
+}
+
+function trAttrRowHtml(p) {
+  return '<tr>' + trIdentityCellHtml(p, { link: TR_STATE.scope !== 'practice' }) +
+    '<td class="c-rt">' + trRtLockupHtml(p.highestRT, p.potential_rt_ratcheted) + '</td>' +
+    '<td>' + trPosChipHtml(p.pos) + '</td>' +
+    '<td>' + escapeTrHtml(p.year || '--') + '</td>' +
+    '<td>' + escapeTrHtml(p.height || '--') + '</td>' +
+    '<td>' + escapeTrHtml(p.weight == null ? '--' : p.weight) + '</td>' +
+    '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(p.attributes || {}) + '</td>' +
+    '</tr>';
+}
+
+// ---------- Season Stats view ----------
+function trStatsHeadHtml() {
+  let groupRow = '<tr class="tr-grouprow"><th class="c-ident" rowspan="2" data-tr-sort="name">Player</th>';
+  let colRow = '<tr class="tr-colrow">';
+  TR_STAT_GROUPS.forEach((g) => {
+    groupRow += '<th class="tr-grp" colspan="' + g.cols.length + '">' + g.label + '</th>';
+    g.cols.forEach((c, i) => {
+      colRow += '<th data-tr-sort="' + c.k + '"' + (i === 0 ? ' class="tr-groupstart"' : '') + '>' +
+        escapeTrHtml(c.k) + '</th>';
+    });
+  });
+  return groupRow + '</tr>' + colRow + '</tr>';
+}
+
+function trStatValue(stats, col, gp) {
+  const raw = Number(stats[col.k] != null ? stats[col.k] : 0) || 0;
+  if (col.pct) return raw.toFixed(1);                      // ratios ignore the toggle
+  if (TR_STATE.per === 'total' || !gp) return Math.round(raw);
+  return (raw / gp).toFixed(1);
+}
+
+function trStatsRowHtml(p, statsByPid) {
+  const stats = statsByPid.get(p._id) || {};
+  const gp = Number(stats.GP || 0) || 0;
+  let cells = '';
+  TR_STAT_GROUPS.forEach((g) => {
+    g.cols.forEach((c, i) => {
+      cells += '<td' + (i === 0 ? ' class="tr-groupstart"' : '') + '>' + escapeTrHtml(trStatValue(stats, c, gp)) + '</td>';
+    });
+  });
+  return '<tr>' + trIdentityCellHtml(p, { link: TR_STATE.scope !== 'practice' }) + cells + '</tr>';
+}
+
+// ---------- render + sort ----------
+function trStatsByPid() {
+  const m = new Map();
+  (statsData || []).forEach((s) => m.set(s._id, s.stats || {}));
+  return m;
+}
+
+function trSortRows(rows) {
+  const key = TR_STATE.sortKey;
+  const dir = TR_STATE.sortDir;
+  const statsByPid = trStatsByPid();
+  const tiles = window.GOB_AttrTiles;
+  const val = (p) => {
+    if (key === 'name') return p.name || '';
+    if (key === 'pos') return p.pos || '';
+    if (key === 'year') return yearSortValue(p.year);
+    if (key === 'height') return p.heightRaw || 0;
+    if (key === 'weight') return p.weight != null ? p.weight : -1;
+    if (key === 'RT') return p.highestRT != null ? p.highestRT : -1;
+    if (tiles.ATTR_KEYS.indexOf(key) !== -1) {
+      const v = tiles.tileValue(p.attributes || {}, key);
+      return v == null ? -1 : v;
     }
-    tr.appendChild(nameTd);
-
-    const addCell = (content) => {
-      const td = document.createElement('td');
-      td.textContent = content;
-      tr.appendChild(td);
-    };
-
-    const tpm = stats['3PTM'] || 0;
-    const tpa = stats['3PTA'] || 0;
-    const fgm = stats.FGM || 0;
-    const fga = stats.FGA || 0;
-    const ftm = stats.FTM || 0;
-    const fta = stats.FTA || 0;
-    const defa = stats.DEF_A || 0;
-    const defs = stats.DEF_S || 0;
-    const scra = stats.SCR_A || 0;
-    const scrs = stats.SCR_S || 0;
-
-    addCell(stats.PTS || 0);
-    addCell(fgm);
-    addCell(fga);
-    addCell(fga > 0 ? ((fgm / fga) * 100).toFixed(1) : '0.0');
-    addCell(tpm);
-    addCell(tpa);
-    addCell(tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0');
-    addCell(ftm);
-    addCell(fta);
-    addCell(fta > 0 ? ((ftm / fta) * 100).toFixed(1) : '0.0');
-    addCell(stats.DREB || 0);
-    addCell(stats.OREB || 0);
-    addCell(stats.TREB || stats.REB || 0);
-    addCell(stats.AST || 0);
-    addCell(stats.STL || 0);
-    addCell(stats.BLK || 0);
-    addCell(stats.F || 0);
-    addCell(stats.TO || 0);
-    addCell(defa);
-    addCell(defa > 0 ? `${Math.round((defs / defa) * 100)}%` : '0%');
-    addCell(scra);
-    addCell(scra > 0 ? ((scrs / scra) * 100).toFixed(1) : '0.0');
-
-    tbody.appendChild(tr);
+    const stats = statsByPid.get(p._id) || {};
+    const gp = Number(stats.GP || 0) || 0;
+    return Number(trStatValue(stats, { k: key, pct: /%$/.test(key) }, gp)) || 0;
+  };
+  return rows.slice().sort((a, b) => {
+    const av = val(a), bv = val(b);
+    if (typeof av === 'string' || typeof bv === 'string') {
+      return dir === 'asc' ? String(av).localeCompare(String(bv)) : String(bv).localeCompare(String(av));
+    }
+    return dir === 'asc' ? av - bv : bv - av;
   });
 }
 
-function renderRosterInto(data, tbodyId) {
-  const tbody = document.getElementById(tbodyId);
-  if (!tbody) return;
-  tbody.innerHTML = '';
-
-  data.forEach(p => {
-    const tr = document.createElement('tr');
-    const attrs = p.attributes || {};
-    
-    // Name with link (Practice Squad team view & recruits: plain text, no jersey/detail page)
-    const nameTd = document.createElement('td');
-    if (mode === 'practice_squad' || p.isRecruit) {
-      nameTd.textContent = p.name;
-    } else {
-      const nameLink = document.createElement('a');
-      nameLink.href = buildPlayerDetailUrl(p._id);
-      nameLink.textContent =
-        typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
-      nameLink.style.color = 'inherit';
-      nameLink.style.textDecoration = 'none';
-      nameLink.addEventListener('mouseenter', () => {
-        nameLink.style.textDecoration = 'underline';
-      });
-      nameLink.addEventListener('mouseleave', () => {
-        nameLink.style.textDecoration = 'none';
-      });
-      nameTd.appendChild(nameLink);
-    }
-    if (mode !== 'practice_squad' && p.hasPlayingTimePromise) {
-      const ptp = document.createElement('span');
-      ptp.textContent = ' (PTP)';
-      ptp.style.color = '#bb2f35';
-      ptp.style.fontWeight = '700';
-      nameTd.appendChild(ptp);
-    }
-    if (p.isGraduating) {
-      const gr = document.createElement('span');
-      gr.textContent = ' (GR)';
-      gr.style.color = '#2f8f46';
-      gr.style.fontWeight = '700';
-      nameTd.appendChild(gr);
-    }
-    tr.appendChild(nameTd);
-    
-    const addCell = (content, extraClass) => {
-      const td = document.createElement('td');
-      td.textContent = content;
-      if (extraClass) td.className = extraClass;
-      tr.appendChild(td);
-      return td;
-    };
-
-    addCell(p.pos);
-    addCell(p.year);
-    addCell(p.height);
-    addCell(p.weight);
-    // One cell of shared attribute tiles, replacing the 12 numeric columns.
-    const attrTd = document.createElement('td');
-    attrTd.className = 'attr-tiles-cell';
-    attrTd.innerHTML = window.GOB_AttrTiles.tilesHtml(attrs || {});
-    tr.appendChild(attrTd);
-    // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
-    // Potential Rating (§Phase 4): show current/potential (e.g. C/B) when the backend
-    // supplied a projected ceiling; header stays "RT", color stays by current rating.
-    const _rtText = p.highestRT === null
-      ? '-'
-      : formatRtWithPotentialDisplay(p.highestRT, p.potential_rt_ratcheted);
-    const rtCell = addCell(
-      _rtText,
-      typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.highestRT) : ''
-    );
-    rtCell.setAttribute('data-tooltip', 'current/potential');
-    rtCell.setAttribute('title', 'current/potential');
-    
-    tbody.appendChild(tr);
-  });
-  
-  // Initialize tooltips if available. Scope to the whole roster table so the
-  // column headers (SC, SH, ID, OD, …) also get tooltips, not just the data
-  // cells under them.
+function renderTrTable() {
+  const head = document.getElementById('tr-head');
+  const body = document.getElementById('roster-body');
+  if (!head || !body) return;
+  const rows = trSortRows(trRowsForScope());
+  const isStats = TR_STATE.view === 'stats';
+  head.innerHTML = isStats ? trStatsHeadHtml() : trAttrHeadHtml();
+  if (!rows.length) {
+    const span = isStats ? 1 + TR_STAT_GROUPS.reduce((n, g) => n + g.cols.length, 0) : 7;
+    body.innerHTML = '<tr><td colspan="' + span + '" class="tr-empty">No players to show.</td></tr>';
+  } else if (isStats) {
+    const statsByPid = trStatsByPid();
+    body.innerHTML = rows.map((p) => trStatsRowHtml(p, statsByPid)).join('');
+  } else {
+    body.innerHTML = rows.map(trAttrRowHtml).join('');
+  }
+  // Per game / Totals belongs to the stats view only.
+  const per = document.getElementById('tr-per-track');
+  if (per) per.style.display = isStats ? 'inline-flex' : 'none';
+  trUpdateCounts(rows.length);
+  trBindSortControls();
   if (typeof initAttributeTooltips !== 'undefined') {
-    const rosterTable = tbody.closest('table') || tbody;
-    initAttributeTooltips(rosterTable, ['td', 'th', '.attr-tile']);
+    initAttributeTooltips(document.getElementById('roster-table'), ['td', 'th', '.attr-tile', '.attr-abbr']);
   }
 }
 
-function renderStats() {
-  const tbody = document.getElementById('stats-body');
-  tbody.innerHTML = '';
-  
-  if (statsData.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="23">No stats available</td></tr>';
-    return;
+function trUpdateCounts(shown) {
+  const varsity = (rosterData || []).length;
+  const practice = (trainingSquadData || []).length;
+  document.querySelectorAll('[data-tr-count]').forEach((el) => {
+    el.textContent = el.dataset.trCount === 'practice' ? practice : varsity;
+  });
+  const rc = document.getElementById('tr-rowcount');
+  if (rc) rc.textContent = shown + (shown === 1 ? ' player' : ' players');
+}
+
+function trSortBy(key, firstDir) {
+  if (TR_STATE.sortKey === key) {
+    TR_STATE.sortDir = TR_STATE.sortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    TR_STATE.sortKey = key;
+    TR_STATE.sortDir = firstDir || 'desc';
   }
-  
-  // Match stats to roster by player ID
-  const statsMap = new Map();
-  statsData.forEach(s => {
-    statsMap.set(s._id, s.stats || {});
+  renderTrTable();
+}
+
+function trBindSortControls() {
+  document.querySelectorAll('#tr-head [data-tr-sort]').forEach((th) => {
+    th.style.cursor = 'pointer';
+    th.addEventListener('click', () => {
+      const k = th.dataset.trSort;
+      trSortBy(k, (k === 'name' || k === 'pos') ? 'asc' : 'desc');
+    });
   });
-  
-  rosterData.forEach(p => {
-    const stats = statsMap.get(p._id) || {};
-    const tr = document.createElement('tr');
-    
-    // Name
-    const nameTd = document.createElement('td');
-    const nameLink = document.createElement('a');
-    nameLink.href = buildPlayerDetailUrl(p._id);
-    nameLink.textContent =
-      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
-    nameLink.style.color = 'inherit';
-    nameLink.style.textDecoration = 'none';
-    nameLink.addEventListener('mouseenter', () => {
-      nameLink.style.textDecoration = 'underline';
-    });
-    nameLink.addEventListener('mouseleave', () => {
-      nameLink.style.textDecoration = 'none';
-    });
-    nameTd.appendChild(nameLink);
-    if (p.hasPlayingTimePromise) {
-      const ptp = document.createElement('span');
-      ptp.textContent = ' (PTP)';
-      ptp.style.color = '#bb2f35';
-      ptp.style.fontWeight = '700';
-      nameTd.appendChild(ptp);
-    }
-    if (p.isGraduating) {
-      const gr = document.createElement('span');
-      gr.textContent = ' (GR)';
-      gr.style.color = '#2f8f46';
-      gr.style.fontWeight = '700';
-      nameTd.appendChild(gr);
-    }
-    tr.appendChild(nameTd);
-    
-    const addCell = (content) => {
-      const td = document.createElement('td');
-      td.textContent = content;
-      tr.appendChild(td);
-    };
-    
-    // Use 3PTM/3PTA directly (standardized field names)
-    const tpm = stats['3PTM'] || 0;
-    const tpa = stats['3PTA'] || 0;
-    const fgm = stats.FGM || 0;
-    const fga = stats.FGA || 0;
-    const ftm = stats.FTM || 0;
-    const fta = stats.FTA || 0;
-    const defa = stats.DEF_A || 0;
-    const defs = stats.DEF_S || 0;
-    const scra = stats.SCR_A || 0;
-    const scrs = stats.SCR_S || 0;
-    
-    addCell(stats.PTS || 0);
-    addCell(fgm);
-    addCell(fga);
-    addCell(fga > 0 ? ((fgm / fga) * 100).toFixed(1) : '0.0');
-    addCell(tpm);
-    addCell(tpa);
-    addCell(tpa > 0 ? ((tpm / tpa) * 100).toFixed(1) : '0.0');
-    addCell(ftm);
-    addCell(fta);
-    addCell(fta > 0 ? ((ftm / fta) * 100).toFixed(1) : '0.0');
-    addCell(stats.DREB || 0);
-    addCell(stats.OREB || 0);
-    addCell(stats.TREB || stats.REB || 0);
-    addCell(stats.AST || 0);
-    addCell(stats.STL || 0);
-    addCell(stats.BLK || 0);
-    addCell(stats.F || 0);
-    addCell(stats.TO || 0);
-    addCell(defa);
-    addCell(defa > 0 ? `${Math.round((defs / defa) * 100)}%` : '0%');
-    addCell(scra);
-    addCell(scra > 0 ? ((scrs / scra) * 100).toFixed(1) : '0.0');
-    
-    tbody.appendChild(tr);
+  document.querySelectorAll('#tr-head [data-attr-sort]').forEach((btn) => {
+    btn.addEventListener('click', (e) => { e.stopPropagation(); trSortBy(btn.dataset.attrSort, 'desc'); });
   });
 }
 
-function setupRosterSorting() {
-  const headers = document.querySelectorAll('#roster-table thead th');
-  headers.forEach(header => {
-    // The collapsed "Attributes" header carries no data-sort. Without this guard it
-    // would still look clickable and would set the sort column to undefined.
-    if (!header.dataset.sort) {
-      header.style.cursor = 'default';
-      return;
-    }
-    header.style.cursor = 'pointer';
-    header.addEventListener('click', () => {
-      const sortKey = header.dataset.sort;
-      if (sortKey === rosterSortColumn) {
-        rosterSortDirection = rosterSortDirection === 'desc' ? 'asc' : 'desc';
-      } else {
-        rosterSortColumn = sortKey;
-        rosterSortDirection = 'desc';
-      }
-      sortRoster();
+function trBindToolbar() {
+  const press = (sel, attr, value) => {
+    document.querySelectorAll(sel).forEach((b) =>
+      b.setAttribute('aria-pressed', b.dataset[attr] === value ? 'true' : 'false'));
+  };
+  document.querySelectorAll('[data-tr-scope]').forEach((b) => {
+    b.addEventListener('click', () => {
+      TR_STATE.scope = b.dataset.trScope;
+      press('[data-tr-scope]', 'trScope', TR_STATE.scope);
+      renderTrTable();
+    });
+  });
+  document.querySelectorAll('[data-tr-view]').forEach((b) => {
+    b.addEventListener('click', () => {
+      TR_STATE.view = b.dataset.trView;
+      press('[data-tr-view]', 'trView', TR_STATE.view);
+      // Default sort per view so the table opens on something meaningful.
+      TR_STATE.sortKey = TR_STATE.view === 'stats' ? 'PTS' : 'RT';
+      TR_STATE.sortDir = 'desc';
+      renderTrTable();
+    });
+  });
+  document.querySelectorAll('[data-tr-per]').forEach((b) => {
+    b.addEventListener('click', () => {
+      TR_STATE.per = b.dataset.trPer;
+      press('[data-tr-per]', 'trPer', TR_STATE.per);
+      renderTrTable();
     });
   });
 }
 
-function sortRoster() {
-  rosterData.sort((a, b) => {
-    let val1, val2;
-    
-    if (rosterSortColumn === 'name') {
-      val1 = a.name || '';
-      val2 = b.name || '';
-      return rosterSortDirection === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
-    } else if (rosterSortColumn === 'RT') {
-      val1 = a.highestRT ?? -Infinity;
-      val2 = b.highestRT ?? -Infinity;
-    } else if (rosterSortColumn === 'year') {
-      val1 = yearSortValue(a.year);
-      val2 = yearSortValue(b.year);
-    } else if (rosterSortColumn === 'height') {
-      val1 = a.heightRaw || 0;
-      val2 = b.heightRaw || 0;
-    } else if (rosterSortColumn === 'weight') {
-      val1 = parseInt(a.weight) || 0;
-      val2 = parseInt(b.weight) || 0;
-    } else {
-      // Attribute columns
-      val1 = getAttrSortValue(a.attributes || {}, rosterSortColumn);
-      val2 = getAttrSortValue(b.attributes || {}, rosterSortColumn);
-    }
-    
-    if (rosterSortDirection === 'desc') {
-      return val2 - val1;
-    } else {
-      return val1 - val2;
-    }
-  });
-  
-  renderRoster();
-}
-
-function setupStatsSorting() {
-  const headers = document.querySelectorAll('#stats-table thead th');
-  headers.forEach(header => {
-    header.style.cursor = 'pointer';
-    header.addEventListener('click', () => {
-      const sortKey = header.dataset.sort;
-      if (sortKey === statsSortColumn) {
-        statsSortDirection = statsSortDirection === 'desc' ? 'asc' : 'desc';
-      } else {
-        statsSortColumn = sortKey;
-        statsSortDirection = 'desc';
-      }
-      sortStats();
-    });
-  });
-}
-
-function sortStats() {
-  // Create a combined array for sorting
-  const combined = rosterData.map(p => {
-    const stats = statsData.find(s => s._id === p._id)?.stats || {};
-    return { player: p, stats };
-  });
-  
-  combined.sort((a, b) => {
-    let val1, val2;
-    
-    if (statsSortColumn === 'name') {
-      val1 = a.player.name || '';
-      val2 = b.player.name || '';
-      return statsSortDirection === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
-    } else if (statsSortColumn === 'FG%') {
-      const fga1 = a.stats.FGA || 0;
-      const fga2 = b.stats.FGA || 0;
-      val1 = fga1 > 0 ? (a.stats.FGM || 0) / fga1 : 0;
-      val2 = fga2 > 0 ? (b.stats.FGM || 0) / fga2 : 0;
-    } else if (statsSortColumn === '3PT%') {
-      const tpa1 = a.stats['3PTA'] || 0;
-      const tpa2 = b.stats['3PTA'] || 0;
-      const tpm1 = a.stats['3PTM'] || 0;
-      const tpm2 = b.stats['3PTM'] || 0;
-      val1 = tpa1 > 0 ? tpm1 / tpa1 : 0;
-      val2 = tpa2 > 0 ? tpm2 / tpa2 : 0;
-    } else if (statsSortColumn === 'FT%') {
-      const fta1 = a.stats.FTA || 0;
-      const fta2 = b.stats.FTA || 0;
-      val1 = fta1 > 0 ? (a.stats.FTM || 0) / fta1 : 0;
-      val2 = fta2 > 0 ? (b.stats.FTM || 0) / fta2 : 0;
-    } else if (statsSortColumn === 'DEF%') {
-      const defa1 = a.stats.DEF_A || 0;
-      const defa2 = b.stats.DEF_A || 0;
-      val1 = defa1 > 0 ? (a.stats.DEF_S || 0) / defa1 : 0;
-      val2 = defa2 > 0 ? (b.stats.DEF_S || 0) / defa2 : 0;
-    } else if (statsSortColumn === 'SCR%') {
-      const scra1 = a.stats.SCR_A || 0;
-      const scra2 = b.stats.SCR_A || 0;
-      val1 = scra1 > 0 ? (a.stats.SCR_S || 0) / scra1 : 0;
-      val2 = scra2 > 0 ? (b.stats.SCR_S || 0) / scra2 : 0;
-    } else {
-      val1 = a.stats[statsSortColumn] || 0;
-      val2 = b.stats[statsSortColumn] || 0;
-    }
-    
-    if (statsSortDirection === 'desc') {
-      return val2 - val1;
-    } else {
-      return val1 - val2;
-    }
-  });
-  
-  // Update rosterData order
-  rosterData = combined.map(item => item.player);
-  
-  // Re-render both tables
-  renderRoster();
-  renderStats();
+/** Identity lockup: team name plus record and conference standing from the payload. */
+function trRenderLockup(data) {
+  const nameEl = document.getElementById('tr-team-name');
+  if (nameEl) nameEl.textContent = data.team_name || data.team || teamName || '--';
+  const banner = document.getElementById('team-banner-card');
+  if (banner && typeof getTeamAssetPath === 'function' && (data.team_name || teamName)) {
+    banner.src = getTeamAssetPath(data.team_name || teamName, 'banner_primary');
+  }
+  const rec = data.team_record;
+  const recEl = document.getElementById('tr-record');
+  const standEl = document.getElementById('tr-standing');
+  const block = document.getElementById('tr-record-block');
+  if (!rec) { if (block) block.style.display = 'none'; return; }
+  if (block) block.style.display = '';
+  if (recEl) recEl.textContent = rec.wins + '-' + rec.losses;
+  if (standEl) {
+    standEl.textContent = rec.conference_place
+      ? rec.conference_place + (rec.conference_size ? ' of ' + rec.conference_size : '')
+      : '--';
+  }
 }

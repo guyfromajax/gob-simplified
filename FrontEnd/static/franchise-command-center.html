@@ -396,19 +396,13 @@
             <table id="fcc-recruits-table" class="roster-table recruiting-table">
               <thead>
                 <tr>
-                  <!-- Region and Archetype folded into the identity cell as a sub-line.
-                       Their sort affordances survive as controls under "Recruit" — folding
-                       must not silently delete a sortable column. Both are alphabetical,
-                       so both sort ascending first. -->
-                  <th class="c-ident" data-sort-key="name">Recruit
-                    <span class="ident-subsort">
-                      <button type="button" class="attr-abbr" data-sub-sort="homeRegion" data-first-dir="asc">Region</button>
-                      <button type="button" class="attr-abbr" data-sub-sort="archetype" data-first-dir="asc">Archetype</button>
-                    </span>
-                  </th>
-                  <th data-sort-key="year">YR</th>
+                  <!-- Column order mirrors the Roster tab so the two read the same way.
+                       Region and Archetype live in the identity cell as a sub-line under
+                       the name; they are no longer sortable. -->
+                  <th class="c-ident" data-sort-key="name">Recruit</th>
                   <th class="c-rt" data-sort-key="rt">RT<span class="rt-caption">cur &rarr; pot</span></th>
                   <th data-sort-key="pos">POS</th>
+                  <th data-sort-key="year">YR</th>
                   <th data-sort-key="height">HT</th>
                   <th data-sort-key="weight">WT</th>
                   <th class="attr-tiles-head" id="fcc-recruits-attr-head"></th>

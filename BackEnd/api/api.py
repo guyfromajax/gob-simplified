@@ -7112,14 +7112,14 @@ try:
             try:
                 from BackEnd.utils.franchise_standings import calculate_franchise_standings
 
-                fr_doc = db.franchises.find_one(
+                fr_doc = franchises_collection.find_one(
                     {"_id": ObjectId(franchise_id)},
                     {"results": 1},
                 ) or {}
                 conf = team.get("conference")
                 conf_team_ids = {
                     str(t["_id"]): t
-                    for t in db.teams.find({"conference": conf}, {"_id": 1, "name": 1})
+                    for t in teams_collection.find({"conference": conf}, {"_id": 1, "name": 1})
                 } if conf is not None else {}
                 standings = calculate_franchise_standings(fr_doc.get("results", {}) or {}, conf_team_ids)
                 own = standings.get(str(team["_id"]), {}) or {}

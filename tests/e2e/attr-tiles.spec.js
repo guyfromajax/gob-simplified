@@ -154,87 +154,9 @@ test.describe('tiers', () => {
   });
 });
 
-test.describe('team-roster-view header alignment (real markup)', () => {
-  const PAGE = read('team-roster-view.html');
-  const PAGE_CSS = PAGE.slice(PAGE.indexOf('<style>') + 7, PAGE.indexOf('</style>'));
-  // The Player Attributes table's own thead, straight from the page.
-  const THEAD = (() => {
-    const i = PAGE.indexOf('id="roster-table"');
-    const a = PAGE.indexOf('<thead>', i);
-    const b = PAGE.indexOf('</thead>', a) + '</thead>'.length;
-    return PAGE.slice(a, b);
-  })();
-
-  async function mountRoster(page) {
-    await page.setViewportSize({ width: 1600, height: 800 });
-    await page.setContent(`<style>${PAGE_CSS}</style><style>${TILES_CSS}</style>
-      <body style="margin:0;background:#0b0d14">
-      <table class="roster-table" id="roster-table">${THEAD}<tbody id="tb"></tbody></table></body>`);
-    await page.addScriptTag({ content: TILES_JS });
-    await page.evaluate((a) => {
-      const tr = document.createElement('tr');
-      ['#2 Kermit Prospect', 'C', 'JR', '6\'9"', '242'].forEach((v) => {
-        const td = document.createElement('td'); td.textContent = v; tr.appendChild(td);
-      });
-      const attrTd = document.createElement('td');
-      attrTd.className = 'attr-tiles-cell';
-      attrTd.innerHTML = window.GOB_AttrTiles.tilesHtml(a);
-      tr.appendChild(attrTd);
-      const rt = document.createElement('td'); rt.textContent = 'B+/A'; tr.appendChild(rt);
-      document.getElementById('tb').appendChild(tr);
-    }, rawAttrs([7, 2, 10, 3, 3, 3, 7, 3, 6, 4, 4, 3]));
-  }
-
-  test('header count matches body count — no orphaned columns', async ({ page }) => {
-    await mountRoster(page);
-    const m = await page.evaluate(() => ({
-      heads: document.querySelectorAll('#roster-table thead th').length,
-      cells: document.querySelectorAll('#roster-table tbody tr td').length,
-      labels: [...document.querySelectorAll('#roster-table thead th')].map((t) => t.textContent.trim()),
-    }));
-    expect(m.heads).toBe(m.cells);
-    expect(m.labels).toEqual(['Name', 'POS', 'Year', 'Height', 'Weight', 'Attributes', 'RT']);
-  });
-
-  test('no stray single-attribute headers survive', async ({ page }) => {
-    await mountRoster(page);
-    const labels = await page.evaluate(() =>
-      [...document.querySelectorAll('#roster-table thead th')].map((t) => t.textContent.trim()));
-    for (const abbr of ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT']) {
-      expect(labels, abbr).not.toContain(abbr);
-    }
-  });
-
-  test('"Attributes" is centered over the tile block', async ({ page }) => {
-    await mountRoster(page);
-    const m = await page.evaluate(() => {
-      const th = [...document.querySelectorAll('#roster-table thead th')]
-        .find((t) => t.textContent.trim() === 'Attributes');
-      const tiles = [...document.querySelectorAll('#roster-table .attr-tile')];
-      const h = th.getBoundingClientRect();
-      const first = tiles[0].getBoundingClientRect();
-      const last = tiles[tiles.length - 1].getBoundingClientRect();
-      const cell = document.querySelector('#roster-table .attr-tiles-cell').getBoundingClientRect();
-      return {
-        headerCenter: h.left + h.width / 2,
-        blockCenter: (first.left + last.right) / 2,
-        cellCenter: cell.left + cell.width / 2,
-        tiles: tiles.length,
-      };
-    });
-    expect(m.tiles).toBe(12);
-    expect(Math.abs(m.headerCenter - m.blockCenter)).toBeLessThan(2);
-    expect(Math.abs(m.headerCenter - m.cellCenter)).toBeLessThan(2);
-  });
-
-  test('the Attributes header is not clickable-looking (it cannot sort)', async ({ page }) => {
-    await mountRoster(page);
-    await page.addScriptTag({ content: read('team-roster-view.js').includes('setupRosterSorting')
-      ? 'window.__hasGuard = true;' : 'window.__hasGuard = false;' });
-    // Source-level guard: headers without data-sort get cursor:default and no handler.
-    expect(read('team-roster-view.js')).toContain("if (!header.dataset.sort)");
-  });
-});
+// team-roster-view's header is now built at runtime by trAttrHeadHtml(), not authored in
+// the page. Its alignment and column-count coverage moved to standalone-roster.spec.js,
+// which mounts the real renderer instead of a hand-built stand-in of the old markup.
 
 test.describe('the four in-scope surfaces all use the shared builder', () => {
   const SURFACES = [
@@ -245,7 +167,8 @@ test.describe('the four in-scope surfaces all use the shared builder', () => {
 
   for (const [file, label] of SURFACES) {
     test(`${label} calls GOB_AttrTiles`, async () => {
-      expect(read(file)).toContain('GOB_AttrTiles.tilesHtml');
+      // Grouped surfaces build a whole 6-pair cell; the Hub pool still renders a flat strip.
+      expect(read(file)).toMatch(/GOB_AttrTiles\.(grouped)?[tT]ilesHtml/);
     });
   }
 
@@ -262,10 +185,17 @@ test.describe('the four in-scope surfaces all use the shared builder', () => {
       const html = read(page);
       expect(html, page).not.toContain('<th>SC</th>');
       expect(html, page).not.toContain('data-sort-key="SC"');
-      // The grouped header's contents are rendered by attrTiles.js, so assert the
-      // host cell exists rather than a literal label.
-      expect(html, page).toContain('attr-tiles-head');
+      expect(html, page).not.toContain('data-sort="SC"');
     }
+  });
+
+  test('every surface routes its attribute header through the grouped builder', async () => {
+    // The header markup is rendered, not authored, so assert on the caller.
+    // The FCC renders both of its tabs' headers (Roster and Recruiting); the standalone
+    // roster renders its own. recruiting-common.js supplies rows, never the header.
+    const fcc = read('franchise-command-center.js').split('GOB_AttrTiles.groupedHeaderHtml').length - 1;
+    expect(fcc).toBe(2);
+    expect(read('team-roster-view.js')).toContain('GOB_AttrTiles.groupedHeaderHtml');
   });
 
   test('out-of-scope surfaces are untouched', async () => {

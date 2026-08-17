@@ -192,7 +192,9 @@ th.c-rt, td.c-rt { white-space: nowrap; }
   color: rgba(255, 255, 255, .26);
   font-variant-numeric: tabular-nums;
 }
-.ident-body { min-width: 0; }
+/* Column flex, not bare spans: inline spans ran the name and its sub-line together
+   on one line ("Pierre MunozRegion A - Classic PG"). */
+.ident-body { display: flex; flex-direction: column; min-width: 0; }
 .ident-name {
   font: 700 13.5px/1.2 'Inter', sans-serif;
   color: #fff;
