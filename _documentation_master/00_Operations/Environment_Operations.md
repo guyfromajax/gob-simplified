@@ -1,7 +1,9 @@
 # Environment and Database Operations
 
 This is the operational runbook for local development, Railway configuration,
-database maintenance, script-only secrets, backups, and credential incidents.
+database maintenance, script-only secrets, backups, and credential incidents. Production
+release sequencing belongs to `Deploy_To_Live_System.md`; the two runbooks share the same
+environment and authorization rules.
 
 ## Non-negotiable rules
 
@@ -10,7 +12,9 @@ database maintenance, script-only secrets, backups, and credential incidents.
   `MONGO_DB_NAME`, the runtime environment, and an explicit script target.
 - Local application development uses only repository-root `.env.local` and
   `gob-staging`. There is no generic `.env` or production env file.
-- `GOB_DB_ACCESS` is process-only. Never store it in a file.
+- For ad-hoc production commands, `GOB_DB_ACCESS` is process-only. Never store it in a
+  file or a persistent shell profile. Railway application runtime uses Railway platform
+  identity instead and does not need this variable.
 - Tests use explicit mongomock or a uniquely named disposable database; never `gob` or
   `gob-staging`.
 - Never paste credentials into chat, tickets, documentation, PRs, or shell commands
@@ -46,10 +50,17 @@ Railway uses injected variables only; it does not need or read a repository env 
 | `MONGO_URI` path | `/gob-staging` | `/gob` |
 | `JWT_SECRET_KEY` | staging-specific secret | different production secret |
 | `GOB_DB_ACCESS` | omit | omit; Railway runtime receives deployed write access from its platform identity |
+| `MAINTENANCE_MODE` | normally `false` or omitted | normally `false`; temporarily `true` only during the maintenance workflow |
 
 Keep all other environment-specific application secrets in the corresponding Railway
 environment. Startup logs safely report source, environment, database, and mode without
-printing the URI.
+printing the URI. `/health` safely reports the running commit, hash seed, environment,
+database name, and **resolved** database access. For Railway production, resolved access
+is `write` even though the raw `GOB_DB_ACCESS` variable is absent.
+
+Changing `MAINTENANCE_MODE` is an operational deployment action. Follow the ordered
+Railway/Netlify procedure in `Deploy_To_Live_System.md`; do not toggle it independently
+without completing that checklist.
 
 ## Tests and disposable databases
 
@@ -67,7 +78,7 @@ non-live name and use a tool specifically designed for scratch targets. Producti
 cluster scratch tools require production read authorization for the cluster connection,
 an explicit scratch name, and exact confirmation before destructive cleanup.
 
-## Staging maintenance
+## Database script operations
 
 Every database-aware script must require an explicit target and print a safe preflight.
 Inspect its exact switches first:
@@ -79,6 +90,11 @@ Inspect its exact switches first:
 
 Writers must expose explicit write intent such as `--apply`, `--commit`, or `--yes`.
 Dry-run output should be reviewed before enabling that flag.
+
+`./.venv/bin/python scripts/check_env_safety.py` is the enforcement check. A script that
+it reports for direct `MongoClient` use or independent dotenv loading is not approved for
+staging or production operation until it is migrated to the shared connection helper.
+Do not treat a historically used script as exempt.
 
 ## Read-only production diagnostics
 
@@ -129,7 +145,8 @@ Review Atlas → Database → Backup regularly. A restore should normally target
 temporary Atlas deployment or another isolated database first. Verify collection
 counts and representative records before deciding on any production replacement.
 Production restore is an incident operation requiring a maintenance window and an
-explicit recovery plan.
+explicit recovery plan. Use the maintenance and rollback sequence in
+`Deploy_To_Live_System.md` to stop writes and keep the public application closed.
 
 ## Script-only secrets
 

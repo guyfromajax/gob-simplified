@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from pymongo import MongoClient
 from pymongo.collection import Collection
-from BackEnd.env_config import resolve_database_environment
+from BackEnd.env_config import resolve_database_environment, resolve_runtime_db_access
 
 # Snapshot the REAL process environment before any dotenv file is loaded. The prod-access
 # opt-in below is read from this snapshot only, so that dropping GOB_DB_ACCESS=write into
@@ -51,9 +51,6 @@ def _init_client(uri: str | None):
 #   read-only diagnostics:  GOB_DB_ACCESS=read  python script.py
 #   deliberate migration:   GOB_DB_ACCESS=write python script.py
 # Neither can be checked in, and neither persists past the command that used it.
-PROD_DB_NAMES = {"gob"}
-
-
 class ProdAccessBlocked(RuntimeError):
     """Raised when a process reaches production without opting in."""
 
@@ -63,14 +60,7 @@ class ProdWriteBlocked(RuntimeError):
 
 
 def _resolve_db_access(db_name: str) -> str:
-    if db_name not in PROD_DB_NAMES:
-        return "write"
-    explicit = (DB_ENV.process_environment.get("GOB_DB_ACCESS") or "").strip().lower()
-    if explicit in ("read", "write"):
-        return explicit
-    if any(k.startswith("RAILWAY_") for k in DB_ENV.process_environment):
-        return "write"
-    return "refuse"
+    return resolve_runtime_db_access(db_name, DB_ENV.process_environment)
 
 
 _MUTATORS = frozenset({

@@ -29,6 +29,44 @@ const LINEUP_CHANGE_MS = 1000;
 /** Auto Team Stats on lulls — shipped behind flag, default off (brief §6). */
 const AUTO_TEAM_STATS_ON_LULLS = false;
 
+/**
+ * Scale-to-fit for the content box (fix 1). The composition is authored once at the
+ * 1280x720 floor and scaled uniformly; it is never stretched, because stretching grows
+ * the stat-bar tracks while the 84px rows stay put and still leaves vertical dead space.
+ * Capped so portraits and type stay broadcast-scale on very large displays, floored at
+ * 1.0 because 720p is the minimum supported size, not a target to shrink past.
+ */
+/**
+ * Worm vertical floor, converging across the game (±18 at tip → ±6 at final).
+ *
+ * The x-domain is the whole game from tip, so early on the worm has almost no width to
+ * travel and any y-move renders near-vertical. The lever is NOT a growing x-domain: that
+ * would make the same run occupy different widths at different times and destroy
+ * "remaining game is remaining space", which clutch depends on. A converging y-floor
+ * flattens the early game instead, and says something true while it does it — a two-point
+ * swing in Q1 matters less than a two-point swing at the final horn.
+ *
+ * Auto-fit still overrides: a game wider than the floor is always fitted to its extremes.
+ */
+const WORM_FLOOR_TIP = 18;
+const WORM_FLOOR_FINAL = 6;
+
+function wormScaleFloor(progress) {
+  const t = Math.max(0, Math.min(1, Number(progress) || 0));
+  return WORM_FLOOR_TIP + (WORM_FLOOR_FINAL - WORM_FLOOR_TIP) * t;
+}
+
+const FIT_W = 1228;
+const FIT_H = 572;
+const FIT_MAX_SCALE = 1.6;
+const FIT_MIN_SCALE = 1;
+
+function fitScale(availW, availH) {
+  if (!(availW > 0) || !(availH > 0)) return FIT_MIN_SCALE;
+  const raw = Math.min(availW / FIT_W, availH / FIT_H);
+  return Math.max(FIT_MIN_SCALE, Math.min(FIT_MAX_SCALE, raw));
+}
+
 const SIL = `<svg viewBox="0 0 100 100"><circle cx="50" cy="34" r="19" fill="rgba(255,255,255,0.15)"/><path d="M12 100c0-22 17-36 38-36s38 14 38 36" fill="rgba(255,255,255,0.15)"/></svg>`;
 const FLAME = `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-1 4.5-2.5 6.5C8 10.7 7 12.4 7 14.5 7 18 9.2 21 12 21s5-3 5-6.5c0-2.4-1.3-4-2.4-5.6.2 1.6-.4 2.7-1.3 3.3.5-2.6-.9-6.4-1.3-10.2z"/></svg>`;
 const SNOW = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1M12 5.5l2 2M12 5.5l-2 2M12 18.5l2-2M12 18.5l-2-2M5.5 12l2 2M5.5 12l2-2M18.5 12l-2 2M18.5 12l-2-2"/></svg>`;
@@ -61,13 +99,18 @@ function ensureStyles() {
       font-family:Inter,system-ui,sans-serif;color:rgba(255,255,255,.90);-webkit-font-smoothing:antialiased;
       --w90:rgba(255,255,255,.90);--w70:rgba(255,255,255,.70);--w55:rgba(255,255,255,.55);--w40:rgba(255,255,255,.40);--w25:rgba(255,255,255,.25);
       --hair:rgba(255,255,255,.08);--boardw:398px;--stagew:400px}
-    .sgp-root .overlay{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;padding:16px 26px 12px;gap:14px;isolation:isolate;
+    .sgp-root .overlay{position:relative;flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;padding:16px 26px 12px;gap:14px;isolation:isolate;
       background:radial-gradient(120% 78% at 50% 30%,rgba(39,64,142,.13),transparent 62%),radial-gradient(90% 70% at 50% 120%,rgba(247,148,32,.045),transparent 60%),#0b0d14}
     .sgp-root .overlay::before{content:'';position:absolute;left:50%;bottom:-54%;width:94%;aspect-ratio:1/1;transform:translateX(-50%);border-radius:50%;border:1px solid rgba(255,255,255,.04);pointer-events:none}
     .sgp-root.fade-in{animation:sgpFade .45s ease}
     @keyframes sgpFade{from{opacity:0}to{opacity:1}}
     .sgp-root.dissolving{opacity:0;transition:opacity .45s ease}
 
+    /* Fixed-aspect content box: 398+400+398 + 2x16 gaps = 1228 wide, 512+14+46 = 572 tall.
+       One transform scales the whole composition; nothing inside re-flows, so the density
+       relationships tuned at the 1280x720 floor survive at every viewport size. */
+    .sgp-root .fit{width:1228px;height:572px;flex-shrink:0;display:flex;flex-direction:column;gap:14px;
+      transform-origin:top center;will-change:transform}
     .sgp-root .zones{height:512px;display:grid;grid-template-columns:minmax(260px,var(--boardw)) var(--stagew) minmax(260px,var(--boardw));gap:16px;justify-content:center;position:relative;z-index:1;min-height:0}
     .sgp-root .footer{height:46px;display:grid;grid-template-columns:minmax(260px,var(--boardw)) var(--stagew) minmax(260px,var(--boardw));gap:16px;align-items:center;justify-content:center;position:relative;z-index:1}
 
@@ -121,7 +164,10 @@ function ensureStyles() {
 
     .sgp-root .stage{display:flex;flex-direction:column;gap:14px;min-height:0;padding:10px 12px 12px;border-radius:14px;
       background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.008));box-shadow:inset 0 0 0 1px rgba(255,255,255,.045)}
-    .sgp-root .wormblock{display:flex;flex-direction:column;flex-shrink:0;height:246px}
+    /* At rest the worm claims the stage (276 tall at the floor, chart area 246). The slot
+       below stays reserved at 200 whatever fills it, so the stage never changes size across
+       resting worm / team panel / card. */
+    .sgp-root .wormblock{display:flex;flex-direction:column;flex:1;min-height:0}
     .sgp-root .wormfill{position:relative;flex:1;min-height:0;overflow:hidden;margin-top:4px}
     .sgp-root .wormfill .wormsvg{position:absolute;inset:0;width:100%;height:100%;margin:0}
     .sgp-root .wl-head{display:flex;align-items:baseline;justify-content:space-between;height:14px}
@@ -130,7 +176,6 @@ function ensureStyles() {
     .sgp-root .wl-axis{display:flex;justify-content:space-between;margin-top:3px;font-family:ui-monospace,Menlo,monospace;font-size:8px;letter-spacing:.06em;color:var(--w25)}
     .sgp-root .wormdot{filter:drop-shadow(0 0 4px currentColor)}
     .sgp-root .slot{position:relative;flex-shrink:0;height:200px;display:flex;flex-direction:column;justify-content:center}
-    .sgp-root .slot.framed{border-radius:10px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
     .sgp-root .pretip-lbl{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.28em;color:rgba(255,255,255,.40);pointer-events:none;z-index:2}
     .sgp-root.is-pretip .pretip-lbl{display:flex}
 
@@ -148,11 +193,13 @@ function ensureStyles() {
     .sgp-root .pivot{position:relative;height:7px}
     .sgp-root .pivot::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.13)}
 
-    .sgp-root .bench{display:flex;align-items:center;gap:7px;overflow:hidden}
+    .sgp-root .bench{display:flex;align-items:center;gap:7px;overflow:hidden;flex-wrap:nowrap;min-width:0}
     .sgp-root .bench.home{flex-direction:row-reverse}
     .sgp-root .bench-lbl{font-family:ui-monospace,Menlo,monospace;font-size:8px;letter-spacing:.14em;color:var(--w25);flex-shrink:0}
-    .sgp-root .bchip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.045);border:1px solid var(--hair);border-radius:20px;padding:3px 9px;font-size:10.5px;white-space:nowrap}
-    .sgp-root .bchip b{font-weight:700;color:var(--w70)}
+    /* Chips never shrink: rail density must not change with roster events. The room comes
+       from the content instead — the chip's job is identity, so the name is the payload
+       and the rebound count was the part that could go. */
+    .sgp-root .bchip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.045);border:1px solid var(--hair);border-radius:20px;padding:3px 9px;font-size:10.5px;white-space:nowrap;flex:0 0 auto}
     .sgp-root .bchip .bstat{color:var(--w40);font-variant-numeric:tabular-nums}
     .sgp-root .bchip.out{opacity:.7}
     .sgp-root .bout{font-family:'Bebas Neue',sans-serif;font-size:9.5px;color:#2a0606;background:${RED};border-radius:3px;padding:1px 4px 0;letter-spacing:.04em}
@@ -225,6 +272,7 @@ function buildSkeleton(teams) {
   root.className = 'sgp-root fade-in';
   root.innerHTML = `
     <div class="overlay">
+      <div class="fit" data-fit>
       <div class="zones">
         <div class="board away" data-side="away">
           <div class="bhead"><span class="dot" style="background:${esc(teams.away.color)}"></span><span>${esc(teams.away.name)} · AWAY</span></div>
@@ -236,7 +284,7 @@ function buildSkeleton(teams) {
             <div class="wormfill"></div>
             <div class="wl-axis"><span>TIP</span><span>Q1</span><span>HALF</span><span>Q3</span><span>FINAL</span></div>
           </div>
-          <div class="slot framed" data-slot>
+          <div class="slot" data-slot>
             <div class="pretip-lbl">STARTING LINEUPS · TIP-OFF</div>
             <div class="tsp" data-team-panel style="display:none">
               <div class="tsp-head"><span class="tsp-cap">TEAM STATS</span></div>
@@ -259,6 +307,7 @@ function buildSkeleton(teams) {
         </div>
         <div class="bench home" data-bench="home"></div>
       </div>
+      </div>
       <div class="breakcard">
         <div class="bc-eyebrow">QUARTER BREAK</div>
         <div class="bc-title"></div>
@@ -279,7 +328,7 @@ function wormSvg(wormState, w, h, home, away) {
     ? wormState.elapsed
     : (samples.length ? samples[samples.length - 1].elapsed : 0);
   const margins = samples.length ? samples.map((s) => s.margin) : [0];
-  const maxAbs = Math.max(6, ...margins.map((m) => Math.abs(m)));
+  const maxAbs = Math.max(wormScaleFloor(elapsed / domain), ...margins.map((m) => Math.abs(m)));
   const xAt = (sec) => pad + (Math.min(sec, domain) / domain) * (w - pad * 2);
   const y = (m) => Math.max(pad, Math.min(h - pad, mid - (m / maxAbs) * (mid - pad)));
 
@@ -327,12 +376,24 @@ function wormSvg(wormState, w, h, home, away) {
   </svg>`;
 }
 
+/** Chips that fit beside a board at this width before they start clipping mid-word. */
+const BENCH_MAX_CHIPS = 3;
+
+/**
+ * The rail is empty until someone leaves the floor, and with no rotation subs the only
+ * route onto it is a foul-out. Empty means the whole rail is gone — a lone BENCH label
+ * over nothing reads as a component that failed to load. Chips arrive most-recent-exit
+ * first, and the overflow collapses to one +N rather than clipping the last chip.
+ */
 function benchHtml(chips) {
-  if (!chips || !chips.length) return '<span class="bench-lbl">BENCH</span>';
-  const items = chips.map((c) =>
-    `<span class="bchip${c.out ? ' out' : ''}"><b>${esc(c.name)}</b>${c.out ? '<span class="bout">OUT</span>' : ''}<span class="bstat">${c.pts}p · ${c.reb}r</span></span>`
+  if (!chips || !chips.length) return '';
+  const shown = chips.slice(0, BENCH_MAX_CHIPS);
+  const extra = chips.length - shown.length;
+  const items = shown.map((c) =>
+    `<span class="bchip${c.out ? ' out' : ''}"><b>${esc(c.name)}</b>${c.out ? '<span class="bout">OUT</span>' : ''}<span class="bstat">${c.pts}p</span></span>`
   ).join('');
-  return `<span class="bench-lbl">BENCH</span>${items}`;
+  const more = extra > 0 ? `<span class="bchip"><b>+${extra}</b></span>` : '';
+  return `<span class="bench-lbl">BENCH</span>${items}${more}`;
 }
 
 function updatePlayerRow(rowEl, p, teamColor) {
@@ -493,10 +554,22 @@ export function showSimGamePresentation(timeline, opts = {}) {
   const root = buildSkeleton(teams);
   mount.appendChild(root);
 
+  const fitEl = root.querySelector('[data-fit]');
+  const overlayEl = root.querySelector('.overlay');
+  const applyFit = () => {
+    if (!fitEl || !overlayEl) return;
+    const cs = getComputedStyle(overlayEl);
+    const availW = overlayEl.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+    const availH = overlayEl.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+    fitEl.style.transform = `scale(${fitScale(availW, availH)})`;
+  };
+
   const positionBelowScoreboard = () => {
     const sbEl = document.getElementById('scoreboard');
     const top = sbEl ? Math.max(0, Math.round(sbEl.getBoundingClientRect().bottom)) : 0;
     root.style.top = `${top}px`;
+    // The overlay's height depends on where the scoreboard ends, so re-fit after moving.
+    applyFit();
   };
   positionBelowScoreboard();
   window.addEventListener('resize', positionBelowScoreboard);

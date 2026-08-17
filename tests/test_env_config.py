@@ -6,11 +6,26 @@ from BackEnd.env_config import (
     EnvironmentConfigurationError,
     database_name_from_uri,
     resolve_database_environment,
+    resolve_runtime_db_access,
 )
 
 
 def _uri(db_name: str) -> str:
     return f"mongodb://example.invalid/{db_name}"
+
+
+def test_runtime_access_resolver_uses_railway_platform_identity_for_production():
+    assert resolve_runtime_db_access("gob", {"RAILWAY_ENVIRONMENT": "production"}) == "write"
+
+
+def test_runtime_access_resolver_preserves_explicit_ad_hoc_production_modes():
+    assert resolve_runtime_db_access("gob", {"GOB_DB_ACCESS": "read"}) == "read"
+    assert resolve_runtime_db_access("gob", {"GOB_DB_ACCESS": "write"}) == "write"
+    assert resolve_runtime_db_access("gob", {}) == "refuse"
+
+
+def test_runtime_access_resolver_allows_nonproduction_without_prod_opt_in():
+    assert resolve_runtime_db_access("gob-staging", {}) == "write"
 
 
 def test_missing_local_env_fails_without_dotenv_fallback(tmp_path: Path):

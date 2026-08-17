@@ -1,166 +1,264 @@
-# Deploy To Live System
+# Deploy to Live System
 
-- **Branch rules:** `develop` = staging (Netlify + Railway). `main` = production. Don’t push to `main` until staging is verified on `develop`.
+This is the production deployment runbook for Netlify, Railway, and MongoDB Atlas.
 
----
+## Operating rules
 
-## Standard Deploy (No Maintenance)
+- `develop` deploys staging. `main` deploys production.
+- Never merge into `main` until the exact `develop` commit has passed hosted CI and staging QA.
+- All scheduled times are **Eastern Time (ET)** using the IANA zone `America/New_York`.
+  This means EST (UTC−5) in winter and EDT (UTC−4) in summer; operators do not perform
+  UTC or daylight-saving arithmetic.
+- Railway application runtime receives production write authorization from Railway
+  platform identity. Do **not** add persistent `GOB_DB_ACCESS` to Railway.
+- Local production diagnostics and migrations still require process-only
+  `GOB_DB_ACCESS=read|write`; see `Environment_Operations.md`.
+- If any required check fails, keep maintenance enabled and fix forward or roll back.
 
-1. Make changes on `develop`, push, confirm staging deploys (Netlify + Railway if backend changed).
+## Choose the deployment path
+
+### Standard deployment — no maintenance window
+
+Use for low-risk changes that do not require users to stop writing:
+
+1. Push `develop`; require hosted CI success and successful Netlify/Railway staging deploys.
 2. Smoke test staging.
-3. Merge `develop` into `main`, push `main`.
-4. Confirm production deploys, then smoke test production (homepage, auth, a quick gameplay check).
+3. Merge `develop` into `main` and push.
+4. Require hosted CI success for the production SHA and successful production deploys.
+5. Run the post-deployment verification and manual smoke checks below.
+
+### Maintenance deployment — advance warning and write freeze
+
+Use for large releases, data migrations, or changes where mixed old/new clients are unsafe.
+The workflow uses **three production pushes**:
+
+1. warning banner;
+2. application update with the maintenance page enabled;
+3. reopening configuration.
+
+The backend write freeze is controlled separately in Railway.
 
 ---
 
-## Maintenance Deploy (Update to Live with Warning)
+## Maintenance deployment checklist
 
-**High-level:**
+### Preparation — before T−60 minutes ET
 
-1. **T–60 min:** Push the warning banner live (steps below). No Railway change. Users see a dismissible red banner; it does not show on court/set-lineup/game-plan so it won’t disrupt active games.
-2. **Right before the real deploy:** Turn on the maintenance page (Netlify) and block writes (Railway): uncomment the wildcard in `FrontEnd/static/_redirects` and push `main`; set Railway production `MAINTENANCE_MODE=true`.
-3. **Push the update to main** (merge your branch into `main`, push).
-4. **After deploys are done:** Set Railway `MAINTENANCE_MODE=false`; comment `_redirects` back and set `maintenance.json` `enabled: false`; push `main`. Users then see the live app with the new code.
+- [ ] All intended application changes are committed and pushed to `develop`.
+- [ ] Hosted `Run Tests` is green for that exact `develop` SHA.
+- [ ] Netlify and Railway staging deploys succeeded.
+- [ ] Staging smoke testing is complete.
+- [ ] The maintenance start is chosen and communicated in ET.
+- [ ] If data will move, confirm a current Atlas Cloud Backup snapshot and prepare the
+      separately reviewed migration, dry run, verification, and rollback procedure.
+- [ ] Confirm the operator can access Netlify, Railway, GitHub Actions, and Atlas.
 
----
+### Push 1 — T−60 minutes ET: warning banner
 
-### Step 1 — T–60 min: Push the warning banner only
+Checkout the current production branch:
 
-Do **not** merge your feature branch yet. Deploy only the banner config.
+```bash
+git checkout main
+git pull origin main
+```
 
-1. Checkout `main` and pull latest (stash or commit any other work first):
+Edit only `FrontEnd/static/config/maintenance.json`:
+
+```json
+{
+  "id": "maintenance-YYYY-MM-DD-1",
+  "enabled": true,
+  "starts_at_iso": "YYYY-MM-DDTHH:MM:SS",
+  "starts_at_timezone": "America/New_York",
+  "show_minutes_before": 60,
+  "message": "Maintenance begins soon. Please finish your game to avoid losing progress.",
+  "details_url": ""
+}
+```
+
+`starts_at_iso` is New York wall-clock time with no `Z` or numeric offset. For example,
+`2026-08-20T15:00:00` means 3:00 PM ET on August 20. The parser applies EST or EDT for
+that date automatically.
+
+The `id` must be new so users who dismissed an earlier warning see this one. The banner
+polls once per minute. It is intentionally suppressed on `court.html`, `set-lineup.html`,
+and `game-plan.html` so an active game is not interrupted.
+
+```bash
+git add FrontEnd/static/config/maintenance.json
+git commit -m "chore: schedule production maintenance warning"
+git push origin main
+```
+
+After Netlify deploys, confirm the warning appears on a public page and FCC, and remains
+absent from the three deferred gameplay pages.
+
+### Push 2 — at the scheduled time ET: freeze writes and deploy the update
+
+1. In the Railway **production** environment, set `MAINTENANCE_MODE=true`.
+2. Wait for the Railway change to deploy. Confirm `/health` remains `200` and the Railway
+   production logs identify `environment=production database=gob`.
+3. Merge the tested staging branch without committing yet:
 
    ```bash
    git checkout main
    git pull origin main
+   git merge --no-commit --no-ff develop
    ```
 
-2. Edit **only** `FrontEnd/static/config/maintenance.json`:
+4. In `FrontEnd/static/_redirects`, enable the wildcard maintenance rule:
 
-   - Set `"enabled": true`.
-   - Set `"id"` to a **new** value (e.g. `maintenance-2026-02-17`). Changing the id ensures returning users who dismissed a previous banner will see this one.
-   - Set `"starts_at_iso"` to the **planned maintenance start** (when you’ll turn on the maintenance page and set Railway `MAINTENANCE_MODE=true`). The banner appears **60 minutes before** that instant (or immediately if that time is less than 60 minutes away).
-   - **Recommended (US Eastern / Philadelphia):** use a **naive** local time string with **no** `Z` and **no** `±hh:mm` offset, e.g. `"2026-02-17T15:00:00"`. That is interpreted as **wall clock in `America/New_York`** (Eastern Standard or Eastern Daylight, depending on the date). Optional `"starts_at_timezone"` overrides the IANA zone if you need something other than New York (rare).
-   - **Alternate (absolute / UTC):** you may still pass a full ISO instant with `Z` or an explicit offset (e.g. `"2026-02-17T20:00:00Z"`). In that case `starts_at_timezone` is ignored for parsing.
-   - Optionally keep or edit `"message"` and leave `"details_url": ""` unless you have a link.
-
-   Example — maintenance starts **3:00 PM US Eastern** on 17 Feb 2026 (no UTC math required):
-
-   ```json
-   {
-     "id": "maintenance-2026-02-17",
-     "enabled": true,
-     "starts_at_iso": "2026-02-17T15:00:00",
-     "show_minutes_before": 60,
-     "message": "Maintenance begins soon. Please finish your game to avoid losing progress.",
-     "details_url": ""
-   }
+   ```text
+   /*        /maintenance.html 200!
    ```
 
-   Example — same instant expressed explicitly in UTC (optional):
+   Keep the preceding `/images`, `/css`, `/js`, and `/sounds` asset rules intact.
 
-   ```json
-   "starts_at_iso": "2026-02-17T20:00:00Z"
-   ```
-
-3. Commit and push only that file:
+5. Commit the merge and push once:
 
    ```bash
-   git add FrontEnd/static/config/maintenance.json
-   git commit -m "chore: enable 60-min maintenance warning banner"
+   git add FrontEnd/static/_redirects
+   git commit -m "deploy: release develop under maintenance"
    git push origin main
    ```
 
-4. After Netlify deploys, check production (e.g. mode-select or homepage). The red banner should appear there; it will not appear on court/set-lineup/game-plan.
+6. Confirm Netlify serves the maintenance page and wait for Railway production to finish.
+7. Require hosted CI success for this exact SHA.
+8. Verify the running backend while the maintenance page remains active:
+
+   ```bash
+   DEPLOY_SHA="$(git rev-parse HEAD)"
+   ./.venv/bin/python scripts/verify_deploy.py \
+     --health-url https://<production-backend>/health \
+     --expect-commit "$DEPLOY_SHA" \
+     --check-ci
+   ```
+
+The build check requires:
+
+- the running commit matches `DEPLOY_SHA`;
+- `PYTHONHASHSEED=0`;
+- `environment=production`;
+- `database=gob`;
+- resolved database authorization is `write`.
+
+Do not pass `--smoke-url` while the maintenance page is intentionally enabled; that check
+correctly rejects a maintenance response.
+
+### Data movement — only when explicitly required
+
+Code-only deployments skip this section.
+
+- Confirm Atlas backup first.
+- Use only a reviewed script that goes through the shared database connection boundary.
+- Compare content checksums, not only document counts.
+- Run a read-only dry run before granting process-only write authorization.
+- Keep Railway and Netlify maintenance active throughout the write and verification.
+- Do not use a script reported by `scripts/check_env_safety.py` until it is migrated to the
+  shared connection helper.
+
+New code reading old reference data is the safer interim state. Do not publish new data
+before the corresponding code is live unless that exact old-code/new-data combination was
+explicitly verified.
+
+### Push 3 — reopen production
+
+Only proceed when the application deployment, hosted CI, and any data verification pass.
+
+1. Set Railway production `MAINTENANCE_MODE=false` and wait for Railway to finish. The
+   Netlify maintenance page still prevents normal entry while the backend reopens.
+2. Comment the wildcard in `FrontEnd/static/_redirects`:
+
+   ```text
+   # /*        /maintenance.html 200!
+   ```
+
+3. Set `enabled` to `false` in `FrontEnd/static/config/maintenance.json`.
+4. Commit and push the reopening configuration:
+
+   ```bash
+   git add FrontEnd/static/_redirects FrontEnd/static/config/maintenance.json
+   git commit -m "chore: reopen production after maintenance"
+   git push origin main
+   ```
+
+5. Wait for hosted CI, Netlify, and Railway to succeed for the final SHA.
+6. Run final automated verification:
+
+   ```bash
+   FINAL_SHA="$(git rev-parse HEAD)"
+   ./.venv/bin/python scripts/verify_deploy.py \
+     --health-url https://<production-backend>/health \
+     --expect-commit "$FINAL_SHA" \
+     --check-ci \
+     --smoke-url https://<production-frontend>/homepage.html \
+     --smoke-url https://<production-frontend>/login.html
+   ```
+
+The public smoke checks require HTTP 2xx, nonempty content, and proof that Netlify is no
+longer serving `<title>Maintenance</title>`.
+
+7. Complete the manual authenticated checks:
+   - homepage and login;
+   - enter an existing franchise and load FCC;
+   - open a game preview/set-lineup surface;
+   - run one short gameplay action appropriate to the release;
+   - confirm Railway logs show no new application or database errors.
+
+Production is reopened only when every required check is green.
 
 ---
 
-### Step 2 — Right before the real deploy: Maintenance on
+## Optional data and seeding verification
 
-- **Netlify (maintenance page):** On `main`, in `FrontEnd/static/_redirects`, uncomment the wildcard so all routes serve the maintenance page:
-  - Change `# /*        /maintenance.html 200!` → `/*        /maintenance.html 200!`  
-  - (The `200!` is required so the redirect overrides existing HTML.)  
-  Commit and push `main`.
-- **Railway:** Set production env `MAINTENANCE_MODE=true` so the API returns 503 on writes (POST/PUT/PATCH/DELETE).
+`scripts/verify_deploy.py` also supports reference-data checksums and a new-franchise seed
+audit. These are required only when the release changes those surfaces.
 
----
-
-### Step 3 — Push the update
-
-Merge your branch (e.g. `develop`) into `main` and push. Wait for Netlify and Railway production deploys to finish.
-
----
-
-### Step 4 — Reopen after maintenance
-
-1. **Railway:** Set production `MAINTENANCE_MODE=false`.
-2. **Netlify:** In `FrontEnd/static/_redirects`, comment the wildcard line back (`# /* ...`), and in `FrontEnd/static/config/maintenance.json` set `"enabled": false`. Commit and push `main`.
-
-Users will now see the live site with the new code.
-
----
-
-**Reference:**
-
-- Banner dismissal is stored in browser localStorage by `id`; changing `id` in the config makes the banner show again for returning users.
-- Time math is implemented in `FrontEnd/static/js/shared/maintenanceBanner.js`: naive `starts_at_iso` values use **IANA `America/New_York`** (US Eastern, including EST and EDT), not the viewer’s browser local zone and not “UTC only.”
-
-
----
-
-## Post-deploy verification — `scripts/verify_deploy.py`
-
-**Nothing else on a deploy proves it took.** Production silently diverged from `develop` by
-**158 commits** once, and no surface exposed the running build. `/health` now reports
-`commit`, `hash_seed` and `db_access`.
+Read-only production data verification must use the process-scoped production variables
+described in `Environment_Operations.md` and the explicit `--db gob` target:
 
 ```bash
-scripts/verify_deploy.py --health-url https://<prod>/health   # A: build
-GOB_DB_ACCESS=read scripts/verify_deploy.py --data            # B: data (prod MONGO_URI)
-scripts/verify_deploy.py --franchise-id <id> --delete         # C: seeding
+GOB_DB_ACCESS=read \
+MONGO_URI="$PROD_MONGO_URI" \
+MONGO_DB_NAME=gob \
+ENVIRONMENT=production \
+./.venv/bin/python scripts/verify_deploy.py \
+  --db gob \
+  --data \
+  --snapshot <verified-snapshot-directory>
 ```
 
-| check | asserts |
-|---|---|
-| **A. BUILD** | `/health` commit matches what shipped; `PYTHONHASHSEED=0` live; `GOB_DB_ACCESS=write` set |
-| **B. DATA** | copied collections match the shipped staging snapshot by **CONTENT checksum ignoring `_id`** — counts are not enough (`recruit_sets` matched on count while differing by 150 recruits) |
-| **C. SEEDING** | a throwaway **week-1, unplayed** franchise gets identity persisted, sliders varying, and the current init values — then deletes it and its FTD/FPD/FRD rows |
+The seed audit requires an authenticated operator to create an unplayed week-1 throwaway
+franchise. Deleting it is a production write and therefore requires a separately reviewed
+process-level write invocation. Never embed authentication or production credentials in the
+verification script.
 
-C takes a franchise id rather than creating one: creation needs an authenticated session and
-the script deliberately does not embed auth. **The franchise must be unplayed** — training moves
-the seeded values on the first week.
+## Failure and rollback rules
 
-The check was **negative-controlled**: run against prod before a deploy, B correctly FAILS.
+### Failure before reopening
 
-## Deploys that also move DATA
+- Leave `MAINTENANCE_MODE=true`.
+- Leave the Netlify maintenance wildcard enabled.
+- Preserve logs and identify whether Netlify, Railway, CI, code, or data failed.
+- Fix forward or revert the failed application commit on `main`.
+- Require the same exact-SHA verification before attempting to reopen.
 
-Some deploys need reference collections copied staging → prod. **Back them up first** — the
-code half has a git rollback, the data half has nothing, and `gob.players_backup` is a stale
-snapshot whose `attributes` differ from live on 1440/1536 documents.
+### Failure after reopening
 
-**ORDERING IS BACKUP → MERGE → COPY, not copy → merge.** New code reading old data is a
-known-good combination (two full measurement seasons ran on exactly that). **Old code reading
-NEW data is untested.**
+1. Set Railway production `MAINTENANCE_MODE=true` first to stop writes from open tabs.
+2. Re-enable the Netlify maintenance wildcard and push.
+3. Preserve logs and determine whether code rollback, data recovery, or both are required.
+4. For data incidents, follow the Atlas restore procedure in `Environment_Operations.md`;
+   never improvise broad compensating writes.
 
-Before copying, **checksum content rather than comparing counts**, and note that documents can
-be identical except for `_id` — the skeleton collections hash differently across databases
-while every coordinate matches, so copying them would churn prod for no benefit. **Heuristic:
-same byte size + different hash usually means metadata; a real content change moves the size.**
+## Why the checks are mandatory
 
-## ⚠️ The prod/local divergence trap
+Production previously diverged from `develop` by 158 commits without an obvious surface
+showing the running build. `/health` and `scripts/verify_deploy.py` exist to prove that the
+tested commit, production environment, `gob` database, deterministic hash seed, and resolved
+authorization are the combination actually running.
 
-**A franchise created through the UI is seeded by the DEPLOYED backend and then measured by
-LOCAL code.** Everything set at creation comes from prod; everything computed during a run comes
-from local. **Anything changed since the last deploy seeds wrong, silently, and looks like data
-rather than an error.**
-
-Caught once on `rebound_modifier` (deployed 0.2 vs local 0.5) only because someone was looking
-for it. The worst instance found: **100% of FPD players carried pre-recalibration
-`position_ratings`, median delta 24, max 55** — baked in at creation and never recomputed for
-franchise mode.
-
-Before any measurement season, do ONE of:
-1. **Deploy first**, so seeded and measured code agree (cleanest).
-2. **Normalise after creation** — overwrite everything local would seed differently, including
-   recomputing FPD `position_ratings`.
-3. **Provision locally** rather than through the UI.
+A UI-created franchise is seeded by deployed code. Local measurement code can then read that
+persisted state, creating a silent deployed/local hybrid. Before any measurement season,
+deploy first, provision locally, or explicitly normalize every field that changed—including
+FPD `position_ratings`.

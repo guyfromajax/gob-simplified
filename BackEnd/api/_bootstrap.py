@@ -5,6 +5,7 @@ the rest of the API fails to load (e.g. DB, routers). Used by api.py.
 import os
 import sys
 from fastapi import FastAPI, Response
+from BackEnd.env_config import resolve_runtime_db_access
 
 app = FastAPI()
 
@@ -39,12 +40,15 @@ def health_check():
     outside. Prod silently diverged from develop by 158 commits once because nothing
     exposed this; scripts/verify_deploy.py reads it."""
     print("🔵 [HEALTH] GET /health", file=sys.stderr, flush=True)
+    db_name = os.environ.get("MONGO_DB_NAME", "")
     return {
         "status": "healthy",
         "port": os.getenv("PORT", "?"),
         "commit": _deployed_commit(),
         "hash_seed": os.environ.get("PYTHONHASHSEED", "unset"),
-        "db_access": os.environ.get("GOB_DB_ACCESS", "unset"),
+        "environment": os.environ.get("ENVIRONMENT", "unknown"),
+        "database": db_name or "unknown",
+        "db_access": resolve_runtime_db_access(db_name, os.environ),
     }
 
 

@@ -18,6 +18,7 @@ from dotenv import dotenv_values
 ALLOWED_ENVIRONMENTS = frozenset({"development", "test", "staging", "production"})
 PROTECTED_DOTENV_KEYS = frozenset({"GOB_DB_ACCESS", "GOB_DB_MODE"})
 REAL_DB_CONFIG_KEYS = frozenset({"MONGO_URI", "MONGO_DB_NAME"})
+PRODUCTION_DB_NAMES = frozenset({"gob"})
 
 
 class EnvironmentConfigurationError(RuntimeError):
@@ -32,6 +33,27 @@ class DatabaseEnvironment:
     mongo_uri: str | None
     source: str
     process_environment: Mapping[str, str]
+
+
+def resolve_runtime_db_access(
+    db_name: str,
+    process_environment: Mapping[str, str],
+) -> str:
+    """Return the effective database authorization for an application process.
+
+    The database boundary and ``/health`` share this resolver so deployment
+    verification reports the permission the process actually has. Railway's
+    platform identity authorizes the deployed app; ad-hoc production processes
+    still require an explicit, process-only ``GOB_DB_ACCESS`` value.
+    """
+    if str(db_name or "").strip() not in PRODUCTION_DB_NAMES:
+        return "write"
+    explicit = str(process_environment.get("GOB_DB_ACCESS") or "").strip().lower()
+    if explicit in {"read", "write"}:
+        return explicit
+    if any(str(key).startswith("RAILWAY_") for key in process_environment):
+        return "write"
+    return "refuse"
 
 
 def database_name_from_uri(uri: str) -> str:

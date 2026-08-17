@@ -246,6 +246,8 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
 
   const teamOf = (id) => (directory[id] && directory[id].team) || null;
   const everPlayed = new Set(); // ids seen on court at any point
+  const exitOrder = new Map(); // id -> tick of the turn they last left the floor
+  let exitTick = 0;
 
   const worm = []; // { elapsed, margin }[] — x is game time, never sample index
   const frames = [];
@@ -315,14 +317,17 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
         const stats = cum[id] || {};
         const dir = directory[id] || {};
         return {
+          id,
           name: dir.name || 'Unknown',
           pts: num(stats.PTS),
           reb: reb(stats),
           out: outIds.has(id),
         };
       })
-      // stable, readable order: highest scorers first
-      .sort((a, b) => b.pts - a.pts);
+      // Most-recent exit first: the rail answers "who just left the floor", so a
+      // foul-out has to arrive at the head of it. Points break ties among players who
+      // left on the same turn.
+      .sort((a, b) => (exitOrder.get(b.id) || 0) - (exitOrder.get(a.id) || 0) || b.pts - a.pts);
 
   // Team fouls and timeouts are NOT derived here. Both are engine-owned and
   // emitted per turn (`home_team_fouls` / `away_team_fouls` / `home_timeouts` /
@@ -518,16 +523,25 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     // Bug 4 fix: helper turns (inbound / rebound / timeout) omit the lineups — carry
     // forward the last known five so on-court stats hold instead of the bars pulsing
     // to 0 on those turns.
-    const homeLineup =
-      turn.home_lineup && Object.keys(turn.home_lineup).length ? turn.home_lineup : (lastHomeLineup || {});
-    const awayLineup =
-      turn.away_lineup && Object.keys(turn.away_lineup).length ? turn.away_lineup : (lastAwayLineup || {});
+    // Bug 4 fix, extended: helper turns (inbound / rebound / free throws / timeout) may
+    // omit the lineups entirely OR name only some of the five. A partial lineup used as-is
+    // shrinks the on-court set, and everyone it failed to mention is read as having left
+    // the floor — which is how still-playing starters turned up on the bench rail in Q1
+    // with no foul-outs. Only a complete five replaces the last known one.
+    const completeOr = (lineup, fallback) =>
+      (onCourtIds(lineup).length === POSITIONS.length ? lineup : (fallback || lineup || {}));
+    const homeLineup = completeOr(turn.home_lineup, lastHomeLineup);
+    const awayLineup = completeOr(turn.away_lineup, lastAwayLineup);
     lastHomeLineup = homeLineup;
     lastAwayLineup = awayLineup;
     const homeCourt = onCourtIds(homeLineup);
     const awayCourt = onCourtIds(awayLineup);
     const court = [...homeCourt, ...awayCourt];
     court.forEach((id) => everPlayed.add(id));
+    if (prevCourt) {
+      exitTick += 1;
+      prevCourt.forEach((id) => { if (!court.includes(id)) exitOrder.set(id, exitTick); });
+    }
 
     // Worm history: elapsed game seconds (not sample index) + home−away margin.
     const elapsed = elapsedGameSeconds(sb.quarter, sb.clock);

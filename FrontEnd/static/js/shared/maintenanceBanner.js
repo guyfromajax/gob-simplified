@@ -7,7 +7,7 @@
  * starts_at_iso:
  * - With Z or a numeric offset (e.g. ...Z, +00:00, -05:00): parsed as an absolute instant (UTC / offset).
  * - Naive local time (e.g. 2026-02-17T15:00:00, no Z/offset): interpreted as wall clock in
- *   `starts_at_timezone` (default America/New_York — US Eastern, Philadelphia).
+ *   `starts_at_timezone` (default America/New_York — Eastern Time, including EST/EDT).
  *
  * This script is intentionally dependency-free and safe to include on every page.
  */
@@ -166,9 +166,16 @@
       return true;
     }
 
-    var minutesBefore = safeParseInt(config.show_minutes_before, 60);
-    var windowStart = startsAtMs - minutesBefore * 60 * 1000;
+    var windowStart = getWarningWindowStartMs(config);
     return nowMs() >= windowStart;
+  }
+
+  function getWarningWindowStartMs(config) {
+    if (!config) return null;
+    var startsAtMs = safeParseTimeMs(config.starts_at_iso, config.starts_at_timezone);
+    if (startsAtMs == null) return null;
+    var minutesBefore = safeParseInt(config.show_minutes_before, 60);
+    return startsAtMs - minutesBefore * 60 * 1000;
   }
 
   function buildBanner(config) {
@@ -285,10 +292,21 @@
     window.setInterval(tick, POLL_MS);
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", start);
-  } else {
-    start();
+  // CommonJS export exists only for executable time-zone contract tests. Browsers
+  // continue to use the dependency-free classic script and expose no test global.
+  if (typeof module !== "undefined" && module.exports) {
+    module.exports = {
+      safeParseTimeMs: safeParseTimeMs,
+      getWarningWindowStartMs: getWarningWindowStartMs,
+      defaultWallClockTimeZone: DEFAULT_WALL_CLOCK_TZ,
+    };
+  }
+
+  if (typeof document !== "undefined") {
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", start);
+    } else {
+      start();
+    }
   }
 })();
-

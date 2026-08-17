@@ -1,9 +1,9 @@
 {
   "id": "2026-04-22-maint-1",
   "enabled": false,
-  "starts_at_iso": "2026-04-23T03:00:00Z",
+  "starts_at_iso": "2026-04-22T23:00:00",
   "starts_at_timezone": "America/New_York",
-  "show_minutes_before": 1,
+  "show_minutes_before": 60,
   "message": "Maintenance begins soon. Please finish your game to avoid losing progress.",
   "details_url": ""
 }

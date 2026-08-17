@@ -6,19 +6,22 @@ Nothing else on the deploy checklist proves this, and "prod silently diverged fr
 develop for 158 commits" is exactly the failure it closes. Every check reports what it
 saw, not just pass/fail, so a partial deploy is diagnosable rather than just red.
 
-  A. BUILD    /health reports the running commit, PYTHONHASHSEED and GOB_DB_ACCESS.
-  B. DATA     the collections the deploy copies match the staging snapshot that was
+  A. BUILD    /health reports the running commit, environment, database, hash seed,
+              and resolved database authorization.
+  B. CI       the exact shipped commit has a completed, successful hosted Run Tests run.
+  C. DATA     the collections the deploy copies match the staging snapshot that was
               shipped (checksums, not counts — counts matched while content differed).
-  C. SEEDING  a throwaway franchise's seeded values match what the new code produces.
+  D. SEEDING  a throwaway franchise's seeded values match what the new code produces.
 
-WHY C NEEDS A FRANCHISE FROM YOU: creating one requires an authenticated session
+WHY D NEEDS A FRANCHISE FROM YOU: creating one requires an authenticated session
 (POST /franchise/select-team), which this script deliberately does not embed. Create a
 throwaway in the UI on prod, pass its id, and use --delete when done.
 
 usage:
-  scripts/verify_deploy.py --health-url https://<prod>/health --expect-commit <sha>
-  scripts/verify_deploy.py --franchise-id <id> [--delete]
-  scripts/verify_deploy.py --data --snapshot ~/gob-measurement-archive/db_backups_predeploy
+  scripts/verify_deploy.py --health-url https://<prod>/health --expect-commit <sha> --check-ci
+  scripts/verify_deploy.py --smoke-url https://<frontend>/homepage.html
+  scripts/verify_deploy.py --db gob --franchise-id <id> [--delete]
+  scripts/verify_deploy.py --db gob --data --snapshot ~/gob-measurement-archive/db_backups_predeploy
 """
 
 from __future__ import annotations
@@ -100,14 +103,75 @@ def verify_build(url: str, expect_commit: str | None) -> None:
     check(str(body.get("hash_seed")) == "0",
           f"PYTHONHASHSEED=0 in the running process (got {body.get('hash_seed')!r}) "
           f"— set by start.sh; games are not replayable without it")
+    check(str(body.get("environment")) == "production",
+          f"running environment is production (got {body.get('environment')!r})")
+    check(str(body.get("database")) == "gob",
+          f"running database is gob (got {body.get('database')!r})")
     check(str(body.get("db_access")) == "write",
-          f"GOB_DB_ACCESS=write set in Railway (got {body.get('db_access')!r}) "
-          f"— the redundant signal for the prod guard; RAILWAY_* alone also works")
+          f"resolved production database access is write (got {body.get('db_access')!r}) "
+          f"— Railway platform identity authorizes the deployed app; no persistent "
+          f"GOB_DB_ACCESS variable is required")
 
 
-# ── B. data ──────────────────────────────────────────────────────────────────────────
+def verify_hosted_ci(expect_commit: str) -> None:
+    """Require a successful hosted Run Tests workflow for the shipped commit."""
+    section("B. HOSTED CI — did the shipped commit pass GitHub Actions?")
+    try:
+        result = subprocess.run(
+            [
+                "gh", "run", "list",
+                "--commit", expect_commit,
+                "--workflow", "test.yml",
+                "--json", "conclusion,status,databaseId,url",
+                "--limit", "10",
+            ],
+            cwd=_GOB_ROOT,
+            text=True,
+            capture_output=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        check(False, f"could not query GitHub Actions with gh: {type(exc).__name__}: {exc}")
+        return
+    if result.returncode != 0:
+        detail = (result.stderr or result.stdout or "unknown gh error").strip()
+        check(False, f"GitHub Actions query failed: {detail}")
+        return
+    try:
+        runs = json.loads(result.stdout or "[]")
+    except json.JSONDecodeError as exc:
+        check(False, f"GitHub Actions returned invalid JSON: {exc}")
+        return
+    successful = [
+        run for run in runs
+        if run.get("status") == "completed" and run.get("conclusion") == "success"
+    ]
+    check(bool(successful),
+          f"Run Tests completed successfully for commit {expect_commit} "
+          f"(matching runs={len(runs)}, successful={len(successful)})")
+
+
+def verify_smoke_url(url: str) -> None:
+    """Read-only public-surface smoke check used after maintenance is removed."""
+    section(f"SMOKE — {url}")
+    try:
+        request = urllib.request.Request(url, headers={"User-Agent": "gob-deploy-verifier/1"})
+        with urllib.request.urlopen(request, timeout=15) as response:
+            status = int(response.getcode() or 0)
+            body = response.read().decode("utf-8", errors="replace")
+    except Exception as exc:
+        check(False, f"surface unreachable: {type(exc).__name__}: {exc}")
+        return
+    check(200 <= status < 300, f"returned HTTP {status}")
+    check(bool(body.strip()), "returned a non-empty response")
+    check("<title>Maintenance</title>" not in body,
+          "is serving the live application rather than the maintenance page")
+
+
+# ── C. data ──────────────────────────────────────────────────────────────────────────
 def verify_data(db, snapshot_dir: str) -> None:
-    section("B. DATA — did the collection copy land, byte for byte?")
+    section("C. DATA — did the collection copy land, byte for byte?")
     from bson import json_util
     print(f"       connected to {db.name!r}")
     if db.name != "gob":
@@ -133,9 +197,9 @@ def verify_data(db, snapshot_dir: str) -> None:
                         f"(prod {gn} docs {gh} vs snapshot {wn} docs {wh})")
 
 
-# ── C. seeding ───────────────────────────────────────────────────────────────────────
+# ── D. seeding ───────────────────────────────────────────────────────────────────────
 def verify_seeding(db, franchise_id: str, delete: bool) -> None:
-    section("C. SEEDING — does a NEW franchise get the new init values?")
+    section("D. SEEDING — does a NEW franchise get the new init values?")
     from bson import ObjectId
     FTD = db["franchise_team_data"]
     franchises_collection = db["franchises"]
@@ -205,6 +269,10 @@ def main() -> int:
     ap.add_argument("--db", choices=["gob"], help="Required for --data or --franchise-id")
     ap.add_argument("--expect-commit", default=None,
                     help="short SHA the deploy should be running (default: local HEAD)")
+    ap.add_argument("--check-ci", action="store_true",
+                    help="require a successful hosted Run Tests workflow for the expected commit")
+    ap.add_argument("--smoke-url", action="append", default=[],
+                    help="read-only live URL to smoke check; may be passed more than once")
     ap.add_argument("--data", action="store_true", help="run the collection-content checks")
     ap.add_argument("--snapshot",
                     default=os.path.expanduser("~/gob-measurement-archive/db_backups_predeploy"))
@@ -212,8 +280,8 @@ def main() -> int:
     ap.add_argument("--delete", action="store_true", help="delete the throwaway when done")
     args = ap.parse_args()
 
-    if not (args.health_url or args.data or args.franchise_id):
-        ap.error("nothing to do — pass --health-url, --data and/or --franchise-id")
+    if not (args.health_url or args.check_ci or args.smoke_url or args.data or args.franchise_id):
+        ap.error("nothing to do — pass --health-url, --check-ci, --smoke-url, --data and/or --franchise-id")
     if (args.data or args.franchise_id) and args.db != "gob":
         ap.error("--data and --franchise-id require the explicit target --db gob")
     if args.delete and not args.franchise_id:
@@ -225,7 +293,7 @@ def main() -> int:
         connection = connect_migration_target("gob", write=args.delete)
 
     expect = args.expect_commit
-    if args.health_url and not expect:
+    if (args.health_url or args.check_ci) and not expect:
         try:
             expect = subprocess.check_output(
                 ["git", "rev-parse", "--short", "HEAD"], cwd=_GOB_ROOT,
@@ -236,6 +304,13 @@ def main() -> int:
 
     if args.health_url:
         verify_build(args.health_url, expect)
+    if args.check_ci:
+        if not expect:
+            check(False, "hosted CI verification requires --expect-commit or a readable local HEAD")
+        else:
+            verify_hosted_ci(expect)
+    for smoke_url in args.smoke_url:
+        verify_smoke_url(smoke_url)
     if args.data:
         verify_data(connection.database, args.snapshot)
     if args.franchise_id:
