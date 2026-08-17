@@ -405,6 +405,39 @@ test.describe('watchlist', () => {
     expect(calls[0].unexpected).toBeUndefined();
   });
 
+  test('the toggle request is sent as JSON, not text/plain', async ({ page }) => {
+    // mountPool stubs fetchJSON and asserts only on the parsed body, so it never sees
+    // the request headers — which is how a missing Content-Type shipped. fetch()
+    // defaults a string body to text/plain and FastAPI 422s it before the handler
+    // runs, so the star flipped optimistically and reverted on every click. Assert on
+    // the options the hub passes, since that is what decides the header.
+    await mountPool(page);
+    await page.evaluate(() => {
+      window.__wire = [];
+      const realFetchJSON = window.RecruitingCommon.fetchJSON;
+      window.RecruitingCommon.fetchJSON = function (url, options) {
+        const headers = Object.assign(
+          {}, window.API_CONFIG ? window.API_CONFIG.getAuthHeaders() : {}, (options || {}).headers || {},
+        );
+        window.__wire.push({
+          url: String(url),
+          method: (options || {}).method,
+          hasBody: typeof (options || {}).body === 'string',
+          contentType: headers['Content-Type'] || headers['content-type'] || null,
+        });
+        return realFetchJSON.call(this, url, options);
+      };
+    });
+
+    await page.click('#hub-pool tbody tr.rec:first-child .wt');
+    await page.waitForFunction(() => (window.__wire || []).length > 0);
+    const [call] = await page.evaluate(() => window.__wire);
+    expect(call.url).toContain('/franchise/recruiting-watchlist');
+    expect(call.method).toBe('PATCH');
+    expect(call.hasBody).toBe(true);
+    expect(call.contentType).toBe('application/json');
+  });
+
   test('watchlist view collapses 450 to the shortlist in one click', async ({ page }) => {
     await mountPool(page, { watchlist: ['r-3', 'r-9', 'r-21'] });
     expect(await rowCount(page)).toBe(450);

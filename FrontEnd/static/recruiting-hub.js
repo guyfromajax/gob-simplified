@@ -331,7 +331,11 @@
     refreshWatchDependentChrome();
     btn.disabled = true;
     Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-watchlist'), {
-      method: 'PATCH',
+      // fetchJSON does not set Content-Type, and fetch() defaults a string body to
+      // text/plain — which FastAPI rejects with 422 before the handler runs. Every
+      // other body-carrying call in this file sets it; this one did not, so the star
+      // flipped optimistically and the catch below reverted it on every click.
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ franchise_id: context.franchiseId, recruit_id: id, watching: turningOn })
     }).then(function (res) {
       state.watchlist = new Set((res && res.watchlist ? res.watchlist : []).map(String));

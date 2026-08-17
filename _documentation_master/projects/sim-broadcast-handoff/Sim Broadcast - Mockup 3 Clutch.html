@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sim Broadcast — Mockup 3 · Clutch</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sim-broadcast-frame.css">
+<style>
+/* ---- clutch frame mode: same three zones, heightened. Nothing restructures. ---- */
+.overlay.vig::after{content:'';position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:radial-gradient(112% 86% at 50% 50%,transparent 40%,rgba(0,0,0,.62) 100%)}
+.overlay.edge{box-shadow:inset 0 1.5px 0 var(--lead),inset 0 -1.5px 0 var(--lead)}
+.overlay.entering .board{filter:brightness(.42) saturate(.7)}
+.board{transition:filter .6s cubic-bezier(.2,.7,.2,1)}
+.wormfill{transform-origin:50% 50%;transition:transform .6s cubic-bezier(.2,.7,.2,1)}
+.wl-cap.poss{color:var(--orange);letter-spacing:.2em}
+.wl-axis span{transition:color .4s}
+.wl-axis.endgame span{color:rgba(255,255,255,.12)}
+.wl-axis.endgame span:last-child{color:var(--w70);font-weight:700}
+/* foul trouble gains emphasis in clutch — existing data, more weight, no new elements */
+.overlay.clutch .prow.ft{background:radial-gradient(120% 150% at 50% 50%,rgba(255,215,0,.07),transparent 74%)}
+.overlay.clutch .prow.ft::after{content:'';position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,215,0,.34);pointer-events:none}
+.overlay.clutch .tag-ft{background:rgba(255,215,0,.14)}
+/* cards in clutch: shorter slot, one line, no sub-line */
+.card{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:14px 15px;border-radius:11px;
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.012));box-shadow:inset 0 0 0 1px var(--cc),0 12px 30px rgba(0,0,0,.5)}
+.ctag{align-self:flex-start;font-family:var(--bebas);font-size:12px;line-height:1;letter-spacing:.16em;padding:3px 7px 2px;border-radius:4px;border:1px solid}
+.cline{font-family:var(--bebas);font-size:33px;line-height:1.02;letter-spacing:.02em;color:#fff;text-wrap:balance}
+.slot.short{height:144px}
+.gate{background:#0b0d14;border-radius:10px;padding:14px 16px;font-family:var(--mono);font-size:11px;letter-spacing:.04em;color:rgba(255,255,255,.55);display:flex;gap:22px;flex-wrap:wrap}
+.gate b{color:#fff;font-weight:400}
+.gate .on{color:#34EC27}.gate .off{color:#ff6d6d}
+@media (prefers-reduced-motion:reduce){.board,.wormfill{transition:none}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="phead">
+    <h1>Sim Broadcast — Mockup 3</h1><span class="k">CLUTCH · A FRAME MODE, NOT A CARD</span>
+    <p>Under two minutes with the margin inside six — two possessions. Same three zones, same locked geometry — the boards do not restructure. What changes is the worm's vertical scale, the frame's periphery, and what the stage is allowed to say.</p>
+  </div>
+
+  <div class="frame" id="frame">
+    <div class="sb" id="sb"></div>
+    <div class="overlay" id="ov">
+      <div class="zones" id="zones">
+        <div class="board away" id="boardAway"></div>
+        <div class="stage" id="stage"></div>
+        <div class="board home" id="boardHome"></div>
+      </div>
+      <div class="footer" id="footer"></div>
+    </div>
+  </div>
+
+  <div class="harness">
+    <div class="hcard">
+      <div class="sechead">CONTROLS</div>
+      <div class="hgrid">
+        <div class="hq"><span class="lab">Game state</span><div class="seg" data-k="state"><button data-v="one">1:12 · margin 2</button><button data-v="two">1:12 · margin 5</button><button data-v="blow">1:12 · decided</button></div></div>
+        <div class="hq"><span class="lab">Stage</span><div class="seg" data-k="stage"><button data-v="rest">Worm only</button><button data-v="card">Moment card</button></div></div>
+        <div class="hq"><span class="lab">Frame treatment</span><div class="seg" data-k="treat"><button data-v="none">None</button><button data-v="vig">Vignette</button><button data-v="edge">Vignette + lead rule</button></div></div>
+        <div class="hq"><span class="lab">Worm scale</span><div class="seg" data-k="scale"><button data-v="auto">Auto (full game)</button><button data-v="8">Clamp ±8</button><button data-v="5">Clamp ±5</button></div></div>
+      </div>
+      <div style="margin-top:14px"><button class="ctlbtn" id="replay" style="font-family:var(--inter);font-size:12px;font-weight:600;color:#15171c;border-color:rgba(21,23,28,.2);padding:8px 14px;border-radius:7px;background:#fff;cursor:pointer">Replay clutch entry</button></div>
+    </div>
+    <div class="hcard">
+      <div class="sechead">GATE</div>
+      <div class="readout" id="readout"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="sechead">CLUTCH ENGAGEMENT</div>
+    <div class="gate" id="gate"></div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script src="sim-broadcast-parts.js"></script>
+<script>
+const S={stagew:400,rest:'worm',slot:'expand',ctl:'stage'};
+const H={state:'one',stage:'rest',treat:'edge',scale:'8'};
+
+/* Explicit late-game box score. Authored, not derived: five on-court lines + bench sum to the
+   score on the board, and every foul state is one thing only. */
+const A5=[
+ {pos:'PG',name:'M. Whitney',jersey:38,rt:78,pts:14,reb:4,ast:8,def:47,fouls:4},
+ {pos:'SG',name:'E. Terrell',jersey:13,rt:54,pts:12,reb:3,ast:3,def:44,fouls:3},
+ {pos:'SF',name:'C. Conway',jersey:53,rt:84,pts:21,reb:8,ast:3,def:58,fouls:3},
+ {pos:'PF',name:"A. O'Brien",jersey:42,rt:89,pts:16,reb:12,ast:2,def:64,fouls:3},
+ {pos:'C',name:'Q. Vale',jersey:24,rt:46,pts:7,reb:2,ast:1,def:51,fouls:2,sub:true}
+];
+const H5BASE=[
+ {pos:'PG',name:'D. Reyes',jersey:4,rt:86,pts:18,reb:5,ast:9,def:57,fouls:2},
+ {pos:'SG',name:'J. Pratt',jersey:22,rt:33,pts:7,reb:2,ast:2,def:41,fouls:3},
+ {pos:'SF',name:'I. Frank',jersey:31,rt:92,pts:24,reb:7,ast:4,def:66,fouls:3,spot:true,hot:true},
+ {pos:'PF',name:'T. Wilson',jersey:45,rt:59,pts:11,reb:10,ast:1,def:61,fouls:4},
+ {pos:'C',name:'M. Soto',jersey:55,rt:73,pts:13,reb:8,ast:2,def:55,fouls:3,sub:true}
+];
+// the two fouled-out players sit on the bench with the red OUT marker; their replacements carry IN
+const BENCH3={away:[{name:'L. Gordon',pts:8,reb:9,out:true}],home:[{name:'R. Ellis',pts:7,reb:4,out:true}]};
+const AWAY_TOTAL=A5.reduce((a,p)=>a+p.pts,0)+BENCH3.away[0].pts;   // 78
+// a wider margin is extra HOME points, so the box score always adds up to the scoreboard
+function homeFive(margin){
+  const extra=margin-2;
+  return H5BASE.map((p,i)=>{
+    const add=i===2?Math.min(extra,8):i===0?Math.max(0,extra-8):0;
+    return Object.assign({},p,{pts:p.pts+add});
+  });
+}
+
+const SERIES={
+  one:[0,2,3,1,-2,-4,-3,0,2,4,3,6,5,3,1,-1,-3,-2,0,3,5,7,6,4,2,4,6,8,7,5,3,1,-1,0,2,4,3,1,-2,-1,1,3,2,4,3,2],
+  two:null, blow:null
+};
+SERIES.two=SERIES.one.map((v,i)=>i<40?v:v+3);
+SERIES.blow=SERIES.one.map((v,i)=>i<32?v:v+Math.round((i-31)*1.05));
+
+const SCORES={one:{atol:1,htol:2,afoul:9,hfoul:12},two:{atol:1,htol:2,afoul:9,hfoul:12},blow:{atol:2,htol:3,afoul:11,hfoul:10}};
+
+function boardHTML(list,side){
+  const t=T[side];
+  const head=`<div class="bhead"><span class="dot" style="background:${t.color}"></span><span>${t.name} · ${side}</span></div>`;
+  return head+list.map(p=>{
+    let h=row(p,t.color);
+    if(!p.out&&p.fouls>=4)h=h.replace('class="prow','class="prow ft ');
+    return h;
+  }).join('');
+}
+function scoreboardHTML(){
+  const s=SCORES[H.state], m=SERIES[H.state].slice(-1)[0];
+  return `<div class="sb-side left">
+    <div class="sb-logo" style="background:linear-gradient(135deg,${T.away.color},#0b0d14)">${T.away.abbr}</div>
+    <div class="sb-meta"><span class="sb-rank">#${T.away.rank}</span><span class="sb-rec">${T.away.rec}</span></div>
+    <div class="sb-score">${AWAY_TOTAL}</div>
+    <div class="sb-tf"><span>TOL ${s.atol}</span><span>F ${s.afoul}</span></div></div>
+  <div class="sb-center"><div class="sb-clock">1:12</div><div class="sb-per"><span class="sb-q">4TH</span><span class="sb-shot">12</span></div></div>
+  <div class="sb-side right">
+    <div class="sb-tf right"><span>TOL ${s.htol}</span><span>F ${s.hfoul}</span></div>
+    <div class="sb-score">${AWAY_TOTAL+m}</div>
+    <div class="sb-meta right"><span class="sb-rank">#${T.home.rank}</span><span class="sb-rec">${T.home.rec}</span></div>
+    <div class="sb-logo" style="background:linear-gradient(225deg,${T.home.color},#0b0d14)">${T.home.abbr}</div></div>
+  <div class="sb-edge" style="--al:${T.away.color};--hl:${T.home.color}"></div>`;
+}
+function cardHTML(){
+  return `<div class="card" style="--cc:#34EC2755">
+    <span class="ctag" style="color:#34EC27;border-color:#34EC2766">BUCKET</span>
+    <div class="cline">REYES 24 PTS</div></div>`;
+}
+
+function engaged(){ const m=Math.abs(SERIES[H.state].slice(-1)[0]); return m<=6; }
+
+function render(){
+  const boardw=(1228-S.stagew-32)/2;
+  const ov=document.getElementById('ov');
+  ov.style.setProperty('--stagew',S.stagew+'px');
+  ov.style.setProperty('--boardw',boardw+'px');
+
+  WORM.length=0; SERIES[H.state].forEach(v=>WORM.push(v));
+  const cur=WORM[WORM.length-1], on=engaged();
+  const leadCol=cur>=0?T.home.color:T.away.color;
+  ov.style.setProperty('--lead',leadCol+'55');
+  ov.className='overlay'+(on?' clutch':'')
+    +(on&&H.treat!=='none'?' vig':'')+(on&&H.treat==='edge'?' edge':'');
+
+  document.getElementById('sb').innerHTML=scoreboardHTML();
+  document.getElementById('boardAway').innerHTML=boardHTML(A5,'away');
+  document.getElementById('boardHome').innerHTML=boardHTML(homeFive(cur),'home');
+
+  // clutch gives the worm the stage; the card slot shrinks to one line
+  const clamp=H.scale==='auto'?0:parseInt(H.scale,10);
+  const wormH=on?302:246, slotCls='slot'+(on?' short':'');
+  const cap=on
+    ? '<span class="wl-cap poss">'+(Math.abs(cur)<=3?'ONE POSSESSION':'TWO POSSESSIONS')+'</span>'
+    : '<span class="wl-cap">LEAD MARGIN</span>';
+  const stageInner=H.stage==='card'?cardHTML():(on?'':teamPanel());
+  document.getElementById('stage').innerHTML=
+    `<div class="wormblock grow">
+      <div class="wl-head">${cap}<span class="wl-team" style="color:${leadCol}">${cur>=0?T.home.abbr:T.away.abbr} +${Math.abs(cur)}</span></div>
+      <div class="wormfill" style="height:${wormH}px;flex:none">${worm(S.stagew-24,wormH,{clamp:on&&clamp?clamp:undefined,wall:on})}</div>
+      <div class="wl-axis${on?' endgame':''}"><span>TIP</span><span>Q1</span><span>HALF</span><span>Q3</span><span>FINAL</span></div>
+    </div>
+    <div class="${slotCls}">${stageInner}</div>`;
+
+  const chips=side=>{
+    const list=BENCH3[side]; if(!list.length)return '<div></div>';
+    return `<div class="bench ${side}"><span class="bench-lbl">BENCH</span>${list.map(c=>`<span class="bchip${c.out?' out':''}"><b>${c.name}</b>${c.out?'<span class="bout">OUT</span>':''}<span class="bstat">${c.pts}p · ${c.reb}r</span></span>`).join('')}</div>`;
+  };
+  document.getElementById('footer').innerHTML=chips('away')+controls()+chips('home');
+
+  // gate + measurements
+  const px=n=>Math.round(n)+'px';
+  const zones=document.querySelector('.zones');
+  const rows=[
+    ['Clutch engaged',on?'YES':'NO','ok',on],
+    ['Margin',Math.abs(cur)+(Math.abs(cur)<=3?' · one possession':Math.abs(cur)<=6?' · two possessions':' · decided')],
+    ['Worm scale',on?(clamp?'clamped ±'+clamp:'auto (full game)'):'auto · clamp is clutch-only'],
+    ['Worm height',px(wormH)],
+    ['Directed slot',on?'144px · one line only':'200px · analysis allowed'],
+    ['Dot position',Math.round((WORM.length-1)/47*100)+'% across'],
+    ['Box score sums',AWAY_TOTAL+' – '+(AWAY_TOTAL+cur)+' · matches board','ok',true],
+    ['Zone row',px(zones.getBoundingClientRect().height)+' of 512','ok',zones.getBoundingClientRect().height<=512]
+  ];
+  document.getElementById('readout').innerHTML=rows.map(r=>
+    `<div class="r ${r[2]?(r[3]?'ok':'warn'):''}"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
+  document.getElementById('gate').innerHTML=
+    `<span>under 2:00 <b class="on">YES</b> (1:12)</span>`+
+    `<span>within 6 <b class="${Math.abs(cur)<=6?'on':'off'}">${Math.abs(cur)<=6?'YES':'NO'}</b> (margin ${Math.abs(cur)})</span>`+
+    `<span>→ clutch mode <b class="${on?'on':'off'}">${on?'ENGAGED':'NOT ENGAGED'}</b></span>`+
+    `<span>analysis on stage <b class="${on?'off':'on'}">${on?'SUPPRESSED':'ALLOWED'}</b></span>`+
+    `<span>card cadence <b>${on?'3.4s gap · 2.6s hold':'4.2s gap · 2.6s hold'}</b></span>`;
+
+  document.querySelectorAll('.seg').forEach(seg=>{
+    const k=seg.dataset.k;
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',String(H[k])===b.dataset.v));
+  });
+}
+document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  H[seg.dataset.k]=b.dataset.v; render();
+}));
+
+/* the gear change is a transition, not a state: boards drop and recover while the worm rescales */
+function replayEntry(){
+  render();
+  const ov=document.getElementById('ov'), wf=document.querySelector('.wormfill');
+  if(!engaged()||!wf)return;
+  ov.classList.add('entering');
+  wf.style.transform='scaleY(.55)';
+  requestAnimationFrame(()=>requestAnimationFrame(()=>{
+    ov.classList.remove('entering');
+    wf.style.transform='none';
+  }));
+}
+document.getElementById('replay').addEventListener('click',replayEntry);
+
+document.getElementById('notes').innerHTML=`
+<div class="note"><h3>1 · Does it register as a gear change?</h3>
+<p>Four things move at once, over 600ms: the worm's vertical scale <b>clamps to ±8</b> so a single basket becomes a visible swing instead of a wobble; the worm takes the stage (302px, up from 246); the periphery darkens with a vignette and picks up a hairline rule in the leading team's colour; and the stage loses the right to say anything analytical. Hit <b>Replay clutch entry</b> — the boards dip and recover while the chart stretches, which is the whole beat.</p>
+<p>Crucially <b>nothing restructures</b>. Same five rows, same four bars, same slot position. The frame gets more intense; the furniture doesn't move, so the coach never has to re-find anything at the moment he can least afford to.</p></div>
+
+<div class="note"><h3>2 · Does drama cost legibility?</h3>
+<p>No, because the drama is all in the periphery and the scale. The vignette bottoms out at 62% black at the corners and is fully transparent across the middle 40%, so every number keeps its contrast — compare with <b>None</b>, the difference is focus, not readability.</p>
+<p>The clamp is the one honest tradeoff, and it has to hold the whole engaged range: the gate allows up to 6, so the scale clamps at <b>±8</b> — gate plus headroom, so a six-point game's dot still sits inside the chart instead of flat against the ceiling. Toggle <b>Clamp ±5</b> with the margin-5 state to see it go too far, where the line pins to the top edge and reads as clipped rather than dramatic.</p></div>
+
+<div class="note"><h3>3 · What signals "this is the end"?</h3>
+<p>The worm does, because it's plotted on a fixed game-length axis: at 1:12 the dot is <b>96% across</b> and there is a visible <b>wall</b> at the right edge. Remaining game is remaining space, and it has almost run out. No countdown, no timer duplication, no win probability.</p>
+<p>Two supporting moves: the axis labels fade out except <b>FINAL</b>, and the worm's caption switches from LEAD MARGIN to <b>ONE POSSESSION</b> or <b>TWO POSSESSIONS</b> — a fact about the score, not a prediction. The scoreboard keeps the actual clock; the overlay never repeats it.</p></div>
+
+<div class="note"><h3>4 · The gate, and what it protects</h3>
+<p>Clutch needs <b>both</b> conditions: under 2:00 <i>and</i> a margin of <b>6 or less</b> — two possessions, so a five-point game gets the treatment too. Set the state to <b>decided</b> — 17 points with the same 1:12 on the clock — and clutch stays off: normal frame, analysis allowed back on the stage. A blowout is not drama, and treating it as such is how a broadcast loses credibility.</p>
+<p>While engaged, cards keep firing at a tighter gap (3.4s vs 4.2s) but only Moments — Margin and Context are suppressed. Nobody wants a rebounding differential here. Foul trouble is the one board element that gains emphasis, since it's the constraint the coach is actually living with in the last minute.</p></div>`;
+
+render();
+</script>
+</body>
+</html>

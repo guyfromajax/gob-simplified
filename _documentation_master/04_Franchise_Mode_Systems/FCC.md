@@ -265,10 +265,13 @@ It renders an eight-card summary grid:
   - Player of the Game
   - POTG stat line
 
-#### Player Scoring
+#### Team Leaders
 
-- top 12 user-roster players sorted by PPG, then RT
-- displays player name and PPG only
+- provides `PTS`, `REB`, `AST`, and `DEF` category toggles; `PTS` is the default
+- lists up to 12 user-roster players, sorted by the selected season rate and then RT
+- `PTS`, `REB`, and `AST` display per-game averages to one decimal (`PPG`, `RPG`, `APG`)
+- `DEF` displays whole-number `DEF%` (`DEF_S / DEF_A`) and requires at least `4.0 DEFA` per game played to qualify
+- category changes are client-side over the already-loaded user roster, with no additional API request
 
 #### News
 
@@ -938,7 +941,7 @@ Recruiting is a first-class FCC presence all season. Levels are driven by **stat
 
 **The Wire card** spans two columns and renders `recruiting_lean_events` (Prompt 1) — gains *and* drops, newest first, with a phase-appropriate status line. `.fcc-drop-badge` / `.fcc-drop-row` mirror the existing `.fcc-newlean-*` geometry exactly, differing only in accent token, so drops can never render quieter than gains. Standings was retired to keep the grid at rows of 4; see `Season_Init_System.md` cross-reference below and §5.5 of the build plan.
 
-Grid: `Locker Room │ Next Game │ RECRUITING (span 2)` / `Rankings │ Last Game │ Player Scoring │ News`. Locker Room leads so Next Game sits directly above Last Game.
+Grid: `Locker Room │ Next Game │ RECRUITING (span 2)` / `Rankings │ Last Game │ Team Leaders │ News`. Locker Room leads so Next Game sits directly above Last Game.
 
 ### Walk-On Welcome
 

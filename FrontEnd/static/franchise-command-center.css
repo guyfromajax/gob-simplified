@@ -1264,6 +1264,40 @@ body.has-auth-bar #franchise-container {
   height: 100%;
 }
 
+#franchise-container #home-tab .fcc-home-leaders-head {
+  align-items: center;
+}
+
+.fcc-home-leaders-toggle {
+  display: flex;
+  gap: 3px;
+}
+
+.fcc-home-leaders-toggle button {
+  min-width: 32px;
+  height: 24px;
+  padding: 0 6px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(255, 255, 255, 0.58);
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', cursive;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+
+.fcc-home-leaders-toggle button:hover {
+  color: rgba(255, 255, 255, 0.9);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.fcc-home-leaders-toggle button[aria-pressed="true"] {
+  color: #ffffff;
+  border-color: var(--fcc-primary-top);
+  background: var(--fcc-primary-deep);
+}
+
 .fcc-home-team-stats-header,
 .fcc-home-team-stats-row {
   grid-template-columns: minmax(0, 1fr) 44px;

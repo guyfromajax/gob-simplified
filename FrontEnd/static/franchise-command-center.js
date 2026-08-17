@@ -105,6 +105,7 @@ let fccInitializationPromise = null;
 let playbooksWeekSavedCache = null;
 let fccPlaybooksSummaryCache = null;
 let userRosterPlayersCache = [];
+let homeTeamLeaderCategory = 'PTS';
 let userScheduleDataCache = null;
 let homeLastGameDataCache = null;
 let fccNewsListCache = null;
@@ -1206,35 +1207,83 @@ function renderHomeTeamStatsCard() {
     body.innerHTML = createEmptyHomeState('Loading...');
     return;
   }
+  const category = homeTeamLeaderCategory;
+  const categoryConfig = {
+    PTS: {
+      heading: 'PPG',
+      qualifies: (player) => getGamesPlayed(player) > 0,
+      value: (player) => Number(getPlayerSeasonStats(player).PTS || 0) / getGamesPlayed(player),
+      display: (value) => value.toFixed(1)
+    },
+    REB: {
+      heading: 'RPG',
+      qualifies: (player) => getGamesPlayed(player) > 0,
+      value: (player) => getPlayerTotalRebounds(player) / getGamesPlayed(player),
+      display: (value) => value.toFixed(1)
+    },
+    AST: {
+      heading: 'APG',
+      qualifies: (player) => getGamesPlayed(player) > 0,
+      value: (player) => Number(getPlayerSeasonStats(player).AST || 0) / getGamesPlayed(player),
+      display: (value) => value.toFixed(1)
+    },
+    DEF: {
+      heading: 'DEF%',
+      qualifies: (player) => {
+        const gp = getGamesPlayed(player);
+        return gp > 0 && (Number(getPlayerSeasonStats(player).DEF_A || 0) / gp) >= 4;
+      },
+      value: (player) => {
+        const stats = getPlayerSeasonStats(player);
+        const attempts = Number(stats.DEF_A || 0);
+        return attempts > 0 ? (Number(stats.DEF_S || 0) / attempts) * 100 : 0;
+      },
+      display: (value) => `${Math.round(value)}%`
+    }
+  };
+  const activeConfig = categoryConfig[category] || categoryConfig.PTS;
   const players = [...userRosterPlayersCache]
+    .filter(activeConfig.qualifies)
     .sort((a, b) => {
-      const bGp = getGamesPlayed(b);
-      const aGp = getGamesPlayed(a);
-      const bPpg = getPlayerPpg(b);
-      const aPpg = getPlayerPpg(a);
-      if (bGp === 0 && aGp === 0) {
-        return getPlayerRt(b) - getPlayerRt(a);
-      }
-      if (bPpg !== aPpg) return bPpg - aPpg;
+      const difference = activeConfig.value(b) - activeConfig.value(a);
+      if (difference !== 0) return difference;
       return getPlayerRt(b) - getPlayerRt(a);
     })
     .slice(0, 12);
+  if (!players.length) {
+    body.innerHTML = createEmptyHomeState(category === 'DEF' ? 'No qualifying defenders yet.' : 'No season stats yet.');
+    return;
+  }
   body.innerHTML = `
     <div class="fcc-home-team-stats">
       <div class="fcc-home-team-stats-header">
         <span>Player</span>
-        <span>PPG</span>
+        <span>${activeConfig.heading}</span>
       </div>
       <div class="fcc-home-list-scroll">
         ${players.map((player, index) => `
           <div class="fcc-home-team-stats-row">
             <span class="fcc-home-team-stats-name">${escapeHomeHtml(`${index + 1}. ${getPlayerDisplayName(player)}`)}</span>
-            <span class="fcc-home-team-stats-value">${escapeHomeHtml(formatPerGame(getPlayerSeasonStats(player).PTS || 0, getGamesPlayed(player)))}</span>
+            <span class="fcc-home-team-stats-value">${escapeHomeHtml(activeConfig.display(activeConfig.value(player)))}</span>
           </div>
         `).join('')}
       </div>
     </div>
   `;
+}
+
+function bindHomeTeamLeaderButtons() {
+  document.querySelectorAll('[data-home-leader-category]').forEach((button) => {
+    if (button.dataset.bound) return;
+    button.dataset.bound = '1';
+    button.addEventListener('click', () => {
+      homeTeamLeaderCategory = button.dataset.homeLeaderCategory || 'PTS';
+      document.querySelectorAll('[data-home-leader-category]').forEach((candidate) => {
+        candidate.setAttribute('aria-pressed', String(candidate.dataset.homeLeaderCategory === homeTeamLeaderCategory));
+      });
+      renderHomeTeamStatsCard();
+    });
+  });
 }
 
 function getNewLeanRecruitIdSet() {
@@ -1567,6 +1616,7 @@ async function renderNewsTab() {
 }
 
 async function renderHomeTab() {
+  bindHomeTeamLeaderButtons();
   renderHomeRankingsCard();
   renderHomeLockerRoomCard();
   renderHomeTeamStatsCard();

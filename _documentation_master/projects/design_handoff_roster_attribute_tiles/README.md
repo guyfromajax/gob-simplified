@@ -1,5 +1,8 @@
 # Handoff: Roster & Recruiting attribute-tile redesign
 
+> **Shipped.** This file is the original brief. For what actually landed — including where
+> it diverged from this document — see [AS_BUILT.md](AS_BUILT.md).
+
 ## Overview
 
 The 12 player attributes recently changed from plain numbers to colored tiles (`attr-tiles.css` +

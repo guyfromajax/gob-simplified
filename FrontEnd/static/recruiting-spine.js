@@ -220,10 +220,32 @@
           '<span class="wk">' + label + '</span><span class="nm">' + esc(s.nm) + '</span></div>';
       }).join('');
 
-      var orient = phase === 'passive'
-        ? '<strong>Why can\'t I invite yet?</strong> It\'s Week ' + esc(week) +
-          '. Invites begin Week 20 — ' + esc(p.next.toLowerCase()) + '.'
-        : '<strong>You\'re in ' + esc(p.name) + '.</strong> ' + esc(p.next) + '.';
+      // Weeks 27-34 are Passive mechanics again, but AFTER Invite Season. Asking "why
+      // can't I invite yet?" there and pointing at Week 20 sends the player backwards to
+      // a week already gone, so the postseason gets its own forward-looking line (the
+      // FCC strip already special-cases the same stretch). Both weeks are read off SEGS
+      // rather than hardcoded, so moving a segment moves the copy with it.
+      var segFor = function (key) {
+        for (var i = 0; i < SEGS.length; i++) { if (SEGS[i].key === key) return SEGS[i]; }
+        return null;
+      };
+      var inviteSeg = segFor('invite');
+      var daySeg = segFor('day');
+      var postseason = phase === 'passive' && inviteSeg && week > inviteSeg.hi;
+
+      var orient;
+      if (postseason) {
+        orient = '<strong>You\'re in the postseason.</strong> ' +
+          (daySeg ? 'Signing Day is Week ' + esc(daySeg.lo) + '.' : esc(p.next) + '.');
+      } else if (phase === 'passive') {
+        // Both remaining branches state the milestone once, from PHASES[].next — this
+        // one used to hardcode "Invites begin Week 20" and append p.next as well, so the
+        // week appeared twice and the two halves could drift apart.
+        orient = '<strong>Why can\'t I invite yet?</strong> It\'s Week ' + esc(week) +
+          '. ' + esc(p.next) + '.';
+      } else {
+        orient = '<strong>You\'re in ' + esc(p.name) + '.</strong> ' + esc(p.next) + '.';
+      }
 
       return '' +
         '<div class="pstrip' + (open ? ' is-open' : '') + '">' +

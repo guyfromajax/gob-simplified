@@ -10902,9 +10902,16 @@ def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
         from BackEnd.utils.franchise_team_display import resolve_team_display
 
         display = resolve_team_display(franchise_id, top_lean)
-        name = str(display.get("name") or "").strip() or _resolve_team_name_from_any(top_lean)
-        # The shared resolver echoes the raw ref back when it can't find a team;
-        # never surface an id to the UI — that reads as a bug to the player.
+        name = str(display.get("name") or "").strip()
+        # The shared resolver echoes the raw ref back when it cannot find a team, so an
+        # echo means "unresolved", not "named". Testing only for an empty string left
+        # the fallback below unreachable and every such lean rendered as "--".
+        # Reached when the ref is not an ObjectId (team_id / name / code form), which
+        # resolve_team_display cannot look up at all.
+        if not name or name == str(top_lean):
+            name = _resolve_team_name_from_any(top_lean) or ""
+        # That helper echoes the ref as its own last resort; never surface an id to the
+        # UI — it reads as a bug to the player.
         doc["lean_display"] = "--" if not name or name == str(top_lean) else name
     else:
         doc["lean_display"] = "Open" if top_lean == "open" else "--"
@@ -10938,6 +10945,10 @@ def get_recruit(recruit_id: str, franchise_id: str = Query(...)):
                     team_name = str(
                         resolve_team_display(franchise_oid, signed_tid).get("name") or ""
                     ).strip()
+                    # An echoed ref means unresolved, not named — otherwise the raw
+                    # team_id wins over the name recorded at signing and reaches the UI.
+                    if team_name == str(signed_tid):
+                        team_name = ""
                 if not team_name:
                     team_name = str(signed_info.get("team_name") or "").strip()
                 doc["is_signed"] = True
