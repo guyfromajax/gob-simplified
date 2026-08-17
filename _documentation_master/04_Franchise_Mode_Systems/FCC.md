@@ -361,7 +361,7 @@ The `Team Measures` tab is the current user-team attribute summary.
 
 It shows:
 
-- radar chart
+- radar chart scaled to the persisted core-eight range of **−20 to +20**; its dominant-shape pulse retains the prior proportional threshold at **+14** (70% of the positive range)
 - Shooting linear card
 - Rebounding linear card
 - Team Chemistry card
@@ -495,6 +495,8 @@ It renders:
 2. projected starting five (**image cards**, not the old attribute table)
 3. opponent Team Measures
 4. opponent Play Usage (Last Game)
+
+The opponent Team Measures radar uses the same shared **−20 to +20** renderer as the user-team Team Measures tab. Values are clamped only at the persisted core-eight limits, so values beyond the former ±10 range remain visually distinct.
 
 ### Opponent resolution
 

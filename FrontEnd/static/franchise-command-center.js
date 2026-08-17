@@ -4742,21 +4742,29 @@ const TEAM_MEASURES_RADAR_AXES = [
   { key: 'fight', label: 'Fight', angle: 180 },
   { key: 'pt_opp_modifier', label: 'P/T Offense', angle: 225 }
 ];
+const TEAM_MEASURES_RADAR_MIN = -20;
+const TEAM_MEASURES_RADAR_MAX = 20;
+const TEAM_MEASURES_RADAR_SPAN = TEAM_MEASURES_RADAR_MAX - TEAM_MEASURES_RADAR_MIN;
+// Preserve the former +7-of-10 visual threshold at the same 70% position.
+const TEAM_MEASURES_RADAR_DOMINANT_MIN = 14;
 
 function buildTeamMeasuresRadarMarkup(teamAttrs) {
   const center = 250;
   const radius = 164;
   const labelRadius = 204;
   const pointLabelRadius = 18;
-  const ringValues = [10, 6.7, 3.3, 0, -3.3, -6.7, -10];
+  const ringValues = [20, 13.3, 6.7, 0, -6.7, -13.3, -20];
 
   const values = TEAM_MEASURES_RADAR_AXES.map((axis) => Number(teamAttrs?.[axis.key] || 0));
-  const clampedValues = values.map((value) => Math.max(-10, Math.min(10, value)));
-  const dominantCount = values.filter((value) => Number(value) >= 7).length;
+  const clampedValues = values.map((value) => Math.max(TEAM_MEASURES_RADAR_MIN, Math.min(TEAM_MEASURES_RADAR_MAX, value)));
+  const dominantCount = values.filter((value) => Number(value) >= TEAM_MEASURES_RADAR_DOMINANT_MIN).length;
 
   function radiusForValue(value) {
-    const clamped = Math.max(-10, Math.min(10, Number(value) || 0));
-    return ((clamped + 10) / 20) * radius;
+    const clamped = Math.max(
+      TEAM_MEASURES_RADAR_MIN,
+      Math.min(TEAM_MEASURES_RADAR_MAX, Number(value) || 0)
+    );
+    return ((clamped - TEAM_MEASURES_RADAR_MIN) / TEAM_MEASURES_RADAR_SPAN) * radius;
   }
 
   function pointFor(angleDeg, value, extra = 0) {
@@ -4773,18 +4781,18 @@ function buildTeamMeasuresRadarMarkup(teamAttrs) {
       const point = pointFor(axis.angle, ringValue);
       return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
     }).join(' ');
-    const ringClass = ringValue === 10
+    const ringClass = ringValue === TEAM_MEASURES_RADAR_MAX
       ? ' tm-radar-ring-outer'
       : ringValue === 0
         ? ' tm-radar-ring-zero'
-        : ringValue === -10
+        : ringValue === TEAM_MEASURES_RADAR_MIN
           ? ' tm-radar-ring-inner'
           : '';
     return `<polygon class="tm-radar-ring${ringClass}" points="${points}" />`;
   }).join('');
 
   const axisLines = TEAM_MEASURES_RADAR_AXES.map((axis) => {
-    const point = pointFor(axis.angle, 10);
+    const point = pointFor(axis.angle, TEAM_MEASURES_RADAR_MAX);
     return `<line class="tm-radar-axis" x1="${center}" y1="${center}" x2="${point.x.toFixed(2)}" y2="${point.y.toFixed(2)}" />`;
   }).join('');
 
@@ -4794,7 +4802,7 @@ function buildTeamMeasuresRadarMarkup(teamAttrs) {
   }).join(' ');
 
   const labels = TEAM_MEASURES_RADAR_AXES.map((axis) => {
-    const point = pointFor(axis.angle, 10, labelRadius - radius);
+    const point = pointFor(axis.angle, TEAM_MEASURES_RADAR_MAX, labelRadius - radius);
     return `<text class="tm-radar-axis-label" x="${point.x.toFixed(2)}" y="${point.y.toFixed(2)}" text-anchor="middle" dominant-baseline="middle">${axis.label}</text>`;
   }).join('');
 
