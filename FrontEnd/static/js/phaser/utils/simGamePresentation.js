@@ -482,7 +482,10 @@ function updateTeamPanel(panelEl, teamPanel, awayColor, homeColor) {
     { key: 'paint', a: a.paint, h: h.paint, lowBetter: false, format: (v) => String(Math.round(v)) },
     { key: 'fg', a: a.fgPct, h: h.fgPct, lowBetter: false, rate: true, format: (v) => (Number(v) || 0).toFixed(1) },
     { key: 'tpm', a: a.tpm, h: h.tpm, lowBetter: false, rate: true, format: (v) => String(Math.round(v)) },
-    { key: 'fouls', a: a.fouls, h: h.fouls, lowBetter: true, format: (v) => String(Math.round(v)) },
+    // Fouls read as accumulating trouble, so the bar grows toward the team in it, in that
+    // team's colour. `lowBetter` still governs the white value highlight — fewer fouls is
+    // still the better number — so only the pill is inverted, not the judgement.
+    { key: 'fouls', a: a.fouls, h: h.fouls, lowBetter: true, pullToHigh: true, format: (v) => String(Math.round(v)) },
   ];
   specs.forEach((spec) => {
     const row = panelEl.querySelector(`.tsr[data-stat="${spec.key}"]`);
@@ -502,12 +505,13 @@ function updateTeamPanel(panelEl, teamPanel, awayColor, homeColor) {
     if (!pull) return;
     const edge = Math.abs(av - hv);
     const widthPct = edge === 0 ? 0 : Math.min(46, 8 + edge * 2.5);
+    const pullsAway = spec.pullToHigh ? av > hv : aLead;
     if (edge === 0) {
       pull.style.width = '0';
       pull.style.left = '50%';
       pull.style.right = 'auto';
       pull.style.background = 'transparent';
-    } else if (aLead) {
+    } else if (pullsAway) {
       pull.style.right = '50%';
       pull.style.left = 'auto';
       pull.style.width = `${widthPct}%`;

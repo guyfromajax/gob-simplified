@@ -423,9 +423,16 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     atol: sb.atol, htol: sb.htol,
   });
 
+  // TEAM FOULS on the panel is a WHOLE-GAME total, and deliberately not the same number
+  // the scoreboard shows. The scoreboard reads the engine's `home_team_fouls` /
+  // `away_team_fouls`, which reset every quarter because they drive the bonus. The panel
+  // is a box score: it carries `team_totals[].F`, which the engine sums across all
+  // players for the full game (team_manager.get_team_game_stats). Both are engine-owned
+  // and merely sampled here — the FE still derives neither. This previously overrode the
+  // game total with the per-quarter value, so the panel just mirrored the scoreboard.
   const teamPanelSnapshot = () => ({
-    away: { ...teamPanel.away, fouls: sb.afoul },
-    home: { ...teamPanel.home, fouls: sb.hfoul },
+    away: { ...teamPanel.away },
+    home: { ...teamPanel.home },
   });
 
   const wormMeta = (elapsed) => {

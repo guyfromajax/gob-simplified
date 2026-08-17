@@ -114,10 +114,10 @@
     }
 
     var wall = parseNaiveWallTimeToUtcMs(trimmed, tz);
-    if (wall != null) return wall;
-
-    var fallback = Date.parse(trimmed);
-    return isNaN(fallback) ? null : fallback;
+    // Never fall back to Date.parse for a naive value: that would interpret the
+    // schedule in the viewer's local zone and violate the New York-time contract.
+    // Invalid or nonexistent DST wall times fail closed instead.
+    return wall;
   }
 
   function getDismissedIdKey() {

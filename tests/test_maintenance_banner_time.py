@@ -23,12 +23,14 @@ const summerWindow = m.getWarningWindowStartMs({{
   starts_at_timezone: 'America/New_York',
   show_minutes_before: 60
 }});
+const nonexistentDstTime = m.safeParseTimeMs('2026-03-08T02:30:00', 'America/New_York');
 console.log(JSON.stringify({{
   zone: m.defaultWallClockTimeZone,
   winter: new Date(winter).toISOString(),
   summer: new Date(summer).toISOString(),
   winterWindow: new Date(winterWindow).toISOString(),
-  summerWindow: new Date(summerWindow).toISOString()
+  summerWindow: new Date(summerWindow).toISOString(),
+  nonexistentDstTime
 }}));
 """
     result = subprocess.run(
@@ -50,6 +52,7 @@ def test_new_york_wall_clock_handles_est_and_edt_with_sixty_minute_window():
         "summer": "2026-08-15T19:00:00.000Z",  # 3 PM EDT (UTC-4)
         "winterWindow": "2026-01-15T19:00:00.000Z",
         "summerWindow": "2026-08-15T18:00:00.000Z",
+        "nonexistentDstTime": None,
     }
 
 

@@ -40,14 +40,25 @@ async function mount(page, { width = 1920, height = 1080, frames } = {}) {
   await page.setViewportSize({ width, height });
   await page.goto('/');
   await page.setContent('<div id="scoreboard" style="height:120px;background:#111"></div>');
+  // Playback holds each frame 130-900ms and then DISSOLVES AND REMOVES the overlay. A
+  // one-frame timeline therefore self-destructs about a second after mount, which the
+  // measurements below would lose a race against. Repeat the resting frame so playback
+  // cannot finish while the test is still looking at it.
+  const list = frames || [frame()];
+  const padded = Array.from({ length: 400 }, (_, i) => list[Math.min(i, list.length - 1)]);
   await page.evaluate(async ({ teams, frames }) => {
     const mod = await import('/js/phaser/utils/simGamePresentation.js');
     window.__mod = mod;
     // Never resolves during the test; we only inspect the mounted DOM.
     mod.showSimGamePresentation({ teams, frames }, { driveScoreboard: false });
-  }, { teams: TEAMS, frames: frames || [frame()] });
+  }, { teams: TEAMS, frames: padded });
   await page.waitForSelector('.sgp-root [data-fit]');
   await page.waitForTimeout(250);
+  const alive = await page.evaluate(() => {
+    const r = document.querySelector('.sgp-root');
+    return !!r && !r.classList.contains('dissolving');
+  });
+  expect(alive, 'overlay tore itself down before the assertions ran').toBe(true);
 }
 
 const box = (page, sel) => page.evaluate((s) => {
@@ -281,5 +292,70 @@ test.describe('worm floor converges', () => {
     // 3:06 of Q1 = 174s of 1920. Slope scales as 1/maxAbs, so the reduction is 6/maxAbs.
     const at306 = await impliedMax(page, 174 / 1920, 2);
     expect(6 / at306).toBeLessThan(0.5);            // at least halves the slope
+  });
+});
+
+test.describe('team stats: fouls pill', () => {
+  const AWAY_COLOR = 'rgb(158, 27, 50)';   // #9E1B32
+  const HOME_COLOR = 'rgb(31, 138, 91)';   // #1F8A5B
+
+  async function foulsRow(page, awayFouls, homeFouls) {
+    const side = (f) => ({ reb: 10, to: 5, fb: 4, paint: 8, fgm: 9, fga: 20, fgPct: 45, tpm: 2, fouls: f });
+    await mount(page, { frames: [frame({ teamPanel: { away: side(awayFouls), home: side(homeFouls) } })] });
+    await page.click('.sgp-root .ctlseg [data-v="team"]');
+    await page.waitForTimeout(150);
+    return page.evaluate(() => {
+      const row = document.querySelector('.tsr[data-stat="fouls"]');
+      const pull = row.querySelector('.pull');
+      const cs = getComputedStyle(pull);
+      const rowBox = row.querySelector('.tug').getBoundingClientRect();
+      const pullBox = pull.getBoundingClientRect();
+      return {
+        bg: cs.backgroundColor,
+        width: cs.width,
+        // Which half of the track the bar occupies.
+        towardAway: pullBox.left + pullBox.width / 2 < rowBox.left + rowBox.width / 2,
+        awayLead: row.querySelector('.va').classList.contains('lead'),
+        homeLead: row.querySelector('.vh').classList.contains('lead'),
+      };
+    });
+  }
+
+  test('grows toward the team with MORE fouls, in that team colour', async ({ page }) => {
+    const homeInTrouble = await foulsRow(page, 2, 7);
+    expect(homeInTrouble.towardAway).toBe(false);      // pulls to the home side
+    expect(homeInTrouble.bg).toBe(HOME_COLOR);
+
+    const awayInTrouble = await foulsRow(page, 8, 3);
+    expect(awayInTrouble.towardAway).toBe(true);
+    expect(awayInTrouble.bg).toBe(AWAY_COLOR);
+  });
+
+  test('the white value highlight still marks the FEWER-fouls team', async ({ page }) => {
+    const m = await foulsRow(page, 2, 7);
+    expect(m.awayLead).toBe(true);    // away has fewer fouls — still the better number
+    expect(m.homeLead).toBe(false);
+  });
+
+  test('level fouls leave the pill empty', async ({ page }) => {
+    const m = await foulsRow(page, 4, 4);
+    expect(m.width).toBe('0px');
+  });
+
+  test('turnovers are untouched — still toward the team with FEWER', async ({ page }) => {
+    const side = (to) => ({ reb: 10, to, fb: 4, paint: 8, fgm: 9, fga: 20, fgPct: 45, tpm: 2, fouls: 4 });
+    await mount(page, { frames: [frame({ teamPanel: { away: side(2), home: side(9) } })] });
+    await page.click('.sgp-root .ctlseg [data-v="team"]');
+    await page.waitForTimeout(150);
+    const m = await page.evaluate(() => {
+      const row = document.querySelector('.tsr[data-stat="to"]');
+      const pull = row.querySelector('.pull');
+      const track = row.querySelector('.tug').getBoundingClientRect();
+      const box = pull.getBoundingClientRect();
+      return { bg: getComputedStyle(pull).backgroundColor,
+               towardAway: box.left + box.width / 2 < track.left + track.width / 2 };
+    });
+    expect(m.towardAway).toBe(true);   // away committed fewer turnovers
+    expect(m.bg).toBe(AWAY_COLOR);
   });
 });

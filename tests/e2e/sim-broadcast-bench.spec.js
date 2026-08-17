@@ -32,6 +32,14 @@ function summary(turns) {
   };
 }
 
+/** team_totals rows are keyed by core team name and are cumulative for the whole game. */
+function totals({ homeF = 0, awayF = 0 } = {}) {
+  const row = (F) => ({ PTS: 20, FGM: 8, FGA: 18, '3PTM': 2, FTM: 2, FTA: 3,
+                        OREB: 3, DREB: 7, REB: 10, AST: 5, STL: 2, BLK: 1, TO: 4,
+                        F, PIP: 8, FB_PTS: 4, DEF_A: 12, DEF_S: 5 });
+  return { Lancaster: row(homeF), Xavier: row(awayF) };
+}
+
 const turn = (over = {}) => ({
   quarter: 1, clock: '3:06',
   score: { home: 4, away: 2 },
@@ -100,4 +108,53 @@ test('the most recent exit is first on the rail', async ({ page }) => {
   expect(names[0]).toBe('Home 1');          // left most recently
   expect(names).toContain('Home 3');
   expect(names.indexOf('Home 1')).toBeLessThan(names.indexOf('Home 3'));
+});
+
+test.describe('team fouls: panel is the game, scoreboard is the quarter', () => {
+  async function panelAndBoard(page, turns) {
+    await page.goto('/');
+    return page.evaluate(async (sum) => {
+      const mod = await import('/js/phaser/utils/simTimelineAssembler.js');
+      const tl = mod.buildSimTimeline([sum], { homeTeamName: 'Lancaster', awayTeamName: 'Xavier' });
+      const f = tl.frames[tl.frames.length - 1];
+      return {
+        panelAway: f.teamPanel.away.fouls, panelHome: f.teamPanel.home.fouls,
+        boardAway: f.score.afoul, boardHome: f.score.hfoul,
+      };
+    }, summary(turns));
+  }
+
+  test('the panel carries the whole-game total, not the quarter count', async ({ page }) => {
+    // Q2, quarter counters already reset; the game totals keep climbing.
+    const m = await panelAndBoard(page, [
+      turn({ quarter: 1, clock: '1:00', team_totals: totals({ homeF: 6, awayF: 5 }),
+             home_team_fouls: 6, away_team_fouls: 5 }),
+      turn({ quarter: 2, clock: '7:40', team_totals: totals({ homeF: 9, awayF: 8 }),
+             home_team_fouls: 3, away_team_fouls: 3 }),
+    ]);
+    expect(m.panelHome).toBe(9);   // whole game
+    expect(m.panelAway).toBe(8);
+    expect(m.boardHome).toBe(3);   // this quarter only
+    expect(m.boardAway).toBe(3);
+  });
+
+  test('the two agree in Q1, before any reset has happened', async ({ page }) => {
+    const m = await panelAndBoard(page, [
+      turn({ quarter: 1, clock: '5:00', team_totals: totals({ homeF: 4, awayF: 2 }),
+             home_team_fouls: 4, away_team_fouls: 2 }),
+    ]);
+    expect(m.panelHome).toBe(m.boardHome);
+    expect(m.panelAway).toBe(m.boardAway);
+  });
+
+  test('the panel total never decreases across a quarter break', async ({ page }) => {
+    const m = await panelAndBoard(page, [
+      turn({ quarter: 1, clock: '0:30', team_totals: totals({ homeF: 7, awayF: 6 }),
+             home_team_fouls: 7, away_team_fouls: 6 }),
+      turn({ quarter: 2, clock: '7:50', team_totals: totals({ homeF: 7, awayF: 6 }),
+             home_team_fouls: 0, away_team_fouls: 0 }),
+    ]);
+    expect(m.panelHome).toBe(7);
+    expect(m.boardHome).toBe(0);   // reset for the new quarter
+  });
 });

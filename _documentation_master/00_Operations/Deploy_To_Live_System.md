@@ -80,6 +80,10 @@ Edit only `FrontEnd/static/config/maintenance.json`:
 `2026-08-20T15:00:00` means 3:00 PM ET on August 20. The parser applies EST or EDT for
 that date automatically.
 
+Choose a real New York wall time. A nonexistent clock time during the spring DST jump
+(for example, 2:30 AM on the transition date) is rejected rather than being interpreted
+in the operator's or user's local timezone.
+
 The `id` must be new so users who dismissed an earlier warning see this one. The banner
 polls once per minute. It is intentionally suppressed on `court.html`, `set-lineup.html`,
 and `game-plan.html` so an active game is not interrupted.
