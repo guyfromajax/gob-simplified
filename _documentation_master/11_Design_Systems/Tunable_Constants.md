@@ -803,7 +803,9 @@ Cross-ref: **OREB** shared rebound scoring / bounce / OTB / `OREB_REBOUND_SCORE_
 
 ## Sim Game Experience
 
-Playback pacing for the **Sim Full Game / Sim Rest of Game** broadcast overlay (Act 2). All six live at the top of `FrontEnd/static/js/phaser/utils/simGamePresentation.js`. Stat bars, on-court lineups, worm, scoreboard, and spotlight all update **together, once per emitted turn** (one frame = one `turns[]` entry); a quarter is normalized to `QUARTER_MS` regardless of how many turns it contains.
+Playback pacing for the **Sim Full Game / Sim Rest of Game** broadcast overlay (Act 2). All seven live at the top of `FrontEnd/static/js/phaser/utils/simGamePresentation.js`. Stat bars, on-court lineups, worm, scoreboard, and spotlight all update **together, once per emitted turn** (one frame = one `turns[]` entry); a quarter is normalized to `QUARTER_MS` regardless of how many turns it contains.
+
+> Full system documentation: [`06_Gameplay_Systems/Sim_Game_Presentation_System.md`](../06_Gameplay_Systems/Sim_Game_Presentation_System.md). This section is pacing only.
 
 | Constant | File | Value | Affects | Effect |
 |---|---|---|---|---|
@@ -816,6 +818,13 @@ Playback pacing for the **Sim Full Game / Sim Rest of Game** broadcast overlay (
 | `LINEUP_CHANGE_MS` | simGamePresentation.js | `1000` | playback | Extra hold on a frame where the on-court five changed (foul-out swap / sub) so the swap reads. Overrides the normal per-turn hold on those frames, so a quarter with lineup changes runs slightly over `QUARTER_MS` (≈ `LINEUP_CHANGE_MS − normal per-turn hold` per change). |
 
 **Whole game ≈ ~80–85s** (4 × ~18s + three break cards + tip-off + final). Bars ease via a 0.5s CSS `width` transition between emitted values; reduced-motion fast-forwards (live ~40ms, holds ~400ms).
+
+### Not tunable here, but easily mistaken for pacing
+
+- **Skip.** A click anywhere on the overlay jumps to the final frame and holds `FINAL_MS`. Undocumented in the UI, no affordance, and contrary to the original "no skip in v1" decision — see the system doc §8.
+- **Full-width footprint.** The overlay spans the whole viewport below the scoreboard, covering the court *and* both side panels; only the scoreboard stays live. Its top offset is read from the scoreboard's measured height at mount and on resize, not from `--scoreboard-height`.
+- **Moments ticker.** Not built. `.ticker` is a fixed 44px empty slot, held so a later build cannot reflow the layout. Every frame carries `ticker: null`.
+- **Team fouls and timeouts are emitted, not derived.** `_append_turn()` stamps `home_team_fouls` / `away_team_fouls` / `home_timeouts` / `away_timeouts` per turn. Team fouls reset each quarter in the engine, so no client-side sum of player `F` can reproduce them; do not reintroduce one.
 
 ---
 

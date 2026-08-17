@@ -286,12 +286,12 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
       // stable, readable order: highest scorers first
       .sort((a, b) => b.pts - a.pts);
 
-  const teamFouls = (teamKey) =>
-    Object.keys(cum).reduce(
-      (sum, id) => (teamOf(id) === teamKey ? sum + num(cum[id].F) : sum),
-      0
-    );
-
+  // Team fouls and timeouts are NOT derived here. Both are engine-owned and
+  // emitted per turn (`home_team_fouls` / `away_team_fouls` / `home_timeouts` /
+  // `away_timeouts`, stamped in GameManager._append_turn). Summing player F on
+  // the client cannot reproduce the per-quarter team-foul reset, and a single
+  // end-state timeout read spoils the whole broadcast with the final value.
+  // We sample the emitted numbers and carry them forward; we never compute them.
   const timeoutsFor = (summary, teamId) => {
     const t = summary && summary.teams && summary.teams[nid(teamId)];
     return t && t.timeouts != null ? num(t.timeouts) : null;
@@ -352,6 +352,9 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
   // the last known scoreboard values instead of resetting to 0-0 / 0:00.
   const sb = {
     away: 0, home: 0, clock: (openTurn && openTurn.clock) || '8:00', quarter: 1, shot: 24,
+    // Pre-tip defaults. Helper turns and any pre-stamp cached game omit the
+    // emitted fields, so these are carry-forward seeds, not derivations.
+    afoul: 0, hfoul: 0,
     atol: timeoutsFor(last, last && last.away_team_id),
     htol: timeoutsFor(last, last && last.home_team_id),
   };
@@ -364,11 +367,16 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     if (turn && turn.clock) sb.clock = turn.clock;
     if (turn && turn.quarter != null) sb.quarter = num(turn.quarter);
     if (turn && turn.shot_clock_remaining != null) sb.shot = num(turn.shot_clock_remaining);
+    // Emitted-only, carry forward when absent (helper turns / legacy payloads).
+    if (turn && turn.away_team_fouls != null) sb.afoul = num(turn.away_team_fouls);
+    if (turn && turn.home_team_fouls != null) sb.hfoul = num(turn.home_team_fouls);
+    if (turn && turn.away_timeouts != null) sb.atol = num(turn.away_timeouts);
+    if (turn && turn.home_timeouts != null) sb.htol = num(turn.home_timeouts);
   };
   const scoreSnapshot = () => ({
     away: sb.away, home: sb.home, clock: sb.clock,
     quarter: quarterLabel(sb.quarter), shot: sb.shot,
-    afoul: teamFouls('away'), hfoul: teamFouls('home'),
+    afoul: sb.afoul, hfoul: sb.hfoul,
     atol: sb.atol, htol: sb.htol,
   });
 
@@ -389,10 +397,17 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
         clock: (openTurn.clock) || '8:00',
         quarter: quarterLabel(openTurn.quarter || 1),
         shot: 24,
+        // Tip-off is 0-0 on fouls by definition. Timeouts come from the opening
+        // turn's emitted stamp; the summary read is a legacy fallback only (it
+        // carries the END-of-quarter value, which would spoil the pre-tip frame).
         afoul: 0,
         hfoul: 0,
-        atol: timeoutsFor(first, first.away_team_id),
-        htol: timeoutsFor(first, first.home_team_id),
+        atol: openTurn.away_timeouts != null
+          ? num(openTurn.away_timeouts)
+          : timeoutsFor(first, first.away_team_id),
+        htol: openTurn.home_timeouts != null
+          ? num(openTurn.home_timeouts)
+          : timeoutsFor(first, first.home_team_id),
       },
       worm: [0],
       away: POSITIONS.map((pos, i) =>

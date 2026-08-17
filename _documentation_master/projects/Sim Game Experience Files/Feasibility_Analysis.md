@@ -1,5 +1,31 @@
 # Sim Game Presentation — Feasibility Analysis (response to C+C Prompt 1)
 
+> ## ⚠️ HISTORICAL — pre-build document, retained for reasoning only
+>
+> **Written before implementation. The feature has since shipped.** Where this document
+> and the code disagree, **the code is right**. Current behaviour is documented in
+> [`06_Gameplay_Systems/Sim_Game_Presentation_System.md`](../../06_Gameplay_Systems/Sim_Game_Presentation_System.md);
+> pacing lives in [`11_Design_Systems/Tunable_Constants.md`](../../11_Design_Systems/Tunable_Constants.md).
+> This file is kept because the Q1–Q10 investigation explains *why* the architecture is
+> shaped the way it is — it is not a description of what exists.
+>
+> **What changed between this analysis and the shipped build:**
+>
+> | This doc says | Shipped |
+> |---|---|
+> | RT bands: adopt the canonical **4-band** `rtBucket.js` map | `rtBucket.js` now runs `RT_DISPLAY_MODE = 'letter'` — **9 grades over 4 colours** (A++→F), per the Styleguide's RT Letter-Grade Scale. The badge shows a letter, not a number. Q7's colour reasoning still holds; the band count does not. |
+> | Overlay mounts as a body-level fixed overlay over the court region | Correct, but **full-width** — it covers the court *and* both side panels below the scoreboard. Only the scoreboard stays live. |
+> | Q9: Moments derived client-side from `turns[]`, random stub acceptable for review | **Not built at all.** No stub shipped. `.ticker` is a fixed 44px empty slot; every frame carries `ticker: null`. |
+> | Chunk 0 backend: add `rt` **and** "confirm per-turn team fouls/timeouts for the scoreboard" | `rt` shipped. The team fouls/timeouts half was **missed** — the client derived team fouls by summing player `F` (which never resets per quarter) and read timeouts once from the final summary (which spoiled the end state from frame one). Both are now emitted per turn from `_append_turn()`. |
+> | Chunk 4 — Moments/ticker | Skipped. Chunks 0–3, 5, 6 shipped. |
+> | Design ↔ data map row `p.spot` — POTG on partial cumulative stats | Correct, with one clarification: the spotlight scores **only the ten players currently on court**, not the whole roster. |
+>
+> **Confirmed accurate and still load-bearing:** Q1 (DOM, not Phaser), Q2 (the `bootGame.js`
+> seam — line numbers have drifted, the seam has not), Q3–Q6, Q8, Q10, and the "Assumptions"
+> block, whose *"run the quarter loop to completion, then play the assembled timeline"*
+> recommendation is exactly what shipped.
+
+
 **Verdict: highly feasible, low backend risk.** Act 2 is a DOM overlay reusing Act 1's machinery, and the sim **already emits a real per-possession timeline** — the broadcast plays back real data, no re-simulation or synthesis. Almost every value the design needs already exists and is already streamed. There is **one** real data-plumbing gap (roster RT not in the game payload) and **three** design reconciliations to settle before building.
 
 ---

@@ -88,21 +88,25 @@ The **Sim Quarter** column documents the dormant logic (the button is always hid
 
 **Frontend** (`bootGame.js` - `handleSimFullGame()`):
 1. User clicks `.sim-full-game-button` → calls `handleSimFullGame()`
-2. Loops from current quarter through Q4
-3. For each quarter:
-   - Shows "Simulating Q1...", "Simulating Q2...", etc. (stops at Q4, no Q5+)
-   - Auto-generates lineups
+2. Forks on `isSimFullGame = Math.max(0, quarter) < 2`; Sim Full Game raises the opaque bridge cover immediately
+3. Loops from current quarter through Q4:
+   - Auto-generates lineups (Q1 uses the user's set lineup and game plan)
    - POST to `/api/simulate-quarter` with `full_sim: true`
-   - Waits for response
+   - Collects each response into `quarterSummaries[]` for the broadcast
+   - After the **Q1** response, launches the Act 1 cover (it needs the game set up so `/lineup-for-matchups?prefer_opening=1` returns the tip-off five)
    - Increments to next quarter
 4. Stops when `lastSummary.is_final === true`
-5. Clears status text
-6. Navigates to completion popup
+5. Resolves the sim-done promise, releasing the held veil; awaits the cover's dissolve
+6. `buildSimTimeline(quarterSummaries)` → `showSimGamePresentation(timeline)` — the Act 2 broadcast
+7. `handleGameCompletion(...)` → completion popup
 
-**Status Text Display**:
-- Shows "Simulating Q1...", "Simulating Q2...", "Simulating Q3...", "Simulating Q4..." during simulation
-- Does NOT show for Sim Quarter button (uses text scroll popup instead)
-- When transitioning to computer games (Tournament/Franchise modes), shows "Simulating Computer Games..." instead of "Simulating Q5..."
+**Presentation** (see [Sim Game Presentation System](./Sim_Game_Presentation_System.md)):
+- The user **never sees** "Simulating Qn" on this path. Both variants are covered for the entire sim:
+  - **Sim Full Game** — opaque bridge cover on button press → Act 1 starting-five reveal → `Tip Off` → veil **held on the sim's completion**, not a timer.
+  - **Sim Rest Of Game** — `PREPPING SIM` veil, same hold.
+- On sim completion the cover dissolves into the **Act 2 broadcast** (~80–85s), which drives the live scoreboard from emitted frames, then hands off to `handleGameCompletion()` unchanged.
+- Every stage is self-guarded: any failure degrades straight to the completion popup.
+- The `#sim-status` element and its "Simulating Qn" / "Simulating Computer Games..." strings still exist in code and are still cleared by the loop, but are hidden behind the covers on this path.
 
 **Backend**: Same as Sim Quarter (calls `/api/simulate-quarter` multiple times)
 

@@ -903,6 +903,24 @@ class GameManager:
             except Exception as e:
                 logging.error(f"⚠️ Team momentum stamp failed: {e}")
 
+        # Stamp live team fouls + timeouts on every turn so the scoreboard is a
+        # pure render of engine state rather than a frontend derivation (UESS §1).
+        # `Team.team_fouls` is engine-owned and resets each quarter (main.py); a
+        # summed-player-fouls derivation on the client cannot reproduce that reset
+        # and never resets. `Team.timeouts` starts at 4 and carries the whole game.
+        # Flat home/away ints mirror the home_team_momentum/away_team_momentum
+        # convention directly above — no name-keyed lookup for consumers to match.
+        # Additive only: no RNG draws, no gameplay reads, four attribute reads per
+        # turn. Draw-preserving, so seeded exact-diff must stay byte-identical.
+        if isinstance(turn_result, dict):
+            try:
+                turn_result["home_team_fouls"] = int(getattr(self.home_team, "team_fouls", 0) or 0)
+                turn_result["away_team_fouls"] = int(getattr(self.away_team, "team_fouls", 0) or 0)
+                turn_result["home_timeouts"] = int(getattr(self.home_team, "timeouts", 4) or 0)
+                turn_result["away_timeouts"] = int(getattr(self.away_team, "timeouts", 4) or 0)
+            except Exception as e:
+                logging.error(f"⚠️ Team fouls/timeouts stamp failed: {e}")
+
         if isinstance(turn_result, dict):
             sync_lineup_coords_from_turn(self, turn_result)
 
