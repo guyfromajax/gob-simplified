@@ -16,17 +16,25 @@
  *
  * The renderer consumes `frames` + `teams`; it never sees a raw API shape.
  *
- * Frame (`st`) shape — mirrors sim-presentation.js:
- *   { phase, quarter, score:{away,home,clock,quarter,shot,atol,afoul,htol,hfoul},
- *     worm:[margin...], away:[p×5], home:[p×5], benchAway:[c], benchHome:[c],
- *     ticker:null,               // moments tabled (Prompt 2 §2) — slot stays empty
- *     breakSummary?, final? }
- *   player p: { pos,name,jersey,rt,pts,reb,ast,def,fouls,hot,cold,out,sub,spot }
+ * Frame shape (slice 1):
+ *   { phase, quarter, score:{...},
+ *     worm:{ samples:[{elapsed,margin}], elapsed, domain, progress },
+ *     teamPanel:{ away:{reb,to,fb,paint,fgm,fga,fgPct,tpm,fouls}, home:{...} },
+ *     away:[p×5], home:[p×5], benchAway:[c], benchHome:[c],
+ *     ticker:null, breakSummary?, final? }
+ *   player p: { id,pos,name,jersey,rt,pts,reb,ast,def,fouls,hot,cold,out,sub,spot }
  *   bench chip c: { name,pts,reb,out }
  */
 
 import { calculatePotgPoints } from '../../shared/potg.js';
 import { readableTeamPresentationColor } from './matchupsUiShared.js';
+import {
+  REG_Q_SEC,
+  elapsedGameSeconds,
+  wormDomainSeconds,
+} from './simWormTime.js';
+
+export { REG_Q_SEC, OT_Q_SEC, clockToSeconds, elapsedGameSeconds, wormDomainSeconds } from './simWormTime.js';
 
 const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const MO_GLYPH_THRESHOLD = 4; // |MO| >= 4 → hot/cold glyph — matches existing MO_GLYPH_THRESHOLD (gameScene.js:221), the ±5-scale box-score convention
@@ -36,6 +44,24 @@ const nid = (v) => (v == null ? '' : String(v));
 function num(v) {
   const n = Number(v);
   return Number.isFinite(n) ? n : 0;
+}
+
+/** Snapshot the seven team-panel stats from an emitted team_totals row. */
+function teamPanelFromTotals(row) {
+  const r = row || {};
+  const fgm = num(r.FGM);
+  const fga = num(r.FGA);
+  return {
+    reb: num(r.REB) || num(r.OREB) + num(r.DREB),
+    to: num(r.TO),
+    fb: num(r.FB_PTS),
+    paint: num(r.PIP),
+    fgm,
+    fga,
+    fgPct: fga > 0 ? (fgm / fga) * 100 : 0,
+    tpm: num(r['3PTM'] != null ? r['3PTM'] : r['3PM']),
+    fouls: num(r.F),
+  };
 }
 
 // RT source: the game payload now carries `rt` per player (backend Chunk 0,
@@ -221,9 +247,21 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
   const teamOf = (id) => (directory[id] && directory[id].team) || null;
   const everPlayed = new Set(); // ids seen on court at any point
 
-  const worm = [];
+  const worm = []; // { elapsed, margin }[] — x is game time, never sample index
   const frames = [];
   const reconciliation = { checks: 0, drifts: [] };
+  let teamPanel = {
+    away: { reb: 0, to: 0, fb: 0, paint: 0, fgm: 0, fga: 0, fgPct: 0, tpm: 0, fouls: 0 },
+    home: { reb: 0, to: 0, fb: 0, paint: 0, fgm: 0, fga: 0, fgPct: 0, tpm: 0, fouls: 0 },
+  };
+  let maxQuarterSeen = 1;
+
+  const applyTeamTotals = (turn) => {
+    const tt = turn && turn.team_totals;
+    if (!tt || typeof tt !== 'object') return;
+    if (tt[awayName]) teamPanel = { ...teamPanel, away: teamPanelFromTotals(tt[awayName]) };
+    if (tt[homeName]) teamPanel = { ...teamPanel, home: teamPanelFromTotals(tt[homeName]) };
+  };
 
   // Synthetic pre-tip zero frame (phase pretip) from the opening lineup of Q1.
   const first = summaries[0] || {};
@@ -380,6 +418,21 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     atol: sb.atol, htol: sb.htol,
   });
 
+  const teamPanelSnapshot = () => ({
+    away: { ...teamPanel.away, fouls: sb.afoul },
+    home: { ...teamPanel.home, fouls: sb.hfoul },
+  });
+
+  const wormMeta = (elapsed) => {
+    const domain = wormDomainSeconds(maxQuarterSeen);
+    return {
+      samples: worm.map((s) => ({ ...s })),
+      elapsed,
+      domain,
+      progress: domain > 0 ? elapsed / domain : 0,
+    };
+  };
+
   // ── Pre-tip frame ──────────────────────────────────────────────────────
   // Tip-off zero-state only makes sense when starting at Q1 (Sim Full Game); a
   // mid-game Sim Rest join begins directly at its quarter's first frame.
@@ -409,7 +462,11 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
           ? num(openTurn.home_timeouts)
           : timeoutsFor(first, first.home_team_id),
       },
-      worm: [0],
+      worm: wormMeta(0),
+      teamPanel: {
+        away: { reb: 0, to: 0, fb: 0, paint: 0, fgm: 0, fga: 0, fgPct: 0, tpm: 0, fouls: 0 },
+        home: { reb: 0, to: 0, fb: 0, paint: 0, fgm: 0, fga: 0, fgPct: 0, tpm: 0, fouls: 0 },
+      },
       away: POSITIONS.map((pos, i) =>
         buildPlayer(nid(openTurn.away_lineup && openTurn.away_lineup[pos]), pos, mo, null, new Set(), new Set())
       ),
@@ -455,6 +512,8 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     if (foId) fouledOut.add(foId);
 
     applyTurnToScoreboard(turn);
+    applyTeamTotals(turn);
+    maxQuarterSeen = Math.max(maxQuarterSeen, tQ);
 
     // Bug 4 fix: helper turns (inbound / rebound / timeout) omit the lineups — carry
     // forward the last known five so on-court stats hold instead of the bars pulsing
@@ -470,8 +529,9 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     const court = [...homeCourt, ...awayCourt];
     court.forEach((id) => everPlayed.add(id));
 
-    // Worm history spans the whole game (context even when we join mid-game at Q2+).
-    worm.push(sb.home - sb.away);
+    // Worm history: elapsed game seconds (not sample index) + home−away margin.
+    const elapsed = elapsedGameSeconds(sb.quarter, sb.clock);
+    worm.push({ elapsed, margin: sb.home - sb.away });
 
     // Emit playback frames only from startQuarter onward (Sim Rest joins at Q2+).
     if (tQ >= startQuarter) {
@@ -489,7 +549,8 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
         phase: isLast ? 'final' : 'live',
         quarter: tQ,
         score: scoreSnapshot(),
-        worm: worm.slice(),
+        worm: wormMeta(elapsed),
+        teamPanel: teamPanelSnapshot(),
         away: POSITIONS.map((pos) =>
           buildPlayer(nid(awayLineup[pos]), pos, momentumMap, spotlightId, subIds, outIds)
         ),
