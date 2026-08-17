@@ -42,6 +42,24 @@
     FT: 'Free Throws',
   };
 
+  /**
+   * PRESENTATION-ONLY pairing. Twelve identical tiles read as a barcode; six labelled
+   * pairs read as chunks.
+   *
+   * Deliberately separate from ATTR_KEYS, which MUST NOT be reordered: the display
+   * pairing needs RB,ST then AG,ND, while ATTR_KEYS has AG before ST to match the
+   * backend roster_builder order that SCOUTING_PROJECTED_ATTR_COLS also mirrors.
+   * Reordering the shared array to get the pairing would shift those consumers.
+   */
+  var ATTR_PAIRS = [
+    { label: 'OFFENSE', keys: ['SC', 'SH'] },
+    { label: 'DEFENSE', keys: ['ID', 'OD'] },
+    { label: 'SKILLS', keys: ['PS', 'BH'] },
+    { label: 'GRIT', keys: ['RB', 'ST'] },
+    { label: 'BODY', keys: ['AG', 'ND'] },
+    { label: 'MIND', keys: ['IQ', 'FT'] },
+  ];
+
   function escapeHtml(value) {
     return String(value == null ? '' : value)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -101,8 +119,62 @@
       '>Attributes</th>';
   }
 
+  // ── Grouped variants (Roster / Recruiting / standalone roster) ────────────────
+  // Tiles render WITHOUT their inner label here: the abbreviation prints once in the
+  // header instead of twelve times per row. Hover identification is unaffected —
+  // every tile still carries data-tooltip.
+
+  /** Six labelled pairs of label-less tiles, for one player. */
+  function groupedTilesHtml(attrs) {
+    return '<div class="attr-grid">' + ATTR_PAIRS.map(function (pair) {
+      return '<div class="attr-pair">' + pair.keys.map(function (key) {
+        return tileHtml(key, tileValue(attrs, key), false);
+      }).join('') + '</div>';
+    }).join('') + '</div>';
+  }
+
+  function groupedTilesCellHtml(attrs) {
+    return '<td class="attr-tiles-cell">' + groupedTilesHtml(attrs) + '</td>';
+  }
+
+  /**
+   * Two-row grouped header: pair labels above, per-attribute sort controls below.
+   * `sort` is { key, dir } so the active control can show its caret.
+   */
+  function groupedHeaderHtml(sort) {
+    var active = (sort && sort.key) || '';
+    var dir = (sort && sort.dir) || 'desc';
+    return '<div class="attr-grid attr-grid--head">' + ATTR_PAIRS.map(function (pair) {
+      var labels = '<div class="attr-grp">' + escapeHtml(pair.label) + '</div>';
+      var controls = pair.keys.map(function (key) {
+        var isSorted = key === active;
+        return '<button type="button" class="attr-abbr' + (isSorted ? ' is-sorted' : '') + '"' +
+          ' data-attr-sort="' + escapeHtml(key) + '"' +
+          (isSorted ? ' data-dir="' + escapeHtml(dir) + '"' : '') +
+          ' data-tooltip="' + escapeHtml(ATTR_FULL_NAMES[key] || key) + '"' +
+          ' aria-label="Sort by ' + escapeHtml(ATTR_FULL_NAMES[key] || key) + '">' +
+          escapeHtml(key) + '</button>';
+      }).join('');
+      return labels + '<div class="attr-pair">' + controls + '</div>';
+    }).join('') + '</div>';
+  }
+
+  /** Sort comparator on the DISPLAYED 0-10 value, so ties behave as the user sees them. */
+  function compareByAttr(a, b, key, dir) {
+    var av = tileValue(a, key);
+    var bv = tileValue(b, key);
+    if (av == null) av = -1;
+    if (bv == null) bv = -1;
+    return dir === 'asc' ? av - bv : bv - av;
+  }
+
   var api = {
     ATTR_KEYS: ATTR_KEYS,
+    ATTR_PAIRS: ATTR_PAIRS,
+    groupedTilesHtml: groupedTilesHtml,
+    groupedTilesCellHtml: groupedTilesCellHtml,
+    groupedHeaderHtml: groupedHeaderHtml,
+    compareByAttr: compareByAttr,
     ATTR_FULL_NAMES: ATTR_FULL_NAMES,
     tileValue: tileValue,
     tierClass: tierClass,

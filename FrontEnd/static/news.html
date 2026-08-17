@@ -197,13 +197,32 @@
 
     /* ranking_table — Recruiting Report / Results (Rank | Team | Score) */
     table.news-rt {
-      max-width: 420px;
+      max-width: 100%;
+    }
+
+    .news-rt-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px 20px;
+      align-items: start;
+      margin: 4px 0 10px;
+    }
+
+    .news-rt-cols .news-pt-wrap {
+      margin: 0;
+      min-width: 0;
     }
 
     table.news-rt th.news-pt-num:first-child,
     table.news-rt td.news-pt-num:first-child {
       width: 3.5em;
       padding-right: 10px;
+    }
+
+    @media (max-width: 640px) {
+      .news-rt-cols {
+        grid-template-columns: 1fr;
+      }
     }
 
     .news-story-line:last-child {

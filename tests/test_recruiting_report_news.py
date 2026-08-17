@@ -65,9 +65,27 @@ def test_rank_respects_limit():
     assert ranked[-1]["rank"] == 25
 
 
+def test_rank_include_team_ids_keeps_zeros():
+    scores = {"a": 20, "b": 0}
+    names = {"a": "Alpha", "b": "Beta", "c": "Gamma"}
+    ranked = rank_teams_by_points(
+        scores,
+        names,
+        limit=16,
+        rng=random.Random(0),
+        include_team_ids={"a", "b", "c"},
+        include_zeros=True,
+    )
+    assert len(ranked) == 3
+    assert ranked[0]["team_id"] == "a"
+    assert ranked[0]["score"] == 20
+    assert {r["team_id"] for r in ranked[1:]} == {"b", "c"}
+    assert all(r["score"] == 0 for r in ranked[1:])
+
+
 def test_build_story_includes_national_and_region_tables():
     scores = {"a": 100, "b": 90, "c": 80, "d": 10}
-    names = {"a": "Alpha", "b": "Beta", "c": "Gamma", "d": "Delta"}
+    names = {"a": "Alpha", "b": "Beta", "c": "Gamma", "d": "Delta", "e": "Echo"}
     story = build_recruiting_rankings_story(
         story_id="w2-recruiting-report",
         week=2,
@@ -76,9 +94,9 @@ def test_build_story_includes_national_and_region_tables():
         scores=scores,
         team_name_map=names,
         user_region_letter="A",
-        region_team_ids={"a", "d"},
+        region_team_ids={"a", "d", "e"},
         national_limit=25,
-        region_limit=5,
+        region_limit=16,
     )
     assert story is not None
     assert story["headline"] == "Week 2 Recruiting Report"
@@ -96,7 +114,11 @@ def test_build_story_includes_national_and_region_tables():
         line for line in story["rich_lines"] if line.get("type") == "ranking_table"
     ]
     assert len(ranking_tables) == 2
-    assert [r["team_id"] for r in ranking_tables[1]["rows"]] == ["a", "d"]
+    assert ranking_tables[0]["column_split"] == [13, 12]
+    assert ranking_tables[1]["column_split"] == [8, 8]
+    # Region lists all region teams (including 0-point Echo), score-desc.
+    assert [r["team_id"] for r in ranking_tables[1]["rows"]] == ["a", "d", "e"]
+    assert ranking_tables[1]["rows"][2]["score"] == 0
 
 
 def test_build_story_none_when_no_points():

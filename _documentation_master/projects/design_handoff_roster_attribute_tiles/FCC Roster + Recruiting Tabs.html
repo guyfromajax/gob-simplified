@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en" data-tilelabel="header" data-grouping="grouped" data-density="compact" data-recruitid="folded" data-ps="scope">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FCC — Roster &amp; Recruiting Tabs</title>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="fcc-tabs.css">
+<style id="__om-edit-overrides"></style>
+</head>
+<body>
+<div id="franchise-container">
+<div id="tournament-top">
+<div id="top-left">
+<div id="fcc-user-row"><span class="fcc-username">guyfromajax</span><span class="fcc-username-badge">Alpha</span></div>
+<button class="mode-exit-btn" type="button">Exit Franchise</button>
+</div>
+<div id="top-center">
+<img id="team-logo" class="team-logo" alt="Four Corners">
+<div class="fcc-meta-row">
+<div id="fcc-season-label" class="fcc-season-label">Season 3 · Week 12</div>
+<div id="fcc-record-label" class="fcc-season-label fcc-record-label">Record: 9-2</div>
+<div class="fcc-season-label fcc-rank-label">National Rank: 14</div>
+</div>
+</div>
+<div id="top-right" class="right-controls"><button class="hero-btn" type="button">Run Training</button></div>
+</div>
+<div id="tournament-tabs">
+<div class="tab-buttons">
+<button type="button" class="is-inert" data-tab="home-tab">Coach's Office</button>
+<button type="button" class="active" data-tab="roster-tab">Roster</button>
+<button type="button" class="is-inert" data-tab="player-stats-tab">Player Stats</button>
+<button type="button" class="is-inert" data-tab="team-stats-tab">Team Measures</button>
+<button type="button" class="is-inert" data-tab="game-plan-tab">Game Plan</button>
+<button type="button" class="is-inert" data-tab="playbooks-tab">Playbooks</button>
+<button type="button" class="is-inert" data-tab="coaches-tab">Scouting Report</button>
+<button type="button" class="is-inert" data-tab="standings-tab">Standings</button>
+<button type="button" class="is-inert" data-tab="schedule-tab">Schedule</button>
+<button type="button" class="is-inert" data-tab="fcc-team-stats-summary-tab">Team Stats</button>
+<button type="button" class="is-inert" data-tab="awards-tab">Leaders</button>
+<button type="button" class="is-inert" data-tab="press-tab">News</button>
+<button type="button" data-tab="recruits-tab">Recruiting</button>
+<button type="button" class="is-inert" data-tab="tutorials-tab">Inbox<span class="inbox-badge"></span></button>
+</div>
+
+<div id="roster-tab" class="tab-content active">
+<div class="tab-head">
+<div class="head-left">
+<h3>Roster</h3>
+<div class="scope" id="roster-scope">
+<button class="pill" type="button" data-scope="varsity" aria-pressed="true">Varsity <em>12</em></button>
+<button class="pill" type="button" data-scope="squad" aria-pressed="false">Practice Squad <em>3</em></button>
+</div>
+</div>
+<div class="head-right">
+<span class="count" id="roster-count">12 players</span>
+<button class="pill display-btn" type="button" id="display-btn">Display options</button>
+</div>
+</div>
+<section class="fcc-data-card">
+<div class="fcc-data-card-body scroll-x" id="roster-surface"></div>
+</section>
+<section class="stacked-ps">
+<h3 class="fcc-practice-squad-title">Practice Squad</h3>
+<div class="fcc-data-card"><div class="fcc-data-card-body scroll-x" id="ps-surface"></div></div>
+</section>
+</div>
+
+<div id="recruits-tab" class="tab-content">
+<div class="tab-head">
+<div class="head-left"><h3>Recruits Leaning Your Way</h3></div>
+<div class="head-right">
+<span class="count" id="recruits-count">8 recruits</span>
+<button class="pill display-btn" type="button" id="display-btn-2">Display options</button>
+</div>
+</div>
+<section class="fcc-data-card">
+<div class="fcc-data-card-body scroll-x" id="recruits-surface"></div>
+</section>
+<div class="fcc-standings-footer-link-wrap">
+<a class="fcc-standings-full-link" href="#">See all recruits here</a>
+<a class="fcc-standings-full-link" href="#">Practice Squad Season</a>
+</div>
+</div>
+</div>
+</div>
+<div id="tweaks-root"></div>
+<script src="roster-fixture.js"></script>
+<script src="recruits-fixture.js"></script>
+<script src="fcc-tabs.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel">
+const FCC_TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "recruitIdentity": "Folded",
+  "practiceSquad": "Scope toggle",
+  "density": "Compact",
+  "tileLabels": "In header",
+  "grouping": "Grouped"
+}/*EDITMODE-END*/;
+
+function FccTweaks() {
+  const [t, setTweak] = useTweaks(FCC_TWEAK_DEFAULTS);
+  React.useEffect(() => {
+    const d = document.documentElement.dataset;
+    d.recruitid = t.recruitIdentity === 'Folded' ? 'folded' : 'columns';
+    d.ps = t.practiceSquad === 'Scope toggle' ? 'scope' : 'stacked';
+    d.density = t.density === 'Compact' ? 'compact' : 'regular';
+    d.tilelabel = t.tileLabels === 'In tile' ? 'tile' : 'header';
+    d.grouping = t.grouping === 'Flat' ? 'flat' : 'grouped';
+    if (window.GOB_FCC_RENDER) window.GOB_FCC_RENDER();
+  }, [t]);
+  return (
+    <TweaksPanel>
+      <TweakSection label="Recruiting tab" />
+      <TweakRadio label="Region + archetype" value={t.recruitIdentity} options={['Folded', 'Columns']} onChange={(v) => setTweak('recruitIdentity', v)} />
+      <TweakSection label="Roster tab" />
+      <TweakRadio label="Practice squad" value={t.practiceSquad} options={['Scope toggle', 'Stacked']} onChange={(v) => setTweak('practiceSquad', v)} />
+      <TweakSection label="Both tabs" />
+      <TweakRadio label="Density" value={t.density} options={['Regular', 'Compact']} onChange={(v) => setTweak('density', v)} />
+      <TweakRadio label="Tile labels" value={t.tileLabels} options={['In header', 'In tile']} onChange={(v) => setTweak('tileLabels', v)} />
+      <TweakRadio label="Grouping" value={t.grouping} options={['Grouped', 'Flat']} onChange={(v) => setTweak('grouping', v)} />
+    </TweaksPanel>
+  );
+}
+ReactDOM.createRoot(document.getElementById('tweaks-root')).render(<FccTweaks />);
+const openPanel = () => window.postMessage({ type: '__activate_edit_mode' }, '*');
+document.getElementById('display-btn').addEventListener('click', openPanel);
+document.getElementById('display-btn-2').addEventListener('click', openPanel);
+</script>
+</body>
+</html>

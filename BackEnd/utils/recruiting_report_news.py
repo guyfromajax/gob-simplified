@@ -13,7 +13,9 @@ from typing import Any, Callable
 
 LEAN_SLOT_WEIGHTS = {"1": 1.0, "2": 0.5, "3": 0.25}
 NATIONAL_LIMIT = 25
-REGION_LIMIT = 5
+REGION_LIMIT = 16  # full region (2 conferences × 8 teams)
+NATIONAL_COLUMN_SPLIT = (13, 12)
+REGION_COLUMN_SPLIT = (8, 8)
 
 
 def recruit_max_rt(recruit_doc: dict[str, Any]) -> int:
@@ -65,10 +67,24 @@ def rank_teams_by_points(
     *,
     limit: int,
     rng: random.Random | None = None,
+    include_team_ids: set[str] | None = None,
+    include_zeros: bool = False,
 ) -> list[dict[str, Any]]:
-    """Strict sequential ranks 1..N. Omit zero-point teams. Ties broken randomly."""
+    """Strict sequential ranks 1..N. Ties broken randomly.
+
+    By default omits zero-point teams. When ``include_team_ids`` is set, ranks that
+    fixed roster (missing scores treated as 0); ``include_zeros`` keeps 0-point rows.
+    """
     rng = rng or random
-    items = [(tid, int(pts)) for tid, pts in (scores or {}).items() if int(pts) > 0]
+    if include_team_ids is not None:
+        items = [
+            (str(tid), int((scores or {}).get(str(tid), 0) or 0))
+            for tid in include_team_ids
+        ]
+        if not include_zeros:
+            items = [(tid, pts) for tid, pts in items if pts > 0]
+    else:
+        items = [(tid, int(pts)) for tid, pts in (scores or {}).items() if int(pts) > 0]
     items.sort(key=lambda row: (-row[1], rng.random()))
     ranked: list[dict[str, Any]] = []
     for i, (tid, pts) in enumerate(items[: max(0, int(limit))], start=1):
@@ -96,7 +112,7 @@ def build_recruiting_rankings_story(
     national_limit: int = NATIONAL_LIMIT,
     region_limit: int = REGION_LIMIT,
 ) -> dict[str, Any] | None:
-    """National Top 25 + user-region Top 5 ranking tables. None if nobody has points."""
+    """National Top 25 + full user-region rankings. None if nobody has national points."""
     national = rank_teams_by_points(
         scores,
         team_name_map,
@@ -111,18 +127,18 @@ def build_recruiting_rankings_story(
             "type": "ranking_table",
             "columns": ["Rank", "Team", "Score"],
             "rows": national,
+            "column_split": list(NATIONAL_COLUMN_SPLIT),
         },
     ]
 
     region_letter = (user_region_letter or "").strip().upper()
     if region_letter and region_team_ids:
-        region_scores = {
-            tid: pts for tid, pts in scores.items() if tid in region_team_ids
-        }
         regional = rank_teams_by_points(
-            region_scores,
+            scores,
             team_name_map,
             limit=region_limit,
+            include_team_ids=set(region_team_ids),
+            include_zeros=True,
         )
         if regional:
             rich_lines.append({"type": "gap"})
@@ -132,6 +148,7 @@ def build_recruiting_rankings_story(
                     "type": "ranking_table",
                     "columns": ["Rank", "Team", "Score"],
                     "rows": regional,
+                    "column_split": list(REGION_COLUMN_SPLIT),
                 }
             )
 

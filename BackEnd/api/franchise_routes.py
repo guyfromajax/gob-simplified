@@ -12711,7 +12711,7 @@ def _apply_training_squad_progression_and_report(
 LEAN_MOVEMENT_LAST_WEEK = 34
 
 NEWS_RECRUITING_REPORT_NATIONAL_LIMIT = 25
-NEWS_RECRUITING_REPORT_REGION_LIMIT = 5
+NEWS_RECRUITING_REPORT_REGION_LIMIT = 16  # full region (2×8)
 # Weekly recruiting report titles the *current* franchise week (one ahead of the
 # completed week / Upset Report). Completing week W publishes "Week W+1 …".
 NEWS_RECRUITING_REPORT_MAX_TITLE_WEEK = 35

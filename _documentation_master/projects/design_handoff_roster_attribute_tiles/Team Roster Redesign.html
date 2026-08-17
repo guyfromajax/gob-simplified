@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en" data-tilelabel="header" data-grouping="grouped" data-rt="lead" data-density="compact" data-banding="zebra" data-poscolor="off" data-five="on" data-basis="pergame">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Team Roster — Redesign</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="team-roster-redesign.css">
+<style id="__om-edit-overrides"></style>
+</head>
+<body>
+<div class="page">
+<button class="back" type="button">Back to Locker Room</button>
+<div class="shell">
+<div class="crest">
+<div class="crest-lockup">
+<img id="crest-art" class="crest-card" alt="Four Corners">
+<div class="crest-id"><span class="sub">Team Roster</span><h1 id="team-name">Four Corners</h1></div>
+</div>
+<div class="crest-meta">
+<div class="meta-cell"><b id="m-record">9-2</b><span>Record</span></div>
+<div class="meta-cell"><b id="m-conf">2nd</b><span>Conference 14</span></div>
+</div>
+</div>
+<div id="five-strip">
+<div class="five-eyebrow"><h2>PROJECTED STARTING FIVE</h2><div class="rule"></div></div>
+<div class="five" id="five"></div>
+</div>
+<div class="toolbar">
+<div class="scope">
+<button class="pill" type="button" data-scope="varsity" aria-pressed="true">Varsity <em id="scope-varsity-n">12</em></button>
+<button class="pill" type="button" data-scope="squad" aria-pressed="false">Practice Squad <em id="scope-squad-n">3</em></button>
+</div>
+<div class="toolbar-right">
+<div class="basis" id="basis" hidden>
+<button class="seg" type="button" data-basis="pergame" aria-pressed="true">Per game</button>
+<button class="seg" type="button" data-basis="totals" aria-pressed="false">Totals</button>
+</div>
+<button class="pill display-btn" type="button" id="display-btn" title="Open display options">Display options</button>
+<div class="views">
+<button class="tab" type="button" data-view="attributes" aria-selected="true">Attributes</button>
+<button class="tab" type="button" data-view="stats" aria-selected="false">Season Stats</button>
+</div>
+</div>
+</div>
+<div class="surface" id="surface"></div>
+</div>
+</div>
+<div id="tweaks-root"></div>
+<script src="roster-fixture.js"></script>
+<script src="team-roster-redesign.js"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel">
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "tileLabels": "In header",
+  "grouping": "Grouped",
+  "rtPlacement": "Beside name",
+  "density": "Compact",
+  "banding": "Zebra",
+  "posColors": false,
+  "startingFive": true
+}/*EDITMODE-END*/;
+
+function RosterTweaks() {
+  const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  React.useEffect(() => {
+    const d = document.documentElement.dataset;
+    d.tilelabel = t.tileLabels === 'In tile' ? 'tile' : 'header';
+    d.grouping = t.grouping === 'Flat' ? 'flat' : 'grouped';
+    d.rt = t.rtPlacement === 'Trailing' ? 'trail' : 'lead';
+    d.density = t.density === 'Compact' ? 'compact' : 'regular';
+    d.banding = t.banding === 'Zebra' ? 'zebra' : 'hairline';
+    d.poscolor = t.posColors ? 'on' : 'off';
+    d.five = t.startingFive ? 'on' : 'off';
+    if (window.GOB_ROSTER_RENDER) window.GOB_ROSTER_RENDER();
+  }, [t]);
+  return (
+    <TweaksPanel>
+      <TweakSection label="Attribute tiles" />
+      <TweakRadio label="Tile labels" value={t.tileLabels} options={['In header', 'In tile']} onChange={(v) => setTweak('tileLabels', v)} />
+      <TweakRadio label="Grouping" value={t.grouping} options={['Grouped', 'Flat']} onChange={(v) => setTweak('grouping', v)} />
+      <TweakSection label="Row layout" />
+      <TweakRadio label="RT column" value={t.rtPlacement} options={['Beside name', 'Trailing']} onChange={(v) => setTweak('rtPlacement', v)} />
+      <TweakRadio label="Density" value={t.density} options={['Regular', 'Compact']} onChange={(v) => setTweak('density', v)} />
+      <TweakRadio label="Row banding" value={t.banding} options={['Hairline', 'Zebra']} onChange={(v) => setTweak('banding', v)} />
+      <TweakToggle label="Position colors" value={t.posColors} onChange={(v) => setTweak('posColors', v)} />
+      <TweakSection label="Page" />
+      <TweakToggle label="Projected five strip" value={t.startingFive} onChange={(v) => setTweak('startingFive', v)} />
+    </TweaksPanel>
+  );
+}
+ReactDOM.createRoot(document.getElementById('tweaks-root')).render(<RosterTweaks />);
+// In-page opener: the panel listens for the host's activate message, so send the same one.
+document.getElementById('display-btn').addEventListener('click', () => {
+  window.postMessage({ type: '__activate_edit_mode' }, '*');
+});
+</script>
+</body>
+</html>

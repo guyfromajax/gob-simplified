@@ -51,13 +51,13 @@
 
 ##Headline: "Week {N} Recruiting Report"
 - Cadence: **Week 1** at season init (franchise create / `finish_season` rollover, after initial leans are written). Then on each week completion for completed weeks **1–34**, titled for the **current** week after advance (`Week {completed + 1}`), so the report sits one week ahead of that week's Upset Report. Lean movement (including postseason performance leans) runs through week **34**, so title weeks go through **35**.
-- Criteria: publish when rankings have any team with lean-share points > 0 **and/or** the completed week produced qualifying lean announcements. Teams with **0 points are omitted** from ranking tables; national and region lists may be shorter than their caps.
+- Criteria: publish when rankings have any team with lean-share points > 0 **and/or** the completed week produced qualifying lean announcements. National omits **0-point** teams (list may be shorter than 25). Region lists **all 16** region teams (0-point teams included at the bottom).
 - Scoring (pre–Week 35 signings): each recruit's value is **current RT** (`max` position rating). Teams on the lean list accrue:
   - slot 1 → 100% of RT
   - slot 2 → 50% of RT
   - slot 3 → 25% of RT  
   All values are **rounded integers**.
-- Ranking: strict sequential ranks `1..N`; ties broken **randomly**. National Top **25**; user-region Top **5** labeled `Region {letter}` (e.g. `Region A`).
+- Ranking: strict sequential ranks `1..N`; ties broken **randomly**. National Top **25** (two columns: **13** left / **12** right). User **region** lists **all 16** teams (two columns of **8**), including 0-point teams, labeled `Region {letter}` (e.g. `Region A`). National still omits 0-point teams.
 - Content (top to bottom):
   1. `ranking_table` rich lines under `National Recruit Rankings` and `Region {letter}` (when points exist).
   2. Section heading **Recruiting Leans Announced**, then the former leans story body:
@@ -71,6 +71,6 @@
 ##Headline: "Season {N} Recruiting Results"
 - Moment: after **Run Recruiting** completes in week 35 (franchise advances to week 36; user returns to FCC at week 36). No week number in the headline.
 - Scoring: signing team only receives **100%** of each signed recruit's RT. No other team scores for that recruit.
-- Same ranking / omit-zero / rich-table rules as the weekly report rankings (National Top 25 + user Region Top 5). No leans section.
+- Same ranking / rich-table rules as the weekly report rankings (National Top 25 in 13+12 columns + full Region 16 in 8+8). No leans section.
 - `story_id`: `s{N}-recruiting-results`.
 

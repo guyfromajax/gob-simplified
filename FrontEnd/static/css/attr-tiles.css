@@ -61,3 +61,223 @@ th.attr-tiles-head {
 @media (max-width: 900px) {
   td.attr-tiles-cell { overflow-x: auto; }
 }
+
+/* ============================================================
+   GROUPED VARIANT — 6 labelled pairs, labels in the header only.
+   Used by the FCC Roster tab, the FCC Recruiting tab and the standalone
+   roster page. recruiting.html (Hub pool) keeps the flat labelled tiles.
+   ============================================================ */
+:root {
+  --tile-w: 26px;
+  --tile-h: 27px;
+  /* The pair gap is what makes the grouping legible, so it stays responsive. */
+  --attr-group-gap: clamp(7px, 1vw, 15px);
+}
+
+.attr-grid {
+  display: grid;
+  grid-template-columns: repeat(6, auto);
+  column-gap: var(--attr-group-gap);
+  justify-content: center;
+}
+
+.attr-grid--head { row-gap: 6px; }
+
+.attr-pair {
+  display: grid;
+  grid-template-columns: repeat(2, var(--tile-w));
+  column-gap: 2.5px;
+}
+
+.attr-grp {
+  grid-column: 1 / -1;
+  text-align: center;
+  font: 700 8.5px/1 'Inter', sans-serif;
+  letter-spacing: .1em;
+  color: rgba(255, 255, 255, .26);
+  white-space: nowrap;
+}
+
+/* Per-attribute sort control — the abbreviation IS the control. */
+.attr-abbr {
+  font: 700 9.5px/1 'Inter', sans-serif;
+  letter-spacing: .05em;
+  color: rgba(255, 255, 255, .5);
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  cursor: pointer;
+  transition: color .14s ease;
+}
+
+.attr-abbr:hover,
+.attr-abbr.is-sorted { color: #fff; }
+.attr-abbr.is-sorted::after {
+  content: "▾";
+  font-size: 8px;
+  margin-left: 2px;
+  color: #F79420;
+}
+.attr-abbr.is-sorted[data-dir="asc"]::after { content: "▴"; }
+.attr-abbr:focus-visible { outline: 2px solid #F79420; outline-offset: 1px; }
+
+/* Grouped tiles use the shared tokens; the inner label is suppressed by the builder. */
+.attr-grid .attr-tile { width: var(--tile-w); height: var(--tile-h); }
+
+/* ---- RT current -> potential lockup, beside the player name ---- */
+.rt-lockup {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  justify-content: center;
+  white-space: nowrap;
+}
+.rt-lockup b {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1;
+}
+.rt-lockup i {
+  font: 600 11px/1 'Inter', sans-serif;
+  font-style: normal;
+  opacity: .62;
+}
+.rt-lockup i::before {
+  content: "\2192 ";
+  color: rgba(255, 255, 255, .26);
+  opacity: .8;
+}
+th.c-rt, td.c-rt { white-space: nowrap; }
+.rt-caption {
+  display: block;
+  font: 600 9px/1 'Inter', sans-serif;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .26);
+  margin-top: 3px;
+}
+
+/* ---- Neutral position chip. Colored chips were built and REJECTED; do not add
+        position color tokens. ---- */
+.pos-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 21px;
+  border-radius: 5px;
+  font: 700 10.5px/1 'Inter', sans-serif;
+  letter-spacing: .06em;
+  color: rgba(255, 255, 255, .86);
+  background: rgba(255, 255, 255, .07);
+  border: 1px solid rgba(255, 255, 255, .1);
+}
+
+/* ---- Identity cell: jersey + name (+ optional sub-line) ---- */
+.ident {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+}
+.ident-jersey {
+  flex: 0 0 26px;
+  width: 26px;
+  text-align: right;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-weight: 400;
+  font-size: 19px;
+  line-height: 1;
+  color: rgba(255, 255, 255, .26);
+  font-variant-numeric: tabular-nums;
+}
+.ident-body { min-width: 0; }
+.ident-name {
+  font: 700 13.5px/1.2 'Inter', sans-serif;
+  color: #fff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ident-name a { color: #fff; text-decoration: none; }
+.ident-name a:hover { text-decoration: underline; }
+/* Sub-line floor is .62 — lighter fails AA at this size on a banded row. */
+.ident-sub {
+  margin-top: 2px;
+  font: 500 11px/1.3 'Inter', sans-serif;
+  color: rgba(255, 255, 255, .62);
+  white-space: nowrap;
+}
+.ident-sub b { font-weight: 700; color: rgba(255, 255, 255, .78); }
+
+/* ---- Toolbar: scope / view toggles + row count (FCC control vocabulary) ---- */
+.attr-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.scope-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(255, 255, 255, .06);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+  color: rgba(255, 255, 255, .62);
+  font: 600 12px/1 'Inter', sans-serif;
+  letter-spacing: .03em;
+  cursor: pointer;
+  transition: background .14s ease, color .14s ease, border-color .14s ease;
+}
+.scope-btn:hover { background: rgba(255, 255, 255, .11); color: rgba(255, 255, 255, .9); }
+.scope-btn[aria-pressed="true"] {
+  background: rgba(255, 255, 255, .09);
+  border-color: rgba(255, 255, 255, .18);
+  color: #fff;
+}
+.scope-btn:focus-visible { outline: 2px solid #F79420; outline-offset: 2px; }
+.scope-btn .n {
+  font: 500 11px/1 'Inter', sans-serif;
+  font-variant-numeric: tabular-nums;
+  color: rgba(255, 255, 255, .26);
+}
+.scope-btn[aria-pressed="true"] .n { color: rgba(255, 255, 255, .55); }
+
+.attr-rowcount {
+  margin-left: auto;
+  font: 700 12px/1 'Inter', sans-serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, .5);
+}
+
+/* Segmented Per game / Totals */
+.seg-track {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, .04);
+}
+.seg-track button {
+  min-height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: rgba(255, 255, 255, .62);
+  font: 600 11.5px/1 'Inter', sans-serif;
+  cursor: pointer;
+}
+.seg-track button[aria-pressed="true"] {
+  background: rgba(255, 255, 255, .11);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .08);
+  color: #fff;
+}
+.seg-track button:focus-visible { outline: 2px solid #F79420; outline-offset: 1px; }
