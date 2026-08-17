@@ -100,6 +100,11 @@ from BackEnd.models.game_manager import GameManager
 from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets, generate_walk_on_profile
 from BackEnd.models.franchise_manager import carry_dev_fields
 from BackEnd.models.franchise_manager import build_walk_ons_news_story, walk_on_news_row
+from BackEnd.utils.recruiting_lean_events import (
+    diff_lean,
+    render_lean_event,
+    summarize_kinds,
+)
 from BackEnd.utils.franchise_rank_prestige import (
     FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
     SOS_AVG_DEFAULT,
@@ -114,6 +119,11 @@ logger = logging.getLogger(__name__)
 
 STATIC_DIR = Path(__file__).resolve().parents[2] / "FrontEnd" / "static"
 RECRUITING_ORDERS_WEEK_35_FIELD = "recruiting_orders_week_35"
+# DEPRECATED — superseded by RECRUITING_LEAN_EVENTS_FIELD ("recruiting_lean_events").
+# This field CANNOT represent a drop: every reader re-intersects it against the
+# recruit's CURRENT lean list, so a recruit who dropped the user is filtered out by
+# construction. Do not extend it or add readers. Existing readers stay until the UI
+# moves to the event log (ux-build-plan §4.2).
 FCC_PENDING_NEW_LEAN_RECRUITS_FIELD = "fcc_pending_new_lean_recruit_ids"
 WEEK_35_RECRUITING_RESULTS_FIELD = "week_35_recruiting_results"
 # Walk-On Welcome modal payload, snapshotted at season rollover (finish_season)
@@ -7141,8 +7151,19 @@ def _finalize_franchise_week_after_cpu_games(
     """
     existing_results = franchise_doc.get("results", {})
     existing_results[str(week)] = results
-    new_lean_events = _apply_performance_based_recruiting_lean_updates(franchise_doc, week, results)
-    new_lean_events += _apply_complete_week_recruiting_lean_updates(franchise_doc, week, results)
+    new_lean_events, lean_movement_events = _apply_performance_based_recruiting_lean_updates(
+        franchise_doc, week, results
+    )
+    _visit_lean_events, _visit_movement = _apply_complete_week_recruiting_lean_updates(
+        franchise_doc, week, results
+    )
+    new_lean_events += _visit_lean_events
+    lean_movement_events += _visit_movement
+    # Single write point for the lean-movement log. Both mutation sites stamp their own
+    # recruiting_*_applied guard and return [] on replay, so this inherits that guard
+    # rather than needing its own — and one write can't double-apply the way two
+    # independent writes could.
+    _persist_recruiting_lean_events(franchise_id, franchise_doc, week, lean_movement_events)
     # Training-squad weekly progression (weeks 2–26) + milestone development report.
     ts_weekly_gains: list[dict[str, Any]] = []
     try:
@@ -11181,6 +11202,11 @@ def _append_fcc_pending_new_lean_recruits(
     recruit_ids: list[str],
     user_team_id: str,
 ) -> None:
+    """DEPRECATED — additions-only; see FCC_PENDING_NEW_LEAN_RECRUITS_FIELD.
+
+    Left in place so current FCC readers keep working. New reporting goes through
+    _persist_recruiting_lean_events, which records drops too.
+    """
     _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
     if not user_team_object_id or str(user_team_object_id) != str(user_team_id):
         return
@@ -11254,17 +11280,52 @@ def _game_performance_lean_chances_for_week(week: int) -> dict[str, tuple[float,
     return None
 
 
+RECRUITING_LEAN_EVENTS_FIELD = "recruiting_lean_events"
+
+
+def _persist_recruiting_lean_events(
+    franchise_id: ObjectId,
+    franchise_doc: dict,
+    week: int,
+    events: list[dict[str, Any]],
+) -> None:
+    """Write the week's user-relevant lean movement, week-keyed like recruiting_results.
+
+    No-ops on an empty list, which is what makes replay safe: a re-run week returns []
+    from both mutation sites (their recruiting_*_applied guards) and therefore cannot
+    overwrite the events already recorded for that week.
+    """
+    if not events:
+        return
+    by_kind = summarize_kinds(events)
+    logger.info(
+        "[LEAN-EVENTS] franchise=%s week=%s total=%s by_kind=%s",
+        str(franchise_id), week, len(events), by_kind,
+    )
+    franchise_doc.setdefault(RECRUITING_LEAN_EVENTS_FIELD, {})
+    franchise_doc[RECRUITING_LEAN_EVENTS_FIELD][str(week)] = events
+    db.franchises.update_one(
+        {"_id": franchise_id},
+        {"$set": {f"{RECRUITING_LEAN_EVENTS_FIELD}.{week}": events}},
+    )
+
+
 def _apply_performance_based_recruiting_lean_updates(
     franchise_doc: dict,
     week: int,
     results: list[dict],
-) -> list[dict[str, str]]:
-    """Applies the week's performance-based lean rolls. Returns the week's new-lean
-    events ([{recruit_id, team_id}, ...] where the team was newly added to a recruit's
-    lean list) for downstream consumers like the weekly news."""
+) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    """Applies the week's performance-based lean rolls.
+
+    Returns ``(new_lean_events, movement_events)``:
+      * ``new_lean_events`` — league-wide additions ([{recruit_id, team_id}, ...]),
+        unchanged, feeding the existing Updated Recruiting Leans story.
+      * ``movement_events`` — user-relevant movement in BOTH directions from
+        ``diff_lean``, for the event log. Reporting only; no mechanic changes.
+    """
     chances = _game_performance_lean_chances_for_week(week)
     if chances is None:
-        return []
+        return [], []
 
     fid = franchise_doc["_id"]
     applied_map = franchise_doc.get("recruiting_performance_lean_applied") or {}
@@ -11274,7 +11335,7 @@ def _apply_performance_based_recruiting_lean_updates(
             franchise_doc.get("_id"),
             week,
         )
-        return []
+        return [], []
 
     ftd_docs = list(
         franchise_team_data_collection.find(
@@ -11294,7 +11355,7 @@ def _apply_performance_based_recruiting_lean_updates(
         )
         franchise_doc.setdefault("recruiting_performance_lean_applied", {})
         franchise_doc["recruiting_performance_lean_applied"][str(week)] = True
-        return []
+        return [], []
 
     team_oid_list = [ObjectId(tid) for tid in natl_by_team_id]
     team_region_by_id: dict[str, str] = {}
@@ -11312,6 +11373,7 @@ def _apply_performance_based_recruiting_lean_updates(
     user_team_id_str = str(user_team_object_id) if user_team_object_id else ""
     newly_added_for_user: list[str] = []
     new_lean_events: list[dict[str, str]] = []
+    movement_events: list[dict[str, Any]] = []
 
     played: set[str] = set()
     game_by_team: dict[str, dict] = {}
@@ -11325,7 +11387,12 @@ def _apply_performance_based_recruiting_lean_updates(
         game_by_team[away_id] = row
         game_by_team[home_id] = row
 
-    def _maybe_roll(team_id: str, probability: float, rt_low: bool) -> None:
+    def _maybe_roll(
+        team_id: str,
+        probability: float,
+        rt_low: bool,
+        cause: dict[str, Any] | None = None,
+    ) -> None:
         if probability <= 0 or random.random() > probability:
             return
         region = team_region_by_id.get(team_id) or ""
@@ -11352,6 +11419,16 @@ def _apply_performance_based_recruiting_lean_updates(
             new_lean_events.append({"recruit_id": rid, "team_id": team_id})
             if user_team_id_str and team_id == user_team_id_str:
                 newly_added_for_user.append(rid)
+        # Reporting only — the mutation above is unchanged. diff_lean filters to
+        # user-relevant movement, so recruits the user has no tie to yield nothing.
+        for event in diff_lean(
+            old_lean, new_lean,
+            user_team_id=user_team_id_str,
+            actor_team_id=team_id,
+            cause=cause,
+        ):
+            event["recruit_id"] = rid
+            movement_events.append(event)
         doc["Lean"] = new_lean
         franchise_recruits_data_collection.update_one(
             {"franchise_id": str(fid), "recruit_id": rid},
@@ -11384,8 +11461,9 @@ def _apply_performance_based_recruiting_lean_updates(
 
         won = my_score > opp_score
         if won:
-            _maybe_roll(team_id, win_chances[0], rt_low=True)
-            _maybe_roll(team_id, win_chances[1], rt_low=False)
+            win_cause = {"type": "win", "opponent_team_id": opponent_id}
+            _maybe_roll(team_id, win_chances[0], rt_low=True, cause=win_cause)
+            _maybe_roll(team_id, win_chances[1], rt_low=False, cause=win_cause)
             continue
 
         opp_rank = natl_by_team_id.get(opponent_id, 999)
@@ -11394,8 +11472,9 @@ def _apply_performance_based_recruiting_lean_updates(
         quality = opp_rank < my_rank and loss_margin <= 8
         if not quality:
             continue
-        _maybe_roll(team_id, loss_chances[0], rt_low=True)
-        _maybe_roll(team_id, loss_chances[1], rt_low=False)
+        loss_cause = {"type": "quality_loss", "opponent_team_id": opponent_id}
+        _maybe_roll(team_id, loss_chances[0], rt_low=True, cause=loss_cause)
+        _maybe_roll(team_id, loss_chances[1], rt_low=False, cause=loss_cause)
 
     _append_fcc_pending_new_lean_recruits(
         franchise_doc,
@@ -11409,7 +11488,7 @@ def _apply_performance_based_recruiting_lean_updates(
     )
     franchise_doc.setdefault("recruiting_performance_lean_applied", {})
     franchise_doc["recruiting_performance_lean_applied"][str(week)] = True
-    return new_lean_events
+    return new_lean_events, movement_events
 
 
 def _update_recruit_lean_after_visit(
@@ -11452,16 +11531,18 @@ def _apply_complete_week_recruiting_lean_updates(
     franchise_doc: dict,
     week: int,
     results: list[dict],
-) -> list[dict[str, str]]:
-    """Applies the week's visit-based lean updates (weeks 20-26). Returns the week's
-    new-lean events ([{recruit_id, team_id}, ...] where the team was newly added to a
-    recruit's lean list) for downstream consumers like the weekly news."""
+) -> tuple[list[dict[str, str]], list[dict[str, Any]]]:
+    """Applies the week's visit-based lean updates (weeks 20-26).
+
+    Returns ``(new_lean_events, movement_events)`` — see the performance-lean
+    counterpart above for the split.
+    """
     applied = (franchise_doc.get("recruiting_lean_updates_applied") or {}).get(str(week))
     if applied:
         logger.info("Skipping recruiting lean updates for franchise=%s week=%s; already applied", franchise_doc.get("_id"), week)
-        return []
+        return [], []
     if week < 20 or week > 26:
-        return []
+        return [], []
 
     fid = franchise_doc["_id"]
     ftd_docs = list(franchise_team_data_collection.find(
@@ -11470,7 +11551,7 @@ def _apply_complete_week_recruiting_lean_updates(
     ))
     if not ftd_docs:
         db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
-        return []
+        return [], []
 
     visited_recruit_ids: set[str] = set()
     team_ids = [doc["team_id"] for doc in ftd_docs if doc.get("team_id") is not None]
@@ -11497,7 +11578,7 @@ def _apply_complete_week_recruiting_lean_updates(
 
     if not recruit_visit_pairs:
         db.franchises.update_one({"_id": fid}, {"$set": {f"recruiting_lean_updates_applied.{week}": True}})
-        return []
+        return [], []
 
     recruit_ids = [recruit_id for _, recruit_id in recruit_visit_pairs]
     recruit_docs_by_id = {
@@ -11512,6 +11593,7 @@ def _apply_complete_week_recruiting_lean_updates(
     user_team_id_str = str(user_team_object_id) if user_team_object_id else ""
     newly_added_for_user: list[str] = []
     new_lean_events: list[dict[str, str]] = []
+    movement_events: list[dict[str, Any]] = []
 
     bulk_updates = []
     for team_id, recruit_id in recruit_visit_pairs:
@@ -11530,6 +11612,15 @@ def _apply_complete_week_recruiting_lean_updates(
             new_lean_events.append({"recruit_id": recruit_id, "team_id": team_id})
             if user_team_id_str and team_id == user_team_id_str:
                 newly_added_for_user.append(recruit_id)
+        # Reporting only — the mutation above is unchanged.
+        for event in diff_lean(
+            old_lean, updated_lean,
+            user_team_id=user_team_id_str,
+            actor_team_id=team_id,
+            cause={"type": "visit", "by_user": bool(user_team_id_str and team_id == user_team_id_str)},
+        ):
+            event["recruit_id"] = recruit_id
+            movement_events.append(event)
         bulk_updates.append({
             "filter": {"franchise_id": str(fid), "recruit_id": recruit_id},
             "update": {"$set": {"Lean": updated_lean}},
@@ -11553,7 +11644,7 @@ def _apply_complete_week_recruiting_lean_updates(
         {"_id": fid},
         {"$set": {f"recruiting_lean_updates_applied.{week}": True}},
     )
-    return new_lean_events
+    return new_lean_events, movement_events
 
 
 def _resolve_weekly_recruiting_visits(
@@ -12417,6 +12508,11 @@ def _apply_training_squad_progression_and_report(
 # cleared at season rollover in finish_season.
 # ---------------------------------------------------------------------------
 
+# Last week that generates recruiting lean movement — the upper bound of the
+# 27-34 postseason band in _game_performance_lean_chances_for_week. News runs to
+# here, not to REGULAR_SEASON_WEEKS, so postseason movement is reported.
+LEAN_MOVEMENT_LAST_WEEK = 34
+
 NEWS_UPSET_RANK_GAP = 29  # winner_rank - loser_rank must exceed this
 NEWS_UPSET_LOSER_RANK_MAX = 64  # losing team must be ranked 1–64 (inclusive)
 NEWS_PS_ALL_STARS_MIN_GAIN = 4  # weekly cumulative attribute gain must exceed this
@@ -12640,6 +12736,57 @@ def _build_recruiting_leans_story(
     }
 
 
+def _build_recruiting_movement_story(
+    franchise_id: ObjectId,
+    week: int,
+    movement_events: list[dict[str, Any]],
+    team_name_map: dict[str, str],
+) -> dict[str, Any] | None:
+    """"Your Board Moved" — the user's own lean movement, gains AND drops.
+
+    Distinct from the league-wide Updated Recruiting Leans story, which reports only
+    additions and only for top recruits / the user's conference. This one is personal
+    and carries the losses, which is the half the UI never showed.
+    """
+    if not movement_events:
+        return None
+
+    recruit_ids = [str(e.get("recruit_id") or "") for e in movement_events if e.get("recruit_id")]
+    recruit_names: dict[str, str] = {}
+    if recruit_ids:
+        # Scoped to this franchise: set recruits share one recruit_id across every
+        # franchise, so an unscoped $in would match other franchises' documents.
+        for doc in franchise_recruits_data_collection.find(
+            {"franchise_id": str(franchise_id), "recruit_id": {"$in": list(set(recruit_ids))}},
+            {"recruit_id": 1, "name": 1},
+        ):
+            recruit_names[str(doc.get("recruit_id"))] = str(doc.get("name") or "")
+
+    def name_of(team_id: Any) -> str:
+        return team_name_map.get(str(team_id or ""), "")
+
+    lines = []
+    for event in movement_events:
+        line = render_lean_event(
+            event,
+            recruit_names.get(str(event.get("recruit_id") or "")) or "A recruit",
+            name_of,
+        )
+        if line:
+            lines.append(line)
+    if not lines:
+        return None
+
+    return {
+        "story_id": f"w{week}-recruiting-movement",
+        "week": int(week),
+        "type": "recruiting_movement",
+        "headline": "Your Board Moved",
+        "lines": lines,
+        "created_at": datetime.utcnow(),
+    }
+
+
 def _prepend_season_news_stories(
     franchise_doc: dict[str, Any], stories: list[dict[str, Any]]
 ) -> None:
@@ -12685,8 +12832,13 @@ def _append_franchise_week_news(
     Must run BEFORE _apply_regular_season_rank_prestige_updates so FTD natl_rank
     still holds the entering-week ranks the games were played under.
     """
-    if week < 1 or week > ScheduleManager.REGULAR_SEASON_WEEKS:
+    # Weeks 27-34 generate lean movement (see _game_performance_lean_chances_for_week)
+    # and used to report none of it — the early return stopped at REGULAR_SEASON_WEEKS.
+    # Postseason weeks now reach the recruiting stories; the game-result stories below
+    # gate themselves on regular-season weeks.
+    if week < 1 or week > LEAN_MOVEMENT_LAST_WEEK:
         return
+    regular_season = week <= ScheduleManager.REGULAR_SEASON_WEEKS
     rank_by_team_id: dict[str, int] = {}
     for doc in franchise_team_data_collection.find(
         {"franchise_id": franchise_id},
@@ -12745,12 +12897,22 @@ def _append_franchise_week_news(
         )
 
     # PS game-results news publishes during the CPU-training completion phase.
+    # Upset report and PS all-stars are regular-season concepts; only the recruiting
+    # stories run in weeks 27-34.
     stories = [
         story
         for story in (
-            _build_week_upset_report_story(week, results, rank_by_team_id, team_name_map),
-            _build_ps_all_stars_story(week, ts_weekly_gains, team_name_map),
+            _build_week_upset_report_story(week, results, rank_by_team_id, team_name_map)
+            if regular_season else None,
+            _build_ps_all_stars_story(week, ts_weekly_gains, team_name_map)
+            if regular_season else None,
             recruiting_leans_story,
+            _build_recruiting_movement_story(
+                franchise_id,
+                week,
+                (franchise_doc.get(RECRUITING_LEAN_EVENTS_FIELD) or {}).get(str(week)) or [],
+                team_name_map,
+            ),
         )
         if story
     ]
@@ -13358,13 +13520,30 @@ def get_recruiting_data(
 @router.get("/franchise/news")
 def get_franchise_news(
     franchise_id: str,
+    category: str | None = Query(
+        None,
+        description="Story-type filter. 'recruiting' returns recruiting_* stories only.",
+    ),
     user: dict = Depends(get_current_user),
 ):
-    """Season news feed for the standalone news page (newest first; cleared at season rollover)."""
+    """Season news feed for the standalone news page (newest first; cleared at season rollover).
+
+    ``category=recruiting`` narrows to the ``recruiting_*`` story types
+    (``recruiting_leans``, ``recruiting_movement``) so personal recruiting news can be
+    read on its own.
+    """
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    news = franchise_doc.get("season_news") or []
+    if category:
+        prefix = f"{category}_"
+        news = [
+            story for story in news
+            if str(story.get("type") or "").startswith(prefix)
+        ]
     return {
         "week": int(franchise_doc.get("week", 1) or 1),
-        "news": franchise_doc.get("season_news") or [],
+        "category": category,
+        "news": news,
     }
 
 
