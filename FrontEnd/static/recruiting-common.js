@@ -276,7 +276,77 @@
         onSortChange();
       });
     });
+
+    // Sub-controls under "Recruit" — Region and Archetype kept their sort affordance
+    // when their columns folded into the identity cell. stopPropagation so they don't
+    // also trigger the parent <th>'s name sort.
+    table.querySelectorAll('[data-sub-sort]').forEach(function (btn) {
+      if (btn.dataset.bound === '1') return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var key = btn.dataset.subSort;
+        if (sortState.key === key) {
+          sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortState.key = key;
+          sortState.direction = btn.dataset.firstDir || 'asc';
+        }
+        applySortIndicators(table, sortState);
+        applySubSortIndicators(table, sortState);
+        onSortChange();
+      });
+    });
+
+    // Per-attribute sort controls in the grouped header.
+    table.querySelectorAll('[data-attr-sort]').forEach(function (btn) {
+      if (btn.dataset.bound === '1') return;
+      btn.dataset.bound = '1';
+      btn.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var key = btn.dataset.attrSort;
+        if (sortState.key === key) {
+          sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+          sortState.key = key;
+          sortState.direction = 'desc';
+        }
+        applySortIndicators(table, sortState);
+        onSortChange();
+      });
+    });
+
     applySortIndicators(table, sortState);
+    applySubSortIndicators(table, sortState);
+  }
+
+  function applySubSortIndicators(table, sortState) {
+    table.querySelectorAll('[data-sub-sort]').forEach(function (btn) {
+      var on = btn.dataset.subSort === sortState.key;
+      btn.classList.toggle('is-sorted', on);
+      if (on) btn.dataset.dir = sortState.direction;
+      else delete btn.dataset.dir;
+    });
+  }
+
+  /** Neutral POS chip. Colored position chips were built and rejected. */
+  function posChipHtml(pos) {
+    return '<span class="pos-chip">' + escapeHtml(pos || '--') + '</span>';
+  }
+
+  /** RT as an explicit current -> potential lockup. Colours from the RT bucket helper. */
+  function rtLockupHtml(rt, potentialRt, year) {
+    var cls = recruitRtClass(rt, year);
+    var cur = typeof global.formatRtDisplay === 'function'
+      ? global.formatRtDisplay(rt) : (rt == null ? '--' : String(rt));
+    var html = '<span class="rt-lockup"><b class="' + cls + '">' + escapeHtml(cur) + '</b>';
+    if (potentialRt != null) {
+      var pcls = recruitRtClass(potentialRt, year);
+      var pot = typeof global.formatRtDisplay === 'function'
+        ? global.formatRtDisplay(potentialRt) : String(potentialRt);
+      html += '<i class="' + pcls + '">' + escapeHtml(pot) + '</i>';
+    }
+    return html + '</span>';
   }
 
   function renderRecruitTableRows(tbody, recruits, options) {
@@ -301,30 +371,32 @@
       if (newLeanIds.has(String(recruit.recruitId))) tr.classList.add('fcc-newlean');
       if (onRowClick) tr.classList.add('recruit-clickable');
       var nameHtml = recruitNameLinkHtml(recruit.recruitId, franchiseId, recruit.name);
-      var nameCell = newLeanIds.has(String(recruit.recruitId))
-        ? '<td><span class="fcc-newlean-cell"><span class="fcc-newlean-badge">New</span>' + nameHtml + '</span></td>'
-        : '<td>' + nameHtml + '</td>';
-      tr.innerHTML = [
-        nameCell,
-        '<td>' + recruit.homeRegion + '</td>',
-        '<td>' + recruit.archetype + '</td>',
+      var isNew = newLeanIds.has(String(recruit.recruitId));
+      // Region is a single letter product-wide, so it reads "Region A" ... "Region H".
+      var regionRaw = String(recruit.homeRegion || '').trim();
+      var regionText = regionRaw && regionRaw !== '--' ? 'Region ' + regionRaw.charAt(0).toUpperCase() : '';
+      var subParts = [];
+      if (regionText) subParts.push(escapeHtml(regionText));
+      if (recruit.archetype && recruit.archetype !== '--') subParts.push('<b>' + escapeHtml(recruit.archetype) + '</b>');
+      var identityCell = '<td class="c-ident"><div class="ident">' +
+        '<span class="ident-body">' +
+          '<span class="ident-name">' +
+            (isNew ? '<span class="fcc-newlean-badge">New</span> ' : '') + nameHtml +
+          '</span>' +
+          (subParts.length ? '<span class="ident-sub">' + subParts.join(' · ') + '</span>' : '') +
+        '</span></div></td>';
+tr.innerHTML = [
+        // Column order: Recruit | RT | POS | HT | WT | Attributes | Current Lean.
+        // Home Region and Archetype fold into the identity cell as a sub-line — as
+        // separate columns the table overflowed the panel and pushed Current Lean,
+        // the column this table exists to be scanned for, off-screen.
+        identityCell,
+        '<td>' + escapeHtml(recruit.yearDisplay || '--') + '</td>',
+        '<td class="c-rt">' + rtLockupHtml(recruit.rt, recruit.potentialRt, recruit.year) + '</td>',
+        '<td>' + posChipHtml(recruit.pos) + '</td>',
         '<td>' + recruit.height + '</td>',
         '<td>' + (recruit.weight != null ? recruit.weight : '--') + '</td>',
-        '<td>' + recruit.pos + '</td>',
-        '<td>' + recruit.yearDisplay + '</td>',
-        '<td>' + recruit.attrs.SC + '</td>',
-        '<td>' + recruit.attrs.SH + '</td>',
-        '<td>' + recruit.attrs.ID + '</td>',
-        '<td>' + recruit.attrs.OD + '</td>',
-        '<td>' + recruit.attrs.PS + '</td>',
-        '<td>' + recruit.attrs.BH + '</td>',
-        '<td>' + recruit.attrs.RB + '</td>',
-        '<td>' + recruit.attrs.AG + '</td>',
-        '<td>' + recruit.attrs.ST + '</td>',
-        '<td>' + recruit.attrs.ND + '</td>',
-        '<td>' + recruit.attrs.IQ + '</td>',
-        '<td>' + recruit.attrs.FT + '</td>',
-        '<td class="' + recruitRtClass(recruit.rt, recruit.year) + '" data-tooltip="current/potential" title="current/potential">' + formatRtWithPotential(recruit.rt, recruit.potentialRt) + '</td>',
+        '<td class="attr-tiles-cell">' + global.GOB_AttrTiles.groupedTilesHtml(recruit.rawAttrs) + '</td>',
         useLadder
           ? '<td class="lean-ladder-cell">' + global.RecruitingSpine.Lean.ladderHtml(
               global.RecruitingSpine.Lean.fromBackend({ Lean: recruit.lean }, { userTeamId: userTeamId, teamNameMap: teamNameMap })

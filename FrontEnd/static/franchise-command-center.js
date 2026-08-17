@@ -2204,24 +2204,31 @@ function renderFccRecruits() {
 
   if (useSignedRecruits) {
     if (!signedRecruitsDataCache.length) {
-      tbody.innerHTML = '<tr><td colspan="20">No recruits or walk-ons joined your team.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="8">No recruits or walk-ons joined your team.</td></tr>';
       return;
     }
     const rows = RecruitingCommon.sortRecruits(signedRecruitsDataCache, recruitSortState);
     if (tbody) tbody.innerHTML = '';
     rows.forEach(function (recruit) {
       const tr = document.createElement('tr');
+      // Same column order as the main path: Recruit | RT | POS | HT | WT | Attributes | Lean.
+      const sRegion = String(recruit.homeRegion || '').trim();
+      const sSub = [
+        sRegion && sRegion !== '--' ? 'Region ' + sRegion.charAt(0).toUpperCase() : '',
+        recruit.archetype && recruit.archetype !== '--' ? '<b>' + escapeHomeHtml(recruit.archetype) + '</b>' : '',
+      ].filter(Boolean).join(' · ');
       tr.innerHTML = [
-        '<td>' + RecruitingCommon.recruitNameLinkHtml(recruit.detailRecruitId, franchiseId, recruit.name) + '</td>',
-        '<td>' + recruit.homeRegion + '</td>',
-        '<td>' + recruit.archetype + '</td>',
+        '<td class="c-ident"><div class="ident"><span class="ident-body">' +
+          '<span class="ident-name">' + RecruitingCommon.recruitNameLinkHtml(recruit.detailRecruitId, franchiseId, recruit.name) + '</span>' +
+          (sSub ? '<span class="ident-sub">' + sSub + '</span>' : '') +
+        '</span></div></td>',
+        '<td>' + escapeHomeHtml(recruit.yearDisplay || '--') + '</td>',
+        '<td class="c-rt">' + fccRtLockupHtml(recruit.rt, recruit.potentialRt) + '</td>',
+        '<td>' + fccPosChipHtml(recruit.pos) + '</td>',
         '<td>' + recruit.height + '</td>',
         '<td>' + (recruit.weight != null ? recruit.weight : '--') + '</td>',
-        '<td>' + recruit.pos + '</td>',
-        '<td>' + (recruit.yearDisplay || '--') + '</td>',
-        // Shared attribute tiles; rawAttrs because the builder does its own 0-10 scaling.
-        '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.tilesHtml(recruit.rawAttrs) + '</td>',
-        '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + formatRtWithPotentialDisplay(recruit.rt, recruit.potentialRt) + '</td>'
+        '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(recruit.rawAttrs) + '</td>',
+        '<td>&mdash;</td>'
       ].join('');
       tbody.appendChild(tr);
     });
@@ -2229,7 +2236,7 @@ function renderFccRecruits() {
   }
 
   if (!leanRecruitsDataCache.length) {
-    tbody.innerHTML = '<tr><td colspan="21">No recruits currently have your team on their lean list.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="8">No recruits currently have your team on their lean list.</td></tr>';
     return;
   }
   RecruitingCommon.renderRecruitTableRows(
@@ -2291,6 +2298,12 @@ function initFccRecruits(topData) {
       raw: player
     };
   });
+  const recruitsAttrHead = document.getElementById('fcc-recruits-attr-head');
+  if (recruitsAttrHead && window.GOB_AttrTiles) {
+    recruitsAttrHead.innerHTML = window.GOB_AttrTiles.groupedHeaderHtml({
+      key: recruitSortState.key, dir: recruitSortState.direction,
+    });
+  }
   RecruitingCommon.bindSortableHeaders(
     document.getElementById('fcc-recruits-table'),
     recruitSortState,

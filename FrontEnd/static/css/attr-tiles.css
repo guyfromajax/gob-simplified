@@ -281,3 +281,17 @@ th.c-rt, td.c-rt { white-space: nowrap; }
   color: #fff;
 }
 .seg-track button:focus-visible { outline: 2px solid #F79420; outline-offset: 1px; }
+
+/* Region / Archetype sort controls under "Recruit" — their columns folded into the
+   identity cell, but the sort affordance had to survive. */
+.ident-subsort {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+  justify-content: flex-start;
+}
+.ident-subsort .attr-abbr {
+  font: 700 9px/1 'Inter', sans-serif;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}

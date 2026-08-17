@@ -262,7 +262,9 @@ test.describe('the four in-scope surfaces all use the shared builder', () => {
       const html = read(page);
       expect(html, page).not.toContain('<th>SC</th>');
       expect(html, page).not.toContain('data-sort-key="SC"');
-      expect(html, page).toContain('class="attr-tiles-head">Attributes');
+      // The grouped header's contents are rendered by attrTiles.js, so assert the
+      // host cell exists rather than a literal label.
+      expect(html, page).toContain('attr-tiles-head');
     }
   });
 

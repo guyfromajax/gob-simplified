@@ -24,6 +24,7 @@ function extractById(html, id) {
   }
 }
 const ROSTER_TAB = extractById(HTML, 'roster-tab');
+const RECRUITS_TAB = extractById(HTML, 'recruits-tab');
 
 async function mount(page) {
   await page.setViewportSize({ width: 1500, height: 900 });
@@ -180,3 +181,101 @@ test('no stacked practice-squad table remains in the Roster tab', async () => {
 });
 
 const CSS_HAS_POS_COLORS = /--pos-(pg|sg|sf|pf|c)\b/i.test(CSS);
+
+
+test.describe('FCC Recruiting tab', () => {
+  async function mountRecruits(page, width) {
+    await page.setViewportSize({ width: width || 1500, height: 900 });
+    await page.setContent(`<style>${CSS}</style>
+      <style>body{margin:0;background:#0b0d14}.tab-content{display:block!important}
+             #franchise-container{width:${width || 1500}px}</style>
+      <div id="franchise-container"><div id="tournament-tabs">${RECRUITS_TAB}</div></div>`);
+    await page.addScriptTag({ content: read('js/shared/rtBucket.js') });
+    await page.addScriptTag({ content: read('js/shared/attrTiles.js') });
+    await page.evaluate(() => {
+      const A = ['SC','SH','ID','OD','PS','BH','RB','AG','ST','ND','IQ','FT'];
+      const mk = (i) => { const a={}; A.forEach((k,j)=>a[k]=((i*7+j*13)%95+5)); return a; };
+      document.getElementById('fcc-recruits-attr-head').innerHTML =
+        window.GOB_AttrTiles.groupedHeaderHtml({ key: 'rt', dir: 'desc' });
+      document.getElementById('fcc-recruits-body').innerHTML = [0,1,2].map((i) =>
+        '<tr><td class="c-ident"><div class="ident"><span class="ident-body">' +
+        '<span class="ident-name"><a href="#">Isaiah Frame</a></span>' +
+        '<span class="ident-sub">Region A · <b>Slasher</b></span></span></div></td>' +
+        '<td>JR</td>' +
+        '<td class="c-rt"><span class="rt-lockup"><b class="rt-high">B</b><i class="rt-elite">A</i></span></td>' +
+        '<td><span class="pos-chip">SG</span></td><td>6\'4"</td><td>190</td>' +
+        '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(mk(i)) + '</td>' +
+        '<td class="lean-ladder-cell">lean</td></tr>').join('');
+    });
+  }
+
+  test('column order is Recruit RT POS HT WT Attributes Current Lean', async ({ page }) => {
+    await mountRecruits(page);
+    // The attributes cell holds the grouped header grid, so identify it by class
+    // rather than by text.
+    const labels = await page.evaluate(() =>
+      [...document.querySelectorAll('#fcc-recruits-table thead th')].map((t) =>
+        t.classList.contains('attr-tiles-head')
+          ? 'ATTRS'
+          : t.firstChild.textContent.trim()));
+    expect(labels).toEqual(['Recruit', 'YR', 'RT', 'POS', 'HT', 'WT', 'ATTRS', 'Current Lean']);
+  });
+
+  test('Region and Archetype fold into the identity sub-line', async ({ page }) => {
+    await mountRecruits(page);
+    const m = await page.evaluate(() => {
+      const sub = document.querySelector('#fcc-recruits-body .ident-sub');
+      return { text: sub.textContent.trim(), opacity: getComputedStyle(sub).color };
+    });
+    expect(m.text).toBe('Region A · Slasher');
+    expect(m.opacity).toBe('rgba(255, 255, 255, 0.62)');   // AA floor, not lighter
+  });
+
+  test('both folded columns keep a sort control', async ({ page }) => {
+    await mountRecruits(page);
+    const keys = await page.evaluate(() =>
+      [...document.querySelectorAll('#fcc-recruits-table [data-sub-sort]')].map((b) => ({
+        key: b.dataset.subSort, first: b.dataset.firstDir })));
+    expect(keys).toEqual([
+      { key: 'homeRegion', first: 'asc' },
+      { key: 'archetype', first: 'asc' },
+    ]);
+  });
+
+  test('all 12 attributes sort, and the header lays out six across', async ({ page }) => {
+    await mountRecruits(page);
+    const m = await page.evaluate(() => {
+      const groups = [...document.querySelectorAll('#fcc-recruits-table thead .attr-grp')];
+      return {
+        controls: document.querySelectorAll('#fcc-recruits-table [data-attr-sort]').length,
+        rows: [...new Set(groups.map((g) => Math.round(g.getBoundingClientRect().y)))].length,
+      };
+    });
+    expect(m.controls).toBe(12);
+    expect(m.rows).toBe(1);
+  });
+
+  test('no horizontal scrollbar at the production container width', async ({ page }) => {
+    await mountRecruits(page, 1440);
+    const m = await page.evaluate(() => {
+      const wrap = document.querySelector('#recruits-tab .fcc-data-card-body');
+      return {
+        overflows: wrap.scrollWidth > wrap.clientWidth + 1,
+        bodyOverflows: document.body.scrollWidth > window.innerWidth + 1,
+        leanVisible: !!document.querySelector('#fcc-recruits-body .lean-ladder-cell'),
+      };
+    });
+    expect(m.overflows).toBe(false);
+    expect(m.bodyOverflows).toBe(false);
+    expect(m.leanVisible).toBe(true);
+  });
+
+  test('header count matches body count — no orphaned columns', async ({ page }) => {
+    await mountRecruits(page);
+    const m = await page.evaluate(() => ({
+      heads: document.querySelectorAll('#fcc-recruits-table thead th').length,
+      cells: document.querySelectorAll('#fcc-recruits-body tr:first-child td').length,
+    }));
+    expect(m.heads).toBe(m.cells);
+  });
+});

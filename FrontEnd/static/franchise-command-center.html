@@ -396,15 +396,22 @@
             <table id="fcc-recruits-table" class="roster-table recruiting-table">
               <thead>
                 <tr>
-                  <th data-sort-key="name">Name</th>
-                  <th data-sort-key="homeRegion">Home Region</th>
-                  <th data-sort-key="archetype">Archetype</th>
+                  <!-- Region and Archetype folded into the identity cell as a sub-line.
+                       Their sort affordances survive as controls under "Recruit" — folding
+                       must not silently delete a sortable column. Both are alphabetical,
+                       so both sort ascending first. -->
+                  <th class="c-ident" data-sort-key="name">Recruit
+                    <span class="ident-subsort">
+                      <button type="button" class="attr-abbr" data-sub-sort="homeRegion" data-first-dir="asc">Region</button>
+                      <button type="button" class="attr-abbr" data-sub-sort="archetype" data-first-dir="asc">Archetype</button>
+                    </span>
+                  </th>
+                  <th data-sort-key="year">YR</th>
+                  <th class="c-rt" data-sort-key="rt">RT<span class="rt-caption">cur &rarr; pot</span></th>
+                  <th data-sort-key="pos">POS</th>
                   <th data-sort-key="height">HT</th>
                   <th data-sort-key="weight">WT</th>
-                  <th data-sort-key="pos">POS</th>
-                  <th data-sort-key="year">YR</th>
-                  <th class="attr-tiles-head">Attributes</th>
-                  <th data-sort-key="rt" data-tooltip="current/potential">RT</th>
+                  <th class="attr-tiles-head" id="fcc-recruits-attr-head"></th>
                   <th id="fcc-recruits-last-col" data-sort-key="lean">Current Lean</th>
                 </tr>
               </thead>
