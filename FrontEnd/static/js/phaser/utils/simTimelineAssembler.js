@@ -21,6 +21,7 @@
  *     worm:{ samples:[{elapsed,margin}], elapsed, domain, progress },
  *     teamPanel:{ away:{reb,to,fb,paint,fgm,fga,fgPct,tpm,fouls}, home:{...} },
  *     away:[p×5], home:[p×5], benchAway:[c], benchHome:[c],
+ *     events:[{id,kind,last}]  — what happened this turn, for the card engine,
  *     ticker:null, breakSummary?, final? }
  *   player p: { id,pos,name,jersey,rt,pts,reb,ast,def,fouls,hot,cold,out,sub,spot }
  *   bench chip c: { name,pts,reb,out }
@@ -242,6 +243,37 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
         bucket[k] = num(bucket[k]) + num(v);
       });
     });
+  };
+
+  /**
+   * Notable per-player events for this turn, read straight off the emitted deltas.
+   *
+   * The card engine needs to know WHAT just happened; the assembler already carries the
+   * numbers, so this classifies them rather than deriving anything new. A Moment card is a
+   * running-total readout off one of these — never a described play (brief §8).
+   *
+   * `last` is the increment that triggered it, which the copy pack's {LAST} slot fills.
+   */
+  const turnEvents = (deltas) => {
+    if (!deltas || typeof deltas !== 'object') return [];
+    const out = [];
+    Object.entries(deltas).forEach(([pid, entry]) => {
+      const id = nid(pid);
+      const st = (entry && entry.stats) || {};
+      const d = (k) => num(st[k]);
+      const fgm = d('FGM');
+      const fga = d('FGA');
+      const tpm = num(st['3PTM'] != null ? st['3PTM'] : st['3PM']);
+      const boards = d('OREB') + d('DREB');
+      if (tpm > 0) out.push({ id, kind: 'three', last: 3 });
+      else if (fgm > 0) out.push({ id, kind: d('PIP') > 0 ? 'paint' : 'bucket', last: d('PTS') || 2 });
+      if (fga > fgm) out.push({ id, kind: 'miss', last: fga - fgm });
+      if (boards > 0) out.push({ id, kind: 'board', last: boards });
+      if (d('AST') > 0) out.push({ id, kind: 'dime', last: d('AST') });
+      if (d('STL') + d('BLK') > 0) out.push({ id, kind: 'stock', last: d('STL') + d('BLK') });
+      if (d('F') > 0) out.push({ id, kind: 'foul', last: d('F') });
+    });
+    return out;
   };
 
   const teamOf = (id) => (directory[id] && directory[id].team) || null;
@@ -580,6 +612,7 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
         ),
         benchAway: benchChips(court, 'away', fouledOut),
         benchHome: benchChips(court, 'home', fouledOut),
+        events: turnEvents(turn.deltas),
         ticker: null, // moments tabled — engine leaves the 44px slot empty
       };
       if (isLast) {

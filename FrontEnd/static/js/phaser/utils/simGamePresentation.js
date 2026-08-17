@@ -13,6 +13,8 @@
 
 import { fadeOutPregameBed } from './gameSfx.js';
 import { REG_Q_SEC } from './simWormTime.js';
+import { loadMomentCopy } from './simMomentCopy.js';
+import { CardCadence } from './simCardCadence.js';
 
 const POSC = { PG: '#4A90D9', SG: '#7B5EA7', SF: '#3A8C4A', PF: '#C0392B', C: '#D4A017' };
 const GREEN = '#34EC27', BLUE = '#4A90D9', ORANGE = '#F79420', RED = '#ff6d6d', GOLD = '#FFD700';
@@ -176,6 +178,36 @@ function ensureStyles() {
     .sgp-root .wl-axis{display:flex;justify-content:space-between;margin-top:3px;font-family:ui-monospace,Menlo,monospace;font-size:8px;letter-spacing:.06em;color:var(--w25)}
     .sgp-root .wormdot{filter:drop-shadow(0 0 4px currentColor)}
     .sgp-root .slot{position:relative;flex-shrink:0;height:200px;display:flex;flex-direction:column;justify-content:center}
+    /* ---- Cards in the directed slot. The slot is already reserved at 200, so a card
+       arriving changes nothing about the stage's size — only what fills the lower band. ---- */
+    .sgp-root .card{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:8px;
+      padding:14px 15px;border-radius:11px;z-index:3;
+      background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.012));
+      box-shadow:inset 0 0 0 1px var(--cc),0 12px 30px rgba(0,0,0,.5);
+      opacity:1;transform:none;
+      transition:opacity .18s cubic-bezier(.2,.7,.2,1),transform .18s cubic-bezier(.2,.7,.2,1)}
+    /* Entry only: the settled card carries no transform, so text never sits on a scaled layer. */
+    .sgp-root .card.enter{opacity:0;transform:scale(.985) translateY(5px)}
+    .sgp-root .card.leaving{opacity:0}
+    .sgp-root .ctag{align-self:flex-start;font-family:'Bebas Neue',sans-serif;font-size:12px;line-height:1;letter-spacing:.16em;padding:3px 7px 2px;border-radius:4px;border:1px solid}
+    .sgp-root .cline{font-family:'Bebas Neue',sans-serif;font-size:31px;line-height:1.02;letter-spacing:.02em;color:#fff;text-wrap:balance}
+    .sgp-root .csub{font-family:ui-monospace,Menlo,monospace;font-size:9px;letter-spacing:.1em;color:var(--w40)}
+    .sgp-root .cmargin{display:flex;flex-direction:column;gap:6px}
+    .sgp-root .cmrow{display:flex;align-items:baseline;justify-content:space-between}
+    .sgp-root .cmval{font-family:'Bebas Neue',sans-serif;font-size:34px;line-height:1;letter-spacing:.02em}
+    .sgp-root .cmtug{position:relative;height:13px;border-radius:7px;background:rgba(255,255,255,.07)}
+    .sgp-root .cmtug::before{content:'';position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,.22)}
+    .sgp-root .cmtug .pull{position:absolute;top:0;bottom:0;border-radius:7px}
+    .sgp-root .cset{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.14em;color:var(--w70);border:1px solid rgba(255,255,255,.16);border-radius:5px;padding:3px 8px 2px}
+    .sgp-root .cset b{color:${GOLD};font-weight:400}
+    .sgp-root .cbig{display:flex;align-items:baseline;gap:9px}
+    .sgp-root .cbig .n{font-family:'Bebas Neue',sans-serif;font-size:40px;line-height:1;color:#fff}
+    .sgp-root .cbig .l{font-family:'Bebas Neue',sans-serif;font-size:15px;letter-spacing:.14em;color:var(--w55)}
+    /* Dim, never the quarter-break blur: on a 2.6s card a blur reads as a modal you must
+       wait out, and it destroys whatever the coach was mid-read on. */
+    .sgp-root .zones .board{transition:filter .18s}
+    .sgp-root .zones.is-carddim .board{filter:brightness(.72)}
+
     .sgp-root .pretip-lbl{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.28em;color:rgba(255,255,255,.40);pointer-events:none;z-index:2}
     .sgp-root.is-pretip .pretip-lbl{display:flex}
 
@@ -220,7 +252,28 @@ function ensureStyles() {
     .sgp-root .finalstamp{position:absolute;top:16px;left:50%;transform:translateX(-50%);z-index:6;display:none;font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:.28em;color:#fff;background:rgba(11,13,20,.6);border:1px solid rgba(255,255,255,.16);border-radius:8px;padding:5px 20px 3px}
     .sgp-root.is-final .finalstamp{display:block}
 
+    /* ---- cadence debug panel (?debug_cards=1) -----------------------------------------
+       Off by default and position:fixed, so it never participates in the composition's
+       layout or its measurements. This is the panel the weights get tuned against. */
+    .sgp-dbg{position:fixed;top:8px;right:8px;width:322px;max-height:calc(100vh - 16px);z-index:2100;
+      display:flex;flex-direction:column;gap:6px;padding:10px 11px;border-radius:10px;
+      background:rgba(8,10,15,.94);border:1px solid rgba(255,255,255,.14);
+      font-family:ui-monospace,Menlo,monospace;font-size:10px;color:rgba(255,255,255,.72)}
+    .sgp-dbg h4{font-size:9px;letter-spacing:.16em;color:rgba(255,255,255,.42);margin:0;text-transform:uppercase}
+    .sgp-dbg .row{display:flex;justify-content:space-between;gap:8px}
+    .sgp-dbg .row b{color:#fff;font-weight:600;font-variant-numeric:tabular-nums}
+    .sgp-dbg .grid{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;text-align:center}
+    .sgp-dbg .grid div{background:rgba(255,255,255,.05);border-radius:4px;padding:3px 2px}
+    .sgp-dbg .grid i{display:block;font-style:normal;color:rgba(255,255,255,.4);font-size:8px}
+    .sgp-dbg .log{display:flex;flex-direction:column;gap:1px;overflow:auto;max-height:230px}
+    .sgp-dbg .lg{display:grid;grid-template-columns:30px 62px 1fr;gap:5px;padding:2px 0;
+      border-bottom:1px dashed rgba(255,255,255,.07);color:rgba(255,255,255,.38)}
+    .sgp-dbg .lg.f{color:rgba(255,255,255,.92)}
+    .sgp-dbg .lg .x{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .sgp-dbg .hr{height:1px;background:rgba(255,255,255,.1);margin:2px 0}
+
     @media (prefers-reduced-motion: reduce){
+      .sgp-root .card,.sgp-root .zones .board{transition:none}
       .sgp-root .fill,.sgp-root .tug .pull{transition:none}
       .sgp-root .prow.spot::before,.sgp-root .flame{animation:none}
       .sgp-root.fade-in{animation:none}
@@ -525,6 +578,141 @@ function updateTeamPanel(panelEl, teamPanel, awayColor, homeColor) {
   });
 }
 
+/* ===================== CARDS (brief §8) =====================
+ * One at a time, in the already-reserved 200px slot. Four types share one component: a tag,
+ * a body, and a mono sub-line. Copy never lives here — every string arrives on the card model
+ * from the moment pack (see simMomentCopy.js).
+ */
+
+/** Hold is the same for every type, clutch included. */
+const CARD_HOLD_MS = 2600;
+/** Entry transition; exit is a plain fade of the same length. */
+const CARD_ENTER_MS = 180;
+
+const CARD_COLORS = { green: GREEN, blue: BLUE, orange: ORANGE, red: RED, gold: GOLD };
+
+/** Copy packs name colours; resolve to the palette, never to a raw value from data. */
+function cardColor(name) {
+  return CARD_COLORS[String(name || '').toLowerCase()] || GREEN;
+}
+
+/**
+ * Margin is NOT a separate component — it is the §7 tug at higher emphasis, and it must be
+ * whichever tug currently has the widest edge. Rates (FG%, 3PM) are excluded: they are pivot
+ * rows, not tugs, so they have no edge to promote.
+ */
+function widestMarginStat(teamPanel, stats) {
+  const a = (teamPanel && teamPanel.away) || {};
+  const h = (teamPanel && teamPanel.home) || {};
+  let best = null;
+  (stats || []).forEach((spec) => {
+    const av = Number(a[spec.key]) || 0;
+    const hv = Number(h[spec.key]) || 0;
+    const edge = Math.abs(av - hv);
+    if (edge <= 0) return;
+    if (!best || edge > best.edge) best = { key: spec.key, label: spec.label, away: av, home: hv, edge };
+  });
+  return best;
+}
+
+function marginBodyHtml(m, awayColor, homeColor) {
+  const homeBetter = m.home > m.away;
+  const edge = Math.abs(m.home - m.away);
+  const pct = Math.min(edge / Math.max(m.home, m.away, 1), 1) * 50;
+  const col = homeBetter ? homeColor : awayColor;
+  const dim = 'rgba(255,255,255,.45)';
+  return '<div class="cmargin">' +
+    '<div class="cmrow">' +
+      `<span class="cmval" style="color:${homeBetter ? dim : '#fff'}">${esc(m.away)}</span>` +
+      `<span class="cmval" style="color:${homeBetter ? '#fff' : dim}">${esc(m.home)}</span>` +
+    '</div>' +
+    `<div class="cmtug"><div class="pull" style="${homeBetter ? 'left:50%' : 'right:50%'};width:${pct}%;` +
+      `background:linear-gradient(${homeBetter ? '90deg' : '270deg'},${col}44,${col})"></div></div>` +
+  '</div>';
+}
+
+/**
+ * Build a card's markup from its model. Every visible string comes from the model.
+ * @param {object} c { kind, tag, color, line, sub, margin?, ctx? }
+ */
+function cardHtml(c, awayColor, homeColor) {
+  const color = cardColor(c.color);
+  let tag = '';
+  let body = '';
+  if (c.kind === 'margin' && c.margin) {
+    tag = `<span class="ctag" style="color:${color};border-color:${color}66">${esc(c.margin.label)}</span>`;
+    body = marginBodyHtml(c.margin, awayColor, homeColor);
+  } else if (c.kind === 'context' && c.ctx) {
+    // The setting sits beside its outcome and makes no claim. No probability, ever.
+    tag = `<div class="cset">${esc(c.ctx.setting)}: <b>${esc(c.ctx.value)}</b></div>`;
+    body = `<div class="cbig"><span class="n">${esc(c.ctx.now)}</span><span class="l">${esc(c.ctx.stat)}</span></div>`;
+  } else {
+    tag = `<span class="ctag" style="color:${color};border-color:${color}66">${esc(c.tag)}</span>`;
+    body = `<div class="cline">${esc(c.line)}</div>`;
+  }
+  const sub = c.sub ? `<div class="csub">${esc(c.sub)}</div>` : '';
+  return `<div class="card enter" data-card data-kind="${esc(c.kind || 'moment')}" style="--cc:${color}55">${tag}${body}${sub}</div>`;
+}
+
+/**
+ * Cadence debug panel (brief §9: "instrument this").
+ *
+ * Every fired card AND every suppressed candidate with its reason, plus measured per-quarter
+ * counts and the share of runtime with a card up. Silent suppression is untunable — the
+ * reasons are the whole point, because after Q1 it is the rest floor, the player cooldown and
+ * event supply that bind, not the card-to-card gap.
+ *
+ * Enabled with ?debug_cards=1 (matching the existing debug_pc convention), never by default.
+ */
+function cardsDebugEnabled() {
+  try {
+    if (typeof window === 'undefined') return false;
+    if (window.DEBUG_CARDS) return true;
+    return new URLSearchParams(window.location.search).has('debug_cards');
+  } catch (e) {
+    return false;
+  }
+}
+
+function renderCardsDebug(el, cadence) {
+  if (!el) return;
+  if (!cadence) { el.innerHTML = '<h4>cadence</h4><div class="row"><span>waiting for copy…</span></div>'; return; }
+  const st = cadence.stats();
+  const prof = cadence.profile();
+  const target = 12;   // brief §9: roughly a dozen cards across the broadcast
+  const rows = st.byQuarter.map((q) => `<div><b>${q.fired}</b><i>Q${q.q}</i></div>`).join('');
+  const reasons = Object.entries(st.suppressedByReason)
+    .sort((a, b) => b[1] - a[1])
+    .map(([r, n]) => `<div class="row"><span>${esc(r)}</span><b>${n}</b></div>`).join('');
+  const log = cadence.log.slice(-40).reverse().map((e) => `
+    <div class="lg${e.fired ? ' f' : ''}">
+      <span>${e.t.toFixed(0)}s</span>
+      <span>${esc(String(e.tag || '').slice(0, 9))}</span>
+      <span class="x">${esc(e.fired ? (e.detail || '') : e.reason)}</span>
+    </div>`).join('');
+  el.innerHTML = `
+    <h4>cadence · Q${cadence.quarter}${cadence.suspended ? ' · HELD' : ''}</h4>
+    <div class="row"><span>playback</span><b>${st.t.toFixed(1)}s</b></div>
+    <div class="row"><span>cards fired</span><b>${st.total} / ~${target}</b></div>
+    <div class="row"><span>share on screen</span><b>${st.share}%</b></div>
+    <div class="row"><span>suppressed</span><b>${st.suppressed}</b></div>
+    <div class="hr"></div>
+    <h4>fired by quarter</h4>
+    <div class="grid">${rows}</div>
+    <div class="hr"></div>
+    <h4>gates now</h4>
+    <div class="row"><span>gap / rest</span><b>${prof.gap}s / ${prof.restFloor}s</b></div>
+    <div class="row"><span>player cool</span><b>${prof.playerCool}s</b></div>
+    <div class="row"><span>variety hold</span><b>${Math.round(prof.variety * 100)}%</b></div>
+    <div class="row"><span>by type</span><b>M${st.counts.moment} R${st.counts.run} G${st.counts.margin} C${st.counts.context}</b></div>
+    <div class="hr"></div>
+    <h4>held, by reason</h4>
+    <div class="reasons" data-dbg-reasons>${reasons || '<div class="row"><span>none yet</span></div>'}</div>
+    <div class="hr"></div>
+    <h4>candidates (newest first)</h4>
+    <div class="log">${log}</div>`;
+}
+
 function setRestMode(root, mode) {
   const wormBtn = root.querySelector('.ctlseg [data-v="worm"]');
   const teamBtn = root.querySelector('.ctlseg [data-v="team"]');
@@ -579,13 +767,70 @@ export function showSimGamePresentation(timeline, opts = {}) {
   window.addEventListener('resize', positionBelowScoreboard);
 
   let restMode = 'worm';
+  let cadence = null;          // set once the copy pack resolves; see below
+  // Declared before the control handler below, which reads it on click.
+  const dbgEl = cardsDebugEnabled() ? document.createElement('div') : null;
+  if (dbgEl) {
+    dbgEl.className = 'sgp-dbg';
+    root.appendChild(dbgEl);
+    renderCardsDebug(dbgEl, null);
+  }
   setRestMode(root, restMode);
   root.querySelector('.ctlseg')?.addEventListener('click', (ev) => {
     const btn = ev.target.closest('button[data-v]');
     if (!btn) return;
     restMode = btn.getAttribute('data-v') === 'team' ? 'team' : 'worm';
     setRestMode(root, restMode);
+    // Team Stats is a hold mode: a card already up gives the slot back at once, and the
+    // engine stops queueing rather than banking candidates to dump on the way back.
+    if (cadence) cadence.suspend(restMode === 'team');
+    if (dbgEl) renderCardsDebug(dbgEl, cadence);
+    if (restMode === 'team') endCard();
   });
+
+  /* ---- card presenter -------------------------------------------------------------
+   * Owns only the showing of a card: entry, hold, exit, and the board dim underneath.
+   * WHICH card and WHEN is the cadence engine's job; this deliberately knows neither.
+   */
+  const slotEl = root.querySelector('[data-slot]');
+  const zonesEl = root.querySelector('.zones');
+  const cardTimers = [];
+  let cardBusy = false;
+
+  const clearCardTimers = () => { cardTimers.splice(0).forEach(clearTimeout); };
+
+  const endCard = () => {
+    clearCardTimers();
+    if (slotEl) slotEl.querySelectorAll('[data-card]').forEach((n) => n.remove());
+    if (zonesEl) zonesEl.classList.remove('is-carddim');
+    cardBusy = false;
+  };
+
+  /**
+   * Present one card. Resolves when the slot is free again.
+   * Returns false without rendering when Team Stats is up: the user asked for the numbers,
+   * and taking them away is the one thing not to do. Nothing queues while held.
+   */
+  const showCard = (model) => {
+    if (!slotEl || !model) return false;
+    if (root.dataset.restMode === 'team') return false;
+    if (cardBusy) return false;
+    cardBusy = true;
+    slotEl.insertAdjacentHTML('beforeend', cardHtml(model, teams.away.color, teams.home.color));
+    const el = slotEl.querySelector('[data-card]');
+    if (zonesEl) zonesEl.classList.add('is-carddim');
+    const settle = () => { if (el) el.classList.remove('enter'); };
+    if (prefersReduced) settle();
+    else if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(settle));
+    else cardTimers.push(setTimeout(settle, 16));
+
+    cardTimers.push(setTimeout(() => {
+      if (el) el.classList.add('leaving');
+      if (zonesEl) zonesEl.classList.remove('is-carddim');
+      cardTimers.push(setTimeout(endCard, prefersReduced ? 0 : CARD_ENTER_MS));
+    }, CARD_HOLD_MS));
+    return true;
+  };
 
   const wormFill = root.querySelector('.wormfill');
   const wlTeam = root.querySelector('.wl-team');
@@ -674,6 +919,23 @@ export function showSimGamePresentation(timeline, opts = {}) {
     return Math.min(FRAME_MAX_MS, Math.max(FRAME_MIN_MS, Math.round(QUARTER_MS / c)));
   };
 
+  /* ---- cadence ----------------------------------------------------------------------
+   * Copy loads asynchronously; until it lands the broadcast simply runs without cards
+   * rather than blocking the tip-off on a fetch.
+   */
+  loadMomentCopy().then((pack) => {
+    cadence = new CardCadence({
+      pack,
+      teams,
+      seed: (frames && frames.length) || 7,
+      onCard: (model) => showCard(model),
+    });
+    root.__cadence = cadence;
+    if (dbgEl) renderCardsDebug(dbgEl, cadence);
+  });
+
+  root.__cards = { showCard, endCard, isBusy: () => cardBusy };
+
   return new Promise((resolve) => {
     const timers = [];
     let done = false;
@@ -682,6 +944,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
       done = true;
       fadeOutPregameBed();
       timers.forEach(clearTimeout);
+      clearCardTimers();
       window.removeEventListener('resize', positionBelowScoreboard);
       root.classList.add('dissolving');
       const t = setTimeout(() => { root.remove(); resolve(); }, prefersReduced ? 0 : 450);
@@ -692,8 +955,13 @@ export function showSimGamePresentation(timeline, opts = {}) {
     const step = () => {
       if (done) return;
       if (i >= frames.length) { finish(); return; }
-      renderFrame(frames[i]);
-      const hold = holdFor(frames[i]);
+      const frame = frames[i];
+      renderFrame(frame);
+      const hold = holdFor(frame);
+      // The engine measures PLAYBACK seconds — the time the viewer actually experiences —
+      // so a frame's own hold is the tick, not game clock.
+      if (cadence) cadence.step(frame, hold / 1000);
+      if (dbgEl) renderCardsDebug(dbgEl, cadence);
       i += 1;
       timers.push(setTimeout(step, hold));
     };

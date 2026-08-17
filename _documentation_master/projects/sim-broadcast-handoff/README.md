@@ -10,8 +10,14 @@ so the agent can open the mockups as reference.
 - `Sim Broadcast - Mockup 3 Clutch.html` — clutch frame mode + its gate
 
 Mockups 2 and 3 load the shared files by relative path, so keep the folder flat.
-Mockup 2 fetches `sim-moment-copy.md` over HTTP — serve the folder (any static server) rather than
-opening from `file://`, or it silently falls back to `sim-moment-pack.js`.
+
+> **Card copy has moved.** `sim-moment-copy.md` is now canonical at
+> `FrontEnd/static/sim-moment-copy.md` and is served by the app — edit it there. The copy that
+> used to sit in this folder was deleted so the two cannot drift.
+> Mockup 2 fetches `sim-moment-copy.md` relative to itself, so with the file gone it now falls
+> back to `sim-moment-pack.js` (a designed fallback, not a break) and shows that pack's copy.
+> To preview live copy edits in the mockup, drop a copy of the canonical file back into this
+> folder temporarily — just don't commit it.
 
 ## Shared source
 
@@ -20,7 +26,7 @@ opening from `file://`, or it silently falls back to `sim-moment-pack.js`.
 | `sim-broadcast-frame.css` | every measurement and token in the frame |
 | `sim-broadcast-parts.js` | board rows, worm, team stats panel, control cluster |
 | `sim-card-engine.js` | selection weights, cadence gates, per-quarter curve |
-| `sim-moment-copy.md` | **all card copy — edit this file, reload, done** |
+| `sim-moment-copy.md` | **all card copy** — now at `FrontEnd/static/sim-moment-copy.md` (canonical, served) |
 | `sim-moment-pack.js` | fallback copy pack; the .md wins when reachable |
 
 The mockups drive themselves from a synthetic event stream standing in for real emitted turns.
