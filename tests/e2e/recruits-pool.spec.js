@@ -308,6 +308,48 @@ test.describe('filters compose', () => {
   });
 });
 
+test.describe('attribute tiles', () => {
+  test('10+ renders in the brand RT display blue', async ({ page }) => {
+    await mountPool(page);
+    const m = await page.evaluate(() => {
+      // Force a known spread onto the first row's chips and re-read the classes.
+      const chips = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child .at')];
+      return chips.map((c) => ({
+        v: Number(c.querySelector('s').textContent),
+        cls: c.className,
+        color: getComputedStyle(c.querySelector('s')).color,
+      }));
+    });
+    const blue = 'rgb(74, 144, 217)';
+    for (const chip of m) {
+      if (chip.v >= 10) {
+        expect(chip.cls, `value ${chip.v}`).toContain('elite');
+        expect(chip.color, `value ${chip.v}`).toBe(blue);
+      } else {
+        expect(chip.cls, `value ${chip.v}`).not.toContain('elite');
+        expect(chip.color, `value ${chip.v}`).not.toBe(blue);
+      }
+    }
+  });
+
+  test('the tier boundaries hold at 9/10', async ({ page }) => {
+    await mountPool(page);
+    const m = await page.evaluate(() => {
+      const chip = document.querySelector('#hub-pool tbody tr.rec:first-child .at');
+      const s = chip.querySelector('s');
+      const read = (v) => {
+        s.textContent = String(v);
+        chip.className = 'at' + (v >= 10 ? ' elite' : v >= 7 ? ' hi' : v <= 3 ? ' lo' : '');
+        return getComputedStyle(s).color;
+      };
+      return { nine: read(9), ten: read(10), sixteen: read(16) };
+    });
+    expect(m.ten).toBe('rgb(74, 144, 217)');
+    expect(m.sixteen).toBe('rgb(74, 144, 217)');
+    expect(m.nine).not.toBe('rgb(74, 144, 217)');
+  });
+});
+
 test.describe('watchlist', () => {
   test('star toggles, is 32px, gold when on, hollow when off, and has no text label', async ({ page }) => {
     await mountPool(page);

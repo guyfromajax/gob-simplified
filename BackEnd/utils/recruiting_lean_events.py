@@ -137,9 +137,22 @@ def diff_lean(
 
     # Third parties knocked off a ladder the user is on — the field changed even when
     # the user's own rank did not.
-    for gone in sorted(_teams_on(old) - _teams_on(new)):
-        if gone != user:
-            events.append(_event(DISPLACED, displaced_team_id=gone))
+    #
+    # SUPPRESSED when this same diff produced the user's own gain. One lean recalc has
+    # one cause, so a team falling off alongside gained_you / moved_up did so *because*
+    # the user was added or climbed — it isn't independent news. Reporting it would also
+    # claim continuity the player never had: "dropped Lancaster — you're still #3" reads
+    # as though they held #3 through the change, when a moment earlier they weren't on
+    # the ladder at all.
+    #
+    # Only gained_you and moved_up suppress it. A displaced event with no user movement
+    # is the bystander case this kind exists for, and one alongside a drop or a slide is
+    # still independent of the user's own loss.
+    user_gained = any(event.get("kind") in (GAINED_YOU, MOVED_UP) for event in events)
+    if not user_gained:
+        for gone in sorted(_teams_on(old) - _teams_on(new)):
+            if gone != user:
+                events.append(_event(DISPLACED, displaced_team_id=gone))
 
     return events
 

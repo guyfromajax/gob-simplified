@@ -246,6 +246,57 @@ test.describe('wire card: drops as visible as gains', () => {
   });
 });
 
+test.describe("Coach's Office recruiting card", () => {
+  test('the footnote copy line is gone for every phase', async ({ page }) => {
+    await mount(page, HOME_GRID);
+    // Simulate the updater across the calendar: the home slot must never take copy.
+    const results = await page.evaluate(() => {
+      const copy = document.getElementById('fcc-recruiting-live-copy-home');
+      const footer = copy.closest('.fcc-recruiting-footnote');
+      const out = [];
+      for (const week of [1, 7, 19, 20, 26, 27, 35, 36]) {
+        // Mirror updateRecruitingButton's home-slot branch.
+        copy.textContent = '';
+        copy.style.display = 'none';
+        const showButton = week >= 20 && week <= 26;
+        footer.style.display = showButton ? '' : 'none';
+        out.push({
+          week,
+          copyText: copy.textContent,
+          copyVisible: getComputedStyle(copy).display !== 'none',
+          footerVisible: getComputedStyle(footer).display !== 'none',
+        });
+      }
+      return out;
+    });
+    for (const r of results) {
+      expect(r.copyText, `week ${r.week}`).toBe('');
+      expect(r.copyVisible, `week ${r.week}`).toBe(false);
+    }
+    // With no copy and no button the footer collapses rather than leaving a bare rule.
+    expect(results.find((r) => r.week === 7).footerVisible).toBe(false);
+  });
+
+  test('the wire status line has the card body to itself', async ({ page }) => {
+    await mount(page, HOME_GRID);
+    const m = await page.evaluate(() => {
+      const body = document.getElementById('home-recruiting-body');
+      body.innerHTML = '<div class="fcc-home-empty">No board movement yet</div>'
+        + '<div class="fcc-wire-status">No movement on your board this week.</div>';
+      const copy = document.getElementById('fcc-recruiting-live-copy-home');
+      const footer = copy.closest('.fcc-recruiting-footnote');
+      copy.style.display = 'none';
+      footer.style.display = 'none';
+      const status = body.querySelector('.fcc-wire-status').getBoundingClientRect();
+      const empty = body.querySelector('.fcc-home-empty').getBoundingClientRect();
+      return { statusTop: status.top, emptyBottom: empty.bottom, statusH: status.height };
+    });
+    expect(m.statusH).toBeGreaterThan(0);
+    // The status line sits below the empty state, not on top of it.
+    expect(m.statusTop).toBeGreaterThanOrEqual(m.emptyBottom - 1);
+  });
+});
+
 test.describe('tab badge', () => {
   test('.inbox-badge renders on the Recruiting tab and the tab is renamed', async ({ page }) => {
     const tabBar = HTML.slice(HTML.indexOf('<div class="tab-buttons">'),

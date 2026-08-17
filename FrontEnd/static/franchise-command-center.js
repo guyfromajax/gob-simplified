@@ -4060,16 +4060,22 @@ function updateRecruitingButton(data) {
     href = `/recruiting.html?${params.toString()}`;
   }
 
+  // showCopy=false on the Coach's Office card: the Wire renders its own phase-aware
+  // status line inside the card body, and this footnote sat on top of it. The Recruiting
+  // tab keeps its footnote copy.
   const slots = [
-    ['fcc-recruiting-live-copy-home', 'fcc-recruiting-btn-home'],
-    ['fcc-recruiting-live-copy-tab', 'fcc-recruiting-btn-tab'],
+    ['fcc-recruiting-live-copy-home', 'fcc-recruiting-btn-home', false],
+    ['fcc-recruiting-live-copy-tab', 'fcc-recruiting-btn-tab', true],
   ];
-  for (const [copyId, btnId] of slots) {
+  for (const [copyId, btnId, showCopy] of slots) {
     const recruitingBtn = document.getElementById(btnId);
     const liveCopy = document.getElementById(copyId);
     if (!recruitingBtn || !liveCopy) continue;
-    liveCopy.textContent = text;
-    liveCopy.style.display = 'block';                 // footnote always shows the phase
+    liveCopy.textContent = showCopy ? text : '';
+    liveCopy.style.display = showCopy ? 'block' : 'none';
+    // With no copy and no button the footer would render as a bare rule; hide it.
+    const footer = liveCopy.closest('.fcc-recruiting-footnote');
+    if (footer) footer.style.display = (showCopy || showButton) ? '' : 'none';
     recruitingBtn.style.display = showButton ? 'inline-flex' : 'none';
     recruitingBtn.textContent = btnLabel || '';
     recruitingBtn.disabled = !showButton;

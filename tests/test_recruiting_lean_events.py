@@ -222,13 +222,62 @@ def test_displaced_not_reported_when_user_is_off_the_ladder():
     assert diff_lean(old, new, user_team_id=US) == []
 
 
-def test_user_movement_and_displacement_can_co_occur():
-    """User climbs while a third party falls off — both are reported."""
-    old = ladder(RIVAL, US, OTHER)
+# --------------------------------------------------------------------------
+# displaced is suppressed when the SAME diff produced the user's own gain
+# --------------------------------------------------------------------------
+
+def test_gained_you_suppresses_a_paired_displacement():
+    """Added at #3 while a rival falls off: the rival fell off BECAUSE we were added.
+
+    Reporting both produced "added you at #3" followed by "dropped Lancaster — you're
+    still #3", which claims continuity the player never had.
+    """
+    old = ladder(RIVAL, OTHER, THIRD)
+    new = ladder(RIVAL, OTHER, US)
+    events = diff_lean(old, new, user_team_id=US)
+    assert kinds(events) == [GAINED_YOU]
+    assert only(events, GAINED_YOU)["rank"] == 3
+
+
+def test_moved_up_suppresses_a_paired_displacement():
+    """Climbing #3 -> #1 pushes someone off; that is downstream of our own move."""
+    old = ladder(RIVAL, OTHER, US)
     new = ladder(US, RIVAL, None)
     events = diff_lean(old, new, user_team_id=US)
-    assert set(kinds(events)) == {MOVED_UP, DISPLACED}
+    assert kinds(events) == [MOVED_UP]
+    assert (only(events, MOVED_UP)["prev_rank"], only(events, MOVED_UP)["rank"]) == (3, 1)
+
+
+def test_bystander_displacement_survives_without_user_movement():
+    """A rival displacing another rival on a ladder we already sit on is real news."""
+    old = ladder(US, RIVAL, OTHER)
+    new = ladder(US, RIVAL, THIRD)
+    events = diff_lean(old, new, user_team_id=US)
+    assert kinds(events) == [DISPLACED]
     assert only(events, DISPLACED)["displaced_team_id"] == OTHER
+
+
+def test_displacement_survives_alongside_a_user_slide():
+    """Only gains suppress it — a slide is our own loss, not the cause of theirs."""
+    old = ladder(RIVAL, US, OTHER)
+    new = ladder(RIVAL, THIRD, US)
+    events = diff_lean(old, new, user_team_id=US)
+    assert set(kinds(events)) == {MOVED_DOWN, DISPLACED}
+    assert only(events, DISPLACED)["displaced_team_id"] == OTHER
+
+
+def test_displacement_survives_alongside_rival_took_your_top():
+    old = ladder(US, RIVAL, OTHER)
+    new = ladder(RIVAL, US, THIRD)
+    events = diff_lean(old, new, user_team_id=US)
+    assert set(kinds(events)) == {RIVAL_TOOK_YOUR_TOP, DISPLACED}
+
+
+def test_suppression_does_not_change_wire_counts():
+    """wire_counts already excludes displaced, so the feed changes but counts do not."""
+    from BackEnd.utils.recruiting_lean_events import wire_counts
+    paired = diff_lean(ladder(RIVAL, OTHER, THIRD), ladder(RIVAL, OTHER, US), user_team_id=US)
+    assert wire_counts(paired) == {"moved": 1, "dropped": 0}
 
 
 # --------------------------------------------------------------------------

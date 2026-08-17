@@ -154,7 +154,8 @@
   function attrChipsHtml(r) {
     return '<div class="attr-chips">' + ATTR_KEYS.map(function (k) {
       var v = r.attrs[k];
-      var cls = v >= 7 ? ' hi' : v <= 3 ? ' lo' : '';
+      // 10+ uses the brand RT display blue (#4A90D9, the .rt-elite colour).
+      var cls = v >= 10 ? ' elite' : v >= 7 ? ' hi' : v <= 3 ? ' lo' : '';
       return '<span class="at' + cls + '" data-attr="' + k + '"><u>' + k + '</u><s>' + v + '</s></span>';
     }).join('') + '</div>';
   }
