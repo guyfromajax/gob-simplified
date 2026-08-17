@@ -29,6 +29,7 @@
     "#{winning team rank}. {winning team name} upset #{losing team rank}.{losing team name} by a score of {final score}.
     - list each game on its own line
     - list games in ascending order of the natl_rank of the losing team, starting with teh lowest
+- Coach's Office: Upset Reports are **excluded** from the News container (still on the standalone news page / News tab).
 
 ##Headline: "Practice Squad All-Stars"
 - Criteria: create a list of all Practice Squad players who ahve a total attrbute gain > 4 for the week. If no PS players qualify, this news is not generated for that week.
@@ -36,41 +37,40 @@
     -"{PS Player Name} of {Player Team Name -- school only, no mascot} increased by {increase cumulative total} attribute points this week. His strongest gains were in {list full attribute handle of the highest gain, if there is a tie, list all that are tied using proper grammar of commas and "and" preceding the final attribute}. He's now a {RT value} rated {highest rated position abbreviation -- PG, SG, SF, PF, or C}.
 -Limit the list to the top 10 by Cum Gain. if there is a tie that pushes the list beyond 10, list all that are in the tie then stop after that.
 
-##Headline: Updated Recruiting Leans Announced
-- Criteria: List lean announcement from all recruits with RT > 49 and list lean announcements for all teams in the user's conference -- in that order. If a recruit with RT > 49 announces a lean with a team from teh user's conference, he is listed in both places.
--Content
-    "Top Rated Recruit Announcements"
-    "{Recruit Name} who is a {recruit's RT} rated {recruit's archetype} has announced a lean twoard {team name}."
-    (list all highly rated recrtuits in this manner)
-    "  " (empty line)
-    "Conference {User Conference} Lean Announcements" (ex: "Conference 1 Lean Announcements)
-    "{Team Name}"
-    "{Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT})"
-    "{Team Name}"
-    "{Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT})"
-    "{Team Name}"
-    "{Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT}), {Recruit Name} ({Recruit RT})"
+##Headline: "Updated Recruiting Leans Announced"
+- *(Merged into the weekly Recruiting Report — see Recruiting Reports below. Standalone story is no longer published.)*
 
-    For user conferecne list teams from lowest natl_rank to highest. Only list recruits who have declared a lean to the team that week.
+
+**Coach's Office News container**
+- Shows up to 5 newest headlines from `season_news`.
+- **Excludes** Upset Reports (those remain on the standalone news page / News tab).
+- Weekly **Recruiting Report** (combined rankings + leans) is included.
 
 
 **Recruiting Reports**
 
 ##Headline: "Week {N} Recruiting Report"
 - Cadence: **Week 1** at season init (franchise create / `finish_season` rollover, after initial leans are written). Then on each week completion for completed weeks **1–34**, titled for the **current** week after advance (`Week {completed + 1}`), so the report sits one week ahead of that week's Upset Report. Lean movement (including postseason performance leans) runs through week **34**, so title weeks go through **35**.
-- Criteria: always publish when any team has lean-share points > 0. Teams with **0 points are omitted**; national and region lists may be shorter than their caps.
+- Criteria: publish when rankings have any team with lean-share points > 0 **and/or** the completed week produced qualifying lean announcements. Teams with **0 points are omitted** from ranking tables; national and region lists may be shorter than their caps.
 - Scoring (pre–Week 35 signings): each recruit's value is **current RT** (`max` position rating). Teams on the lean list accrue:
   - slot 1 → 100% of RT
   - slot 2 → 50% of RT
   - slot 3 → 25% of RT  
   All values are **rounded integers**.
 - Ranking: strict sequential ranks `1..N`; ties broken **randomly**. National Top **25**; user-region Top **5** labeled `Region {letter}` (e.g. `Region A`).
-- Content: `ranking_table` rich lines (columns Rank / Team / Score) under headings `National Recruit Rankings` and `Region {letter}`.
+- Content (top to bottom):
+  1. `ranking_table` rich lines under `National Recruit Rankings` and `Region {letter}` (when points exist).
+  2. Section heading **Recruiting Leans Announced**, then the former leans story body:
+     - `Top Rated Recruit Announcements` — recruits with RT > 49 who added a lean that week
+     - `Conference {N} Lean Announcements` — new leans toward teams in the user's conference (teams by ascending natl_rank; a recruit can appear in both sections)
 - `story_id`: `w{N}-recruiting-report`. Skipped if already present when prepending.
+
+##Headline: "Your Recruiting Board Moved"
+- Personal lean gains and drops for the user's board (completed week). Separate from the league-wide leans section on the Recruiting Report.
 
 ##Headline: "Season {N} Recruiting Results"
 - Moment: after **Run Recruiting** completes in week 35 (franchise advances to week 36; user returns to FCC at week 36). No week number in the headline.
 - Scoring: signing team only receives **100%** of each signed recruit's RT. No other team scores for that recruit.
-- Same ranking / omit-zero / rich-table rules as the weekly report (National Top 25 + user Region Top 5).
-- `story_id`: `s{N}-recruiting-results`. Implementation: `BackEnd/utils/recruiting_report_news.py` + `_append_franchise_week_news` / `run_week_35_recruiting` / season-init paths.
+- Same ranking / omit-zero / rich-table rules as the weekly report rankings (National Top 25 + user Region Top 5). No leans section.
+- `story_id`: `s{N}-recruiting-results`.
 

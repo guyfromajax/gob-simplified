@@ -319,6 +319,24 @@ def test_append_week_news_resolves_user_conference_from_string_team_id(monkeypat
             {"_id": rival_oid, "conference": 4},
         ])),
     )
+    monkeypatch.setattr(
+        franchise_routes,
+        "_build_weekly_recruiting_report_story",
+        lambda *_a, **_k: {
+            "story_id": "w4-recruiting-report",
+            "week": 4,
+            "type": "recruiting_report",
+            "headline": "Week 4 Recruiting Report",
+            "rich_lines": [
+                {"type": "heading", "text": "National Recruit Rankings"},
+                {
+                    "type": "ranking_table",
+                    "columns": ["Rank", "Team", "Score"],
+                    "rows": [{"rank": 1, "team_id": "x", "team": "X", "score": 10}],
+                },
+            ],
+        },
+    )
 
     franchise_doc = {
         "user_team_id": "Morristown",
@@ -329,13 +347,17 @@ def test_append_week_news_resolves_user_conference_from_string_team_id(monkeypat
     franchise_routes._append_franchise_week_news(franchise_id, franchise_doc, 3, [], [], events)
 
     stories = franchise_doc.get("season_news") or []
-    leans_story = next((s for s in stories if s.get("type") == "recruiting_leans"), None)
-    assert leans_story is not None
-    assert leans_story["lines"] == [
-        "Conference 4 Lean Announcements",
-        "Rival U",
-        "Al Low (D)",
-    ]
+    report = next((s for s in stories if s.get("type") == "recruiting_report"), None)
+    assert report is not None
+    assert report["headline"] == "Week 4 Recruiting Report"
+    assert report["story_id"] == "w4-recruiting-report"
+    assert not any(s.get("type") == "recruiting_leans" for s in stories)
+    texts = [line.get("text") for line in report["rich_lines"] if line.get("text")]
+    assert "National Recruit Rankings" in texts
+    assert "Recruiting Leans Announced" in texts
+    assert "Conference 4 Lean Announcements" in texts
+    assert "Rival U" in texts
+    assert "Al Low (D)" in texts
 
 
 def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
@@ -354,6 +376,11 @@ def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
         franchise_routes,
         "_format_team_name_map",
         lambda team_ids=None, franchise=None: {team_a: "Underdog U", team_b: "Favorite State"},
+    )
+    monkeypatch.setattr(
+        franchise_routes,
+        "_build_weekly_recruiting_report_story",
+        lambda *_a, **_k: None,
     )
 
     franchise_doc = {
@@ -375,20 +402,56 @@ def test_append_franchise_week_news_prepends_and_persists_on_doc(monkeypatch):
     assert news[0]["lines"] == ["#50. Underdog U upset #11. Favorite State by a score of 88-81."]
 
 
-def test_append_franchise_week_news_skips_eos_weeks(monkeypatch):
+def test_append_franchise_week_news_skips_after_lean_window(monkeypatch):
     franchise_doc = {}
-    franchise_routes._append_franchise_week_news(ObjectId(), franchise_doc, 27, [], [])
+    franchise_routes._append_franchise_week_news(ObjectId(), franchise_doc, 35, [], [])
     assert "season_news" not in franchise_doc
 
 
-def test_franchise_news_headlines_limit_and_shape():
+def test_franchise_news_headlines_excludes_upset_and_limits():
     franchise_doc = {
         "season_news": [
-            {"story_id": f"w{week}-upset-report", "week": week, "headline": f"Week {week} Upset Report", "lines": ["x"]}
-            for week in range(8, 0, -1)
+            {
+                "story_id": "w8-upset-report",
+                "week": 8,
+                "type": "upset_report",
+                "headline": "Week 8 Upset Report",
+                "lines": ["x"],
+            },
+            {
+                "story_id": "w9-recruiting-report",
+                "week": 9,
+                "type": "recruiting_report",
+                "headline": "Week 9 Recruiting Report",
+                "rich_lines": [],
+            },
+            {
+                "story_id": "w8-ps-all-stars",
+                "week": 8,
+                "type": "ps_all_stars",
+                "headline": "Practice Squad All-Stars",
+                "lines": ["y"],
+            },
+            {
+                "story_id": "w7-upset-report",
+                "week": 7,
+                "type": "upset_report",
+                "headline": "Week 7 Upset Report",
+                "lines": ["z"],
+            },
+            {
+                "story_id": "w7-recruiting-movement",
+                "week": 7,
+                "type": "recruiting_movement",
+                "headline": "Your Recruiting Board Moved",
+                "lines": ["m"],
+            },
         ]
     }
     headlines = franchise_routes._franchise_news_headlines(franchise_doc)
-    assert len(headlines) == 5
-    assert headlines[0] == {"story_id": "w8-upset-report", "headline": "Week 8 Upset Report", "week": 8}
+    assert [h["story_id"] for h in headlines] == [
+        "w9-recruiting-report",
+        "w8-ps-all-stars",
+        "w7-recruiting-movement",
+    ]
     assert all(set(h.keys()) == {"story_id", "headline", "week"} for h in headlines)

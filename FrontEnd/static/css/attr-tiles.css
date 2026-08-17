@@ -1,0 +1,63 @@
+/*
+ * Attribute tiles — shared visual for the 12-attribute display.
+ * Pair with /js/shared/attrTiles.js (markup) and /js/shared/attributeTooltips.js (hover).
+ *
+ * Used by: Recruits screen (Recruiting Hub pool), FCC Roster tab, FCC Recruits tab,
+ * team-roster-view.html. Every other attribute surface is deliberately unchanged.
+ *
+ * Tiers: 10+ brand blue (#4A90D9, the .rt-elite colour), 7-9 green, <=3 red.
+ */
+
+.attr-tiles {
+  display: flex;
+  gap: 2.5px;
+  align-items: center;
+  justify-content: center;
+}
+
+.attr-tile {
+  width: 26px;
+  height: 30px;
+  border-radius: 3px;
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  cursor: help;
+}
+
+.attr-tile u {
+  font: 700 6.8px/1 'Inter', sans-serif;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.24);
+}
+
+.attr-tile s {
+  font: 400 13.5px/1 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.62);
+  font-variant-numeric: tabular-nums;
+}
+
+.attr-tile.is-elite { background: rgba(74, 144, 217, 0.18); }
+.attr-tile.is-elite s { color: #4A90D9; }
+.attr-tile.is-hi { background: rgba(52, 236, 39, 0.15); }
+.attr-tile.is-hi s { color: #9cf294; }
+.attr-tile.is-lo { background: rgba(255, 109, 109, 0.12); }
+.attr-tile.is-lo s { color: #ffa8a8; }
+
+/* Table surfaces: one cell holding the whole row of tiles, header centered over it. */
+td.attr-tiles-cell { padding: 4px 6px; }
+
+th.attr-tiles-head {
+  text-align: center;
+  white-space: nowrap;
+}
+
+/* The tiles row is wide; let its own cell scroll rather than the page. */
+@media (max-width: 900px) {
+  td.attr-tiles-cell { overflow-x: auto; }
+}

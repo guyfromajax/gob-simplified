@@ -277,23 +277,22 @@ test.describe("Coach's Office recruiting card", () => {
     expect(results.find((r) => r.week === 7).footerVisible).toBe(false);
   });
 
-  test('the wire status line has the card body to itself', async ({ page }) => {
+  test('the no-movement status line is omitted from the card', async ({ page }) => {
     await mount(page, HOME_GRID);
     const m = await page.evaluate(() => {
       const body = document.getElementById('home-recruiting-body');
-      body.innerHTML = '<div class="fcc-home-empty">No board movement yet</div>'
-        + '<div class="fcc-wire-status">No movement on your board this week.</div>';
+      body.innerHTML = '<div class="fcc-home-empty">No board movement yet</div>';
       const copy = document.getElementById('fcc-recruiting-live-copy-home');
       const footer = copy.closest('.fcc-recruiting-footnote');
       copy.style.display = 'none';
       footer.style.display = 'none';
-      const status = body.querySelector('.fcc-wire-status').getBoundingClientRect();
-      const empty = body.querySelector('.fcc-home-empty').getBoundingClientRect();
-      return { statusTop: status.top, emptyBottom: empty.bottom, statusH: status.height };
+      return {
+        statusCount: body.querySelectorAll('.fcc-wire-status').length,
+        text: body.textContent,
+      };
     });
-    expect(m.statusH).toBeGreaterThan(0);
-    // The status line sits below the empty state, not on top of it.
-    expect(m.statusTop).toBeGreaterThanOrEqual(m.emptyBottom - 1);
+    expect(m.statusCount).toBe(0);
+    expect(m.text).not.toContain('No movement on your board this week.');
   });
 });
 

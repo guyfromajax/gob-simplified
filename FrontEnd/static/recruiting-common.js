@@ -201,6 +201,9 @@
         leanDisplay: getLeanDisplay(lean, teamNameMap),
         leanSortValue: getLeanSortValue(lean, teamNameMap),
         attrs: normalizedAttrs,
+        // Un-scaled attributes, for the shared attr-tile builder — it does its own
+        // 0-10 conversion, so handing it pre-divided values would scale twice.
+        rawAttrs: attrs,
         raw: recruit,
       };
     });

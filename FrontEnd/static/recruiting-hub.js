@@ -136,7 +136,7 @@
       th('year', 'Yr') +
       th('height', 'Ht') +
       th('region', 'Rgn') +
-      '<th class="attrs-col">Attributes</th>' +
+      '<th class="attrs-col attr-tiles-head">Attributes</th>' +
       '<th class="lean-h">Lean</th>' +
       '<th class="watch-col">Watch</th>' +
       '</tr></thead>';
@@ -151,14 +151,12 @@
     return '<span class="pc-av"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
       ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"></span>';
   }
+  // Delegates to the shared builder so this screen, the FCC Roster/Recruits tabs and
+  // team-roster-view all render identical tiles with identical hover copy.
   function attrChipsHtml(r) {
-    return '<div class="attr-chips">' + ATTR_KEYS.map(function (k) {
-      var v = r.attrs[k];
-      // 10+ uses the brand RT display blue (#4A90D9, the .rt-elite colour).
-      var cls = v >= 10 ? ' elite' : v >= 7 ? ' hi' : v <= 3 ? ' lo' : '';
-      return '<span class="at' + cls + '" data-attr="' + k + '"><u>' + k + '</u><s>' + v + '</s></span>';
-    }).join('') + '</div>';
+    return window.GOB_AttrTiles.tilesHtml(r.rawAttrs);
   }
+
   function watchButtonHtml(r) {
     var on = state.watchlist.has(String(r.recruitId));
     var path = 'M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z';
@@ -187,7 +185,7 @@
       '<td class="year">' + Common.escapeHtml(r.yearDisplay) + '</td>' +
       '<td class="num">' + Common.escapeHtml(r.height) + '</td>' +
       '<td class="num">' + Common.escapeHtml(regionOf(r) || '--') + '</td>' +
-      '<td class="attrs-cell">' + attrChipsHtml(r) + '</td>' +
+      '<td class="attr-tiles-cell">' + attrChipsHtml(r) + '</td>' +
       '<td class="lean-col">' + Spine.Lean.ladderHtml(r.leanModel) + '</td>' +
       '<td class="watch-cell">' + watchButtonHtml(r) + '</td>' +
       '</tr>';
@@ -253,7 +251,7 @@
       '<div class="pool-scroll"><table class="pool">' + colgroupHtml() + headHtml() +
       '<tbody>' + poolBodyHtml() + '</tbody></table></div>';
     bindPool(host);
-    if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['th', 'td']);
+    if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['th', 'td', '.attr-tile']);
   }
   function bindPool(host) {
     var search = host.querySelector('#pool-search');
@@ -315,7 +313,7 @@
   function renderPoolBodyOnly() {
     var tbody = document.querySelector('#hub-pool tbody'); if (tbody) tbody.innerHTML = poolBodyHtml();
     bindPoolBodyHandlers(document.getElementById('hub-pool'));
-    if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(document.getElementById('hub-pool'), ['td']);
+    if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(document.getElementById('hub-pool'), ['td', '.attr-tile']);
   }
   function updateCount() {
     var el = document.querySelector('#hub-pool .pool-fcount b');

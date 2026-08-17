@@ -15,12 +15,12 @@ const path = require('path');
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
 
-const CSS = read('recruiting-spine.css');
+const CSS = read('recruiting-spine.css') + read('css/attr-tiles.css');
 // Same order recruiting.html loads them; common.js supplies getBestPosition, which
 // RecruitingCommon.normalizeRecruits depends on.
 const SCRIPTS = [
   'common.js',
-  'js/shared/rtBucket.js',
+  'js/shared/attrTiles.js', 'js/shared/rtBucket.js',
   'js/shared/playerYear.js',
   'recruiting-common.js',
   'recruiting-spine.js',
@@ -194,7 +194,7 @@ test.describe('columns and headers', () => {
     await mountPool(page);
     const m = await page.evaluate(() => {
       const th = [...document.querySelectorAll('#hub-pool thead th')].find((t) => t.textContent.trim() === 'Attributes');
-      const chips = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child .at')];
+      const chips = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child .attr-tile')];
       const first = chips[0].getBoundingClientRect(), last = chips[chips.length - 1].getBoundingClientRect();
       const h = th.getBoundingClientRect();
       return {
@@ -214,7 +214,7 @@ test.describe('columns and headers', () => {
     await mountPool(page);
     const m = await page.evaluate(() => ({
       condensedClass: !!document.querySelector('#hub-pool table.pool.condensed'),
-      chipsVisible: document.querySelectorAll('#hub-pool tbody tr.rec:first-child .at').length,
+      chipsVisible: document.querySelectorAll('#hub-pool tbody tr.rec:first-child .attr-tile').length,
       nameWidth: document.querySelector('#hub-pool tbody tr.rec:first-child td.name-col').getBoundingClientRect().width,
       tableWidth: document.querySelector('#hub-pool table.pool').getBoundingClientRect().width,
     }));
@@ -313,7 +313,7 @@ test.describe('attribute tiles', () => {
     await mountPool(page);
     const m = await page.evaluate(() => {
       // Force a known spread onto the first row's chips and re-read the classes.
-      const chips = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child .at')];
+      const chips = [...document.querySelectorAll('#hub-pool tbody tr.rec:first-child .attr-tile')];
       return chips.map((c) => ({
         v: Number(c.querySelector('s').textContent),
         cls: c.className,
@@ -323,10 +323,10 @@ test.describe('attribute tiles', () => {
     const blue = 'rgb(74, 144, 217)';
     for (const chip of m) {
       if (chip.v >= 10) {
-        expect(chip.cls, `value ${chip.v}`).toContain('elite');
+        expect(chip.cls, `value ${chip.v}`).toContain('is-elite');
         expect(chip.color, `value ${chip.v}`).toBe(blue);
       } else {
-        expect(chip.cls, `value ${chip.v}`).not.toContain('elite');
+        expect(chip.cls, `value ${chip.v}`).not.toContain('is-elite');
         expect(chip.color, `value ${chip.v}`).not.toBe(blue);
       }
     }
@@ -335,11 +335,11 @@ test.describe('attribute tiles', () => {
   test('the tier boundaries hold at 9/10', async ({ page }) => {
     await mountPool(page);
     const m = await page.evaluate(() => {
-      const chip = document.querySelector('#hub-pool tbody tr.rec:first-child .at');
+      const chip = document.querySelector('#hub-pool tbody tr.rec:first-child .attr-tile');
       const s = chip.querySelector('s');
       const read = (v) => {
         s.textContent = String(v);
-        chip.className = 'at' + (v >= 10 ? ' elite' : v >= 7 ? ' hi' : v <= 3 ? ' lo' : '');
+        chip.className = 'attr-tile ' + (v >= 10 ? 'is-elite' : v >= 7 ? 'is-hi' : v <= 3 ? 'is-lo' : '');
         return getComputedStyle(s).color;
       };
       return { nine: read(9), ten: read(10), sixteen: read(16) };

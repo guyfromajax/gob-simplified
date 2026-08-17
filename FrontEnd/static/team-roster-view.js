@@ -673,9 +673,11 @@ function renderRosterInto(data, tbodyId) {
     addCell(p.year);
     addCell(p.height);
     addCell(p.weight);
-    ROSTER_ATTR_KEYS.forEach((attr) => {
-      addCell(formatAttrForDisplay(attrs, attr));
-    });
+    // One cell of shared attribute tiles, replacing the 12 numeric columns.
+    const attrTd = document.createElement('td');
+    attrTd.className = 'attr-tiles-cell';
+    attrTd.innerHTML = window.GOB_AttrTiles.tilesHtml(attrs || {});
+    tr.appendChild(attrTd);
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
     // Potential Rating (§Phase 4): show current/potential (e.g. C/B) when the backend
     // supplied a projected ceiling; header stays "RT", color stays by current rating.
@@ -697,7 +699,7 @@ function renderRosterInto(data, tbodyId) {
   // cells under them.
   if (typeof initAttributeTooltips !== 'undefined') {
     const rosterTable = tbody.closest('table') || tbody;
-    initAttributeTooltips(rosterTable, ['td', 'th']);
+    initAttributeTooltips(rosterTable, ['td', 'th', '.attr-tile']);
   }
 }
 

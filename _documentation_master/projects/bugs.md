@@ -916,3 +916,23 @@ measurement pass, not the compute.
 **Trigger to do it:** the next time the identity constants are being re-derived anyway. Doing
 it standalone means paying for a full recalibration to fix a consistency defect no user sees
 directly.
+
+## Sunset: `/team-roster/{team}` (removed 2026-08-17)
+
+Removed the route, its 8 Jinja templates, the 8 "In Development" sibling pages, the
+dev-only `/team-roster/` static-redirect entry, and `tests/test_team_roster_page.py`.
+
+Why it went rather than being brought in line with the attribute-tile work:
+
+- **Zero inbound links** anywhere in the repo — reachable only by typing the URL.
+- **Wrong data source.** It read `players_collection` (the universal player pool), not
+  franchise player data, so the same team showed *different numbers* than
+  `team-roster-view.html`.
+- **Already dead in development.** The dev middleware redirects any `/team-roster/*`
+  path to `/static/...` before routing (`api.py`, static_dirs), so the page only ever
+  rendered in production. That is likely why its data source drifted unnoticed.
+- **No auth.** The route took no `Depends(get_current_user)` while every other roster
+  surface is behind auth.
+
+Residual risk accepted: an external bookmark or link would now 404. If that surfaces,
+the fix is a 301 to `/team-roster-view.html` rather than restoring the page.

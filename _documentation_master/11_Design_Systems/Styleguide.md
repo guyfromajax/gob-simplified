@@ -54,6 +54,26 @@ The canonical color scale for player attribute bar fills throughout the product.
 - **61–80:** `#34EC27` — green (solid)
 - **81+:** `#4A90D9` — light blue (elite, including 100+)
 
+### Attribute Tiles
+
+Four surfaces render the 12 roster attributes as **tiles** rather than numeric columns: the Recruits screen (Recruiting Hub pool), the FCC **Roster** tab (including the Practice Squad table inside it), the FCC **Recruiting** tab, and `team-roster-view.html`. Every other attribute surface — Set Lineup's card back, Player Detail, Scouting Report — is deliberately unchanged.
+
+Single implementation: **`/js/shared/attrTiles.js`** (markup) + **`/css/attr-tiles.css`** (visual). No surface may build its own tile.
+
+| Rule | Value |
+|---|---|
+| Scale | 0–10, preferring `anchor_<KEY>` |
+| Missing value | `--`, never `0` |
+| Tiers | **10+** `#4A90D9` brand blue · **7–9** `#34EC27` green · **≤3** `#ff6d6d` red · else neutral |
+| Hover | Full attribute name + 10-scale value — `Rebounding: 6` |
+| Header | The 12 abbreviation columns collapse to one centered **Attributes** header |
+
+Hover copy is delivered as `data-tooltip`, which `attributeTooltips.js` honours verbatim; a surface only needs `initAttributeTooltips(container, ['.attr-tile'])` after rendering.
+
+**Note on the tier bands.** These differ from the Attribute Bar Scale above (which puts light blue at 81+, i.e. 8+ on the 0–10 display). The tile tiers are 10+/7–9/≤3 by explicit design decision. Unresolved whether the two should converge.
+
+**Collapsing the header removed per-attribute sorting** on the FCC Recruiting tab, which previously carried `data-sort-key` on each of the 12 columns. Sorting by RT, position, year and name is unaffected.
+
 ### RT Letter-Grade Scale
 
 All overall/best RT and individual PG/SG/SF/PF/C position ratings display as

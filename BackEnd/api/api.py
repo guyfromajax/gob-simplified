@@ -479,7 +479,6 @@ try:
                 "/js/",
                 "/images/",
                 "/sounds/",
-                "/team-roster/",
                 "/styles/",
             )
             static_exts = (
@@ -7717,107 +7716,6 @@ try:
             "team": team_doc.get("name", team_id) if team_doc else team_id,
             "players": players_data,
         }
-    
-    
-    @app.get("/team-roster/{team}", response_class=HTMLResponse)
-    def team_roster_page(request: Request, team: str):
-        # Render an HTML roster page for a given team.
-        players_cursor = players_collection.find({"team": team})
-        players = []
-        order = ["PG", "SG", "SF", "PF", "C"]
-        year_map = {
-            "jh": "JH",
-            "senior": "SR",
-            "sr": "SR",
-            "junior": "JR",
-            "jr": "JR",
-            "sophomore": "SO",
-            "so": "SO",
-            "freshman": "FR",
-            "fr": "FR",
-            "graduate": "GR",
-            "grad": "GR",
-        }
-        for p in players_cursor:
-            attrs = p.get("attributes", {})
-            raw_height = p.get("height")
-            try:
-                height_raw = int(float(raw_height))
-            except (TypeError, ValueError):
-                height_raw = None
-            display_attributes = [
-                "SC",
-                "SH",
-                "ID",
-                "OD",
-                "PS",
-                "BH",
-                "RB",
-                "AG",
-                "ST",
-                "ND",
-                "IQ",
-                "FT",
-            ]
-    
-            pos_ratings = p.get("position_ratings") or {}
-            pos = "-"
-            rt_val: int | None = None
-            for o in order:
-                rating = pos_ratings.get(o)
-                if rating is None:
-                    continue
-                if rt_val is None or rating > rt_val:
-                    pos, rt_val = o, rating
-            rt = int(rt_val) if rt_val is not None else "-"
-    
-            year_raw = p.get("year", "--")
-            year_abbr = year_map.get(str(year_raw).lower(), year_raw or "--")
-    
-            # Convert attributes to 0-12 display scale
-            display_attrs = {}
-            for attr in display_attributes:
-                raw_val = attrs.get(attr)
-                if raw_val == "--" or raw_val is None:
-                    display_attrs[attr] = "--"
-                else:
-                    display_attrs[attr] = int(raw_val // 10)  # Convert to 0-12 scale
-    
-            first = p.get("first_name", "") or ""
-            last = p.get("last_name", "") or ""
-            name = f"{first} {last}".strip()
-            jersey = p.get("jersey")
-            players.append(
-                {
-                    "_id": str(p.get("_id")),  # Add player ID for linking
-                    "jersey": jersey,
-                    "name": name,
-                    "display_name": format_player_display_name(jersey, first, last),
-                    "pos": pos,
-                    "year": year_abbr,
-                    "height": format_height(raw_height),
-                    "height_raw": height_raw,
-                    "weight": p.get("weight", "--"),
-                    "attributes": display_attrs,
-                    "position_ratings": p.get("position_ratings", {}),
-                    "rt": rt,
-                    "rt_value": rt_val if rt_val is not None else -1,
-                    # Projected ceiling for the per-team base-roster pages (§Phase 4). These
-                    # read the pool, where potential_factor is not persisted until Phase 5 —
-                    # resolve_potential_factor derives the stable hash value, and Phase 5
-                    # backfills exactly that value, so the displayed ceiling never changes.
-                    POTENTIAL_RT_FIELD: potential_rt_for_player(
-                        str(p.get("_id")), p.get("entry_tier"),
-                        p.get("potential_factor"), p.get("position_ratings", {})),
-                }
-            )
-    
-        players.sort(key=lambda x: x.get("rt_value", -1), reverse=True)
-    
-        template_name = f"team-roster/team-roster-{team.replace(' ', '-')}.html"
-        return templates.TemplateResponse(
-            template_name, {"request": request, "team": team, "players": players}
-        )
     
     
     @app.get("/tournament/active")

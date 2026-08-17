@@ -14,8 +14,8 @@ const path = require('path');
 
 const S = path.join(__dirname, '../../FrontEnd/static');
 const read = (p) => fs.readFileSync(path.join(S, p), 'utf8');
-const CSS = read('recruiting-spine.css') + read('recruiting-signing.css');
-const SCRIPTS = ['common.js', 'js/shared/rtBucket.js', 'js/shared/playerYear.js',
+const CSS = read('recruiting-spine.css') + read('recruiting-signing.css') + read('css/attr-tiles.css');
+const SCRIPTS = ['common.js', 'js/shared/attrTiles.js', 'js/shared/rtBucket.js', 'js/shared/playerYear.js',
   'recruiting-common.js', 'recruiting-spine.js'].map(read);
 const HUB = read('recruiting-hub.js');
 

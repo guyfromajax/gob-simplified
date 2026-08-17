@@ -1394,7 +1394,7 @@ function wireStatusLine(week, wire) {
     if (counts.dropped) parts.push(`${counts.dropped} dropped you`);
     return `${parts.join(' · ')} since you last looked.`;
   }
-  return 'No movement on your board this week.';
+  return '';
 }
 
 function renderHomeRecruitingWire() {
@@ -1414,7 +1414,10 @@ function renderHomeRecruitingWire() {
   }
 
   const events = Array.isArray(wire.events) ? wire.events : [];
-  const status = `<div class="fcc-wire-status">${escapeHomeHtml(wireStatusLine(week, wire))}</div>`;
+  const statusText = wireStatusLine(week, wire);
+  const status = statusText
+    ? `<div class="fcc-wire-status">${escapeHomeHtml(statusText)}</div>`
+    : '';
 
   if (!events.length) {
     body.innerHTML = `${createEmptyHomeState('No board movement yet')}${status}`;
@@ -2216,18 +2219,8 @@ function renderFccRecruits() {
         '<td>' + (recruit.weight != null ? recruit.weight : '--') + '</td>',
         '<td>' + recruit.pos + '</td>',
         '<td>' + (recruit.yearDisplay || '--') + '</td>',
-        '<td>' + recruit.attrs.SC + '</td>',
-        '<td>' + recruit.attrs.SH + '</td>',
-        '<td>' + recruit.attrs.ID + '</td>',
-        '<td>' + recruit.attrs.OD + '</td>',
-        '<td>' + recruit.attrs.PS + '</td>',
-        '<td>' + recruit.attrs.BH + '</td>',
-        '<td>' + recruit.attrs.RB + '</td>',
-        '<td>' + recruit.attrs.AG + '</td>',
-        '<td>' + recruit.attrs.ST + '</td>',
-        '<td>' + recruit.attrs.ND + '</td>',
-        '<td>' + recruit.attrs.IQ + '</td>',
-        '<td>' + recruit.attrs.FT + '</td>',
+        // Shared attribute tiles; rawAttrs because the builder does its own 0-10 scaling.
+        '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.tilesHtml(recruit.rawAttrs) + '</td>',
         '<td class="' + (typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : '') + '">' + formatRtWithPotentialDisplay(recruit.rt, recruit.potentialRt) + '</td>'
       ].join('');
       tbody.appendChild(tr);
@@ -2306,7 +2299,7 @@ function initFccRecruits(topData) {
   renderFccRecruits();
   if (typeof initAttributeTooltips !== 'undefined') {
     const recruitsTable = document.getElementById('fcc-recruits-table');
-    if (recruitsTable) initAttributeTooltips(recruitsTable, ['th']);
+    if (recruitsTable) initAttributeTooltips(recruitsTable, ['th', '.attr-tile']);
   }
   void renderHomeTab();
 }
@@ -2582,7 +2575,7 @@ function renderRecruits(data) {
   
   // Initialize tooltips for table cells (and headers)
   if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
+    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
   }
 }
 
@@ -2715,13 +2708,11 @@ function renderPracticeSquad(data) {
       addCell(yearMap[(p.year || '').toLowerCase()] || p.year || '--');
       addCell(formatHeight(p.height));
       addCell(p.weight ?? '--');
-      ATTR_HEADERS.forEach(h => {
-        const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
-        const displayVal = h === 'NG'
-          ? (rawVal != null ? rawVal.toFixed(2) : '--')
-          : (rawVal != null ? Math.floor(rawVal / 10) : '--');
-        addCell(displayVal);
-      });
+      // Tiles, matching the roster table directly above it in the same tab.
+      const psAttrTd = document.createElement('td');
+      psAttrTd.className = 'attr-tiles-cell';
+      psAttrTd.innerHTML = window.GOB_AttrTiles.tilesHtml(attrs || {});
+      tr.appendChild(psAttrTd);
       const rt = best.rating;
       const rtCell = addCell(
         rt == null ? '-' : formatRtWithPotentialDisplay(rt, p.potential_rt_ratcheted),
@@ -2806,7 +2797,7 @@ function renderPracticeSquad(data) {
   section.style.display = '';
   if (statsSection) statsSection.style.display = '';
   if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
+    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
   }
 }
 
@@ -2906,16 +2897,12 @@ function renderTeam(data) {
     addCell(p.height);
     addCell(p.weight);
 
-    ATTR_HEADERS.forEach(h => {
-      const attrs = p.attributes || {};
-      // Use anchor attribute (base value) as fallback, same as lineup screen
-      const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
-      // Convert to 0-12 scale, except NG which stays as decimal
-      const displayVal = h === 'NG'
-        ? (rawVal != null ? rawVal.toFixed(2) : '--')
-        : (rawVal != null ? Math.floor(rawVal / 10) : '--');
-      addCell(displayVal);
-    });
+    // One cell of attribute tiles, replacing the 12 numeric columns. Shared builder, so
+    // this matches the Recruits screen, the Recruits tab and team-roster-view exactly.
+    const attrTd = document.createElement('td');
+    attrTd.className = 'attr-tiles-cell';
+    attrTd.innerHTML = window.GOB_AttrTiles.tilesHtml(p.attributes || {});
+    tr.appendChild(attrTd);
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
     // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
     // projected ceiling; header stays "RT", color stays by current rating. This runs in both
@@ -2933,7 +2920,7 @@ function renderTeam(data) {
   // Initialize tooltips. Scope to the parent table so the SC/SH/ID/… column
   // headers also get tooltips, not only the cells under them.
   if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
+    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
   }
 
   // Practice Squad (+ Recruits after Week 35) rendered below the active roster.
@@ -3203,14 +3190,11 @@ function sortRosterTable(columnName, direction) {
     addCell(p.height);
     addCell(p.weight);
 
-    ATTR_HEADERS.forEach(h => {
-      const attrs = p.attributes || {};
-      const rawVal = attrs[`anchor_${h}`] ?? attrs[h];
-      const displayVal = h === 'NG'
-        ? (rawVal != null ? rawVal.toFixed(2) : '--')
-        : (rawVal != null ? Math.floor(rawVal / 10) : '--');
-      addCell(displayVal);
-    });
+    // Same tiles on the post-sort re-render; otherwise sorting drops back to numbers.
+    const sortedAttrTd = document.createElement('td');
+    sortedAttrTd.className = 'attr-tiles-cell';
+    sortedAttrTd.innerHTML = window.GOB_AttrTiles.tilesHtml(p.attributes || {});
+    tr.appendChild(sortedAttrTd);
     // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
     // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
     // projected ceiling; header stays "RT", color stays by current rating. This runs in both
@@ -3226,7 +3210,7 @@ function sortRosterTable(columnName, direction) {
   });
 
   if (typeof initAttributeTooltips !== 'undefined') {
-    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th']);
+    initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
   }
 }
 

@@ -12953,23 +12953,23 @@ def _build_ps_all_stars_story(
 
 
 NEWS_TOP_RECRUIT_MIN_RT = 49  # recruit RT must exceed this for the Top Rated section
+NEWS_COACH_OFFICE_EXCLUDED_TYPES = frozenset({"upset_report"})
 
 
-def _build_recruiting_leans_story(
-    week: int,
+def _build_recruiting_leans_lines(
     lean_events: list[dict[str, str]],
     rank_by_team_id: dict[str, int],
     team_name_map: dict[str, str],
     recruit_by_id: dict[str, dict[str, Any]],
     conference_by_team_id: dict[str, str],
     user_conference: str | None,
-) -> dict[str, Any] | None:
-    """Updated Recruiting Leans Announced: recruits with RT > NEWS_TOP_RECRUIT_MIN_RT
-    who newly added a team to their lean list this week, followed by new leans toward
-    teams in the user's conference (a recruit can appear in both sections). None when
-    neither section has content."""
-    # Group the week's new-lean events per recruit (a recruit can pick up
-    # multiple teams in performance-lean weeks; combine into one line).
+) -> list[str] | None:
+    """Body lines for the Recruiting Leans Announced section (no outer header).
+
+    Recruits with RT > NEWS_TOP_RECRUIT_MIN_RT who newly added a team to their lean
+    list, followed by new leans toward teams in the user's conference (a recruit can
+    appear in both). None when neither section has content.
+    """
     teams_by_recruit: dict[str, list[str]] = {}
     for event in lean_events or []:
         recruit_id = str(event.get("recruit_id") or "")
@@ -13009,7 +13009,6 @@ def _build_recruiting_leans_story(
         )
 
     conference_lines: list[str] = []
-    # Conference teams from lowest natl_rank to highest (rank 1 first).
     for team_id in sorted(
         conference_recruits_by_team, key=lambda tid: rank_by_team_id.get(tid, 999)
     ):
@@ -13030,6 +13029,78 @@ def _build_recruiting_leans_story(
             lines.append("")
         lines.append(f"Conference {user_conference} Lean Announcements")
         lines.extend(conference_lines)
+    return lines
+
+
+def _recruiting_leans_section_rich_lines(leans_lines: list[str]) -> list[dict[str, Any]]:
+    """Wrap lean body lines under a Recruiting Leans Announced section heading."""
+    rich: list[dict[str, Any]] = [
+        {"type": "gap"},
+        {"type": "heading", "text": "Recruiting Leans Announced"},
+    ]
+    for line in leans_lines:
+        if not str(line).strip():
+            rich.append({"type": "gap"})
+            continue
+        text = str(line)
+        if text == "Top Rated Recruit Announcements" or (
+            text.startswith("Conference ") and text.endswith(" Lean Announcements")
+        ):
+            rich.append({"type": "heading", "text": text})
+        else:
+            rich.append({"type": "text", "text": text})
+    return rich
+
+
+def _merge_recruiting_report_with_leans(
+    report_story: dict[str, Any] | None,
+    leans_lines: list[str] | None,
+    *,
+    report_week: int,
+) -> dict[str, Any] | None:
+    """One Week N Recruiting Report story: rankings first, then leans section."""
+    if not report_story and not leans_lines:
+        return None
+    if report_story is None:
+        report_story = {
+            "story_id": f"w{report_week}-recruiting-report",
+            "week": int(report_week),
+            "type": "recruiting_report",
+            "headline": f"Week {report_week} Recruiting Report",
+            "rich_lines": [],
+            "created_at": datetime.utcnow(),
+        }
+    else:
+        # Copy so callers can reuse the rankings builder output safely.
+        report_story = dict(report_story)
+        report_story["rich_lines"] = list(report_story.get("rich_lines") or [])
+    if leans_lines:
+        report_story["rich_lines"].extend(_recruiting_leans_section_rich_lines(leans_lines))
+    if not report_story.get("rich_lines"):
+        return None
+    return report_story
+
+
+def _build_recruiting_leans_story(
+    week: int,
+    lean_events: list[dict[str, str]],
+    rank_by_team_id: dict[str, int],
+    team_name_map: dict[str, str],
+    recruit_by_id: dict[str, dict[str, Any]],
+    conference_by_team_id: dict[str, str],
+    user_conference: str | None,
+) -> dict[str, Any] | None:
+    """Legacy standalone leans story (tests / callers). Prefer merge into the report."""
+    lines = _build_recruiting_leans_lines(
+        lean_events,
+        rank_by_team_id,
+        team_name_map,
+        recruit_by_id,
+        conference_by_team_id,
+        user_conference,
+    )
+    if not lines:
+        return None
     return {
         "story_id": f"w{week}-recruiting-leans",
         "week": int(week),
@@ -13046,11 +13117,11 @@ def _build_recruiting_movement_story(
     movement_events: list[dict[str, Any]],
     team_name_map: dict[str, str],
 ) -> dict[str, Any] | None:
-    """"Your Board Moved" — the user's own lean movement, gains AND drops.
+    """"Your Recruiting Board Moved" — the user's own lean movement, gains AND drops.
 
-    Distinct from the league-wide Updated Recruiting Leans story, which reports only
-    additions and only for top recruits / the user's conference. This one is personal
-    and carries the losses, which is the half the UI never showed.
+    Distinct from the league-wide Recruiting Leans Announced section on the weekly
+    Recruiting Report, which reports only additions and only for top recruits / the
+    user's conference. This one is personal and carries the losses.
     """
     if not movement_events:
         return None
@@ -13085,7 +13156,7 @@ def _build_recruiting_movement_story(
         "story_id": f"w{week}-recruiting-movement",
         "week": int(week),
         "type": "recruiting_movement",
-        "headline": "Your Board Moved",
+        "headline": "Your Recruiting Board Moved",
         "lines": lines,
         "created_at": datetime.utcnow(),
     }
@@ -13155,7 +13226,7 @@ def _append_franchise_week_news(
 
     team_name_map = _format_team_name_map(franchise=franchise_doc)
 
-    recruiting_leans_story = None
+    recruiting_leans_lines = None
     if new_lean_events:
         recruit_ids = list({str(e.get("recruit_id") or "") for e in new_lean_events})
         recruit_by_id = {
@@ -13190,8 +13261,7 @@ def _append_franchise_week_news(
             )
             if user_team_doc and user_team_doc.get("conference") is not None:
                 user_conference = str(user_team_doc.get("conference"))
-        recruiting_leans_story = _build_recruiting_leans_story(
-            week,
+        recruiting_leans_lines = _build_recruiting_leans_lines(
             new_lean_events,
             rank_by_team_id,
             team_name_map,
@@ -13204,9 +13274,13 @@ def _append_franchise_week_news(
     # Upset report and PS all-stars are regular-season concepts; only the recruiting
     # stories run in weeks 27-34.
     # Recruiting Report titles the *next* week (current after advance) so it sits
-    # one week ahead of the Upset Report for the completed week.
-    recruiting_report_story = _build_weekly_recruiting_report_story(
-        franchise_id, franchise_doc, week + 1
+    # one week ahead of the Upset Report for the completed week. Lean announcements
+    # from the completed week are merged into that same report story.
+    report_week = week + 1
+    recruiting_report_story = _merge_recruiting_report_with_leans(
+        _build_weekly_recruiting_report_story(franchise_id, franchise_doc, report_week),
+        recruiting_leans_lines,
+        report_week=report_week,
     )
     stories = [
         story
@@ -13215,7 +13289,6 @@ def _append_franchise_week_news(
             if regular_season else None,
             _build_ps_all_stars_story(week, ts_weekly_gains, team_name_map)
             if regular_season else None,
-            recruiting_leans_story,
             _build_recruiting_movement_story(
                 franchise_id,
                 week,
@@ -13232,15 +13305,24 @@ def _append_franchise_week_news(
 
 
 def _franchise_news_headlines(franchise_doc: dict[str, Any], limit: int = 5) -> list[dict[str, Any]]:
-    """Latest headlines for the Coach's Office News card (season_news is newest first)."""
-    return [
-        {
-            "story_id": story.get("story_id"),
-            "headline": story.get("headline"),
-            "week": story.get("week"),
-        }
-        for story in (franchise_doc.get("season_news") or [])[:limit]
-    ]
+    """Latest headlines for the Coach's Office News card (season_news is newest first).
+
+    Upset Reports stay on the full news page but are omitted from this card.
+    """
+    headlines: list[dict[str, Any]] = []
+    for story in franchise_doc.get("season_news") or []:
+        if story.get("type") in NEWS_COACH_OFFICE_EXCLUDED_TYPES:
+            continue
+        headlines.append(
+            {
+                "story_id": story.get("story_id"),
+                "headline": story.get("headline"),
+                "week": story.get("week"),
+            }
+        )
+        if len(headlines) >= limit:
+            break
+    return headlines
 
 
 def _season_awards_score(season_stats: dict[str, Any]) -> tuple[int, int]:
@@ -13939,8 +14021,8 @@ def get_franchise_news(
     """Season news feed for the standalone news page (newest first; cleared at season rollover).
 
     ``category=recruiting`` narrows to the ``recruiting_*`` story types
-    (``recruiting_leans``, ``recruiting_movement``) so personal recruiting news can be
-    read on its own.
+    (``recruiting_report``, ``recruiting_results``, ``recruiting_movement``, and any
+    legacy ``recruiting_leans``) so recruiting news can be read on its own.
     """
     franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
     news = franchise_doc.get("season_news") or []

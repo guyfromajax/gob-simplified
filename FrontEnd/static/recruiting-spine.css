@@ -289,18 +289,11 @@ tr.region-row td{padding:0;border:0}
 .pool .pc-txt .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pool .pc-txt .pc-arch{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-/* Attribute chips: label over value, one flex row centred in its column. */
-.pool td.attrs-cell{padding:0}
-.pool .attr-chips{display:flex;gap:2.5px;align-items:center;justify-content:center}
-.pool .at{width:26px;height:30px;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:rgba(255,255,255,.05)}
-.pool .at u{font:700 6.8px/1 var(--body);text-decoration:none;color:var(--muted-3)}
-.pool .at s{font:400 13.5px/1 var(--display);text-decoration:none;color:var(--muted);font-variant-numeric:tabular-nums}
-.pool .at.elite{background:rgba(74,144,217,.18)}
-.pool .at.elite s{color:#4A90D9}
-.pool .at.hi{background:rgba(52,236,39,.15)}
-.pool .at.hi s{color:#9cf294}
-.pool .at.lo{background:rgba(255,109,109,.12)}
-.pool .at.lo s{color:#ffa8a8}
+/* Attribute tiles come from the shared /css/attr-tiles.css so this screen, the FCC
+   Roster/Recruits tabs and team-roster-view stay identical. Only the cell padding is
+   local. */
+.pool td.attr-tiles-cell{padding:0}
+.pool .attr-tiles{justify-content:center}
 
 /* Watch star: 32px hit target, gold filled when on, hollow when off, no text label. */
 .pool td.watch-cell{text-align:center}
