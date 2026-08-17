@@ -4076,7 +4076,7 @@ playNowBtn.addEventListener('click', async () => {
     params.set('team_id', userTeamId);
     params.set('from', 'fcc');
     params.set('return_url', getCurrentRelativeUrl());
-    const recruitingUrl = `/recruiting-orders.html?${params.toString()}`;
+    const recruitingUrl = `/recruiting.html?${params.toString()}`;
     const goRecruiting = async () => {
       await confirmSfxReady;
       try {
