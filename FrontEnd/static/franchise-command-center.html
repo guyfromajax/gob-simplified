@@ -58,6 +58,15 @@
       <div id="top-right" class="right-controls">
         <div class="hero-buttons-group">
           <button id="play-now" class="hero-btn">Run Training</button>
+          <!-- Second slot of the existing flex column. Amber and always skippable;
+               only #play-now ever turns green and blocks the week. -->
+          <button id="fcc-recruiting-secondary" class="fcc-rec-btn" style="display: none;">
+            <span id="fcc-recruiting-secondary-dot" class="fcc-invite__dot" aria-hidden="true" style="display: none;"></span>
+            <span class="fcc-rec-btn__txt">
+              <em id="fcc-recruiting-secondary-line1">Recruiting</em>
+              <small id="fcc-recruiting-secondary-line2"></small>
+            </span>
+          </button>
         </div>
       </div>
     </div>
@@ -76,14 +85,20 @@
         <button id="stats-nav-btn" data-tab="fcc-team-stats-summary-tab">Team Stats</button>
         <button data-tab="awards-tab">Leaders</button>
         <button data-tab="press-tab">News</button>
-        <button data-tab="recruits-tab">Recruits</button>
+        <!-- Same slot, renamed. Carries .inbox-badge when the wire needs attention. -->
+        <button data-tab="recruits-tab">Recruiting</button>
         <button data-tab="tutorials-tab">Inbox</button>
       </div>
       <div id="home-tab" class="tab-content active">
         <div class="fcc-home-grid">
+          <!-- Row 1: Locker Room | Next Game | RECRUITING (span 2).
+               Locker Room leads so Next Game sits directly above Last Game in row 2 —
+               the two game cards read as a vertical pair. Standings retired here: it
+               duplicated the Standings tab and /standings.html, and dropping it makes
+               the arithmetic work (7 cards, one spanning 2 = 8 column-units). -->
           <section class="fcc-home-card">
-            <h3>Standings</h3>
-            <div id="home-standings-body" class="fcc-home-card-body">In Development</div>
+            <h3>Locker Room</h3>
+            <div id="home-locker-room-body" class="fcc-home-card-body">In Development</div>
           </section>
           <section class="fcc-home-card">
             <div class="fcc-home-card-head fcc-home-card-head--tier">
@@ -92,12 +107,11 @@
             </div>
             <div id="home-next-game-body" class="fcc-home-card-body">In Development</div>
           </section>
-          <section class="fcc-home-card">
-            <h3>Locker Room</h3>
-            <div id="home-locker-room-body" class="fcc-home-card-body">In Development</div>
-          </section>
-          <section class="fcc-home-card fcc-home-card-recruiting">
-            <h3>Recruiting</h3>
+          <section class="fcc-home-card fcc-home-card-recruiting fcc-home-card--recruiting">
+            <div class="fcc-home-card-head">
+              <h3>Recruiting</h3>
+              <a id="home-recruiting-full-link" class="fcc-home-card-link" href="#">Open Recruiting</a>
+            </div>
             <div id="home-recruiting-body" class="fcc-home-card-body">In Development</div>
             <footer class="fcc-recruiting-footnote fcc-recruiting-footnote--embed" aria-label="Recruiting season status">
               <p id="fcc-recruiting-live-copy-home" class="fcc-recruiting-footnote__text"></p>
@@ -596,6 +610,7 @@
   <script src="/js/shared/alphaFeedbackModal.js"></script>
   <script src="/js/shared/regionByeModal.js"></script>
   <script src="/js/shared/walkOnWelcomeModal.js"></script>
+  <script src="/js/shared/recruitingButtonState.js"></script>
   <script src="/js/shared/bigNewsModals.js"></script>
   <script src="/js/shared/tierEmblem.js"></script>
   <script src="/franchise-command-center.js"></script>

@@ -310,6 +310,105 @@ visually distinct.
 Immediately to its right, the year filter offers `All`, `JR`, `SO`, `FR`, and `JH`; year, region,
 name, and leaning filters compose rather than replacing one another.
 
+## 10b. Watchlist
+
+An **unordered, uncapped shortlist** of recruit ids the player is tracking. `recruiting_watchlist` on the franchise doc; toggled by `PATCH /franchise/recruiting-watchlist`; surfaced in the pool as a star per row and as a Views filter.
+
+**It is not a board.** Ranks and the 20-slot cap belong to the week-20 invite board (FTD `Recruits`). Conflating them would make every star press imply a position.
+
+| Aspect | Behavior |
+|---|---|
+| Shape | Flat list of recruit ids, de-duplicated, insertion order preserved |
+| Cap | None. `MAX_BOARD` (20) caps the *board*, not the shortlist |
+| Seeds the board | At week 20, **client-side only**, and only when no board is saved |
+| Writes | `recruiting_watchlist` and nothing else |
+
+### The seeding rule
+
+> Watchlist seeding must never write FTD `Recruits`.
+
+`has_saved_board` derives from `_team_order_list(ftd["Recruits"])`, and both the week-20 gate and the server guard at `franchise_routes.py:11966` key off it. Persisting a seed on page load would make `_team_order_list` non-empty before the player saved anything, silently reopening the gate. `Recruits` is written by `save_recruiting_orders` and nowhere else.
+
+This is the same failure mode as `seedAlloc()` — pre-committing the player to a choice they never made — so it is asserted in `tests/test_recruiting_watchlist.py` rather than left to review. The seed also runs only when the board is empty, so it can never reorder or overwrite a board the player built, and it orders by RT descending because the shortlist itself carries no ranks.
+
+## 10c. Recruit pool (450 rows)
+
+Columns: **Recruit · Pos · RT · Yr · Ht · Rgn · Attributes · Lean · Watch**. Name/Pos/RT lead because they answer "is he worth watching" fastest and keep the sorted column beside the name; Lean and Watch pair at the right edge because both are about *you and him*, not about him.
+
+- **`.pool.condensed` is deleted.** It hid the attribute columns whenever the dock was open — i.e. exactly during the invite phase, when you are comparing recruits. Attributes are visible in every phase.
+- Name column is **capped at 248px, not flexed**; the table is `width: max-content` (~1030px), so no dead space opens between the name and Pos.
+- Headers centered over their columns, with **Attributes centered across the whole 12-chip block**. (The mockup right-aligns that header; the build prompt corrected it.)
+- Sticky header, sortable columns, **RT descending by default**.
+- Attribute values use the product-wide 0–10 scale via `RecruitingCommon.formatAttrValue`, not the mockup's raw 0–100 placeholders.
+- Headshots: `API_CONFIG.getRecruitImageUrl(image_id, {size:'card'})` with `loading="lazy"`, then `ensureRecruitImage` → retry → drop to the generic frame on a second failure.
+- Region grouping is replaced by a flat sortable list plus a **Rgn column**; region is now a dropdown filter.
+- Filters in two labelled rows. **Filter**: region dropdown (9 options, rarely changed) + position and year as segmented controls (few options, switched constantly — a dropdown costs a click every time) + name search. **Views**: Watchlist · Leans to me · Unranked by me, mutually exclusive; clicking the active one clears it.
+
+## 10d. Signing Day (week 35)
+
+The player makes every commitment, and the screen shows only facts.
+
+**No load-time allocation.** `seedAlloc()` is **deleted**. It allocated 12/9/6 points — 27 of 50 — and attached **binding** playing-time promises to two recruits, unmarked, on page load. The page loads at **0 of 50 with zero promises**; only a previously *saved* allocation is restored. Any future helper must be a button the player presses, never a load-time side effect.
+
+**No percentage anywhere.** The old odds bar computed `base(standing) + points × 2.2 + (promise ? 18 : 0)` — an admitted placeholder, blind to rivals — and displayed it as a percent. A number like "62%" is a promise the sim cannot keep. Two honest columns replace it:
+
+| Column | Shows | Source |
+|---|---|---|
+| **Standing** | Lean position and its multiplier — `#1 ×5`, `#2 ×3`, `— ×1` | `leanModel` (mirrors the backend `score = (1 + points + PT_bonus) × lean_mult`) |
+| **Field** | How many programs are funding him: a count plus a segment bar with the user's segment highlighted | `payload.competition_counts` |
+
+If you find yourself deriving a probability to rank or sort on this screen, that is the placeholder growing back. A regression test walks every text node and fails on a literal `%`.
+
+**Competition counts** — `_week_35_competition_counts(fid)` returns `recruit_id → number of programs funding him`, counting only entries with `points > 0` (a zero-point slot is not competition) and once per team. Knowable because CPU week-35 boards are seeded server-side on the user's first save. Returns `{}` before boards exist, which renders as "no field yet" rather than as zero competition.
+
+**Roster capacity is a server number.** `_roster_capacity_payload(fid, team_id)` ships as `payload.roster_capacity` (`roster_spots`, `scholarships`, `roster_cap: 15`, `roster_used`). It wraps the pre-existing `_calculate_available_roster_spots` / `_calculate_available_scholarships` rather than recomputing. **Both** signing day and the invite board's rail read it — capacity is the header number, and the board's position mix sits beneath it answering a different question. Nothing derives capacity client-side; funding was previously uncapped against a hard 15-man ceiling.
+
+**Removed:** the scholarship toggle. It was normalized false/dormant and affected neither score nor roster state — a visible control that did nothing. `order_entries` no longer carries a `scholarship` key.
+
+**Added back:** year and archetype on the signing row. A senior and a freshman previously looked identical on the screen where 50 points get committed.
+
+**Submit summary** replaces the blind 950ms redirect. After both requests land, the player sees what they committed — points, standing, multiplier, field per recruit — and leaves on their own click.
+
+**Pre-flight rail** is the one place on this screen allowed to editorialize, and every warning must name the recruit *and* the number driving it:
+
+> `6 programs funding DeAndre Pope, you're #2 at ×3 — 5 points is unlikely to carry.`
+> `19 points unspent and 4 roster spots; Ruiz is uncontested at ×1.`
+> `Binding promise on Vance at ×1 — he has no lean toward you, so the promise carries the whole bid.`
+
+A clean board says "Nothing flagged" rather than showing an empty panel.
+
+## 10e. Results (week 36)
+
+**Playback, not a new engine.** The resolution already processes recruits one at a time in RT order. The results screen replays that sequence with Next / Auto-play / Skip all. Nothing here changes who signs where.
+
+**Every row explains itself:** headshot, linked name, position, RT pair, where he signed, your points, your standing and multiplier, field size, and a one-line why.
+
+### The why must come from the resolution
+
+`_generate_week_35_recruiting_results` writes a `resolution` block onto each signed entry, recording the numbers the signing was actually decided by:
+
+| Field | Meaning |
+|---|---|
+| `field_size` | Programs funding him (`points > 0`), matching `_week_35_competition_counts` |
+| `points_by_team` | Points each funder committed |
+| `scores_by_team` | Every board's score as the engine computed it |
+| `winner_team_id` / `winner_score` / `winner_points` | Who won and on what |
+| `lean_multipliers` | Each boarded team's multiplier |
+| `lean_at_resolution` | The ladder at decision time |
+| `pt_offer_count` | Playing-time offers, which scale the PT bonus |
+
+`week_35_signing_reason()` assembles the sentence from **those recorded numbers only**. It never calls `_week_35_team_score` — a second implementation of the scoring rule is how the client drifted the first time, and `test_week_35_signing_reason.py` guards it structurally by parsing the function body. A pre-existing signing with no `resolution` block renders `—` rather than an invented reason.
+
+**Multiplier drift, fixed.** The engine scores slot 3 at **×2**. An earlier client table listed only `{1: 5, 2: 3}` and defaulted rank 3 to ×1, so signing day would have displayed the wrong multiplier. There is now one definition — `WEEK_35_LEAN_MULTIPLIERS` — used by `_week_35_team_score` and served to the client as `payload.lean_multipliers`.
+
+**Class summary** after the sequence: signed, funded, class average RT, points spent, and roster spots remaining — the last read from the same `_roster_capacity_payload` helper signing day uses.
+
+**Scope.** The sequence covers recruits you boarded plus everyone you signed. A recruit you never boarded is not part of your season and is excluded, so the "You never boarded him" reason exists server-side for completeness but does not appear on this screen.
+
+### Carry-back fix: reachable warnings
+
+The signing pool defaults to `sTab: 'mine'`, which hides recruits with no lean to you — exactly the ×1 and "no field yet" cases the pre-flight rail warns about. Each recruit-specific warning is now a button routed through the existing `jumpTo()`, which switches to the All tab and flashes the row. Aggregate warnings (over budget, more funded than spots) name no recruit and stay non-clickable. **The `mine` default is unchanged** — the defect was the unreachable warning, not the tab.
+
 ## 11. Key files and tests
 
 ### Code

@@ -221,3 +221,71 @@ def summarize_kinds(events: Iterable[dict[str, Any]]) -> dict[str, int]:
         if kind:
             counts[kind] = counts.get(kind, 0) + 1
     return counts
+
+
+# Kinds that changed the user's own standing, as opposed to the surrounding field.
+_MOVED_KINDS = frozenset({GAINED_YOU, MOVED_UP, MOVED_DOWN, RIVAL_TOOK_YOUR_TOP})
+
+
+def wire_counts(events: Iterable[dict[str, Any]]) -> dict[str, int]:
+    """``{"moved": n, "dropped": m}`` for the secondary button's count line.
+
+    ``displaced`` is deliberately excluded from both totals: a rival falling off a
+    ladder is context for the card, not a change to the user's own standing, and
+    counting it would inflate "moved" with events the player didn't experience as
+    movement.
+    """
+    moved = 0
+    dropped = 0
+    for event in events:
+        kind = str(event.get("kind") or "")
+        if kind == DROPPED_YOU:
+            dropped += 1
+        elif kind in _MOVED_KINDS:
+            moved += 1
+    return {"moved": moved, "dropped": dropped}
+
+
+def unseen_events(
+    events_by_week: dict[str, Any] | None,
+    seen_week: int,
+) -> list[dict[str, Any]]:
+    """Events from weeks after ``seen_week``, newest week first.
+
+    The marker is a week number, not a boolean, precisely so "seen week 12" and
+    "seen week 13" are distinguishable within one season.
+    """
+    return _flatten_weeks(events_by_week, minimum_week=int(seen_week or 0) + 1)
+
+
+def recent_events(
+    events_by_week: dict[str, Any] | None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    """All recorded events, newest week first — the Wire card's feed."""
+    flat = _flatten_weeks(events_by_week, minimum_week=None)
+    return flat[:limit] if limit else flat
+
+
+def _flatten_weeks(
+    events_by_week: dict[str, Any] | None,
+    minimum_week: int | None,
+) -> list[dict[str, Any]]:
+    weeks: list[tuple[int, list[dict[str, Any]]]] = []
+    for raw_week, raw_events in (events_by_week or {}).items():
+        try:
+            week = int(raw_week)
+        except (TypeError, ValueError):
+            continue
+        if minimum_week is not None and week < minimum_week:
+            continue
+        if isinstance(raw_events, list):
+            weeks.append((week, raw_events))
+    weeks.sort(key=lambda pair: pair[0], reverse=True)
+    flat: list[dict[str, Any]] = []
+    for week, week_events in weeks:
+        for event in week_events:
+            entry = dict(event)
+            entry.setdefault("week", week)
+            flat.append(entry)
+    return flat

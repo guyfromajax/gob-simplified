@@ -1437,22 +1437,17 @@ async function initializeTrainingPoints() {
         if (pointsRemainingEl) {
           pointsRemainingEl.textContent = TOTAL_POINTS;
         }
+        // Training ends at training (ux-build-plan §5.1). Recruiting is reached from
+        // the FCC — secondary hero button, tab badge, or the week-20 gate — not by
+        // routing out of Run Training.
+        //
+        // IMPORTANT: this removes only the ROUTE. The invite itself still fires on
+        // week advance using whatever board exists, exactly as before, so no week can
+        // be silently lost. Decoupling the EXECUTION was tried and reversed once
+        // because Run Training was the only guaranteed weekly trigger — don't.
         if (recruitingInvitesBtn) {
-          const showRecruitingInvites = currentWeek >= 20 && currentWeek <= 26;
-          recruitingInvitesBtn.style.display = showRecruitingInvites ? 'inline-flex' : 'none';
-          if (showRecruitingInvites) {
-            recruitingInvitesBtn.onclick = function () {
-              playSound('confirm-1-lowervol.wav');
-              saveTrainingFormDraft();
-              const params = new URLSearchParams();
-              params.set('franchise_id', franchiseId);
-              if (teamId) params.set('team_id', teamId);
-              params.set('from', 'training');
-              params.set('session_type', urlParams.get('session_type') || 'in-season');
-              // Recruiting Hub owns the invite board now (D2). Was recruiting-invites.html.
-              window.location.href = `/recruiting.html?${params.toString()}`;
-            };
-          }
+          recruitingInvitesBtn.style.display = 'none';
+          recruitingInvitesBtn.onclick = null;
         }
         restoreTrainingFormDraft();
         console.log(`🎯 [TRAINING] Training points set to ${TOTAL_POINTS} (first training: ${data.is_first_training})`);

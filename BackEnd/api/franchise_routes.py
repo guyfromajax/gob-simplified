@@ -100,10 +100,18 @@ from BackEnd.models.game_manager import GameManager
 from BackEnd.models.franchise_manager import choose_franchise_first_name, get_franchise_name_assets, generate_walk_on_profile
 from BackEnd.models.franchise_manager import carry_dev_fields
 from BackEnd.models.franchise_manager import build_walk_ons_news_story, walk_on_news_row
+from BackEnd.utils.recruiting_report_news import (
+    build_recruiting_rankings_story,
+    team_points_from_lean_lists,
+    team_points_from_signings,
+)
 from BackEnd.utils.recruiting_lean_events import (
     diff_lean,
+    recent_events,
     render_lean_event,
     summarize_kinds,
+    unseen_events,
+    wire_counts,
 )
 from BackEnd.utils.franchise_rank_prestige import (
     FRANCHISE_RANK_PRESTIGE_SYSTEM_VERSION,
@@ -3805,6 +3813,20 @@ BRACKET_REVEAL_SEEN_FIELD = "bracket_reveal_seen"
 BRACKET_UPDATE_SEEN_FIELD = "bracket_update_seen"
 RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_season"
 WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD = "walk_on_welcome_modal_seen_season"
+# Read marker for the recruiting wire. A WEEK number, not a boolean: a season-scoped
+# boolean cannot distinguish "seen week 12's events" from "seen week 13's". Stamped
+# when the player OPENS the Recruiting surface — not on hover, not on FCC render, so
+# reading the button tooltip never clears the badge.
+RECRUITING_WIRE_SEEN_WEEK_FIELD = "recruiting_wire_seen_week"
+# Week the visit-window invite board was last saved. FTD "Recruits" persists across
+# weeks, so it cannot answer "sent THIS week" on its own.
+RECRUITING_BOARD_SAVED_WEEK_FIELD = "recruiting_board_saved_week"
+# Watchlist: an UNORDERED, UNCAPPED shortlist of recruit ids the player is tracking.
+# It is NOT a board — ordering and the 20-slot cap belong to the week-20 invite board
+# (FTD "Recruits"). Conflating them would make every star press imply a rank.
+# It seeds the board CLIENT-SIDE at week 20; nothing here ever writes FTD "Recruits",
+# because has_saved_board derives from that field and the week-20 gate keys off it.
+RECRUITING_WATCHLIST_FIELD = "recruiting_watchlist"
 
 BRACKET_REVEAL_WEEKS = {
     27: ("conference", "Conference Tournament · Weeks 27–29", "full"),
@@ -4036,6 +4058,126 @@ def _build_recruiting_results_modal_payload(
         "recruits": recruits,
         "count": len(recruits),
         # NOTE: count reflects the capped list above, not the full signing class.
+    }
+
+
+WIRE_CARD_EVENT_LIMIT = 12
+# Visit window (weeks 20-26), matching _apply_complete_week_recruiting_lean_updates.
+INVITE_FIRST_WEEK = 20
+INVITE_LAST_WEEK = 26
+
+
+def _build_recruiting_wire_payload(
+    franchise_doc: dict[str, Any] | None,
+    user_team_id: str | None,
+) -> dict[str, Any]:
+    """Wire state for the FCC: unseen counts for the button/badge, feed for the card.
+
+    Reporting only — reads the Prompt 1 event log and the board-saved marker; changes
+    no recruiting mechanic.
+    """
+    if not franchise_doc:
+        return {
+            "seen_week": 0, "unseen_count": 0, "counts": {"moved": 0, "dropped": 0},
+            "events": [], "board_saved_week": 0, "has_saved_board": False,
+        }
+
+    week = int(franchise_doc.get("week", 1) or 1)
+    seen_week = int(franchise_doc.get(RECRUITING_WIRE_SEEN_WEEK_FIELD, 0) or 0)
+    events_by_week = franchise_doc.get(RECRUITING_LEAN_EVENTS_FIELD) or {}
+    unseen = unseen_events(events_by_week, seen_week)
+
+    # "Has a board at all" (drives the week-20 gate) is a different question from
+    # "sent one this week" (drives the button's dead state).
+    has_saved_board = False
+    if user_team_id:
+        try:
+            ftd_doc = franchise_team_data_collection.find_one(
+                {"franchise_id": franchise_doc["_id"], "team_id": ObjectId(str(user_team_id))},
+                {"Recruits": 1},
+            ) or {}
+            # MUST go through _team_order_list: "Recruits" is initialized to
+            # {"1".."20": None} at franchise creation and again at every rollover, and
+            # a 20-key dict of Nones is truthy — bool() on it reports a saved board for
+            # a franchise that has never saved one. The helper drops empty slots and is
+            # already used in exactly this sense by the week-20 training guards
+            # (:11966, :15290), which 400 when the board is empty.
+            has_saved_board = bool(_team_order_list(ftd_doc.get("Recruits")))
+        except Exception:
+            logger.debug("wire payload: could not read saved board", exc_info=True)
+
+    # This week's events, unbounded — the invite board annotates every affected row, so
+    # it cannot use the WIRE_CARD_EVENT_LIMIT-truncated feed below.
+    this_week = [
+        dict(event) for event in ((events_by_week or {}).get(str(week)) or [])
+        if isinstance(event, dict)
+    ]
+
+    # Render each event's sentence here, where recruit and team names resolve — the
+    # same copy layer the weekly news story uses, so both surfaces read identically.
+    feed = recent_events(events_by_week, WIRE_CARD_EVENT_LIMIT)
+    if feed:
+        recruit_ids = {str(e.get("recruit_id") or "") for e in feed if e.get("recruit_id")}
+        recruit_names: dict[str, str] = {}
+        if recruit_ids:
+            for doc in franchise_recruits_data_collection.find(
+                {"franchise_id": str(franchise_doc["_id"]), "recruit_id": {"$in": list(recruit_ids)}},
+                {"recruit_id": 1, "name": 1},
+            ):
+                recruit_names[str(doc.get("recruit_id"))] = str(doc.get("name") or "")
+        team_name_map = _format_team_name_map(franchise=franchise_doc)
+
+        def _name_of(team_id: Any) -> str:
+            return team_name_map.get(str(team_id or ""), "")
+
+        for event in feed:
+            event["line"] = render_lean_event(
+                event,
+                recruit_names.get(str(event.get("recruit_id") or "")) or "A recruit",
+                _name_of,
+            )
+        feed = [event for event in feed if event.get("line")]
+
+    if this_week:
+        ids_tw = {str(e.get("recruit_id") or "") for e in this_week if e.get("recruit_id")}
+        names_tw: dict[str, str] = {}
+        if ids_tw:
+            for doc in franchise_recruits_data_collection.find(
+                {"franchise_id": str(franchise_doc["_id"]), "recruit_id": {"$in": list(ids_tw)}},
+                {"recruit_id": 1, "name": 1},
+            ):
+                names_tw[str(doc.get("recruit_id"))] = str(doc.get("name") or "")
+        map_tw = _format_team_name_map(franchise=franchise_doc)
+        for event in this_week:
+            event["line"] = render_lean_event(
+                event,
+                names_tw.get(str(event.get("recruit_id") or "")) or "A recruit",
+                lambda tid: map_tw.get(str(tid or ""), ""),
+            )
+
+    # Recruits the user's team has already visited this season. The invite board's hero
+    # is the top UNVISITED board recruit, so it needs this to skip spent names.
+    visited: list[str] = []
+    if user_team_id:
+        seen_ids: set[str] = set()
+        for wk in range(INVITE_FIRST_WEEK, INVITE_LAST_WEEK + 1):
+            rid = _user_week_visit_recruit_id(
+                franchise_doc.get("recruiting_results") or {}, wk, str(user_team_id)
+            )
+            if rid and rid not in seen_ids:
+                seen_ids.add(rid)
+                visited.append(rid)
+
+    return {
+        "week": week,
+        "seen_week": seen_week,
+        "unseen_count": len(unseen),
+        "counts": wire_counts(unseen),
+        "events": feed,
+        "events_this_week": this_week,
+        "visited_recruit_ids": visited,
+        "board_saved_week": int(franchise_doc.get(RECRUITING_BOARD_SAVED_WEEK_FIELD, 0) or 0),
+        "has_saved_board": has_saved_board,
     }
 
 
@@ -9662,6 +9804,9 @@ def command_center_data(
         response["walk_on_welcome_modal"] = (
             _build_walk_on_welcome_modal_payload(franchise_doc) if franchise_doc else None
         )
+        response["recruiting_wire"] = _build_recruiting_wire_payload(
+            franchise_doc, str(team_id) if team_id else None
+        )
         return response
     if profile:
         from BackEnd.utils.profiling import run_profiled
@@ -12085,6 +12230,58 @@ def _is_graduating_year(year_value: str | None) -> bool:
     return year in {"senior", "graduate"}
 
 
+ROSTER_CAP = 15
+
+
+def _roster_capacity_payload(fid: ObjectId, user_team_id: str | None) -> dict[str, Any]:
+    """Roster capacity, computed once server-side and read by every consumer.
+
+    Signing day and the invite board's rail both need this. Neither may recompute it
+    client-side — funding is otherwise uncapped against a hard 15-man ceiling, and two
+    independent derivations would drift.
+    """
+    if not user_team_id:
+        return {"roster_spots": 0, "scholarships": 0, "roster_cap": ROSTER_CAP, "roster_used": ROSTER_CAP}
+    spots = _calculate_available_roster_spots(fid, user_team_id)
+    return {
+        "roster_spots": spots,
+        "scholarships": _calculate_available_scholarships(fid, user_team_id),
+        "roster_cap": ROSTER_CAP,
+        "roster_used": max(0, ROSTER_CAP - spots),
+    }
+
+
+def _week_35_competition_counts(fid: ObjectId) -> dict[str, int]:
+    """recruit_id -> number of programs funding him on their week-35 board.
+
+    Counts only entries with points > 0: a slot with zero points is not funding.
+    Returns {} before the boards exist, which the UI renders as "no field yet" rather
+    than as zero competition.
+    """
+    counts: dict[str, int] = {}
+    for ftd_doc in franchise_team_data_collection.find(
+        {"franchise_id": fid},
+        {RECRUITING_ORDERS_WEEK_35_FIELD: 1},
+    ):
+        orders = ftd_doc.get(RECRUITING_ORDERS_WEEK_35_FIELD) or {}
+        seen_for_team: set[str] = set()
+        for entry in orders.values():
+            if not isinstance(entry, dict):
+                continue
+            recruit_id = str(entry.get("id") or "").strip()
+            if not recruit_id or recruit_id in seen_for_team:
+                continue
+            try:
+                points = int(entry.get("points", 0) or 0)
+            except Exception:
+                points = 0
+            if points <= 0:
+                continue
+            seen_for_team.add(recruit_id)
+            counts[recruit_id] = counts.get(recruit_id, 0) + 1
+    return counts
+
+
 def _calculate_available_roster_spots(fid: ObjectId, user_team_id: str) -> int:
     try:
         team_object_id = ObjectId(user_team_id)
@@ -12513,6 +12710,12 @@ def _apply_training_squad_progression_and_report(
 # here, not to REGULAR_SEASON_WEEKS, so postseason movement is reported.
 LEAN_MOVEMENT_LAST_WEEK = 34
 
+NEWS_RECRUITING_REPORT_NATIONAL_LIMIT = 25
+NEWS_RECRUITING_REPORT_REGION_LIMIT = 5
+# Weekly recruiting report titles the *current* franchise week (one ahead of the
+# completed week / Upset Report). Completing week W publishes "Week W+1 …".
+NEWS_RECRUITING_REPORT_MAX_TITLE_WEEK = 35
+
 NEWS_UPSET_RANK_GAP = 29  # winner_rank - loser_rank must exceed this
 NEWS_UPSET_LOSER_RANK_MAX = 64  # losing team must be ranked 1–64 (inclusive)
 NEWS_PS_ALL_STARS_MIN_GAIN = 4  # weekly cumulative attribute gain must exceed this
@@ -12543,6 +12746,107 @@ def _join_with_and(items: list[str]) -> str:
     if len(items) == 2:
         return items[0] + " and " + items[1]
     return ", ".join(items[:-1]) + ", and " + items[-1]
+
+
+def _user_team_region_letter(franchise_doc: dict[str, Any]) -> str | None:
+    """User team's region letter (A–D), or None if unavailable."""
+    _, user_team_id = get_user_team_from_franchise(franchise_doc)
+    if not user_team_id:
+        return None
+    try:
+        oid = ObjectId(str(user_team_id))
+    except Exception:
+        return None
+    team_doc = db.teams.find_one({"_id": oid}, {"region": 1})
+    if not team_doc:
+        return None
+    region = str(team_doc.get("region") or "").strip().upper()
+    return region if len(region) == 1 else None
+
+
+def _region_team_ids_for_letter(region_letter: str) -> set[str]:
+    """Team ObjectId strings in the given region letter."""
+    docs = db.teams.find({"region": region_letter}, {"_id": 1})
+    return {str(doc["_id"]) for doc in docs if doc.get("_id") is not None}
+
+
+def _build_recruiting_rankings_story(
+    *,
+    story_id: str,
+    week: int,
+    headline: str,
+    story_type: str,
+    scores: dict[str, int],
+    team_name_map: dict[str, str],
+    user_region_letter: str | None,
+    region_team_ids: set[str] | None,
+) -> dict[str, Any] | None:
+    """National Top 25 + user-region Top 5 ranking tables. None if nobody has points."""
+    return build_recruiting_rankings_story(
+        story_id=story_id,
+        week=week,
+        headline=headline,
+        story_type=story_type,
+        scores=scores,
+        team_name_map=team_name_map,
+        user_region_letter=user_region_letter,
+        region_team_ids=region_team_ids,
+        national_limit=NEWS_RECRUITING_REPORT_NATIONAL_LIMIT,
+        region_limit=NEWS_RECRUITING_REPORT_REGION_LIMIT,
+    )
+
+
+def _build_weekly_recruiting_report_story(
+    franchise_id: ObjectId | str,
+    franchise_doc: dict[str, Any],
+    report_week: int,
+) -> dict[str, Any] | None:
+    """Lean-list recruiting rankings titled for the current franchise week."""
+    report_week = int(report_week)
+    if report_week < 1 or report_week > NEWS_RECRUITING_REPORT_MAX_TITLE_WEEK:
+        return None
+    recruits = list(
+        franchise_recruits_data_collection.find(
+            {"franchise_id": str(franchise_id)},
+            {"Lean": 1, "position_ratings": 1, "recruit_id": 1},
+        )
+    )
+    scores = team_points_from_lean_lists(recruits, _recruit_rt)
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
+    region_letter = _user_team_region_letter(franchise_doc)
+    region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()
+    return _build_recruiting_rankings_story(
+        story_id=f"w{report_week}-recruiting-report",
+        week=report_week,
+        headline=f"Week {report_week} Recruiting Report",
+        story_type="recruiting_report",
+        scores=scores,
+        team_name_map=team_name_map,
+        user_region_letter=region_letter,
+        region_team_ids=region_ids,
+    )
+
+
+def _build_season_recruiting_results_story(
+    franchise_doc: dict[str, Any],
+    signed_players: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """Post–Week 35 Results: signing teams scored at 100% of recruit RT."""
+    season = int(franchise_doc.get("current_season") or 1)
+    scores = team_points_from_signings(signed_players)
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
+    region_letter = _user_team_region_letter(franchise_doc)
+    region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()
+    return _build_recruiting_rankings_story(
+        story_id=f"s{season}-recruiting-results",
+        week=36,
+        headline=f"Season {season} Recruiting Results",
+        story_type="recruiting_results",
+        scores=scores,
+        team_name_map=team_name_map,
+        user_region_letter=region_letter,
+        region_team_ids=region_ids,
+    )
 
 
 def _build_week_upset_report_story(
@@ -12899,6 +13203,11 @@ def _append_franchise_week_news(
     # PS game-results news publishes during the CPU-training completion phase.
     # Upset report and PS all-stars are regular-season concepts; only the recruiting
     # stories run in weeks 27-34.
+    # Recruiting Report titles the *next* week (current after advance) so it sits
+    # one week ahead of the Upset Report for the completed week.
+    recruiting_report_story = _build_weekly_recruiting_report_story(
+        franchise_id, franchise_doc, week + 1
+    )
     stories = [
         story
         for story in (
@@ -12913,12 +13222,13 @@ def _append_franchise_week_news(
                 (franchise_doc.get(RECRUITING_LEAN_EVENTS_FIELD) or {}).get(str(week)) or [],
                 team_name_map,
             ),
+            recruiting_report_story,
         )
         if story
     ]
     if not stories:
         return
-    franchise_doc["season_news"] = stories + list(franchise_doc.get("season_news") or [])
+    _prepend_season_news_stories(franchise_doc, stories)
 
 
 def _franchise_news_headlines(franchise_doc: dict[str, Any], limit: int = 5) -> list[dict[str, Any]]:
@@ -13005,6 +13315,49 @@ def _persist_week_35_awards_if_needed(franchise_doc: dict[str, Any]) -> dict[str
     )
     franchise_doc[AWARDS_FIELD] = awards
     return awards
+
+
+def week_35_signing_reason(
+    resolution: dict[str, Any] | None,
+    user_team_id: str | None,
+    winner_team_name: str,
+    signed_with_user: bool,
+) -> str:
+    """One line explaining a signing, assembled ONLY from recorded resolution numbers.
+
+    Every value here was written by the resolution loop. Nothing is recomputed — in
+    particular this never calls _week_35_team_score, because a second implementation of
+    the scoring rule is exactly how the client/engine drift began (slot 3 = x2, not x1).
+    Returns "" when the resolution predates this field.
+    """
+    if not resolution:
+        return ""
+    field = int(resolution.get("field_size", 0) or 0)
+    uid = str(user_team_id or "")
+    points_by_team = resolution.get("points_by_team") or {}
+    mults = resolution.get("lean_multipliers") or {}
+    user_points = int(points_by_team.get(uid, 0) or 0)
+    user_mult = int(mults.get(uid, 1) or 1)
+    user_boarded = uid in (resolution.get("scores_by_team") or {})
+
+    def _mult_phrase(mult: int) -> str:
+        return {5: "#1 lean x5", 3: "#2 lean x3", 2: "#3 lean x2"}.get(mult, "no lean x1")
+
+    if signed_with_user:
+        if field <= 1:
+            return "Uncontested — nobody else boarded him"
+        return _mult_phrase(user_mult) + " · only " + str(field) + " programs funding"
+
+    if not user_boarded:
+        return "You never boarded him" + (" · " + str(field) + " programs did" if field else "")
+
+    if user_points <= 0:
+        return "You boarded him with 0 points · " + winner_team_name + " funded him"
+
+    return (
+        str(field) + " programs funding · " + str(user_points) +
+        (" point" if user_points == 1 else " points") + " didn't carry"
+    )
 
 
 def _week_35_result_entry_from_recruit(recruit_doc: dict[str, Any], team_doc: dict[str, Any], scholarship: bool, playing_time: bool, walk_on: bool = False) -> dict[str, Any]:
@@ -13305,6 +13658,19 @@ def _choose_week_35_team_slots(chance_map: dict[str, int]) -> list[tuple[str, in
     return selected[:4]
 
 
+# Lean-slot multipliers used by _week_35_team_score. Served to the client on the
+# recruiting payload so signing day never hardcodes its own copy — a second
+# implementation already drifted once (slot 3 is x2, not x1).
+WEEK_35_LEAN_MULTIPLIERS = {"1": 5, "2": 3, "3": 2}
+
+
+def _week_35_lean_multiplier(lean: dict[str, Any] | None, team_id: str) -> int:
+    for slot, mult in WEEK_35_LEAN_MULTIPLIERS.items():
+        if (lean or {}).get(slot) == team_id:
+            return mult
+    return 1
+
+
 def _week_35_team_score(
     team_id: str,
     entry: dict[str, Any],
@@ -13319,14 +13685,7 @@ def _week_35_team_score(
             subtotal += 15
         elif pt_offer_count > 2:
             subtotal += 7
-    multiplier = 1
-    if lean.get("1") == team_id:
-        multiplier = 5
-    elif lean.get("2") == team_id:
-        multiplier = 3
-    elif lean.get("3") == team_id:
-        multiplier = 2
-    return subtotal * multiplier
+    return subtotal * _week_35_lean_multiplier(lean, team_id)
 
 
 def _run_week_35_signings(franchise_doc: dict[str, Any]) -> dict[str, Any]:
@@ -13408,6 +13767,31 @@ def _run_week_35_signings(franchise_doc: dict[str, Any]) -> dict[str, Any]:
             playing_time=playing_time,
             walk_on=False,
         )
+        # ── Resolution facts ─────────────────────────────────────────────────────
+        # The numbers this signing was actually decided by. The results screen builds
+        # its one-line "why" from these; it does NOT re-derive them, because a second
+        # implementation of _week_35_team_score would drift from the engine.
+        # "Funding" means points > 0, matching _week_35_competition_counts.
+        funders = {
+            tid: int(e.get("points", 0) or 0)
+            for tid, e in entries_by_team.items()
+            if int(e.get("points", 0) or 0) > 0
+        }
+        signed_entry["resolution"] = {
+            "field_size": len(funders),
+            "points_by_team": funders,
+            "scores_by_team": {tid: int(v) for tid, v in chance_map.items()},
+            "winner_team_id": winner_team_id,
+            "winner_score": int(chance_map.get(winner_team_id, 0)),
+            "winner_points": int((entries_by_team.get(winner_team_id) or {}).get("points", 0) or 0),
+            "lean_multipliers": {
+                tid: _week_35_lean_multiplier(lean, tid) for tid in entries_by_team
+            },
+            "lean_at_resolution": {
+                slot: (lean.get(slot) if lean else None) for slot in ("1", "2", "3")
+            },
+            "pt_offer_count": pt_offer_count,
+        }
         signed_players.append(signed_entry)
         signed_by_recruit_id[recruit_id] = {
             "team_id": winner_team_id,
@@ -13461,6 +13845,20 @@ def get_recruiting_data(
     saved_orders = ftd_doc.get("Recruits", {}) if ftd_doc else {}
     saved_week_35_orders = ftd_doc.get(RECRUITING_ORDERS_WEEK_35_FIELD, {}) if ftd_doc else {}
     week_35_results = franchise_doc.get(WEEK_35_RECRUITING_RESULTS_FIELD) or {}
+    # Attach the user-facing "why" for each signing, built from the resolution numbers the
+    # engine recorded. Done here (one place) rather than in the client, so the scoring rule
+    # is never reimplemented on the read side.
+    if week_35_results.get("signed_players"):
+        _uid = str(user_team_id or "")
+        for _sp in week_35_results["signed_players"]:
+            if not isinstance(_sp, dict):
+                continue
+            _sp["signing_reason"] = week_35_signing_reason(
+                _sp.get("resolution"),
+                _uid,
+                str(_sp.get("team_name") or ""),
+                str(_sp.get("team_id") or "") == _uid,
+            )
 
     recruits = list(
         franchise_recruits_data_collection.find(
@@ -13509,11 +13907,23 @@ def get_recruiting_data(
         "saved_order_entries_week_35": _week_35_order_entries(saved_week_35_orders),
         "available_roster_spots": _calculate_available_roster_spots(fid, user_team_id),
         "available_scholarships": _calculate_available_scholarships(fid, user_team_id),
+        # Single capacity source for BOTH signing day and the invite board's rail. Capacity
+        # is the header number; position mix (which the rail derives from the board) answers
+        # a different question and sits beneath it.
+        "roster_capacity": _roster_capacity_payload(fid, user_team_id),
+        # Per-recruit competition count: how many programs are funding him. Knowable
+        # because CPU week-35 boards are seeded server-side on the user's first save.
+        "competition_counts": _week_35_competition_counts(fid),
+        # Single source for lean multipliers; signing day must not hardcode its own.
+        "lean_multipliers": WEEK_35_LEAN_MULTIPLIERS,
         "week_35_points_budget": WEEK_35_RECRUITING_POINTS_BUDGET,
         "recruits": recruits,
         "team_name_map": team_name_map,
         "week_35_recruiting_results": week_35_results,
         "week_35_recruiting_ran": bool(franchise_doc.get("week_35_recruiting_ran", False)),
+        "watchlist": _recruiting_watchlist(franchise_doc),
+        # Prompt 1 event log, so the invite board can annotate the rows it affects.
+        "recruiting_wire": _build_recruiting_wire_payload(franchise_doc, user_team_id),
     }
 
 
@@ -13883,6 +14293,12 @@ def save_recruiting_orders(
             }
         },
     )
+    # Per-week send marker for the FCC secondary button's .is-dead state. FTD
+    # "Recruits" persists across weeks and so can't answer "sent THIS week".
+    db.franchises.update_one(
+        {"_id": fid},
+        {"$set": {RECRUITING_BOARD_SAVED_WEEK_FIELD: week}},
+    )
     return {"status": "success", "saved_orders": orders_payload, "results_week": None}
 
 
@@ -13918,16 +14334,22 @@ def run_week_35_recruiting(
 
     results = _run_week_35_signings(franchise_doc)
     season_transition_token = _mint_season_transition_token()
+    results_story = _build_season_recruiting_results_story(
+        franchise_doc, results.get("signed_players") or []
+    )
+    if results_story:
+        _prepend_season_news_stories(franchise_doc, [results_story])
+    update_fields: dict[str, Any] = {
+        "week": 36,
+        "week_35_recruiting_ran": True,
+        WEEK_35_RECRUITING_RESULTS_FIELD: results,
+        SEASON_TRANSITION_TOKEN_FIELD: season_transition_token,
+    }
+    if results_story:
+        update_fields["season_news"] = franchise_doc.get("season_news") or []
     db.franchises.update_one(
         {"_id": fid},
-        {
-            "$set": {
-                "week": 36,
-                "week_35_recruiting_ran": True,
-                WEEK_35_RECRUITING_RESULTS_FIELD: results,
-                SEASON_TRANSITION_TOKEN_FIELD: season_transition_token,
-            }
-        },
+        {"$set": update_fields},
     )
     return {"status": "success", "week": 36, "results": results}
 
@@ -16305,6 +16727,92 @@ def mark_recruiting_results_modal_seen(
     return {"seen": True, "season": current_season}
 
 
+def _recruiting_watchlist(franchise_doc: dict[str, Any] | None) -> list[str]:
+    """De-duplicated watchlist ids, insertion order preserved.
+
+    A plain list, never a dict of slots — the watchlist has no ranks. (Contrast FTD
+    "Recruits", which is a 20-slot dict pre-filled with None; that shape is exactly
+    why has_saved_board has to go through _team_order_list.)
+    """
+    seen: set[str] = set()
+    out: list[str] = []
+    for raw in (franchise_doc or {}).get(RECRUITING_WATCHLIST_FIELD) or []:
+        rid = str(raw or "").strip()
+        if rid and rid not in seen:
+            seen.add(rid)
+            out.append(rid)
+    return out
+
+
+class RecruitingWatchlistRequest(BaseModel):
+    franchise_id: str
+    recruit_id: str
+    watching: bool | None = None  # omit to toggle
+
+
+@router.patch("/franchise/recruiting-watchlist")
+def toggle_recruiting_watchlist(
+    req: RecruitingWatchlistRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Add or remove one recruit from the watchlist.
+
+    Writes ONLY ``recruiting_watchlist`` on the franchise doc. It must never touch FTD
+    "Recruits": that field is what ``has_saved_board`` reads, so writing it here would
+    flip the week-20 gate open before the player had saved anything — the seedAlloc()
+    mistake (pre-committing the player to a choice they never made) in a new place.
+    """
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    recruit_id = str(req.recruit_id or "").strip()
+    if not recruit_id:
+        raise HTTPException(status_code=400, detail="recruit_id is required")
+
+    valid = franchise_recruits_data_collection.count_documents(
+        {"franchise_id": str(req.franchise_id), "recruit_id": recruit_id}, limit=1
+    )
+    if not valid:
+        raise HTTPException(status_code=400, detail="Unknown recruit for this franchise")
+
+    watchlist = _recruiting_watchlist(franchise_doc)
+    currently = recruit_id in watchlist
+    watching = (not currently) if req.watching is None else bool(req.watching)
+
+    if watching and not currently:
+        watchlist.append(recruit_id)
+    elif not watching and currently:
+        watchlist = [rid for rid in watchlist if rid != recruit_id]
+
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {RECRUITING_WATCHLIST_FIELD: watchlist}},
+    )
+    return {"watching": watching, "count": len(watchlist), "watchlist": watchlist}
+
+
+class RecruitingWireSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/recruiting-wire-seen")
+def mark_recruiting_wire_seen(
+    req: RecruitingWireSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Stamp the wire as read through the current week.
+
+    Called when the player OPENS the Recruiting surface. Deliberately not called on
+    hover or on FCC render — reading the secondary button's tooltip must not clear
+    the badge.
+    """
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    week = int(franchise_doc.get("week", 1) or 1)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {RECRUITING_WIRE_SEEN_WEEK_FIELD: week}},
+    )
+    return {"seen": True, "seen_week": week}
+
+
 class WalkOnWelcomeModalSeenRequest(BaseModel):
     franchise_id: str
 
@@ -17344,6 +17852,23 @@ def finish_season(req: FinishSeasonRequest):
     ]
     if frd_docs:
         franchise_recruits_data_collection.insert_many(frd_docs)
+
+    # Week 1 Recruiting Report for the new season — must run after FRD insert so
+    # initial leans exist. Prepended ahead of Walk Ons (newest first).
+    try:
+        _w1_franchise = dict(franchise_doc)
+        _w1_franchise["current_season"] = next_season
+        _w1_franchise["week"] = 1
+        _w1_report = _build_weekly_recruiting_report_story(
+            franchise_id, _w1_franchise, 1
+        )
+        if _w1_report:
+            next_season_news.insert(0, _w1_report)
+    except Exception:
+        logger.exception(
+            "[NEWS] week-1 recruiting report failed at rollover; continuing. franchise_id=%s",
+            str(franchise_id),
+        )
 
     db.games.delete_many({"franchise_id": str(franchise_id)})
     from BackEnd.practice_squad.stats import clear_ps_season_stats_for_franchise

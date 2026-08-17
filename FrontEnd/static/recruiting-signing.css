@@ -19,7 +19,7 @@
 .spool-region{height:32px;padding:0 26px 0 11px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.26);color:var(--text);font:600 11.5px/1 var(--body);cursor:pointer;appearance:none}
 .spool-region:focus{outline:none;border-color:var(--muted-3)}
 
-.spool-colhdr,.prow{display:grid;grid-template-columns:minmax(150px,1fr) 42px 78px 46px 52px 150px 132px 150px;align-items:center;gap:10px}
+.spool-colhdr,.prow{display:grid;grid-template-columns:minmax(170px,1fr) 42px 60px 62px 72px 132px 132px 138px;align-items:center;gap:10px}
 .spool-colhdr{padding:9px 18px;font:800 9.5px/1 var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted-2);border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);position:sticky;top:0;z-index:2}
 .spool-colhdr .c-num{text-align:center}
 .spool-rows{max-height:600px;overflow-y:auto}
@@ -125,5 +125,133 @@
 @media (max-width:1180px){
   .hub-body-sign{grid-template-columns:1fr}
   .rail{position:static;max-height:none;order:2}
-  .spool-colhdr,.prow{grid-template-columns:minmax(120px,1fr) 36px 62px 40px 46px 138px 120px 132px;gap:8px}
+  .spool-colhdr,.prow{grid-template-columns:minmax(130px,1fr) 36px 52px 54px 64px 116px 118px 124px;gap:8px}
 }
+
+/* ============================================================
+   SIGNING DAY v2 — Standing + Field, capacity, pre-flight, summary.
+   NO PERCENTAGE ANYWHERE. A probability is a promise the sim cannot keep;
+   a count and a multiplier are facts. If a % appears here, the placeholder
+   has grown back.
+   ============================================================ */
+
+/* year chip ahead of the archetype: a senior and a freshman must not look alike */
+.prow-yr{display:inline-flex;align-items:center;height:15px;padding:0 5px;margin-right:6px;border-radius:4px;
+  font:700 9px/1 var(--body);letter-spacing:.06em;color:var(--muted);background:rgba(255,255,255,.07);
+  border:1px solid var(--border-soft)}
+
+/* Standing — lean position and its multiplier, the mechanic the tutorial claims matters */
+.stand-cell{display:flex;align-items:baseline;gap:6px;justify-content:center}
+.stand-pos{font:400 18px/1 var(--display);color:var(--muted-2);letter-spacing:.02em}
+.stand-mult{font:700 10px/1 var(--body);letter-spacing:.04em;color:var(--muted-3)}
+.stand-cell.s-you1 .stand-pos{color:#a9ff9c}
+.stand-cell.s-you1 .stand-mult{color:var(--you)}
+.stand-cell.s-list .stand-pos{color:#ffdf9e}
+.stand-cell.s-list .stand-mult{color:var(--list)}
+
+/* Field — how many programs are funding him, count + segment bar, yours highlighted */
+.field-cell{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
+.field-n{font:400 17px/1 var(--display);color:var(--muted)}
+.field-n.dim{color:var(--muted-3)}
+.field-bar{display:flex;gap:2px;align-items:center}
+.field-bar i{width:6px;height:10px;border-radius:2px;background:rgba(255,255,255,.16)}
+.field-bar i.mine{background:var(--you);box-shadow:0 0 6px rgba(52,236,39,.55)}
+.field-lab{font:600 8.5px/1 var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted-3)}
+
+/* capacity — read from payload.roster_capacity, never recomputed client-side */
+.cap-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--hair)}
+.cap-item{font:600 11px/1 var(--body);color:var(--muted-2)}
+.cap-item b{font:400 16px/1 var(--display);color:var(--text);margin-right:2px}
+
+/* pre-flight — the only place on this screen allowed to editorialize */
+.preflight{display:flex;flex-direction:column;gap:7px;padding:12px 14px;border-top:1px solid var(--hair)}
+.pfw{display:grid;grid-template-columns:16px minmax(0,1fr);gap:8px;align-items:start;
+  font:500 11px/1.5 var(--body);color:var(--muted-2)}
+.pfw svg{width:13px;height:13px;margin-top:2px}
+.pfw.warn{color:#ffc9a0}
+.pfw.warn svg{color:var(--orange)}
+.pfw.info svg{color:var(--lblue)}
+.pfw.ok{color:var(--muted-3)}
+.pfw.ok svg{color:var(--muted-3)}
+
+/* submit summary — replaces the blind 950ms redirect */
+.ssum-overlay{position:fixed;inset:0;z-index:9000;display:flex;align-items:center;justify-content:center;
+  padding:20px;background:rgba(0,0,0,.72)}
+.ssum{width:min(560px,100%);max-height:86vh;overflow-y:auto;border:1px solid var(--border);border-radius:16px;
+  background:var(--panel);box-shadow:0 24px 48px rgba(0,0,0,.5);animation:ssum-in 200ms ease both}
+@keyframes ssum-in{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.ssum{animation:none}}
+.ssum-head{padding:20px 22px 14px;border-bottom:1px solid var(--hair)}
+.ssum-title{font:400 28px/1 var(--display);letter-spacing:.02em}
+.ssum-sub{margin-top:7px;font:500 12px/1.5 var(--body);color:var(--muted-2)}
+.ssum-rows{padding:6px 10px}
+.ssum-row{display:grid;grid-template-columns:minmax(0,1fr) 34px 66px 92px 58px;gap:8px;align-items:center;
+  padding:9px 12px;border-bottom:1px solid rgba(255,255,255,.05);font:500 12px/1.3 var(--body);color:var(--muted)}
+.ssum-row:last-child{border-bottom:0}
+.ssum-nm{color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ssum-nm b{color:var(--orange);font-weight:700;margin-left:5px}
+.ssum-pos{text-align:center;font-weight:700;color:var(--muted-2)}
+.ssum-stand,.ssum-field{font:600 10.5px/1 var(--body);color:var(--muted-3);text-align:center}
+.ssum-pts{text-align:right;font:400 16px/1 var(--display);color:var(--text)}
+.ssum-empty{padding:24px 22px;font:500 12px/1.6 var(--body);color:var(--muted-3);text-align:center}
+.ssum-foot{padding:14px 22px 20px;display:flex;justify-content:flex-end;border-top:1px solid var(--hair)}
+.ssum-go{height:40px;padding:0 22px;border-radius:9px;border:1px solid rgba(52,236,39,.5);
+  background:linear-gradient(180deg,#49ff37,#34ec27);color:#07101f;font:400 16px/1 var(--display);
+  letter-spacing:.04em;cursor:pointer}
+.ssum-go:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+/* ============================================================
+   RESULTS (week 36) — playback of the sequence the engine already ran.
+   Every number on a row was RECORDED BY THE RESOLUTION. Nothing here
+   recomputes the scoring rule.
+   ============================================================ */
+.rstage{padding:16px 22px 26px;display:flex;flex-direction:column;gap:14px}
+.rhead-t{font:400 30px/1 var(--display);letter-spacing:.02em}
+.rhead-s{margin-top:6px;font:500 12px/1.5 var(--body);color:var(--muted-2)}
+.rempty{padding:40px 20px;text-align:center;font:500 13px/1.6 var(--body);color:var(--muted-3)}
+
+.rctl{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.rbtn{height:38px;padding:0 18px;border-radius:9px;border:1px solid var(--border);background:rgba(255,255,255,.05);
+  color:var(--muted);font:400 15px/1 var(--display);letter-spacing:.04em;cursor:pointer;transition:background .13s,color .13s}
+.rbtn:hover{color:#fff;background:rgba(255,255,255,.1)}
+.rbtn.main{border-color:rgba(52,236,39,.5);background:linear-gradient(180deg,#49ff37,#34ec27);color:#07101f}
+.rctl-count,.rctl-done{font:600 11px/1 var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted-3)}
+
+.rrows{display:flex;flex-direction:column;gap:8px}
+.rrow{display:grid;grid-template-columns:48px minmax(140px,1.1fr) 74px minmax(120px,.8fr) 56px 84px 56px minmax(160px,1.2fr);
+  gap:12px;align-items:center;padding:11px 14px;border:1px solid var(--border);border-radius:12px;background:var(--surf)}
+.rrow.won{border-color:var(--you-line);background:linear-gradient(90deg,rgba(52,236,39,.08),transparent 55%),var(--surf)}
+.rrow.lost{background:linear-gradient(90deg,rgba(255,109,109,.06),transparent 55%),var(--surf)}
+.rrow.is-in{animation:rrow-in 260ms ease both}
+@keyframes rrow-in{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion:reduce){.rrow.is-in{animation:none}}
+.rav{width:48px;height:48px;border-radius:9px;overflow:hidden;border:1px solid var(--border);
+  background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02));display:flex;align-items:flex-end;justify-content:center}
+.rav img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.rid{min-width:0}
+.rnm{font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rnm a{color:var(--text);text-decoration:none;border-bottom:1px solid transparent}
+.rnm a:hover{border-bottom-color:var(--muted-3)}
+.rmeta{font:500 10.5px/1.3 var(--body);color:var(--muted-2);margin-top:2px}
+.rrt{font:400 22px/1 var(--display);letter-spacing:.02em;text-align:center}
+.rsigned{display:flex;flex-direction:column;gap:3px;min-width:0}
+.rsigned-lab{font:700 8px/1 var(--body);letter-spacing:.11em;text-transform:uppercase;color:var(--muted-3)}
+.rsigned-team{font:600 12px/1.2 var(--body);color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rsigned-team.mine{color:#a9ff9c}
+.rnum{display:flex;flex-direction:column;align-items:center;gap:2px}
+.rnum b{font:400 17px/1 var(--display);color:var(--text);font-weight:400}
+.rnum span{font:700 8px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted-3)}
+.rwhy{font:500 11.5px/1.45 var(--body);color:var(--muted-2);min-width:0}
+
+.rsum{margin-top:6px;border:1px solid var(--border);border-radius:14px;background:var(--panel-2);padding:16px 18px 18px}
+.rsum-title{font:400 24px/1 var(--display);letter-spacing:.02em;margin-bottom:12px}
+.rsum-grid{display:flex;gap:26px;flex-wrap:wrap}
+.rsum-cell{display:flex;flex-direction:column;gap:4px}
+.rsum-cell b{font:400 26px/1 var(--display);color:var(--text);font-weight:400}
+.rsum-cell span{font:700 9px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;color:var(--muted-3)}
+
+/* clickable pre-flight warning (carry-back fix) */
+.pfw.is-clickable{appearance:none;width:100%;text-align:left;border:0;background:transparent;cursor:pointer;
+  padding:2px 0;border-radius:6px;font:inherit}
+.pfw.is-clickable:hover span{color:#fff;text-decoration:underline}
+.pfw.is-clickable:focus-visible{outline:2px solid var(--orange);outline-offset:2px}

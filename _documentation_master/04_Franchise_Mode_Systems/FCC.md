@@ -912,6 +912,32 @@ Confirmation modal shown before calling:
 
 - `/franchise/finish-season`
 
+### Recruiting Presence (three levels)
+
+Recruiting is a first-class FCC presence all season. Levels are driven by **state, not phase**.
+
+| Level | Fires when | Element |
+|---|---|---|
+| Ambient | Nothing needs the player | Coach's Office Recruiting card (the Wire) |
+| Prompted | Board unsent this week, or unseen wire events | Secondary hero button + `.inbox-badge` on the Recruiting tab |
+| Gated | Week 20 with no board · Week 35 | `#play-now` itself |
+
+**Colour law.** Green is reserved for the gating action. The secondary button is always amber (`#F79420`) because it is always skippable; recruiting only turns green when it *becomes* `#play-now`.
+
+**Secondary button** lives in the previously-empty second slot of `.hero-buttons-group`. Its state comes from `recruitingButtonState()` (`js/shared/recruitingButtonState.js`) — a pure function, so all five states are unit-tested without a DOM. It has its own `.fcc-rec-btn` class rather than a `.hero-btn` modifier: the green gradient lives on `.hero-btn` itself, so a modifier would have to fight inheritance and any miss would paint a non-gating control green. Both buttons are `width: 186px` so they share a right edge.
+
+**Week-20 gate** sits in `updatePlayButton` immediately after `cut_required` — an illegal roster outranks an empty board. Mode `build-invite-board`.
+
+**Out of Run Training.** `training.js` no longer routes to recruiting. Only the **route** was removed: the invite still fires on week advance using whatever board exists, so no week can be silently lost. Decoupling the *execution* was built and reversed once because Run Training was the only guaranteed weekly trigger — do not re-decouple it.
+
+**Read marker.** `recruiting_wire_seen_week` stores a **week number, not a boolean** — a season-scoped boolean cannot distinguish "seen week 12's events" from "seen week 13's". Stamped by `PATCH /franchise/recruiting-wire-seen` when the player **opens** the Recruiting surface; never on hover (reading the tooltip must not clear the badge) and never on FCC render.
+
+**Board-sent marker.** `recruiting_board_saved_week` records the week the visit-window board was last saved. FTD `Recruits` persists across weeks and so cannot answer "sent *this* week", which the button's `.is-dead` state needs.
+
+**The Wire card** spans two columns and renders `recruiting_lean_events` (Prompt 1) — gains *and* drops, newest first, with a phase-appropriate status line. `.fcc-drop-badge` / `.fcc-drop-row` mirror the existing `.fcc-newlean-*` geometry exactly, differing only in accent token, so drops can never render quieter than gains. Standings was retired to keep the grid at rows of 4; see `Season_Init_System.md` cross-reference below and §5.5 of the build plan.
+
+Grid: `Locker Room │ Next Game │ RECRUITING (span 2)` / `Rankings │ Last Game │ Player Scoring │ News`. Locker Room leads so Next Game sits directly above Last Game.
+
 ### Walk-On Welcome
 
 Season-start reveal of the walk-ons who joined the roster, shown on the first FCC landing of a new season (week 1, before Training Camp). Season 2+ only.

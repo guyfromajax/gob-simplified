@@ -970,45 +970,6 @@ function createEmptyHomeState(message = 'N/A') {
   return `<div class="fcc-home-empty">${escapeHomeHtml(message)}</div>`;
 }
 
-function renderHomeStandingsCard() {
-  const body = document.getElementById('home-standings-body');
-  if (!body) return;
-  if (!standingsDataCache?.standings || userConference == null) {
-    body.innerHTML = createEmptyHomeState('Loading...');
-    return;
-  }
-  const teams = standingsDataCache.standings
-    .filter((team) => Number(team.conference) === Number(userConference))
-    .sort((a, b) => (Number(b.W || 0) - Number(a.W || 0)) || (Number(b.differential || 0) - Number(a.differential || 0)));
-  if (!teams.length) {
-    body.innerHTML = createEmptyHomeState();
-    return;
-  }
-
-  const rows = teams.map((team) => `
-    <div class="fcc-home-standings-row">
-      <span class="fcc-home-standings-team">${escapeHomeHtml(standingsTeamLabel(team))}</span>
-      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.W ?? 0)}</span>
-      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.L ?? 0)}</span>
-      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.PF ?? 0)}</span>
-      <span class="fcc-home-standings-stat">${escapeHomeHtml(team.PA ?? 0)}</span>
-    </div>
-  `).join('');
-
-  body.innerHTML = `
-    <div class="fcc-home-standings">
-      <div class="fcc-home-standings-row fcc-home-standings-row-header">
-        <span class="fcc-home-standings-team">Team</span>
-        <span class="fcc-home-standings-stat">W</span>
-        <span class="fcc-home-standings-stat">L</span>
-        <span class="fcc-home-standings-stat">PF</span>
-        <span class="fcc-home-standings-stat">PA</span>
-      </div>
-      <div class="fcc-home-list-scroll">${rows}</div>
-    </div>
-  `;
-}
-
 function renderHomeRankingsCard() {
   const body = document.getElementById('home-rankings-body');
   if (!body) return;
@@ -1311,30 +1272,6 @@ function fccRecruitStandingRank(recruit) {
   return 0;
 }
 
-function buildHomeRecruitRowHtml(recruit) {
-  const rank = fccRecruitStandingRank(recruit);
-  const standCls = rank === 1 ? 'you1' : rank > 1 ? 'list' : '';
-  // Dot only when it isn't already flagged "New" (the New badge is that row's marker).
-  const standDot = (rank && !isNewLeanRecruit(recruit)) ? `<span class="recruit-stand-dot ${standCls}"></span>` : '';
-  const standChip = rank ? `<span class="recruit-stand-chip ${standCls}">#${rank}</span>` : '';
-  const rowHtml = `
-    <div class="fcc-home-recruit-row">
-      <span class="fcc-home-recruit-name">${standDot}${RecruitingCommon.recruitNameLinkHtml(recruit.recruitId, franchiseId, recruit.name)}${standChip}</span>
-      <span class="fcc-home-recruit-arch">${escapeHomeHtml(recruit.archetype || '--')}</span>
-      <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.height || '--')}</span>
-      <span class="fcc-home-recruit-stat">${escapeHomeHtml(recruit.weight ?? '--')}</span>
-      <span class="fcc-home-recruit-stat ${typeof window.getRecruitRtBucketClassForYear === 'function' ? window.getRecruitRtBucketClassForYear(recruit.rt, recruit.year) : ''}">${escapeHomeHtml(formatRtWithPotentialDisplay(recruit.rt, recruit.potentialRt))}</span>
-    </div>
-  `;
-  if (!isNewLeanRecruit(recruit)) return rowHtml;
-  return `
-    <div class="fcc-newlean-row">
-      ${rowHtml}
-      <div class="fcc-newlean-tag"><span class="fcc-newlean-badge">New</span></div>
-    </div>
-  `;
-}
-
 function buildFccInviteBlockHtml(recruit, week, wide) {
   if (!recruit) return '';
   const isAssigned = recruit.status === 'assigned';
@@ -1386,33 +1323,177 @@ function renderFccRecruitsInviteBanner() {
   host.hidden = false;
 }
 
-function renderHomeRecruitingCard() {
+// ───────── Recruiting: the Wire ─────────
+// Surfaces the Prompt 1 event log (recruiting_lean_events). Reporting only.
+
+const RECRUITING_DROP_KINDS = new Set(['dropped_you']);
+const RECRUITING_GAIN_KINDS = new Set(['gained_you', 'moved_up']);
+
+function buildRecruitingUrl() {
+  const params = new URLSearchParams();
+  if (franchiseId) params.set('franchise_id', franchiseId);
+  if (userTeamId) params.set('team_id', userTeamId);
+  params.set('from', 'fcc');
+  params.set('return_url', getCurrentRelativeUrl());
+  return `/recruiting.html?${params.toString()}`;
+}
+
+/**
+ * Open the Recruiting surface and stamp the wire as read.
+ *
+ * Mark-seen belongs HERE and nowhere else: not on hover (reading the button's
+ * tooltip must not clear the badge) and not on FCC render (that would clear it
+ * before the player has seen anything).
+ */
+async function openRecruitingSurface() {
+  const url = buildRecruitingUrl();
+  try {
+    if (franchiseId && typeof API_CONFIG !== 'undefined') {
+      await fetch(API_CONFIG.buildUrl('/franchise/recruiting-wire-seen'), {
+        method: 'PATCH',
+        headers: Object.assign(
+          { 'Content-Type': 'application/json' },
+          API_CONFIG.getAuthHeaders ? API_CONFIG.getAuthHeaders() : {}
+        ),
+        body: JSON.stringify({ franchise_id: franchiseId }),
+      });
+    }
+  } catch (err) {
+    // Never block navigation on the read marker.
+    console.warn('[WIRE] could not persist seen state:', err);
+  }
+  window.location.href = url;
+}
+
+function wireRowClassFor(kind) {
+  if (RECRUITING_DROP_KINDS.has(kind)) return 'fcc-drop-row';
+  if (RECRUITING_GAIN_KINDS.has(kind)) return 'fcc-newlean-row';
+  return 'fcc-wire-row';
+}
+
+function wireBadgeFor(kind) {
+  if (RECRUITING_DROP_KINDS.has(kind)) return '<span class="fcc-drop-badge">Drop</span>';
+  if (RECRUITING_GAIN_KINDS.has(kind)) return '<span class="fcc-newlean-badge">Gain</span>';
+  return '';
+}
+
+/** Phase-appropriate status line beneath the feed. */
+function wireStatusLine(week, wire) {
+  const w = Number(week || 0);
+  const counts = wire.counts || {};
+  if (w === 35) return 'Signing Day — allocate your recruiting points.';
+  if (w >= 20 && w <= 26) {
+    if (Number(wire.board_saved_week || 0) === w) return `Invite board sent for week ${w}.`;
+    if (!wire.has_saved_board) return 'No invite board yet — build one to start sending invites.';
+    return `Invite week ${w - 19} of 7 — board not sent yet.`;
+  }
+  const unseen = Number(wire.unseen_count || 0);
+  if (unseen > 0) {
+    const parts = [];
+    if (counts.moved) parts.push(`${counts.moved} moved`);
+    if (counts.dropped) parts.push(`${counts.dropped} dropped you`);
+    return `${parts.join(' · ')} since you last looked.`;
+  }
+  return 'No movement on your board this week.';
+}
+
+function renderHomeRecruitingWire() {
   const body = document.getElementById('home-recruiting-body');
   if (!body) return;
+  const wire = commandCenterTopDataCache?.recruiting_wire || {};
   const week = Number(commandCenterTopDataCache?.week || document.body.dataset.fccWeek || 1);
-  const inviteBlock = (week >= 20 && week <= 26 && currentWeekInviteRecruitCache)
-    ? buildFccInviteBlockHtml(currentWeekInviteRecruitCache, week, false)
-    : '';
-  const recruits = partitionRecruitsWithNewLeans(
-    [...leanRecruitsDataCache].sort((a, b) => Number(b.rt || 0) - Number(a.rt || 0)),
-    null,
-    null
-  );
-  body.innerHTML = `
-    ${inviteBlock}
-    <div class="fcc-home-recruiting">
-      <div class="fcc-home-list-scroll">
-        <div class="fcc-home-recruit-header">
-          <span>Recruit</span>
-          <span>Arch.</span>
-          <span>HT</span>
-          <span>WT</span>
-          <span>RT</span>
+
+  const fullLink = document.getElementById('home-recruiting-full-link');
+  if (fullLink && !fullLink.dataset.wireBound) {
+    fullLink.dataset.wireBound = '1';
+    fullLink.href = buildRecruitingUrl();
+    fullLink.addEventListener('click', (event) => {
+      event.preventDefault();
+      void openRecruitingSurface();
+    });
+  }
+
+  const events = Array.isArray(wire.events) ? wire.events : [];
+  const status = `<div class="fcc-wire-status">${escapeHomeHtml(wireStatusLine(week, wire))}</div>`;
+
+  if (!events.length) {
+    body.innerHTML = `${createEmptyHomeState('No board movement yet')}${status}`;
+    return;
+  }
+
+  const rows = events.map((event) => {
+    const kind = String(event.kind || '');
+    const badge = wireBadgeFor(kind);
+    return `
+      <div class="${wireRowClassFor(kind)}">
+        <div class="fcc-wire-line">
+          <span>${escapeHomeHtml(event.line || '')}</span>
+          <span class="fcc-wire-line__wk">Wk ${escapeHomeHtml(event.week ?? '--')}</span>
         </div>
-        ${recruits.map((recruit) => buildHomeRecruitRowHtml(recruit)).join('')}
+        ${badge ? `<div class="fcc-newlean-tag">${badge}</div>` : ''}
       </div>
+    `;
+  }).join('');
+
+  body.innerHTML = `
+    <div class="fcc-home-recruiting">
+      <div class="fcc-home-list-scroll">${rows}</div>
     </div>
+    ${status}
   `;
+}
+
+/** Secondary hero button + tab badge, both driven by the pure state function. */
+function renderRecruitingSecondaryButton() {
+  const btn = document.getElementById('fcc-recruiting-secondary');
+  const api = window.GOB_RecruitingButtonState;
+  if (!btn || !api) return;
+
+  const wire = commandCenterTopDataCache?.recruiting_wire || {};
+  const week = Number(commandCenterTopDataCache?.week || document.body.dataset.fccWeek || 1);
+  const state = api.recruitingButtonState({
+    week,
+    counts: wire.counts || {},
+    boardSavedWeek: Number(wire.board_saved_week || 0),
+    hasSavedBoard: !!wire.has_saved_board,
+  });
+
+  btn.style.display = state.visible ? 'flex' : 'none';
+  if (state.visible) {
+    const line1 = document.getElementById('fcc-recruiting-secondary-line1');
+    const line2 = document.getElementById('fcc-recruiting-secondary-line2');
+    const dot = document.getElementById('fcc-recruiting-secondary-dot');
+    if (line1) line1.textContent = state.line1;
+    if (line2) line2.textContent = state.line2;
+    if (dot) dot.style.display = state.pulse ? 'block' : 'none';
+    btn.classList.toggle('is-dead', !!state.dead);
+    if (!btn.dataset.wireBound) {
+      btn.dataset.wireBound = '1';
+      btn.addEventListener('click', () => { void openRecruitingSurface(); });
+    }
+  }
+
+  // Tab badge — prompted only. Hovering the button does not clear it; only opening
+  // the surface does, via the mark-seen PATCH.
+  const tabBtn = document.querySelector('#franchise-container [data-tab="recruits-tab"]')
+    || document.querySelector('[data-tab="recruits-tab"]');
+  if (tabBtn) {
+    const prompted = api.recruitingIsPrompted({
+      week,
+      counts: wire.counts || {},
+      boardSavedWeek: Number(wire.board_saved_week || 0),
+      hasSavedBoard: !!wire.has_saved_board,
+    });
+    let badge = tabBtn.querySelector('.inbox-badge');
+    if (prompted && !badge) {
+      badge = document.createElement('span');
+      badge.className = 'inbox-badge';
+      tabBtn.appendChild(badge);
+    } else if (!prompted && badge) {
+      badge.remove();
+    }
+    if (getComputedStyle(tabBtn).position === 'static') tabBtn.style.position = 'relative';
+  }
 }
 
 function renderHomeNewsCard() {
@@ -1483,11 +1564,11 @@ async function renderNewsTab() {
 }
 
 async function renderHomeTab() {
-  renderHomeStandingsCard();
   renderHomeRankingsCard();
   renderHomeLockerRoomCard();
   renderHomeTeamStatsCard();
-  renderHomeRecruitingCard();
+  renderHomeRecruitingWire();
+  renderRecruitingSecondaryButton();
   renderHomeNewsCard();
   renderHomeMatchupCard('home-next-game-body', commandCenterTopDataCache?.next_game_summary || null, {
     emptyMessage: commandCenterTopDataCache?.next_game_is_bye ? 'Bye' : 'N/A'
@@ -3393,11 +3474,11 @@ async function init() {
     bindResourcesLinks();
     if (standingsDataCache) renderStandings(standingsDataCache, 'A');
     if (userRosterPlayersCache.length) renderTeam({ players: userRosterPlayersCache });
-    renderHomeStandingsCard();
     renderHomeRankingsCard();
     renderHomeLockerRoomCard();
     renderHomeTeamStatsCard();
-    renderHomeRecruitingCard();
+    renderHomeRecruitingWire();
+    renderRecruitingSecondaryButton();
     renderHomeNewsCard();
     if (userScheduleDataCache) {
       void renderHomeTab();
@@ -3883,9 +3964,18 @@ function updatePlayButton(data) {
   const tournamentComplete = eosTournament?.completed || false;
   const cutRequired = !!data.cut_required;
   
+  const wire = data.recruiting_wire || {};
+  // Week-20 gate: the invite window opens and there is no board to send. Same slot
+  // pattern as the cut gate above, and deliberately AFTER it — an illegal roster
+  // outranks an empty board.
+  const needsInviteBoard = week === 20 && !wire.has_saved_board;
+
   if (cutRequired) {
     playNowBtn.textContent = 'Assign Practice Squad';
     playNowBtn.dataset.mode = 'cut-players';
+  } else if (needsInviteBoard) {
+    playNowBtn.textContent = 'Build Invite Board';
+    playNowBtn.dataset.mode = 'build-invite-board';
   } else if (week === 35) {
     playNowBtn.textContent = 'Recruiting';
     playNowBtn.dataset.mode = 'week35-recruiting';
@@ -4067,6 +4157,11 @@ playNowBtn.addEventListener('click', async () => {
     } else {
       await navigateToTraining();
     }
+    return;
+  }
+
+  if (mode === 'build-invite-board') {
+    await openRecruitingSurface();
     return;
   }
 

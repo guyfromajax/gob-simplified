@@ -54,3 +54,23 @@
     For user conferecne list teams from lowest natl_rank to highest. Only list recruits who have declared a lean to the team that week.
 
 
+**Recruiting Reports**
+
+##Headline: "Week {N} Recruiting Report"
+- Cadence: **Week 1** at season init (franchise create / `finish_season` rollover, after initial leans are written). Then on each week completion for completed weeks **1–34**, titled for the **current** week after advance (`Week {completed + 1}`), so the report sits one week ahead of that week's Upset Report. Lean movement (including postseason performance leans) runs through week **34**, so title weeks go through **35**.
+- Criteria: always publish when any team has lean-share points > 0. Teams with **0 points are omitted**; national and region lists may be shorter than their caps.
+- Scoring (pre–Week 35 signings): each recruit's value is **current RT** (`max` position rating). Teams on the lean list accrue:
+  - slot 1 → 100% of RT
+  - slot 2 → 50% of RT
+  - slot 3 → 25% of RT  
+  All values are **rounded integers**.
+- Ranking: strict sequential ranks `1..N`; ties broken **randomly**. National Top **25**; user-region Top **5** labeled `Region {letter}` (e.g. `Region A`).
+- Content: `ranking_table` rich lines (columns Rank / Team / Score) under headings `National Recruit Rankings` and `Region {letter}`.
+- `story_id`: `w{N}-recruiting-report`. Skipped if already present when prepending.
+
+##Headline: "Season {N} Recruiting Results"
+- Moment: after **Run Recruiting** completes in week 35 (franchise advances to week 36; user returns to FCC at week 36). No week number in the headline.
+- Scoring: signing team only receives **100%** of each signed recruit's RT. No other team scores for that recruit.
+- Same ranking / omit-zero / rich-table rules as the weekly report (National Top 25 + user Region Top 5).
+- `story_id`: `s{N}-recruiting-results`. Implementation: `BackEnd/utils/recruiting_report_news.py` + `_append_franchise_week_news` / `run_week_35_recruiting` / season-init paths.
+

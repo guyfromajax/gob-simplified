@@ -127,6 +127,36 @@
     ].join('');
   }
 
+  /**
+   * Recruiting Report / Results ranking table: Rank | Team | Score.
+   * Rows are {rank, team, score} (team_id optional, unused for display).
+   */
+  function renderRankingTable(columns, rows) {
+    if (!rows || !rows.length) return '';
+    var cols = (columns && columns.length) ? columns : ['Rank', 'Team', 'Score'];
+    var head = cols.map(function (label, idx) {
+      var cls = (idx === 1) ? ' class="news-pt-name"' : ' class="news-pt-num"';
+      return '<th' + cls + '>' + escapeHtml(label) + '</th>';
+    });
+    var body = rows.map(function (row) {
+      return [
+        '<tr>',
+        '<td class="news-pt-num">' + escapeHtml(row.rank == null ? '--' : String(row.rank)) + '</td>',
+        '<td class="news-pt-name">' + escapeHtml(row.team || row.team_id || '--') + '</td>',
+        '<td class="news-pt-num">' + escapeHtml(row.score == null ? '--' : String(row.score)) + '</td>',
+        '</tr>'
+      ].join('');
+    });
+    return [
+      '<div class="news-pt-wrap news-rt-wrap">',
+      '<table class="news-pt news-rt">',
+      '<thead><tr>' + head.join('') + '</tr></thead>',
+      '<tbody>' + body.join('') + '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
   function renderRichLines(richLines) {
     if (!richLines || !richLines.length) return '';
     return richLines.map(function (item) {
@@ -150,6 +180,9 @@
       }
       if (type === 'player_table') {
         return renderPlayerTable(item.players || []);
+      }
+      if (type === 'ranking_table') {
+        return renderRankingTable(item.columns || [], item.rows || []);
       }
       if (type === 'game_result') {
         var line = escapeHtml(item.text);

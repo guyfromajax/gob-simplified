@@ -210,8 +210,9 @@ a{color:var(--orange);text-decoration:none}a:hover{color:#ffb454}
 .pool-scroll::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:6px;border:2px solid var(--panel)}
 .pool-scroll::-webkit-scrollbar-track{background:transparent}
 
-table.pool{width:100%;border-collapse:collapse;font-size:12px;min-width:1080px}
-.pool.condensed{min-width:560px}
+/* Sizes to its CONTENT (~1030px), not to the container. A stretched table opens dead
+   space between the name and Pos; the name column is capped rather than flexed. */
+table.pool{border-collapse:collapse;font-size:12px;width:max-content;min-width:100%;table-layout:fixed}
 .pool thead th{position:sticky;top:0;z-index:3;background:linear-gradient(180deg,rgba(34,38,50,.99),rgba(24,27,37,.99));backdrop-filter:blur(6px);font:800 10px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted-2);padding:11px 6px;border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none}
 .pool thead th.num{text-align:center}
 .pool thead th .arrow{color:var(--orange);margin-left:3px;font-size:9px}
@@ -256,8 +257,85 @@ tr.region-row td{padding:0;border:0}
 .pool td.lean-col{padding-left:14px;padding-right:14px;position:relative;min-width:230px}
 .attr-sep{border-left:1px solid rgba(255,255,255,.05)}
 
-/* condensed = dock active: hide attribute columns */
-.pool.condensed .attr-col,.pool.condensed td.attr{display:none}
+/* .pool.condensed is GONE by design. It hid the attribute columns whenever the dock
+   was open — i.e. exactly during the invite phase, when you are comparing recruits.
+   Attributes stay visible in every phase. */
+
+/* ---------- Pool v2: fixed column widths, headers centered over their columns ----------
+   Widths sum to ~1030px with the 12-chip attribute block sized to its content, so the
+   header can centre over the whole block rather than over the first chip. */
+.pool col.c-name{width:248px}
+.pool col.c-pos{width:44px}
+.pool col.c-rt{width:86px}
+.pool col.c-yr{width:40px}
+.pool col.c-ht{width:52px}
+.pool col.c-rgn{width:44px}
+.pool col.c-attrs{width:340px}
+.pool col.c-lean{width:132px}
+.pool col.c-watch{width:52px}
+.pool col.c-add{width:46px}
+
+.pool thead th.attrs-col{text-align:center;padding-left:0;padding-right:0}
+.pool thead th.watch-col,.pool thead th.lean-h{text-align:center;cursor:default}
+.pool thead th.watch-col:hover,.pool thead th.lean-h:hover{color:var(--muted-2)}
+
+/* Name cell: headshot + name/archetype, clipped rather than wrapped. */
+.pool td.name-col .pc-id{display:flex;align-items:center;gap:10px;min-width:0}
+.pool .pc-av{width:36px;height:36px;border-radius:7px;flex:0 0 auto;overflow:hidden;border:1px solid var(--border);
+  background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02));display:flex;align-items:flex-end;justify-content:center}
+.pool .pc-av img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.pool .pc-txt{min-width:0}
+.pool .pc-txt .pc-name{display:flex;align-items:center;gap:8px;min-width:0}
+.pool .pc-txt .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pool .pc-txt .pc-arch{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* Attribute chips: label over value, one flex row centred in its column. */
+.pool td.attrs-cell{padding:0}
+.pool .attr-chips{display:flex;gap:2.5px;align-items:center;justify-content:center}
+.pool .at{width:26px;height:30px;border-radius:3px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;background:rgba(255,255,255,.05)}
+.pool .at u{font:700 6.8px/1 var(--body);text-decoration:none;color:var(--muted-3)}
+.pool .at s{font:400 13.5px/1 var(--display);text-decoration:none;color:var(--muted);font-variant-numeric:tabular-nums}
+.pool .at.hi{background:rgba(52,236,39,.15)}
+.pool .at.hi s{color:#9cf294}
+.pool .at.lo{background:rgba(255,109,109,.12)}
+.pool .at.lo s{color:#ffa8a8}
+
+/* Watch star: 32px hit target, gold filled when on, hollow when off, no text label. */
+.pool td.watch-cell{text-align:center}
+.pool .wt{width:32px;height:32px;border-radius:8px;border:1px solid transparent;background:transparent;color:var(--muted-3);
+  cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:color .14s,background .14s;padding:0}
+.pool .wt svg{width:17px;height:17px}
+.pool .wt:hover{color:#FFD700;background:rgba(255,215,0,.10)}
+.pool .wt.is-on{color:#FFD700}
+.pool .wt.is-on:hover{color:#fff0a0}
+.pool .wt:focus-visible{outline:2px solid #FFD700;outline-offset:-2px}
+.pool .wt[disabled]{opacity:.45;cursor:progress}
+
+/* ---------- two-row filter bar ---------- */
+.pool-fbar{border:1px solid var(--border);border-bottom:0;border-radius:13px 13px 0 0;background:var(--panel-2);overflow:hidden}
+.pool-frow{display:flex;align-items:center;gap:10px;padding:10px 14px;flex-wrap:wrap}
+.pool-frow + .pool-frow{border-top:1px solid var(--hair)}
+.pool-flab{font:700 9px/1 var(--body);letter-spacing:.13em;text-transform:uppercase;color:var(--muted-3);min-width:44px}
+.pool-sel select{height:31px;padding:0 26px 0 10px;border-radius:8px;border:1px solid var(--border);background:var(--surf-2);
+  color:var(--muted);font:600 11.5px/1 var(--body);cursor:pointer;appearance:none}
+.pool-seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--surf-2)}
+.pool-seg button{height:31px;min-width:38px;padding:0 10px;border:0;border-right:1px solid var(--border-soft);background:transparent;
+  color:var(--muted-2);font:700 11px/1 var(--body);letter-spacing:.03em;cursor:pointer;transition:background .13s,color .13s}
+.pool-seg button:last-child{border-right:0}
+.pool-seg button:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.pool-seg button.is-on{background:rgba(255,255,255,.11);color:#fff}
+.pool-srch{height:31px;width:180px;padding:0 11px;border-radius:8px;border:1px solid var(--border);background:var(--surf-2);
+  color:var(--text);font:500 11.5px/1 var(--body)}
+.pool-srch::placeholder{color:var(--muted-3)}
+.pool-view{display:inline-flex;align-items:center;gap:7px;height:31px;padding:0 11px;border-radius:8px;border:1px solid var(--border);
+  background:var(--surf-2);color:var(--muted-2);font:700 11px/1 var(--body);letter-spacing:.02em;cursor:pointer;transition:background .13s,color .13s,border-color .13s}
+.pool-view:hover{color:var(--text);background:rgba(255,255,255,.06)}
+.pool-view.is-on{color:#fff;background:rgba(255,255,255,.11);border-color:var(--muted-3)}
+.pool-view svg{width:12px;height:12px}
+.pool-view .n{font:700 10px/1 var(--body);color:var(--muted-3)}
+.pool-view.is-on .n{color:var(--muted)}
+.pool-fcount{margin-left:auto;font-size:11.5px;color:var(--muted-3)}
+.pool-fcount b{color:var(--muted);font-weight:700}
 
 /* ============================================================
    ASSEMBLED SPINE
@@ -272,7 +350,7 @@ tr.region-row td{padding:0;border:0}
 .hub-anchor .ic{color:var(--orange);font-size:13px;line-height:1}
 .spine-body{padding:16px 20px 20px;display:grid;gap:16px;transition:grid-template-columns .3s ease}
 .spine-body.no-dock{grid-template-columns:1fr}
-.spine-body.with-dock{grid-template-columns:minmax(0,1fr) 320px}
+.spine-body.with-dock{grid-template-columns:minmax(0,1fr) 306px}
 
 /* weekly story strip (passive leverage signal) */
 .story{display:flex;align-items:stretch;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel-2)}
@@ -315,3 +393,121 @@ tr.region-row td{padding:0;border:0}
   .spine-body.with-dock{grid-template-columns:1fr}
   .dir-note{display:none}
 }
+
+/* ============================================================
+   INVITE BOARD (mockups/3-invite-board.html)
+   Re-ranking is the invite decision: the hero is the top UNVISITED board recruit,
+   so there is no second selection step.
+   ============================================================ */
+.bpanel{border:1px solid var(--border);border-radius:18px;background:var(--panel);padding:18px 20px 20px}
+.bpanel-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+.bpanel-title{font:400 26px/1 var(--display);letter-spacing:.03em}
+.bpanel-title small{display:block;font:700 9px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted-3);margin-bottom:6px}
+.bpanel-count{font:400 22px/1 var(--display);color:var(--text);white-space:nowrap}
+.bpanel-count .of{font-size:13px;color:var(--muted-3);margin-left:2px}
+.bpanel-foot{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
+.bbtn-clear,.bbtn-save{height:36px;padding:0 16px;border-radius:9px;font:400 15px/1 var(--display);letter-spacing:.04em;cursor:pointer}
+.bbtn-clear{border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--muted-2)}
+.bbtn-clear:hover{color:#fff;background:rgba(255,255,255,.08)}
+.bbtn-save{border:1px solid rgba(52,236,39,.5);background:linear-gradient(180deg,#49ff37,#34ec27);color:#07101f}
+.bbtn-save[disabled]{opacity:.6;cursor:progress}
+
+/* hero — this week's invite target */
+.bhero{display:grid;grid-template-columns:74px minmax(0,1fr) auto;gap:18px;align-items:center;
+  border:1px solid var(--you-line);border-radius:14px;padding:16px 18px;
+  background:linear-gradient(120deg,rgba(52,236,39,.07),transparent 55%),var(--surf)}
+.bhero-empty{grid-template-columns:1fr;border-color:var(--border);background:var(--surf)}
+.bhero-av{width:74px;height:74px;border-radius:11px;overflow:hidden;border:1px solid var(--border);
+  background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02));display:flex;align-items:flex-end;justify-content:center}
+.bhero-av img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.bhero-eyebrow{font:700 9px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;color:var(--muted-3);margin-bottom:6px}
+.bhero-name{font:400 30px/1 var(--display);letter-spacing:.02em}
+.bhero-name a{color:var(--text);text-decoration:none;border-bottom:1px solid transparent}
+.bhero-name a:hover{border-bottom-color:var(--muted-3)}
+.bhero-meta{font-size:12px;color:var(--muted-2);margin-top:5px}
+.bhero-meta b{color:var(--muted);font-weight:600}
+.bhero-why{font-size:12px;color:#a9ff9c;margin-top:7px}
+.bhero-right{text-align:right}
+.bhero-rt{font:400 34px/1 var(--display)}
+.bhero-cap{display:block;font:700 9px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3);margin-top:5px}
+
+/* seed notice — client-side seed, nothing committed yet */
+.bseed{display:flex;align-items:center;gap:12px;margin-top:12px;padding:9px 12px;border-radius:0 9px 9px 0;
+  background:var(--surf);border:1px solid var(--border-soft);border-left:2px solid var(--amber-line);
+  font-size:11.5px;line-height:1.5;color:var(--muted-2)}
+.bseed-txt{flex:1;min-width:0}
+.bseed-txt b{color:#ffd7a0;font-weight:700}
+.bseed-x{width:24px;height:24px;flex:0 0 auto;border-radius:6px;border:1px solid var(--border);background:var(--surf-2);
+  color:var(--muted-3);font-size:13px;line-height:1;cursor:pointer}
+.bseed-x:hover{color:#fff;border-color:var(--muted-3)}
+
+/* board rows */
+.brows{border:1px solid var(--border);border-radius:13px;margin-top:14px;overflow:hidden}
+.brow{display:grid;grid-template-columns:52px minmax(160px,1.2fr) 40px 36px 78px 190px minmax(130px,.95fr) 30px;
+  align-items:center;min-height:56px;padding:0 14px;border-bottom:1px solid var(--hair);background:var(--surf);font-size:12.5px}
+.brow:last-child{border-bottom:0}
+.brow.bhdr{background:rgba(255,255,255,.045);min-height:34px;font:700 9px/1 var(--body);
+  letter-spacing:.13em;text-transform:uppercase;color:var(--muted-3)}
+.brow[draggable="true"]{cursor:grab}
+.brow.dragover{box-shadow:inset 0 2px 0 var(--orange)}
+/* movement wash: green for gains, red for drops. The drop is the loudest thing in the
+   row — it is the only thing on this screen that should make you act. */
+.brow.gained{background:linear-gradient(90deg,rgba(52,236,39,.07),transparent 60%)}
+.brow.dropped{background:linear-gradient(90deg,rgba(255,109,109,.13),transparent 62%);box-shadow:inset 3px 0 0 #ff6d6d}
+.brow-empty{padding:22px 16px;text-align:center;font-size:12px;color:var(--muted-3);background:var(--surf)}
+.brank{display:flex;align-items:center;gap:8px;color:var(--muted-3)}
+.bnum{font:400 18px/1 var(--display);color:var(--muted)}
+.bgrip{width:9px;height:14px;flex:0 0 auto;opacity:.7;cursor:grab;
+  background:radial-gradient(circle,var(--muted-3) 1px,transparent 1px) 0 0/4.5px 4.5px}
+.bname{display:flex;align-items:center;gap:10px;min-width:0}
+.bav{width:40px;height:40px;border-radius:8px;flex:0 0 auto;overflow:hidden;border:1px solid var(--border);
+  background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02));display:flex;align-items:flex-end;justify-content:center}
+.bav img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.btxt{min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btxt small{display:block;font:500 10.5px/1.3 var(--body);color:var(--muted-2)}
+.btxt a{color:var(--text);text-decoration:none;border-bottom:1px solid transparent}
+.btxt a:hover{border-bottom-color:var(--muted-3)}
+.brow .bc{text-align:center;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.brow .bc.dim{color:var(--muted-2);font-size:11px;font-weight:500}
+.brt{font:400 20px/1 var(--display);letter-spacing:.02em}
+.bladder{min-width:0}
+.bx{width:24px;height:24px;border-radius:6px;border:1px solid var(--border);background:var(--surf-2);
+  color:var(--muted-3);font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.bx:hover{color:#ffa8a8;border-color:rgba(255,109,109,.4)}
+
+/* this-week cell */
+.bmv{display:flex;align-items:center;gap:8px;min-width:0}
+.bmv-ico{width:22px;height:22px;border-radius:6px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font:700 12px/1 var(--body)}
+.bmv-ico.up{background:rgba(52,236,39,.16);color:#7cf06f}
+.bmv-ico.dn{background:rgba(255,109,109,.18);color:#ff9c9c}
+.bmv-txt{min-width:0;font:600 11.5px/1.3 var(--body);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bmv-txt.dn{color:#ffb3b3;font-weight:700}
+.bmv-txt small{display:block;font:500 10px/1.3 var(--body);color:var(--muted-3);font-weight:500}
+.bmv-quiet{font-size:11.5px;color:var(--muted-3)}
+
+/* right rail — changes that affect the board, and roster needs. Nothing else. */
+.brail{display:flex;flex-direction:column;gap:16px;min-width:0}
+.rpanel{border:1px solid var(--border);border-radius:18px;background:var(--panel);padding:16px 18px 18px}
+.reyebrow{font:700 9.5px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted-3);margin-bottom:10px}
+.reyebrow.is-live{color:#ffd7a0}
+.rquiet{font-size:11.5px;line-height:1.5;color:var(--muted-3)}
+.rev{display:grid;grid-template-columns:20px minmax(0,1fr);gap:9px;align-items:start;padding:9px 0;border-bottom:1px solid var(--hair);font-size:12px}
+.rev:last-child{border-bottom:0}
+.rico{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font:700 11px/1 var(--body)}
+.rico.up{background:rgba(52,236,39,.15);color:#7cf06f}
+.rico.dn{background:rgba(255,109,109,.15);color:#ff9c9c}
+.rtxt{color:var(--muted);line-height:1.45}
+.rtxt b{color:var(--text);font-weight:600}
+.rtxt em{display:block;font-style:normal;color:var(--muted-3);font-size:10.5px;margin-top:2px}
+.rneeds{display:flex;gap:5px;flex-wrap:wrap}
+.rneed{height:24px;padding:0 9px;border-radius:6px;font:700 10px/1 var(--body);letter-spacing:.05em;
+  display:flex;align-items:center;background:rgba(255,255,255,.05);border:1px solid var(--border-soft);color:var(--muted)}
+.rneed.hot{background:rgba(243,167,60,.14);border-color:var(--amber-line);color:#ffd7a0}
+.rsplit{border-top:1px solid var(--hair);margin:14px 0}
+.rstat{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;font-size:12px;color:var(--muted)}
+.rstat .v{font:400 20px/1 var(--display);color:var(--text)}
+.rstat .v s{text-decoration:none;color:var(--muted-3);font-size:14px}
+
+/* Invite-board rail capacity block — same payload source as signing day. */
+.cap-row--rail{margin-top:0;padding-top:0;border-top:0;margin-bottom:12px}
+.rneeds-lab{font:700 8.5px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3);margin-bottom:6px}

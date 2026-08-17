@@ -27,7 +27,7 @@
     { value: 'Freshman', label: 'FR' },
     { value: 'JH', label: 'JH' }
   ];
-  var SORTABLE = { name: 'text', pos: 'text', year: 'text', height: 'num', weight: 'num', rt: 'num' };
+  var SORTABLE = { name: 'text', pos: 'num', year: 'num', height: 'num', region: 'text', rt: 'num' };
   var INVITE_WEEKS = [20, 21, 22, 23, 24, 25, 26];
   var POS_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
   var MAX_BOARD = 20;
@@ -37,14 +37,22 @@
     week: 1, phase: 'passive', userTeamId: null, userRegion: '',
     recruits: [], byId: {}, newLeanIds: new Set(),
     board: [],                       // ordered recruit ids (invite phase)
-    search: '', region: 'all', year: 'all', mineOnly: false,
+    search: '', region: 'all', pos: 'all', year: 'all',
+    view: 'all',                     // 'all' | 'watch' | 'leans' | 'unranked'
+    watchlist: new Set(),            // unordered, uncapped shortlist of recruit ids
+    wire: {},                        // Prompt 1 event log (recruiting_wire payload)
+    boardSeededFromWatchlist: false, // drives the seed notice; cleared on save/reorder
+    seedNoticeDismissed: false,
     sort: { key: 'rt', dir: 'desc' }, collapsed: {},
     drag: { from: null, over: null },
     // Signing Day (wk 35)
-    alloc: {},                       // { recruitId: {points, promise} }
+    alloc: {},                       // { recruitId: {points, promise} } — starts EMPTY
+    rosterCapacity: {},              // from payload.roster_capacity
+    competitionCounts: {},           // recruit_id -> programs funding him
     sTab: 'mine', sRegion: 'all', sSearch: '', week35Ran: false, flashId: null,
     // Results (D4)
     currentResultsWeek: null, weeklyDismissed: false, visitTree: null,
+    playback: { index: 0, auto: false, done: false, timer: null },
     week35Results: {}, signFilter: 'all'
   };
   var SIGN = { TOTAL: 50, MAX_PER: 20, PROMISE_W: 18 };
@@ -52,7 +60,9 @@
   function boardActive() { return state.phase === 'invite'; }
   function attrClass(v) { return v >= 65 ? 'attr-hi' : v >= 40 ? 'attr-mid' : v >= 20 ? 'attr-lo' : 'attr-zero'; }
   function regionOf(rec) { var v = rec && rec.homeRegion ? String(rec.homeRegion).trim().toUpperCase() : ''; return v ? v.charAt(0) : ''; }
-  function colspan() { return (boardActive() ? 1 : 0) + 5 + ATTR_KEYS.length + 2; }
+  // Recruit | Pos | RT | Yr | Ht | Rgn | Attributes | Lean | Watch — attributes are a
+  // single cell of chips now, not 12 columns. +1 for the add column in the invite phase.
+  function colspan() { return (boardActive() ? 1 : 0) + 9; }
 
   var CHEVRON = '<svg class="region-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"></path></svg>';
   var ARROW_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M7 17L17 7M9 7h8v8"></path></svg>';
@@ -64,26 +74,35 @@
   function hasDock() { return boardActive(); }
 
   // ===================== POOL =====================
+  // ---------- filters ----------
+  // Region is a dropdown (9 options, rarely changed); Position and Year are segmented
+  // controls (few options, switched constantly — a dropdown costs a click every time).
   function filteredRecruits() {
     var q = state.search.trim().toLowerCase();
     return state.recruits.filter(function (r) {
       if (state.region !== 'all' && regionOf(r) !== state.region) return false;
+      if (state.pos !== 'all' && String(r.pos).toUpperCase() !== state.pos) return false;
       if (state.year !== 'all' && r.year !== state.year) return false;
-      if (state.mineOnly && !r.leansToUser) return false;
+      if (state.view === 'watch' && !state.watchlist.has(String(r.recruitId))) return false;
+      if (state.view === 'leans' && !r.leansToUser) return false;
+      if (state.view === 'unranked' && state.board.indexOf(r.recruitId) !== -1) return false;
       if (q && String(r.name).toLowerCase().indexOf(q) === -1) return false;
       return true;
     });
   }
   function sortValue(r, key) {
     switch (key) {
-      case 'name': return r.name; case 'pos': return r.pos;
+      case 'name': return r.name;
+      case 'pos': return POS_ORDER.indexOf(String(r.pos).toUpperCase());
       case 'year': return Common.getYearSortValue(r.year);
-      case 'height': return r.heightRaw; case 'weight': return r.weight != null ? r.weight : -1;
-      case 'rt': return r.rt != null ? r.rt : -1; default: return r[key];
+      case 'height': return r.heightRaw;
+      case 'region': return regionOf(r);
+      case 'rt': return r.rt != null ? r.rt : -1;
+      default: return r[key];
     }
   }
   function sortRecs(recs) {
-    var key = state.sort.key, dir = state.sort.dir, num = SORTABLE[key] === 'num' || key === 'year';
+    var key = state.sort.key, dir = state.sort.dir, num = SORTABLE[key] === 'num';
     return recs.slice().sort(function (a, b) {
       var av = sortValue(a, key), bv = sortValue(b, key), c;
       if (num) c = dir === 'asc' ? av - bv : bv - av;
@@ -92,15 +111,60 @@
     });
   }
   function arrow(key) { return state.sort.key === key ? '<span class="arrow">' + (state.sort.dir === 'asc' ? '▲' : '▼') + '</span>' : ''; }
-  function th(key, label, cls) { return '<th class="' + (cls || 'num') + '" data-sortkey="' + key + '">' + label + arrow(key) + '</th>'; }
+  function th(key, label, cls) {
+    return '<th class="' + (cls || 'num') + '" data-sortkey="' + key + '">' + label + arrow(key) + '</th>';
+  }
 
+  // ---------- head ----------
+  // Order: Recruit | Pos | RT | Yr | Ht | Rgn | Attributes | Lean | Watch.
+  // Name/Pos/RT lead because they answer "is he worth watching" fastest, and it keeps
+  // the sorted column beside the name. Lean and Watch pair at the right edge: both are
+  // about you and him, not about him.
+  function colgroupHtml() {
+    return '<colgroup>' +
+      (boardActive() ? '<col class="c-add">' : '') +
+      '<col class="c-name"><col class="c-pos"><col class="c-rt"><col class="c-yr"><col class="c-ht">' +
+      '<col class="c-rgn"><col class="c-attrs"><col class="c-lean"><col class="c-watch">' +
+      '</colgroup>';
+  }
   function headHtml() {
-    var attrTh = ATTR_KEYS.map(function (k, i) { return '<th class="num attr-col' + (i === 0 ? ' attr-sep' : '') + '">' + k + '</th>'; }).join('');
     return '<thead><tr>' +
       (boardActive() ? '<th class="act"></th>' : '') +
-      th('name', 'Name', 'name-col') + th('pos', 'Pos') + th('year', 'Yr') + th('height', 'Ht') + th('weight', 'Wt') +
-      attrTh + '<th class="num attr-sep" data-sortkey="rt" data-tooltip="current/potential" title="current/potential">RT' + arrow('rt') + '</th>' +
-      '<th class="lean-col">Leans / Your Standing</th></tr></thead>';
+      th('name', 'Recruit', 'name-col') +
+      th('pos', 'Pos') +
+      '<th class="num" data-sortkey="rt" data-tooltip="current/potential" title="current/potential">RT' + arrow('rt') + '</th>' +
+      th('year', 'Yr') +
+      th('height', 'Ht') +
+      th('region', 'Rgn') +
+      '<th class="attrs-col">Attributes</th>' +
+      '<th class="lean-h">Lean</th>' +
+      '<th class="watch-col">Watch</th>' +
+      '</tr></thead>';
+  }
+
+  // ---------- row ----------
+  function headshotHtml(r) {
+    var imageId = r.imageId;
+    if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
+      return '<span class="pc-av"></span>';
+    }
+    return '<span class="pc-av"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
+      ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"></span>';
+  }
+  function attrChipsHtml(r) {
+    return '<div class="attr-chips">' + ATTR_KEYS.map(function (k) {
+      var v = r.attrs[k];
+      var cls = v >= 7 ? ' hi' : v <= 3 ? ' lo' : '';
+      return '<span class="at' + cls + '" data-attr="' + k + '"><u>' + k + '</u><s>' + v + '</s></span>';
+    }).join('') + '</div>';
+  }
+  function watchButtonHtml(r) {
+    var on = state.watchlist.has(String(r.recruitId));
+    var path = 'M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z';
+    return '<button class="wt' + (on ? ' is-on' : '') + '" data-watch-id="' + r.recruitId + '" type="button"' +
+      ' aria-pressed="' + (on ? 'true' : 'false') + '" aria-label="' + (on ? 'Remove from' : 'Add to') + ' watchlist">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="' + path + '" stroke="currentColor" stroke-width="1.7"' +
+      ' fill="' + (on ? 'currentColor' : 'none') + '" stroke-linejoin="round"></path></svg></button>';
   }
   function rowHtml(r) {
     var rowCls = r.yourRank === 1 ? 'mine' : r.yourRank > 1 ? 'list-mine' : '';
@@ -113,89 +177,138 @@
       if (idx !== -1) rowCls += ' on-board';
     }
     var flags = (state.newLeanIds.has(String(r.recruitId)) ? '<span class="flag new">New</span>' : '');
-    var attrs = ATTR_KEYS.map(function (k, i) { var v = r.attrs[k]; return '<td class="attr ' + attrClass(v) + (i === 0 ? ' attr-sep' : '') + '">' + v + '</td>'; }).join('');
-    return '<tr class="rec ' + rowCls + '">' + actCell +
-      '<td class="name-col"><div class="pc-name"><span class="nm">' + Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) + '</span>' + flags + '</div>' +
-        '<div class="pc-arch">' + Common.escapeHtml(r.archetype) + '</div></td>' +
+    return '<tr class="rec ' + rowCls + '" data-rec-id="' + r.recruitId + '">' + actCell +
+      '<td class="name-col"><div class="pc-id">' + headshotHtml(r) + '<span class="pc-txt">' +
+        '<span class="pc-name"><span class="nm">' + Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) + '</span>' + flags + '</span>' +
+        '<span class="pc-arch">' + Common.escapeHtml(r.archetype) + '</span></span></div></td>' +
       '<td class="pos">' + Common.escapeHtml(r.pos) + '</td>' +
+      '<td class="rt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></td>' +
       '<td class="year">' + Common.escapeHtml(r.yearDisplay) + '</td>' +
       '<td class="num">' + Common.escapeHtml(r.height) + '</td>' +
-      '<td class="num">' + (r.weight != null ? r.weight : '--') + '</td>' + attrs +
-      '<td class="rt attr-sep" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></td>' +
-      '<td class="lean-col">' + Spine.Lean.ladderHtml(r.leanModel) + '</td></tr>';
+      '<td class="num">' + Common.escapeHtml(regionOf(r) || '--') + '</td>' +
+      '<td class="attrs-cell">' + attrChipsHtml(r) + '</td>' +
+      '<td class="lean-col">' + Spine.Lean.ladderHtml(r.leanModel) + '</td>' +
+      '<td class="watch-cell">' + watchButtonHtml(r) + '</td>' +
+      '</tr>';
   }
   function poolBodyHtml() {
-    var recs = sortRecs(filteredRecruits()), byRegion = {};
-    recs.forEach(function (r) { var g = regionOf(r); (byRegion[g] = byRegion[g] || []).push(r); });
-    var rows = '', cs = colspan();
-    REGION_ORDER.forEach(function (region) {
-      var list = byRegion[region]; if (!list || !list.length) return;
-      var collapsed = !!state.collapsed[region];
-      var mineCount = list.filter(function (r) { return r.leansToUser; }).length;
-      rows += '<tr class="region-row"><td colspan="' + cs + '">' +
-        '<button class="region-bar' + (collapsed ? ' region-collapsed' : '') + '" data-region="' + region + '" type="button">' +
-          CHEVRON + '<span class="region-letter">' + region + '</span><span class="region-name"></span>' +
-          '<span class="region-stat"><b>' + list.length + '</b> recruits</span>' +
-          (mineCount > 0 ? '<span class="region-mine"><span class="d"></span>' + mineCount + ' leaning to you</span>' : '') +
-        '</button></td></tr>';
-      if (!collapsed) rows += list.map(rowHtml).join('');
+    var recs = sortRecs(filteredRecruits());
+    if (!recs.length) {
+      return '<tr><td colspan="' + colspan() + '" style="padding:26px;text-align:center;color:var(--muted-3)">No recruits match your filters.</td></tr>';
+    }
+    return recs.map(rowHtml).join('');
+  }
+
+  // ---------- filter bar ----------
+  function segHtml(attr, options, current) {
+    return '<div class="pool-seg">' + options.map(function (o) {
+      return '<button class="' + (current === o.value ? 'is-on' : '') + '" data-' + attr + '="' + o.value + '" type="button">' + o.label + '</button>';
+    }).join('') + '</div>';
+  }
+  function viewCounts() {
+    var watch = 0, leans = 0, unranked = 0;
+    state.recruits.forEach(function (r) {
+      if (state.watchlist.has(String(r.recruitId))) watch++;
+      if (r.leansToUser) leans++;
+      if (state.board.indexOf(r.recruitId) === -1) unranked++;
     });
-    if (!rows) rows = '<tr><td colspan="' + cs + '" style="padding:26px;text-align:center;color:var(--muted-3)">No recruits match your filters.</td></tr>';
-    return rows;
+    return { watch: watch, leans: leans, unranked: unranked };
+  }
+  function viewBtn(value, label, count, iconSvg) {
+    return '<button class="pool-view' + (state.view === value ? ' is-on' : '') + '" data-view="' + value + '" type="button">' +
+      (iconSvg || '') + label + '<span class="n">' + count + '</span></button>';
   }
   function toolbarHtml(total, shown) {
-    var remainingRegions = REGION_ORDER.filter(function (r) { return r !== state.userRegion; });
-    var myRegionChip = function (r) {
-      var classes = 'chip is-my-region' + (state.region === r ? ' is-active' : '');
-      return '<span class="my-region-filter"><span class="my-region-label">my region</span>' +
-        '<button class="' + classes + '" data-region="' + r + '" aria-label="Region ' + r + ', my region">' + r + '</button></span>';
-    };
-    var chips = '<button class="chip' + (state.region === 'all' ? ' is-active' : '') + '" data-region="all">All</button>';
-    if (state.userRegion) chips += myRegionChip(state.userRegion);
-    chips += remainingRegions.map(function (r) {
-      return '<button class="chip' + (state.region === r ? ' is-active' : '') + '" data-region="' + r + '">' + r + '</button>';
-    }).join('');
-    var yearChips = YEAR_FILTERS.map(function (year) {
-      return '<button class="chip' + (state.year === year.value ? ' is-active' : '') + '" data-year="' + year.value + '">' + year.label + '</button>';
-    }).join('');
-    return '<div class="pool-toolbar"><div class="ptb-group"><span class="ptb-label">Find</span>' +
-      '<input class="ptb-search" id="pool-search" placeholder="Name…" value="' + Common.escapeHtml(state.search) + '"></div>' +
-      '<div class="ptb-group"><span class="ptb-label">Region</span>' + chips + '</div>' +
-      '<div class="ptb-group"><span class="ptb-label">Year</span>' + yearChips + '</div>' +
-      '<button class="chip mine' + (state.mineOnly ? ' is-active' : '') + '" id="pool-mine">◗ Leaning to me</button>' +
-      '<span class="ptb-count">Showing <strong>' + shown + '</strong> of ' + total + '</span></div>';
+    var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z" fill="currentColor"/></svg>';
+    var counts = viewCounts();
+    var regionOpts = '<option value="all"' + (state.region === 'all' ? ' selected' : '') + '>All regions</option>' +
+      REGION_ORDER.map(function (r) {
+        var mine = state.userRegion === r ? ' — yours' : '';
+        return '<option value="' + r + '"' + (state.region === r ? ' selected' : '') + '>Region ' + r + mine + '</option>';
+      }).join('');
+    var posOpts = [{ value: 'all', label: 'All' }].concat(POS_ORDER.map(function (p) { return { value: p, label: p }; }));
+    var activeFilters = (state.region !== 'all') + (state.pos !== 'all') + (state.year !== 'all')
+      + (state.view !== 'all') + (state.search.trim() ? 1 : 0);
+    return '<div class="pool-fbar">' +
+      '<div class="pool-frow"><span class="pool-flab">Filter</span>' +
+        '<span class="pool-sel"><select id="pool-region" aria-label="Region">' + regionOpts + '</select></span>' +
+        segHtml('pos', posOpts, state.pos) +
+        segHtml('year', YEAR_FILTERS, state.year) +
+        '<input class="pool-srch" id="pool-search" placeholder="Search name…" value="' + Common.escapeHtml(state.search) + '">' +
+      '</div>' +
+      '<div class="pool-frow"><span class="pool-flab">Views</span>' +
+        viewBtn('watch', 'Watchlist', counts.watch, STAR) +
+        viewBtn('leans', 'Leans to me', counts.leans) +
+        viewBtn('unranked', 'Unranked by me', counts.unranked) +
+        '<span class="pool-fcount">Showing <b>' + shown + '</b> of ' + total +
+          (activeFilters ? '' : ' · no filters') + '</span>' +
+      '</div></div>';
   }
+
+  // ---------- render ----------
   function renderPool() {
     var host = document.getElementById('hub-pool'); if (!host) return;
     host.innerHTML = toolbarHtml(state.recruits.length, filteredRecruits().length) +
-      '<div class="pool-scroll"><table class="pool' + (hasDock() ? ' condensed' : '') + '">' + headHtml() + '<tbody>' + poolBodyHtml() + '</tbody></table></div>';
+      '<div class="pool-scroll"><table class="pool">' + colgroupHtml() + headHtml() +
+      '<tbody>' + poolBodyHtml() + '</tbody></table></div>';
     bindPool(host);
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['th', 'td']);
   }
   function bindPool(host) {
     var search = host.querySelector('#pool-search');
     if (search) search.addEventListener('input', function () { state.search = this.value; renderPoolBodyOnly(); updateCount(); });
-    host.querySelectorAll('.pool-toolbar .chip[data-region]').forEach(function (b) { b.addEventListener('click', function () { state.region = this.dataset.region; renderPool(); }); });
-    host.querySelectorAll('.pool-toolbar .chip[data-year]').forEach(function (b) { b.addEventListener('click', function () { state.year = this.dataset.year; renderPool(); }); });
-    var mine = host.querySelector('#pool-mine'); if (mine) mine.addEventListener('click', function () { state.mineOnly = !state.mineOnly; renderPool(); });
+    var region = host.querySelector('#pool-region');
+    if (region) region.addEventListener('change', function () { state.region = this.value; renderPool(); });
+    host.querySelectorAll('.pool-seg button[data-pos]').forEach(function (b) {
+      b.addEventListener('click', function () { state.pos = this.dataset.pos; renderPool(); });
+    });
+    host.querySelectorAll('.pool-seg button[data-year]').forEach(function (b) {
+      b.addEventListener('click', function () { state.year = this.dataset.year; renderPool(); });
+    });
+    host.querySelectorAll('.pool-view[data-view]').forEach(function (b) {
+      // Views are mutually exclusive; clicking the active one clears it.
+      b.addEventListener('click', function () {
+        state.view = state.view === this.dataset.view ? 'all' : this.dataset.view;
+        renderPool();
+      });
+    });
     host.querySelectorAll('th[data-sortkey]').forEach(function (thEl) {
       if (!SORTABLE[thEl.dataset.sortkey]) return;
       thEl.style.cursor = 'pointer';
       thEl.addEventListener('click', function () {
         var k = this.dataset.sortkey;
         if (state.sort.key === k) state.sort.dir = state.sort.dir === 'asc' ? 'desc' : 'asc';
-        else state.sort = { key: k, dir: (k === 'name' || k === 'pos' || k === 'year') ? 'asc' : 'desc' };
+        else state.sort = { key: k, dir: (k === 'name' || k === 'pos' || k === 'year' || k === 'region') ? 'asc' : 'desc' };
         renderPool();
       });
     });
     bindPoolBodyHandlers(host);
   }
   function bindPoolBodyHandlers(host) {
-    host.querySelectorAll('.region-bar').forEach(function (b) {
-      b.addEventListener('click', function () { state.collapsed[this.dataset.region] = !state.collapsed[this.dataset.region]; renderPoolBodyOnly(); });
-    });
     host.querySelectorAll('.pool-add, .pool-rankbadge').forEach(function (b) {
       b.addEventListener('click', function (e) { e.stopPropagation(); toggleBoard(this.dataset.id); });
+    });
+    host.querySelectorAll('.wt[data-watch-id]').forEach(function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation(); toggleWatch(this); });
+    });
+    bindHeadshotFallbacks(host);
+  }
+  // Lazy paint: on a 404 ask the backend to paint the master, retry once, then generic.
+  function bindHeadshotFallbacks(host) {
+    host.querySelectorAll('.pc-av img[data-image-id]').forEach(function (img) {
+      if (img.dataset.fallbackBound) return;
+      img.dataset.fallbackBound = '1';
+      img.addEventListener('error', function () {
+        var el = this, imageId = el.dataset.imageId;
+        if (el.dataset.retried || typeof API_CONFIG === 'undefined') {
+          el.remove();
+          return;
+        }
+        el.dataset.retried = '1';
+        API_CONFIG.ensureRecruitImage(imageId).then(function () {
+          el.src = API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' }) + '?r=1';
+        }).catch(function () { el.remove(); });
+      });
     });
   }
   function renderPoolBodyOnly() {
@@ -203,85 +316,307 @@
     bindPoolBodyHandlers(document.getElementById('hub-pool'));
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(document.getElementById('hub-pool'), ['td']);
   }
-  function updateCount() { var el = document.querySelector('#hub-pool .ptb-count strong'); if (el) el.textContent = filteredRecruits().length; }
+  function updateCount() {
+    var el = document.querySelector('#hub-pool .pool-fcount b');
+    if (el) el.textContent = filteredRecruits().length;
+  }
+
+  // ---------- watchlist ----------
+  // A shortlist: no ranks, no cap. Ordering is the invite board's job at week 20.
+  function toggleWatch(btn) {
+    var id = String(btn.dataset.watchId || ''); if (!id) return;
+    var turningOn = !state.watchlist.has(id);
+    // Optimistic: flip locally so 450 rows don't wait on the network.
+    if (turningOn) state.watchlist.add(id); else state.watchlist.delete(id);
+    paintWatchButton(btn, turningOn);
+    refreshWatchDependentChrome();
+    btn.disabled = true;
+    Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-watchlist'), {
+      method: 'PATCH',
+      body: JSON.stringify({ franchise_id: context.franchiseId, recruit_id: id, watching: turningOn })
+    }).then(function (res) {
+      state.watchlist = new Set((res && res.watchlist ? res.watchlist : []).map(String));
+      paintWatchButton(btn, state.watchlist.has(id));
+      refreshWatchDependentChrome();
+    }).catch(function (err) {
+      console.error('[WATCHLIST] toggle failed, reverting', err);
+      if (turningOn) state.watchlist.delete(id); else state.watchlist.add(id);
+      paintWatchButton(btn, state.watchlist.has(id));
+      refreshWatchDependentChrome();
+    }).then(function () { btn.disabled = false; });
+  }
+  function paintWatchButton(btn, on) {
+    btn.classList.toggle('is-on', !!on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btn.setAttribute('aria-label', (on ? 'Remove from' : 'Add to') + ' watchlist');
+    var path = btn.querySelector('path');
+    if (path) path.setAttribute('fill', on ? 'currentColor' : 'none');
+  }
+  function refreshWatchDependentChrome() {
+    var counts = viewCounts();
+    var btn = document.querySelector('#hub-pool .pool-view[data-view="watch"] .n');
+    if (btn) btn.textContent = counts.watch;
+    // The watchlist view is itself filtered by the watchlist, so a toggle changes rows.
+    if (state.view === 'watch') { renderPoolBodyOnly(); updateCount(); }
+  }
 
   // ===================== BOARD ops =====================
   function toggleBoard(id) {
     var i = state.board.indexOf(id);
     if (i !== -1) state.board.splice(i, 1);
     else if (state.board.length < MAX_BOARD) state.board.push(id);
+    clearSeedNotice();   // any edit makes the board the player's, not the seed's
     renderBoardDependent();
   }
-  function removeFromBoard(id) { var i = state.board.indexOf(id); if (i !== -1) { state.board.splice(i, 1); renderBoardDependent(); } }
+  function removeFromBoard(id) {
+    var i = state.board.indexOf(id);
+    if (i !== -1) { state.board.splice(i, 1); clearSeedNotice(); renderBoardDependent(); }
+  }
   function reorderBoard(from, to) {
     if (from == null || from === to) return;
-    var m = state.board.splice(from, 1)[0]; state.board.splice(to, 0, m); renderBoardDependent();
+    var m = state.board.splice(from, 1)[0]; state.board.splice(to, 0, m);
+    clearSeedNotice();   // the order is the player's now, not the seed's
+    renderBoardDependent();
   }
   function renderBoardDependent() { renderPoolBodyOnly(); renderDock(); }
 
-  // ===================== INVITE DOCK =====================
-  function slotHtml(id, index) {
-    var r = state.byId[id]; if (!r) return '';
-    var stand = r.yourRank === 1 ? '<span class="islot-stand you1"><svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"></circle></svg>#1</span>'
-      : r.yourRank > 1 ? '<span class="islot-stand list">#' + r.yourRank + '</span>' : '';
-    var claimed = (r.leanModel.leans || []).filter(function (s) { return !s.open; }).length;
-    var dots = [0, 1, 2].map(function (i) { return '<i class="' + (i < claimed ? 'on' : '') + '"></i>'; }).join('');
-    return '<div class="islot queued" draggable="true" data-index="' + index + '">' +
-      '<span class="islot-rank">' + (index + 1) + '</span>' +
-      '<span class="islot-grip"><span></span><span></span><span></span><span></span><span></span><span></span></span>' +
-      '<div class="islot-body"><div class="islot-name"><span class="nm">' + Common.escapeHtml(r.name) + '</span>' + stand + '</div>' +
-        '<div class="islot-meta"><span class="islot-pos">' + Common.escapeHtml(r.pos) + '</span><span>Rgn ' + regionOf(r) + '</span>' +
-        '<span class="islot-rt ' + Spine.rtClassForYear(r.rt, r.year) + '" data-tooltip="current/potential" title="current/potential">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + ' RT</span></div></div>' +
-      '<div class="islot-right"><span class="islot-lists c' + claimed + '" title="' + claimed + ' of 3 lean slots claimed">' +
-        '<span class="dots">' + dots + '</span><span class="cap">' + (claimed === 0 ? 'Open list' : claimed + '/3 leans') + '</span></span></div>' +
-      '<button class="islot-remove" data-id="' + id + '" title="Remove" type="button">×</button></div>';
+  // ===================== INVITE BOARD =====================
+  // Re-ranking IS the invite decision: the hero shows the top UNVISITED board recruit,
+  // so there is no second selection step. Board order drives it.
+
+  // ---------- wire events, indexed for the board ----------
+  function wireEventsThisWeek() {
+    var wire = state.wire || {};
+    return (wire.events_this_week || []).filter(function (e) { return e && e.recruit_id; });
   }
-  function inviteDockHtml() {
-    var recs = state.board.map(function (id) { return state.byId[id]; }).filter(Boolean);
-    var leaning = recs.filter(function (r) { return r.leansToUser; }).length;
-    var weeks = INVITE_WEEKS.map(function (w) {
-      var cls = w < state.week ? 'sent' : w === state.week ? 'now' : 'future';
-      return '<div class="iweek ' + cls + '"><span class="pip"></span><span class="wl">W' + w + '</span></div>';
-    }).join('');
-    var breakdown = POS_ORDER.map(function (p) {
-      var n = recs.filter(function (r) { return r.pos === p; }).length;
-      return '<span class="ibreak' + (n === 0 ? ' zero' : '') + '"><span class="bn">' + n + '</span><span class="bl">' + p + '</span></span>';
-    }).join('');
-    var needMore = Math.max(0, INVITE_WEEKS.length - state.board.length);
-    var invitesLeft = INVITE_WEEKS.filter(function (w) { return w >= state.week; }).length;
-    var list = state.board.length === 0
-      ? '<div class="idock-list"><div class="idock-empty"><div class="t1">No recruits ranked</div><div class="t2">Click <strong>+</strong> on a recruit in the pool to add them. Each week the hub invites your top-ranked recruit.</div></div></div>'
-      : '<div class="idock-list"><div class="idock-group-lbl">Priority order · drag to rank</div>' +
-          state.board.map(function (id, i) { return slotHtml(id, i); }).join('') + '</div>';
-    var nudge = needMore > 0
-      ? '<div class="idock-nudge">' + INFO + '<span><b>' + invitesLeft + ' invites left</b> this season — rank ' + needMore + ' more so every week has a target.</span></div>'
-      : '';
-    return '<aside class="idock">' +
-      '<div class="idock-head"><div class="idock-titlerow">' +
-        '<div class="idock-title"><small>Invite Season · Wk ' + state.week + '</small>Invite Board</div>' +
-        '<div class="idock-count"><span class="n">' + state.board.length + '</span><span class="of">/ ' + MAX_BOARD + '</span></div></div>' +
-        '<div class="idock-weeks">' + weeks + '</div>' +
-        '<div class="idock-meta"><span class="idock-leaning"><span class="d"></span><b>' + leaning + '</b> of ' + state.board.length + ' lean to you</span>' +
-        '<span class="idock-break">' + breakdown + '</span></div></div>' +
-      list + nudge +
-      '<div class="idock-foot"><button class="idock-clear" id="dock-clear" type="button">Clear</button>' +
-        '<button class="idock-save" id="dock-save" type="button">Save Board</button></div></aside>';
-  }
-  function renderDock() {
-    var host = document.getElementById('hub-dock'); if (!host) return;
-    host.innerHTML = inviteDockHtml(); bindDock(host);
-  }
-  function bindDock(host) {
-    host.querySelectorAll('.islot-remove').forEach(function (b) { b.addEventListener('click', function () { removeFromBoard(this.dataset.id); }); });
-    host.querySelectorAll('.islot').forEach(function (slot) {
-      slot.addEventListener('dragstart', function (e) { state.drag.from = Number(this.dataset.index); e.dataTransfer.effectAllowed = 'move'; });
-      slot.addEventListener('dragover', function (e) { e.preventDefault(); var i = Number(this.dataset.index); if (i !== state.drag.over) { state.drag.over = i; this.classList.add('dragover'); } });
-      slot.addEventListener('dragleave', function () { this.classList.remove('dragover'); });
-      slot.addEventListener('drop', function (e) { e.preventDefault(); reorderBoard(state.drag.from, Number(this.dataset.index)); state.drag.from = state.drag.over = null; });
-      slot.addEventListener('dragend', function () { state.drag.from = state.drag.over = null; host.querySelectorAll('.islot').forEach(function (s) { s.classList.remove('dragover'); }); });
+  function wireByRecruit() {
+    var map = {};
+    wireEventsThisWeek().forEach(function (e) {
+      var id = String(e.recruit_id);
+      // One badge per row: a drop outranks anything else that touched the same recruit.
+      if (!map[id] || (e.kind === 'dropped_you' && map[id].kind !== 'dropped_you')) map[id] = e;
     });
-    var clear = host.querySelector('#dock-clear'); if (clear) clear.addEventListener('click', function () { state.board = []; renderBoardDependent(); });
-    var save = host.querySelector('#dock-save'); if (save) save.addEventListener('click', saveBoard);
+    return map;
+  }
+  var GAIN_KINDS = { gained_you: 1, moved_up: 1 };
+  var DROP_KINDS = { dropped_you: 1, moved_down: 1, rival_took_your_top: 1 };
+  function movementClass(kind) {
+    if (DROP_KINDS[kind]) return 'dropped';
+    if (GAIN_KINDS[kind]) return 'gained';
+    return '';
+  }
+  // "Dropped you / Fairview took #1" — headline plus its cause, split for two lines.
+  function movementParts(event) {
+    var line = String(event.line || '');
+    var dash = line.indexOf(' — ');
+    var head = dash === -1 ? line : line.slice(0, dash);
+    var why = dash === -1 ? '' : line.slice(dash + 3);
+    // The recruit's name already leads the row, so strip it from the headline.
+    var rec = state.byId[String(event.recruit_id)];
+    if (rec && head.indexOf(rec.name) === 0) head = head.slice(rec.name.length).trim();
+    return { head: head || '—', why: why };
+  }
+  function thisWeekCellHtml(id) {
+    var event = wireByRecruit()[String(id)];
+    if (!event) return '<div class="bmv"><span class="bmv-quiet">—</span></div>';
+    var drop = !!DROP_KINDS[event.kind];
+    var parts = movementParts(event);
+    return '<div class="bmv"><span class="bmv-ico ' + (drop ? 'dn' : 'up') + '">' + (drop ? '↓' : '↑') + '</span>' +
+      '<span class="bmv-txt' + (drop ? ' dn' : '') + '">' + Common.escapeHtml(parts.head) +
+      (parts.why ? '<small>' + Common.escapeHtml(parts.why) + '</small>' : '') + '</span></div>';
+  }
+
+  function headshotBoxHtml(r, cls) {
+    if (!r) return '<span class="' + cls + '"></span>';
+    var imageId = r.imageId;
+    if (!imageId || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getRecruitImageUrl !== 'function') {
+      return '<span class="' + cls + '"></span>';
+    }
+    return '<span class="' + cls + '"><img src="' + Common.escapeHtml(API_CONFIG.getRecruitImageUrl(imageId, { size: 'card' })) + '"' +
+      ' alt="" loading="lazy" decoding="async" data-image-id="' + Common.escapeHtml(imageId) + '"></span>';
+  }
+
+  // ---------- hero: the top unvisited recruit ----------
+  function visitedRecruitIds() {
+    var out = {};
+    ((state.wire && state.wire.visited_recruit_ids) || []).forEach(function (id) { out[String(id)] = true; });
+    return out;
+  }
+  function topUnvisitedId() {
+    var visited = visitedRecruitIds();
+    for (var i = 0; i < state.board.length; i++) {
+      if (!visited[String(state.board[i])]) return state.board[i];
+    }
+    return null;
+  }
+  function heroHtml() {
+    var id = topUnvisitedId();
+    if (!id) {
+      return '<div class="bhero bhero-empty"><div class="bhero-body">' +
+        '<div class="bhero-name">No invite target</div>' +
+        '<div class="bhero-meta">' + (state.board.length
+          ? 'Every ranked recruit has already had a visit. Add more from the pool below.'
+          : 'Rank recruits below and your top unvisited name is invited each week.') +
+        '</div></div></div>';
+    }
+    var r = state.byId[id]; if (!r) return '';
+    var rank = state.board.indexOf(id) + 1;
+    var why = r.yourRank === 1 ? 'Already #1 on his ladder — the visit protects it.'
+      : r.yourRank > 1 ? 'You sit #' + r.yourRank + ' on his ladder — a visit is your move up.'
+        : 'Not on his ladder yet — a visit is how you get on it.';
+    return '<div class="bhero">' + headshotBoxHtml(r, 'bhero-av') +
+      '<div class="bhero-body">' +
+        '<div class="bhero-eyebrow">This week’s invite · board rank ' + rank + '</div>' +
+        '<div class="bhero-name">' + Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) + '</div>' +
+        '<div class="bhero-meta"><b>' + Common.escapeHtml(r.pos) + '</b> · ' + Common.escapeHtml(r.archetype) +
+          ' · Region ' + regionOf(r) + ' · ' + Common.escapeHtml(r.height) + '</div>' +
+        '<div class="bhero-why">' + Common.escapeHtml(why) + '</div></div>' +
+      '<div class="bhero-right"><span class="bhero-rt ' + Spine.rtClassForYear(r.rt, r.year) + '" data-tooltip="current/potential" title="current/potential">' +
+        Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span><span class="bhero-cap">RT</span></div></div>';
+  }
+
+  // ---------- seed notice ----------
+  // Shown only when the board came from the watchlist seed, never from a real save —
+  // otherwise it would be a lie. Says plainly that nothing is sent yet, because the
+  // whole point of the client-side seed is that the player is not yet committed.
+  function seedNoticeHtml() {
+    if (!state.boardSeededFromWatchlist || state.seedNoticeDismissed) return '';
+    return '<div class="bseed" id="board-seed-notice">' +
+      '<span class="bseed-txt">Seeded from your watchlist, ranked by RT. Drag to re-order — ' +
+      '<b>nothing is sent until you save</b>.</span>' +
+      '<button class="bseed-x" id="board-seed-dismiss" type="button" aria-label="Dismiss">×</button></div>';
+  }
+  // Any real reorder means the order is now the player's, so the notice has served out.
+  function clearSeedNotice() { state.boardSeededFromWatchlist = false; }
+
+  // ---------- board rows ----------
+  function boardRowHtml(id, index) {
+    var r = state.byId[id]; if (!r) return '';
+    var event = wireByRecruit()[String(id)];
+    var moveCls = event ? movementClass(event.kind) : '';
+    return '<div class="brow ' + moveCls + '" draggable="true" data-index="' + index + '" data-id="' + id + '">' +
+      '<div class="brank"><span class="bgrip" aria-hidden="true"></span><span class="bnum">' + (index + 1) + '</span></div>' +
+      '<div class="bname">' + headshotBoxHtml(r, 'bav') + '<span class="btxt">' +
+        Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) +
+        '<small>' + Common.escapeHtml(r.archetype) + ' · Region ' + regionOf(r) + '</small></span></div>' +
+      '<div class="bc">' + Common.escapeHtml(r.pos) + '</div>' +
+      '<div class="bc dim">' + Common.escapeHtml(r.yearDisplay) + '</div>' +
+      '<div class="brt ' + Spine.rtClassForYear(r.rt, r.year) + '" data-tooltip="current/potential" title="current/potential">' +
+        Common.formatRtWithPotential(r.rt, r.potentialRt) + '</div>' +
+      '<div class="bladder">' + Spine.Lean.ladderHtml(r.leanModel) + '</div>' +
+      thisWeekCellHtml(id) +
+      '<div><button class="bx" data-remove-id="' + id + '" title="Remove from board" type="button">×</button></div>' +
+      '</div>';
+  }
+  function boardHtml() {
+    var rows = state.board.length
+      ? state.board.map(boardRowHtml).join('')
+      : '<div class="brow-empty">No recruits ranked. Click <strong>+</strong> in the pool below — each week the hub invites your top-ranked unvisited recruit.</div>';
+    return '<section class="bpanel">' +
+      '<div class="bpanel-head"><div class="bpanel-title"><small>Invite Season · Wk ' + state.week + '</small>Invite Board</div>' +
+        '<div class="bpanel-count"><span class="n">' + state.board.length + '</span><span class="of">/ ' + MAX_BOARD + '</span></div></div>' +
+      heroHtml() + seedNoticeHtml() +
+      '<div class="brows">' +
+        '<div class="brow bhdr"><div>#</div><div>Recruit</div><div class="bc">Pos</div><div class="bc">Yr</div>' +
+          '<div>RT</div><div>Lean</div><div>This week</div><div></div></div>' +
+        rows + '</div>' +
+      '<div class="bpanel-foot"><button class="bbtn-clear" id="dock-clear" type="button">Clear</button>' +
+        '<button class="bbtn-save" id="dock-save" type="button">Save Board</button></div></section>';
+  }
+
+  // ---------- right rail ----------
+  // Capacity is the HEADER number and comes from payload.roster_capacity — the same
+  // source signing day reads. Position mix answers a different question (what shape the
+  // board is), so it sits beneath rather than standing in for capacity.
+  function rosterNeedsHtml() {
+    var cap = capacity();
+    var counted = {};
+    POS_ORDER.forEach(function (p) { counted[p] = 0; });
+    state.board.forEach(function (id) {
+      var r = state.byId[id]; if (!r) return;
+      var pos = String(r.pos).toUpperCase();
+      if (counted[pos] != null) counted[pos] += 1;
+    });
+    var mix = POS_ORDER.map(function (pos) {
+      var n = counted[pos];
+      return '<span class="rneed' + (n === 0 ? ' hot' : '') + '">' + pos + ' · ' + n + '</span>';
+    }).join('');
+    return '<div class="cap-row cap-row--rail">' +
+        '<span class="cap-item"><b>' + cap.spots + '</b>/' + cap.cap + ' roster spots</span>' +
+        '<span class="cap-item"><b>' + cap.scholarships + '</b> scholarships</span></div>' +
+      '<div class="rneeds-lab">Board position mix</div>' +
+      '<div class="rneeds">' + mix + '</div>';
+  }
+
+  function boardRailHtml() {
+    var events = wireEventsThisWeek();
+    // Only events that land on a ranked recruit "affect your board" — annotate each with
+    // the board rank it hits, which is the whole point of the panel.
+    var affecting = events.map(function (e) {
+      var idx = state.board.indexOf(String(e.recruit_id));
+      if (idx === -1) idx = state.board.indexOf(e.recruit_id);
+      return { event: e, rank: idx === -1 ? null : idx + 1 };
+    }).filter(function (x) { return x.rank !== null; });
+    affecting.sort(function (a, b) {
+      var ad = DROP_KINDS[a.event.kind] ? 0 : 1, bd = DROP_KINDS[b.event.kind] ? 0 : 1;
+      return ad - bd || a.rank - b.rank;
+    });
+
+    var changes;
+    if (!affecting.length) {
+      // Quiet, not empty: a week with no movement still says so.
+      changes = '<div class="rpanel"><div class="reyebrow">This week</div>' +
+        '<div class="rquiet">No changes affect your board this week. Your order still stands.</div></div>';
+    } else {
+      changes = '<div class="rpanel"><div class="reyebrow is-live">' + affecting.length +
+        ' change' + (affecting.length === 1 ? '' : 's') + ' affect' + (affecting.length === 1 ? 's' : '') + ' your board</div>' +
+        affecting.map(function (x) {
+          var drop = !!DROP_KINDS[x.event.kind];
+          var parts = movementParts(x.event);
+          var rec = state.byId[String(x.event.recruit_id)];
+          return '<div class="rev"><span class="rico ' + (drop ? 'dn' : 'up') + '">' + (drop ? '↓' : '↑') + '</span>' +
+            '<span class="rtxt"><b>' + Common.escapeHtml(rec ? rec.name : 'A recruit') + '</b> ' +
+            Common.escapeHtml(parts.head.toLowerCase()) +
+            '<em>' + (parts.why ? Common.escapeHtml(parts.why) + ' · ' : '') + 'board rank ' + x.rank + '</em></span></div>';
+        }).join('') + '</div>';
+    }
+
+    var invitesLeft = INVITE_WEEKS.filter(function (w) { return w >= state.week; }).length;
+    var needs = '<div class="rpanel"><div class="reyebrow">Roster capacity</div>' + rosterNeedsHtml() +
+      '<div class="rsplit"></div>' +
+      '<div class="rstat"><span>Board slots used</span><span class="v">' + state.board.length + '<s>/' + MAX_BOARD + '</s></span></div>' +
+      '<div class="rstat"><span>Invites remaining</span><span class="v">' + invitesLeft + '<s>/7</s></span></div></div>';
+
+    return '<aside class="brail">' + changes + needs + '</aside>';
+  }
+
+  function renderDock() {
+    var board = document.getElementById('hub-board');
+    if (board) { board.innerHTML = boardHtml(); bindBoard(board); }
+    var host = document.getElementById('hub-dock');
+    if (host) { host.innerHTML = boardRailHtml(); }
+    if (typeof window.initAttributeTooltips === 'function') {
+      if (board) window.initAttributeTooltips(board, ['div', 'span']);
+    }
+  }
+  function bindBoard(host) {
+    host.querySelectorAll('[data-remove-id]').forEach(function (b) {
+      b.addEventListener('click', function (e) { e.stopPropagation(); removeFromBoard(this.dataset.removeId); });
+    });
+    host.querySelectorAll('.brow[data-index]').forEach(function (row) {
+      row.addEventListener('dragstart', function (e) { state.drag.from = Number(this.dataset.index); e.dataTransfer.effectAllowed = 'move'; });
+      row.addEventListener('dragover', function (e) { e.preventDefault(); var i = Number(this.dataset.index); if (i !== state.drag.over) { state.drag.over = i; this.classList.add('dragover'); } });
+      row.addEventListener('dragleave', function () { this.classList.remove('dragover'); });
+      row.addEventListener('drop', function (e) { e.preventDefault(); reorderBoard(state.drag.from, Number(this.dataset.index)); state.drag.from = state.drag.over = null; });
+      row.addEventListener('dragend', function () { state.drag.from = state.drag.over = null; host.querySelectorAll('.brow').forEach(function (s) { s.classList.remove('dragover'); }); });
+    });
+    var dismiss = host.querySelector('#board-seed-dismiss');
+    if (dismiss) dismiss.addEventListener('click', function () { state.seedNoticeDismissed = true; renderDock(); });
+    var clear = host.querySelector('#dock-clear');
+    if (clear) clear.addEventListener('click', function () { state.board = []; clearSeedNotice(); renderBoardDependent(); });
+    var save = host.querySelector('#dock-save');
+    if (save) save.addEventListener('click', saveBoard);
+    bindHeadshotFallbacks(host);
   }
 
   function saveBoard() {
@@ -289,7 +624,13 @@
     Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-orders'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ franchise_id: context.franchiseId, recruit_ids: state.board })
-    }).then(function () { showToast(); })
+    }).then(function () {
+      // Committed: the notice says "nothing is sent until you save", which is no longer
+      // true, so it must go. Also flips this board from seeded to saved.
+      clearSeedNotice();
+      renderDock();
+      showToast();
+    })
       .catch(function (err) { console.error(err); showToast('Save failed', String(err && err.message || err), false); })
       .then(function () { if (btn) { btn.disabled = false; btn.textContent = 'Save Board'; } });
   }
@@ -322,33 +663,78 @@
   var WARN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17v.5"></path><path d="M10.3 3.9L2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"></path></svg>';
   var DOT_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="6"></circle></svg>';
 
-  // Placeholder odds (per spec; real signing math is league-relative → not client-computable).
-  // Kept isolated so it can be swapped. Directionally consistent with the backend
-  // score = (1+points+PT_bonus)·lean_mult.
-  function signOdds(rec, points, promise) {
-    var a = Spine.Lean.analyze(rec.leanModel);
-    var base = a.standing === 'you1' ? 48 : a.standing === 'list' ? (a.rank === 2 ? 34 : 26)
-      : a.standing === 'locked' ? 8 : a.standing === 'open' ? 20 : a.standing === 'quiet' ? 16 : 14;
-    var s = Math.max(4, Math.min(99, Math.round(base + points * 2.2 + (promise ? SIGN.PROMISE_W : 0))));
-    var band = s >= 72 ? { cls: 'o-lock', lab: 'Strong' } : s >= 48 ? { cls: 'o-even', lab: 'In the Mix' }
-      : s >= 26 ? { cls: 'o-slim', lab: 'Slim' } : { cls: 'o-long', lab: 'Long shot' };
-    return { pct: s, cls: band.cls, lab: band.lab };
+  // Lean multipliers come from the SERVER (payload.lean_multipliers), which is the same
+  // map _week_35_team_score uses. Hardcoding them here is how this drifted the first
+  // time: slot 3 scores x2, and an earlier client table defaulted it to x1.
+  var LEAN_MULT_FALLBACK = { 1: 5, 2: 3, 3: 2 };
+  function leanMultiplier(rank) {
+    var served = state.leanMultipliers || {};
+    var key = String(Number(rank) || 0);
+    var v = served[key] != null ? served[key] : LEAN_MULT_FALLBACK[key];
+    return Number(v) || 1;
   }
+
+  // ── Standing + Field: two honest columns, no percentage anywhere ─────────────
+  // There is deliberately no probability on this screen. A number like "62%" is a
+  // promise the sim cannot keep; a count and a multiplier are facts. If you ever find
+  // yourself deriving one to rank or sort, that is the old placeholder growing back.
+  function standingCellHtml(r) {
+    var rank = Number(r.yourRank || 0);
+    var mult = leanMultiplier(rank);
+    var label = rank === 1 ? '#1' : rank > 1 ? '#' + rank : '—';
+    var cls = rank === 1 ? ' s-you1' : rank > 1 ? ' s-list' : '';
+    return '<div class="stand-cell' + cls + '">' +
+      '<span class="stand-pos">' + label + '</span>' +
+      '<span class="stand-mult">x' + mult + '</span></div>';
+  }
+  function competitionCount(id) {
+    var counts = (state.competitionCounts || {});
+    var raw = counts[String(id)];
+    return raw == null ? null : Number(raw);
+  }
+  // Segment bar: one segment per funding program, the user's own highlighted.
+  function fieldCellHtml(r) {
+    var id = r.recruitId;
+    var count = competitionCount(id);
+    var funded = allocOf(id).points > 0;
+    if (count == null) {
+      return '<div class="field-cell"><span class="field-n dim">—</span>' +
+        '<span class="field-lab">no field yet</span></div>';
+    }
+    // The user's own funding may not be in the server snapshot yet (it is written on
+    // save), so add it here rather than under-reporting the field.
+    var total = count + (funded && !state.week35Ran ? 1 : 0);
+    var segs = '';
+    for (var i = 0; i < Math.min(total, 12); i++) {
+      segs += '<i class="' + (funded && i === 0 ? 'mine' : '') + '"></i>';
+    }
+    return '<div class="field-cell">' +
+      '<span class="field-n">' + total + '</span>' +
+      '<span class="field-bar">' + segs + '</span>' +
+      '<span class="field-lab">' + (total === 1 ? 'program' : 'programs') + '</span></div>';
+  }
+
   function allocOf(id) { return state.alloc[id] || { points: 0, promise: false }; }
   function committedIds() { return Object.keys(state.alloc).filter(function (id) { var a = state.alloc[id]; return a && (a.points > 0 || a.promise); }); }
   function spent() { return committedIds().reduce(function (s, id) { return s + (state.alloc[id].points || 0); }, 0); }
   function remaining() { return SIGN.TOTAL - spent(); }
   function pruneAlloc(id) { var a = state.alloc[id]; if (a && a.points === 0 && !a.promise) delete state.alloc[id]; }
 
-  function seedAlloc() {
-    var mine = state.recruits.filter(function (r) { return r.leansToUser; }).sort(function (a, b) { return (b.rt || 0) - (a.rt || 0); });
-    var out = {};
-    if (mine[0]) out[mine[0].recruitId] = { points: 12, promise: true };
-    if (mine[1]) out[mine[1].recruitId] = { points: 9, promise: true };
-    if (mine[2]) out[mine[2].recruitId] = { points: 6, promise: false };
-    return out;
-  }
+  // seedAlloc() is DELETED on purpose. It allocated 12/9/6 points — 27 of 50 — and
+  // attached BINDING playing-time promises to two recruits, unmarked, on page load.
+  // The page loads at 0 of 50 with no promises; the player makes every commitment.
+  // Any future helper must be a button they press, never a load-time side effect.
 
+  // ── Roster capacity — read from the payload, never recomputed ────────────────
+  function capacity() {
+    var c = state.rosterCapacity || {};
+    return {
+      spots: Number(c.roster_spots || 0),
+      scholarships: Number(c.scholarships || 0),
+      cap: Number(c.roster_cap || 15),
+      used: Number(c.roster_used || 0),
+    };
+  }
   function signFiltered() {
     var q = state.sSearch.trim().toLowerCase();
     return state.recruits.filter(function (r) {
@@ -360,54 +746,145 @@
   }
 
   function prowHtml(r) {
-    var a = allocOf(r.recruitId), o = signOdds(r, a.points, a.promise);
+    var a = allocOf(r.recruitId);
     var committed = a.points > 0 || a.promise;
-    var claimed = (r.leanModel.leans || []).filter(function (s) { return !s.open; }).length;
-    var stand = r.yourRank === 1 ? '<span class="brow-stand you1">' + DOT_SVG + '#1</span>'
-      : r.yourRank > 1 ? '<span class="brow-stand list">#' + r.yourRank + '</span>' : '';
-    var dots = [0, 1, 2].map(function (i) { return '<i class="' + (i < claimed ? 'on' : '') + '"></i>'; }).join('');
     var canPlus = remaining() > 0 && a.points < SIGN.MAX_PER;
     return '<div class="prow' + (committed ? ' funded' : '') + (state.flashId === r.recruitId ? ' flash' : '') + '" data-id="' + r.recruitId + '">' +
-      '<div class="prow-name"><div class="nm"><span class="txt">' + Common.escapeHtml(r.name) + '</span>' + stand + '</div>' +
-        '<div class="prow-arch">' + Common.escapeHtml(r.archetype) + '</div></div>' +
+      '<div class="prow-name"><div class="nm">' +
+          Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) + '</div>' +
+        // Year and archetype belong here: a senior and a freshman must not look identical
+        // on the screen where 50 points get committed.
+        '<div class="prow-arch"><span class="prow-yr">' + Common.escapeHtml(r.yearDisplay) + '</span>' +
+          Common.escapeHtml(r.archetype) + '</div></div>' +
       '<span class="prow-pos">' + Common.escapeHtml(r.pos) + '</span>' +
       '<span class="prow-region">' + regionOf(r) + '</span>' +
       '<span class="prow-rt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
-      '<span class="prow-leans" title="' + claimed + ' of 3 leans">' + dots + '</span>' +
+      standingCellHtml(r) +
+      fieldCellHtml(r) +
       '<div><div class="stepper"><button data-step="-1" data-id="' + r.recruitId + '"' + (a.points === 0 ? ' disabled' : '') + '>−</button>' +
         '<span class="val' + (a.points === 0 ? ' zero' : '') + '">' + a.points + '</span>' +
         '<button data-step="1" data-id="' + r.recruitId + '"' + (canPlus ? '' : ' disabled') + '>+</button><span class="stepper-pts">pts</span></div></div>' +
       '<div class="promise-cell' + (a.promise ? ' set' : '') + '"><button class="promise-toggle" data-promise="' + r.recruitId + '" title="Promise playing time">' +
         '<span class="box">' + CHECK + '</span>' + (a.promise ? 'Binding' : 'Promise') + '</button></div>' +
-      '<div class="odds ' + o.cls + '"><div class="odds-top"><span class="odds-lab">' + o.lab + '</span><span class="odds-pct">' + o.pct + '%</span></div>' +
-        '<div class="odds-bar"><div class="odds-fill" style="width:' + o.pct + '%"></div></div></div></div>';
+      '</div>';
+  }
+
+  // ── Pre-flight warnings ──────────────────────────────────────────────────────
+  // The one place on this screen allowed to editorialize. Each warning must name the
+  // recruit and the number driving it — a warning without both is a stat, not advice.
+  function preflightWarnings() {
+    var out = [];
+    var cap = capacity();
+    var rem = remaining();
+    var ids = committedIds();
+
+    ids.forEach(function (id) {
+      var r = state.byId[id]; if (!r) return;
+      var a = state.alloc[id];
+      var rank = Number(r.yourRank || 0);
+      var mult = leanMultiplier(rank);
+      var field = competitionCount(id);
+      var standing = rank === 1 ? "you're #1 at x5" : rank > 1 ? "you're #" + rank + ' at x' + mult : "you're not on his ladder at x1";
+      // Thin funding against a crowded field.
+      if (field != null && field >= 4 && a.points > 0 && a.points <= 6) {
+        out.push({
+          id: id,
+          level: 'warn',
+          text: field + ' programs funding ' + r.name + ', ' + standing + ' — ' + a.points +
+            ' point' + (a.points === 1 ? '' : 's') + ' is unlikely to carry.',
+        });
+      }
+      // A binding promise where the multiplier is working against you.
+      if (a.promise && mult === 1) {
+        out.push({
+          id: id,
+          level: 'warn',
+          text: 'Binding promise on ' + r.name + ' at x1 — he has no lean toward you, so the promise carries the whole bid.',
+        });
+      }
+    });
+
+    // Points left on the table while roster spots remain, called out against the
+    // cheapest uncontested name so the advice is actionable.
+    if (rem > 0 && cap.spots > 0) {
+      var uncontested = state.recruits.filter(function (r) {
+        var field = competitionCount(r.recruitId);
+        return field != null && field <= 1 && !allocOf(r.recruitId).points;
+      }).sort(function (x, y) { return (y.rt || 0) - (x.rt || 0); })[0];
+      if (uncontested) {
+        out.push({
+          id: uncontested.recruitId,
+          level: 'info',
+          text: rem + ' point' + (rem === 1 ? '' : 's') + ' unspent and ' + cap.spots +
+            ' roster spot' + (cap.spots === 1 ? '' : 's') + '; ' + uncontested.name +
+            ' is uncontested at x' + leanMultiplier(uncontested.yourRank) + '.',
+        });
+      }
+    }
+
+    // More commitments than spots is a hard problem, not a nudge.
+    if (ids.length > cap.spots) {
+      out.push({
+        level: 'warn',
+        text: ids.length + ' recruits funded but only ' + cap.spots + ' roster spot' +
+          (cap.spots === 1 ? '' : 's') + ' — signings beyond that cannot be taken.',
+      });
+    }
+    if (rem < 0) {
+      out.push({ level: 'warn', text: Math.abs(rem) + ' points over budget — trim before submitting.' });
+    }
+    return out;
   }
 
   function railHtml() {
-    var cids = committedIds().map(function (id) { return { r: state.byId[id], a: state.alloc[id], o: signOdds(state.byId[id], state.alloc[id].points, state.alloc[id].promise) }; })
+    var cids = committedIds().map(function (id) { return { r: state.byId[id], a: state.alloc[id] }; })
       .filter(function (x) { return x.r; })
-      .sort(function (x, y) { return (y.a.points - x.a.points) || (y.o.pct - x.o.pct); });
+      .sort(function (x, y) { return (y.a.points - x.a.points) || ((y.r.rt || 0) - (x.r.rt || 0)); });
     var rem = remaining(), promises = committedIds().filter(function (id) { return state.alloc[id].promise; }).length;
     var pct = Math.min(100, (spent() / SIGN.TOTAL) * 100);
+    var cap = capacity();
+
     var list = cids.length === 0
       ? '<div class="rail-list"><div class="rail-empty"><div class="t1">Nothing committed</div><div class="t2">Add points to a recruit in the pool and they\'ll appear here.</div></div></div>'
       : '<div class="rail-list">' + cids.map(function (x) {
+          var rank = Number(x.r.yourRank || 0);
           return '<div class="citem" data-jump="' + x.r.recruitId + '" title="Jump to recruit"><div class="citem-body">' +
             '<div class="citem-name"><span class="nm">' + Common.escapeHtml(x.r.name) + '</span>' + (x.a.promise ? '<span class="pmk">· PT</span>' : '') + '</div>' +
-            '<div class="citem-meta"><span class="citem-pts">' + x.a.points + ' pts</span><span data-tooltip="current/potential" title="current/potential">' + Common.escapeHtml(x.r.pos) + ' · ' + Common.formatRtWithPotential(x.r.rt, x.r.potentialRt) + ' RT</span>' +
-            '<span class="citem-odds" style="color:var(--muted)">' + x.o.pct + '%</span></div></div>' +
+            '<div class="citem-meta"><span class="citem-pts">' + x.a.points + ' pts</span>' +
+            '<span data-tooltip="current/potential" title="current/potential">' + Common.escapeHtml(x.r.pos) + ' · ' + Common.formatRtWithPotential(x.r.rt, x.r.potentialRt) + ' RT</span>' +
+            '<span class="citem-mult">' + (rank ? '#' + rank : '—') + ' x' + leanMultiplier(rank) + '</span></div></div>' +
             '<button class="citem-x" data-remove="' + x.r.recruitId + '" title="Remove">×</button></div>';
         }).join('') + '</div>';
+
+    var warnings = preflightWarnings();
+    var preflight = warnings.length
+      ? '<div class="preflight">' + warnings.map(function (w) {
+          // Clickable when the warning is about a specific recruit: jumpTo() reveals him
+          // even when the 'mine' tab hides him. The mine default stays — the problem was
+          // the unreachable warning, not the tab.
+          var tag = w.id ? 'button' : 'div';
+          var attrs = w.id ? ' type="button" data-pfw-jump="' + w.id + '"' : '';
+          return '<' + tag + ' class="pfw ' + w.level + (w.id ? ' is-clickable' : '') + '"' + attrs + '>' +
+            (w.level === 'warn' ? WARN_SVG : DOT_SVG) +
+            '<span>' + Common.escapeHtml(w.text) + '</span></' + tag + '>';
+        }).join('') + '</div>'
+      : '<div class="preflight"><div class="pfw ok">' + DOT_SVG +
+        '<span>Nothing flagged. Your commitments fit your budget and your roster.</span></div></div>';
+
     var note = promises > 0
       ? '<div class="rail-note">' + WARN_SVG + '<span><b>' + promises + ' binding ' + (promises === 1 ? 'promise' : 'promises') + '</b> — honor the playing time or your program\'s standing suffers.</span></div>'
       : '<div class="rail-note"><span>Promises are <b>binding</b> — set one only if you\'ll honor the minutes.</span></div>';
     var disabled = rem < 0 || state.week35Ran;
+
     return '<div class="rail-head"><div class="rail-title">Your Orders</div>' +
       '<div class="budget-nums"><span class="rem' + (rem < 0 ? ' over' : '') + '">' + rem + '</span><span class="of">/ ' + SIGN.TOTAL + '</span></div>' +
       '<div class="budget-caprow"><span class="budget-cap">Points to spend</span>' +
         '<span class="budget-promises"><b>' + promises + '</b> ' + (promises === 1 ? 'promise' : 'promises') + '</span></div>' +
-      '<div class="budget-bar"><div class="budget-fill' + (rem < 0 ? ' over' : '') + '" style="width:' + pct + '%"></div></div></div>' +
-      list +
+      '<div class="budget-bar"><div class="budget-fill' + (rem < 0 ? ' over' : '') + '" style="width:' + pct + '%"></div></div>' +
+      // Capacity is the header number, straight from the payload.
+      '<div class="cap-row"><span class="cap-item"><b>' + cap.spots + '</b>/' + cap.cap + ' roster spots</span>' +
+        '<span class="cap-item"><b>' + cap.scholarships + '</b> scholarships</span></div></div>' +
+      list + preflight +
       '<div class="rail-foot">' + note +
         '<button class="rail-submit" id="sign-submit"' + (disabled ? ' disabled' : '') + '>' + (state.week35Ran ? 'Signings Run' : 'Submit Orders') + '</button></div>';
   }
@@ -421,7 +898,7 @@
           '<select class="spool-region" id="sign-region">' + regionOpts + '</select>' +
           '<input class="spool-search" id="sign-search" placeholder="Search name…" value="' + Common.escapeHtml(state.sSearch) + '"></div></div>' +
         '<div class="spool-colhdr"><span>Recruit</span><span class="c-num">Pos</span><span class="c-num">Region</span><span class="c-num">RT</span>' +
-          '<span>Leans</span><span>Points</span><span>Playing Time</span><span>Sign odds</span></div>' +
+          '<span class="c-num">Standing</span><span class="c-num">Field</span><span>Points</span><span>Playing Time</span></div>' +
         '<div class="spool-rows" id="sign-rows">' + signFiltered().map(prowHtml).join('') + '</div></div>' +
       '<aside class="rail" id="sign-rail">' + railHtml() + '</aside>';
   }
@@ -466,6 +943,11 @@
     var host = document.getElementById('sign-rail'); if (!host) return;
     host.querySelectorAll('[data-jump]').forEach(function (b) { b.addEventListener('click', function () { jumpTo(this.dataset.jump); }); });
     host.querySelectorAll('[data-remove]').forEach(function (b) { b.addEventListener('click', function (e) { e.stopPropagation(); removeCommit(this.dataset.remove); }); });
+    // A warning that names a recruit must be able to reach him — jumpTo() switches off
+    // the 'mine' tab when he doesn't lean to us, then flashes the row.
+    host.querySelectorAll('[data-pfw-jump]').forEach(function (b) {
+      b.addEventListener('click', function () { jumpTo(this.dataset.pfwJump); });
+    });
     var submit = host.querySelector('#sign-submit'); if (submit) submit.addEventListener('click', submitOrders);
   }
   function bindSignBoard() {
@@ -475,10 +957,59 @@
     bindSignRows(); bindSignRail();
   }
 
+  // Snapshot taken BEFORE submitting, so the summary reports what was actually sent
+  // even though state.alloc is about to be locked by week35Ran.
+  function submitSummaryRows() {
+    return committedIds().map(function (id) {
+      var r = state.byId[id], a = state.alloc[id];
+      var rank = Number((r && r.yourRank) || 0);
+      return {
+        name: r ? r.name : id,
+        pos: r ? r.pos : '--',
+        points: a.points,
+        promise: !!a.promise,
+        standing: rank ? '#' + rank : '—',
+        mult: leanMultiplier(rank),
+        field: competitionCount(id),
+      };
+    }).sort(function (x, y) { return y.points - x.points; });
+  }
+
+  // Replaces the blind 950ms redirect: the player sees what they committed, then leaves
+  // on their own click. No percentage here either — points, standing, multiplier, field.
+  function showSubmitSummary(rows) {
+    var total = rows.reduce(function (n, x) { return n + x.points; }, 0);
+    var promises = rows.filter(function (x) { return x.promise; }).length;
+    var body = rows.length
+      ? '<div class="ssum-rows">' + rows.map(function (x) {
+          return '<div class="ssum-row"><span class="ssum-nm">' + Common.escapeHtml(x.name) +
+            (x.promise ? '<b>· PT</b>' : '') + '</span>' +
+            '<span class="ssum-pos">' + Common.escapeHtml(x.pos) + '</span>' +
+            '<span class="ssum-stand">' + x.standing + ' x' + x.mult + '</span>' +
+            '<span class="ssum-field">' + (x.field == null ? '—' : x.field + (x.field === 1 ? ' program' : ' programs')) + '</span>' +
+            '<span class="ssum-pts">' + x.points + ' pts</span></div>';
+        }).join('') + '</div>'
+      : '<div class="ssum-empty">You submitted no funding. Every recruit signs elsewhere.</div>';
+    var overlay = document.createElement('div');
+    overlay.className = 'ssum-overlay';
+    overlay.innerHTML = '<div class="ssum" role="dialog" aria-modal="true" aria-label="Orders submitted">' +
+      '<div class="ssum-head"><div class="ssum-title">Orders Submitted</div>' +
+        '<div class="ssum-sub">' + total + ' of ' + SIGN.TOTAL + ' points committed across ' +
+        rows.length + ' recruit' + (rows.length === 1 ? '' : 's') +
+        (promises ? ' · ' + promises + ' binding ' + (promises === 1 ? 'promise' : 'promises') : '') +
+        '</div></div>' + body +
+      '<div class="ssum-foot"><button class="ssum-go" id="ssum-go" type="button">Back to Locker Room</button></div></div>';
+    document.body.appendChild(overlay);
+    var go = overlay.querySelector('#ssum-go');
+    go.addEventListener('click', function () { window.location.href = Common.buildFccUrl(context); });
+    go.focus();
+  }
+
   function submitOrders() {
     if (remaining() < 0 || state.week35Ran) return;
     var btn = document.getElementById('sign-submit'); if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
-    var entries = committedIds().map(function (id) { return { id: id, points: state.alloc[id].points, scholarship: false, playing_time: !!state.alloc[id].promise }; });
+    var entries = committedIds().map(function (id) { return { id: id, points: state.alloc[id].points, playing_time: !!state.alloc[id].promise }; });
+    var summaryRows = submitSummaryRows();
     Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-orders'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ franchise_id: context.franchiseId, order_entries: entries })
@@ -488,8 +1019,8 @@
         body: JSON.stringify({ franchise_id: context.franchiseId })
       });
     }).then(function () {
-      showToast('Orders Submitted', 'Points spent and promises are now binding.');
-      setTimeout(function () { window.location.href = Common.buildFccUrl(context); }, 950);
+      state.week35Ran = true;
+      showSubmitSummary(summaryRows);
     }).catch(function (err) {
       console.error(err); showToast('Submit failed', String(err && err.message || err), false);
       if (btn) { btn.disabled = false; btn.textContent = 'Submit Orders'; }
@@ -504,52 +1035,155 @@
     if (r.yourRank > 1) return '<span class="' + cls + ' list">#' + r.yourRank + '</span>';
     return '<span class="' + cls + ' none">—</span>';
   }
-  function signingsList() {
-    var signed = state.week35Results.signed_by_recruit_id || {};
-    return state.recruits.filter(function (r) { return signed[r.recruitId]; }).map(function (r) {
-      var info = signed[r.recruitId] || {};
-      var withYou = String(info.team_id) === String(state.userTeamId);
+  // ===================== RESULTS (week 36) =====================
+  // Playback of a sequence that ALREADY happens: the engine resolves recruits one at a
+  // time in RT order. Nothing here changes who signs where — it only reveals the order
+  // the engine already produced.
+
+  function signedEntriesForUserView() {
+    var entries = (state.week35Results.signed_players || []).filter(function (e) {
+      return e && !e.walk_on && e.recruit_id;
+    });
+    var uid = String(state.userTeamId);
+    return entries.map(function (e) {
+      var r = state.byId[String(e.recruit_id)];
+      var res = e.resolution || {};
+      var pts = (res.points_by_team || {});
+      var mults = (res.lean_multipliers || {});
       return {
+        id: String(e.recruit_id),
         r: r,
-        team: info.team_name || info.team_id || '—',
-        team_id: info.team_id,
-        withYou: withYou,
+        name: r ? r.name : (e.name || '--'),
+        pos: e.pos || (r ? r.pos : '--'),
+        rt: e.rt != null ? e.rt : (r ? r.rt : null),
+        potentialRt: r ? r.potentialRt : null,
+        year: r ? r.yearDisplay : '',
+        imageId: r ? r.imageId : e.image_id,
+        team: e.team_name || '—',
+        withYou: String(e.team_id) === uid,
+        // Every number below was RECORDED BY THE RESOLUTION. None is recomputed here.
+        yourPoints: Number(pts[uid] || 0),
+        yourMult: Number(mults[uid] || 0),
+        fieldSize: Number(res.field_size || 0),
+        reason: e.signing_reason || '',
+        boarded: Object.prototype.hasOwnProperty.call(res.scores_by_team || {}, uid),
       };
-    }).sort(function (a, b) { return (b.withYou - a.withYou) || ((b.r.rt || 0) - (a.r.rt || 0)); });
+    }).filter(function (x) {
+      // The sequence is about your season: recruits you boarded, plus everyone you signed.
+      return x.withYou || x.boarded;
+    });
   }
+
+  // Signing order = the order the engine resolved them, i.e. RT descending.
+  function playbackList() {
+    return signedEntriesForUserView().sort(function (a, b) {
+      return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1);
+    });
+  }
+
+  function resultRowHtml(x, revealed) {
+    var standing = x.yourMult
+      ? (x.yourMult === 5 ? '#1 x5' : x.yourMult === 3 ? '#2 x3' : x.yourMult === 2 ? '#3 x2' : 'no lean x1')
+      : '—';
+    return '<div class="rrow' + (x.withYou ? ' won' : ' lost') + (revealed ? ' is-in' : '') + '" data-rid="' + x.id + '">' +
+      headshotBoxHtml({ imageId: x.imageId }, 'rav') +
+      '<div class="rid"><div class="rnm">' +
+        (x.r ? Common.recruitNameLinkHtml(x.id, context.franchiseId, x.name) : Common.escapeHtml(x.name)) +
+        '</div><div class="rmeta">' + Common.escapeHtml(x.pos) +
+        (x.year ? ' · ' + Common.escapeHtml(x.year) : '') + '</div></div>' +
+      '<div class="rrt ' + (x.r ? Spine.rtClassForYear(x.rt, x.r.year) : '') + '" data-tooltip="current/potential" title="current/potential">' +
+        Common.formatRtWithPotential(x.rt, x.potentialRt) + '</div>' +
+      '<div class="rsigned"><span class="rsigned-lab">Signed with</span>' +
+        '<span class="rsigned-team' + (x.withYou ? ' mine' : '') + '">' + Common.escapeHtml(x.team) + '</span></div>' +
+      '<div class="rnum"><b>' + x.yourPoints + '</b><span>pts</span></div>' +
+      '<div class="rnum"><b>' + standing + '</b><span>standing</span></div>' +
+      '<div class="rnum"><b>' + (x.fieldSize || '—') + '</b><span>field</span></div>' +
+      '<div class="rwhy">' + Common.escapeHtml(x.reason || '—') + '</div>' +
+      '</div>';
+  }
+
+  function classSummaryHtml(list) {
+    var cap = capacity();
+    var signed = list.filter(function (x) { return x.withYou; });
+    var funded = list.filter(function (x) { return x.yourPoints > 0; });
+    var pointsSpent = list.reduce(function (n, x) { return n + x.yourPoints; }, 0);
+    var rts = signed.map(function (x) { return Number(x.rt || 0); }).filter(function (v) { return v > 0; });
+    var avg = rts.length ? Math.round(rts.reduce(function (a, b) { return a + b; }, 0) / rts.length) : null;
+    var avgDisplay = avg == null ? '—'
+      : (typeof formatRtDisplay === 'function' ? formatRtDisplay(avg) : String(avg));
+    return '<section class="rsum"><div class="rsum-title">Your Class</div>' +
+      '<div class="rsum-grid">' +
+        '<div class="rsum-cell"><b>' + signed.length + '</b><span>signed</span></div>' +
+        '<div class="rsum-cell"><b>' + funded.length + '</b><span>funded</span></div>' +
+        '<div class="rsum-cell"><b>' + avgDisplay + '</b><span>class avg RT</span></div>' +
+        '<div class="rsum-cell"><b>' + pointsSpent + '</b><span>points spent</span></div>' +
+        // Same _roster_capacity_payload helper signing day reads.
+        '<div class="rsum-cell"><b>' + Math.max(0, cap.spots - signed.length) + '</b><span>roster spots left</span></div>' +
+      '</div></section>';
+  }
+
   function finalSigningsHtml() {
-    var all = signingsList();
-    var won = all.filter(function (s) { return s.withYou; });
-    var targets = state.recruits.filter(function (r) { return r.leansToUser; });
-    var targetsWon = targets.filter(function (r) { var s = (state.week35Results.signed_by_recruit_id || {})[r.recruitId]; return s && String(s.team_id) === String(state.userTeamId); }).length;
-    var rows = state.signFilter === 'mine' ? all.filter(function (s) { return s.withYou; })
-      : state.signFilter === 'targets' ? all.filter(function (s) { return s.r.leansToUser; }) : all;
-    var chip = function (k, l) { return '<button class="chip' + (state.signFilter === k ? ' on' : '') + '" data-sfilter="' + k + '">' + l + '</button>'; };
-    var rowsHtml = rows.map(function (s) {
-      var r = s.r, ab = Spine.Lean.deriveAbbr(s.team, s.teamId || s.team_id);
-      return '<div class="srow' + (s.withYou ? ' win' : '') + '">' +
-        '<div class="sname"><span class="nm">' + Common.escapeHtml(r.name) + '</span></div>' +
-        '<span class="scol spos">' + Common.escapeHtml(r.pos) + '</span>' +
-        '<span class="scol sregion">' + regionOf(r) + '</span>' +
-        '<span class="scol srt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
-        '<span class="scol">' + signStandChip(r) + '</span>' +
-        '<div class="ssigned"><span class="logo ' + (s.withYou ? 'you' : 'rival') + '">' + Common.escapeHtml(ab) + '</span>' +
-          '<span class="team ' + (s.withYou ? 'you' : 'rival') + '">' + Common.escapeHtml(s.team) + '</span></div>' +
-        '<span class="soutcome ' + (s.withYou ? 'win' : 'loss') + '">' + (s.withYou ? 'Signed' : 'Lost') + '</span></div>';
-    }).join('') || '<div class="srow" style="grid-template-columns:1fr"><span style="color:var(--muted-3);padding:20px">No signings to show.</span></div>';
-    return '<div class="signings-wrap" style="margin:0 22px 22px;border:1px solid var(--border);border-radius:16px;overflow:hidden;background:var(--panel-2)">' +
-      '<div class="signsum"><div><div class="signsum-big"><span class="n">' + won.length + '</span><span class="of">signings</span></div>' +
-        '<div class="signsum-cap">To ' + Common.escapeHtml(state.teamName || 'your program') + '</div></div>' +
-        '<div class="signsum-breakdown">' +
-          '<div class="ssb"><span class="v win">' + targetsWon + '</span><span class="l">Targets won</span></div>' +
-          '<div class="ssb"><span class="v loss">' + (targets.length - targetsWon) + '</span><span class="l">Targets lost</span></div>' +
-          '<div class="ssb"><span class="v">' + targets.length + '</span><span class="l">Leaned to you</span></div></div></div>' +
-      '<div class="sign-filter">' + chip('all', 'All signings') + chip('mine', 'Signed with you') + chip('targets', 'Your targets') + '</div>' +
-      '<div class="signtable"><div class="shdr"><span>Recruit</span><span class="c">Pos</span><span class="c">Region</span><span class="c">RT</span>' +
-        '<span class="c">Your standing</span><span>Signed with</span><span></span></div>' + rowsHtml + '</div></div>';
+    var list = playbackList();
+    if (!list.length) {
+      return '<div class="rstage"><div class="rempty">No recruits to report — you never boarded anyone this season.</div></div>';
+    }
+    var pb = state.playback;
+    var shown = pb.done ? list.length : Math.min(pb.index, list.length);
+    var rows = list.slice(0, shown).map(function (x, i) {
+      return resultRowHtml(x, i === shown - 1 && !pb.done);
+    }).join('');
+    var remaining = list.length - shown;
+    var controls = pb.done || remaining <= 0
+      ? '<div class="rctl"><span class="rctl-done">All ' + list.length + ' revealed</span></div>'
+      : '<div class="rctl">' +
+          '<button class="rbtn main" id="pb-next" type="button">Next recruit →</button>' +
+          '<button class="rbtn" id="pb-auto" type="button">' + (pb.auto ? 'Pause' : 'Auto-play') + '</button>' +
+          '<button class="rbtn" id="pb-skip" type="button">Skip all</button>' +
+          '<span class="rctl-count">' + shown + ' of ' + list.length + '</span>' +
+        '</div>';
+    return '<div class="rstage">' +
+      '<div class="rhead"><div class="rhead-t">Signing Day Results</div>' +
+        '<div class="rhead-s">Revealed in the order the engine resolved them — highest RT first.</div></div>' +
+      controls +
+      '<div class="rrows">' + rows + '</div>' +
+      ((pb.done || remaining <= 0) ? classSummaryHtml(list) : '') +
+      '</div>';
+  }
+
+  function stopAutoPlay() {
+    if (state.playback.timer) { clearInterval(state.playback.timer); state.playback.timer = null; }
+    state.playback.auto = false;
+  }
+  function renderSignings() {
+    var host = document.getElementById('hub-signings'); if (!host) return;
+    host.innerHTML = finalSigningsHtml();
+    bindSignings();
+    if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['div']);
+  }
+  function playbackAdvance() {
+    var total = playbackList().length;
+    if (state.playback.index >= total) { state.playback.done = true; stopAutoPlay(); }
+    else state.playback.index += 1;
+    if (state.playback.index >= total) { state.playback.done = true; stopAutoPlay(); }
+    renderSignings();
   }
   function bindSignings() {
-    document.querySelectorAll('[data-sfilter]').forEach(function (b) { b.addEventListener('click', function () { state.signFilter = this.dataset.sfilter; document.getElementById('hub-signings').innerHTML = finalSigningsHtml(); bindSignings(); }); });
+    var next = document.getElementById('pb-next');
+    if (next) next.addEventListener('click', function () { stopAutoPlay(); playbackAdvance(); });
+    var skip = document.getElementById('pb-skip');
+    if (skip) skip.addEventListener('click', function () {
+      stopAutoPlay();
+      state.playback.index = playbackList().length;
+      state.playback.done = true;
+      renderSignings();
+    });
+    var auto = document.getElementById('pb-auto');
+    if (auto) auto.addEventListener('click', function () {
+      if (state.playback.auto) { stopAutoPlay(); renderSignings(); return; }
+      state.playback.auto = true;
+      state.playback.timer = setInterval(playbackAdvance, 900);
+      renderSignings();
+    });
   }
 
   // ---- Weekly-visit results panel (wks 20-26) ----
@@ -640,6 +1274,9 @@
       '<div class="spine-body ' + (hasDock() ? 'with-dock' : 'no-dock') + '" style="padding-top:14px">' +
         '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' +
           (state.phase === 'passive' ? storyHtml() : '') +
+          // Invite phase: hero + board rows lead the main column (mockup .desk), with the
+          // pool beneath as the add source. The right column is the rail.
+          (hasDock() ? '<div id="hub-board"></div>' : '') +
           '<div class="pool-wrap"><div id="hub-pool"></div></div></div>' +
         (hasDock() ? '<div id="hub-dock"></div>' : '') + '</div>';
     root.innerHTML =
@@ -656,7 +1293,7 @@
       onDismiss: null   // weekly-results panel is persistent now; the anchor only scrolls to the pool
     });
     if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); bindSignBoard(); }
-    else if (results) { document.getElementById('hub-signings').innerHTML = finalSigningsHtml(); bindSignings(); }
+    else if (results) { renderSignings(); }
     else { renderPool(); if (hasDock()) renderDock(); if (showWeeklyPanel()) loadWeeklyPanel(); }
   }
 
@@ -682,21 +1319,50 @@
           r.leanModel = model; r.leansToUser = model.leansToUser; r.yourRank = model.yourRank;
           state.byId[r.recruitId] = r; return r;
         });
+        state.wire = data.recruiting_wire || {};
+        // Capacity and competition are SERVER numbers — never recomputed client-side.
+        state.rosterCapacity = data.roster_capacity || {};
+        state.competitionCounts = data.competition_counts || {};
+        state.leanMultipliers = data.lean_multipliers || {};
+        state.watchlist = new Set((data.watchlist || []).map(String));
         // Seed the board from saved orders ({"1":id,...} → ordered), keeping only still-valid,
         // unique recruits (backend already dedupes; guard defensively).
         var seen = {};
         state.board = Common.recruitingOrderIds(data.saved_orders || {}).filter(function (id) {
           if (!state.byId[id] || seen[id]) return false; seen[id] = true; return true;
         });
+        // Watchlist pre-populates the invite board — CLIENT-SIDE STATE ONLY.
+        //
+        // HARD RULE: this must never persist. has_saved_board derives from
+        // _team_order_list(ftd["Recruits"]), and both the week-20 gate and the server
+        // guard at franchise_routes:11966 key off it. Writing Recruits here would flip
+        // the gate open before the player had saved anything — seedAlloc()'s mistake
+        // (pre-committing the player to a choice they never made) in a new location.
+        // Recruits is written by save_recruiting_orders and nowhere else.
+        //
+        // Only seeds when nothing is saved yet, so it can never reorder or overwrite a
+        // board the player built. The watchlist has no ranks, so RT descending supplies
+        // the initial order the board needs — the star press implied no position.
+        state.boardSeededFromWatchlist = false;
+        if (!state.board.length && state.watchlist.size) {
+          state.boardSeededFromWatchlist = true;
+          state.board = state.recruits
+            .filter(function (r) { return state.watchlist.has(String(r.recruitId)); })
+            .sort(function (a, b) { return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1); })
+            .slice(0, MAX_BOARD)
+            .map(function (r) { return r.recruitId; });
+        }
         // Signing Day: restore the budget from saved entries; else auto-fill top leaners.
         state.week35Ran = !!data.week_35_recruiting_ran;
         if (state.phase === 'day') {
-          var savedEntries = (data.saved_order_entries_week_35 || []).filter(function (e) { return e && state.byId[e.id]; });
-          if (savedEntries.length) {
-            savedEntries.forEach(function (e) { state.alloc[e.id] = { points: Number(e.points) || 0, promise: !!e.playing_time }; pruneAlloc(e.id); });
-          } else {
-            state.alloc = seedAlloc();
-          }
+          // Restore what the player previously SAVED, and nothing else. There is no
+          // load-time seed: an empty board loads at 0 of 50 with zero promises.
+          (data.saved_order_entries_week_35 || [])
+            .filter(function (e) { return e && state.byId[e.id]; })
+            .forEach(function (e) {
+              state.alloc[e.id] = { points: Number(e.points) || 0, promise: !!e.playing_time };
+              pruneAlloc(e.id);
+            });
         }
         renderShell();
       })

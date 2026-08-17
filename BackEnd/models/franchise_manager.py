@@ -726,6 +726,56 @@ class FranchiseManager:
             franchise_recruits_data_collection.insert_many(frd_docs)
         _perf["frd_insert_many"] = (time.time() - _t0) * 1000
 
+        # Week 1 Recruiting Report from initial leans (newest-first ahead of Walk Ons).
+        try:
+            from BackEnd.utils.recruiting_report_news import (
+                build_recruiting_rankings_story,
+                recruit_max_rt,
+                team_points_from_lean_lists,
+            )
+
+            _w1_scores = team_points_from_lean_lists(frd_docs, recruit_max_rt)
+            _w1_names = {
+                str(t["_id"]): (t.get("name") or str(t["_id"]))
+                for t in self.teams
+                if t.get("_id") is not None
+            }
+            _w1_region = None
+            _w1_region_ids: set[str] = set()
+            if user_team_object_id:
+                for t in self.teams:
+                    if str(t.get("_id")) != str(user_team_object_id):
+                        continue
+                    _w1_region = str(t.get("region") or "").strip().upper() or None
+                    break
+                if _w1_region:
+                    _w1_region_ids = {
+                        str(t["_id"])
+                        for t in self.teams
+                        if str(t.get("region") or "").strip().upper() == _w1_region
+                        and t.get("_id") is not None
+                    }
+            _w1_report = build_recruiting_rankings_story(
+                story_id="w1-recruiting-report",
+                week=1,
+                headline="Week 1 Recruiting Report",
+                story_type="recruiting_report",
+                scores=_w1_scores,
+                team_name_map=_w1_names,
+                user_region_letter=_w1_region,
+                region_team_ids=_w1_region_ids,
+            )
+            if _w1_report:
+                self.db.franchises.update_one(
+                    {"_id": self.franchise_id},
+                    {"$push": {"season_news": {"$each": [_w1_report], "$position": 0}}},
+                )
+        except Exception:
+            logger.exception(
+                "[NEWS] week-1 recruiting report failed at season init; continuing. franchise_id=%s",
+                str(self.franchise_id),
+            )
+
         _t0 = time.time()
         team_name_to_total_attrs = {}
         for p in self.db.players.find({}, {"team": 1, "attributes": 1}):

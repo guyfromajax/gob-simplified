@@ -303,8 +303,76 @@ body.has-auth-bar #franchise-container {
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  gap: 0;
+  gap: 8px;
 }
+
+/* Both hero buttons are a fixed 186px so they share a right edge. min-width alone
+   let the secondary size to its content (~265px) and the ragged edge read as a bug. */
+#franchise-container .hero-btn,
+#franchise-container .fcc-rec-btn {
+  width: 186px;
+}
+
+/* Secondary recruiting button. Its own class, NOT a .hero-btn modifier: the green
+   gradient lives on .hero-btn itself, so a modifier would have to fight inheritance
+   and any miss would show green on a non-gating control. Colour law: amber here,
+   green only on #play-now. */
+#franchise-container .fcc-rec-btn {
+  min-height: 44px;
+  padding: 7px 12px;
+  border: 1px solid rgba(247, 148, 32, 0.55);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(247, 148, 32, 0.22), rgba(247, 148, 32, 0.13));
+  color: #ffd7a0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  position: relative;
+  text-align: left;
+  transition: filter 0.18s ease, transform 0.18s ease;
+}
+
+#franchise-container .fcc-rec-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+#franchise-container .fcc-rec-btn:active { transform: translateY(0); }
+
+#franchise-container .fcc-rec-btn__txt {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  min-width: 0;
+}
+
+#franchise-container .fcc-rec-btn__txt em {
+  font-style: normal;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  line-height: 1;
+}
+
+#franchise-container .fcc-rec-btn small {
+  font: 600 9.5px/1 'Inter', sans-serif;
+  color: rgba(255, 215, 160, 0.78);
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+/* Board already sent this week — present but visibly spent. */
+#franchise-container .fcc-rec-btn.is-dead {
+  opacity: 0.5;
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.5);
+}
+
+#franchise-container .fcc-rec-btn.is-dead small { color: rgba(255, 255, 255, 0.45); }
 
 #franchise-container .hero-btn {
   min-width: 138px;
@@ -3987,3 +4055,53 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   box-shadow: inset 3px 0 0 var(--fcc-newlean-accent);
 }
 .fcc-newlean-cell { display:inline-flex; align-items:center; gap:7px; }
+
+/* ───────── Wire card: drops, as visible as gains ─────────
+   Same geometry as .fcc-newlean-badge / .fcc-newlean-row on purpose — only the
+   accent token differs. Drops are the reason the card exists; anything quieter than
+   the gain treatment would bury them. */
+:root { --fcc-drop-accent: #ff6d6d; }
+
+.fcc-drop-badge {
+  display:inline-flex; align-items:center;
+  font-family:'JetBrains Mono', monospace; font-size:8.5px; font-weight:700;
+  letter-spacing:0.12em; text-transform:uppercase;
+  color:#1d0707; background:var(--fcc-drop-accent);
+  padding:2px 6px; border-radius:5px; line-height:1;
+}
+
+.fcc-drop-row {
+  position:relative; border-radius:8px; margin-bottom:3px; padding:3px 8px 5px;
+  background:linear-gradient(90deg,
+    color-mix(in srgb, var(--fcc-drop-accent) 15%, transparent),
+    color-mix(in srgb, var(--fcc-drop-accent) 4%, transparent));
+  box-shadow:inset 3px 0 0 var(--fcc-drop-accent);
+}
+
+/* Neutral movement (rival churn on a ladder you're on) — quieter than either. */
+.fcc-wire-row {
+  position:relative; border-radius:8px; margin-bottom:3px; padding:3px 8px 5px;
+  background:rgba(255,255,255,0.03);
+  box-shadow:inset 3px 0 0 rgba(255,255,255,0.14);
+}
+
+.fcc-wire-line {
+  display:flex; align-items:baseline; gap:8px; justify-content:space-between;
+  font-family:'Inter', sans-serif; font-size:12px; line-height:1.45;
+  color:rgba(255,255,255,0.9);
+}
+
+.fcc-wire-line__wk {
+  font-family:'JetBrains Mono', monospace; font-size:9px;
+  color:rgba(255,255,255,0.45); white-space:nowrap; flex:0 0 auto;
+}
+
+.fcc-wire-status {
+  margin-top:8px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.08);
+  font-family:'Inter', sans-serif; font-size:11px; color:rgba(255,255,255,0.55);
+}
+
+/* Recruiting card spans two columns (Standings retired to keep rows of 4).
+   At double width the 126px list cap is unnecessarily tight. */
+#franchise-container .fcc-home-card--recruiting { grid-column: span 2; }
+#franchise-container .fcc-home-card--recruiting .fcc-home-list-scroll { max-height: 210px; }

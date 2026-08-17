@@ -193,14 +193,18 @@ one-line status beneath (invites sent, points remaining, whatever the phase call
 arithmetic (8 cards where one spans 2 = 9 column-units, which doesn't divide into rows of 4):
 
 ```
-Row 1:  Next Game  │ Locker Room │ RECRUITING (span 2)
-Row 2:  Rankings   │ Last Game   │ Player Scoring │ News
+Row 1:  Locker Room │ Next Game │ RECRUITING (span 2)
+Row 2:  Rankings    │ Last Game │ Player Scoring │ News
 ```
+
+Locker Room leads so that **Next Game sits directly above Last Game** — the two game cards
+read as a vertical pair.
 
 7 cards, 8 column-units, two clean rows. `grid-column: span 2` is a one-line addition;
 removing Standings means deleting its `<section>` (`html:84-87`) and
-`renderHomeStandingsCard()` (`js:973-1009`). **Check first** whether `#standings-full-link`
-(`html:130-132`) is scoped to the card or the tab. At double width, revisit the 126px
+`renderHomeStandingsCard()` (`js:973-1009`) **plus both of its call sites** (`js:1486`,
+`js:3396`). `#standings-full-link` is **safe** — verified at `html:137`, inside
+`#standings-tab`, not inside the card. At double width, revisit the 126px
 `.fcc-home-list-scroll` cap for this card.
 
 ### 5.6 Recruits tab → Recruiting
@@ -329,6 +333,10 @@ Deliberately small:
 4. Competition count per recruit on the week-35 payload (§6.3).
 5. `recruiting_watchlist` array on the franchise doc + a toggle endpoint (§6.1).
 6. Deprecate `fcc_pending_new_lean_recruit_ids` once the event log lands.
+7. `recruiting_wire_seen_week` on the franchise doc + a mark-seen endpoint (§5.3). Two of the
+   five secondary-button states key off *unseen*, and nothing today records a read marker.
+   Follows the existing seen-marker pattern (`PATCH /franchise/recruiting-results-modal-seen`).
+   This is reporting infrastructure, not a recruiting mechanic.
 
 Everything else is frontend.
 
@@ -353,19 +361,70 @@ and is self-contained.
 
 ## 9. Mockups
 
-Five exist in `_documentation_master/projects/Recruiting_Hub_Redesign/mockups/`. Against this
-scope:
+In `_documentation_master/projects/Recruiting_Hub_Redesign/mockups/`. All have been revised
+to this scope — the shelved columns are already stripped:
 
 | Mockup | Status |
 |---|---|
-| `2-fcc-integration.html` | **Use as-is.** Nothing in it depends on shelved mechanics. |
-| `3-invite-board.html` | **Use, minus** the Read column (motivation) and the lock badge. The wire panel, roster needs, headshots and dock all hold. |
-| `4-signing-day.html` | **Use, minus** motivation-derived notes. Standing/Field/Points/Promise structure holds. |
-| `5-results.html` | **Use, minus** the Report/Bloom/Motivation stats. |
-| `1-scout-desk.html` | **Shelved** with the mechanic. Keep for the future project. |
+| `1-recruits-pool.html` | **Build to this.** 450-row scale, split Filter/Views bar, capped name column, watchlist star. |
+| `2-fcc-integration.html` | **Build to this.** Both hero buttons 186px; Coach's Office grid per §5.5. |
+| `3-invite-board.html` | **Build to this.** Wire panel, roster needs, headshots, dock. |
+| `4-signing-day.html` | **Build to this.** 0/50 load, Standing + Field columns, no odds %. |
+| `5-results.html` | **Build to this.** Reveal sequence, every row explains why. |
+| `_shelved-scout-desk.html` | **Shelved** with the mechanic. Keep for the future project. |
 
-The Invite Board and Signing Day mockups want a revision pass to strip the shelved columns —
-which will also make them measurably less dense, since those columns were the density.
+---
+
+## 9b. Status — SHIPPED (2026-08-17)
+
+All seven prompts (0–6) are built. 215 tests: 131 Playwright, 84 pytest.
+
+**Defects found and fixed during the build, in order of severity:**
+
+1. **`has_saved_board` was always true.** `bool(ftd_doc["Recruits"])` — but `Recruits`
+   initializes to a 20-slot dict of `None` at both franchise creation
+   (`franchise_manager.py:830`) and season rollover (`franchise_routes.py:17323`), which is
+   truthy. The week-20 gate could never fire, and the ungated button routed the player into
+   the `:11966` server rejection. Fixed to `_team_order_list(...)`, the helper that guard
+   already used.
+2. **Slot-3 lean multiplier displayed as ×1 instead of ×2.** The engine scores `#3` at ×2;
+   the build plan's shorthand omitted slot 3 and the client table was written literally.
+   Fixed by collapsing to one `WEEK_35_LEAN_MULTIPLIERS` (`:13664`) that the scorer and the
+   payload both read.
+3. **`railHtml()` name collision** with the Signing Day rail — hoisting meant the invite
+   board silently rendered the wrong panel. Renamed `boardRailHtml()`.
+4. **`UnboundLocalError` on empty event feeds** in `_build_recruiting_wire_payload`.
+5. **Seeded invite board was unexplained** — `boardSeededFromWatchlist` was set and never
+   read. Now surfaces a dismissible notice stating nothing is saved yet.
+6. **Signing Day rail warned about invisible recruits** — the pool defaults to
+   `sTab: 'mine'`, hiding the ×1 cases the rail names. Warnings are now buttons routed
+   through the existing `jumpTo()`.
+
+**Design decisions worth carrying forward:**
+
+- Attributes render 0–10 (`Math.floor(v/10)`), matching the roster page. The mockup's 0–100
+  would have made recruiting the only screen on a different scale.
+- The watchlist seeds the invite board **client-side only**. Writing the seed to `Recruits`
+  would flip `has_saved_board` and re-break the week-20 gate — `seedAlloc()`'s mistake in a
+  new location.
+- No percentage appears anywhere on Signing Day. A count and a multiplier are facts; a
+  probability is a promise the sim can't keep.
+- Signing reasons are assembled from a `resolution` block the engine writes (`:13780`),
+  never recomputed from the scorer.
+
+**Six items no test can reach — they need a real season:**
+
+1. Lean-event volume and copy in real play (the 150–300 figure is an estimate, never a target)
+2. Walk-on modal + news story through a real rollover
+3. Wire payload → FCC card render path end-to-end
+4. 450-row pool smoothness, and the headshot 404 → `ensureRecruitImage` → retry path
+5. Drag-reorder on the invite board (only remove-and-rerender is covered)
+6. A real week-35 resolution — competition counts against seeded CPU boards, and the
+   two-request submit sequence
+
+**First thing to check on the first FCC load:** whether the `[LEAN-EVENTS]` per-kind log
+appears at all. If it's silent, the likeliest cause is `user_team_id_str` being empty at the
+mutation sites, which produces zero events without erroring.
 
 ---
 
