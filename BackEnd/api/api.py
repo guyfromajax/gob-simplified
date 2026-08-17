@@ -7103,6 +7103,49 @@ try:
             "projected_starting_five": projected_starting_five,
         }
 
+        # Record + conference standing for the roster page's identity lockup. Franchise
+        # mode only — outside a franchise there is no season to have a record in.
+        # Derived from the same calculate_franchise_standings helper the Standings tab
+        # uses, so the two can't disagree.
+        response_data["team_record"] = None
+        if franchise_id and team.get("_id") is not None:
+            try:
+                from BackEnd.utils.franchise_standings import calculate_franchise_standings
+
+                fr_doc = db.franchises.find_one(
+                    {"_id": ObjectId(franchise_id)},
+                    {"results": 1},
+                ) or {}
+                conf = team.get("conference")
+                conf_team_ids = {
+                    str(t["_id"]): t
+                    for t in db.teams.find({"conference": conf}, {"_id": 1, "name": 1})
+                } if conf is not None else {}
+                standings = calculate_franchise_standings(fr_doc.get("results", {}) or {}, conf_team_ids)
+                own = standings.get(str(team["_id"]), {}) or {}
+                wins = int(own.get("W", 0) or 0)
+                losses = int(own.get("L", 0) or 0)
+                # Conference place by wins, then point differential — same ordering the
+                # Standings tab presents.
+                ranked = sorted(
+                    conf_team_ids.keys(),
+                    key=lambda tid: (
+                        -int((standings.get(tid, {}) or {}).get("W", 0) or 0),
+                        -(int((standings.get(tid, {}) or {}).get("PF", 0) or 0)
+                          - int((standings.get(tid, {}) or {}).get("PA", 0) or 0)),
+                    ),
+                )
+                place = ranked.index(str(team["_id"])) + 1 if str(team["_id"]) in ranked else None
+                response_data["team_record"] = {
+                    "wins": wins,
+                    "losses": losses,
+                    "conference": conf,
+                    "conference_place": place,
+                    "conference_size": len(conf_team_ids) or None,
+                }
+            except Exception:
+                logger.exception("[ROSTER] record/standing lookup failed; omitting")
+
         # Team Builder: overlay identity when this roster is loaded in a franchise.
         if franchise_id and team.get("_id") is not None:
             try:
