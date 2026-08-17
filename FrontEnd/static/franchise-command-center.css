@@ -4105,3 +4105,57 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
    At double width the 126px list cap is unnecessarily tight. */
 #franchise-container .fcc-home-card--recruiting { grid-column: span 2; }
 #franchise-container .fcc-home-card--recruiting .fcc-home-list-scroll { max-height: 210px; }
+
+/* ============================================================
+   Roster / Recruiting tabs — sticky identity column.
+   The banding sits on the <tr>, so a transparent sticky cell would show rows
+   sliding underneath it. Each row state needs a SOLID equivalent.
+   ============================================================ */
+#franchise-container #roster-tab table.roster-table th.c-ident,
+#franchise-container #roster-tab table.roster-table td.c-ident,
+#franchise-container #recruits-tab table.roster-table th.c-ident,
+#franchise-container #recruits-tab table.roster-table td.c-ident {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  text-align: left;
+  background: #191d27;               /* solid base — matches the card fill */
+}
+
+#franchise-container #roster-tab table.roster-table thead th.c-ident,
+#franchise-container #recruits-tab table.roster-table thead th.c-ident {
+  z-index: 4;                        /* above both the sticky header and body cells */
+  background: #22262f;
+}
+
+#franchise-container #roster-tab table.roster-table tbody tr:nth-child(even) td.c-ident,
+#franchise-container #recruits-tab table.roster-table tbody tr:nth-child(even) td.c-ident {
+  background: #1c202a;               /* solid equivalent of the banded row */
+}
+
+#franchise-container #roster-tab table.roster-table tbody tr:hover td.c-ident,
+#franchise-container #recruits-tab table.roster-table tbody tr:hover td.c-ident {
+  background: #232833;               /* solid equivalent of the hover row */
+}
+
+/* The grouped attribute header is a 2-row grid inside one cell, so it sticks as a unit.
+   It still needs opaque backing or rows bleed through on scroll. */
+#franchise-container #roster-tab table.roster-table thead th.attr-tiles-head,
+#franchise-container #recruits-tab table.roster-table thead th.attr-tiles-head {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #22262f;
+}
+
+#franchise-container #recruits-tab table.roster-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: #22262f;
+}
+
+#franchise-container #recruits-tab .fcc-data-card-body.scroll-x {
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+}

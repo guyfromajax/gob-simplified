@@ -2208,7 +2208,7 @@ function renderFccRecruits() {
       return;
     }
     const rows = RecruitingCommon.sortRecruits(signedRecruitsDataCache, recruitSortState);
-    tbody.innerHTML = '';
+    if (tbody) tbody.innerHTML = '';
     rows.forEach(function (recruit) {
       const tr = document.createElement('tr');
       tr.innerHTML = [
@@ -2536,7 +2536,7 @@ function renderTeamStats(data, scope) {
 function renderRecruits(data) {
   if (!data) return;
   const tbody = document.getElementById('recruits-body');
-  tbody.innerHTML = '';
+  if (tbody) tbody.innerHTML = '';
   
   // Process recruits to add position and rating info
   let recruits = (data.recruits || []).map(r => {
@@ -2654,7 +2654,10 @@ function renderPracticeSquad(data) {
   const statsSection = document.getElementById('ps-stats-section');
   const titleEl = document.getElementById('ps-section-title');
   const statsTitleEl = document.getElementById('ps-stats-title');
-  if (!section || !tbody) return;
+  // The Roster tab's stacked PS attributes table is gone — practice squad is now a SCOPE
+  // of the one roster table (bindFccRosterScope). This function still owns the PS stats
+  // table on the Player Stats tab, so it must not bail when the old section is absent.
+  if (!statsBody && !tbody) return;
   // Neither field provided on this render (e.g. cache restore) => leave as-is.
   if (!Array.isArray(data.training_squad) && !Array.isArray(data.practice_squad_recruits)) return;
 
@@ -2663,8 +2666,8 @@ function renderPracticeSquad(data) {
   const combined = psPlayers.concat(recruits);
 
   if (!combined.length) {
-    section.style.display = 'none';
-    tbody.innerHTML = '';
+    if (section) section.style.display = 'none';
+    if (tbody) tbody.innerHTML = '';
     if (statsBody) statsBody.innerHTML = '';
     if (statsSection) statsSection.style.display = 'none';
     return;
@@ -2675,7 +2678,7 @@ function renderPracticeSquad(data) {
   if (statsTitleEl) statsTitleEl.textContent = psTitle;
 
   // Attributes table
-  tbody.innerHTML = '';
+  if (tbody) tbody.innerHTML = '';
   combined.forEach(p => {
     try {
       const best = getBestPosition(p.position_ratings || {});
@@ -2720,7 +2723,7 @@ function renderPracticeSquad(data) {
       );
       rtCell.setAttribute('data-tooltip', 'current/potential');
       rtCell.setAttribute('title', 'current/potential');
-      tbody.appendChild(tr);
+      if (tbody) tbody.appendChild(tr);
     } catch (e) {
       console.error('Error rendering practice squad player:', p, e);
     }
@@ -2794,10 +2797,172 @@ function renderPracticeSquad(data) {
     });
   }
 
-  section.style.display = '';
+  if (section) section.style.display = '';
   if (statsSection) statsSection.style.display = '';
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
+  }
+}
+
+// ===================== FCC Roster tab — shared builders =====================
+// One row builder for all three render paths (first paint, post-sort, scope switch).
+// Three separate copies of the attribute loop existed here before and drifted.
+const FCC_ROSTER_STATE = { scope: 'varsity', sortKey: 'RT', sortDir: 'desc' };
+
+/** Neutral POS chip. Colored position chips were built and rejected. */
+function fccPosChipHtml(pos) {
+  return '<span class="pos-chip">' + escapeHomeHtml(pos || '--') + '</span>';
+}
+
+/** RT as an explicit current -> potential lockup, bucket-coloured (never hardcoded). */
+function fccRtLockupHtml(rt, potentialRt) {
+  const cls = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(rt) : '';
+  const cur = typeof formatRtDisplay === 'function' ? formatRtDisplay(rt) : (rt == null ? '--' : String(rt));
+  let html = '<span class="rt-lockup"><b class="' + cls + '">' + escapeHomeHtml(cur) + '</b>';
+  if (potentialRt != null) {
+    const pcls = typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(potentialRt) : '';
+    const pot = typeof formatRtDisplay === 'function' ? formatRtDisplay(potentialRt) : String(potentialRt);
+    html += '<i class="' + pcls + '">' + escapeHomeHtml(pot) + '</i>';
+  }
+  return html + '</span>';
+}
+
+/** Identity cell: jersey in a fixed box so numbers align, then the linked name. */
+function fccIdentityCellHtml(opts) {
+  const o = opts || {};
+  const nameHtml = o.href
+    ? '<a href="' + escapeHomeHtml(o.href) + '">' + escapeHomeHtml(o.name || '--') + '</a>'
+    : escapeHomeHtml(o.name || '--');
+  return '<div class="ident">' +
+    '<span class="ident-jersey">' + escapeHomeHtml(o.jersey == null ? '' : o.jersey) + '</span>' +
+    '<span class="ident-body"><span class="ident-name">' + nameHtml + (o.flags || '') + '</span>' +
+    (o.sub ? '<span class="ident-sub">' + o.sub + '</span>' : '') +
+    '</span></div>';
+}
+
+function fccRosterFlagsHtml(p) {
+  let out = '';
+  if (p.has_playing_time_promise) out += '<span class="ident-flag ptp"> (PTP)</span>';
+  if (p.is_graduating) out += '<span class="ident-flag gr"> (GR)</span>';
+  if (p.walk_on) out += '<span class="ident-flag wo"> (walk on)</span>';
+  return out;
+}
+
+/** One roster row: Player | RT | POS | YR | HT | WT | Attributes. */
+function fccRosterRowHtml(p, opts) {
+  const o = opts || {};
+  const href = o.link === false ? null : buildPlayerDetailUrl(p._id || p.player_id);
+  return '<td class="c-ident">' + fccIdentityCellHtml({
+      name: p.name, jersey: p.jersey, href: href, flags: fccRosterFlagsHtml(p),
+    }) + '</td>' +
+    '<td class="c-rt">' + fccRtLockupHtml(p.rt, p.potential_rt_ratcheted) + '</td>' +
+    '<td>' + fccPosChipHtml(p.pos) + '</td>' +
+    '<td>' + escapeHomeHtml(p.year == null ? '--' : p.year) + '</td>' +
+    '<td>' + escapeHomeHtml(p.height == null ? '--' : p.height) + '</td>' +
+    '<td>' + escapeHomeHtml(p.weight == null ? '--' : p.weight) + '</td>' +
+    '<td class="attr-tiles-cell">' + window.GOB_AttrTiles.groupedTilesHtml(p.attributes || {}) + '</td>';
+}
+
+/** Grouped 2-row attribute header + its per-attribute sort controls. */
+function renderFccRosterAttrHeader() {
+  const head = document.getElementById('fcc-roster-attr-head');
+  if (!head || !window.GOB_AttrTiles) return;
+  head.innerHTML = window.GOB_AttrTiles.groupedHeaderHtml({
+    key: FCC_ROSTER_STATE.sortKey, dir: FCC_ROSTER_STATE.sortDir,
+  });
+  head.querySelectorAll('[data-attr-sort]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      fccRosterSortBy(btn.dataset.attrSort, 'desc');
+    });
+  });
+  if (typeof initAttributeTooltips !== 'undefined') initAttributeTooltips(head, ['.attr-abbr']);
+}
+
+/** Single entry point for every sort, so state and rendering can't disagree. */
+function fccRosterSortBy(key, firstDir) {
+  if (FCC_ROSTER_STATE.sortKey === key) {
+    FCC_ROSTER_STATE.sortDir = FCC_ROSTER_STATE.sortDir === 'desc' ? 'asc' : 'desc';
+  } else {
+    FCC_ROSTER_STATE.sortKey = key;
+    FCC_ROSTER_STATE.sortDir = firstDir || 'desc';
+  }
+  rosterSortColumn = FCC_ROSTER_STATE.sortKey;
+  rosterSortDirection = FCC_ROSTER_STATE.sortDir;
+  renderFccRosterAttrHeader();
+  sortRosterTable(FCC_ROSTER_STATE.sortKey, FCC_ROSTER_STATE.sortDir);
+}
+
+function fccPracticeSquadPlayers() {
+  const d = commandCenterTopDataCache || {};
+  return []
+    .concat(Array.isArray(d.training_squad) ? d.training_squad : [])
+    .concat(Array.isArray(d.practice_squad_recruits) ? d.practice_squad_recruits : []);
+}
+
+/** Practice-squad entries arrive in a different shape than roster players. */
+function fccNormalizePracticePlayer(p) {
+  const best = typeof getBestPosition === 'function' ? getBestPosition(p.position_ratings || {}) : {};
+  const heightRaw = Number(p.height) || 0;
+  return {
+    _id: p._id || p.player_id,
+    name: `${p.first_name || ''} ${p.last_name || ''}`.trim() || p.name || '--',
+    jersey: p.jersey,
+    pos: best.pos || p.pos || '--',
+    year: (typeof window.GOB_PlayerYear !== 'undefined' && window.GOB_PlayerYear.formatDisplay)
+      ? window.GOB_PlayerYear.formatDisplay(p.year) : (p.year || '--'),
+    height: heightRaw ? `${Math.floor(heightRaw / 12)}'${heightRaw % 12}"` : '--',
+    weight: p.weight != null ? p.weight : '--',
+    attributes: p.attributes || {},
+    rt: best.rating != null ? best.rating : null,
+    potential_rt_ratcheted: p.potential_rt_ratcheted != null ? p.potential_rt_ratcheted : null,
+  };
+}
+
+function updateFccRosterCounts() {
+  const varsity = (userRosterPlayersCache || []).length;
+  const practice = fccPracticeSquadPlayers().length;
+  document.querySelectorAll('#roster-tab [data-scope-count]').forEach((el) => {
+    el.textContent = el.dataset.scopeCount === 'practice' ? practice : varsity;
+  });
+  const count = document.getElementById('roster-rowcount');
+  if (count) {
+    const shown = FCC_ROSTER_STATE.scope === 'practice' ? practice : varsity;
+    count.textContent = shown + (shown === 1 ? ' player' : ' players');
+  }
+}
+
+/** Scope toggle: swaps the one table's body instead of stacking a second table. */
+function bindFccRosterScope() {
+  const buttons = document.querySelectorAll('#roster-tab [data-roster-scope]');
+  buttons.forEach((btn) => {
+    if (btn.dataset.scopeBound) return;
+    btn.dataset.scopeBound = '1';
+    btn.addEventListener('click', () => {
+      FCC_ROSTER_STATE.scope = btn.dataset.rosterScope;
+      buttons.forEach((b) => b.setAttribute('aria-pressed',
+        b.dataset.rosterScope === FCC_ROSTER_STATE.scope ? 'true' : 'false'));
+      renderFccRosterBody();
+    });
+  });
+  updateFccRosterCounts();
+}
+
+function renderFccRosterBody() {
+  const tbody = document.getElementById('team-body');
+  if (!tbody) return;
+  if (FCC_ROSTER_STATE.scope === 'practice') {
+    const rows = fccPracticeSquadPlayers().map(fccNormalizePracticePlayer);
+    tbody.innerHTML = rows.length
+      ? rows.map((p) => '<tr>' + fccRosterRowHtml(p, { link: false }) + '</tr>').join('')
+      : '<tr><td colspan="7" style="padding:22px;text-align:center;color:rgba(255,255,255,.4)">No practice-squad players.</td></tr>';
+    updateFccRosterCounts();
+    if (typeof initAttributeTooltips !== 'undefined') {
+      initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
+    }
+  } else {
+    sortRosterTable(FCC_ROSTER_STATE.sortKey, FCC_ROSTER_STATE.sortDir);
+    updateFccRosterCounts();
   }
 }
 
@@ -2811,7 +2976,7 @@ function renderTeam(data) {
   if (!tbody) {
     return;
   }
-  tbody.innerHTML = '';
+  if (tbody) tbody.innerHTML = '';
   let players = (data.players || []).map(p => {
     try {
       const best = getBestPosition(p.position_ratings || {});
@@ -2845,114 +3010,43 @@ function renderTeam(data) {
   players.forEach((p, index) => {
     const tr = document.createElement('tr');
     
-    // Create player name as clickable link
-    const nameTd = document.createElement("td");
-    const nameLink = document.createElement("a");
-    nameLink.href = buildPlayerDetailUrl(p._id);
-    nameLink.textContent =
-      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
-    nameLink.style.color = 'inherit';
-    nameLink.style.textDecoration = 'none';
-    nameLink.addEventListener('mouseenter', () => {
-      nameLink.style.textDecoration = 'underline';
-    });
-    nameLink.addEventListener('mouseleave', () => {
-      nameLink.style.textDecoration = 'none';
-    });
-    nameTd.appendChild(nameLink);
-    if (p.has_playing_time_promise) {
-      const ptp = document.createElement('span');
-      ptp.textContent = ' (PTP)';
-      ptp.style.color = '#bb2f35';
-      ptp.style.fontWeight = '700';
-      nameTd.appendChild(ptp);
-    }
-    if (p.is_graduating) {
-      const gr = document.createElement('span');
-      gr.textContent = ' (GR)';
-      gr.style.color = '#2f8f46';
-      gr.style.fontWeight = '700';
-      nameTd.appendChild(gr);
-    }
-    if (p.walk_on) {
-      const wo = document.createElement('span');
-      wo.textContent = ' (walk on)';
-      wo.style.color = '#8a93a6';
-      wo.style.fontWeight = '700';
-      nameTd.appendChild(wo);
-    }
-    tr.appendChild(nameTd);
-
-    // Add other columns directly as DOM elements
-    const addCell = (content, extraClass) => {
-      const td = document.createElement('td');
-      td.textContent = content;
-      if (extraClass) td.className = extraClass;
-      tr.appendChild(td);
-      return td;
-    };
-
-    addCell(p.pos);
-    addCell(p.year);
-    addCell(p.height);
-    addCell(p.weight);
-
-    // One cell of attribute tiles, replacing the 12 numeric columns. Shared builder, so
-    // this matches the Recruits screen, the Recruits tab and team-roster-view exactly.
-    const attrTd = document.createElement('td');
-    attrTd.className = 'attr-tiles-cell';
-    attrTd.innerHTML = window.GOB_AttrTiles.tilesHtml(p.attributes || {});
-    tr.appendChild(attrTd);
-    // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
-    // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
-    // projected ceiling; header stays "RT", color stays by current rating. This runs in both
-    // Roster-tab render paths (initial renderTeam + post-sort re-render).
-    const rtCell = addCell(
-      formatRtWithPotentialDisplay(p.rt, p.potential_rt_ratcheted),
-      typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
-    );
-    rtCell.setAttribute('data-tooltip', 'current/potential');
-    rtCell.setAttribute('title', 'current/potential');
-
+    // Shared row builder — same markup as the post-sort and scope-switch paths.
+    tr.innerHTML = fccRosterRowHtml(p);
     tbody.appendChild(tr);
   });
+  renderFccRosterAttrHeader();
+  bindFccRosterScope();
 
-  // Initialize tooltips. Scope to the parent table so the SC/SH/ID/… column
-  // headers also get tooltips, not only the cells under them.
+  // Initialize tooltips. Scoped to the parent table so the grouped header's sort
+  // controls and every tile get their hover copy.
   if (typeof initAttributeTooltips !== 'undefined') {
     initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
   }
 
-  // Practice Squad (+ Recruits after Week 35) rendered below the active roster.
+  // Practice squad is now a scope of THIS table (see bindFccRosterScope), not a second
+  // stacked table. renderPracticeSquad still populates the Player Stats tab's PS stats.
   renderPracticeSquad(data);
 
-  // Add click handlers to sortable headers
-  const sortableHeaders = document.querySelectorAll('#roster-tab .roster-table thead th');
+  // Sort bindings. KEY-based, not index-based: the 12 attribute columns collapsed into
+  // one cell, so an index lookup mapped clicks to the wrong column (Attributes -> SC).
+  const sortableHeaders = document.querySelectorAll('#roster-tab .roster-table thead th[data-sort-col]');
   let rosterSortColumn = 'RT';
   let rosterSortDirection = 'desc';
-  
-  sortableHeaders.forEach((header, index) => {
+
+  sortableHeaders.forEach((header) => {
     // Remove existing listeners
     const newHeader = header.cloneNode(true);
     header.parentNode.replaceChild(newHeader, header);
-    
+
     newHeader.style.cursor = 'pointer';
     newHeader.style.userSelect = 'none';
     newHeader.addEventListener('click', () => {
-      const columnNames = ['Name', 'POS', 'Year', 'Height', 'Weight', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT', 'RT'];
-      const columnName = columnNames[index];
-      
-      // Toggle sort direction if clicking the same column
-      if (rosterSortColumn === columnName) {
-        rosterSortDirection = rosterSortDirection === 'desc' ? 'asc' : 'desc';
-      } else {
-        rosterSortColumn = columnName;
-        rosterSortDirection = 'desc';
-      }
-      
-      sortRosterTable(columnName, rosterSortDirection);
+      // Name sorts A->Z first; everything else high->low first.
+      const columnName = newHeader.dataset.sortCol;
+      fccRosterSortBy(columnName, columnName === 'Name' ? 'asc' : 'desc');
     });
   });
+  void rosterSortColumn; void rosterSortDirection;
   renderPlayerStatsTable(data.players || []);
   void renderHomeTab();
 }
@@ -2984,7 +3078,7 @@ function renderPlayerStatsTable(players) {
     }
 
   function renderRows(rows) {
-    tbody.innerHTML = '';
+    if (tbody) tbody.innerHTML = '';
     rows.forEach((entry) => {
       const stats = entry.stats || {};
       const tpm = stats['3PTM'] || 0;
@@ -3136,76 +3230,11 @@ function sortRosterTable(columnName, direction) {
   });
   
   // Re-render the table
-  tbody.innerHTML = '';
-  rosterTableDataForSorting.forEach((p, index) => {
+  if (tbody) tbody.innerHTML = '';
+rosterTableDataForSorting.forEach((p) => {
     const tr = document.createElement('tr');
-    
-    const nameTd = document.createElement("td");
-    const nameLink = document.createElement("a");
-    nameLink.href = buildPlayerDetailUrl(p._id);
-    nameLink.textContent =
-      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
-    nameLink.style.color = 'inherit';
-    nameLink.style.textDecoration = 'none';
-    nameLink.addEventListener('mouseenter', () => {
-      nameLink.style.textDecoration = 'underline';
-    });
-    nameLink.addEventListener('mouseleave', () => {
-      nameLink.style.textDecoration = 'none';
-    });
-    nameTd.appendChild(nameLink);
-    if (p.has_playing_time_promise) {
-      const ptp = document.createElement('span');
-      ptp.textContent = ' (PTP)';
-      ptp.style.color = '#bb2f35';
-      ptp.style.fontWeight = '700';
-      nameTd.appendChild(ptp);
-    }
-    if (p.is_graduating) {
-      const gr = document.createElement('span');
-      gr.textContent = ' (GR)';
-      gr.style.color = '#2f8f46';
-      gr.style.fontWeight = '700';
-      nameTd.appendChild(gr);
-    }
-    if (p.walk_on) {
-      const wo = document.createElement('span');
-      wo.textContent = ' (walk on)';
-      wo.style.color = '#8a93a6';
-      wo.style.fontWeight = '700';
-      nameTd.appendChild(wo);
-    }
-    tr.appendChild(nameTd);
-
-    const addCell = (content, extraClass) => {
-      const td = document.createElement('td');
-      td.textContent = content;
-      if (extraClass) td.className = extraClass;
-      tr.appendChild(td);
-      return td;
-    };
-
-    addCell(p.pos);
-    addCell(p.year);
-    addCell(p.height);
-    addCell(p.weight);
-
-    // Same tiles on the post-sort re-render; otherwise sorting drops back to numbers.
-    const sortedAttrTd = document.createElement('td');
-    sortedAttrTd.className = 'attr-tiles-cell';
-    sortedAttrTd.innerHTML = window.GOB_AttrTiles.tilesHtml(p.attributes || {});
-    tr.appendChild(sortedAttrTd);
-    // RT colored per canonical Attribute Bar Scale (see /css/rt-buckets.css).
-    // Potential Rating (§Phase 4): current/potential (e.g. C/B) when the backend supplied a
-    // projected ceiling; header stays "RT", color stays by current rating. This runs in both
-    // Roster-tab render paths (initial renderTeam + post-sort re-render).
-    const rtCell = addCell(
-      formatRtWithPotentialDisplay(p.rt, p.potential_rt_ratcheted),
-      typeof window.getRtBucketClass === 'function' ? window.getRtBucketClass(p.rt) : ''
-    );
-    rtCell.setAttribute('data-tooltip', 'current/potential');
-    rtCell.setAttribute('title', 'current/potential');
-
+    // Shared row builder — identical markup to first paint and the scope switch.
+    tr.innerHTML = fccRosterRowHtml(p);
     tbody.appendChild(tr);
   });
 
@@ -3241,7 +3270,7 @@ function renderTeamTraits(data, scope) {
   // Render main table
   const tbody = document.getElementById('team-traits-body');
   if (!tbody) return;
-  tbody.innerHTML = '';
+  if (tbody) tbody.innerHTML = '';
   
   // Sort by default (total descending)
   sortTeamTraitsTable(teamTraitsSortColumn, teamTraitsSortDirection);
@@ -3313,7 +3342,7 @@ function sortTeamTraitsTable(columnName, direction) {
   });
   
   // Render sorted table
-  tbody.innerHTML = '';
+  if (tbody) tbody.innerHTML = '';
   teamTraitsDataForSorting.forEach(team => {
     const tr = document.createElement('tr');
     const attrs = team.attributes || {};

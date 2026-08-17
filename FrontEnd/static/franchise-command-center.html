@@ -153,40 +153,30 @@
         </div>
       </div>
       <div id="roster-tab" class="tab-content">
+        <!-- Scope toggle replaces the old stacked practice-squad table: one table, two
+             scopes. aria-pressed carries the state, so it isn't conveyed by colour alone. -->
+        <div class="attr-toolbar">
+          <button type="button" class="scope-btn" data-roster-scope="varsity" aria-pressed="true">Varsity<span class="n" data-scope-count="varsity">0</span></button>
+          <button type="button" class="scope-btn" data-roster-scope="practice" aria-pressed="false">Practice Squad<span class="n" data-scope-count="practice">0</span></button>
+          <span class="attr-rowcount" id="roster-rowcount"></span>
+        </div>
         <section class="fcc-data-card">
           <div class="fcc-data-card-body scroll-x">
             <table class="roster-table">
               <thead>
                 <tr>
-                  <th>Name</th>
-                  <th>POS</th>
-                  <th>Year</th>
-                  <th>Height</th>
-                  <th>Weight</th>
-                  <th class="attr-tiles-head">Attributes</th>
-                  <th data-tooltip="current/potential">RT</th>
+                  <th class="c-ident" data-sort-col="Name">Player</th>
+                  <th class="c-rt" data-sort-col="RT">RT<span class="rt-caption">cur &rarr; pot</span></th>
+                  <th data-sort-col="POS">POS</th>
+                  <th data-sort-col="Year">YR</th>
+                  <th data-sort-col="Height">HT</th>
+                  <th data-sort-col="Weight">WT</th>
+                  <!-- Grouped 2-row header (pair labels + per-attribute sort controls) is a
+                       CSS grid inside this one cell, so it sticks as a single unit. -->
+                  <th class="attr-tiles-head" id="fcc-roster-attr-head"></th>
                 </tr>
               </thead>
               <tbody id="team-body"></tbody>
-            </table>
-          </div>
-        </section>
-        <section class="fcc-data-card" id="training-squad-section" style="display:none; margin-top:16px;">
-          <div class="fcc-data-card-body scroll-x">
-            <h3 id="ps-section-title" class="fcc-practice-squad-title">Practice Squad</h3>
-            <table class="roster-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>POS</th>
-                  <th>Year</th>
-                  <th>Height</th>
-                  <th>Weight</th>
-                  <th class="attr-tiles-head">Attributes</th>
-                  <th data-tooltip="current/potential">RT</th>
-                </tr>
-              </thead>
-              <tbody id="training-squad-body"></tbody>
             </table>
           </div>
         </section>
