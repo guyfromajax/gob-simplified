@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GOB · Invite Board — Recruiting Hub (Weeks 20–26)</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d14; --panel:rgba(14,16,24,.96); --panel-2:rgba(20,23,33,.96);
+  --surf:rgba(255,255,255,.028); --surf-2:rgba(255,255,255,.05);
+  --border:rgba(255,255,255,.09); --border-soft:rgba(255,255,255,.06); --hair:rgba(255,255,255,.07);
+  --text:#f4f5f8; --muted:rgba(255,255,255,.62); --muted-2:rgba(255,255,255,.4); --muted-3:rgba(255,255,255,.24);
+  --navy:#27408E; --lblue:#4A90D9; --orange:#F79420; --gold:#FFD700; --green:#34EC27; --red:#ff6d6d;
+  --you:#34EC27; --you-soft:rgba(52,236,39,.14); --you-line:rgba(52,236,39,.42);
+  --list:#f2c14e; --list-soft:rgba(242,193,78,.13); --list-line:rgba(242,193,78,.4);
+  --amber:#f3a73c; --amber-line:rgba(243,167,60,.38);
+  --display:'Bebas Neue',sans-serif; --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);-webkit-font-smoothing:antialiased}
+.doc{max-width:1400px;margin:0 auto;padding:30px 28px 90px}
+.mock{display:flex;align-items:center;gap:14px;border:1px dashed var(--muted-3);border-radius:10px;padding:10px 16px;margin-bottom:24px;background:rgba(255,255,255,.02)}
+.mock b{font:700 10px/1 var(--body);letter-spacing:.18em;text-transform:uppercase;color:var(--orange)}
+.mock span{font-size:12px;color:var(--muted-2)}
+
+/* phase strip */
+.pstrip{display:flex;align-items:stretch;border:1px solid var(--border);border-radius:13px;overflow:hidden;background:var(--panel-2);margin-bottom:16px}
+.pstrip-status{display:flex;align-items:center;gap:14px;padding:12px 18px}
+.pdot{width:11px;height:11px;border-radius:50%;position:relative;background:var(--green)}
+.pdot::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:1px solid var(--green);animation:pp 1.8s ease-out infinite}
+@keyframes pp{0%{transform:scale(.7);opacity:.8}100%{transform:scale(1.9);opacity:0}}
+.pwk{font:400 26px/1 var(--display);letter-spacing:.03em}
+.pmeta{display:flex;flex-direction:column;gap:2px}
+.pname{font:400 20px/1 var(--display);letter-spacing:.03em;color:var(--green)}
+.psub{font-size:11.5px;color:var(--muted-2)} .psub b{color:var(--muted);font-weight:600}
+.paction{margin-left:auto;display:flex;align-items:center;gap:18px;padding:12px 16px 12px 20px}
+.pcount{text-align:right}
+.pcount .n{font:400 30px/1 var(--display)} .pcount .n b{color:var(--orange);font-weight:400}
+.pcount .n i{color:var(--muted-2);font-style:normal;font-size:20px}
+.pcount .cap{font:700 9px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3);margin-top:3px}
+.pbtn{appearance:none;height:38px;padding:0 18px;border-radius:9px;border:1px solid rgba(52,236,39,.5);background:linear-gradient(180deg,#49ff37,#34ec27);color:#07101f;font:400 15px/1 var(--display);letter-spacing:.04em;cursor:pointer}
+
+.desk{display:grid;grid-template-columns:minmax(0,1fr) 306px;gap:16px;align-items:start}
+.panel{border:1px solid var(--border);border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.026),transparent 40%),var(--panel);box-shadow:0 20px 48px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.06)}
+.pad{padding:20px 22px 22px}
+.ptitle{font:400 26px/1 var(--display);letter-spacing:.03em;margin:0 0 3px}
+.psubt{font-size:11.5px;color:var(--muted-2);margin:0 0 16px}
+.eyebrow{font:700 9.5px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted-3);margin-bottom:9px}
+
+/* tooltip */
+.tt{position:relative;cursor:help}
+.tt::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:#11131b;border:1px solid var(--border);border-radius:7px;padding:7px 10px;font:500 11px/1.45 var(--body);
+  color:var(--text);width:max-content;max-width:230px;text-align:left;letter-spacing:0;text-transform:none;
+  opacity:0;pointer-events:none;transition:opacity .13s;box-shadow:0 10px 26px rgba(0,0,0,.55);z-index:40}
+.tt:hover::after{opacity:1}
+
+/* ---------- invite dock ---------- */
+.dock{display:grid;grid-template-columns:74px minmax(0,1fr) auto;gap:18px;align-items:center;
+  border:1px solid var(--you-line);border-radius:14px;background:linear-gradient(120deg,rgba(52,236,39,.07),transparent 55%),var(--surf);padding:16px 18px}
+.dportrait svg{width:56px;height:56px;opacity:.55}
+.dportrait{width:74px;height:74px;border-radius:11px;overflow:hidden;background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(255,255,255,.02));
+  border:1px solid var(--border);display:flex;align-items:flex-end;justify-content:center;font:400 26px/1 var(--display);color:var(--muted-3)}
+.dname{font:400 30px/1 var(--display);letter-spacing:.02em}
+.dmeta{font-size:12px;color:var(--muted-2);margin-top:5px}
+.dmeta b{color:var(--muted);font-weight:600}
+.dwhy{font-size:12px;color:#a9ff9c;margin-top:7px}
+.dright{text-align:right}
+.dright .rt{font:400 34px/1 var(--display)}
+.dright .cap{font:700 9px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3);margin-top:5px}
+
+/* ---------- board rows ---------- */
+.brows{border:1px solid var(--border);border-radius:13px;overflow:visible;margin-top:6px}
+.brow{display:grid;grid-template-columns:32px minmax(176px,1.25fr) 36px 32px 78px 194px minmax(122px,.92fr) 28px;
+  align-items:center;height:56px;padding:0 14px;border-bottom:1px solid var(--hair);background:var(--surf);font-size:12.5px}
+.brow:first-child{border-radius:12px 12px 0 0}
+.brow:last-child{border-bottom:0;border-radius:0 0 12px 12px}
+.bhdr{background:rgba(255,255,255,.045);height:34px;font:700 9px/1 var(--body);letter-spacing:.13em;text-transform:uppercase;color:var(--muted-3)}
+.brow.moved{background:linear-gradient(90deg,rgba(255,109,109,.09),transparent 60%)}
+.brow.gained{background:linear-gradient(90deg,rgba(52,236,39,.07),transparent 60%)}
+.rank{display:flex;align-items:center;gap:7px;color:var(--muted-3)}
+.rank .num{font:400 18px/1 var(--display);color:var(--muted)}
+.grip{width:9px;height:14px;background:
+  radial-gradient(circle,var(--muted-3) 1px,transparent 1px) 0 0/4.5px 4.5px;opacity:.7;cursor:grab}
+.bname{display:flex;align-items:center;gap:10px;min-width:0}
+.bav{width:40px;height:40px;border-radius:8px;flex:0 0 auto;overflow:hidden;border:1px solid var(--border);
+  background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02));display:flex;align-items:flex-end;justify-content:center}
+.bav svg{width:30px;height:30px;opacity:.5}
+.bav.unseen{opacity:.55;filter:grayscale(.5)}
+.btxt{min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.btxt small{display:block;font:500 10.5px/1.3 var(--body);color:var(--muted-2)}
+.btxt a{color:var(--text);text-decoration:none;border-bottom:1px solid transparent}
+.btxt a:hover{border-bottom-color:var(--muted-3)}
+.bc{text-align:center;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.bc.dim{color:var(--muted-2);font-size:11px}
+.rt{display:flex;align-items:baseline;gap:4px}
+.rt .g,.rt .p{font:400 23px/1 var(--display)}
+.rt .sep{font:400 15px/1 var(--display);color:var(--muted-3)}
+.g.c,.p.c{color:var(--gold)} .g.b,.p.b{color:var(--green)} .g.a,.p.a{color:var(--lblue)} .g.f,.p.f{color:var(--red)}
+.stars{font-size:12.5px;letter-spacing:1.5px;color:var(--muted-3)} .stars b{color:var(--gold);font-weight:400}
+
+/* lean ladder */
+.ladder{display:flex;align-items:center;gap:4px;flex-wrap:nowrap}
+.slot{display:inline-flex;align-items:center;justify-content:center;height:23px;min-width:40px;padding:0 6px;border-radius:5px;
+  font:700 9.5px/1 var(--body);letter-spacing:.04em;color:var(--muted);background:rgba(255,255,255,.06);border:1px solid var(--border-soft)}
+.slot.you{color:#0c1f0a;background:var(--you);border-color:transparent;font-weight:800}
+.slot.open{color:var(--muted-3);background:transparent;border-style:dashed;border-color:var(--muted-3);font-style:italic}
+.slot .p{font:700 8px/1 var(--body);opacity:.6;margin-right:3px}
+.lock{display:inline-flex;align-items:center;height:23px;padding:0 6px;border-radius:5px;margin-left:3px;flex:0 0 auto;
+  background:rgba(255,109,109,.14);border:1px solid rgba(255,109,109,.4);color:#ff9c9c;font:700 9px/1 var(--body);letter-spacing:.06em}
+
+/* read / motivation */
+.mv{display:flex;align-items:center;gap:8px;min-width:0}
+.mvi{width:22px;height:22px;border-radius:6px;flex:0 0 auto;display:flex;align-items:center;justify-content:center;font:700 12px/1 var(--body)}
+.mvi.up{background:rgba(52,236,39,.16);color:#7cf06f}
+.mvi.dn{background:rgba(255,109,109,.18);color:#ff9c9c}
+.mvt{min-width:0;font:600 11.5px/1.3 var(--body);color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mvt small{display:block;font:500 10px/1.3 var(--body);color:var(--muted-3);font-weight:500}
+.mvt.dn{color:#ffb3b3}
+.quiet{font-size:11.5px;color:var(--muted-3)}
+.xbtn{width:24px;height:24px;border-radius:6px;border:1px solid var(--border);background:var(--surf-2);color:var(--muted-3);
+  font-size:13px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.xbtn:hover{color:#ffa8a8;border-color:rgba(255,109,109,.4)}
+
+/* right rail */
+.wev{display:grid;grid-template-columns:20px minmax(0,1fr);gap:9px;align-items:start;padding:9px 0;border-bottom:1px solid var(--hair);font-size:12px}
+.wev:last-child{border-bottom:0}
+.wico{width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;font:700 11px/1 var(--body)}
+.wico.up{background:rgba(52,236,39,.15);color:#7cf06f}
+.wico.dn{background:rgba(255,109,109,.15);color:#ff9c9c}
+.wtxt{color:var(--muted);line-height:1.45} .wtxt b{color:var(--text);font-weight:600}
+.wtxt em{display:block;font-style:normal;color:var(--muted-3);font-size:10.5px;margin-top:2px}
+.statline{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;font-size:12px;color:var(--muted)}
+.statline .v{font:400 20px/1 var(--display);color:var(--text)}
+.statline .v s{text-decoration:none;color:var(--muted-3);font-size:14px}
+.split{border-top:1px solid var(--hair);margin:16px 0}
+.note{font-size:11px;line-height:1.5;color:var(--muted-2);background:var(--surf);border:1px solid var(--border-soft);
+  border-left:2px solid var(--amber-line);border-radius:0 8px 8px 0;padding:10px 12px;margin-top:14px}
+.needs{display:flex;gap:5px;flex-wrap:wrap;margin-top:3px}
+.need{height:24px;padding:0 9px;border-radius:6px;font:700 10px/1 var(--body);letter-spacing:.05em;display:flex;align-items:center;gap:5px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border-soft);color:var(--muted)}
+.need.hot{background:rgba(243,167,60,.14);border-color:var(--amber-line);color:#ffd7a0}
+@media (prefers-reduced-motion: reduce){*{animation:none!important}}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div class="mock">
+    <b>Mockup v2</b>
+    <span>Recruiting Hub · <strong style="color:var(--muted)">Invite phase body</strong> (weeks 20–26). Current mechanics — no fog, no scout. The board tells you what moved this week and why you'd re-rank.</span>
+  </div>
+
+  <div class="pstrip">
+    <div class="pstrip-status" style="display:flex;align-items:center;gap:14px;padding:12px 18px">
+      <div class="pdot"></div>
+      <div class="pwk">Week 22</div>
+      <div class="pmeta">
+        <div class="pname">Invite</div>
+        <div class="psub">Scout is hosting visits — no scouting until next season. Signing Day is <b>Week 35</b>.</div>
+      </div>
+    </div>
+    <div class="paction">
+      <div class="pcount"><div class="n"><b>3</b><i>/7</i></div><div class="cap">Invites sent</div></div>
+      <button class="pbtn">Send Week 22 Invite →</button>
+    </div>
+  </div>
+
+  <div class="desk">
+    <div>
+      <!-- ===== DOCK ===== -->
+      <div class="panel pad">
+        <h2 class="ptitle">This Week's Invite</h2>
+        <p class="psubt">Top of the board that hasn't already visited. Re-rank to change who goes.</p>
+        <div class="dock">
+          <div class="dportrait" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></div>
+          <div>
+            <div class="dname">Marcus Bell</div>
+            <div class="dmeta">PG · 6'2" · JH · Region C · <b>Floor General</b></div>
+            <div class="dwhy">He moved you to #1 this week and your PG room is thin. This is the invite to protect.</div>
+          </div>
+          <div class="dright">
+            <div class="rt"><span style="color:var(--green)">B</span><span style="color:var(--muted-3);font-size:22px">/</span><span style="color:var(--lblue)">A</span></div>
+            <div class="cap">Current / Potential</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== BOARD ===== -->
+      <div class="panel pad" style="margin-top:16px">
+        <h2 class="ptitle">The Board</h2>
+        <p class="psubt">7 of 20 slots used · ranked order decides who gets each week's invite.</p>
+
+        <div class="brows">
+          <div class="brow bhdr">
+            <div>#</div><div>Recruit</div><div class="bc">Pos</div><div class="bc">Yr</div>
+            <div>RT</div><div>Lean</div><div>This week</div><div></div>
+          </div>
+
+          <div class="brow gained">
+            <div class="rank"><span class="grip"></span><span class="num">1</span></div>
+            <div class="bname"><span class="bav" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="btxt"><a href="#">Marcus Bell</a><small>Floor General · Region C</small></span></div>
+            <div class="bc">PG</div><div class="bc dim">JH</div>
+            <div class="rt tt" data-tooltip="Current / Potential"><span class="g b">B</span><span class="sep">/</span><span class="p a">A</span></div>
+            <div class="ladder"><span class="slot you"><span class="p">1</span>YOU</span><span class="slot"><span class="p">2</span>FRV</span><span class="slot open"><span class="p">3</span>open</span></div>
+            <div class="mv"><span class="mvi up">↑</span><span class="mvt">Moved you to #1<small>after Kettle Falls</small></span></div>
+            <div><button class="xbtn">×</button></div>
+          </div>
+          <div class="brow">
+            <div class="rank"><span class="grip"></span><span class="num">2</span></div>
+            <div class="bname"><span class="bav" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="btxt"><a href="#">Cormac Dwyer</a><small>Two-Way Wing · Region F</small></span></div>
+            <div class="bc">SF</div><div class="bc dim">JH</div>
+            <div class="rt tt" data-tooltip="Current / Potential"><span class="g b">B+</span><span class="sep">/</span><span class="p a">A+</span></div>
+            <div class="ladder"><span class="slot"><span class="p">1</span>FRV</span><span class="slot"><span class="p">2</span>CHB</span><span class="slot you"><span class="p">3</span>YOU</span></div>
+            <div class="mv"><span class="quiet">—</span></div>
+            <div><button class="xbtn">×</button></div>
+          </div>
+          <div class="brow moved">
+            <div class="rank"><span class="grip"></span><span class="num">3</span></div>
+            <div class="bname"><span class="bav" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="btxt"><a href="#">DeAndre Pope</a><small>Scoring Guard · Region A</small></span></div>
+            <div class="bc">SG</div><div class="bc dim">Fr</div>
+            <div class="rt tt" data-tooltip="Current / Potential"><span class="g b">B</span><span class="sep">/</span><span class="p b">B+</span></div>
+            <div class="ladder"><span class="slot"><span class="p">1</span>FRV</span><span class="slot"><span class="p">2</span>STA</span><span class="slot"><span class="p">3</span>CHB</span></div>
+            <div class="mv"><span class="mvi dn">↓</span><span class="mvt dn">Dropped you<small>Fairview took #1</small></span></div>
+            <div><button class="xbtn">×</button></div>
+          </div>
+          <div class="brow">
+            <div class="rank"><span class="grip"></span><span class="num">4</span></div>
+            <div class="bname"><span class="bav" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="btxt"><a href="#">Andre Whitlock</a><small>Stretch Four · Region A</small></span></div>
+            <div class="bc">PF</div><div class="bc dim">JH</div>
+            <div class="rt tt" data-tooltip="Current / Potential"><span class="g c">C+</span><span class="sep">/</span><span class="p b">B</span></div>
+            <div class="ladder"><span class="slot"><span class="p">1</span>WLD</span><span class="slot you"><span class="p">2</span>YOU</span><span class="slot open"><span class="p">3</span>open</span></div>
+            <div class="mv"><span class="quiet">—</span></div>
+            <div><button class="xbtn">×</button></div>
+          </div>
+          <div class="brow">
+            <div class="rank"><span class="grip"></span><span class="num">5</span></div>
+            <div class="bname"><span class="bav" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="btxt"><a href="#">Isaiah Mbeki</a><small>Rim Protector · Region D</small></span></div>
+            <div class="bc">C</div><div class="bc dim">JH</div>
+            <div class="rt tt" data-tooltip="Current / Potential"><span class="g b">B</span><span class="sep">/</span><span class="p a">A+</span></div>
+            <div class="ladder"><span class="slot"><span class="p">1</span>CHB</span><span class="slot open"><span class="p">2</span>open</span><span class="slot open"><span class="p">3</span>open</span></div>
+            <div class="mv"><span class="quiet">—</span></div>
+            <div><button class="xbtn">×</button></div>
+          </div>
+          <div class="brow gained">
+            <div class="rank"><span class="grip"></span><span class="num">6</span></div>
+            <div class="bname"><span class="bav" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="btxt"><a href="#">Sam Oyelaran</a><small>Rim Runner · Region A</small></span></div>
+            <div class="bc">C</div><div class="bc dim">Fr</div>
+            <div class="rt tt" data-tooltip="Current / Potential"><span class="g c">C</span><span class="sep">/</span><span class="p b">B</span></div>
+            <div class="ladder"><span class="slot you"><span class="p">1</span>YOU</span><span class="slot"><span class="p">2</span>WLD</span><span class="slot open"><span class="p">3</span>open</span></div>
+            <div class="mv"><span class="mvi up">↑</span><span class="mvt">Moved you to #1<small>after Kettle Falls</small></span></div>
+            <div><button class="xbtn">×</button></div>
+          </div>
+          <div class="brow">
+            <div class="rank"><span class="grip"></span><span class="num">7</span></div>
+            <div class="bname"><span class="bav" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="btxt"><a href="#">Jalen Ruiz</a><small>Slasher · Region A</small></span></div>
+            <div class="bc">SF</div><div class="bc dim">So</div>
+            <div class="rt tt" data-tooltip="Current / Potential"><span class="g c">C</span><span class="sep">/</span><span class="p c">C+</span></div>
+            <div class="ladder"><span class="slot open"><span class="p">1</span>open</span><span class="slot open"><span class="p">2</span>open</span><span class="slot open"><span class="p">3</span>open</span></div>
+            <div class="mv"><span class="quiet">—</span></div>
+            <div><button class="xbtn">×</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== RIGHT RAIL ===== -->
+    <div>
+      <div class="panel pad">
+        <div class="eyebrow" style="color:#ffd7a0">2 changes affect your board</div>
+        <div class="wev">
+          <div class="wico dn">↓</div>
+          <div class="wtxt"><b>DeAndre Pope</b> dropped you<em>Fairview #1 · you were #3 · board rank 3</em></div>
+        </div>
+        <div class="wev">
+          <div class="wico up">↑</div>
+          <div class="wtxt"><b>Sam Oyelaran</b> moved you to #1<em>after the Kettle Falls win · board rank 6</em></div>
+        </div>
+        <div class="note">You gained two #1 leans and lost one. <strong style="color:var(--muted)">Your board order is now wrong</strong> — Pope is sitting at rank 3 and no longer has you on his ladder.</div>
+      </div>
+
+      <div class="panel pad" style="margin-top:16px">
+        <div class="eyebrow">Roster needs</div>
+        <div class="needs">
+          <span class="need hot">PG · 1 left</span>
+          <span class="need hot">C · 1 left</span>
+          <span class="need">SF · 3</span>
+          <span class="need">SG · 3</span>
+          <span class="need">PF · 4</span>
+        </div>
+        <div class="split"></div>
+        <div class="statline"><span>Roster spots open</span><span class="v">4<s>/15</s></span></div>
+        <div class="statline"><span>Board slots used</span><span class="v">7<s>/20</s></span></div>
+        <div class="statline"><span>Invites remaining</span><span class="v">4<s>/7</s></span></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>

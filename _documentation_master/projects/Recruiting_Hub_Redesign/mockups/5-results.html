@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>GOB · Signing Results — Recruiting Hub (Week 36)</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d14; --panel:rgba(14,16,24,.96); --panel-2:rgba(20,23,33,.96);
+  --surf:rgba(255,255,255,.028); --surf-2:rgba(255,255,255,.05);
+  --border:rgba(255,255,255,.09); --border-soft:rgba(255,255,255,.06); --hair:rgba(255,255,255,.07);
+  --text:#f4f5f8; --muted:rgba(255,255,255,.62); --muted-2:rgba(255,255,255,.4); --muted-3:rgba(255,255,255,.24);
+  --navy:#27408E; --lblue:#4A90D9; --orange:#F79420; --gold:#FFD700; --green:#34EC27; --red:#ff6d6d;
+  --you:#34EC27; --you-soft:rgba(52,236,39,.14); --you-line:rgba(52,236,39,.42);
+  --amber:#f3a73c; --amber-line:rgba(243,167,60,.38);
+  --display:'Bebas Neue',sans-serif; --body:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:var(--body);-webkit-font-smoothing:antialiased}
+.doc{max-width:1400px;margin:0 auto;padding:30px 28px 90px}
+.mock{display:flex;align-items:flex-start;gap:14px;border:1px dashed var(--muted-3);border-radius:10px;padding:11px 16px;margin-bottom:24px;background:rgba(255,255,255,.02)}
+.mock b{font:700 10px/1.5 var(--body);letter-spacing:.18em;text-transform:uppercase;color:var(--orange);flex:0 0 auto}
+.mock span{font-size:12px;color:var(--muted-2);line-height:1.55}
+.sechead{display:flex;align-items:baseline;gap:12px;margin:34px 0 12px}
+.sechead .num{font:400 20px/1 var(--display);color:var(--orange)}
+.sechead h2{font:400 27px/1 var(--display);letter-spacing:.02em;margin:0}
+.sechead p{font-size:12px;color:var(--muted-2);margin:0 0 0 auto;max-width:56ch;text-align:right}
+
+/* phase strip */
+.pstrip{display:flex;align-items:stretch;border:1px solid var(--border);border-radius:13px;overflow:hidden;background:var(--panel-2);margin-bottom:16px}
+.pstrip-status{display:flex;align-items:center;gap:14px;padding:12px 18px}
+.pdot{width:11px;height:11px;border-radius:50%;background:var(--orange)}
+.pwk{font:400 26px/1 var(--display);letter-spacing:.03em}
+.pmeta{display:flex;flex-direction:column;gap:2px}
+.pname{font:400 20px/1 var(--display);letter-spacing:.03em;color:var(--orange)}
+.psub{font-size:11.5px;color:var(--muted-2)} .psub b{color:var(--muted);font-weight:600}
+.paction{margin-left:auto;display:flex;align-items:center;gap:14px;padding:12px 16px 12px 20px}
+.pbtn{appearance:none;height:38px;padding:0 18px;border-radius:9px;border:1px solid rgba(52,236,39,.5);
+  background:linear-gradient(180deg,#49ff37,#34ec27);color:#07101f;font:400 15px/1 var(--display);letter-spacing:.04em;cursor:pointer}
+.pghost{appearance:none;height:38px;padding:0 15px;border-radius:9px;border:1px solid var(--border);background:var(--surf-2);
+  color:var(--muted);font:700 11px/1 var(--body);letter-spacing:.04em;cursor:pointer}
+
+.panel{border:1px solid var(--border);border-radius:18px;background:linear-gradient(160deg,rgba(255,255,255,.026),transparent 40%),var(--panel);box-shadow:0 20px 48px rgba(0,0,0,.4),inset 0 1px 0 rgba(255,255,255,.06)}
+.pad{padding:22px 24px 24px}
+.ptitle{font:400 26px/1 var(--display);letter-spacing:.03em;margin:0 0 3px}
+.psubt{font-size:11.5px;color:var(--muted-2);margin:0 0 18px}
+.eyebrow{font:700 9.5px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;color:var(--muted-3);margin-bottom:10px}
+
+/* ============ PLAYBACK STAGE ============ */
+.stage{position:relative;border:1px solid var(--border);border-radius:16px;overflow:hidden;
+  background:radial-gradient(120% 130% at 50% -10%,rgba(247,148,32,.10),transparent 58%),var(--panel-2);padding:26px 28px 22px}
+.ticker{display:flex;align-items:center;gap:10px;margin-bottom:20px}
+.tick{height:4px;flex:1;border-radius:2px;background:rgba(255,255,255,.08)}
+.tick.done{background:rgba(255,255,255,.24)}
+.tick.won{background:var(--green)}
+.tick.lost{background:rgba(255,109,109,.55)}
+.tick.now{background:var(--orange);box-shadow:0 0 10px rgba(247,148,32,.6)}
+.tickcap{font:700 9px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3);white-space:nowrap}
+
+.reveal{display:grid;grid-template-columns:92px minmax(0,1fr) 250px;gap:22px;align-items:center}
+.rport svg{width:68px;height:68px;opacity:.55}
+.rport{width:92px;height:92px;border-radius:13px;border:1px solid var(--border);overflow:hidden;
+  background:linear-gradient(160deg,rgba(255,255,255,.09),rgba(255,255,255,.02));
+  display:flex;align-items:flex-end;justify-content:center;font:400 30px/1 var(--display);color:var(--muted-3)}
+.rname{font:400 42px/.94 var(--display);letter-spacing:.01em}
+.rmeta{font-size:12.5px;color:var(--muted-2);margin-top:7px}
+.rmeta b{color:var(--muted);font-weight:600}
+.rline{display:flex;align-items:center;gap:9px;margin-top:12px}
+.verdict{display:inline-flex;align-items:center;height:30px;padding:0 13px;border-radius:8px;font:400 19px/1 var(--display);letter-spacing:.04em}
+.verdict.won{background:var(--you);color:#07101f}
+.verdict.lost{background:rgba(255,109,109,.17);border:1px solid rgba(255,109,109,.45);color:#ff9c9c}
+.rto{font-size:13px;color:var(--muted)}
+.rto b{color:var(--text);font-weight:700}
+.rwhy{font-size:12px;color:var(--muted-3);margin-top:9px;line-height:1.5}
+.rwhy em{font-style:normal;color:#ffd7a0}
+
+.rstats{border-left:1px solid var(--hair);padding-left:20px}
+.rsrow{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;font-size:12px;color:var(--muted-2)}
+.rsrow .v{font:400 19px/1 var(--display);color:var(--text)}
+.rsrow .v.g{color:var(--green)} .rsrow .v.b{color:var(--lblue)} .rsrow .v.o{color:var(--orange)}
+.rtpair{display:flex;align-items:baseline;gap:4px}
+.rtpair .g,.rtpair .p{font:400 22px/1 var(--display)}
+.rtpair .sep{font:400 15px/1 var(--display);color:var(--muted-3)}
+
+.stagefoot{display:flex;align-items:center;gap:12px;margin-top:22px;padding-top:16px;border-top:1px solid var(--hair)}
+.sfbtn{appearance:none;height:36px;padding:0 16px;border-radius:8px;border:1px solid var(--border);background:var(--surf-2);
+  color:var(--muted);font:700 11px/1 var(--body);letter-spacing:.04em;cursor:pointer}
+.sfbtn.main{border-color:rgba(247,148,32,.55);background:rgba(247,148,32,.16);color:#ffd7a0}
+.sfnote{margin-left:auto;font-size:11px;color:var(--muted-3)}
+
+/* ============ CLASS SUMMARY ============ */
+.sumgrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:6px}
+.sumcard{border:1px solid var(--border);border-radius:14px;background:var(--surf);padding:16px 17px}
+.sumcard .n{font:400 40px/.9 var(--display)}
+.sumcard .n s{text-decoration:none;font-size:18px;color:var(--muted-3)}
+.sumcard .c{font:700 9px/1.4 var(--body);letter-spacing:.13em;text-transform:uppercase;color:var(--muted-3);margin-top:8px}
+.sumcard.acc .n{color:var(--orange)}
+.sumcard.good .n{color:var(--green)}
+
+.crows{border:1px solid var(--border);border-radius:13px;overflow:visible;margin-top:14px}
+.crow{display:grid;grid-template-columns:minmax(176px,1.2fr) 32px 34px 80px 92px 126px minmax(140px,1fr);
+  align-items:center;height:56px;padding:0 15px;border-bottom:1px solid var(--hair);background:var(--surf);font-size:12.5px}
+.crow:first-child{border-radius:12px 12px 0 0}
+.crow:last-child{border-bottom:0;border-radius:0 0 12px 12px}
+.chdr{background:rgba(255,255,255,.045);height:34px;font:700 9px/1 var(--body);letter-spacing:.13em;text-transform:uppercase;color:var(--muted-3)}
+.crow.won{background:linear-gradient(90deg,rgba(52,236,39,.075),transparent 58%)}
+.crow.lost{background:linear-gradient(90deg,rgba(255,109,109,.07),transparent 58%)}
+.av{width:40px;height:40px;border-radius:8px;flex:0 0 auto;overflow:hidden;border:1px solid var(--border);
+  background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02));display:flex;align-items:flex-end;justify-content:center}
+.av svg{width:30px;height:30px;opacity:.5}
+.cname{display:flex;align-items:center;gap:10px;min-width:0}
+.ctx{min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ctx small{display:block;font:500 10.5px/1.3 var(--body);color:var(--muted-2)}
+.ctx a{color:var(--text);text-decoration:none;border-bottom:1px solid transparent}
+.ctx a:hover{border-bottom-color:var(--muted-3)}
+.cc{text-align:center;font-weight:700;color:var(--muted);letter-spacing:.04em}
+.cc.dim{color:var(--muted-2);font-size:11px}
+.g.c,.p.c{color:var(--gold)} .g.b,.p.b{color:var(--green)} .g.a,.p.a{color:var(--lblue)}
+.stars{font-size:12px;letter-spacing:1.5px;color:var(--muted-3)} .stars b{color:var(--gold);font-weight:400}
+.pill{display:inline-flex;align-items:center;height:24px;padding:0 10px;border-radius:6px;font:700 10px/1 var(--body);letter-spacing:.06em}
+.pill.won{background:var(--you);color:#07101f}
+.pill.lost{background:rgba(255,109,109,.15);border:1px solid rgba(255,109,109,.4);color:#ff9c9c}
+.cnote{font:500 11px/1.4 var(--body);color:var(--muted-2)}
+.cnote b{color:var(--text);font-weight:600}
+.cnote.dim{color:var(--muted-3);font-style:italic}
+
+.tt{position:relative;cursor:help}
+.tt::after{content:attr(data-tooltip);position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);
+  background:#11131b;border:1px solid var(--border);border-radius:7px;padding:7px 10px;font:500 11px/1.45 var(--body);
+  color:var(--text);width:max-content;max-width:250px;text-align:left;letter-spacing:0;text-transform:none;font-weight:500;
+  opacity:0;pointer-events:none;transition:opacity .13s;box-shadow:0 10px 26px rgba(0,0,0,.55);z-index:40}
+.tt:hover::after{opacity:1}
+.tt.forced::after{opacity:1}
+.note{font-size:11.5px;line-height:1.55;color:var(--muted-2);background:var(--surf);border:1px solid var(--border-soft);
+  border-left:2px solid var(--amber-line);border-radius:0 8px 8px 0;padding:11px 13px;margin-top:16px}
+</style>
+</head>
+<body>
+<div class="doc">
+
+  <div class="mock">
+    <b>Mockup v2</b>
+    <span>Recruiting Hub · <strong style="color:var(--muted)">Results</strong> (week 36). Batch resolution stays exactly as it is — this is a <strong style="color:var(--muted)">playback</strong> of a sequence that already happens recruit-by-recruit in RT order. No new engine.</span>
+  </div>
+
+  <div class="pstrip">
+    <div class="pstrip-status">
+      <div class="pdot"></div>
+      <div class="pwk">Week 36</div>
+      <div class="pmeta">
+        <div class="pname">Signing Results</div>
+        <div class="psub">Class of Season 3 · <b>4 of 11</b> revealed</div>
+      </div>
+    </div>
+    <div class="paction">
+      <button class="pghost">Skip to summary</button>
+      <button class="pbtn">Continue →</button>
+    </div>
+  </div>
+
+  <!-- ============ 01 · PLAYBACK ============ -->
+  <div class="sechead"><span class="num">01</span><h2>The Reveal</h2>
+    <p>One recruit at a time, in signing order. The screen you actually watch.</p></div>
+
+  <div class="stage">
+    <div class="ticker">
+      <span class="tickcap">4 / 11</span>
+      <span class="tick won"></span><span class="tick lost"></span><span class="tick won"></span>
+      <span class="tick now"></span>
+      <span class="tick"></span><span class="tick"></span><span class="tick"></span>
+      <span class="tick"></span><span class="tick"></span><span class="tick"></span><span class="tick"></span>
+    </div>
+
+    <div class="reveal">
+      <div class="rport" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></div>
+      <div>
+        <div class="rname">Marcus Bell</div>
+        <div class="rmeta">PG · 6'2" · JH · Region C · <b>16 points · Starter promised</b></div>
+        <div class="rline">
+          <span class="verdict won">Signed</span>
+          <span class="rto">with <b>Ridgeline State</b> — over Fairview</span>
+        </div>
+        <div class="rwhy">You were his <em>#1 lean (×5)</em> since week 22, and only two programs funded him.</div>
+      </div>
+      <div class="rstats">
+        <div class="rsrow"><span>RT</span>
+          <span class="rtpair"><span class="g b">B</span><span class="sep">/</span><span class="p a">A</span></span></div>
+        <div class="rsrow"><span>Points</span><span class="v o">16</span></div>
+        <div class="rsrow"><span>Your standing</span><span class="v g">#1 ×5</span></div>
+        <div class="rsrow"><span>Field</span><span class="v">2 programs</span></div>
+      </div>
+    </div>
+
+    <div class="stagefoot">
+      <button class="sfbtn main">Next recruit →</button>
+      <button class="sfbtn">Auto-play</button>
+      <button class="sfbtn">Skip all</button>
+      <span class="sfnote">Seven still to come · 3 of your 7 funded recruits resolved</span>
+    </div>
+  </div>
+
+  <!-- ============ 02 · CLASS SUMMARY ============ -->
+  <div class="sechead"><span class="num">02</span><h2>Class Summary</h2>
+    <p>After the sequence. Every recruit you funded — won or lost — with why.</p></div>
+
+  <div class="sumgrid">
+    <div class="sumcard good"><div class="n">3<s>/7</s></div><div class="c">Signed</div></div>
+    <div class="sumcard"><div class="n">B<s>avg RT</s></div><div class="c">Class rating</div></div>
+    <div class="sumcard acc"><div class="n">31<s>/50</s></div><div class="c">Points spent</div></div>
+    <div class="sumcard"><div class="n">1<s>/15</s></div><div class="c">Roster spot left</div></div>
+  </div>
+
+  <div class="crows">
+    <div class="crow chdr">
+      <div>Recruit</div><div class="cc">Pos</div><div class="cc">Yr</div><div>RT</div>
+      <div>Result</div><div>Signed with</div><div>Why</div>
+    </div>
+
+    <div class="crow won">
+      <div class="cname"><span class="av" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="ctx"><a href="#">Marcus Bell</a><small>Region C · 16 pts</small></span></div>
+      <div class="cc">PG</div><div class="cc dim">JH</div>
+      <div class="rtpair tt" data-tooltip="Current / Potential"><span class="g b">B</span><span class="sep">/</span><span class="p a">A</span></div>
+      <div><span class="pill won">Signed</span></div>
+      <div class="cnote"><b>Ridgeline State</b></div>
+      <div class="cnote">#1 lean ×5 · only 2 programs funding</div>
+    </div>
+
+    <div class="crow won">
+      <div class="cname"><span class="av" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="ctx"><a href="#">Sam Oyelaran</a><small>Region A · 10 pts</small></span></div>
+      <div class="cc">C</div><div class="cc dim">Fr</div>
+      <div class="rtpair tt" data-tooltip="Current / Potential"><span class="g c">C</span><span class="sep">/</span><span class="p b">B</span></div>
+      <div><span class="pill won">Signed</span></div>
+      <div class="cnote"><b>Ridgeline State</b></div>
+      <div class="cnote">#1 lean ×5 · 3 programs funding</div>
+    </div>
+
+    <div class="crow lost">
+      <div class="cname"><span class="av" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="ctx"><a href="#">Andre Whitlock</a><small>Region A · 5 pts</small></span></div>
+      <div class="cc">PF</div><div class="cc dim">JH</div>
+      <div class="rtpair tt" data-tooltip="Current / Potential"><span class="g c">C+</span><span class="sep">/</span><span class="p b">B</span></div>
+      <div><span class="pill lost">Lost</span></div>
+      <div class="cnote"><b>Wildmoor</b></div>
+      <div class="cnote">6 programs funding · 5 points didn't carry</div>
+    </div>
+
+    <div class="crow won">
+      <div class="cname"><span class="av" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="ctx"><a href="#">Jalen Ruiz</a><small>Region A · 0 pts</small></span></div>
+      <div class="cc">SF</div><div class="cc dim">So</div>
+      <div class="rtpair tt" data-tooltip="Current / Potential"><span class="g c">C</span><span class="sep">/</span><span class="p c">C+</span></div>
+      <div><span class="pill won">Signed</span></div>
+      <div class="cnote"><b>Ridgeline State</b></div>
+      <div class="cnote">Uncontested — nobody else boarded him</div>
+    </div>
+
+    <div class="crow lost">
+      <div class="cname"><span class="av" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="ctx"><a href="#">Cormac Dwyer</a><small>Region F · 0 pts</small></span></div>
+      <div class="cc">SF</div><div class="cc dim">JH</div>
+      <div class="rtpair tt" data-tooltip="Current / Potential"><span class="g b">B+</span><span class="sep">/</span><span class="p a">A+</span></div>
+      <div><span class="pill lost">Lost</span></div>
+      <div class="cnote"><b>Fairview</b></div>
+      <div class="cnote">#3 at ×2 · 8 programs funding</div>
+    </div>
+
+    <div class="crow lost">
+      <div class="cname"><span class="av" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="ctx"><a href="#">DeAndre Pope</a><small>Region A · 0 pts</small></span></div>
+      <div class="cc">SG</div><div class="cc dim">Fr</div>
+      <div class="rtpair tt" data-tooltip="Current / Potential"><span class="g b">B</span><span class="sep">/</span><span class="p b">B+</span></div>
+      <div><span class="pill lost">Lost</span></div>
+      <div class="cnote"><b>Fairview</b></div>
+      <div class="cnote">Dropped you week 22 · unfunded</div>
+    </div>
+
+    <div class="crow lost">
+      <div class="cname"><span class="av" style="color:var(--muted-2)"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="8" r="4.2" fill="currentColor"/><path d="M3.6 24c0-4.9 3.8-8.6 8.4-8.6s8.4 3.7 8.4 8.6z" fill="currentColor"/></svg></span><span class="ctx"><a href="#">Isaiah Mbeki</a><small>Region D · 0 pts</small></span></div>
+      <div class="cc">C</div><div class="cc dim">JH</div>
+      <div class="rtpair tt" data-tooltip="Current / Potential"><span class="g b">B</span><span class="sep">/</span><span class="p a">A+</span></div>
+      <div><span class="pill lost">Lost</span></div>
+      <div class="cnote"><b>Cross Harbor</b></div>
+      <div class="cnote dim">Never on his ladder · unfunded</div>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong style="color:var(--muted)">Every row explains itself.</strong> The old screen gave you position, region, RT and a team name. This one closes the loop: what you spent, where you stood on his ladder, and how many programs you were up against. Ruiz is the row worth noticing — signed for <em>zero points</em> because nobody else boarded him.
+  </div>
+
+</div>
+</body>
+</html>
