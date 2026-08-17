@@ -801,6 +801,12 @@ function renderStats() {
 function setupRosterSorting() {
   const headers = document.querySelectorAll('#roster-table thead th');
   headers.forEach(header => {
+    // The collapsed "Attributes" header carries no data-sort. Without this guard it
+    // would still look clickable and would set the sort column to undefined.
+    if (!header.dataset.sort) {
+      header.style.cursor = 'default';
+      return;
+    }
     header.style.cursor = 'pointer';
     header.addEventListener('click', () => {
       const sortKey = header.dataset.sort;
