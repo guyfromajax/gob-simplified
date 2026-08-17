@@ -286,16 +286,16 @@ test.describe('capacity comes from the payload', () => {
     const txt = await page.evaluate(() => document.querySelector('#sign-rail .cap-row').textContent);
     expect(txt).toContain('3');
     expect(txt).toContain('15');
-    expect(txt).toContain('7');
     expect(txt).toContain('roster spots');
-    expect(txt).toContain('scholarships');
+    // Scholarships are sunset — the readout must NOT come back.
+    expect(txt).not.toContain('scholarship');
   });
 
   test('a different served number changes the display — not recomputed locally', async ({ page }) => {
     await mount(page, { capacity: { roster_spots: 9, scholarships: 1, roster_cap: 15, roster_used: 6 } });
     const txt = await page.evaluate(() => document.querySelector('#sign-rail .cap-row').textContent);
     expect(txt).toContain('9');
-    expect(txt).toContain('1');
+    expect(txt).not.toContain('scholarship');
   });
 });
 

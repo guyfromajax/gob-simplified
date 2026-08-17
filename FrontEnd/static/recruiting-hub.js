@@ -542,7 +542,7 @@
     }).join('');
     return '<div class="cap-row cap-row--rail">' +
         '<span class="cap-item"><b>' + cap.spots + '</b>/' + cap.cap + ' roster spots</span>' +
-        '<span class="cap-item"><b>' + cap.scholarships + '</b> scholarships</span></div>' +
+        '</div>' +
       '<div class="rneeds-lab">Board position mix</div>' +
       '<div class="rneeds">' + mix + '</div>';
   }
@@ -882,7 +882,7 @@
       '<div class="budget-bar"><div class="budget-fill' + (rem < 0 ? ' over' : '') + '" style="width:' + pct + '%"></div></div>' +
       // Capacity is the header number, straight from the payload.
       '<div class="cap-row"><span class="cap-item"><b>' + cap.spots + '</b>/' + cap.cap + ' roster spots</span>' +
-        '<span class="cap-item"><b>' + cap.scholarships + '</b> scholarships</span></div></div>' +
+        '</div>' +
       list + preflight +
       '<div class="rail-foot">' + note +
         '<button class="rail-submit" id="sign-submit"' + (disabled ? ' disabled' : '') + '>' + (state.week35Ran ? 'Signings Run' : 'Submit Orders') + '</button></div>';

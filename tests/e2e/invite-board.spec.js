@@ -244,7 +244,7 @@ test.describe('right rail', () => {
     }));
     expect(m.panels).toBe(2);
     expect(m.eyebrows[1]).toBe('Roster capacity');
-    expect(m.capItems).toBe(2);
+    expect(m.capItems).toBe(1);   // scholarships sunset; roster spots only
     expect(m.mixLabel).toBe('Board position mix');
     expect(m.needs).toBe(5);
   });
