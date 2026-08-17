@@ -144,6 +144,9 @@
   function groupedHeaderHtml(sort) {
     var active = (sort && sort.key) || '';
     var dir = (sort && sort.dir) || 'desc';
+    // The group label nests INSIDE its pair, so `grid-column: 1 / -1` spans the pair's
+    // two columns. As a direct child of .attr-grid it spanned all six and forced its own
+    // full-width row, stacking the header into one tall column.
     return '<div class="attr-grid attr-grid--head">' + ATTR_PAIRS.map(function (pair) {
       var labels = '<div class="attr-grp">' + escapeHtml(pair.label) + '</div>';
       var controls = pair.keys.map(function (key) {
@@ -155,7 +158,7 @@
           ' aria-label="Sort by ' + escapeHtml(ATTR_FULL_NAMES[key] || key) + '">' +
           escapeHtml(key) + '</button>';
       }).join('');
-      return labels + '<div class="attr-pair">' + controls + '</div>';
+      return '<div class="attr-pair">' + labels + controls + '</div>';
     }).join('') + '</div>';
   }
 

@@ -79,6 +79,41 @@ test('tiles are grouped into 6 labelled pairs with no in-tile labels', async ({ 
   expect(m.inTileLabels).toBe(0);
 });
 
+test('the grouped header lays out SIX ACROSS, not one tall column', async ({ page }) => {
+  await mount(page);
+  const m = await page.evaluate(() => {
+    const groups = [...document.querySelectorAll('#roster-tab thead .attr-grp')];
+    const boxes = groups.map((g) => g.getBoundingClientRect());
+    const rows = [...new Set(boxes.map((b) => Math.round(b.y)))];
+    const xs = boxes.map((b) => Math.round(b.x));
+    const head = document.querySelector('#roster-tab thead').getBoundingClientRect();
+    return { rows: rows.length, xs, ascending: xs.every((x, i) => i === 0 || x > xs[i - 1]), headHeight: head.height };
+  });
+  // All six group labels share one row and march left-to-right.
+  expect(m.rows).toBe(1);
+  expect(m.ascending).toBe(true);
+  // A stacked header ran ~400px tall; two text rows plus padding is far less.
+  expect(m.headHeight).toBeLessThan(120);
+});
+
+test('each pair is 2 tiles wide and pairs are separated by the group gap', async ({ page }) => {
+  await mount(page);
+  const m = await page.evaluate(() => {
+    const pairs = [...document.querySelectorAll('#roster-tab tbody tr:first-child .attr-pair')];
+    const boxes = pairs.map((p) => p.getBoundingClientRect());
+    const innerGaps = pairs.map((p) => {
+      const t = [...p.querySelectorAll('.attr-tile')].map((x) => x.getBoundingClientRect());
+      return Math.round(t[1].left - t[0].right);
+    });
+    const groupGaps = boxes.slice(1).map((b, i) => Math.round(b.left - boxes[i].right));
+    return { rows: [...new Set(boxes.map((b) => Math.round(b.y)))].length, innerGaps, groupGaps };
+  });
+  expect(m.rows).toBe(1);
+  // Within a pair: 2.5px. Between pairs: the responsive clamp, always wider.
+  for (const g of m.innerGaps) expect(g).toBeLessThanOrEqual(3);
+  for (const g of m.groupGaps) expect(g).toBeGreaterThan(5);
+});
+
 test('RT is a current-to-potential lockup with the CUR/POT caption', async ({ page }) => {
   await mount(page);
   const m = await page.evaluate(() => {

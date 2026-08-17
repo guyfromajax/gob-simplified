@@ -81,7 +81,7 @@ th.attr-tiles-head {
   justify-content: center;
 }
 
-.attr-grid--head { row-gap: 6px; }
+.attr-grid--head .attr-pair { row-gap: 6px; }
 
 .attr-pair {
   display: grid;
