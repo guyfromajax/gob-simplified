@@ -753,11 +753,19 @@ body.has-auth-bar #franchise-container {
 .fcc-home-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Every card is exactly one row tall, both rows the same. Sizing rows to content let
+     the tallest card in row 1 set that row's height — the Recruiting card, whose wire
+     grows all season — so row 1 stood 315px against row 2's 216 and row 2 walked down
+     the page. Cards fill this box and scroll inside it instead of stretching it. */
+  --fcc-home-row-h: 216px;
+  grid-auto-rows: var(--fcc-home-row-h);
   gap: 14px;
 }
 
 .fcc-home-card {
-  min-height: 180px;
+  /* The grid row owns the height now; a min-height here would fight it. */
+  min-height: 0;
+  overflow: hidden;
   padding: 16px 16px 18px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 18px;
@@ -4153,14 +4161,13 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
    One number, not one per state — the list height follows the box rather than being
    a second constant to keep in sync. */
 #franchise-container .fcc-home-card--recruiting .fcc-home-card-body {
-  /* The one reserved height, every week. On Signing Day the footnote is moved INSIDE
-     this box, so the card measures the same as a week where the footnote is hidden —
-     the button changes what fills the box, never how big it is. */
-  flex: 0 0 auto;
-  height: 242px;
+  /* Fills whatever the row leaves and scrolls inside it, so a season's worth of wire
+     cannot change the card's height. Replaces a fixed 242px body, which was itself
+     what made row 1 taller than row 2. */
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
 }
 #franchise-container .fcc-home-card--recruiting .fcc-home-recruiting {
   flex: 1;

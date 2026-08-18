@@ -284,7 +284,8 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
    * derived here from the emitted score and deltas — no new engine, same rule as the
    * cards: a presentation of something that already happened.
    *
-   * All four conditions, per spec:
+   * All conditions, per spec:
+   *   - Q4 or OT only (quarter >= 4),
    *   - 10 seconds or less remaining,
    *   - the shot CHANGES the lead (scorer's team was not ahead, and is after),
    *   - free throws count,
@@ -295,6 +296,7 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
   let winnerCandidate = null;
 
   const considerGameWinner = (turn, quarter, preHome, preAway) => {
+    if (num(quarter) < 4) return;                       // Q4 / OT only
     if (clockToSeconds(sb.clock) > 10) return;
     const dHome = sb.home - preHome;
     const dAway = sb.away - preAway;

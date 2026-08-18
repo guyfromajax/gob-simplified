@@ -2,8 +2,8 @@
 /**
  * Game-winning shot: detection in the assembler, presentation as a callout.
  *
- * Spec: 10 seconds or less remaining, the score CHANGES the lead, free throws count,
- * the LAST such score in the game wins the title, and it must belong to the team that
+ * Spec: Q4/OT only, 10 seconds or less remaining, the score CHANGES the lead, free throws
+ * count, the LAST such score in the game wins the title, and it must belong to the team that
  * actually won. The engine declares `pgpc_tier_c.game_winner_shot` but never writes it,
  * so this is derived from the emitted score + deltas — no engine change.
  */
@@ -85,6 +85,17 @@ test.describe('detection', () => {
       turn(4, '0:30', 70, 71, 'a1', 2),
       turn(4, '0:11', 72, 71, 'h3', 2),          // 11s — one second too early
       turn(4, '0:00', 72, 71, null, 0),
+    ]);
+    expect(m.winner).toBeNull();
+  });
+
+  test('a Q2 lead-change inside 10 seconds is not a game-winner', async ({ page }) => {
+    const m = await build(page, [
+      turn(2, '0:30', 30, 31, 'a1', 2),
+      turn(2, '0:08', 32, 31, 'h3', 2),          // lead change at end of Q2
+      turn(2, '0:00', 32, 31, null, 0),
+      turn(4, '2:00', 70, 60, 'h1', 2),          // home wins later without a late lead change
+      turn(4, '0:00', 70, 60, null, 0),
     ]);
     expect(m.winner).toBeNull();
   });

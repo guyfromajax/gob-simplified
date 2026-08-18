@@ -527,3 +527,67 @@ test.describe('Signing Day: the Recruiting card is one call to action', () => {
     expect(m.strays).toBe(0);
   });
 });
+
+
+test.describe('every Coach\'s Office card is one row tall', () => {
+  const fill = (page, wireRows) => page.evaluate((n) => {
+    const list = (k, cls) => `<div class="fcc-home-list-scroll">${Array.from({ length: k }, () =>
+      `<div class="${cls}"><span>Team</span><span>0-0</span></div>`).join('')}</div>`;
+    document.getElementById('home-rankings-body').innerHTML = list(10, 'fcc-home-list-row');
+    document.getElementById('home-news-body').innerHTML = list(5, 'fcc-home-news-row');
+    document.getElementById('home-team-stats-body').innerHTML = list(5, 'fcc-home-team-stats-row');
+    const rows = Array.from({ length: n }, () =>
+      '<div class="fcc-wire-row"><div class="fcc-wire-line"><span>x</span></div></div>').join('');
+    document.getElementById('home-recruiting-body').innerHTML = n
+      ? `<div class="fcc-home-recruiting"><div class="fcc-home-list-scroll">${rows}</div></div>`
+        + '<div class="fcc-wire-status">6 moved</div>'
+      : '<div class="fcc-home-empty">No board movement yet</div><div class="fcc-wire-status"></div>';
+    document.querySelector('.fcc-recruiting-footnote--embed').style.display = 'none';
+  }, wireRows);
+
+  const geo = (page) => page.evaluate(() => {
+    const cards = [...document.querySelectorAll('.fcc-home-grid .fcc-home-card')];
+    const sc = document.querySelector('.fcc-home-card--recruiting .fcc-home-list-scroll');
+    return {
+      heights: [...new Set(cards.map((c) => Math.round(c.getBoundingClientRect().height)))],
+      row2Top: Math.round(cards[3].getBoundingClientRect().top),
+      wireScrolls: sc ? sc.scrollHeight > sc.clientHeight + 1 : null,
+    };
+  });
+
+  test('row 1 and row 2 are the same height — one value across all seven cards', async ({ page }) => {
+    await mount(page, `<div id="franchise-container">${HOME_GRID}</div>`);
+    await fill(page, 3);
+    const m = await geo(page);
+    // Row 1 used to stand 315px against row 2's 216, which pushed row 2 below the fold.
+    expect(m.heights.length, `differing heights: ${m.heights.join(', ')}`).toBe(1);
+  });
+
+  test('a season of wire does not change any card height or move row 2', async ({ page }) => {
+    await mount(page, `<div id="franchise-container">${HOME_GRID}</div>`);
+    const seen = [];
+    for (const n of [0, 1, 3, 12, 40, 90]) {
+      await fill(page, n);
+      seen.push(await geo(page));
+    }
+    for (const g of seen) expect(g.heights).toEqual(seen[0].heights);
+    for (const g of seen) expect(g.row2Top).toBe(seen[0].row2Top);
+  });
+
+  test('the wire stays reachable — it scrolls inside the card rather than being cut', async ({ page }) => {
+    await mount(page, `<div id="franchise-container">${HOME_GRID}</div>`);
+    await fill(page, 40);
+    // scrollHeight alone is not proof: an overflow:visible box still reports tall
+    // content while spilling into a card that clips it. Move the scroll and check it
+    // actually moved, and that the box is a scroller.
+    const m = await page.evaluate(() => {
+      const sc = document.querySelector('.fcc-home-card--recruiting .fcc-home-list-scroll');
+      const overflowY = getComputedStyle(sc).overflowY;
+      sc.scrollTop = 9999;
+      return { overflowY, moved: sc.scrollTop > 0, taller: sc.scrollHeight > sc.clientHeight + 1 };
+    });
+    expect(['auto', 'scroll']).toContain(m.overflowY);
+    expect(m.taller).toBe(true);
+    expect(m.moved).toBe(true);
+  });
+});

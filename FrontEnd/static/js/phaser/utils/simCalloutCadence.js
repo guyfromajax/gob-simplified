@@ -318,9 +318,9 @@ export class CalloutCadence {
     // --- special beats (priority order). Drops on gate fail; never queues. ---
 
     // 0) Game-winning shot. Stamped on its frame by the timeline assembler: the last
-    // lead-changing score inside the final 10 seconds, by the team that went on to win
-    // (free throws included). Outranks everything and ignores the gates — it fires even
-    // if another callout is mid-hold, because there is no later chance to show it.
+    // lead-changing score inside the final 10 seconds of Q4/OT, by the team that went on
+    // to win (free throws included). Outranks everything and ignores the gates — it fires
+    // even if another callout is mid-hold, because there is no later chance to show it.
     if (frame.gameWinner && !this.gameWinnerFired) {
       const gw = frame.gameWinner;
       const picked = pickCalloutLine(this.pack, GAME_WINNER_TIER, {
