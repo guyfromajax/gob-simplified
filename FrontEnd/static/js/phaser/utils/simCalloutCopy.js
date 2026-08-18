@@ -14,6 +14,9 @@ const MIN_CATEGORIES = 8;
 export const CALLOUT_PACK = {
   version: '2026.08.d-fallback',
   categories: {
+    gamewinner: { avatar: 'headshot', color: 'gold', lines: [
+      '{NAME} — Game Winning Shot!',
+    ] },
     milestone: { avatar: 'headshot', color: 'gold', lines: [
       '{NAME} has *{PTS}* now', "That's *{PTS}* for {NAME}", '{NAME} up to *{PTS}* points',
     ] },

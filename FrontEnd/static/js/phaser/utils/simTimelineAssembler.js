@@ -31,6 +31,7 @@ import { calculatePotgPoints } from '../../shared/potg.js';
 import { readableTeamPresentationColor } from './matchupsUiShared.js';
 import {
   REG_Q_SEC,
+  clockToSeconds,
   elapsedGameSeconds,
   wormDomainSeconds,
 } from './simWormTime.js';
@@ -274,6 +275,69 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
       if (d('F') > 0) out.push({ id, kind: 'foul', last: d('F') });
     });
     return out;
+  };
+
+  /**
+   * Game-winning shot.
+   *
+   * The engine declares `pgpc_tier_c.game_winner_shot` but never writes it, so this is
+   * derived here from the emitted score and deltas — no new engine, same rule as the
+   * cards: a presentation of something that already happened.
+   *
+   * All four conditions, per spec:
+   *   - 10 seconds or less remaining,
+   *   - the shot CHANGES the lead (scorer's team was not ahead, and is after),
+   *   - free throws count,
+   *   - the LAST such shot in the game wins the title, and it must belong to the team
+   *     that actually won — so a candidate is recorded and later overwritten, then
+   *     validated against the final score once the game is over.
+   */
+  let winnerCandidate = null;
+
+  const considerGameWinner = (turn, quarter, preHome, preAway) => {
+    if (clockToSeconds(sb.clock) > 10) return;
+    const dHome = sb.home - preHome;
+    const dAway = sb.away - preAway;
+    if (dHome <= 0 && dAway <= 0) return;               // no points scored on this turn
+    const side = dHome > dAway ? 'home' : 'away';
+    const wasAhead = side === 'home' ? preHome > preAway : preAway > preHome;
+    const isAhead = side === 'home' ? sb.home > sb.away : sb.away > sb.home;
+    if (wasAhead || !isAhead) return;                    // must CHANGE the lead
+    // Scorer = the player whose PTS moved on this turn. Free throws land here too,
+    // which is intended: they count.
+    let scorerId = '';
+    let best = 0;
+    Object.entries(turn.deltas || {}).forEach(([pid, entry]) => {
+      const pts = num(((entry || {}).stats || {}).PTS);
+      if (pts > best) { best = pts; scorerId = nid(pid); }
+    });
+    if (!scorerId) return;
+    winnerCandidate = {
+      playerId: scorerId,
+      side,
+      points: best,
+      quarter,
+      clock: sb.clock,
+      // Snapshot the score so the final validation is not fooled by later OT periods.
+      home: sb.home,
+      away: sb.away,
+    };
+  };
+
+  /** The candidate only counts if its team actually won. */
+  const resolveGameWinner = () => {
+    if (!winnerCandidate) return null;
+    const finalHome = sb.home;
+    const finalAway = sb.away;
+    const won = winnerCandidate.side === 'home' ? finalHome > finalAway : finalAway > finalHome;
+    if (!won) return null;
+    const dir = directory[winnerCandidate.playerId] || {};
+    return {
+      ...winnerCandidate,
+      name: dir.name || 'Unknown',
+      pos: dir.pos || '',
+      jersey: dir.jersey != null ? dir.jersey : '',
+    };
   };
 
   const teamOf = (id) => (directory[id] && directory[id].team) || null;
@@ -561,9 +625,13 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     const foId = nid(turn.foul_out_player || (turn.fouled_out && turn.fouled_out.player_id));
     if (foId) fouledOut.add(foId);
 
+    // Game-winner detection needs the score on BOTH sides of the turn.
+    const preHome = sb.home;
+    const preAway = sb.away;
     applyTurnToScoreboard(turn);
     applyTeamTotals(turn);
     maxQuarterSeen = Math.max(maxQuarterSeen, tQ);
+    considerGameWinner(turn, tQ, preHome, preAway);
 
     // Bug 4 fix: helper turns (inbound / rebound / timeout) omit the lineups — carry
     // forward the last known five so on-court stats hold instead of the bars pulsing
@@ -647,6 +715,23 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
       ? frames[frames.length - 1].final.home_won
       : num((last.score || {})[homeName]) > num((last.score || {})[awayName]);
 
+  // Stamp the winning shot onto the frame it happened on, so the cadence engine can
+  // fire it at the moment it occurred rather than at the end of playback.
+  const gameWinner = resolveGameWinner();
+  if (gameWinner) {
+    for (let i = frames.length - 1; i >= 0; i -= 1) {
+      const f = frames[i];
+      // Skip the synthetic bookend frames rather than naming the live phase: 'pretip'
+      // repeats the first turn's clock, and 'final' repeats the last one's.
+      if (f.phase === 'pretip' || f.phase === 'final' || f.phase === 'break') continue;
+      if (String((f.score || {}).clock) === String(gameWinner.clock)
+        && num(f.quarter) === num(gameWinner.quarter)) {
+        f.gameWinner = gameWinner;
+        break;
+      }
+    }
+  }
+
   return {
     teams,
     frames,
@@ -654,6 +739,7 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
       quarters: summaries.length,
       frameCount: frames.length,
       homeWon,
+      gameWinner,
       reconciliation,
     },
   };

@@ -15,6 +15,8 @@ sit close to the line and read as an aside, not a broadcast lower third.
 - Wrap the number in `*asterisks*` to bold it — that's the only markup.
 - Keep under ~40 characters. These are asides, not headlines.
 - Only **special** moments earn a callout. Routine buckets, rebounds and assists do not.
+- `gamewinner` is the one exception to the ~40-character rule and to the sentence-case
+  rule: it is the loudest moment in the game and holds for 6s rather than 2.6s.
 
 ---
 
@@ -60,6 +62,9 @@ sit close to the line and read as an aside, not a broadcast lower third.
 - {NAME} — what a shot!
 - {NAME} ties it!
 - Tied up by {NAME}!
+
+### gamewinner · avatar headshot · gold
+- {NAME} — Game Winning Shot!
 
 ### fouledout · avatar headshot · red
 - {NAME} fouls out

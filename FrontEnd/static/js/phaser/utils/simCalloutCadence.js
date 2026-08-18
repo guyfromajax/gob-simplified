@@ -16,6 +16,13 @@ export const QUARTER_PROFILES = [
 ];
 
 export const CALLOUT_HOLD_S = 2.6;
+/**
+ * The one tier that holds longer. The shot that won the game is the loudest moment in
+ * the broadcast, so it takes the screen for 6s and is exempt from the cadence gates —
+ * a "rest floor" or "cadence gap" must never be the reason the game-winner went unseen.
+ */
+export const GAME_WINNER_HOLD_S = 6;
+export const GAME_WINNER_TIER = 'gamewinner';
 export const GLOBAL_GAP_S = 9;
 export const STREAK_PTS = 8;
 export const RUN_MIN_PTS = 10;
@@ -95,6 +102,7 @@ export class CalloutCadence {
     this.run = { side: null, pts: 0 };
 
     this.players = {};
+    this.gameWinnerFired = false;   // fires at most once per game
     this.advLatched = {}; // `${side}:${key}:${edge}` -> true
     this.defCount = { away: 0, home: 0 };
     this.counts = {};
@@ -140,7 +148,7 @@ export class CalloutCadence {
   _fire(model, playerId) {
     const shown = this.onCallout(model);
     if (!shown) return this._hold('presenter refused', String(model.tier || '').toUpperCase());
-    this.busyUntil = this.t + CALLOUT_HOLD_S;
+    this.busyUntil = this.t + (model.tier === GAME_WINNER_TIER ? GAME_WINNER_HOLD_S : CALLOUT_HOLD_S);
     this.lastFire = this.t;
     const tier = model.tier || 'other';
     this.counts[tier] = (this.counts[tier] || 0) + 1;
@@ -308,6 +316,31 @@ export class CalloutCadence {
     }
 
     // --- special beats (priority order). Drops on gate fail; never queues. ---
+
+    // 0) Game-winning shot. Stamped on its frame by the timeline assembler: the last
+    // lead-changing score inside the final 10 seconds, by the team that went on to win
+    // (free throws included). Outranks everything and ignores the gates — it fires even
+    // if another callout is mid-hold, because there is no later chance to show it.
+    if (frame.gameWinner && !this.gameWinnerFired) {
+      const gw = frame.gameWinner;
+      const picked = pickCalloutLine(this.pack, GAME_WINNER_TIER, {
+        NAME: shortName(gw.name),
+        PTS: gw.points,
+      }, this.rnd);
+      if (picked) {
+        this.gameWinnerFired = true;
+        // Clear any hold so the presenter accepts it immediately.
+        this.busyUntil = -99;
+        return this._fire({
+          ...picked,
+          tier: GAME_WINNER_TIER,
+          avatar: 'headshot',
+          side: gw.side,
+          playerId: gw.playerId,
+          teamAbbr: (this.teams[gw.side] || {}).abbr || '',
+        }, gw.playerId);
+      }
+    }
 
     // 1) Foul-out
     for (let i = 0; i < roster.length; i += 1) {

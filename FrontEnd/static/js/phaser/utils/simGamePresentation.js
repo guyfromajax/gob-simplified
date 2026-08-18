@@ -13,7 +13,7 @@
 import { fadeOutPregameBed } from './gameSfx.js';
 import { REG_Q_SEC, clockToSeconds } from './simWormTime.js';
 import { loadCalloutCopy } from './simCalloutCopy.js';
-import { CalloutCadence, CALLOUT_HOLD_S } from './simCalloutCadence.js';
+import { CalloutCadence, CALLOUT_HOLD_S, GAME_WINNER_HOLD_S, GAME_WINNER_TIER } from './simCalloutCadence.js';
 
 const POSC = { PG: '#4A90D9', SG: '#7B5EA7', SF: '#3A8C4A', PF: '#C0392B', C: '#D4A017' };
 const GREEN = '#34EC27', BLUE = '#4A90D9', ORANGE = '#F79420', RED = '#ff6d6d', GOLD = '#FFD700';
@@ -40,6 +40,8 @@ const WORM_PAD_X = 4;
 const WORM_PAD_Y = 10;
 
 const CALLOUT_HOLD_MS = Math.round(CALLOUT_HOLD_S * 1000); // 2600
+/** The game-winner holds longer; the cadence engine owns both numbers. */
+const GAME_WINNER_HOLD_MS = Math.round(GAME_WINNER_HOLD_S * 1000); // 6000
 const CALLOUT_ENTER_MS = 200;
 
 const BENCH_MAX_CHIPS = 3;
@@ -904,7 +906,9 @@ export function showSimGamePresentation(timeline, opts = {}) {
 
   const showCallout = (model) => {
     if (!plotEl || !model || !highlightsOn) return false;
-    if (calloutBusy) return false;
+    // A callout mid-hold normally wins. The game-winner is the exception: there is no
+    // later chance to show it, so it replaces whatever is up.
+    if (calloutBusy && model.tier !== GAME_WINNER_TIER) return false;
     calloutBusy = true;
     const col = calloutColor(model.color);
     activeCallout = { col, model };
@@ -935,13 +939,15 @@ export function showSimGamePresentation(timeline, opts = {}) {
       calloutTimers.push(setTimeout(settleAndFreeze, 16));
     }
 
+    // The game-winner holds for 6s; every other tier for 2.6s.
+    const holdMs = model.tier === GAME_WINNER_TIER ? GAME_WINNER_HOLD_MS : CALLOUT_HOLD_MS;
     calloutTimers.push(setTimeout(() => {
       if (calloutEl) {
         calloutEl.style.opacity = '0';
         if (leaderEl) leaderEl.style.opacity = '0';
       }
       calloutTimers.push(setTimeout(clearCallout, prefersReduced ? 0 : CALLOUT_ENTER_MS));
-    }, CALLOUT_HOLD_MS));
+    }, holdMs));
 
     return true;
   };
