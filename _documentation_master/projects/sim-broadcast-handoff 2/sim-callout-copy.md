@@ -3,18 +3,18 @@
 Small pills that appear next to the worm's action point. **Sentence case, conversational** — these
 sit close to the line and read as an aside, not a broadcast lower third.
 
-**version: 2026.08.d**
+**version: 2026.08.e**
+
+> Design-handoff mirror. Production source of truth: `FrontEnd/static/sim-callout-copy.md`.
 
 ## How to edit
 
 - `###` lines are tiers/categories — leave them alone, the engine matches on the id.
 - `-` lines are copy variants. Add, delete, rewrite freely.
-- Slots: `{NAME}` `{PTS}` `{REB}` `{AST}` `{STREAK}` `{RUN}` `{TEAM}` `{EDGE}` `{STAT}` `{DEF}` `{CATS}`
-- `avatar headshot` uses the player portrait; `avatar abbr` uses a tinted tile with the team's
-  three-letter abbreviation (there are no square team logos, so no logo is ever used here).
-- Wrap the number in `*asterisks*` to bold it — that's the only markup.
-- Keep under ~40 characters. These are asides, not headlines.
-- Only **special** moments earn a callout. Routine buckets, rebounds and assists do not.
+- Slots: `{NAME}` `{PTS}` `{REB}` `{AST}` `{STREAK}` `{RUN}` `{TEAM}` `{EDGE}` `{STAT}` `{DEF}` `{CATS}` `{SHOT}`
+- Mid/late specials only for most tiers. **Q1–Q2** also use `earlyPts` / `earlyReb` / `earlyAst`
+  and light `ambient2` / `ambient3` / `ambientBoard` lines — still subject to cadence gates.
+- `gamewinner` holds 6s and is the loudest beat.
 
 ---
 
@@ -32,6 +32,34 @@ sit close to the line and read as an aside, not a broadcast lower third.
 - {NAME} — double-double
 - Double-double for {NAME}
 - {NAME} hits *{CATS}*
+
+### earlyPts · avatar headshot · gold
+- {NAME} already has *{PTS}*
+- *{PTS}* early for {NAME}
+- {NAME} to *{PTS}* already
+
+### earlyReb · avatar headshot · gold
+- {NAME} has *{REB}* boards already
+- *{REB}* early boards for {NAME}
+
+### earlyAst · avatar headshot · gold
+- {NAME} with *{AST}* dimes already
+- *{AST}* assists early for {NAME}
+
+### ambient2 · avatar headshot · green
+- {NAME} knocks down a *2*
+- {NAME} — that's a *2*
+- Bucket for {NAME}
+
+### ambient3 · avatar headshot · green
+- {NAME} from deep — *3*
+- {NAME} knocks down a *3*
+- Three for {NAME}
+
+### ambientBoard · avatar headshot · green
+- {NAME} pulls the board
+- {NAME} with the rebound
+- Board to {NAME}
 
 ### streak · avatar headshot · orange
 - {NAME} has the last *{STREAK}*
@@ -60,6 +88,9 @@ sit close to the line and read as an aside, not a broadcast lower third.
 - {NAME} — what a shot!
 - {NAME} ties it!
 - Tied up by {NAME}!
+
+### gamewinner · avatar headshot · gold
+- {NAME} — Game Winning Shot!
 
 ### fouledout · avatar headshot · red
 - {NAME} fouls out

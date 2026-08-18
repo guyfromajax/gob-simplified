@@ -1,8 +1,10 @@
 /**
  * Sim broadcast callout cadence — special beats only (wide-worm restructure).
  *
- * Routine events are dropped, not queued. Global min gap 9s + per-player cool from the
- * old quarter curve. Copy from simCalloutCopy.js / sim-callout-copy.md only.
+ * Routine mid-game events are dropped, not queued. Q1–Q2 also allow early thresholds
+ * (10 PTS / 5 REB / 5 AST) and light ambient bucket/board lines. Global min gap 9s +
+ * per-player cool from the old quarter curve. Copy from simCalloutCopy.js /
+ * sim-callout-copy.md only.
  */
 
 import { pickCalloutLine } from './simCalloutCopy.js';
@@ -27,6 +29,14 @@ export const GLOBAL_GAP_S = 9;
 export const STREAK_PTS = 8;
 export const RUN_MIN_PTS = 10;
 export const DEFENSE_MAX_PER_TEAM = 2;
+
+/** Q1–Q2 early thresholds (latched once per player when crossed in those quarters). */
+export const EARLY_Q_MAX = 2;
+export const EARLY_PTS = 10;
+export const EARLY_REB = 5;
+export const EARLY_AST = 5;
+/** Chance to attempt an ambient Q1/Q2 bucket/board line when a frame has such an event. */
+export const AMBIENT_CHANCE = 0.33;
 
 const ADV_POS = [
   { key: 'reb', label: 'rebounding', panel: 'reb' },
@@ -171,6 +181,7 @@ export class CalloutCadence {
         streak: 0,
         pointLatches: {},
         r10: false, dd: false, outLatched: false, defLatched: false,
+        earlyPts: false, earlyReb: false, earlyAst: false,
       };
     }
     const p = this.players[id];
@@ -475,6 +486,59 @@ export class CalloutCadence {
       if (ok) {
         this.advLatched[adv.key] = true;
         return true;
+      }
+    }
+
+    // 9) Early Q1/Q2 thresholds — last among specials. Once per player when crossed
+    // in Q1 or Q2; mid-game milestone (≥20) / boards10 / etc. still fire later.
+    if (this.quarter <= EARLY_Q_MAX) {
+      for (let i = 0; i < roster.length; i += 1) {
+        const row = roster[i];
+        const p = this._player(row.id, row);
+
+        if (!p.earlyPts && p.pts >= EARLY_PTS) {
+          const ok = this._try('earlyPts', {
+            NAME: shortName(p.name), PTS: p.pts,
+          }, p.side, p.id);
+          if (ok) { p.earlyPts = true; return true; }
+        }
+        if (!p.earlyReb && p.reb >= EARLY_REB) {
+          const ok = this._try('earlyReb', {
+            NAME: shortName(p.name), REB: p.reb,
+          }, p.side, p.id);
+          if (ok) { p.earlyReb = true; return true; }
+        }
+        if (!p.earlyAst && p.ast >= EARLY_AST) {
+          const ok = this._try('earlyAst', {
+            NAME: shortName(p.name), AST: p.ast,
+          }, p.side, p.id);
+          if (ok) { p.earlyAst = true; return true; }
+        }
+      }
+    }
+
+    // 10) Q1/Q2 ambient filler — real bucket/3/board events only; paced by gates + roll.
+    if (this.quarter <= EARLY_Q_MAX) {
+      const ambientEvents = [];
+      for (let i = 0; i < events.length; i += 1) {
+        const ev = events[i];
+        if (!meta[ev.id]) continue;
+        if (ev.kind === 'three') ambientEvents.push({ ev, tier: 'ambient3' });
+        else if (ev.kind === 'bucket' || ev.kind === 'paint') {
+          ambientEvents.push({ ev, tier: 'ambient2' });
+        } else if (ev.kind === 'board') {
+          ambientEvents.push({ ev, tier: 'ambientBoard' });
+        }
+      }
+      if (ambientEvents.length && this.rnd() < AMBIENT_CHANCE) {
+        const pick = ambientEvents[Math.min(
+          ambientEvents.length - 1,
+          Math.floor(this.rnd() * ambientEvents.length),
+        )];
+        const row = meta[pick.ev.id];
+        const p = this._player(pick.ev.id, row);
+        const ok = this._try(pick.tier, { NAME: shortName(p.name) }, p.side, p.id);
+        if (ok) return true;
       }
     }
 

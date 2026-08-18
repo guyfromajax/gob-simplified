@@ -199,6 +199,27 @@ Per-turn hold is `QUARTER_MS ÷ turns-in-quarter`, clamped to `[FRAME_MIN_MS, FR
 
 ---
 
+## 6.1 Callout system (Act 2 worm pills)
+
+Replaces the old card deck. Source: `simCalloutCadence.js` + `sim-callout-copy.md` (loaded by `simCalloutCopy.js`).
+
+**Pacing gates (all tiers except `gamewinner`):** HIGHLIGHTS on; not mid-hold; rest floor after previous callout ends; global gap **9s**; per-player cool from `QUARTER_PROFILES` (Q1 15s → Q4 8s). Failed candidates are **dropped**, never queued.
+
+**Priority (first match wins):**
+1. `gamewinner` — Q4/OT, ≤10s, lead-changing score by the eventual winner (assembler stamp); 6s hold; bypasses gates
+2. `fouledout`
+3. `clutch` — Q4/OT ≤120s, tie or lead-change scoring
+4. Mid-game player specials: `milestone` (≥20, steps of 10), `boards10`, `doubleDouble`, `defense`
+5. `streak` (8+ unanswered PTS by one player)
+6. `run` (10+ unanswered team PTS)
+7. `advantage` / `disadvantage` (±10 / ±20 team-stat edge)
+8. **Early Q1–Q2 thresholds** (once per player when crossed in Q1 or Q2): `earlyPts` (10), `earlyReb` (5), `earlyAst` (5). Later ≥20 / 10-board / etc. still fire in Q3–Q4.
+9. **Q1–Q2 ambient** — real `three` / `bucket`|`paint` / `board` events only; ~33% roll when eligible (`AMBIENT_CHANCE`); tiers `ambient3` / `ambient2` / `ambientBoard`
+
+Copy is edit-and-reload in `FrontEnd/static/sim-callout-copy.md`. Zero callout strings in cadence/presentation source (bundled fallback in `simCalloutCopy.js` only).
+
+---
+
 ## 7. Moments ticker — specced, not built
 
 The design called for a sparse ticker (5–8 `RUN` / `HEAT` / `FOUL` / `LEAD` moments per game). It was **tabled before the first build.**
@@ -230,6 +251,9 @@ Known wrinkle: the handler clears *all* pending timers, including the finish tim
 - `js/phaser/bootGame.js` — `handleSimFullGame()`, orchestration and act sequencing
 - `js/phaser/utils/simTimelineAssembler.js` — `buildSimTimeline()`, turns → frames
 - `js/phaser/utils/simGamePresentation.js` — `showSimGamePresentation()`, Act 2 overlay + playback + injected CSS
+- `js/phaser/utils/simCalloutCadence.js` — callout priority, gates, early/ambient Q1–Q2 rules
+- `js/phaser/utils/simCalloutCopy.js` — loads `sim-callout-copy.md` (+ bundled fallback)
+- `static/sim-callout-copy.md` — editable callout lines (tiers/variants)
 - `js/phaser/utils/preGameExperience.js` — Act 1 (`displayOnly`), `showPreppingSimCover()`, `showOpaqueSimBridgeCover()` / `clearOpaqueSimBridgeCover()`
 - `js/phaser/utils/gameCompletionPopup.js` — the handoff target, unchanged by this system
 - `js/phaser/utils/matchupsUiShared.js` — `readableTeamPresentationColor`, positions, tile DNA

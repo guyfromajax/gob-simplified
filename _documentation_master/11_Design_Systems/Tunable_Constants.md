@@ -817,6 +817,20 @@ Playback pacing for the **Sim Full Game / Sim Rest of Game** broadcast overlay (
 | `FINAL_MS` | simGamePresentation.js | `2600` | playback | Final hold before handoff to the existing completion popup. |
 | `LINEUP_CHANGE_MS` | simGamePresentation.js | `1000` | playback | Extra hold on a frame where the on-court five changed (foul-out swap / sub) so the swap reads. Overrides the normal per-turn hold on those frames, so a quarter with lineup changes runs slightly over `QUARTER_MS` (≈ `LINEUP_CHANGE_MS − normal per-turn hold` per change). |
 
+### Callout cadence (`simCalloutCadence.js`)
+
+| Constant | Value | Effect |
+|---|---|---|
+| `GLOBAL_GAP_S` | `9` | Minimum seconds between callouts (except `gamewinner`). |
+| `CALLOUT_HOLD_S` | `2.6` | On-screen hold for normal tiers. |
+| `GAME_WINNER_HOLD_S` | `6` | Hold for `gamewinner` only. |
+| `EARLY_Q_MAX` | `2` | Early thresholds + ambient only in Q1–Q2. |
+| `EARLY_PTS` / `EARLY_REB` / `EARLY_AST` | `10` / `5` / `5` | Once-per-player early latches when crossed in Q1–Q2. |
+| `AMBIENT_CHANCE` | `0.33` | Probability of attempting an ambient bucket/3/board line when the frame has such an event. |
+| `QUARTER_PROFILES[].playerCool` | 15 → 8 | Per-player cool (seconds) by quarter. |
+
+Copy: `FrontEnd/static/sim-callout-copy.md`. See [`Sim_Game_Presentation_System.md` §6.1](../06_Gameplay_Systems/Sim_Game_Presentation_System.md).
+
 **Whole game ≈ ~80–85s** (4 × ~18s + three break cards + tip-off + final). Bars ease via a 0.5s CSS `width` transition between emitted values; reduced-motion fast-forwards (live ~40ms, holds ~400ms).
 
 ### Not tunable here, but easily mistaken for pacing

@@ -12,7 +12,7 @@ const MIN_CATEGORIES = 8;
 
 /** Bundled fallback — kept in sync with FrontEnd/static/sim-callout-copy.md. */
 export const CALLOUT_PACK = {
-  version: '2026.08.d-fallback',
+  version: '2026.08.e-fallback',
   categories: {
     gamewinner: { avatar: 'headshot', color: 'gold', lines: [
       '{NAME} — Game Winning Shot!',
@@ -25,6 +25,24 @@ export const CALLOUT_PACK = {
     ] },
     doubleDouble: { avatar: 'headshot', color: 'gold', lines: [
       '{NAME} — double-double', 'Double-double for {NAME}', '{NAME} hits *{CATS}*',
+    ] },
+    earlyPts: { avatar: 'headshot', color: 'gold', lines: [
+      '{NAME} already has *{PTS}*', '*{PTS}* early for {NAME}', '{NAME} to *{PTS}* already',
+    ] },
+    earlyReb: { avatar: 'headshot', color: 'gold', lines: [
+      '{NAME} has *{REB}* boards already', '*{REB}* early boards for {NAME}',
+    ] },
+    earlyAst: { avatar: 'headshot', color: 'gold', lines: [
+      '{NAME} with *{AST}* dimes already', '*{AST}* assists early for {NAME}',
+    ] },
+    ambient2: { avatar: 'headshot', color: 'green', lines: [
+      '{NAME} knocks down a *2*', '{NAME} — that\'s a *2*', 'Bucket for {NAME}',
+    ] },
+    ambient3: { avatar: 'headshot', color: 'green', lines: [
+      '{NAME} from deep — *3*', '{NAME} knocks down a *3*', 'Three for {NAME}',
+    ] },
+    ambientBoard: { avatar: 'headshot', color: 'green', lines: [
+      '{NAME} pulls the board', '{NAME} with the rebound', 'Board to {NAME}',
     ] },
     streak: { avatar: 'headshot', color: 'orange', lines: [
       '{NAME} has the last *{STREAK}*', '*{STREAK}* straight for {NAME}',
