@@ -255,3 +255,26 @@
   padding:2px 0;border-radius:6px;font:inherit}
 .pfw.is-clickable:hover span{color:#fff;text-decoration:underline}
 .pfw.is-clickable:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+
+/* ---------- Signing Day filters: watchlist + position + year ----------
+   Same controls as the pool's filter bar, so the two screens are operated the same
+   way. The pool's .pool-seg styling lives in recruiting-spine.css; these only add
+   what the signing toolbar needs on top of it. */
+.spool-watch{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 11px;border-radius:8px;
+  border:1px solid var(--border);background:rgba(0,0,0,.26);color:var(--muted-2);
+  font:700 11px/1 var(--body);letter-spacing:.02em;cursor:pointer;transition:.13s;flex-shrink:0}
+.spool-watch svg{width:13px;height:13px;color:var(--muted-3)}
+.spool-watch:hover{color:var(--text);border-color:var(--muted-3)}
+.spool-watch.on{background:rgba(255,215,0,.12);border-color:rgba(255,215,0,.5);color:#ffd700}
+.spool-watch.on svg{color:#ffd700}
+.spool-watch .n{font-variant-numeric:tabular-nums;color:var(--muted-3);font-weight:700}
+.spool-watch.on .n{color:#ffd700}
+/* The toolbar now carries a lot; let it wrap onto a second line rather than squeeze
+   the controls or push the search box off the card. */
+.spool-head{flex-wrap:wrap;row-gap:10px}
+
+/* ---------- My Orders view: the rail takes the whole width ---------- */
+.hub-anchor--orders .ic{color:var(--green,#34EC27)}
+.hub-anchor--orders.is-on{background:rgba(52,236,39,.12);border-color:rgba(52,236,39,.45);color:#a9ff9c}
+.hub-body-sign.is-orders-only{grid-template-columns:minmax(0,1fr)}
+.hub-body-sign.is-orders-only .spool{display:none}

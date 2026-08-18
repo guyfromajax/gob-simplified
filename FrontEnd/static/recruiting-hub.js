@@ -50,12 +50,17 @@
     rosterCapacity: {},              // from payload.roster_capacity
     competitionCounts: {},           // recruit_id -> programs funding him
     sTab: 'mine', sRegion: 'all', sSearch: '', week35Ran: false, flashId: null,
+    // Signing Day filters mirror the pool's, but keep their own state: the two
+    // screens are read for different jobs and a filter carried across surprises.
+    sPos: 'all', sYear: 'all', sWatch: false, sView: 'pool',
     // Results (D4)
     currentResultsWeek: null, weeklyDismissed: false, visitTree: null,
     playback: { index: 0, auto: false, done: false, timer: null },
     week35Results: {}, signFilter: 'all'
   };
-  var SIGN = { TOTAL: 50, MAX_PER: 20, PROMISE_W: 18 };
+  // No per-recruit cap: the 50-point budget is the only limit, so every point can go
+  // on one recruit if that is the call the coach wants to make.
+  var SIGN = { TOTAL: 50, PROMISE_W: 18 };
 
   function boardActive() { return state.phase === 'invite'; }
   function attrClass(v) { return v >= 65 ? 'attr-hi' : v >= 40 ? 'attr-mid' : v >= 20 ? 'attr-lo' : 'attr-zero'; }
@@ -196,6 +201,27 @@
       return '<tr><td colspan="' + colspan() + '" style="padding:26px;text-align:center;color:var(--muted-3)">No recruits match your filters.</td></tr>';
     }
     return recs.map(rowHtml).join('');
+  }
+
+  /**
+   * Region <option>s with the user's own region lifted to the top, above a divider.
+   * His region is the one he recruits in every week, so it should not be hunted for
+   * halfway down an alphabetical list. It still appears in the A-H run below the rule,
+   * so the list stays complete and scanning by letter works — the same value twice is
+   * intentional, and selecting either filters identically.
+   */
+  function regionOptionsHtml(selected) {
+    var mine = state.userRegion;
+    var opt = function (value, label) {
+      return '<option value="' + value + '"' + (selected === value ? ' selected' : '') + '>' + label + '</option>';
+    };
+    var head = '';
+    if (mine && REGION_ORDER.indexOf(mine) !== -1) {
+      head = opt(mine, 'Region ' + mine + ' — your region')
+        + '<option disabled>──────────</option>';
+    }
+    return head + opt('all', 'All regions')
+      + REGION_ORDER.map(function (r) { return opt(r, 'Region ' + r); }).join('');
   }
 
   // ---------- filter bar ----------
@@ -688,7 +714,9 @@
     var cls = rank === 1 ? ' s-you1' : rank > 1 ? ' s-list' : '';
     return '<div class="stand-cell' + cls + '">' +
       '<span class="stand-pos">' + label + '</span>' +
-      '<span class="stand-mult">x' + mult + '</span></div>';
+      // "5x odds" rather than "x5": the number is a multiplier ON HIS ODDS of signing
+      // with you, and the bare "x5" read as a quantity.
+      '<span class="stand-mult">' + mult + 'x odds</span></div>';
   }
   function competitionCount(id) {
     var counts = (state.competitionCounts || {});
@@ -742,7 +770,10 @@
     var q = state.sSearch.trim().toLowerCase();
     return state.recruits.filter(function (r) {
       if (state.sTab === 'mine' && !r.leansToUser) return false;
+      if (state.sWatch && !state.watchlist.has(String(r.recruitId))) return false;
       if (state.sRegion !== 'all' && regionOf(r) !== state.sRegion) return false;
+      if (state.sPos !== 'all' && r.pos !== state.sPos) return false;
+      if (state.sYear !== 'all' && r.year !== state.sYear) return false;
       if (q && String(r.name).toLowerCase().indexOf(q) === -1) return false;
       return true;
     }).sort(function (a, b) { return (b.rt || 0) - (a.rt || 0); });
@@ -751,7 +782,7 @@
   function prowHtml(r) {
     var a = allocOf(r.recruitId);
     var committed = a.points > 0 || a.promise;
-    var canPlus = remaining() > 0 && a.points < SIGN.MAX_PER;
+    var canPlus = remaining() > 0;
     return '<div class="prow' + (committed ? ' funded' : '') + (state.flashId === r.recruitId ? ' flash' : '') + '" data-id="' + r.recruitId + '">' +
       '<div class="prow-name"><div class="nm">' +
           Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) + '</div>' +
@@ -854,7 +885,9 @@
           return '<div class="citem" data-jump="' + x.r.recruitId + '" title="Jump to recruit"><div class="citem-body">' +
             '<div class="citem-name"><span class="nm">' + Common.escapeHtml(x.r.name) + '</span>' + (x.a.promise ? '<span class="pmk">· PT</span>' : '') + '</div>' +
             '<div class="citem-meta"><span class="citem-pts">' + x.a.points + ' pts</span>' +
-            '<span data-tooltip="current/potential" title="current/potential">' + Common.escapeHtml(x.r.pos) + ' · ' + Common.formatRtWithPotential(x.r.rt, x.r.potentialRt) + ' RT</span>' +
+            '<span data-tooltip="current/potential" title="current/potential">' + Common.escapeHtml(x.r.pos) +
+              ' · <span class="v ' + Spine.rtClassForYear(x.r.rt, x.r.year) + '">' +
+              Common.formatRtWithPotential(x.r.rt, x.r.potentialRt) + '</span> RT</span>' +
             '<span class="citem-mult">' + (rank ? '#' + rank : '—') + ' x' + leanMultiplier(rank) + '</span></div></div>' +
             '<button class="citem-x" data-remove="' + x.r.recruitId + '" title="Remove">×</button></div>';
         }).join('') + '</div>';
@@ -893,17 +926,55 @@
   }
 
   function signBoardHtml() {
-    var regionOpts = '<option value="all">All regions</option>' + REGION_ORDER.map(function (r) { return '<option value="' + r + '"' + (state.sRegion === r ? ' selected' : '') + '>' + r + '</option>'; }).join('');
+    var STAR = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.6l2.9 5.9 6.5.95-4.7 4.58 1.11 6.47L12 17.44l-5.81 3.06 1.11-6.47-4.7-4.58 6.5-.95z" fill="currentColor"/></svg>';
+    var watchCount = state.recruits.filter(function (r) { return state.watchlist.has(String(r.recruitId)); }).length;
+    var posOpts = [{ value: 'all', label: 'All' }].concat(POS_ORDER.map(function (p) { return { value: p, label: p }; }));
     return '<div class="spool"><div class="spool-head"><div class="spool-title">Recruit Pool</div>' +
         '<div class="spool-tools"><div class="spool-tabs">' +
           '<button class="spool-tab' + (state.sTab === 'mine' ? ' on' : '') + '" data-stab="mine">Leaning to you</button>' +
           '<button class="spool-tab' + (state.sTab === 'all' ? ' on' : '') + '" data-stab="all">All</button></div>' +
-          '<select class="spool-region" id="sign-region">' + regionOpts + '</select>' +
+          // The watchlist he built all season is the shortest path to the recruits he
+          // actually means to spend on, so it sits with the other filters here too.
+          '<button class="spool-watch' + (state.sWatch ? ' on' : '') + '" id="sign-watch" type="button" aria-pressed="' +
+            (state.sWatch ? 'true' : 'false') + '">' + STAR + 'Watchlist<span class="n">' + watchCount + '</span></button>' +
+          '<select class="spool-region" id="sign-region">' + regionOptionsHtml(state.sRegion) + '</select>' +
+          segHtml('spos', posOpts, state.sPos) +
+          segHtml('syear', YEAR_FILTERS, state.sYear) +
           '<input class="spool-search" id="sign-search" placeholder="Search name…" value="' + Common.escapeHtml(state.sSearch) + '"></div></div>' +
         '<div class="spool-colhdr"><span>Recruit</span><span class="c-num">Pos</span><span class="c-num">Region</span><span class="c-num">RT</span>' +
           '<span class="c-num">Standing</span><span class="c-num">Field</span><span>Points</span><span>Playing Time</span></div>' +
         '<div class="spool-rows" id="sign-rows">' + signFiltered().map(prowHtml).join('') + '</div></div>' +
       '<aside class="rail" id="sign-rail">' + railHtml() + '</aside>';
+  }
+
+  /**
+   * Signing Day view switch. 'orders' drops the Recruit Pool entirely and lets Your
+   * Orders take the full width — the state where the coach is reviewing what he has
+   * committed rather than shopping. A class on the container, not a re-render, so
+   * scroll position and the rail's own state survive the switch.
+   */
+  function applySignView() {
+    var host = document.getElementById('hub-sign');
+    if (host) host.classList.toggle('is-orders-only', state.sView === 'orders');
+    var btn = document.getElementById('hub-orders-toggle');
+    if (btn) {
+      btn.classList.toggle('is-on', state.sView === 'orders');
+      btn.setAttribute('aria-pressed', state.sView === 'orders' ? 'true' : 'false');
+    }
+  }
+
+  function setSignView(view) {
+    state.sView = view === 'orders' ? 'orders' : 'pool';
+    applySignView();
+  }
+
+  /** Re-render the whole signing board: the toolbar's pressed states move with the filters. */
+  function refreshSignBoard() {
+    var host = document.getElementById('hub-sign');
+    if (!host) return;
+    host.innerHTML = signBoardHtml();
+    applySignView();
+    bindSignBoard();
   }
 
   function renderSignRows() {
@@ -917,7 +988,7 @@
 
   function stepPoints(id, d) {
     var a = allocOf(id), nv = a.points + d;
-    if (nv < 0 || nv > SIGN.MAX_PER) return;
+    if (nv < 0) return;
     if (d > 0 && remaining() <= 0) return;
     state.alloc[id] = { points: nv, promise: a.promise }; pruneAlloc(id);
     renderSignRows(); renderSignRail();
@@ -956,6 +1027,14 @@
   function bindSignBoard() {
     document.querySelectorAll('[data-stab]').forEach(function (b) { b.addEventListener('click', function () { state.sTab = this.dataset.stab; renderSignRows(); document.querySelectorAll('[data-stab]').forEach(function (x) { x.classList.toggle('on', x.dataset.stab === state.sTab); }); }); });
     var region = document.getElementById('sign-region'); if (region) region.addEventListener('change', function () { state.sRegion = this.value; renderSignRows(); });
+    var watch = document.getElementById('sign-watch');
+    if (watch) watch.addEventListener('click', function () { state.sWatch = !state.sWatch; refreshSignBoard(); });
+    document.querySelectorAll('[data-spos]').forEach(function (b) {
+      b.addEventListener('click', function () { state.sPos = this.dataset.spos; refreshSignBoard(); });
+    });
+    document.querySelectorAll('[data-syear]').forEach(function (b) {
+      b.addEventListener('click', function () { state.sYear = this.dataset.syear; refreshSignBoard(); });
+    });
     var search = document.getElementById('sign-search'); if (search) search.addEventListener('input', function () { state.sSearch = this.value; renderSignRows(); });
     bindSignRows(); bindSignRail();
   }
@@ -1290,12 +1369,29 @@
       inviteSent: Math.max(0, INVITE_WEEKS.filter(function (w) { return w < state.week; }).length), points: remaining() });
     Spine.Phase.bind(phaseHost);
     var mount = document.getElementById('hub-anchor-mount');
-    mount.innerHTML = Spine.Anchor.html();
+    // Signing Day pairs the pool anchor with a My Orders view: the same two things the
+    // screen is about, switched from one place. Outside Signing Day there is no orders
+    // view to switch to, so the anchor stands alone as before.
+    mount.innerHTML = Spine.Anchor.html()
+      + (signing
+        ? '<button class="hub-anchor hub-anchor--orders' + (state.sView === 'orders' ? ' is-on' : '') +
+          '" id="hub-orders-toggle" type="button" aria-pressed="' + (state.sView === 'orders' ? 'true' : 'false') +
+          '"><span class="ic">◧</span> My Orders</button>'
+        : '');
     Spine.Anchor.bind(mount.querySelector('.hub-anchor'), {
       poolSelector: signing ? '.spool' : results ? '.signings-wrap' : '.pool-wrap',
       onDismiss: null   // weekly-results panel is persistent now; the anchor only scrolls to the pool
     });
-    if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); bindSignBoard(); }
+    if (signing) {
+      // The pool anchor is also the way back: pressing it leaves the orders-only view.
+      var poolBtn = mount.querySelector('.hub-anchor:not(.hub-anchor--orders)');
+      if (poolBtn) poolBtn.addEventListener('click', function () { setSignView('pool'); });
+      var ordersBtn = document.getElementById('hub-orders-toggle');
+      if (ordersBtn) ordersBtn.addEventListener('click', function () {
+        setSignView(state.sView === 'orders' ? 'pool' : 'orders');
+      });
+    }
+    if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); applySignView(); bindSignBoard(); }
     else if (results) { renderSignings(); }
     else { renderPool(); if (hasDock()) renderDock(); if (showWeeklyPanel()) loadWeeklyPanel(); }
   }

@@ -1427,6 +1427,9 @@ function wireBadgeFor(kind) {
 }
 
 /** Phase-appropriate status line beneath the feed. */
+/** Signing Day: the Coach's Office card becomes a single call to action. */
+const SIGNING_DAY_WEEK = 35;
+
 function wireStatusLine(week, wire) {
   const w = Number(week || 0);
   const counts = wire.counts || {};
@@ -1464,6 +1467,25 @@ function renderHomeRecruitingWire() {
 
   const events = Array.isArray(wire.events) ? wire.events : [];
   const statusText = wireStatusLine(week, wire);
+  const card = body.closest('.fcc-home-card--recruiting');
+  const footer = card ? card.querySelector('.fcc-recruiting-footnote--embed') : null;
+
+  // Week 35 is a single call to action, not a feed. The wire's whole season of movement
+  // is behind it now, so the card drops the event list entirely and shows one line over
+  // the button, centred. The footnote element is MOVED rather than rebuilt so the button
+  // keeps the click handler updateRecruitingButton() wired onto it by id.
+  if (week === SIGNING_DAY_WEEK) {
+    if (card) card.classList.add('is-signing-day');
+    body.innerHTML = '<div class="fcc-wire-signing">'
+      + `<p class="fcc-wire-signing__copy">${escapeHomeHtml(statusText)}</p>`
+      + '</div>';
+    const stack = body.querySelector('.fcc-wire-signing');
+    if (footer && stack) stack.appendChild(footer);
+    return;
+  }
+  if (card) card.classList.remove('is-signing-day');
+  // Put the footnote back if a previous render moved it into the body.
+  if (card && footer && footer.parentElement !== card) card.appendChild(footer);
   // Always emitted, even when empty: the card reserves a fixed height, and a status
   // line that appears and disappears would move the boundary the list sits above.
   const status = `<div class="fcc-wire-status">${escapeHomeHtml(statusText || '')}</div>`;

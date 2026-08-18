@@ -4145,15 +4145,72 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
    its items' MAX-content, so an uncapped list drags row 2 off the fold as a season
    runs. A max-height alone was not enough either: the list still grew INTO the cap,
    so the card climbed 216px -> 337px over the first dozen events and took row 2 with
-   it. The list is therefore a FIXED height, not a cap — the card reserves its space
-   up front and holds it whether the wire has one event or sixty, and the overflow
-   scrolls. The empty state reserves the same box so week 1 is the same size as week
-   30. 210px is the double-width list height the design already specified. */
-#franchise-container .fcc-home-card--recruiting .fcc-home-list-scroll,
+   it. The card body therefore reserves ONE fixed height for every week of the season,
+   and whatever is inside fits itself to that box:
+     - the wire list flex-fills the space left under the status line and scrolls;
+     - the empty state fills it;
+     - Signing Day centres its call to action in it.
+   One number, not one per state — the list height follows the box rather than being
+   a second constant to keep in sync. */
+#franchise-container .fcc-home-card--recruiting .fcc-home-card-body {
+  /* The one reserved height, every week. On Signing Day the footnote is moved INSIDE
+     this box, so the card measures the same as a week where the footnote is hidden —
+     the button changes what fills the box, never how big it is. */
+  flex: 0 0 auto;
+  height: 242px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+#franchise-container .fcc-home-card--recruiting .fcc-home-recruiting {
+  flex: 1;
+  min-height: 0;
+}
+#franchise-container .fcc-home-card--recruiting .fcc-home-list-scroll {
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  height: auto;
+}
 #franchise-container .fcc-home-card--recruiting .fcc-home-empty {
-  height: 210px;
-  max-height: 210px;
-  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* Signing Day (week 35): one call to action, centred in the card.
+   The event feed is gone, so nothing competes with the button — the copy sits directly
+   above it and the pair is centred on both axes. The footnote's separator rule and its
+   left alignment are dropped here; both exist to divide it from a list that isn't
+   there. The card keeps the same height as every other week (see the fixed-height
+   block above), so row 2 does not move when the season reaches Signing Day. */
+#franchise-container .fcc-home-card--recruiting.is-signing-day .fcc-home-card-body {
+  align-items: center;
+  justify-content: center;
+}
+#franchise-container .fcc-home-card--recruiting.is-signing-day .fcc-wire-signing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+#franchise-container .fcc-home-card--recruiting.is-signing-day .fcc-wire-signing__copy {
+  margin: 0;
+  font-family: 'Inter', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+}
+/* Two IDs, to outrank `#franchise-container #home-tab .fcc-home-card-recruiting
+   .fcc-recruiting-footnote--embed` above — its margin-top/padding-top otherwise survive
+   here and push the button below the optical centre of the stack. */
+#franchise-container #home-tab .fcc-home-card--recruiting.is-signing-day .fcc-recruiting-footnote--embed {
+  margin: 0;
+  padding: 0;
+  border-top: none;
+  justify-content: center;
+  text-align: center;
 }
 
 /* ============================================================

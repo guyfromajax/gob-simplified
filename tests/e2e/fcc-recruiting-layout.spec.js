@@ -394,3 +394,136 @@ test.describe('Coach\'s Office cards hold their size as the wire fills', () => {
     expect(one).toBe(many);
   });
 });
+
+
+test.describe('Signing Day: the Recruiting card is one call to action', () => {
+  /** Drive the REAL renderer so the branch under test is the shipped one. */
+  async function renderWire(page, { week, events }) {
+    await page.evaluate(({ week, events }) => {
+      window.commandCenterTopDataCache = {
+        week,
+        recruiting_wire: { events, counts: { moved: 6, dropped: 3 }, unseen_count: 9 },
+      };
+      window.renderHomeRecruitingWire();
+    }, { week, events });
+  }
+
+  async function mountWithJs(page) {
+    await mount(page, `<div id="franchise-container">${HOME_GRID}</div>`);
+    // Only the functions under test; the module is a classic script full of page globals.
+    const js = require('fs').readFileSync(
+      require('path').join(__dirname, '../../FrontEnd/static/franchise-command-center.js'), 'utf8');
+    const start = js.indexOf('const SIGNING_DAY_WEEK');
+    const end = js.indexOf('/** Secondary hero button');
+    await page.addScriptTag({ content: [
+      'function escapeHomeHtml(s){return String(s==null?"":s);}',
+      'function createEmptyHomeState(m){return "<div class=\\"fcc-home-empty\\">"+m+"</div>";}',
+      'function buildRecruitingUrl(){return "#";}',
+      'function wireBadgeFor(){return "";}',
+      'function wireRowClassFor(){return "fcc-wire-row";}',
+      'function openRecruitingSurface(){}',
+      js.slice(start, end),
+      'window.renderHomeRecruitingWire = renderHomeRecruitingWire;',
+    ].join('\n') });
+  }
+
+  const EVENTS = Array.from({ length: 12 }, (_, i) => ({
+    kind: 'displaced', line: `Jacques Chen dropped Nickel Beach — you're still #2`, week: 30 + (i % 5),
+  }));
+
+  test('week 35 shows no recruiting news at all', async ({ page }) => {
+    await mountWithJs(page);
+    await renderWire(page, { week: 35, events: EVENTS });
+    const m = await page.evaluate(() => {
+      const card = document.querySelector('.fcc-home-card--recruiting');
+      return {
+        rows: card.querySelectorAll('.fcc-wire-row').length,
+        lists: card.querySelectorAll('.fcc-home-list-scroll').length,
+        status: card.querySelectorAll('.fcc-wire-status').length,
+        copy: (card.querySelector('.fcc-wire-signing__copy') || {}).textContent,
+      };
+    });
+    expect(m.rows).toBe(0);
+    expect(m.lists).toBe(0);
+    expect(m.status).toBe(0);
+    expect(m.copy).toContain('Signing Day');
+  });
+
+  test('the copy sits directly above the button, both centred', async ({ page }) => {
+    await mountWithJs(page);
+    await renderWire(page, { week: 35, events: EVENTS });
+    const m = await page.evaluate(() => {
+      const card = document.querySelector('.fcc-home-card--recruiting');
+      const body = card.querySelector('.fcc-home-card-body');
+      // Mirror updateRecruitingButton() on this card FIRST — button shown, its own copy
+      // <p> hidden — then measure. Measuring before these land reads a stale layout.
+      document.getElementById('fcc-recruiting-live-copy-home').style.display = 'none';
+      const btn = document.getElementById('fcc-recruiting-btn-home');
+      btn.style.display = 'inline-flex';
+      const copy = card.querySelector('.fcc-wire-signing__copy').getBoundingClientRect();
+      const b = btn.getBoundingClientRect();
+      const box = body.getBoundingClientRect();
+      return {
+        stacked: b.top >= copy.bottom - 1,               // button below the copy
+        overlaps: b.top < copy.bottom - 1,
+        copyCentreX: copy.left + copy.width / 2, btnCentreX: b.left + b.width / 2,
+        boxCentreX: box.left + box.width / 2,
+        groupCentreY: (copy.top + b.bottom) / 2, boxCentreY: box.top + box.height / 2,
+        inButton: card.querySelector('.fcc-wire-signing').contains(btn),
+      };
+    });
+    expect(m.overlaps).toBe(false);                      // the reported collision
+    expect(m.stacked).toBe(true);
+    expect(m.inButton).toBe(true);
+    expect(Math.abs(m.copyCentreX - m.boxCentreX)).toBeLessThan(2);
+    expect(Math.abs(m.btnCentreX - m.boxCentreX)).toBeLessThan(2);
+    expect(Math.abs(m.groupCentreY - m.boxCentreY)).toBeLessThan(3);
+  });
+
+  test('a normal week still shows the wire, and the card height is unchanged', async ({ page }) => {
+    await mountWithJs(page);
+    await renderWire(page, { week: 30, events: EVENTS });
+    const normal = await page.evaluate(() => {
+      // Mirror updateRecruitingButton(): in a passive week there is no button and no
+      // copy on this card, so the footnote is hidden. Leaving it visible would compare
+      // Signing Day against a state the app never renders.
+      document.querySelector('.fcc-recruiting-footnote--embed').style.display = 'none';
+      const card = document.querySelector('.fcc-home-card--recruiting');
+      return {
+        rows: document.querySelectorAll('.fcc-wire-row').length,
+        h: Math.round(card.getBoundingClientRect().height),
+        body: Math.round(card.querySelector('.fcc-home-card-body').getBoundingClientRect().height),
+        signing: card.classList.contains('is-signing-day'),
+      };
+    });
+    expect(normal.rows).toBe(12);
+    expect(normal.signing).toBe(false);
+
+    await renderWire(page, { week: 35, events: EVENTS });
+    const signing = await page.evaluate(() => {
+      document.getElementById('fcc-recruiting-live-copy-home').style.display = 'none';
+      document.getElementById('fcc-recruiting-btn-home').style.display = 'inline-flex';
+      const card = document.querySelector('.fcc-home-card--recruiting');
+      return { h: Math.round(card.getBoundingClientRect().height),
+               body: Math.round(card.querySelector('.fcc-home-card-body').getBoundingClientRect().height) };
+    });
+    expect(signing.body).toBe(normal.body);  // the reserved box is the same every week
+    expect(signing.h).toBe(normal.h);        // so row 2 does not move on Signing Day
+  });
+
+  test('leaving week 35 restores the footnote and the feed', async ({ page }) => {
+    await mountWithJs(page);
+    await renderWire(page, { week: 35, events: EVENTS });
+    await renderWire(page, { week: 30, events: EVENTS });
+    const m = await page.evaluate(() => {
+      const card = document.querySelector('.fcc-home-card--recruiting');
+      const footer = card.querySelector('.fcc-recruiting-footnote--embed');
+      return { rows: card.querySelectorAll('.fcc-wire-row').length,
+               footerBackOnCard: footer.parentElement === card,
+               strays: card.querySelectorAll('.fcc-wire-signing').length };
+    });
+    expect(m.rows).toBe(12);
+    expect(m.footerBackOnCard).toBe(true);   // the moved element must not be stranded
+    expect(m.strays).toBe(0);
+  });
+});

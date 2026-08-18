@@ -167,10 +167,12 @@ test.describe('Standing column', () => {
         mult: r.querySelector('.stand-mult').textContent.trim(),
       })));
     const byId = Object.fromEntries(m.map((x) => [x.id, x]));
-    // r-0 => user #1 (x5), r-1 => user #2 (x3), r-2 => absent (x1)
-    expect(byId['r-0']).toMatchObject({ pos: '#1', mult: 'x5' });
-    expect(byId['r-1']).toMatchObject({ pos: '#2', mult: 'x3' });
-    expect(byId['r-2']).toMatchObject({ pos: '—', mult: 'x1' });
+    // Reads "5x odds", not "x5": the number multiplies his odds of signing with you,
+    // and the bare "x5" read as a quantity. Changed deliberately.
+    // r-0 => user #1 (5x), r-1 => user #2 (3x), r-2 => absent (1x)
+    expect(byId['r-0']).toMatchObject({ pos: '#1', mult: '5x odds' });
+    expect(byId['r-1']).toMatchObject({ pos: '#2', mult: '3x odds' });
+    expect(byId['r-2']).toMatchObject({ pos: '—', mult: '1x odds' });
   });
 });
 
@@ -272,11 +274,18 @@ test.describe('steppers stop at 0 remaining', () => {
     expect(enabled).toBe(3);
   });
 
-  test('the per-recruit cap holds', async ({ page }) => {
+  test('REVERSED: there is no per-recruit cap — only the 50-point budget binds', async ({ page }) => {
+    // The 20-point ceiling was removed: all 50 can go on one recruit if that is the call.
     await mount(page, { savedEntries: [{ id: 'r-0', points: 20, playing_time: false }] });
-    const disabled = await page.evaluate(() =>
+    const stillOpen = await page.evaluate(() =>
       document.querySelector('#hub-sign .prow[data-id="r-0"] .stepper button[data-step="1"]').disabled);
-    expect(disabled).toBe(true);
+    expect(stillOpen).toBe(false);
+
+    // The budget is what stops it.
+    await mount(page, { savedEntries: [{ id: 'r-0', points: 50, playing_time: false }] });
+    const spent = await page.evaluate(() =>
+      document.querySelector('#hub-sign .prow[data-id="r-0"] .stepper button[data-step="1"]').disabled);
+    expect(spent).toBe(true);
   });
 });
 
