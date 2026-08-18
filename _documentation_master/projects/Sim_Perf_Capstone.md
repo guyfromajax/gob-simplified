@@ -226,6 +226,11 @@ A single spread value (`[2]`) means the fixture is flat and the run understates 
 5. **Timing claims use medians of 3+ on a quiet box.** Wall-clock is noisy (~±5% even quiet, 1.5–2×
    under a CPU hog). Prefer phase self-times, call counts, and CPU-time (`getrusage`) — all more
    robust than wall. Watch for a background hog before trusting any wall number.
+   **CPU-time is *more* robust than wall, not immune.** On a heterogeneous CPU (Apple P/E cores) a
+   loaded box reschedules workers onto efficiency cores and the *same work bills 2.5× the
+   CPU-seconds* — measured 2026-08-17, 148s → 375s for one identical seeded week. **Call counts are
+   the only contention-proof instrument** (`cProfile` ncalls, phase `calls`). See the 2026-08-18 case
+   study.
 
 ---
 
@@ -537,3 +542,56 @@ entire test tree was exempt. If you add a test root, give it a guard.
 legitimately change basketball and may cost some compute — verify distributionally, budget them)
 from *pure diagnostics* (gate OFF for bulk sims — free win, no behavior change). Profile to attribute
 the cost per phase before touching anything.
+
+### Regression case study — the deploy lottery, and two instruments that lied (2026-08-18)
+
+**Symptom:** staging weeks at 80–85 s against production's 35 s, on the same franchise state.
+Production was 4 commits behind, and those 4 were the Sim Game Experience work — so the code gap
+looked like the obvious culprit. It wasn't. **Nothing in the code or the data was involved.**
+
+**Root cause:** the staging service was scheduled onto a different Railway host type. One field in
+`[POOL-EFFICIENCY]` carried the whole story:
+
+| | `cpus=` | cpu_week worker CPU | efficiency | wall |
+|---|---|---|---|---|
+| staging, bad host | **48** | 420.8 s | 62% | 84.9 s |
+| staging, after redeploy | **32** | 227.4 s | 89% | 31.9 s |
+| production (14 wks stable) | **32** | ~250 s | 89–91% | ~34.5 s |
+
+A redeploy moved it to a 32-core host and **every metric normalised at once** — sim, PS, autotrain
+and persistence together. That simultaneity is the tell: a code change cannot move a Mongo write, a
+training pool and a sim pool by the same factor.
+
+**Why it looked like the feature work.** Staging redeploys on every push; production doesn't. A
+deploy in the same window moved it onto the bad host, so the slowdown correlated perfectly with the
+Sim Game Experience commits while being caused by none of them. **Deploy-time correlation is not
+code causation when the deploy also re-rolls the machine.**
+
+**Two instruments this document recommends gave wrong answers.**
+
+1. **CPU-time is not contention-immune.** `worker_cpu` for one identical seeded week read 375 s on a
+   loaded laptop and 148 s on the same laptop quiet — the box had a game pinning 2 cores, and macOS
+   rescheduled workers onto efficiency cores, so identical work billed 2.5× the CPU-seconds. Two
+   conclusions were drawn and retracted on that basis ("this franchise's data is expensive", "there
+   is a 6→11 s/game spread between weeks"). **Only call counts are contention-proof.**
+2. **Railway's Console is not the app's container.** It spins a separate instance of the image:
+   `cpus=32` in the console while the running app logged `cpus=48`, and Sentry's `server_name` never
+   matched a console hostname. Every console measurement — the CPU loop benchmark, the Python
+   version, the `bson.has_c()` check — described the wrong machine, and the hardware hypothesis was
+   wrongly dismissed on that evidence. **Verify which host you are on before trusting a shell.**
+
+**What did work.** `git worktree` A/B of the two deployed commits against identical franchise data,
+back to back on one box: production's commit 147.3 s vs HEAD 148.3 s of worker CPU — the four
+suspect commits cleared in one measurement. Then the same seeded harness run *inside* the staging
+container (`scripts/perf_sim_baseline.py`, same `--seed`), which matched production exactly and
+proved the container was capable, isolating the fault to the app's host.
+
+**Runbook — slower sims, no clear cause:**
+
+1. **Read `cpus=` in `[POOL-EFFICIENCY]` first.** `32` + `worker_cpu` ~230–250 s + ~90% efficiency is
+   healthy. `48` + ~420 s + ~62% is a bad host.
+2. **Bad host → redeploy to re-roll the scheduler.** Costs nothing, and re-check the same line after.
+3. **`cpus` already healthy → the redeploy will not help.** Investigate code and data, and use the
+   worktree A/B above rather than reasoning from a diff.
+4. **Check `cpus=` after every production deploy.** Production is stable only because it is rarely
+   redeployed; a merge re-rolls that dice for real users.
