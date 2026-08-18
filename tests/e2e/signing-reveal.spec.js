@@ -173,6 +173,9 @@ async function submitAndReveal(page, opts = {}) {
     };
   }, signed);
   await page.click('#sign-submit');
+  // Submit now only saves — the confirm modal stands between saving and running.
+  await page.waitForSelector('#ssum-go', { timeout: 5000 });
+  await page.click('#ssum-go');
   await page.waitForSelector('#hub-reveal', { timeout: 5000 });
   return signed;
 }
@@ -291,18 +294,23 @@ test.describe('no replay', () => {
     await submitAndReveal(page);
     await page.click('#rv-skip');
     await page.waitForFunction(() => !!document.getElementById('rv-done'));
-    await page.click('#rv-skip');
+    // Skip is gone at the end now, so force extra renders directly — the guard is
+    // seenSent, not the number of clicks available.
+    await page.evaluate(() => {
+      for (let i = 0; i < 5; i += 1) window.__hubRenderReveal && window.__hubRenderReveal();
+    });
     const n = await page.evaluate(() =>
       window.__seen.filter((u) => u.includes('week-35-reveal-seen')).length);
     expect(n).toBe(1);
   });
 
-  test('Continue hands off to the submit summary', async ({ page }) => {
+  test('Continue leaves the reveal for the FCC', async ({ page }) => {
     await submitAndReveal(page);
     await page.click('#rv-skip');
+    const nav = page.waitForNavigation({ timeout: 5000 }).catch(() => null);
     await page.click('#rv-done');
-    expect(await page.locator('#hub-reveal').count()).toBe(0);
-    expect(await page.locator('.ssum-overlay').count()).toBe(1);
+    await nav;
+    expect(page.url()).toContain('franchise-command-center');
   });
 });
 
@@ -372,5 +380,125 @@ test.describe('no percentage anywhere (ported)', () => {
     const { signed, conferences } = conferenceFixture();
     await mountPool(page, { week: 36, signed, conferences });
     expect(await textWithPercent('#hub-signings')(page)).toEqual([]);
+  });
+});
+
+test.describe('Orders Submitted modal (confirm before running)', () => {
+  test('Submit saves the orders and opens the modal — it does NOT run recruiting', async ({ page }) => {
+    const { signed, conferences } = conferenceFixture();
+    await mountPool(page, { week: 35, signed: null, conferences });
+    await page.evaluate((s) => {
+      window.__seen = [];
+      const real = window.RecruitingCommon.fetchJSON;
+      window.RecruitingCommon.fetchJSON = function (url, options) {
+        const u = String(url);
+        if (u.includes('run-week-35')) { window.__seen.push(u); return Promise.resolve({ status: 'success', week: 36, results: { signed_players: s } }); }
+        if (u.includes('recruiting-orders') || u.includes('week-35-reveal-seen')) { window.__seen.push(u); return Promise.resolve({}); }
+        return real.call(this, url, options);
+      };
+    }, signed);
+    await page.click('#sign-submit');
+    await page.waitForSelector('.ssum-overlay');
+    const m = await page.evaluate(() => ({
+      title: document.querySelector('.ssum-title').textContent.trim(),
+      buttons: [...document.querySelectorAll('.ssum-foot button')].map((b) => b.textContent.trim()),
+      calls: window.__seen.map((u) => u.split('/').pop()),
+      revealUp: !!document.getElementById('hub-reveal'),
+    }));
+    expect(m.title).toBe('Orders Submitted');
+    expect(m.buttons).toEqual(['Back to Orders', 'Run Recruiting']);
+    // Orders saved; recruiting NOT yet run — that was the out-of-place part before.
+    expect(m.calls).toContain('recruiting-orders');
+    expect(m.calls).not.toContain('run-week-35-recruiting');
+    expect(m.revealUp).toBe(false);
+  });
+
+  test('Back to Orders returns to an editable board with the CTA re-armed', async ({ page }) => {
+    const { signed, conferences } = conferenceFixture();
+    await mountPool(page, { week: 35, signed: null, conferences });
+    await page.evaluate(() => {
+      const real = window.RecruitingCommon.fetchJSON;
+      window.RecruitingCommon.fetchJSON = function (url, options) {
+        if (String(url).includes('recruiting-orders')) return Promise.resolve({});
+        return real.call(this, url, options);
+      };
+    });
+    await page.click('#sign-submit');
+    await page.waitForSelector('#ssum-back');
+    await page.click('#ssum-back');
+    const m = await page.evaluate(() => {
+      const btn = document.getElementById('sign-submit');
+      return { overlay: document.querySelectorAll('.ssum-overlay').length,
+               label: btn.textContent.trim(), disabled: btn.disabled,
+               rows: document.querySelectorAll('.spool-rows .prow').length };
+    });
+    expect(m.overlay).toBe(0);
+    expect(m.label).toBe('Submit Orders');
+    expect(m.disabled).toBe(false);
+    expect(m.rows).toBeGreaterThan(0);     // still editable
+  });
+});
+
+test.describe('reveal layout holds still', () => {
+  test('the title, meter and buttons do not move as results fill in', async ({ page }) => {
+    await submitAndReveal(page, { mine: 3, others: 12 });
+    const geo = () => page.evaluate(() => {
+      const r = (s) => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().top) : null; };
+      return { title: r('.rvtitle'), head: r('.rvhead'), rows: r('.rvrows'),
+               rowsH: Math.round(document.querySelector('.rvrows').getBoundingClientRect().height),
+               foot: r('.rvfoot') };
+    });
+    const first = await geo();
+    await page.click('#rv-skip');
+    const second = await geo();
+    await page.click('#rv-skip');
+    const third = await geo();
+    expect(second).toEqual(first);
+    expect(third).toEqual(first);
+  });
+
+  test('the rows box holds six and scrolls the rest', async ({ page }) => {
+    await submitAndReveal(page, { mine: 3, others: 12 });
+    await page.click('#rv-skip');
+    await page.waitForFunction(() => !!document.getElementById('rv-done'));
+    // The newest row animates in over 0.34s with a translateY; measuring mid-flight puts
+    // it outside the box. Let it settle, then measure the real rects.
+    await page.waitForTimeout(450);
+    const m = await page.evaluate(() => {
+      const box = document.querySelector('.rvrows');
+      const rows = [...box.querySelectorAll('.rvrow')];
+      const bb = box.getBoundingClientRect();
+      const fullyVisible = rows.filter((r) => {
+        const b = r.getBoundingClientRect();
+        return b.top >= bb.top - 1 && b.bottom <= bb.bottom + 1;
+      }).length;
+      return { total: rows.length, fullyVisible, scrolls: box.scrollHeight > box.clientHeight + 1 };
+    });
+    expect(m.total).toBe(15);
+    expect(m.fullyVisible).toBe(6);
+    expect(m.scrolls).toBe(true);
+  });
+
+  test('the header names the user\'s own conference by number', async ({ page }) => {
+    await submitAndReveal(page);
+    const title = await page.evaluate(() => document.querySelector('.rvtitle').textContent.trim());
+    expect(title).toBe('Conference 9 Recruiting Results');
+  });
+});
+
+test.describe('finished state', () => {
+  test('Skip To End is gone once every result is out — only Continue remains', async ({ page }) => {
+    await submitAndReveal(page);
+    expect(await page.locator('#rv-skip').count()).toBe(1);
+    await page.click('#rv-skip');
+    await page.waitForFunction(() => !!document.getElementById('rv-done'));
+    const m = await page.evaluate(() => ({
+      skip: document.querySelectorAll('#rv-skip').length,
+      note: document.querySelectorAll('.rvskip-note').length,
+      buttons: [...document.querySelectorAll('.rvfoot button')].map((b) => b.textContent.trim()),
+    }));
+    expect(m.skip).toBe(0);
+    expect(m.note).toBe(0);        // the note goes with the button
+    expect(m.buttons).toEqual(['Continue']);
   });
 });

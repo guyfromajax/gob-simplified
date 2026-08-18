@@ -285,7 +285,12 @@
    ============================================================ */
 .rvhost{position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;
   background:radial-gradient(120% 78% at 50% 24%,rgba(39,64,142,.16),transparent 62%),rgba(8,10,16,.97)}
-.rvwrap{width:min(760px,94vw);max-height:92vh;display:flex;flex-direction:column;gap:14px;padding:22px}
+/* Static shell: the rows box is sized to exactly REVEAL_VISIBLE_ROWS, so the title and
+   meter above and the buttons below hold still as results fill in. Previously the wrap
+   grew with the list and pushed both away from the centre. */
+.rvwrap{width:min(760px,94vw);display:flex;flex-direction:column;gap:14px;padding:22px}
+.rvtitle{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:24px;
+  letter-spacing:.05em;color:#fff;text-align:center}
 .rvhead{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px}
 .rvcount{font:600 13px/1 var(--body);color:var(--muted-2);font-variant-numeric:tabular-nums;white-space:nowrap}
 .rvcount b{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:26px;color:#fff;margin-right:2px}
@@ -297,7 +302,11 @@
   letter-spacing:.08em;color:rgba(255,255,255,.26)}
 .rvtick.is-at{color:#fff}
 .rvgrade{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:32px;line-height:1;color:#fff;min-width:52px;text-align:right}
-.rvrows{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding-right:4px}
+/* --rv-row-h is one .rvrow (44px avatar + 2x9px padding + 2x1px border = 64). Six rows
+   plus five gaps is the fixed height; older results scroll rather than resize the box. */
+.rvrows{--rv-row-h:64px;--rv-row-gap:7px;
+  height:calc(6 * var(--rv-row-h) + 5 * var(--rv-row-gap));
+  flex:0 0 auto;overflow-y:auto;display:flex;flex-direction:column;gap:var(--rv-row-gap);padding-right:4px}
 .rvwait{padding:34px;text-align:center;color:var(--muted-3);font:600 12px/1.5 var(--body)}
 .rvrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto minmax(0,150px);align-items:center;gap:12px;
   padding:9px 12px;border-radius:11px;border:1px solid var(--border);background:rgba(255,255,255,.03)}
@@ -312,7 +321,7 @@
 .rvteam{font:600 11.5px/1.3 var(--body);color:var(--muted-2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rvyou{display:inline-block;margin-left:7px;padding:2px 5px 1px;border-radius:4px;background:#34EC27;color:#06210a;
   font:700 8.5px/1 var(--body);letter-spacing:.08em;vertical-align:middle}
-.rvfoot{display:flex;flex-direction:column;align-items:center;gap:5px}
+.rvfoot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:44px}
 .rvbtn{height:38px;padding:0 20px;border-radius:9px;border:1px solid var(--border);background:rgba(255,255,255,.05);
   color:var(--text);font:700 12px/1 var(--body);letter-spacing:.03em;cursor:pointer;transition:.13s}
 .rvbtn:hover{background:rgba(255,255,255,.1);border-color:var(--muted-3)}
@@ -341,3 +350,10 @@
 .lsnm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgba(255,255,255,.86)}
 .lspos{color:var(--muted-3);font-size:10.5px}
 .lsrt{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:14px;text-align:right}
+
+/* Orders Submitted modal: two choices, ghost + green action. Back to Orders is a
+   no-op close — the orders are already saved, so nothing is lost by editing again. */
+.ssum-foot{display:flex;align-items:center;justify-content:center;gap:10px}
+.ssum-back{height:40px;padding:0 18px;border-radius:9px;border:1px solid var(--border);
+  background:transparent;color:var(--muted-2);font:700 12px/1 var(--body);letter-spacing:.03em;cursor:pointer;transition:.13s}
+.ssum-back:hover{color:#fff;background:rgba(255,255,255,.06);border-color:var(--muted-3)}

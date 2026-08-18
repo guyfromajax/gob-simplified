@@ -1084,11 +1084,47 @@
         rows.length + ' recruit' + (rows.length === 1 ? '' : 's') +
         (promises ? ' · ' + promises + ' binding ' + (promises === 1 ? 'promise' : 'promises') : '') +
         '</div></div>' + body +
-      '<div class="ssum-foot"><button class="ssum-go" id="ssum-go" type="button">Back to Locker Room</button></div></div>';
+      '<div class="ssum-foot">' +
+        '<button class="ssum-back" id="ssum-back" type="button">Back to Orders</button>' +
+        '<button class="ssum-go" id="ssum-go" type="button">Run Recruiting</button>' +
+      '</div></div>';
     document.body.appendChild(overlay);
+    // Back to Orders: the orders are already saved, so closing loses nothing and the
+    // board is still editable. Run Recruiting is the irreversible step.
+    var back = overlay.querySelector('#ssum-back');
+    if (back) back.addEventListener('click', function () {
+      overlay.remove();
+      var btn = document.getElementById('sign-submit');
+      if (btn) { btn.disabled = false; btn.textContent = 'Submit Orders'; }
+    });
     var go = overlay.querySelector('#ssum-go');
-    go.addEventListener('click', function () { window.location.href = Common.buildFccUrl(context); });
+    go.addEventListener('click', function () { overlay.remove(); runRecruiting(); });
     go.focus();
+  }
+
+  /**
+   * Run the signings, then hand straight to the reveal.
+   *
+   * Split out of submitOrders so the confirm modal sits between SAVING the orders and
+   * RUNNING them — previously it appeared after the results were already resolved, which
+   * put "Orders Submitted" on screen after the decision could no longer be changed.
+   */
+  function runRecruiting() {
+    var btn = document.getElementById('sign-submit');
+    if (btn) { btn.disabled = true; btn.textContent = 'Running…'; }
+    Common.fetchJSON(API_CONFIG.buildUrl('/franchise/run-week-35-recruiting'), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ franchise_id: context.franchiseId })
+    }).then(function (res) {
+      state.week35Ran = true;
+      // The signings were resolved by the call we just made, so state.week35Results —
+      // loaded when the page opened — is stale. Take what the endpoint produced.
+      if (res && res.results) state.week35Results = res.results;
+      startReveal();
+    }).catch(function (err) {
+      console.error(err); showToast('Run failed', String(err && err.message || err), false);
+      if (btn) { btn.disabled = false; btn.textContent = 'Submit Orders'; }
+    });
   }
 
   // ===================== SIGNING DAY CONFERENCE REVEAL =====================
@@ -1098,6 +1134,30 @@
   // the conference).
 
   var REVEAL_HOLD_MS = 3000;
+  /** The reveal owns the screen, so it owns the audio: the National Tournament bed. */
+  var REVEAL_TRACK = 'pregame-national-tourney.mp3';
+  /** Rows visible at once. The container is sized to exactly this many so the header
+   *  above and the buttons below never move as results fill in. */
+  var REVEAL_VISIBLE_ROWS = 6;
+
+  /**
+   * Swap the franchise loop for the tournament bed while the reveal is up.
+   * recruiting-hub.js is a classic script, so the module is pulled in dynamically —
+   * same URL as the page's own import, therefore the same audio elements.
+   */
+  function revealMusic(on) {
+    var url = (window.API_CONFIG && API_CONFIG.buildStaticPath)
+      ? API_CONFIG.buildStaticPath('/js/musicController.js')
+      : '/js/musicController.js';
+    import(url).then(function (m) {
+      if (on) {
+        if (m.clearFranchiseMusicState) m.clearFranchiseMusicState();
+        if (m.playGameplayTrack) m.playGameplayTrack(REVEAL_TRACK);
+      } else if (m.stopGameplayTrack) {
+        m.stopGameplayTrack();
+      }
+    }).catch(function (err) { console.warn('[REVEAL] music skipped', err); });
+  }
   // The grade run the meter walks down. Mirrors RT_BANDS in rtBucket.js, which owns the
   // thresholds; taken from there at runtime so the two cannot drift.
   function revealGrades() {
@@ -1167,12 +1227,23 @@
       ? shown.map(function (e, n) { return revealRowHtml(e, n === 0); }).join('')
       : '<div class="rvwait">Conference signings begin…</div>';
 
-    var skipLabel = remaining === -1 ? 'Skip To End' : 'Skip To My Next Signing';
-    var skipNote = remaining === -1
-      ? '<div class="rvskip-note">' + mineLeft + ' signings remain for your team</div>'
-      : '';
+    // Once every signing is out, the skip control has nothing left to skip to — the
+    // note goes with the button rather than sitting under a missing one.
+    var footer = state.reveal.done
+      ? '<button class="rvbtn is-go" id="rv-done" type="button">Continue</button>'
+      : '<button class="rvbtn" id="rv-skip" type="button">' +
+          (remaining === -1 ? 'Skip To End' : 'Skip To My Next Signing') + '</button>' +
+        (remaining === -1
+          ? '<div class="rvskip-note">' + mineLeft + ' signings remain for your team</div>'
+          : '');
+
+    var conf = (state.conferences && state.conferences.user_conference) || null;
+    var title = conf
+      ? 'Conference ' + conf + ' Recruiting Results'
+      : 'Recruiting Results';
 
     return '<div class="rvwrap">' +
+      '<div class="rvtitle">' + Common.escapeHtml(title) + '</div>' +
       '<div class="rvhead">' +
         '<div class="rvcount"><b>' + i + '</b>/' + total + '</div>' +
         '<div class="rvmeter"><div class="rvmeter-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
@@ -1180,10 +1251,7 @@
         '<div class="rvgrade">' + Common.escapeHtml(currentGrade) + '</div>' +
       '</div>' +
       '<div class="rvrows">' + body + '</div>' +
-      '<div class="rvfoot">' +
-        '<button class="rvbtn" id="rv-skip" type="button">' + skipLabel + '</button>' + skipNote +
-        (state.reveal.done ? '<button class="rvbtn is-go" id="rv-done" type="button">Continue</button>' : '') +
-      '</div></div>';
+      '<div class="rvfoot">' + footer + '</div></div>';
   }
 
   function renderReveal() {
@@ -1199,6 +1267,9 @@
     var done = host.querySelector('#rv-done');
     if (done) done.addEventListener('click', function () { finishReveal(); });
   }
+
+  // Test seam: lets a spec force extra renders to prove the seen-stamp fires once.
+  window.__hubRenderReveal = function () { renderReveal(); };
 
   function revealTo(index) {
     var list = revealList();
@@ -1227,15 +1298,19 @@
 
   function finishReveal() {
     stopReveal();
+    revealMusic(false);
     var host = document.getElementById('hub-reveal');
     if (host) host.remove();
-    showSubmitSummary(state.reveal.summaryRows || []);
+    // The confirm modal now comes BEFORE the run, so Continue leaves for the FCC.
+    window.location.href = Common.buildFccUrl(context);
   }
 
-  function startReveal(summaryRows) {
+  function startReveal() {
     var list = revealList();
-    state.reveal = { index: 0, done: false, timer: null, summaryRows: summaryRows, seenSent: false };
-    if (!list.length) { markRevealSeen(); showSubmitSummary(summaryRows); return; }
+    state.reveal = { index: 0, done: false, timer: null, seenSent: false };
+    // Nothing to reveal: stamp it seen and go, rather than opening an empty screen.
+    if (!list.length) { markRevealSeen(); window.location.href = Common.buildFccUrl(context); return; }
+    revealMusic(true);
     var host = document.createElement('div');
     host.className = 'rvhost';
     host.id = 'hub-reveal';
@@ -1255,18 +1330,9 @@
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ franchise_id: context.franchiseId, order_entries: entries })
     }).then(function () {
-      return Common.fetchJSON(API_CONFIG.buildUrl('/franchise/run-week-35-recruiting'), {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ franchise_id: context.franchiseId })
-      });
-    }).then(function (res) {
-      state.week35Ran = true;
-      // The signings were resolved by the call we just made, so state.week35Results —
-      // loaded when the page opened — is stale. run-week-35-recruiting returns the
-      // results it produced; take them rather than revealing an empty conference.
-      if (res && res.results) state.week35Results = res.results;
-      // The reveal is the payoff; the summary follows it rather than replacing it.
-      startReveal(summaryRows);
+      // Orders are SAVED, not run. The modal is the confirm step: Back to Orders keeps
+      // editing, Run Recruiting commits.
+      showSubmitSummary(summaryRows);
     }).catch(function (err) {
       console.error(err); showToast('Submit failed', String(err && err.message || err), false);
       if (btn) { btn.disabled = false; btn.textContent = 'Submit Orders'; }

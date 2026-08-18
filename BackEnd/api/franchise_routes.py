@@ -18152,6 +18152,15 @@ def finish_season(req: FinishSeasonRequest):
             "recruiting_results": {},
             "recruiting_lean_updates_applied": {},
             "recruiting_performance_lean_applied": {},
+            # The whole recruit pool is regenerated below, so every per-recruit record
+            # from last season is stale the moment the season turns. These four were
+            # missed, and the wire in particular carried last season's movement into the
+            # new season's Coach's Office — week-28 events under a Season 2 / Week 1
+            # header, with the badge still counting them as unseen.
+            RECRUITING_LEAN_EVENTS_FIELD: {},
+            RECRUITING_WIRE_SEEN_WEEK_FIELD: 0,
+            RECRUITING_WATCHLIST_FIELD: [],
+            RECRUITING_BOARD_SAVED_WEEK_FIELD: 0,
             FCC_PENDING_NEW_LEAN_RECRUITS_FIELD: [],
             "week_35_recruiting_ran": False,
             WEEK_35_RECRUITING_RESULTS_FIELD: {},

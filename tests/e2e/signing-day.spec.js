@@ -397,13 +397,18 @@ test.describe('submit summary', () => {
     expect(m.text).not.toContain('%');
   });
 
-  test('both requests fire before the summary appears', async ({ page }) => {
+  test('REVERSED: only the SAVE fires before the summary — running is a separate choice', async ({ page }) => {
+    // The modal used to appear after the signings had already been resolved, which put
+    // "Orders Submitted" on screen once the decision could no longer be changed. Submit
+    // now saves and asks; Run Recruiting is what commits.
     await mount(page, { savedEntries: [{ id: 'r-0', points: 5, playing_time: false }] });
     await page.click('#sign-submit');
     await page.waitForSelector('.ssum-overlay');
     const writes = await page.evaluate(() => window.__writes.map((w) => w.url));
     expect(writes.some((u) => u.includes('/franchise/recruiting-orders'))).toBe(true);
-    expect(writes.some((u) => u.includes('/franchise/run-week-35-recruiting'))).toBe(true);
+    expect(writes.some((u) => u.includes('/franchise/run-week-35-recruiting'))).toBe(false);
+    // The other half — that Run Recruiting DOES fire it and opens the reveal — is covered
+    // in signing-reveal.spec.js. Pressing it here navigates, which tears down __writes.
   });
 
   test('submitting nothing still explains the consequence', async ({ page }) => {
