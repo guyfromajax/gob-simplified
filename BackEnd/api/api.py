@@ -828,7 +828,8 @@ try:
             try:
                 # ✅ FTD: Load team_attributes from franchise_team_data collection instead of franchise doc
                 from BackEnd.db import franchise_team_data_collection
-                from bson import ObjectId
+                # (module-level ObjectId — a local import here shadowed it for the whole
+                # function, breaking the tournament lookup at L814)
                 
                 # Convert team_id to ObjectId if it's a string
                 try:
@@ -5220,7 +5221,8 @@ try:
                 # Include the complete db_summary (without animations) in the response
                 # This is the same document that was just saved to the database
                 # ✅ FIX: Convert ObjectIds to strings for JSON serialization (recursively)
-                from bson import ObjectId
+                # (module-level ObjectId — a local import here shadowed it for the whole
+                # function, breaking the game-id fallback lookups at L4228/L4637)
                 import json
                 
                 def convert_objectids(obj):
@@ -6736,7 +6738,11 @@ try:
         # Strategy 2: If not found and looks like ObjectId, try ObjectId lookup and get team_id string
         if not team_doc and len(lookup_value) == 24 and all(c in '0123456789abcdefABCDEF' for c in lookup_value):
             try:
-                from bson import ObjectId
+                # NOTE: no local `from bson import ObjectId` here. This branch is
+                # conditional (24-char hex only), but a function-scoped import binds
+                # the name for the WHOLE function — so every name-based lookup that
+                # skipped this branch hit UnboundLocalError at the standings lookup
+                # below (Sentry PYTHON-FASTAPI-72). Use the module-level import.
                 obj_id = ObjectId(lookup_value)
                 team_doc = teams_collection.find_one({"_id": obj_id})
                 if team_doc:
