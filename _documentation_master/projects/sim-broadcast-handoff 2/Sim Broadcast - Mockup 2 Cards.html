@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sim Broadcast — Mockup 2 · Cards</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sim-broadcast-frame.css">
+<style>
+/* ---- cards in the directed slot (200px reserved band, stage geometry never moves) ---- */
+.card{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:8px;padding:14px 15px;border-radius:11px;
+  background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.012));box-shadow:inset 0 0 0 1px var(--cc),0 12px 30px rgba(0,0,0,.5);
+  opacity:1;transform:none;transition:opacity .18s cubic-bezier(.2,.7,.2,1),transform .18s cubic-bezier(.2,.7,.2,1)}
+.card.enter{opacity:0;transform:scale(.985) translateY(5px)}
+.ctag{align-self:flex-start;font-family:var(--bebas);font-size:12px;line-height:1;letter-spacing:.16em;padding:3px 7px 2px;border-radius:4px;border:1px solid}
+.cline{font-family:var(--bebas);font-size:31px;line-height:1.02;letter-spacing:.02em;color:#fff;text-wrap:balance}
+.csub{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:var(--w40)}
+.cmargin{display:flex;flex-direction:column;gap:6px}
+.cmrow{display:flex;align-items:baseline;justify-content:space-between}
+.cmval{font-family:var(--bebas);font-size:34px;line-height:1;letter-spacing:.02em}
+.cmtug{position:relative;height:13px;border-radius:7px;background:rgba(255,255,255,.07)}
+.cmtug::before{content:'';position:absolute;left:50%;top:-3px;bottom:-3px;width:1px;background:rgba(255,255,255,.22)}
+.cmtug .pull{position:absolute;top:0;bottom:0;border-radius:7px}
+.cset{display:inline-flex;align-items:center;gap:6px;align-self:flex-start;font-family:var(--bebas);font-size:15px;letter-spacing:.14em;color:var(--w70);border:1px solid rgba(255,255,255,.16);border-radius:5px;padding:3px 8px 2px}
+.cset b{color:var(--gold);font-weight:400}
+.cbig{display:flex;align-items:baseline;gap:9px}
+.cbig .n{font-family:var(--bebas);font-size:40px;line-height:1;color:#fff}
+.cbig .l{font-family:var(--bebas);font-size:15px;letter-spacing:.14em;color:var(--w55)}
+.zones .board{transition:filter .18s,opacity .18s}
+.zones.tdim .board{filter:brightness(.72)}
+.zones.tblur .board{filter:blur(3px) brightness(.42);opacity:.55}
+
+/* ---- harness: cadence log ---- */
+.log{display:flex;flex-direction:column;gap:0;max-height:238px;overflow:hidden}
+.lg{display:grid;grid-template-columns:34px 74px 1fr;gap:6px;align-items:baseline;padding:3.5px 0;border-bottom:1px dashed rgba(21,23,28,.1);font-family:var(--mono);font-size:9.5px;color:rgba(21,23,28,.4)}
+.lg .lk{letter-spacing:.08em}
+.lg .lx{color:rgba(21,23,28,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lg.f{color:rgba(21,23,28,.8)}.lg.f .lx{color:#15171c;font-weight:600}
+.lstats{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:10px;font-size:11.5px}
+.lstats span{color:rgba(21,23,28,.5)}.lstats b{font-variant-numeric:tabular-nums}
+.promo{background:#0b0d14;border-radius:10px;padding:18px;display:flex;align-items:center;gap:26px}
+.promo .cell{width:376px;position:relative}
+.promo .cell.q{padding:10px 12px;border-radius:11px;background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.008));box-shadow:inset 0 0 0 1px rgba(255,255,255,.045)}
+.promo .cell.p{height:200px}
+.promo .arrow{font-family:var(--bebas);font-size:22px;color:rgba(255,255,255,.3);letter-spacing:.1em}
+.promo .lbl{position:absolute;top:-14px;left:0;font-family:var(--mono);font-size:8.5px;letter-spacing:.16em;color:rgba(255,255,255,.3)}
+@media (prefers-reduced-motion:reduce){.card{transition:none}.zones .board{transition:none}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="phead">
+    <h1>Sim Broadcast — Mockup 2</h1><span class="k">CARDS · STAGE 400 LOCKED</span>
+    <p>Same frame as mockup 1 — stage 400, worm expanded at rest, controls under stage. The directed slot's 200px is reserved either way, so a card never moves the stage. Live mode runs the real selection engine: weighting, per-player cooldowns, variety holds and cadence caps, with every decision logged at right.</p>
+  </div>
+
+  <div class="frame" id="frame">
+    <div class="sb" id="sb"></div>
+    <div class="overlay" id="ov">
+      <div class="zones" id="zones">
+        <div class="board away" id="boardAway"></div>
+        <div class="stage" id="stage"></div>
+        <div class="board home" id="boardHome"></div>
+      </div>
+      <div class="footer" id="footer"></div>
+    </div>
+  </div>
+
+  <div class="harness">
+    <div class="hcard">
+      <div class="sechead">CONTROLS</div>
+      <div class="hgrid">
+        <div class="hq"><span class="lab">Mode</span><div class="seg" data-k="mode"><button data-v="live">Live playback</button><button data-v="study">Study (freeze)</button></div></div>
+        <div class="hq"><span class="lab">Card type (study)</span><div class="seg" data-k="type"><button data-v="moment">Moment</button><button data-v="run">Run</button><button data-v="margin">Margin</button><button data-v="context">Context</button></div></div>
+        <div class="hq"><span class="lab">Board treatment under a card</span><div class="seg" data-k="board"><button data-v="none">None</button><button data-v="tdim">Dim .72</button><button data-v="tblur">Quarter-break blur</button></div></div>
+        <div class="hq"><span class="lab">Playback speed</span><div class="seg" data-k="speed"><button data-v="1">1×</button><button data-v="2">2×</button><button data-v="4">4×</button></div></div>
+      </div>
+    </div>
+    <div class="hcard">
+      <div class="sechead">CADENCE</div>
+      <div class="lstats" id="copysrc" style="margin:0 0 8px"></div>
+      <div class="lstats" id="lstats"></div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="sechead">PROMOTION — THE SAME TUG, QUIET THEN PROMOTED</div>
+    <div class="promo">
+      <div class="cell q" id="promoQuiet"><span class="lbl">REST · TEAM PANEL</span></div>
+      <span class="arrow">▶</span>
+      <div class="cell p" id="promoCard"><span class="lbl">CARD · DIRECTED SLOT</span></div>
+    </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script src="sim-broadcast-parts.js"></script>
+<script src="sim-moment-pack.js"></script>
+<script src="sim-card-engine.js"></script>
+<script>
+const S={stagew:400,rest:'worm',slot:'expand',ctl:'stage'};
+const H={mode:'live',type:'moment',board:'tdim',speed:1};
+const C=SimCards.COLORS;
+let PACK=MOMENT_PACK, PACKSRC='sim-moment-pack.js (fallback)';
+
+/* Copy lives in sim-moment-copy.md — edit that file, reload, done. The .js pack is the fallback
+   if the md can't be fetched. Format: '### id · tag X · color Y' then '- ' lines. */
+function parseCopyMd(md){
+  const categories={}, context=[]; let cur=null, isCtx=false;
+  const ver=(md.match(/\*\*version:\s*([^*]+)\*\*/)||[])[1];
+  md.split(/\r?\n/).forEach(raw=>{
+    const l=raw.trim();
+    if(l.startsWith('###')){
+      const parts=l.replace(/^#+\s*/,'').split('·').map(s=>s.trim());
+      const id=parts[0];
+      isCtx=(id==='context');
+      if(isCtx){cur=null;return;}
+      const meta={tag:id.toUpperCase(),color:'green'};
+      parts.slice(1).forEach(p=>{
+        const t=p.match(/^tag\s+(.+)$/i); if(t)meta.tag=t[1].trim();
+        const c=p.match(/^color\s+(\w+)$/i); if(c)meta.color=c[1].trim();
+      });
+      categories[id]={tag:meta.tag,color:meta.color,lines:[]}; cur=categories[id]; return;
+    }
+    if(!l.startsWith('- '))return;
+    const v=l.slice(2).trim();
+    if(isCtx){
+      const f=v.split('|').map(s=>s.trim());
+      if(f.length>=6)context.push({setting:f[0],value:f[1],stat:f[2],now:f[3],base:f[4],league:f[5]});
+    } else if(cur) cur.lines.push(v);
+  });
+  return {version:(ver||'md').trim(),categories,context};
+}
+
+const STUDY={
+  moment:{kind:'moment',tag:'BUCKET',color:C.green,line:'REYES 16 PTS',sub:'PG · 16 PTS · 4 REB · 9 AST'},
+  run:{kind:'run',tag:'RUN',color:C.orange,line:'FAIRVIEW 11–0',sub:'unanswered · 2:41 of Q3'},
+  margin:{kind:'margin',tag:'MARGIN',color:C.blue,line:'FAST BREAK POINTS',
+    margin:{label:'FAST BREAK',away:6,home:17,awayName:'AA',homeName:'FV'},sub:'turnovers 9–14 · same tug, promoted'},
+  context:{kind:'context',tag:'CONTEXT',color:C.gold,line:'TEAM FOULS 11',
+    ctx:{setting:'AGGRESSION',value:'HIGH',stat:'TEAM FOULS',now:'11',base:'you avg 7.4',league:'league 8.1'},
+    sub:'you avg 7.4 · league 8.1'}
+};
+
+function cardHTML(c){
+  let tag='',body;
+  if(c.margin){
+    const m=c.margin, homeBetter=m.home>m.away, edge=Math.abs(m.home-m.away), pct=Math.min(edge/Math.max(m.home,m.away,1),1)*50;
+    const col=homeBetter?T.home.color:T.away.color;
+    tag=`<span class="ctag" style="color:${c.color};border-color:${c.color}66">${m.label}</span>`;
+    body=`<div class="cmargin">
+      <div class="cmrow"><span class="cmval" style="color:${homeBetter?'rgba(255,255,255,.45)':'#fff'}">${m.away}</span>
+        <span class="cmval" style="color:${homeBetter?'#fff':'rgba(255,255,255,.45)'}">${m.home}</span></div>
+      <div class="cmtug"><div class="pull" style="${homeBetter?'left:50%':'right:50%'};width:${pct}%;background:linear-gradient(${homeBetter?'90deg':'270deg'},${col}44,${col})"></div></div></div>`;
+  } else if(c.ctx){
+    const x=c.ctx;
+    tag=`<div class="cset">${x.setting}: <b>${x.value}</b></div>`;
+    body=`<div class="cbig"><span class="n">${x.now}</span><span class="l">${x.stat}</span></div>`;
+  } else {
+    tag=`<span class="ctag" style="color:${c.color};border-color:${c.color}66">${c.tag}</span>`;
+    body=`<div class="cline">${c.line}</div>`;
+  }
+  return `<div class="card" style="--cc:${c.color}55">${tag}${body}<div class="csub">${c.sub||''}</div></div>`;
+}
+
+/* ---------- frame ---------- */
+function buildFrame(){
+  const boardw=(1228-S.stagew-32)/2;
+  const ov=document.getElementById('ov');
+  ov.style.setProperty('--stagew',S.stagew+'px');
+  ov.style.setProperty('--boardw',boardw+'px');
+  document.getElementById('sb').innerHTML=scoreboard();
+  document.getElementById('boardAway').innerHTML=board(AWAY,'away');
+  document.getElementById('boardHome').innerHTML=board(HOME,'home');
+  const cur=WORM[WORM.length-1];
+  const lead=`<span class="wl-team" style="color:${cur>0?T.home.color:T.away.color}">${cur>0?T.home.abbr:T.away.abbr} +${Math.abs(cur)}</span>`;
+  document.getElementById('stage').innerHTML=
+    `<div class="wormblock grow">
+      <div class="wl-head"><span class="wl-cap">LEAD MARGIN</span>${lead}</div>
+      <div class="wormfill">${worm(S.stagew-24,272)}</div>
+      <div class="wl-axis"><span>TIP</span><span>Q1</span><span>HALF</span><span>Q3</span><span>FINAL</span></div>
+    </div>
+    <div class="slot" id="slot">${restHTML()}</div>`;
+  const chips=side=>{
+    const list=BENCH[side];
+    if(!list.length)return '<div></div>';
+    return `<div class="bench ${side}"><span class="bench-lbl">BENCH</span>${list.slice(0,3).map(c=>`<span class="bchip${c.out?' out':''}"><b>${c.name}</b>${c.out?'<span class="bout">OUT</span>':''}<span class="bstat">${c.pts}p · ${c.reb}r</span></span>`).join('')}</div>`;
+  };
+  document.getElementById('footer').innerHTML=chips('away')+controls()+chips('home');
+}
+
+function restHTML(){ return S.rest==='team'?teamPanel(eng?eng.teamStats():null):''; }
+let cardUp=false;
+function zonesClass(){
+  document.getElementById('zones').className='zones'+(cardUp&&H.board!=='none'?' '+H.board:'');
+}
+/* patch the panel in place so the tug bars animate their 0.5s width transition
+   instead of being rebuilt already at their new width */
+function patchPanel(rows){
+  const tsp=document.querySelector('#slot .tsp'); if(!tsp)return;
+  const els=tsp.querySelectorAll('.tsr');
+  if(els.length!==rows.length){ document.getElementById('slot').innerHTML=teamPanel(rows); return; }
+  rows.forEach((r,i)=>{
+    const [lb,a,h,kind,low,pointLow]=r, el=els[i], na=parseFloat(a), nh=parseFloat(h);
+    const homeBetter=low?nh<na:nh>na, tie=na===nh;
+    const pl=pointLow==null?low:pointLow, barHome=pl?nh<na:nh>na;
+    const va=el.querySelector('.va'), vh=el.querySelector('.vh');
+    va.textContent=a; vh.textContent=h;
+    va.classList.toggle('lead',!tie&&!homeBetter); vh.classList.toggle('lead',!tie&&homeBetter);
+    if(kind==='rate'){
+      va.style.color=''; vh.style.color=''; return;
+    }
+    const tug=el.querySelector('.tug'); if(!tug)return;
+    let pull=tug.querySelector('.pull');
+    if(tie){ if(pull)pull.style.width='0%'; return; }
+    if(!pull){ pull=document.createElement('div'); pull.className='pull'; tug.appendChild(pull); }
+    const pct=Math.min(Math.abs(na-nh)/Math.max(na,nh,1),1)*50;
+    const col=barHome?T.home.color:T.away.color;
+    pull.style.left=barHome?'50%':'auto'; pull.style.right=barHome?'auto':'50%';
+    pull.style.width=pct+'%';
+    pull.style.background=`linear-gradient(${barHome?'90deg':'270deg'},${col}44,${col})`;
+  });
+}
+const WORM0=WORM.slice();
+function patchBoards(){
+  if(!eng)return;
+  [['away','boardAway'],['home','boardHome']].forEach(([side,id])=>{
+    const rows=document.querySelectorAll('#'+id+' .prow');
+    const ps=eng.players.filter(p=>p.side===side);
+    rows.forEach((el,i)=>{
+      const p=ps[i]; if(!p)return;
+      const vals=[[p.pts,20,false],[p.reb,10,false],[p.ast,10,false],[p.def,100,true]];
+      el.querySelectorAll('.barrow').forEach((br,j)=>{
+        const v=vals[j][0], max=vals[j][1], pct=vals[j][2], maxed=pct?v>=80:v>=max;
+        br.querySelector('.bv').textContent=pct?v+'%':v;
+        const fill=br.querySelector('.fill');
+        fill.style.width=Math.min(v/max,1)*100+'%';
+        fill.style.background=maxed?'#4A90D9':'#34EC27';
+        fill.style.color=maxed?'#4A90D9':'#34EC27';
+        fill.classList.toggle('maxed',maxed);
+      });
+      el.querySelectorAll('.pip').forEach((pip,k)=>{
+        pip.style.background=k<p.fouls?(p.fouls>=4?'#FFD700':'rgba(255,255,255,.7)'):'rgba(255,255,255,.14)';
+      });
+    });
+  });
+}
+function patchScoreboard(){
+  if(!eng)return;
+  const sum=side=>eng.players.filter(p=>p.side===side).reduce((a,p)=>a+p.pts,0);
+  const sc=document.querySelectorAll('#sb .sb-score');
+  if(sc.length>1){ sc[0].textContent=sum('away'); sc[1].textContent=sum('home'); }
+  const prog=Math.min(eng.t/85,1), q=Math.min(4,Math.floor(prog*4)+1), qf=prog*4-(q-1);
+  const rem=(1-qf)*600, mm=Math.floor(rem/60), ss=Math.floor(rem%60);
+  const clock=document.querySelector('#sb .sb-clock'), per=document.querySelector('#sb .sb-q');
+  if(clock)clock.textContent=prog>=1?'FINAL':mm+':'+String(ss).padStart(2,'0');
+  if(per)per.textContent=['1ST','2ND','3RD','4TH'][q-1];
+  const tf=document.querySelectorAll('#sb .sb-tf');
+  if(tf.length>1){ tf[0].children[1].textContent='F '+eng.team.away.fouls; tf[1].children[1].textContent='F '+eng.team.home.fouls; }
+}
+function patchWorm(){
+  if(!eng)return;
+  const sum=side=>eng.players.filter(p=>p.side===side).reduce((a,p)=>a+p.pts,0);
+  const m=sum('home')-sum('away');
+  // sample count derives from elapsed playback, not tick count, so the dot's horizontal position
+  // is always eng.t / runtime across the fixed 48-point domain — and self-corrects after a stall
+  const want=Math.max(2,Math.min(48,Math.round(eng.t/85*48)+1));
+  if(WORM.length>want)WORM.length=want;
+  while(WORM.length<want)WORM.push(m);
+  WORM[WORM.length-1]=m;
+  const wf=document.querySelector('.wormfill'); if(wf)wf.innerHTML=worm(S.stagew-24,272);
+  const wt=document.querySelector('.wl-team');
+  if(wt){ wt.style.color=m>=0?T.home.color:T.away.color; wt.textContent=(m>=0?T.home.abbr:T.away.abbr)+' +'+Math.abs(m); }
+}
+function showCard(c){
+  const slot=document.getElementById('slot');
+  slot.innerHTML=cardHTML(c);
+  const el=slot.firstElementChild;
+  el.classList.add('enter');
+  requestAnimationFrame(()=>el.classList.remove('enter'));
+  cardUp=true; zonesClass();
+}
+function clearCard(){
+  document.getElementById('slot').innerHTML=restHTML();
+  cardUp=false; zonesClass();
+}
+
+/* ---------- engine wiring ---------- */
+let eng=null, raf=null, lastT=0, acc=0, logRows=[];
+function startEngine(){
+  stopEngine(); logRows=[]; WORM.length=0; WORM.push(0,0); clearCard();
+  eng=new SimCards.Engine({
+    pack:PACK, teams:T, away:AWAY, home:HOME, seed:7, fromTip:true,
+    onCard:showCard, onRest:clearCard,
+    onLog:e=>{logRows.unshift(e); if(logRows.length>14)logRows.pop(); paintLog();}
+  });
+  // wall-clock driven: dt from performance.now(), fixed 1/30 sub-steps so gates stay fine-grained
+  eng.suspend(S.rest==='team');
+  lastT=performance.now(); acc=0; paintLog();
+  const STEP=1/30; let panelT=0;
+  const loop=now=>{
+    const dt=Math.min((now-lastT)/1000,0.25)*H.speed; lastT=now; acc+=dt;
+    while(acc>=STEP){ eng.step(STEP); acc-=STEP; }
+    if(eng.t>=85){ const keep=logRows.slice(0,13); startEngine(); logRows=[{t:0,tag:'—',text:'restart · new game',fired:false,reason:'85s runtime'}].concat(keep); return; }
+    panelT+=dt;
+    if(panelT>0.4){
+      panelT=0; patchBoards(); patchWorm(); patchScoreboard();
+      if(S.rest==='team'&&!cardUp)patchPanel(eng.teamStats());
+    }
+    paintLog();
+    raf=requestAnimationFrame(loop);
+  };
+  raf=requestAnimationFrame(loop);
+}
+function stopEngine(){ if(raf)cancelAnimationFrame(raf); raf=null; }
+function paintLog(){
+  const s=eng?eng.stats():{perMin:'0.0',total:0,suppressed:0,share:0,counts:{moment:0,run:0,margin:0,context:0},t:0,q:1,clutch:false,gap:'5.5',hold:'1.2',byQ:[0,1,2,3].map(()=>({fired:0,share:0}))};
+  const rate=s.t<10?'—':s.perMin;
+  document.getElementById('lstats').innerHTML=
+    `<span>${s.clutch?'<b style="color:#a4560f">CLUTCH</b>':'Q<b>'+s.q+'</b>'} · ${s.t.toFixed(0)}s of 85</span><span>gap <b>${s.gap}s</b></span><span>hold <b>${s.hold}s</b></span>`+
+    `<span>cards/min <b>${rate}</b></span><span>fired <b>${s.total}</b></span><span>held <b>${s.suppressed}</b></span>`+
+    `<span>card up <b>${s.share}%</b> overall</span>`+
+    `<span>by quarter <b>${s.byQ.map((x,i)=>'Q'+(i+1)+' '+x.fired+'/'+x.share+'%').join(' · ')}</b></span>`+
+    `<span>moment <b>${s.counts.moment}</b> · run <b>${s.counts.run}</b> · margin <b>${s.counts.margin}</b> · ctx <b>${s.counts.context}</b></span>`;
+  document.getElementById('log').innerHTML=logRows.map(e=>
+    `<div class="lg${e.fired?' f':''}"><span>${e.t.toFixed(0)}s</span><span class="lk">${e.tag}</span><span class="lx">${e.fired?e.text:e.text+' — '+e.reason}</span></div>`).join('');
+}
+
+function paintSegs(){
+  document.querySelectorAll('.seg').forEach(seg=>{
+    const k=seg.dataset.k;
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',String(H[k])===b.dataset.v));
+  });
+}
+function apply(){
+  // (re)start only on a real mode transition — a board-treatment or rest-state click must never
+  // discard the run, or the measured per-quarter numbers reset to tip-off
+  if(H.mode==='live'){ if(!eng||!raf) startEngine(); }
+  else { stopEngine(); showCard(STUDY[H.type]); }
+  paintSegs();
+}
+document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  const k=seg.dataset.k, v=b.dataset.v;
+  H[k]=(k==='speed')?parseFloat(v):v;
+  if(k==='type')H.mode='study';
+  if(k==='board'||k==='speed'){ zonesClass(); paintSegs(); return; }
+  apply();
+}));
+document.getElementById('ov').addEventListener('click',e=>{
+  const b=e.target.closest('.ctlseg[data-rest] button'); if(!b)return;
+  S.rest=b.dataset.v; buildFrame(); cardUp=false; zonesClass();
+  if(eng)eng.suspend(S.rest==='team');
+  paintSegs();
+});
+
+/* ---------- promotion comparison ---------- */
+document.getElementById('promoQuiet').insertAdjacentHTML('beforeend',teamPanel());
+document.getElementById('promoCard').insertAdjacentHTML('beforeend',cardHTML(STUDY.margin));
+
+document.getElementById('notes').innerHTML=`
+<div class="note"><h3>1 · Does a card interrupt without alarming?</h3>
+<p>It arrives in a slot the viewer has been looking at for 85 seconds, at 200px in a stage that doesn't move — so the change is <b>content, not layout</b>. Entry is 180ms, scale .985→1 with a 5px rise; no slide-in, no flash, no sound cue. The tag is the only saturated element and it's 12px.</p>
+<p>Force comes from the board treatment, not the card: at <b>Dim .72</b> the boards recede enough that the stage is briefly the only thing with contrast, and recover in 180ms. That's an emphasis, not an alert.</p></div>
+
+<div class="note"><h3>2 · Board dimming — dim, not blur</h3>
+<p>The quarter-break blur (<b>blur(3px) brightness(.42)</b>) is right for a beat that owns the screen for seconds. On a 1.2s card it reads as a modal and it kills the thing the coach may be mid-read on — Wilson's fourth foul.</p>
+<p><b>Dim .72</b> keeps every number legible while clearly demoting it. Toggle all three: none makes the card fight the boards for attention; blur makes a 1.2s card feel like an interruption you have to wait out.</p></div>
+
+<div class="note"><h3>3 · Does tag + line carry in the hold?</h3>
+<p>Yes for Moment, Run and Context — one line of Bebas at 31px, ~34 characters, plus a mono sub-line that is deliberately skippable. The Margin card is the slowest: two numbers plus a tug bar. It reads at a glance <b>only because the same bar has already been sitting in the team panel</b> (see the promotion strip above) — recognition does the work, not reading.</p>
+<p>Hold is <b>2.6s for every card type</b>, clutch included. The brief's original 1.2s covered noticing the change plus reading the line with no dwell left — it went by too fast. Longer holds are paid for with wider gaps (Q1 6.5s → Q4 4.2s), so cards get rarer as they get slower: roughly 12 a broadcast instead of 18, each one landing.</p></div>
+
+<div class="note"><h3>4 · The moment engine</h3>
+<p>Every Moment card is a <b>stat readout</b> built from emitted per-player deltas — a total the engine already knows, never a described play. Copy comes from an editable source file, <b>sim-moment-copy.md</b> \u2014 one section per card type, one line per variant, rewritten in place with no code change. It ships as data, so freshness is a file swap: online play fetches the current copy, downloaded builds pick one up on patch. (Loaded source and line count are shown in the cadence panel.)</p>
+<p>Selection: event weight (a three outranks a free throw) × prominence, with a <b>1.6× boost for players under 8 points</b> and a variety hold on headliners, so the feed doesn't become one player's channel. Milestones jump the queue.</p>
+<p><b>Every gate curves, not just the gap.</b> Tightening the card-to-card gap alone changes nothing after Q1, because by then the binding constraints are the rest floor, the per-player cooldown and how fast candidates arrive. So all of them escalate together — gap 5.5→3.0s, rest floor 1.6→0.8s, cooldown 15→8s, variety hold 35%→22%, event supply 1.0→0.7s — and in clutch (2.2s gap, 0.5s floor, 6s cooldown, no variety hold) analysis switches off so moments have the slot to themselves. Per-quarter fired counts and card-up share are <b>measured live</b> in the cadence panel, not asserted here — watch a full 85s run and read the by-quarter row.</p></div>
+
+<div class="note"><h3>5 · TEAM STATS is a hold mode</h3>
+<p>Choosing TEAM STATS <b>suppresses every card</b>, not just highlights — the coach asked for the numbers, and letting a card yank the panel away takes back the only thing he chose. Margin is doubly redundant there: it promotes a row already on screen.</p>
+<p>Nothing queues while held — cards are events, not a backlog, so switching back rejoins the live cadence instead of dumping what was missed. Suppressions log as <b>team stats held</b>. The quarter-break card is unaffected: different system, owns the screen anyway.</p></div>
+
+<div class="note"><h3>6 · Carry forward into the build prompt</h3>
+<p><b>Team colour selection must be preserved.</b> The display already picks primary or secondary team colour per team based on which pops against the background — every coloured element here (portrait borders, tug fills, worm strokes, rate-row accents, board headers, scoreboard edge) must consume that <i>resolved</i> colour, never a raw primary. Two dark-primary teams facing each other is the case a naive implementation breaks on.</p>
+<p>Also carried: the tugs are <b>live</b> — they move off the same event stream the cards read, using the existing 0.5s width transition, and the Margin card is whichever tug currently has the widest edge, not a fixed stat.</p></div>`;
+
+buildFrame();
+fetch('sim-moment-copy.md').then(r=>r.ok?r.text():Promise.reject())
+  .then(t=>{const p=parseCopyMd(t); if(Object.keys(p.categories).length>=8&&p.context.length){PACK=p;PACKSRC='sim-moment-copy.md · v'+p.version;}})
+  .catch(()=>{})
+  .finally(()=>{
+    const cats=Object.keys(PACK.categories).length;
+    const lines=Object.values(PACK.categories).reduce((a,c)=>a+c.lines.length,0);
+    document.getElementById('copysrc').innerHTML=`copy source <b>${PACKSRC}</b> · ${cats} card types · ${lines} lines · ${PACK.context.length} context cards`;
+    apply();
+  });
+</script>
+</body>
+</html>

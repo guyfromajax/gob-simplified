@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sim Broadcast — Mockup 4 · Wide Worm</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="sim-broadcast-frame.css">
+<link rel="stylesheet" href="sim-broadcast-wide.css">
+<style>
+.log{display:flex;flex-direction:column;max-height:210px;overflow:hidden}
+.lg{display:grid;grid-template-columns:34px 78px 1fr;gap:6px;align-items:baseline;padding:3.5px 0;border-bottom:1px dashed rgba(21,23,28,.1);font-family:var(--mono);font-size:9.5px;color:rgba(21,23,28,.4)}
+.lg .lx{color:rgba(21,23,28,.45);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lg.f{color:rgba(21,23,28,.8)}.lg.f .lx{color:#15171c;font-weight:600}
+.lstats{display:flex;flex-wrap:wrap;gap:6px 14px;margin-bottom:9px;font-size:11.5px}
+.lstats span{color:rgba(21,23,28,.5)}.lstats b{font-variant-numeric:tabular-nums}
+.curve{background:#0b0d14;border-radius:10px;padding:16px 18px;display:flex;align-items:center;gap:28px;flex-wrap:wrap}
+.curve svg{display:block}
+.curve .cap{font-family:var(--mono);font-size:9px;letter-spacing:.14em;color:rgba(255,255,255,.35);margin-bottom:8px}
+.curve .rd{font-size:12px;color:rgba(255,255,255,.6);line-height:1.7;max-width:420px}
+.curve .rd b{color:#fff}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="phead">
+    <h1>Sim Broadcast — Mockup 4</h1><span class="k">WIDE WORM · THREE PANES · CALLOUTS</span>
+    <p>The worm takes the full width and a compressed vertical scale; the three panes sit beneath it; highlights become small callouts pinned to the action point. Live playback runs the whole restructure — the frame is the true 1280×720 floor, scaled as one transform.</p>
+  </div>
+
+  <div class="frame" id="frame">
+    <div class="sb" id="sb"></div>
+    <div class="ov4" id="ov">
+      <div class="box4" id="box">
+        <div class="w4" id="w4">
+          <div class="w4-head"><span class="w4-cap" id="wcap">LEAD MARGIN</span><span class="w4-team" id="wteam"></span></div>
+          <div class="w4-plot" id="plot"></div>
+          <div class="w4-axis" id="waxis"><span>TIP</span><span>Q1</span><span>HALF</span><span>Q3</span><span>FINAL</span></div>
+        </div>
+        <div class="band" id="band"></div>
+        <div class="f4" id="foot"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="harness">
+    <div class="hcard">
+      <div class="sechead">CONTROLS</div>
+      <div class="hgrid">
+        <div class="hq"><span class="lab">Compression past ±10</span><div class="seg" data-k="beyond"><button data-v="0.35">65% cut</button><button data-v="0.2">80% cut</button><button data-v="0.1">90% cut</button></div></div>
+        <div class="hq"><span class="lab">Callout placement</span><div class="seg" data-k="place"><button data-v="follow">Follows the dot</button><button data-v="above">Pinned above plot</button></div></div>
+        <div class="hq"><span class="lab">Callout tier</span><div class="seg" data-k="tier"><button data-v="special">Special only</button><button data-v="loose">Looser (incl. dimes)</button></div></div>
+        <div class="hq"><span class="lab">Speed</span><div class="seg" data-k="speed"><button data-v="1">1×</button><button data-v="2">2×</button><button data-v="4">4×</button></div></div>
+      </div>
+    </div>
+    <div class="hcard">
+      <div class="sechead">CADENCE</div>
+      <div class="lstats" id="copysrc"></div>
+      <div class="lstats" id="lstats"></div>
+      <div class="log" id="log"></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="sechead">THE VERTICAL SCALE</div>
+    <div class="curve">
+      <div><div class="cap">MARGIN → HEIGHT</div><div id="curvesvg"></div></div>
+      <div class="rd" id="curverd"></div>
+    </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script src="sim-broadcast-parts.js"></script>
+<script src="sim-broadcast-wide.js"></script>
+<script src="sim-card-engine.js"></script>
+<script src="sim-moment-pack.js"></script>
+<script>
+const S={beyond:0.2,place:'follow',tier:'special',speed:1,on:true};
+const RUNTIME=85, TOTAL=48;
+let PACK=null, PACKSRC='inline fallback';
+
+const FALLBACK={version:'inline',categories:{
+  milestone:{avatar:'headshot',color:'gold',lines:['{NAME} has *{PTS}* now',"That's *{PTS}* for {NAME}",'{NAME} up to *{PTS}* points']},
+  boards10:{avatar:'headshot',color:'gold',lines:['{NAME} has *{REB}* boards','*{REB}* rebounds for {NAME}']},
+  doubleDouble:{avatar:'headshot',color:'gold',lines:['{NAME} — *{PTS}* and *{REB}*','Double-double for {NAME}']},
+  dimes:{avatar:'headshot',color:'blue',lines:['{NAME} up to *{AST}* assists','*{AST}* dimes for {NAME}']},
+  streak:{avatar:'headshot',color:'orange',lines:['{NAME} has the last *{STREAK}*','*{STREAK}* straight for {NAME}']},
+  run:{avatar:'abbr',color:'orange',lines:['{TEAM} on a *{RUN}* run','*{RUN}* unanswered for {TEAM}']},
+  advantage:{avatar:'abbr',color:'blue',lines:['*+{EDGE}* {STAT} advantage','{TEAM} up *{EDGE}* on {STAT}']},
+  clutch:{avatar:'headshot',color:'green',lines:['{NAME} — go-ahead bucket!','{NAME} puts them up!']},
+  fouledout:{avatar:'headshot',color:'red',lines:['{NAME} fouls out',"That's five on {NAME}"]}
+}};
+const COL={gold:'#FFD700',blue:'#4A90D9',orange:'#F79420',green:'#34EC27',red:'#ff6d6d'};
+
+function parseCallouts(md){
+  const categories={}; let cur=null;
+  const ver=(md.match(/\*\*version:\s*([^*]+)\*\*/)||[])[1];
+  md.split(/\r?\n/).forEach(raw=>{
+    const l=raw.trim();
+    if(l.startsWith('###')){
+      const parts=l.replace(/^#+\s*/,'').split('·').map(s=>s.trim());
+      const meta={avatar:'headshot',color:'blue'};
+      parts.slice(1).forEach(p=>{
+        const a=p.match(/^avatar\s+(\w+)/i); if(a)meta.avatar=a[1].toLowerCase();        if(COL[p])meta.color=p;
+      });
+      categories[parts[0]]={avatar:meta.avatar,color:meta.color,lines:[]};
+      cur=categories[parts[0]]; return;
+    }
+    if(l.startsWith('- ')&&cur)cur.lines.push(l.slice(2).trim());
+  });
+  return {version:(ver||'md').trim(),categories};
+}
+
+/* ---------- engine: same event stream, far stricter promotion ---------- */
+let eng=null,raf=null,lastT=0,acc=0,logRows=[],series=[0,0],co=null,coUntil=-99,lastCo=-99,fired=0;
+const SPECIAL=['milestone','boards10','doubleDouble','streak','run','advantage','clutch','fouledout'];
+
+function pick(a,r){return a[Math.floor(r*a.length)]}
+function fill(line,map){
+  return line.replace(/\{(\w+)\}/g,(_,k)=>map[k]==null?'':map[k]).replace(/\*([^*]+)\*/g,'<b>$1</b>');
+}
+function avatarHTML(cat,side){
+  const c=COL[(PACK.categories[cat]||{}).color||'blue'];
+  if((PACK.categories[cat]||{}).avatar!=='headshot')
+    return `<div class="co-av logo" style="--coc:${c};background:linear-gradient(135deg,${T[side].color},#0b0d14)">${T[side].abbr}</div>`;
+  return `<div class="co-av" style="--coc:${c}">${SIL}</div>`;
+}
+function showCallout(cat,side,map){
+  const c=PACK.categories[cat]; if(!c||!c.lines.length)return;
+  const col=COL[c.color]||'#4A90D9';
+  const txt=fill(pick(c.lines,Math.random()),map);
+  co={cat,side,col,html:`${avatarHTML(cat,side)}<div class="co-txt">${txt}</div>`};
+  coUntil=eng.t+2.6; lastCo=eng.t; fired++;
+  logRows.unshift({t:eng.t,tag:cat,text:txt.replace(/<[^>]+>/g,''),fired:true});
+  if(logRows.length>13)logRows.pop();
+  paintCallout(true);
+}
+function held(cat,reason){
+  logRows.unshift({t:eng.t,tag:cat,text:'held',fired:false,reason});
+  if(logRows.length>13)logRows.pop();
+}
+
+function candidate(){
+  // only special beats earn a callout; everything routine is dropped, not queued
+  const ps=eng.players;
+  for(const p of ps){
+    if(p.__co10==null)p.__co10=p.pts>=10;
+    if(p.__co20==null)p.__co20=p.pts>=20;
+    if(p.__cor10==null)p.__cor10=p.reb>=10;
+    if(p.__codd==null)p.__codd=p.pts>=10&&p.reb>=10;
+    if(p.__coout==null)p.__coout=!!p.out;
+    if(!p.__coout&&p.fouls>=5){p.__coout=true;return{cat:'fouledout',side:p.side,map:{NAME:last(p.name)}}}
+    if(!p.__codd&&p.pts>=10&&p.reb>=10){p.__codd=true;return{cat:'doubleDouble',side:p.side,map:{NAME:last(p.name),PTS:p.pts,REB:p.reb}}}
+    if(!p.__co20&&p.pts>=20){p.__co20=true;return{cat:'milestone',side:p.side,map:{NAME:last(p.name),PTS:p.pts}}}
+    if(!p.__co10&&p.pts>=10){p.__co10=true;return{cat:'milestone',side:p.side,map:{NAME:last(p.name),PTS:p.pts}}}
+    if(!p.__cor10&&p.reb>=10){p.__cor10=true;return{cat:'boards10',side:p.side,map:{NAME:last(p.name),REB:p.reb}}}
+    if(p.streak>=8&&eng.t-(p.__costreak||-99)>20){p.__costreak=eng.t;return{cat:'streak',side:p.side,map:{NAME:last(p.name),STREAK:p.streak}}}
+    if(S.tier==='loose'&&p.ast>=6&&p.ast%3===0&&eng.t-(p.__codime||-99)>25){p.__codime=eng.t;return{cat:'dimes',side:p.side,map:{NAME:last(p.name),AST:p.ast}}}
+  }
+  if(eng.run&&eng.run.pts>=10){const s=eng.run.side;eng.run={side:null,pts:0};
+    return{cat:'run',side:s,map:{TEAM:T[s].name,RUN:eng.run_pts||10}}}
+  const tug=eng._biggestTug&&eng._biggestTug();
+  if(tug&&Math.abs(tug.home-tug.away)>=10&&eng.t-(window.__coadv||-99)>34){
+    window.__coadv=eng.t;
+    const side=tug.home>tug.away?'home':'away';
+    return{cat:'advantage',side,map:{EDGE:Math.abs(tug.home-tug.away),STAT:tug.label.toLowerCase(),TEAM:T[side].name}};
+  }
+  return null;
+}
+function last(n){return n.replace(/^[A-Z]\.\s*/,'')}
+
+/* ---------- render ---------- */
+function scaleBox(){
+  const ov=document.getElementById('ov'),box=document.getElementById('box');
+  const aw=ov.clientWidth-52, ah=ov.clientHeight-28;
+  const k=Math.max(1,Math.min(1.6,Math.min(aw/1228,ah/572)));
+  box.style.transform=`scale(${k})`;
+  box.style.marginBottom=(572*(k-1))+'px';
+  box.style.marginLeft=((aw-1228*k)/2)+'px';
+}
+function buildStatic(){
+  document.getElementById('sb').innerHTML=scoreboard();
+  document.getElementById('foot').innerHTML=
+    `<div class="bench away" id="bA"></div>
+     <div class="tgl"><span class="tgl-lbl">HIGHLIGHTS</span><div class="tgl-sw${S.on?' on':''}" id="tgl"></div></div>
+     <div class="bench home" id="bH"></div>`;
+  document.getElementById('tgl').addEventListener('click',()=>{
+    S.on=!S.on; document.getElementById('tgl').classList.toggle('on',S.on);
+    if(!S.on){co=null;paintCallout();}
+  });
+}
+function paintBand(){
+  if(!eng)return;
+  const aw=eng.players.filter(p=>p.side==='away'), hm=eng.players.filter(p=>p.side==='home');
+  document.getElementById('band').innerHTML=
+    Wide.lineupPane(aw,'away')+Wide.statsPane(eng.teamStats())+Wide.lineupPane(hm,'home');
+}
+function paintWorm(){
+  if(!eng)return;
+  const want=Math.max(2,Math.min(TOTAL,Math.round(eng.t/RUNTIME*TOTAL)+1));
+  const m=eng.pts.home-eng.pts.away;
+  if(series.length>want)series.length=want;
+  while(series.length<want)series.push(m);
+  series[series.length-1]=m;
+  const clutch=eng.phase().clutch;
+  const r=Wide.wormWide(series,1228,208,{beyond:S.beyond,total:TOTAL,wall:clutch});
+  const plot=document.getElementById('plot');
+  plot.innerHTML=r.svg;
+  const cap=document.getElementById('wcap');
+  cap.className='w4-cap'+(clutch?' poss':'');
+  cap.textContent=clutch?(Math.abs(m)<=3?'ONE POSSESSION':'TWO POSSESSIONS'):'LEAD MARGIN';
+  const wt=document.getElementById('wteam');
+  wt.style.color=m===0?'rgba(255,255,255,.5)':(m>0?T.home.color:T.away.color);
+  wt.textContent=m===0?'TIED':(m>0?T.home.abbr:T.away.abbr)+' +'+Math.abs(m);
+  document.getElementById('waxis').className='w4-axis'+(clutch?' endgame':'');
+  window.__dot={cx:r.cx,cy:r.cy,rising:r.rising};
+  paintCallout();
+}
+function paintCallout(entering){
+  const plot=document.getElementById('plot');
+  plot.querySelectorAll('.co,.co-leader').forEach(n=>n.remove());
+  if(!co||!S.on)return;
+  const d=window.__dot||{cx:614,cy:104,rising:true};
+  const el=document.createElement('div');
+  el.className='co'+(entering?' enter':'');
+  el.style.setProperty('--coc',co.col);
+  el.innerHTML=co.html;
+  if(S.place==='above'){ el.style.left='50%'; el.style.top='-2px'; el.style.transform='translateX(-50%)'; }
+  plot.appendChild(el);
+  if(S.place==='follow'){
+    const w=el.offsetWidth||220, h=el.offsetHeight||42;
+    const flipX=d.cx>1228-w-40;
+    // sit on the opposite side of the line's direction so the callout never covers the stroke
+    const below=d.rising;
+    let left=flipX?d.cx-w-16:d.cx+16;
+    let top=below?d.cy+14:d.cy-h-14;
+    top=Math.max(2,Math.min(208-h-2,top));
+    el.style.left=left+'px'; el.style.top=top+'px';
+    const lead=document.createElement('div');
+    lead.className='co-leader';
+    lead.style.setProperty('--coc',co.col);
+    const lx=Math.min(d.cx,left+(flipX?w:0)), lw=Math.abs((flipX?left+w:left)-d.cx);
+    lead.style.left=lx+'px'; lead.style.top=(d.cy-.5)+'px'; lead.style.width=Math.max(6,lw)+'px'; lead.style.height='1px';
+    lead.style.opacity='.5';
+    plot.appendChild(lead);
+  }
+  if(entering)requestAnimationFrame(()=>el.classList.remove('enter'));
+}
+function paintFooter(){
+  if(!eng)return;
+  const chips=side=>{
+    const outs=eng.players.filter(p=>p.side===side&&p.out).slice(0,3);
+    if(!outs.length)return '';
+    return `<span class="bench-lbl">BENCH</span>`+outs.map(p=>
+      `<span class="bchip out"><b>${p.name}</b><span class="bout">OUT</span><span class="bstat">${p.pts}p</span></span>`).join('');
+  };
+  document.getElementById('bA').innerHTML=chips('away');
+  document.getElementById('bH').innerHTML=chips('home');
+}
+function paintScoreboard(){
+  if(!eng)return;
+  const sc=document.querySelectorAll('#sb .sb-score');
+  if(sc.length>1){sc[0].textContent=eng.pts.away;sc[1].textContent=eng.pts.home}
+  const prog=Math.min(eng.t/RUNTIME,1), q=Math.min(4,Math.floor(prog*4)+1), qf=prog*4-(q-1);
+  const rem=(1-qf)*600;
+  const cl=document.querySelector('#sb .sb-clock'), per=document.querySelector('#sb .sb-q');
+  if(cl)cl.textContent=prog>=1?'FINAL':Math.floor(rem/60)+':'+String(Math.floor(rem%60)).padStart(2,'0');
+  if(per)per.textContent=['1ST','2ND','3RD','4TH'][q-1];
+  const tf=document.querySelectorAll('#sb .sb-tf');
+  if(tf.length>1){tf[0].children[1].textContent='F '+eng.team.away.fouls;tf[1].children[1].textContent='F '+eng.team.home.fouls}
+}
+function paintLog(){
+  const mins=Math.max((eng?eng.t:0)/60,.01);
+  document.getElementById('lstats').innerHTML=
+    `<span>${eng&&eng.phase().clutch?'<b style="color:#a4560f">CLUTCH</b>':'Q<b>'+(eng?eng.phase().q:1)+'</b>'} · ${(eng?eng.t:0).toFixed(0)}s of ${RUNTIME}</span>`+
+    `<span>callouts <b>${fired}</b></span><span>per min <b>${(eng&&eng.t>10?fired/mins:0).toFixed(1)}</b></span>`+
+    `<span>on screen <b>${Math.round((window.__coTime||0)/Math.max(eng?eng.t:1,.01)*100)}%</b></span>`;
+  document.getElementById('log').innerHTML=logRows.map(e=>
+    `<div class="lg${e.fired?' f':''}"><span>${e.t.toFixed(0)}s</span><span>${e.tag}</span><span class="lx">${e.fired?e.text:'held — '+e.reason}</span></div>`).join('');
+}
+
+function startEngine(){
+  stopEngine(); logRows=[]; series=[0,0]; co=null; coUntil=-99; lastCo=-99; fired=0;
+  window.__coTime=0; window.__coadv=-99;
+  eng=new SimCards.Engine({pack:MOMENT_PACK,teams:T,away:AWAY,home:HOME,seed:Math.floor(Math.random()*9999),fromTip:true,
+    cfg:{holdMode:'flat',hold:0.01},onCard:()=>{},onRest:()=>{},onLog:()=>{}});
+  eng.suspend(true);   // the card system is off in this design; callouts replace it
+  buildStatic(); paintBand(); paintWorm(); paintFooter(); paintScoreboard(); paintLog(); scaleBox();
+  lastT=performance.now(); acc=0;
+  const STEP=1/30; let pt=0;
+  const loop=now=>{
+    const dt=Math.min((now-lastT)/1000,.25)*S.speed; lastT=now; acc+=dt;
+    while(acc>=STEP){eng.step(STEP);acc-=STEP}
+    if(eng.t<coUntil)window.__coTime=(window.__coTime||0)+dt;
+    if(eng.t>=coUntil&&co){co=null;paintCallout()}
+    if(S.on&&!co&&eng.t-lastCo>9){
+      const c=candidate();
+      if(c)showCallout(c.cat,c.side,c.map);
+    }
+    if(eng.t>=RUNTIME){startEngine();return}
+    pt+=dt;
+    if(pt>.4){pt=0;paintBand();paintWorm();paintFooter();paintScoreboard()}
+    paintLog();
+    raf=requestAnimationFrame(loop);
+  };
+  raf=requestAnimationFrame(loop);
+}
+function stopEngine(){if(raf)cancelAnimationFrame(raf);raf=null}
+
+document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  const k=seg.dataset.k,v=b.dataset.v;
+  S[k]=(k==='beyond'||k==='speed')?parseFloat(v):v;
+  document.querySelectorAll('.seg').forEach(s=>s.querySelectorAll('button').forEach(x=>
+    x.classList.toggle('on',String(S[s.dataset.k])===x.dataset.v)));
+  paintWorm(); drawCurve();
+}));
+window.addEventListener('resize',scaleBox);
+
+function drawCurve(){
+  const w=250,h=150,mid=h/2,dom=Wide.compress(45,10,S.beyond);
+  const y=m=>mid-(Wide.compress(m,10,S.beyond)/dom)*(mid-8);
+  let p='';
+  for(let m=-45;m<=45;m++)p+=(m===-45?'M':'L')+` ${(8+(m+45)/90*(w-16)).toFixed(1)} ${y(m).toFixed(1)} `;
+  const k1=y(10),k2=y(-10);
+  document.getElementById('curvesvg').innerHTML=`<svg width="${w}" height="${h}">
+    <line x1="0" y1="${mid}" x2="${w}" y2="${mid}" stroke="rgba(255,255,255,.14)" stroke-dasharray="3 4"/>
+    <line x1="0" y1="${k1}" x2="${w}" y2="${k1}" stroke="rgba(255,255,255,.1)" stroke-dasharray="2 5"/>
+    <line x1="0" y1="${k2}" x2="${w}" y2="${k2}" stroke="rgba(255,255,255,.1)" stroke-dasharray="2 5"/>
+    <path d="${p}" fill="none" stroke="#F79420" stroke-width="2"/>
+    <text x="4" y="${k1-5}" fill="rgba(255,255,255,.35)" font-family="ui-monospace" font-size="8">+10</text>
+    <text x="4" y="${k2+11}" fill="rgba(255,255,255,.35)" font-family="ui-monospace" font-size="8">-10</text>
+  </svg>`;
+  const inside=(Wide.compress(10,10,S.beyond)/dom*100).toFixed(0);
+  const two=(Wide.compress(2,10,S.beyond)/dom*100).toFixed(1);
+  document.getElementById('curverd').innerHTML=
+    `Inside a ten-point game the line uses <b>${inside}%</b> of the half-height — a two-point swing moves it <b>${two}%</b>, about <b>${(two/100*94).toFixed(0)}px</b>. Past ±10 each additional point is worth <b>${(S.beyond*100).toFixed(0)}%</b> of that. A 30-point margin sits only <b>${(Wide.compress(30,10,S.beyond)/dom*100).toFixed(0)}%</b> up, so a blowout flattens toward the top instead of stretching the whole chart. The scale is <b>fixed, never auto-fit</b>: the same margin is always the same height, so shape stays comparable across the broadcast.`;
+}
+
+document.getElementById('notes').innerHTML=`
+<div class="note"><h3>1 · Full width, compressed height</h3>
+<p>The worm now spans all <b>1228px</b> — five times the plot width it had in the stage column — so the run of the line finally carries the game. Each of the 48 samples gets ~25px of horizontal travel, which also kills the early-steepness problem on its own: the near-vertical cliff you saw at 3:06 was 34px of run, and it's now ~180px.</p>
+<p>Vertical is the trade. The scale is <b>fixed and nonlinear</b>, not auto-fit: full resolution inside a ten-point game, <b>${(S.beyond*100).toFixed(0)}%</b> of that beyond. Faint dashed guides sit at ±10 so the change is disclosed rather than hidden. Because it never re-fits, the same margin is always at the same height — the thing auto-fit could never promise.</p></div>
+
+<div class="note"><h3>2 · Three panes, and what the row had to become</h3>
+<p>The band is <b>256px</b> for all three panes, which forces the player row from 84px down to <b>40px</b>. Four stacked bars can't survive that, so the row went horizontal: portrait 34px, identity and status stacked in the middle, then <b>four stat cells</b> — value over a 40px mini-bar — as columns with labels in the pane header. Same four stats, same colour rules, read as a table instead of a stack.</p>
+<p>Team stats gained room, not lost it: <b>330px</b> wide with 26px rows, so the tugs are longer than they were in the 400px stage. The panes are wider than the old boards (433 vs 398), so names have more space, not less.</p></div>
+
+<div class="note"><h3>3 · Callouts — the recommendation</h3>
+<p><b>Follows the dot</b> is the one to ship. The eye is already at the action point, so the callout arrives inside the existing gaze — no reacquisition, which is exactly what you observed the big card was costing. It offsets to the opposite side of the line's direction so it never covers the stroke, flips left as the dot nears the right wall, and draws a 1px leader back to the dot so the association is explicit.</p>
+<p>Copy is <b>sentence case in Inter</b>, not Bebas caps — a small pill near the line should read as an aside, not a lower third. That also lands the "more human" copy you wanted: <i>Reyes has 18 now</i>, not <i>REYES 18 PTS</i>. Lines live in <b>sim-callout-copy.md</b>, same edit-and-reload contract.</p>
+<p>Team beats use a <b>38×30 tinted tile with the three-letter abbreviation</b> rather than a logo — all team logos are horizontal, and letterboxing one into a 30px avatar would render it unreadable. The abbreviation reads at any size and takes the team's resolved colour, so identity survives where a shrunken logo wouldn't.</p></div>
+
+<div class="note"><h3>4 · What earns a callout now</h3>
+<p>Only <b>special</b> beats: point milestones (10/20/30), ten rebounds, double-doubles, 8+ straight by one player, 10+ unanswered as a team, a ±10 team-stat advantage, a go-ahead bucket in clutch, and a foul-out. Everything routine — ordinary buckets, single boards, assists, cold lines — is <b>dropped, not queued</b>. That's roughly <b>6–8 callouts a broadcast</b> against the twelve cards before, with something on screen about a fifth of the time instead of a third.</p>
+<p>The old card system is off in this design, and the WORM/TEAM toggle is gone with it — team stats are permanent now, so there's nothing to switch. The footer keeps one control: <b>HIGHLIGHTS on/off</b>, default on. Turning it off is the only way to get a fully quiet screen, which is worth having.</p></div>
+
+<div class="note"><h3>5 · Open question — is 65% enough compression?</h3>
+<p>You proposed 80% and it's the default here. Try <b>65%</b> and <b>90%</b>: at 90% a 30-point lead barely leaves the ten-point band, which reads as honest at first and then as broken once you notice a blowout looks like a tie game. At 65% the chart keeps a little more of the story of how the lead was built. My read is 80% is right, but it's worth ten seconds on each.</p>
+<p>One consequence to accept either way: <b>we're deliberately under-drawing blowouts.</b> That's the correct bias for this product — the coach who is up 30 doesn't need drama, and the one in a two-point game does.</p></div>`;
+
+fetch('sim-callout-copy.md').then(r=>r.ok?r.text():Promise.reject())
+  .then(t=>{const p=parseCallouts(t); if(Object.keys(p.categories).length>=6){PACK=p;PACKSRC='sim-callout-copy.md · v'+p.version}})
+  .catch(()=>{})
+  .finally(()=>{
+    if(!PACK)PACK=FALLBACK;
+    const lines=Object.values(PACK.categories).reduce((a,c)=>a+c.lines.length,0);
+    document.getElementById('copysrc').innerHTML=
+      `<span>copy <b>${PACKSRC}</b> · ${Object.keys(PACK.categories).length} tiers · ${lines} lines</span>`;
+    document.querySelectorAll('.seg').forEach(s=>s.querySelectorAll('button').forEach(x=>
+      x.classList.toggle('on',String(S[s.dataset.k])===x.dataset.v)));
+    drawCurve(); startEngine();
+  });
+</script>
+</body>
+</html>

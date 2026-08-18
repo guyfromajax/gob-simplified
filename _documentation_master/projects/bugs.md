@@ -1,14 +1,6 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
-2. Pregame UX stats wiring is inconsistent
-3. Improve FB Outlet Pass denied animation
-4. Scouting Report tab loads as empty when it's th first landing screen
-
-
-##Full Product Readiness
-1. Fine tuen height / weight
-2. Change leader screens and load modals to averages instead of totals
-
+2. Improve FB Outlet Pass denied animation
 
 ##Playtest Launch / In Progress
 1. Steam
@@ -18,14 +10,12 @@
 4. College and Pro setup
 5. UX upgrade -- particularly around tabs and scrolling and back buttons (relative to browser back button), load screens
 6. UI Design upgrade, what is this game's personality?
+7. Wire Stripe into site
 
 
 ##Full Product Perfection
 1. Training Camp News Report
-2. Week 20 Recruiting Report to Inbox
 3. Recruiting Round Up Results
-4. Comprehensive Blowout Governor
-6. Add a new hire news story for user team
 102. Team court images
 108. Message board
 113. Bring logic to screens
@@ -38,12 +28,10 @@
 129: Loose Balls!
 131. Centralized Turn Transition Helper / System
 137. Watermark free version of player headshots
-138. College & Pro game system
-139. Mod system for uploading custom teams
+139. Mod system for uploading custom leagues
 140. Better logic and impact to player EM
-141. Training Report player attribute calibration -- 1 or 10 scale
 142. Logic and impact for play scores
-143. Nail player plumbing for Mod TEams
+143. Nail player plumbing for Mod Teams
 144. Nail mod team balance, league-wide
 
 199. Mobile
@@ -52,7 +40,6 @@
 ##Continuous Evolution (base is built)
 1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
 2. Advanced Topics tutorials
-3. Steam Strategy
 4. Monetization plan
 5. Players as Characters
 

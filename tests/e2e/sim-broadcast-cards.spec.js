@@ -2,9 +2,11 @@
 /**
  * Sim Broadcast cards (brief §8) — the four types in the directed slot.
  *
- * Reference: `Sim Broadcast - Mockup 2 Cards.html`. Card COPY is never asserted as a literal
- * here: it comes from the moment pack, and pinning strings in a test would recreate the
- * "copy in source" problem the pipeline exists to avoid.
+ * SKIPPED (Mockup 4): directed cards / three-zone stage / Highlights↔Team Stats switch
+ * were removed in favour of worm callouts + always-visible team stats. Keep this file
+ * for history until callout e2e coverage replaces it.
+ *
+ * Reference: `Sim Broadcast - Mockup 2 Cards.html`.
  */
 const { test, expect } = require('@playwright/test');
 
@@ -61,7 +63,8 @@ const momentModel = (page, id, values) => page.evaluate(({ id, values }) => {
   return p && { kind: 'moment', tag: p.tag, color: p.color, line: p.line, sub: null };
 }, { id, values });
 
-test.describe('the four types', () => {
+// Mockup 4 removed directed cards / three-zone stage / Highlights↔Team Stats switch.
+test.describe.skip('the four types', () => {
   test('a moment card shows a tag and a one-line stat readout', async ({ page }) => {
     await mount(page);
     const model = await momentModel(page, 'bucket', { NAME: 'REYES', PTS: 24, FGM: 9, FGA: 14, LAST: 2, REB: 5, AST: 3 });
@@ -139,7 +142,7 @@ test.describe('the four types', () => {
   });
 });
 
-test.describe('presentation', () => {
+test.describe.skip('presentation', () => {
   test('the stage does not change size when a card arrives or leaves', async ({ page }) => {
     await mount(page);
     const h = () => page.evaluate(() => ({
@@ -220,7 +223,7 @@ test.describe('presentation', () => {
   });
 });
 
-test.describe('team stats is a hold mode', () => {
+test.describe.skip('team stats is a hold mode', () => {
   test('all card types are suppressed while the panel is up, and nothing queues', async ({ page }) => {
     await mount(page);
     await page.click('.sgp-root .ctlseg [data-v="team"]');

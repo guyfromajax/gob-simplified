@@ -316,7 +316,10 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
       pts: num(stats.PTS),
       reb: reb(stats),
       ast: num(stats.AST),
+      stl: num(stats.STL),
+      blk: num(stats.BLK),
       def: defPct(stats),
+      defA: num(stats.DEF_A),
       fouls: num(stats.F),
       hot: mo >= MO_GLYPH_THRESHOLD,
       cold: mo <= -MO_GLYPH_THRESHOLD,
@@ -544,6 +547,9 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
           summaryAway: prev.score.away,
           summaryHome: prev.score.home,
           summaryNote: spot ? `Top performer — ${spotDir.name}, ${num((cum[spot] || {}).PTS)} PTS` : '',
+          summarySpotId: spot || null,
+          summarySpotName: spot ? (spotDir.name || '') : '',
+          summarySpotPts: spot ? num((cum[spot] || {}).PTS) : 0,
         };
       }
       curQuarter = tQ;

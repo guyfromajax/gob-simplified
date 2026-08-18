@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sim Broadcast — Mockup 1 · Rest State</title>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d14;--bg2:#10141d;--green:#34EC27;--blue:#4A90D9;--orange:#F79420;--red:#ff6d6d;--gold:#FFD700;
+  --w90:rgba(255,255,255,.90);--w70:rgba(255,255,255,.70);--w55:rgba(255,255,255,.55);--w40:rgba(255,255,255,.40);--w25:rgba(255,255,255,.25);
+  --hair:rgba(255,255,255,.08);--bebas:'Bebas Neue',sans-serif;--inter:'Inter',sans-serif;--mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--inter);background:#e9e7e2;color:#15171c;-webkit-font-smoothing:antialiased;padding:34px 34px 60px}
+a{color:#8a4b12}a:hover{color:#b8651c}
+.page{width:1280px;margin:0 auto;display:flex;flex-direction:column;gap:22px}
+.phead{display:flex;align-items:baseline;gap:16px;flex-wrap:wrap}
+.phead h1{font-family:var(--bebas);font-size:38px;line-height:1;letter-spacing:.02em}
+.phead .k{font-family:var(--bebas);font-size:19px;letter-spacing:.08em;color:#a4560f}
+.phead p{font-size:13px;color:rgba(21,23,28,.62);max-width:760px;text-wrap:pretty}
+
+/* ============ 1280×720 FRAME ============ */
+.frame{position:relative;width:1280px;height:720px;background:#05060a;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 26px 60px rgba(0,0,0,.34);border-radius:4px}
+.fmark{position:absolute;right:8px;top:126px;z-index:9;font-family:var(--mono);font-size:9px;letter-spacing:.12em;color:rgba(255,255,255,.22);writing-mode:vertical-rl}
+
+/* scoreboard — context only, not part of this design */
+.sb{position:relative;height:120px;flex-shrink:0;background:#000;color:#fff;font-family:var(--bebas);display:flex;align-items:center;justify-content:space-between;padding:0 16px}
+.sb-side{display:flex;align-items:center;gap:16px}
+.sb-logo{width:124px;height:66px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:30px;letter-spacing:.04em;color:rgba(255,255,255,.94);border:1px solid rgba(255,255,255,.08)}
+.sb-meta{display:flex;flex-direction:column;gap:2px}.sb-meta.right{align-items:flex-end}
+.sb-rank{font-size:15px;letter-spacing:.05em;color:rgba(255,255,255,.78)}
+.sb-rec{font-family:var(--inter);font-size:11px;font-weight:600;color:rgba(255,255,255,.42)}
+.sb-score{font-size:58px;line-height:1;min-width:70px;text-align:center}
+.sb-tf{display:flex;flex-direction:column;gap:1px;font-size:14px;line-height:1.15;color:rgba(255,255,255,.6)}.sb-tf.right{align-items:flex-end}
+.sb-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;gap:2px}
+.sb-clock{font-size:54px;line-height:1}
+.sb-per{display:flex;align-items:center;gap:22px}
+.sb-q{font-size:19px;color:var(--orange)}.sb-shot{font-size:19px;color:var(--gold)}
+.sb-edge{position:absolute;left:0;right:0;bottom:0;height:2px;background:linear-gradient(to right,var(--al) 0%,rgba(255,255,255,.1) 48%,rgba(255,255,255,.1) 52%,var(--hl) 100%)}
+
+/* ============ OVERLAY (600px) ============ */
+.overlay{position:relative;flex:1;padding:16px 26px 12px;display:flex;flex-direction:column;gap:14px;isolation:isolate;
+  background:radial-gradient(120% 78% at 50% 30%,rgba(39,64,142,.13),transparent 62%),radial-gradient(90% 70% at 50% 120%,rgba(247,148,32,.045),transparent 60%),var(--bg)}
+.overlay::before{content:'';position:absolute;left:50%;bottom:-54%;width:94%;aspect-ratio:1/1;transform:translateX(-50%);border-radius:50%;border:1px solid rgba(255,255,255,.04);pointer-events:none}
+.zones{height:512px;display:grid;grid-template-columns:var(--boardw) var(--stagew) var(--boardw);grid-template-rows:minmax(0,1fr);gap:16px;position:relative;z-index:1}
+.footer{height:46px;display:grid;grid-template-columns:var(--boardw) var(--stagew) var(--boardw);gap:16px;align-items:center;position:relative;z-index:1}
+
+/* ---- BOARD ---- */
+.board{display:flex;flex-direction:column;gap:11px;justify-content:center;min-height:0;overflow:hidden}
+.bhead{height:16px;display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--w40);text-transform:uppercase}
+.board.home .bhead{flex-direction:row-reverse}
+.bhead .dot{width:6px;height:6px;border-radius:2px;flex-shrink:0}
+.prow{height:84px;display:flex;align-items:center;gap:12px;padding:0 8px;border-radius:12px;position:relative;transition:filter .3s}
+.board.home .prow{flex-direction:row-reverse}
+.prow.isout{filter:saturate(.5) brightness(.82)}
+.prow.spot{background:radial-gradient(120% 150% at 50% 50%,rgba(247,148,32,.11),transparent 72%)}
+.prow.spot::before{content:'';position:absolute;inset:0;border-radius:12px;box-shadow:inset 0 0 0 1px rgba(247,148,32,.38),0 0 20px rgba(247,148,32,.14);animation:spotPulse 2.6s ease-in-out infinite}
+@keyframes spotPulse{0%,100%{box-shadow:inset 0 0 0 1px rgba(247,148,32,.32),0 0 14px rgba(247,148,32,.09)}50%{box-shadow:inset 0 0 0 1px rgba(247,148,32,.54),0 0 26px rgba(247,148,32,.2)}}
+.head{position:relative;flex-shrink:0;width:62px;height:62px;border-radius:12px;overflow:hidden;background:linear-gradient(180deg,#1b2130,#10141d);border:2px solid rgba(255,255,255,.16);box-shadow:0 5px 14px rgba(0,0,0,.4)}
+.head .sil{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center}
+.head .sil svg{width:80%;height:90%}
+.rtb{position:absolute;top:3px;left:3px;z-index:2;font-family:var(--bebas);font-size:12px;line-height:1;padding:2px 4px 1px;border-radius:4px;color:#0b0d14;box-shadow:0 1px 4px rgba(0,0,0,.45)}
+.pbody{flex:1;min-width:0;display:flex;flex-direction:column;gap:4px}
+.pname{display:flex;align-items:center;gap:6px;line-height:1;height:13px}
+.board.home .pname{flex-direction:row-reverse}
+.pname .pos{font-family:var(--bebas);font-size:12px;line-height:1;letter-spacing:.04em;flex-shrink:0}
+.pname .nm{font-size:13px;line-height:1;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pname .jn{font-size:10.5px;line-height:1;font-weight:600;color:var(--w40);flex-shrink:0}
+.spotmark{font-family:var(--bebas);font-size:11px;letter-spacing:.1em;color:var(--orange);flex-shrink:0}
+.tag-in{font-family:var(--bebas);font-size:10px;line-height:1;padding:2px 4px 1px;border-radius:3px;background:var(--green);color:#06210a;letter-spacing:.04em}
+.status{display:flex;align-items:center;gap:8px;height:12px}
+.board.home .status{flex-direction:row-reverse}
+.mo{width:12px;height:12px;display:flex;flex-shrink:0}.mo svg{width:100%;height:100%}
+.flame{animation:flick 1.1s ease-in-out infinite}
+@keyframes flick{0%,100%{transform:scale(1) rotate(-1deg);opacity:.92}50%{transform:scale(1.13) rotate(2deg);opacity:1}}
+.pips{display:flex;gap:2.5px}.board.home .pips{flex-direction:row-reverse}
+.pip{width:10px;height:3.5px;border-radius:2px}
+.tag-out,.tag-ft{font-family:var(--bebas);font-size:9.5px;line-height:1;letter-spacing:.06em;padding:2px 4px 1px;border-radius:3px;white-space:nowrap}
+.tag-out{background:var(--red);color:#2a0606}.tag-ft{color:var(--gold);border:1px solid rgba(255,215,0,.4)}
+.bars{display:flex;flex-direction:column;gap:4px}
+.barrow{display:grid;grid-template-columns:25px 1fr 28px;align-items:center;gap:7px;height:9px}
+.board.home .barrow{grid-template-columns:28px 1fr 25px}
+.bl{font-family:var(--mono);font-size:8px;line-height:1;letter-spacing:.08em;color:var(--w40)}
+.board.away .bl{text-align:left}.board.home .bl{text-align:right}
+.bv{font-size:11px;line-height:1;font-weight:700;color:var(--w90);font-variant-numeric:tabular-nums}
+.board.away .bv{text-align:right}.board.home .bv{text-align:left}
+.track{position:relative;height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;display:flex}
+.board.home .track{justify-content:flex-end}
+.fill{height:100%;border-radius:4px;transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.fill.maxed{box-shadow:0 0 8px 0 currentColor}
+
+/* ---- STAGE ---- */
+.stage{display:flex;flex-direction:column;gap:14px;min-height:0;padding:10px 12px 12px;border-radius:14px;
+  background:linear-gradient(180deg,rgba(255,255,255,.028),rgba(255,255,255,.008));box-shadow:inset 0 0 0 1px rgba(255,255,255,.045)}
+.wormblock{display:flex;flex-direction:column;flex-shrink:0}
+.wormblock.grow{flex:1;min-height:0}
+.wormfill{position:relative;flex:1;min-height:0;overflow:hidden;margin-top:4px}
+.wormfill .wormsvg{position:absolute;inset:0;width:100%;height:100%;margin:0}
+.wl-head{display:flex;align-items:baseline;justify-content:space-between;height:14px}
+.wl-cap{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--w40)}
+.wl-team{font-family:var(--bebas);font-size:19px;letter-spacing:.04em;line-height:1}
+.wormsvg{display:block;width:100%;height:84px;margin-top:4px}
+.wormdot{filter:drop-shadow(0 0 4px currentColor)}
+.wl-axis{display:flex;justify-content:space-between;margin-top:3px;font-family:var(--mono);font-size:8px;letter-spacing:.06em;color:var(--w25)}
+.slot{position:relative;flex-shrink:0;height:200px;display:flex;flex-direction:column;justify-content:center}
+.slot.flex{flex:1;height:auto;min-height:0}
+.slot.framed{border-radius:10px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.05)}
+
+/* team stats panel */
+.tsp{display:flex;flex-direction:column;gap:6px}
+.tsp-head{display:flex;align-items:center;justify-content:space-between;height:12px;margin-bottom:2px}
+.tsp-cap{font-family:var(--mono);font-size:9px;letter-spacing:.16em;color:var(--w40)}
+.tsp-note{font-family:var(--mono);font-size:8px;letter-spacing:.05em;color:var(--w25)}
+.tsr{display:grid;grid-template-columns:60px 26px 1fr 26px;align-items:center;gap:7px;height:18px}
+.tsr .lb{font-family:var(--mono);font-size:8.5px;letter-spacing:.05em;color:var(--w55);white-space:nowrap}
+.tsr .va,.tsr .vh{font-size:12px;line-height:1;font-weight:700;font-variant-numeric:tabular-nums;color:var(--w40)}
+.tsr .va{text-align:right}.tsr .vh{text-align:left}
+.tsr .va.lead,.tsr .vh.lead{color:#fff}
+.tug{position:relative;height:7px;border-radius:4px;background:rgba(255,255,255,.06)}
+.tug::before{content:'';position:absolute;left:50%;top:-2px;bottom:-2px;width:1px;background:rgba(255,255,255,.18)}
+.tug .pull{position:absolute;top:0;bottom:0;border-radius:4px;transition:width .5s cubic-bezier(.2,.7,.2,1)}
+.pivot{position:relative;height:7px}
+.pivot::before{content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;background:rgba(255,255,255,.13)}
+.pivot::after{content:'RATE';position:absolute;left:50%;top:-1px;transform:translateX(-50%);padding:0 6px;background:#0e121b;font-family:var(--mono);font-size:7px;letter-spacing:.14em;color:var(--w25)}
+
+/* ---- FOOTER: bench + controls ---- */
+.bench{display:flex;align-items:center;gap:7px;overflow:hidden}
+.bench.home{flex-direction:row-reverse}
+.bench-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.14em;color:var(--w25);flex-shrink:0}
+.bchip{display:inline-flex;align-items:center;gap:6px;background:rgba(255,255,255,.045);border:1px solid var(--hair);border-radius:20px;padding:3px 9px;font-size:10.5px;white-space:nowrap}
+.bchip b{font-weight:700;color:var(--w70)}
+.bchip .bstat{color:var(--w40);font-variant-numeric:tabular-nums}
+.bchip.out{opacity:.7}
+.bout{font-family:var(--bebas);font-size:9.5px;color:#2a0606;background:var(--red);border-radius:3px;padding:1px 4px 0;letter-spacing:.04em}
+.ctl{display:flex;align-items:center;gap:8px;justify-content:center}
+.ctl.right{justify-content:flex-end}
+.ctlseg{display:flex;border:1px solid rgba(255,255,255,.09);border-radius:6px;overflow:hidden}
+.ctlseg button{font-family:var(--bebas);font-size:11.5px;letter-spacing:.09em;padding:5px 9px 4px;background:transparent;border:0;color:var(--w40);cursor:pointer;transition:color .2s,background .2s}
+.ctlseg button.on{color:var(--w90);background:rgba(255,255,255,.07)}
+.ctlseg button:hover{color:var(--w70)}
+.ctlbtn{font-family:var(--bebas);font-size:11.5px;letter-spacing:.09em;padding:5px 9px 4px;background:transparent;border:1px solid rgba(255,255,255,.09);border-radius:6px;color:var(--w40);cursor:pointer;transition:color .2s,border-color .2s}
+.ctlbtn:hover{color:var(--w70);border-color:rgba(255,255,255,.18)}
+.stagefoot .ctl{justify-content:center;padding-top:2px}
+
+/* ============ HARNESS ============ */
+.harness{display:grid;grid-template-columns:1fr 380px;gap:18px;align-items:start}
+.hcard{background:#fff;border:1px solid rgba(21,23,28,.1);border-radius:10px;padding:16px 18px}
+.hgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px 22px}
+.hq{display:flex;flex-direction:column;gap:7px}
+.hq .lab{font-family:var(--mono);font-size:9px;letter-spacing:.13em;color:rgba(21,23,28,.5);text-transform:uppercase}
+.seg{display:flex;border:1px solid rgba(21,23,28,.16);border-radius:7px;overflow:hidden;width:fit-content}
+.seg button{font-family:var(--inter);font-size:12px;font-weight:600;padding:7px 12px;background:#fff;border:0;border-right:1px solid rgba(21,23,28,.1);color:rgba(21,23,28,.6);cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg button.on{background:#15171c;color:#fff}
+.readout{display:flex;flex-direction:column;gap:0}
+.readout .r{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px dashed rgba(21,23,28,.12);font-size:12px}
+.readout .r:last-child{border-bottom:0}
+.readout .r span:first-child{color:rgba(21,23,28,.55)}
+.readout .r b{font-variant-numeric:tabular-nums}
+.readout .r.ok b{color:#15803d}.readout .r.warn b{color:#a4560f}
+.notes{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+.note{background:#fff;border:1px solid rgba(21,23,28,.1);border-radius:10px;padding:14px 16px}
+.note h3{font-family:var(--bebas);font-size:17px;letter-spacing:.03em;margin-bottom:6px}
+.note p{font-size:12.5px;line-height:1.5;color:rgba(21,23,28,.72);text-wrap:pretty}
+.note p+p{margin-top:7px}
+.note b{color:#15171c}
+.sechead{font-family:var(--bebas);font-size:15px;letter-spacing:.1em;color:rgba(21,23,28,.45);margin-bottom:10px}
+@media (prefers-reduced-motion:reduce){.prow.spot::before,.flame{animation:none}.fill,.tug .pull{transition:none}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="phead">
+    <h1>Sim Broadcast — Mockup 1</h1><span class="k">REST STATE · 1280×720</span>
+    <p>Three zones, boards fixed, stage the only variable. Stage width is live below — the frame is exactly 1280×720 (120px scoreboard + 600px overlay), so what you see is the 720p floor, not a scaled render.</p>
+  </div>
+
+  <div class="frame" id="frame">
+    <div class="fmark">SCOREBOARD = EXISTING · NOT REDESIGNED</div>
+    <div class="sb" id="sb"></div>
+    <div class="overlay" id="ov">
+      <div class="zones">
+        <div class="board away" id="boardAway"></div>
+        <div class="stage" id="stage"></div>
+        <div class="board home" id="boardHome"></div>
+      </div>
+      <div class="footer" id="footer"></div>
+    </div>
+  </div>
+
+  <div class="harness">
+    <div class="hcard">
+      <div class="sechead">CONTROLS</div>
+      <div class="hgrid">
+        <div class="hq"><span class="lab">Stage width</span><div class="seg" data-k="stagew"><button data-v="400">400</button><button data-v="450">450</button><button data-v="500">500</button></div></div>
+        <div class="hq"><span class="lab">Rest state</span><div class="seg" data-k="rest"><button data-v="worm">Worm</button><button data-v="team">Team stats</button></div></div>
+        <div class="hq"><span class="lab">Worm-only rest (no panel)</span><div class="seg" data-k="slot"><button data-v="bare">Small worm, empty slot</button><button data-v="expand">Worm expands</button></div></div>
+        <div class="hq"><span class="lab">Control cluster</span><div class="seg" data-k="ctl"><button data-v="stage">Under stage</button><button data-v="right">Bottom right</button><button data-v="foot">Stage foot</button></div></div>
+      </div>
+    </div>
+    <div class="hcard">
+      <div class="sechead">MEASURED</div>
+      <div class="readout" id="readout"></div>
+    </div>
+  </div>
+
+  <div class="notes" id="notes"></div>
+</div>
+
+<script>
+const GREEN='#34EC27',BLUE='#4A90D9',ORANGE='#F79420',RED='#ff6d6d',GOLD='#FFD700';
+const POSC={PG:'#4A90D9',SG:'#7B5EA7',SF:'#3A8C4A',PF:'#C0392B',C:'#D4A017'};
+const RTC=r=>r>=81?BLUE:r>=61?GREEN:r>=41?GOLD:RED;
+const SIL='<svg viewBox="0 0 100 100"><circle cx="50" cy="34" r="19" fill="rgba(255,255,255,0.14)"/><path d="M12 100c0-22 17-36 38-36s38 14 38 36" fill="rgba(255,255,255,0.14)"/></svg>';
+const FLAME='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c1 3-1 4.5-2.5 6.5C8 10.7 7 12.4 7 14.5 7 18 9.2 21 12 21s5-3 5-6.5c0-2.4-1.3-4-2.4-5.6.2 1.6-.4 2.7-1.3 3.3.5-2.6-.9-6.4-1.3-10.2z"/></svg>';
+const SNOW='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 2v20M2 12h20M4.9 4.9l14.2 14.2M19.1 4.9L4.9 19.1M12 5.5l2 2M12 5.5l-2 2M12 18.5l2-2M12 18.5l-2-2M5.5 12l2 2M5.5 12l2-2M18.5 12l-2 2M18.5 12l-2-2"/></svg>';
+
+const T={away:{abbr:'AA',name:'Ann Arbor',color:'#9E1B32',rank:18,rec:'15–8'},
+         home:{abbr:'FV',name:'Fairview',color:'#2E9E5B',rank:11,rec:'19–5'}};
+const SCORE={away:54,home:60,clock:'6:12',quarter:'3RD',shot:18,atol:3,htol:4,afoul:7,hfoul:11};
+const AWAY=[
+ {pos:'PG',name:'M. Whitney',jersey:38,rt:78,pts:12,reb:3,ast:7,def:46,fouls:3},
+ {pos:'SG',name:'E. Terrell',jersey:13,rt:54,pts:9,reb:2,ast:3,def:44,fouls:2},
+ {pos:'SF',name:'C. Conway',jersey:53,rt:84,pts:18,reb:7,ast:2,def:58,fouls:2,hot:true},
+ {pos:'PF',name:"A. O'Brien",jersey:42,rt:89,pts:16,reb:11,ast:1,def:64,fouls:2},
+ {pos:'C',name:'L. Gordon',jersey:66,rt:37,pts:6,reb:8,ast:0,def:52,fouls:4}];
+const HOME=[
+ {pos:'PG',name:'D. Reyes',jersey:4,rt:86,pts:14,reb:4,ast:9,def:57,fouls:1},
+ {pos:'SG',name:'J. Pratt',jersey:22,rt:33,pts:5,reb:2,ast:2,def:41,fouls:2,cold:true},
+ {pos:'SF',name:'I. Frank',jersey:31,rt:92,pts:22,reb:6,ast:4,def:66,fouls:2,spot:true},
+ {pos:'PF',name:'T. Wilson',jersey:45,rt:59,pts:8,reb:9,ast:1,def:61,fouls:4},
+ {pos:'C',name:'M. Soto',jersey:55,rt:73,pts:9,reb:7,ast:1,def:55,fouls:3,sub:true}];
+const BENCH={away:[],
+             home:[{name:'R. Ellis',pts:6,reb:3,out:true}]};
+const WORM=[0,2,4,1,-2,-3,-1,2,5,3,6,4,2,5,7,4,1,3,6,8,5,3,6,9,7,4,6,8,6];
+// team stats: [label, awayVal, homeVal, kind, betterIsLow]
+const TEAMSTATS=[
+ ['REBOUNDS',31,27,'tug',false],
+ ['TURNOVERS',9,14,'tug',true],
+ ['FAST BREAK',6,17,'tug',false],
+ ['PTS IN PAINT',18,26,'tug',false],
+ ['FG%','43.1','47.6','rate',false],
+ ['3PM',5,8,'rate',false],
+ ['TEAM FOULS',7,11,'tug',true]];
+
+const S={stagew:400,rest:'worm',slot:'expand',ctl:'stage'};
+
+/* ---------- pieces ---------- */
+function bar(label,v,max,pct){
+  const fill=Math.min(v/max,1)*100, maxed=pct?v>=80:v>=max;
+  const color=maxed?BLUE:GREEN, val=pct?v+'%':v;
+  return `<div class="barrow"><span class="bl">${label}</span><div class="track"><div class="fill${maxed?' maxed':''}" style="width:${fill}%;background:${color};color:${color}"></div></div><span class="bv">${val}</span></div>`;
+}
+function pips(f,out){
+  let s='';
+  for(let i=0;i<5;i++){const c=out?RED:(f>=4?GOLD:'rgba(255,255,255,.7)');s+=`<span class="pip" style="background:${i<f?c:'rgba(255,255,255,.14)'}"></span>`}
+  return `<span class="pips">${s}</span>`;
+}
+function row(p,tc){
+  const st=[];
+  if(p.hot)st.push(`<span class="mo flame" style="color:${ORANGE}">${FLAME}</span>`);
+  if(p.cold)st.push(`<span class="mo" style="color:${BLUE}">${SNOW}</span>`);
+  st.push(pips(p.fouls,p.out));
+  if(p.out)st.push('<span class="tag-out">FOULED OUT</span>');
+  else if(p.fouls>=4)st.push('<span class="tag-ft">FOUL TROUBLE</span>');
+  return `<div class="prow${p.spot?' spot':''}${p.out?' isout':''}">
+    <div class="head" style="border-color:${p.out?RED:tc}"><span class="rtb" style="background:${RTC(p.rt)}">${p.rt}</span><div class="sil">${SIL}</div></div>
+    <div class="pbody">
+      <div class="pname"><span class="pos" style="color:${POSC[p.pos]}">${p.pos}</span><span class="nm">${p.name}</span><span class="jn">#${p.jersey}</span>${p.spot?'<span class="spotmark">◆ TOP</span>':''}${p.sub?'<span class="tag-in">IN</span>':''}</div>
+      <div class="status">${st.join('')}</div>
+      <div class="bars">${bar('PTS',p.pts,20)}${bar('REB',p.reb,10)}${bar('AST',p.ast,10)}${bar('DEF',p.def,100,true)}</div>
+    </div></div>`;
+}
+function board(list,side){
+  const t=T[side];
+  const head=`<div class="bhead"><span class="dot" style="background:${t.color}"></span><span>${t.name} · ${side}</span></div>`;
+  return head+list.map(p=>row(p,t.color)).join('');
+}
+function worm(w,h,opts){
+  // Fixed time domain: x is game progress, not sample index. The dot travels L→R and the
+  // unplayed region stays as structure (zero line + quarter ticks) so shape stays comparable.
+  const o=opts||{}, total=o.total||48, pad=6, mid=h/2, n=WORM.length;
+  const maxAbs=Math.max(6,...WORM.map(Math.abs));
+  const x=i=>pad+i*(w-pad*2)/(total-1), y=m=>mid-(m/maxAbs)*(mid-pad);
+  let line='',area=`M ${x(0)} ${mid} `;
+  WORM.forEach((m,i)=>{line+=(i?'L':'M')+` ${x(i).toFixed(1)} ${y(m).toFixed(1)} `;area+=`L ${x(i).toFixed(1)} ${y(m).toFixed(1)} `});
+  area+=`L ${x(n-1)} ${mid} Z`;
+  const cur=WORM[n-1], cx=x(n-1);
+  const ticks=[.25,.5,.75].map(f=>`<line x1="${(pad+f*(w-pad*2)).toFixed(1)}" y1="2" x2="${(pad+f*(w-pad*2)).toFixed(1)}" y2="${h-2}" stroke="rgba(255,255,255,${f===.5?'.085':'.05'})" stroke-width="1"/>`).join('');
+  return `<svg class="wormsvg" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="wgu" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${T.home.color}" stop-opacity=".45"/><stop offset="1" stop-color="${T.home.color}" stop-opacity="0"/></linearGradient>
+      <linearGradient id="wgd" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="${T.away.color}" stop-opacity=".45"/><stop offset="1" stop-color="${T.away.color}" stop-opacity="0"/></linearGradient>
+      <clipPath id="clipu"><rect x="0" y="0" width="${w}" height="${mid}"/></clipPath>
+      <clipPath id="clipd"><rect x="0" y="${mid}" width="${w}" height="${mid}"/></clipPath>
+    </defs>
+    ${ticks}
+    <line x1="0" y1="${mid}" x2="${w}" y2="${mid}" stroke="rgba(255,255,255,.16)" stroke-width="1" stroke-dasharray="3 4"/>
+    <path d="${area}" fill="url(#wgu)" clip-path="url(#clipu)"/>
+    <path d="${area}" fill="url(#wgd)" clip-path="url(#clipd)"/>
+    <path d="${line}" fill="none" stroke="${T.home.color}" stroke-width="2.2" stroke-linejoin="round" clip-path="url(#clipu)"/>
+    <path d="${line}" fill="none" stroke="${T.away.color}" stroke-width="2.2" stroke-linejoin="round" clip-path="url(#clipd)"/>
+    <line x1="${cx.toFixed(1)}" y1="2" x2="${cx.toFixed(1)}" y2="${h-2}" stroke="rgba(255,255,255,.14)" stroke-width="1"/>
+    <circle class="wormdot" cx="${cx.toFixed(1)}" cy="${y(cur).toFixed(1)}" r="3.4" fill="${cur>=0?T.home.color:T.away.color}"/>
+  </svg>`;
+}
+function teamPanel(){
+  const rows=TEAMSTATS.map(([lb,a,h,kind,low])=>{
+    const na=parseFloat(a),nh=parseFloat(h);
+    const homeBetter=low?nh<na:nh>na, tie=na===nh;
+    if(kind==='rate') return `<div class="tsr"><span class="lb">${lb}</span><span class="va${!tie&&!homeBetter?' lead':''}" ${!tie&&!homeBetter?`style="color:${T.away.color}"`:''}>${a}</span><div class="pivot"></div><span class="vh${!tie&&homeBetter?' lead':''}" ${!tie&&homeBetter?`style="color:${T.home.color}"`:''}>${h}</span></div>`;
+    const edge=Math.abs(na-nh), denom=Math.max(na,nh,1);
+    const pct=Math.min(edge/denom,1)*50;
+    const col=homeBetter?T.home.color:T.away.color;
+    const pull=tie?'':`<div class="pull" style="${homeBetter?'left:50%':'right:50%'};width:${pct}%;background:linear-gradient(${homeBetter?'90deg':'270deg'},${col}44,${col})"></div>`;
+    return `<div class="tsr"><span class="lb">${lb}</span><span class="va${!tie&&!homeBetter?' lead':''}">${a}</span><div class="tug">${pull}</div><span class="vh${!tie&&homeBetter?' lead':''}">${h}</span></div>`;
+  }).join('');
+  return `<div class="tsp"><div class="tsp-head"><span class="tsp-cap">TEAM</span><span class="tsp-note">bar pulls toward better</span></div>${rows}</div>`;
+}
+function controls(){
+  return `<div class="ctl${S.ctl==='right'?' right':''}">
+    <div class="ctlseg" data-rest><button data-v="worm" class="${S.rest==='worm'?'on':''}">WORM</button><button data-v="team" class="${S.rest==='team'?'on':''}">TEAM</button></div>
+    <button class="ctlbtn">1×</button><button class="ctlbtn">▶▶</button></div>`;
+}
+function scoreboard(){
+  return `<div class="sb-side left">
+    <div class="sb-logo" style="background:linear-gradient(135deg,${T.away.color},#0b0d14)">${T.away.abbr}</div>
+    <div class="sb-meta"><span class="sb-rank">#${T.away.rank}</span><span class="sb-rec">${T.away.rec}</span></div>
+    <div class="sb-score">${SCORE.away}</div>
+    <div class="sb-tf"><span>TOL ${SCORE.atol}</span><span>F ${SCORE.afoul}</span></div></div>
+  <div class="sb-center"><div class="sb-clock">${SCORE.clock}</div><div class="sb-per"><span class="sb-q">${SCORE.quarter}</span><span class="sb-shot">${SCORE.shot}</span></div></div>
+  <div class="sb-side right">
+    <div class="sb-tf right"><span>TOL ${SCORE.htol}</span><span>F ${SCORE.hfoul}</span></div>
+    <div class="sb-score">${SCORE.home}</div>
+    <div class="sb-meta right"><span class="sb-rank">#${T.home.rank}</span><span class="sb-rec">${T.home.rec}</span></div>
+    <div class="sb-logo" style="background:linear-gradient(225deg,${T.home.color},#0b0d14)">${T.home.abbr}</div></div>
+  <div class="sb-edge" style="--al:${T.away.color};--hl:${T.home.color}"></div>`;
+}
+
+/* ---------- render ---------- */
+function render(){
+  const boardw=(1228-S.stagew-32)/2;
+  const ov=document.getElementById('ov');
+  ov.style.setProperty('--stagew',S.stagew+'px');
+  ov.style.setProperty('--boardw',boardw+'px');
+
+  document.getElementById('sb').innerHTML=scoreboard();
+  document.getElementById('boardAway').innerHTML=board(AWAY,'away');
+  document.getElementById('boardHome').innerHTML=board(HOME,'home');
+
+  const cur=WORM[WORM.length-1];
+  const lead=cur===0?'<span class="wl-team" style="color:rgba(255,255,255,.5)">TIED</span>'
+    :`<span class="wl-team" style="color:${cur>0?T.home.color:T.away.color}">${cur>0?T.home.abbr:T.away.abbr} +${Math.abs(cur)}</span>`;
+  grow=S.slot==='expand';
+  const wormH=grow?272:84;
+  const slotCls='slot'+(grow?'':' flex')+(S.slot==='framed'?' framed':'');
+  const slotInner=S.rest==='team'?teamPanel():'';
+  const foot=S.ctl==='foot'?`<div class="stagefoot">${controls()}</div>`:'';
+  document.getElementById('stage').innerHTML=
+    `<div class="wormblock${grow?' grow':''}">
+      <div class="wl-head"><span class="wl-cap">LEAD MARGIN</span>${lead}</div>
+      ${grow?`<div class="wormfill">${worm(S.stagew-24,wormH)}</div>`:worm(S.stagew-24,wormH)}
+      <div class="wl-axis"><span>TIP</span><span>Q1</span><span>HALF</span><span>Q3</span><span>FINAL</span></div>
+    </div>
+    <div class="${slotCls}">${slotInner}</div>${foot}`;
+
+  const chips=side=>{
+    const list=BENCH[side];
+    if(!list.length)return '<div></div>';
+    const show=list.slice(0,3), extra=list.length-show.length;
+    return `<div class="bench ${side}"><span class="bench-lbl">BENCH</span>${show.map(c=>`<span class="bchip${c.out?' out':''}"><b>${c.name}</b>${c.out?'<span class="bout">OUT</span>':''}<span class="bstat">${c.pts}p · ${c.reb}r</span></span>`).join('')}${extra?`<span class="bchip"><b>+${extra}</b></span>`:''}</div>`;
+  };
+  const mid=S.ctl==='stage'?controls():'<div></div>';
+  const right=S.ctl==='right'?`<div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">${chips('home')}${controls()}</div>`:chips('home');
+  document.getElementById('footer').innerHTML=chips('away')+mid+right;
+
+  // readout
+  requestAnimationFrame(measure);
+
+  document.querySelectorAll('.seg').forEach(seg=>{
+    const k=seg.dataset.k;
+    seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',String(S[k])===b.dataset.v));
+  });
+}
+function measure(){
+  const px=n=>Math.round(n)+'px';
+  const boardw=(1228-S.stagew-32)/2;
+  const bd=document.getElementById('boardAway');
+  const zones=document.querySelector('.zones'), ft=document.querySelector('.footer');
+  const trackEl=bd.querySelector('.track'), rowEl=bd.querySelector('.prow'), bodyEl=bd.querySelector('.pbody');
+  const stackH=Array.from(bd.children).reduce((a,c)=>a+c.getBoundingClientRect().height,0)+11*(bd.children.length-1);
+  const zoneH=zones.getBoundingClientRect().height, ftH=ft.getBoundingClientRect().height;
+  const rowH=parseFloat(getComputedStyle(zones).gridTemplateRows)||zoneH;
+  const boxH=Math.max(rowH,bd.getBoundingClientRect().height,document.getElementById('stage').getBoundingClientRect().height);
+  const need=boxH+14+ftH, have=572;
+  const slotEl=document.querySelector('.slot');
+  const rows=[
+    ['Stage width',px(S.stagew)],
+    ['Board width (each)',px(boardw)],
+    ['Stat bar track',px(trackEl.getBoundingClientRect().width),'ok',trackEl.getBoundingClientRect().width>=190],
+    ['Player row · content',px(rowEl.getBoundingClientRect().height)+' · '+px(bodyEl.getBoundingClientRect().height),'ok',bodyEl.getBoundingClientRect().height<=rowEl.getBoundingClientRect().height],
+    ['Board content (head+rows)',px(stackH)+' of '+px(zoneH),'ok',stackH<=zoneH],
+    ['Zone row · tallest box',px(rowH)+' · '+px(boxH),'ok',boxH<=zoneH],
+    ['Overlay inner','1228 × '+have],
+    ['Vertical budget',px(boxH)+' + 14 + '+px(ftH)+' = '+px(need),'ok',need<=have],
+    ['Worm height',px((document.querySelector('.wormfill')||document.querySelector('.wormsvg')).getBoundingClientRect().height)+(grow?' (expanded)':'')],
+    ['Directed slot',px(slotEl.getBoundingClientRect().height)+(S.rest==='team'?' · team panel':grow?' reserved':' empty')]
+  ];
+  document.getElementById('readout').innerHTML=rows.map(r=>
+    `<div class="r ${r[2]?(r[3]?'ok':'warn'):''}"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
+}
+let grow=true;
+document.getElementById('ov').addEventListener('click',e=>{
+  const b=e.target.closest('.ctlseg[data-rest] button'); if(!b)return;
+  S.rest=b.dataset.v; render();
+});
+document.querySelectorAll('.seg').forEach(seg=>seg.addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b)return;
+  const k=seg.dataset.k, v=b.dataset.v;
+  S[k]=k==='stagew'?parseInt(v,10):v;
+  render();
+}));
+
+document.getElementById('notes').innerHTML=`
+<div class="note"><h3>1 · 400 vs 500 — locked at 400</h3>
+<p>At <b>400</b> each board gets <b>398px</b> and the four bars keep a <b>241px</b> track — a point of PTS is ~12px, so a bar visibly moves on a single basket. At <b>500</b> the board falls to 348 and the track to <b>191px</b> (~9.5px per point); still legible, but the bars stop reading as motion and start reading as state.</p>
+<p>The stage doesn't need the extra 100px: the team panel fits in 400 with a 200px+ tug track, and a card line at Bebas 22px carries ~34 characters. <b>The stage should buy its room vertically, not horizontally</b> — which is what the worm-expands treatment does.</p></div>
+
+<div class="note"><h3>2 · Bars at the narrower board</h3>
+<p>They hold. Row is <b>84px</b> (62px portrait + breathing), body is name 13 / status 12 / four 8px bars — nothing below 8px type except mono labels, which are letterspaced caps. The 1080p case scales all of this ×1.5.</p>
+<p>Losses to watch: long names ellipsize past ~15 characters at 500, and FOUL TROUBLE + hot glyph + pips is the full status line's budget — a third status token would wrap.</p></div>
+
+<div class="note"><h3>3 · Does empty read as calm?</h3>
+<p><b>Small worm + empty slot</b> is the honest failure: ~390px of nothing that reads as a load error. (The old "framed" option only added a 1px 5%-white inset — invisible, so it did no work; removed.)</p>
+<p><b>Worm expands</b> is locked. At rest the worm claims the stage and the slot holds a reserved 200px; when a card arrives the worm gives that 200px back in one 0.4s move. Because <b>WORM is the default rest state</b> and the panel takes that same reserved 200px when it comes up, the stage never changes size between resting states — only what fills the lower band.</p></div>
+
+<div class="note"><h3>5 · Bench rail logic</h3>
+<p>Chips are <b>everyone who has logged court time and is not in the current five</b> — nothing else. The sim runs no rotation subs, so the only way onto the rail is a <b>foul-out</b>: the outgoing player drops here with a red <b>OUT</b> marker and his replacement takes the same row with an <b>IN</b> tag. Home shows that pair; away has had no exits, so its rail is hidden rather than showing an empty label.</p>
+<p>Order is most-recent exit first; cap <b>3 chips</b> per side at this board width, overflow collapses to <b>+N</b>. Stats stay live (pts · reb) so a fouled-out 18-point night doesn't vanish from the screen.</p></div>
+
+<div class="note"><h3>6 · Moments — out of scope here</h3>
+<p>Correct, no moments in this frame. Cards are mockup 2, and one of the four types has a data problem worth naming now: <b>Moment</b> cards (STEAL — Reyes, coast to coast) need play-by-play prose the sim path doesn't emit, and the build prompt tabled client-side derivation rather than ship a synthesized feed.</p>
+<p><b>Run</b>, <b>Margin</b> and <b>Context</b> cards are all derivable from counts already on the wire, so mockup 2 will use those three. If Moment cards matter, they need a backend line, not a renderer trick.</p></div>
+
+<div class="note"><h3>4 · Where the controls sit</h3>
+<p><b>Under stage</b> is locked: interaction lives in the same column as the only thing that changes, boards keep a bench-only footer, and the cluster sits in the footer's 46px so it never competes for stage space. The <b>WORM / TEAM</b> pair is live in the frame — it swaps the resting state (expanded worm vs worm + team panel) and nothing else; <b>1×</b> is playback speed, <b>▶▶</b> skips to final. All three change what you see, never what happens.</p>
+<p>Treatment is hairline-on-transparent at 40% white — it resolves on approach, never on glance.</p></div>`;
+
+render();
+</script>
+</body>
+</html>
