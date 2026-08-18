@@ -342,7 +342,7 @@ test.describe('team stats: fouls pill', () => {
     expect(m.width).toBe('0px');
   });
 
-  test('turnovers are untouched — still toward the team with FEWER', async ({ page }) => {
+  test('turnovers grow toward the team with MORE turnovers', async ({ page }) => {
     const side = (to) => ({ reb: 10, to, fb: 4, paint: 8, fgm: 9, fga: 20, fgPct: 45, tpm: 2, fouls: 4 });
     await mount(page, { frames: [frame({ teamPanel: { away: side(2), home: side(9) } })] });
     await page.click('.sgp-root .ctlseg [data-v="team"]');
@@ -355,7 +355,45 @@ test.describe('team stats: fouls pill', () => {
       return { bg: getComputedStyle(pull).backgroundColor,
                towardAway: box.left + box.width / 2 < track.left + track.width / 2 };
     });
-    expect(m.towardAway).toBe(true);   // away committed fewer turnovers
-    expect(m.bg).toBe(AWAY_COLOR);
+    expect(m.towardAway).toBe(false);  // home committed more turnovers
+    expect(m.bg).toBe(HOME_COLOR);
+  });
+
+  test('FG% and 3PT tug toward the greater value', async ({ page }) => {
+    await mount(page, {
+      frames: [frame({
+        teamPanel: {
+          away: { reb: 10, to: 5, fb: 4, paint: 8, fgm: 9, fga: 20, fgPct: 40, tpm: 2, fouls: 4 },
+          home: { reb: 10, to: 5, fb: 4, paint: 8, fgm: 12, fga: 20, fgPct: 55, tpm: 6, fouls: 4 },
+        },
+      })],
+    });
+    await page.click('.sgp-root .ctlseg [data-v="team"]');
+    await page.waitForTimeout(150);
+    const m = await page.evaluate(() => {
+      const read = (key) => {
+        const row = document.querySelector(`.tsr[data-stat="${key}"]`);
+        const pull = row.querySelector('.pull');
+        const track = row.querySelector('.tug').getBoundingClientRect();
+        const box = pull.getBoundingClientRect();
+        return {
+          label: row.querySelector('.lb').textContent,
+          hasPull: !!pull,
+          bg: getComputedStyle(pull).backgroundColor,
+          towardAway: box.left + box.width / 2 < track.left + track.width / 2,
+        };
+      };
+      const labels = [...document.querySelectorAll('.tsp .tsr .lb')].map((el) => el.textContent);
+      return { labels, fg: read('fg'), tpm: read('tpm') };
+    });
+    expect(m.labels).toEqual([
+      'FG%', '3PT', 'PTS IN PAINT', 'FAST BREAK', 'REBOUNDS', 'TURNOVERS', 'TEAM FOULS',
+    ]);
+    expect(m.fg.hasPull).toBe(true);
+    expect(m.fg.towardAway).toBe(false);
+    expect(m.fg.bg).toBe(HOME_COLOR);
+    expect(m.tpm.hasPull).toBe(true);
+    expect(m.tpm.towardAway).toBe(false);
+    expect(m.tpm.bg).toBe(HOME_COLOR);
   });
 });

@@ -1,0 +1,180 @@
+=== BY CUMULATIVE TIME (top 80) ===
+         35591607 function calls (30782405 primitive calls) in 18.430 seconds
+
+   Ordered by: cumulative time
+   List reduced from 2047 to 80 due to restriction <80>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+     12/6    0.001    0.000   18.290    3.048 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/monitor.py:57(target)
+      254    0.022    0.000   17.243    0.068 /Users/jamesdavies/gob-simplified/BackEnd/models/game_manager.py:1459(simulate_macro_turn)
+      254    0.249    0.001   16.191    0.064 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:1432(run_micro_turn)
+        4    0.008    0.002   12.438    3.110 /Users/jamesdavies/gob-simplified/BackEnd/main.py:362(simulate_quarter)
+        5    0.000    0.000   11.882    2.376 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/monitor.py:187(_run)
+        5    0.000    0.000   11.881    2.376 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/monitor.py:224(_check_server)
+2887977/25216    3.243    0.000    7.053    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/copy.py:119(deepcopy)
+445464/25076    1.377    0.000    6.976    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/copy.py:218(_deepcopy_dict)
+      2/1    0.000    0.000    6.408    6.408 /Users/jamesdavies/gob-simplified/scripts/perf_sim_baseline.py:194(run_cpu_game)
+      2/1    0.000    0.000    6.407    6.407 /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:6026(_run_franchise_cpu_full_simulation_core)
+      127    0.004    0.000    5.950    0.047 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:3897(resolve_half_court_offense)
+      127    0.024    0.000    5.585    0.044 /Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:7491(resolve_half_court_offense_logic)
+54670/25982    0.080    0.000    4.755    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/copy.py:192(_deepcopy_list)
+        5    0.003    0.001    4.245    0.849 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/monitor.py:256(_check_once)
+1482425/435    2.075    0.000    3.904    0.009 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:1446(convert_players)
+      384    0.009    0.000    3.736    0.010 /Users/jamesdavies/gob-simplified/BackEnd/models/animator.py:1483(compute_defender_grid)
+      270    0.011    0.000    3.559    0.013 /Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:5769(_stamp_contest_defender_grid)
+      144    0.026    0.000    3.522    0.024 /Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:6342(_resolve_hco_offense_shot_dynamic)
+        5    0.006    0.001    3.438    0.688 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:4227(_preview_non_hco_eoq_turn)
+        5    0.000    0.000    3.347    0.669 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:4191(_clone_game_for_preview)
+      384    0.083    0.000    2.995    0.008 /Users/jamesdavies/gob-simplified/BackEnd/models/animator.py:1273(_build_all_animations)
+   286/47    0.002    0.000    2.483    0.053 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/copy.py:248(_reconstruct)
+      117    0.145    0.001    2.337    0.020 /Users/jamesdavies/gob-simplified/BackEnd/models/animator.py:1835(_position_zone_defenders)
+     4152    0.230    0.000    2.048    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:1070(assign_all_zone_defenders)
+  9498445    1.990    0.000    1.990    0.000 {method 'get' of 'dict' objects}
+      432    0.006    0.000    1.228    0.003 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:189(_attach_clock_contract)
+      432    0.006    0.000    1.205    0.003 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:346(_build_clock_event_ledger)
+     2004    0.008    0.000    1.196    0.001 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:362(append_event)
+       35    0.001    0.000    1.128    0.032 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:4095(_emit_pressure_animation_steps)
+   241598    0.179    0.000    1.088    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:557(_point_in_zone)
+6632322/6632058    1.054    0.000    1.057    0.000 {built-in method builtins.isinstance}
+      6/3    0.000    0.000    0.998    0.333 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/monitor.py:414(_run)
+    64/50    0.075    0.001    0.972    0.019 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/network.py:328(_receive_data_on_socket)
+   123/99    0.022    0.000    0.970    0.010 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/socket_checker.py:45(select)
+      103    0.002    0.000    0.946    0.009 /Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:5817(_hco_contest_final_skeleton)
+    26/23    0.000    0.000    0.914    0.040 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/helpers.py:316(inner)
+       34    0.001    0.000    0.882    0.026 /Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:847(build_lineup_from_mongo)
+    70/64    0.002    0.000    0.879    0.014 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py:1289(recv_into)
+       67    0.000    0.000    0.874    0.013 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/cursor.py:1260(next)
+       25    0.000    0.000    0.874    0.035 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/cursor.py:1144(_refresh)
+    32/25    0.001    0.000    0.873    0.035 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/network.py:244(receive_message)
+       20    0.001    0.000    0.872    0.044 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/cursor.py:1045(__send_message)
+    40/20    0.000    0.000    0.871    0.044 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/_csot.py:100(csot_wrapper)
+       20    0.000    0.000    0.871    0.044 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/mongo_client.py:1352(_run_operation)
+       20    0.000    0.000    0.870    0.044 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/mongo_client.py:1464(_retryable_read)
+       20    0.000    0.000    0.870    0.043 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/mongo_client.py:1428(_retry_internal)
+       20    0.000    0.000    0.869    0.043 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/mongo_client.py:2295(run)
+       20    0.000    0.000    0.868    0.043 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/mongo_client.py:2431(_read)
+   241598    0.623    0.000    0.868    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:390(_point_in_polygon)
+       20    0.000    0.000    0.860    0.043 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/mongo_client.py:1383(_cmd)
+       20    0.001    0.000    0.858    0.043 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/server.py:97(run_operation)
+270551/256883    0.253    0.000    0.851    0.000 {built-in method builtins.next}
+    26/20    0.000    0.000    0.846    0.042 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/pool.py:1014(receive_message)
+   139/98    0.005    0.000    0.826    0.008 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py:136(__enter__)
+      314    0.010    0.000    0.786    0.003 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:5770(update_clock_and_possession)
+       35    0.007    0.000    0.775    0.022 /Users/jamesdavies/gob-simplified/BackEnd/engine/dynamic_hct_step_emitter.py:972(build_dynamic_hct_animation_steps)
+      6/3    0.001    0.000    0.773    0.258 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/monitor.py:427(_ping)
+      6/3    0.001    0.000    0.720    0.240 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/pool.py:813(hello)
+    16/15    0.001    0.000    0.703    0.047 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/collection.py:1475(find_one)
+    70/64    0.040    0.001    0.701    0.011 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py:1129(read)
+       34    0.000    0.000    0.697    0.020 /Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:435(_get_or_compute_team_fill_order)
+        2    0.003    0.002    0.697    0.348 /Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:383(compute_team_fill_order)
+      414    0.000    0.000    0.695    0.002 /Users/jamesdavies/gob-simplified/BackEnd/engine/dynamic_hct_step_emitter.py:82(_project_pressure_step)
+        2    0.001    0.000    0.694    0.347 /Users/jamesdavies/gob-simplified/BackEnd/utils/playbook_weights_utils.py:255(compute_position_shot_weights)
+      414    0.001    0.000    0.691    0.002 /Users/jamesdavies/gob-simplified/BackEnd/engine/pressure_step_state.py:102(project_animation_step_through_pressure_state)
+      437    0.003    0.000    0.657    0.002 /Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:9988(get_hco_skeleton)
+      437    0.006    0.000    0.649    0.001 /Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:10108(_get_skeleton_from_team_plays)
+      6/3    0.001    0.000    0.602    0.201 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/pool.py:816(_hello)
+      519    0.002    0.000    0.598    0.001 /Users/jamesdavies/gob-simplified/BackEnd/models/game_manager.py:2459(update_team_stats)
+     1038    0.320    0.000    0.596    0.001 /Users/jamesdavies/gob-simplified/BackEnd/models/team_manager.py:1052(update_team_stats)
+       40    0.002    0.000    0.589    0.015 /Users/jamesdavies/gob-simplified/BackEnd/utils/plays_catalog.py:121(doc_by_id)
+     4152    0.078    0.000    0.587    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:877(_detect_overlapping_zones)
+    70/64    0.551    0.008    0.566    0.009 {method 'read' of '_ssl._SSLSocket' objects}
+    64/63    0.001    0.000    0.547    0.009 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/pool.py:1614(checkout)
+     2037    0.005    0.000    0.542    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/uuid.py:710(uuid4)
+      3/2    0.001    0.000    0.532    0.266 /Users/jamesdavies/gob-simplified/BackEnd/models/team_manager.py:264(__init__)
+  3914422    0.519    0.000    0.519    0.000 {built-in method builtins.id}
+  1165719    0.338    0.000    0.494    0.000 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:1436(_safe_key)
+      267    0.143    0.001    0.484    0.002 /Users/jamesdavies/gob-simplified/BackEnd/models/animator.py:2124(_position_standard_defenders)
+     8401    0.118    0.000    0.479    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:911(_resolve_overlap_assignments)
+
+
+
+
+=== BY TOTAL (SELF) TIME (top 80) ===
+         35591607 function calls (30782405 primitive calls) in 18.430 seconds
+
+   Ordered by: internal time
+   List reduced from 2047 to 80 due to restriction <80>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+2887977/25216    3.243    0.000    7.053    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/copy.py:119(deepcopy)
+1482425/435    2.075    0.000    3.904    0.009 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:1446(convert_players)
+  9498445    1.990    0.000    1.990    0.000 {method 'get' of 'dict' objects}
+445464/25076    1.377    0.000    6.976    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/copy.py:218(_deepcopy_dict)
+6632322/6632058    1.054    0.000    1.057    0.000 {built-in method builtins.isinstance}
+   241598    0.623    0.000    0.868    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:390(_point_in_polygon)
+    70/64    0.551    0.008    0.566    0.009 {method 'read' of '_ssl._SSLSocket' objects}
+  3914422    0.519    0.000    0.519    0.000 {built-in method builtins.id}
+  1165719    0.338    0.000    0.494    0.000 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:1436(_safe_key)
+     1038    0.320    0.000    0.596    0.001 /Users/jamesdavies/gob-simplified/BackEnd/models/team_manager.py:1052(update_team_stats)
+   500420    0.286    0.000    0.458    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/copy.py:232(_keep_alive)
+270551/256883    0.253    0.000    0.851    0.000 {built-in method builtins.next}
+      254    0.249    0.001   16.191    0.064 /Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:1432(run_micro_turn)
+     4152    0.230    0.000    2.048    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:1070(assign_all_zone_defenders)
+  2371247    0.215    0.000    0.215    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/copy.py:173(_deepcopy_atomic)
+   897204    0.208    0.000    0.208    0.000 {method 'items' of 'dict' objects}
+   936814    0.207    0.000    0.207    0.000 {method 'append' of 'list' objects}
+   241598    0.179    0.000    1.088    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:557(_point_in_zone)
+      117    0.145    0.001    2.337    0.020 /Users/jamesdavies/gob-simplified/BackEnd/models/animator.py:1835(_position_zone_defenders)
+      267    0.143    0.001    0.484    0.002 /Users/jamesdavies/gob-simplified/BackEnd/models/animator.py:2124(_position_standard_defenders)
+   856648    0.139    0.000    0.139    0.000 {built-in method builtins.len}
+    23685    0.128    0.000    0.189    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:363(_get_zone_coords)
+     8401    0.118    0.000    0.479    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:911(_resolve_overlap_assignments)
+    120/0    0.115    0.001    0.000          {built-in method time.sleep}
+    121/2    0.112    0.001    0.000    0.000 {method 'poll' of 'select.poll' objects}
+    28608    0.104    0.000    0.229    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:1521(calculate_defender_coords)
+      384    0.083    0.000    2.995    0.008 /Users/jamesdavies/gob-simplified/BackEnd/models/animator.py:1273(_build_all_animations)
+54670/25982    0.080    0.000    4.755    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/copy.py:192(_deepcopy_list)
+     4152    0.078    0.000    0.587    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:877(_detect_overlapping_zones)
+   279220    0.075    0.000    0.076    0.000 {built-in method builtins.getattr}
+    64/50    0.075    0.001    0.972    0.019 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/network.py:328(_receive_data_on_socket)
+    13085    0.066    0.000    0.415    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:720(assign_zone_defender_coords)
+   308179    0.057    0.000    0.057    0.000 {built-in method builtins.abs}
+      548    0.054    0.000    0.087    0.000 /Users/jamesdavies/gob-simplified/BackEnd/models/team_manager.py:1094(get_team_game_stats)
+    16266    0.049    0.000    0.100    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:180(_player_effective_slot_rating)
+    11059    0.047    0.000    0.076    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:1816(_apply_defender_posture)
+    48298    0.047    0.000    0.075    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/random.py:245(_randbelow_with_getrandbits)
+    28596    0.046    0.000    0.368    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:1858(get_defender_coords)
+   241402    0.046    0.000    0.046    0.000 {built-in method builtins.iter}
+   181537    0.046    0.000    0.059    0.000 {built-in method builtins.min}
+   190697    0.045    0.000    0.049    0.000 {built-in method builtins.max}
+      258    0.045    0.000    0.161    0.001 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared.py:447(calc_skeleton_step_timing_contract)
+    30378    0.044    0.000    0.106    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/random.py:295(randrange)
+    70/64    0.040    0.001    0.701    0.011 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py:1129(read)
+      384    0.038    0.000    0.056    0.000 /Users/jamesdavies/gob-simplified/BackEnd/models/animator.py:1507(defender_grid_from_animations)
+    16392    0.036    0.000    0.063    0.000 <frozen importlib._bootstrap>:1390(_handle_fromlist)
+    71974    0.035    0.000    0.035    0.000 {built-in method builtins.round}
+    10687    0.034    0.000    0.107    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/animation_step_helpers.py:352(_ag_grid_per_game_sec)
+     4152    0.034    0.000    0.061    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared_defense.py:1369(_apply_multi_defender_offsets)
+    15914    0.033    0.000    0.053    0.000 /Users/jamesdavies/gob-simplified/BackEnd/models/animator.py:45(_attack_drive_defender_override)
+    15298    0.033    0.000    0.057    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared.py:338(_extract_step_location_coords)
+   103317    0.029    0.000    0.029    0.000 {built-in method builtins.hasattr}
+    27624    0.029    0.000    0.034    0.000 /Users/jamesdavies/gob-simplified/BackEnd/engine/attack_drive_clearance.py:76(_home_spot_coords)
+     9063    0.028    0.000    0.042    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/animation_step_helpers.py:197(_player_lookup_by_id)
+      432    0.028    0.000    0.058    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared.py:3683(sync_lineup_coords_from_turn)
+      144    0.026    0.000    3.522    0.024 /Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:6342(_resolve_hco_offense_shot_dynamic)
+    63552    0.026    0.000    0.026    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared.py:3257(get_away_player_coords)
+    10366    0.026    0.000    0.035    0.000 /Users/jamesdavies/gob-simplified/BackEnd/engine/pass_contest.py:106(_project_onto_segment)
+      632    0.026    0.000    0.054    0.000 /Users/jamesdavies/gob-simplified/BackEnd/engine/pressure_step_state.py:150(_players_state)
+      432    0.025    0.000    0.216    0.000 /Users/jamesdavies/gob-simplified/BackEnd/models/game_manager.py:835(_append_turn)
+      127    0.024    0.000    5.585    0.044 /Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:7491(resolve_half_court_offense_logic)
+       34    0.024    0.001    0.179    0.005 /Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:452(solve_best_assignment)
+     3190    0.023    0.000    0.033    0.000 /Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:5236(_hco_nearest_def_dist)
+      108    0.023    0.000    0.202    0.002 /Users/jamesdavies/gob-simplified/BackEnd/models/shot_manager.py:661(resolve_shot)
+    66557    0.023    0.000    0.023    0.000 {built-in method math.hypot}
+    16114    0.022    0.000    0.034    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/shared.py:2281(derive_pts_from_shooting_stats)
+      254    0.022    0.000   17.243    0.068 /Users/jamesdavies/gob-simplified/BackEnd/models/game_manager.py:1459(simulate_macro_turn)
+   123/99    0.022    0.000    0.970    0.010 /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/pymongo/socket_checker.py:45(select)
+    27504    0.020    0.000    0.080    0.000 /Users/jamesdavies/gob-simplified/BackEnd/engine/attack_drive_clearance.py:88(_spot_display_coords)
+     8708    0.020    0.000    0.041    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/defense_identity.py:302(resolve_to_defense_id)
+    27624    0.020    0.000    0.027    0.000 /Users/jamesdavies/gob-simplified/BackEnd/engine/attack_drive_clearance.py:81(_display_coords)
+    16556    0.020    0.000    0.032    0.000 /Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:155(_player_slot_rating)
+      380    0.019    0.000    0.201    0.001 /Users/jamesdavies/gob-simplified/BackEnd/engine/pressure_step_state.py:190(_project_from_formal_state)
+     3638    0.018    0.000    0.018    0.000 /Users/jamesdavies/gob-simplified/BackEnd/models/player.py:263(_rescale_attributes)
+    16770    0.018    0.000    0.050    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/random.py:345(choice)
+     1658    0.018    0.000    0.034    0.000 /Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:4927(_hco_step_def_xy)
+    10881    0.018    0.000    0.041    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/logging/__init__.py:2210(debug)
+    30378    0.017    0.000    0.124    0.000 /usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/random.py:336(randint)
+    55686    0.017    0.000    0.017    0.000 {method 'lower' of 'str' objects}
+    23628    0.017    0.000    0.021    0.000 /Users/jamesdavies/gob-simplified/BackEnd/engine/pressure_step_state.py:488(_coord)
+
+

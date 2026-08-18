@@ -1,0 +1,9 @@
+kind,matchup,seed,side,team,team_id,final_score,possessions,FGM,FGA,FG_pct,TPM,TPA,TP_pct,FTM,FTA,FT_pct,TO,OREB,DREB,REB,AST,STL,BLK,PF
+cpu_full,South Lancaster @ Durham,20260720,home,Durham,DURHAM,102,66.88,31,54,57.41,3,10,30.0,37,52,71.15,7,17,33,50,15,5,7,9
+cpu_full,South Lancaster @ Durham,20260720,away,South Lancaster,SOUTH_LANCASTER,56,65.28,18,53,33.96,11,30,36.67,9,12,75.0,9,2,14,16,15,6,3,41
+cpu_full,Nickel Beach @ Lancaster,20260721,home,Lancaster,LANCASTER,78,61.24,28,60,46.67,5,19,26.32,17,21,80.95,3,11,21,32,18,7,7,13
+cpu_full,Nickel Beach @ Lancaster,20260721,away,Nickel Beach,NICKEL_BEACH,47,57.84,17,45,37.78,8,25,32.0,5,11,45.45,17,9,21,30,15,1,2,15
+cpu_full,IDA @ Xavien,20260722,home,Xavien,XAVIEN,47,58.08,18,46,39.13,6,19,31.58,5,7,71.43,16,7,19,26,12,2,3,15
+cpu_full,IDA @ Xavien,20260722,away,IDA,IDA,64,55.8,22,49,44.9,5,20,25.0,15,20,75.0,8,10,21,31,13,8,9,9
+cpu_full,Cagers World @ Morristown,20260723,home,Morristown,MORRISTOWN,77,70.96,28,52,53.85,14,24,58.33,7,9,77.78,20,5,28,33,21,1,4,28
+cpu_full,Cagers World @ Morristown,20260723,away,Cagers World,CAGERS_WORLD,91,71.76,30,68,44.12,10,32,31.25,21,29,72.41,7,16,21,37,15,14,5,11

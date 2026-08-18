@@ -300,12 +300,12 @@ function playerRowSkeleton(side) {
 
 function teamPanelSkeleton() {
   const rows = [
+    ['fg', 'FG%', 'tug'],
+    ['tpm', '3PT', 'tug'],
+    ['paint', 'PTS IN PAINT', 'tug'],
+    ['fb', 'FAST BREAK', 'tug'],
     ['reb', 'REBOUNDS', 'tug'],
     ['to', 'TURNOVERS', 'tug'],
-    ['fb', 'FAST BREAK', 'tug'],
-    ['paint', 'PTS IN PAINT', 'tug'],
-    ['fg', 'FG%', 'rate'],
-    ['tpm', '3PM', 'rate'],
     ['fouls', 'TEAM FOULS', 'tug'],
   ];
   return rows.map(([key, label, kind]) => `
@@ -528,16 +528,15 @@ function updateTeamPanel(panelEl, teamPanel, awayColor, homeColor) {
   if (!panelEl || !teamPanel) return;
   const a = teamPanel.away || {};
   const h = teamPanel.home || {};
+  // Order matches the panel skeleton. Counting + rate stats all tug; TO/fouls pills
+  // grow toward the higher (worse) total while the white lead highlight still marks fewer.
   const specs = [
-    { key: 'reb', a: a.reb, h: h.reb, lowBetter: false, format: (v) => String(Math.round(v)) },
-    { key: 'to', a: a.to, h: h.to, lowBetter: true, format: (v) => String(Math.round(v)) },
-    { key: 'fb', a: a.fb, h: h.fb, lowBetter: false, format: (v) => String(Math.round(v)) },
+    { key: 'fg', a: a.fgPct, h: h.fgPct, lowBetter: false, format: (v) => (Number(v) || 0).toFixed(1) },
+    { key: 'tpm', a: a.tpm, h: h.tpm, lowBetter: false, format: (v) => String(Math.round(v)) },
     { key: 'paint', a: a.paint, h: h.paint, lowBetter: false, format: (v) => String(Math.round(v)) },
-    { key: 'fg', a: a.fgPct, h: h.fgPct, lowBetter: false, rate: true, format: (v) => (Number(v) || 0).toFixed(1) },
-    { key: 'tpm', a: a.tpm, h: h.tpm, lowBetter: false, rate: true, format: (v) => String(Math.round(v)) },
-    // Fouls read as accumulating trouble, so the bar grows toward the team in it, in that
-    // team's colour. `lowBetter` still governs the white value highlight — fewer fouls is
-    // still the better number — so only the pill is inverted, not the judgement.
+    { key: 'fb', a: a.fb, h: h.fb, lowBetter: false, format: (v) => String(Math.round(v)) },
+    { key: 'reb', a: a.reb, h: h.reb, lowBetter: false, format: (v) => String(Math.round(v)) },
+    { key: 'to', a: a.to, h: h.to, lowBetter: true, pullToHigh: true, format: (v) => String(Math.round(v)) },
     { key: 'fouls', a: a.fouls, h: h.fouls, lowBetter: true, pullToHigh: true, format: (v) => String(Math.round(v)) },
   ];
   specs.forEach((spec) => {
@@ -553,7 +552,6 @@ function updateTeamPanel(panelEl, teamPanel, awayColor, homeColor) {
     const hLead = spec.lowBetter ? hv < av : hv > av;
     va.classList.toggle('lead', aLead);
     vh.classList.toggle('lead', hLead);
-    if (spec.rate) return;
     const pull = row.querySelector('.pull');
     if (!pull) return;
     const edge = Math.abs(av - hv);
