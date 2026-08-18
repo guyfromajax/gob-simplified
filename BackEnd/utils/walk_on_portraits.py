@@ -3,6 +3,9 @@
 Source art is the retired set_0001 mover archive, remapped to collision-free
 ``image_id``s (see BackEnd/data/walk_on_portraits_manifest.json). Assign at camp
 cuts when a Walk On survives onto the active 12; paint via ensure_player_image.
+
+Season 1 uses this pool only. Season 2+ unions it with recruit ``set_0001`` kit ids
+(see ``pick_roster_maker_image_id``).
 """
 from __future__ import annotations
 
@@ -46,7 +49,35 @@ def pick_walk_on_image_id(
     rng: Optional[random.Random] = None,
 ) -> str | None:
     """Pick an unused walk-on portrait id; wrap to full pool when exhausted."""
-    pool = list(walk_on_image_ids())
+    return pick_roster_maker_image_id(used, season=1, rng=rng)
+
+
+def pick_roster_maker_image_id(
+    used: Iterable[str] | None,
+    *,
+    season: int = 1,
+    recruit_pool: Sequence[str] | None = None,
+    rng: Optional[random.Random] = None,
+) -> str | None:
+    """Pick a portrait id for a Walk On making the active 12.
+
+    Season 1: walk-on pool only.
+    Season 2+: walk-on pool ∪ recruit set_0001 kit ids (``recruit_pool``).
+    League-wide de-dupe via ``used`` (``franchises.walk_on_image_ids_used``); wraps when
+    the applicable pool is exhausted.
+    """
+    walk_ids = list(walk_on_image_ids())
+    if int(season or 1) <= 1:
+        pool = walk_ids
+    else:
+        extra = [str(x) for x in (recruit_pool or []) if x]
+        seen: set[str] = set()
+        pool = []
+        for iid in walk_ids + extra:
+            if iid in seen:
+                continue
+            seen.add(iid)
+            pool.append(iid)
     if not pool:
         return None
     used_set = {str(x) for x in (used or []) if x}
@@ -59,5 +90,8 @@ def is_walk_on_fpd(doc: dict[str, Any] | None) -> bool:
     if not doc:
         return False
     meta = doc.get("meta") if isinstance(doc.get("meta"), dict) else {}
-    arch = str(meta.get("archetype") or doc.get("archetype") or "").strip()
-    return arch == "Walk On"
+    arch = str(meta.get("archetype") or doc.get("archetype") or "").strip().lower()
+    # Normalize common separators so "Walk On" / "Walk-On" / "walk_on" all match.
+    arch = arch.replace("-", " ").replace("_", " ")
+    arch = " ".join(arch.split())
+    return arch == "walk on"

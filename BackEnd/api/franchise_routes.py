@@ -3813,6 +3813,11 @@ REGION_BYE_MODAL_SEEN_SEASON_FIELD = "region_bye_modal_seen_season"
 BRACKET_REVEAL_SEEN_FIELD = "bracket_reveal_seen"
 BRACKET_UPDATE_SEEN_FIELD = "bracket_update_seen"
 RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_season"
+
+# Signing Day conference reveal: stamped with the season once the playback has been
+# watched, so a refresh after submitting does not replay it. Mirrors the modal flag
+# above rather than inventing a second convention.
+WEEK_35_REVEAL_SEEN_SEASON_FIELD = "week_35_reveal_seen_season"
 WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD = "walk_on_welcome_modal_seen_season"
 # Read marker for the recruiting wire. A WEEK number, not a boolean: a season-scoped
 # boolean cannot distinguish "seen week 12's events" from "seen week 13's". Stamped
@@ -9595,10 +9600,16 @@ def command_center_data(
 
                 response["team_name_map"] = resolve_team_name_map(franchise_doc)
                 week_35_results = franchise_doc.get(WEEK_35_RECRUITING_RESULTS_FIELD) or {}
+                # Walk-ons are roster backfill, not a signing outcome, and their FIRST
+                # reveal is the Walk-On Welcome modal on the next season's opening FCC
+                # landing. Filtered at the source so every consumer of this field is
+                # covered — the Recruits tab was listing them the moment week 35 ran,
+                # which spoiled that reveal by a whole off-season.
                 response["week_35_user_recruits"] = [
                     player
                     for player in (week_35_results.get("signed_players") or [])
                     if str(player.get("team_id") or "") == str(team_id)
+                    and not player.get("walk_on")
                 ]
                 for _sp in response["week_35_user_recruits"]:
                     _sp[POTENTIAL_RT_FIELD] = potential_rt_for_player(
@@ -9826,6 +9837,36 @@ def _ftd_team_list_for_franchise(franchise_id) -> dict:
     fid = ObjectId(franchise_id) if isinstance(franchise_id, str) else franchise_id
     docs = list(franchise_team_data_collection.find({"franchise_id": fid}, {"team_id": 1}))
     return {str(d["team_id"]): {} for d in docs}
+
+
+def _recruiting_conference_context(
+    franchise_id: ObjectId,
+    user_team_id: Any,
+) -> dict[str, Any]:
+    """Conference data the Signing Day reveal and the week-36 list both need.
+
+    ``order`` is the display order for the league list: the user's conference, then its
+    sister, then 1-16 ascending with those two removed so neither repeats. Built here
+    because ``_sister_conference`` is the one definition of "same region, other
+    conference" — the client must not re-derive it from conference numbers.
+    """
+    by_team: dict[str, int] = {}
+    for team in db.teams.find({}, {"_id": 1, "conference": 1}):
+        try:
+            by_team[str(team["_id"])] = int(team.get("conference") or 0)
+        except (TypeError, ValueError):
+            continue
+
+    user_conf = by_team.get(str(user_team_id)) or 0
+    sister = _sister_conference(user_conf) if user_conf else 0
+    lead = [c for c in (user_conf, sister) if c]
+    order = lead + [c for c in range(1, 17) if c not in lead]
+    return {
+        "user_conference": user_conf or None,
+        "sister_conference": sister or None,
+        "order": order,
+        "by_team_id": by_team,
+    }
 
 
 def _sister_conference(conference: int) -> int:
@@ -12489,6 +12530,23 @@ def _maybe_initialize_practice_squad_week_1(
 def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str | None = None) -> None:
     from BackEnd.utils.walk_on_roster_identity import assign_walk_ons_making_active_roster
 
+    fran_doc = db.franchises.find_one(
+        {"_id": franchise_id}, {"current_season": 1}
+    ) or {}
+    current_season = int(fran_doc.get("current_season", 1) or 1)
+    recruit_image_pool = None
+    if current_season >= 2:
+        try:
+            from BackEnd.models.recruit_sets import _base_image_pool
+
+            recruit_image_pool = list(_base_image_pool(db) or [])
+        except Exception:
+            logger.exception(
+                "[WALK-ON-ROSTER] set_0001 pool load failed franchise=%s",
+                str(franchise_id),
+            )
+            recruit_image_pool = []
+
     ftd_docs = list(franchise_team_data_collection.find(
         {"franchise_id": franchise_id},
         {"team_id": 1, "players": 1, "scholarship_players": 1, "training_squad_players": 1, "playing_time_promise_players": 1},
@@ -12554,6 +12612,8 @@ def _apply_cpu_training_camp_cuts(franchise_id: ObjectId, excluded_team_id: str 
                 fpd_map=fpd_map,
                 franchise_players_data_collection=franchise_players_data_collection,
                 franchises_collection=db.franchises,
+                current_season=current_season,
+                recruit_image_pool=recruit_image_pool,
                 warm=False,
             )
         except Exception:
@@ -12854,7 +12914,13 @@ def _build_season_recruiting_results_story(
 ) -> dict[str, Any] | None:
     """Post–Week 35 Results: signing teams scored at 100% of recruit RT."""
     season = int(franchise_doc.get("current_season") or 1)
-    scores = team_points_from_signings(signed_players)
+    # Walk-ons are roster backfill, not recruiting. Counting their RT here inflated every
+    # team's score in proportion to how many spots it had to fill — which rewarded the
+    # teams that recruited WORST. Filtered at this caller rather than inside
+    # team_points_from_signings(), which is a general scorer with its own tests.
+    scores = team_points_from_signings(
+        [player for player in (signed_players or []) if not player.get("walk_on")]
+    )
     team_name_map = _format_team_name_map(franchise=franchise_doc)
     region_letter = _user_team_region_letter(franchise_doc)
     region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()
@@ -14023,6 +14089,15 @@ def get_recruiting_data(
         "recruits": recruits,
         "team_name_map": team_name_map,
         "week_35_recruiting_results": week_35_results,
+        # Conference context for the Signing Day reveal (user's conference only) and the
+        # week-36 list ordering (user -> sister -> 1..16). Sent as data, never derived on
+        # the client: _sister_conference() is the single definition of "same region,
+        # other conference" and the client must not re-implement it.
+        "conferences": _recruiting_conference_context(fid, user_team_id),
+        "week_35_reveal_seen": (
+            int(franchise_doc.get(WEEK_35_REVEAL_SEEN_SEASON_FIELD, 0) or 0)
+            == _franchise_current_season(franchise_doc)
+        ),
         "week_35_recruiting_ran": bool(franchise_doc.get("week_35_recruiting_ran", False)),
         "watchlist": _recruiting_watchlist(franchise_doc),
         # Prompt 1 event log, so the invite board can annotate the rows it affects.
@@ -14835,6 +14910,13 @@ def cut_franchise_players(
     try:
         from BackEnd.utils.walk_on_roster_identity import assign_walk_ons_making_active_roster
 
+        current_season = int(franchise_doc.get("current_season", 1) or 1)
+        recruit_image_pool = None
+        if current_season >= 2:
+            from BackEnd.models.recruit_sets import _base_image_pool
+
+            recruit_image_pool = list(_base_image_pool(db) or [])
+
         walk_on_assign = assign_walk_ons_making_active_roster(
             franchise_id=fid,
             team_id=team_object_id,
@@ -14844,6 +14926,8 @@ def cut_franchise_players(
             franchises_collection=db.franchises,
             teams_collection=db.teams,
             franchise_doc=franchise_doc,
+            current_season=current_season,
+            recruit_image_pool=recruit_image_pool,
             warm=True,
         )
     except Exception:
@@ -16896,6 +16980,30 @@ class RecruitingWireSeenRequest(BaseModel):
     franchise_id: str
 
 
+class Week35RevealSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/week-35-reveal-seen")
+def mark_week_35_reveal_seen(
+    req: Week35RevealSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Stamp the Signing Day conference reveal as watched for this season.
+
+    Called when the playback reaches its end (or is skipped to the end), so a refresh
+    after submitting does not replay it. Season-stamped rather than boolean so a new
+    season gets its own reveal without anything having to clear the flag.
+    """
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    season = _franchise_current_season(franchise_doc)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {WEEK_35_REVEAL_SEEN_SEASON_FIELD: season}},
+    )
+    return {"seen_season": season}
+
+
 @router.patch("/franchise/recruiting-wire-seen")
 def mark_recruiting_wire_seen(
     req: RecruitingWireSeenRequest,
@@ -18011,6 +18119,9 @@ def finish_season(req: FinishSeasonRequest):
             "training_status.training_completed": False,
             "training_status.session_type": "preseason",
             "training_status.training_disabled_for_eos": False,
+            # Season-scoped guard: each new season's final camp week must assign
+            # CPU roster overflow to training squads before the PS league is built.
+            "training_status.cpu_training_camp_cuts_applied": False,
             "stats.top_10_points": [],
             "stats.top_10_rebounds": [],
             "stats.top_10_assists": [],

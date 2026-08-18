@@ -14,7 +14,7 @@ from BackEnd.utils.jersey_assignment import jersey_position_for_player, pick_jer
 from BackEnd.utils.walk_on_portraits import (
     FRANCHISE_USED_FIELD,
     is_walk_on_fpd,
-    pick_walk_on_image_id,
+    pick_roster_maker_image_id,
 )
 
 logger = logging.getLogger(__name__)
@@ -63,10 +63,16 @@ def assign_walk_ons_making_active_roster(
     franchises_collection: Any,
     teams_collection: Any = None,
     franchise_doc: Optional[dict[str, Any]] = None,
+    current_season: int = 1,
+    recruit_image_pool: Optional[list[str]] = None,
     warm: bool = False,
     rng: Optional[random.Random] = None,
 ) -> dict[str, Any]:
     """Assign missing jersey/image_id to Walk Ons on the active 12.
+
+    Season 1 draws from the walk-on pool only. Season 2+ draws at random from
+    walk-on ∪ ``recruit_image_pool`` (typically set_0001). One franchise-season
+    used list (``walk_on_image_ids_used``) covers both pools.
 
     Returns a summary dict. When ``warm`` is True, eagerly paints the team's
     newly stamped masters (user path); CPU stays lazy via ensure_player_image.
@@ -79,10 +85,12 @@ def assign_walk_ons_making_active_roster(
         "skipped_has_jersey": 0,
         "skipped_has_image": 0,
         "warmed": 0,
+        "season": int(current_season or 1),
         "assignments": [],  # [{player_id, jersey, image_id}]
     }
     fid_str = str(franchise_id)
     team_id_str = str(team_id) if team_id is not None else ""
+    season = int(current_season or 1)
 
     walk_ons: list[tuple[str, dict[str, Any]]] = []
     for pid in active_player_ids:
@@ -134,7 +142,12 @@ def assign_walk_ons_making_active_roster(
         if image_id:
             summary["skipped_has_image"] += 1
         else:
-            image_id = pick_walk_on_image_id(used_ids + newly_used, rng=rng)
+            image_id = pick_roster_maker_image_id(
+                used_ids + newly_used,
+                season=season,
+                recruit_pool=recruit_image_pool,
+                rng=rng,
+            )
             if image_id:
                 set_fields["meta.image_id"] = image_id
                 newly_used.append(image_id)

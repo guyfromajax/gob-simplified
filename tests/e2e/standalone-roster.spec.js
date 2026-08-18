@@ -56,7 +56,7 @@ async function mount(page, opts = {}) {
     rosterData = window.__roster;
     trainingSquadData = window.__ps;
     statsData = window.__stats;
-    trRenderLockup({ team_name: 'Kettle Falls', team_record: rec });
+    trRenderLockup({ team_name: 'Kettle Falls', conference: 1, team_record: rec });
     trBindToolbar();
     renderTrTable();
   }, opts.record === NO_RECORD ? null : DEFAULT_RECORD);
@@ -147,11 +147,15 @@ test.describe('identity lockup', () => {
       name: document.getElementById('tr-team-name').textContent.trim(),
       record: document.getElementById('tr-record').textContent.trim(),
       standing: document.getElementById('tr-standing').textContent.trim(),
+      conferenceLabel: document.getElementById('tr-conference-label').textContent.trim(),
       banner: document.getElementById('team-banner-card').getBoundingClientRect(),
+      centeredBanner: document.getElementById('team-banner'),
     }));
     expect(m.name).toBe('Kettle Falls');
     expect(m.record).toBe('18-6');
     expect(m.standing).toBe('2 of 16');
+    expect(m.conferenceLabel).toBe('Conference 1');
+    expect(m.centeredBanner).toBeNull();
     expect(Math.round(m.banner.width)).toBe(224);
     expect(Math.round(m.banner.height)).toBe(79);
   });

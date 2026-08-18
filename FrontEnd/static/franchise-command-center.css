@@ -4266,3 +4266,75 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   max-height: calc(100vh - 260px);
   overflow: auto;
 }
+
+/* ============================================================
+   Advancing To Season N — full-screen rollover cover.
+   The three items are one stacked group, centred on both axes: the confirm modal
+   used to stay up with a live button through a multi-second job, which read as
+   "nothing happened, press again".
+   ============================================================ */
+.fcc-season-advance {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(120% 78% at 50% 30%, rgba(39, 64, 142, 0.16), transparent 62%),
+    rgba(8, 10, 16, 0.97);
+  animation: fcc-season-advance-in 0.22s ease;
+}
+@keyframes fcc-season-advance-in { from { opacity: 0; } to { opacity: 1; } }
+.fcc-season-advance__stack {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  text-align: center;
+  padding: 24px;
+}
+.fcc-season-advance__logo {
+  width: 260px;
+  max-width: 62vw;
+  height: auto;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 22px 50px rgba(0, 0, 0, 0.55);
+}
+.fcc-season-advance__copy {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 34px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  color: #f7f9ff;
+}
+/* Indeterminate on purpose — the server does not report rollover progress, and a
+   fake percentage would be a promise we cannot keep. */
+.fcc-season-advance__bar {
+  position: relative;
+  width: 260px;
+  max-width: 62vw;
+  height: 6px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.09);
+}
+.fcc-season-advance__bar i {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 42%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(52, 236, 39, 0.25), #34EC27, rgba(52, 236, 39, 0.25));
+  animation: fcc-season-advance-sweep 1.15s ease-in-out infinite;
+}
+@keyframes fcc-season-advance-sweep {
+  0% { left: -45%; }
+  100% { left: 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .fcc-season-advance { animation: none; }
+  .fcc-season-advance__bar i { animation: none; left: 0; width: 100%; opacity: 0.7; }
+}

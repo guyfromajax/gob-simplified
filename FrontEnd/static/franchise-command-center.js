@@ -2337,8 +2337,9 @@ function initFccRecruits(topData) {
     const attrs = player.attributes || {};
     return {
       recruitId: player.recruit_id || player.player_id,
-      // Link target only: recruitId falls back to player_id for walk-ons, which
-      // would not resolve against FRD. Null here means "render name as text".
+      // Walk-ons no longer reach this list — the API filters them so their first
+      // reveal is the next season's Walk-On Welcome modal. The fallbacks stay because
+      // they cost nothing and keep the row rendering if that ever changes.
       detailRecruitId: player.recruit_id || null,
       name: player.walk_on ? player.name + ' (walk on)' : player.name,
       homeRegion: player.home_region || '--',
@@ -3918,6 +3919,39 @@ function flashSeasonAdvanceScreen() {
   window.setTimeout(cleanup, 500);
 }
 
+/**
+ * Full-screen "Advancing To Season N" cover.
+ *
+ * Rollover is a multi-second server job. Without a cover the confirm modal stayed up
+ * with a re-armed button, which reads as "nothing happened — press it again". This
+ * takes the screen instead: the team's own logo, the destination season, and a pulse
+ * bar that says work is happening without pretending to know how much is left.
+ */
+function showSeasonAdvanceOverlay(nextSeason) {
+  document.querySelector('.fcc-season-advance')?.remove();
+  const logo = document.getElementById('team-logo');
+  const src = logo?.src || '/images/teams/general/general_banner_primary.jpg';
+  const overlay = document.createElement('div');
+  overlay.className = 'fcc-season-advance';
+  overlay.setAttribute('role', 'status');
+  overlay.setAttribute('aria-live', 'polite');
+  overlay.innerHTML = `
+    <div class="fcc-season-advance__stack">
+      <img class="fcc-season-advance__logo" src="${escapeHomeHtml(src)}" alt="">
+      <div class="fcc-season-advance__copy">Advancing To Season ${escapeHomeHtml(nextSeason)}</div>
+      <div class="fcc-season-advance__bar"><i></i></div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  return overlay;
+}
+
+/** The season the franchise is moving INTO. */
+function nextSeasonNumber() {
+  const current = Number(commandCenterTopDataCache?.current_season || 1);
+  return (Number.isFinite(current) ? current : 1) + 1;
+}
+
 function showNewSeasonConfirmModal() {
   const overlay = document.createElement('div');
   overlay.className = 'gob-modal-overlay fcc-new-season-modal is-visible';
@@ -4362,6 +4396,10 @@ playNowBtn.addEventListener('click', async () => {
       const originalText = playNowBtn.textContent;
       playNowBtn.disabled = true;
       playNowBtn.textContent = 'Starting...';
+      // Take the modal down and put the cover up BEFORE the request: the old order left
+      // the dialog and a live button on screen for the whole rollover.
+      closeModal();
+      const advanceOverlay = showSeasonAdvanceOverlay(nextSeasonNumber());
       try {
         const res = await fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
           method: 'POST',
@@ -4372,11 +4410,12 @@ playNowBtn.addEventListener('click', async () => {
         window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
       } catch (err) {
         console.error(err);
+        // Only pull the cover down on failure — on success it stays up through the
+        // navigation, so the screen never flashes back to the old season.
+        advanceOverlay.remove();
         alert('Unable to start new season');
         playNowBtn.disabled = false;
         playNowBtn.textContent = originalText;
-      } finally {
-        closeModal();
       }
     });
     return;

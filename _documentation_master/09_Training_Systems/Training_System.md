@@ -866,7 +866,7 @@ Position floors (`SHAPE_P6_FLOOR_BASE` × weight scale) replace the retired shap
 - `training_status.week` - Week number aligned with last training
 - `training_status.user_training_applied_week` - User phase done for that week (split flow)
 - `training_status.cpu_training_complete_week` - CPU phase done for that week
-- `training_status.cpu_training_camp_cuts_applied` - Final-camp-week CPU cuts have run (when applicable)
+- `training_status.cpu_training_camp_cuts_applied` - Season-scoped guard indicating that final-camp-week CPU cuts have run. `finish_season` resets it to `false` so CPU teams assign roster overflow to their training squads again during the next season's camp.
 
 **FCC API (`GET /franchise/command-center/data`):**
 - `last_training_report_week` - Integer week for the current **latest** user training report (`latest_training.week`), used to render the Inbox message and link; omitted or null when no report exists yet

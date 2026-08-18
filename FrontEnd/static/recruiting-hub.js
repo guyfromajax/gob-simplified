@@ -56,7 +56,11 @@
     // Results (D4)
     currentResultsWeek: null, weeklyDismissed: false, visitTree: null,
     playback: { index: 0, auto: false, done: false, timer: null },
-    week35Results: {}, signFilter: 'all'
+    week35Results: {}, signFilter: 'all',
+    // Signing Day conference reveal (payload `conferences`; `revealSeen` season-stamped
+    // server-side so a refresh after submitting does not replay it).
+    conferences: null, teamNameMap: {}, revealSeen: false,
+    reveal: { index: 0, done: false, timer: null, summaryRows: null, seenSent: false }
   };
   // No per-recruit cap: the 50-point budget is the only limit, so every point can go
   // on one recruit if that is the call the coach wants to make.
@@ -1087,6 +1091,161 @@
     go.focus();
   }
 
+  // ===================== SIGNING DAY CONFERENCE REVEAL =====================
+  // Every signing in the user's conference, revealed one at a time from the highest RT
+  // down. Presentation only: the engine already resolves in RT order, so this shows a
+  // sequence that already happened (Prompt 6's rule, widened from the user's class to
+  // the conference).
+
+  var REVEAL_HOLD_MS = 3000;
+  // The grade run the meter walks down. Mirrors RT_BANDS in rtBucket.js, which owns the
+  // thresholds; taken from there at runtime so the two cannot drift.
+  function revealGrades() {
+    var seen = [];
+    [100, 90, 80, 70, 60, 50, 40, 30, 0].forEach(function (rt) {
+      var g = window.getRtPresentation ? window.getRtPresentation(rt) : null;
+      if (g && seen.indexOf(g.grade) === -1) seen.push(g.grade);
+    });
+    return seen;
+  }
+
+  /** Conference-wide signings, highest RT first. Walk-ons are not signings. */
+  function revealList() {
+    var conf = (state.conferences && state.conferences.user_conference) || null;
+    var byTeam = (state.conferences && state.conferences.by_team_id) || {};
+    if (!conf) return [];
+    return (state.week35Results.signed_players || []).filter(function (e) {
+      return e && !e.walk_on && Number(byTeam[String(e.team_id)]) === Number(conf);
+    }).sort(function (a, b) {
+      return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1);
+    });
+  }
+
+  function isUserSigning(entry) {
+    return String(entry.team_id) === String(state.userTeamId);
+  }
+
+  /** Index of the next signing that is the user's own, or -1 when none remain. */
+  function nextUserIndex(list, from) {
+    for (var i = from; i < list.length; i++) { if (isUserSigning(list[i])) return i; }
+    return -1;
+  }
+
+  function revealRowHtml(entry, isNew) {
+    var teamName = (state.teamNameMap && state.teamNameMap[String(entry.team_id)]) || entry.team_name || '';
+    var mine = isUserSigning(entry);
+    return '<div class="rvrow' + (mine ? ' is-mine' : '') + (isNew ? ' is-new' : '') + '">' +
+      headshotBoxHtml({ imageId: entry.image_id }, 'rvav') +
+      '<div class="rvid"><div class="rvnm">' + Common.escapeHtml(entry.name || '--') + '</div>' +
+      '<div class="rvsub">' + Common.escapeHtml(entry.pos || '--') + ' · ' +
+        Common.escapeHtml(entry.home_region || '--') + '</div></div>' +
+      '<div class="rvrt ' + Spine.rtClassForYear(entry.rt, entry.year) + '">' +
+        Common.formatRtWithPotential(entry.rt, entry.potential_rt_ratcheted) + '</div>' +
+      '<div class="rvteam">' + Common.escapeHtml(teamName) +
+        (mine ? '<span class="rvyou">YOU</span>' : '') + '</div></div>';
+  }
+
+  function revealHtml() {
+    var list = revealList();
+    var i = Math.min(state.reveal.index, list.length);
+    var total = list.length;
+    var current = list[i - 1];
+    var grades = revealGrades();
+    var currentGrade = current && window.getRtPresentation
+      ? window.getRtPresentation(current.rt).grade
+      : grades[0];
+    var pct = total ? (i / total) * 100 : 0;
+    var remaining = nextUserIndex(list, i);
+    var mineLeft = list.slice(i).filter(isUserSigning).length;
+
+    var ticks = grades.map(function (g) {
+      return '<span class="rvtick' + (g === currentGrade ? ' is-at' : '') + '">' + g + '</span>';
+    }).join('');
+
+    var shown = list.slice(0, i).reverse();
+    var body = shown.length
+      ? shown.map(function (e, n) { return revealRowHtml(e, n === 0); }).join('')
+      : '<div class="rvwait">Conference signings begin…</div>';
+
+    var skipLabel = remaining === -1 ? 'Skip To End' : 'Skip To My Next Signing';
+    var skipNote = remaining === -1
+      ? '<div class="rvskip-note">' + mineLeft + ' signings remain for your team</div>'
+      : '';
+
+    return '<div class="rvwrap">' +
+      '<div class="rvhead">' +
+        '<div class="rvcount"><b>' + i + '</b>/' + total + '</div>' +
+        '<div class="rvmeter"><div class="rvmeter-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
+          '<div class="rvticks">' + ticks + '</div></div>' +
+        '<div class="rvgrade">' + Common.escapeHtml(currentGrade) + '</div>' +
+      '</div>' +
+      '<div class="rvrows">' + body + '</div>' +
+      '<div class="rvfoot">' +
+        '<button class="rvbtn" id="rv-skip" type="button">' + skipLabel + '</button>' + skipNote +
+        (state.reveal.done ? '<button class="rvbtn is-go" id="rv-done" type="button">Continue</button>' : '') +
+      '</div></div>';
+  }
+
+  function renderReveal() {
+    var host = document.getElementById('hub-reveal');
+    if (!host) return;
+    host.innerHTML = revealHtml();
+    var skip = host.querySelector('#rv-skip');
+    if (skip) skip.addEventListener('click', function () {
+      var list = revealList();
+      var next = nextUserIndex(list, state.reveal.index);
+      revealTo(next === -1 ? list.length : next + 1);
+    });
+    var done = host.querySelector('#rv-done');
+    if (done) done.addEventListener('click', function () { finishReveal(); });
+  }
+
+  function revealTo(index) {
+    var list = revealList();
+    state.reveal.index = Math.max(0, Math.min(index, list.length));
+    if (state.reveal.index >= list.length) {
+      state.reveal.done = true;
+      stopReveal();
+      markRevealSeen();
+    }
+    renderReveal();
+  }
+
+  function stopReveal() {
+    if (state.reveal.timer) { clearInterval(state.reveal.timer); state.reveal.timer = null; }
+  }
+
+  /** Season-stamped so a refresh after submitting does not replay it. */
+  function markRevealSeen() {
+    if (state.reveal.seenSent) return;
+    state.reveal.seenSent = true;
+    Common.fetchJSON(API_CONFIG.buildUrl('/franchise/week-35-reveal-seen'), {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ franchise_id: context.franchiseId })
+    }).catch(function (err) { console.error('[REVEAL] seen stamp failed', err); });
+  }
+
+  function finishReveal() {
+    stopReveal();
+    var host = document.getElementById('hub-reveal');
+    if (host) host.remove();
+    showSubmitSummary(state.reveal.summaryRows || []);
+  }
+
+  function startReveal(summaryRows) {
+    var list = revealList();
+    state.reveal = { index: 0, done: false, timer: null, summaryRows: summaryRows, seenSent: false };
+    if (!list.length) { markRevealSeen(); showSubmitSummary(summaryRows); return; }
+    var host = document.createElement('div');
+    host.className = 'rvhost';
+    host.id = 'hub-reveal';
+    document.body.appendChild(host);
+    renderReveal();
+    state.reveal.timer = setInterval(function () {
+      revealTo(state.reveal.index + 1);
+    }, REVEAL_HOLD_MS);
+  }
+
   function submitOrders() {
     if (remaining() < 0 || state.week35Ran) return;
     var btn = document.getElementById('sign-submit'); if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
@@ -1100,23 +1259,20 @@
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ franchise_id: context.franchiseId })
       });
-    }).then(function () {
+    }).then(function (res) {
       state.week35Ran = true;
-      showSubmitSummary(summaryRows);
+      // The signings were resolved by the call we just made, so state.week35Results —
+      // loaded when the page opened — is stale. run-week-35-recruiting returns the
+      // results it produced; take them rather than revealing an empty conference.
+      if (res && res.results) state.week35Results = res.results;
+      // The reveal is the payoff; the summary follows it rather than replacing it.
+      startReveal(summaryRows);
     }).catch(function (err) {
       console.error(err); showToast('Submit failed', String(err && err.message || err), false);
       if (btn) { btn.disabled = false; btn.textContent = 'Submit Orders'; }
     });
   }
 
-  // ===================== RESULTS (D4) =====================
-  // ---- Week-36 final signings ----
-  function signStandChip(r, cls) {
-    cls = cls || 'sstand';
-    if (r.yourRank === 1) return '<span class="' + cls + ' you1">' + DOT_SVG + '#1</span>';
-    if (r.yourRank > 1) return '<span class="' + cls + ' list">#' + r.yourRank + '</span>';
-    return '<span class="' + cls + ' none">—</span>';
-  }
   // ===================== RESULTS (week 36) =====================
   // Playback of a sequence that ALREADY happens: the engine resolves recruits one at a
   // time in RT order. Nothing here changes who signs where — it only reveals the order
@@ -1156,118 +1312,100 @@
     });
   }
 
-  // Signing order = the order the engine resolved them, i.e. RT descending.
-  function playbackList() {
-    return signedEntriesForUserView().sort(function (a, b) {
-      return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1);
+  /**
+   * League signing list (week 36). No playback — the drama happened on Signing Day; this
+   * is the durable record you come back to.
+   *
+   * Grouped by conference then team, ordered user's conference -> sister conference ->
+   * 1..16 ascending with those two removed so neither repeats. The order comes from the
+   * server (`conferences.order`); "same region, other conference" has one definition and
+   * the client does not re-derive it.
+   *
+   * Walk-ons are excluded here as everywhere before rollover — they are roster backfill,
+   * not signings, and their first reveal is next season's Walk-On Welcome.
+   */
+  function leagueSigningGroups() {
+    var conf = state.conferences || {};
+    var byTeam = conf.by_team_id || {};
+    var order = conf.order || [];
+    var buckets = {};
+    (state.week35Results.signed_players || []).forEach(function (e) {
+      if (!e || e.walk_on) return;
+      var c = Number(byTeam[String(e.team_id)]) || 0;
+      if (!c) return;
+      (buckets[c] = buckets[c] || {});
+      var tid = String(e.team_id);
+      (buckets[c][tid] = buckets[c][tid] || []).push(e);
+    });
+    return order.filter(function (c) { return buckets[c]; }).map(function (c) {
+      var teams = Object.keys(buckets[c]).map(function (tid) {
+        return {
+          teamId: tid,
+          name: (state.teamNameMap && state.teamNameMap[tid]) || (buckets[c][tid][0] || {}).team_name || '',
+          isUser: String(tid) === String(state.userTeamId),
+          signings: buckets[c][tid].sort(function (a, b) {
+            return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1);
+          })
+        };
+      }).sort(function (a, b) { return a.name.localeCompare(b.name); });
+      return {
+        conference: c,
+        label: conferenceLabel(c),
+        isUser: Number(c) === Number(conf.user_conference),
+        isSister: Number(c) === Number(conf.sister_conference),
+        teams: teams
+      };
     });
   }
 
-  function resultRowHtml(x, revealed) {
-    var standing = x.yourMult
-      ? (x.yourMult === 5 ? '#1 x5' : x.yourMult === 3 ? '#2 x3' : x.yourMult === 2 ? '#3 x2' : 'no lean x1')
-      : '—';
-    return '<div class="rrow' + (x.withYou ? ' won' : ' lost') + (revealed ? ' is-in' : '') + '" data-rid="' + x.id + '">' +
-      headshotBoxHtml({ imageId: x.imageId }, 'rav') +
-      '<div class="rid"><div class="rnm">' +
-        (x.r ? Common.recruitNameLinkHtml(x.id, context.franchiseId, x.name) : Common.escapeHtml(x.name)) +
-        '</div><div class="rmeta">' + Common.escapeHtml(x.pos) +
-        (x.year ? ' · ' + Common.escapeHtml(x.year) : '') + '</div></div>' +
-      '<div class="rrt ' + (x.r ? Spine.rtClassForYear(x.rt, x.r.year) : '') + '" data-tooltip="current/potential" title="current/potential">' +
-        Common.formatRtWithPotential(x.rt, x.potentialRt) + '</div>' +
-      '<div class="rsigned"><span class="rsigned-lab">Signed with</span>' +
-        '<span class="rsigned-team' + (x.withYou ? ' mine' : '') + '">' + Common.escapeHtml(x.team) + '</span></div>' +
-      '<div class="rnum"><b>' + x.yourPoints + '</b><span>pts</span></div>' +
-      '<div class="rnum"><b>' + standing + '</b><span>standing</span></div>' +
-      '<div class="rnum"><b>' + (x.fieldSize || '—') + '</b><span>field</span></div>' +
-      '<div class="rwhy">' + Common.escapeHtml(x.reason || '—') + '</div>' +
-      '</div>';
+  /** E1 / E2 rather than "Conference 9" — the format the rest of the app already uses. */
+  function conferenceLabel(c) {
+    var n = Number(c);
+    if (!isFinite(n) || n < 1 || n > 16) return '';
+    return String.fromCharCode(65 + Math.floor((n - 1) / 2)) + (((n - 1) % 2) + 1);
   }
 
-  function classSummaryHtml(list) {
-    var cap = capacity();
-    var signed = list.filter(function (x) { return x.withYou; });
-    var funded = list.filter(function (x) { return x.yourPoints > 0; });
-    var pointsSpent = list.reduce(function (n, x) { return n + x.yourPoints; }, 0);
-    var rts = signed.map(function (x) { return Number(x.rt || 0); }).filter(function (v) { return v > 0; });
-    var avg = rts.length ? Math.round(rts.reduce(function (a, b) { return a + b; }, 0) / rts.length) : null;
-    var avgDisplay = avg == null ? '—'
-      : (typeof formatRtDisplay === 'function' ? formatRtDisplay(avg) : String(avg));
-    return '<section class="rsum"><div class="rsum-title">Your Class</div>' +
-      '<div class="rsum-grid">' +
-        '<div class="rsum-cell"><b>' + signed.length + '</b><span>signed</span></div>' +
-        '<div class="rsum-cell"><b>' + funded.length + '</b><span>funded</span></div>' +
-        '<div class="rsum-cell"><b>' + avgDisplay + '</b><span>class avg RT</span></div>' +
-        '<div class="rsum-cell"><b>' + pointsSpent + '</b><span>points spent</span></div>' +
-        // Same _roster_capacity_payload helper signing day reads.
-        '<div class="rsum-cell"><b>' + Math.max(0, cap.spots - signed.length) + '</b><span>roster spots left</span></div>' +
-      '</div></section>';
+  function leagueRowHtml(e) {
+    return '<div class="lsrow">' +
+      '<span class="lsnm">' + Common.escapeHtml(e.name || '--') + '</span>' +
+      '<span class="lspos">' + Common.escapeHtml(e.pos || '--') + '</span>' +
+      '<span class="lsrt ' + Spine.rtClassForYear(e.rt, e.year) + '">' +
+        Common.formatRtWithPotential(e.rt, e.potential_rt_ratcheted) + '</span>' +
+      '</div>';
   }
 
   function finalSigningsHtml() {
-    var list = playbackList();
-    if (!list.length) {
-      return '<div class="rstage"><div class="rempty">No recruits to report — you never boarded anyone this season.</div></div>';
+    var groups = leagueSigningGroups();
+    if (!groups.length) {
+      return '<div class="rstage"><div class="rempty">No signings to report yet.</div></div>';
     }
-    var pb = state.playback;
-    var shown = pb.done ? list.length : Math.min(pb.index, list.length);
-    var rows = list.slice(0, shown).map(function (x, i) {
-      return resultRowHtml(x, i === shown - 1 && !pb.done);
+    var body = groups.map(function (g) {
+      var tag = g.isUser ? '<span class="lstag you">Your conference</span>'
+        : g.isSister ? '<span class="lstag sis">Sister conference</span>' : '';
+      var teams = g.teams.map(function (t) {
+        return '<div class="lsteam' + (t.isUser ? ' is-user' : '') + '">' +
+          '<div class="lsteam-h">' + Common.escapeHtml(t.name) +
+            '<span class="lsn">' + t.signings.length + '</span></div>' +
+          t.signings.map(leagueRowHtml).join('') + '</div>';
+      }).join('');
+      return '<section class="lsconf' + (g.isUser ? ' is-user' : '') + '">' +
+        '<div class="lsconf-h"><span class="lsconf-t">Conference ' + g.label + '</span>' + tag + '</div>' +
+        '<div class="lsconf-teams">' + teams + '</div></section>';
     }).join('');
-    var remaining = list.length - shown;
-    var controls = pb.done || remaining <= 0
-      ? '<div class="rctl"><span class="rctl-done">All ' + list.length + ' revealed</span></div>'
-      : '<div class="rctl">' +
-          '<button class="rbtn main" id="pb-next" type="button">Next recruit →</button>' +
-          '<button class="rbtn" id="pb-auto" type="button">' + (pb.auto ? 'Pause' : 'Auto-play') + '</button>' +
-          '<button class="rbtn" id="pb-skip" type="button">Skip all</button>' +
-          '<span class="rctl-count">' + shown + ' of ' + list.length + '</span>' +
-        '</div>';
     return '<div class="rstage">' +
       '<div class="rhead"><div class="rhead-t">Signing Day Results</div>' +
-        '<div class="rhead-s">Revealed in the order the engine resolved them — highest RT first.</div></div>' +
-      controls +
-      '<div class="rrows">' + rows + '</div>' +
-      ((pb.done || remaining <= 0) ? classSummaryHtml(list) : '') +
-      '</div>';
+        '<div class="rhead-s">Every signing in the league, by conference.</div></div>' +
+      '<div class="lswrap">' + body + '</div></div>';
   }
 
-  function stopAutoPlay() {
-    if (state.playback.timer) { clearInterval(state.playback.timer); state.playback.timer = null; }
-    state.playback.auto = false;
-  }
+  // The week-36 screen is a league LIST now, not a playback — the reveal moved to
+  // Signing Day itself, so its Next / Auto-play / Skip all controls and the
+  // per-row reveal helpers went with it.
   function renderSignings() {
     var host = document.getElementById('hub-signings'); if (!host) return;
     host.innerHTML = finalSigningsHtml();
-    bindSignings();
     if (typeof window.initAttributeTooltips === 'function') window.initAttributeTooltips(host, ['div']);
   }
-  function playbackAdvance() {
-    var total = playbackList().length;
-    if (state.playback.index >= total) { state.playback.done = true; stopAutoPlay(); }
-    else state.playback.index += 1;
-    if (state.playback.index >= total) { state.playback.done = true; stopAutoPlay(); }
-    renderSignings();
-  }
-  function bindSignings() {
-    var next = document.getElementById('pb-next');
-    if (next) next.addEventListener('click', function () { stopAutoPlay(); playbackAdvance(); });
-    var skip = document.getElementById('pb-skip');
-    if (skip) skip.addEventListener('click', function () {
-      stopAutoPlay();
-      state.playback.index = playbackList().length;
-      state.playback.done = true;
-      renderSignings();
-    });
-    var auto = document.getElementById('pb-auto');
-    if (auto) auto.addEventListener('click', function () {
-      if (state.playback.auto) { stopAutoPlay(); renderSignings(); return; }
-      state.playback.auto = true;
-      state.playback.timer = setInterval(playbackAdvance, 900);
-      renderSignings();
-    });
-  }
-
   // ---- Weekly-visit results panel (wks 20-26) ----
   function showWeeklyPanel() { return state.phase === 'invite' && state.currentResultsWeek === state.week && !state.weeklyDismissed; }
   function weeklyPanelHtml() {
@@ -1413,6 +1551,9 @@
         state.week35Results = data.week_35_recruiting_results || {};
         state.newLeanIds = new Set((data.new_lean_recruit_ids || []).map(String));
         var teamNameMap = data.team_name_map || {};
+        state.teamNameMap = teamNameMap;
+        state.conferences = data.conferences || null;
+        state.revealSeen = !!data.week_35_reveal_seen;
         state.recruits = Common.normalizeRecruits(data.recruits || [], teamNameMap).map(function (r) {
           var model = Spine.Lean.fromBackend({ Lean: r.lean }, { userTeamId: state.userTeamId, teamNameMap: teamNameMap });
           r.leanModel = model; r.leansToUser = model.leansToUser; r.yourRank = model.yourRank;

@@ -17,6 +17,7 @@ def test_finish_season_resets_franchise_results(monkeypatch):
         "week": 36,
         "current_season": 1,
         "results": {"1": [{"team1_score": 80, "team2_score": 70}]},
+        "training_status": {"cpu_training_camp_cuts_applied": True},
     }
 
     def capture_update(query, update_doc):
@@ -50,6 +51,7 @@ def test_finish_season_resets_franchise_results(monkeypatch):
 
     assert result["status"] == "success"
     assert captured_update["results"] == {}
+    assert captured_update["training_status.cpu_training_camp_cuts_applied"] is False
 
 
 def test_finish_season_normalizes_signed_freshman_attributes(monkeypatch):

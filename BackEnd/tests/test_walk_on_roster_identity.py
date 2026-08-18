@@ -13,6 +13,8 @@ from BackEnd.utils.jersey_assignment import (
 from BackEnd.utils.team_builder_portraits import resolve_kit_keys
 from BackEnd.utils.walk_on_portraits import (
     FRANCHISE_USED_FIELD,
+    is_walk_on_fpd,
+    pick_roster_maker_image_id,
     pick_walk_on_image_id,
     walk_on_image_ids,
 )
@@ -59,6 +61,31 @@ class WalkOnPortraitPoolTests(unittest.TestCase):
         # Exhausted → reuse allowed
         pick2 = pick_walk_on_image_id(ids, rng=rng)
         self.assertIn(pick2, ids)
+
+    def test_season1_ignores_recruit_pool(self):
+        rng = random.Random(1)
+        recruit = ["recruit-only-aaa"]
+        pick = pick_roster_maker_image_id(
+            [], season=1, recruit_pool=recruit, rng=rng
+        )
+        self.assertIn(pick, walk_on_image_ids())
+        self.assertNotEqual(pick, "recruit-only-aaa")
+
+    def test_season2_union_can_draw_recruit_id(self):
+        rng = random.Random(0)
+        walk_ids = list(walk_on_image_ids())
+        recruit = ["recruit-only-bbb"]
+        # Exhaust walk-on pool so the only unused id is the recruit one.
+        pick = pick_roster_maker_image_id(
+            walk_ids, season=2, recruit_pool=recruit, rng=rng
+        )
+        self.assertEqual(pick, "recruit-only-bbb")
+
+    def test_is_walk_on_normalizes_separators(self):
+        self.assertTrue(is_walk_on_fpd({"meta": {"archetype": "Walk On"}}))
+        self.assertTrue(is_walk_on_fpd({"meta": {"archetype": "walk-on"}}))
+        self.assertTrue(is_walk_on_fpd({"archetype": "WALK_ON"}))
+        self.assertFalse(is_walk_on_fpd({"meta": {"archetype": "Scorer"}}))
 
 
 class AssignWalkOnRosterTests(unittest.TestCase):
@@ -115,6 +142,34 @@ class AssignWalkOnRosterTests(unittest.TestCase):
         fran_col.update_one.assert_called_once()
         add = fran_col.update_one.call_args[0][1]["$addToSet"][FRANCHISE_USED_FIELD]["$each"]
         self.assertEqual(add, [set_doc["meta.image_id"]])
+
+    def test_season2_can_stamp_recruit_pool_id(self):
+        rng = random.Random(0)
+        fpd_col = MagicMock()
+        fran_col = MagicMock()
+        fran_col.find_one.return_value = {
+            FRANCHISE_USED_FIELD: list(walk_on_image_ids())
+        }
+        walk_need = {
+            "meta": {"archetype": "Walk On"},
+            "position_intent": "PF",
+            "position_ratings": {"PF": 55},
+        }
+        summary = assign_walk_ons_making_active_roster(
+            franchise_id="fid2",
+            team_id="tid2",
+            active_player_ids=["w1"],
+            fpd_map={"w1": walk_need},
+            franchise_players_data_collection=fpd_col,
+            franchises_collection=fran_col,
+            current_season=2,
+            recruit_image_pool=["recruit-s2-ccc"],
+            warm=False,
+            rng=rng,
+        )
+        self.assertEqual(summary["image_assigned"], 1)
+        set_doc = fpd_col.update_one.call_args[0][1]["$set"]
+        self.assertEqual(set_doc["meta.image_id"], "recruit-s2-ccc")
 
 
 class TestCollectionTruthiness(unittest.TestCase):

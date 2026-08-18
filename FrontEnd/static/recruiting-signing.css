@@ -278,3 +278,66 @@
 .hub-anchor--orders.is-on{background:rgba(52,236,39,.12);border-color:rgba(52,236,39,.45);color:#a9ff9c}
 .hub-body-sign.is-orders-only{grid-template-columns:minmax(0,1fr)}
 .hub-body-sign.is-orders-only .spool{display:none}
+
+/* ============================================================
+   Signing Day conference reveal — full-screen, after submit.
+   Newest signing enters at the top; the meter walks the real RT grade run.
+   ============================================================ */
+.rvhost{position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;
+  background:radial-gradient(120% 78% at 50% 24%,rgba(39,64,142,.16),transparent 62%),rgba(8,10,16,.97)}
+.rvwrap{width:min(760px,94vw);max-height:92vh;display:flex;flex-direction:column;gap:14px;padding:22px}
+.rvhead{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px}
+.rvcount{font:600 13px/1 var(--body);color:var(--muted-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.rvcount b{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:26px;color:#fff;margin-right:2px}
+.rvmeter{display:flex;flex-direction:column;gap:5px;min-width:0}
+.rvmeter-bar{position:relative;height:6px;border-radius:4px;background:rgba(255,255,255,.09);overflow:hidden}
+.rvmeter-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;
+  background:linear-gradient(90deg,#4A90D9,#34EC27 55%,#FFD700 78%,#ff6d6d);transition:width .4s ease}
+.rvticks{display:flex;justify-content:space-between;font:700 8.5px/1 var(--mono,ui-monospace,Menlo,monospace);
+  letter-spacing:.08em;color:rgba(255,255,255,.26)}
+.rvtick.is-at{color:#fff}
+.rvgrade{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:32px;line-height:1;color:#fff;min-width:52px;text-align:right}
+.rvrows{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;gap:7px;padding-right:4px}
+.rvwait{padding:34px;text-align:center;color:var(--muted-3);font:600 12px/1.5 var(--body)}
+.rvrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto minmax(0,150px);align-items:center;gap:12px;
+  padding:9px 12px;border-radius:11px;border:1px solid var(--border);background:rgba(255,255,255,.03)}
+.rvrow.is-mine{border-color:rgba(52,236,39,.45);background:rgba(52,236,39,.09)}
+.rvrow.is-new{animation:rv-in .34s cubic-bezier(.2,.7,.2,1)}
+@keyframes rv-in{from{opacity:0;transform:translateY(-8px) scale(.99)}to{opacity:1;transform:none}}
+.rvav{width:44px;height:44px;border-radius:9px;overflow:hidden;background:rgba(255,255,255,.06);flex-shrink:0}
+.rvav img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block}
+.rvnm{font:700 13.5px/1.2 var(--body);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rvsub{font:500 10.5px/1.3 var(--body);color:var(--muted-3)}
+.rvrt{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:20px;line-height:1;white-space:nowrap}
+.rvteam{font:600 11.5px/1.3 var(--body);color:var(--muted-2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rvyou{display:inline-block;margin-left:7px;padding:2px 5px 1px;border-radius:4px;background:#34EC27;color:#06210a;
+  font:700 8.5px/1 var(--body);letter-spacing:.08em;vertical-align:middle}
+.rvfoot{display:flex;flex-direction:column;align-items:center;gap:5px}
+.rvbtn{height:38px;padding:0 20px;border-radius:9px;border:1px solid var(--border);background:rgba(255,255,255,.05);
+  color:var(--text);font:700 12px/1 var(--body);letter-spacing:.03em;cursor:pointer;transition:.13s}
+.rvbtn:hover{background:rgba(255,255,255,.1);border-color:var(--muted-3)}
+.rvbtn.is-go{background:#34EC27;border-color:#34EC27;color:#06210a}
+.rvskip-note{font:500 10.5px/1 var(--body);color:var(--muted-3)}
+@media (prefers-reduced-motion:reduce){.rvrow.is-new{animation:none}.rvmeter-bar i{transition:none}}
+
+/* ---------- Week 36: league signing list (no playback) ---------- */
+.lswrap{display:flex;flex-direction:column;gap:16px}
+.lsconf{border:1px solid var(--border);border-radius:13px;background:rgba(255,255,255,.02);overflow:hidden}
+.lsconf.is-user{border-color:rgba(52,236,39,.4)}
+.lsconf-h{display:flex;align-items:center;gap:10px;padding:11px 14px;background:rgba(255,255,255,.03);
+  border-bottom:1px solid var(--border)}
+.lsconf-t{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:19px;letter-spacing:.05em;color:#fff}
+.lstag{font:700 8.5px/1 var(--body);letter-spacing:.1em;text-transform:uppercase;padding:3px 7px 2px;border-radius:4px}
+.lstag.you{background:rgba(52,236,39,.16);color:#a9ff9c}
+.lstag.sis{background:rgba(74,144,217,.16);color:#9fc7f5}
+.lsconf-teams{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1px;background:var(--border)}
+.lsteam{background:#0e1016;padding:11px 13px;display:flex;flex-direction:column;gap:5px}
+.lsteam.is-user{background:rgba(52,236,39,.06)}
+.lsteam-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  font:700 12px/1.2 var(--body);color:#fff;padding-bottom:5px;border-bottom:1px solid var(--border)}
+.lsn{font:600 10px/1 var(--body);color:var(--muted-3);font-variant-numeric:tabular-nums}
+.lsrow{display:grid;grid-template-columns:minmax(0,1fr) 34px auto;align-items:baseline;gap:8px;
+  font:500 11.5px/1.4 var(--body);color:var(--muted-2)}
+.lsnm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:rgba(255,255,255,.86)}
+.lspos{color:var(--muted-3);font-size:10.5px}
+.lsrt{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:14px;text-align:right}

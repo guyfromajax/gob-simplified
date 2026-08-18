@@ -178,7 +178,7 @@ An accepted team fills the highest open slot or replaces slot 3. The pass is gua
 ### User board
 
 - Maximum 20 entries.
-- Total points budget: 50.
+- Total points budget: 50 — and that budget is the ONLY limit; there is no per-recruit cap.
 - Each entry stores `id`, integer `points`, `scholarship`, and `playing_time`.
 - `scholarship` is currently normalized false/dormant.
 - Running recruiting without a saved user board is rejected.
@@ -203,6 +203,31 @@ score = subtotal × lean multiplier
 
 - Playing-time bonus: 15 when only one or two teams offer it; 7 when more than two offer it.
 - Lean multipliers: #1 = 5×, #2 = 3×, #3 = 2×, not on lean = 1×.
+
+### Signing Day reveal (on submit)
+
+Submitting orders runs the signings and then plays them back **before** the summary. Scope is the
+**user's conference only** (8 teams), highest RT first, one every **3000ms**. Presentation only —
+the engine already resolves in RT order, so this shows a sequence that already happened.
+
+- **Walk-ons are excluded.** They are roster backfill, not signings; their first reveal is the next
+  season's Walk-On Welcome modal.
+- **Skip control** jumps to the user's next signing. Once none remain the CTA becomes *Skip To End*
+  with `0 signings remain for your team` beneath it — the same state a coach who signed nobody sees.
+- **Progress** carries the count (`12/45`) and a meter whose stops are the real RT grade bands read
+  from `rtBucket.js` at runtime, so the run reads A++ → F without a second copy of the thresholds.
+- **No replay.** Reaching the end PATCHes `/franchise/week-35-reveal-seen`, which season-stamps
+  `week_35_reveal_seen_season`. A refresh after submitting does not replay it, and a new season gets
+  its own reveal without anything having to clear the flag.
+
+### Week 36 results — league list
+
+The week-36 screen is a **list**, not a playback (the drama moved to Signing Day). Every signing in
+the league, grouped by conference then team, ordered: the user's conference → its **sister
+conference** (`_sister_conference`: same region, other conference) → conferences 1–16 ascending with
+those two removed so neither repeats. Conferences display as `E1` / `E2`. Walk-ons excluded here too.
+
+The FCC's Recruiting Results modal is unchanged and still fires on first FCC entry after week 35.
 - At most four finalists remain; ties at the cutoff are randomly sampled.
 - Winner is drawn proportionally from finalist scores.
 - Scholarship offers do not currently affect score or roster scholarship state.
@@ -236,17 +261,22 @@ initialization follows that contract and adds three walk-ons per team onto the p
 
 ### Making the active 12 (jersey + portrait)
 
-After the **last camp week** (`CAMP_WEEKS`, currently 3) training completes, user and CPU camp cuts
+After the **last camp week** (`CAMP_WEEKS`, currently 1) training completes, user and CPU camp cuts
 reduce each roster to 12. Walk-ons who **survive onto that 12** (not sent to `training_squad_players`)
 receive:
 
 1. **Jersey** — same helper as week-35 signing (`position_intent`, conflict-aware), skipped if
    `meta.jersey` is already set.
-2. **Portrait** — random kit from the 71-id walk-on pool (`portrait-kits/walk_on_portraits/`,
-   manifest `BackEnd/data/walk_on_portraits_manifest.json`), skipped if `meta.image_id` is already
-   set (e.g. Team Builder). League-wide within the franchise season: used ids live on
-   `franchises.walk_on_image_ids_used`; when the pool is exhausted, ids may repeat. Cleared at
-   `finish_season`.
+2. **Portrait** — random kit from the season pool, skipped if `meta.image_id` (or top-level
+   `image_id`) is already set (e.g. Team Builder):
+   - **Season 1:** the 71-id walk-on pool only (`portrait-kits/walk_on_portraits/`,
+     manifest `BackEnd/data/walk_on_portraits_manifest.json`).
+   - **Season 2+:** walk-on pool ∪ recruit `set_0001` kit ids (`recruit_sets._base_image_pool`),
+     drawn at random with no split.
+   League-wide within the franchise season: used ids (from either pool) live on one list,
+   `franchises.walk_on_image_ids_used`; when the applicable pool is exhausted, ids may repeat.
+   Cleared at `finish_season`. Imageless on Training Squad is intentional until they make an
+   active 12.
 3. **Paint** — user team eager-warmed into `players/master/<player_id>.png` in team colors; CPU
    lazy via `POST /player-image/ensure`.
 

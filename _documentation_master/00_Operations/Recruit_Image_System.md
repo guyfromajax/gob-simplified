@@ -279,12 +279,15 @@ Mechanically identical; only storage differs:
    collide across franchises; portrait lineage is `image_id`. Week-35 fill walk-ons also get a
    fresh `player_id` and usually no `image_id` at signing.
 4. **Walk-on makes the 12** — after last-camp-week cuts, survivors with archetype `Walk On` and no
-   `meta.image_id` borrow from the **71 walk-on kits** at
-   `portrait-kits/walk_on_portraits/` (remapped UUIDs from the retired set_0001 mover archive;
-   manifest `BackEnd/data/walk_on_portraits_manifest.json`). Season de-dupe:
-   `franchises.walk_on_image_ids_used` (cleared at `finish_season`). Paint via
-   `ensure_player_image` / user eager warm — same kit path as recruits once `resolve_kit_keys`
-   resolves the walk-on prefix.
+   `meta.image_id` borrow a portrait:
+   - **Season 1:** the **71 walk-on kits** at `portrait-kits/walk_on_portraits/` (remapped UUIDs
+     from the retired set_0001 mover archive; manifest
+     `BackEnd/data/walk_on_portraits_manifest.json`).
+   - **Season 2+:** random draw from walk-on kits ∪ recruit `set_0001` (`_base_image_pool`).
+   Season de-dupe is one list: `franchises.walk_on_image_ids_used` (cleared at `finish_season`).
+   Paint via `ensure_player_image` / user eager warm — `resolve_kit_keys` routes walk-on ids to
+   the walk-on prefix and recruit ids to `recruits/kit/`. Training Squad walk-ons stay imageless
+   until they make an active 12.
 
 Two properties this buys for free:
 

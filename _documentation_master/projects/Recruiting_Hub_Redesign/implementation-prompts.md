@@ -298,6 +298,12 @@ summary before navigating.
 **Acceptance:** playback advances and can be skipped; every row shows a reason; the summary
 reconciles with what was submitted on Signing Day.
 
+> **SUPERSEDED (shipped differently).** The playback moved to **Signing Day, on submit**, and widened
+> from the user's class to the **user's conference** — 3000ms per reveal, skip-to-my-next-signing,
+> count + RT-grade meter, no replay (`week_35_reveal_seen_season`). The week-36 screen became a
+> **league list** grouped by conference (user → sister → 1–16 ascending), so items 2 and 3 above —
+> per-row *why* and the class summary — no longer exist on it. See `Recruiting_System.md` §7.
+
 ---
 
 ## Sequencing
