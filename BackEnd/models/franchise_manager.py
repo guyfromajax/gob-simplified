@@ -727,9 +727,19 @@ class FranchiseManager:
         _perf["frd_insert_many"] = (time.time() - _t0) * 1000
 
         # Week 1 Recruiting Report from initial leans (newest-first ahead of Walk Ons).
+        # Ranks are computed here but written onto FTD when those docs are created below
+        # (FTD does not exist yet at this point in season init).
+        from BackEnd.utils.recruiting_report_news import (
+            FTD_RECRUITING_RANK,
+            FTD_RECRUITING_REGION_RANK,
+            FTD_RECRUITING_SCORE,
+        )
+
+        _w1_recruiting_ranks: dict[str, dict[str, int]] = {}
         try:
             from BackEnd.utils.recruiting_report_news import (
                 build_recruiting_rankings_story,
+                compute_recruiting_rank_fields,
                 recruit_max_rt,
                 team_points_from_lean_lists,
             )
@@ -755,6 +765,17 @@ class FranchiseManager:
                         if str(t.get("region") or "").strip().upper() == _w1_region
                         and t.get("_id") is not None
                     }
+            _w1_team_ids = [
+                str(t["_id"]) for t in self.teams if t.get("_id") is not None
+            ]
+            _w1_region_by = {
+                str(t["_id"]): str(t.get("region") or "").strip().upper()
+                for t in self.teams
+                if t.get("_id") is not None
+            }
+            _w1_recruiting_ranks = compute_recruiting_rank_fields(
+                _w1_scores, _w1_team_ids, _w1_region_by
+            )
             _w1_report = build_recruiting_rankings_story(
                 story_id="w1-recruiting-report",
                 week=1,
@@ -867,6 +888,7 @@ class FranchiseManager:
             prestige_ftd = rank_data.get("prestige", 0)
             total_player_attrs = rank_data.get("total_player_attrs", 0)
             natl_rank = rank_data.get("natl_rank", 128)
+            recruiting_rank_data = _w1_recruiting_ranks.get(str(team_object_id)) or {}
 
             ftd_doc = {
                 "franchise_id": self.franchise_id,
@@ -889,6 +911,15 @@ class FranchiseManager:
                 "prestige": prestige_ftd,
                 "total_player_attrs": total_player_attrs,
                 "natl_rank": natl_rank,
+                FTD_RECRUITING_RANK: int(
+                    recruiting_rank_data.get(FTD_RECRUITING_RANK) or 128
+                ),
+                FTD_RECRUITING_REGION_RANK: int(
+                    recruiting_rank_data.get(FTD_RECRUITING_REGION_RANK) or 16
+                ),
+                FTD_RECRUITING_SCORE: int(
+                    recruiting_rank_data.get(FTD_RECRUITING_SCORE) or 0
+                ),
                 "sos_avg": rank_data.get("sos_avg", SOS_AVG_DEFAULT),
                 "sos_rank_sum": rank_data.get("sos_rank_sum", 0),
                 "sos_games_played": rank_data.get("sos_games_played", 0),

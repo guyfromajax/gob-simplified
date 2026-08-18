@@ -63,10 +63,10 @@ out six across. Covered by a geometry assertion, not an element count.
 ## Backend
 
 `/roster/{team}` returns `team_record` (franchise mode only): `wins`, `losses`, `conference`,
-`conference_place`, `conference_size`, `natl_rank`. Conference place from
-`calculate_franchise_standings` (same helper as the Standings tab — wins, then point differential);
-`natl_rank` from FTD. Lockup labels: Record, Conference Rank (`N of M`), National Rank. `null`
-outside a franchise.
+`conference_place`, `conference_size`, `natl_rank`, `recruiting_rank`, `recruiting_region_rank`.
+Conference place from `calculate_franchise_standings` (same helper as the Standings tab — wins,
+then point differential); `natl_rank` / recruiting ranks from FTD. Lockup labels: Record,
+Conference Rank (`N of M`), National Rank, Recruiting Rank. `null` outside a franchise.
 
 ⚠️ The block is wrapped in `except Exception` so a lookup failure degrades to no record rather than
 a 500. That also **hides typos**: it first shipped calling `db.franchises` / `db.teams`, names that

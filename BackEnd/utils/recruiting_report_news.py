@@ -3,19 +3,30 @@
 Weekly reports (weeks 1–35 title cadence): team points from lean-list share of
 each recruit's current RT. Week-35 Results: points = 100% of signed recruits' RT
 for the signing team only.
+
+Durable ranks (FTD ``recruiting_rank`` / ``recruiting_region_rank`` /
+``recruiting_score``) are recomputed from the same scores at those moments so
+Roster and other surfaces can read without rescanning FRDs.
 """
 
 from __future__ import annotations
 
+import logging
 import random
 from datetime import datetime
-from typing import Any, Callable
+from typing import Any, Callable, Mapping, Optional, Sequence
+
+logger = logging.getLogger(__name__)
 
 LEAN_SLOT_WEIGHTS = {"1": 1.0, "2": 0.5, "3": 0.25}
 NATIONAL_LIMIT = 25
 REGION_LIMIT = 16  # full region (2 conferences × 8 teams)
 NATIONAL_COLUMN_SPLIT = (13, 12)
 REGION_COLUMN_SPLIT = (8, 8)
+
+FTD_RECRUITING_RANK = "recruiting_rank"
+FTD_RECRUITING_REGION_RANK = "recruiting_region_rank"
+FTD_RECRUITING_SCORE = "recruiting_score"
 
 
 def recruit_max_rt(recruit_doc: dict[str, Any]) -> int:
@@ -97,6 +108,102 @@ def rank_teams_by_points(
             }
         )
     return ranked
+
+
+def compute_recruiting_rank_fields(
+    scores: Mapping[str, int] | None,
+    team_ids: Sequence[str],
+    region_by_team_id: Mapping[str, str],
+    *,
+    rng: Optional[random.Random] = None,
+) -> dict[str, dict[str, int]]:
+    """Full-league recruiting ranks for FTD persistence.
+
+    Every team in ``team_ids`` gets a national ``recruiting_rank`` (1..N, zeros included)
+    and a ``recruiting_region_rank`` within its region letter (1..region size). Ties break
+    randomly once at compute time; persisted values stay stable until the next recompute.
+    """
+    chooser = rng if rng is not None else random.Random()
+    score_map = {str(k): int(v or 0) for k, v in (scores or {}).items()}
+    ids = [str(tid) for tid in team_ids if tid]
+    if not ids:
+        return {}
+
+    national = [(tid, score_map.get(tid, 0)) for tid in ids]
+    national.sort(key=lambda row: (-row[1], chooser.random()))
+    out: dict[str, dict[str, int]] = {}
+    for place, (tid, pts) in enumerate(national, start=1):
+        out[tid] = {
+            FTD_RECRUITING_RANK: place,
+            FTD_RECRUITING_SCORE: pts,
+            FTD_RECRUITING_REGION_RANK: 0,
+        }
+
+    by_region: dict[str, list[str]] = {}
+    for tid in ids:
+        letter = str(region_by_team_id.get(tid) or "").strip().upper() or "?"
+        by_region.setdefault(letter, []).append(tid)
+
+    for tids in by_region.values():
+        region_rows = [(tid, score_map.get(tid, 0)) for tid in tids]
+        region_rows.sort(key=lambda row: (-row[1], chooser.random()))
+        for place, (tid, _) in enumerate(region_rows, start=1):
+            out[tid][FTD_RECRUITING_REGION_RANK] = place
+
+    return out
+
+
+def persist_recruiting_ranks_to_ftd(
+    *,
+    franchise_id: Any,
+    ranked_by_team_id: Mapping[str, Mapping[str, int]],
+    franchise_team_data_collection: Any,
+) -> int:
+    """Write recruiting rank fields onto each FTD doc. Returns update count."""
+    if not ranked_by_team_id:
+        return 0
+    try:
+        from bson import ObjectId
+        from pymongo import UpdateOne
+    except Exception:
+        logger.exception("[RECRUITING-RANK] imports failed")
+        return 0
+
+    ops = []
+    now = datetime.utcnow()
+    for tid, fields in ranked_by_team_id.items():
+        try:
+            team_oid = ObjectId(str(tid))
+        except Exception:
+            continue
+        ops.append(
+            UpdateOne(
+                {"franchise_id": franchise_id, "team_id": team_oid},
+                {
+                    "$set": {
+                        FTD_RECRUITING_RANK: int(fields.get(FTD_RECRUITING_RANK) or 0),
+                        FTD_RECRUITING_REGION_RANK: int(
+                            fields.get(FTD_RECRUITING_REGION_RANK) or 0
+                        ),
+                        FTD_RECRUITING_SCORE: int(fields.get(FTD_RECRUITING_SCORE) or 0),
+                        "updated_at": now,
+                    }
+                },
+            )
+        )
+    if not ops:
+        return 0
+    try:
+        result = franchise_team_data_collection.bulk_write(ops, ordered=False)
+        return int(getattr(result, "modified_count", 0) or 0) + int(
+            getattr(result, "upserted_count", 0) or 0
+        )
+    except Exception:
+        logger.exception(
+            "[RECRUITING-RANK] FTD bulk write failed franchise=%s",
+            str(franchise_id),
+        )
+        return 0
 
 
 def build_recruiting_rankings_story(

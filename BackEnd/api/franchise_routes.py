@@ -102,6 +102,8 @@ from BackEnd.models.franchise_manager import carry_dev_fields
 from BackEnd.models.franchise_manager import build_walk_ons_news_story, walk_on_news_row
 from BackEnd.utils.recruiting_report_news import (
     build_recruiting_rankings_story,
+    compute_recruiting_rank_fields,
+    persist_recruiting_ranks_to_ftd,
     team_points_from_lean_lists,
     team_points_from_signings,
 )
@@ -12851,6 +12853,31 @@ def _region_team_ids_for_letter(region_letter: str) -> set[str]:
     return {str(doc["_id"]) for doc in docs if doc.get("_id") is not None}
 
 
+def _persist_recruiting_ranks_from_scores(
+    franchise_id: ObjectId | str,
+    scores: dict[str, int],
+) -> None:
+    """Rank all 128 teams (zeros included) and write recruiting_* fields to FTD.
+
+    Called whenever weekly lean scores or Week-35 signing scores are computed so
+    Roster / FCC can read durable ranks without rescanning FRDs. After Week 35
+    Results this freezes until the next season's Week-1 lean recompute.
+    """
+    team_docs = list(db.teams.find({}, {"_id": 1, "region": 1}))
+    team_ids = [str(doc["_id"]) for doc in team_docs if doc.get("_id") is not None]
+    region_by_team_id = {
+        str(doc["_id"]): str(doc.get("region") or "").strip().upper()
+        for doc in team_docs
+        if doc.get("_id") is not None
+    }
+    ranked = compute_recruiting_rank_fields(scores, team_ids, region_by_team_id)
+    persist_recruiting_ranks_to_ftd(
+        franchise_id=franchise_id,
+        ranked_by_team_id=ranked,
+        franchise_team_data_collection=franchise_team_data_collection,
+    )
+
+
 def _build_recruiting_rankings_story(
     *,
     story_id: str,
@@ -12893,6 +12920,14 @@ def _build_weekly_recruiting_report_story(
         )
     )
     scores = team_points_from_lean_lists(recruits, _recruit_rt)
+    try:
+        _persist_recruiting_ranks_from_scores(franchise_id, scores)
+    except Exception:
+        logger.exception(
+            "[RECRUITING-RANK] weekly persist failed franchise=%s week=%s",
+            str(franchise_id),
+            report_week,
+        )
     team_name_map = _format_team_name_map(franchise=franchise_doc)
     region_letter = _user_team_region_letter(franchise_doc)
     region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()
@@ -12921,6 +12956,16 @@ def _build_season_recruiting_results_story(
     scores = team_points_from_signings(
         [player for player in (signed_players or []) if not player.get("walk_on")]
     )
+    franchise_id = franchise_doc.get("_id")
+    if franchise_id is not None:
+        try:
+            _persist_recruiting_ranks_from_scores(franchise_id, scores)
+        except Exception:
+            logger.exception(
+                "[RECRUITING-RANK] results persist failed franchise=%s season=%s",
+                str(franchise_id),
+                season,
+            )
     team_name_map = _format_team_name_map(franchise=franchise_doc)
     region_letter = _user_team_region_letter(franchise_doc)
     region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()

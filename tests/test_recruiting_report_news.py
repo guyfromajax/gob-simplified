@@ -135,3 +135,41 @@ def test_build_story_none_when_no_points():
         )
         is None
     )
+
+
+def test_compute_recruiting_rank_fields_full_128_includes_zeros():
+    from BackEnd.utils.recruiting_report_news import (
+        FTD_RECRUITING_RANK,
+        FTD_RECRUITING_REGION_RANK,
+        FTD_RECRUITING_SCORE,
+        compute_recruiting_rank_fields,
+    )
+
+    team_ids = [f"t{i}" for i in range(1, 9)]
+    region_by = {tid: ("A" if i <= 4 else "B") for i, tid in enumerate(team_ids, start=1)}
+    scores = {"t1": 100, "t2": 50, "t5": 80}
+    ranked = compute_recruiting_rank_fields(
+        scores, team_ids, region_by, rng=random.Random(0)
+    )
+    assert len(ranked) == 8
+    assert ranked["t1"][FTD_RECRUITING_RANK] == 1
+    assert ranked["t1"][FTD_RECRUITING_SCORE] == 100
+    assert ranked["t5"][FTD_RECRUITING_RANK] == 2
+    assert ranked["t2"][FTD_RECRUITING_RANK] == 3
+    # Zero-point teams still receive national places 4..8
+    zero_places = sorted(
+        ranked[tid][FTD_RECRUITING_RANK]
+        for tid in team_ids
+        if ranked[tid][FTD_RECRUITING_SCORE] == 0
+    )
+    assert zero_places == [4, 5, 6, 7, 8]
+    # Region A: t1, t2, then two zeros → places 1..4
+    assert ranked["t1"][FTD_RECRUITING_REGION_RANK] == 1
+    assert ranked["t2"][FTD_RECRUITING_REGION_RANK] == 2
+    assert {
+        ranked["t3"][FTD_RECRUITING_REGION_RANK],
+        ranked["t4"][FTD_RECRUITING_REGION_RANK],
+    } == {3, 4}
+    # Region B: t5 first
+    assert ranked["t5"][FTD_RECRUITING_REGION_RANK] == 1
+

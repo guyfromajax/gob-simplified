@@ -81,5 +81,11 @@ def test_block_includes_natl_rank_from_ftd():
     assert "franchise_team_data_collection" in block
 
 
+def test_block_includes_recruiting_rank_from_ftd():
+    block = _record_block()
+    assert '"recruiting_rank"' in block
+    assert '"recruiting_region_rank"' in block
+
+
 def test_block_is_syntactically_valid_python():
     ast.parse(SRC)

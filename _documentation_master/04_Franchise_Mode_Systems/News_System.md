@@ -58,6 +58,11 @@
   - slot 3 → 25% of RT  
   All values are **rounded integers**.
 - Ranking: strict sequential ranks `1..N`; ties broken **randomly**. National Top **25** (two columns: **13** left / **12** right). User **region** lists **all 16** teams (two columns of **8**), including 0-point teams, labeled `Region {letter}` (e.g. `Region A`). National still omits 0-point teams.
+- **Durable FTD ranks** (same scores, separate from the news Top-25 cut): every team gets
+  `recruiting_rank` (national 1–128, zeros included), `recruiting_region_rank` (1–16 within
+  region), and `recruiting_score`. Written at Week-1 init, each weekly report recompute
+  (through title week 35), and frozen after Week-35 Results until next season. Roster /
+  other surfaces read FTD — they do not rescan lean lists.
 - Content (top to bottom):
   1. `ranking_table` rich lines under `National Recruit Rankings` and `Region {letter}` (when points exist).
   2. Section heading **Recruiting Leans Announced**, then the former leans story body:
@@ -72,5 +77,6 @@
 - Moment: after **Run Recruiting** completes in week 35 (franchise advances to week 36; user returns to FCC at week 36). No week number in the headline.
 - Scoring: signing team only receives **100%** of each signed recruit's RT. No other team scores for that recruit.
 - Same ranking / rich-table rules as the weekly report rankings (National Top 25 in 13+12 columns + full Region 16 in 8+8). No leans section.
+- Also writes the durable FTD recruiting ranks from Results scoring and **freezes** them until next season Week 1.
 - `story_id`: `s{N}-recruiting-results`.
 

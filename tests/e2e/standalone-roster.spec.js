@@ -16,7 +16,8 @@ const ATTRS = ['SC','SH','ID','OD','PS','BH','RB','AG','ST','ND','IQ','FT'];
 
 const NO_RECORD = Symbol('no-record');
 const DEFAULT_RECORD = {
-  wins: 18, losses: 6, conference: 1, conference_place: 2, conference_size: 16, natl_rank: 41,
+  wins: 18, losses: 6, conference: 1, conference_place: 2, conference_size: 16,
+  natl_rank: 41, recruiting_rank: 17,
 };
 
 async function mount(page, opts = {}) {
@@ -143,7 +144,7 @@ test.describe('per game / totals', () => {
 });
 
 test.describe('identity lockup', () => {
-  test('shows record, conference rank, and national rank from the payload', async ({ page }) => {
+  test('shows record, conference rank, national rank, and recruiting rank from the payload', async ({ page }) => {
     await mount(page);
     const m = await page.evaluate(() => ({
       name: document.getElementById('tr-team-name').textContent.trim(),
@@ -151,6 +152,7 @@ test.describe('identity lockup', () => {
       standing: document.getElementById('tr-standing').textContent.trim(),
       conferenceLabel: document.getElementById('tr-conference-label').textContent.trim(),
       natlRank: document.getElementById('tr-natl-rank').textContent.trim(),
+      recruitingRank: document.getElementById('tr-recruiting-rank').textContent.trim(),
       banner: document.getElementById('team-banner-card').getBoundingClientRect(),
       centeredBanner: document.getElementById('team-banner'),
     }));
@@ -159,6 +161,7 @@ test.describe('identity lockup', () => {
     expect(m.standing).toBe('2 of 16');
     expect(m.conferenceLabel).toBe('Conference Rank');
     expect(m.natlRank).toBe('41');
+    expect(m.recruitingRank).toBe('17');
     expect(m.centeredBanner).toBeNull();
     expect(Math.round(m.banner.width)).toBe(224);
     expect(Math.round(m.banner.height)).toBe(79);

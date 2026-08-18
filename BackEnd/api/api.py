@@ -7150,7 +7150,13 @@ try:
                         "franchise_id": ObjectId(str(franchise_id)),
                         "team_id": team["_id"],
                     },
-                    {"natl_rank": 1, "Recruits": 1},
+                    {
+                        "natl_rank": 1,
+                        "Recruits": 1,
+                        "recruiting_rank": 1,
+                        "recruiting_region_rank": 1,
+                        "recruiting_score": 1,
+                    },
                 )
                 response_data["team_record"] = {
                     "wins": wins,
@@ -7159,6 +7165,18 @@ try:
                     "conference_place": place,
                     "conference_size": len(conf_team_ids) or None,
                     "natl_rank": natl_rank_from_ftd_document(ftd_rank_doc),
+                    "recruiting_rank": (
+                        int(ftd_rank_doc.get("recruiting_rank"))
+                        if isinstance(ftd_rank_doc, dict)
+                        and ftd_rank_doc.get("recruiting_rank") is not None
+                        else None
+                    ),
+                    "recruiting_region_rank": (
+                        int(ftd_rank_doc.get("recruiting_region_rank"))
+                        if isinstance(ftd_rank_doc, dict)
+                        and ftd_rank_doc.get("recruiting_region_rank") is not None
+                        else None
+                    ),
                 }
             except Exception:
                 logger.exception("[ROSTER] record/standing lookup failed; omitting")
