@@ -7109,14 +7109,17 @@ try:
             "projected_starting_five": projected_starting_five,
         }
 
-        # Record + conference standing for the roster page's identity lockup. Franchise
-        # mode only — outside a franchise there is no season to have a record in.
-        # Derived from the same calculate_franchise_standings helper the Standings tab
-        # uses, so the two can't disagree.
+        # Record + conference/national rank for the roster page's identity lockup.
+        # Franchise mode only — outside a franchise there is no season to have a record in.
+        # Conference place uses the same calculate_franchise_standings helper the Standings
+        # tab uses; natl_rank comes from FTD.
         response_data["team_record"] = None
         if franchise_id and team.get("_id") is not None:
             try:
                 from BackEnd.utils.franchise_standings import calculate_franchise_standings
+                from BackEnd.utils.game_team_scoreboard_enrichment import (
+                    natl_rank_from_ftd_document,
+                )
 
                 fr_doc = franchises_collection.find_one(
                     {"_id": ObjectId(franchise_id)},
@@ -7142,12 +7145,20 @@ try:
                     ),
                 )
                 place = ranked.index(str(team["_id"])) + 1 if str(team["_id"]) in ranked else None
+                ftd_rank_doc = franchise_team_data_collection.find_one(
+                    {
+                        "franchise_id": ObjectId(str(franchise_id)),
+                        "team_id": team["_id"],
+                    },
+                    {"natl_rank": 1, "Recruits": 1},
+                )
                 response_data["team_record"] = {
                     "wins": wins,
                     "losses": losses,
                     "conference": conf,
                     "conference_place": place,
                     "conference_size": len(conf_team_ids) or None,
+                    "natl_rank": natl_rank_from_ftd_document(ftd_rank_doc),
                 }
             except Exception:
                 logger.exception("[ROSTER] record/standing lookup failed; omitting")

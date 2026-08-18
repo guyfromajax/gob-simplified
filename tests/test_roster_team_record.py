@@ -74,5 +74,12 @@ def test_block_is_franchise_gated():
     assert "if franchise_id" in block, "record must not be computed outside a franchise"
 
 
+def test_block_includes_natl_rank_from_ftd():
+    block = _record_block()
+    assert '"natl_rank"' in block
+    assert "natl_rank_from_ftd_document" in block
+    assert "franchise_team_data_collection" in block
+
+
 def test_block_is_syntactically_valid_python():
     ast.parse(SRC)

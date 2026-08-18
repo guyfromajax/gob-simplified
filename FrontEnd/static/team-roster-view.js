@@ -765,7 +765,7 @@ function trBindToolbar() {
   });
 }
 
-/** Identity lockup: team name plus record and conference standing from the payload. */
+/** Identity lockup: team name plus record, conference rank, and national rank. */
 function trRenderLockup(data) {
   const nameEl = document.getElementById('tr-team-name');
   if (nameEl) nameEl.textContent = data.team_name || data.team || teamName || '--';
@@ -777,19 +777,20 @@ function trRenderLockup(data) {
   const recEl = document.getElementById('tr-record');
   const standEl = document.getElementById('tr-standing');
   const conferenceLabelEl = document.getElementById('tr-conference-label');
+  const natlEl = document.getElementById('tr-natl-rank');
   const block = document.getElementById('tr-record-block');
   if (!rec) { if (block) block.style.display = 'none'; return; }
   if (block) block.style.display = '';
   if (recEl) recEl.textContent = rec.wins + '-' + rec.losses;
-  if (conferenceLabelEl) {
-    const conference = data.conference != null ? data.conference : rec.conference;
-    conferenceLabelEl.textContent = conference != null && String(conference).trim()
-      ? 'Conference ' + String(conference).trim()
-      : 'Conference';
-  }
+  if (conferenceLabelEl) conferenceLabelEl.textContent = 'Conference Rank';
   if (standEl) {
     standEl.textContent = rec.conference_place
       ? rec.conference_place + (rec.conference_size ? ' of ' + rec.conference_size : '')
       : '--';
+  }
+  if (natlEl) {
+    const raw = rec.natl_rank != null ? rec.natl_rank : data.natl_rank;
+    const n = Number(raw);
+    natlEl.textContent = Number.isFinite(n) && n > 0 ? String(Math.trunc(n)) : '--';
   }
 }

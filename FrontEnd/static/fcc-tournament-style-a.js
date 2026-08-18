@@ -124,7 +124,7 @@
   function regionChampionshipMatchupForDisplay(bracket) {
     var fin = bracket && bracket.final && bracket.final[0] ? bracket.final[0] : null;
     if (!fin || detectRegionShape(bracket) !== '3') return fin;
-    var byeId = regionByeTeamId(fin);
+    var byeId = regionByeTeamId(fin, bracket.round1);
     if (!byeId && isRealTeamId(fin.away_team)) byeId = String(fin.away_team);
     if (!byeId || String(fin.home_team) === byeId) return fin;
     var sc = fin.score || {};
@@ -178,12 +178,20 @@
     return '4';
   }
 
-  function regionByeTeamId(finalM) {
+  function regionByeTeamId(finalM, round1) {
     if (!finalM) return null;
     var h = finalM.home_team;
     var a = finalM.away_team;
     if (String(h).indexOf('R1_') === 0) return isRealTeamId(a) ? a : null;
     if (String(a).indexOf('R1_') === 0) return isRealTeamId(h) ? h : null;
+    // Once Region Round 1 is complete, progression replaces the R1_0 placeholder
+    // in the final with its winner. The other finalist is the team that had the bye.
+    var r1 = round1 && round1[0];
+    var r1Winner = r1 && r1.winner;
+    if (isRealTeamId(r1Winner)) {
+      if (String(h) === String(r1Winner) && isRealTeamId(a)) return a;
+      if (String(a) === String(r1Winner) && isRealTeamId(h)) return h;
+    }
     return null;
   }
 
@@ -204,7 +212,7 @@
       return padMatchups(bracket.round1, 2);
     }
     if (shape === '3') {
-      var byeId = regionByeTeamId(fin);
+      var byeId = regionByeTeamId(fin, bracket.round1);
       var real = (bracket.round1 || [])[0] || null;
       return [syntheticByeMatchup(byeId), real];
     }
