@@ -324,3 +324,73 @@ test.describe('tab badge', () => {
     expect(result.bg).toContain('247, 148, 32');
   });
 });
+
+
+test.describe('Coach\'s Office cards hold their size as the wire fills', () => {
+  /** Render the recruiting card the way franchise-command-center.js does. */
+  const wireHtml = (n) => {
+    if (!n) {
+      return '<div class="fcc-home-empty">No board movement yet</div>'
+        + '<div class="fcc-wire-status"></div>';
+    }
+    const rows = Array.from({ length: n }, (_, i) => `
+      <div class="fcc-wire-row">
+        <div class="fcc-wire-line"><span>Jacques Chen dropped Nickel Beach — you're still #2</span>
+        <span class="fcc-wire-line__wk">Wk 12</span></div>
+        ${i % 3 === 0 ? '<div class="fcc-newlean-tag">GAIN</div>' : ''}
+      </div>`).join('');
+    return `<div class="fcc-home-recruiting"><div class="fcc-home-list-scroll">${rows}</div></div>`
+      + '<div class="fcc-wire-status">6 moved · 3 dropped you since you last looked.</div>';
+  };
+
+  async function measure(page, n) {
+    await page.evaluate((html) => {
+      document.getElementById('home-recruiting-body').innerHTML = html;
+    }, wireHtml(n));
+    return page.evaluate(() => {
+      const grid = document.querySelector('.fcc-home-grid');
+      const cards = [...grid.querySelectorAll('.fcc-home-card')];
+      const rec = document.querySelector('.fcc-home-card--recruiting');
+      const scroll = rec.querySelector('.fcc-home-list-scroll');
+      return {
+        card: Math.round(rec.getBoundingClientRect().height),
+        row1: Math.max(...cards.slice(0, 3).map((c) => Math.round(c.getBoundingClientRect().height))),
+        row2Top: Math.round(Math.min(...cards.slice(3).map((c) => c.getBoundingClientRect().top))),
+        overflows: scroll ? scroll.scrollHeight > scroll.clientHeight + 1 : null,
+      };
+    });
+  }
+
+  test('the recruiting card is the same height at 0, 1 and 60 events', async ({ page }) => {
+    await mount(page, `<div id="franchise-container">${HOME_GRID}</div>`);
+    const empty = await measure(page, 0);
+    const few = await measure(page, 3);
+    const many = await measure(page, 60);
+    // A season's worth of wire must not make the card taller than week 1.
+    expect(few.card).toBe(empty.card);
+    expect(many.card).toBe(empty.card);
+    expect(many.overflows).toBe(true);      // the events are still all reachable, by scrolling
+  });
+
+  test('row 2 never moves down as the wire fills', async ({ page }) => {
+    await mount(page, `<div id="franchise-container">${HOME_GRID}</div>`);
+    const tops = [];
+    for (const n of [0, 1, 3, 6, 12, 25, 60]) tops.push((await measure(page, n)).row2Top);
+    expect(new Set(tops).size, `row 2 top drifted: ${tops.join(', ')}`).toBe(1);
+  });
+
+  test('the wire list is a fixed box, not one that grows into a cap', async ({ page }) => {
+    await mount(page, `<div id="franchise-container">${HOME_GRID}</div>`);
+    await page.evaluate((html) => {
+      document.getElementById('home-recruiting-body').innerHTML = html;
+    }, wireHtml(1));
+    const one = await page.evaluate(() =>
+      Math.round(document.querySelector('.fcc-home-list-scroll').getBoundingClientRect().height));
+    await page.evaluate((html) => {
+      document.getElementById('home-recruiting-body').innerHTML = html;
+    }, wireHtml(40));
+    const many = await page.evaluate(() =>
+      Math.round(document.querySelector('.fcc-home-list-scroll').getBoundingClientRect().height));
+    expect(one).toBe(many);
+  });
+});

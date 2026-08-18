@@ -1464,9 +1464,9 @@ function renderHomeRecruitingWire() {
 
   const events = Array.isArray(wire.events) ? wire.events : [];
   const statusText = wireStatusLine(week, wire);
-  const status = statusText
-    ? `<div class="fcc-wire-status">${escapeHomeHtml(statusText)}</div>`
-    : '';
+  // Always emitted, even when empty: the card reserves a fixed height, and a status
+  // line that appears and disappears would move the boundary the list sits above.
+  const status = `<div class="fcc-wire-status">${escapeHomeHtml(statusText || '')}</div>`;
 
   if (!events.length) {
     body.innerHTML = `${createEmptyHomeState('No board movement yet')}${status}`;
