@@ -107,6 +107,7 @@ from BackEnd.utils.recruiting_report_news import (
 )
 from BackEnd.utils.recruiting_lean_events import (
     diff_lean,
+    filter_repeat_displacements,
     recent_events,
     render_lean_event,
     summarize_kinds,
@@ -11453,10 +11454,19 @@ def _persist_recruiting_lean_events(
     """
     if not events:
         return
+    # A rival dropped from the same recruit a week or two ago is churn, not news — the
+    # slot it vacated gets refilled silently, so the identical sentence would otherwise
+    # repeat. Filtered here rather than in diff_lean, which is pure and sees one diff.
+    raw_total = len(events)
+    events = filter_repeat_displacements(
+        events, franchise_doc.get(RECRUITING_LEAN_EVENTS_FIELD), week
+    )
+    if not events:
+        return
     by_kind = summarize_kinds(events)
     logger.info(
-        "[LEAN-EVENTS] franchise=%s week=%s total=%s by_kind=%s",
-        str(franchise_id), week, len(events), by_kind,
+        "[LEAN-EVENTS] franchise=%s week=%s total=%s repeats_dropped=%s by_kind=%s",
+        str(franchise_id), week, len(events), raw_total - len(events), by_kind,
     )
     franchise_doc.setdefault(RECRUITING_LEAN_EVENTS_FIELD, {})
     franchise_doc[RECRUITING_LEAN_EVENTS_FIELD][str(week)] = events

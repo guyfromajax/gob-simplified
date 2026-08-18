@@ -1239,6 +1239,12 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
   return (
     buildSlotShellOpen(slotIndex, franchiseId) +
       '<div class="franchise-home-card franchise-home-card-active" role="link" tabindex="0" data-action="enter-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '" style="background-image:url(\'' + escapeHtml(bannerUrl) + '\');background-size:cover;background-position:center;">' +
+        '<div class="franchise-slot-menu" data-franchise-id="' + escapeHtml(franchiseId) + '">' +
+          '<button type="button" class="franchise-slot-menu-btn" data-action="slot-menu" aria-expanded="false" aria-controls="franchise-slot-menu-pop-' + slotIndex + '" aria-label="Options for ' + escapeHtml(teamName) + '">···</button>' +
+          '<div class="franchise-slot-menu-pop" id="franchise-slot-menu-pop-' + slotIndex + '">' +
+            '<button type="button" class="franchise-slot-delete-btn" data-action="delete-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '">Delete Franchise</button>' +
+          '</div>' +
+        '</div>' +
         '<img class="franchise-card-banner" src="' + escapeHtml(bannerUrl) + '" alt="' + escapeHtml(teamName) + '" style="display:none;">' +
         '<div class="franchise-card-content">' +
           '<div>' +
@@ -1255,7 +1261,6 @@ function buildOccupiedSlotHtml(franchiseData, teamDoc, commandCenterData, slotIn
           resumeHtml +
           '<div class="franchise-card-actions">' +
             '<button type="button" class="franchise-enter-btn" data-action="enter-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '">' + escapeHtml(enterLabel) + '</button>' +
-            '<button type="button" class="franchise-slot-delete-btn" data-action="delete-franchise" data-franchise-id="' + escapeHtml(franchiseId) + '">Delete Franchise</button>' +
           '</div>' +
         '</div>' +
       '</div>' +
@@ -1291,6 +1296,7 @@ function assignFranchisesToSlots(franchises) {
 
 function renderFranchiseSlots(franchises, teamsById, teamsByName, commandCenterById) {
   if (!franchiseHomeSlots) return;
+  closeAllSlotMenus();
   Object.keys(slotRuntimeById).forEach(function (k) { delete slotRuntimeById[k]; });
 
   const bySlot = assignFranchisesToSlots(franchises);
@@ -1407,7 +1413,16 @@ const deleteFranchiseModalConfirm = document.getElementById('delete-franchise-mo
 const slotsFullModal = document.getElementById('slots-full-modal');
 const slotsFullModalOk = document.getElementById('slots-full-modal-ok');
 
+function closeAllSlotMenus() {
+  document.querySelectorAll('.franchise-slot-menu.is-open').forEach(function (menu) {
+    menu.classList.remove('is-open');
+    const button = menu.querySelector('.franchise-slot-menu-btn');
+    if (button) button.setAttribute('aria-expanded', 'false');
+  });
+}
+
 function openDeleteFranchiseModal(franchiseData) {
+  closeAllSlotMenus();
   pendingDeleteFranchise = franchiseData || null;
   if (!pendingDeleteFranchise) return;
   const teamName = safeText(pendingDeleteFranchise.user_team_id, 'this franchise');
@@ -1516,6 +1531,17 @@ if (franchiseHomeSlots) {
       startNewFranchiseFlow(actionEl.getAttribute('data-home-slot'));
       return;
     }
+    if (action === 'slot-menu') {
+      event.preventDefault();
+      event.stopPropagation();
+      const menu = actionEl.closest('.franchise-slot-menu');
+      if (!menu) return;
+      const willOpen = !menu.classList.contains('is-open');
+      closeAllSlotMenus();
+      menu.classList.toggle('is-open', willOpen);
+      actionEl.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+      return;
+    }
     if (action === 'delete-franchise') {
       event.preventDefault();
       event.stopPropagation();
@@ -1534,6 +1560,7 @@ if (franchiseHomeSlots) {
 
   franchiseHomeSlots.addEventListener('keydown', function (event) {
     if (event.key !== 'Enter' && event.key !== ' ') return;
+    if (event.target.closest('.franchise-slot-menu')) return;
     const card = event.target.closest('[data-action="enter-franchise"].franchise-home-card-active');
     if (!card || !franchiseHomeSlots.contains(card)) return;
     event.preventDefault();
@@ -1541,6 +1568,19 @@ if (franchiseHomeSlots) {
     goToFranchiseCommandCenter(card.getAttribute('data-franchise-id'));
   });
 }
+
+document.addEventListener('click', function (event) {
+  if (!event.target.closest('.franchise-slot-menu')) closeAllSlotMenus();
+});
+
+document.addEventListener('keydown', function (event) {
+  if (event.key !== 'Escape') return;
+  const openMenu = document.querySelector('.franchise-slot-menu.is-open');
+  if (!openMenu) return;
+  const trigger = openMenu.querySelector('.franchise-slot-menu-btn');
+  closeAllSlotMenus();
+  if (trigger) trigger.focus();
+});
 
 if (deleteFranchiseModalCancel) {
   deleteFranchiseModalCancel.addEventListener('click', closeDeleteFranchiseModal);

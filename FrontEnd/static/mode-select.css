@@ -989,7 +989,7 @@ body.mode-select-page .franchise-home-card-active {
   border-radius: 14px;
   transition: transform 0.18s ease, box-shadow 0.18s ease;
   cursor: pointer;
-  overflow: hidden;
+  overflow: visible;
   background-color: #0b0d14;
   background-size: cover;
   background-position: center center;
@@ -1014,6 +1014,7 @@ body.mode-select-page .franchise-home-card-active::before {
       rgba(11, 13, 20, 0.68) 100%
     );
   z-index: 1;
+  border-radius: inherit;
 }
 
 body.mode-select-page .franchise-card-media {
@@ -1286,6 +1287,74 @@ body.mode-select-page .franchise-slot-delete-btn {
 body.mode-select-page .franchise-slot-delete-btn:hover {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.08);
+}
+
+body.mode-select-page .franchise-slot-menu {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 6;
+}
+
+body.mode-select-page .franchise-slot-menu-btn {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  background: rgba(11, 13, 20, 0.62);
+  backdrop-filter: blur(6px);
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 0.16s ease, background 0.16s ease;
+}
+
+body.mode-select-page .franchise-slot-menu-btn:hover,
+body.mode-select-page .franchise-slot-menu-btn:focus-visible {
+  color: #ffffff;
+  background: rgba(11, 13, 20, 0.86);
+}
+
+body.mode-select-page .franchise-slot-menu-pop {
+  position: absolute;
+  top: 66px;
+  right: 0;
+  min-width: 172px;
+  padding: 6px;
+  display: none;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 10px;
+  background: rgba(20, 24, 33, 0.98);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+}
+
+body.mode-select-page .franchise-slot-menu.is-open .franchise-slot-menu-pop {
+  display: block;
+}
+
+body.mode-select-page .franchise-slot-menu-pop .franchise-slot-delete-btn {
+  display: block;
+  width: 100%;
+  height: auto;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #ff8a7a;
+}
+
+body.mode-select-page .franchise-slot-menu-pop .franchise-slot-delete-btn:hover,
+body.mode-select-page .franchise-slot-menu-pop .franchise-slot-delete-btn:focus-visible {
+  background: rgba(255, 90, 70, 0.14);
+  color: #ff8a7a;
 }
 
 body.mode-select-page .confirm-modal {
@@ -1933,6 +2002,7 @@ body.mode-select-page .fv-a .franchise-card-actions {
   flex-direction: column;
   align-items: flex-end;
   gap: 5px;
+  padding-right: 42px;
 }
 
 /* ---- B · Status band: single info row, live game rides a band on the card's
@@ -2085,4 +2155,3 @@ body.mode-select-page .fv-c .franchise-empty-cta {
     font-size: 19px;
   }
 }
-

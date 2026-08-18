@@ -333,14 +333,14 @@ test.describe('team stats: fouls pill', () => {
     }, { rowSel: teamStatSel.row('fouls'), tugSel: teamStatSel.tug, pullSel: teamStatSel.pull });
   }
 
-  test('grows toward the team with MORE fouls, in that team colour', async ({ page }) => {
+  test('grows toward the team with MORE fouls, in the opponent colour', async ({ page }) => {
     const homeInTrouble = await foulsRow(page, 2, 7);
     expect(homeInTrouble.towardAway).toBe(false);      // pulls to the home side
-    expect(homeInTrouble.bg).toBe(HOME_COLOR);
+    expect(homeInTrouble.bg).toBe(AWAY_COLOR);         // opponent (away) colour
 
     const awayInTrouble = await foulsRow(page, 8, 3);
     expect(awayInTrouble.towardAway).toBe(true);
-    expect(awayInTrouble.bg).toBe(AWAY_COLOR);
+    expect(awayInTrouble.bg).toBe(HOME_COLOR);
   });
 
   test('the white value highlight still marks the FEWER-fouls team', async ({ page }) => {
@@ -366,7 +366,7 @@ test.describe('team stats: fouls pill', () => {
                towardAway: box.left + box.width / 2 < track.left + track.width / 2 };
     }, { rowSel: teamStatSel.row('to'), tugSel: teamStatSel.tug, pullSel: teamStatSel.pull });
     expect(m.towardAway).toBe(false);  // home committed more turnovers
-    expect(m.bg).toBe(HOME_COLOR);
+    expect(m.bg).toBe(AWAY_COLOR);     // opponent colour
   });
 
   test('FG% and 3PT tug toward the greater value', async ({ page }) => {

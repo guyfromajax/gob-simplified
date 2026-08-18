@@ -8,6 +8,7 @@ user actually held #1. No DB, no fixtures beyond literal ladders.
 import pytest
 
 from BackEnd.utils.recruiting_lean_events import (
+    filter_repeat_displacements,
     DISPLACED,
     DROPPED_YOU,
     GAINED_YOU,
@@ -257,20 +258,53 @@ def test_bystander_displacement_survives_without_user_movement():
     assert only(events, DISPLACED)["displaced_team_id"] == OTHER
 
 
-def test_displacement_survives_alongside_a_user_slide():
-    """Only gains suppress it — a slide is our own loss, not the cause of theirs."""
+def test_a_user_slide_suppresses_a_paired_displacement():
+    """REVERSED: these used to be reported together, which made the copy lie.
+
+    The pair rendered as "moved you down to #3" followed by "dropped Lancaster —
+    you're still #3". "still" is only true when the user held the rank through the
+    change, so alongside any user movement it claims continuity they never had.
+    """
     old = ladder(RIVAL, US, OTHER)
     new = ladder(RIVAL, THIRD, US)
     events = diff_lean(old, new, user_team_id=US)
-    assert set(kinds(events)) == {MOVED_DOWN, DISPLACED}
-    assert only(events, DISPLACED)["displaced_team_id"] == OTHER
+    assert kinds(events) == [MOVED_DOWN]
 
 
-def test_displacement_survives_alongside_rival_took_your_top():
+def test_rival_taking_your_top_suppresses_a_paired_displacement():
     old = ladder(US, RIVAL, OTHER)
     new = ladder(RIVAL, US, THIRD)
     events = diff_lean(old, new, user_team_id=US)
-    assert set(kinds(events)) == {RIVAL_TOOK_YOUR_TOP, DISPLACED}
+    assert kinds(events) == [RIVAL_TOOK_YOUR_TOP]
+
+
+def test_being_dropped_suppresses_a_paired_displacement():
+    """Off the ladder entirely, a bystander drop has no standing to be relative to."""
+    old = ladder(RIVAL, US, OTHER)
+    new = ladder(RIVAL, THIRD, None)
+    events = diff_lean(old, new, user_team_id=US)
+    assert kinds(events) == [DROPPED_YOU]
+
+
+@pytest.mark.parametrize("old,new", [
+    (ladder(RIVAL, OTHER, THIRD), ladder(RIVAL, OTHER, US)),   # gained
+    (ladder(RIVAL, OTHER, US), ladder(US, RIVAL, None)),       # moved up
+    (ladder(RIVAL, US, OTHER), ladder(RIVAL, THIRD, US)),      # slid down
+    (ladder(US, RIVAL, OTHER), ladder(RIVAL, US, THIRD)),      # lost the top
+    (ladder(RIVAL, US, OTHER), ladder(RIVAL, THIRD, None)),    # dropped
+])
+def test_displaced_never_accompanies_user_movement(old, new):
+    """The invariant behind the copy: "you're still #N" only when they truly are."""
+    events = diff_lean(old, new, user_team_id=US)
+    assert DISPLACED not in kinds(events)
+    assert len(events) == 1
+
+
+def test_displaced_still_fires_when_the_user_holds_position():
+    """The bystander case the kind exists for is untouched by the wider suppression."""
+    events = diff_lean(ladder(US, RIVAL, OTHER), ladder(US, RIVAL, None), user_team_id=US)
+    assert kinds(events) == [DISPLACED]
+    assert only(events, DISPLACED)["rank"] == only(events, DISPLACED)["prev_rank"] == 1
 
 
 def test_suppression_does_not_change_wire_counts():
@@ -361,3 +395,68 @@ def test_copy_drops_unknown_name_clauses_rather_than_rendering_blanks():
     line = render_lean_event(event, "Unknown Recruit", lambda _tid: "")
     assert line == "Unknown Recruit added you at #1"
     assert "—" not in line
+
+
+# --------------------------------------------------------------------------
+# Repeat displacements across weeks — the "dropped Appalachia" x2 report
+# --------------------------------------------------------------------------
+
+def _displaced(recruit_id, team_id, week=None):
+    event = {"kind": DISPLACED, "recruit_id": recruit_id, "displaced_team_id": team_id,
+             "rank": 2, "prev_rank": 2}
+    if week is not None:
+        event["week"] = week
+    return event
+
+
+def test_repeat_displacement_of_the_same_team_is_suppressed():
+    """A #1 team drops the lowest lean every roll; the freed slot refills silently.
+
+    Reported as-is the player sees the identical sentence in consecutive weeks with
+    nothing between, which reads as a duplicated message.
+    """
+    history = {"12": [_displaced("r1", OTHER)]}
+    kept = filter_repeat_displacements([_displaced("r1", OTHER)], history, 13)
+    assert kept == []
+
+
+def test_a_different_team_dropped_from_the_same_recruit_is_still_news():
+    history = {"12": [_displaced("r1", OTHER)]}
+    kept = filter_repeat_displacements([_displaced("r1", THIRD)], history, 13)
+    assert len(kept) == 1
+
+
+def test_the_same_team_dropped_from_a_different_recruit_is_still_news():
+    history = {"12": [_displaced("r1", OTHER)]}
+    kept = filter_repeat_displacements([_displaced("r2", OTHER)], history, 13)
+    assert len(kept) == 1
+
+
+def test_the_repeat_returns_after_the_lookback_window():
+    history = {"5": [_displaced("r1", OTHER)]}
+    assert filter_repeat_displacements([_displaced("r1", OTHER)], history, 13) != []
+
+
+def test_duplicates_within_one_week_collapse_to_one():
+    """Two rolls on one recruit in a week can drop the same team twice."""
+    batch = [_displaced("r1", OTHER), _displaced("r1", OTHER)]
+    assert len(filter_repeat_displacements(batch, {}, 13)) == 1
+
+
+def test_user_events_are_never_filtered():
+    """A repeated gain or drop is real news every time — only displaced is churn."""
+    history = {"12": [{"kind": GAINED_YOU, "recruit_id": "r1"},
+                      {"kind": DROPPED_YOU, "recruit_id": "r1"}]}
+    batch = [{"kind": GAINED_YOU, "recruit_id": "r1"}, {"kind": DROPPED_YOU, "recruit_id": "r1"}]
+    assert filter_repeat_displacements(batch, history, 13) == batch
+
+
+def test_replaying_the_same_week_does_not_suppress_against_itself():
+    """The week's own stored events must not filter the events being rewritten."""
+    history = {"13": [_displaced("r1", OTHER)]}
+    kept = filter_repeat_displacements([_displaced("r1", OTHER)], history, 13)
+    assert len(kept) == 1
+
+
+def test_events_without_ids_are_left_alone():
+    assert len(filter_repeat_displacements([{"kind": DISPLACED}], {"12": [{"kind": DISPLACED}]}, 13)) == 1

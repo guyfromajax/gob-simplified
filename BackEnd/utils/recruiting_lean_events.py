@@ -138,18 +138,21 @@ def diff_lean(
     # Third parties knocked off a ladder the user is on — the field changed even when
     # the user's own rank did not.
     #
-    # SUPPRESSED when this same diff produced the user's own gain. One lean recalc has
-    # one cause, so a team falling off alongside gained_you / moved_up did so *because*
-    # the user was added or climbed — it isn't independent news. Reporting it would also
-    # claim continuity the player never had: "dropped Lancaster — you're still #3" reads
-    # as though they held #3 through the change, when a moment earlier they weren't on
-    # the ladder at all.
+    # SUPPRESSED whenever this same diff also moved the user. One lean recalc has one
+    # cause, so a team falling off alongside any user movement did so as part of that
+    # same change — it isn't independent news. It also makes the copy lie: the sentence
+    # is "dropped Lancaster — you're still #3", and "still" is only true when the user
+    # held #3 through the change. Paired with a gain, a slide, a takeover or a drop it
+    # claims continuity the player never had:
     #
-    # Only gained_you and moved_up suppress it. A displaced event with no user movement
-    # is the bystander case this kind exists for, and one alongside a drop or a slide is
-    # still independent of the user's own loss.
-    user_gained = any(event.get("kind") in (GAINED_YOU, MOVED_UP) for event in events)
-    if not user_gained:
+    #     moved Crickstown to #1 — you're now #2
+    #     dropped Appalachia — you're still #2      <- they were #1 a moment ago
+    #
+    # Because the block above emits at most one event, and only for the user's own
+    # standing, "the user did not move" is exactly "nothing has been emitted yet".
+    # displaced is the bystander kind: it fires only when the user held position.
+    user_moved = bool(events)
+    if not user_moved:
         for gone in sorted(_teams_on(old) - _teams_on(new)):
             if gone != user:
                 events.append(_event(DISPLACED, displaced_team_id=gone))
@@ -257,6 +260,71 @@ def wire_counts(events: Iterable[dict[str, Any]]) -> dict[str, int]:
         elif kind in _MOVED_KINDS:
             moved += 1
     return {"moved": moved, "dropped": dropped}
+
+
+# How far back a displacement is remembered before the same one is news again.
+# The performance rule ("team already at 1 -> remove the lowest other occupied lean")
+# fires on every successful roll, so a rival can be dropped, re-added into the freed
+# slot, and dropped again within a couple of weeks. Raising this quietens the feed
+# further; lowering it lets near-identical lines back in.
+DISPLACED_REPEAT_LOOKBACK_WEEKS = 4
+
+
+def filter_repeat_displacements(
+    events: list[dict[str, Any]],
+    events_by_week: dict[str, Any] | None,
+    week: int,
+    lookback_weeks: int = DISPLACED_REPEAT_LOOKBACK_WEEKS,
+) -> list[dict[str, Any]]:
+    """Drop ``displaced`` events already reported for the same recruit + team recently.
+
+    A team at #1 removes the lowest lean every time it rolls (Recruiting_System.md §5),
+    and the freed slot is refilled by the next team that rolls in — so the same rival is
+    dropped from the same recruit over and over. Only the removals are user-relevant, so
+    the arrivals between them are silent and the feed shows the identical sentence twice
+    with nothing in between, which reads as a duplicated message rather than churn.
+
+    Suppressing the repeat is preferred over reporting the arrival: the arrival is not
+    news to the player, and emitting it would roughly double the feed's volume to say
+    nothing about their own standing.
+
+    Only ``displaced`` is filtered. Events about the user's own standing are always kept
+    — a repeated drop or gain is real news every time it happens.
+    """
+    if not events:
+        return events
+    try:
+        current_week = int(week)
+    except (TypeError, ValueError):
+        return events
+
+    floor = current_week - max(0, int(lookback_weeks or 0))
+    seen: set[tuple[str, str]] = set()
+    for raw_week, raw_events in (events_by_week or {}).items():
+        try:
+            past_week = int(raw_week)
+        except (TypeError, ValueError):
+            continue
+        # `< current_week` so a re-run of THIS week cannot suppress against itself.
+        if past_week < floor or past_week >= current_week:
+            continue
+        for event in raw_events if isinstance(raw_events, list) else []:
+            if event.get("kind") != DISPLACED:
+                continue
+            key = (str(event.get("recruit_id") or ""), str(event.get("displaced_team_id") or ""))
+            if all(key):
+                seen.add(key)
+
+    kept: list[dict[str, Any]] = []
+    for event in events:
+        if event.get("kind") == DISPLACED:
+            key = (str(event.get("recruit_id") or ""), str(event.get("displaced_team_id") or ""))
+            if all(key) and key in seen:
+                continue
+            if all(key):
+                seen.add(key)   # also collapses repeats WITHIN this week's batch
+        kept.append(event)
+    return kept
 
 
 def unseen_events(

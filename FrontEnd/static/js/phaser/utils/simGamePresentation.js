@@ -41,7 +41,6 @@ const WORM_PAD_Y = 10;
 
 const CALLOUT_HOLD_MS = Math.round(CALLOUT_HOLD_S * 1000); // 2600
 const CALLOUT_ENTER_MS = 200;
-const CALLOUT_SIDE_GAP = 16;
 
 const BENCH_MAX_CHIPS = 3;
 
@@ -322,9 +321,10 @@ function ensureStyles() {
     .sgp-root .tgl-sw.on{background:rgba(52,236,39,.2)}
     .sgp-root .tgl-sw.on::after{transform:translateX(18px);background:var(--green)}
 
-    .sgp-root .pretip-lbl{position:absolute;inset:0;display:none;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.28em;color:rgba(255,255,255,.40);pointer-events:none;z-index:2;
-      background:radial-gradient(60% 80% at 50% 50%,rgba(11,13,20,.55),transparent 70%)}
-    .sgp-root.is-pretip .pretip-lbl{display:flex}
+    .sgp-root .pretip-lbl{position:absolute;left:50%;top:25%;transform:translate(-50%,-50%);display:none;
+      font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:.28em;color:rgba(255,255,255,.40);
+      pointer-events:none;z-index:2;white-space:nowrap}
+    .sgp-root.is-pretip .pretip-lbl{display:block}
 
     .sgp-root.is-break .fit{filter:blur(3px) brightness(.42);opacity:.5}
     .sgp-root .breakcard{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:5;background:radial-gradient(60% 60% at 50% 50%,rgba(11,13,20,.62),rgba(11,13,20,.9))}
@@ -423,7 +423,9 @@ function buildSkeleton(teams) {
             <span class="w4-cap" data-wcap>LEAD MARGIN</span>
             <span class="w4-team" data-wteam></span>
           </div>
-          <div class="w4-plot" data-plot></div>
+          <div class="w4-plot" data-plot>
+            <div class="pretip-lbl">TIP OFF</div>
+          </div>
           <div class="w4-axis" data-waxis><span>TIP</span><span>Q1</span><span>HALF</span><span>Q3</span><span>FINAL</span></div>
         </div>
         <div class="band" data-band>
@@ -453,7 +455,6 @@ function buildSkeleton(teams) {
             </div>
             <div class="lineup" data-lineup="home">${homeRows}</div>
           </div>
-          <div class="pretip-lbl">STARTING LINEUPS · TIP-OFF</div>
         </div>
         <div class="f4">
           <div class="bench away" data-bench="away"></div>
@@ -600,8 +601,8 @@ function updateTeamPanel(panelEl, teamPanel, awayColor, homeColor) {
     { key: 'paint', a: a.paint, h: h.paint, lowBetter: false, format: (v) => String(Math.round(v)) },
     { key: 'fb', a: a.fb, h: h.fb, lowBetter: false, format: (v) => String(Math.round(v)) },
     { key: 'reb', a: a.reb, h: h.reb, lowBetter: false, format: (v) => String(Math.round(v)) },
-    { key: 'to', a: a.to, h: h.to, lowBetter: true, pullToHigh: true, format: (v) => String(Math.round(v)) },
-    { key: 'fouls', a: a.fouls, h: h.fouls, lowBetter: true, pullToHigh: true, format: (v) => String(Math.round(v)) },
+    { key: 'to', a: a.to, h: h.to, lowBetter: true, pullToHigh: true, opponentColor: true, format: (v) => String(Math.round(v)) },
+    { key: 'fouls', a: a.fouls, h: h.fouls, lowBetter: true, pullToHigh: true, opponentColor: true, format: (v) => String(Math.round(v)) },
   ];
   specs.forEach((spec) => {
     const row = panelEl.querySelector(`.tsr4[data-stat="${spec.key}"]`);
@@ -621,6 +622,11 @@ function updateTeamPanel(panelEl, teamPanel, awayColor, homeColor) {
     const edge = Math.abs(av - hv);
     const widthPct = edge === 0 ? 0 : Math.min(46, 8 + edge * 2.5);
     const pullsAway = spec.pullToHigh ? av > hv : aLead;
+    // TO/fouls: bar still grows toward the higher total, but in the opponent's colour
+    // (the team benefiting from the trouble).
+    const fill = spec.opponentColor
+      ? (pullsAway ? homeColor : awayColor)
+      : (pullsAway ? awayColor : homeColor);
     if (edge === 0) {
       pull.style.width = '0';
       pull.style.left = '50%';
@@ -630,12 +636,12 @@ function updateTeamPanel(panelEl, teamPanel, awayColor, homeColor) {
       pull.style.right = '50%';
       pull.style.left = 'auto';
       pull.style.width = `${widthPct}%`;
-      pull.style.background = awayColor;
+      pull.style.background = fill;
     } else {
       pull.style.left = '50%';
       pull.style.right = 'auto';
       pull.style.width = `${widthPct}%`;
-      pull.style.background = homeColor;
+      pull.style.background = fill;
     }
   });
 }
@@ -798,6 +804,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
   let calloutEl = null;
   let leaderEl = null;
   let activeCallout = null;
+  let frozenCallout = null; // set once at appearance — pill never tracks the worm
 
   const clearCalloutTimers = () => { calloutTimers.splice(0).forEach(clearTimeout); };
 
@@ -806,22 +813,53 @@ export function showSimGamePresentation(timeline, opts = {}) {
     if (calloutEl) { calloutEl.remove(); calloutEl = null; }
     if (leaderEl) { leaderEl.remove(); leaderEl = null; }
     activeCallout = null;
+    frozenCallout = null;
     calloutBusy = false;
   };
 
+  /**
+   * Place once at appearance and freeze. Vertical: above mid if tip is below mid,
+   * below mid if tip is above, or halfway top→mid when tied. Horizontal: right edge
+   * on tip x. Leader freezes to that same tip.
+   */
   const placeCallout = () => {
     if (!calloutEl || !plotEl || !activeCallout) return;
-    const d = tipMeta || { cx: FIT_W / 2, cy: WORM_PLOT_H / 2, rising: true };
+    if (frozenCallout) {
+      calloutEl.style.left = `${frozenCallout.left}px`;
+      calloutEl.style.top = `${frozenCallout.top}px`;
+      if (leaderEl) {
+        leaderEl.style.left = `${frozenCallout.leaderLeft}px`;
+        leaderEl.style.top = `${frozenCallout.leaderTop}px`;
+        leaderEl.style.width = `${frozenCallout.leaderW}px`;
+      }
+      return;
+    }
+
+    const d = tipMeta || { cx: FIT_W / 2, cy: WORM_PLOT_H / 2, cur: 0 };
     const plotW = tipMeta.w || plotEl.clientWidth || FIT_W;
     const plotH = tipMeta.h || plotEl.clientHeight || WORM_PLOT_H;
+    const mid = plotH / 2;
     const pw = calloutEl.offsetWidth || 220;
     const ph = calloutEl.offsetHeight || 42;
-    const flipX = d.cx > plotW - pw - 40;
-    const below = !!d.rising; // opposite of rising stroke
-    let left = flipX ? d.cx - pw - CALLOUT_SIDE_GAP : d.cx + CALLOUT_SIDE_GAP;
-    let top = below ? d.cy + 14 : d.cy - ph - 14;
+    const gap = 12;
+
+    let top;
+    if (!d.cur) {
+      // Tied — halfway between plot top and the zero mid-line.
+      top = (mid / 2) - (ph / 2);
+    } else if (d.cy > mid) {
+      // Tip below mid → pill just above mid.
+      top = mid - gap - ph;
+    } else {
+      // Tip above mid → pill just below mid.
+      top = mid + gap;
+    }
+
+    // Right-justified to the tip x at appearance.
+    let left = d.cx - pw;
     top = Math.max(2, Math.min(plotH - ph - 2, top));
     left = Math.max(2, Math.min(plotW - pw - 2, left));
+
     calloutEl.style.left = `${left}px`;
     calloutEl.style.top = `${top}px`;
 
@@ -831,11 +869,18 @@ export function showSimGamePresentation(timeline, opts = {}) {
       plotEl.appendChild(leaderEl);
     }
     leaderEl.style.setProperty('--coc', activeCallout.col);
-    const lx = Math.min(d.cx, left + (flipX ? pw : 0));
-    const lw = Math.abs((flipX ? left + pw : left) - d.cx);
-    leaderEl.style.left = `${lx}px`;
-    leaderEl.style.top = `${d.cy - 0.5}px`;
-    leaderEl.style.width = `${Math.max(6, lw)}px`;
+    // Leader from pill's right edge to the frozen tip (same x as right-justify target).
+    const tipX = d.cx;
+    const tipY = d.cy;
+    const attachX = left + pw;
+    const leaderLeft = Math.min(attachX, tipX);
+    const leaderW = Math.max(6, Math.abs(tipX - attachX));
+    const leaderTop = tipY - 0.5;
+    leaderEl.style.left = `${leaderLeft}px`;
+    leaderEl.style.top = `${leaderTop}px`;
+    leaderEl.style.width = `${leaderW}px`;
+
+    frozenCallout = { left, top, leaderLeft, leaderTop, leaderW };
   };
 
   const buildCalloutAvatar = (model, col) => {
@@ -867,6 +912,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
     clearCalloutTimers();
     if (calloutEl) calloutEl.remove();
     if (leaderEl) { leaderEl.remove(); leaderEl = null; }
+    frozenCallout = null;
 
     calloutEl = document.createElement('div');
     calloutEl.className = prefersReduced ? 'co' : 'co enter';
@@ -878,14 +924,15 @@ export function showSimGamePresentation(timeline, opts = {}) {
     calloutEl.appendChild(txt);
     plotEl.appendChild(calloutEl);
 
-    placeCallout();
-
-    const settle = () => { if (calloutEl) calloutEl.classList.remove('enter'); };
-    if (prefersReduced) settle();
+    const settleAndFreeze = () => {
+      placeCallout(); // first layout pass freezes position
+      if (calloutEl) calloutEl.classList.remove('enter');
+    };
+    if (prefersReduced) settleAndFreeze();
     else if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(() => requestAnimationFrame(settle));
+      requestAnimationFrame(() => requestAnimationFrame(settleAndFreeze));
     } else {
-      calloutTimers.push(setTimeout(settle, 16));
+      calloutTimers.push(setTimeout(settleAndFreeze, 16));
     }
 
     calloutTimers.push(setTimeout(() => {
@@ -944,7 +991,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
     const drawn = wormSvgHtml(wormState, w, h, teams.home.color, teams.away.color, clutch);
     tipMeta = drawn.meta;
     replaceWormSvg(drawn.svg);
-    if (activeCallout) placeCallout();
+    // Callouts stay frozen at appearance — do not re-place with the worm.
 
     const cur = tipMeta.cur || 0;
     if (wCap) {
