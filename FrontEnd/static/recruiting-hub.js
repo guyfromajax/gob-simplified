@@ -395,6 +395,88 @@
     if (state.view === 'watch') { renderPoolBodyOnly(); updateCount(); }
   }
 
+  // ===================== UNSUBMITTED DRAFT =====================
+  // Opening a recruit's profile and coming back must not silently discard edits — the
+  // board and the week-35 allocation are both real work, and a full page navigation
+  // otherwise reloads them from the server copy.
+  //
+  // Same shape as the training form draft (training.js): sessionStorage, keyed by
+  // franchise + team + week, versioned, and re-validated on restore. It is CLIENT-ONLY
+  // and writes nothing to FTD `Recruits`, so it cannot flip `has_saved_board` — the
+  // seeding rule applies here for exactly the same reason it applies to the watchlist
+  // seed: a draft is not a submission.
+  var DRAFT_V = 1;
+
+  function draftKey() {
+    if (!context.franchiseId) return null;
+    return 'gob_recruiting_draft_' + context.franchiseId + '|' + (context.teamId || '') + '|w' + state.week;
+  }
+
+  function saveDraft() {
+    var key = draftKey(); if (!key) return;
+    try {
+      sessionStorage.setItem(key, JSON.stringify({
+        v: DRAFT_V, week: state.week, phase: state.phase,
+        board: state.board, alloc: state.alloc,
+      }));
+    } catch (_e) {}
+  }
+
+  function clearDraft() {
+    var key = draftKey(); if (!key) return;
+    try { sessionStorage.removeItem(key); } catch (_e) {}
+  }
+
+  /** Parsed draft for THIS week and phase, or null. */
+  function readDraft() {
+    var key = draftKey(); if (!key) return null;
+    var raw; try { raw = sessionStorage.getItem(key); } catch (_e) { return null; }
+    if (!raw) return null;
+    var o; try { o = JSON.parse(raw); } catch (_e) { return null; }
+    if (!o || o.v !== DRAFT_V) return null;
+    // The key already carries the week, but a week can advance in another tab under the
+    // same key, so the payload re-states it. Phase likewise: an invite board must never
+    // be restored onto Signing Day.
+    if (Number(o.week) !== Number(state.week)) return null;
+    if (o.phase !== state.phase) return null;
+    return o;
+  }
+
+  /**
+   * Lay a draft over the server copy, dropping anything it cannot vouch for.
+   *
+   * A draft is untrusted input by the time it is read back: the pool is regenerated at
+   * rollover, so ids can vanish, and sessionStorage is user-editable. Everything is
+   * re-checked against the loaded recruits and the same caps the UI enforces.
+   */
+  function restoreDraft() {
+    var d = readDraft(); if (!d) return;
+    if (state.phase === 'invite' && Array.isArray(d.board)) {
+      var seen = {};
+      state.board = d.board.filter(function (id) {
+        if (!state.byId[id] || seen[id]) return false; seen[id] = true; return true;
+      }).slice(0, MAX_BOARD);
+      // An edited board is the player's, whatever seeded it.
+      clearSeedNotice();
+    }
+    if (state.phase === 'day' && d.alloc && typeof d.alloc === 'object') {
+      var alloc = {}, total = 0;
+      Object.keys(d.alloc).forEach(function (id) {
+        var a = d.alloc[id];
+        if (!state.byId[id] || !a) return;
+        var pts = Math.max(0, Math.floor(Number(a.points) || 0));
+        var promise = !!a.promise;
+        if (!pts && !promise) return;
+        alloc[id] = { points: pts, promise: promise };
+        total += pts;
+      });
+      // Over budget can only come from a tampered or stale payload — the UI cannot
+      // produce one. Drop the whole draft rather than restoring a board that cannot
+      // be submitted.
+      if (total <= SIGN.TOTAL) state.alloc = alloc;
+    }
+  }
+
   // ===================== BOARD ops =====================
   function toggleBoard(id) {
     var i = state.board.indexOf(id);
@@ -413,7 +495,9 @@
     clearSeedNotice();   // the order is the player's now, not the seed's
     renderBoardDependent();
   }
-  function renderBoardDependent() { renderPoolBodyOnly(); renderDock(); }
+  // Every board edit passes through here, so it is the one place the draft needs
+  // stamping — reorder included, which no click handler alone would cover.
+  function renderBoardDependent() { saveDraft(); renderPoolBodyOnly(); renderDock(); }
 
   // ===================== INVITE BOARD =====================
   // Re-ranking IS the invite decision: the hero shows the top UNVISITED board recruit,
@@ -603,6 +687,8 @@
       // Committed: the notice says "nothing is sent until you save", which is no longer
       // true, so it must go. Also flips this board from seeded to saved.
       clearSeedNotice();
+      // The server copy now IS the board, so the draft has nothing left to preserve.
+      clearDraft();
       renderDock();
       showToast();
     })
@@ -932,19 +1018,21 @@
   }
   function renderSignRail() { var rail = document.getElementById('sign-rail'); if (rail) { rail.innerHTML = railHtml(); bindSignRail(); } }
 
+  // Shared tail for every allocation edit — the one place the draft is stamped.
+  function afterAllocChange() { saveDraft(); renderSignRows(); renderSignRail(); }
   function stepPoints(id, d) {
     var a = allocOf(id), nv = a.points + d;
     if (nv < 0) return;
     if (d > 0 && remaining() <= 0) return;
     state.alloc[id] = { points: nv, promise: a.promise }; pruneAlloc(id);
-    renderSignRows(); renderSignRail();
+    afterAllocChange();
   }
   function togglePromise(id) {
     var a = allocOf(id);
     state.alloc[id] = { points: a.points, promise: !a.promise }; pruneAlloc(id);
-    renderSignRows(); renderSignRail();
+    afterAllocChange();
   }
-  function removeCommit(id) { delete state.alloc[id]; renderSignRows(); renderSignRail(); }
+  function removeCommit(id) { delete state.alloc[id]; afterAllocChange(); }
   function jumpTo(id) {
     var r = state.byId[id]; if (!r) return;
     if (state.sTab === 'mine' && !r.leansToUser) { state.sTab = 'all'; renderSignRows(); document.querySelectorAll('[data-stab]').forEach(function (b) { b.classList.toggle('on', b.dataset.stab === 'all'); }); }
@@ -1295,7 +1383,8 @@
       body: JSON.stringify({ franchise_id: context.franchiseId, order_entries: entries })
     }).then(function () {
       // Orders are SAVED, not run. The modal is the confirm step: Back to Orders keeps
-      // editing, Run Recruiting commits.
+      // editing, the FCC's Run Recruiting Day commits.
+      clearDraft();
       showSubmitSummary(summaryRows);
     }).catch(function (err) {
       console.error(err); showToast('Submit failed', String(err && err.message || err), false);
@@ -1665,6 +1754,9 @@
               pruneAlloc(e.id);
             });
         }
+        // LAST, so it lays over the server copy, the watchlist seed and the restored
+        // week-35 entries alike — an unsubmitted edit is newer than all three.
+        restoreDraft();
         renderShell();
         maybeAutoRun();
       })

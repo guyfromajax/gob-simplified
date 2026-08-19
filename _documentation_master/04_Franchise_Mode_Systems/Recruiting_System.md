@@ -394,6 +394,37 @@ visually distinct.
 Immediately to its right, the year filter offers `All`, `JR`, `SO`, `FR`, and `JH`; year, region,
 name, and leaning filters compose rather than replacing one another.
 
+## 10a-1. Unsubmitted edits (draft)
+
+Leaving the Hub for a recruit's profile is a full navigation, so without this the board
+or the week-35 allocation reloads from the server copy and the player's edits are gone.
+Same pattern as the training form draft in `training.js`.
+
+| Aspect | Behavior |
+|---|---|
+| Store | `sessionStorage`, key `gob_recruiting_draft_<fid>\|<team>\|w<week>` |
+| Payload | `{v, week, phase, board, alloc}` |
+| Written | On every edit, via the two choke points: `renderBoardDependent()` (board) and `afterAllocChange()` (week 35) |
+| Cleared | On a successful `save_recruiting_orders` — board save and week-35 submit alike |
+| Restored | Last in the load path, over the server copy, the watchlist seed and the restored week-35 entries |
+
+**It is not a submission.** Client-only, and it never writes FTD `Recruits`, so it cannot
+flip `has_saved_board` — the same rule that governs the watchlist seed, for the same
+reason. A draft also cannot satisfy the FCC's invite step, which reads `board_saved_week`.
+
+**Re-validated on read**, because by then it is untrusted input — the pool is regenerated
+at rollover and `sessionStorage` is user-editable:
+
+- version, week and phase must match (week is doubled: the key carries it *and* the
+  payload re-states it, so a week advancing in another tab cannot resurrect a stale edit
+  under a reused key);
+- board ids must exist in the loaded pool, de-duplicated, capped at `MAX_BOARD`;
+- an allocation over `SIGN.TOTAL` is dropped **whole**, not clamped — the UI cannot
+  produce one, and a clamped board could not be submitted.
+
+Reorder is covered because `renderBoardDependent()` is the choke point; a per-button hook
+would miss drag entirely. Tests: `tests/e2e/recruiting-draft.spec.js`.
+
 ## 10b. Watchlist
 
 An **unordered, uncapped shortlist** of recruit ids the player is tracking. `recruiting_watchlist` on the franchise doc; toggled by `PATCH /franchise/recruiting-watchlist`; surfaced in the pool as a star per row and as a Views filter.
@@ -538,6 +569,8 @@ The signing pool defaults to `sTab: 'mine'`, which hides recruits with no lean t
 - `tests/e2e/invite-board.spec.js` — board writes, 20-slot cap, drag reorder, header CTA.
 - `tests/e2e/invite-board-layout.spec.js` — 20 always-drawn slots, two columns, visit chip, open
   future weeks, pool `Wt`.
+- `tests/e2e/recruiting-draft.spec.js` — unsubmitted edits survive a page round trip,
+  both phases, plus the restore-time validation.
 - `tests/e2e/week35-signing-pair.spec.js` — the FCC's Signing Day pair: green CTA split,
   ghost button visibility/size/colour, branch order vs `cut_required`.
 - `tests/e2e/signing-reveal.spec.js` — `run handoff` block: the modal runs nothing, and
