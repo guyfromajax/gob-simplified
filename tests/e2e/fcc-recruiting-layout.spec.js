@@ -40,9 +40,10 @@ function extractById(html, id) {
 }
 
 const HERO_GROUP = (() => {
-  const idx = HTML.indexOf('class="hero-buttons-group"');
-  const open = HTML.lastIndexOf('<div', idx);
-  const close = HTML.indexOf('</div>', HTML.indexOf('</button>', HTML.indexOf('fcc-recruiting-secondary-line2')));
+  const open = HTML.indexOf('<div class="hero-buttons-group">');
+  if (open === -1) throw new Error('hero-buttons-group not found');
+  const close = HTML.indexOf('</div>', HTML.indexOf('id="fcc-week35-edit-orders"'));
+  if (close === -1) throw new Error('hero-buttons-group not closed');
   return HTML.slice(open, close + 6);
 })();
 
@@ -63,76 +64,15 @@ async function mount(page, innerHtml, opts = {}) {
   `);
 }
 
-test.describe('hero buttons', () => {
-  test.beforeEach(async ({ page }) => {
-    await mount(page, HERO_GROUP);
-    await page.evaluate(() => {
-      const btn = document.getElementById('fcc-recruiting-secondary');
-      btn.style.display = 'flex';
-      document.getElementById('fcc-recruiting-secondary-line2').textContent =
-        '2 moved · 1 dropped you';
-    });
-  });
-
-  test('both buttons are exactly 186px wide', async ({ page }) => {
-    const widths = await page.evaluate(() => ({
-      play: document.getElementById('play-now').getBoundingClientRect().width,
-      rec: document.getElementById('fcc-recruiting-secondary').getBoundingClientRect().width,
-    }));
-    expect(widths.play).toBe(186);
-    expect(widths.rec).toBe(186);
-  });
-
-  test('they share a right edge', async ({ page }) => {
-    const edges = await page.evaluate(() => ({
-      play: document.getElementById('play-now').getBoundingClientRect().right,
-      rec: document.getElementById('fcc-recruiting-secondary').getBoundingClientRect().right,
-    }));
-    expect(Math.abs(edges.play - edges.rec)).toBeLessThan(0.5);
-  });
-
-  test('the long count line does not widen the button past 186px', async ({ page }) => {
-    const width = await page.evaluate(() => {
-      document.getElementById('fcc-recruiting-secondary-line2').textContent =
-        '12 moved · 11 dropped you';
-      return document.getElementById('fcc-recruiting-secondary').getBoundingClientRect().width;
-    });
-    expect(width).toBe(186);
-  });
-
-  test('secondary is amber, not green — only #play-now gates', async ({ page }) => {
-    const colors = await page.evaluate(() => {
-      const rec = getComputedStyle(document.getElementById('fcc-recruiting-secondary'));
-      const play = getComputedStyle(document.getElementById('play-now'));
-      return { recBg: rec.backgroundImage, playBg: play.backgroundImage, recBorder: rec.borderTopColor };
-    });
-    // The green gradient belongs to .hero-btn only.
-    expect(colors.playBg).toContain('52, 236, 39');
-    expect(colors.recBg).not.toContain('52, 236, 39');
-    expect(colors.recBg).toContain('247, 148, 32');
-    expect(colors.recBorder).toContain('247, 148, 32');
-  });
-
-  test('is-dead visibly mutes the button', async ({ page }) => {
-    const opacity = await page.evaluate(() => {
-      const btn = document.getElementById('fcc-recruiting-secondary');
-      btn.classList.add('is-dead');
-      return Number(getComputedStyle(btn).opacity);
-    });
-    expect(opacity).toBeLessThan(1);
-  });
-
-  test('the two-line label renders both lines stacked', async ({ page }) => {
-    const box = await page.evaluate(() => {
-      const l1 = document.getElementById('fcc-recruiting-secondary-line1').getBoundingClientRect();
-      const l2 = document.getElementById('fcc-recruiting-secondary-line2').getBoundingClientRect();
-      return { l1y: l1.y, l2y: l2.y, l1h: l1.height, l2h: l2.height };
-    });
-    expect(box.l1h).toBeGreaterThan(0);
-    expect(box.l2h).toBeGreaterThan(0);
-    expect(box.l2y).toBeGreaterThan(box.l1y);
-  });
-});
+// RETIRED: the 'hero buttons' block.
+//
+// It measured the amber #fcc-recruiting-secondary button — width parity with #play-now,
+// its shared right edge, the two-line label, the is-dead state, and the amber-not-green
+// colour law. That button was REMOVED: every week's recruiting news already lives in the
+// Coach's Office recruiting card, and a second notice under the green action bar was
+// repeating it. The only thing left below #play-now is week 35's ghost
+// "Edit Recruiting Orders", whose size and colour are measured in
+// week35-signing-pair.spec.js against this same extracted markup.
 
 test.describe('Coach\'s Office grid', () => {
   test.beforeEach(async ({ page }) => {

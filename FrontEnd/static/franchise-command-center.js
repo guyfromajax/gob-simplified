@@ -1429,6 +1429,10 @@ function wireBadgeFor(kind) {
 /** Phase-appropriate status line beneath the feed. */
 /** Signing Day: the Coach's Office card becomes a single call to action. */
 const SIGNING_DAY_WEEK = 35;
+// Invite window. Mirrors INVITE_FIRST_WEEK/INVITE_LAST_WEEK in recruitingButtonState.js
+// and INVITE_WEEKS on the backend; updatePlayButton needs them without the module.
+const INVITE_FIRST_WEEK = 20;
+const INVITE_LAST_WEEK = 26;
 
 function wireStatusLine(week, wire) {
   const w = Number(week || 0);
@@ -1517,38 +1521,23 @@ function renderHomeRecruitingWire() {
   `;
 }
 
-/** Secondary hero button + tab badge, both driven by the pure state function. */
-function renderRecruitingSecondaryButton() {
-  const btn = document.getElementById('fcc-recruiting-secondary');
+/**
+ * Recruiting TAB BADGE. Driven by the same pure state function as before.
+ *
+ * The amber secondary hero button it used to render is GONE: every week's recruiting
+ * news lives in the Coach's Office recruiting card, and a second notice under the green
+ * action bar was repeating it. The only thing left below #play-now is week 35's
+ * "Edit Recruiting Orders" ghost.
+ */
+function renderRecruitingTabBadge() {
   const api = window.GOB_RecruitingButtonState;
-  if (!btn || !api) return;
+  if (!api) return;
 
   const wire = commandCenterTopDataCache?.recruiting_wire || {};
   const week = Number(commandCenterTopDataCache?.week || document.body.dataset.fccWeek || 1);
-  const state = api.recruitingButtonState({
-    week,
-    counts: wire.counts || {},
-    boardSavedWeek: Number(wire.board_saved_week || 0),
-    hasSavedBoard: !!wire.has_saved_board,
-  });
 
-  btn.style.display = state.visible ? 'flex' : 'none';
-  if (state.visible) {
-    const line1 = document.getElementById('fcc-recruiting-secondary-line1');
-    const line2 = document.getElementById('fcc-recruiting-secondary-line2');
-    const dot = document.getElementById('fcc-recruiting-secondary-dot');
-    if (line1) line1.textContent = state.line1;
-    if (line2) line2.textContent = state.line2;
-    if (dot) dot.style.display = state.pulse ? 'block' : 'none';
-    btn.classList.toggle('is-dead', !!state.dead);
-    if (!btn.dataset.wireBound) {
-      btn.dataset.wireBound = '1';
-      btn.addEventListener('click', () => { void openRecruitingSurface(); });
-    }
-  }
-
-  // Tab badge — prompted only. Hovering the button does not clear it; only opening
-  // the surface does, via the mark-seen PATCH.
+  // Tab badge — prompted only. Hovering does not clear it; only opening the surface
+  // does, via the mark-seen PATCH.
   const tabBtn = document.querySelector('#franchise-container [data-tab="recruits-tab"]')
     || document.querySelector('[data-tab="recruits-tab"]');
   if (tabBtn) {
@@ -1643,7 +1632,7 @@ async function renderHomeTab() {
   renderHomeLockerRoomCard();
   renderHomeTeamStatsCard();
   renderHomeRecruitingWire();
-  renderRecruitingSecondaryButton();
+  renderRecruitingTabBadge();
   renderHomeNewsCard();
   renderHomeMatchupCard('home-next-game-body', commandCenterTopDataCache?.next_game_summary || null, {
     emptyMessage: commandCenterTopDataCache?.next_game_is_bye ? 'Bye' : 'N/A'
@@ -3568,6 +3557,7 @@ async function init() {
     updatePlayButton(commandCenterTopDataCache);
     updateScoutingButton(commandCenterTopDataCache);
     updateRecruitingButton(commandCenterTopDataCache);
+    updateWeek35EditOrdersButton(commandCenterTopDataCache);
     updateAwardsButton(commandCenterTopDataCache);
     void updatePlaybooksButtonState(commandCenterTopDataCache);
     bindResourcesLinks();
@@ -3577,7 +3567,7 @@ async function init() {
     renderHomeLockerRoomCard();
     renderHomeTeamStatsCard();
     renderHomeRecruitingWire();
-    renderRecruitingSecondaryButton();
+    renderRecruitingTabBadge();
     renderHomeNewsCard();
     if (userScheduleDataCache) {
       void renderHomeTab();
@@ -3648,6 +3638,7 @@ async function init() {
   updatePlayButton(topData);
   updateScoutingButton(topData);
   updateRecruitingButton(topData);
+  updateWeek35EditOrdersButton(topData);
   updateAwardsButton(topData);
   await updatePlaybooksButtonState(topData);
   const playbooksTab = document.getElementById('playbooks-tab');
@@ -4103,17 +4094,34 @@ function updatePlayButton(data) {
   const cutRequired = !!data.cut_required;
   
   const wire = data.recruiting_wire || {};
-  // Week-20 gate: the invite window opens and there is no board to send. Same slot
-  // pattern as the cut gate above, and deliberately AFTER it — an illegal roster
-  // outranks an empty board.
-  const needsInviteBoard = week === 20 && !wire.has_saved_board;
+  // Weeks 20-26 open with recruiting. Invites are the FIRST step of the week — the
+  // green button runs Recruit Invites -> Training -> Play Game — because invites are
+  // assigned during run-training, so a board sent afterwards misses its own week.
+  //
+  // Done = the board was SUBMITTED this week (board_saved_week), not merely built:
+  // has_saved_board never clears once set, so it can only gate week 20. Deliberately
+  // AFTER the cut gate — an illegal roster outranks an unsent board.
+  //
+  // UI ORDER ONLY. /run-training still 400s in week 20 with no board at all, and still
+  // accepts weeks 21-26 without a fresh one; nothing here can lock a save out of a week.
+  const inviteWindow = week >= INVITE_FIRST_WEEK && week <= INVITE_LAST_WEEK;
+  const invitesPending = inviteWindow && Number(wire.board_saved_week || 0) !== week;
 
   if (cutRequired) {
     playNowBtn.textContent = 'Assign Practice Squad';
     playNowBtn.dataset.mode = 'cut-players';
-  } else if (needsInviteBoard) {
-    playNowBtn.textContent = 'Build Invite Board';
-    playNowBtn.dataset.mode = 'build-invite-board';
+  } else if (invitesPending) {
+    // Set on the first week (there is nothing to review yet), Review after — the board
+    // persists, so weeks 21-26 are confirming a standing list rather than building one.
+    playNowBtn.textContent = week === INVITE_FIRST_WEEK ? 'Set Recruit Invites' : 'Review Recruit Invites';
+    playNowBtn.dataset.mode = 'recruit-invites';
+  } else if (week === 35 && wire.week_35_orders_submitted) {
+    // Orders are saved but NOT run. The green press runs the day; the ghost button
+    // below it (see updateWeek35EditOrdersButton) goes back to edit. The cut offer does
+    // not repeat here — it belongs on the way IN, before points were committed against
+    // a roster size.
+    playNowBtn.textContent = 'Run Recruiting Day';
+    playNowBtn.dataset.mode = 'week35-run';
   } else if (week === 35) {
     playNowBtn.textContent = 'Recruiting';
     playNowBtn.dataset.mode = 'week35-recruiting';
@@ -4155,6 +4163,26 @@ function updatePlayButton(data) {
       playNowBtn.textContent = 'Play Next Game';
       playNowBtn.dataset.mode = 'play';
     }
+  }
+}
+
+/**
+ * "Edit Recruiting Orders" — the ghost half of the Signing Day pair.
+ *
+ * Only week 35, and only once orders exist: before that the green button IS the way in
+ * to the board, so a second button pointing at the same place would be noise. Hidden
+ * every other week, so the hero group is unchanged outside Signing Day.
+ */
+function updateWeek35EditOrdersButton(data) {
+  const btn = document.getElementById('fcc-week35-edit-orders');
+  if (!btn) return;
+  const week = Number(data?.week || 1);
+  const wire = data?.recruiting_wire || {};
+  const show = week === SIGNING_DAY_WEEK && !!wire.week_35_orders_submitted;
+  btn.style.display = show ? 'block' : 'none';
+  if (show && !btn.dataset.wireBound) {
+    btn.dataset.wireBound = '1';
+    btn.addEventListener('click', () => { void openRecruitingSurface(); });
   }
 }
 
@@ -4304,8 +4332,27 @@ playNowBtn.addEventListener('click', async () => {
     return;
   }
 
-  if (mode === 'build-invite-board') {
+  if (mode === 'recruit-invites') {
     await openRecruitingSurface();
+    return;
+  }
+
+  if (mode === 'week35-run') {
+    // The hub owns both /run-week-35-recruiting and the reveal that follows it, so the
+    // press is handed over rather than duplicated here. No cut offer: the orders are
+    // already allocated against the current roster.
+    const params = new URLSearchParams();
+    params.set('franchise_id', franchiseId);
+    params.set('team_id', userTeamId);
+    params.set('from', 'fcc');
+    params.set('action', 'run');
+    params.set('return_url', getCurrentRelativeUrl());
+    await confirmSfxReady;
+    try {
+      const { clearFranchiseMusicState } = await import('/js/musicController.js');
+      clearFranchiseMusicState();
+    } catch {}
+    window.location.href = `/recruiting.html?${params.toString()}`;
     return;
   }
 

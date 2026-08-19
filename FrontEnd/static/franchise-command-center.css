@@ -306,73 +306,44 @@ body.has-auth-bar #franchise-container {
   gap: 8px;
 }
 
-/* Both hero buttons are a fixed 186px so they share a right edge. min-width alone
-   let the secondary size to its content (~265px) and the ragged edge read as a bug. */
+/* Hero buttons are a fixed 186px so they share a right edge. min-width alone let a
+   button size to its content and the ragged edge read as a bug. */
 #franchise-container .hero-btn,
-#franchise-container .fcc-rec-btn {
+#franchise-container .fcc-ghost-btn {
   width: 186px;
 }
 
-/* Secondary recruiting button. Its own class, NOT a .hero-btn modifier: the green
-   gradient lives on .hero-btn itself, so a modifier would have to fight inheritance
-   and any miss would show green on a non-gating control. Colour law: amber here,
-   green only on #play-now. */
-#franchise-container .fcc-rec-btn {
-  min-height: 44px;
-  padding: 7px 12px;
-  border: 1px solid rgba(247, 148, 32, 0.55);
+/* Signing Day escape hatch, directly under #play-now. Same box as .hero-btn (the width
+   above, plus the height/type below) so the pair reads as one stack; ghost fill because
+   green is the gating action and this one is skippable. */
+#franchise-container .fcc-ghost-btn {
+  min-width: 138px;
+  min-height: 42px;
+  padding: 10px 18px;
+  border: 1px solid rgba(255, 255, 255, 0.28);
   border-radius: 10px;
-  background: linear-gradient(180deg, rgba(247, 148, 32, 0.22), rgba(247, 148, 32, 0.13));
-  color: #ffd7a0;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.78);
   cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 8px;
-  position: relative;
-  text-align: left;
-  transition: filter 0.18s ease, transform 0.18s ease;
-}
-
-#franchise-container .fcc-rec-btn:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-}
-
-#franchise-container .fcc-rec-btn:active { transform: translateY(0); }
-
-#franchise-container .fcc-rec-btn__txt {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 3px;
-  min-width: 0;
-}
-
-#franchise-container .fcc-rec-btn__txt em {
-  font-style: normal;
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 15px;
-  letter-spacing: 0.04em;
-  line-height: 1;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-align: center;
+  transition: 0.13s;
 }
 
-#franchise-container .fcc-rec-btn small {
-  font: 600 9.5px/1 'Inter', sans-serif;
-  color: rgba(255, 215, 160, 0.78);
-  letter-spacing: 0.01em;
-  white-space: nowrap;
+#franchise-container .fcc-ghost-btn:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.55);
 }
 
-/* Board already sent this week — present but visibly spent. */
-#franchise-container .fcc-rec-btn.is-dead {
-  opacity: 0.5;
-  border-color: rgba(255, 255, 255, 0.16);
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.5);
+#franchise-container .fcc-ghost-btn:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 2px;
 }
 
-#franchise-container .fcc-rec-btn.is-dead small { color: rgba(255, 255, 255, 0.45); }
 
 #franchise-container .hero-btn {
   min-width: 138px;

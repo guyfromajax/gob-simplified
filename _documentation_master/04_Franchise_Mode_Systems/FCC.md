@@ -924,14 +924,25 @@ Recruiting is a first-class FCC presence all season. Levels are driven by **stat
 | Level | Fires when | Element |
 |---|---|---|
 | Ambient | Nothing needs the player | Coach's Office Recruiting card (the Wire) |
-| Prompted | Board unsent this week, or unseen wire events | Secondary hero button + `.inbox-badge` on the Recruiting tab |
-| Gated | Week 20 with no board · Week 35 | `#play-now` itself |
+| Prompted | Board unsent this week, or unseen wire events | `.inbox-badge` on the Recruiting tab |
+| Gated | Weeks 20–26 board unsent this week · Week 35 | `#play-now` itself |
 
-**Colour law.** Green is reserved for the gating action. The secondary button is always amber (`#F79420`) because it is always skippable; recruiting only turns green when it *becomes* `#play-now`.
+**Colour law.** Green is reserved for the gating action. The only non-green control below `#play-now` is week 35's `Edit Recruiting Orders` ghost.
 
-**Secondary button** lives in the previously-empty second slot of `.hero-buttons-group`. Its state comes from `recruitingButtonState()` (`js/shared/recruitingButtonState.js`) — a pure function, so all five states are unit-tested without a DOM. It has its own `.fcc-rec-btn` class rather than a `.hero-btn` modifier: the green gradient lives on `.hero-btn` itself, so a modifier would have to fight inheritance and any miss would paint a non-gating control green. Both buttons are `width: 186px` so they share a right edge.
+**REMOVED: the amber secondary hero button.** It restated, under the green action bar, news the Coach's Office recruiting card already carries in full. `.fcc-rec-btn` and the `#fcc-recruiting-secondary` markup are deleted; `recruitingButtonState()` survives because the tab badge still reads it through `recruitingIsPrompted()` (`renderRecruitingTabBadge`).
 
-**Week-20 gate** sits in `updatePlayButton` immediately after `cut_required` — an illegal roster outranks an empty board. Mode `build-invite-board`.
+### The invite step (weeks 20–26)
+
+The green button runs **Recruit Invites → Training → Play Game**. Invites lead because they are *assigned during* `run-training` — a board sent afterwards misses its own week.
+
+| Week | CTA | Mode |
+|---|---|---|
+| 20 | `Set Recruit Invites` | `recruit-invites` |
+| 21–26 | `Review Recruit Invites` | `recruit-invites` |
+
+- **Done = sent THIS week** (`recruiting_wire.board_saved_week === week`), not "has a board". FTD `Recruits` persists across weeks, so `has_saved_board` never clears once set and can only gate week 20.
+- Sits immediately after `cut_required` — an illegal roster outranks an unsent board.
+- **UI order only.** `/run-training` still 400s in week 20 with no board at all, and still accepts weeks 21–26 without a fresh one, so a stale client can never lock a save out of its week.
 
 **Out of Run Training.** `training.js` no longer routes to recruiting. Only the **route** was removed: the invite still fires on week advance using whatever board exists, so no week can be silently lost. Decoupling the *execution* was built and reversed once because Run Training was the only guaranteed weekly trigger — do not re-decouple it.
 

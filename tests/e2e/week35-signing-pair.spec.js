@@ -1,0 +1,145 @@
+// @ts-check
+/**
+ * Signing Day's two-button pair on the FCC.
+ *
+ * Once week-35 orders are saved the week splits: the green #play-now RUNS the day, and
+ * a ghost button below it goes back to the hub to edit. Before orders exist there is
+ * nothing to run, so the green button is still the way IN to the board (and still
+ * carries the pre-recruiting cut offer, which is why its mode must not change).
+ *
+ * Extracts the REAL functions out of franchise-command-center.js — same technique as
+ * fcc-invite-step.spec.js — so the test tracks the shipped branch order rather than a
+ * copy of it.
+ *
+ * Run: npx playwright test tests/e2e/week35-signing-pair.spec.js --project=chromium
+ */
+const { test, expect } = require('@playwright/test');
+const fs = require('fs');
+const path = require('path');
+
+const S = path.join(__dirname, '../../FrontEnd/static');
+const JS = fs.readFileSync(path.join(S, 'franchise-command-center.js'), 'utf8');
+const CSS = fs.readFileSync(path.join(S, 'franchise-command-center.css'), 'utf8');
+const HTML = fs.readFileSync(path.join(S, 'franchise-command-center.html'), 'utf8');
+
+function extractFunction(source, name) {
+  const lines = source.split('\n');
+  const start = lines.findIndex((l) => l.startsWith(`function ${name}(`));
+  if (start === -1) throw new Error(`${name} not found`);
+  const end = lines.findIndex((l, i) => i > start && l === '}');
+  return lines.slice(start, end + 1).join('\n');
+}
+
+const UPDATE_PLAY_BUTTON = extractFunction(JS, 'updatePlayButton');
+const UPDATE_EDIT_BUTTON = extractFunction(JS, 'updateWeek35EditOrdersButton');
+// Pulled from source rather than hardcoded: if a week boundary ever moves, these tests
+// move with it instead of asserting against a stale number.
+const SIGNING_DAY_CONST = ['SIGNING_DAY_WEEK', 'INVITE_FIRST_WEEK', 'INVITE_LAST_WEEK'].map((n) => {
+  const m = JS.match(new RegExp(`^const ${n} = \\d+;$`, 'm'));
+  if (!m) throw new Error(`${n} not found`);
+  return m[0];
+}).join('\n');
+
+/** The real hero button group, lifted out of the shipped template. */
+const HERO_GROUP = (() => {
+  const open = HTML.indexOf('<div class="hero-buttons-group">');
+  if (open === -1) throw new Error('hero-buttons-group not found');
+  const close = HTML.indexOf('</div>', HTML.indexOf('id="fcc-week35-edit-orders"'));
+  if (close === -1) throw new Error('hero-buttons-group not closed');
+  return HTML.slice(open, close + 6);
+})();
+
+async function runWith(page, data) {
+  return page.evaluate(({ playSrc, editSrc, weekConst, css, group, data }) => {
+    document.head.innerHTML = `<style>${css}</style>`;
+    document.body.innerHTML = `<div id="franchise-container"><div class="right-controls">${group}</div></div>`;
+    window.fccCpuSimNeedsRecovery = () => false;
+    window.userTeamId = 'user-team';
+    // Label lookups only — week 34 falls through to the postseason branch, and these
+    // tests assert the mode and the ghost button, never the postseason copy.
+    window.EOS_PLAY_CTA_BY_WEEK = {};
+    window.EOS_SIM_CTA_BY_WEEK = {};
+    // eslint-disable-next-line no-eval
+    eval(`${weekConst}\n${playSrc}\n${editSrc}\nwindow.__play = updatePlayButton; window.__edit = updateWeek35EditOrdersButton;`);
+    window.__play(data);
+    window.__edit(data);
+    const play = document.getElementById('play-now');
+    const edit = document.getElementById('fcc-week35-edit-orders');
+    const pr = play.getBoundingClientRect();
+    const er = edit.getBoundingClientRect();
+    return {
+      text: play.textContent.trim(),
+      mode: play.dataset.mode || null,
+      editText: edit.textContent.trim(),
+      editShown: getComputedStyle(edit).display !== 'none',
+      editBelow: er.top >= pr.bottom - 1,
+      sameWidth: Math.round(er.width) === Math.round(pr.width),
+      sameHeight: Math.round(er.height) === Math.round(pr.height),
+      // Colour law: green is the gating action. The ghost button must not be green.
+      editBg: getComputedStyle(edit).backgroundColor,
+      playBg: getComputedStyle(play).backgroundImage,
+    };
+  }, { playSrc: UPDATE_PLAY_BUTTON, editSrc: UPDATE_EDIT_BUTTON, weekConst: SIGNING_DAY_CONST, css: CSS, group: HERO_GROUP, data });
+}
+
+const SUBMITTED = { recruiting_wire: { week_35_orders_submitted: true } };
+const NOT_SUBMITTED = { recruiting_wire: { week_35_orders_submitted: false } };
+
+test.describe('week 35 — orders submitted', () => {
+  test('the green button runs the day', async ({ page }) => {
+    const r = await runWith(page, { week: 35, ...SUBMITTED });
+    expect(r.text).toBe('Run Recruiting Day');
+    expect(r.mode).toBe('week35-run');
+  });
+
+  test('a ghost button below it goes back to edit', async ({ page }) => {
+    const r = await runWith(page, { week: 35, ...SUBMITTED });
+    expect(r.editShown).toBe(true);
+    expect(r.editText).toBe('Edit Recruiting Orders');
+    expect(r.editBelow).toBe(true);
+  });
+
+  test('the ghost button is the same size as the green one', async ({ page }) => {
+    const r = await runWith(page, { week: 35, ...SUBMITTED });
+    expect(r.sameWidth).toBe(true);
+    expect(r.sameHeight).toBe(true);
+  });
+
+  test('and is not green — green is reserved for the gating action', async ({ page }) => {
+    const r = await runWith(page, { week: 35, ...SUBMITTED });
+    expect(r.playBg).toContain('gradient');
+    expect(r.editBg).toBe('rgba(0, 0, 0, 0)');
+  });
+});
+
+test.describe('week 35 — before orders exist', () => {
+  test('the green button still opens the board, with its cut offer intact', async ({ page }) => {
+    const r = await runWith(page, { week: 35, ...NOT_SUBMITTED });
+    // week35-recruiting is the mode that raises "Cut Players?" before entering the hub.
+    // Renaming or re-pointing it here would silently drop the pre-recruiting cut.
+    expect(r.text).toBe('Recruiting');
+    expect(r.mode).toBe('week35-recruiting');
+  });
+
+  test('no ghost button — it would point where the green one already goes', async ({ page }) => {
+    const r = await runWith(page, { week: 35, ...NOT_SUBMITTED });
+    expect(r.editShown).toBe(false);
+  });
+});
+
+test.describe('the pair is week 35 only', () => {
+  for (const week of [26, 34, 36]) {
+    test(`week ${week} shows no ghost button even with orders on file`, async ({ page }) => {
+      const r = await runWith(page, { week, ...SUBMITTED });
+      expect(r.editShown).toBe(false);
+      expect(r.mode).not.toBe('week35-run');
+    });
+  }
+
+  test('an illegal roster still outranks the run', async ({ page }) => {
+    // cut_required is checked before the week-35 branch and must stay there: signing
+    // over a roster that is not legal yet would commit points against the wrong size.
+    const r = await runWith(page, { week: 35, cut_required: true, ...SUBMITTED });
+    expect(r.mode).toBe('cut-players');
+  });
+});

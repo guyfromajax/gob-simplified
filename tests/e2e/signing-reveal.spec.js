@@ -34,7 +34,7 @@ const POS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const USER_TEAM = 'user-team-id';
 
 /** 450 deterministic recruits in the /franchise/recruiting-data shape. */
-function fixture({ week = 7, watchlist = [], savedOrders = {}, signed = null, conferences = null, revealSeen = false } = {}) {
+function fixture({ week = 7, watchlist = [], savedOrders = {}, signed = null, conferences = null, revealSeen = false, savedEntries = [] } = {}) {
   const recruits = [];
   for (let i = 0; i < 450; i++) {
     const attributes = {};
@@ -61,6 +61,7 @@ function fixture({ week = 7, watchlist = [], savedOrders = {}, signed = null, co
     team: 'South Lancaster', team_id: USER_TEAM, team_region: 'A', week,
     recruits, team_name_map: { [USER_TEAM]: 'South Lancaster', 'rival-1': 'Fairview' },
     saved_orders: savedOrders, watchlist,
+    saved_order_entries_week_35: savedEntries,
     new_lean_recruit_ids: [],
     week_35_recruiting_results: signed ? { signed_players: signed } : {},
     week_35_recruiting_ran: !!signed,
@@ -78,7 +79,10 @@ async function mountPool(page, opts = {}) {
   await page.setViewportSize({ width: 1440, height: 1000 });
   // Real origin first: getQueryContext reads location.search, and about:blank has no
   // origin (setContent preserves whatever URL the page is already on).
-  await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
+  // ?action=run is the FCC's "Run Recruiting Day" handing the press to the hub, which
+  // owns both the run call and the reveal.
+  await page.goto('/?franchise_id=fid-test&team_id=user-team-id'
+    + (opts.action ? `&action=${opts.action}` : ''));
   await page.setContent(`
     <style>${CSS}</style>
     <style>body{margin:0;background:#0b0d14}.doc{max-width:1180px;margin:0 auto;padding:20px}</style>
@@ -86,8 +90,12 @@ async function mountPool(page, opts = {}) {
   `);
   for (const src of SCRIPTS) await page.addScriptTag({ content: src });
 
-  await page.evaluate(({ data }) => {
+  await page.evaluate(({ data, runResults }) => {
     window.__patchCalls = [];
+    // Flat url log. The reveal's no-replay tests assert on it, and the auto-run path
+    // means those calls now happen during mount rather than after a click.
+    window.__seen = [];
+    window.__runResults = runResults;
     window.API_CONFIG = {
       buildUrl: (p) => `https://stub.local${p}`,
       getAuthHeaders: () => ({}),
@@ -98,8 +106,18 @@ async function mountPool(page, opts = {}) {
     const realFetchJSON = window.RecruitingCommon.fetchJSON;
     window.RecruitingCommon.fetchJSON = function (url, options) {
       const method = (options && options.method) || 'GET';
+      window.__seen.push(String(url));
       if (String(url).includes('/franchise/recruiting-data')) {
         return Promise.resolve(window.__fixture);
+      }
+      // Auto-run fires during load, so this stub has to exist before HUB is injected.
+      if (String(url).includes('run-week-35')) {
+        window.__patchCalls.push({ url: String(url) });
+        return Promise.resolve({ status: 'success', week: 36, results: { signed_players: window.__runResults || [] } });
+      }
+      if (String(url).includes('week-35-reveal-seen')) {
+        window.__patchCalls.push({ url: String(url) });
+        return Promise.resolve({});
       }
       if (String(url).includes('/franchise/recruiting-watchlist')) {
         const body = JSON.parse(options.body);
@@ -114,10 +132,13 @@ async function mountPool(page, opts = {}) {
       return Promise.resolve({});
     };
     void realFetchJSON;
-  }, { data: fixture(opts) });
+  }, { data: fixture(opts), runResults: opts.runResults || null });
 
   await page.addScriptTag({ content: HUB });
-  await page.waitForSelector(opts.week === 35 ? '.spool-rows .prow' : opts.week >= 36 ? '.rstage' : '#hub-pool table.pool tbody tr.rec', { timeout: 10000 });
+  await page.waitForSelector(opts.waitFor ? opts.waitFor
+    : opts.action === 'run' ? '#hub-reveal'
+    : opts.week === 35 ? '.spool-rows .prow'
+      : opts.week >= 36 ? '.rstage' : '#hub-pool table.pool tbody tr.rec', { timeout: 10000 });
   return patchCalls;
 }
 
@@ -151,31 +172,22 @@ function conferenceFixture({ mine = 3, others = 12, walkOns = 4 } = {}) {
   return { signed, conferences };
 }
 
-/** Mount Signing Day with results already resolvable, then press Submit. */
+/**
+ * Reach the reveal the way the shipped flow now does.
+ *
+ * Submitting no longer runs anything: it saves, the modal sends the player to the
+ * locker room, and the FCC's "Run Recruiting Day" hands the press back here as
+ * ?action=run. So the reveal is entered on load with orders already saved. That
+ * submit-only-saves half is asserted directly in its own test below.
+ */
 async function submitAndReveal(page, opts = {}) {
   const { signed, conferences } = conferenceFixture(opts);
-  await mountPool(page, { week: 35, signed: null, conferences, revealSeen: false });
-  await page.evaluate((s) => {
-    window.__seen = [];
-    const real = window.RecruitingCommon.fetchJSON;
-    window.RecruitingCommon.fetchJSON = function (url, options) {
-      const u = String(url);
-      if (u.includes('run-week-35')) {
-        window.__seen.push(u);
-        // The real endpoint returns the results it just produced.
-        return Promise.resolve({ status: 'success', week: 36, results: { signed_players: s } });
-      }
-      if (u.includes('recruiting-orders') || u.includes('week-35-reveal-seen')) {
-        window.__seen.push(u);
-        return Promise.resolve({});
-      }
-      return real.call(this, url, options);
-    };
-  }, signed);
-  await page.click('#sign-submit');
-  // Submit now only saves — the confirm modal stands between saving and running.
-  await page.waitForSelector('#ssum-go', { timeout: 5000 });
-  await page.click('#ssum-go');
+  await mountPool(page, {
+    week: 35, signed: null, conferences, revealSeen: false,
+    savedEntries: [{ id: 'r-0', points: 12, playing_time: false }],
+    action: 'run',
+    runResults: signed,
+  });
   await page.waitForSelector('#hub-reveal', { timeout: 5000 });
   return signed;
 }
@@ -406,7 +418,7 @@ test.describe('Orders Submitted modal (confirm before running)', () => {
       revealUp: !!document.getElementById('hub-reveal'),
     }));
     expect(m.title).toBe('Orders Submitted');
-    expect(m.buttons).toEqual(['Back to Orders', 'Run Recruiting']);
+    expect(m.buttons).toEqual(['Back to Orders', 'Go To Locker Room']);
     // Orders saved; recruiting NOT yet run — that was the out-of-place part before.
     expect(m.calls).toContain('recruiting-orders');
     expect(m.calls).not.toContain('run-week-35-recruiting');
@@ -500,5 +512,77 @@ test.describe('finished state', () => {
     expect(m.skip).toBe(0);
     expect(m.note).toBe(0);        // the note goes with the button
     expect(m.buttons).toEqual(['Continue']);
+  });
+});
+
+test.describe('run handoff', () => {
+  // The irreversible step moved off this screen. Submitting saves and sends the player
+  // to the locker room; the FCC's green "Run Recruiting Day" hands the press back here
+  // as ?action=run, because the run call and the reveal both live in the hub.
+
+  test('the modal sends you to the locker room without running anything', async ({ page }) => {
+    const { conferences } = conferenceFixture();
+    await mountPool(page, {
+      week: 35, signed: null, conferences,
+      savedEntries: [{ id: 'r-0', points: 12, playing_time: false }],
+    });
+    // Recorded in sessionStorage, not window.__seen: the click NAVIGATES, and a
+    // page-scoped log dies with the context. A URL assertion alone is not enough
+    // either — runRecruiting() with no user signings ALSO lands on the FCC, so it
+    // passes whether the button ran the day or not.
+    await page.evaluate(() => {
+      sessionStorage.removeItem('__ran');
+      const real = window.RecruitingCommon.fetchJSON;
+      window.RecruitingCommon.fetchJSON = function (url, options) {
+        if (String(url).includes('run-week-35')) sessionStorage.setItem('__ran', '1');
+        return real.call(this, url, options);
+      };
+    });
+    await page.route('**/franchise-command-center*', (route) =>
+      route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>locker room</body></html>' }));
+    await page.click('#sign-submit');
+    await page.waitForSelector('.ssum-overlay');
+    await page.click('#ssum-go');
+    await page.waitForURL('**/franchise-command-center*', { timeout: 5000 });
+    expect(await page.evaluate(() => sessionStorage.getItem('__ran'))).toBe(null);
+  });
+
+  test('?action=run with no saved orders does not run — the endpoint would 400', async ({ page }) => {
+    const { conferences } = conferenceFixture();
+    await mountPool(page, {
+      week: 35, signed: null, conferences, action: 'run',
+      savedEntries: [], waitFor: '.spool-rows .prow',
+    });
+    const m = await page.evaluate(() => ({
+      ran: window.__seen.some((u) => u.includes('run-week-35')),
+      reveal: !!document.getElementById('hub-reveal'),
+    }));
+    expect(m.ran).toBe(false);
+    expect(m.reveal).toBe(false);
+  });
+
+  test('?action=run after the signings already ran does not re-run them', async ({ page }) => {
+    const { signed, conferences } = conferenceFixture();
+    await mountPool(page, {
+      week: 35, signed, conferences, action: 'run',
+      savedEntries: [{ id: 'r-0', points: 12, playing_time: false }],
+      waitFor: '.spool-rows .prow',
+    });
+    expect(await page.evaluate(() =>
+      window.__seen.some((u) => u.includes('run-week-35')))).toBe(false);
+  });
+
+  test('no ?action=run means no run on load — the board is just the board', async ({ page }) => {
+    const { conferences } = conferenceFixture();
+    await mountPool(page, {
+      week: 35, signed: null, conferences,
+      savedEntries: [{ id: 'r-0', points: 12, playing_time: false }],
+    });
+    const m = await page.evaluate(() => ({
+      ran: window.__seen.some((u) => u.includes('run-week-35')),
+      reveal: !!document.getElementById('hub-reveal'),
+    }));
+    expect(m.ran).toBe(false);
+    expect(m.reveal).toBe(false);
   });
 });

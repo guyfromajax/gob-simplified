@@ -1028,20 +1028,42 @@
         '</div></div>' + body +
       '<div class="ssum-foot">' +
         '<button class="ssum-back" id="ssum-back" type="button">Back to Orders</button>' +
-        '<button class="ssum-go" id="ssum-go" type="button">Run Recruiting</button>' +
+        '<button class="ssum-lr" id="ssum-go" type="button">Go To Locker Room</button>' +
       '</div></div>';
     document.body.appendChild(overlay);
     // Back to Orders: the orders are already saved, so closing loses nothing and the
-    // board is still editable. Run Recruiting is the irreversible step.
+    // board is still editable.
     var back = overlay.querySelector('#ssum-back');
     if (back) back.addEventListener('click', function () {
       overlay.remove();
       var btn = document.getElementById('sign-submit');
       if (btn) { btn.disabled = false; btn.textContent = 'Submit Orders'; }
     });
+    // The irreversible step MOVED to the FCC. Submitting saves; running is a separate
+    // press on the locker-room screen, where "Edit Recruiting Orders" sits beside it.
+    // Amber, not green: this button no longer commits anything.
     var go = overlay.querySelector('#ssum-go');
-    go.addEventListener('click', function () { overlay.remove(); runRecruiting(); });
+    go.addEventListener('click', function () {
+      overlay.remove();
+      window.location.href = Common.buildFccUrl(context);
+    });
     go.focus();
+  }
+
+  /**
+   * Entry from the FCC's "Run Recruiting Day" (?action=run).
+   *
+   * The run and the reveal both live here, so the FCC hands the press over rather than
+   * duplicating them. Guarded three ways because a URL is user-editable: only on
+   * Signing Day, only once the orders the endpoint requires exist, and never after the
+   * signings have already run (the run itself advances the franchise to week 36, so
+   * this is belt-and-braces against a stale tab).
+   */
+  function maybeAutoRun() {
+    if (context.action !== 'run') return;
+    if (state.phase !== 'day' || state.week35Ran) return;
+    if (!committedIds().length) return;
+    runRecruiting();
   }
 
   /**
@@ -1644,6 +1666,7 @@
             });
         }
         renderShell();
+        maybeAutoRun();
       })
       .catch(function (err) { console.error(err); if (root) root.innerHTML = '<div class="hub-error">Failed to load recruits.</div>'; });
   }

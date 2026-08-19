@@ -195,10 +195,14 @@
 .ssum-pts{text-align:right;font:400 16px/1 var(--display);color:var(--text)}
 .ssum-empty{padding:24px 22px;font:500 12px/1.6 var(--body);color:var(--muted-3);text-align:center}
 .ssum-foot{padding:14px 22px 20px;display:flex;justify-content:flex-end;border-top:1px solid var(--hair)}
-.ssum-go{height:40px;padding:0 22px;border-radius:9px;border:1px solid rgba(52,236,39,.5);
-  background:linear-gradient(180deg,#49ff37,#34ec27);color:#07101f;font:400 16px/1 var(--display);
+/* Amber, not green. Colour law: green is the GATING action, and this button no longer
+   runs anything — the orders are saved and the run moved to the FCC's own green button.
+   Same box as the old .ssum-go so the modal footer is unchanged. */
+.ssum-lr{height:40px;padding:0 22px;border-radius:9px;border:1px solid rgba(247,148,32,.55);
+  background:linear-gradient(180deg,#ffa53d,#f79420);color:#07101f;font:400 16px/1 var(--display);
   letter-spacing:.04em;cursor:pointer}
-.ssum-go:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.ssum-lr:hover{background:linear-gradient(180deg,#ffb559,#ffa32e)}
+.ssum-lr:focus-visible{outline:2px solid #fff;outline-offset:2px}
 
 /* ============================================================
    RESULTS (week 36) — playback of the sequence the engine already ran.

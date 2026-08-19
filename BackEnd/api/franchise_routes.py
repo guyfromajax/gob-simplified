@@ -4093,6 +4093,7 @@ def _build_recruiting_wire_payload(
         return {
             "seen_week": 0, "unseen_count": 0, "counts": {"moved": 0, "dropped": 0},
             "events": [], "board_saved_week": 0, "has_saved_board": False,
+            "week_35_orders_submitted": False,
         }
 
     week = int(franchise_doc.get("week", 1) or 1)
@@ -4103,12 +4104,19 @@ def _build_recruiting_wire_payload(
     # "Has a board at all" (drives the week-20 gate) is a different question from
     # "sent one this week" (drives the button's dead state).
     has_saved_board = False
+    # Week 35 splits in two once orders exist: the FCC's green button RUNS the day and a
+    # ghost button below it goes back to edit. Derived from the SAME field
+    # run_week_35_recruiting requires (:14712), so the green button can never offer a run
+    # the endpoint would 400. Cleared at rollover with the rest of FTD (:18189), so last
+    # season's orders cannot arm next season's button.
+    week_35_orders_submitted = False
     if user_team_id:
         try:
             ftd_doc = franchise_team_data_collection.find_one(
                 {"franchise_id": franchise_doc["_id"], "team_id": ObjectId(str(user_team_id))},
-                {"Recruits": 1},
+                {"Recruits": 1, RECRUITING_ORDERS_WEEK_35_FIELD: 1},
             ) or {}
+            week_35_orders_submitted = bool(ftd_doc.get(RECRUITING_ORDERS_WEEK_35_FIELD))
             # MUST go through _team_order_list: "Recruits" is initialized to
             # {"1".."20": None} at franchise creation and again at every rollover, and
             # a 20-key dict of Nones is truthy — bool() on it reports a saved board for
@@ -4191,6 +4199,7 @@ def _build_recruiting_wire_payload(
         "visited_recruit_ids": visited,
         "board_saved_week": int(franchise_doc.get(RECRUITING_BOARD_SAVED_WEEK_FIELD, 0) or 0),
         "has_saved_board": has_saved_board,
+        "week_35_orders_submitted": week_35_orders_submitted,
     }
 
 

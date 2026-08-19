@@ -411,7 +411,7 @@ An **unordered, uncapped shortlist** of recruit ids the player is tracking. `rec
 
 > Watchlist seeding must never write FTD `Recruits`.
 
-`has_saved_board` derives from `_team_order_list(ftd["Recruits"])`, and both the week-20 gate and the server guard at `franchise_routes.py:11966` key off it. Persisting a seed on page load would make `_team_order_list` non-empty before the player saved anything, silently reopening the gate. `Recruits` is written by `save_recruiting_orders` and nowhere else.
+`has_saved_board` derives from `_team_order_list(ftd["Recruits"])`, and the server guard that 400s week-20 training keys off it. (The FCC's *button* moved to `board_saved_week` — see the invite step in `FCC.md` — but the server guard did not.) Persisting a seed on page load would make `_team_order_list` non-empty before the player saved anything, silently reopening the gate. `Recruits` is written by `save_recruiting_orders` and nowhere else.
 
 This is the same failure mode as `seedAlloc()` — pre-committing the player to a choice they never made — so it is asserted in `tests/test_recruiting_watchlist.py` rather than left to review. The seed also runs only when the board is empty, so it can never reorder or overwrite a board the player built, and it orders by RT descending because the shortlist itself carries no ranks.
 
@@ -451,7 +451,36 @@ If you find yourself deriving a probability to rank or sort on this screen, that
 
 **Added back:** year and archetype on the signing row. A senior and a freshman previously looked identical on the screen where 50 points get committed.
 
-**Submit summary** replaces the blind 950ms redirect. After both requests land, the player sees what they committed — points, standing, multiplier, field per recruit — and leaves on their own click.
+**Submit summary** replaces the blind 950ms redirect. After the save lands, the player sees what they committed — points, standing, multiplier, field per recruit — and leaves on their own click.
+
+### Submitting and running are two presses on two screens
+
+Submitting **saves**. Running is a separate, deliberate press back on the FCC, so the
+irreversible step never rides on the same click as the save.
+
+| Step | Where | Button |
+|---|---|---|
+| 1. Commit points | Hub · Signing Day | `Submit Orders` → `POST /franchise/recruiting-orders` |
+| 2. Leave | Submit-summary modal | `Go To Locker Room` (amber) → FCC. `Back to Orders` still reopens the board. |
+| 3. Run | FCC hero | `Run Recruiting Day` (green) → Hub `?action=run` |
+| 3b. Change your mind | FCC hero, below the green | `Edit Recruiting Orders` (ghost) → Hub |
+
+- **The hub owns the run.** `POST /franchise/run-week-35-recruiting` and the reveal that
+  follows it both live in `recruiting-hub.js`, so the FCC hands the press over as
+  `?action=run` rather than duplicating them. `maybeAutoRun()` is guarded three ways — a
+  URL is user-editable: Signing Day phase only, orders must exist, and never after the
+  signings have run.
+- **The pair is state-driven.** `recruiting_wire.week_35_orders_submitted` derives from
+  FTD `recruiting_orders_week_35` — the *same* field `run_week_35_recruiting` requires —
+  so the green button can never offer a run the endpoint would 400. Cleared at rollover
+  with the rest of FTD, so last season's orders cannot arm next season's button.
+- **Before orders exist** the green button is still `Recruiting` → mode
+  `week35-recruiting`, and there is no ghost button. That mode is what raises the
+  optional **Cut Players?** offer, so the cut stays on the way *in*, before points are
+  committed against a roster size — it does not repeat on the run press.
+- **Colour law.** Green is the gating action, so only `Run Recruiting Day` is green. The
+  modal's CTA turned amber the moment it stopped committing anything, and
+  `Edit Recruiting Orders` is a ghost fill at the same box size as `#play-now`.
 
 **Pre-flight rail** is the one place on this screen allowed to editorialize, and every warning must name the recruit *and* the number driving it:
 
@@ -509,6 +538,10 @@ The signing pool defaults to `sTab: 'mine'`, which hides recruits with no lean t
 - `tests/e2e/invite-board.spec.js` — board writes, 20-slot cap, drag reorder, header CTA.
 - `tests/e2e/invite-board-layout.spec.js` — 20 always-drawn slots, two columns, visit chip, open
   future weeks, pool `Wt`.
+- `tests/e2e/week35-signing-pair.spec.js` — the FCC's Signing Day pair: green CTA split,
+  ghost button visibility/size/colour, branch order vs `cut_required`.
+- `tests/e2e/signing-reveal.spec.js` — `run handoff` block: the modal runs nothing, and
+  `?action=run`'s three guards.
 - `tests/e2e/recruits-pool.spec.js` — column order, sorting, filters.
 - `tests/test_recruiting_watchlist.py` — the seeding rule (never writes FTD `Recruits`).
 

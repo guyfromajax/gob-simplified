@@ -81,6 +81,9 @@
       teamId: params.get('team_id'),
       from: params.get('from') || 'fcc',
       returnUrl: params.get('return_url'),
+      // 'run' = the FCC's Signing Day green button handing the run over to the hub,
+      // which owns both the run call and the reveal.
+      action: params.get('action') || '',
     };
   }
 
