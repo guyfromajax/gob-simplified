@@ -168,11 +168,11 @@ test.describe('450 rows', () => {
 });
 
 test.describe('columns and headers', () => {
-  test('column order is Recruit Pos RT Yr Ht Rgn Attributes Lean Watch', async ({ page }) => {
+  test('column order is Recruit Pos RT Yr Ht Wt Rgn Attributes Lean Watch', async ({ page }) => {
     await mountPool(page);
     const labels = await page.evaluate(() =>
       [...document.querySelectorAll('#hub-pool thead th')].map((t) => t.textContent.replace(/[▲▼]/g, '').trim()));
-    expect(labels).toEqual(['Recruit', 'Pos', 'RT', 'Yr', 'Ht', 'Rgn', 'Attributes', 'Lean', 'Watch']);
+    expect(labels).toEqual(['Recruit', 'Pos', 'RT', 'Yr', 'Ht', 'Wt', 'Rgn', 'Attributes', 'Lean', 'Watch']);
   });
 
   test('every header is centered over its column', async ({ page }) => {
@@ -221,8 +221,9 @@ test.describe('columns and headers', () => {
     expect(m.condensedClass).toBe(false);
     expect(m.chipsVisible).toBe(12);
     expect(Math.round(m.nameWidth)).toBe(248);
-    // Content-sized, not stretched to a much wider container.
-    expect(m.tableWidth).toBeLessThan(1150);
+    // Content-sized, not stretched to a much wider container. Wt widened it ~44px;
+    // see the known-limitation note on the invite-phase width test.
+    expect(m.tableWidth).toBeLessThan(1250);
   });
 
   test('RT sorts descending by default and is the active sort', async ({ page }) => {

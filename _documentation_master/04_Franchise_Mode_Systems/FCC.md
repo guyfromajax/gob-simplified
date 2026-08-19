@@ -956,6 +956,10 @@ Cannot collide with **Cut Players Required** — that needs training complete fo
 
 Every season (including season 1, which gets no modal) also writes a **"{Team} Walk Ons Announced"** news story carrying the same table. Full rules: [Season_Init_System.md](Season_Init_System.md) → Walk-On Announcement.
 
+### Conference Champion Region Qualification
+
+When the user is the conference tournament #1 seed but loses that tournament, the first FCC return shows `window.ConferenceRsRegionModal` on the shared Sammy chrome. `topData.conference_rs_region_modal.lost_round` selects the early-loss or championship-loss closing sentence. The modal is season-stamped through `PATCH /franchise/conference-rs-region-modal-seen`, uses the team-specific Conference 1 Sammy asset with the generic fallback, and sends `Go To Locker Room` to the Home tab's Locker Room card. It is registered in `fccHasCompetingModal()` so lower-priority FCC prompts yield to it. Tournament qualification and wording rules live in [Franchise_Tournament_System.md](Franchise_Tournament_System.md).
+
 ---
 
 ## FCC Page Load

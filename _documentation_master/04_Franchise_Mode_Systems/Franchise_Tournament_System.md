@@ -49,6 +49,15 @@ Region Tournament first-round matchups:
 - Primary button: `Sim Region First Round`. It runs the existing `/franchise/sim-rest-of-tournament` week-advance flow.
 - Ghost button: `Back to Locker Room`. It closes the modal and leaves the user in the Franchise Command Center.
 
+### Conference Champion Region Qualification Modal
+
+- Show once per season after the user, as its conference tournament's #1 seed, loses in the Conference Tournament. The completed bracket result is authoritative; an unplayed game or a user win does not qualify.
+- Eligibility is returned by the command-center API as `conference_rs_region_modal`, including `lost_round` (`round1`, `round2`, or `final`). Presentation is persisted in `conference_rs_region_modal_seen_season` through `PATCH /franchise/conference-rs-region-modal-seen`.
+- The first sentence explains that the regular-season conference title still qualifies the team for the Region Tournament.
+- After a first-round or semifinal loss, the second sentence tells the user to sim the rest of the Conference Tournament. After a championship loss, it sends the user directly on to the Region Tournament.
+- The modal uses the Conference 1 team's Sammy portrait when one exists and the generic white Sammy for every other team.
+- Primary button: `Go To Locker Room`. It selects the FCC Home tab when necessary and scrolls to the Locker Room card.
+
 ## National Tournament
 
 - The 8 region tournament winners qualify for the national tournament.

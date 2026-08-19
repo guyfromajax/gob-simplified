@@ -51,7 +51,9 @@
     var actions = document.getElementById('cut-modal-actions');
     var pulse = document.getElementById('cut-modal-pulse');
     title.textContent = config.title || 'Assign Practice Squad';
+    title.classList.toggle('is-centered', !!config.centerTitle);
     message.textContent = config.message || '';
+    message.hidden = !config.message;
     if (accent) {
       accent.className = 'gob-modal-accent';
       accent.classList.add(config.accent || 'is-red');
@@ -278,7 +280,7 @@
             setSubmitBusy(true);
             showModal({
               title: 'Assigning Practice Squad',
-              message: 'Saving your practice squad assignment…',
+              centerTitle: true,
               accent: 'is-green',
               pulse: true,
               actions: []

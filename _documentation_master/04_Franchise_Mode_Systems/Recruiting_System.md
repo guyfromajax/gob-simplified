@@ -182,6 +182,30 @@ the board only persists FTD `Recruits`. Re-running training in the same week can
 processor returns early when `recruiting_results.<week>` already exists. Week 20 rejects training
 outright until a board is saved; weeks 21–26 simply produce no visit from an empty board.
 
+### Invite board (Hub, weeks 20–26)
+
+**Twenty ranks, always drawn.** Two columns of ten (1–10 / 11–20). An unfilled rank renders as an
+`Open` slot, not an absence — the panel is a static size, and the number of invites left is legible
+without a counter doing the arithmetic.
+
+| Region | Contents |
+|---|---|
+| Panel header | `Invite Board` · `n/20` · **Submit Invites** (right-justified). No footer bar. |
+| Row | Headshot · name + archetype (stacked) · Pos · RT (cur/pot) · Yr · Ht · Wt · Lean ladder · visit chip · remove |
+| Visit chip | `Wk 20`…`Wk 26` on a recruit who has already visited you, stamped in the row's own control zone so it never shifts the data columns |
+| Season panel | Expands to a visit log, ascending by week — one row per week 20–26, future weeks shown open |
+
+**Removed by instruction, code kept:** the *This Week* movement column. `thisWeekCellHtml` and
+`topUnvisitedId` remain in `recruiting-hub.js`, dormant and uncalled, against a possible return.
+Row movement classes (`.dropped` / `.gained`) still come off the same wire events and are still styled.
+
+**Removed outright:** the *Invite Target* hero (board rank 1 already **is** the invite target — the
+hero restated it), the *Clear* button (a one-press wipe of a ranked board with no confirm and no
+undo), and the right rail (*This Week* / *Roster Capacity*).
+
+**Known limitation.** `.doc { max-width: 1360px }` caps the Hub page, so the pool's Lean and Watch
+columns stay scroll-only; adding `Wt` cost ~44px more. Not a board bug — noted where it bites.
+
 ### Recruit Visit modal
 
 On returning to the FCC from the training report in weeks 20–26, a Moment modal on the shared Sammy
@@ -393,7 +417,7 @@ This is the same failure mode as `seedAlloc()` — pre-committing the player to 
 
 ## 10c. Recruit pool (450 rows)
 
-Columns: **Recruit · Pos · RT · Yr · Ht · Rgn · Attributes · Lean · Watch**. Name/Pos/RT lead because they answer "is he worth watching" fastest and keep the sorted column beside the name; Lean and Watch pair at the right edge because both are about *you and him*, not about him.
+Columns: **Recruit · Pos · RT · Yr · Ht · Wt · Rgn · Attributes · Lean · Watch**. Name/Pos/RT lead because they answer "is he worth watching" fastest and keep the sorted column beside the name; Lean and Watch pair at the right edge because both are about *you and him*, not about him.
 
 - **`.pool.condensed` is deleted.** It hid the attribute columns whenever the dock was open — i.e. exactly during the invite phase, when you are comparing recruits. Attributes are visible in every phase.
 - Name column is **capped at 248px, not flexed**; the table is `width: max-content` (~1030px), so no dead space opens between the name and Pos.
@@ -421,7 +445,7 @@ If you find yourself deriving a probability to rank or sort on this screen, that
 
 **Competition counts** — `_week_35_competition_counts(fid)` returns `recruit_id → number of programs funding him`, counting only entries with `points > 0` (a zero-point slot is not competition) and once per team. Knowable because CPU week-35 boards are seeded server-side on the user's first save. Returns `{}` before boards exist, which renders as "no field yet" rather than as zero competition.
 
-**Roster capacity is a server number.** `_roster_capacity_payload(fid, team_id)` ships as `payload.roster_capacity` (`roster_spots`, `scholarships`, `roster_cap: 15`, `roster_used`). It wraps the pre-existing `_calculate_available_roster_spots` / `_calculate_available_scholarships` rather than recomputing. **Both** signing day and the invite board's rail read it — capacity is the header number, and the board's position mix sits beneath it answering a different question. Nothing derives capacity client-side; funding was previously uncapped against a hard 15-man ceiling.
+**Roster capacity is a server number.** `_roster_capacity_payload(fid, team_id)` ships as `payload.roster_capacity` (`roster_spots`, `scholarships`, `roster_cap: 15`, `roster_used`). It wraps the pre-existing `_calculate_available_roster_spots` / `_calculate_available_scholarships` rather than recomputing. **Signing day** reads it. The invite board's rail was removed, so it is no longer a second consumer. Nothing derives capacity client-side; funding was previously uncapped against a hard 15-man ceiling.
 
 **Removed:** the scholarship toggle. It was normalized false/dormant and affected neither score nor roster state — a visible control that did nothing. `order_entries` no longer carries a `scholarship` key.
 
@@ -479,6 +503,14 @@ The signing pool defaults to `sTab: 'mine'`, which hides recruits with no lean t
 - `BackEnd/utils/player_generation.py` — shared player construction.
 - `BackEnd/api/franchise_routes.py` — weekly orders, visits, leans, week 35, rollover.
 - `BackEnd/utils/rt_projection.py` — Potential Rating projection.
+
+### Tests
+
+- `tests/e2e/invite-board.spec.js` — board writes, 20-slot cap, drag reorder, header CTA.
+- `tests/e2e/invite-board-layout.spec.js` — 20 always-drawn slots, two columns, visit chip, open
+  future weeks, pool `Wt`.
+- `tests/e2e/recruits-pool.spec.js` — column order, sorting, filters.
+- `tests/test_recruiting_watchlist.py` — the seeding rule (never writes FTD `Recruits`).
 
 ### Related system docs
 

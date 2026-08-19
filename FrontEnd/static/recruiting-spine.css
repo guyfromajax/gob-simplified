@@ -269,6 +269,7 @@ tr.region-row td{padding:0;border:0}
 .pool col.c-rt{width:86px}
 .pool col.c-yr{width:40px}
 .pool col.c-ht{width:52px}
+.pool col.c-wt{width:44px}
 .pool col.c-rgn{width:44px}
 .pool col.c-attrs{width:340px}
 .pool col.c-lean{width:132px}
@@ -401,9 +402,9 @@ tr.region-row td{padding:0;border:0}
 .bpanel-count{font:400 22px/1 var(--display);color:var(--text);white-space:nowrap}
 .bpanel-count .of{font-size:13px;color:var(--muted-3);margin-left:2px}
 .bpanel-foot{display:flex;gap:10px;justify-content:flex-end;margin-top:14px}
-.bbtn-clear,.bbtn-save{height:36px;padding:0 16px;border-radius:9px;font:400 15px/1 var(--display);letter-spacing:.04em;cursor:pointer}
-.bbtn-clear{border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--muted-2)}
-.bbtn-clear:hover{color:#fff;background:rgba(255,255,255,.08)}
+/* Clear was removed from the invite board — one-press wipe of a ranked board with no
+   confirmation and no undo. Rows come off individually. */
+.bbtn-save{height:36px;padding:0 16px;border-radius:9px;font:400 15px/1 var(--display);letter-spacing:.04em;cursor:pointer}
 .bbtn-save{border:1px solid rgba(52,236,39,.5);background:linear-gradient(180deg,#49ff37,#34ec27);color:#07101f}
 .bbtn-save[disabled]{opacity:.6;cursor:progress}
 
@@ -487,3 +488,46 @@ tr.region-row td{padding:0;border:0}
 /* Invite-board rail capacity block — same payload source as signing day. */
 .cap-row--rail{margin-top:0;padding-top:0;border-top:0;margin-bottom:12px}
 .rneeds-lab{font:700 8.5px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3);margin-bottom:6px}
+
+/* ============================================================
+   Invite Board — two fixed columns of ten (ranks 1-10 / 11-20).
+   Every rank is always drawn, empty or not, so the panel is a constant size and
+   never pushes the pool below it down as recruits are added.
+   ============================================================ */
+.bgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.bcol{display:flex;flex-direction:column;gap:4px;min-width:0}
+.bcol .brow{display:grid;
+  grid-template-columns:30px minmax(0,1fr) 30px 58px 30px 44px 38px minmax(0,96px) 44px 24px;
+  align-items:center;gap:6px;padding:5px 6px;border-radius:9px;font-size:11.5px}
+.bcol .brow.bhdr{padding:2px 6px;font:700 8.5px/1 var(--body);letter-spacing:.1em;
+  text-transform:uppercase;color:var(--muted-3);background:none;border:0}
+.bcol .brow.is-empty{border:1px dashed var(--border-soft);background:transparent;color:var(--muted-3)}
+.bempty-hint{grid-column:2 / -1;font:500 10.5px/1 var(--body);color:var(--muted-3);font-style:italic}
+.bcol .bname{display:flex;align-items:center;gap:7px;min-width:0}
+.bcol .btxt{display:flex;flex-direction:column;gap:1px;min-width:0}
+.bcol .btxt small{font:500 9.5px/1.2 var(--body);color:var(--muted-3);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bcol .bav{width:26px;height:26px;flex:0 0 auto}
+/* Visited chip: the WEEK is the payload, so it is stamped rather than hidden in a
+   tooltip. Sits with the row controls, never between the data columns. */
+.bvisit{display:flex;justify-content:flex-end}
+.bvisit-chip{display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:9px;
+  background:rgba(52,236,39,.13);border:1px solid rgba(52,236,39,.34);color:#a9ff9c;
+  font:700 8.5px/1 var(--body);letter-spacing:.05em;white-space:nowrap}
+.brow.is-visited{background:rgba(52,236,39,.045)}
+
+/* Header row now carries the count and the CTA. */
+.bpanel-head{display:flex;align-items:center;gap:14px}
+.bpanel-head .bpanel-count{margin-left:auto}
+.bpanel-head .bbtn-save{flex:0 0 auto}
+
+/* Season panel: invite visit log, below the timeline. */
+.vlog{margin-top:14px;border-top:1px solid var(--hair);padding-top:12px}
+.vlog-head{font:700 9px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted-3);margin-bottom:8px}
+.vlog-row{display:grid;grid-template-columns:74px minmax(0,1fr) auto;gap:10px;align-items:center;
+  padding:5px 0;border-bottom:1px solid var(--hair);font-size:11.5px}
+.vlog-row:last-child{border-bottom:0}
+.vlog-wk{color:var(--muted-3);font-weight:600}
+.vlog-nm{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vlog-row.is-open .vlog-open{color:var(--muted-3);font-style:italic}

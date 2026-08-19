@@ -3812,6 +3812,7 @@ def _get_user_eos_phase_status(
 
 
 REGION_BYE_MODAL_SEEN_SEASON_FIELD = "region_bye_modal_seen_season"
+CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD = "conference_rs_region_modal_seen_season"
 BRACKET_REVEAL_SEEN_FIELD = "bracket_reveal_seen"
 BRACKET_UPDATE_SEEN_FIELD = "bracket_update_seen"
 RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_season"
@@ -4299,6 +4300,47 @@ def _should_show_region_bye_modal(
     current_season = int(franchise_doc.get("current_season", 1) or 1)
     seen_season = int(franchise_doc.get(REGION_BYE_MODAL_SEEN_SEASON_FIELD, 0) or 0)
     return seen_season != current_season
+
+
+def _build_conference_rs_region_modal_payload(
+    franchise_doc: dict[str, Any],
+    user_team_id_str: Optional[str],
+    team_doc: Optional[dict[str, Any]],
+) -> Optional[dict[str, Any]]:
+    """Once-per-season notice when the conference #1 seed loses its tournament."""
+    if not franchise_doc or not user_team_id_str or not team_doc:
+        return None
+    if not franchise_doc.get("eos_tournament_active", False):
+        return None
+    current_season = int(franchise_doc.get("current_season", 1) or 1)
+    seen_season = int(franchise_doc.get(CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD, 0) or 0)
+    if seen_season == current_season:
+        return None
+    conference = team_doc.get("conference")
+    if conference is None:
+        return None
+    tournament = (franchise_doc.get("conference_tournaments") or {}).get(str(conference)) or {}
+    user_id = ft._eos_team_id_canonical(user_team_id_str)
+    seeds = tournament.get("seeds") or {}
+    user_seed = next(
+        (seed for team_id, seed in seeds.items() if ft._eos_team_id_canonical(team_id) == user_id),
+        None,
+    )
+    if int(user_seed or 0) != 1:
+        return None
+    bracket = tournament.get("bracket") or {}
+    for round_key in ("round1", "round2", "final"):
+        for matchup in bracket.get(round_key) or []:
+            if not isinstance(matchup, dict):
+                continue
+            participants = {
+                ft._eos_team_id_canonical(matchup.get("away_team")),
+                ft._eos_team_id_canonical(matchup.get("home_team")),
+            }
+            winner = ft._eos_team_id_canonical(matchup.get("winner"))
+            if user_id in participants and winner and winner != user_id:
+                return {"eligible": True, "lost_round": round_key, "season": current_season}
+    return None
 
 
 @router.options("/franchise/select-team")
@@ -9864,6 +9906,13 @@ def command_center_data(
                 str(team_id) if team_id else None,
             )
         )
+        response["conference_rs_region_modal"] = (
+            _build_conference_rs_region_modal_payload(
+                franchise_doc, str(team_id) if team_id else None, team_doc
+            )
+            if franchise_doc
+            else None
+        )
         response["bracket_reveal_modal"] = (
             _build_bracket_reveal_modal_payload(franchise_doc, team_doc, week)
             if franchise_doc and team_doc
@@ -12042,6 +12091,50 @@ def _region_display_order(user_region: str | None) -> list[str]:
     return ordered
 
 
+INVITE_WEEKS = tuple(range(20, 27))
+
+
+def _user_visit_history(
+    franchise_doc: dict[str, Any],
+    user_team_id: Any,
+) -> list[dict[str, Any]]:
+    """One row per invite week (20-26): the recruit who visited the user that week.
+
+    ``recruit_id`` is None for a week not yet played, and for a week that ran without
+    giving the user a visit — the Season panel renders both as an open invite. The
+    recruit's CURRENT lean rides along, so the panel shows where each visit stands now
+    rather than a frozen snapshot of the moment it happened.
+    """
+    results = franchise_doc.get("recruiting_results") or {}
+    team_key = str(user_team_id or "")
+    by_week: dict[int, str] = {}
+    for week in INVITE_WEEKS:
+        rid = (results.get(str(week)) or {}).get(team_key)
+        if rid:
+            by_week[week] = str(rid)
+
+    docs = {
+        doc["recruit_id"]: doc
+        for doc in franchise_recruits_data_collection.find(
+            {"franchise_id": str(franchise_doc["_id"]),
+             "recruit_id": {"$in": list(by_week.values())}},
+            {"_id": 0, "recruit_id": 1, "name": 1, "Lean": 1},
+        )
+    } if by_week else {}
+
+    out: list[dict[str, Any]] = []
+    for week in INVITE_WEEKS:
+        rid = by_week.get(week)
+        doc = docs.get(rid) if rid else None
+        out.append({
+            "week": week,
+            "recruit_id": rid,
+            "name": (doc or {}).get("name") if doc else None,
+            "lean": (doc or {}).get("Lean") if doc else None,
+        })
+    return out
+
+
 def _build_recruiting_results_payload(franchise_doc: dict, week: int) -> dict:
     fid = franchise_doc["_id"]
     week_key = str(week)
@@ -14184,6 +14277,9 @@ def get_recruiting_data(
         "week": franchise_doc.get("week", 1),
         "new_lean_recruit_ids": new_lean_recruit_ids,
         "current_results_week": franchise_doc.get("week", 1) if str(franchise_doc.get("week", 1)) in (franchise_doc.get("recruiting_results", {}) or {}) else None,
+        # Every invite week and who visited the user that week — weeks with no entry are
+        # weeks not yet played, which the Season panel shows as remaining invites.
+        "visit_history": _user_visit_history(franchise_doc, user_team_id),
         "saved_orders": saved_orders,
         "saved_orders_week_35": saved_week_35_orders,
         "saved_order_entries_week_35": _week_35_order_entries(saved_week_35_orders),
@@ -16976,6 +17072,25 @@ def mark_region_bye_modal_seen(
     db.franchises.update_one(
         {"_id": franchise_doc["_id"]},
         {"$set": {REGION_BYE_MODAL_SEEN_SEASON_FIELD: current_season}},
+    )
+    return {"seen": True, "season": current_season}
+
+
+class ConferenceRsRegionModalSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/conference-rs-region-modal-seen")
+def mark_conference_rs_region_modal_seen(
+    req: ConferenceRsRegionModalSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Persist that the conference-title Region qualification notice was presented."""
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    current_season = int(franchise_doc.get("current_season", 1) or 1)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {CONFERENCE_RS_REGION_MODAL_SEEN_SEASON_FIELD: current_season}},
     )
     return {"seen": True, "season": current_season}
 

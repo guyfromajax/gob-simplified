@@ -27,7 +27,7 @@
     { value: 'Freshman', label: 'FR' },
     { value: 'JH', label: 'JH' }
   ];
-  var SORTABLE = { name: 'text', pos: 'num', year: 'num', height: 'num', region: 'text', rt: 'num' };
+  var SORTABLE = { name: 'text', pos: 'num', year: 'num', height: 'num', weight: 'num', region: 'text', rt: 'num' };
   var INVITE_WEEKS = [20, 21, 22, 23, 24, 25, 26];
   var POS_ORDER = ['PG', 'SG', 'SF', 'PF', 'C'];
   var MAX_BOARD = 20;
@@ -59,7 +59,7 @@
     week35Results: {}, signFilter: 'all',
     // Signing Day conference reveal (payload `conferences`; `revealSeen` season-stamped
     // server-side so a refresh after submitting does not replay it).
-    conferences: null, teamNameMap: {}, revealSeen: false,
+    conferences: null, teamNameMap: {}, revealSeen: false, visitHistory: [],
     reveal: { index: 0, done: false, timer: null, summaryRows: null, seenSent: false }
   };
   // No per-recruit cap: the 50-point budget is the only limit, so every point can go
@@ -71,7 +71,7 @@
   function regionOf(rec) { var v = rec && rec.homeRegion ? String(rec.homeRegion).trim().toUpperCase() : ''; return v ? v.charAt(0) : ''; }
   // Recruit | Pos | RT | Yr | Ht | Rgn | Attributes | Lean | Watch — attributes are a
   // single cell of chips now, not 12 columns. +1 for the add column in the invite phase.
-  function colspan() { return (boardActive() ? 1 : 0) + 9; }
+  function colspan() { return (boardActive() ? 1 : 0) + 10; }   // +1: Wt
 
   var CHEVRON = '<svg class="region-chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"></path></svg>';
   var ARROW_UP = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6"><path d="M7 17L17 7M9 7h8v8"></path></svg>';
@@ -133,7 +133,7 @@
     return '<colgroup>' +
       (boardActive() ? '<col class="c-add">' : '') +
       '<col class="c-name"><col class="c-pos"><col class="c-rt"><col class="c-yr"><col class="c-ht">' +
-      '<col class="c-rgn"><col class="c-attrs"><col class="c-lean"><col class="c-watch">' +
+      '<col class="c-wt"><col class="c-rgn"><col class="c-attrs"><col class="c-lean"><col class="c-watch">' +
       '</colgroup>';
   }
   function headHtml() {
@@ -144,6 +144,7 @@
       '<th class="num" data-sortkey="rt" data-tooltip="current/potential" title="current/potential">RT' + arrow('rt') + '</th>' +
       th('year', 'Yr') +
       th('height', 'Ht') +
+      th('weight', 'Wt') +
       th('region', 'Rgn') +
       '<th class="attrs-col attr-tiles-head">Attributes</th>' +
       '<th class="lean-h">Lean</th>' +
@@ -193,6 +194,7 @@
       '<td class="rt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></td>' +
       '<td class="year">' + Common.escapeHtml(r.yearDisplay) + '</td>' +
       '<td class="num">' + Common.escapeHtml(r.height) + '</td>' +
+      '<td class="num">' + (r.weight != null ? Common.escapeHtml(r.weight) : '--') + '</td>' +
       '<td class="num">' + Common.escapeHtml(regionOf(r) || '--') + '</td>' +
       '<td class="attr-tiles-cell">' + attrChipsHtml(r) + '</td>' +
       '<td class="lean-col">' + Spine.Lean.ladderHtml(r.leanModel) + '</td>' +
@@ -449,6 +451,11 @@
     if (rec && head.indexOf(rec.name) === 0) head = head.slice(rec.name.length).trim();
     return { head: head || '—', why: why };
   }
+  /**
+   * DORMANT — the board's "This week" column was removed from the layout but the
+   * feature is kept on purpose so it can be switched back on. Render this cell from
+   * boardRowHtml() and re-add its header to restore it.
+   */
   function thisWeekCellHtml(id) {
     var event = wireByRecruit()[String(id)];
     if (!event) return '<div class="bmv"><span class="bmv-quiet">—</span></div>';
@@ -475,6 +482,7 @@
     ((state.wire && state.wire.visited_recruit_ids) || []).forEach(function (id) { out[String(id)] = true; });
     return out;
   }
+  /** DORMANT — see thisWeekCellHtml: kept with the "This week" feature it belongs to. */
   function topUnvisitedId() {
     var visited = visitedRecruitIds();
     for (var i = 0; i < state.board.length; i++) {
@@ -482,32 +490,6 @@
     }
     return null;
   }
-  function heroHtml() {
-    var id = topUnvisitedId();
-    if (!id) {
-      return '<div class="bhero bhero-empty"><div class="bhero-body">' +
-        '<div class="bhero-name">No invite target</div>' +
-        '<div class="bhero-meta">' + (state.board.length
-          ? 'Every ranked recruit has already had a visit. Add more from the pool below.'
-          : 'Rank recruits below and your top unvisited name is invited each week.') +
-        '</div></div></div>';
-    }
-    var r = state.byId[id]; if (!r) return '';
-    var rank = state.board.indexOf(id) + 1;
-    var why = r.yourRank === 1 ? 'Already #1 on his ladder — the visit protects it.'
-      : r.yourRank > 1 ? 'You sit #' + r.yourRank + ' on his ladder — a visit is your move up.'
-        : 'Not on his ladder yet — a visit is how you get on it.';
-    return '<div class="bhero">' + headshotBoxHtml(r, 'bhero-av') +
-      '<div class="bhero-body">' +
-        '<div class="bhero-eyebrow">This week’s invite · board rank ' + rank + '</div>' +
-        '<div class="bhero-name">' + Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) + '</div>' +
-        '<div class="bhero-meta"><b>' + Common.escapeHtml(r.pos) + '</b> · ' + Common.escapeHtml(r.archetype) +
-          ' · Region ' + regionOf(r) + ' · ' + Common.escapeHtml(r.height) + '</div>' +
-        '<div class="bhero-why">' + Common.escapeHtml(why) + '</div></div>' +
-      '<div class="bhero-right"><span class="bhero-rt ' + Spine.rtClassForYear(r.rt, r.year) + '" data-tooltip="current/potential" title="current/potential">' +
-        Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span><span class="bhero-cap">RT</span></div></div>';
-  }
-
   // ---------- seed notice ----------
   // Shown only when the board came from the watchlist seed, never from a real save —
   // otherwise it would be a lie. Says plainly that nothing is sent yet, because the
@@ -523,38 +505,68 @@
   function clearSeedNotice() { state.boardSeededFromWatchlist = false; }
 
   // ---------- board rows ----------
+  /** Which invite week (if any) this recruit visited the user's team. */
+  function visitWeekFor(id) {
+    var hist = state.visitHistory || [];
+    for (var i = 0; i < hist.length; i++) {
+      if (hist[i].recruit_id && String(hist[i].recruit_id) === String(id)) return hist[i].week;
+    }
+    return null;
+  }
+
   function boardRowHtml(id, index) {
-    var r = state.byId[id]; if (!r) return '';
+    var r = state.byId[id];
+    // Every rank 1-20 is always drawn. An unfilled slot is a slot, not an absence —
+    // it keeps the panel a fixed size and shows how much board is left.
+    if (!r) {
+      return '<div class="brow is-empty" data-index="' + index + '">' +
+        '<div class="brank"><span class="bnum">' + (index + 1) + '</span></div>' +
+        '<div class="bempty-hint">Open</div></div>';
+    }
     var event = wireByRecruit()[String(id)];
     var moveCls = event ? movementClass(event.kind) : '';
-    return '<div class="brow ' + moveCls + '" draggable="true" data-index="' + index + '" data-id="' + id + '">' +
+    var visited = visitWeekFor(id);
+    return '<div class="brow ' + moveCls + (visited ? ' is-visited' : '') +
+        '" draggable="true" data-index="' + index + '" data-id="' + id + '">' +
       '<div class="brank"><span class="bgrip" aria-hidden="true"></span><span class="bnum">' + (index + 1) + '</span></div>' +
       '<div class="bname">' + headshotBoxHtml(r, 'bav') + '<span class="btxt">' +
         Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) +
-        '<small>' + Common.escapeHtml(r.archetype) + ' · Region ' + regionOf(r) + '</small></span></div>' +
+        '<small>' + Common.escapeHtml(r.archetype) + '</small></span></div>' +
       '<div class="bc">' + Common.escapeHtml(r.pos) + '</div>' +
-      '<div class="bc dim">' + Common.escapeHtml(r.yearDisplay) + '</div>' +
       '<div class="brt ' + Spine.rtClassForYear(r.rt, r.year) + '" data-tooltip="current/potential" title="current/potential">' +
         Common.formatRtWithPotential(r.rt, r.potentialRt) + '</div>' +
+      '<div class="bc dim">' + Common.escapeHtml(r.yearDisplay) + '</div>' +
+      '<div class="bc dim">' + Common.escapeHtml(r.height) + '</div>' +
+      '<div class="bc dim">' + (r.weight != null ? Common.escapeHtml(r.weight) : '--') + '</div>' +
       '<div class="bladder">' + Spine.Lean.ladderHtml(r.leanModel) + '</div>' +
-      thisWeekCellHtml(id) +
-      '<div><button class="bx" data-remove-id="' + id + '" title="Remove from board" type="button">×</button></div>' +
+      // Visited chip: the week is the point, so it is stamped rather than hidden in a
+      // tooltip. Sits with the row's own controls so it never shifts the data columns.
+      '<div class="bvisit">' + (visited ? '<span class="bvisit-chip">Wk ' + visited + '</span>' : '') + '</div>' +
+      '<div><button class="bx" data-remove-id="' + id + '" title="Remove from board" type="button">\u00d7</button></div>' +
       '</div>';
   }
+
+  function boardColumnHtml(from, to) {
+    var out = '';
+    for (var i = from; i < to; i++) out += boardRowHtml(state.board[i], i);
+    return '<div class="bcol">' +
+      '<div class="brow bhdr"><div>#</div><div>Recruit</div><div class="bc">Pos</div>' +
+        '<div>RT</div><div class="bc">Yr</div><div class="bc">Ht</div><div class="bc">Wt</div>' +
+        '<div>Lean</div><div></div><div></div></div>' + out + '</div>';
+  }
+
   function boardHtml() {
-    var rows = state.board.length
-      ? state.board.map(boardRowHtml).join('')
-      : '<div class="brow-empty">No recruits ranked. Click <strong>+</strong> in the pool below — each week the hub invites your top-ranked unvisited recruit.</div>';
+    // Header carries the count and the CTA; the hero panel that repeated rank 1 is gone.
     return '<section class="bpanel">' +
-      '<div class="bpanel-head"><div class="bpanel-title"><small>Invite Season · Wk ' + state.week + '</small>Invite Board</div>' +
-        '<div class="bpanel-count"><span class="n">' + state.board.length + '</span><span class="of">/ ' + MAX_BOARD + '</span></div></div>' +
-      heroHtml() + seedNoticeHtml() +
-      '<div class="brows">' +
-        '<div class="brow bhdr"><div>#</div><div>Recruit</div><div class="bc">Pos</div><div class="bc">Yr</div>' +
-          '<div>RT</div><div>Lean</div><div>This week</div><div></div></div>' +
-        rows + '</div>' +
-      '<div class="bpanel-foot"><button class="bbtn-clear" id="dock-clear" type="button">Clear</button>' +
-        '<button class="bbtn-save" id="dock-save" type="button">Save Board</button></div></section>';
+      '<div class="bpanel-head">' +
+        '<div class="bpanel-title"><small>Invite Season \u00b7 Wk ' + state.week + '</small>Invite Board</div>' +
+        '<div class="bpanel-count"><span class="n">' + state.board.length + '</span><span class="of">/ ' + MAX_BOARD + '</span></div>' +
+        '<button class="bbtn-save" id="dock-save" type="button">Submit Invites</button>' +
+      '</div>' +
+      seedNoticeHtml() +
+      // Two fixed columns of ten: ranks 1-10 and 11-20.
+      '<div class="bgrid">' + boardColumnHtml(0, 10) + boardColumnHtml(10, MAX_BOARD) + '</div>' +
+      '</section>';
   }
 
   function renderDock() {
@@ -577,8 +589,6 @@
     });
     var dismiss = host.querySelector('#board-seed-dismiss');
     if (dismiss) dismiss.addEventListener('click', function () { state.seedNoticeDismissed = true; renderDock(); });
-    var clear = host.querySelector('#dock-clear');
-    if (clear) clear.addEventListener('click', function () { state.board = []; clearSeedNotice(); renderBoardDependent(); });
     var save = host.querySelector('#dock-save');
     if (save) save.addEventListener('click', saveBoard);
     bindHeadshotFallbacks(host);
@@ -1480,6 +1490,32 @@
       .catch(function (err) { console.error(err); state.weeklyDismissed = true; host.innerHTML = ''; });
   }
 
+  /**
+   * Season-panel visit log: every invite week 20-26 in ascending order.
+   *
+   * A week with no recruit is an invite the player still has — shown as an open row
+   * rather than omitted, so the remaining count is readable at a glance rather than
+   * arithmetic. Each visited week carries the recruit's CURRENT lean, not a snapshot,
+   * so the log answers "where does that visit stand now".
+   */
+  function visitLogHtml() {
+    var hist = state.visitHistory || [];
+    if (!hist.length) return '';
+    var rows = hist.map(function (v) {
+      if (!v.recruit_id) {
+        return '<div class="vlog-row is-open"><span class="vlog-wk">Week ' + v.week + '</span>' +
+          '<span class="vlog-open">Invite available</span></div>';
+      }
+      var r = state.byId[String(v.recruit_id)];
+      var model = r ? r.leanModel
+        : Spine.Lean.fromBackend({ Lean: v.lean }, { userTeamId: state.userTeamId, teamNameMap: state.teamNameMap });
+      return '<div class="vlog-row"><span class="vlog-wk">Week ' + v.week + '</span>' +
+        '<span class="vlog-nm">' + Common.escapeHtml(v.name || (r && r.name) || '--') + '</span>' +
+        '<span class="vlog-lean">' + Spine.Lean.ladderHtml(model) + '</span></div>';
+    }).join('');
+    return '<div class="vlog"><div class="vlog-head">Invite visits</div>' + rows + '</div>';
+  }
+
   // ===================== SHELL =====================
   function renderShell() {
     var root = document.getElementById('hub-root');
@@ -1504,7 +1540,9 @@
       '<div class="spine-topbar" style="padding-top:12px;padding-bottom:0"><div style="flex:1" id="hub-phase"></div></div>' + body;
     var phaseHost = document.getElementById('hub-phase');
     phaseHost.innerHTML = Spine.Phase.stripHtml({ phase: state.phase, week: state.week,
-      inviteSent: Math.max(0, INVITE_WEEKS.filter(function (w) { return w < state.week; }).length), points: remaining() });
+      inviteSent: Math.max(0, INVITE_WEEKS.filter(function (w) { return w < state.week; }).length),
+      points: remaining(),
+      visitsHtml: visitLogHtml() });
     Spine.Phase.bind(phaseHost);
     var mount = document.getElementById('hub-anchor-mount');
     // Signing Day pairs the pool anchor with a My Orders view: the same two things the
@@ -1554,6 +1592,7 @@
         state.teamNameMap = teamNameMap;
         state.conferences = data.conferences || null;
         state.revealSeen = !!data.week_35_reveal_seen;
+        state.visitHistory = data.visit_history || [];
         state.recruits = Common.normalizeRecruits(data.recruits || [], teamNameMap).map(function (r) {
           var model = Spine.Lean.fromBackend({ Lean: r.lean }, { userTeamId: state.userTeamId, teamNameMap: teamNameMap });
           r.leanModel = model; r.leansToUser = model.leansToUser; r.yourRank = model.yourRank;

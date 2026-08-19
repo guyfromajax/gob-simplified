@@ -3669,6 +3669,7 @@ async function init() {
     );
   }
   championshipMomentsDone.then(() => {
+    if (window.ConferenceRsRegionModal) window.ConferenceRsRegionModal.maybeShow(topData);
     if (window.RegionByeModal) window.RegionByeModal.maybeShow(topData);
     // Season-start walk-on reveal. Self-gates on its own payload and defers via
     // blockerVisible() while any other overlay is up, so ordering here is safe:
@@ -3883,6 +3884,7 @@ function fccHasCompetingModal(topData) {
   }
   if (Array.isArray(topData?.pending_championship_moments) && topData.pending_championship_moments.length) return true;
   if (topData?.region_bye_modal_eligible) return true;
+  if (topData?.conference_rs_region_modal?.eligible) return true;
   if (topData?.bracket_reveal_modal?.eligible || topData?.bracket_update_modal?.eligible || topData?.recruiting_results_modal?.eligible) return true;
   if (topData?.walk_on_welcome_modal?.eligible) return true;
   if (topData?.cut_required && Number(topData.cut_count || 0) > 0) return true;

@@ -95,119 +95,29 @@ async function mount(page, o = {}) {
   await page.waitForSelector('#hub-board .bpanel', { timeout: 10000 });
 }
 
-const rows = (page) => page.locator('#hub-board .brow[data-index]');
+// FILLED rows only. The board now draws all 20 ranks, empty slots included, so
+// `.brow[data-index]` alone would always report 20.
+const rows = (page) => page.locator('#hub-board .brow[data-id]');
 
-test.describe('board order drives the dock', () => {
-  test('hero is the top board recruit when none are visited', async ({ page }) => {
-    await mount(page, { board: ['r-5', 'r-2', 'r-7'] });
-    const m = await page.evaluate(() => ({
-      name: document.querySelector('#hub-board .bhero-name').textContent.trim(),
-      eyebrow: document.querySelector('#hub-board .bhero-eyebrow').textContent.trim(),
-    }));
-    expect(m.name).toBe('Recruit 05');
-    expect(m.eyebrow).toContain('board rank 1');
-  });
-
-  test('hero skips already-visited recruits', async ({ page }) => {
-    await mount(page, { board: ['r-5', 'r-2', 'r-7'], visited: ['r-5', 'r-2'] });
-    const m = await page.evaluate(() => ({
-      name: document.querySelector('#hub-board .bhero-name').textContent.trim(),
-      eyebrow: document.querySelector('#hub-board .bhero-eyebrow').textContent.trim(),
-    }));
-    expect(m.name).toBe('Recruit 07');
-    expect(m.eyebrow).toContain('board rank 3');
-  });
-
-  test('reordering changes the hero — re-ranking IS the invite decision', async ({ page }) => {
-    await mount(page, { board: ['r-5', 'r-2', 'r-7'] });
-    expect(await page.evaluate(() =>
-      document.querySelector('#hub-board .bhero-name').textContent.trim())).toBe('Recruit 05');
-    // Remove the leader; the next name takes the invite with no second selection step.
-    await page.click('#hub-board .brow[data-index="0"] .bx');
-    await page.waitForFunction(() =>
-      document.querySelector('#hub-board .bhero-name').textContent.trim() === 'Recruit 02');
-  });
-
-  test('all board recruits visited leaves a stated empty hero, not a blank', async ({ page }) => {
-    await mount(page, { board: ['r-5'], visited: ['r-5'] });
-    const txt = await page.evaluate(() => document.querySelector('#hub-board .bhero').textContent);
-    expect(txt).toContain('No invite target');
-    expect(txt).toContain('already had a visit');
-  });
-});
-
-test.describe('this-week column', () => {
-  test('drop, gain and no-event rows each render correctly', async ({ page }) => {
-    await mount(page, {
-      board: ['r-1', 'r-2', 'r-3'],
-      events: [dropEvent('r-1'), gainEvent('r-3')],
-    });
-    const cells = await page.evaluate(() =>
-      [...document.querySelectorAll('#hub-board .brow[data-index]')].map((r) => ({
-        id: r.dataset.id,
-        cls: r.className,
-        text: r.querySelector('.bmv').textContent.trim(),
-        quiet: !!r.querySelector('.bmv-quiet'),
-      })));
-    const byId = Object.fromEntries(cells.map((c) => [c.id, c]));
-    expect(byId['r-1'].text).toContain('dropped you');
-    expect(byId['r-1'].text).toContain('Fairview moved to #1');
-    expect(byId['r-1'].cls).toContain('dropped');
-    expect(byId['r-3'].text).toContain('moved you to #1');
-    expect(byId['r-3'].cls).toContain('gained');
-    expect(byId['r-2'].quiet).toBe(true);
-    expect(byId['r-2'].cls).not.toContain('dropped');
-    expect(byId['r-2'].cls).not.toContain('gained');
-  });
-
-  test('the recruit name is not repeated inside its own row cell', async ({ page }) => {
-    await mount(page, { board: ['r-1'], events: [dropEvent('r-1')] });
-    const cell = await page.evaluate(() =>
-      document.querySelector('#hub-board .brow[data-index="0"] .bmv').textContent);
-    expect(cell).not.toContain('Recruit 01');
-    expect(cell).toContain('dropped you');
-  });
-
-  test('drops are visually the loudest thing in the row', async ({ page }) => {
-    await mount(page, {
-      board: ['r-1', 'r-3'], events: [dropEvent('r-1'), gainEvent('r-3')],
-    });
-    const m = await page.evaluate(() => {
-      const q = (s) => document.querySelector(s);
-      const drop = q('#hub-board .brow.dropped'), gain = q('#hub-board .brow.gained');
-      return {
-        dropShadow: getComputedStyle(drop).boxShadow,
-        gainShadow: getComputedStyle(gain).boxShadow,
-        dropWeight: getComputedStyle(drop.querySelector('.bmv-txt')).fontWeight,
-        gainWeight: getComputedStyle(gain.querySelector('.bmv-txt')).fontWeight,
-      };
-    });
-    // Only the drop carries an accent rail, and its text is heavier.
-    expect(m.dropShadow).not.toBe('none');
-    expect(m.gainShadow).toBe('none');
-    expect(Number(m.dropWeight)).toBeGreaterThan(Number(m.gainWeight));
-  });
-});
-
-// REMOVED: the invite-phase right rail (This week / Roster capacity).
+// RETIRED: 'board order drives the dock' (invite hero) and 'this-week column'.
 //
-// It occupied a 306px column beside the board, which squeezed the pool table and pushed
-// its Lean and Watch columns off-screen — the two columns the pool exists to be scanned
-// for. The rail, its two builders (boardRailHtml / rosterNeedsHtml) and its styles were
-// all removed; these four tests went with it rather than being left green against markup
-// that no longer renders.
+// Both were removed from the board by direct instruction, not by drift:
+//   hero      — "remove Invite Target container, that's just redundant info to the
+//                player ranked at #1". Rank 1 IS the invite target; the hero restated it.
+//   this-week — "Yes remove This Week (but don't delete the feature code, I may want to
+//                bring it back)". `thisWeekCellHtml`/`topUnvisitedId` are still in
+//                recruiting-hub.js, dormant and uncalled — so these tests are deleted
+//                rather than skipped, and would need rewriting against the new two-column
+//                layout if the column comes back.
 //
-// What the rail showed and where it survives: invites remaining and board slots used are
-// both already on this screen (the phase header and the board's own counter). Roster
-// capacity and the board position mix are NOT shown here any more — see the note in
-// recruits-pool.spec.js.
-
+// What survived the removal: row movement classes (.dropped/.gained) are still applied
+// from the same wire events, and are asserted in 'rows' below.
 
 test.describe('rows', () => {
   test('every row has a full lean ladder, a headshot and a linked name', async ({ page }) => {
     await mount(page, { board: ['r-1', 'r-2', 'r-3'] });
     const m = await page.evaluate(() =>
-      [...document.querySelectorAll('#hub-board .brow[data-index]')].map((r) => ({
+      [...document.querySelectorAll('#hub-board .brow[data-id]')].map((r) => ({
         ladderSlots: r.querySelectorAll('.bladder .slot, .bladder .lb-slot, .bladder [class*="slot"]').length,
         ladderText: r.querySelector('.bladder').textContent.trim().length,
         img: !!r.querySelector('.bav img'),
@@ -220,11 +130,6 @@ test.describe('rows', () => {
       expect(row.lazy).toBe('lazy');
       expect(row.href).toContain('recruit');
     }
-  });
-
-  test('hero has a headshot too', async ({ page }) => {
-    await mount(page, { board: ['r-1'] });
-    expect(await page.evaluate(() => !!document.querySelector('#hub-board .bhero-av img'))).toBe(true);
   });
 
   test('the 20-slot cap still holds', async ({ page }) => {
@@ -299,5 +204,33 @@ test.describe('seed notice', () => {
     expect(writes).toHaveLength(1);
     expect(writes[0].url).toContain('/franchise/recruiting-orders');
     expect(JSON.parse(writes[0].body).recruit_ids).toEqual(['r-1', 'r-2', 'r-3']);
+  });
+});
+
+test.describe('invite board actions', () => {
+  test('Submit Invites is the only action, and it lives in the panel header', async ({ page }) => {
+    await mount(page, { board: ['r-1', 'r-2'] });
+    const m = await page.evaluate(() => {
+      const head = document.querySelector('#hub-board .bpanel-head');
+      return {
+        headButtons: [...head.querySelectorAll('button')].map((b) => b.textContent.trim()),
+        foot: document.querySelectorAll('#hub-board .bpanel-foot').length,
+        clear: document.querySelectorAll('#dock-clear, .bbtn-clear').length,
+      };
+    });
+    // A one-press wipe of a ranked board, with no confirmation and no undo, is gone.
+    expect(m.headButtons).toEqual(['Submit Invites']);
+    expect(m.foot).toBe(0);
+    expect(m.clear).toBe(0);
+  });
+
+  test('rows can still be removed one at a time', async ({ page }) => {
+    await mount(page, { board: ['r-1', 'r-2', 'r-3'] });
+    // Relative, not absolute: .brow also matches the board's header row.
+    const before = await page.locator('#hub-board [data-remove-id]').count();
+    await page.click('#hub-board [data-remove-id]');
+    const after = await page.locator('#hub-board [data-remove-id]').count();
+    expect(before).toBe(3);
+    expect(after).toBe(2);
   });
 });

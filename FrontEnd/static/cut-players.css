@@ -68,6 +68,14 @@ body {
   display: none;
 }
 
+.gob-modal-title.is-centered {
+  text-align: center;
+}
+
+.gob-modal-subtitle[hidden] {
+  display: none;
+}
+
 /* Same green pulse bar as page-load overlays (pageLoadOverlay.js). */
 .cut-modal-pulse {
   display: flex;
