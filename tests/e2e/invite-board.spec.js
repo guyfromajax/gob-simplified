@@ -189,66 +189,19 @@ test.describe('this-week column', () => {
   });
 });
 
-test.describe('right rail', () => {
-  test('counts only events that hit a ranked recruit, annotated with board rank', async ({ page }) => {
-    await mount(page, {
-      board: ['r-1', 'r-2', 'r-3'],
-      // r-9 is NOT on the board, so it must not be counted as affecting it.
-      events: [dropEvent('r-3'), gainEvent('r-1'), dropEvent('r-9')],
-    });
-    const m = await page.evaluate(() => ({
-      eyebrow: document.querySelector('#hub-dock .reyebrow').textContent.trim(),
-      entries: [...document.querySelectorAll('#hub-dock .rev')].map((e) => e.textContent.trim()),
-    }));
-    expect(m.eyebrow).toBe('2 changes affect your board');
-    expect(m.entries).toHaveLength(2);
-    // Drop first, and each annotated with the rank it hits.
-    expect(m.entries[0]).toContain('Recruit 03');
-    expect(m.entries[0]).toContain('board rank 3');
-    expect(m.entries[1]).toContain('Recruit 01');
-    expect(m.entries[1]).toContain('board rank 1');
-    expect(m.entries.join(' ')).not.toContain('Recruit 09');
-  });
+// REMOVED: the invite-phase right rail (This week / Roster capacity).
+//
+// It occupied a 306px column beside the board, which squeezed the pool table and pushed
+// its Lean and Watch columns off-screen — the two columns the pool exists to be scanned
+// for. The rail, its two builders (boardRailHtml / rosterNeedsHtml) and its styles were
+// all removed; these four tests went with it rather than being left green against markup
+// that no longer renders.
+//
+// What the rail showed and where it survives: invites remaining and board slots used are
+// both already on this screen (the phase header and the board's own counter). Roster
+// capacity and the board position mix are NOT shown here any more — see the note in
+// recruits-pool.spec.js.
 
-  test('singular wording for one change', async ({ page }) => {
-    await mount(page, { board: ['r-1'], events: [gainEvent('r-1')] });
-    expect(await page.evaluate(() =>
-      document.querySelector('#hub-dock .reyebrow').textContent.trim()))
-      .toBe('1 change affects your board');
-  });
-
-  test('a week with no events shows a quiet rail, not an empty panel', async ({ page }) => {
-    await mount(page, { board: ['r-1', 'r-2'], events: [] });
-    const m = await page.evaluate(() => {
-      const panel = document.querySelector('#hub-dock .rpanel');
-      return {
-        text: panel.textContent.trim(),
-        hasQuiet: !!panel.querySelector('.rquiet'),
-        height: panel.getBoundingClientRect().height,
-      };
-    });
-    expect(m.hasQuiet).toBe(true);
-    expect(m.text).toContain('No changes affect your board');
-    expect(m.height).toBeGreaterThan(40);
-  });
-
-  test('rail holds exactly two panels — changes and roster capacity, nothing else', async ({ page }) => {
-    await mount(page, { board: ['r-1'], events: [gainEvent('r-1')] });
-    const m = await page.evaluate(() => ({
-      panels: document.querySelectorAll('#hub-dock .rpanel').length,
-      eyebrows: [...document.querySelectorAll('#hub-dock .reyebrow')].map((e) => e.textContent.trim()),
-      needs: document.querySelectorAll('#hub-dock .rneed').length,
-      // Capacity is the header number and comes from the payload; position mix sits beneath.
-      capItems: document.querySelectorAll('#hub-dock .cap-item').length,
-      mixLabel: document.querySelector('#hub-dock .rneeds-lab')?.textContent.trim(),
-    }));
-    expect(m.panels).toBe(2);
-    expect(m.eyebrows[1]).toBe('Roster capacity');
-    expect(m.capItems).toBe(1);   // scholarships sunset; roster spots only
-    expect(m.mixLabel).toBe('Board position mix');
-    expect(m.needs).toBe(5);
-  });
-});
 
 test.describe('rows', () => {
   test('every row has a full lean ladder, a headshot and a linked name', async ({ page }) => {

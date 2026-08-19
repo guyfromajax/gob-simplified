@@ -203,6 +203,27 @@ def _eos_championship_kind(user_won: bool, eos_game_meta: dict | None) -> str | 
     return None
 
 
+def _eos_tournament_round_label(eos_game_meta: dict | None) -> str | None:
+    """Human-facing label for an EOS game, including non-title rounds."""
+    if not isinstance(eos_game_meta, dict):
+        return None
+    phase = str(eos_game_meta.get("phase") or "").strip().lower()
+    try:
+        rnd = int(eos_game_meta.get("round") or 0)
+    except (TypeError, ValueError):
+        return None
+    return {
+        ("conference", 1): "Conference Tourney First Round",
+        ("conference", 2): "Conference Tourney Semifinals",
+        ("conference", 3): "Conference Tourney Championship",
+        ("region", 1): "Region Tourney Semifinals",
+        ("region", 2): "Region Tourney Championship",
+        ("national", 1): "National Tourney First Round",
+        ("national", 2): "National Tourney Semifinals",
+        ("national", 3): "National Tourney Championship",
+    }.get((phase, rnd))
+
+
 def build_community_highlight_pending(
     *,
     week: int,
@@ -245,6 +266,9 @@ def build_community_highlight_pending(
     if game_id:
         out["game_id"] = str(game_id).strip()
     kind = _eos_championship_kind(user_won, eos_game_meta)
+    tournament_round_label = _eos_tournament_round_label(eos_game_meta)
+    if tournament_round_label:
+        out["tournament_round_label"] = tournament_round_label
     if kind:
         out["eos_championship"] = {
             "kind": kind,
@@ -371,13 +395,8 @@ def _top_defender_season_summary(franchise_id_str: str, user_team_id_str: str) -
     return best
 
 
-def _potg_from_game_id(game_id: str | None) -> dict[str, Any] | None:
+def _game_doc_from_game_id(game_id: str | None) -> dict[str, Any] | None:
     if not game_id:
-        return None
-    try:
-        from BackEnd.api.franchise_routes import _calculate_potg_summary
-    except Exception:
-        logger.debug("[COMMUNITY_HIGHLIGHTS] POTG import failed", exc_info=True)
         return None
     doc = games_collection.find_one({"_id": game_id})
     if not doc and len(str(game_id)) == 24:
@@ -385,7 +404,50 @@ def _potg_from_game_id(game_id: str | None) -> dict[str, Any] | None:
             doc = games_collection.find_one({"_id": ObjectId(game_id)})
         except Exception:
             doc = None
+    return doc if isinstance(doc, dict) else None
+
+
+def _overtime_count_from_game_doc(game_doc: dict[str, Any] | None) -> int:
+    """Count played OT periods from period arrays; legacy ``quarter`` is ambiguous."""
+    if not isinstance(game_doc, dict):
+        return 0
+    period_lists: list[list[Any]] = []
+    teams = game_doc.get("teams")
+    if isinstance(teams, dict):
+        for blob in teams.values():
+            if isinstance(blob, dict) and isinstance(blob.get("points_by_quarter"), list):
+                period_lists.append(blob["points_by_quarter"])
+    top_level = game_doc.get("points_by_quarter")
+    if isinstance(top_level, dict):
+        period_lists.extend(value for value in top_level.values() if isinstance(value, list))
+    elif isinstance(top_level, list):
+        period_lists.append(top_level)
+    if not period_lists:
+        return 0
+    return max(0, max(len(periods) for periods in period_lists) - 4)
+
+
+def _overtime_phrase(overtime_count: int) -> str:
+    count = max(0, int(overtime_count or 0))
+    if count == 1:
+        return "in OT"
+    if count == 2:
+        return "in double OT"
+    if count == 3:
+        return "in triple OT"
+    if count >= 4:
+        return f"in {count} overtime quarters"
+    return ""
+
+
+def _potg_from_game_id(game_id: str | None) -> dict[str, Any] | None:
+    doc = _game_doc_from_game_id(game_id)
     if not doc:
+        return None
+    try:
+        from BackEnd.api.franchise_routes import _calculate_potg_summary
+    except Exception:
+        logger.debug("[COMMUNITY_HIGHLIGHTS] POTG import failed", exc_info=True)
         return None
     return _calculate_potg_summary(doc)
 
@@ -418,6 +480,8 @@ def _build_standard_entry(
     rank_label: str,
     natl_rank: int,
     user_team_record: str,
+    tournament_round_label: str,
+    overtime_count: int,
     gp_delta: int,
     primary: str,
     secondary: str,
@@ -437,6 +501,8 @@ def _build_standard_entry(
         "natl_rank": natl_rank,
         "rank_label": rank_label,
         "user_team_record": str(user_team_record or "0-0"),
+        "tournament_round_label": str(tournament_round_label or ""),
+        "overtime_count": max(0, int(overtime_count or 0)),
         "gp_delta": gp_delta,
         "primary_color": primary,
         "secondary_color": secondary,
@@ -668,6 +734,8 @@ def flush_community_highlight_pending_after_week(
             user_score, opponent_score = 0, 0
     user_score = int(user_score)
     opponent_score = int(opponent_score)
+    game_doc = _game_doc_from_game_id(pending.get("game_id"))
+    overtime_count = _overtime_count_from_game_doc(game_doc)
 
     franchise_id_str = str(fresh.get("_id"))
     entries: list[dict[str, Any]] = []
@@ -686,6 +754,7 @@ def flush_community_highlight_pending_after_week(
             )
         details_line = (
             f"Championship Game: {ut_name}: {user_score} - {opp_name}: {opponent_score}"
+            + (f" {_overtime_phrase(overtime_count)}" if overtime_count else "")
             + (f" -- {potg_part}" if potg_part else "")
         )
         scope_label = ""
@@ -730,6 +799,8 @@ def flush_community_highlight_pending_after_week(
                 rank_label=rank_label,
                 natl_rank=natl_rank,
                 user_team_record=user_team_record,
+                tournament_round_label=str(pending.get("tournament_round_label") or ""),
+                overtime_count=overtime_count,
                 gp_delta=gp_delta,
                 primary=primary,
                 secondary=secondary,

@@ -557,77 +557,9 @@
         '<button class="bbtn-save" id="dock-save" type="button">Save Board</button></div></section>';
   }
 
-  // ---------- right rail ----------
-  // Capacity is the HEADER number and comes from payload.roster_capacity — the same
-  // source signing day reads. Position mix answers a different question (what shape the
-  // board is), so it sits beneath rather than standing in for capacity.
-  function rosterNeedsHtml() {
-    var cap = capacity();
-    var counted = {};
-    POS_ORDER.forEach(function (p) { counted[p] = 0; });
-    state.board.forEach(function (id) {
-      var r = state.byId[id]; if (!r) return;
-      var pos = String(r.pos).toUpperCase();
-      if (counted[pos] != null) counted[pos] += 1;
-    });
-    var mix = POS_ORDER.map(function (pos) {
-      var n = counted[pos];
-      return '<span class="rneed' + (n === 0 ? ' hot' : '') + '">' + pos + ' · ' + n + '</span>';
-    }).join('');
-    return '<div class="cap-row cap-row--rail">' +
-        '<span class="cap-item"><b>' + cap.spots + '</b>/' + cap.cap + ' roster spots</span>' +
-        '</div>' +
-      '<div class="rneeds-lab">Board position mix</div>' +
-      '<div class="rneeds">' + mix + '</div>';
-  }
-
-  function boardRailHtml() {
-    var events = wireEventsThisWeek();
-    // Only events that land on a ranked recruit "affect your board" — annotate each with
-    // the board rank it hits, which is the whole point of the panel.
-    var affecting = events.map(function (e) {
-      var idx = state.board.indexOf(String(e.recruit_id));
-      if (idx === -1) idx = state.board.indexOf(e.recruit_id);
-      return { event: e, rank: idx === -1 ? null : idx + 1 };
-    }).filter(function (x) { return x.rank !== null; });
-    affecting.sort(function (a, b) {
-      var ad = DROP_KINDS[a.event.kind] ? 0 : 1, bd = DROP_KINDS[b.event.kind] ? 0 : 1;
-      return ad - bd || a.rank - b.rank;
-    });
-
-    var changes;
-    if (!affecting.length) {
-      // Quiet, not empty: a week with no movement still says so.
-      changes = '<div class="rpanel"><div class="reyebrow">This week</div>' +
-        '<div class="rquiet">No changes affect your board this week. Your order still stands.</div></div>';
-    } else {
-      changes = '<div class="rpanel"><div class="reyebrow is-live">' + affecting.length +
-        ' change' + (affecting.length === 1 ? '' : 's') + ' affect' + (affecting.length === 1 ? 's' : '') + ' your board</div>' +
-        affecting.map(function (x) {
-          var drop = !!DROP_KINDS[x.event.kind];
-          var parts = movementParts(x.event);
-          var rec = state.byId[String(x.event.recruit_id)];
-          return '<div class="rev"><span class="rico ' + (drop ? 'dn' : 'up') + '">' + (drop ? '↓' : '↑') + '</span>' +
-            '<span class="rtxt"><b>' + Common.escapeHtml(rec ? rec.name : 'A recruit') + '</b> ' +
-            Common.escapeHtml(parts.head.toLowerCase()) +
-            '<em>' + (parts.why ? Common.escapeHtml(parts.why) + ' · ' : '') + 'board rank ' + x.rank + '</em></span></div>';
-        }).join('') + '</div>';
-    }
-
-    var invitesLeft = INVITE_WEEKS.filter(function (w) { return w >= state.week; }).length;
-    var needs = '<div class="rpanel"><div class="reyebrow">Roster capacity</div>' + rosterNeedsHtml() +
-      '<div class="rsplit"></div>' +
-      '<div class="rstat"><span>Board slots used</span><span class="v">' + state.board.length + '<s>/' + MAX_BOARD + '</s></span></div>' +
-      '<div class="rstat"><span>Invites remaining</span><span class="v">' + invitesLeft + '<s>/7</s></span></div></div>';
-
-    return '<aside class="brail">' + changes + needs + '</aside>';
-  }
-
   function renderDock() {
     var board = document.getElementById('hub-board');
     if (board) { board.innerHTML = boardHtml(); bindBoard(board); }
-    var host = document.getElementById('hub-dock');
-    if (host) { host.innerHTML = boardRailHtml(); }
     if (typeof window.initAttributeTooltips === 'function') {
       if (board) window.initAttributeTooltips(board, ['div', 'span']);
     }
@@ -1557,14 +1489,16 @@
     else if (results) body = '<div id="hub-signings"></div>';
     else body =
       (showWeeklyPanel() ? '<div id="hub-weekly"></div>' : '') +
-      '<div class="spine-body ' + (hasDock() ? 'with-dock' : 'no-dock') + '" style="padding-top:14px">' +
+      // Single column in every phase. The invite phase used to carry a 306px rail
+      // (This week / Roster capacity) beside the board, which squeezed the pool table
+      // and pushed its Lean and Watch columns out of view — the two columns the pool
+      // exists to be scanned for.
+      '<div class="spine-body no-dock" style="padding-top:14px">' +
         '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' +
           (state.phase === 'passive' ? storyHtml() : '') +
-          // Invite phase: hero + board rows lead the main column (mockup .desk), with the
-          // pool beneath as the add source. The right column is the rail.
+          // Invite phase: hero + board rows lead, with the pool beneath as the add source.
           (hasDock() ? '<div id="hub-board"></div>' : '') +
-          '<div class="pool-wrap"><div id="hub-pool"></div></div></div>' +
-        (hasDock() ? '<div id="hub-dock"></div>' : '') + '</div>';
+          '<div class="pool-wrap"><div id="hub-pool"></div></div></div></div>';
     root.innerHTML =
       '<div class="spine-topbar"><span class="spine-h">Recruiting <b>Hub</b></span><span id="hub-anchor-mount"></span></div>' +
       '<div class="spine-topbar" style="padding-top:12px;padding-bottom:0"><div style="flex:1" id="hub-phase"></div></div>' + body;

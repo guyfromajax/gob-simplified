@@ -14,7 +14,7 @@ Feed for the **Community Highlights** panel on **Mode Select** (`FrontEnd/static
 | **Display name** | `username` from the user’s MongoDB `users` document (email local-part when unset), same idea as the alpha leaderboard. **Render the username in bold** everywhere it appears in highlight copy, with the user’s lead coaching archetype icon immediately after the username when `lead_archetype` is available. |
 | **National rank** | User team’s **`natl_rank` from FTD** (`franchise_team_data`) **after** phase B persistence, with caveats below. |
 | **Geek Points (display)** | **Net GP earned from that completed user game only** — not season total, not lifetime account total. |
-| **Standard game copy** | One summary line: beat / lost, **scores**, **regular-season W–L** (weeks 1–26 results only), and national rank (`#--` when rank is missing or skipped). |
+| **Standard game copy** | One summary line: beat / lost, **scores**, **regular-season W–L** (weeks 1–26 results only), and national rank (`#--` when rank is missing or skipped). Overtime games include the played-OT phrase defined below. |
 
 ---
 
@@ -39,6 +39,10 @@ Phase B runs **`_apply_regular_season_rank_prestige_updates`** inside **`_comple
   - **Left (main copy):** **`{user_name}` (bold)** + lead coaching archetype icon when available, coaching `{user_team_name}`, **beat** (win) / **lost to** (loss) `{opponent_team_name}` **`{user_score}`-`{opponent_score}`**. `{user_team_name}` is now **`{user_team_record}`** (regular-season wins-losses, e.g. `5-3`) **& ranked** **`{rank_label}`** (e.g. `#7` or `#--`) in the nation. Same sentence when scores are omitted (older payloads): beat/lost line without the numeric score pair, then record and rank. Reserve width so the GP column does not collide.
   - **Right:** `+/- {net GP for that game}` — **positive: bold gold**; **negative: bold red**. If the left block wraps to two lines, **vertically center** the GP block in the row.
   - **Persistence:** Each stored standard entry includes **`user_team_record`** (string `W-L`) computed at flush from franchise `results` weeks 1–26 via the same standings helper used for the conference RS highlight `Record:` line.
+
+- **Tournament standard rows:** Tournament losses in every round, plus wins before the championship round, use: "`{username}`, coaching `#{rank} {team}`, beat/lost to `{opponent}` `{score}` in the `{round label}`." They omit the regular-season record and trailing national-rank sentence. Round labels are Conference Tourney First Round/Semifinals/Championship, Region Tourney Semifinals/Championship, and National Tourney First Round/Semifinals/Championship.
+- **Championship-win exception:** Conference, Region, and National championship wins retain the existing two-line championship cards described under Special display rules. Championship losses use the tournament standard row above.
+- **Overtime:** Append `in OT`, `in double OT`, `in triple OT`, or (for 4+) `in {n} overtime quarters` immediately after the score. For tournament standard rows, the tournament round follows the OT phrase. OT count comes from finalized `points_by_quarter` arrays (periods beyond the first four); ambiguous legacy `quarter` values are not used to invent a count.
 
 ---
 

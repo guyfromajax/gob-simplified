@@ -1,6 +1,8 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 2. Improve FB Outlet Pass denied animation
+3. FCC modal if user team earns a bye and loses a conference tourney game
+4. Verify timing of Recruit Visit logic and communicaiotn of that. Also need more P&C around announcing Recruiting Visits
 
 ##Playtest Launch / In Progress
 1. Steam
@@ -15,14 +17,11 @@
 
 ##Full Product Perfection
 1. Training Camp News Report
-3. Recruiting Round Up Results
 102. Team court images
 108. Message board
 113. Bring logic to screens
 114. Better individual player defense stat tracking
 116. User account -- link X & Facebook?
-117. More action on Signing Day
-125. MM: Micro Movement SFX
 127. Get Aggressive / Get Conservative settings and Playcall Center buttons
 128. Add a badass design appraoch to New Stories
 129: Loose Balls!

@@ -173,6 +173,36 @@ drops the lowest other lean). Otherwise:
 An accepted team fills the highest open slot or replaces slot 3. The pass is guarded by
 `recruiting_lean_updates_applied.<week>`.
 
+### When invites are assigned
+
+Assignment runs when the player **runs training** for that week, not when the board is saved.
+`POST /franchise/run-training` → `_process_weekly_recruiting_invites()` resolves every team's visit
+in one pass, writes `recruiting_results.<week>`, and stamps each team's FTD `recruit_visit`. Saving
+the board only persists FTD `Recruits`. Re-running training in the same week cannot reassign — the
+processor returns early when `recruiting_results.<week>` already exists. Week 20 rejects training
+outright until a board is saved; weeks 21–26 simply produce no visit from an empty board.
+
+### Recruit Visit modal
+
+On returning to the FCC from the training report in weeks 20–26, a Moment modal on the shared Sammy
+chrome announces the recruit visiting the user's team: *"Hey Coach, here is this week's invite!"*
+
+- **Table** mirrors the Walk-On Welcome row — Name · Pos · Yr · Ht · Wt · **Rgn** · the core 12 on
+  the 0–10 scale · RT — with **Region** the one column a recruit adds, because it decides whether he
+  is a realistic target. RT shows **current/potential** as letter grades.
+- **Sammy image** comes from `getTeamSammyImage()`: the team-coloured portrait for the eight teams
+  in `TEAM_COACH_ABBR` (conference 1), the generic white Sammy otherwise. No conference check of its
+  own — the mapping already encodes it.
+- **No visit, no modal.** An empty board, or the user's pick losing the prestige-weighted draw,
+  ends the week silently rather than announcing nothing.
+- **Once per week**, via `recruit_visit_modal_seen_week` and
+  `PATCH /franchise/recruit-visit-modal-seen`. Week-stamped, so each of weeks 20–26 gets its own
+  reveal and the next week arms it with nothing needing to clear the flag. Reset at season rollover.
+
+The Walk-On Welcome modal now shows **current/potential** RT too; walk-ons carry `entry_tier` and
+`potential_factor` through signing, so the ceiling is computed at the payload boundary rather than
+stored.
+
 ## 7. Week 35 final recruiting
 
 ### User board

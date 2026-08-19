@@ -3821,6 +3821,10 @@ RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_seas
 # above rather than inventing a second convention.
 WEEK_35_REVEAL_SEEN_SEASON_FIELD = "week_35_reveal_seen_season"
 WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD = "walk_on_welcome_modal_seen_season"
+
+# Recruit Visit modal (weeks 20-26). Week-stamped, not boolean: each invite week gets
+# its own reveal, and a new week arms it without anything having to clear the flag.
+RECRUIT_VISIT_MODAL_SEEN_WEEK_FIELD = "recruit_visit_modal_seen_week"
 # Read marker for the recruiting wire. A WEEK number, not a boolean: a season-scoped
 # boolean cannot distinguish "seen week 12's events" from "seen week 13's". Stamped
 # when the player OPENS the Recruiting surface — not on hover, not on FCC render, so
@@ -4217,6 +4221,66 @@ def _build_walk_on_welcome_modal_payload(
         "walk_ons": walk_ons,
         "count": len(walk_ons),
     }
+
+
+def _build_recruit_visit_modal_payload(
+    franchise_doc: dict[str, Any] | None,
+    team_id: Any,
+) -> dict[str, Any] | None:
+    """Recruit Visit modal: the recruit visiting the user's team this invite week.
+
+    Armed by training — `_process_weekly_recruiting_invites` resolves visits and writes
+    `recruiting_results.<week>` — so the modal lands when the player returns to the FCC
+    from the training report.
+
+    Returns None when there is no visit to announce: outside weeks 20-26, before
+    training has run, once the week has been seen, or when the resolver gave the user
+    nothing that week (an empty board, or their pick lost the prestige-weighted draw).
+    A modal that announces nothing is worse than silence.
+    """
+    if not franchise_doc or not team_id:
+        return None
+    week = int(franchise_doc.get("week", 1) or 1)
+    if week < 20 or week > 26:
+        return None
+    if int(franchise_doc.get(RECRUIT_VISIT_MODAL_SEEN_WEEK_FIELD, 0) or 0) == week:
+        return None
+
+    assignments = (franchise_doc.get("recruiting_results") or {}).get(str(week)) or {}
+    recruit_id = assignments.get(str(team_id))
+    if not recruit_id:
+        return None
+
+    recruit = franchise_recruits_data_collection.find_one(
+        {"franchise_id": str(franchise_doc["_id"]), "recruit_id": str(recruit_id)},
+        {"_id": 0},
+    )
+    if not recruit:
+        return None
+
+    from BackEnd.utils.rt_projection import potential_rt_for_player
+
+    best = _best_position(recruit.get("position_ratings") or {})
+    row = walk_on_news_row(
+        name=recruit.get("name") or "--",
+        pos=best.get("pos") or "--",
+        year=recruit.get("year"),
+        height=recruit.get("height"),
+        weight=recruit.get("weight"),
+        attributes=recruit.get("attributes") or {},
+        rt=best.get("rating"),
+        potential_rt=potential_rt_for_player(
+            str(recruit.get("recruit_id") or ""),
+            recruit.get("entry_tier"),
+            recruit.get("potential_factor"),
+            recruit.get("position_ratings") or {},
+        ),
+        # The one column the visit row adds over a walk-on's: a recruit has a home
+        # region and it decides whether he is a realistic target.
+        region=str(recruit.get("Home Region") or "").strip().upper() or None,
+    )
+    row["recruit_id"] = str(recruit_id)
+    return {"eligible": True, "week": week, "recruit": row}
 
 
 def _should_show_region_bye_modal(
@@ -9817,6 +9881,10 @@ def command_center_data(
         )
         response["walk_on_welcome_modal"] = (
             _build_walk_on_welcome_modal_payload(franchise_doc) if franchise_doc else None
+        )
+        # Weeks 20-26: who is visiting this week. Armed by training, seen-stamped per week.
+        response["recruit_visit_modal"] = (
+            _build_recruit_visit_modal_payload(franchise_doc, team_id) if franchise_doc else None
         )
         response["recruiting_wire"] = _build_recruiting_wire_payload(
             franchise_doc, str(team_id) if team_id else None
@@ -17029,6 +17097,29 @@ class Week35RevealSeenRequest(BaseModel):
     franchise_id: str
 
 
+class RecruitVisitModalSeenRequest(BaseModel):
+    franchise_id: str
+
+
+@router.patch("/franchise/recruit-visit-modal-seen")
+def mark_recruit_visit_modal_seen(
+    req: RecruitVisitModalSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Stamp this invite week's Recruit Visit modal as seen.
+
+    Week-stamped so weeks 20-26 each get their own reveal; the next week arms it again
+    with nothing needing to clear the flag.
+    """
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    week = int(franchise_doc.get("week", 1) or 1)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {RECRUIT_VISIT_MODAL_SEEN_WEEK_FIELD: week}},
+    )
+    return {"seen_week": week}
+
+
 @router.patch("/franchise/week-35-reveal-seen")
 def mark_week_35_reveal_seen(
     req: Week35RevealSeenRequest,
@@ -17895,6 +17986,8 @@ def finish_season(req: FinishSeasonRequest):
     # "Walk On" archetype no longer distinguishes THIS season's arrivals from
     # walk-ons still rostered from earlier seasons. Mirrors the pending-payload
     # pattern used by FCC_PENDING_NEW_LEAN_RECRUITS_FIELD.
+    from BackEnd.utils.rt_projection import potential_rt_for_player
+
     _welcome_user_team_name, _welcome_user_team_id = get_user_team_from_franchise(franchise_doc)
     pending_walk_on_welcome: list[dict[str, Any]] = []
     if _welcome_user_team_id:
@@ -17913,6 +18006,15 @@ def finish_season(req: FinishSeasonRequest):
                     signed_player.get("attributes") or {}
                 ),
                 rt=signed_player.get("rt"),
+                # Walk-ons carry entry_tier / potential_factor / position_ratings
+                # through signing (carry_dev_fields), so the ceiling is computable
+                # here — the same call the FCC Recruits tab uses.
+                potential_rt=potential_rt_for_player(
+                    str(signed_player.get("player_id") or ""),
+                    signed_player.get("entry_tier"),
+                    signed_player.get("potential_factor"),
+                    signed_player.get("position_ratings") or {},
+                ),
             )
             row["player_id"] = str(signed_player.get("player_id"))
             pending_walk_on_welcome.append(row)
@@ -18161,6 +18263,7 @@ def finish_season(req: FinishSeasonRequest):
             RECRUITING_WIRE_SEEN_WEEK_FIELD: 0,
             RECRUITING_WATCHLIST_FIELD: [],
             RECRUITING_BOARD_SAVED_WEEK_FIELD: 0,
+            RECRUIT_VISIT_MODAL_SEEN_WEEK_FIELD: 0,
             FCC_PENDING_NEW_LEAN_RECRUITS_FIELD: [],
             "week_35_recruiting_ran": False,
             WEEK_35_RECRUITING_RESULTS_FIELD: {},

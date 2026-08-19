@@ -3675,6 +3675,10 @@ async function init() {
     // the two cannot be eligible on the same visit (a region bye is a week-30
     // state, this is a week-1 pre-Training-Camp one).
     if (window.WalkOnWelcomeModal) window.WalkOnWelcomeModal.maybeShow(topData);
+    // Weeks 20-26: who is visiting this week. Both are Moment modals on the shared
+    // Sammy chrome and both self-suppress, so ordering only matters if a season ever
+    // starts inside the invite window — which it cannot.
+    if (window.RecruitVisitModal) window.RecruitVisitModal.maybeShow(topData);
     if (window.BigNewsModals) {
       window.BigNewsModals.maybeShow(topData, {
         userTeamId,

@@ -377,6 +377,15 @@ function chStandardCopyHtml(entry) {
   var rankLabel = escapeHtmlMs(entry.rank_label || '#--');
   var recRaw = entry.user_team_record != null && String(entry.user_team_record).trim() !== '' ? String(entry.user_team_record).trim() : '';
   var rec = recRaw ? escapeHtmlMs(recRaw) : '';
+  var tournamentRound = entry.tournament_round_label != null
+    ? String(entry.tournament_round_label).trim()
+    : '';
+  var overtimeCount = parseInt(entry.overtime_count, 10);
+  var overtimeSuffix = '';
+  if (overtimeCount === 1) overtimeSuffix = ' in OT';
+  else if (overtimeCount === 2) overtimeSuffix = ' in double OT';
+  else if (overtimeCount === 3) overtimeSuffix = ' in triple OT';
+  else if (overtimeCount >= 4) overtimeSuffix = ' in ' + overtimeCount + ' overtime quarters';
   var userStrong = chUsernameHtml(entry);
   var usc = entry.user_score;
   var osc = entry.opponent_score;
@@ -388,6 +397,17 @@ function chStandardCopyHtml(entry) {
   var tailRanked = rec
     ? ut + ' is now ' + rec + ' & ranked ' + rankLabel + ' in the nation.'
     : ut + ' is now ranked ' + rankLabel + ' in the nation.';
+  if (tournamentRound) {
+    var rankedTeam = rankLabel + ' ' + ut;
+    var tournamentSuffix = ' in the ' + escapeHtmlMs(tournamentRound);
+    if (hasScores) {
+      return (
+        userStrong + ', coaching ' + rankedTeam + ', ' + beatLost + ' ' + opp + ' ' +
+        Number(usc) + '-' + Number(osc) + overtimeSuffix + tournamentSuffix + '.'
+      );
+    }
+    return userStrong + ', coaching ' + rankedTeam + ', ' + beatLost + ' ' + opp + overtimeSuffix + tournamentSuffix + '.';
+  }
   if (hasScores) {
     return (
       userStrong +
@@ -401,11 +421,12 @@ function chStandardCopyHtml(entry) {
       Number(usc) +
       '-' +
       Number(osc) +
+      overtimeSuffix +
       '. ' +
       tailRanked
     );
   }
-  return userStrong + ', coaching ' + ut + ', ' + beatLost + ' ' + opp + '. ' + tailRanked;
+  return userStrong + ', coaching ' + ut + ', ' + beatLost + ' ' + opp + overtimeSuffix + '. ' + tailRanked;
 }
 
 // FTE v2 debut entry — copy locked by Coach (Q8):

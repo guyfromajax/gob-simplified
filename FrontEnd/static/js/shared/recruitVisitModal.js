@@ -1,24 +1,23 @@
 /**
- * Walk-On Welcome modal — season-start reveal of the walk-ons who joined the
- * user's roster.
+ * Recruit Visit modal — the recruit visiting the user's team this invite week.
  *
- * Season 2+ only. The server writes its payload during finish_season and clears
- * it on dismiss, so Season 1 (which never runs a rollover) can never arm it —
- * that's what keeps this out of the crowded first-time-experience flow rather
- * than a client-side season check.
+ * Weeks 20-26. Visits are resolved when the player runs training
+ * (`_process_weekly_recruiting_invites`), so this lands when they return to the FCC
+ * from the training report. Eligibility and once-per-week persistence are
+ * server-authoritative via command-center data and
+ * /franchise/recruit-visit-modal-seen.
  *
- * Eligibility and once-per-season persistence are server-authoritative through
- * command-center data and /franchise/walk-on-welcome-modal-seen. A season that
- * signed a full class produces no walk-ons and no payload, so nothing shows.
+ * A week with no visit produces no payload and no modal: an empty board, or the
+ * user's pick losing the prestige-weighted draw, both end the week silently rather
+ * than announcing nothing.
  *
- * Moment Modal (Styleguide §Modal System) on the shared Sammy chrome:
- * .is-wide because the roster table cannot compress to the 520px default, and
- * .is-orange because "Go To Locker Room" navigates rather than gates.
+ * Mirrors the Walk-On Welcome table exactly, plus one column — Region — because a
+ * recruit has a home region and it decides whether he is a realistic target.
  */
 (function () {
   'use strict';
 
-  var STYLESHEET_HREF = '/css/walk-on-welcome.css';
+  var STYLESHEET_HREF = '/css/walk-on-welcome.css';   // same chrome as the walk-on table
   // Roster-page column order (team-roster-view.js ROSTER_ATTR_KEYS).
   var ATTR_KEYS = ['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'AG', 'ST', 'ND', 'IQ', 'FT'];
 
@@ -52,7 +51,7 @@
 
   function markSeen(fid) {
     if (!fid || typeof API_CONFIG === 'undefined') return Promise.resolve();
-    return fetch(API_CONFIG.buildUrl('/franchise/walk-on-welcome-modal-seen'), {
+    return fetch(API_CONFIG.buildUrl('/franchise/recruit-visit-modal-seen'), {
       method: 'PATCH',
       headers: Object.assign(
         { 'Content-Type': 'application/json' },
@@ -60,7 +59,7 @@
       ),
       body: JSON.stringify({ franchise_id: fid }),
     }).catch(function (err) {
-      console.warn('[WalkOnWelcomeModal] could not persist seen state:', err);
+      console.warn('[RecruitVisitModal] could not persist seen state:', err);
     });
   }
 
@@ -111,18 +110,13 @@
     return td;
   }
 
-  function buildBody(walkOns) {
+  function buildBody(players) {
     var wrap = document.createElement('div');
 
     var headline = document.createElement('p');
     headline.className = 'wow-headline';
-    headline.textContent = 'Welcome to the season, Coach.';
+    headline.textContent = 'Hey Coach, here is this week\u2019s invite!';
     wrap.appendChild(headline);
-
-    var sub = document.createElement('p');
-    sub.className = 'wow-sub';
-    sub.textContent = "Here are this season's walk-ons.";
-    wrap.appendChild(sub);
 
     var tableWrap = document.createElement('div');
     tableWrap.className = 'wow-tablewrap';
@@ -133,7 +127,7 @@
     var thead = document.createElement('thead');
     var headRow = document.createElement('tr');
     [
-      ['Name', 'wow-name'], ['Pos', ''], ['Yr', ''], ['Ht', ''], ['Wt', 'wow-num']
+      ['Name', 'wow-name'], ['Pos', ''], ['Yr', ''], ['Ht', ''], ['Wt', 'wow-num'], ['Rgn', '']
     ].concat(ATTR_KEYS.map(function (k) { return [k, 'wow-num']; }))
      .concat([['RT', 'wow-num']])
      .forEach(function (spec) {
@@ -146,7 +140,7 @@
     table.appendChild(thead);
 
     var tbody = document.createElement('tbody');
-    walkOns.forEach(function (player) {
+    players.forEach(function (player) {
       var row = document.createElement('tr');
       var attrs = player.attributes || {};
       cell(row, player.name || '--', 'wow-name');
@@ -154,6 +148,7 @@
       cell(row, formatYear(player.year));
       cell(row, formatHeight(player.height));
       cell(row, player.weight == null ? '--' : String(player.weight), 'wow-num');
+      cell(row, player.region || '--');
       ATTR_KEYS.forEach(function (key) {
         cell(row, String(formatAttr(attrs, key)), 'wow-num');
       });
@@ -178,10 +173,10 @@
   }
 
   function maybeShow(data) {
-    var payload = data && data.walk_on_welcome_modal;
+    var payload = data && data.recruit_visit_modal;
     if (presented || !payload || !payload.eligible) return;
-    var walkOns = payload.walk_ons || [];
-    if (!walkOns.length) return;
+    var recruit = payload.recruit;
+    if (!recruit) return;
     if (blockerVisible()) {
       schedule(data);
       return;
@@ -198,31 +193,22 @@
       var showSammyModal = loaded[0].showSammyModal;
       var getTeamSammyImage = loaded[1].getTeamSammyImage;
       showSammyModal({
-        eyebrow: 'Season ' + (payload.season || ''),
-        body: buildBody(walkOns),
-        ctaLabel: 'Go To Locker Room',
+        eyebrow: 'Week ' + (payload.week || '') + ' \u00b7 Invite Season',
+        body: buildBody([recruit]),
+        ctaLabel: 'Go To Recruiting',
         imageSrc: getTeamSammyImage(data.team || ''),
         modalClass: 'is-wide',
         primaryClass: 'is-orange',
         onCta: function () {
-          var card = document.getElementById('home-locker-room-body');
-          if (!card) return;
-          var homeTab = document.querySelector('[data-tab="home-tab"]');
-          if (homeTab && !document.getElementById('home-tab').classList.contains('active')) {
-            homeTab.click();
-          }
-          card.scrollIntoView({
-            behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
-              ? 'auto' : 'smooth',
-            block: 'center',
-          });
+          var tab = document.querySelector('[data-tab="recruits-tab"]');
+          if (tab) tab.click();
         },
       });
       return markSeen(fid);
     }).catch(function (err) {
-      console.error('[WalkOnWelcomeModal] failed to show:', err);
+      console.error('[RecruitVisitModal] failed to show:', err);
     });
   }
 
-  window.WalkOnWelcomeModal = { maybeShow: maybeShow };
+  window.RecruitVisitModal = { maybeShow: maybeShow };
 })();

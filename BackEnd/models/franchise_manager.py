@@ -300,14 +300,21 @@ def walk_on_news_row(
     weight: Any,
     attributes: dict[str, Any],
     rt: Any,
+    potential_rt: Any = None,
+    region: Any = None,
 ) -> dict[str, Any]:
-    """One walk-on row for the Walk-Ons Announced story / welcome modal.
+    """One player row for the Walk-Ons Announced story / welcome modal, and for the
+    weekly Recruit Visit modal, which mirrors it.
 
     Stores raw values only — the 0-10 attribute scale, the year abbreviation and
-    the RT letter grade are all applied at the display boundary so the story
+    the RT letter grades are all applied at the display boundary so the story
     never bakes in a presentation format that later drifts from the roster page.
+
+    ``potential_rt`` is the ratcheted projected ceiling, rendered beside current RT as
+    ``B+/A``. ``region`` is carried for recruits (a walk-on has no home region) and is
+    omitted from the row when absent, so the walk-on table keeps its existing columns.
     """
-    return {
+    row = {
         "name": name or "--",
         "pos": pos or "--",
         "year": year,
@@ -315,7 +322,11 @@ def walk_on_news_row(
         "weight": weight,
         "attributes": dict(attributes or {}),
         "rt": rt,
+        "potential_rt": potential_rt,
     }
+    if region not in (None, ""):
+        row["region"] = region
+    return row
 
 
 def build_walk_ons_news_story(team_name: str, walk_ons: list[dict[str, Any]]) -> dict[str, Any]:

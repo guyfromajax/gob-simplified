@@ -492,3 +492,63 @@ test.describe('week-20 seeding must not persist', () => {
     expect(slots).toBe(0);
   });
 });
+
+
+test.describe('invite phase runs full width (no board rail)', () => {
+  test('the rail is gone and the body is a single column', async ({ page }) => {
+    await mountPool(page, { week: 22 });          // invite season
+    const m = await page.evaluate(() => {
+      const body = document.querySelector('.spine-body');
+      return {
+        rail: document.querySelectorAll('.brail, #hub-dock').length,
+        cls: body.className,
+        cols: getComputedStyle(body).gridTemplateColumns.split(' ').length,
+        board: !!document.getElementById('hub-board'),
+      };
+    });
+    expect(m.rail).toBe(0);
+    expect(m.cls).toContain('no-dock');
+    expect(m.cols).toBe(1);
+    expect(m.board).toBe(true);                   // the invite board itself stays
+  });
+
+  test('the Lean and Watch columns are rendered, but still overflow (known limitation)', async ({ page }) => {
+    await mountPool(page, { week: 22 });
+    const m = await page.evaluate(() => {
+      const sc = document.querySelector('#hub-pool .pool-scroll');
+      const heads = [...document.querySelectorAll('#hub-pool thead th')].map((h) => h.className);
+      return {
+        hasLean: heads.some((c) => c.includes('lean')),
+        hasWatch: heads.some((c) => c.includes('watch')),
+        client: sc.clientWidth,
+        overflowBy: sc.scrollWidth - sc.clientWidth,
+      };
+    });
+    // Both columns exist and are reachable by scrolling .pool-scroll.
+    expect(m.hasLean).toBe(true);
+    expect(m.hasWatch).toBe(true);
+
+    // KNOWN LIMITATION, recorded rather than asserted away.
+    //
+    // Removing the 306px rail gave the pool that width back, but the table still needs
+    // ~88px more than it has, so Lean and Watch sit off the right edge until the user
+    // scrolls sideways. The cause is NOT the rail: `.doc { max-width: 1360px }` in
+    // recruiting-spine.css caps the whole hub page, so the pool measures the same
+    // 1096px at 1440, 1600, 1920 and 2200 viewports. Fixing it means raising that cap,
+    // narrowing the 12-tile attributes column, or dropping a column — a product call.
+    //
+    // Asserts the CURRENT truth so the suite stays honest; flip to toBe(0) once settled.
+    expect(m.overflowBy).toBeGreaterThan(0);
+    expect(m.overflowBy).toBeLessThan(200);   // if this grows, something else regressed
+  });
+
+  test('the passive phase is unchanged — it never had a rail', async ({ page }) => {
+    await mountPool(page, { week: 7 });
+    const m = await page.evaluate(() => ({
+      cls: document.querySelector('.spine-body').className,
+      board: !!document.getElementById('hub-board'),
+    }));
+    expect(m.cls).toContain('no-dock');
+    expect(m.board).toBe(false);
+  });
+});
