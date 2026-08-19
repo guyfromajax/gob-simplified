@@ -63,36 +63,58 @@
       <div class="lineup-left-panel">
         <section class="lineup-roster-section">
           <div class="lineup-roster-header-row">
-            <div class="lineup-roster-label">Roster — click or drag to assign</div>
+            <div class="lineup-roster-label">Set Lineup</div>
+            <div id="lineup-header-reads" class="lineup-header-reads" hidden></div>
             <div class="rankings-toggle-wrap roster-panel-toggle-wrap">
-              <button type="button" id="roster-view-attributes" class="rankings-toggle active">Attributes</button>
+              <button type="button" id="roster-view-game" class="rankings-toggle active">Game</button>
+              <button type="button" id="roster-view-attributes" class="rankings-toggle">Attributes</button>
               <button type="button" id="roster-view-stats" class="rankings-toggle">Stats</button>
             </div>
           </div>
           <div id="roster-table-container" class="roster-table-region active">
             <div class="roster-table-scroll">
-              <div id="roster-attributes-pane" class="roster-roster-pane">
+              <div id="roster-game-pane" class="roster-roster-pane">
+                <table class="roster-table roster-game-table gob-data-grid">
+                  <thead>
+                    <tr>
+                      <th data-sort="POS">POS</th>
+                      <th class="hs-col"></th>
+                      <th class="l" data-sort="PLAYER">PLAYER</th>
+                      <th data-sort="ENG">ENG</th>
+                      <th class="attr-label" data-attr="RT" data-sort="RT">RT</th>
+                      <th data-sort="F">F</th>
+                      <th data-sort="MIN">MIN</th>
+                      <th data-sort="MO">MO</th>
+                      <th class="rm-col"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="roster-body-game"></tbody>
+                </table>
+              </div>
+              <div id="roster-attributes-pane" class="roster-roster-pane" hidden>
                 <table class="roster-table gob-data-grid">
                   <thead>
                     <tr>
-                      <th>Player Name</th>
-                      <th>Pos</th>
-                      <th>HT</th>
-                      <th>WT</th>
-                      <th>NG</th>
-                      <th>SC</th>
-                      <th>SH</th>
-                      <th>ID</th>
-                      <th>OD</th>
-                      <th>PS</th>
-                      <th>BH</th>
-                      <th>RB</th>
-                      <th>ST</th>
-                      <th>AG</th>
-                      <th>ND</th>
-                      <th>IQ</th>
-                      <th>FT</th>
-                      <th class="attr-label" data-attr="RT">RT</th>
+                      <th data-sort="POS">POS</th>
+                      <th class="hs-col"></th>
+                      <th class="l" data-sort="PLAYER">PLAYER</th>
+                      <th data-sort="ENG">ENG</th>
+                      <th class="attr-label" data-attr="RT" data-sort="RT">RT</th>
+                      <th data-sort="HT">HT</th>
+                      <th data-sort="WT">WT</th>
+                      <th data-sort="SC">SC</th>
+                      <th data-sort="SH">SH</th>
+                      <th data-sort="ID">ID</th>
+                      <th data-sort="OD">OD</th>
+                      <th data-sort="PS">PS</th>
+                      <th data-sort="BH">BH</th>
+                      <th data-sort="RB">RB</th>
+                      <th data-sort="ST">ST</th>
+                      <th data-sort="AG">AG</th>
+                      <th data-sort="ND">ND</th>
+                      <th data-sort="IQ">IQ</th>
+                      <th data-sort="FT">FT</th>
+                      <th class="rm-col"></th>
                     </tr>
                   </thead>
                   <tbody id="roster-body"></tbody>
@@ -102,31 +124,37 @@
                 <table class="roster-stats-table gob-data-grid">
                   <thead>
                     <tr>
-                      <th>Name</th>
-                      <th>PTS</th>
-                      <th>FGM/FGA</th>
-                      <th>3PTM/3PTA</th>
-                      <th>FTM/FTA</th>
-                      <th>DREB</th>
-                      <th>OREB</th>
-                      <th>TREB</th>
-                      <th>AST</th>
-                      <th>STL</th>
-                      <th>BLK</th>
-                      <th>F</th>
-                      <th>TO</th>
-                      <th>DEFA</th>
-                      <th>DEF%</th>
-                      <th>SCRA</th>
-                      <th>SCR%</th>
-                      <th>MIN</th>
+                      <th data-sort="POS">POS</th>
+                      <th class="hs-col"></th>
+                      <th class="l" data-sort="PLAYER">PLAYER</th>
+                      <th data-sort="ENG">ENG</th>
+                      <th class="attr-label" data-attr="RT" data-sort="RT">RT</th>
+                      <th data-sort="PTS">PTS</th>
+                      <th data-sort="FGM/FGA">FGM/FGA</th>
+                      <th data-sort="3PTM/3PTA">3PTM/3PTA</th>
+                      <th data-sort="FTM/FTA">FTM/FTA</th>
+                      <th data-sort="DREB">DREB</th>
+                      <th data-sort="OREB">OREB</th>
+                      <th data-sort="TREB">TREB</th>
+                      <th data-sort="AST">AST</th>
+                      <th data-sort="STL">STL</th>
+                      <th data-sort="BLK">BLK</th>
+                      <th data-sort="F">F</th>
+                      <th data-sort="TO">TO</th>
+                      <th data-sort="DEFA">DEFA</th>
+                      <th data-sort="DEF%">DEF%</th>
+                      <th data-sort="SCRA">SCRA</th>
+                      <th data-sort="SCR%">SCR%</th>
+                      <th data-sort="MIN">MIN</th>
+                      <th class="rm-col"></th>
                     </tr>
                   </thead>
                   <tbody id="roster-body-stats"></tbody>
                 </table>
               </div>
-              <p id="roster-pos-note" class="pos-note"><em>*Pos represents the player's highest rated position. Players can play any position.</em></p>
+              <p id="roster-pos-note" class="pos-note"><em>POS shows the assigned slot for on-court players, and the highest rated position for the bench. Players can play any position.</em></p>
             </div>
+            <button id="autoset-lineup" class="lineup-btn lineup-btn-ghost autoset-lineup-btn" type="button">Autoset Lineup</button>
             <div class="roster-panel-actions">
               <button id="gameplan-optional" class="lineup-btn lineup-btn-orange" type="button">Game Plan</button>
               <button id="playbooks-button" class="lineup-btn lineup-btn-ghost" type="button">Playbooks</button>
@@ -136,40 +164,9 @@
       </div>
 
       <div class="lineup-right-panel">
-        <section class="lineup-slots-section">
-          <div class="lineup-slots-label">Starting Five</div>
-          <ul id="slots">
-            <li class="slot" data-pos="PG">
-              <div class="slot-pos">PG</div>
-              <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
-              <button class="remove" hidden aria-label="Remove player from PG">✕</button>
-            </li>
-            <li class="slot" data-pos="SG">
-              <div class="slot-pos">SG</div>
-              <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
-              <button class="remove" hidden aria-label="Remove player from SG">✕</button>
-            </li>
-            <li class="slot" data-pos="SF">
-              <div class="slot-pos">SF</div>
-              <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
-              <button class="remove" hidden aria-label="Remove player from SF">✕</button>
-            </li>
-            <li class="slot" data-pos="PF">
-              <div class="slot-pos">PF</div>
-              <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
-              <button class="remove" hidden aria-label="Remove player from PF">✕</button>
-            </li>
-            <li class="slot" data-pos="C">
-              <div class="slot-pos">C</div>
-              <div class="slot-content empty"><span class="slot-empty-copy">Drag a player here</span></div>
-              <button class="remove" hidden aria-label="Remove player from C">✕</button>
-            </li>
-          </ul>
+        <section class="lineup-weights-section">
           <div id="lineup-shot-weights" class="lineup-shot-weights"></div>
         </section>
-        <div class="lineup-left-footer">
-          <button id="autoset-lineup" class="lineup-btn lineup-btn-ghost" type="button">Autoset Lineup</button>
-        </div>
       </div>
     </div>
 

@@ -1679,16 +1679,19 @@
     var rtCls = r ? Spine.rtClassForYear(r.rt, r.year) : '';
     var year = r ? Common.escapeHtml(r.yearDisplay) : '--';
     var pos = r ? Common.escapeHtml(r.pos) : '--';
+    // ONE header row above the image: week left, position centre, RT right. The week and
+    // the spec line were two rows of small type stacked a few pixels apart, which read as
+    // one crowded four-item header rather than a stamp plus a spec.
     return '<div class="vwk is-filled">' +
-      '<div class="vwk-hd">' + label + '</div>' +
-      headshotBoxHtml(r, 'vwk-av') +
-      '<div class="vwk-nm">' + name + '</div>' +
-      // One row, three anchors: year left, position centre, RT right. RT used to sit up
-      // in the header opposite the week, which read as a label for the week rather than
-      // for the recruit.
-      '<div class="vwk-meta"><span class="vwk-yr">' + year + '</span>' +
+      '<div class="vwk-hd">' + label +
         '<span class="vwk-pos">' + pos + '</span>' +
         '<span class="vwk-rt ' + rtCls + '">' + rt + '</span></div>' +
+      headshotBoxHtml(r, 'vwk-av') +
+      // Year on its own line under the name, not beside it: inline, it took ~24px off
+      // the name and clipped it at the tile's 148px of usable width. The ladder is
+      // pinned to the bottom, so the extra line costs nothing.
+      '<div class="vwk-nm">' + name + '</div>' +
+      '<div class="vwk-yr">' + year + '</div>' +
       '<div class="vwk-lean">' + Spine.Lean.ladderHtml(model) + '</div>' +
       '</div>';
   }

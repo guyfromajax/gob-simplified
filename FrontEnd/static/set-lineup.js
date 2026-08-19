@@ -179,12 +179,14 @@ function lockExhaustedUserLineupControls() {
   if (!exhaustedUserLineupLocked) return;
   document.body.classList.add('exhausted-lineup-locked');
   document.querySelectorAll(
-    '#autoset-lineup, #roster-view-attributes, #roster-view-stats, .slot .remove'
+    '#autoset-lineup, #roster-view-game, #roster-view-attributes, #roster-view-stats, .roster-row-remove'
   ).forEach(control => {
     control.disabled = true;
     control.setAttribute('aria-disabled', 'true');
   });
-  document.querySelectorAll('.slot, #roster-body tr, #roster-body-stats tr, .player-card').forEach(element => {
+  document.querySelectorAll(
+    '#roster-body-game tr, #roster-body tr, #roster-body-stats tr'
+  ).forEach(element => {
     element.draggable = false;
     element.setAttribute('draggable', 'false');
   });
@@ -561,11 +563,40 @@ async function fetchLineupPlaybooksData() {
 function renderLineupShotWeights(playbookData) {
   const weightsContainer = document.getElementById('lineup-shot-weights');
   if (!weightsContainer) return;
-  weightsContainer.innerHTML = '';
-  // TODO: confirm position_shot_weights available in set-lineup playbook fetch
-  if (playbookData?.position_shot_weights && typeof renderShotWeights === 'function') {
-    renderShotWeights(weightsContainer, playbookData.position_shot_weights, true);
+  const shotWeights = playbookData?.position_shot_weights;
+  if (!shotWeights || (!shotWeights.playbooks && !shotWeights.playcall_center)) {
+    weightsContainer.innerHTML = '<p class="psw-unavailable">Shot weight data unavailable.</p>';
+    return;
   }
+  const POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+  const colorFn = typeof getPswColor === 'function' ? getPswColor : () => '#34EC27';
+
+  function renderBarGroup(label, data) {
+    if (!data) return '';
+    const values = POSITIONS.map((pos) => ({ pos, pct: Number(data[pos] ?? 0) || 0 }));
+    const maxPct = Math.max(...values.map((value) => value.pct));
+    const rows = values.map(({ pos, pct }) => {
+      const color = colorFn(pct);
+      const hi = pct === maxPct && maxPct > 0 ? ' is-hi' : '';
+      return `
+        <div class="psw-bar-row${hi}">
+          <div class="psw-bar-pos">${pos}</div>
+          <div class="psw-bar-track"><i style="width:${pct}%;background:${color}"></i></div>
+          <div class="psw-bar-val" style="color:${color}">${pct}%</div>
+        </div>`;
+    }).join('');
+    return `
+      <div class="psw-bar-group">
+        <div class="psw-bar-label">${label}</div>
+        ${rows}
+      </div>`;
+  }
+
+  weightsContainer.innerHTML = `
+    <div class="psw-bar-root">
+      ${renderBarGroup('Playbook Shot Weights', shotWeights.playbooks)}
+      ${renderBarGroup('Play Call Center Shot Weights', shotWeights.playcall_center)}
+    </div>`;
 }
 
 function getLineupPlaybookPercentage(percentages, key, id) {
@@ -1029,288 +1060,620 @@ function formatMinutesRosterStats(seconds) {
   return Math.floor(seconds / 60).toString();
 }
 
-const ROSTER_STATS_COLUMN_NAMES = ['Name', 'PTS', 'FGM/FGA', '3PTM/3PTA', 'FTM/FTA', 'DREB', 'OREB', 'TREB', 'AST', 'STL', 'BLK', 'F', 'TO', 'DEFA', 'DEF%', 'SCRA', 'SCR%', 'MIN'];
+const LINEUP_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+const FOUL_TROUBLE_MIN = 3;
 
+const ROSTER_STATS_COLUMN_NAMES = [
+  'POS', 'PLAYER', 'ENG', 'RT',
+  'PTS', 'FGM/FGA', '3PTM/3PTA', 'FTM/FTA', 'DREB', 'OREB', 'TREB', 'AST', 'STL', 'BLK', 'F', 'TO', 'DEFA', 'DEF%', 'SCRA', 'SCR%', 'MIN'
+];
+const ROSTER_ATTR_COLUMN_NAMES = [
+  'POS', 'PLAYER', 'ENG', 'RT', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'
+];
+const ROSTER_GAME_COLUMN_NAMES = ['POS', 'PLAYER', 'ENG', 'RT', 'F', 'MIN', 'MO'];
+
+let rosterPanelView = 'game'; // game | attributes | stats
 let rosterDataForSorting = [];
-/** Display header label or 'RT' for default highest-rating sort (no dedicated column). */
-let attrSortColumn = 'RT';
+let attrSortColumn = 'ENG';
 let attrSortDirection = 'desc';
-
 let rosterStatsRows = [];
-let statsSortColumn = 'PTS';
+let statsSortColumn = 'ENG';
 let statsSortDirection = 'desc';
+let gameSortColumn = 'ENG';
+let gameSortDirection = 'desc';
+let rosterTableEventsBound = false;
 
-function buildRosterStatsRowSnapshot(p) {
-  const st = getGameStatsForRoster(p);
-  const fgm = Number(st.FGM) || 0;
-  const fga = Number(st.FGA) || 0;
-  const tpm = Number(st['3PTM']) || 0;
-  const tpa = Number(st['3PTA']) || 0;
-  const ftm = Number(st.FTM) || 0;
-  const fta = Number(st.FTA) || 0;
-  const dreb = Number(st.DREB) || 0;
-  const oreb = Number(st.OREB) || 0;
-  const treb = dreb + oreb;
-  const defa = Number(st.DEF_A) || 0;
-  const defs = Number(st.DEF_S) || 0;
-  const defPct = defa > 0 ? (defs / defa) * 100 : 0;
-  const scra = Number(st.SCR_A) || 0;
-  const scrs = Number(st.SCR_S) || 0;
-  const scrPct = scra > 0 ? (scrs / scra) * 100 : 0;
-  return {
-    player: p,
-    sort: {
-      Name: (p.name || '').trim(),
-      PTS: Number(st.PTS) || 0,
-      'FGM/FGA': { m: fgm, a: fga },
-      '3PTM/3PTA': { m: tpm, a: tpa },
-      'FTM/FTA': { m: ftm, a: fta },
-      DREB: dreb,
-      OREB: oreb,
-      TREB: treb,
-      AST: Number(st.AST) || 0,
-      STL: Number(st.STL) || 0,
-      BLK: Number(st.BLK) || 0,
-      F: Number(st.F) || 0,
-      TO: Number(st.TO) || 0,
-      DEFA: defa,
-      'DEF%': defPct,
-      SCRA: scra,
-      'SCR%': scrPct,
-      MIN: Number(st.MIN) || 0
-    }
-  };
+function getEnergyPercent(player) {
+  const ng = player?.attributes?.NG ?? player?.NG ?? 1.0;
+  return Math.round((Number(ng) || 0) * 100);
 }
 
-function compareRosterStatsSnapshots(a, b) {
-  const col = statsSortColumn;
-  const desc = statsSortDirection === 'desc';
-  const av = a.sort[col];
-  const bv = b.sort[col];
+function getEnergyClassFromPercent(percent) {
+  if (percent >= 90) return 'high';
+  if (percent >= 80) return 'medium';
+  if (percent >= 70) return 'low';
+  return 'critical';
+}
 
-  if (col === 'Name') {
-    return desc ? bv.localeCompare(av) : av.localeCompare(bv);
+function getEnergyEdgeColor(energyClass) {
+  if (energyClass === 'medium') return '#F5C518';
+  if (energyClass === 'low') return '#ff9f43';
+  if (energyClass === 'critical') return '#ff6d6d';
+  return 'transparent';
+}
+
+function getAssignedSlotForPlayer(playerId) {
+  if (!playerId) return null;
+  for (const pos of LINEUP_POSITIONS) {
+    if (lineup[pos] != null && String(lineup[pos]) === String(playerId)) return pos;
+  }
+  return null;
+}
+
+function getNaturalPosition(player) {
+  const entries = Object.entries(player?.position_ratings || {});
+  if (!entries.length) return '--';
+  return entries.reduce((a, b) => (b[1] > a[1] ? b : a))[0];
+}
+
+function getDisplayRt(player, assignedSlot) {
+  const ratings = player?.position_ratings || {};
+  if (assignedSlot && ratings[assignedSlot] != null) return ratings[assignedSlot];
+  const values = Object.values(ratings);
+  return values.length ? Math.max(...values) : '--';
+}
+
+function getPlayerFouls(player) {
+  const st = getGameStatsForRoster(player);
+  return Number(st.F) || 0;
+}
+
+function isLineupPregameContext() {
+  const scoreboard = document.getElementById('context-scoreboard');
+  if (scoreboard) return scoreboard.classList.contains('is-pregame');
+  const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
+  const currentQuarter = parseInt(urlParams.get('quarter'), 10) || quarter || 1;
+  const activeId = typeof getActiveGameId === 'function' ? getActiveGameId() : gameId;
+  return !(activeId && (resumeFromTimeout || currentQuarter > 1));
+}
+
+function buildEnergyCell(percent) {
+  const energyClass = getEnergyClassFromPercent(percent);
+  const td = document.createElement('td');
+  td.className = 'eng-cell';
+  td.innerHTML = `
+    <div class="eng">
+      <div class="engbar"><i class="${energyClass}" style="width:${Math.max(0, Math.min(100, percent))}%"></i></div>
+      <span class="engnum ${energyClass}">${percent}%</span>
+    </div>`;
+  return td;
+}
+
+function buildMoPipsCell(moValue) {
+  const td = document.createElement('td');
+  const mo = Math.max(-5, Math.min(5, Number(moValue) || 0));
+  const neg = [];
+  const pos = [];
+  for (let i = 1; i <= 5; i += 1) {
+    const onNeg = mo < 0 && i <= Math.abs(mo);
+    const onPos = mo > 0 && i <= mo;
+    neg.push(`<s class="${onNeg ? 'on neg' : ''}"></s>`);
+    pos.push(`<s class="${onPos ? 'on pos' : ''}"></s>`);
+  }
+  td.innerHTML = `
+    <div class="mo-pips" title="${mo === 0 ? '' : (mo > 0 ? '+' + mo : String(mo))}">
+      <div class="side neg">${neg.join('')}</div>
+      <div class="ctr"></div>
+      <div class="side pos">${pos.join('')}</div>
+    </div>`;
+  return td;
+}
+
+function buildHeadshotCell(playerId, playerName) {
+  const td = document.createElement('td');
+  td.className = 'hs-cell';
+  if (!playerId) {
+    td.innerHTML = '<div class="roster-empty-hs" aria-hidden="true"></div>';
+    return td;
+  }
+  const playerImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getPlayerImageUrl)
+    ? API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' })
+    : `/images/players/${playerId}.png`;
+  const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getGenericHeadshotUrl)
+    ? API_CONFIG.getGenericHeadshotUrl({ size: 'card' })
+    : '/images/players/generic_headshot.png';
+  const img = document.createElement('img');
+  img.className = 'roster-headshot';
+  img.src = playerImg;
+  img.alt = playerName || '';
+  img.onerror = () => { img.onerror = null; img.src = genericImg; };
+  td.appendChild(img);
+  return td;
+}
+
+function buildRemoveCell(pos, playerId) {
+  const td = document.createElement('td');
+  td.className = 'rm-cell';
+  if (!pos || !playerId) return td;
+  if (isFtLockedPlayer(playerId)) return td;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'roster-row-remove';
+  btn.setAttribute('aria-label', `Remove player from ${pos}`);
+  btn.dataset.pos = pos;
+  btn.textContent = '✕';
+  td.appendChild(btn);
+  return td;
+}
+
+function appendSharedLeadingCells(tr, {
+  posLabel,
+  player,
+  playerId,
+  assignedSlot,
+  empty = false,
+}) {
+  const edgeClass = empty ? 'high' : getEnergyClassFromPercent(getEnergyPercent(player || {}));
+  const slotTd = document.createElement('td');
+  slotTd.className = 'slot-cell';
+  slotTd.style.setProperty('--edge', empty ? 'transparent' : getEnergyEdgeColor(edgeClass));
+  slotTd.textContent = posLabel || '--';
+  tr.appendChild(slotTd);
+
+  if (empty) {
+    tr.appendChild(buildHeadshotCell(null));
+    const nameTd = document.createElement('td');
+    nameTd.className = 'player-name-cell';
+    nameTd.innerHTML = '<span class="roster-empty-copy">Drag a player here</span>';
+    tr.appendChild(nameTd);
+    const emptyEng = document.createElement('td');
+    emptyEng.className = 'eng-cell';
+    emptyEng.textContent = '—';
+    tr.appendChild(emptyEng);
+    const emptyRt = document.createElement('td');
+    emptyRt.className = 'rt';
+    emptyRt.textContent = '—';
+    tr.appendChild(emptyRt);
+    return;
   }
 
-  if (av && typeof av === 'object' && av !== null && 'm' in av) {
-    if (desc) {
-      if (bv.m !== av.m) return bv.m - av.m;
-      return bv.a - av.a;
+  tr.appendChild(buildHeadshotCell(playerId, player?.name));
+
+  const nameTd = document.createElement('td');
+  nameTd.className = 'player-name-cell';
+  const wrap = document.createElement('div');
+  wrap.className = 'player-name-wrap';
+  const nameText = document.createElement('span');
+  nameText.className = 'player-name-link';
+  nameText.textContent = typeof formatNameWithJersey === 'function'
+    ? formatNameWithJersey(player.jersey, player.name)
+    : (player.name || '—');
+  wrap.appendChild(nameText);
+  if (isFtLockedPlayer(playerId)) {
+    const badge = document.createElement('span');
+    badge.className = 'ft-shooter-lock-badge';
+    badge.textContent = 'Free Throw Shooter';
+    wrap.appendChild(badge);
+  }
+  nameTd.appendChild(wrap);
+  tr.appendChild(nameTd);
+
+  tr.appendChild(buildEnergyCell(getEnergyPercent(player)));
+
+  const rt = getDisplayRt(player, assignedSlot);
+  const rtTd = document.createElement('td');
+  rtTd.className = `rt ${rtBucketClassOrEmpty(rt)}`;
+  rtTd.textContent = formatRtDisplay(rt);
+  tr.appendChild(rtTd);
+}
+
+function buildGroupHeaderRow(label, count, colSpan) {
+  const tr = document.createElement('tr');
+  tr.className = 'group-header';
+  const td = document.createElement('td');
+  td.colSpan = colSpan;
+  td.innerHTML = `<div class="roster-group-label">${label}<span class="cnt">${count}</span></div>`;
+  tr.appendChild(td);
+  return tr;
+}
+
+function buildGroupGapRow(colSpan) {
+  const tr = document.createElement('tr');
+  tr.className = 'group-gap';
+  const td = document.createElement('td');
+  td.colSpan = colSpan;
+  tr.appendChild(td);
+  return tr;
+}
+
+function comparePlayersForSort(a, b, columnName, direction) {
+  const desc = direction === 'desc';
+  const slotA = a._assignedSlot || null;
+  const slotB = b._assignedSlot || null;
+
+  const energyA = getEnergyPercent(a);
+  const energyB = getEnergyPercent(b);
+  const foulsA = getPlayerFouls(a);
+  const foulsB = getPlayerFouls(b);
+  const statsA = getGameStatsForRoster(a);
+  const statsB = getGameStatsForRoster(b);
+  const moA = Number(a.attributes?.MO ?? a.MO ?? 0) || 0;
+  const moB = Number(b.attributes?.MO ?? b.MO ?? 0) || 0;
+  const rtA = getDisplayRt(a, slotA);
+  const rtB = getDisplayRt(b, slotB);
+  const posA = slotA || getNaturalPosition(a);
+  const posB = slotB || getNaturalPosition(b);
+
+  let val1;
+  let val2;
+
+  if (columnName === 'PLAYER' || columnName === 'Player Name' || columnName === 'Name') {
+    val1 = a.name || '';
+    val2 = b.name || '';
+    return desc ? val2.localeCompare(val1) : val1.localeCompare(val2);
+  }
+  if (columnName === 'POS' || columnName === 'Pos') {
+    val1 = LINEUP_POSITIONS.indexOf(posA);
+    val2 = LINEUP_POSITIONS.indexOf(posB);
+    if (val1 < 0) val1 = 99;
+    if (val2 < 0) val2 = 99;
+  } else if (columnName === 'ENG' || columnName === 'NG') {
+    val1 = energyA;
+    val2 = energyB;
+  } else if (columnName === 'RT') {
+    val1 = Number(rtA);
+    val2 = Number(rtB);
+    if (!Number.isFinite(val1)) val1 = -Infinity;
+    if (!Number.isFinite(val2)) val2 = -Infinity;
+  } else if (columnName === 'F') {
+    val1 = foulsA;
+    val2 = foulsB;
+  } else if (columnName === 'MIN') {
+    val1 = Number(statsA.MIN) || 0;
+    val2 = Number(statsB.MIN) || 0;
+  } else if (columnName === 'MO') {
+    val1 = moA;
+    val2 = moB;
+  } else if (columnName === 'HT') {
+    const parseHeight = (h) => {
+      if (!h || h === '--') return 0;
+      const match = String(h).match(/(\d+)'(\d+)"/);
+      return match ? parseInt(match[1], 10) * 12 + parseInt(match[2], 10) : 0;
+    };
+    val1 = parseHeight(a.height);
+    val2 = parseHeight(b.height);
+  } else if (columnName === 'WT') {
+    val1 = parseInt(a.weight, 10) || 0;
+    val2 = parseInt(b.weight, 10) || 0;
+  } else if (['SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'].includes(columnName)) {
+    const attrsA = a.attributes || {};
+    const attrsB = b.attributes || {};
+    val1 = Math.floor((attrsA[`anchor_${columnName}`] ?? attrsA[columnName] ?? 0) / 10);
+    val2 = Math.floor((attrsB[`anchor_${columnName}`] ?? attrsB[columnName] ?? 0) / 10);
+  } else if (columnName === 'PTS') {
+    val1 = Number(statsA.PTS) || 0;
+    val2 = Number(statsB.PTS) || 0;
+  } else if (columnName === 'FGM/FGA') {
+    val1 = Number(statsA.FGM) || 0;
+    val2 = Number(statsB.FGM) || 0;
+    if (val1 === val2) {
+      val1 = Number(statsA.FGA) || 0;
+      val2 = Number(statsB.FGA) || 0;
     }
-    if (av.m !== bv.m) return av.m - bv.m;
-    return av.a - bv.a;
+  } else if (columnName === '3PTM/3PTA') {
+    val1 = Number(statsA['3PTM']) || 0;
+    val2 = Number(statsB['3PTM']) || 0;
+    if (val1 === val2) {
+      val1 = Number(statsA['3PTA']) || 0;
+      val2 = Number(statsB['3PTA']) || 0;
+    }
+  } else if (columnName === 'FTM/FTA') {
+    val1 = Number(statsA.FTM) || 0;
+    val2 = Number(statsB.FTM) || 0;
+    if (val1 === val2) {
+      val1 = Number(statsA.FTA) || 0;
+      val2 = Number(statsB.FTA) || 0;
+    }
+  } else if (columnName === 'DREB') {
+    val1 = Number(statsA.DREB) || 0;
+    val2 = Number(statsB.DREB) || 0;
+  } else if (columnName === 'OREB') {
+    val1 = Number(statsA.OREB) || 0;
+    val2 = Number(statsB.OREB) || 0;
+  } else if (columnName === 'TREB') {
+    val1 = (Number(statsA.DREB) || 0) + (Number(statsA.OREB) || 0);
+    val2 = (Number(statsB.DREB) || 0) + (Number(statsB.OREB) || 0);
+  } else if (columnName === 'AST') {
+    val1 = Number(statsA.AST) || 0;
+    val2 = Number(statsB.AST) || 0;
+  } else if (columnName === 'STL') {
+    val1 = Number(statsA.STL) || 0;
+    val2 = Number(statsB.STL) || 0;
+  } else if (columnName === 'BLK') {
+    val1 = Number(statsA.BLK) || 0;
+    val2 = Number(statsB.BLK) || 0;
+  } else if (columnName === 'TO') {
+    val1 = Number(statsA.TO) || 0;
+    val2 = Number(statsB.TO) || 0;
+  } else if (columnName === 'DEFA') {
+    val1 = Number(statsA.DEF_A) || 0;
+    val2 = Number(statsB.DEF_A) || 0;
+  } else if (columnName === 'DEF%') {
+    const defaA = Number(statsA.DEF_A) || 0;
+    const defaB = Number(statsB.DEF_A) || 0;
+    val1 = defaA > 0 ? ((Number(statsA.DEF_S) || 0) / defaA) * 100 : 0;
+    val2 = defaB > 0 ? ((Number(statsB.DEF_S) || 0) / defaB) * 100 : 0;
+  } else if (columnName === 'SCRA') {
+    val1 = Number(statsA.SCR_A) || 0;
+    val2 = Number(statsB.SCR_A) || 0;
+  } else if (columnName === 'SCR%') {
+    const scraA = Number(statsA.SCR_A) || 0;
+    const scraB = Number(statsB.SCR_A) || 0;
+    val1 = scraA > 0 ? ((Number(statsA.SCR_S) || 0) / scraA) * 100 : 0;
+    val2 = scraB > 0 ? ((Number(statsB.SCR_S) || 0) / scraB) * 100 : 0;
+  } else {
+    val1 = 0;
+    val2 = 0;
   }
 
-  const an = Number(av) || 0;
-  const bn = Number(bv) || 0;
-  return desc ? bn - an : an - bn;
+  if (desc) return val2 - val1;
+  return val1 - val2;
 }
 
-function applyRosterStatsSort() {
-  rosterStatsRows.sort(compareRosterStatsSnapshots);
+function sortPlayerList(list, columnName, direction) {
+  return [...list].sort((a, b) => comparePlayersForSort(a, b, columnName, direction));
 }
 
-function sortRosterDataInPlace(data, columnName, direction) {
-  const columnMap = {
-    'Player Name': 'name',
-    'Pos': 'pos',
-    'HT': 'height',
-    'WT': 'weight',
-    'SC': 'SC',
-    'SH': 'SH',
-    'ID': 'ID',
-    'OD': 'OD',
-    'PS': 'PS',
-    'BH': 'BH',
-    'RB': 'RB',
-    'ST': 'ST',
-    'AG': 'AG',
-    'ND': 'ND',
-    'IQ': 'IQ',
-    'FT': 'FT',
-    'NG': 'NG',
-    'RT': 'RT'
-  };
+function decoratePlayerForRoster(p) {
+  const playerId = getPlayerStableId(p);
+  const assignedSlot = getAssignedSlotForPlayer(playerId);
+  return { ...p, _playerId: playerId, _assignedSlot: assignedSlot };
+}
 
-  const dataKey = columnMap[columnName] || columnName;
+function updateLineupHeaderReads() {
+  const host = document.getElementById('lineup-header-reads');
+  if (!host) return;
+  if (isLineupPregameContext()) {
+    host.hidden = true;
+    host.innerHTML = '';
+    return;
+  }
+  const onCourt = LINEUP_POSITIONS
+    .map((pos) => (lineup[pos] ? playerMap[lineup[pos]] : null))
+    .filter(Boolean);
+  if (onCourt.length < 5) {
+    host.hidden = true;
+    host.innerHTML = '';
+    return;
+  }
+  const energies = onCourt.map(getEnergyPercent);
+  const avg = Math.round(energies.reduce((s, n) => s + n, 0) / energies.length);
+  const under70 = energies.filter((n) => n < 70).length;
+  const foulRisk = onCourt.filter((p) => getPlayerFouls(p) >= FOUL_TROUBLE_MIN).length;
+  host.hidden = false;
+  host.innerHTML = `
+    <span class="lineup-header-read"><span class="k">AVG ENG</span><span class="v">${avg}%</span></span>
+    <span class="lineup-header-read"><span class="k">BELOW 70%</span><span class="v${under70 ? ' is-alert' : ''}">${under70}</span></span>
+    <span class="lineup-header-read"><span class="k">FOUL TROUBLE</span><span class="v${foulRisk ? ' is-warn' : ''}">${foulRisk}</span></span>`;
+}
 
-  data.sort((a, b) => {
-    let val1;
-    let val2;
-
-    if (dataKey === 'name') {
-      val1 = a.name || '';
-      val2 = b.name || '';
-      return direction === 'desc' ? val2.localeCompare(val1) : val1.localeCompare(val2);
-    }
-    if (dataKey === 'RT') {
-      val1 = a.highestRT ?? -Infinity;
-      val2 = b.highestRT ?? -Infinity;
-    } else if (dataKey === 'pos') {
-      const posOrder = ['PG', 'SG', 'SF', 'PF', 'C'];
-      const posRatingsA = a.position_ratings || {};
-      const posRatingsB = b.position_ratings || {};
-      const entriesA = Object.entries(posRatingsA);
-      const entriesB = Object.entries(posRatingsB);
-      const bestA = entriesA.length ? entriesA.reduce((x, y) => y[1] > x[1] ? y : x)[0] : '';
-      const bestB = entriesB.length ? entriesB.reduce((x, y) => y[1] > x[1] ? y : x)[0] : '';
-      val1 = posOrder.indexOf(bestA);
-      val2 = posOrder.indexOf(bestB);
-    } else if (dataKey === 'height') {
-      const parseHeight = (h) => {
-        if (!h || h === '--') return 0;
-        const match = h.match(/(\d+)'(\d+)"/);
-        return match ? parseInt(match[1], 10) * 12 + parseInt(match[2], 10) : 0;
-      };
-      val1 = parseHeight(a.height);
-      val2 = parseHeight(b.height);
-    } else if (dataKey === 'weight') {
-      val1 = parseInt(a.weight, 10) || 0;
-      val2 = parseInt(b.weight, 10) || 0;
-    } else if (dataKey === 'NG') {
-      const attrsA = a.attributes || {};
-      const attrsB = b.attributes || {};
-      val1 = attrsA.NG ?? 1.0;
-      val2 = attrsB.NG ?? 1.0;
-    } else {
-      const attrsA = a.attributes || {};
-      const attrsB = b.attributes || {};
-      const rawValA = attrsA[`anchor_${dataKey}`] ?? attrsA[dataKey] ?? 0;
-      const rawValB = attrsB[`anchor_${dataKey}`] ?? attrsB[dataKey] ?? 0;
-      val1 = Math.floor(rawValA / 10);
-      val2 = Math.floor(rawValB / 10);
-    }
-
-    if (direction === 'desc') {
-      return val2 - val1;
-    }
-    return val1 - val2;
+function wireSortableHeaders(selector, _columnNames, onSort) {
+  document.querySelectorAll(selector).forEach((header) => {
+    const col = header.getAttribute('data-sort');
+    if (!col) return;
+    const newHeader = header.cloneNode(true);
+    header.parentNode.replaceChild(newHeader, header);
+    newHeader.style.cursor = 'pointer';
+    newHeader.style.userSelect = 'none';
+    newHeader.addEventListener('click', () => onSort(col));
   });
+}
+
+function createPlayerRowShell(player, { onCourt, assignedSlot, emptySlot }) {
+  const tr = document.createElement('tr');
+  if (emptySlot) {
+    tr.className = 'on-court empty-slot';
+    tr.dataset.slot = emptySlot;
+    tr.draggable = false;
+    return tr;
+  }
+  const playerId = player._playerId || getPlayerStableId(player);
+  tr.dataset.playerId = playerId;
+  if (assignedSlot) tr.dataset.slot = assignedSlot;
+  tr.classList.add(onCourt ? 'on-court' : 'bench');
+  if (player.ineligible || player.fouled_out) {
+    tr.classList.add('ineligible');
+    tr.style.opacity = '0.7';
+    tr.style.pointerEvents = 'none';
+    tr.style.cursor = 'not-allowed';
+    tr.draggable = false;
+  } else {
+    tr.draggable = !exhaustedUserLineupLocked;
+    tr.style.cursor = onCourt ? 'grab' : 'pointer';
+  }
+  if (isFtLockedPlayer(playerId)) tr.classList.add('ft-shooter-locked');
+  return tr;
+}
+
+function renderRosterGame() {
+  const tbody = document.getElementById('roster-body-game');
+  if (!tbody) return;
+  tbody.innerHTML = '';
+  const colSpan = 9;
+  const decorated = roster.map(decoratePlayerForRoster);
+  const onCourtFilled = [];
+  const emptySlots = [];
+  LINEUP_POSITIONS.forEach((pos) => {
+    const pid = lineup[pos];
+    if (!pid) {
+      emptySlots.push(pos);
+      return;
+    }
+    const player = decorated.find((p) => String(p._playerId) === String(pid));
+    if (player) onCourtFilled.push({ ...player, _assignedSlot: pos });
+    else emptySlots.push(pos);
+  });
+  const onCourtSorted = sortPlayerList(onCourtFilled, gameSortColumn, gameSortDirection);
+  const bench = sortPlayerList(
+    decorated.filter((p) => !p._assignedSlot),
+    gameSortColumn,
+    gameSortDirection
+  );
+  const fragment = document.createDocumentFragment();
+  fragment.appendChild(buildGroupHeaderRow('ON COURT', 5, colSpan));
+  onCourtSorted.forEach((p) => {
+    const tr = createPlayerRowShell(p, { onCourt: true, assignedSlot: p._assignedSlot });
+    appendSharedLeadingCells(tr, {
+      posLabel: p._assignedSlot,
+      player: p,
+      playerId: p._playerId,
+      assignedSlot: p._assignedSlot,
+    });
+    const stats = getGameStatsForRoster(p);
+    const fouls = Number(stats.F) || 0;
+    const foulTd = document.createElement('td');
+    foulTd.className = `foul-cell${fouls >= 5 ? ' out' : (fouls >= FOUL_TROUBLE_MIN ? ' warn' : '')}`;
+    foulTd.textContent = String(fouls);
+    tr.appendChild(foulTd);
+    const minTd = document.createElement('td');
+    minTd.textContent = formatMinutesRosterStats(Number(stats.MIN) || 0);
+    tr.appendChild(minTd);
+    tr.appendChild(buildMoPipsCell(p.attributes?.MO ?? p.MO ?? 0));
+    tr.appendChild(buildRemoveCell(p._assignedSlot, p._playerId));
+    fragment.appendChild(tr);
+  });
+  emptySlots.forEach((pos) => {
+    const tr = createPlayerRowShell(null, { emptySlot: pos });
+    appendSharedLeadingCells(tr, { posLabel: pos, empty: true });
+    for (let i = 0; i < 3; i += 1) {
+      const td = document.createElement('td');
+      td.textContent = '—';
+      tr.appendChild(td);
+    }
+    tr.appendChild(document.createElement('td'));
+    fragment.appendChild(tr);
+  });
+  fragment.appendChild(buildGroupGapRow(colSpan));
+  fragment.appendChild(buildGroupHeaderRow('BENCH', bench.length, colSpan));
+  bench.forEach((p) => {
+    const tr = createPlayerRowShell(p, { onCourt: false, assignedSlot: null });
+    appendSharedLeadingCells(tr, {
+      posLabel: getNaturalPosition(p),
+      player: p,
+      playerId: p._playerId,
+      assignedSlot: null,
+    });
+    const stats = getGameStatsForRoster(p);
+    const fouls = Number(stats.F) || 0;
+    const foulTd = document.createElement('td');
+    foulTd.className = `foul-cell${fouls >= 5 ? ' out' : (fouls >= FOUL_TROUBLE_MIN ? ' warn' : '')}`;
+    foulTd.textContent = String(fouls);
+    tr.appendChild(foulTd);
+    const minTd = document.createElement('td');
+    minTd.textContent = formatMinutesRosterStats(Number(stats.MIN) || 0);
+    tr.appendChild(minTd);
+    tr.appendChild(buildMoPipsCell(p.attributes?.MO ?? p.MO ?? 0));
+    tr.appendChild(document.createElement('td'));
+    fragment.appendChild(tr);
+  });
+  tbody.appendChild(fragment);
+  wireSortableHeaders('#roster-game-pane .roster-table thead th', ROSTER_GAME_COLUMN_NAMES, sortRosterGame);
 }
 
 function renderRosterAttributes() {
   const tbody = document.getElementById('roster-body');
   if (!tbody) return;
   tbody.innerHTML = '';
-
-  rosterDataForSorting = roster.map(p => {
-    const posRatings = p.position_ratings || {};
-    const rtValues = Object.values(posRatings);
-    const highestRT = rtValues.length > 0 ? Math.max(...rtValues) : -Infinity;
-    return { ...p, highestRT };
+  const colSpan = 20;
+  const decorated = roster.map(decoratePlayerForRoster);
+  const onCourtFilled = [];
+  const emptySlots = [];
+  LINEUP_POSITIONS.forEach((pos) => {
+    const pid = lineup[pos];
+    if (!pid) {
+      emptySlots.push(pos);
+      return;
+    }
+    const player = decorated.find((p) => String(p._playerId) === String(pid));
+    if (player) onCourtFilled.push({ ...player, _assignedSlot: pos });
+    else emptySlots.push(pos);
   });
-
-  sortRosterDataInPlace(rosterDataForSorting, attrSortColumn, attrSortDirection);
-
+  const onCourtSorted = sortPlayerList(onCourtFilled, attrSortColumn, attrSortDirection);
+  const bench = sortPlayerList(
+    decorated.filter((p) => !p._assignedSlot),
+    attrSortColumn,
+    attrSortDirection
+  );
   const fragment = document.createDocumentFragment();
+  fragment.appendChild(buildGroupHeaderRow('ON COURT', 5, colSpan));
 
-  function getEnergyClass(ngValue) {
-    const percent = Math.round((ngValue ?? 1.0) * 100);
-    if (percent >= 90) return 'high';
-    if (percent >= 80) return 'medium';
-    if (percent >= 70) return 'low';
-    return 'critical';
-  }
-
-  rosterDataForSorting.forEach(p => {
-    const playerId = getPlayerStableId(p);
-    const tr = document.createElement('tr');
-    tr.draggable = !p.ineligible;
-    if (playerId) tr.dataset.playerId = playerId;
-    if (p.ineligible || p.fouled_out) {
-      tr.classList.add('ineligible');
-      tr.style.backgroundColor = '#d3d3d3';
-      tr.style.opacity = '0.7';
-      tr.style.pointerEvents = 'none';
-      tr.style.cursor = 'not-allowed';
-    }
-    tr.addEventListener('dragstart', e => {
-      if (playerId) e.dataTransfer.setData('text/plain', playerId);
-    });
-
-    const posRatings = p.position_ratings || {};
-    let bestPos = '--';
-    let rt = '--';
-    const entries = Object.entries(posRatings);
-    if (entries.length) {
-      const [pos, rating] = entries.reduce((a, b) => (b[1] > a[1] ? b : a));
-      bestPos = pos;
-      rt = rating;
-    }
-    const anchorAttrs = p.attributes || {};
-
-    const displayPlayerName =
-      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : p.name;
-    const ngValue = anchorAttrs.NG ?? 1.0;
-    const weightValue = p.weight != null && p.weight !== '' ? p.weight : '--';
-    const cells = [
-      displayPlayerName,
-      bestPos,
+  function appendAttrTail(tr, p) {
+    const attrs = p.attributes || {};
+    const vals = [
       formatHeight(p.height),
-      weightValue,
-      `${Math.round(ngValue * 100)}%`,
-      Math.floor((anchorAttrs.anchor_SC ?? anchorAttrs.SC ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_SH ?? anchorAttrs.SH ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_ID ?? anchorAttrs.ID ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_OD ?? anchorAttrs.OD ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_PS ?? anchorAttrs.PS ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_BH ?? anchorAttrs.BH ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_RB ?? anchorAttrs.RB ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_ST ?? anchorAttrs.ST ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_AG ?? anchorAttrs.AG ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_ND ?? anchorAttrs.ND ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_IQ ?? anchorAttrs.IQ ?? 0) / 10),
-      Math.floor((anchorAttrs.anchor_FT ?? anchorAttrs.FT ?? 0) / 10),
-      formatRtDisplay(rt)
+      p.weight != null && p.weight !== '' ? p.weight : '--',
+      Math.floor((attrs.anchor_SC ?? attrs.SC ?? 0) / 10),
+      Math.floor((attrs.anchor_SH ?? attrs.SH ?? 0) / 10),
+      Math.floor((attrs.anchor_ID ?? attrs.ID ?? 0) / 10),
+      Math.floor((attrs.anchor_OD ?? attrs.OD ?? 0) / 10),
+      Math.floor((attrs.anchor_PS ?? attrs.PS ?? 0) / 10),
+      Math.floor((attrs.anchor_BH ?? attrs.BH ?? 0) / 10),
+      Math.floor((attrs.anchor_RB ?? attrs.RB ?? 0) / 10),
+      Math.floor((attrs.anchor_ST ?? attrs.ST ?? 0) / 10),
+      Math.floor((attrs.anchor_AG ?? attrs.AG ?? 0) / 10),
+      Math.floor((attrs.anchor_ND ?? attrs.ND ?? 0) / 10),
+      Math.floor((attrs.anchor_IQ ?? attrs.IQ ?? 0) / 10),
+      Math.floor((attrs.anchor_FT ?? attrs.FT ?? 0) / 10),
     ];
-    const classes = ['', '', 'ht', 'wt', `ng ${getEnergyClass(ngValue)}`, '', '', '', '', '', '', '', '', '', '', '', '', `rt ${rtBucketClassOrEmpty(rt)}`];
-
-    cells.forEach((val, idx) => {
+    vals.forEach((val) => {
       const td = document.createElement('td');
-      if (idx === 0) {
-        td.className = 'player-name-cell';
-        const wrap = document.createElement('div');
-        wrap.className = 'player-name-wrap';
-        const nameText = document.createElement('span');
-        nameText.textContent = val ?? '--';
-        nameText.className = 'player-name-link';
-        wrap.appendChild(nameText);
-        td.appendChild(wrap);
-      } else {
-        td.textContent = val ?? '--';
-      }
-      if (classes[idx]) td.className = classes[idx];
+      td.textContent = val ?? '--';
       tr.appendChild(td);
     });
+  }
 
+  onCourtSorted.forEach((p) => {
+    const tr = createPlayerRowShell(p, { onCourt: true, assignedSlot: p._assignedSlot });
+    appendSharedLeadingCells(tr, {
+      posLabel: p._assignedSlot,
+      player: p,
+      playerId: p._playerId,
+      assignedSlot: p._assignedSlot,
+    });
+    appendAttrTail(tr, p);
+    tr.appendChild(buildRemoveCell(p._assignedSlot, p._playerId));
     fragment.appendChild(tr);
   });
-
-  tbody.appendChild(fragment);
-
-  const sortableHeaders = document.querySelectorAll('#roster-attributes-pane .roster-table thead th');
-  sortableHeaders.forEach((header, index) => {
-    const newHeader = header.cloneNode(true);
-    header.parentNode.replaceChild(newHeader, header);
-
-    newHeader.style.cursor = 'pointer';
-    newHeader.style.userSelect = 'none';
-    newHeader.addEventListener('click', () => {
-      const columnNames = ['Player Name', 'Pos', 'HT', 'WT', 'NG', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT', 'RT'];
-      sortRoster(columnNames[index]);
-    });
+  emptySlots.forEach((pos) => {
+    const tr = createPlayerRowShell(null, { emptySlot: pos });
+    appendSharedLeadingCells(tr, { posLabel: pos, empty: true });
+    for (let i = 0; i < 14; i += 1) {
+      const td = document.createElement('td');
+      td.textContent = '—';
+      tr.appendChild(td);
+    }
+    tr.appendChild(document.createElement('td'));
+    fragment.appendChild(tr);
   });
-
-  // Re-attach attribute tooltips after the sort-handler clone loop above.
-  // cloneNode(true) does NOT copy event listeners, so any mouseenter/mouseleave
-  // handlers attached by initAttributeTooltips on the original th elements get
-  // wiped when the headers are replaced. We re-attach here so the tooltips
-  // survive every re-render (initial paint, sort clicks, autoset, etc.).
+  fragment.appendChild(buildGroupGapRow(colSpan));
+  fragment.appendChild(buildGroupHeaderRow('BENCH', bench.length, colSpan));
+  bench.forEach((p) => {
+    const tr = createPlayerRowShell(p, { onCourt: false, assignedSlot: null });
+    appendSharedLeadingCells(tr, {
+      posLabel: getNaturalPosition(p),
+      player: p,
+      playerId: p._playerId,
+      assignedSlot: null,
+    });
+    appendAttrTail(tr, p);
+    tr.appendChild(document.createElement('td'));
+    fragment.appendChild(tr);
+  });
+  tbody.appendChild(fragment);
+  wireSortableHeaders('#roster-attributes-pane .roster-table thead th', ROSTER_ATTR_COLUMN_NAMES, sortRoster);
   if (typeof initAttributeTooltips !== 'undefined') {
     const thead = document.querySelector('#roster-attributes-pane .roster-table thead');
-    if (thead) {
-      initAttributeTooltips(thead, ['th', '[data-attr]']);
-    }
+    if (thead) initAttributeTooltips(thead, ['th', '[data-attr]']);
   }
 }
 
@@ -1318,30 +1681,31 @@ function renderRosterStats() {
   const tbody = document.getElementById('roster-body-stats');
   if (!tbody) return;
   tbody.innerHTML = '';
-
-  rosterStatsRows = roster.map(buildRosterStatsRowSnapshot);
-  applyRosterStatsSort();
-
-  const fragment = document.createDocumentFragment();
-
-  rosterStatsRows.forEach(snap => {
-    const p = snap.player;
-    const playerId = getPlayerStableId(p);
-    const stats = getGameStatsForRoster(p);
-    const tr = document.createElement('tr');
-    tr.draggable = !p.ineligible;
-    if (playerId) tr.dataset.playerId = playerId;
-    if (p.ineligible || p.fouled_out) {
-      tr.classList.add('ineligible');
-      tr.style.backgroundColor = '#d3d3d3';
-      tr.style.opacity = '0.7';
-      tr.style.pointerEvents = 'none';
-      tr.style.cursor = 'not-allowed';
+  const colSpan = 23;
+  const decorated = roster.map(decoratePlayerForRoster);
+  const onCourtFilled = [];
+  const emptySlots = [];
+  LINEUP_POSITIONS.forEach((pos) => {
+    const pid = lineup[pos];
+    if (!pid) {
+      emptySlots.push(pos);
+      return;
     }
-    tr.addEventListener('dragstart', e => {
-      if (playerId) e.dataTransfer.setData('text/plain', playerId);
-    });
+    const player = decorated.find((p) => String(p._playerId) === String(pid));
+    if (player) onCourtFilled.push({ ...player, _assignedSlot: pos });
+    else emptySlots.push(pos);
+  });
+  const onCourtSorted = sortPlayerList(onCourtFilled, statsSortColumn, statsSortDirection);
+  const bench = sortPlayerList(
+    decorated.filter((p) => !p._assignedSlot),
+    statsSortColumn,
+    statsSortDirection
+  );
+  const fragment = document.createDocumentFragment();
+  fragment.appendChild(buildGroupHeaderRow('ON COURT', 5, colSpan));
 
+  function appendStatsTail(tr, p) {
+    const stats = getGameStatsForRoster(p);
     const treb = (Number(stats.DREB) || 0) + (Number(stats.OREB) || 0);
     const defa = Number(stats.DEF_A) || 0;
     const defs = Number(stats.DEF_S) || 0;
@@ -1349,20 +1713,8 @@ function renderRosterStats() {
     const scra = Number(stats.SCR_A) || 0;
     const scrs = Number(stats.SCR_S) || 0;
     const scrPct = scra > 0 ? ((scrs / scra) * 100).toFixed(0) : '0';
-    const minDisplay = formatMinutesRosterStats(Number(stats.MIN) || 0);
-
-    const nameTd = document.createElement('td');
-    nameTd.className = 'player-name-cell';
-    const wrap = document.createElement('div');
-    wrap.className = 'player-name-wrap';
-    const nameText = document.createElement('span');
-    nameText.className = 'player-name-link';
-    nameText.textContent = typeof formatNameWithJersey === 'function' ? formatNameWithJersey(p.jersey, p.name) : (p.name || '—');
-    wrap.appendChild(nameText);
-    nameTd.appendChild(wrap);
-    tr.appendChild(nameTd);
-
-    const cellVals = [
+    const fouls = Number(stats.F) || 0;
+    const vals = [
       String(stats.PTS || 0),
       `${stats.FGM || 0}/${stats.FGA || 0}`,
       `${stats['3PTM'] || 0}/${stats['3PTA'] || 0}`,
@@ -1373,84 +1725,79 @@ function renderRosterStats() {
       String(stats.AST || 0),
       String(stats.STL || 0),
       String(stats.BLK || 0),
-      String(stats.F || 0),
+      String(fouls),
       String(stats.TO || 0),
       String(defa),
       `${defPct}%`,
       String(scra),
       `${scrPct}%`,
-      minDisplay
+      formatMinutesRosterStats(Number(stats.MIN) || 0),
     ];
-
-    cellVals.forEach(text => {
+    vals.forEach((text, idx) => {
       const td = document.createElement('td');
       td.textContent = text;
+      if (idx === 10) {
+        td.className = `foul-cell${fouls >= 5 ? ' out' : (fouls >= FOUL_TROUBLE_MIN ? ' warn' : '')}`;
+      }
       tr.appendChild(td);
     });
+  }
 
+  onCourtSorted.forEach((p) => {
+    const tr = createPlayerRowShell(p, { onCourt: true, assignedSlot: p._assignedSlot });
+    appendSharedLeadingCells(tr, {
+      posLabel: p._assignedSlot,
+      player: p,
+      playerId: p._playerId,
+      assignedSlot: p._assignedSlot,
+    });
+    appendStatsTail(tr, p);
+    tr.appendChild(buildRemoveCell(p._assignedSlot, p._playerId));
     fragment.appendChild(tr);
   });
-
-  tbody.appendChild(fragment);
-
-  const sortableHeaders = document.querySelectorAll('#roster-stats-pane .roster-stats-table thead th');
-  sortableHeaders.forEach((header, index) => {
-    const newHeader = header.cloneNode(true);
-    header.parentNode.replaceChild(newHeader, header);
-
-    newHeader.style.cursor = 'pointer';
-    newHeader.style.userSelect = 'none';
-    newHeader.addEventListener('click', () => {
-      sortRosterStats(ROSTER_STATS_COLUMN_NAMES[index]);
-    });
+  emptySlots.forEach((pos) => {
+    const tr = createPlayerRowShell(null, { emptySlot: pos });
+    appendSharedLeadingCells(tr, { posLabel: pos, empty: true });
+    for (let i = 0; i < 17; i += 1) {
+      const td = document.createElement('td');
+      td.textContent = '—';
+      tr.appendChild(td);
+    }
+    tr.appendChild(document.createElement('td'));
+    fragment.appendChild(tr);
   });
+  fragment.appendChild(buildGroupGapRow(colSpan));
+  fragment.appendChild(buildGroupHeaderRow('BENCH', bench.length, colSpan));
+  bench.forEach((p) => {
+    const tr = createPlayerRowShell(p, { onCourt: false, assignedSlot: null });
+    appendSharedLeadingCells(tr, {
+      posLabel: getNaturalPosition(p),
+      player: p,
+      playerId: p._playerId,
+      assignedSlot: null,
+    });
+    appendStatsTail(tr, p);
+    tr.appendChild(document.createElement('td'));
+    fragment.appendChild(tr);
+  });
+  tbody.appendChild(fragment);
+  wireSortableHeaders('#roster-stats-pane .roster-stats-table thead th', ROSTER_STATS_COLUMN_NAMES, sortRosterStats);
 }
 
 function applySelectionToRosterRows() {
-  const selectedIds = new Set(Object.values(lineup).filter(Boolean).map(id => String(id)));
-  roster.forEach(p => {
-    const playerId = getPlayerStableId(p);
-    if (!playerId) return;
-    document.querySelectorAll('tr[data-player-id]').forEach(row => {
-      if (String(row.dataset.playerId) !== String(playerId)) return;
-      if (selectedIds.has(String(playerId))) {
-        row.classList.add('selected');
-      } else {
-        row.classList.remove('selected');
-      }
-
-      if (!p.ineligible && !p.fouled_out) {
-        row.addEventListener('click', () => {
-          if (!Object.values(lineup).some(id => String(id) === String(playerId))) {
-            const assigned = fillNextSlot(playerId);
-            if (assigned) {
-              playSound('click-soft.mp3');
-            }
-          }
-        });
-      } else if (p.ineligible || p.fouled_out) {
-        row.classList.add('ineligible');
-        row.style.backgroundColor = '#d3d3d3';
-        row.style.opacity = '0.7';
-        row.style.pointerEvents = 'none';
-        row.style.cursor = 'not-allowed';
-      }
-    });
-  });
+  // Selection and interactions are bound once via bindRosterTableEvents().
 }
 
 function renderRoster() {
+  renderRosterGame();
   renderRosterAttributes();
   renderRosterStats();
-  applySelectionToRosterRows();
+  updateLineupHeaderReads();
+  bindRosterTableEvents();
 }
 
 function refreshLineupAvailabilityDisplay() {
-  if (currentView === 'player') {
-    renderPlayerView();
-  } else {
-    renderRoster();
-  }
+  renderRoster();
 }
 
 function sortRoster(columnName) {
@@ -1473,21 +1820,39 @@ function sortRosterStats(columnName) {
   renderRoster();
 }
 
+function sortRosterGame(columnName) {
+  if (gameSortColumn === columnName) {
+    gameSortDirection = gameSortDirection === 'desc' ? 'asc' : 'desc';
+  } else {
+    gameSortColumn = columnName;
+    gameSortDirection = 'desc';
+  }
+  renderRoster();
+}
+
 function initRosterPanelToggle() {
+  const btnGame = document.getElementById('roster-view-game');
   const btnAttr = document.getElementById('roster-view-attributes');
   const btnStats = document.getElementById('roster-view-stats');
+  const paneGame = document.getElementById('roster-game-pane');
   const paneAttr = document.getElementById('roster-attributes-pane');
   const paneStats = document.getElementById('roster-stats-pane');
-  if (!btnAttr || !btnStats || !paneAttr || !paneStats) return;
+  if (!btnGame || !btnAttr || !btnStats || !paneGame || !paneAttr || !paneStats) return;
 
   function apply(view) {
-    const isAttr = view === 'attributes';
-    btnAttr.classList.toggle('active', isAttr);
-    btnStats.classList.toggle('active', !isAttr);
-    paneAttr.hidden = !isAttr;
-    paneStats.hidden = isAttr;
+    rosterPanelView = view;
+    btnGame.classList.toggle('active', view === 'game');
+    btnAttr.classList.toggle('active', view === 'attributes');
+    btnStats.classList.toggle('active', view === 'stats');
+    paneGame.hidden = view !== 'game';
+    paneAttr.hidden = view !== 'attributes';
+    paneStats.hidden = view !== 'stats';
   }
 
+  btnGame.addEventListener('click', () => {
+    playSound('click-tiny.wav');
+    apply('game');
+  });
   btnAttr.addEventListener('click', () => {
     playSound('click-tiny.wav');
     apply('attributes');
@@ -1496,7 +1861,111 @@ function initRosterPanelToggle() {
     playSound('click-tiny.wav');
     apply('stats');
   });
-  apply('attributes');
+  apply('game');
+}
+
+function clearLineupSlot(pos) {
+  const removedId = lineup[pos];
+  if (isFtLockedPlayer(removedId)) {
+    if (typeof showToast === 'function') showToast('Free throw shooter must stay in the lineup');
+    return;
+  }
+  delete lineup[pos];
+  if (removedId != null && rimRunnerPlayerId != null && String(rimRunnerPlayerId) === String(removedId)) {
+    rimRunnerPlayerId = null;
+  }
+  updatePlayButton();
+  renderRoster();
+}
+
+function applyRosterDrop({ draggedPlayerId, sourcePos, dropPos }) {
+  if (!draggedPlayerId || !dropPos) return;
+  const existingAtDrop = lineup[dropPos] || null;
+  if (sourcePos && existingAtDrop) {
+    lineup[sourcePos] = existingAtDrop;
+  } else if (sourcePos && !existingAtDrop) {
+    delete lineup[sourcePos];
+  } else if (!sourcePos) {
+    for (const p of Object.keys(lineup)) {
+      if (String(lineup[p]) === String(draggedPlayerId)) delete lineup[p];
+    }
+  }
+  lineup[dropPos] = draggedPlayerId;
+  updatePlayButton();
+  playSound('click-soft.mp3');
+  renderRoster();
+}
+
+function bindRosterTableEvents() {
+  const container = document.getElementById('roster-table-container');
+  if (!container || rosterTableEventsBound) return;
+  rosterTableEventsBound = true;
+
+  container.addEventListener('dragstart', (e) => {
+    const tr = e.target.closest('tr[data-player-id]');
+    if (!tr || exhaustedUserLineupLocked) {
+      e.preventDefault();
+      return;
+    }
+    const playerId = tr.dataset.playerId;
+    const sourcePos = tr.dataset.slot || '';
+    e.dataTransfer.setData('text/plain', playerId);
+    if (sourcePos) e.dataTransfer.setData('application/x-slot-pos', sourcePos);
+    e.dataTransfer.effectAllowed = 'move';
+  });
+
+  container.addEventListener('dragover', (e) => {
+    const tr = e.target.closest('tr[data-slot]');
+    if (!tr) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+    tr.classList.add('drag-over');
+  });
+
+  container.addEventListener('dragleave', (e) => {
+    const tr = e.target.closest('tr[data-slot]');
+    if (tr) tr.classList.remove('drag-over');
+  });
+
+  container.addEventListener('drop', (e) => {
+    const tr = e.target.closest('tr[data-slot]');
+    if (!tr) return;
+    e.preventDefault();
+    tr.classList.remove('drag-over');
+    const draggedPlayerId = e.dataTransfer.getData('text/plain');
+    const dropPos = tr.dataset.slot;
+    let sourcePos = e.dataTransfer.getData('application/x-slot-pos') || null;
+    if (!sourcePos) {
+      for (const [p, id] of Object.entries(lineup)) {
+        if (String(id) === String(draggedPlayerId)) {
+          sourcePos = p;
+          break;
+        }
+      }
+    }
+    const player = playerMap[draggedPlayerId];
+    if (player && (player.ineligible || player.fouled_out)) {
+      showToast(`${player.name} has fouled out and cannot play`);
+      return;
+    }
+    applyRosterDrop({ draggedPlayerId, sourcePos, dropPos });
+  });
+
+  container.addEventListener('click', (e) => {
+    const removeBtn = e.target.closest('.roster-row-remove');
+    if (removeBtn) {
+      e.stopPropagation();
+      playSound('x-back.mp3');
+      clearLineupSlot(removeBtn.dataset.pos);
+      return;
+    }
+    const tr = e.target.closest('tr[data-player-id]');
+    if (!tr || tr.classList.contains('on-court') || tr.classList.contains('ineligible')) return;
+    const playerId = tr.dataset.playerId;
+    if (!playerId || Object.values(lineup).some((id) => String(id) === String(playerId))) return;
+    const assigned = fillNextSlot(playerId);
+    if (assigned) playSound('click-soft.mp3');
+  });
 }
 
 function updatePlayButton() {
@@ -1571,7 +2040,7 @@ function rosterRowsForAutosetApi() {
 
 async function autosetLineup() {
   playSound('chaotic-choice.wav');
-  document.querySelectorAll('.slot').forEach(slot => clearSlot(slot));
+  LINEUP_POSITIONS.forEach((pos) => { delete lineup[pos]; });
 
   if (!roster.length || roster.length < 5) {
     showToast('Roster not loaded yet');
@@ -1614,9 +2083,7 @@ async function autosetLineup() {
     ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
       if (lu[pos]) lineup[pos] = lu[pos];
     });
-    updateAllSlotDisplays();
     updatePlayButton();
-    setupSlotDragAndDrop();
     refreshLineupAvailabilityDisplay();
     showToast('Lineup auto-generated!');
   } catch (e) {
@@ -1625,147 +2092,10 @@ async function autosetLineup() {
   }
 }
 
-function updateSlotDisplay(slot) {
-  const pos = slot.dataset.pos;
-  const playerId = lineup[pos];
-  const remove = slot.querySelector('.remove');
-  const slotContent = slot.querySelector('.slot-content');
-  
-  if (playerId && playerMap[playerId]) {
-    const player = playerMap[playerId];
-    const rating = player.position_ratings?.[pos] ?? '--';
-    
-    // Get energy (same pattern as energy - check attributes first, then fallback)
-    const energy = player.attributes?.NG ?? player.NG ?? 1.0;
-    const energyPercent = Math.round(energy * 100);
-    
-    // Get stats - handle both flat (game stats) and nested (season stats) structures
-    // Game stats are already flattened at loadRoster line 211: rosterPlayer.stats = gp.stats?.game || gp.stats || {}
-    // Initial roster stats are nested: stats.season.PTS (from API line 1317)
-    const rawStats = player.stats || {};
-    const stats = rawStats.game || rawStats.season || rawStats || {};
-    
-    // Get all stats with fallbacks (same pattern as energy)
-    const fouls = stats.F || 0;
-    
-    // Get emotion (EM) - same pattern as energy: check attributes first, then fallback
-    const em = player.attributes?.EM ?? player.EM ?? 50;
-    let emoji = '😐'; // Default straight face
-    if (em >= 80) emoji = '😎';        // Sunglasses
-    else if (em >= 60) emoji = '😊';   // Big smile
-    else if (em >= 40) emoji = '😐';   // Straight face
-    else if (em >= 20) emoji = '😕';   // Slight frown
-    else emoji = '😡';                 // Angry face
-    
-    // Get momentum (MO) - same pattern as energy: check attributes first, then fallback
-    const momentum = player.attributes?.MO ?? player.MO ?? 0;
-    const moValue = typeof momentum === 'number' ? momentum : 0;
-    
-    // ✅ UNIFIED: Use same thresholds as Player Grid (70/80/90%) — green from 90%, yellow 80–89%
-    // Determine energy color class
-    let energyClass = 'high';
-    if (energyPercent < 70) energyClass = 'critical';
-    else if (energyPercent < 80) energyClass = 'low';
-    else if (energyPercent < 90) energyClass = 'medium';
-    
-    // Calculate momentum bar widths
-    let leftWidth = '0%';
-    let rightWidth = '0%';
-    if (moValue < 0) {
-      // Negative momentum: fill left side with red (MO scale ±5)
-      // Bar is center-anchored (right:50%), width = % of container, so the
-      // half = 50%. -5 fills the whole half (50%); -1 = 20% of half (10%).
-      const fillPercent = Math.min(50, Math.abs(moValue) / 5 * 50);
-      leftWidth = `${fillPercent}%`;
-    } else if (moValue > 0) {
-      // Positive momentum: fill right side with green (MO scale ±5)
-      // +5 fills the whole half (50% of container); +1 = 20% of half (10%).
-      const fillPercent = Math.min(50, moValue / 5 * 50);
-      rightWidth = `${fillPercent}%`;
-    }
-    
-    const playerImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getPlayerImageUrl)
-      ? API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' })
-      : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? `/static/images/players/${playerId}.png` : `/images/players/${playerId}.png`);
-    const genericImg = (typeof API_CONFIG !== 'undefined' && API_CONFIG.getGenericHeadshotUrl)
-      ? API_CONFIG.getGenericHeadshotUrl({ size: 'card' })
-      : ((window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') ? '/static/images/players/generic_headshot.png' : '/images/players/generic_headshot.png');
-    const slotDisplayName =
-      typeof formatNameWithJersey === 'function' ? formatNameWithJersey(player.jersey, player.name) : player.name;
-    // Build slot content HTML
-    slotContent.innerHTML = `
-      <div class="player-image-container">
-        <img class="player-image" src="${playerImg}"
-             onerror="this.src='${genericImg}'" alt="${player.name}">
-      </div>
-      <div class="slot-info">
-        <div class="slot-row-1">
-          <div class="player-name">${slotDisplayName}</div>
-          <div class="player-rating ${rtBucketClassOrEmpty(rating)}">RT: ${formatRtDisplay(rating)}</div>
-        </div>
-        <div class="slot-row-2">
-          <div class="slot-stat slot-stat-momentum">
-            <span class="slot-stat-label">MO</span>
-            <div class="player-momentum">
-              <div class="momentum-bar-container">
-                <div class="momentum-bar-left" style="width: ${leftWidth}"></div>
-                <div class="momentum-bar-center"></div>
-                <div class="momentum-bar-right" style="width: ${rightWidth}"></div>
-              </div>
-            </div>
-          </div>
-          <div class="slot-stat"><span class="slot-stat-label">F</span><span class="player-fouls${fouls >= 3 ? ' danger' : ''}">${fouls}</span></div>
-          <div class="slot-stat"><span class="slot-stat-label">ENG</span><span class="player-energy ${energyClass}">${energyPercent}%</span></div>
-        </div>
-      </div>
-    `;
-    
-    slotContent.classList.remove('empty');
-
-    // MO bar hover tooltip: signed value only ("+3" / "-2"), no copy, hidden at 0.
-    // innerHTML was just replaced, so this is a fresh element (no listener buildup).
-    if (moValue !== 0) {
-      const moBar = slotContent.querySelector('.player-momentum .momentum-bar-container');
-      if (moBar) {
-        setupPositionRatingTooltip(moBar, moValue > 0 ? `+${moValue}` : `${moValue}`);
-      }
-    }
-
-    // Show remove button — unless this player is the locked FT shooter, who
-    // cannot be removed (but can still be reordered via drag).
-    const ftLocked = isFtLockedPlayer(playerId);
-    if (remove) {
-      remove.hidden = ftLocked;
-      remove.disabled = ftLocked;
-    }
-    slot.classList.toggle('ft-shooter-locked', ftLocked);
-    if (ftLocked) {
-      const overlay = document.createElement('div');
-      overlay.className = 'ft-shooter-lock-overlay';
-      overlay.textContent = 'Free Throw Shooter';
-      slotContent.appendChild(overlay);
-    }
-
-    slot.classList.add('filled');
-    slot.draggable = true;  // reorder remains allowed even when FT-locked
-    slot.setAttribute('draggable', 'true');
-  } else {
-    // Empty slot
-    slotContent.innerHTML = '<span class="slot-empty-copy">Drag a player here</span>';
-    slotContent.classList.add('empty');
-
-    if (remove) {
-      remove.hidden = true;
-    }
-
-    slot.classList.remove('filled');
-    slot.classList.remove('ft-shooter-locked');
-    slot.draggable = false;
-    slot.setAttribute('draggable', 'false');
-  }
+function updateSlotDisplay(_slot) {
+  // Starting Five cards removed — table rows are the lineup UI.
 }
 
-/** Clear Rim Runner if that player is no longer in the lineup */
 function normalizeRimRunnerSelection() {
   if (rimRunnerPlayerId == null) return;
   const inLineup = Object.values(lineup).some((id) => String(id) === String(rimRunnerPlayerId));
@@ -1776,114 +2106,19 @@ function normalizeRimRunnerSelection() {
 
 function updateAllSlotDisplays() {
   normalizeRimRunnerSelection();
-  document.querySelectorAll('.slot').forEach(slot => {
-    updateSlotDisplay(slot);
-  });
+  updatePlayButton();
+  renderRoster();
 }
 
-function clearSlot(slot) {
-  const pos = slot.dataset.pos;
-  const removedId = lineup[pos];
-  // FT shooter safeguard: cannot remove the player owed free throws.
-  if (isFtLockedPlayer(removedId)) {
-    if (typeof showToast === 'function') showToast('Free throw shooter must stay in the lineup');
-    return;
-  }
-  delete lineup[pos];
-  if (removedId != null && rimRunnerPlayerId != null && String(rimRunnerPlayerId) === String(removedId)) {
-    rimRunnerPlayerId = null;
-  }
-  updateSlotDisplay(slot);
-  updatePlayButton();
-  
-  // Re-render views to update selection state
-  if (currentView === 'player') {
-    renderPlayerView();
-  } else {
-    renderRoster();
-  }
+function clearSlot(slotOrPos) {
+  const pos = typeof slotOrPos === 'string' ? slotOrPos : slotOrPos?.dataset?.pos;
+  if (!pos) return;
+  clearLineupSlot(pos);
 }
 
 function setupSlots() {
-  document.querySelectorAll('.slot').forEach(slot => {
-    clearSlot(slot);
-  });
-  
-  const slotsContainer = document.getElementById('slots');
-  if (!slotsContainer) return;
-
-  // Delegated dragstart on container
-  slotsContainer.addEventListener('dragstart', (e) => {
-    const slot = e.target.closest('.slot');
-    if (!slot) return;
-    const pos = slot.dataset.pos;
-    const playerId = lineup[pos];
-    if (playerId) {
-      console.log('[DND] dragstart', { pos, playerId });
-      dndLog('[DND] dragstart', { pos, playerId });
-      e.dataTransfer.setData('text/plain', playerId);
-      e.dataTransfer.setData('application/x-slot-pos', pos);
-      e.dataTransfer.effectAllowed = 'move';
-    } else {
-      e.preventDefault();
-    }
-  });
-
-  // Allow drops on slots
-  slotsContainer.addEventListener('dragover', (e) => {
-    if (e.target.closest('.slot')) {
-      e.preventDefault();
-      e.dataTransfer.dropEffect = 'move';
-    }
-  });
-
-  slotsContainer.addEventListener('drop', (e) => {
-    const slot = e.target.closest('.slot');
-    if (!slot) return;
-    e.preventDefault();
-
-    const draggedPlayerId = e.dataTransfer.getData('text/plain');
-    const dropPos = slot.dataset.pos;
-    console.log('[DND] drop start', { draggedPlayerId, dropPos, lineup: { ...lineup } });
-    dndLog('[DND] drop start', { draggedPlayerId, dropPos, lineup: { ...lineup } });
-    if (!draggedPlayerId) return;
-
-    // Infer source slot from lineup
-    let sourcePos = null;
-    for (const [p, id] of Object.entries(lineup)) {
-      if (id === draggedPlayerId) { sourcePos = p; break; }
-    }
-
-    const existingAtDrop = lineup[dropPos] || null;
-    console.log('[DND] resolved', { sourcePos, existingAtDrop });
-    dndLog('[DND] resolved', { sourcePos, existingAtDrop });
-
-    // Swap/move logic
-    if (sourcePos && existingAtDrop) {
-      lineup[sourcePos] = existingAtDrop;
-    } else if (sourcePos && !existingAtDrop) {
-      delete lineup[sourcePos];
-    } else if (!sourcePos) {
-      // Ensure uniqueness if dragged from roster
-      for (const p of Object.keys(lineup)) {
-        if (lineup[p] === draggedPlayerId) delete lineup[p];
-      }
-    }
-
-    lineup[dropPos] = draggedPlayerId;
-    console.log('[DND] drop end', { lineup: { ...lineup } });
-    dndLog('[DND] drop end', { lineup: { ...lineup } });
-
-    updateAllSlotDisplays();
-    updatePlayButton();
-    playSound('click-soft.mp3');
-
-    if (currentView === 'player') {
-      renderPlayerView();
-    } else {
-      renderRoster();
-    }
-  });
+  // Cards removed. Table drag/drop is bound in bindRosterTableEvents().
+  bindRosterTableEvents();
 }
 
 function resolveTeam() {
@@ -2086,25 +2321,9 @@ function removeIneligiblePlayersFromLineup() {
     // If player is ineligible (fouled out), remove from lineup
     if (player && (player.ineligible || player.fouled_out)) {
       console.log(`✅ [FOUL-OUT] Removing ${player.name} (ID: ${playerId}) from ${pos} slot (fouled out)`);
-      lineup[pos] = null;
+      delete lineup[pos];
       removedCount++;
-      
-      // Clear the slot display
-      const slot = document.querySelector(`.slot[data-pos="${pos}"]`);
-      if (slot) {
-        const slotContent = slot.querySelector('.slot-content');
-        if (slotContent) {
-          slotContent.innerHTML = '';
-          slotContent.classList.add('empty');
-          slot.classList.remove('filled');
-          slot.draggable = false;
-          const removeBtn = slot.querySelector('.remove');
-          if (removeBtn) removeBtn.hidden = true;
-        }
-        console.log(`✅ [FOUL-OUT] Cleared ${pos} slot display`);
-      } else {
-        console.warn(`⚠️ [FOUL-OUT] Slot element not found for position ${pos}`);
-      }
+      console.log(`✅ [FOUL-OUT] Cleared ${pos} from lineup`);
     }
   });
   
@@ -2248,9 +2467,9 @@ async function init() {
   await loadRoster();
   initRosterPanelToggle();
   await setHeader();
-  setupSlots(); // Setup slot event handlers (this clears slots/lineup)
+  setupSlots(); // Bind table drag/drop (lineup starts empty until URL restore)
   
-  // Restore lineup from URL AFTER setupSlots (which clears the lineup)
+  // Restore lineup from URL
   restoreLineupFromUrl();
   
   // ✅ FOUL OUT: Remove ineligible players from lineup AFTER restoring from URL
@@ -2291,10 +2510,9 @@ async function init() {
     };
   };
   
-  await loadFtShooterLock(); // FT shooter lock state before slots render
-  updateAllSlotDisplays(); // Display restored lineup in slots
-  updatePlayButton(); // Update play button state based on restored lineup
-  refreshLineupAvailabilityDisplay(); // Keep left-side roster/card disabled state in sync with restored lineup
+  await loadFtShooterLock(); // FT shooter lock state before table render
+  updatePlayButton();
+  refreshLineupAvailabilityDisplay();
   lockExhaustedUserLineupControls();
   if (enteredExhaustedLineupState) showExhaustedUserLineupModal();
   try {
@@ -3185,36 +3403,12 @@ function assignToSlot(pos, playerId) {
   
   // Update lineup data
   lineup[pos] = playerId;
-  
-  // Update all slot displays to ensure position ratings are shown correctly
   updateAllSlotDisplays();
-  
-  updatePlayButton();
-  
-  // Re-attach event listeners after DOM update
-  setupSlotDragAndDrop();
-  
-  // Re-render views to update selection state
-  if (currentView === 'player') {
-    renderPlayerView();
-  } else {
-    renderRoster();
-  }
-  
   return true;
 }
 
 function getHighestOpenSlotPosition() {
-  const renderedSlots = Array.from(document.querySelectorAll('#slots .slot[data-pos]'));
-  for (const slot of renderedSlots) {
-    const pos = slot.dataset.pos;
-    if (pos && !lineup[pos]) {
-      return pos;
-    }
-  }
-
-  const fallbackPositions = ['PG', 'SG', 'SF', 'PF', 'C'];
-  return fallbackPositions.find(pos => !lineup[pos]) || null;
+  return LINEUP_POSITIONS.find(pos => !lineup[pos]) || null;
 }
 
 function fillNextSlot(playerId) {
@@ -3235,83 +3429,12 @@ function fillNextSlot(playerId) {
   return false;
 }
 
-// Make slots draggable for swapping
 function setupSlotDragAndDrop() {
-  const slots = document.querySelectorAll('.slot');
-  
-  slots.forEach(slot => {
-    const pos = slot.dataset.pos;
-    // Ensure draggable state reflects whether slot is filled
-    const filled = !!lineup[pos];
-    slot.draggable = filled;
-    slot.setAttribute('draggable', filled ? 'true' : 'false');
-
-    // Wire up remove button click event
-    const removeBtn = slot.querySelector('.remove');
-    if (removeBtn) {
-      // Remove any existing listeners to prevent duplicates
-      const newRemoveBtn = removeBtn.cloneNode(true);
-      removeBtn.parentNode.replaceChild(newRemoveBtn, removeBtn);
-      
-      newRemoveBtn.addEventListener('click', (e) => {
-        e.stopPropagation(); // Prevent slot click from firing
-        playSound('x-back.mp3');
-        clearSlot(slot);
-      });
-    }
-
-    // Provide drag data when dragging a filled slot
-    slot.addEventListener('dragstart', (e) => {
-      const playerId = lineup[pos];
-      if (!playerId) { e.preventDefault(); return; }
-      e.dataTransfer.setData('text/plain', playerId);
-      e.dataTransfer.effectAllowed = 'move';
-    });
-    
-    slot.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      slot.classList.add('drag-over');
-    });
-    
-    slot.addEventListener('dragleave', () => {
-      slot.classList.remove('drag-over');
-    });
-    
-    slot.addEventListener('drop', (e) => {
-      e.preventDefault();
-      slot.classList.remove('drag-over');
-      
-      const draggedId = e.dataTransfer.getData('text/plain');
-      const targetPos = pos;
-      if (!draggedId) return;
-      
-      // If slot is filled, swap; else assign
-      if (lineup[targetPos]) {
-        const currentId = lineup[targetPos];
-        const draggedPos = Object.keys(lineup).find(p => lineup[p] === draggedId);
-        if (draggedPos) {
-          lineup[draggedPos] = currentId;
-          lineup[targetPos] = draggedId;
-          updateAllSlots();
-        } else {
-          assignToSlot(targetPos, draggedId);
-        }
-      } else {
-        assignToSlot(targetPos, draggedId);
-      }
-      playSound('click-soft.mp3');
-    });
-  });
+  // Cards removed; table DnD is bound in bindRosterTableEvents().
 }
 
 function updateAllSlots() {
-  // Use the new updateAllSlotDisplays() function which handles the new HTML structure
   updateAllSlotDisplays();
-  updatePlayButton();
-  // Re-attach event listeners after DOM update
-  setupSlotDragAndDrop();
-  if (currentView === 'player') renderPlayerView();
-  if (currentView === 'grid') renderRoster();
 }
 
 // D&D on-screen debug overlay

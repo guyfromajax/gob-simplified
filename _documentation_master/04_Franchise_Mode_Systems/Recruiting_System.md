@@ -205,7 +205,7 @@ remaining are the same picture. Counter reads *spent / 7*.
 
 | State | When | Square shows |
 |---|---|---|
-| `is-filled` | a recruit visited | headshot · name · then one line of year (left) / position (centre) / RT cur-pot (right) · current lean ladder |
+| `is-filled` | a recruit visited | one header line of week (left) / position (centre) / RT cur-pot (right) · headshot · name · year · current lean ladder |
 | `is-pending` | `week === current week`, unresolved | "This week" · *Set at training* · amber |
 | `is-missed` | a past week that gave no visit | "No visit" · *Invite spent* |
 | `is-upcoming` | week not yet reached | "Upcoming" · *Invite open* |
@@ -219,8 +219,13 @@ becomes a **fixed three-column grid**, so one lean occupies one third and leaves
 two empty. Flex would stretch a lone lean to full width and make a one-lean recruit read
 identically to a three-lean one — the empty thirds are the information.
 
-The meta line is a `1fr auto 1fr` grid, not `space-between`: the position holds the tile's
-centre line whatever the year and RT either side of it measure.
+The header is a `1fr auto 1fr` grid, not `space-between`: that makes the flanking cells
+equal whatever they contain, so the position holds the tile's true centre line. Content
+sizing puts it ~1.4px off, which looks centred and is not — the test asserts sub-pixel.
+
+**Year is on its own line under the name.** Inline beside it, the year took ~24px off a
+148px-wide tile and clipped the name. The ladder is pinned to the bottom, so the extra
+line costs nothing.
 
 Squares are square by `aspect-ratio`, with a `min-height` floor that only takes over well
 below the page's 1360px cap. **No counter and no eyebrow** — seven squares are already the

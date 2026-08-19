@@ -555,12 +555,12 @@ function updatePlayerRow(rowEl, p, teamColor) {
   let pips = '';
   for (let i = 0; i < 5; i += 1) {
     const on = i < p.fouls;
-    const c = p.out ? RED : (p.fouls >= 4 ? GOLD : 'rgba(255,255,255,0.7)');
+    const c = p.out ? RED : (p.fouls >= 3 ? GOLD : 'rgba(255,255,255,0.7)');
     pips += `<span class="pip" style="background:${on ? c : 'rgba(255,255,255,0.14)'}"></span>`;
   }
   status.push(`<span class="pips">${pips}</span>`);
   if (p.out) status.push(`<span class="tag4" style="background:${RED};color:#2a0606">OUT</span>`);
-  else if (p.fouls >= 4) {
+  else if (p.fouls >= 3) {
     status.push(`<span class="tag4" style="color:${GOLD};box-shadow:inset 0 0 0 1px rgba(255,215,0,.4)">FOUL TROUBLE</span>`);
   }
   if (p.sub) status.push(`<span class="tag4" style="background:${GREEN};color:#06210a">IN</span>`);
@@ -590,7 +590,7 @@ function updatePlayerRow(rowEl, p, teamColor) {
 
   rowEl.classList.toggle('spot', !!p.spot);
   rowEl.classList.toggle('isout', !!p.out);
-  rowEl.classList.toggle('ft', !p.out && p.fouls >= 4);
+  rowEl.classList.toggle('ft', !p.out && p.fouls >= 3);
 }
 
 function updateTeamPanel(panelEl, teamPanel, awayColor, homeColor) {

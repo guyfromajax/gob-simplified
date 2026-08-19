@@ -1,11 +1,12 @@
-## Lineup Selection Screen ✅ **COMPLETE** (January 2025; re-verified against code June 2026)
+## Lineup Selection Screen ✅ **COMPLETE** (January 2025; re-verified against code June 2026; timeout-read redesign Aug 2026)
 
 **Base Constants**
 
 1. **Positions**: PG, SG, SF, PF, C (5 positions)
 2. **Fouled Out**: Players with 5+ fouls always excluded (applies to both manual and auto-set)
-3. **Auto-Set Only - Energy Thresholds**: Default NG >= 80%, Late Q4/OT NG >= 64%
-4. **Auto-Set Only - Foul Restrictions**: Q1 (>1), Q2 (>2), Q3 (>3), Q4 (>3 if >4min remaining), OT (none, but 5+ excluded)
+3. **Foul Trouble (display)**: F ≥ 3 on live gameplay surfaces (Set Lineup header / foul cells, court sim presentation)
+4. **Auto-Set Only - Energy Thresholds**: Default NG >= 80%, Late Q4/OT NG >= 64%
+5. **Auto-Set Only - Foul Restrictions**: Q1 (>1), Q2 (>2), Q3 (>3), Q4 (>3 if >4min remaining), OT (none, but 5+ excluded)
 
 ---
 
@@ -14,80 +15,64 @@
 **Lineup Selection Screen Flow (4 Steps)**
 
 1. **Load Roster Data** - Fetch from mode-specific endpoint, merge game data if `gameId` exists
-2. **Display Player Information** - Show stats (PTS, REB, AST, Def%), attributes (EM, MO, NG), fouls
-3. **Set Lineup** - Drag-and-drop players to positions, real-time validation
+2. **Display Player Information** - Game / Attributes / Stats views in one table; on-court five grouped above bench
+3. **Set Lineup** - Click or drag within the table (including empty on-court placeholder rows), real-time validation
 4. **Save and Navigate** - Lineup saved to URL parameters, navigate to Game Plan/Box Score/Gameplay
 
 **Long Form Documentation**
 
 ### Overview
 
-The Lineup Selection Screen allows users to set their starting lineup before each game and during timeouts. It displays comprehensive player information including current game stats, attributes, and eligibility status for all roster players.
+The Lineup Selection Screen allows users to set their starting lineup before each game and during timeouts. The right-hand Starting Five cards were removed: the roster table is the lineup UI. Default view is **Game**.
 
 **Key Features:**
-- Drag-and-drop lineup selection (5 positions)
-- Real-time display of player stats and attributes
-- Player eligibility filtering (fouled out)
-- Grid view and player card view modes
-- Pre-game and in-game (timeout) lineup management
+- `Game | Attributes | Stats` segmented views (Game default)
+- On-court (5) + Bench groups; empty slots as placeholder rows
+- ENG bar + RT beside the player name in all views (existing 90/80/70 energy bands)
+- MO as −5…+5 pip ladder (red left / white right) in Game view
+- Header reads (in-game only, current five): AVG ENG, BELOW 70%, FOUL TROUBLE (F≥3)
+- Right rail: Playbook + Play Call Center shot-weight bar charts (existing `getPswColor` scale)
+- Autoset Lineup below the table (left)
 
 ### Data Sources
 
 **Backend:**
 - **Roster API**: ✅ UNIFIED endpoint `/roster/{team_name}` with query parameters (`?franchise_id={id}` or `?tournament_id={id}`) for all modes
 - **Game API** (`/api/game/{gameId}`): Returns player stats (including F = fouls), attributes (EM, MO, CH, NG)
+- **Playbooks API** (`/api/playbooks`): `position_shot_weights.playbooks` + `position_shot_weights.playcall_center`
 
 **Frontend:**
-- `loadRoster()`: Loads roster, merges game data if `gameId` exists; derives fouled-out status from game stats (F ≥ 5) on each visit
-- `updateSlotDisplay()`: Displays stats/attributes for lineup players
+- `FrontEnd/static/set-lineup.html` / `set-lineup.js` / `set-lineup.css`
+- `loadRoster()`, `renderRoster()`, `autosetLineup()` → `POST /api/autoset-lineup`
 
 ### Player Stats and Attributes Display
 
-**Lineup Players Show:**
-- Stats: PTS, REB (OREB+DREB+REB), AST, DEF% (`DEF_S/DEF_A*100`, displayed as a whole-number percent)
-- Attributes: EM (emoji), MO (visual bar -5 to +5), NG (color-coded %), Fouls
+**Shared leading columns (all views):** POS · headshot · PLAYER · ENG · RT
+- On-court POS = assigned slot; bench POS = highest-rated position
+- On-court RT = that slot’s `position_ratings[pos]`; bench RT = highest rating
+- ENG uses existing bands: ≥90 green, 80–89 yellow, 70–79 orange, &lt;70 red (bar fill; number is white opacity only)
 
-**NG color bands (lineup bars and grid view aligned):** Red &lt;70%, Orange 70–80%, Yellow 80–89%, Green 90–100%.
+**Game view:** F · MIN · MO (pips)
+**Attributes:** HT WT SC SH ID OD PS BH RB ST AG ND IQ FT (NG relocated into ENG; trailing RT relocated)
+**Stats:** existing box-score columns unchanged after the shared prefix
 
-**Data Flow:**
-- **Pre-Game**: Roster loads → Game initialized (`/api/init-game`, `game_id` written to URL) → Game data merged via `getActiveGameId()` → All players get game EM/MO/NG (MO = 0 at init)
-- **In-Game**: Roster loads → Game data fetched → Stats/attributes merged → Lineup players display current values
+**NG color bands (bars):** Red &lt;70%, Orange 70–80%, Yellow 80–89%, Green 90–100%.
 
-**Mode-Specific Handling:**
-- **All modes:** Roster loads first; when a `game_id` is available (URL or just written by `init-game`), `/api/game/{gameId}` merges **game** stats and attributes (EM, MO, NG) onto roster rows. Gameplay MO always starts at **0** at init (`Player.randomize_game_attributes`); franchise roster docs may still carry training MO in FPD — the merge must win for display.
-- **Single Game (sunset)**: Roster base attributes + merged game stats/attributes
-- **Franchise**: Roster evolved attributes + merged game stats/attributes (do not show FPD training MO pre-game)
-- **Tournament (sunset)**: Roster base + tournament attributes + merged game stats/attributes
-
-### Pre-Game EM/MO Display Fix
-
-**Issue (2025):** EM/MO not displaying on pre-game lineup screen despite initialization.
-
-**Root Cause:** `/api/game/{gameId}` only returned lineup players (5), not all roster players (12).
-
-**Fix:** Changed to `team.get_all_players()` to return all players, ensuring all roster players get EM/MO attributes.
-
-**Issue (2026-06):** Pre-game MO bars showed stale non-zero values (e.g. Culture Builder Inspire MO on franchise roster) every game; court showed 0 correctly.
-
-**Root Cause:** Franchise command center opens set-lineup **without** `game_id`. `loadRoster()` calls `init-game`, writes `game_id` to the URL via `replaceState`, but the page-load `gameId` const stayed `null`, so the game merge was skipped and MO came from `/roster/...` (FPD) instead of the initialized game doc.
-
-**Fix:** After `init-game`, resolve the active id with `getActiveGameId()` (reads URL, falls back to page-load snapshot) before fetching `/api/game/...` and merging EM/MO/NG. Code: `FrontEnd/static/set-lineup.js` — `getActiveGameId()`, `loadRoster()` merge block.
+**Momentum:** integer −5…+5; table pips fill outward from center; negative = brand red, positive = white.
 
 ### Player Eligibility Filtering (Fouled Out)
 
-**How it works:** Each time the user enters the lineup screen (pre-game, after a timeout, after a quarter break), the screen fetches game data when `gameId` is present. When merging that game data into the roster, any player whose **game foul count (F) is ≥ 5** is marked ineligible (fouled out). No separate ineligible list is persisted or passed from the backend for this screen—eligibility is derived from current game stats on every visit.
+**How it works:** Each time the user enters the lineup screen (pre-game, after a timeout, after a quarter break), the screen fetches game data when `gameId` is present. When merging that game data into the roster, any player whose **game foul count (F) is ≥ 5** is marked ineligible (fouled out).
 
-**Manual selection:** Fouled-out players (5+ fouls) cannot be added to the lineup. They are greyed out and non-draggable in both grid view and player (card) view.
+**FT shooter lock:** designated free-throw shooter cannot be removed (✕ hidden; badge on row); reorder via drag still allowed.
 
-**Visual indicators:** Reduced opacity, grey styling, disabled drag-and-drop and click-to-fill for fouled-out players in grid and player views. Fouled-out players already in the lineup are removed when the lineup is restored/applied (e.g. from URL or after merge).
-
-**Note:** Energy and foul count filtering (NG thresholds, quarter-specific restrictions) are only applied in the Auto-Set Lineup feature, not for manual selection.
+**Manual selection:** Fouled-out players cannot be added. Click bench → fill next empty PG→C slot. Drag onto an on-court row (including empty placeholder) assigns that slot / swaps.
 
 ### Key Files
 
 **Frontend:**
 - `FrontEnd/static/set-lineup.html` - Page structure
-- `FrontEnd/static/set-lineup.js` - `loadRoster()`, `autosetLineup()` → `POST /api/autoset-lineup`, `updateSlotDisplay()`, `renderRoster()`, `updatePlayButton()`
+- `FrontEnd/static/set-lineup.js` - `loadRoster()`, `autosetLineup()` → `POST /api/autoset-lineup`, `renderRoster()`, `updatePlayButton()`
 - `FrontEnd/static/js/phaser/utils/autosetLineupApi.js` - `generateBothLineupsFromApi()` for sim Q2–Q4 (same endpoint)
 
 **Backend:**

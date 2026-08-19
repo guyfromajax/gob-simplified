@@ -560,21 +560,20 @@ tr.region-row td{padding:0;border:0}
 .vwk{aspect-ratio:1/1;min-height:152px;min-width:0;display:flex;flex-direction:column;align-items:center;
   gap:6px;padding:10px 10px 9px;border-radius:14px;border:1px solid var(--border-soft);
   background:rgba(255,255,255,.022);overflow:hidden}
-.vwk-hd{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:6px}
-.vwk-wk{font:700 8.5px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3)}
+/* Week, position, RT on one line — left, centre, right. A 1fr/auto/1fr grid, not
+   space-between, so the position holds the tile's centre line whatever the week and RT
+   either side of it measure. */
+.vwk-hd{width:100%;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:4px}
+.vwk-wk{font:700 8.5px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3);
+  text-align:left;min-width:0;overflow:hidden}
 .vwk-av{width:50px;height:50px;border-radius:10px;flex:0 0 auto;overflow:hidden;border:1px solid var(--border);
   background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02));
   display:flex;align-items:flex-end;justify-content:center;margin-top:2px}
 .vwk-av img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
 .vwk-nm{width:100%;text-align:center;font-weight:600;font-size:11.5px;line-height:1.15;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-/* Year, position, RT on one line — left, centre, right. A 1fr/auto/1fr grid, not
-   space-between, so the position stays on the tile's centre line whatever the other
-   two measure. */
-.vwk-meta{width:100%;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:4px;
-  font:500 9.5px/1 var(--body)}
-.vwk-yr{color:var(--muted-2);text-align:left;min-width:0;overflow:hidden}
-.vwk-pos{color:var(--muted);font-weight:700;text-align:center;white-space:nowrap}
+.vwk-yr{font:500 9.5px/1 var(--body);color:var(--muted-2)}
+.vwk-pos{font:700 9.5px/1 var(--body);color:var(--muted);text-align:center;white-space:nowrap}
 .vwk-rt{font:700 9.5px/1 var(--body);letter-spacing:.02em;text-align:right;min-width:0;overflow:hidden}
 /* The ladder is shared with the board, where it has room for 52px slots. Inside a
    square it divides the tile instead of setting its width. */

@@ -173,7 +173,7 @@ All breaks use **one mechanic**: bench → 0; active players decay **toward 0** 
 
 Driven by `gameScene.js`: `momentumValueForTeam()` reads `turn.{home,away}_team_momentum` (then the summary `team_momentum` fallback), and `updateMomentumBar(side, value)` maps the value over `±MO_TEAM_MAX_FE` (=25) to fill widths (rail fills the half-bar) each scoreboard update.
 
-The **player tooltip** momentum bar (and the **set-lineup** bar) read live MO: each turn's `player_momentum` is folded into `playerStats[id].MO`, and the tooltip reads `playerStats.MO` (falling back to the load-time `player.attributes.MO`). Both scale the fill over `±MO_MAX` (=5).
+The **player tooltip** momentum bar (and the **set-lineup** MO pip ladder) read live MO: each turn's `player_momentum` is folded into `playerStats[id].MO`, and the tooltip reads `playerStats.MO` (falling back to the load-time `player.attributes.MO`). Both scale over `±MO_MAX` (=5). Fill colors: **negative = red**, **positive = white** (team momentum bar remains red/green).
 
 **Pre-game set-lineup:** MO must come from the **game doc** after `init-game` (MO = 0), not franchise roster FPD (training Inspire can persist MO there). `loadRoster()` merges via `getActiveGameId()` so the URL written by `init-game` is used even when the page loaded without `game_id`. See `Lineup_Selection_Screen.md` § Pre-Game EM/MO Display Fix (2026-06).
 

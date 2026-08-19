@@ -1840,7 +1840,7 @@ export function createGameScene(Phaser) {
             leftBar.style.width = `${fillPercent}%`;
             rightBar.style.width = '0%';
           } else if (moValue > 0) {
-            // Positive momentum: fill right side with green (MO scale ±5)
+            // Positive momentum: fill right side with white (MO scale ±5)
             // +5 fills the whole half (50% of container); +1 = 20% of half (10%).
             const fillPercent = Math.min(50, moValue / 5 * 50);
             leftBar.style.width = '0%';

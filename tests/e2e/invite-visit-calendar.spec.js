@@ -101,7 +101,6 @@ const tiles = (page) => page.evaluate(() =>
       state: (t.querySelector('.vwk-state') || {}).textContent || null,
       rt: (t.querySelector('.vwk-rt') || {}).textContent || null,
       pos: (t.querySelector('.vwk-pos') || {}).textContent || null,
-      rtInHead: !!t.querySelector('.vwk-hd .vwk-rt'),
       yr: (t.querySelector('.vwk-yr') || {}).textContent || null,
       leanSlots: t.querySelectorAll('.lb-slot').length,
       leanYou: t.querySelectorAll('.lb-slot.is-you, .lb-slot.is-you-list').length,
@@ -179,32 +178,55 @@ test.describe('a spent week shows what it bought', () => {
     expect(t.leanYou).toBe(1);
   });
 
-  test('year, position and RT sit on one line — left, centre, right', async ({ page }) => {
+  test('week, position and RT share one header line — left, centre, right', async ({ page }) => {
     await mount(page, { week: 23, visits: { 20: 'r-1' } });
     const m = await page.evaluate(() => {
       const t = document.querySelector('#hub-visits .vwk.is-filled');
       const box = (sel) => t.querySelector(sel).getBoundingClientRect();
       const tile = t.getBoundingClientRect();
-      const yr = box('.vwk-yr'), pos = box('.vwk-pos'), rt = box('.vwk-rt');
+      const wk = box('.vwk-wk'), pos = box('.vwk-pos'), rt = box('.vwk-rt');
+      // Centre lines, not tops: the three run at different font sizes, so their boxes
+      // start a pixel apart even when they are perfectly on one line.
+      const midY = (r) => (r.top + r.bottom) / 2;
       return {
-        oneLine: Math.round(yr.top) === Math.round(pos.top) && Math.round(pos.top) === Math.round(rt.top),
-        order: yr.left < pos.left && pos.left < rt.left,
+        oneLine: Math.abs(midY(wk) - midY(pos)) < 2 && Math.abs(midY(pos) - midY(rt)) < 2,
+        order: wk.left < pos.left && pos.left < rt.left,
         // Centre means the tile's centre line, not merely "between the other two".
-        posCentred: Math.abs((pos.left + pos.right) / 2 - (tile.left + tile.right) / 2) < 2,
-        belowImage: yr.top >= box('.vwk-av').bottom,
+        // Sub-pixel, deliberately: space-between lands the position within 1.4px of
+        // centre here purely because "Wk 20" and the RT pair happen to measure alike,
+        // so a 2px tolerance would pass on a layout that only looks centred.
+        posOffset: Math.abs((pos.left + pos.right) / 2 - (tile.left + tile.right) / 2),
+        // What actually guarantees it: 1fr/auto/1fr makes the flanking cells equal,
+        // whatever their contents. Content-sized cells are 33.1 and 30.4.
+        flanksEqual: Math.abs(wk.width - rt.width) < 0.5,
+        aboveImage: pos.bottom <= box('.vwk-av').top,
       };
     });
     expect(m.oneLine).toBe(true);
     expect(m.order).toBe(true);
-    expect(m.posCentred).toBe(true);
-    expect(m.belowImage).toBe(true);
+    expect(m.posOffset).toBeLessThan(0.5);
+    expect(m.flanksEqual).toBe(true);
+    expect(m.aboveImage).toBe(true);
   });
 
-  test('RT left the header — the week stands alone up there', async ({ page }) => {
+  test('the year sits under the name, on its own line', async ({ page }) => {
+    // Inline beside the name it took ~24px off a 148px-wide tile and clipped the name.
     await mount(page, { week: 23, visits: { 20: 'r-1' } });
-    const t = (await tiles(page))[0];
-    expect(t.rtInHead).toBe(false);
-    expect(t.rt).toBeTruthy();
+    const m = await page.evaluate(() => {
+      const t = document.querySelector('#hub-visits .vwk.is-filled');
+      const nm = t.querySelector('.vwk-nm');
+      const nmBox = nm.getBoundingClientRect();
+      const yr = t.querySelector('.vwk-yr').getBoundingClientRect();
+      return {
+        below: yr.top >= nmBox.bottom - 1,
+        // The name gets the tile's full usable width back.
+        nameFullWidth: nmBox.width >= t.clientWidth - 21,
+        nameClips: getComputedStyle(nm).textOverflow === 'ellipsis',
+      };
+    });
+    expect(m.below).toBe(true);
+    expect(m.nameFullWidth).toBe(true);
+    expect(m.nameClips).toBe(true);
   });
 
   test('one lean takes one third, not the whole ladder', async ({ page }) => {
