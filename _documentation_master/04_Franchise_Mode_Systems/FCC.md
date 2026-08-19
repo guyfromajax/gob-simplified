@@ -927,7 +927,16 @@ Recruiting is a first-class FCC presence all season. Levels are driven by **stat
 | Prompted | Board unsent this week, or unseen wire events | `.inbox-badge` on the Recruiting tab |
 | Gated | Weeks 20–26 board unsent this week · Week 35 | `#play-now` itself |
 
-**Colour law.** Green is reserved for the gating action. The only non-green control below `#play-now` is week 35's `Edit Recruiting Orders` ghost.
+**Colour law.** Green is reserved for the gating action. The only non-green control below `#play-now` is the `#fcc-edit-recruiting` ghost.
+
+**The ghost button** (`#fcc-edit-recruiting`) is the way *back* into recruiting. It appears exactly when the week's recruiting step is done and the green button has moved on — any earlier and it would only restate where green already goes.
+
+| Week | Fires when | Label |
+|---|---|---|
+| 20–26 | `board_saved_week === week` | `Edit Recruit Invites` |
+| 35 | `week_35_orders_submitted` | `Edit Recruiting Orders` |
+
+One element, one handler (`openRecruitingSurface()`), same box as `#play-now` with a ghost fill. Going back is safe in both windows: unsubmitted edits made in the Hub are held by the sessionStorage draft, and re-submitting overwrites.
 
 **REMOVED: the amber secondary hero button.** It restated, under the green action bar, news the Coach's Office recruiting card already carries in full. `.fcc-rec-btn` and the `#fcc-recruiting-secondary` markup are deleted; `recruitingButtonState()` survives because the tab badge still reads it through `recruitingIsPrompted()` (`renderRecruitingTabBadge`).
 
@@ -943,6 +952,7 @@ The green button runs **Recruit Invites → Training → Play Game**. Invites le
 - **Done = sent THIS week** (`recruiting_wire.board_saved_week === week`), not "has a board". FTD `Recruits` persists across weeks, so `has_saved_board` never clears once set and can only gate week 20.
 - Sits immediately after `cut_required` — an illegal roster outranks an unsent board.
 - **UI order only.** `/run-training` still 400s in week 20 with no board at all, and still accepts weeks 21–26 without a fresh one, so a stale client can never lock a save out of its week.
+- Once the step is done the ghost `Edit Recruit Invites` appears beneath the green button, so submitting is never a one-way door.
 
 **Out of Run Training.** `training.js` no longer routes to recruiting. Only the **route** was removed: the invite still fires on week advance using whatever board exists, so no week can be silently lost. Decoupling the *execution* was built and reversed once because Run Training was the only guaranteed weekly trigger — do not re-decouple it.
 

@@ -1,8 +1,6 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 2. Improve FB Outlet Pass denied animation
-3. FCC modal if user team earns a bye and loses a conference tourney game
-4. Verify timing of Recruit Visit logic and communicaiotn of that. Also need more P&C around announcing Recruiting Visits
 
 ##Playtest Launch / In Progress
 1. Steam

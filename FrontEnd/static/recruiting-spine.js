@@ -271,10 +271,6 @@
             '<span><i style="background:rgba(255,255,255,.5)"></i>Results · signed</span>' +
           '</div>' +
           '<div class="ptl-orient">' + INFO + '<span>' + orient + '</span></div>' +
-          // Visit log sits BELOW the timeline: the timeline says where the season is,
-          // this says what the player has spent. Supplied by the caller (the hub owns
-          // the data); absent elsewhere, so other phases render the timeline alone.
-          (opts.visitsHtml || '') +
         '</div></div>';
     },
 

@@ -1609,22 +1609,67 @@
    * arithmetic. Each visited week carries the recruit's CURRENT lean, not a snapshot,
    * so the log answers "where does that visit stand now".
    */
-  function visitLogHtml() {
+  /**
+   * The invite season as a seven-square calendar — one square per week 20-26.
+   *
+   * It replaces the Season-panel list. A list of seven rows makes the season read as
+   * history; seven squares in a row make it read as a BUDGET, which is what it is: seven
+   * invites, some spent, some still to come. The spent ones carry the recruit they
+   * bought, so the record and the remaining count are the same picture.
+   *
+   * Four states, and a past week that produced nothing is NOT the same as a week still
+   * to come — one is spent, the other is available:
+   *
+   *   filled   — a recruit visited: headshot, name, RT, year, current leans
+   *   pending  — this week, not yet resolved (visits are assigned at run-training)
+   *   missed   — a week that ran and gave no visit (empty board, or lost the draw)
+   *   upcoming — a week not yet reached
+   */
+  function visitWeekTileHtml(v) {
+    var wk = Number(v.week);
+    var label = '<span class="vwk-wk">Wk ' + wk + '</span>';
+
+    if (!v.recruit_id) {
+      var state_ = wk > state.week ? 'upcoming' : wk === state.week ? 'pending' : 'missed';
+      var copy = { upcoming: 'Upcoming', pending: 'This week', missed: 'No visit' }[state_];
+      var sub = { upcoming: 'Invite open', pending: 'Set at training', missed: 'Invite spent' }[state_];
+      return '<div class="vwk is-' + state_ + '">' +
+        '<div class="vwk-hd">' + label + '</div>' +
+        '<div class="vwk-empty"><span class="vwk-mark" aria-hidden="true"></span>' +
+          '<span class="vwk-state">' + copy + '</span>' +
+          '<span class="vwk-note">' + sub + '</span></div>' +
+        '</div>';
+    }
+
+    // The pool is the source for everything the visit payload does not carry (headshot,
+    // RT, year). Every visited recruit is still in it during weeks 20-26, but the
+    // fallback keeps a name and a lean on screen if one ever is not.
+    var r = state.byId[String(v.recruit_id)];
+    var model = r ? r.leanModel
+      : Spine.Lean.fromBackend({ Lean: v.lean }, { userTeamId: state.userTeamId, teamNameMap: state.teamNameMap });
+    var name = Common.escapeHtml(v.name || (r && r.name) || '--');
+    var rt = r ? Common.formatRtWithPotential(r.rt, r.potentialRt) : '--';
+    var rtCls = r ? Spine.rtClassForYear(r.rt, r.year) : '';
+    var year = r ? Common.escapeHtml(r.yearDisplay) : '--';
+    return '<div class="vwk is-filled">' +
+      '<div class="vwk-hd">' + label + '<span class="vwk-rt ' + rtCls + '">' + rt + '</span></div>' +
+      headshotBoxHtml(r, 'vwk-av') +
+      '<div class="vwk-nm">' + name + '</div>' +
+      '<div class="vwk-yr">' + year + '</div>' +
+      '<div class="vwk-lean">' + Spine.Lean.ladderHtml(model) + '</div>' +
+      '</div>';
+  }
+
+  function visitCalendarHtml() {
     var hist = state.visitHistory || [];
     if (!hist.length) return '';
-    var rows = hist.map(function (v) {
-      if (!v.recruit_id) {
-        return '<div class="vlog-row is-open"><span class="vlog-wk">Week ' + v.week + '</span>' +
-          '<span class="vlog-open">Invite available</span></div>';
-      }
-      var r = state.byId[String(v.recruit_id)];
-      var model = r ? r.leanModel
-        : Spine.Lean.fromBackend({ Lean: v.lean }, { userTeamId: state.userTeamId, teamNameMap: state.teamNameMap });
-      return '<div class="vlog-row"><span class="vlog-wk">Week ' + v.week + '</span>' +
-        '<span class="vlog-nm">' + Common.escapeHtml(v.name || (r && r.name) || '--') + '</span>' +
-        '<span class="vlog-lean">' + Spine.Lean.ladderHtml(model) + '</span></div>';
-    }).join('');
-    return '<div class="vlog"><div class="vlog-head">Invite visits</div>' + rows + '</div>';
+    var used = hist.filter(function (v) { return !!v.recruit_id; }).length;
+    return '<section class="vcal">' +
+      '<div class="vcal-head"><div class="vcal-title"><small>Weeks 20\u201326</small>Invite Visits</div>' +
+        '<div class="vcal-count"><span class="n">' + used + '</span><span class="of">/ ' + hist.length + '</span></div>' +
+      '</div>' +
+      '<div class="vcal-grid">' + hist.map(visitWeekTileHtml).join('') + '</div>' +
+      '</section>';
   }
 
   // ===================== SHELL =====================
@@ -1643,8 +1688,10 @@
       '<div class="spine-body no-dock" style="padding-top:14px">' +
         '<div style="min-width:0;display:flex;flex-direction:column;gap:14px">' +
           (state.phase === 'passive' ? storyHtml() : '') +
-          // Invite phase: hero + board rows lead, with the pool beneath as the add source.
-          (hasDock() ? '<div id="hub-board"></div>' : '') +
+          // Invite phase: the seven-week visit calendar sits ABOVE the board — what the
+          // season has bought, then what is still ranked to buy — with the pool beneath
+          // as the add source.
+          (hasDock() ? '<div id="hub-visits"></div><div id="hub-board"></div>' : '') +
           '<div class="pool-wrap"><div id="hub-pool"></div></div></div></div>';
     root.innerHTML =
       '<div class="spine-topbar"><span class="spine-h">Recruiting <b>Hub</b></span><span id="hub-anchor-mount"></span></div>' +
@@ -1652,8 +1699,7 @@
     var phaseHost = document.getElementById('hub-phase');
     phaseHost.innerHTML = Spine.Phase.stripHtml({ phase: state.phase, week: state.week,
       inviteSent: Math.max(0, INVITE_WEEKS.filter(function (w) { return w < state.week; }).length),
-      points: remaining(),
-      visitsHtml: visitLogHtml() });
+      points: remaining() });
     Spine.Phase.bind(phaseHost);
     var mount = document.getElementById('hub-anchor-mount');
     // Signing Day pairs the pool anchor with a My Orders view: the same two things the
@@ -1678,6 +1724,8 @@
         setSignView(state.sView === 'orders' ? 'pool' : 'orders');
       });
     }
+    var visits = document.getElementById('hub-visits');
+    if (visits) visits.innerHTML = visitCalendarHtml();
     if (signing) { document.getElementById('hub-sign').innerHTML = signBoardHtml(); applySignView(); bindSignBoard(); }
     else if (results) { renderSignings(); }
     else { renderPool(); if (hasDock()) renderDock(); if (showWeeklyPanel()) loadWeeklyPanel(); }

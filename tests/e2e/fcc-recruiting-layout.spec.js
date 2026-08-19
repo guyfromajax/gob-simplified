@@ -42,7 +42,7 @@ function extractById(html, id) {
 const HERO_GROUP = (() => {
   const open = HTML.indexOf('<div class="hero-buttons-group">');
   if (open === -1) throw new Error('hero-buttons-group not found');
-  const close = HTML.indexOf('</div>', HTML.indexOf('id="fcc-week35-edit-orders"'));
+  const close = HTML.indexOf('</div>', HTML.indexOf('id="fcc-edit-recruiting"'));
   if (close === -1) throw new Error('hero-buttons-group not closed');
   return HTML.slice(open, close + 6);
 })();

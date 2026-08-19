@@ -521,13 +521,66 @@ tr.region-row td{padding:0;border:0}
 .bpanel-head .bpanel-count{margin-left:auto}
 .bpanel-head .bbtn-save{flex:0 0 auto}
 
-/* Season panel: invite visit log, below the timeline. */
-.vlog{margin-top:14px;border-top:1px solid var(--hair);padding-top:12px}
-.vlog-head{font:700 9px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;
-  color:var(--muted-3);margin-bottom:8px}
-.vlog-row{display:grid;grid-template-columns:74px minmax(0,1fr) auto;gap:10px;align-items:center;
-  padding:5px 0;border-bottom:1px solid var(--hair);font-size:11.5px}
-.vlog-row:last-child{border-bottom:0}
-.vlog-wk{color:var(--muted-3);font-weight:600}
-.vlog-nm{color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.vlog-row.is-open .vlog-open{color:var(--muted-3);font-style:italic}
+/* ============================================================
+   INVITE VISITS — the season as seven squares, one per week 20-26.
+
+   Not a log. Seven rows read as history; seven squares in a row read as a BUDGET,
+   which is what invite season is. A spent square carries the recruit it bought, so
+   the record and the remaining count are the same picture.
+
+   Four states, and a past week that produced nothing is NOT the same as a week
+   still to come: .is-filled / .is-pending (this week) / .is-missed / .is-upcoming.
+   ============================================================ */
+.vcal{border:1px solid var(--border);border-radius:18px;background:var(--panel);padding:18px 20px 20px}
+.vcal-head{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;margin-bottom:14px}
+.vcal-title{font:400 26px/1 var(--display);letter-spacing:.03em}
+.vcal-title small{display:block;font:700 9px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted-3);margin-bottom:6px}
+.vcal-count{font:400 22px/1 var(--display);color:var(--text);white-space:nowrap}
+.vcal-count .of{font-size:13px;color:var(--muted-3);margin-left:2px}
+
+/* Seven equal columns, always — the row IS the season, so it never wraps or scrolls.
+   aspect-ratio keeps them square; min-height keeps the content legible if the page
+   is ever narrower than the squares want to be. */
+.vcal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
+.vwk{aspect-ratio:1/1;min-height:152px;min-width:0;display:flex;flex-direction:column;align-items:center;
+  gap:6px;padding:10px 10px 9px;border-radius:14px;border:1px solid var(--border-soft);
+  background:rgba(255,255,255,.022);overflow:hidden}
+.vwk-hd{width:100%;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.vwk-wk{font:700 8.5px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3)}
+.vwk-rt{font:700 10px/1 var(--body);letter-spacing:.02em}
+.vwk-av{width:50px;height:50px;border-radius:10px;flex:0 0 auto;overflow:hidden;border:1px solid var(--border);
+  background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02));
+  display:flex;align-items:flex-end;justify-content:center;margin-top:2px}
+.vwk-av img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.vwk-nm{width:100%;text-align:center;font-weight:600;font-size:11.5px;line-height:1.15;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vwk-yr{font:500 9.5px/1 var(--body);color:var(--muted-2)}
+/* The ladder is shared with the board, where it has room for 52px slots. Inside a
+   square it divides the tile instead of setting its width. */
+.vwk-lean{width:100%;margin-top:auto}
+.vwk .lean-b{gap:4px}
+.vwk .lb-slot{width:auto;flex:1 1 0;min-width:0;padding:4px 2px 3px;gap:2px}
+.vwk .lb-tok{height:16px;font-size:9px}
+.vwk .lb-empty{font-size:9.5px}
+
+/* Spent squares carry a recruit, so they sit forward of the empty ones. */
+.vwk.is-filled{background:rgba(255,255,255,.045);border-color:var(--border)}
+
+/* Empty squares keep the same shape — the row must stay a row of seven. */
+.vwk-empty{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
+.vwk-mark{width:50px;height:50px;border-radius:10px;border:1px dashed var(--muted-3);background:transparent}
+.vwk-state{font:700 10.5px/1 var(--body);letter-spacing:.03em;color:var(--muted-2)}
+.vwk-note{font:500 9.5px/1 var(--body);color:var(--muted-3)}
+
+/* This week is the live one — amber, the same attention colour the rest of the app
+   uses for "you are being asked for something". */
+.vwk.is-pending{border-color:rgba(247,148,32,.42);background:rgba(247,148,32,.07)}
+.vwk.is-pending .vwk-mark{border-color:rgba(247,148,32,.5)}
+.vwk.is-pending .vwk-state{color:#ffd7a0}
+.vwk.is-pending .vwk-wk{color:rgba(255,215,160,.7)}
+
+/* Spent and gave nothing back. Stated, not blank — it is not an invite you still hold. */
+.vwk.is-missed{background:transparent}
+.vwk.is-missed .vwk-mark{border-style:solid;border-color:var(--border-soft)}
+.vwk.is-missed .vwk-state{color:var(--muted-3)}

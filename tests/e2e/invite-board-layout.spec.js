@@ -219,31 +219,13 @@ test.describe('visit chip', () => {
   });
 });
 
-test.describe('Season panel visit log', () => {
-  test('lists weeks 20-26 ascending, future weeks shown as available invites', async ({ page }) => {
-    await mountPool(page, {
-      week: 22,
-      visitHistory: [
-        { week: 20, recruit_id: 'r-0', name: 'Recruit 000', lean: {} },
-        { week: 21, recruit_id: 'r-1', name: 'Recruit 001', lean: {} },
-        ...[22, 23, 24, 25, 26].map((w) => ({ week: w, recruit_id: null, name: null, lean: null })),
-      ],
-    });
-    const m = await page.evaluate(() => {
-      const rows = [...document.querySelectorAll('.vlog-row')];
-      return {
-        weeks: rows.map((r) => r.querySelector('.vlog-wk').textContent.trim()),
-        names: rows.map((r) => { const n = r.querySelector('.vlog-nm'); return n ? n.textContent.trim() : null; }),
-        open: rows.filter((r) => r.classList.contains('is-open')).length,
-        leans: rows.filter((r) => r.querySelector('.lean-b')).length,
-      };
-    });
-    expect(m.weeks).toEqual([20, 21, 22, 23, 24, 25, 26].map((w) => `Week ${w}`));
-    expect(m.names.slice(0, 2)).toEqual(['Recruit 000', 'Recruit 001']);
-    expect(m.open).toBe(5);              // five invites still to spend
-    expect(m.leans).toBe(2);             // each visited week carries the current lean
-  });
-});
+// SUPERSEDED: 'Season panel visit log'.
+//
+// The visit list moved out of the Season panel and became the seven-square calendar
+// above the invite board — a list of seven rows read as history, where seven squares in
+// a row read as a budget, which is what invite season is. Its successor covers the same
+// ground and more (the three empty states, which the list conflated into one) in
+// tests/e2e/invite-visit-calendar.spec.js.
 
 test('the pool now shows Wt', async ({ page }) => {
   await mountPool(page, { week: 7 });

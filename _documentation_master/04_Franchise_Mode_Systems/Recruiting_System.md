@@ -193,7 +193,30 @@ without a counter doing the arithmetic.
 | Panel header | `Invite Board` · `n/20` · **Submit Invites** (right-justified). No footer bar. |
 | Row | Headshot · name + archetype (stacked) · Pos · RT (cur/pot) · Yr · Ht · Wt · Lean ladder · visit chip · remove |
 | Visit chip | `Wk 20`…`Wk 26` on a recruit who has already visited you, stamped in the row's own control zone so it never shifts the data columns |
-| Season panel | Expands to a visit log, ascending by week — one row per week 20–26, future weeks shown open |
+| Above the board | The seven-week **Invite Visits** calendar (below) |
+
+#### Invite Visits — the season as seven squares
+
+One square per invite week, 20–26, in a single row above the board. Not a log: seven
+rows read as history, seven squares in a row read as a **budget**, which is what invite
+season is. A spent square carries the recruit it bought, so the record and the count
+remaining are the same picture. Counter reads *spent / 7*.
+
+| State | When | Square shows |
+|---|---|---|
+| `is-filled` | a recruit visited | headshot · name · RT (cur/pot) · year · current lean ladder |
+| `is-pending` | `week === current week`, unresolved | "This week" · *Set at training* · amber |
+| `is-missed` | a past week that gave no visit | "No visit" · *Invite spent* |
+| `is-upcoming` | week not yet reached | "Upcoming" · *Invite open* |
+
+**A missed week is not an open one.** An empty board, or losing the prestige-weighted
+draw, spends the invite anyway — rendering it like a future week would tell the player
+they still hold something they do not. The old Season-panel list conflated the two.
+
+The lean ladder is the same `Spine.Lean.ladderHtml` the board draws; inside a square its
+slots divide the tile instead of setting its width. Squares are square by
+`aspect-ratio`, with a `min-height` floor that only takes over well below the page's
+1360px cap.
 
 **Removed by instruction, code kept:** the *This Week* movement column. `thisWeekCellHtml` and
 `topUnvisitedId` remain in `recruiting-hub.js`, dormant and uncalled, against a possible return.
@@ -494,7 +517,7 @@ irreversible step never rides on the same click as the save.
 | 1. Commit points | Hub · Signing Day | `Submit Orders` → `POST /franchise/recruiting-orders` |
 | 2. Leave | Submit-summary modal | `Go To Locker Room` (amber) → FCC. `Back to Orders` still reopens the board. |
 | 3. Run | FCC hero | `Run Recruiting Day` (green) → Hub `?action=run` |
-| 3b. Change your mind | FCC hero, below the green | `Edit Recruiting Orders` (ghost) → Hub |
+| 3b. Change your mind | FCC hero, below the green | `Edit Recruiting Orders` (ghost) → Hub. Same `#fcc-edit-recruiting` element that reads `Edit Recruit Invites` in weeks 20–26. |
 
 - **The hub owns the run.** `POST /franchise/run-week-35-recruiting` and the reveal that
   follows it both live in `recruiting-hub.js`, so the FCC hands the press over as
@@ -569,6 +592,8 @@ The signing pool defaults to `sTab: 'mine'`, which hides recruits with no lean t
 - `tests/e2e/invite-board.spec.js` — board writes, 20-slot cap, drag reorder, header CTA.
 - `tests/e2e/invite-board-layout.spec.js` — 20 always-drawn slots, two columns, visit chip, open
   future weeks, pool `Wt`.
+- `tests/e2e/invite-visit-calendar.spec.js` — one row of seven measured squares, the three
+  empty states kept distinct, placement above the board.
 - `tests/e2e/recruiting-draft.spec.js` — unsubmitted edits survive a page round trip,
   both phases, plus the restore-time validation.
 - `tests/e2e/week35-signing-pair.spec.js` — the FCC's Signing Day pair: green CTA split,

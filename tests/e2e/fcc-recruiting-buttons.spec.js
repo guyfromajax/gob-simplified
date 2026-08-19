@@ -1,17 +1,21 @@
 // @ts-check
 /**
- * Signing Day's two-button pair on the FCC.
+ * The FCC's recruiting buttons: the green #play-now and the ghost beneath it.
  *
- * Once week-35 orders are saved the week splits: the green #play-now RUNS the day, and
- * a ghost button below it goes back to the hub to edit. Before orders exist there is
- * nothing to run, so the green button is still the way IN to the board (and still
- * carries the pre-recruiting cut offer, which is why its mode must not change).
+ * The ghost is the way BACK into recruiting, and it appears exactly when this week's
+ * recruiting step is done and the green button has moved on — invites in weeks 20-26,
+ * orders on Signing Day. Any earlier and it would only restate where the green button
+ * already goes.
+ *
+ * Signing Day also splits the green button: once orders are saved it RUNS the day;
+ * before that it is still the way IN to the board, and still carries the pre-recruiting
+ * cut offer, which is why its mode must not change.
  *
  * Extracts the REAL functions out of franchise-command-center.js — same technique as
  * fcc-invite-step.spec.js — so the test tracks the shipped branch order rather than a
  * copy of it.
  *
- * Run: npx playwright test tests/e2e/week35-signing-pair.spec.js --project=chromium
+ * Run: npx playwright test tests/e2e/fcc-recruiting-buttons.spec.js --project=chromium
  */
 const { test, expect } = require('@playwright/test');
 const fs = require('fs');
@@ -31,7 +35,7 @@ function extractFunction(source, name) {
 }
 
 const UPDATE_PLAY_BUTTON = extractFunction(JS, 'updatePlayButton');
-const UPDATE_EDIT_BUTTON = extractFunction(JS, 'updateWeek35EditOrdersButton');
+const UPDATE_EDIT_BUTTON = extractFunction(JS, 'updateEditRecruitingButton');
 // Pulled from source rather than hardcoded: if a week boundary ever moves, these tests
 // move with it instead of asserting against a stale number.
 const SIGNING_DAY_CONST = ['SIGNING_DAY_WEEK', 'INVITE_FIRST_WEEK', 'INVITE_LAST_WEEK'].map((n) => {
@@ -44,7 +48,7 @@ const SIGNING_DAY_CONST = ['SIGNING_DAY_WEEK', 'INVITE_FIRST_WEEK', 'INVITE_LAST
 const HERO_GROUP = (() => {
   const open = HTML.indexOf('<div class="hero-buttons-group">');
   if (open === -1) throw new Error('hero-buttons-group not found');
-  const close = HTML.indexOf('</div>', HTML.indexOf('id="fcc-week35-edit-orders"'));
+  const close = HTML.indexOf('</div>', HTML.indexOf('id="fcc-edit-recruiting"'));
   if (close === -1) throw new Error('hero-buttons-group not closed');
   return HTML.slice(open, close + 6);
 })();
@@ -60,11 +64,11 @@ async function runWith(page, data) {
     window.EOS_PLAY_CTA_BY_WEEK = {};
     window.EOS_SIM_CTA_BY_WEEK = {};
     // eslint-disable-next-line no-eval
-    eval(`${weekConst}\n${playSrc}\n${editSrc}\nwindow.__play = updatePlayButton; window.__edit = updateWeek35EditOrdersButton;`);
+    eval(`${weekConst}\n${playSrc}\n${editSrc}\nwindow.__play = updatePlayButton; window.__edit = updateEditRecruitingButton;`);
     window.__play(data);
     window.__edit(data);
     const play = document.getElementById('play-now');
-    const edit = document.getElementById('fcc-week35-edit-orders');
+    const edit = document.getElementById('fcc-edit-recruiting');
     const pr = play.getBoundingClientRect();
     const er = edit.getBoundingClientRect();
     return {
@@ -84,6 +88,8 @@ async function runWith(page, data) {
 
 const SUBMITTED = { recruiting_wire: { week_35_orders_submitted: true } };
 const NOT_SUBMITTED = { recruiting_wire: { week_35_orders_submitted: false } };
+/** Invites submitted in week `w` — the marker the invite step reads. */
+const sentIn = (w) => ({ recruiting_wire: { board_saved_week: w, has_saved_board: true } });
 
 test.describe('week 35 — orders submitted', () => {
   test('the green button runs the day', async ({ page }) => {
@@ -141,5 +147,44 @@ test.describe('the pair is week 35 only', () => {
     // over a roster that is not legal yet would commit points against the wrong size.
     const r = await runWith(page, { week: 35, cut_required: true, ...SUBMITTED });
     expect(r.mode).toBe('cut-players');
+  });
+});
+
+test.describe('weeks 20-26 — the ghost follows the invite step', () => {
+  test('it appears once invites are submitted THIS week', async ({ page }) => {
+    for (const week of [20, 23, 26]) {
+      const r = await runWith(page, { week, ...sentIn(week) });
+      expect(r.editShown, `week ${week}`).toBe(true);
+      expect(r.editText, `week ${week}`).toBe('Edit Recruit Invites');
+      expect(r.editBelow, `week ${week}`).toBe(true);
+    }
+  });
+
+  test('and not before — the green button is still the way in', async ({ page }) => {
+    const r = await runWith(page, { week: 23, ...sentIn(22) });
+    // Green is still steering to the board; a second button pointing there is noise.
+    expect(r.mode).toBe('recruit-invites');
+    expect(r.editShown).toBe(false);
+  });
+
+  test('it is the same size as the green button here too', async ({ page }) => {
+    const r = await runWith(page, { week: 22, ...sentIn(22) });
+    expect(r.sameWidth).toBe(true);
+    expect(r.sameHeight).toBe(true);
+    expect(r.editBg).toBe('rgba(0, 0, 0, 0)');
+  });
+
+  test('outside the invite window a sent board does not summon it', async ({ page }) => {
+    for (const week of [19, 27]) {
+      const r = await runWith(page, { week, ...sentIn(week) });
+      expect(r.editShown, `week ${week}`).toBe(false);
+    }
+  });
+
+  test('the label is the week\'s own — invites here, orders on Signing Day', async ({ page }) => {
+    const invite = await runWith(page, { week: 24, ...sentIn(24) });
+    const signing = await runWith(page, { week: 35, ...SUBMITTED });
+    expect(invite.editText).toBe('Edit Recruit Invites');
+    expect(signing.editText).toBe('Edit Recruiting Orders');
   });
 });

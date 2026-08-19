@@ -3557,7 +3557,7 @@ async function init() {
     updatePlayButton(commandCenterTopDataCache);
     updateScoutingButton(commandCenterTopDataCache);
     updateRecruitingButton(commandCenterTopDataCache);
-    updateWeek35EditOrdersButton(commandCenterTopDataCache);
+    updateEditRecruitingButton(commandCenterTopDataCache);
     updateAwardsButton(commandCenterTopDataCache);
     void updatePlaybooksButtonState(commandCenterTopDataCache);
     bindResourcesLinks();
@@ -3638,7 +3638,7 @@ async function init() {
   updatePlayButton(topData);
   updateScoutingButton(topData);
   updateRecruitingButton(topData);
-  updateWeek35EditOrdersButton(topData);
+  updateEditRecruitingButton(topData);
   updateAwardsButton(topData);
   await updatePlaybooksButtonState(topData);
   const playbooksTab = document.getElementById('playbooks-tab');
@@ -4117,7 +4117,7 @@ function updatePlayButton(data) {
     playNowBtn.dataset.mode = 'recruit-invites';
   } else if (week === 35 && wire.week_35_orders_submitted) {
     // Orders are saved but NOT run. The green press runs the day; the ghost button
-    // below it (see updateWeek35EditOrdersButton) goes back to edit. The cut offer does
+    // below it (see updateEditRecruitingButton) goes back to edit. The cut offer does
     // not repeat here — it belongs on the way IN, before points were committed against
     // a roster size.
     playNowBtn.textContent = 'Run Recruiting Day';
@@ -4167,20 +4167,31 @@ function updatePlayButton(data) {
 }
 
 /**
- * "Edit Recruiting Orders" — the ghost half of the Signing Day pair.
+ * The ghost button under #play-now — the way BACK into recruiting.
  *
- * Only week 35, and only once orders exist: before that the green button IS the way in
- * to the board, so a second button pointing at the same place would be noise. Hidden
- * every other week, so the hero group is unchanged outside Signing Day.
+ * It appears exactly when this week's recruiting step is done and the green button has
+ * moved on, which is the only time a second button is not just restating where the
+ * green one already goes:
+ *
+ *   weeks 20-26, invites submitted this week -> "Edit Recruit Invites"
+ *   week 35, orders submitted                -> "Edit Recruiting Orders"
+ *
+ * Both land on the Recruiting Hub, and both are safe: unsubmitted edits made there are
+ * preserved by the sessionStorage draft, and re-submitting simply overwrites.
  */
-function updateWeek35EditOrdersButton(data) {
-  const btn = document.getElementById('fcc-week35-edit-orders');
+function updateEditRecruitingButton(data) {
+  const btn = document.getElementById('fcc-edit-recruiting');
   if (!btn) return;
   const week = Number(data?.week || 1);
   const wire = data?.recruiting_wire || {};
-  const show = week === SIGNING_DAY_WEEK && !!wire.week_35_orders_submitted;
-  btn.style.display = show ? 'block' : 'none';
-  if (show && !btn.dataset.wireBound) {
+  const inviteWindow = week >= INVITE_FIRST_WEEK && week <= INVITE_LAST_WEEK;
+  const label = inviteWindow && Number(wire.board_saved_week || 0) === week ? 'Edit Recruit Invites'
+    : week === SIGNING_DAY_WEEK && wire.week_35_orders_submitted ? 'Edit Recruiting Orders'
+      : null;
+  btn.style.display = label ? 'block' : 'none';
+  if (!label) return;
+  btn.textContent = label;
+  if (!btn.dataset.wireBound) {
     btn.dataset.wireBound = '1';
     btn.addEventListener('click', () => { void openRecruitingSurface(); });
   }
