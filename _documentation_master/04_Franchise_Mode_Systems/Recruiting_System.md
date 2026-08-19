@@ -190,9 +190,10 @@ without a counter doing the arithmetic.
 
 | Region | Contents |
 |---|---|
-| Panel header | `Invite Board` · `n/20` · **Submit Invites** (right-justified). No footer bar. |
-| Row | Headshot · name + archetype (stacked) · Pos · RT (cur/pot) · Yr · Ht · Wt · Lean ladder · visit chip · remove |
-| Visit chip | `Wk 20`…`Wk 26` on a recruit who has already visited you, stamped in the row's own control zone so it never shifts the data columns |
+| Panel header | `Invite Board` · **position tiles** (centred) · `n/20` · **Submit Invites**. No eyebrow, no footer bar. |
+| Position tiles | PG · SG · SF · PF · C with the board's count at each. All five always drawn, zero included — the gap is the point, and a tile that vanishes at zero hides what is worth seeing. Derived from `state.board` on every render, so they follow edits. |
+| Row | Headshot · name + archetype (+ visit pill) · Pos · RT (cur/pot) · Yr · Ht · Wt · Lean ladder · remove |
+| Visit pill | `1 visit` / `2 visits` … beside the archetype, on a recruit who has visited you |
 | Above the board | The seven-week **Invite Visits** calendar (below) |
 
 #### Invite Visits — the season as seven squares
@@ -204,7 +205,7 @@ remaining are the same picture. Counter reads *spent / 7*.
 
 | State | When | Square shows |
 |---|---|---|
-| `is-filled` | a recruit visited | headshot · name · RT (cur/pot) · year · current lean ladder |
+| `is-filled` | a recruit visited | headshot · name · then one line of year (left) / position (centre) / RT cur-pot (right) · current lean ladder |
 | `is-pending` | `week === current week`, unresolved | "This week" · *Set at training* · amber |
 | `is-missed` | a past week that gave no visit | "No visit" · *Invite spent* |
 | `is-upcoming` | week not yet reached | "Upcoming" · *Invite open* |
@@ -213,10 +214,23 @@ remaining are the same picture. Counter reads *spent / 7*.
 draw, spends the invite anyway — rendering it like a future week would tell the player
 they still hold something they do not. The old Season-panel list conflated the two.
 
-The lean ladder is the same `Spine.Lean.ladderHtml` the board draws; inside a square its
-slots divide the tile instead of setting its width. Squares are square by
-`aspect-ratio`, with a `min-height` floor that only takes over well below the page's
-1360px cap.
+The lean ladder is the same `Spine.Lean.ladderHtml` the board draws; inside a square it
+becomes a **fixed three-column grid**, so one lean occupies one third and leaves the other
+two empty. Flex would stretch a lone lean to full width and make a one-lean recruit read
+identically to a three-lean one — the empty thirds are the information.
+
+The meta line is a `1fr auto 1fr` grid, not `space-between`: the position holds the tile's
+centre line whatever the year and RT either side of it measure.
+
+Squares are square by `aspect-ratio`, with a `min-height` floor that only takes over well
+below the page's 1360px cap. **No counter and no eyebrow** — seven squares are already the
+count, and a number beside them restated the row.
+
+**The visit pill is a count, not a week.** It replaced a `Wk 20` stamp in a column of its
+own at the row's edge, which sat against the lean ladder and had nowhere to go once a
+recruit had three leans. Which weeks is the calendar's job; what the row could not show
+is **repeat interest**, and a count fits where a stamp did not. The archetype is the part
+that truncates (`.barch`), so a long one shortens itself rather than pushing the pill out.
 
 **Removed by instruction, code kept:** the *This Week* movement column. `thisWeekCellHtml` and
 `topUnvisitedId` remain in `recruiting-hub.js`, dormant and uncalled, against a possible return.

@@ -34,15 +34,22 @@ function recruit(i, leanRank) {
     recruit_id: `r-${i}`, name: `Longnameson Recruit ${String(i).padStart(2, '0')}`,
     image_id: `img-${i}`, archetype: 'Slasher', 'Home Region': 'C',
     year: 'Sophomore', height: 72, weight: 190, attributes,
+    // A potential well above current makes RT render as a PAIR, so the right-hand cell
+    // is much wider than the left. Without that asymmetry, space-between and a real
+    // 1fr/auto/1fr grid put the position in the same place and the test proves nothing.
+    potential_rt_ratcheted: 95,
     position_ratings: { [POS[i % POS.length]]: 80 - i }, Lean: lean,
   };
 }
 
 /** visits: { 20: 'r-1', 22: null, ... } — omitted weeks default to no visit. */
 function fixture(o = {}) {
+  // Per-recruit lean overrides, so a one-lean and a three-lean tile can sit side by side.
+  const leans = o.leans || {};
   const week = o.week ?? 23;
   const recruits = [];
   for (let i = 0; i < 12; i++) recruits.push(recruit(i, i % 3 === 0 ? 1 : i % 3 === 1 ? 2 : 0));
+  recruits.forEach((r) => { if (leans[r.recruit_id]) r.Lean = leans[r.recruit_id]; });
   const byId = Object.fromEntries(recruits.map((r) => [r.recruit_id, r]));
   const visits = o.visits || { 20: 'r-1', 21: 'r-4' };
   return {
@@ -93,6 +100,8 @@ const tiles = (page) => page.evaluate(() =>
       name: (t.querySelector('.vwk-nm') || {}).textContent || null,
       state: (t.querySelector('.vwk-state') || {}).textContent || null,
       rt: (t.querySelector('.vwk-rt') || {}).textContent || null,
+      pos: (t.querySelector('.vwk-pos') || {}).textContent || null,
+      rtInHead: !!t.querySelector('.vwk-hd .vwk-rt'),
       yr: (t.querySelector('.vwk-yr') || {}).textContent || null,
       leanSlots: t.querySelectorAll('.lb-slot').length,
       leanYou: t.querySelectorAll('.lb-slot.is-you, .lb-slot.is-you-list').length,
@@ -134,10 +143,22 @@ test.describe('shape', () => {
     expect(m.cal).toBeLessThanOrEqual(m.board);
   });
 
+  test('no counter — the seven squares are the count', async ({ page }) => {
+    await mount(page);
+    expect(await page.locator('#hub-visits .vcal-count').count()).toBe(0);
+  });
+
   test('and no longer inside the Season panel', async ({ page }) => {
     await mount(page);
     expect(await page.locator('.ptl-inner .vcal').count()).toBe(0);
     expect(await page.locator('.vlog').count()).toBe(0);
+  });
+
+  test('the panel title carries no eyebrow', async ({ page }) => {
+    await mount(page);
+    expect(await page.locator('.vcal-title small').count()).toBe(0);
+    expect(await page.evaluate(() =>
+      document.querySelector('.vcal-title').textContent.trim())).toBe('Invite Visits');
   });
 });
 
@@ -150,11 +171,66 @@ test.describe('a spent week shows what it bought', () => {
     expect(t.img).toBe(true);
     expect(t.rt).toBeTruthy();
     expect(t.yr).toBe('SO');
+    expect(t.pos).toBeTruthy();
     // The ladder renders the recruit's real lean list, so the slot count follows the
     // data (r-1 leans two deep). What matters is that it is the same ladder the board
     // draws, and that the user's own place in it is marked.
     expect(t.leanSlots).toBeGreaterThanOrEqual(2);
     expect(t.leanYou).toBe(1);
+  });
+
+  test('year, position and RT sit on one line — left, centre, right', async ({ page }) => {
+    await mount(page, { week: 23, visits: { 20: 'r-1' } });
+    const m = await page.evaluate(() => {
+      const t = document.querySelector('#hub-visits .vwk.is-filled');
+      const box = (sel) => t.querySelector(sel).getBoundingClientRect();
+      const tile = t.getBoundingClientRect();
+      const yr = box('.vwk-yr'), pos = box('.vwk-pos'), rt = box('.vwk-rt');
+      return {
+        oneLine: Math.round(yr.top) === Math.round(pos.top) && Math.round(pos.top) === Math.round(rt.top),
+        order: yr.left < pos.left && pos.left < rt.left,
+        // Centre means the tile's centre line, not merely "between the other two".
+        posCentred: Math.abs((pos.left + pos.right) / 2 - (tile.left + tile.right) / 2) < 2,
+        belowImage: yr.top >= box('.vwk-av').bottom,
+      };
+    });
+    expect(m.oneLine).toBe(true);
+    expect(m.order).toBe(true);
+    expect(m.posCentred).toBe(true);
+    expect(m.belowImage).toBe(true);
+  });
+
+  test('RT left the header — the week stands alone up there', async ({ page }) => {
+    await mount(page, { week: 23, visits: { 20: 'r-1' } });
+    const t = (await tiles(page))[0];
+    expect(t.rtInHead).toBe(false);
+    expect(t.rt).toBeTruthy();
+  });
+
+  test('one lean takes one third, not the whole ladder', async ({ page }) => {
+    // A recruit with one lean and a recruit with three must not read as two full-width
+    // ladders — the empty thirds ARE the information.
+    await mount(page, {
+      week: 26, visits: { 20: 'r-2', 21: 'r-1' },
+      leans: {
+        'r-2': { 1: USER, 2: null, 3: null },
+        'r-1': { 1: 'rival-1', 2: USER, 3: 'rival-2' },
+      },
+    });
+    const m = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-visits .vwk.is-filled')].map((t) => {
+        const slots = [...t.querySelectorAll('.lb-slot')];
+        return {
+          n: slots.length,
+          first: slots[0].getBoundingClientRect().width,
+          ladder: t.querySelector('.lean-b').getBoundingClientRect().width,
+        };
+      }));
+    // r-2 leans once, r-1 three times — different counts, identical slot width.
+    expect(m[0].n).not.toBe(m[1].n);
+    expect(Math.abs(m[0].first - m[1].first)).toBeLessThan(1);
+    // And a slot is a third of the ladder, never the whole of it.
+    for (const x of m) expect(x.first).toBeLessThan(x.ladder / 2);
   });
 
   test('a long name is clipped, never widening the square', async ({ page }) => {
@@ -195,17 +271,5 @@ test.describe('the three empty states are three different things', () => {
     const t = await tiles(page);
     expect(t[0].cls).toContain('is-filled');
     expect(t[1].cls).toContain('is-upcoming');
-  });
-});
-
-test.describe('the counter', () => {
-  test('counts invites spent, out of seven', async ({ page }) => {
-    await mount(page, { week: 23, visits: { 20: 'r-1', 22: 'r-4' } });
-    const c = await page.evaluate(() => ({
-      n: document.querySelector('.vcal-count .n').textContent,
-      of: document.querySelector('.vcal-count .of').textContent,
-    }));
-    expect(c.n).toBe('2');
-    expect(c.of).toContain('7');
   });
 });

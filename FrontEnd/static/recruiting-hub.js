@@ -590,12 +590,20 @@
 
   // ---------- board rows ----------
   /** Which invite week (if any) this recruit visited the user's team. */
-  function visitWeekFor(id) {
+  /**
+   * How many of weeks 20-26 this recruit has spent visiting the user's team.
+   *
+   * A COUNT, not a week: a recruit can come back, and the seven-square calendar above
+   * already says which weeks. Repeat interest is the thing the board row could not
+   * show, and the number fits where a week stamp did not.
+   */
+  function visitCountFor(id) {
     var hist = state.visitHistory || [];
+    var n = 0;
     for (var i = 0; i < hist.length; i++) {
-      if (hist[i].recruit_id && String(hist[i].recruit_id) === String(id)) return hist[i].week;
+      if (hist[i].recruit_id && String(hist[i].recruit_id) === String(id)) n++;
     }
-    return null;
+    return n;
   }
 
   function boardRowHtml(id, index) {
@@ -609,13 +617,18 @@
     }
     var event = wireByRecruit()[String(id)];
     var moveCls = event ? movementClass(event.kind) : '';
-    var visited = visitWeekFor(id);
-    return '<div class="brow ' + moveCls + (visited ? ' is-visited' : '') +
+    var visits = visitCountFor(id);
+    return '<div class="brow ' + moveCls + (visits ? ' is-visited' : '') +
         '" draggable="true" data-index="' + index + '" data-id="' + id + '">' +
       '<div class="brank"><span class="bgrip" aria-hidden="true"></span><span class="bnum">' + (index + 1) + '</span></div>' +
       '<div class="bname">' + headshotBoxHtml(r, 'bav') + '<span class="btxt">' +
         Common.recruitNameLinkHtml(r.recruitId, context.franchiseId, r.name) +
-        '<small>' + Common.escapeHtml(r.archetype) + '</small></span></div>' +
+        // Visit count rides beside the archetype, not in a column of its own: a stamp
+        // out at the row's edge sat next to the lean ladder and fought it for space the
+        // moment a recruit had three leans.
+        '<small><span class="barch">' + Common.escapeHtml(r.archetype) + '</span>' +
+          (visits ? '<span class="bvisit-pill">' + visits + (visits === 1 ? ' visit' : ' visits') + '</span>' : '') +
+        '</small></span></div>' +
       '<div class="bc">' + Common.escapeHtml(r.pos) + '</div>' +
       '<div class="brt ' + Spine.rtClassForYear(r.rt, r.year) + '" data-tooltip="current/potential" title="current/potential">' +
         Common.formatRtWithPotential(r.rt, r.potentialRt) + '</div>' +
@@ -623,9 +636,6 @@
       '<div class="bc dim">' + Common.escapeHtml(r.height) + '</div>' +
       '<div class="bc dim">' + (r.weight != null ? Common.escapeHtml(r.weight) : '--') + '</div>' +
       '<div class="bladder">' + Spine.Lean.ladderHtml(r.leanModel) + '</div>' +
-      // Visited chip: the week is the point, so it is stamped rather than hidden in a
-      // tooltip. Sits with the row's own controls so it never shifts the data columns.
-      '<div class="bvisit">' + (visited ? '<span class="bvisit-chip">Wk ' + visited + '</span>' : '') + '</div>' +
       '<div><button class="bx" data-remove-id="' + id + '" title="Remove from board" type="button">\u00d7</button></div>' +
       '</div>';
   }
@@ -636,14 +646,31 @@
     return '<div class="bcol">' +
       '<div class="brow bhdr"><div>#</div><div>Recruit</div><div class="bc">Pos</div>' +
         '<div>RT</div><div class="bc">Yr</div><div class="bc">Ht</div><div class="bc">Wt</div>' +
-        '<div>Lean</div><div></div><div></div></div>' + out + '</div>';
+        '<div>Lean</div><div></div></div>' + out + '</div>';
+  }
+
+  // Board shape at a glance. Every position is always drawn, zero included — the gap is
+  // the point, and a tile that disappears at zero hides exactly the thing worth seeing.
+  var BOARD_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
+  function boardPosTilesHtml() {
+    var counts = {};
+    BOARD_POSITIONS.forEach(function (p) { counts[p] = 0; });
+    state.board.forEach(function (id) {
+      var r = state.byId[id];
+      if (r && counts[r.pos] != null) counts[r.pos]++;
+    });
+    return '<div class="bpos">' + BOARD_POSITIONS.map(function (p) {
+      return '<span class="bpos-t' + (counts[p] ? '' : ' is-zero') + '">' +
+        '<b>' + p + '</b><i>' + counts[p] + '</i></span>';
+    }).join('') + '</div>';
   }
 
   function boardHtml() {
     // Header carries the count and the CTA; the hero panel that repeated rank 1 is gone.
     return '<section class="bpanel">' +
       '<div class="bpanel-head">' +
-        '<div class="bpanel-title"><small>Invite Season \u00b7 Wk ' + state.week + '</small>Invite Board</div>' +
+        '<div class="bpanel-title">Invite Board</div>' +
+        boardPosTilesHtml() +
         '<div class="bpanel-count"><span class="n">' + state.board.length + '</span><span class="of">/ ' + MAX_BOARD + '</span></div>' +
         '<button class="bbtn-save" id="dock-save" type="button">Submit Invites</button>' +
       '</div>' +
@@ -1651,11 +1678,17 @@
     var rt = r ? Common.formatRtWithPotential(r.rt, r.potentialRt) : '--';
     var rtCls = r ? Spine.rtClassForYear(r.rt, r.year) : '';
     var year = r ? Common.escapeHtml(r.yearDisplay) : '--';
+    var pos = r ? Common.escapeHtml(r.pos) : '--';
     return '<div class="vwk is-filled">' +
-      '<div class="vwk-hd">' + label + '<span class="vwk-rt ' + rtCls + '">' + rt + '</span></div>' +
+      '<div class="vwk-hd">' + label + '</div>' +
       headshotBoxHtml(r, 'vwk-av') +
       '<div class="vwk-nm">' + name + '</div>' +
-      '<div class="vwk-yr">' + year + '</div>' +
+      // One row, three anchors: year left, position centre, RT right. RT used to sit up
+      // in the header opposite the week, which read as a label for the week rather than
+      // for the recruit.
+      '<div class="vwk-meta"><span class="vwk-yr">' + year + '</span>' +
+        '<span class="vwk-pos">' + pos + '</span>' +
+        '<span class="vwk-rt ' + rtCls + '">' + rt + '</span></div>' +
       '<div class="vwk-lean">' + Spine.Lean.ladderHtml(model) + '</div>' +
       '</div>';
   }
@@ -1663,11 +1696,10 @@
   function visitCalendarHtml() {
     var hist = state.visitHistory || [];
     if (!hist.length) return '';
-    var used = hist.filter(function (v) { return !!v.recruit_id; }).length;
     return '<section class="vcal">' +
-      '<div class="vcal-head"><div class="vcal-title"><small>Weeks 20\u201326</small>Invite Visits</div>' +
-        '<div class="vcal-count"><span class="n">' + used + '</span><span class="of">/ ' + hist.length + '</span></div>' +
-      '</div>' +
+      // No counter: the seven squares ARE the count, and a number beside them restated
+      // what the row already shows.
+      '<div class="vcal-head"><div class="vcal-title">Invite Visits</div></div>' +
       '<div class="vcal-grid">' + hist.map(visitWeekTileHtml).join('') + '</div>' +
       '</section>';
   }

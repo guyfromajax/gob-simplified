@@ -497,7 +497,7 @@ tr.region-row td{padding:0;border:0}
 .bgrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .bcol{display:flex;flex-direction:column;gap:4px;min-width:0}
 .bcol .brow{display:grid;
-  grid-template-columns:30px minmax(0,1fr) 30px 58px 30px 44px 38px minmax(0,96px) 44px 24px;
+  grid-template-columns:30px minmax(0,1fr) 30px 58px 30px 44px 38px minmax(0,96px) 24px;
   align-items:center;gap:6px;padding:5px 6px;border-radius:9px;font-size:11.5px}
 .bcol .brow.bhdr{padding:2px 6px;font:700 8.5px/1 var(--body);letter-spacing:.1em;
   text-transform:uppercase;color:var(--muted-3);background:none;border:0}
@@ -505,21 +505,37 @@ tr.region-row td{padding:0;border:0}
 .bempty-hint{grid-column:2 / -1;font:500 10.5px/1 var(--body);color:var(--muted-3);font-style:italic}
 .bcol .bname{display:flex;align-items:center;gap:7px;min-width:0}
 .bcol .btxt{display:flex;flex-direction:column;gap:1px;min-width:0}
-.bcol .btxt small{font:500 9.5px/1.2 var(--body);color:var(--muted-3);
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Archetype + visit pill on one line. The archetype is the part that truncates, so a
+   long one shortens itself rather than pushing the pill out of the row. */
+.bcol .btxt small{display:flex;align-items:center;gap:5px;min-width:0;
+  font:500 9.5px/1.2 var(--body);color:var(--muted-3)}
+.barch{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bcol .bav{width:26px;height:26px;flex:0 0 auto}
-/* Visited chip: the WEEK is the payload, so it is stamped rather than hidden in a
-   tooltip. Sits with the row controls, never between the data columns. */
-.bvisit{display:flex;justify-content:flex-end}
-.bvisit-chip{display:inline-flex;align-items:center;height:17px;padding:0 6px;border-radius:9px;
+/* Visit count, beside the archetype. Replaces the week stamp that used to sit at the
+   row's edge, where it crowded the lean ladder at three leans. flex:0 0 auto so it is
+   never the thing that shrinks. */
+.bvisit-pill{flex:0 0 auto;display:inline-flex;align-items:center;height:14px;padding:0 5px;border-radius:8px;
   background:rgba(52,236,39,.13);border:1px solid rgba(52,236,39,.34);color:#a9ff9c;
-  font:700 8.5px/1 var(--body);letter-spacing:.05em;white-space:nowrap}
+  font:700 8px/1 var(--body);letter-spacing:.04em;white-space:nowrap}
 .brow.is-visited{background:rgba(52,236,39,.045)}
 
-/* Header row now carries the count and the CTA. */
+/* Header row: title, then the board's position shape centred in the space between it
+   and the right-hand pair (count + CTA). margin:auto on the tiles does the centring, so
+   neither end has to know the other's width. */
 .bpanel-head{display:flex;align-items:center;gap:14px}
+.bpanel-head .bpos{margin:0 auto}
 .bpanel-head .bpanel-count{margin-left:auto}
 .bpanel-head .bbtn-save{flex:0 0 auto}
+
+.bpos{display:flex;align-items:center;gap:6px}
+.bpos-t{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:8px;
+  border:1px solid var(--border-soft);background:rgba(255,255,255,.035)}
+.bpos-t b{font:700 8.5px/1 var(--body);letter-spacing:.1em;color:var(--muted-2)}
+.bpos-t i{font:400 14px/1 var(--display);font-style:normal;color:var(--text)}
+/* Zero is drawn, not hidden — an unfilled position is the thing worth noticing. */
+.bpos-t.is-zero{background:transparent;border-style:dashed}
+.bpos-t.is-zero b{color:var(--muted-3)}
+.bpos-t.is-zero i{color:var(--muted-3)}
 
 /* ============================================================
    INVITE VISITS — the season as seven squares, one per week 20-26.
@@ -536,8 +552,6 @@ tr.region-row td{padding:0;border:0}
 .vcal-title{font:400 26px/1 var(--display);letter-spacing:.03em}
 .vcal-title small{display:block;font:700 9px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;
   color:var(--muted-3);margin-bottom:6px}
-.vcal-count{font:400 22px/1 var(--display);color:var(--text);white-space:nowrap}
-.vcal-count .of{font-size:13px;color:var(--muted-3);margin-left:2px}
 
 /* Seven equal columns, always — the row IS the season, so it never wraps or scrolls.
    aspect-ratio keeps them square; min-height keeps the content legible if the page
@@ -546,23 +560,33 @@ tr.region-row td{padding:0;border:0}
 .vwk{aspect-ratio:1/1;min-height:152px;min-width:0;display:flex;flex-direction:column;align-items:center;
   gap:6px;padding:10px 10px 9px;border-radius:14px;border:1px solid var(--border-soft);
   background:rgba(255,255,255,.022);overflow:hidden}
-.vwk-hd{width:100%;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.vwk-hd{width:100%;display:flex;align-items:center;justify-content:flex-start;gap:6px}
 .vwk-wk{font:700 8.5px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3)}
-.vwk-rt{font:700 10px/1 var(--body);letter-spacing:.02em}
 .vwk-av{width:50px;height:50px;border-radius:10px;flex:0 0 auto;overflow:hidden;border:1px solid var(--border);
   background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02));
   display:flex;align-items:flex-end;justify-content:center;margin-top:2px}
 .vwk-av img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
 .vwk-nm{width:100%;text-align:center;font-weight:600;font-size:11.5px;line-height:1.15;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.vwk-yr{font:500 9.5px/1 var(--body);color:var(--muted-2)}
+/* Year, position, RT on one line — left, centre, right. A 1fr/auto/1fr grid, not
+   space-between, so the position stays on the tile's centre line whatever the other
+   two measure. */
+.vwk-meta{width:100%;display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:4px;
+  font:500 9.5px/1 var(--body)}
+.vwk-yr{color:var(--muted-2);text-align:left;min-width:0;overflow:hidden}
+.vwk-pos{color:var(--muted);font-weight:700;text-align:center;white-space:nowrap}
+.vwk-rt{font:700 9.5px/1 var(--body);letter-spacing:.02em;text-align:right;min-width:0;overflow:hidden}
 /* The ladder is shared with the board, where it has room for 52px slots. Inside a
    square it divides the tile instead of setting its width. */
+/* Three fixed thirds, NOT flex: a lone lean must occupy one third and leave the other
+   two empty, so a recruit with one lean and a recruit with three read as different
+   states rather than as two full-width ladders. */
 .vwk-lean{width:100%;margin-top:auto}
-.vwk .lean-b{gap:4px}
-.vwk .lb-slot{width:auto;flex:1 1 0;min-width:0;padding:4px 2px 3px;gap:2px}
-.vwk .lb-tok{height:16px;font-size:9px}
-.vwk .lb-empty{font-size:9.5px}
+.vwk .lean-b{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;align-items:start}
+.vwk .lb-slot{width:auto;min-width:0;padding:3px 2px;gap:2px}
+.vwk .lb-slot .rk{font-size:7.5px}
+.vwk .lb-tok{height:14px;font-size:8.5px}
+.vwk .lb-empty{grid-column:1 / -1;font-size:9.5px}
 
 /* Spent squares carry a recruit, so they sit forward of the empty ones. */
 .vwk.is-filled{background:rgba(255,255,255,.045);border-color:var(--border)}
