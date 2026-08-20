@@ -306,13 +306,13 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 }
 
 .lineup-right-panel {
-  width: 400px;
+  width: 340px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  padding: 16px 20px 12px;
+  padding: 10px 16px 12px 14px;
   background: rgba(16, 19, 30, 0.98);
-  border-left: 1px solid rgba(255,255,255,0.08);
+  border-left: 1px solid rgba(255,255,255,0.07);
   min-width: 0;
 }
 
@@ -1215,12 +1215,12 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 
 /* —— Timeout-read redesign (table = lineup) —— */
 .autoset-lineup-btn {
-  align-self: flex-start;
-  width: auto;
+  align-self: stretch;
+  width: 100%;
   min-width: 0;
-  height: 36px;
-  margin: 12px 0 0;
-  padding: 0 22px;
+  height: 34px;
+  margin: 0;
+  padding: 0 16px;
 }
 
 .lineup-weights-section {
@@ -1230,10 +1230,32 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   min-height: 0;
 }
 
+.lineup-rail-actions {
+  margin-top: auto;
+  padding-top: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.lineup-rail-actions .roster-panel-actions {
+  margin-top: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.lineup-rail-actions .roster-panel-actions .lineup-btn {
+  width: 100%;
+  min-width: 0;
+  height: 34px;
+}
+
 .lineup-shot-weights {
   margin: 0;
   padding: 0;
   border-top: 0;
+  flex: 0 0 auto;
 }
 
 .lineup-shot-weights .psw-bar-root {
@@ -1315,22 +1337,39 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 
 .roster-table tbody tr.group-header td,
 .roster-stats-table tbody tr.group-header td {
-  padding: 8px 4px 5px;
+  padding: 6px 0 3px;
   border-bottom: 1px solid rgba(255,255,255,0.07);
   background: transparent !important;
   text-align: left;
 }
 
 .roster-group-label {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  padding-left: 8px;
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 12px;
+  font-size: 11px;
   letter-spacing: 0.11em;
   color: rgba(255,255,255,0.40);
 }
 
+.roster-group-label .lbl {
+  letter-spacing: 0.11em;
+}
+
 .roster-group-label .cnt {
   color: rgba(255,255,255,0.22);
-  margin-left: 6px;
+  margin-left: 0;
+}
+
+.roster-group-warn {
+  margin-left: auto;
+  padding-right: 6px;
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: #F5C518;
 }
 
 .roster-table tbody tr.group-gap td,
@@ -1380,10 +1419,10 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 }
 
 .roster-headshot {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   margin: 0 auto;
-  border-radius: 7px;
+  border-radius: 5px;
   border: 1px solid rgba(255,255,255,0.12);
   object-fit: cover;
   object-position: center top;
@@ -1396,35 +1435,61 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 }
 
 .roster-empty-hs {
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   margin: 0 auto;
-  border-radius: 7px;
+  border-radius: 5px;
   border: 1px dashed rgba(255,255,255,0.12);
   background: rgba(255,255,255,0.03);
 }
 
+.roster-game-table {
+  table-layout: fixed;
+  width: 100%;
+  max-width: 1180px;
+  margin: 0 auto;
+}
+
+.roster-game-table th.eng-col,
+.roster-game-table td.eng-cell {
+  width: 152px;
+  min-width: 152px;
+  max-width: 152px;
+}
+
+.roster-game-table th.prod-col,
+.roster-game-table td.prod-cell {
+  width: auto;
+}
+
 .eng-cell {
   min-width: 120px;
-  width: 100%;
 }
 
 .eng {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 8px;
   justify-content: flex-start;
-  padding-left: 4px;
+  padding-left: 6px;
 }
 
 .engbar {
-  height: 6px;
+  height: 5px;
   border-radius: 3px;
   background: rgba(255,255,255,0.10);
   overflow: hidden;
   flex: 1 1 auto;
   min-width: 56px;
-  max-width: 210px;
+  max-width: 150px;
+}
+
+/* Game view: bar stays fixed — surplus goes into production gaps, not ENG length */
+.roster-game-table .engbar {
+  flex: 0 0 104px;
+  width: 104px;
+  min-width: 104px;
+  max-width: 104px;
 }
 
 .engbar i {
@@ -1435,10 +1500,10 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 
 .engnum {
   font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1;
-  width: 34px;
-  flex: 0 0 34px;
+  width: 32px;
+  flex: 0 0 32px;
   text-align: right;
   color: rgba(255,255,255,0.55);
 }
@@ -1446,6 +1511,46 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 .engnum.medium { color: rgba(255,255,255,0.70); }
 .engnum.low { color: rgba(255,255,255,0.90); }
 .engnum.critical { color: #ffffff; }
+
+/* Production cluster — subordinate luminance, no hue; gaps absorb surplus */
+.prod {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  align-items: baseline;
+  gap: 0 15px;
+  padding: 0 26px;
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.prod span {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 3px;
+  white-space: nowrap;
+}
+
+.prod .pv {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 12.5px;
+  line-height: 1;
+  font-style: normal;
+  font-weight: 400;
+  color: rgba(255,255,255,0.55);
+}
+
+.roster-table tbody tr.on-court .prod .pv {
+  color: rgba(255,255,255,0.70);
+}
+
+.prod .pk {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 9px;
+  letter-spacing: 0.09em;
+  font-style: normal;
+  color: rgba(255,255,255,0.22);
+}
 
 .roster-table tbody tr.on-court .player-name-link {
   color: #fff;
@@ -1555,11 +1660,13 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   vertical-align: middle;
 }
 
+.roster-game-table tbody td {
+  height: 28px;
+  padding-top: 2px;
+  padding-bottom: 2px;
+}
+
 .roster-table tbody tr.ft-shooter-locked td.slot-cell,
 .roster-stats-table tbody tr.ft-shooter-locked td.slot-cell {
   box-shadow: inset 3px 0 0 rgba(247,148,32,0.85);
-}
-
-.roster-panel-actions {
-  margin-top: 10px;
 }

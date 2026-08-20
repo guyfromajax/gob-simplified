@@ -13130,6 +13130,37 @@ def _build_season_recruiting_results_story(
     scores = team_points_from_signings(
         [player for player in (signed_players or []) if not player.get("walk_on")]
     )
+
+
+def _carryover_recruiting_results_story(
+    franchise_doc: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Snapshot the prior season's published Results story for next season's feed.
+
+    Headline and body remain unchanged. The release week becomes week 1 because this
+    copy is published into the new season at initialization; source metadata preserves
+    the original week and season without requiring cleared recruiting data.
+    """
+    previous_season = int(franchise_doc.get("current_season") or 1)
+    expected_story_id = f"s{previous_season}-recruiting-results"
+    source = next(
+        (
+            story
+            for story in (franchise_doc.get("season_news") or [])
+            if story.get("story_id") == expected_story_id
+            and story.get("type") == "recruiting_results"
+        ),
+        None,
+    )
+    if not source:
+        return None
+    carried = deepcopy(source)
+    carried["source_week"] = int(source.get("week", 36) or 36)
+    carried["week"] = 1
+    carried["carried_from_season"] = previous_season
+    carried["carried_into_season"] = previous_season + 1
+    carried["created_at"] = datetime.utcnow()
+    return carried
     franchise_id = franchise_doc.get("_id")
     if franchise_id is not None:
         try:
@@ -18180,7 +18211,10 @@ def finish_season(req: FinishSeasonRequest):
     # Same rows also seed the season's "<Team> Walk Ons Announced" story. The modal
     # is dismissed and gone; this is the permanent record, and it runs every season
     # (season 1's equivalent is written at franchise creation).
-    next_season_news: list[dict[str, Any]] = []
+    carried_recruiting_results = _carryover_recruiting_results_story(franchise_doc)
+    next_season_news: list[dict[str, Any]] = (
+        [carried_recruiting_results] if carried_recruiting_results else []
+    )
     if pending_walk_on_welcome and _welcome_user_team_name:
         next_season_news.append(
             build_walk_ons_news_story(_welcome_user_team_name, pending_walk_on_welcome)
@@ -18400,8 +18434,8 @@ def finish_season(req: FinishSeasonRequest):
             "used_recruit_set_ids": _prev_used + ([used_recruit_set_id] if used_recruit_set_id else []),
             "results": {},
             "season_inbox": [],
-            # Cleared for the new season, then seeded with this season's Walk Ons
-            # Announced story (empty list when the class filled the roster).
+            # Cleared for the new season, then seeded with the prior season's exact
+            # Recruiting Results story plus this season's Week-1 stories.
             "season_news": next_season_news,
             "practice_squad": {},
             "schedule": schedule,

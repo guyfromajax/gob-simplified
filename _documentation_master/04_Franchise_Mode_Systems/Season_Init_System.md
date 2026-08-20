@@ -45,6 +45,10 @@ Season init does not intentionally wipe:
 
 Two surfaces, one data shape. Both are written when the walk-ons are created, never derived later.
 
+### Previous Season Recruiting Results
+
+For season 2 and beyond, `finish_season` also carries the prior season's already-published `recruiting_results` story into the new `season_news` feed. It matches the stable `s{previous_season}-recruiting-results` ID and type, deep-copies the exact headline and rich content before Week-35 recruiting state is cleared, and republishes it at Week 1 with source-season/week metadata. Missing stories are not reconstructed. This single feed write supplies the FCC News tab, the Coach's Office News card, and `news.html`.
+
 | Surface | Seasons | Written by |
 |---|---|---|
 | **"\<Team\> Walk Ons Announced"** news story | **1 and up** | `FranchiseManager.initialize_season` (S1) / `finish_season` (S2+) |

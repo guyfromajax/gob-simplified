@@ -27,12 +27,13 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
 **Key Features:**
 - `Game | Attributes | Stats` segmented views (Game default)
-- On-court (5) + Bench groups; empty slots as placeholder rows
+- On-court (5) + Bench groups; empty slots as placeholder rows in PG→C order
 - ENG bar + RT beside the player name in all views (existing 90/80/70 energy bands)
+- Game view production cluster: PTS · REB (DREB+OREB) · AST · DEF% between ENG and RT
 - MO as −5…+5 pip ladder (red left / white right) in Game view
 - Header reads (in-game only, current five): AVG ENG, BELOW 70%, FOUL TROUBLE (F≥3)
-- Right rail: Playbook + Play Call Center shot-weight bar charts (existing `getPswColor` scale)
-- Autoset Lineup below the table (left)
+- Right rail: Playbook + Play Call Center shot-weight charts; Autoset / Game Plan / Playbooks bottom-anchored
+- Game table max-width ~1180px (production gaps absorb surplus; energy bar stays fixed ~104px)
 
 ### Data Sources
 
@@ -52,7 +53,7 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 - On-court RT = that slot’s `position_ratings[pos]`; bench RT = highest rating
 - ENG uses existing bands: ≥90 green, 80–89 yellow, 70–79 orange, &lt;70 red (bar fill; number is white opacity only)
 
-**Game view:** F · MIN · MO (pips)
+**Game view:** ENG · PTS/REB/AST/DEF% · RT · F · MIN · MO (pips). Production numerals always show (including zeros).
 **Attributes:** HT WT SC SH ID OD PS BH RB ST AG ND IQ FT (NG relocated into ENG; trailing RT relocated)
 **Stats:** existing box-score columns unchanged after the shared prefix
 

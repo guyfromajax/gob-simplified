@@ -190,7 +190,7 @@ without a counter doing the arithmetic.
 
 | Region | Contents |
 |---|---|
-| Panel header | `Invite Board` · **position tiles** (centred) · `n/20` · **Submit Invites**. No eyebrow, no footer bar. |
+| Panel header | `Invite Board` · **shape tiles** (centred) · `n/20` · **Submit Invites**. No eyebrow, no footer bar. |
 | Submit | Posts the board, confirms *Invites Submitted*, holds `SUBMIT_HOLD_MS` (2000ms), returns to the FCC |
 | Position tiles | PG · SG · SF · PF · C with the board's count at each. All five always drawn, zero included — the gap is the point, and a tile that vanishes at zero hides what is worth seeing. Derived from `state.board` on every render, so they follow edits. |
 | Row | Headshot · name + archetype (+ visit pill) · Pos · RT (cur/pot) · Yr · Ht · Wt · Lean ladder · remove |
@@ -231,6 +231,21 @@ line costs nothing.
 Squares are square by `aspect-ratio`, with a `min-height` floor that only takes over well
 below the page's 1360px cap. **No counter and no eyebrow** — seven squares are already the
 count, and a number beside them restated the row.
+
+**Shape tiles** answer "what does this board look like" without reading twenty rows. Two
+groups in one centred block, separated by a rule so nine tiles do not read as one run of
+numbers:
+
+| Group | Keys | Order |
+|---|---|---|
+| Position | PG · SG · SF · PF · C | playbook order |
+| Class | JH · FR · SO · JR | youngest first, matching the pool's own year sort |
+
+Every key is always drawn, **zero included and dashed** — an unfilled position or a board
+with no juniors is exactly the thing worth seeing, and a tile that vanishes at zero hides
+it. Counts are derived on each `renderDock()`, so they follow every edit. Years key off
+`yearDisplay`, which is already the abbreviation `formatYearAbbrev` produced, so the tiles
+and the rows cannot drift.
 
 **Submitting ends the visit.** The confirmation holds for 2s, then the player is returned
 to the locker room where the green button is waiting on the next step. Two rules on that

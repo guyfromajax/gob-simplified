@@ -17,6 +17,13 @@ def test_finish_season_resets_franchise_results(monkeypatch):
         "week": 36,
         "current_season": 1,
         "results": {"1": [{"team1_score": 80, "team2_score": 70}]},
+        "season_news": [{
+            "story_id": "s1-recruiting-results",
+            "week": 36,
+            "type": "recruiting_results",
+            "headline": "Season 1 Recruiting Results",
+            "rich_lines": [{"type": "text", "text": "content"}],
+        }],
         "training_status": {"cpu_training_camp_cuts_applied": True},
     }
 
@@ -52,6 +59,14 @@ def test_finish_season_resets_franchise_results(monkeypatch):
     assert result["status"] == "success"
     assert captured_update["results"] == {}
     assert captured_update["training_status.cpu_training_camp_cuts_applied"] is False
+    carried = next(
+        story for story in captured_update["season_news"]
+        if story.get("story_id") == "s1-recruiting-results"
+    )
+    assert carried["headline"] == "Season 1 Recruiting Results"
+    assert carried["rich_lines"] == [{"type": "text", "text": "content"}]
+    assert carried["week"] == 1
+    assert carried["carried_into_season"] == 2
 
 
 def test_finish_season_normalizes_signed_freshman_attributes(monkeypatch):

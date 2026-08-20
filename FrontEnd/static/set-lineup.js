@@ -1070,7 +1070,7 @@ const ROSTER_STATS_COLUMN_NAMES = [
 const ROSTER_ATTR_COLUMN_NAMES = [
   'POS', 'PLAYER', 'ENG', 'RT', 'HT', 'WT', 'SC', 'SH', 'ID', 'OD', 'PS', 'BH', 'RB', 'ST', 'AG', 'ND', 'IQ', 'FT'
 ];
-const ROSTER_GAME_COLUMN_NAMES = ['POS', 'PLAYER', 'ENG', 'RT', 'F', 'MIN', 'MO'];
+const ROSTER_GAME_COLUMN_NAMES = ['POS', 'PLAYER', 'ENG', 'PTS', 'REB', 'AST', 'DEF%', 'RT', 'F', 'MIN', 'MO'];
 
 let rosterPanelView = 'game'; // game | attributes | stats
 let rosterDataForSorting = [];
@@ -1149,6 +1149,42 @@ function buildEnergyCell(percent) {
   return td;
 }
 
+function buildRtCell(player, assignedSlot) {
+  const rt = getDisplayRt(player, assignedSlot);
+  const rtTd = document.createElement('td');
+  rtTd.className = `rt ${rtBucketClassOrEmpty(rt)}`;
+  rtTd.textContent = formatRtDisplay(rt);
+  return rtTd;
+}
+
+function getRosterDefPct(stats) {
+  const defa = Number(stats?.DEF_A) || 0;
+  const defs = Number(stats?.DEF_S) || 0;
+  return defa > 0 ? Math.round((defs / defa) * 100) : 0;
+}
+
+function buildProductionCell(player) {
+  const td = document.createElement('td');
+  td.className = 'prod-cell';
+  if (!player) {
+    td.innerHTML = '<div class="prod"></div>';
+    return td;
+  }
+  const stats = getGameStatsForRoster(player);
+  const reb = (Number(stats.DREB) || 0) + (Number(stats.OREB) || 0);
+  const pts = Number(stats.PTS) || 0;
+  const ast = Number(stats.AST) || 0;
+  const defPct = getRosterDefPct(stats);
+  td.innerHTML = `
+    <div class="prod">
+      <span><b class="pv">${pts}</b><i class="pk">PTS</i></span>
+      <span><b class="pv">${reb}</b><i class="pk">REB</i></span>
+      <span><b class="pv">${ast}</b><i class="pk">AST</i></span>
+      <span><b class="pv">${defPct}</b><i class="pk">DEF%</i></span>
+    </div>`;
+  return td;
+}
+
 function buildMoPipsCell(moValue) {
   const td = document.createElement('td');
   const mo = Math.max(-5, Math.min(5, Number(moValue) || 0));
@@ -1212,6 +1248,7 @@ function appendSharedLeadingCells(tr, {
   playerId,
   assignedSlot,
   empty = false,
+  includeRt = true,
 }) {
   const edgeClass = empty ? 'high' : getEnergyClassFromPercent(getEnergyPercent(player || {}));
   const slotTd = document.createElement('td');
@@ -1224,16 +1261,18 @@ function appendSharedLeadingCells(tr, {
     tr.appendChild(buildHeadshotCell(null));
     const nameTd = document.createElement('td');
     nameTd.className = 'player-name-cell';
-    nameTd.innerHTML = '<span class="roster-empty-copy">Drag a player here</span>';
+    nameTd.innerHTML = '<span class="roster-empty-copy">Empty</span>';
     tr.appendChild(nameTd);
     const emptyEng = document.createElement('td');
     emptyEng.className = 'eng-cell';
     emptyEng.textContent = '—';
     tr.appendChild(emptyEng);
-    const emptyRt = document.createElement('td');
-    emptyRt.className = 'rt';
-    emptyRt.textContent = '—';
-    tr.appendChild(emptyRt);
+    if (includeRt) {
+      const emptyRt = document.createElement('td');
+      emptyRt.className = 'rt';
+      emptyRt.textContent = '—';
+      tr.appendChild(emptyRt);
+    }
     return;
   }
 
@@ -1260,19 +1299,20 @@ function appendSharedLeadingCells(tr, {
 
   tr.appendChild(buildEnergyCell(getEnergyPercent(player)));
 
-  const rt = getDisplayRt(player, assignedSlot);
-  const rtTd = document.createElement('td');
-  rtTd.className = `rt ${rtBucketClassOrEmpty(rt)}`;
-  rtTd.textContent = formatRtDisplay(rt);
-  tr.appendChild(rtTd);
+  if (includeRt) {
+    tr.appendChild(buildRtCell(player, assignedSlot));
+  }
 }
 
-function buildGroupHeaderRow(label, count, colSpan) {
+function buildGroupHeaderRow(label, count, colSpan, warnText = '') {
   const tr = document.createElement('tr');
   tr.className = 'group-header';
   const td = document.createElement('td');
   td.colSpan = colSpan;
-  td.innerHTML = `<div class="roster-group-label">${label}<span class="cnt">${count}</span></div>`;
+  const warnHtml = warnText
+    ? `<span class="roster-group-warn">${warnText}</span>`
+    : '';
+  td.innerHTML = `<div class="roster-group-label"><span class="lbl">${label}</span><span class="cnt">${count}</span>${warnHtml}</div>`;
   tr.appendChild(td);
   return tr;
 }
@@ -1353,6 +1393,9 @@ function comparePlayersForSort(a, b, columnName, direction) {
   } else if (columnName === 'PTS') {
     val1 = Number(statsA.PTS) || 0;
     val2 = Number(statsB.PTS) || 0;
+  } else if (columnName === 'REB') {
+    val1 = (Number(statsA.DREB) || 0) + (Number(statsA.OREB) || 0);
+    val2 = (Number(statsB.DREB) || 0) + (Number(statsB.OREB) || 0);
   } else if (columnName === 'FGM/FGA') {
     val1 = Number(statsA.FGM) || 0;
     val2 = Number(statsB.FGM) || 0;
@@ -1499,36 +1542,28 @@ function renderRosterGame() {
   const tbody = document.getElementById('roster-body-game');
   if (!tbody) return;
   tbody.innerHTML = '';
-  const colSpan = 9;
+  const colSpan = 10;
   const decorated = roster.map(decoratePlayerForRoster);
-  const onCourtFilled = [];
-  const emptySlots = [];
+  const byId = new Map(decorated.map((p) => [String(p._playerId), p]));
+  let filledCount = 0;
   LINEUP_POSITIONS.forEach((pos) => {
-    const pid = lineup[pos];
-    if (!pid) {
-      emptySlots.push(pos);
-      return;
-    }
-    const player = decorated.find((p) => String(p._playerId) === String(pid));
-    if (player) onCourtFilled.push({ ...player, _assignedSlot: pos });
-    else emptySlots.push(pos);
+    if (lineup[pos] && byId.has(String(lineup[pos]))) filledCount += 1;
   });
-  const onCourtSorted = sortPlayerList(onCourtFilled, gameSortColumn, gameSortDirection);
+  const slotsOpen = 5 - filledCount;
   const bench = sortPlayerList(
     decorated.filter((p) => !p._assignedSlot),
     gameSortColumn,
     gameSortDirection
   );
   const fragment = document.createDocumentFragment();
-  fragment.appendChild(buildGroupHeaderRow('ON COURT', 5, colSpan));
-  onCourtSorted.forEach((p) => {
-    const tr = createPlayerRowShell(p, { onCourt: true, assignedSlot: p._assignedSlot });
-    appendSharedLeadingCells(tr, {
-      posLabel: p._assignedSlot,
-      player: p,
-      playerId: p._playerId,
-      assignedSlot: p._assignedSlot,
-    });
+  const openWarn = slotsOpen > 0
+    ? `${slotsOpen} SLOT${slotsOpen > 1 ? 'S' : ''} OPEN`
+    : '';
+  fragment.appendChild(buildGroupHeaderRow('ON COURT', `${filledCount}/5`, colSpan, openWarn));
+
+  function appendGameTail(tr, p) {
+    tr.appendChild(buildProductionCell(p));
+    tr.appendChild(buildRtCell(p, p._assignedSlot || null));
     const stats = getGameStatsForRoster(p);
     const fouls = Number(stats.F) || 0;
     const foulTd = document.createElement('td');
@@ -1539,12 +1574,33 @@ function renderRosterGame() {
     minTd.textContent = formatMinutesRosterStats(Number(stats.MIN) || 0);
     tr.appendChild(minTd);
     tr.appendChild(buildMoPipsCell(p.attributes?.MO ?? p.MO ?? 0));
-    tr.appendChild(buildRemoveCell(p._assignedSlot, p._playerId));
-    fragment.appendChild(tr);
-  });
-  emptySlots.forEach((pos) => {
+  }
+
+  LINEUP_POSITIONS.forEach((pos) => {
+    const pid = lineup[pos];
+    const player = pid ? byId.get(String(pid)) : null;
+    if (player) {
+      const p = { ...player, _assignedSlot: pos };
+      const tr = createPlayerRowShell(p, { onCourt: true, assignedSlot: pos });
+      appendSharedLeadingCells(tr, {
+        posLabel: pos,
+        player: p,
+        playerId: p._playerId,
+        assignedSlot: pos,
+        includeRt: false,
+      });
+      appendGameTail(tr, p);
+      tr.appendChild(buildRemoveCell(pos, p._playerId));
+      fragment.appendChild(tr);
+      return;
+    }
     const tr = createPlayerRowShell(null, { emptySlot: pos });
-    appendSharedLeadingCells(tr, { posLabel: pos, empty: true });
+    appendSharedLeadingCells(tr, { posLabel: pos, empty: true, includeRt: false });
+    tr.appendChild(buildProductionCell(null));
+    const emptyRt = document.createElement('td');
+    emptyRt.className = 'rt';
+    emptyRt.textContent = '—';
+    tr.appendChild(emptyRt);
     for (let i = 0; i < 3; i += 1) {
       const td = document.createElement('td');
       td.textContent = '—';
@@ -1562,17 +1618,9 @@ function renderRosterGame() {
       player: p,
       playerId: p._playerId,
       assignedSlot: null,
+      includeRt: false,
     });
-    const stats = getGameStatsForRoster(p);
-    const fouls = Number(stats.F) || 0;
-    const foulTd = document.createElement('td');
-    foulTd.className = `foul-cell${fouls >= 5 ? ' out' : (fouls >= FOUL_TROUBLE_MIN ? ' warn' : '')}`;
-    foulTd.textContent = String(fouls);
-    tr.appendChild(foulTd);
-    const minTd = document.createElement('td');
-    minTd.textContent = formatMinutesRosterStats(Number(stats.MIN) || 0);
-    tr.appendChild(minTd);
-    tr.appendChild(buildMoPipsCell(p.attributes?.MO ?? p.MO ?? 0));
+    appendGameTail(tr, p);
     tr.appendChild(document.createElement('td'));
     fragment.appendChild(tr);
   });
@@ -1586,26 +1634,22 @@ function renderRosterAttributes() {
   tbody.innerHTML = '';
   const colSpan = 20;
   const decorated = roster.map(decoratePlayerForRoster);
-  const onCourtFilled = [];
-  const emptySlots = [];
+  const byId = new Map(decorated.map((p) => [String(p._playerId), p]));
+  let filledCount = 0;
   LINEUP_POSITIONS.forEach((pos) => {
-    const pid = lineup[pos];
-    if (!pid) {
-      emptySlots.push(pos);
-      return;
-    }
-    const player = decorated.find((p) => String(p._playerId) === String(pid));
-    if (player) onCourtFilled.push({ ...player, _assignedSlot: pos });
-    else emptySlots.push(pos);
+    if (lineup[pos] && byId.has(String(lineup[pos]))) filledCount += 1;
   });
-  const onCourtSorted = sortPlayerList(onCourtFilled, attrSortColumn, attrSortDirection);
+  const slotsOpen = 5 - filledCount;
   const bench = sortPlayerList(
     decorated.filter((p) => !p._assignedSlot),
     attrSortColumn,
     attrSortDirection
   );
   const fragment = document.createDocumentFragment();
-  fragment.appendChild(buildGroupHeaderRow('ON COURT', 5, colSpan));
+  const openWarn = slotsOpen > 0
+    ? `${slotsOpen} SLOT${slotsOpen > 1 ? 'S' : ''} OPEN`
+    : '';
+  fragment.appendChild(buildGroupHeaderRow('ON COURT', `${filledCount}/5`, colSpan, openWarn));
 
   function appendAttrTail(tr, p) {
     const attrs = p.attributes || {};
@@ -1632,19 +1676,23 @@ function renderRosterAttributes() {
     });
   }
 
-  onCourtSorted.forEach((p) => {
-    const tr = createPlayerRowShell(p, { onCourt: true, assignedSlot: p._assignedSlot });
-    appendSharedLeadingCells(tr, {
-      posLabel: p._assignedSlot,
-      player: p,
-      playerId: p._playerId,
-      assignedSlot: p._assignedSlot,
-    });
-    appendAttrTail(tr, p);
-    tr.appendChild(buildRemoveCell(p._assignedSlot, p._playerId));
-    fragment.appendChild(tr);
-  });
-  emptySlots.forEach((pos) => {
+  LINEUP_POSITIONS.forEach((pos) => {
+    const pid = lineup[pos];
+    const player = pid ? byId.get(String(pid)) : null;
+    if (player) {
+      const p = { ...player, _assignedSlot: pos };
+      const tr = createPlayerRowShell(p, { onCourt: true, assignedSlot: pos });
+      appendSharedLeadingCells(tr, {
+        posLabel: pos,
+        player: p,
+        playerId: p._playerId,
+        assignedSlot: pos,
+      });
+      appendAttrTail(tr, p);
+      tr.appendChild(buildRemoveCell(pos, p._playerId));
+      fragment.appendChild(tr);
+      return;
+    }
     const tr = createPlayerRowShell(null, { emptySlot: pos });
     appendSharedLeadingCells(tr, { posLabel: pos, empty: true });
     for (let i = 0; i < 14; i += 1) {
@@ -1683,26 +1731,22 @@ function renderRosterStats() {
   tbody.innerHTML = '';
   const colSpan = 23;
   const decorated = roster.map(decoratePlayerForRoster);
-  const onCourtFilled = [];
-  const emptySlots = [];
+  const byId = new Map(decorated.map((p) => [String(p._playerId), p]));
+  let filledCount = 0;
   LINEUP_POSITIONS.forEach((pos) => {
-    const pid = lineup[pos];
-    if (!pid) {
-      emptySlots.push(pos);
-      return;
-    }
-    const player = decorated.find((p) => String(p._playerId) === String(pid));
-    if (player) onCourtFilled.push({ ...player, _assignedSlot: pos });
-    else emptySlots.push(pos);
+    if (lineup[pos] && byId.has(String(lineup[pos]))) filledCount += 1;
   });
-  const onCourtSorted = sortPlayerList(onCourtFilled, statsSortColumn, statsSortDirection);
+  const slotsOpen = 5 - filledCount;
   const bench = sortPlayerList(
     decorated.filter((p) => !p._assignedSlot),
     statsSortColumn,
     statsSortDirection
   );
   const fragment = document.createDocumentFragment();
-  fragment.appendChild(buildGroupHeaderRow('ON COURT', 5, colSpan));
+  const openWarn = slotsOpen > 0
+    ? `${slotsOpen} SLOT${slotsOpen > 1 ? 'S' : ''} OPEN`
+    : '';
+  fragment.appendChild(buildGroupHeaderRow('ON COURT', `${filledCount}/5`, colSpan, openWarn));
 
   function appendStatsTail(tr, p) {
     const stats = getGameStatsForRoster(p);
@@ -1743,19 +1787,23 @@ function renderRosterStats() {
     });
   }
 
-  onCourtSorted.forEach((p) => {
-    const tr = createPlayerRowShell(p, { onCourt: true, assignedSlot: p._assignedSlot });
-    appendSharedLeadingCells(tr, {
-      posLabel: p._assignedSlot,
-      player: p,
-      playerId: p._playerId,
-      assignedSlot: p._assignedSlot,
-    });
-    appendStatsTail(tr, p);
-    tr.appendChild(buildRemoveCell(p._assignedSlot, p._playerId));
-    fragment.appendChild(tr);
-  });
-  emptySlots.forEach((pos) => {
+  LINEUP_POSITIONS.forEach((pos) => {
+    const pid = lineup[pos];
+    const player = pid ? byId.get(String(pid)) : null;
+    if (player) {
+      const p = { ...player, _assignedSlot: pos };
+      const tr = createPlayerRowShell(p, { onCourt: true, assignedSlot: pos });
+      appendSharedLeadingCells(tr, {
+        posLabel: pos,
+        player: p,
+        playerId: p._playerId,
+        assignedSlot: pos,
+      });
+      appendStatsTail(tr, p);
+      tr.appendChild(buildRemoveCell(pos, p._playerId));
+      fragment.appendChild(tr);
+      return;
+    }
     const tr = createPlayerRowShell(null, { emptySlot: pos });
     appendSharedLeadingCells(tr, { posLabel: pos, empty: true });
     for (let i = 0; i < 17; i += 1) {

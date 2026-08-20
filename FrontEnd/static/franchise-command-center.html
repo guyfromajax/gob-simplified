@@ -185,6 +185,11 @@
         </section>
       </div>
       <div id="player-stats-tab" class="tab-content">
+        <div class="attr-toolbar">
+          <button type="button" class="scope-btn" data-player-stats-scope="varsity" aria-pressed="true">Varsity<span class="n" data-player-stats-count="varsity">0</span></button>
+          <button type="button" class="scope-btn" data-player-stats-scope="practice" aria-pressed="false">Practice Squad<span class="n" data-player-stats-count="practice">0</span></button>
+          <span class="attr-rowcount" id="player-stats-rowcount"></span>
+        </div>
         <section class="fcc-data-card">
           <div class="fcc-data-card-body scroll-x">
             <table class="stats-table">
@@ -217,41 +222,6 @@
                 </tr>
               </thead>
               <tbody id="player-stats-body"></tbody>
-            </table>
-          </div>
-        </section>
-        <section class="fcc-data-card" id="ps-stats-section" style="display:none; margin-top:16px;">
-          <div class="fcc-data-card-body scroll-x">
-            <h3 id="ps-stats-title" class="fcc-practice-squad-title">Practice Squad</h3>
-            <table class="stats-table" id="ps-stats-table">
-              <thead>
-                <tr>
-                  <th>Name</th>
-                  <th>PTS</th>
-                  <th>FGM</th>
-                  <th>FGA</th>
-                  <th>FG%</th>
-                  <th>3PTM</th>
-                  <th>3PTA</th>
-                  <th>3PT%</th>
-                  <th>FTM</th>
-                  <th>FTA</th>
-                  <th>FT%</th>
-                  <th>DREB</th>
-                  <th>OREB</th>
-                  <th>TREB</th>
-                  <th>AST</th>
-                  <th>STL</th>
-                  <th>BLK</th>
-                  <th>F</th>
-                  <th>TO</th>
-                  <th>DEFA</th>
-                  <th>DEF%</th>
-                  <th>SCRA</th>
-                  <th>SCR%</th>
-                </tr>
-              </thead>
-              <tbody id="ps-stats-body"></tbody>
             </table>
           </div>
         </section>

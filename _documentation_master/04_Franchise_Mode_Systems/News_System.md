@@ -7,8 +7,8 @@
 -Have an always-present link at the bottom of the container wiht the copy "See All News". Upon click this takes the user to the standalone news page.
 
 **Stadalone News Page**
-- Headlines and links to news stories are categorized by release moment and kept present throughout the entire season. 
-- When a new season is complete, the news page clears and starts to repopulate upon init of the next season.
+- Headlines and links to news stories are categorized by release moment and kept present throughout the entire season.
+- At rollover, the feed clears except for the exact prior-season `Season {N} Recruiting Results` headline and content, which is republished as a Week 1 carryover. The rest of the new season's stories then populate normally.
 
 **News Moments**
 - Season init (week 1)
@@ -79,4 +79,4 @@
 - Same ranking / rich-table rules as the weekly report rankings (National Top 25 in 13+12 columns + full Region 16 in 8+8). No leans section.
 - Also writes the durable FTD recruiting ranks from Results scoring and **freezes** them until next season Week 1.
 - `story_id`: `s{N}-recruiting-results`.
-
+- **Season 2+ carryover:** `finish_season` snapshots the exact published story before clearing recruiting and news state, retains its `story_id`, headline, and rich content, and inserts it into the next season's `season_news` as a Week 1 release. `source_week: 36`, `carried_from_season`, and `carried_into_season` preserve provenance. Because the FCC News tab, Coach's Office News container, and standalone News page all read `season_news`, the carryover appears on all three without separate copies or frontend logic.

@@ -523,10 +523,14 @@ tr.region-row td{padding:0;border:0}
    and the right-hand pair (count + CTA). margin:auto on the tiles does the centring, so
    neither end has to know the other's width. */
 .bpanel-head{display:flex;align-items:center;gap:14px}
-.bpanel-head .bpos{margin:0 auto}
+.bpanel-head .bshape{margin:0 auto}
 .bpanel-head .bpanel-count{margin-left:auto}
 .bpanel-head .bbtn-save{flex:0 0 auto}
 
+/* Two groups, one centred block: position mix, then class mix. The rule between them
+   is what stops nine tiles reading as one undifferentiated run of numbers. */
+.bshape{display:flex;align-items:center;gap:12px;min-width:0}
+.bshape-div{width:1px;height:18px;background:var(--border);flex:0 0 auto}
 .bpos{display:flex;align-items:center;gap:6px}
 .bpos-t{display:inline-flex;align-items:center;gap:5px;height:24px;padding:0 8px;border-radius:8px;
   border:1px solid var(--border-soft);background:rgba(255,255,255,.035)}

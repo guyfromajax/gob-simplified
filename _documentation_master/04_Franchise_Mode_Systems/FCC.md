@@ -277,6 +277,7 @@ It renders an eight-card summary grid:
 
 - live: renders up to 5 most recent headlines from `topData.news_headlines`
 - each headline links to the standalone news page (`news.html?story_id=...`)
+- in seasons 2+, the prior season's Recruiting Results story is carried into `season_news` as a Week 1 item, so it appears here and in the News tab from the same backend record
 - `See All News` link sits in the card header row, right-justified
 - empty state: `No News To Report`
 - see `06_GMO_Supporting_Systems/News_System.md` for story generation
@@ -321,6 +322,7 @@ Notes:
 - the complete roster response is cached in `userRosterDataCache`; it is the single source for both the Varsity and Practice Squad scopes
 - `userRosterPlayersCache` is the active-player projection used by Home-card consumers; it is derived from `userRosterDataCache.players`
 - Practice Squad rows and counts are derived from `userRosterDataCache.training_squad + userRosterDataCache.practice_squad_recruits` through `FccRosterData.practiceSquadPlayers(...)`; they must not read from `commandCenterTopDataCache`, whose summary contract does not include roster arrays
+- Practice Squad roster rows use the same current-to-potential RT lockup as Varsity. The `/roster/{team_id}` Practice Squad projection must include `entry_tier` and `potential_factor` so `potential_rt_ratcheted` can be calculated rather than emitted as `null`.
 - the session cache persists the complete response as `rosterData`. `rosterPlayers` remains readable only as a backward-compatible fallback for older caches and cannot warm-paint Practice Squad data
 - header tooltips are initialized through `attributeTooltips.js`
 
@@ -328,7 +330,13 @@ Notes:
 
 ## Player Stats Tab
 
-The `Player Stats` tab shows the user roster’s season player stats table.
+The `Player Stats` tab has the same `Varsity | Practice Squad` scope toggle as the Roster tab and displays one stats table for the selected scope.
+
+- Varsity is the default scope and uses each active player's franchise season stats.
+- Practice Squad uses the complete roster cache's `training_squad + practice_squad_recruits` population and each player's `ps_stats` from regional Practice Squad games.
+- Scope buttons show the authoritative player counts and use `aria-pressed` for state.
+- The two scopes replace the table body; a second stacked Practice Squad table must not be added.
+- Sorting state is shared across scope switches, while the underlying stat source changes with the selected scope.
 
 Columns include:
 

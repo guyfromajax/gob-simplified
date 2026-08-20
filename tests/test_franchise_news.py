@@ -408,6 +408,42 @@ def test_append_franchise_week_news_skips_after_lean_window(monkeypatch):
     assert "season_news" not in franchise_doc
 
 
+def test_recruiting_results_story_carries_exact_headline_and_content_into_week_one():
+    source = {
+        "story_id": "s1-recruiting-results",
+        "week": 36,
+        "type": "recruiting_results",
+        "headline": "Season 1 Recruiting Results",
+        "rich_lines": [
+            {"type": "heading", "text": "National Recruit Rankings"},
+            {"type": "ranking_table", "rows": [{"rank": 1, "team": "Ocean City", "score": 91}]},
+        ],
+    }
+    franchise_doc = {"current_season": 1, "season_news": [source]}
+
+    carried = franchise_routes._carryover_recruiting_results_story(franchise_doc)
+
+    assert carried is not source
+    assert carried["story_id"] == "s1-recruiting-results"
+    assert carried["headline"] == source["headline"]
+    assert carried["rich_lines"] == source["rich_lines"]
+    assert carried["week"] == 1
+    assert carried["source_week"] == 36
+    assert carried["carried_from_season"] == 1
+    assert carried["carried_into_season"] == 2
+
+
+def test_recruiting_results_carryover_requires_the_previous_seasons_exact_story():
+    franchise_doc = {
+        "current_season": 2,
+        "season_news": [
+            {"story_id": "s1-recruiting-results", "type": "recruiting_results"},
+            {"story_id": "s2-recruiting-results", "type": "other"},
+        ],
+    }
+    assert franchise_routes._carryover_recruiting_results_story(franchise_doc) is None
+
+
 def test_franchise_news_headlines_excludes_upset_and_limits():
     franchise_doc = {
         "season_news": [

@@ -309,19 +309,31 @@ test.describe('visit pill', () => {
 });
 
 test.describe('board shape tiles', () => {
-  const posTiles = (page) => page.evaluate(() =>
-    [...document.querySelectorAll('#hub-board .bpos-t')].map((t) => ({
-      pos: t.querySelector('b').textContent.trim(),
+  // Two groups in one centred block: positions, then years. Read per group, so a test
+  // about the position mix cannot silently start counting year tiles.
+  const group = (page, i) => page.evaluate((idx) =>
+    [...document.querySelectorAll('#hub-board .bpos')[idx].querySelectorAll('.bpos-t')].map((t) => ({
+      key: t.querySelector('b').textContent.trim(),
       n: Number(t.querySelector('i').textContent.trim()),
       zero: t.classList.contains('is-zero'),
-    })));
+    })), i);
+  const posTiles = (page) => group(page, 0);
+  const yearTiles = (page) => group(page, 1);
 
   test('one tile per position, always all five, in playbook order', async ({ page }) => {
     await mountPool(page, { week: 22, noLeans: true, savedOrders: {} });
     const t = await posTiles(page);
-    expect(t.map((x) => x.pos)).toEqual(['PG', 'SG', 'SF', 'PF', 'C']);
+    expect(t.map((x) => x.key)).toEqual(['PG', 'SG', 'SF', 'PF', 'C']);
     // An empty board still draws all five: the gap is the point, and a tile that
     // vanishes at zero hides exactly the thing worth seeing.
+    expect(t.every((x) => x.n === 0 && x.zero)).toBe(true);
+  });
+
+  test('one tile per class year, always all four, youngest first', async ({ page }) => {
+    await mountPool(page, { week: 22, noLeans: true, savedOrders: {} });
+    const t = await yearTiles(page);
+    // Youngest-first, matching the pool's own year sort rather than a second order.
+    expect(t.map((x) => x.key)).toEqual(['JH', 'FR', 'SO', 'JR']);
     expect(t.every((x) => x.n === 0 && x.zero)).toBe(true);
   });
 
@@ -331,23 +343,30 @@ test.describe('board shape tiles', () => {
     // Add the first four pool rows, then read what the tiles say against the rows.
     for (let i = 0; i < 4; i++) await page.click(`#hub-pool tbody tr.rec:nth-child(${i + 1}) .pool-add`);
     const m = await page.evaluate(() => {
-      const rows = [...document.querySelectorAll('#hub-board .brow[data-id]')]
-        .map((r) => r.querySelectorAll('.bc')[0].textContent.trim());
-      const tiles = Object.fromEntries([...document.querySelectorAll('#hub-board .bpos-t')]
-        .map((t) => [t.querySelector('b').textContent.trim(), Number(t.querySelector('i').textContent.trim())]));
-      return { rows, tiles };
+      const rows = [...document.querySelectorAll('#hub-board .brow[data-id]')].map((r) => {
+        const cells = r.querySelectorAll('.bc');
+        return { pos: cells[0].textContent.trim(), yr: cells[1].textContent.trim() };
+      });
+      const read = (idx) => Object.fromEntries(
+        [...document.querySelectorAll('#hub-board .bpos')[idx].querySelectorAll('.bpos-t')]
+          .map((t) => [t.querySelector('b').textContent.trim(), Number(t.querySelector('i').textContent.trim())]));
+      return { rows, pos: read(0), yr: read(1) };
     });
-    const expected = { PG: 0, SG: 0, SF: 0, PF: 0, C: 0 };
-    m.rows.forEach((p) => { expected[p] += 1; });
-    expect(m.tiles).toEqual(expected);
+    const wantPos = { PG: 0, SG: 0, SF: 0, PF: 0, C: 0 };
+    const wantYr = { JH: 0, FR: 0, SO: 0, JR: 0 };
+    m.rows.forEach((r) => { wantPos[r.pos] += 1; wantYr[r.yr] += 1; });
     expect(m.rows).toHaveLength(4);
+    expect(m.pos).toEqual(wantPos);
+    expect(m.yr).toEqual(wantYr);
+    // Both groups total the board, so neither can quietly count something else.
+    expect(Object.values(m.yr).reduce((a, b) => a + b, 0)).toBe(4);
 
-    // Remove one and the tiles follow — they are derived, not stamped once at load.
+    // Remove one and both groups follow — they are derived, not stamped once at load.
     await page.click('#hub-board .brow[data-id] .bx');
     const after = await page.evaluate(() =>
-      [...document.querySelectorAll('#hub-board .bpos-t i')]
-        .reduce((n, i) => n + Number(i.textContent.trim()), 0));
-    expect(after).toBe(3);
+      [...document.querySelectorAll('#hub-board .bpos')].map((g) =>
+        [...g.querySelectorAll('.bpos-t i')].reduce((n, i) => n + Number(i.textContent.trim()), 0)));
+    expect(after).toEqual([3, 3]);
   });
 
   test('they sit between the title and the action, on the header centre line', async ({ page }) => {
@@ -356,18 +375,26 @@ test.describe('board shape tiles', () => {
       const head = document.querySelector('#hub-board .bpanel-head').getBoundingClientRect();
       const title = document.querySelector('#hub-board .bpanel-title').getBoundingClientRect();
       const cta = document.querySelector('#hub-board #dock-save').getBoundingClientRect();
-      const tiles = document.querySelector('#hub-board .bpos').getBoundingClientRect();
+      const tiles = document.querySelector('#hub-board .bshape').getBoundingClientRect();
+      const groups = [...document.querySelectorAll('#hub-board .bpos')].map((g) => g.getBoundingClientRect());
       return {
         afterTitle: tiles.left >= title.right,
         beforeCta: tiles.right <= cta.left,
         inHead: tiles.top >= head.top - 1 && tiles.bottom <= head.bottom + 1,
         vCentred: Math.abs((tiles.top + tiles.bottom) / 2 - (head.top + head.bottom) / 2) < 2,
+        // One row, positions before years, with a rule between them.
+        oneRow: Math.round(groups[0].top) === Math.round(groups[1].top),
+        posBeforeYears: groups[0].right <= groups[1].left,
+        divider: document.querySelectorAll('#hub-board .bshape-div').length,
       };
     });
     expect(m.afterTitle).toBe(true);
     expect(m.beforeCta).toBe(true);
     expect(m.inHead).toBe(true);
     expect(m.vCentred).toBe(true);
+    expect(m.oneRow).toBe(true);
+    expect(m.posBeforeYears).toBe(true);
+    expect(m.divider).toBe(1);
   });
 
   test('the board title carries no eyebrow', async ({ page }) => {

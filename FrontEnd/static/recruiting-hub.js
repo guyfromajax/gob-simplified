@@ -717,20 +717,43 @@
         '<div>Lean</div><div></div></div>' + out + '</div>';
   }
 
-  // Board shape at a glance. Every position is always drawn, zero included — the gap is
-  // the point, and a tile that disappears at zero hides exactly the thing worth seeing.
+  // Board shape at a glance — position mix and class mix. Every key is always drawn,
+  // zero included: the gap is the point, and a tile that disappears at zero hides
+  // exactly the thing worth seeing.
+  //
+  // Playbook order for positions; youngest-first for years, matching the pool's own
+  // year sort (GOB_PlayerYear.YEAR_SORT_ORDER) rather than inventing a second order.
   var BOARD_POSITIONS = ['PG', 'SG', 'SF', 'PF', 'C'];
-  function boardPosTilesHtml() {
+  var BOARD_YEARS = ['JH', 'FR', 'SO', 'JR'];
+
+  /** keys -> count, over the board, using `pick` to read each recruit's key. */
+  function boardTileCounts(keys, pick) {
     var counts = {};
-    BOARD_POSITIONS.forEach(function (p) { counts[p] = 0; });
+    keys.forEach(function (k) { counts[k] = 0; });
     state.board.forEach(function (id) {
       var r = state.byId[id];
-      if (r && counts[r.pos] != null) counts[r.pos]++;
+      if (!r) return;
+      var k = pick(r);
+      if (counts[k] != null) counts[k]++;
     });
-    return '<div class="bpos">' + BOARD_POSITIONS.map(function (p) {
-      return '<span class="bpos-t' + (counts[p] ? '' : ' is-zero') + '">' +
-        '<b>' + p + '</b><i>' + counts[p] + '</i></span>';
+    return counts;
+  }
+
+  function tileGroupHtml(keys, counts) {
+    return '<div class="bpos">' + keys.map(function (k) {
+      return '<span class="bpos-t' + (counts[k] ? '' : ' is-zero') + '">' +
+        '<b>' + k + '</b><i>' + counts[k] + '</i></span>';
     }).join('') + '</div>';
+  }
+
+  function boardShapeTilesHtml() {
+    // yearDisplay is already the abbreviation the tiles are keyed on (formatYearAbbrev),
+    // so nothing re-derives it here and the two cannot drift.
+    return '<div class="bshape">' +
+      tileGroupHtml(BOARD_POSITIONS, boardTileCounts(BOARD_POSITIONS, function (r) { return r.pos; })) +
+      '<span class="bshape-div" aria-hidden="true"></span>' +
+      tileGroupHtml(BOARD_YEARS, boardTileCounts(BOARD_YEARS, function (r) { return r.yearDisplay; })) +
+      '</div>';
   }
 
   function boardHtml() {
@@ -738,7 +761,7 @@
     return '<section class="bpanel">' +
       '<div class="bpanel-head">' +
         '<div class="bpanel-title">Invite Board</div>' +
-        boardPosTilesHtml() +
+        boardShapeTilesHtml() +
         '<div class="bpanel-count"><span class="n">' + state.board.length + '</span><span class="of">/ ' + MAX_BOARD + '</span></div>' +
         '<button class="bbtn-save" id="dock-save" type="button">Submit Invites</button>' +
       '</div>' +

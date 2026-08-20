@@ -6979,7 +6979,17 @@ try:
                 if ts_ids:
                     ts_docs = list(franchise_players_data_collection.find(
                         {"franchise_id": str(franchise_id), "player_id": {"$in": ts_ids}},
-                        {"player_id": 1, "meta": 1, "attributes": 1, "position_ratings": 1, "ps_season_stats": 1},
+                        {
+                            "player_id": 1,
+                            "meta": 1,
+                            "attributes": 1,
+                            "position_ratings": 1,
+                            "ps_season_stats": 1,
+                            # Required inputs for potential_rt_for_player below. Omitting
+                            # these projected every assigned PS player's POT RT as null.
+                            "entry_tier": 1,
+                            "potential_factor": 1,
+                        },
                     ))
                     ts_by_id = {d["player_id"]: d for d in ts_docs}
                     for pid in ts_ids:
@@ -8327,5 +8337,4 @@ except Exception as e:
     @app.get("/startup-error")
     def _startup_error_route():
         return {"status": "error", "error": str(e), "type": type(e).__name__}
-
 

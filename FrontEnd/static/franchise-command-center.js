@@ -3100,10 +3100,6 @@ function renderTeam(data) {
     initAttributeTooltips(tbody.closest('table') || tbody, ['td', 'th', '.attr-tile']);
   }
 
-  // Practice squad is now a scope of THIS table (see bindFccRosterScope), not a second
-  // stacked table. renderPracticeSquad still populates the Player Stats tab's PS stats.
-  renderPracticeSquad(data);
-
   // Sort bindings. KEY-based, not index-based: the 12 attribute columns collapsed into
   // one cell, so an index lookup mapped clicks to the wrong column (Attributes -> SC).
   const sortableHeaders = document.querySelectorAll('#roster-tab .roster-table thead th[data-sort-col]');
@@ -3124,18 +3120,49 @@ function renderTeam(data) {
     });
   });
   void rosterSortColumn; void rosterSortDirection;
-  renderPlayerStatsTable(data.players || []);
+  renderPlayerStatsTable();
   void renderHomeTab();
 }
 
-function renderPlayerStatsTable(players) {
+const FCC_PLAYER_STATS_STATE = { scope: 'varsity', sortKey: 'PTS', sortDir: 'desc' };
+
+function playerStatsScopePlayers() {
+  return FCC_PLAYER_STATS_STATE.scope === 'practice'
+    ? fccPracticeSquadPlayers()
+    : (userRosterDataCache?.players || []);
+}
+
+function updatePlayerStatsScopeControls() {
+  const varsity = (userRosterDataCache?.players || []).length;
+  const practice = fccPracticeSquadPlayers().length;
+  document.querySelectorAll('#player-stats-tab [data-player-stats-count]').forEach((el) => {
+    el.textContent = el.dataset.playerStatsCount === 'practice' ? practice : varsity;
+  });
+  document.querySelectorAll('#player-stats-tab [data-player-stats-scope]').forEach((button) => {
+    button.setAttribute('aria-pressed', String(button.dataset.playerStatsScope === FCC_PLAYER_STATS_STATE.scope));
+    if (!button.dataset.scopeBound) {
+      button.dataset.scopeBound = '1';
+      button.addEventListener('click', () => {
+        FCC_PLAYER_STATS_STATE.scope = button.dataset.playerStatsScope;
+        renderPlayerStatsTable();
+      });
+    }
+  });
+  const shown = FCC_PLAYER_STATS_STATE.scope === 'practice' ? practice : varsity;
+  const rowCount = document.getElementById('player-stats-rowcount');
+  if (rowCount) rowCount.textContent = shown + (shown === 1 ? ' player' : ' players');
+}
+
+function renderPlayerStatsTable() {
   const tbody = document.getElementById('player-stats-body');
   const statsTable = document.querySelector('#player-stats-tab .stats-table');
   if (!tbody || !statsTable) return;
 
-  const statsRows = (players || []).map((player) => ({
+  updatePlayerStatsScopeControls();
+  const isPractice = FCC_PLAYER_STATS_STATE.scope === 'practice';
+  const statsRows = playerStatsScopePlayers().map((player) => ({
     raw: player,
-    stats: getPlayerSeasonStats(player),
+    stats: isPractice ? (player.ps_stats || {}) : getPlayerSeasonStats(player),
     rt: getPlayerRt(player)
   }));
 
@@ -3156,6 +3183,10 @@ function renderPlayerStatsTable(players) {
 
   function renderRows(rows) {
     if (tbody) tbody.innerHTML = '';
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="24" style="padding:22px;text-align:center;color:rgba(255,255,255,.4)">No players in this scope.</td></tr>';
+      return;
+    }
     rows.forEach((entry) => {
       const stats = entry.stats || {};
       const tpm = stats['3PTM'] || 0;
@@ -3169,8 +3200,13 @@ function renderPlayerStatsTable(players) {
       const defPct = defA > 0 ? String(Math.round(((stats.DEF_S || 0) / defA) * 100)) : '0';
 
       const tr = document.createElement('tr');
+      const playerName = escapeHomeHtml(getDisplayPlayerNameForStats(entry.raw));
+      const playerId = entry.raw?._id || entry.raw?.player_id;
+      const playerCell = isPractice && entry.raw?.is_recruit
+        ? playerName
+        : '<a href="' + buildPlayerDetailUrl(playerId) + '" style="color:inherit;text-decoration:none;">' + playerName + '</a>';
       tr.innerHTML =
-        '<td><a href="' + buildPlayerDetailUrl(entry.raw._id) + '" style="color:inherit;text-decoration:none;">' + getDisplayPlayerNameForStats(entry.raw) + '</a></td>' +
+        '<td>' + playerCell + '</td>' +
         '<td>' + (stats.PTS || 0) + '</td>' +
         '<td>' + (stats.FGM || 0) + '</td>' +
         '<td>' + (stats.FGA || 0) + '</td>' +
@@ -3212,9 +3248,7 @@ function renderPlayerStatsTable(players) {
     renderRows(sorted);
   }
 
-  let activeSort = 'PTS';
-  let activeDirection = 'desc';
-  sortAndRender(activeSort, activeDirection);
+  sortAndRender(FCC_PLAYER_STATS_STATE.sortKey, FCC_PLAYER_STATS_STATE.sortDir);
 
   statsTable.querySelectorAll('thead .sortable').forEach((header) => {
     const newHeader = header.cloneNode(true);
@@ -3223,13 +3257,13 @@ function renderPlayerStatsTable(players) {
     newHeader.style.userSelect = 'none';
     newHeader.addEventListener('click', () => {
       const stat = newHeader.dataset.stat;
-      if (activeSort === stat) {
-        activeDirection = activeDirection === 'desc' ? 'asc' : 'desc';
+      if (FCC_PLAYER_STATS_STATE.sortKey === stat) {
+        FCC_PLAYER_STATS_STATE.sortDir = FCC_PLAYER_STATS_STATE.sortDir === 'desc' ? 'asc' : 'desc';
       } else {
-        activeSort = stat;
-        activeDirection = 'desc';
+        FCC_PLAYER_STATS_STATE.sortKey = stat;
+        FCC_PLAYER_STATS_STATE.sortDir = stat === 'name' ? 'asc' : 'desc';
       }
-      sortAndRender(activeSort, activeDirection);
+      sortAndRender(FCC_PLAYER_STATS_STATE.sortKey, FCC_PLAYER_STATS_STATE.sortDir);
     });
   });
 }
