@@ -193,25 +193,30 @@ test.describe('Invite Board layout', () => {
   test('a ranked row shows headshot, name and archetype stacked', async ({ page }) => {
     await mountPool(page, { week: 22 });
     await page.click('#hub-pool tbody tr.rec:first-child .pool-add');
-    // Measured after the webfonts settle: the display face is taller than the fallback,
-    // and reading the boxes mid-swap put the name and the archetype on the same line.
-    await page.evaluate(() => document.fonts && document.fonts.ready);
+    // Asserted on the MECHANISM, not on measured tops. The board is lean-seeded and
+    // twenty rows tall, so row one sits above the viewport, and reading boxes up there
+    // was flaky under repeat runs. "Stacked" IS the column flex plus the order — that
+    // is the thing that would actually break, and it cannot race.
     const m = await page.evaluate(() => {
       const row = document.querySelector('#hub-board .brow:not(.bhdr):not(.is-empty)');
-      // The name itself, not its wrapper — .btxt contains the archetype too, so its
-      // top is the top of the pair and the comparison below would be against itself.
-      const name = row.querySelector('.btxt a') || row.querySelector('.btxt');
-      const arch = row.querySelector('.btxt small');
+      const btxt = row.querySelector('.btxt');
+      const arch = btxt.querySelector('small');
+      const name = btxt.querySelector('a') || btxt.firstChild;
       return {
         headshot: !!row.querySelector('.bav'),
         arch: arch ? arch.textContent.trim() : null,
-        stacked: arch ? arch.getBoundingClientRect().top > name.getBoundingClientRect().top : false,
+        column: getComputedStyle(btxt).flexDirection,
+        archIsLast: !!arch && btxt.lastElementChild === arch,
+        nameBeforeArch: !!name && !!arch &&
+          (name.compareDocumentPosition(arch) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0,
         wt: !!row.querySelector('.bc'),
       };
     });
     expect(m.headshot).toBe(true);
     expect(m.arch).toBeTruthy();
-    expect(m.stacked).toBe(true);
+    expect(m.column).toBe('column');
+    expect(m.archIsLast).toBe(true);
+    expect(m.nameBeforeArch).toBe(true);
   });
 });
 

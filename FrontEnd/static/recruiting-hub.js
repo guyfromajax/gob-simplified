@@ -1570,7 +1570,12 @@
     var regionIds = (state.conferences && state.conferences.region_team_ids) || [];
     var natIds = Object.keys((state.conferences && state.conferences.region_by_team_id) || {});
     var regionRows = rankTeams(regionIds, scores);
-    var natRows = rankTeams(natIds, scores).slice(0, REVEAL_NATIONAL_TOP);
+    // Scored teams only. Ranking 128 teams that have all signed nobody puts 25 zeroes
+    // in alphabetical order on screen, which says nothing — the table is supposed to
+    // FILL as the league walks, so an unscored team has not earned a row yet.
+    var natRows = rankTeams(natIds, scores)
+      .filter(function (r) { return r.score > 0; })
+      .slice(0, REVEAL_NATIONAL_TOP);
     var pct = cards.length ? (i / cards.length) * 100 : 0;
     var remaining = nextUserIndex(cards, i);
     var mineLeft = cards.slice(i).filter(function (c) { return isUserSigning(c.entry); }).length;
@@ -1585,7 +1590,7 @@
           (remaining === -1 ? 'Skip To End' : 'Skip To My Next') + '</button>' +
         (remaining === -1 ? '' : '<button class="sd-btn" id="rv-end" type="button">Skip To End</button>');
 
-    var season = state.season || (state.week35Results && state.week35Results.season) || '';
+    var season = state.season || '';
     return '<div class="sd">' +
       '<div class="sd-top">' +
         '<div class="sd-brand"><small>' +
@@ -2113,6 +2118,7 @@
         var teamNameMap = data.team_name_map || {};
         state.teamNameMap = teamNameMap;
         state.conferences = data.conferences || null;
+        state.season = data.season || null;
         state.revealSeen = !!data.week_35_reveal_seen;
         state.seedModalSeen = !!data.invite_seed_modal_seen;
         state.visitHistory = data.visit_history || [];

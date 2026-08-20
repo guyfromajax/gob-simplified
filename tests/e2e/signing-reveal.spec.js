@@ -61,6 +61,7 @@ function fixture(o = {}) {
   }
   return {
     team: 'South Lancaster', team_id: USER_TEAM, team_region: 'A', week,
+    season: o.season || 3,
     recruits,
     // The real payload's team_name_map covers every team (resolve_team_name_map with
     // no ids), so the fixture must too — a two-entry map leaves the rails nameless and
@@ -281,6 +282,13 @@ test.describe('the stage', () => {
     expect(m.prog).toContain('Region E');
   });
 
+  test('the header names the season', async ({ page }) => {
+    await stage(page);
+    expect(await page.evaluate(() =>
+      document.querySelector('#hub-reveal .sd-brand small').textContent.trim()))
+      .toBe('Season 3 · Week 35');
+  });
+
   test('a card carries name, position, year and an RT pair', async ({ page }) => {
     await stage(page);
     await page.click('#rv-skip');
@@ -366,6 +374,9 @@ test.describe('the tallies', () => {
 
   test('the national rail fills as the league walks and never exceeds 25', async ({ page }) => {
     await stage(page);
+    // Empty before the first card: 128 teams tied at zero would be alphabetical noise,
+    // not a ranking. A team earns its row by scoring.
+    expect(await railRows(page, true)).toHaveLength(0);
     const before = (await railRows(page, true)).reduce((n, r) => n + r.score, 0);
     await page.click('#rv-end');
     const after = await railRows(page, true);

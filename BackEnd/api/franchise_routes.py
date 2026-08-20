@@ -14394,6 +14394,8 @@ def get_recruiting_data(
             int(franchise_doc.get(INVITE_SEED_MODAL_SEEN_SEASON_FIELD, 0) or 0)
             == _franchise_current_season(franchise_doc)
         ),
+        # The Signing Day header names the season ("Season 1 · Week 35").
+        "season": _franchise_current_season(franchise_doc),
         "week_35_reveal_seen": (
             int(franchise_doc.get(WEEK_35_REVEAL_SEEN_SEASON_FIELD, 0) or 0)
             == _franchise_current_season(franchise_doc)
