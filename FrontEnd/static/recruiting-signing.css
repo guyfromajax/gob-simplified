@@ -287,51 +287,128 @@
    Signing Day conference reveal — full-screen, after submit.
    Newest signing enters at the top; the meter walks the real RT grade run.
    ============================================================ */
-.rvhost{position:fixed;inset:0;z-index:5000;display:flex;align-items:center;justify-content:center;
-  background:radial-gradient(120% 78% at 50% 24%,rgba(39,64,142,.16),transparent 62%),rgba(8,10,16,.97)}
-/* Static shell: the rows box is sized to exactly REVEAL_VISIBLE_ROWS, so the title and
-   meter above and the buttons below hold still as results fill in. Previously the wrap
-   grew with the list and pushed both away from the centre. */
-.rvwrap{width:min(760px,94vw);display:flex;flex-direction:column;gap:14px;padding:22px}
-.rvtitle{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:24px;
-  letter-spacing:.05em;color:#fff;text-align:center}
-.rvhead{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:16px}
-.rvcount{font:600 13px/1 var(--body);color:var(--muted-2);font-variant-numeric:tabular-nums;white-space:nowrap}
-.rvcount b{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:26px;color:#fff;margin-right:2px}
-.rvmeter{display:flex;flex-direction:column;gap:5px;min-width:0}
-.rvmeter-bar{position:relative;height:6px;border-radius:4px;background:rgba(255,255,255,.09);overflow:hidden}
-.rvmeter-bar i{position:absolute;left:0;top:0;bottom:0;border-radius:4px;
-  background:linear-gradient(90deg,#4A90D9,#34EC27 55%,#FFD700 78%,#ff6d6d);transition:width .4s ease}
-.rvticks{display:flex;justify-content:space-between;font:700 8.5px/1 var(--mono,ui-monospace,Menlo,monospace);
-  letter-spacing:.08em;color:rgba(255,255,255,.26)}
-.rvtick.is-at{color:#fff}
-.rvgrade{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:32px;line-height:1;color:#fff;min-width:52px;text-align:right}
-/* --rv-row-h is one .rvrow (44px avatar + 2x9px padding + 2x1px border = 64). Six rows
-   plus five gaps is the fixed height; older results scroll rather than resize the box. */
-.rvrows{--rv-row-h:64px;--rv-row-gap:7px;
-  height:calc(6 * var(--rv-row-h) + 5 * var(--rv-row-gap));
-  flex:0 0 auto;overflow-y:auto;display:flex;flex-direction:column;gap:var(--rv-row-gap);padding-right:4px}
-.rvwait{padding:34px;text-align:center;color:var(--muted-3);font:600 12px/1.5 var(--body)}
-.rvrow{display:grid;grid-template-columns:44px minmax(0,1fr) auto minmax(0,150px);align-items:center;gap:12px;
-  padding:9px 12px;border-radius:11px;border:1px solid var(--border);background:rgba(255,255,255,.03)}
-.rvrow.is-mine{border-color:rgba(52,236,39,.45);background:rgba(52,236,39,.09)}
-.rvrow.is-new{animation:rv-in .34s cubic-bezier(.2,.7,.2,1)}
-@keyframes rv-in{from{opacity:0;transform:translateY(-8px) scale(.99)}to{opacity:1;transform:none}}
-.rvav{width:44px;height:44px;border-radius:9px;overflow:hidden;background:rgba(255,255,255,.06);flex-shrink:0}
-.rvav img{width:100%;height:100%;object-fit:cover;object-position:center top;display:block}
-.rvnm{font:700 13.5px/1.2 var(--body);color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rvsub{font:500 10.5px/1.3 var(--body);color:var(--muted-3)}
-.rvrt{font-family:var(--display,'Bebas Neue Pro','Bebas Neue',sans-serif);font-size:20px;line-height:1;white-space:nowrap}
-.rvteam{font:600 11.5px/1.3 var(--body);color:var(--muted-2);text-align:right;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.rvyou{display:inline-block;margin-left:7px;padding:2px 5px 1px;border-radius:4px;background:#34EC27;color:#06210a;
-  font:700 8.5px/1 var(--body);letter-spacing:.08em;vertical-align:middle}
-.rvfoot{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;min-height:44px}
-.rvbtn{height:38px;padding:0 20px;border-radius:9px;border:1px solid var(--border);background:rgba(255,255,255,.05);
-  color:var(--text);font:700 12px/1 var(--body);letter-spacing:.03em;cursor:pointer;transition:.13s}
-.rvbtn:hover{background:rgba(255,255,255,.1);border-color:var(--muted-3)}
-.rvbtn.is-go{background:#34EC27;border-color:#34EC27;color:#06210a}
-.rvskip-note{font:500 10.5px/1 var(--body);color:var(--muted-3)}
-@media (prefers-reduced-motion:reduce){.rvrow.is-new{animation:none}.rvmeter-bar i{transition:none}}
+/* The reveal host is the full-screen shell; .sd below is the stage inside it. */
+.rvhost{position:fixed;inset:0;z-index:5000;overflow:hidden;background:#05060a}
+
+/* ============================================================
+   SIGNING DAY REVEAL — the stage.
+   Card centre, region tally left, national top 25 right, funded targets
+   along the bottom. All four move on one tick.
+   ============================================================ */
+.sd{position:absolute;inset:0;display:flex;flex-direction:column;
+  background:radial-gradient(1100px 640px at 50% -10%,rgba(52,236,39,.07),transparent 60%),
+    linear-gradient(180deg,#080a10,#05060a 60%)}
+
+.sd-top{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;
+  gap:20px;padding:15px 22px;border-bottom:1px solid var(--hair)}
+.sd-brand{display:flex;flex-direction:column;gap:3px}
+.sd-brand small{font:700 9px/1 var(--body);letter-spacing:.18em;text-transform:uppercase;color:var(--muted-3)}
+.sd-brand b{font:400 27px/1 var(--display);letter-spacing:.03em}
+.sd-prog{display:flex;flex-direction:column;align-items:center;gap:7px}
+.sd-prog-n{font:500 10.5px/1 var(--body);color:var(--muted-2);font-variant-numeric:tabular-nums}
+.sd-prog-n b{font:400 20px/1 var(--display);color:#fff;margin-right:3px}
+.sd-prog-bar{width:270px;height:5px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden}
+.sd-prog-bar i{display:block;height:100%;width:0;border-radius:3px;
+  background:linear-gradient(90deg,var(--green),#9dff5a);transition:width .35s ease}
+.sd-ctl{display:flex;align-items:center;justify-content:flex-end;gap:8px}
+.sd-btn{height:31px;padding:0 12px;border-radius:8px;border:1px solid var(--border);
+  background:rgba(255,255,255,.05);color:var(--muted-2);font:700 10px/1 var(--body);
+  letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.sd-btn.is-pause{width:31px;padding:0;display:flex;align-items:center;justify-content:center;font-size:9px}
+
+.sd-stage{flex:1;min-height:0;display:grid;grid-template-columns:280px minmax(0,1fr) 280px}
+.sd-rail{min-height:0;display:flex;flex-direction:column;padding:13px 15px;overflow:hidden}
+.sd-rail.is-right{border-left:1px solid var(--hair)}
+.sd-card-wrap{border-left:1px solid var(--hair);min-width:0;display:flex;align-items:center;
+  justify-content:center;padding:16px 24px}
+.sd-rail-h{display:flex;align-items:baseline;justify-content:space-between;gap:8px;
+  padding-bottom:9px;margin-bottom:8px;border-bottom:1px solid var(--hair)}
+.sd-rail-t{font:400 17px/1 var(--display);letter-spacing:.03em}
+.sd-rail-s{font:700 8.5px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3)}
+.sd-list{display:flex;flex-direction:column;gap:1px;min-height:0}
+
+.sd-tm{display:grid;grid-template-columns:20px minmax(0,1fr) auto;align-items:center;gap:8px;
+  padding:5px 7px;border-radius:7px;font:500 11.5px/1.2 var(--body);color:var(--muted-2)}
+/* 25 rows have to clear the stage without scrolling, so the national rail runs tighter
+   than the region rail's 16. */
+.is-right .sd-tm{padding:3px 7px;font-size:11px}
+.is-right .sd-tm .sc{font-size:14px}
+.sd-tm .rk{font:700 9px/1 var(--body);color:var(--muted-3);text-align:right;font-variant-numeric:tabular-nums}
+.sd-tm .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sd-tm .sc{font:400 15px/1 var(--display);color:#fff;font-variant-numeric:tabular-nums;white-space:nowrap}
+.sd-tm.is-user{background:rgba(52,236,39,.09);box-shadow:inset 0 0 0 1px rgba(52,236,39,.3)}
+.sd-tm.is-user .nm{color:#a9ff9c}
+.sd-tm.is-hit{background:rgba(255,255,255,.07)}
+.sd-tm.is-hit .sc{color:#9dff5a}
+.sd-tm .dl{font:700 8.5px/1 var(--body);color:#9dff5a;margin-left:5px}
+.sd-tm .dl.dn{color:var(--red)}
+
+/* the card */
+.sd-card{display:flex;flex-direction:column;align-items:center;width:var(--card-w,430px);
+  transition:width .3s cubic-bezier(.2,.75,.2,1)}
+.sd-card-nm{font:400 38px/1 var(--display);letter-spacing:.02em;text-align:center;margin-bottom:13px}
+.sd-shot{width:100%;aspect-ratio:1/1;border-radius:18px;overflow:hidden;position:relative;
+  border:1px solid var(--border);display:flex;align-items:flex-end;justify-content:center;
+  background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02))}
+.sd-shot-img{position:absolute;inset:0;display:block}
+.sd-shot-img img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.sd-flag{position:absolute;left:0;right:0;bottom:0;padding:9px 14px;
+  font:700 10px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;text-align:center}
+.sd-meta{display:grid;grid-template-columns:repeat(3,1fr);width:100%;margin-top:13px;
+  border:1px solid var(--border-soft);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.02)}
+.sd-meta div{padding:9px 6px;text-align:center;border-right:1px solid var(--border-soft)}
+.sd-meta div:last-child{border-right:0}
+.sd-meta small{display:block;font:700 8px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;
+  color:var(--muted-3);margin-bottom:5px}
+.sd-meta b{font:400 21px/1 var(--display);font-weight:400}
+
+/* win / loss states */
+/* State lives on the CARD, not the stage: the mock toggled one attribute on a static
+   page, but the shipped card is re-rendered per tick and carries its own class. */
+.sd-card.is-won .sd-shot{border-color:rgba(52,236,39,.55);
+  box-shadow:0 0 0 1px rgba(52,236,39,.35),0 0 46px rgba(52,236,39,.22)}
+.sd-card.is-won .sd-flag{background:rgba(52,236,39,.9);color:#06210a}
+/* Red is earned — only a recruit the user funded can be a loss. */
+.sd-card.is-lost .sd-shot{border-color:rgba(255,109,109,.45);
+  box-shadow:0 0 0 1px rgba(255,109,109,.28)}
+.sd-card.is-lost .sd-flag{background:rgba(255,109,109,.88);color:#2a0707}
+/* Neutral: someone else's signing, which is most of the region. */
+.sd-card.is-neutral .sd-flag{background:rgba(255,255,255,.07);color:var(--muted-2)}
+
+/* funded targets */
+.sd-targets{border-top:1px solid var(--hair);padding:11px 22px 13px;display:flex;align-items:center;gap:14px}
+.sd-targets-h{display:flex;flex-direction:column;gap:2px;flex:0 0 auto;padding-right:14px;
+  border-right:1px solid var(--hair)}
+.sd-targets-h b{font:400 17px/1 var(--display);letter-spacing:.03em}
+.sd-targets-h small{font:700 8.5px/1 var(--body);letter-spacing:.12em;text-transform:uppercase;color:var(--muted-3)}
+.sd-tgts{display:flex;gap:7px;flex:1;min-width:0;overflow:hidden}
+.sd-tg{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:5px 10px 5px 5px;border-radius:9px;
+  border:1px solid var(--border-soft);background:rgba(255,255,255,.03)}
+.sd-tg-av{width:27px;height:27px;border-radius:6px;flex:0 0 auto;overflow:hidden;
+  background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02));
+  display:flex;align-items:flex-end;justify-content:center}
+.sd-tg-av img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
+.sd-tg-tx{display:flex;flex-direction:column;gap:2px;min-width:0}
+.sd-tg-nm{font:600 11px/1 var(--body);color:rgba(255,255,255,.85);white-space:nowrap}
+.sd-tg-st{font:700 8.5px/1 var(--body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted-3);
+  white-space:nowrap}
+.sd-tg.is-won{border-color:rgba(52,236,39,.5);background:rgba(52,236,39,.1)}
+.sd-tg.is-won .sd-tg-st{color:#9dff5a}
+.sd-tg.is-lost{border-color:rgba(255,109,109,.32);background:rgba(255,109,109,.06)}
+.sd-tg.is-lost .sd-tg-st{color:#ff9c9c}
+.sd-tg.is-lost .sd-tg-nm{color:var(--muted-2)}
+
+
+/* Slide in from the left as each card replaces the last. */
+@keyframes sd-slide{from{opacity:0;transform:translateX(-64px)}to{opacity:1;transform:none}}
+.sd-card{animation:sd-slide .42s cubic-bezier(.2,.75,.2,1)}
+@media (prefers-reduced-motion:reduce){.sd-card{animation:none}}
+.sd-card-wait{font:600 12px/1.5 var(--body);color:var(--muted-3);text-align:center}
+.sd-btn{cursor:pointer;transition:background .13s,color .13s}
+.sd-btn:hover{background:rgba(255,255,255,.1);color:#fff}
+.sd-btn:focus-visible{outline:2px solid #fff;outline-offset:2px}
+.sd-btn.is-go{background:var(--green);border-color:var(--green);color:#06210a}
+.sd-btn.is-go:hover{background:#49ff37;color:#06210a}
 
 /* ---------- Week 36: league signing list (no playback) ---------- */
 .lswrap{display:flex;flex-direction:column;gap:16px}

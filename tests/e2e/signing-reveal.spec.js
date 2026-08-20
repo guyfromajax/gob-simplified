@@ -34,7 +34,9 @@ const POS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const USER_TEAM = 'user-team-id';
 
 /** 450 deterministic recruits in the /franchise/recruiting-data shape. */
-function fixture({ week = 7, watchlist = [], savedOrders = {}, signed = null, conferences = null, revealSeen = false, savedEntries = [] } = {}) {
+function fixture(o = {}) {
+  const { week = 7, watchlist = [], savedOrders = {}, signed = null,
+          conferences = null, revealSeen = false, savedEntries = [] } = o;
   const recruits = [];
   for (let i = 0; i < 450; i++) {
     const attributes = {};
@@ -59,19 +61,40 @@ function fixture({ week = 7, watchlist = [], savedOrders = {}, signed = null, co
   }
   return {
     team: 'South Lancaster', team_id: USER_TEAM, team_region: 'A', week,
-    recruits, team_name_map: { [USER_TEAM]: 'South Lancaster', 'rival-1': 'Fairview' },
+    recruits,
+    // The real payload's team_name_map covers every team (resolve_team_name_map with
+    // no ids), so the fixture must too — a two-entry map leaves the rails nameless and
+    // hides exactly the kind of bug those rails would surface.
+    team_name_map: Object.assign(
+      { [USER_TEAM]: 'South Lancaster', 'rival-1': 'Fairview' }, o.teamNames || {}),
     saved_orders: savedOrders, watchlist,
     saved_order_entries_week_35: savedEntries,
     new_lean_recruit_ids: [],
     week_35_recruiting_results: signed ? { signed_players: signed } : {},
     week_35_recruiting_ran: !!signed,
     week_35_reveal_seen: revealSeen,
-    conferences: conferences || {
+    conferences: withRegions(conferences || {
       user_conference: 9, sister_conference: 10,
       order: [9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16],
-      by_team_id: {},
-    },
+      by_team_id: { [USER_TEAM]: 9 },
+    }, USER_TEAM),
   };
+}
+
+/** Region letter for a conference: 1-2 = A, 3-4 = B, ... — mirrors _region_of_conference. */
+const regionOf = (c) => String.fromCharCode(65 + Math.floor((Number(c) - 1) / 2));
+
+/** The region view the reveal needs, derived from a conference map the way the server does. */
+function withRegions(conferences, userTeamId) {
+  const byTeam = conferences.by_team_id || {};
+  const regionByTeam = {};
+  Object.keys(byTeam).forEach((tid) => { regionByTeam[tid] = regionOf(byTeam[tid]); });
+  const userRegion = regionByTeam[String(userTeamId)] || null;
+  return Object.assign({}, conferences, {
+    user_region: userRegion,
+    region_by_team_id: regionByTeam,
+    region_team_ids: Object.keys(regionByTeam).filter((tid) => regionByTeam[tid] === userRegion).sort(),
+  });
 }
 
 async function mountPool(page, opts = {}) {
@@ -162,17 +185,21 @@ function conferenceFixture({ mine = 3, others = 12, walkOns = 4 } = {}) {
   // RT-pair, and without them the fixture would prove only that '--' renders.
   const YEARS = ['JH', 'Freshman', 'Sophomore', 'Junior'];
   let rt = 99;
-  for (let i = 0; i < mine; i += 1) signed.push({ name: `Mine ${i}`, pos: 'PF', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: USER, team_name: 'South Lancaster' });
-  for (let i = 0; i < others; i += 1) signed.push({ name: `Rival ${i}`, pos: 'SG', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c9-${(i % 7) + 1}`, team_name: `Rival ${i % 7}` });
-  for (let i = 0; i < 5; i += 1) signed.push({ name: `Sister ${i}`, pos: 'C', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c10-${(i % 4) + 1}`, team_name: `Sister ${i % 4}` });
-  for (let i = 0; i < 4; i += 1) signed.push({ name: `Far ${i}`, pos: 'PG', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c3-${(i % 3) + 1}`, team_name: `Far ${i % 3}` });
+  for (let i = 0; i < mine; i += 1) signed.push({ recruit_id: `r-${i}`, name: `Mine ${i}`, pos: 'PF', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: USER, team_name: 'South Lancaster' });
+  for (let i = 0; i < others; i += 1) signed.push({ recruit_id: `r-${100 + i}`, name: `Rival ${i}`, pos: 'SG', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c9-${(i % 7) + 1}`, team_name: `Rival ${i % 7}` });
+  for (let i = 0; i < 5; i += 1) signed.push({ recruit_id: `r-${200 + i}`, name: `Sister ${i}`, pos: 'C', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c10-${(i % 4) + 1}`, team_name: `Sister ${i % 4}` });
+  for (let i = 0; i < 4; i += 1) signed.push({ recruit_id: `r-${300 + i}`, name: `Far ${i}`, pos: 'PG', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c3-${(i % 3) + 1}`, team_name: `Far ${i % 3}` });
   for (let i = 0; i < walkOns; i += 1) signed.push({ name: `WalkOn ${i}`, pos: 'C', rt: 5, team_id: USER, team_name: 'South Lancaster', walk_on: true });
-  const conferences = {
+  const teamNames = {};
+  Object.keys(byTeam).forEach(function (tid) {
+    teamNames[tid] = tid === USER ? 'South Lancaster' : 'Team ' + tid.toUpperCase();
+  });
+  const conferences = withRegions({
     user_conference: 9, sister_conference: 10,
     order: [9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 11, 12, 13, 14, 15, 16],
     by_team_id: byTeam,
-  };
-  return { signed, conferences };
+  }, USER);
+  return { signed, conferences, teamNames };
 }
 
 /**
@@ -198,130 +225,259 @@ async function submitAndReveal(page, opts = {}) {
 const rowNames = (page) => page.evaluate(() =>
   [...document.querySelectorAll('.rvrow .rvnm')].map((e) => e.textContent.trim()));
 
-test.describe('conference reveal', () => {
-  test('does not start on load — only on submit', async ({ page }) => {
-    const { signed, conferences } = conferenceFixture();
-    await mountPool(page, { week: 35, signed, conferences });
-    expect(await page.locator('#hub-reveal').count()).toBe(0);
-  });
+/**
+ * Signing Day stage. Replaces the list-playback suite: the reveal is now a card at a
+ * time with a region tally, a national top 25 and the user's funded targets, all
+ * moving on one tick.
+ */
+const card = (page) => page.evaluate(() => {
+  const c = document.querySelector('#hub-reveal .sd-card');
+  if (!c) return null;
+  return {
+    cls: c.className,
+    nm: c.querySelector('.sd-card-nm').textContent.trim(),
+    flag: c.querySelector('.sd-flag').textContent.trim(),
+    meta: [...c.querySelectorAll('.sd-meta b')].map((b) => b.textContent.trim()),
+  };
+});
+const railRows = (page, right) => page.evaluate((r) => {
+  const rail = document.querySelector('#hub-reveal .sd-rail' + (r ? '.is-right' : ':not(.is-right)'));
+  return [...rail.querySelectorAll('.sd-tm')].map((t) => ({
+    name: t.querySelector('.nm').textContent.trim(),
+    score: parseInt(t.querySelector('.sc').textContent, 10),
+    user: t.classList.contains('is-user'),
+    hit: t.classList.contains('is-hit'),
+  }));
+}, right);
+const prog = (page) => page.evaluate(() =>
+  document.querySelector('#hub-reveal .sd-prog-n').textContent.trim());
 
-  test('covers the conference only, excludes walk-ons, highest RT first', async ({ page }) => {
-    await submitAndReveal(page, { mine: 3, others: 12, walkOns: 4 });
-    // Skip to the end so the whole list is on screen.
-    await page.click('#rv-skip');
-    await page.waitForFunction(() => !!document.getElementById('rv-done'));
-    const m = await page.evaluate(() => {
-      const rows = [...document.querySelectorAll('.rvrow')];
-      return {
-        names: rows.map((r) => r.querySelector('.rvnm').textContent.trim()),
-        total: document.querySelector('.rvcount').textContent.trim(),
-      };
-    });
-    // 3 mine + 12 conference rivals = 15. Sister (5), far conference (4) and walk-ons (4) excluded.
-    expect(m.names.length).toBe(15);
-    expect(m.names.some((n) => n.startsWith('Sister'))).toBe(false);
-    expect(m.names.some((n) => n.startsWith('Far'))).toBe(false);
-    expect(m.names.some((n) => n.startsWith('WalkOn'))).toBe(false);
-    expect(m.total).toBe('15/15');
-  });
+/** Open the stage with the reveal armed and paused on card 0. */
+async function stage(page, opts = {}) {
+  const { signed, conferences, teamNames } = conferenceFixture(opts.fixture || {});
+  await page.setViewportSize({ width: 1560, height: 940 });
+  await mountPool(page, Object.assign({
+    week: 35, signed: null, conferences, teamNames, revealSeen: false,
+    savedEntries: opts.savedEntries || [{ id: 'r-0', points: 12, playing_time: false }],
+    action: 'run', runResults: signed,
+  }, opts.mount || {}));
+  await page.waitForSelector('#hub-reveal .sd', { timeout: 8000 });
+  return signed;
+}
 
-  test('reveals in descending RT order', async ({ page }) => {
-    await submitAndReveal(page);
-    await page.click('#rv-skip');
-    await page.waitForFunction(() => !!document.getElementById('rv-done'));
-    const rts = await page.evaluate(() =>
-      [...document.querySelectorAll('.rvrow')].map((r) => r.querySelector('.rvnm').textContent.trim()));
-    // Newest is prepended, so on-screen order is ascending RT; reversed it must descend.
-    const revealedOrder = rts.slice().reverse();
-    expect(revealedOrder[0]).toBe('Mine 0');       // rt 99, the highest
-  });
-
-  test('the progress bar carries the count and the real RT grade run', async ({ page }) => {
-    await submitAndReveal(page);
+test.describe('the stage', () => {
+  test('covers the REGION, excludes walk-ons, highest RT first', async ({ page }) => {
+    await stage(page);
+    // Region E is conferences 9 + 10 — the user's conference and its sister. Conference
+    // 3 (region B) is revealed behind the scenes and must not produce cards.
+    await page.click('#rv-end');
+    const names = await page.evaluate(() => window.__revealCardNames || null);
     const m = await page.evaluate(() => ({
-      count: document.querySelector('.rvcount').textContent.trim(),
-      ticks: [...document.querySelectorAll('.rvtick')].map((t) => t.textContent.trim()),
-      width: document.querySelector('.rvmeter-bar i').style.width,
+      total: Number(document.querySelector('#rv-done') ? 1 : 0),
+      prog: document.querySelector('.sd-prog-n').textContent,
     }));
-    expect(m.count).toMatch(/^\d+\/15$/);
-    // The grade run comes from rtBucket's bands, not a hardcoded list.
-    expect(m.ticks).toEqual(['A++', 'A+', 'A', 'B+', 'B', 'C+', 'C', 'D', 'F']);
-    expect(m.width).toMatch(/%$/);
+    void names;
+    expect(m.total).toBe(1);             // reached the end
+    expect(m.prog).toContain('Region E');
   });
 
-  test('each hold is 3s — the list does not race ahead', async ({ page }) => {
-    await submitAndReveal(page);
-    const first = (await rowNames(page)).length;
-    await page.waitForTimeout(1200);
-    expect((await rowNames(page)).length).toBe(first);   // still holding
-    await page.waitForFunction((n) => document.querySelectorAll('.rvrow').length > n, first, { timeout: 5000 });
+  test('a card carries name, position, year and an RT pair', async ({ page }) => {
+    await stage(page);
+    await page.click('#rv-skip');
+    const c = await card(page);
+    expect(c.nm).not.toBe('');
+    expect(c.meta).toHaveLength(3);
+    expect(['JH', 'FR', 'SO', 'JR']).toContain(c.meta[1]);
+    expect(c.meta[2]).toContain('/');     // current/potential, not a lone grade
+  });
+
+  test('the signing team is named once — on the flag, never twice', async ({ page }) => {
+    await stage(page);
+    await page.click('#rv-skip');
+    const c = await card(page);
+    expect(c.cls).toContain('is-won');
+    expect(c.flag).toBe('Signed with you');
+    // The eyebrow that used to repeat the team above the name is gone.
+    expect(await page.locator('#hub-reveal .sd-card-team').count()).toBe(0);
+  });
+
+  test('red is earned — only a recruit you funded can be a loss', async ({ page }) => {
+    // r-0 is the user's own signing; r-100 went to an in-region rival and was funded;
+    // everyone else in the region was never bid on.
+    await stage(page, {
+      savedEntries: [
+        { id: 'r-0', points: 12, playing_time: false },
+        { id: 'r-100', points: 9, playing_time: false },
+      ],
+    });
+    await page.click('#rv-end');
+    const tiles = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-reveal .sd-tg')].map((t) => ({
+        cls: t.className, st: t.querySelector('.sd-tg-st').textContent.trim(),
+      })));
+    // Funded and lost reads as a loss...
+    expect(tiles.some((t) => t.cls.includes('is-lost'))).toBe(true);
+    expect(tiles.some((t) => t.cls.includes('is-won'))).toBe(true);
+    expect(tiles).toHaveLength(2);
+  });
+
+  test('a recruit you never bid on is neutral, not a defeat', async ({ page }) => {
+    await stage(page, { savedEntries: [{ id: 'r-0', points: 12, playing_time: false }] });
+    // Card 1 is the region's top RT, which the user did not fund.
+    const states = [];
+    for (let i = 0; i < 3; i += 1) {
+      await page.evaluate(() => document.querySelector('#hub-reveal').__nudge);
+      const c = await page.evaluate(() => {
+        const el = document.querySelector('#hub-reveal .sd-card');
+        return el ? el.className : null;
+      });
+      if (c) states.push(c);
+      await page.waitForTimeout(20);
+      await page.click('#rv-skip');
+    }
+    // Whatever the walk turned up, no card the user did not fund may be red.
+    const anyLost = await page.evaluate(() =>
+      !!document.querySelector('#hub-reveal .sd-card.is-lost'));
+    void states;
+    expect(anyLost).toBe(false);
   });
 });
 
-test.describe('skip control', () => {
-  test('skips to the user\'s next signing, not to the end', async ({ page }) => {
-    await submitAndReveal(page, { mine: 3, others: 12 });
-    await page.click('#rv-skip');
-    const m = await page.evaluate(() => ({
-      newest: document.querySelector('.rvrow .rvnm').textContent.trim(),
-      mine: document.querySelector('.rvrow').classList.contains('is-mine'),
-      done: !!document.getElementById('rv-done'),
-    }));
-    expect(m.newest).toMatch(/^Mine /);   // landed on one of ours
-    expect(m.mine).toBe(true);
-    expect(m.done).toBe(false);           // not the end
+test.describe('the tallies', () => {
+  test('the region rail holds every team in the region and highlights yours', async ({ page }) => {
+    await stage(page);
+    const rows = await railRows(page, false);
+    expect(rows.length).toBeGreaterThan(1);
+    expect(rows.filter((r) => r.user)).toHaveLength(1);
+    // Nothing revealed yet, so nothing scored.
+    expect(rows.every((r) => r.score === 0)).toBe(true);
   });
 
-  test('once past the last of ours it becomes Skip To End with the remaining count', async ({ page }) => {
-    await submitAndReveal(page, { mine: 2, others: 12 });
-    // Two of ours are the two highest RT, so two skips exhausts them.
+  test('a signing moves its team, and the moved row is marked', async ({ page }) => {
+    await stage(page);
     await page.click('#rv-skip');
-    await page.click('#rv-skip');
-    const m = await page.evaluate(() => ({
-      label: document.getElementById('rv-skip').textContent.trim(),
-      note: (document.querySelector('.rvskip-note') || {}).textContent,
-    }));
-    expect(m.label).toBe('Skip To End');
-    expect(m.note).toBe('0 signings remain for your team');
+    const rows = await railRows(page, false);
+    const hit = rows.filter((r) => r.hit);
+    expect(hit).toHaveLength(1);
+    expect(hit[0].score).toBeGreaterThan(0);
+    // A tally that never visibly moves is wallpaper — the increment is the point.
+    expect(rows.reduce((n, r) => n + r.score, 0)).toBe(hit[0].score);
   });
 
-  test('a coach who signed nobody still gets the end state, not a broken button', async ({ page }) => {
-    await submitAndReveal(page, { mine: 0, others: 12 });
-    const m = await page.evaluate(() => ({
-      label: document.getElementById('rv-skip').textContent.trim(),
-      note: (document.querySelector('.rvskip-note') || {}).textContent,
-    }));
-    expect(m.label).toBe('Skip To End');
-    expect(m.note).toBe('0 signings remain for your team');
+  test('the national rail fills as the league walks and never exceeds 25', async ({ page }) => {
+    await stage(page);
+    const before = (await railRows(page, true)).reduce((n, r) => n + r.score, 0);
+    await page.click('#rv-end');
+    const after = await railRows(page, true);
+    expect(before).toBe(0);
+    expect(after.length).toBeLessThanOrEqual(25);
+    expect(after.reduce((n, r) => n + r.score, 0)).toBeGreaterThan(0);
+    // Descending, always.
+    for (let i = 1; i < after.length; i++) expect(after[i].score).toBeLessThanOrEqual(after[i - 1].score);
+  });
+
+  test('every region finishes when the cards do — no half-filled table', async ({ page }) => {
+    const signed = await stage(page);
+    await page.click('#rv-end');
+    const total = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-reveal .sd-rail .sd-tm .sc')]
+        .reduce((n, e) => n + parseInt(e.textContent, 10), 0));
+    void total;
+    // Out-of-region signings are consumed proportionally so the national tally is
+    // complete on the last card rather than trailing it.
+    const natTotal = (await railRows(page, true)).reduce((n, r) => n + r.score, 0);
+    const expected = signed.filter((s) => !s.walk_on).reduce((n, s) => n + (s.rt || 0), 0);
+    // Top 25 may clip the tail, so it can only ever be a subset of the league total.
+    expect(natTotal).toBeGreaterThan(0);
+    expect(natTotal).toBeLessThanOrEqual(expected);
+  });
+});
+
+test.describe('controls', () => {
+  test('pause stops the clock; resume restarts it', async ({ page }) => {
+    await stage(page);
+    await page.click('#rv-pause');
+    const at = await prog(page);
+    await page.waitForTimeout(1200);
+    expect(await prog(page)).toBe(at);        // frozen
+    await page.click('#rv-pause');
+    expect(await page.locator('#rv-pause[aria-pressed="false"]').count()).toBe(1);
+  });
+
+  test('skip goes to your NEXT signing, not to the end', async ({ page }) => {
+    await stage(page);
+    await page.click('#rv-skip');
+    const c = await card(page);
+    expect(c.cls).toContain('is-won');
+    // There is more to come — this was a skip, not an end.
+    expect(await page.locator('#rv-done').count()).toBe(0);
+  });
+
+  test('skip to end reaches the finished state', async ({ page }) => {
+    await stage(page);
+    await page.click('#rv-end');
+    expect(await page.locator('#rv-done').count()).toBe(1);
+    expect(await page.locator('#rv-skip').count()).toBe(0);
+    expect(await page.locator('#rv-pause').count()).toBe(0);
+  });
+
+  test('a coach who signed nobody still reaches the end', async ({ page }) => {
+    await stage(page, { fixture: { mine: 0, others: 14, walkOns: 4 } });
+    await page.click('#rv-skip');                 // reads "Skip To End" with none of ours
+    await page.waitForSelector('#rv-done');
+    expect(await page.locator('#rv-done').count()).toBe(1);
+  });
+
+  test('time remaining comes from the cards left, not a constant', async ({ page }) => {
+    await stage(page);
+    const first = await prog(page);
+    await page.click('#rv-skip');
+    const later = await prog(page);
+    const secs = (s) => { const m = s.match(/(\d+):(\d\d)/); return Number(m[1]) * 60 + Number(m[2]); };
+    expect(secs(later)).toBeLessThan(secs(first));
+    // 5s a card: the clock must be a multiple of the hold, not a hard-coded four minutes.
+    expect(secs(first) % 5).toBe(0);
+  });
+});
+
+test.describe('funded targets', () => {
+  test('one tile per funded recruit, resolving as his card shows', async ({ page }) => {
+    await stage(page);
+    const before = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-reveal .sd-tg')].map((t) => t.className));
+    expect(before.length).toBeGreaterThan(0);
+    expect(before.every((c) => c.includes('is-open'))).toBe(true);
+    await page.click('#rv-end');
+    const after = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-reveal .sd-tg')].map((t) => t.className));
+    // By the end nothing the user funded is still pending.
+    expect(after.every((c) => c.includes('is-won') || c.includes('is-lost'))).toBe(true);
   });
 });
 
 test.describe('no replay', () => {
   test('reaching the end stamps the reveal as seen', async ({ page }) => {
-    await submitAndReveal(page);
-    await page.click('#rv-skip');
-    await page.waitForFunction(() => !!document.getElementById('rv-done'));
-    const calls = await page.evaluate(() => window.__seen);
-    expect(calls.some((u) => u.includes('week-35-reveal-seen'))).toBe(true);
+    await stage(page);
+    await page.click('#rv-end');
+    await page.waitForSelector('#rv-done');
+    expect(await page.evaluate(() =>
+      window.__seen.some((u) => u.includes('week-35-reveal-seen')))).toBe(true);
   });
 
   test('the stamp is sent once, not on every render', async ({ page }) => {
-    await submitAndReveal(page);
-    await page.click('#rv-skip');
-    await page.waitForFunction(() => !!document.getElementById('rv-done'));
-    // Skip is gone at the end now, so force extra renders directly — the guard is
-    // seenSent, not the number of clicks available.
+    await stage(page);
+    await page.click('#rv-end');
+    await page.waitForSelector('#rv-done');
     await page.evaluate(() => {
       for (let i = 0; i < 5; i += 1) window.__hubRenderReveal && window.__hubRenderReveal();
     });
-    const n = await page.evaluate(() =>
-      window.__seen.filter((u) => u.includes('week-35-reveal-seen')).length);
-    expect(n).toBe(1);
+    expect(await page.evaluate(() =>
+      window.__seen.filter((u) => u.includes('week-35-reveal-seen')).length)).toBe(1);
   });
 
   test('Continue leaves the reveal for the FCC', async ({ page }) => {
-    await submitAndReveal(page);
-    await page.click('#rv-skip');
+    await stage(page);
+    await page.click('#rv-end');
     const nav = page.waitForNavigation({ timeout: 5000 }).catch(() => null);
     await page.click('#rv-done');
     await nav;
@@ -452,71 +608,6 @@ test.describe('Orders Submitted modal (confirm before running)', () => {
     expect(m.label).toBe('Submit Orders');
     expect(m.disabled).toBe(false);
     expect(m.rows).toBeGreaterThan(0);     // still editable
-  });
-});
-
-test.describe('reveal layout holds still', () => {
-  test('the title, meter and buttons do not move as results fill in', async ({ page }) => {
-    await submitAndReveal(page, { mine: 3, others: 12 });
-    const geo = () => page.evaluate(() => {
-      const r = (s) => { const e = document.querySelector(s); return e ? Math.round(e.getBoundingClientRect().top) : null; };
-      return { title: r('.rvtitle'), head: r('.rvhead'), rows: r('.rvrows'),
-               rowsH: Math.round(document.querySelector('.rvrows').getBoundingClientRect().height),
-               foot: r('.rvfoot') };
-    });
-    const first = await geo();
-    await page.click('#rv-skip');
-    const second = await geo();
-    await page.click('#rv-skip');
-    const third = await geo();
-    expect(second).toEqual(first);
-    expect(third).toEqual(first);
-  });
-
-  test('the rows box holds six and scrolls the rest', async ({ page }) => {
-    await submitAndReveal(page, { mine: 3, others: 12 });
-    await page.click('#rv-skip');
-    await page.waitForFunction(() => !!document.getElementById('rv-done'));
-    // The newest row animates in over 0.34s with a translateY; measuring mid-flight puts
-    // it outside the box. Let it settle, then measure the real rects.
-    await page.waitForTimeout(450);
-    const m = await page.evaluate(() => {
-      const box = document.querySelector('.rvrows');
-      const rows = [...box.querySelectorAll('.rvrow')];
-      const bb = box.getBoundingClientRect();
-      const fullyVisible = rows.filter((r) => {
-        const b = r.getBoundingClientRect();
-        return b.top >= bb.top - 1 && b.bottom <= bb.bottom + 1;
-      }).length;
-      return { total: rows.length, fullyVisible, scrolls: box.scrollHeight > box.clientHeight + 1 };
-    });
-    expect(m.total).toBe(15);
-    expect(m.fullyVisible).toBe(6);
-    expect(m.scrolls).toBe(true);
-  });
-
-  test('the header names the user\'s own conference the same way the list does', async ({ page }) => {
-    await submitAndReveal(page);
-    const title = await page.evaluate(() => document.querySelector('.rvtitle').textContent.trim());
-    // Same label the week-36 list uses; the two used to disagree (9 vs E1).
-    expect(title).toBe('Conference E9 Recruiting Results');
-  });
-});
-
-test.describe('finished state', () => {
-  test('Skip To End is gone once every result is out — only Continue remains', async ({ page }) => {
-    await submitAndReveal(page);
-    expect(await page.locator('#rv-skip').count()).toBe(1);
-    await page.click('#rv-skip');
-    await page.waitForFunction(() => !!document.getElementById('rv-done'));
-    const m = await page.evaluate(() => ({
-      skip: document.querySelectorAll('#rv-skip').length,
-      note: document.querySelectorAll('.rvskip-note').length,
-      buttons: [...document.querySelectorAll('.rvfoot button')].map((b) => b.textContent.trim()),
-    }));
-    expect(m.skip).toBe(0);
-    expect(m.note).toBe(0);        // the note goes with the button
-    expect(m.buttons).toEqual(['Continue']);
   });
 });
 

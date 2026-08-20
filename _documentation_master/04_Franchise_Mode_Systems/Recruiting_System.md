@@ -326,21 +326,66 @@ score = subtotal × lean multiplier
 - Playing-time bonus: 15 when only one or two teams offer it; 7 when more than two offer it.
 - Lean multipliers: #1 = 5×, #2 = 3×, #3 = 2×, not on lean = 1×.
 
-### Signing Day reveal (on submit)
+### Signing Day reveal (on run)
 
-Submitting orders runs the signings and then plays them back **before** the summary. Scope is the
-**user's conference only** (8 teams), highest RT first, one every **3000ms**. Presentation only —
-the engine already resolves in RT order, so this shows a sequence that already happened.
+A staged reveal, not a list. One card at a time with a region tally, a national top 25
+and the user's funded targets, all moving on a single tick.
 
-- **Walk-ons are excluded.** They are roster backfill, not signings; their first reveal is the next
-  season's Walk-On Welcome modal.
-- **Skip control** jumps to the user's next signing. Once none remain the CTA becomes *Skip To End*
-  with `0 signings remain for your team` beneath it — the same state a coach who signed nobody sees.
-- **Progress** carries the count (`12/45`) and a meter whose stops are the real RT grade bands read
-  from `rtBucket.js` at runtime, so the run reads A++ → F without a second copy of the thresholds.
-- **No replay.** Reaching the end PATCHes `/franchise/week-35-reveal-seen`, which season-stamps
-  `week_35_reveal_seen_season`. A refresh after submitting does not replay it, and a new season gets
-  its own reveal without anything having to clear the flag.
+**Presentation only.** The engine resolved every signing in one pass at week 35; nothing
+here decides anything. Same rule as the week-36 list — if you find yourself computing an
+outcome on this screen, that is the placeholder growing back.
+
+| Element | What it shows |
+|---|---|
+| Card | Name · portrait · Pos / Year / RT-pair. The flag names the team: *Signed with you*, or *Signed with X* |
+| Left rail | The user's **region** — 16 teams (their conference + its sister), class score descending, the just-scored row marked with its gain |
+| Right rail | **National top 25**, filling as the league walks, with rank deltas |
+| Bottom | One tile per **funded** recruit, in board order, resolving won / lost / pending |
+| Header | `Season N · Week 35 / Signing Day`, cards done of total, region, time left, controls |
+
+**Region, not conference.** The unit is 16 teams. `_region_of_conference()` is the one
+definition (1–2 = A, 3–4 = B … 15–16 = H) and ships as data on `conferences`
+(`user_region`, `region_by_team_id`, `region_team_ids`) — the client never re-derives it,
+for the same reason it never re-derives `_sister_conference`.
+
+**All eight regions advance together.** Only the user's region produces cards; the other
+seven exist to move numbers. Each is consumed proportionally —
+`round(len × tick / totalTicks)` — so every region finishes on the **same tick** the
+cards run out and the top 25 can never be left half-filled on the last card.
+
+**Red is earned.** Only a recruit the user actually funded can be a loss; the other
+forty-odd signings in the region pass through neutral. Dressing them all in red would
+spend the colour on news rather than defeat. Every card says the same thing in the same
+place, so the colour carries the stake and the words carry the fact. The finishing
+position (*you were #2*) is **available but unused** — `resolution` records every
+funder's points and score.
+
+**A funded recruit who signs outside your region still gets a card**, slotted at the tick
+his own region resolves him. Spending points and then losing him off-screen is the one
+outcome the screen owes the player.
+
+**Runtime is derived, never constant.** Total = cards × `REVEAL_HOLD_MS` (5000), and the
+header counts down from that. ~50 cards is about four minutes; pause, skip-to-my-next and
+skip-to-end make the length opt-in.
+
+### Portraits are warm-painted for the region
+
+`_warm_signed_player_masters(franchise_id, signed_players, team_ids)` eager-paints
+uniformed masters so cards show team colours instead of popping from a lazy paint
+mid-hold. Two callers: season rollover (user's team, as before) and the week-35 run
+(the whole region).
+
+- **Off the request thread.** A composite costs ~1.2s of CPU (`_finish_rgba` scales to
+  the 3530×3412 archival master), so ~50 of them inline would add a minute to the run
+  response. The reveal holds 5s a card, so a background thread gets ahead on card one
+  and stays ahead.
+- **Never load-bearing.** An unpainted card still renders — the paint-on-miss handler in
+  `api-config.js` catches the 404, paints and retries. Worst case is the old behaviour,
+  so a failure here costs nothing.
+- **Colours come from `resolve_team_display` per team**, matching `ensure_player_image`.
+  The two paths must agree: both check `exists` first, so whichever runs first wins, and
+  a franchise with a Team Builder overlay would otherwise get either uniform depending
+  on timing. The old rollover warm read the core team doc and had this latent.
 
 ### Week 36 results — league list
 
@@ -694,7 +739,9 @@ The signing pool defaults to `sTab: 'mine'`, which hides recruits with no lean t
   empty states kept distinct, placement above the board.
 - `tests/e2e/invite-board.spec.js` — board writes, the 20-slot cap, drag reorder, the
   seed, and the submit path (confirmation, 2s hold and return, double-press guard, failure).
-- `tests/e2e/signing-reveal.spec.js` — the reveal, plus the week-36 league list: four
+- `tests/e2e/signing-reveal.spec.js` — the Signing Day stage (region scope, card fields,
+  red-is-earned, tally movement, national fill, controls, derived clock, targets,
+  no-replay), plus the week-36 league list: four
   columns at a wide viewport, row fields, and the shared conference label.
 - `tests/e2e/invite-seed-modal.spec.js` — the Sammy note: copy, team-vs-generic image,
   seen-stamping, and the no-seed-no-note gate.

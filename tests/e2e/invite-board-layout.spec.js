@@ -76,6 +76,11 @@ function fixture({ week = 7, watchlist = [], savedOrders = {}, visitHistory = nu
 }
 
 async function mountPool(page, opts = {}) {
+  // Submitting the board now confirms, holds 2s and returns to the FCC. Left
+  // unstubbed that navigation tears the page down mid-assertion whenever the sweep
+  // runs slower than the hold — passing solo and failing in the full run.
+  await page.route('**/franchise-command-center*', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>fcc</body></html>' }));
   const patchCalls = [];
   await page.setViewportSize({ width: 1440, height: 1000 });
   // Real origin first: getQueryContext reads location.search, and about:blank has no
@@ -188,9 +193,14 @@ test.describe('Invite Board layout', () => {
   test('a ranked row shows headshot, name and archetype stacked', async ({ page }) => {
     await mountPool(page, { week: 22 });
     await page.click('#hub-pool tbody tr.rec:first-child .pool-add');
+    // Measured after the webfonts settle: the display face is taller than the fallback,
+    // and reading the boxes mid-swap put the name and the archetype on the same line.
+    await page.evaluate(() => document.fonts && document.fonts.ready);
     const m = await page.evaluate(() => {
       const row = document.querySelector('#hub-board .brow:not(.bhdr):not(.is-empty)');
-      const name = row.querySelector('.btxt a, .btxt');
+      // The name itself, not its wrapper — .btxt contains the archetype too, so its
+      // top is the top of the pair and the comparison below would be against itself.
+      const name = row.querySelector('.btxt a') || row.querySelector('.btxt');
       const arch = row.querySelector('.btxt small');
       return {
         headshot: !!row.querySelector('.bav'),

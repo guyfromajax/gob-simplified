@@ -74,6 +74,11 @@ const gainEvent = (id) => ({
 });
 
 async function mount(page, o = {}) {
+  // Submitting the board now confirms, holds 2s and returns to the FCC. Left
+  // unstubbed that navigation tears the page down mid-assertion whenever the sweep
+  // runs slower than the hold — passing solo and failing in the full run.
+  await page.route('**/franchise-command-center*', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>fcc</body></html>' }));
   await page.setViewportSize({ width: 1440, height: 1100 });
   await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
   await page.setContent(`

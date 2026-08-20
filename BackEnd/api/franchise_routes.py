@@ -9993,11 +9993,20 @@ def _recruiting_conference_context(
     sister = _sister_conference(user_conf) if user_conf else 0
     lead = [c for c in (user_conf, sister) if c]
     order = lead + [c for c in range(1, 17) if c not in lead]
+    # Region view, for the Signing Day reveal: the user's 16 (their conference + its
+    # sister) and every team's region letter, so the national tally can group all eight.
+    region_by_team = {tid: _region_of_conference(c) for tid, c in by_team.items()}
+    user_region = _region_of_conference(user_conf)
     return {
         "user_conference": user_conf or None,
         "sister_conference": sister or None,
         "order": order,
         "by_team_id": by_team,
+        "user_region": user_region or None,
+        "region_by_team_id": region_by_team,
+        "region_team_ids": sorted(
+            tid for tid, rg in region_by_team.items() if rg and rg == user_region
+        ),
     }
 
 
@@ -10006,6 +10015,22 @@ def _sister_conference(conference: int) -> int:
     if not isinstance(conference, int) or conference < 1 or conference > 16:
         return conference
     return conference + 1 if conference % 2 == 1 else conference - 1
+
+
+def _region_of_conference(conference: Any) -> str:
+    """Region letter for a conference: 1-2 = A, 3-4 = B, ... 15-16 = H. '' when unknown.
+
+    The single definition, same as ``_sister_conference`` is for "same region, other
+    conference". The Signing Day reveal groups by REGION (16 teams, two conferences),
+    so this ships as data rather than being re-derived on the client.
+    """
+    try:
+        c = int(conference)
+    except (TypeError, ValueError):
+        return ""
+    if c < 1 or c > 16:
+        return ""
+    return chr(ord("A") + (c - 1) // 2)
 
 
 def _schedule_game_key(week: int, away_id: Any, home_id: Any) -> tuple[int, str, str]:
@@ -14804,6 +14829,28 @@ def run_week_35_recruiting(
         {"_id": fid},
         {"$set": update_fields},
     )
+
+    # Warm the user's REGION portraits for the Signing Day reveal, off the request
+    # thread. The reveal holds ~5s per card and a paint costs ~1.2s of CPU, so this
+    # gets ahead of the playhead on the first card and stays ahead — while painting
+    # ~50 masters inline would add a minute to this response.
+    #
+    # Purely an optimisation: a card whose master has not landed yet still renders,
+    # because the lazy paint-on-miss handler in api-config.js catches the 404 and
+    # retries. Worst case is today's behaviour, so a failure here costs nothing.
+    try:
+        region_team_ids = _recruiting_conference_context(fid, user_team_id).get("region_team_ids") or []
+        signed_snapshot = list(results.get("signed_players") or [])
+        if region_team_ids and signed_snapshot:
+            threading.Thread(
+                target=_warm_signed_player_masters,
+                args=(fid, signed_snapshot, region_team_ids),
+                name=f"img-warm-{str(fid)[:8]}",
+                daemon=True,
+            ).start()
+    except Exception:
+        logger.exception("[IMG-WARM] could not start region warm franchise_id=%s", str(fid))
+
     return {"status": "success", "week": 36, "results": results}
 
 
@@ -17862,40 +17909,67 @@ def _warm_team_builder_roster_masters(
     return summary
 
 
-def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players):
-    """Eager-paint the USER team's freshly-signed players' uniform masters at
-    rollover, so their portraits are already in R2 the instant they open their
-    roster next season — matching the "already baked" experience of the original
-    start-of-franchise players. CPU opponents stay lazy (painted on first view).
+def _warm_signed_player_masters(franchise_id, signed_players, team_ids):
+    """Eager-paint uniformed masters for the signings belonging to ``team_ids``.
 
-    Best-effort and self-contained: any failure is logged and swallowed so a
-    portrait paint can never break the season transition. Mirrors the paint in
-    player_image_routes.ensure_player_image, minus the HTTP layer."""
+    Two callers, two moments:
+
+    * season rollover, for the USER's team — so their new players' portraits are
+      already in R2 the instant they open the roster next season, matching the
+      "already baked" feel of the original start-of-franchise players;
+    * Signing Day, for the user's whole REGION — so the reveal shows every card in
+      its team's colours instead of popping from a lazy paint mid-hold.
+
+    Colours come from ``resolve_team_display`` per team, NOT from the core team doc.
+    That is what ``ensure_player_image`` (the lazy path) uses, and the two must agree:
+    both check ``exists`` first, so whichever runs first wins, and a franchise with a
+    Team Builder overlay would otherwise get either uniform depending on timing.
+
+    Best-effort and self-contained: any failure is logged and swallowed, so a portrait
+    paint can never break a season transition or a reveal. Mirrors the paint in
+    player_image_routes.ensure_player_image, minus the HTTP layer.
+
+    Returns the number painted (0 when unconfigured or nothing to do).
+    """
     from BackEnd.services import recruit_image, r2_images
+    from BackEnd.utils.franchise_team_display import resolve_team_display
 
     if not r2_images.is_configured():
-        return
-    user_team_id = str(franchise_doc.get("user_team_id") or "")
-    if not user_team_id:
-        return
+        return 0
+    wanted = {str(t) for t in (team_ids or []) if t}
+    if not wanted:
+        return 0
     to_warm = [
-        s for s in signed_players
-        if str(s.get("team_id") or "") == user_team_id and s.get("image_id") and s.get("player_id")
+        s for s in (signed_players or [])
+        if str(s.get("team_id") or "") in wanted and s.get("image_id") and s.get("player_id")
     ]
     if not to_warm:
-        return
+        return 0
 
-    team = db.teams.find_one({"_id": ObjectId(user_team_id)}) if ObjectId.is_valid(user_team_id) else None
-    if not team:
-        return
-    primary = team.get("primary_color", "#000000")
-    secondary = team.get("secondary_color", "#ffffff")
-    wordmark = team.get("mascot", "")
+    # One display lookup per TEAM, not per player: a region is 16 teams and ~50
+    # signings, so resolving inside the loop would triple the mongo reads for nothing.
+    kit_by_team: dict[str, tuple[str, str, str]] = {}
+    for team_id in {str(s.get("team_id")) for s in to_warm}:
+        try:
+            team = db.teams.find_one({"_id": ObjectId(team_id)}) if ObjectId.is_valid(team_id) else None
+            if not team:
+                continue
+            disp = resolve_team_display(franchise_id, team_id, core_doc=team)
+            kit_by_team[team_id] = (
+                disp.get("primary_color") or team.get("primary_color", "#000000"),
+                disp.get("secondary_color") or team.get("secondary_color", "#ffffff"),
+                disp.get("mascot") if disp.get("mascot") is not None else team.get("mascot", ""),
+            )
+        except Exception:
+            logger.exception("[IMG-WARM] could not resolve team display team_id=%s", team_id)
 
     painted = 0
-    for s in to_warm:
-        player_id = str(s["player_id"])
-        image_id = s["image_id"]
+    for entry in to_warm:
+        player_id = str(entry["player_id"])
+        image_id = entry["image_id"]
+        kit = kit_by_team.get(str(entry.get("team_id")))
+        if not kit:
+            continue
         master_key = f"players/master/{player_id}.png"
         try:
             if r2_images.exists(master_key):
@@ -17915,15 +17989,24 @@ def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players
             if not (r2_images.exists(kit_key) and r2_images.exists(mask_key)):
                 continue
             master = recruit_image.make_signed_master(
-                r2_images.get(kit_key), r2_images.get(mask_key), primary, secondary, wordmark)
+                r2_images.get(kit_key), r2_images.get(mask_key), kit[0], kit[1], kit[2])
             r2_images.put(master_key, master)
             painted += 1
         except Exception:
             logger.exception("[IMG-WARM] paint failed franchise_id=%s player_id=%s",
-                              str(franchise_id), player_id)
+                             str(franchise_id), player_id)
     if painted:
-        logger.info("[IMG-WARM] pre-painted %s user signings franchise_id=%s",
-                    painted, str(franchise_id))
+        logger.info("[IMG-WARM] pre-painted %s signings across %s teams franchise_id=%s",
+                    painted, len(kit_by_team), str(franchise_id))
+    return painted
+
+
+def _warm_user_signed_player_masters(franchise_id, franchise_doc, signed_players):
+    """Rollover warm: the user's own team only. CPU opponents stay lazy."""
+    user_team_id = str((franchise_doc or {}).get("user_team_id") or "")
+    if not user_team_id:
+        return 0
+    return _warm_signed_player_masters(franchise_id, signed_players, [user_team_id])
 
 
 # RT jump that reads as a "breakout" in the offseason report. Chosen to surface

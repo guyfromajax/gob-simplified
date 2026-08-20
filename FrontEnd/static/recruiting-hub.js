@@ -1315,18 +1315,22 @@
     });
   }
 
-  // ===================== SIGNING DAY CONFERENCE REVEAL =====================
-  // Every signing in the user's conference, revealed one at a time from the highest RT
-  // down. Presentation only: the engine already resolves in RT order, so this shows a
-  // sequence that already happened (Prompt 6's rule, widened from the user's class to
-  // the conference).
+  // ===================== SIGNING DAY REVEAL =====================
+  // Presentation only. The engine resolved every signing in one pass at week 35, so
+  // nothing here decides anything — it paces a result that already exists (Prompt 6's
+  // rule). Widened from the user's conference to their REGION: 16 teams, two
+  // conferences, which is the unit the class tallies are read in.
+  //
+  // All eight regions advance at the same pace so the national top 25 fills as the
+  // league walks. Only the user's region produces cards; the other seven exist to move
+  // numbers — except for a recruit the user FUNDED, who earns a card wherever he signs
+  // (spending points and then losing him off-screen is the one outcome the screen owes
+  // the player).
 
-  var REVEAL_HOLD_MS = 3000;
+  var REVEAL_HOLD_MS = 5000;
+  var REVEAL_NATIONAL_TOP = 25;
   /** The reveal owns the screen, so it owns the audio: the National Tournament bed. */
   var REVEAL_TRACK = 'pregame-national-tourney.mp3';
-  /** Rows visible at once. The container is sized to exactly this many so the header
-   *  above and the buttons below never move as results fill in. */
-  var REVEAL_VISIBLE_ROWS = 6;
 
   /**
    * Swap the franchise loop for the tournament bed while the reveal is up.
@@ -1346,103 +1350,274 @@
       }
     }).catch(function (err) { console.warn('[REVEAL] music skipped', err); });
   }
-  // The grade run the meter walks down. Mirrors RT_BANDS in rtBucket.js, which owns the
-  // thresholds; taken from there at runtime so the two cannot drift.
-  function revealGrades() {
-    var seen = [];
-    [100, 90, 80, 70, 60, 50, 40, 30, 0].forEach(function (rt) {
-      var g = window.getRtPresentation ? window.getRtPresentation(rt) : null;
-      if (g && seen.indexOf(g.grade) === -1) seen.push(g.grade);
-    });
-    return seen;
+
+  function byRtDesc(a, b) { return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1); }
+  function isUserSigning(entry) { return String(entry.team_id) === String(state.userTeamId); }
+  function teamNameOf(teamId, fallback) {
+    return (state.teamNameMap && state.teamNameMap[String(teamId)]) || fallback || '';
   }
 
-  /** Conference-wide signings, highest RT first. Walk-ons are not signings. */
+  /** Recruit ids the user committed points or a promise to. */
+  function fundedIds() {
+    var out = {};
+    Object.keys(state.alloc || {}).forEach(function (id) {
+      var a = state.alloc[id];
+      if (a && (a.points > 0 || a.promise)) out[String(id)] = a;
+    });
+    return out;
+  }
+
+  /**
+   * Every non-walk-on signing bucketed by region, each bucket RT-descending.
+   *
+   * Built once per reveal and cached: it is read on every render and every tick, and
+   * re-sorting ~400 entries sixty times a minute for a list that cannot change is
+   * waste.
+   */
+  function revealBuckets() {
+    if (state.reveal.buckets) return state.reveal.buckets;
+    var regionOf = (state.conferences && state.conferences.region_by_team_id) || {};
+    var buckets = {};
+    (state.week35Results.signed_players || []).forEach(function (e) {
+      if (!e || e.walk_on) return;
+      var rg = regionOf[String(e.team_id)];
+      if (!rg) return;
+      (buckets[rg] = buckets[rg] || []).push(e);
+    });
+    Object.keys(buckets).forEach(function (rg) { buckets[rg].sort(byRtDesc); });
+    state.reveal.buckets = buckets;
+    return buckets;
+  }
+
+  function userRegion() { return (state.conferences && state.conferences.user_region) || null; }
+
+  /** The user's region, RT-descending. Its length sets the tick count for the league. */
   function revealList() {
-    var conf = (state.conferences && state.conferences.user_conference) || null;
-    var byTeam = (state.conferences && state.conferences.by_team_id) || {};
-    if (!conf) return [];
-    return (state.week35Results.signed_players || []).filter(function (e) {
-      return e && !e.walk_on && Number(byTeam[String(e.team_id)]) === Number(conf);
+    var b = revealBuckets()[userRegion()];
+    return b || [];
+  }
+
+  /**
+   * How many of region `rg` have resolved after `tick` ticks.
+   *
+   * Every region finishes on the SAME tick as the user's, so the national tally is
+   * complete exactly when the cards run out. Regions differ by a few signings, so the
+   * rate is near 1.0 either way — but pinning it to the total means the top 25 can
+   * never be left half-filled on the last card.
+   */
+  function consumedAt(rg, tick, totalTicks) {
+    var len = (revealBuckets()[rg] || []).length;
+    if (!totalTicks) return 0;
+    return Math.min(len, Math.round(len * tick / totalTicks));
+  }
+
+  /**
+   * The card queue: the user's region in order, plus any recruit they funded who
+   * signed OUTSIDE it, slotted in at the tick his own region resolves him.
+   */
+  function revealCards() {
+    if (state.reveal.cards) return state.reveal.cards;
+    var buckets = revealBuckets();
+    var home = userRegion();
+    var total = (buckets[home] || []).length;
+    var funded = fundedIds();
+    var cards = (buckets[home] || []).map(function (e, i) {
+      return { entry: e, tick: i + 1, away: false };
+    });
+    Object.keys(buckets).forEach(function (rg) {
+      if (rg === home) return;
+      var list = buckets[rg];
+      list.forEach(function (e, i) {
+        if (!funded[String(e.recruit_id)]) return;
+        // The tick this signing lands on under the same proportional rate the tally
+        // uses, so his card and his score arrive together.
+        var tick = list.length ? Math.ceil((i + 1) * total / list.length) : total;
+        cards.push({ entry: e, tick: Math.max(1, Math.min(total, tick)), away: true });
+      });
+    });
+    cards.sort(function (a, b) {
+      if (a.tick !== b.tick) return a.tick - b.tick;
+      return byRtDesc(a.entry, b.entry);
+    });
+    state.reveal.cards = cards;
+    return cards;
+  }
+
+  function revealTotalTicks() { return revealList().length; }
+
+  /** team_id -> class score, after `cardIndex` cards have shown. */
+  function revealScores(cardIndex) {
+    var cards = revealCards();
+    var total = revealTotalTicks();
+    var tick = cardIndex > 0 ? cards[Math.min(cardIndex, cards.length) - 1].tick : 0;
+    var buckets = revealBuckets();
+    var scores = {};
+    Object.keys(buckets).forEach(function (rg) {
+      var n = rg === userRegion() ? Math.min(tick, buckets[rg].length) : consumedAt(rg, tick, total);
+      for (var i = 0; i < n; i++) {
+        var e = buckets[rg][i];
+        var tid = String(e.team_id);
+        scores[tid] = (scores[tid] || 0) + (Number(e.rt) || 0);
+      }
+    });
+    return scores;
+  }
+
+  /** [{teamId,name,score}] for `teamIds`, score descending. */
+  function rankTeams(teamIds, scores) {
+    return teamIds.map(function (tid) {
+      return { teamId: String(tid), name: teamNameOf(tid), score: scores[String(tid)] || 0 };
     }).sort(function (a, b) {
-      return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1);
+      if (b.score !== a.score) return b.score - a.score;
+      return a.name.localeCompare(b.name);
     });
   }
 
-  function isUserSigning(entry) {
-    return String(entry.team_id) === String(state.userTeamId);
+  // ---------- view ----------
+  function revealRailHtml(rows, opts) {
+    var prev = opts.prevRanks || {};
+    var hit = opts.hitTeamId ? String(opts.hitTeamId) : null;
+    var body = rows.map(function (r, i) {
+      var was = prev[r.teamId];
+      // No delta against an empty board: before anything is scored the order is
+      // alphabetical, so the first card would show every team moving.
+      var delta = (was == null || !r.score || was === i + 1) ? 0 : was - (i + 1);
+      var mark = '';
+      if (opts.showDelta && delta) {
+        mark = '<span class="dl' + (delta < 0 ? ' dn' : '') + '">' +
+          (delta > 0 ? '▲' : '▼') + Math.abs(delta) + '</span>';
+      } else if (r.teamId === hit && opts.gain) {
+        mark = '<span class="dl">+' + opts.gain + '</span>';
+      }
+      return '<div class="sd-tm' + (String(r.teamId) === String(state.userTeamId) ? ' is-user' : '') +
+          (r.teamId === hit ? ' is-hit' : '') + '">' +
+        '<span class="rk">' + (i + 1) + '</span>' +
+        '<span class="nm">' + Common.escapeHtml(r.name) + '</span>' +
+        '<span class="sc">' + r.score + mark + '</span></div>';
+    }).join('');
+    return '<div class="sd-rail' + (opts.right ? ' is-right' : '') + '">' +
+      '<div class="sd-rail-h"><span class="sd-rail-t">' + Common.escapeHtml(opts.title) + '</span>' +
+        '<span class="sd-rail-s">' + Common.escapeHtml(opts.sub) + '</span></div>' +
+      '<div class="sd-list">' + body + '</div></div>';
   }
 
-  /** Index of the next signing that is the user's own, or -1 when none remain. */
-  function nextUserIndex(list, from) {
-    for (var i = from; i < list.length; i++) { if (isUserSigning(list[i])) return i; }
-    return -1;
+  function revealCardHtml(card) {
+    if (!card) {
+      return '<div class="sd-card-wrap"><div class="sd-card-wait">Signings begin…</div></div>';
+    }
+    var e = card.entry;
+    var mine = isUserSigning(e);
+    var funded = !!fundedIds()[String(e.recruit_id)];
+    // Red is earned: only a recruit the user actually funded can be a loss. Everyone
+    // else in the region is news, not defeat.
+    var state_ = mine ? 'won' : (funded ? 'lost' : 'neutral');
+    var team = teamNameOf(e.team_id, e.team_name);
+    return '<div class="sd-card-wrap"><div class="sd-card is-' + state_ + '">' +
+      '<div class="sd-card-nm">' + Common.escapeHtml(e.name || '--') + '</div>' +
+      '<div class="sd-shot">' + headshotBoxHtml({ imageId: e.image_id }, 'sd-shot-img') +
+        // One sentence shape in this slot, always: "Signed with you", or the team.
+        '<div class="sd-flag">' + (mine ? 'Signed with you' : 'Signed with ' + Common.escapeHtml(team)) +
+        '</div></div>' +
+      '<div class="sd-meta">' +
+        '<div><small>Pos</small><b>' + Common.escapeHtml(e.pos || '--') + '</b></div>' +
+        '<div><small>Year</small><b>' + Common.escapeHtml(Common.formatYearAbbrev(e.year)) + '</b></div>' +
+        '<div><small>RT</small><b class="' + Spine.rtClassForYear(e.rt, e.year) + '">' +
+          Common.formatRtWithPotential(e.rt, e.potential_rt_ratcheted) + '</b></div>' +
+      '</div></div></div>';
   }
 
-  function revealRowHtml(entry, isNew) {
-    var teamName = (state.teamNameMap && state.teamNameMap[String(entry.team_id)]) || entry.team_name || '';
-    var mine = isUserSigning(entry);
-    return '<div class="rvrow' + (mine ? ' is-mine' : '') + (isNew ? ' is-new' : '') + '">' +
-      headshotBoxHtml({ imageId: entry.image_id }, 'rvav') +
-      '<div class="rvid"><div class="rvnm">' + Common.escapeHtml(entry.name || '--') + '</div>' +
-      '<div class="rvsub">' + Common.escapeHtml(entry.pos || '--') + ' · ' +
-        Common.escapeHtml(entry.home_region || '--') + '</div></div>' +
-      '<div class="rvrt ' + Spine.rtClassForYear(entry.rt, entry.year) + '">' +
-        Common.formatRtWithPotential(entry.rt, entry.potential_rt_ratcheted) + '</div>' +
-      '<div class="rvteam">' + Common.escapeHtml(teamName) +
-        (mine ? '<span class="rvyou">YOU</span>' : '') + '</div></div>';
+  /** One tile per funded recruit, in board order, resolving as his signing shows. */
+  function revealTargetsHtml(cardIndex) {
+    var funded = fundedIds();
+    var ids = state.board.filter(function (id) { return funded[String(id)]; });
+    Object.keys(funded).forEach(function (id) { if (ids.indexOf(id) === -1) ids.push(id); });
+    if (!ids.length) return '';
+    var shownIds = {};
+    revealCards().slice(0, cardIndex).forEach(function (c) {
+      shownIds[String(c.entry.recruit_id)] = c.entry;
+    });
+    var tiles = ids.map(function (id) {
+      var r = state.byId[String(id)];
+      var e = shownIds[String(id)];
+      var cls = 'is-open';
+      var status = (funded[String(id)].points || 0) + ' pts · pending';
+      if (e) {
+        if (isUserSigning(e)) { cls = 'is-won'; status = 'Signed with you'; }
+        else { cls = 'is-lost'; status = 'Lost · ' + teamNameOf(e.team_id, e.team_name); }
+      }
+      return '<div class="sd-tg ' + cls + '">' +
+        headshotBoxHtml(r, 'sd-tg-av') +
+        '<span class="sd-tg-tx"><span class="sd-tg-nm">' +
+          Common.escapeHtml((r && r.name) || (e && e.name) || '--') + '</span>' +
+        '<span class="sd-tg-st">' + Common.escapeHtml(status) + '</span></span></div>';
+    }).join('');
+    return '<div class="sd-targets"><div class="sd-targets-h"><small>Your board</small>' +
+      '<b>Funded Targets</b></div><div class="sd-tgts">' + tiles + '</div></div>';
+  }
+
+  /** mm:ss left, from the cards actually remaining — never a hard-coded total. */
+  function revealTimeLeft(cardIndex) {
+    var left = Math.max(0, revealCards().length - cardIndex);
+    var secs = Math.round(left * REVEAL_HOLD_MS / 1000);
+    return Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
   }
 
   function revealHtml() {
-    var list = revealList();
-    var i = Math.min(state.reveal.index, list.length);
-    var total = list.length;
-    var current = list[i - 1];
-    var grades = revealGrades();
-    var currentGrade = current && window.getRtPresentation
-      ? window.getRtPresentation(current.rt).grade
-      : grades[0];
-    var pct = total ? (i / total) * 100 : 0;
-    var remaining = nextUserIndex(list, i);
-    var mineLeft = list.slice(i).filter(isUserSigning).length;
+    var cards = revealCards();
+    var i = Math.min(state.reveal.index, cards.length);
+    var current = cards[i - 1];
+    var scores = revealScores(i);
+    var regionIds = (state.conferences && state.conferences.region_team_ids) || [];
+    var natIds = Object.keys((state.conferences && state.conferences.region_by_team_id) || {});
+    var regionRows = rankTeams(regionIds, scores);
+    var natRows = rankTeams(natIds, scores).slice(0, REVEAL_NATIONAL_TOP);
+    var pct = cards.length ? (i / cards.length) * 100 : 0;
+    var remaining = nextUserIndex(cards, i);
+    var mineLeft = cards.slice(i).filter(function (c) { return isUserSigning(c.entry); }).length;
 
-    var ticks = grades.map(function (g) {
-      return '<span class="rvtick' + (g === currentGrade ? ' is-at' : '') + '">' + g + '</span>';
-    }).join('');
+    var controls = state.reveal.done
+      ? '<button class="sd-btn is-go" id="rv-done" type="button">Continue</button>'
+      : '<button class="sd-btn is-pause" id="rv-pause" type="button" ' +
+          'aria-pressed="' + (state.reveal.paused ? 'true' : 'false') + '" ' +
+          'title="' + (state.reveal.paused ? 'Resume' : 'Pause') + '">' +
+          (state.reveal.paused ? '▶' : '❙❙') + '</button>' +
+        '<button class="sd-btn" id="rv-skip" type="button">' +
+          (remaining === -1 ? 'Skip To End' : 'Skip To My Next') + '</button>' +
+        (remaining === -1 ? '' : '<button class="sd-btn" id="rv-end" type="button">Skip To End</button>');
 
-    var shown = list.slice(0, i).reverse();
-    var body = shown.length
-      ? shown.map(function (e, n) { return revealRowHtml(e, n === 0); }).join('')
-      : '<div class="rvwait">Conference signings begin…</div>';
-
-    // Once every signing is out, the skip control has nothing left to skip to — the
-    // note goes with the button rather than sitting under a missing one.
-    var footer = state.reveal.done
-      ? '<button class="rvbtn is-go" id="rv-done" type="button">Continue</button>'
-      : '<button class="rvbtn" id="rv-skip" type="button">' +
-          (remaining === -1 ? 'Skip To End' : 'Skip To My Next Signing') + '</button>' +
-        (remaining === -1
-          ? '<div class="rvskip-note">' + mineLeft + ' signings remain for your team</div>'
-          : '');
-
-    // Same label as the week-36 league list. These two screens name the same
-    // conference and used to disagree — the reveal said "Conference 9", the list said
-    // "Conference E1".
-    var conf = (state.conferences && state.conferences.user_conference) || null;
-    var title = conf
-      ? 'Conference ' + (conferenceLabel(conf) || conf) + ' Recruiting Results'
-      : 'Recruiting Results';
-
-    return '<div class="rvwrap">' +
-      '<div class="rvtitle">' + Common.escapeHtml(title) + '</div>' +
-      '<div class="rvhead">' +
-        '<div class="rvcount"><b>' + i + '</b>/' + total + '</div>' +
-        '<div class="rvmeter"><div class="rvmeter-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div>' +
-          '<div class="rvticks">' + ticks + '</div></div>' +
-        '<div class="rvgrade">' + Common.escapeHtml(currentGrade) + '</div>' +
+    var season = state.season || (state.week35Results && state.week35Results.season) || '';
+    return '<div class="sd">' +
+      '<div class="sd-top">' +
+        '<div class="sd-brand"><small>' +
+          (season ? 'Season ' + Common.escapeHtml(String(season)) + ' · ' : '') +
+          'Week 35</small><b>Signing Day</b></div>' +
+        '<div class="sd-prog"><div class="sd-prog-n"><b>' + i + '</b>of ' + cards.length +
+          ' · Region ' + Common.escapeHtml(userRegion() || '--') +
+          ' · <b>' + revealTimeLeft(i) + '</b>left</div>' +
+          '<div class="sd-prog-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div></div>' +
+        '<div class="sd-ctl">' + controls + '</div>' +
       '</div>' +
-      '<div class="rvrows">' + body + '</div>' +
-      '<div class="rvfoot">' + footer + '</div></div>';
+      '<div class="sd-stage">' +
+        revealRailHtml(regionRows, {
+          title: 'Region ' + (userRegion() || ''), sub: 'Class score',
+          hitTeamId: current && current.entry.team_id,
+          gain: current ? current.entry.rt : 0,
+        }) +
+        revealCardHtml(current) +
+        revealRailHtml(natRows, {
+          title: 'Top ' + REVEAL_NATIONAL_TOP + ' Classes', sub: 'National', right: true,
+          showDelta: true, prevRanks: state.reveal.prevNatRanks || {},
+        }) +
+      '</div>' +
+      revealTargetsHtml(i) +
+      '</div>';
+  }
+
+  // ---------- controls ----------
+  /** Index of the next card that is the user's own signing, or -1 when none remain. */
+  function nextUserIndex(cards, from) {
+    for (var i = from; i < cards.length; i++) { if (isUserSigning(cards[i].entry)) return i; }
+    return -1;
   }
 
   function renderReveal() {
@@ -1451,10 +1626,14 @@
     host.innerHTML = revealHtml();
     var skip = host.querySelector('#rv-skip');
     if (skip) skip.addEventListener('click', function () {
-      var list = revealList();
-      var next = nextUserIndex(list, state.reveal.index);
-      revealTo(next === -1 ? list.length : next + 1);
+      var cards = revealCards();
+      var next = nextUserIndex(cards, state.reveal.index);
+      revealTo(next === -1 ? cards.length : next + 1);
     });
+    var end = host.querySelector('#rv-end');
+    if (end) end.addEventListener('click', function () { revealTo(revealCards().length); });
+    var pause = host.querySelector('#rv-pause');
+    if (pause) pause.addEventListener('click', function () { toggleRevealPause(); });
     var done = host.querySelector('#rv-done');
     if (done) done.addEventListener('click', function () { finishReveal(); });
   }
@@ -1463,13 +1642,37 @@
   window.__hubRenderReveal = function () { renderReveal(); };
 
   function revealTo(index) {
-    var list = revealList();
-    state.reveal.index = Math.max(0, Math.min(index, list.length));
-    if (state.reveal.index >= list.length) {
+    var cards = revealCards();
+    // Snapshot the national order BEFORE the move, so the next render can show which
+    // way each team travelled. Ranks, not scores — a team can gain and still fall.
+    var before = rankTeams(
+      Object.keys((state.conferences && state.conferences.region_by_team_id) || {}),
+      revealScores(state.reveal.index)
+    ).slice(0, REVEAL_NATIONAL_TOP);
+    var prev = {};
+    before.forEach(function (r, i) { prev[r.teamId] = i + 1; });
+    state.reveal.prevNatRanks = prev;
+
+    state.reveal.index = Math.max(0, Math.min(index, cards.length));
+    if (state.reveal.index >= cards.length) {
       state.reveal.done = true;
       stopReveal();
       markRevealSeen();
     }
+    renderReveal();
+  }
+
+  function revealTick() { revealTo(state.reveal.index + 1); }
+
+  function startRevealTimer() {
+    stopReveal();
+    state.reveal.timer = setInterval(revealTick, REVEAL_HOLD_MS);
+  }
+
+  function toggleRevealPause() {
+    if (state.reveal.done) return;
+    state.reveal.paused = !state.reveal.paused;
+    if (state.reveal.paused) stopReveal(); else startRevealTimer();
     renderReveal();
   }
 
@@ -1497,19 +1700,23 @@
   }
 
   function startReveal() {
-    var list = revealList();
-    state.reveal = { index: 0, done: false, timer: null, seenSent: false };
+    // Reset the caches too: buckets and cards are derived from week_35_results, which
+    // runRecruiting() has just replaced.
+    state.reveal = {
+      index: 0, done: false, timer: null, seenSent: false, paused: false,
+      buckets: null, cards: null, prevNatRanks: {},
+    };
     // Nothing to reveal: stamp it seen and go, rather than opening an empty screen.
-    if (!list.length) { markRevealSeen(); window.location.href = Common.buildFccUrl(context); return; }
+    if (!revealCards().length) {
+      markRevealSeen(); window.location.href = Common.buildFccUrl(context); return;
+    }
     revealMusic(true);
     var host = document.createElement('div');
     host.className = 'rvhost';
     host.id = 'hub-reveal';
     document.body.appendChild(host);
     renderReveal();
-    state.reveal.timer = setInterval(function () {
-      revealTo(state.reveal.index + 1);
-    }, REVEAL_HOLD_MS);
+    startRevealTimer();
   }
 
   function submitOrders() {
