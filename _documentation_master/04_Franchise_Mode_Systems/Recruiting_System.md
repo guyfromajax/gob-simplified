@@ -191,6 +191,7 @@ without a counter doing the arithmetic.
 | Region | Contents |
 |---|---|
 | Panel header | `Invite Board` · **position tiles** (centred) · `n/20` · **Submit Invites**. No eyebrow, no footer bar. |
+| Submit | Posts the board, confirms *Invites Submitted*, holds `SUBMIT_HOLD_MS` (2000ms), returns to the FCC |
 | Position tiles | PG · SG · SF · PF · C with the board's count at each. All five always drawn, zero included — the gap is the point, and a tile that vanishes at zero hides what is worth seeing. Derived from `state.board` on every render, so they follow edits. |
 | Row | Headshot · name + archetype (+ visit pill) · Pos · RT (cur/pot) · Yr · Ht · Wt · Lean ladder · remove |
 | Visit pill | `1 visit` / `2 visits` … beside the archetype, on a recruit who has visited you |
@@ -230,6 +231,16 @@ line costs nothing.
 Squares are square by `aspect-ratio`, with a `min-height` floor that only takes over well
 below the page's 1360px cap. **No counter and no eyebrow** — seven squares are already the
 count, and a number beside them restated the row.
+
+**Submitting ends the visit.** The confirmation holds for 2s, then the player is returned
+to the locker room where the green button is waiting on the next step. Two rules on that
+path:
+
+- The button is **never re-armed on success** — a second press during the hold would post
+  the same board again and re-stamp `board_saved_week`. It has to be re-queried after
+  `renderDock()`, which rebuilds the panel and detaches the original reference.
+- A **failed** submit neither navigates nor stays disabled: the board was not sent, so the
+  player stays where they can retry, and the label returns to `Submit Invites`.
 
 **The visit pill is a count, not a week.** It replaced a `Wk 20` stamp in a column of its
 own at the row's edge, which sat against the lean ladder and had nowhere to go once a
@@ -477,8 +488,43 @@ An **unordered, uncapped shortlist** of recruit ids the player is tracking. `rec
 |---|---|
 | Shape | Flat list of recruit ids, de-duplicated, insertion order preserved |
 | Cap | None. `MAX_BOARD` (20) caps the *board*, not the shortlist |
-| Seeds the board | At week 20, **client-side only**, and only when no board is saved |
+| Seeds the board | Tops up the lean seed, **client-side only**, and only when no board is saved |
 | Writes | `recruiting_watchlist` and nothing else |
+
+### Board seed — leans first, watchlist to fill
+
+The board a player who has never saved one lands on:
+
+1. every recruit **leaning to you**, RT descending;
+2. then, if that is under 20, watchlist recruits not already on it, RT descending.
+
+A recruit leaning to you is the live signal — he is already interested — so he outranks a
+name you starred to watch; but a star still counts rather than being ignored. Neither
+source carries ranks, so RT descending supplies the order the board needs.
+
+**Only when no board is saved**, which in practice means week 20: FTD `Recruits` persists
+across weeks 20–26, so once the board is submitted it carries forward and the seed never
+fires again until rollover. Two consequences worth knowing:
+
+- The FCC's invite step still wants a **fresh submit each week** (`board_saved_week === week`),
+  so carry-over means the player re-confirms a board rather than rebuilding one.
+- A recruit who already visited **stays on the board** and can be picked again — repeat
+  visits are real (hence the `n visits` pill). Nothing steers the player to re-rank him
+  now that the old "top unvisited" hero is gone.
+
+### Seeded-board note (Sammy)
+
+> "Hey Coach, your Invite Board is pre-populated with your current leans, but you can add
+> other players too."
+
+On the **Hub**, not the FCC — it explains something the player is looking at. Once a season
+via `invite_seed_modal_seen_season` and `PATCH /franchise/invite-seed-modal-seen`;
+season-stamped like the Signing Day reveal, so rollover re-arms it with nothing to clear.
+
+Gated on the seed **having happened**, not merely on the week: a player with no leans and
+no watchlist seeds nothing, and the note would then describe an empty board. It also fires
+after the draft restore, so a returning player whose own edits refilled the board is not
+told they are looking at a seed.
 
 ### The seeding rule
 
@@ -613,6 +659,10 @@ The signing pool defaults to `sTab: 'mine'`, which hides recruits with no lean t
   future weeks, pool `Wt`.
 - `tests/e2e/invite-visit-calendar.spec.js` — one row of seven measured squares, the three
   empty states kept distinct, placement above the board.
+- `tests/e2e/invite-board.spec.js` — board writes, the 20-slot cap, drag reorder, the
+  seed, and the submit path (confirmation, 2s hold and return, double-press guard, failure).
+- `tests/e2e/invite-seed-modal.spec.js` — the Sammy note: copy, team-vs-generic image,
+  seen-stamping, and the no-seed-no-note gate.
 - `tests/e2e/recruiting-draft.spec.js` — unsubmitted edits survive a page round trip,
   both phases, plus the restore-time validation.
 - `tests/e2e/week35-signing-pair.spec.js` — the FCC's Signing Day pair: green CTA split,

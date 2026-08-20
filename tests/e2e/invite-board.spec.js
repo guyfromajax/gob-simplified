@@ -43,7 +43,11 @@ function recruit(i, leanRank) {
 function fixture(o = {}) {
   const week = o.week ?? 21;
   const recruits = [];
-  for (let i = 0; i < 12; i++) recruits.push(recruit(i, i % 3 === 0 ? 1 : i % 3 === 1 ? 2 : 0));
+  // noLeans: nobody leans to the user, so the board seeds from the watchlist alone (or
+  // not at all). Without it every fixture seeds 8 of 12 and "empty board" cases vanish.
+  for (let i = 0; i < 12; i++) {
+    recruits.push(recruit(i, o.noLeans ? 0 : (i % 3 === 0 ? 1 : i % 3 === 1 ? 2 : 0)));
+  }
   const savedOrders = {};
   (o.board || []).forEach((id, i) => { savedOrders[String(i + 1)] = id; });
   return {
@@ -145,6 +149,72 @@ test.describe('rows', () => {
   });
 });
 
+test.describe('board seed', () => {
+  // The fixture's lean pattern: r-0/3/6/9 lean you #1, r-1/4/7/10 lean you #2, rest not.
+  const LEANERS = ['r-0', 'r-1', 'r-3', 'r-4', 'r-6', 'r-7', 'r-9', 'r-10'];
+  const SEEDED = { week: 20, watchlist: ['r-1', 'r-2', 'r-3'], board: [] };
+
+  test('an unsaved board pre-populates from your current leans, RT descending', async ({ page }) => {
+    await mount(page, { week: 20, board: [] });
+    const m = await page.evaluate(() => {
+      const ids = [...document.querySelectorAll('#hub-board .brow[data-id]')].map((r) => r.dataset.id);
+      // position_ratings is 80 - i, so a lower index is a higher RT.
+      return { ids, nums: ids.map((id) => Number(id.split('-')[1])) };
+    });
+    expect(m.ids.sort()).toEqual([...LEANERS].sort());
+    expect(m.nums).toEqual([...m.nums].sort((a, b) => a - b));   // RT descending
+  });
+
+  test('a recruit who does not lean to you is not seeded', async ({ page }) => {
+    await mount(page, { week: 20, board: [] });
+    const ids = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-board .brow[data-id]')].map((r) => r.dataset.id));
+    expect(ids).not.toContain('r-2');    // leans rival-1 / rival-2
+    expect(ids).not.toContain('r-5');
+  });
+
+  test('the watchlist tops up the remainder, behind every lean', async ({ page }) => {
+    // r-2 and r-5 are starred but lean elsewhere, so they land after all eight leaners.
+    await mount(page, { week: 20, board: [], watchlist: ['r-2', 'r-5'] });
+    const ids = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-board .brow[data-id]')].map((r) => r.dataset.id));
+    expect(ids.slice(0, 8).sort()).toEqual([...LEANERS].sort());
+    expect(ids.slice(8)).toEqual(['r-2', 'r-5']);
+  });
+
+  test('a starred recruit who also leans to you is seeded once', async ({ page }) => {
+    await mount(page, { week: 20, board: [], watchlist: ['r-0'] });
+    const ids = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-board .brow[data-id]')].map((r) => r.dataset.id));
+    expect(ids.filter((id) => id === 'r-0')).toHaveLength(1);
+    expect(ids).toHaveLength(LEANERS.length);
+  });
+
+  test('nothing to seed from leaves the board empty', async ({ page }) => {
+    await mount(page, { week: 20, board: [], watchlist: [], noLeans: true });
+    expect(await rows(page).count()).toBe(0);
+    expect(await page.evaluate(() => !!document.querySelector('#board-seed-notice'))).toBe(false);
+  });
+
+  test('a saved board is never overwritten by the seed', async ({ page }) => {
+    await mount(page, { week: 20, board: ['r-5', 'r-2'] });
+    const ids = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-board .brow[data-id]')].map((r) => r.dataset.id));
+    expect(ids).toEqual(['r-5', 'r-2']);
+  });
+
+  test('and later weeks carry that board forward rather than re-seeding', async ({ page }) => {
+    // The board lives in FTD across weeks 20-26, so week 21 opens on what week 20 sent.
+    await mount(page, { week: 21, board: ['r-5', 'r-2'] });
+    const m = await page.evaluate(() => ({
+      ids: [...document.querySelectorAll('#hub-board .brow[data-id]')].map((r) => r.dataset.id),
+      notice: !!document.querySelector('#board-seed-notice'),
+    }));
+    expect(m.ids).toEqual(['r-5', 'r-2']);
+    expect(m.notice).toBe(false);
+  });
+});
+
 test.describe('seed notice', () => {
   const SEEDED = { week: 20, watchlist: ['r-1', 'r-2', 'r-3'], board: [] };
 
@@ -152,7 +222,7 @@ test.describe('seed notice', () => {
     await mount(page, SEEDED);
     const txt = await page.evaluate(() =>
       document.querySelector('#board-seed-notice')?.textContent.trim() || '');
-    expect(txt).toContain('Seeded from your watchlist');
+    expect(txt).toContain('Seeded from your current leans');
     expect(txt).toContain('ranked by RT');
     expect(txt).toContain('Drag to re-order');
     expect(txt).toContain('nothing is sent until you save');
@@ -163,8 +233,8 @@ test.describe('seed notice', () => {
     expect(await page.evaluate(() => !!document.querySelector('#board-seed-notice'))).toBe(false);
   });
 
-  test('absent with no watchlist at all', async ({ page }) => {
-    await mount(page, { week: 20, watchlist: [], board: [] });
+  test('absent when there was nothing to seed from', async ({ page }) => {
+    await mount(page, { week: 20, watchlist: [], board: [], noLeans: true });
     expect(await page.evaluate(() => !!document.querySelector('#board-seed-notice'))).toBe(false);
   });
 
@@ -190,20 +260,106 @@ test.describe('seed notice', () => {
 
   test('the seed itself never writes — has_saved_board cannot flip before save', async ({ page }) => {
     await mount(page, SEEDED);
-    const writes = await page.evaluate(() => window.__writes);
-    expect(writes).toHaveLength(0);
-    // And the seed did produce a board client-side.
-    expect(await rows(page).count()).toBe(3);
+    const orders = await page.evaluate(() =>
+      window.__writes.filter((w) => String(w.url).includes('recruiting-orders')));
+    expect(orders).toHaveLength(0);
+    // And the seed did produce a board client-side: eight leaners, plus r-2 — the only
+    // one of the three starred names who does not already lean to you.
+    expect(await rows(page).count()).toBe(9);
   });
 
   test('saving is the only thing that posts the order', async ({ page }) => {
-    await mount(page, SEEDED);
+    await mount(page, { week: 20, watchlist: ['r-2'], board: [], noLeans: true });
     await page.click('#dock-save');
-    await page.waitForFunction(() => window.__writes.length > 0);
-    const writes = await page.evaluate(() => window.__writes);
-    expect(writes).toHaveLength(1);
-    expect(writes[0].url).toContain('/franchise/recruiting-orders');
-    expect(JSON.parse(writes[0].body).recruit_ids).toEqual(['r-1', 'r-2', 'r-3']);
+    await page.waitForFunction(() =>
+      window.__writes.some((w) => String(w.url).includes('recruiting-orders')));
+    const orders = await page.evaluate(() =>
+      window.__writes.filter((w) => String(w.url).includes('recruiting-orders')));
+    expect(orders).toHaveLength(1);
+    expect(JSON.parse(orders[0].body).recruit_ids).toEqual(['r-2']);
+  });
+});
+
+test.describe('submitting ends the visit', () => {
+  const HOLD_MS = 2000;
+
+  /** Catch the FCC navigation instead of following it, so the page survives to assert on. */
+  async function watchNav(page) {
+    const hits = [];
+    await page.route('**/franchise-command-center*', (route) => {
+      hits.push(route.request().url());
+      route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>locker room</body></html>' });
+    });
+    return hits;
+  }
+
+  test('the confirmation names the thing the button did', async ({ page }) => {
+    await mount(page, { week: 20, board: ['r-1', 'r-2'] });
+    await watchNav(page);
+    await page.click('#dock-save');
+    await page.waitForSelector('#hub-toast.show');
+    const txt = await page.evaluate(() => document.querySelector('#hub-toast').textContent);
+    // The CTA says "Submit Invites"; the confirmation used to say "Saved".
+    expect(txt).toContain('Invites Submitted');
+  });
+
+  test('it holds, then returns to the locker room', async ({ page }) => {
+    await mount(page, { week: 20, board: ['r-1', 'r-2'] });
+    const hits = await watchNav(page);
+    const t0 = Date.now();
+    await page.click('#dock-save');
+    await page.waitForSelector('#hub-toast.show');
+    // Still on the Hub while the confirmation is up.
+    expect(hits).toHaveLength(0);
+    await page.waitForURL('**/franchise-command-center*', { timeout: 5000 });
+    const held = Date.now() - t0;
+    expect(hits).toHaveLength(1);
+    // Bounded both ways: an instant redirect gives no time to read it, and a long one
+    // reads as a hang.
+    expect(held).toBeGreaterThanOrEqual(HOLD_MS - 250);
+    expect(held).toBeLessThan(HOLD_MS + 2000);
+  });
+
+  test('a second press during the hold cannot post the board twice', async ({ page }) => {
+    await mount(page, { week: 20, board: ['r-1', 'r-2'] });
+    await watchNav(page);
+    await page.click('#dock-save');
+    await page.waitForSelector('#hub-toast.show');
+    const btn = await page.evaluate(() => {
+      const b = document.getElementById('dock-save');
+      return { disabled: b.disabled, label: b.textContent.trim() };
+    });
+    expect(btn.disabled).toBe(true);
+    expect(btn.label).toBe('Invites Submitted');
+    // Force the press anyway — a disabled button is the guard, so prove it holds.
+    await page.evaluate(() => document.getElementById('dock-save').click());
+    const posts = await page.evaluate(() =>
+      window.__writes.filter((w) => String(w.url).includes('recruiting-orders')).length);
+    expect(posts).toBe(1);
+  });
+
+  test('a failed submit stays put and re-arms the button', async ({ page }) => {
+    await mount(page, { week: 20, board: ['r-1', 'r-2'] });
+    const hits = await watchNav(page);
+    await page.evaluate(() => {
+      window.RecruitingCommon.fetchJSON = function () {
+        return Promise.reject(new Error('nope'));
+      };
+    });
+    await page.click('#dock-save');
+    await page.waitForSelector('#hub-toast.show');
+    await page.waitForTimeout(HOLD_MS + 400);
+    const m = await page.evaluate(() => {
+      const b = document.getElementById('dock-save');
+      return { toast: document.querySelector('#hub-toast').textContent,
+               disabled: b.disabled, label: b.textContent.trim() };
+    });
+    expect(m.toast).toContain('Submit failed');
+    // No navigation: the board was not sent, so the player must stay where they can retry.
+    expect(hits).toHaveLength(0);
+    expect(m.disabled).toBe(false);
+    // And the label goes back to the one the board actually renders, not "Save Board".
+    expect(m.label).toBe('Submit Invites');
   });
 });
 

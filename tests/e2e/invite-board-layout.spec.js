@@ -35,14 +35,16 @@ const USER_TEAM = 'user-team-id';
 
 /** 450 deterministic recruits in the /franchise/recruiting-data shape. */
 function fixture({ week = 7, watchlist = [], savedOrders = {}, visitHistory = null,
-  threeLeans = false, archetype = 'Slasher' } = {}) {
+  threeLeans = false, noLeans = false, archetype = 'Slasher' } = {}) {
   const recruits = [];
   for (let i = 0; i < 450; i++) {
     const attributes = {};
     ATTRS.forEach((k, j) => { attributes[k] = ((i * 7 + j * 13) % 91) + 5; });
     // threeLeans fills every slot — the case that made the old edge-of-row week stamp
     // and the lean ladder fight for the same space.
-    const lean = threeLeans
+    const lean = noLeans
+      ? { 1: 'rival-1', 2: 'rival-2', 3: null }
+      : threeLeans
       ? { 1: USER_TEAM, 2: 'rival-1', 3: 'rival-2' }
       : i % 11 === 0
         ? { 1: USER_TEAM, 2: 'rival-1', 3: null }
@@ -144,7 +146,7 @@ const board = (page) => page.evaluate(() => {
 
 test.describe('Invite Board layout', () => {
   test('two columns of ten, all 20 ranks always present', async ({ page }) => {
-    await mountPool(page, { week: 22, savedOrders: {} });
+    await mountPool(page, { week: 22, noLeans: true, savedOrders: {} });
     const m = await board(page);
     expect(m.columns).toBe(2);
     expect(m.perColumn).toEqual([10, 10]);
@@ -153,7 +155,7 @@ test.describe('Invite Board layout', () => {
   });
 
   test('the panel is a static size however many are ranked', async ({ page }) => {
-    await mountPool(page, { week: 22 });
+    await mountPool(page, { week: 22, noLeans: true });
     const empty = (await board(page)).panelH;
     // Rank three recruits through the real + control.
     for (const i of [0, 1, 2]) {
@@ -315,7 +317,7 @@ test.describe('board shape tiles', () => {
     })));
 
   test('one tile per position, always all five, in playbook order', async ({ page }) => {
-    await mountPool(page, { week: 22, savedOrders: {} });
+    await mountPool(page, { week: 22, noLeans: true, savedOrders: {} });
     const t = await posTiles(page);
     expect(t.map((x) => x.pos)).toEqual(['PG', 'SG', 'SF', 'PF', 'C']);
     // An empty board still draws all five: the gap is the point, and a tile that
@@ -324,7 +326,8 @@ test.describe('board shape tiles', () => {
   });
 
   test('counts follow the board, and update as it is edited', async ({ page }) => {
-    await mountPool(page, { week: 22 });
+    // noLeans so the board starts empty and the four adds are the whole story.
+    await mountPool(page, { week: 22, noLeans: true });
     // Add the first four pool rows, then read what the tiles say against the rows.
     for (let i = 0; i < 4; i++) await page.click(`#hub-pool tbody tr.rec:nth-child(${i + 1}) .pool-add`);
     const m = await page.evaluate(() => {

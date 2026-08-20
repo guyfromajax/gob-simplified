@@ -105,6 +105,7 @@ let fccInitializationPromise = null;
 let playbooksWeekSavedCache = null;
 let fccPlaybooksSummaryCache = null;
 let userRosterPlayersCache = [];
+let userRosterDataCache = null;
 let homeTeamLeaderCategory = 'PTS';
 let userScheduleDataCache = null;
 let homeLastGameDataCache = null;
@@ -206,6 +207,7 @@ function persistFccSessionCache() {
       topData: commandCenterTopDataCache || null,
       standingsData: standingsDataCache || null,
       rosterPlayers: Array.isArray(userRosterPlayersCache) ? userRosterPlayersCache : [],
+      rosterData: userRosterDataCache || null,
       teamData: teamData || null,
       scheduleData: userScheduleDataCache || null,
       lastGameDataCache: homeLastGameDataCache || null,
@@ -225,7 +227,8 @@ function restoreFccSessionCache() {
   }
   commandCenterTopDataCache = cached.topData || null;
   standingsDataCache = cached.standingsData || null;
-  userRosterPlayersCache = Array.isArray(cached.rosterPlayers) ? cached.rosterPlayers : [];
+  userRosterDataCache = window.FccRosterData.fromSessionCache(cached);
+  userRosterPlayersCache = userRosterDataCache.players;
   teamData = cached.teamData || null;
   userScheduleDataCache = cached.scheduleData || null;
   homeLastGameDataCache = cached.lastGameDataCache || null;
@@ -241,6 +244,7 @@ function invalidateFccTeamScopedCaches() {
   teamData = null;
   fccPlaybooksSummaryCache = null;
   userRosterPlayersCache = [];
+  userRosterDataCache = null;
   homeOpponentRosterCache.clear();
   invalidateHomeWeekSensitiveCaches();
 }
@@ -2969,10 +2973,7 @@ function fccRosterSortBy(key, firstDir) {
 }
 
 function fccPracticeSquadPlayers() {
-  const d = commandCenterTopDataCache || {};
-  return []
-    .concat(Array.isArray(d.training_squad) ? d.training_squad : [])
-    .concat(Array.isArray(d.practice_squad_recruits) ? d.practice_squad_recruits : []);
+  return window.FccRosterData.practiceSquadPlayers(userRosterDataCache);
 }
 
 /** Practice-squad entries arrive in a different shape than roster players. */
@@ -3045,7 +3046,8 @@ function renderTeam(data) {
   if (!data) {
     return;
   }
-  userRosterPlayersCache = data.players || [];
+  userRosterDataCache = window.FccRosterData.normalize(data);
+  userRosterPlayersCache = userRosterDataCache.players;
   persistFccSessionCache();
   const tbody = document.getElementById('team-body');
   if (!tbody) {
@@ -3562,7 +3564,7 @@ async function init() {
     void updatePlaybooksButtonState(commandCenterTopDataCache);
     bindResourcesLinks();
     if (standingsDataCache) renderStandings(standingsDataCache, 'A');
-    if (userRosterPlayersCache.length) renderTeam({ players: userRosterPlayersCache });
+    if (userRosterPlayersCache.length) renderTeam(userRosterDataCache);
     renderHomeRankingsCard();
     renderHomeLockerRoomCard();
     renderHomeTeamStatsCard();

@@ -318,7 +318,10 @@ Data source:
 
 Notes:
 
-- roster data is cached in `userRosterPlayersCache`
+- the complete roster response is cached in `userRosterDataCache`; it is the single source for both the Varsity and Practice Squad scopes
+- `userRosterPlayersCache` is the active-player projection used by Home-card consumers; it is derived from `userRosterDataCache.players`
+- Practice Squad rows and counts are derived from `userRosterDataCache.training_squad + userRosterDataCache.practice_squad_recruits` through `FccRosterData.practiceSquadPlayers(...)`; they must not read from `commandCenterTopDataCache`, whose summary contract does not include roster arrays
+- the session cache persists the complete response as `rosterData`. `rosterPlayers` remains readable only as a backward-compatible fallback for older caches and cannot warm-paint Practice Squad data
 - header tooltips are initialized through `attributeTooltips.js`
 
 ---
@@ -1028,6 +1031,7 @@ Key FCC state variables in the controller:
 - `commandCenterTopDataCache`
 - `standingsDataCache`
 - `teamData`
+- `userRosterDataCache`
 - `userRosterPlayersCache`
 - `userScheduleDataCache`
 - `homeLastGameDataCache`

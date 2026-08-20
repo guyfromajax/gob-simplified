@@ -3821,6 +3821,10 @@ RECRUITING_RESULTS_MODAL_SEEN_SEASON_FIELD = "recruiting_results_modal_seen_seas
 # watched, so a refresh after submitting does not replay it. Mirrors the modal flag
 # above rather than inventing a second convention.
 WEEK_35_REVEAL_SEEN_SEASON_FIELD = "week_35_reveal_seen_season"
+# Season the "your board is pre-populated" Sammy modal was shown. Season-stamped rather
+# than boolean, like the reveal above, so a new season re-arms it with nothing having to
+# clear the flag.
+INVITE_SEED_MODAL_SEEN_SEASON_FIELD = "invite_seed_modal_seen_season"
 WALK_ON_WELCOME_MODAL_SEEN_SEASON_FIELD = "walk_on_welcome_modal_seen_season"
 
 # Recruit Visit modal (weeks 20-26). Week-stamped, not boolean: each invite week gets
@@ -14312,6 +14316,13 @@ def get_recruiting_data(
         # the client: _sister_conference() is the single definition of "same region,
         # other conference" and the client must not re-implement it.
         "conferences": _recruiting_conference_context(fid, user_team_id),
+        # One-time Sammy note explaining the seeded board. Eligible only while the board
+        # is genuinely unsaved — the same condition that decides whether the client seeds
+        # at all, so the modal can never explain a seed that did not happen.
+        "invite_seed_modal_seen": (
+            int(franchise_doc.get(INVITE_SEED_MODAL_SEEN_SEASON_FIELD, 0) or 0)
+            == _franchise_current_season(franchise_doc)
+        ),
         "week_35_reveal_seen": (
             int(franchise_doc.get(WEEK_35_REVEAL_SEEN_SEASON_FIELD, 0) or 0)
             == _franchise_current_season(franchise_doc)
@@ -17221,6 +17232,10 @@ class Week35RevealSeenRequest(BaseModel):
     franchise_id: str
 
 
+class InviteSeedModalSeenRequest(BaseModel):
+    franchise_id: str
+
+
 class RecruitVisitModalSeenRequest(BaseModel):
     franchise_id: str
 
@@ -17242,6 +17257,25 @@ def mark_recruit_visit_modal_seen(
         {"$set": {RECRUIT_VISIT_MODAL_SEEN_WEEK_FIELD: week}},
     )
     return {"seen_week": week}
+
+
+@router.patch("/franchise/invite-seed-modal-seen")
+def mark_invite_seed_modal_seen(
+    req: InviteSeedModalSeenRequest,
+    user: dict = Depends(get_current_user),
+):
+    """Stamp the seeded-board Sammy note as shown for this season.
+
+    Season-stamped for the same reason as the Signing Day reveal: a new season gets its
+    own note without anything having to clear a boolean at rollover.
+    """
+    franchise_doc = verify_franchise_owned_by_user(req.franchise_id, user["user_id"])
+    season = _franchise_current_season(franchise_doc)
+    db.franchises.update_one(
+        {"_id": franchise_doc["_id"]},
+        {"$set": {INVITE_SEED_MODAL_SEEN_SEASON_FIELD: season}},
+    )
+    return {"seen_season": season}
 
 
 @router.patch("/franchise/week-35-reveal-seen")

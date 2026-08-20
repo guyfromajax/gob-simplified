@@ -41,7 +41,8 @@
     view: 'all',                     // 'all' | 'watch' | 'leans' | 'unranked'
     watchlist: new Set(),            // unordered, uncapped shortlist of recruit ids
     wire: {},                        // Prompt 1 event log (recruiting_wire payload)
-    boardSeededFromWatchlist: false, // drives the seed notice; cleared on save/reorder
+    boardSeeded: false,              // drives the seed notice; cleared on save/reorder
+    seedModalSeen: false,            // season-stamped server-side
     seedNoticeDismissed: false,
     sort: { key: 'rt', dir: 'desc' }, collapsed: {},
     drag: { from: null, over: null },
@@ -574,19 +575,86 @@
     }
     return null;
   }
+  // ---------- board seed ----------
+  /**
+   * The board a player who has never saved one lands on.
+   *
+   * Leans first, then the watchlist tops it up. A recruit leaning to you is the live
+   * signal — he is already interested — so he outranks a name you starred to keep an eye
+   * on; but a star still counts for something rather than being ignored. RT descending
+   * within each group: neither source carries ranks, so the board needs an order and
+   * "best available first" is the only defensible one.
+   *
+   * Sets no state and writes nothing — the caller owns both.
+   */
+  function seedBoard() {
+    var byRt = function (a, b) { return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1); };
+    var leans = state.recruits.filter(function (r) { return r.leansToUser; }).sort(byRt);
+    var picked = {};
+    var out = leans.slice(0, MAX_BOARD).map(function (r) { picked[r.recruitId] = 1; return r.recruitId; });
+    if (out.length < MAX_BOARD && state.watchlist.size) {
+      state.recruits
+        .filter(function (r) { return state.watchlist.has(String(r.recruitId)) && !picked[r.recruitId]; })
+        .sort(byRt)
+        .slice(0, MAX_BOARD - out.length)
+        .forEach(function (r) { out.push(r.recruitId); });
+    }
+    state.boardSeeded = out.length > 0;
+    return out;
+  }
+
+  /**
+   * One-time Sammy note explaining the seeded board.
+   *
+   * Fires on the Hub, not the FCC: it explains something the player is looking at, so
+   * it belongs on the screen that shows it. Season-stamped server-side
+   * (/franchise/invite-seed-modal-seen), so a refresh does not replay it and a new
+   * season re-arms it with nothing having to clear a flag.
+   *
+   * Gated on the seed HAVING HAPPENED, not merely on the week: a board with no leans
+   * and no watchlist seeds nothing, and a note about a pre-populated board would then
+   * be describing an empty one.
+   */
+  function maybeShowSeedModal() {
+    if (state.phase !== 'invite' || !state.boardSeeded || state.seedModalSeen) return;
+    state.seedModalSeen = true;
+    var path = function (p) {
+      return (window.API_CONFIG && API_CONFIG.buildStaticPath) ? API_CONFIG.buildStaticPath(p) : p;
+    };
+    Promise.all([
+      import(path('/js/shared/sammyModal.js')),
+      import(path('/js/shared/teamCoachAsset.js')),
+    ]).then(function (loaded) {
+      loaded[0].showSammyModal({
+        eyebrow: 'Week ' + state.week + ' \u00b7 Invite Season',
+        body: 'Hey Coach, your Invite Board is pre-populated with your current leans, '
+          + 'but you can add other players too.',
+        ctaLabel: 'Got It',
+        // Team-coloured Sammy for the eight mapped teams, generic white otherwise —
+        // the mapping already encodes the conference-1 rule, so there is no check here.
+        imageSrc: loaded[1].getTeamSammyImage(state.teamName || ''),
+        primaryClass: 'is-orange',
+      });
+      return Common.fetchJSON(API_CONFIG.buildUrl('/franchise/invite-seed-modal-seen'), {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ franchise_id: context.franchiseId })
+      });
+    }).catch(function (err) { console.warn('[SEED-MODAL] skipped', err); });
+  }
+
   // ---------- seed notice ----------
-  // Shown only when the board came from the watchlist seed, never from a real save —
-  // otherwise it would be a lie. Says plainly that nothing is sent yet, because the
-  // whole point of the client-side seed is that the player is not yet committed.
+  // Shown only when the board came from the seed, never from a real save — otherwise it
+  // would be a lie. Says plainly that nothing is sent yet, because the whole point of
+  // the client-side seed is that the player is not yet committed.
   function seedNoticeHtml() {
-    if (!state.boardSeededFromWatchlist || state.seedNoticeDismissed) return '';
+    if (!state.boardSeeded || state.seedNoticeDismissed) return '';
     return '<div class="bseed" id="board-seed-notice">' +
-      '<span class="bseed-txt">Seeded from your watchlist, ranked by RT. Drag to re-order — ' +
+      '<span class="bseed-txt">Seeded from your current leans, ranked by RT. Drag to re-order — ' +
       '<b>nothing is sent until you save</b>.</span>' +
       '<button class="bseed-x" id="board-seed-dismiss" type="button" aria-label="Dismiss">×</button></div>';
   }
   // Any real reorder means the order is now the player's, so the notice has served out.
-  function clearSeedNotice() { state.boardSeededFromWatchlist = false; }
+  function clearSeedNotice() { state.boardSeeded = false; }
 
   // ---------- board rows ----------
   /** Which invite week (if any) this recruit visited the user's team. */
@@ -705,8 +773,11 @@
     bindHeadshotFallbacks(host);
   }
 
+  // Long enough to read the confirmation, short enough not to feel like a wait.
+  var SUBMIT_HOLD_MS = 2000;
+
   function saveBoard() {
-    var btn = document.getElementById('dock-save'); if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    var btn = document.getElementById('dock-save'); if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
     Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-orders'), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ franchise_id: context.franchiseId, recruit_ids: state.board })
@@ -718,16 +789,31 @@
       clearDraft();
       renderDock();
       showToast();
+      // Submitting ends the visit in the Hub: the confirmation holds, then the player is
+      // returned to the locker room, where the green button is waiting on the next step.
+      //
+      // Re-queried, NOT the `btn` captured above: renderDock() rebuilds the whole panel,
+      // so that reference is detached by now and disabling it guards nothing. The button
+      // is deliberately never re-armed on success — a second press during the hold would
+      // post the same board again and re-stamp board_saved_week.
+      var live = document.getElementById('dock-save');
+      if (live) { live.disabled = true; live.textContent = 'Invites Submitted'; }
+      setTimeout(function () { window.location.href = Common.buildFccUrl(context); }, SUBMIT_HOLD_MS);
     })
-      .catch(function (err) { console.error(err); showToast('Save failed', String(err && err.message || err), false); })
-      .then(function () { if (btn) { btn.disabled = false; btn.textContent = 'Save Board'; } });
+      .catch(function (err) {
+        console.error(err);
+        showToast('Submit failed', String(err && err.message || err), false);
+        // Only a FAILED submit re-arms the button, and it goes back to the label the
+        // board actually renders. No renderDock() on this path, so `btn` is still live.
+        if (btn) { btn.disabled = false; btn.textContent = 'Submit Invites'; }
+      });
   }
 
   // ===================== TOAST =====================
   function showToast(title, sub, ok) {
     var el = document.getElementById('hub-toast');
     if (!el) { el = document.createElement('div'); el.id = 'hub-toast'; el.className = 'hub-toast'; document.body.appendChild(el); }
-    el.innerHTML = '<span class="ti">' + CHECK + '</span><div><div class="tt1">' + Common.escapeHtml(title || 'Invite Board Saved') +
+    el.innerHTML = '<span class="ti">' + CHECK + '</span><div><div class="tt1">' + Common.escapeHtml(title || 'Invites Submitted') +
       '</div><div class="tt2">' + Common.escapeHtml(sub || 'Your ranked board runs each week (Wks 20–26).') + '</div></div>';
     el.style.borderLeftColor = ok === false ? 'var(--red)' : 'var(--green)';
     void el.offsetWidth; el.classList.add('show');
@@ -1786,6 +1872,7 @@
         state.teamNameMap = teamNameMap;
         state.conferences = data.conferences || null;
         state.revealSeen = !!data.week_35_reveal_seen;
+        state.seedModalSeen = !!data.invite_seed_modal_seen;
         state.visitHistory = data.visit_history || [];
         state.recruits = Common.normalizeRecruits(data.recruits || [], teamNameMap).map(function (r) {
           var model = Spine.Lean.fromBackend({ Lean: r.lean }, { userTeamId: state.userTeamId, teamNameMap: teamNameMap });
@@ -1804,7 +1891,7 @@
         state.board = Common.recruitingOrderIds(data.saved_orders || {}).filter(function (id) {
           if (!state.byId[id] || seen[id]) return false; seen[id] = true; return true;
         });
-        // Watchlist pre-populates the invite board — CLIENT-SIDE STATE ONLY.
+        // Pre-populate the invite board — CLIENT-SIDE STATE ONLY.
         //
         // HARD RULE: this must never persist. has_saved_board derives from
         // _team_order_list(ftd["Recruits"]), and both the week-20 gate and the server
@@ -1814,17 +1901,11 @@
         // Recruits is written by save_recruiting_orders and nowhere else.
         //
         // Only seeds when nothing is saved yet, so it can never reorder or overwrite a
-        // board the player built. The watchlist has no ranks, so RT descending supplies
-        // the initial order the board needs — the star press implied no position.
-        state.boardSeededFromWatchlist = false;
-        if (!state.board.length && state.watchlist.size) {
-          state.boardSeededFromWatchlist = true;
-          state.board = state.recruits
-            .filter(function (r) { return state.watchlist.has(String(r.recruitId)); })
-            .sort(function (a, b) { return (b.rt != null ? b.rt : -1) - (a.rt != null ? a.rt : -1); })
-            .slice(0, MAX_BOARD)
-            .map(function (r) { return r.recruitId; });
-        }
+        // board the player built. In practice that means week 20: the board persists in
+        // FTD across weeks 20-26, so once it is submitted it carries forward and this
+        // never fires again until the season rolls over.
+        state.boardSeeded = false;
+        if (!state.board.length) state.board = seedBoard();
         // Signing Day: restore the budget from saved entries; else auto-fill top leaners.
         state.week35Ran = !!data.week_35_recruiting_ran;
         if (state.phase === 'day') {
@@ -1841,6 +1922,9 @@
         // week-35 entries alike — an unsubmitted edit is newer than all three.
         restoreDraft();
         renderShell();
+        // AFTER restoreDraft: a returning player whose draft refilled the board is not
+        // looking at a seed, and must not be told they are.
+        maybeShowSeedModal();
         maybeAutoRun();
       })
       .catch(function (err) { console.error(err); if (root) root.innerHTML = '<div class="hub-error">Failed to load recruits.</div>'; });

@@ -34,15 +34,18 @@ const POS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const USER_TEAM = 'user-team-id';
 
 /** 450 deterministic recruits in the /franchise/recruiting-data shape. */
-function fixture({ week = 7, watchlist = [], savedOrders = {} } = {}) {
+function fixture({ week = 7, watchlist = [], savedOrders = {}, noLeans = false } = {}) {
   const recruits = [];
   for (let i = 0; i < 450; i++) {
     const attributes = {};
     ATTRS.forEach((k, j) => { attributes[k] = ((i * 7 + j * 13) % 91) + 5; });
-    const lean = i % 11 === 0
-      ? { 1: USER_TEAM, 2: 'rival-1', 3: null }
-      : i % 7 === 0 ? { 1: 'rival-1', 2: USER_TEAM, 3: null }
-        : { 1: 'rival-1', 2: null, 3: null };
+    // noLeans: nobody leans to the user, so the board seeds from the watchlist alone.
+    const lean = noLeans
+      ? { 1: 'rival-1', 2: null, 3: null }
+      : i % 11 === 0
+        ? { 1: USER_TEAM, 2: 'rival-1', 3: null }
+        : i % 7 === 0 ? { 1: 'rival-1', 2: USER_TEAM, 3: null }
+          : { 1: 'rival-1', 2: null, 3: null };
     recruits.push({
       recruit_id: `r-${i}`,
       name: `Recruit ${String(i).padStart(3, '0')}`,
@@ -463,13 +466,25 @@ test.describe('watchlist', () => {
 
 test.describe('week-20 seeding must not persist', () => {
   test('board pre-populates from the watchlist without any write', async ({ page }) => {
-    await mountPool(page, { week: 20, watchlist: ['r-4', 'r-8', 'r-12'] });
+    // noLeans isolates the watchlist half of the seed; the leans half is covered in
+    // invite-board.spec.js.
+    await mountPool(page, { week: 20, noLeans: true, watchlist: ['r-4', 'r-8', 'r-12'] });
+    // The stamp rides behind two dynamic imports, so it lands after load settles.
+    // Waiting for it is what makes the exact-list assertion below deterministic.
+    await page.waitForFunction(() =>
+      window.__patchCalls.some((c) => String(c.url).includes('invite-seed-modal-seen')));
     const m = await page.evaluate(() => ({
-      writes: window.__patchCalls.filter((c) => c.unexpected || String(c.url).includes('recruiting-orders')),
+      orders: window.__patchCalls.filter((c) => String(c.url).includes('recruiting-orders')),
+      other: window.__patchCalls.map((c) => String(c.url).split('/').pop()),
       slots: [...document.querySelectorAll('#hub-pool .pool-rankbadge')].length,
     }));
-    // The seed is client state only — no request of any kind fired on load.
-    expect(m.writes).toHaveLength(0);
+    // The seed is client state only: nothing is posted to recruiting-orders, which is
+    // the only field has_saved_board reads.
+    expect(m.orders).toHaveLength(0);
+    // One load-time write IS expected now and must stay accounted for by name — the
+    // seeded-board Sammy note stamping itself seen. Anything else on this list is a
+    // regression, so it is asserted exactly rather than filtered away.
+    expect(m.other).toEqual(['invite-seed-modal-seen']);
     expect(m.slots).toBe(3);
   });
 
@@ -487,8 +502,8 @@ test.describe('week-20 seeding must not persist', () => {
     expect(ranked).not.toContain('r-200');
   });
 
-  test('no watchlist and no saved board leaves the board empty', async ({ page }) => {
-    await mountPool(page, { week: 20 });
+  test('nothing to seed from leaves the board empty', async ({ page }) => {
+    await mountPool(page, { week: 20, noLeans: true });
     const slots = await page.evaluate(() => document.querySelectorAll('#hub-pool .pool-rankbadge').length);
     expect(slots).toBe(0);
   });
