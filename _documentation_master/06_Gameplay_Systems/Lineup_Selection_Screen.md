@@ -27,7 +27,7 @@ The Lineup Selection Screen allows users to set their starting lineup before eac
 
 **Key Features:**
 - `Game | Attributes | Stats` segmented views (Game default)
-- On-court (5) + Bench groups; empty slots as placeholder rows in PG→C order
+- On-court (5) + Bench groups; empty slots as placeholder rows in PG→C order; BENCH group header only (no ON COURT header)
 - ENG bar + RT beside the player name in all views (existing 90/80/70 energy bands)
 - Game view production cluster: PTS · REB (DREB+OREB) · AST · DEF% between ENG and RT
 - MO as −5…+5 pip ladder (red left / white right) in Game view

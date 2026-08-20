@@ -13780,7 +13780,19 @@ def week_35_signing_reason(
 
 
 def _week_35_result_entry_from_recruit(recruit_doc: dict[str, Any], team_doc: dict[str, Any], scholarship: bool, playing_time: bool, walk_on: bool = False) -> dict[str, Any]:
+    from BackEnd.utils.rt_projection import potential_rt_for_player
+
     best_pos = _best_position(recruit_doc.get("position_ratings") or {})
+    # Keyed on recruit_id, NOT the fresh player_id minted below: player_id is only the
+    # deterministic fallback when potential_factor is missing, and a new uuid there would
+    # project a different ceiling than the pool showed for the same recruit an hour
+    # earlier. Signing must not move the number.
+    potential_rt = potential_rt_for_player(
+        str(recruit_doc.get("recruit_id") or ""),
+        recruit_doc.get("entry_tier"),
+        recruit_doc.get("potential_factor"),
+        recruit_doc.get("position_ratings") or {},
+    )
     return {
         # ALWAYS a fresh uuid — never the recruit_id. Set recruits share one
         # recruit_id across every franchise (they all draw set_0001), so keying the
@@ -13809,6 +13821,9 @@ def _week_35_result_entry_from_recruit(recruit_doc: dict[str, Any], team_doc: di
         "attributes": (recruit_doc.get("attributes") or {}).copy(),
         "pos": best_pos.get("pos", "--"),
         "rt": best_pos.get("rating"),
+        # Ratcheted ceiling, so the results screen can show current/potential like every
+        # other recruit surface. None (→ current alone) when there is no basis.
+        "potential_rt_ratcheted": potential_rt,
         "scholarship": bool(scholarship),
         "playing_time": bool(playing_time),
         "walk_on": bool(walk_on),

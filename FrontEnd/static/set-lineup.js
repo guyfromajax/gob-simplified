@@ -1317,15 +1317,6 @@ function buildGroupHeaderRow(label, count, colSpan, warnText = '') {
   return tr;
 }
 
-function buildGroupGapRow(colSpan) {
-  const tr = document.createElement('tr');
-  tr.className = 'group-gap';
-  const td = document.createElement('td');
-  td.colSpan = colSpan;
-  tr.appendChild(td);
-  return tr;
-}
-
 function comparePlayersForSort(a, b, columnName, direction) {
   const desc = direction === 'desc';
   const slotA = a._assignedSlot || null;
@@ -1545,21 +1536,12 @@ function renderRosterGame() {
   const colSpan = 10;
   const decorated = roster.map(decoratePlayerForRoster);
   const byId = new Map(decorated.map((p) => [String(p._playerId), p]));
-  let filledCount = 0;
-  LINEUP_POSITIONS.forEach((pos) => {
-    if (lineup[pos] && byId.has(String(lineup[pos]))) filledCount += 1;
-  });
-  const slotsOpen = 5 - filledCount;
   const bench = sortPlayerList(
     decorated.filter((p) => !p._assignedSlot),
     gameSortColumn,
     gameSortDirection
   );
   const fragment = document.createDocumentFragment();
-  const openWarn = slotsOpen > 0
-    ? `${slotsOpen} SLOT${slotsOpen > 1 ? 'S' : ''} OPEN`
-    : '';
-  fragment.appendChild(buildGroupHeaderRow('ON COURT', `${filledCount}/5`, colSpan, openWarn));
 
   function appendGameTail(tr, p) {
     tr.appendChild(buildProductionCell(p));
@@ -1609,7 +1591,6 @@ function renderRosterGame() {
     tr.appendChild(document.createElement('td'));
     fragment.appendChild(tr);
   });
-  fragment.appendChild(buildGroupGapRow(colSpan));
   fragment.appendChild(buildGroupHeaderRow('BENCH', bench.length, colSpan));
   bench.forEach((p) => {
     const tr = createPlayerRowShell(p, { onCourt: false, assignedSlot: null });
@@ -1635,21 +1616,12 @@ function renderRosterAttributes() {
   const colSpan = 20;
   const decorated = roster.map(decoratePlayerForRoster);
   const byId = new Map(decorated.map((p) => [String(p._playerId), p]));
-  let filledCount = 0;
-  LINEUP_POSITIONS.forEach((pos) => {
-    if (lineup[pos] && byId.has(String(lineup[pos]))) filledCount += 1;
-  });
-  const slotsOpen = 5 - filledCount;
   const bench = sortPlayerList(
     decorated.filter((p) => !p._assignedSlot),
     attrSortColumn,
     attrSortDirection
   );
   const fragment = document.createDocumentFragment();
-  const openWarn = slotsOpen > 0
-    ? `${slotsOpen} SLOT${slotsOpen > 1 ? 'S' : ''} OPEN`
-    : '';
-  fragment.appendChild(buildGroupHeaderRow('ON COURT', `${filledCount}/5`, colSpan, openWarn));
 
   function appendAttrTail(tr, p) {
     const attrs = p.attributes || {};
@@ -1703,7 +1675,6 @@ function renderRosterAttributes() {
     tr.appendChild(document.createElement('td'));
     fragment.appendChild(tr);
   });
-  fragment.appendChild(buildGroupGapRow(colSpan));
   fragment.appendChild(buildGroupHeaderRow('BENCH', bench.length, colSpan));
   bench.forEach((p) => {
     const tr = createPlayerRowShell(p, { onCourt: false, assignedSlot: null });
@@ -1732,21 +1703,12 @@ function renderRosterStats() {
   const colSpan = 23;
   const decorated = roster.map(decoratePlayerForRoster);
   const byId = new Map(decorated.map((p) => [String(p._playerId), p]));
-  let filledCount = 0;
-  LINEUP_POSITIONS.forEach((pos) => {
-    if (lineup[pos] && byId.has(String(lineup[pos]))) filledCount += 1;
-  });
-  const slotsOpen = 5 - filledCount;
   const bench = sortPlayerList(
     decorated.filter((p) => !p._assignedSlot),
     statsSortColumn,
     statsSortDirection
   );
   const fragment = document.createDocumentFragment();
-  const openWarn = slotsOpen > 0
-    ? `${slotsOpen} SLOT${slotsOpen > 1 ? 'S' : ''} OPEN`
-    : '';
-  fragment.appendChild(buildGroupHeaderRow('ON COURT', `${filledCount}/5`, colSpan, openWarn));
 
   function appendStatsTail(tr, p) {
     const stats = getGameStatsForRoster(p);
@@ -1814,7 +1776,6 @@ function renderRosterStats() {
     tr.appendChild(document.createElement('td'));
     fragment.appendChild(tr);
   });
-  fragment.appendChild(buildGroupGapRow(colSpan));
   fragment.appendChild(buildGroupHeaderRow('BENCH', bench.length, colSpan));
   bench.forEach((p) => {
     const tr = createPlayerRowShell(p, { onCourt: false, assignedSlot: null });

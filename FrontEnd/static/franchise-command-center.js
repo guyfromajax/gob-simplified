@@ -868,12 +868,18 @@ function getScheduleDisplayName(teamId) {
   return display || fallback || '';
 }
 
+/**
+ * Region letter + the conference's OWN number: A1 A2 B3 B4 C5 C6 … H15 H16.
+ *
+ * Not letter + 1|2. That gave every region a "1" and a "2", so the suffix said nothing
+ * about which conference — B2 and D2 were different conferences with the same number.
+ * Matches conferenceLabel() in recruiting-hub.js; the two name the same thing.
+ */
 function formatConferenceShortLabel(conference) {
   const numericConference = Number(conference);
   if (!Number.isInteger(numericConference) || numericConference < 1 || numericConference > 16) return '';
   const regionLetter = String.fromCharCode(65 + Math.floor((numericConference - 1) / 2));
-  const conferenceNumber = ((numericConference - 1) % 2) + 1;
-  return `${regionLetter}${conferenceNumber}`;
+  return `${regionLetter}${numericConference}`;
 }
 
 function getTeamTooltipText(teamName) {

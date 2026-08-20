@@ -1425,9 +1425,12 @@
           ? '<div class="rvskip-note">' + mineLeft + ' signings remain for your team</div>'
           : '');
 
+    // Same label as the week-36 league list. These two screens name the same
+    // conference and used to disagree — the reveal said "Conference 9", the list said
+    // "Conference E1".
     var conf = (state.conferences && state.conferences.user_conference) || null;
     var title = conf
-      ? 'Conference ' + conf + ' Recruiting Results'
+      ? 'Conference ' + (conferenceLabel(conf) || conf) + ' Recruiting Results'
       : 'Recruiting Results';
 
     return '<div class="rvwrap">' +
@@ -1613,18 +1616,27 @@
     });
   }
 
-  /** E1 / E2 rather than "Conference 9" — the format the rest of the app already uses. */
+  /**
+   * Region letter + the conference's OWN number: A1 A2 B3 B4 C5 C6 … H15 H16.
+   *
+   * Not letter + 1|2. That printed A1/A2, B1/B2, C1/C2 …, so every region had a "1" and
+   * a "2" and the number said nothing about WHICH conference — B2 and D2 are different
+   * conferences with the same suffix. The number here is the real conference id, so the
+   * label is unique across the league and reversible.
+   */
   function conferenceLabel(c) {
     var n = Number(c);
     if (!isFinite(n) || n < 1 || n > 16) return '';
-    return String.fromCharCode(65 + Math.floor((n - 1) / 2)) + (((n - 1) % 2) + 1);
+    return String.fromCharCode(65 + Math.floor((n - 1) / 2)) + n;
   }
 
   function leagueRowHtml(e) {
     return '<div class="lsrow">' +
       '<span class="lsnm">' + Common.escapeHtml(e.name || '--') + '</span>' +
       '<span class="lspos">' + Common.escapeHtml(e.pos || '--') + '</span>' +
-      '<span class="lsrt ' + Spine.rtClassForYear(e.rt, e.year) + '">' +
+      '<span class="lsyr">' + Common.escapeHtml(Common.formatYearAbbrev(e.year)) + '</span>' +
+      '<span class="lsrt ' + Spine.rtClassForYear(e.rt, e.year) + '" ' +
+        'data-tooltip="current/potential" title="current/potential">' +
         Common.formatRtWithPotential(e.rt, e.potential_rt_ratcheted) + '</span>' +
       '</div>';
   }

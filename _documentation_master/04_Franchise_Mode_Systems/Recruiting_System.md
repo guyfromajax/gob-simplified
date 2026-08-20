@@ -626,6 +626,24 @@ A clean board says "Nothing flagged" rather than showing an empty panel.
 
 ## 10e. Results (week 36)
 
+
+**Layout.** Conferences in order (yours → sister → 1–16), each a fixed **four-team grid**.
+Not `auto-fill`: a conference is 8 teams, so a content-sized grid gave 5+3 or 6+2 and left
+a ragged tail. Four splits it 4+4 at every width above the 1100px breakpoint.
+
+**Row: Name · Pos · Yr · RT (current/potential).** Only the name flexes; the three fixed
+cells keep every team's rows on the same rails, which is what makes four columns
+scannable. `potential_rt_ratcheted` is computed in `_week_35_result_entry_from_recruit`
+and keyed on **recruit_id, not the fresh `player_id`** minted there — player_id is only
+the deterministic fallback when `potential_factor` is missing, and a new uuid would
+project a different ceiling than the pool showed for the same recruit before signing.
+
+**Conference labels are `<region letter><conference number>`** — A1 A2 B3 B4 C5 C6 … H15
+H16. The previous formula was letter + `1|2`, which gave every region a "1" and a "2", so
+B2 and D2 were different conferences wearing the same label. One definition, used by the
+week-36 list, the Signing Day reveal header (which used to disagree, printing
+"Conference 9"), and `formatConferenceShortLabel` on the FCC.
+
 **Playback, not a new engine.** The resolution already processes recruits one at a time in RT order. The results screen replays that sequence with Next / Auto-play / Skip all. Nothing here changes who signs where.
 
 **Every row explains itself:** headshot, linked name, position, RT pair, where he signed, your points, your standing and multiplier, field size, and a one-line why.
@@ -676,6 +694,8 @@ The signing pool defaults to `sTab: 'mine'`, which hides recruits with no lean t
   empty states kept distinct, placement above the board.
 - `tests/e2e/invite-board.spec.js` — board writes, the 20-slot cap, drag reorder, the
   seed, and the submit path (confirmation, 2s hold and return, double-press guard, failure).
+- `tests/e2e/signing-reveal.spec.js` — the reveal, plus the week-36 league list: four
+  columns at a wide viewport, row fields, and the shared conference label.
 - `tests/e2e/invite-seed-modal.spec.js` — the Sammy note: copy, team-vs-generic image,
   seen-stamping, and the no-seed-no-note gate.
 - `tests/e2e/recruiting-draft.spec.js` — unsubmitted edits survive a page round trip,
