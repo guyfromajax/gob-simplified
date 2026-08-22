@@ -19,7 +19,7 @@
 .spool-region{height:32px;padding:0 26px 0 11px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.26);color:var(--text);font:600 11.5px/1 var(--body);cursor:pointer;appearance:none}
 .spool-region:focus{outline:none;border-color:var(--muted-3)}
 
-.spool-colhdr,.prow{display:grid;grid-template-columns:minmax(170px,1fr) 42px 60px 62px 72px 132px 132px 138px;align-items:center;gap:10px}
+.spool-colhdr,.prow{display:grid;grid-template-columns:minmax(170px,1fr) 42px 60px 62px 72px 186px 132px 138px;align-items:center;gap:10px}
 .spool-colhdr{padding:9px 18px;font:800 9.5px/1 var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted-2);border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);position:sticky;top:0;z-index:2}
 .spool-colhdr .c-num{text-align:center}
 .spool-rows{max-height:600px;overflow-y:auto}
@@ -125,13 +125,13 @@
 @media (max-width:1180px){
   .hub-body-sign{grid-template-columns:1fr}
   .rail{position:static;max-height:none;order:2}
-  .spool-colhdr,.prow{grid-template-columns:minmax(130px,1fr) 36px 52px 54px 64px 116px 118px 124px;gap:8px}
+  .spool-colhdr,.prow{grid-template-columns:minmax(110px,1fr) 36px 48px 50px 60px 172px 110px 118px;gap:8px}
 }
 
 /* ============================================================
-   SIGNING DAY v2 — Standing + Field, capacity, pre-flight, summary.
+   SIGNING DAY v2 — Standing + Lean, capacity, pre-flight, summary.
    NO PERCENTAGE ANYWHERE. A probability is a promise the sim cannot keep;
-   a count and a multiplier are facts. If a % appears here, the placeholder
+   a ladder and a multiplier are facts. If a % appears here, the placeholder
    has grown back.
    ============================================================ */
 
@@ -149,14 +149,9 @@
 .stand-cell.s-list .stand-pos{color:#ffdf9e}
 .stand-cell.s-list .stand-mult{color:var(--list)}
 
-/* Field — how many programs are funding him, count + segment bar, yours highlighted */
-.field-cell{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0}
-.field-n{font:400 17px/1 var(--display);color:var(--muted)}
-.field-n.dim{color:var(--muted-3)}
-.field-bar{display:flex;gap:2px;align-items:center}
-.field-bar i{width:6px;height:10px;border-radius:2px;background:rgba(255,255,255,.16)}
-.field-bar i.mine{background:var(--you);box-shadow:0 0 6px rgba(52,236,39,.55)}
-.field-lab{font:600 8.5px/1 var(--body);letter-spacing:.05em;text-transform:uppercase;color:var(--muted-3)}
+/* Lean — same ranked ladder as the invite pool / visit cards (Spine.Lean.ladderHtml) */
+.prow-lean{min-width:0;justify-self:start}
+.prow-lean .lean-b{width:auto}
 
 /* capacity — read from payload.roster_capacity, never recomputed client-side */
 .cap-row{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--hair)}
@@ -288,7 +283,11 @@
    Newest signing enters at the top; the meter walks the real RT grade run.
    ============================================================ */
 /* The reveal host is the full-screen shell; .sd below is the stage inside it. */
-.rvhost{position:fixed;inset:0;z-index:5000;overflow:hidden;background:#05060a}
+/* z-index ABOVE the global auth bar (position:fixed, z-index:9998 in auth-bar.css).
+   At 5000 the bar painted straight over .sd-top — so the title, the countdown and all
+   three controls rendered correctly and sat underneath the site header. This is a
+   takeover screen with its own exit, so covering the chrome is the intent. */
+.rvhost{position:fixed;inset:0;z-index:10000;overflow:hidden;background:#05060a}
 
 /* ============================================================
    SIGNING DAY REVEAL — the stage.
@@ -352,8 +351,13 @@
   background:linear-gradient(165deg,rgba(255,255,255,.10),rgba(255,255,255,.02))}
 .sd-shot-img{position:absolute;inset:0;display:block}
 .sd-shot-img img{width:100%;height:100%;object-fit:cover;object-position:top center;display:block}
-.sd-flag{position:absolute;left:0;right:0;bottom:0;padding:9px 14px;
-  font:700 10px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;text-align:center}
+/* The signing line, above the name. It used to be a bar across the bottom of the
+   portrait, where white copy vanished against the white practice jersey — and would
+   have clashed with any team's uniform once painted. */
+.sd-card-signed{font:700 9.5px/1 var(--body);letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted-3);margin-bottom:7px;text-align:center}
+.sd-card.is-won .sd-card-signed{color:#9dff5a}
+.sd-card.is-lost .sd-card-signed{color:#ff9c9c}
 .sd-meta{display:grid;grid-template-columns:repeat(3,1fr);width:100%;margin-top:13px;
   border:1px solid var(--border-soft);border-radius:12px;overflow:hidden;background:rgba(255,255,255,.02)}
 .sd-meta div{padding:9px 6px;text-align:center;border-right:1px solid var(--border-soft)}
@@ -367,13 +371,9 @@
    page, but the shipped card is re-rendered per tick and carries its own class. */
 .sd-card.is-won .sd-shot{border-color:rgba(52,236,39,.55);
   box-shadow:0 0 0 1px rgba(52,236,39,.35),0 0 46px rgba(52,236,39,.22)}
-.sd-card.is-won .sd-flag{background:rgba(52,236,39,.9);color:#06210a}
 /* Red is earned — only a recruit the user funded can be a loss. */
 .sd-card.is-lost .sd-shot{border-color:rgba(255,109,109,.45);
   box-shadow:0 0 0 1px rgba(255,109,109,.28)}
-.sd-card.is-lost .sd-flag{background:rgba(255,109,109,.88);color:#2a0707}
-/* Neutral: someone else's signing, which is most of the region. */
-.sd-card.is-neutral .sd-flag{background:rgba(255,255,255,.07);color:var(--muted-2)}
 
 /* funded targets */
 .sd-targets{border-top:1px solid var(--hair);padding:11px 22px 13px;display:flex;align-items:center;gap:14px}

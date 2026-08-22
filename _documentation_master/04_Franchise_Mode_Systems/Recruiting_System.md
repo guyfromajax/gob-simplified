@@ -620,11 +620,11 @@ The player makes every commitment, and the screen shows only facts.
 | Column | Shows | Source |
 |---|---|---|
 | **Standing** | Lean position and its multiplier — `#1 ×5`, `#2 ×3`, `— ×1` | `leanModel` (mirrors the backend `score = (1 + points + PT_bonus) × lean_mult`) |
-| **Field** | How many programs are funding him: a count plus a segment bar with the user's segment highlighted | `payload.competition_counts` |
+| **Lean** | The recruit's ranked 1–3 ladder (team abbreviations, user slot highlighted). Same `Spine.Lean.ladderHtml` as the invite pool. Empty ladder reads "No leans yet". | `r.leanModel` |
 
 If you find yourself deriving a probability to rank or sort on this screen, that is the placeholder growing back. A regression test walks every text node and fails on a literal `%`.
 
-**Competition counts** — `_week_35_competition_counts(fid)` returns `recruit_id → number of programs funding him`, counting only entries with `points > 0` (a zero-point slot is not competition) and once per team. Knowable because CPU week-35 boards are seeded server-side on the user's first save. Returns `{}` before boards exist, which renders as "no field yet" rather than as zero competition.
+**Competition counts** — `_week_35_competition_counts(fid)` returns `recruit_id → number of programs funding him`, counting only entries with `points > 0` (a zero-point slot is not competition) and once per team. Knowable because CPU week-35 boards are seeded server-side on the user's first save. Returns `{}` before boards exist. The orders **table** no longer shows this (Lean replaced Field); pre-flight warnings and the submit-summary still consume the counts.
 
 **Roster capacity is a server number.** `_roster_capacity_payload(fid, team_id)` ships as `payload.roster_capacity` (`roster_spots`, `scholarships`, `roster_cap: 15`, `roster_used`). It wraps the pre-existing `_calculate_available_roster_spots` / `_calculate_available_scholarships` rather than recomputing. **Signing day** reads it. The invite board's rail was removed, so it is no longer a second consumer. Nothing derives capacity client-side; funding was previously uncapped against a hard 15-man ceiling.
 

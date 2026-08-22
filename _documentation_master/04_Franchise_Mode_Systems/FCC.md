@@ -128,6 +128,7 @@ Postseason weeks 27-34 replace the generic play/sim labels with the tournament-r
 - `sim-rest-tournament`
   - EOS case where user is eliminated or has a bye and can advance bracket state
   - calls `/franchise/sim-rest-of-tournament`
+  - while the request runs, FCC shows `PageLoadOverlay` pulse (text + green pulse bar, no banner) with round copy: `Simming Conference Semifinals` / `Simming Conference Finals` / `Simming Region Semifinals` / `Simming Region Finals` / `Simming National First Round` / `Simming National Semifinals` / `Simming National Finals` (weeks 28–34)
 - `new-season`
   - week 36 or tournament-complete rollover state
   - shows confirmation modal
@@ -164,6 +165,8 @@ Postseason CTA labels preserve the existing `play` and `sim-rest-tournament` beh
 | 34 | `Play National Championship!` | `Sim National Championship` |
 
 A user with a Region Tournament bye is active but uses the week 30 sim-rest state, so the CTA is `Sim Region Tourney First Round`.
+
+While `/franchise/sim-rest-of-tournament` is in flight, the FCC covers the screen with the shared pulse overlay (`showBanner: false`): centered round copy and the same green pulse bar as other load screens. Overlay copy is week-keyed (`EOS_SIM_OVERLAY_BY_WEEK`), independent of the CTA label.
 
 ---
 

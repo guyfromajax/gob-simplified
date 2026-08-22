@@ -197,6 +197,7 @@
         imageSrc: input.imageSrc || '',
         teamName: input.teamName || '',
         assetKey: input.assetKey || 'banner_primary',
+        showBanner: input.showBanner !== false,
         data: input.data || null
       };
     }
@@ -262,12 +263,20 @@
     }
 
     if (pulseImage) {
-      pulseImage.src = getPulseImageSrc(options);
-      pulseImage.alt = options.teamName || titleText || subtitleText || 'Loading';
+      if (options.showBanner === false) {
+        pulseImage.style.display = 'none';
+        pulseImage.removeAttribute('src');
+        pulseImage.alt = '';
+      } else {
+        pulseImage.style.display = 'block';
+        pulseImage.src = getPulseImageSrc(options);
+        pulseImage.alt = options.teamName || titleText || subtitleText || 'Loading';
+      }
     }
     if (pulseTitle) {
       pulseTitle.textContent = titleText;
       pulseTitle.style.display = titleText ? 'block' : 'none';
+      pulseTitle.style.margin = options.showBanner === false ? '0 0 22px' : '26px 0 10px';
     }
     if (pulseSubtitle) {
       pulseSubtitle.textContent = subtitleText;

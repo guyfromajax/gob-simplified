@@ -19,7 +19,7 @@ Living reference for **who mutates** franchise postseason state (`week` 27–35,
 | Entry / function | EOS mutations | Funnel |
 |------------------|---------------|--------|
 | `_finalize_franchise_week_after_cpu_games` | `results`, `week`, week 26 → init conferences + `eos_tournament_active`; EOS weeks via `_eos_calendar_advance_update_fields`; training reset helper | **Calendar funnel** + progression on user/CPU paths before finalize |
-| `POST /franchise/sim-rest-of-tournament` | Full CPU sims → `ftp.record_tournament_game_result`; `results`; `_eos_calendar_advance_update_fields`; training helper | **Yes** |
+| `POST /franchise/sim-rest-of-tournament` | Parallel CPU-full sims (same pool/thread path as weeks 1–27) → `ftp.record_tournament_game_result`; `results`; `_eos_calendar_advance_update_fields`; training helper. Emits `[CPU-WEEK-TIMING]` / persist split with `path=sim_rest`. | **Yes** |
 | `POST /franchise/complete-week` (+ phase A / start-cpu-sims / phase B) | User block + `_complete_week_finish_cpu_and_persist` → `_finalize_franchise_week_after_cpu_games` | **Yes** (via finalize) |
 | `POST /franchise/sim-championship` | National final: `ftp.record_tournament_game_result` + `ftp.advance_national_bracket` + `$set` national / `eos_tournament_active` / `week` 35 + training reset for 35 | **Record funnel** for the game; **calendar tail** is championship-specific (must **not** call `_eos_calendar_advance_update_fields(34)` again — that would **double** `advance_national_bracket`) |
 | `_eos_heal_conference_eos_from_games` (phase B preflight) | Sync `results` / bracket from `games`; `_eos_advance_all_conference_brackets_until_idle`; `$set` `results` / `conference_tournaments` only | **Repair / heal**, not calendar week advance |

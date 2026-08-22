@@ -42,6 +42,7 @@ function recruit(i, leanRank) {
 function fixture(o = {}) {
   const recruits = [];
   for (let i = 0; i < 10; i++) recruits.push(recruit(i, i % 3 === 0 ? 1 : i % 3 === 1 ? 2 : 0));
+  if (o.emptyLean) recruits[5].Lean = {};
   return {
     team: 'Kettle Falls', team_id: USER, team_region: 'C', week: 35, recruits,
     team_name_map: { [USER]: 'Kettle Falls', 'rival-1': 'Fairview', 'rival-2': 'Brackenridge' },
@@ -152,7 +153,8 @@ test.describe('no percentage anywhere', () => {
     expect(m.odds).toBe(0);
     expect(m.headers).not.toContain('Sign odds');
     expect(m.headers).toContain('Standing');
-    expect(m.headers).toContain('Field');
+    expect(m.headers).toContain('Lean');
+    expect(m.headers).not.toContain('Field');
   });
 });
 
@@ -176,47 +178,43 @@ test.describe('Standing column', () => {
   });
 });
 
-test.describe('Field column', () => {
-  test('count matches the seeded competition counts', async ({ page }) => {
-    await mount(page, { competition: { 'r-0': 6, 'r-1': 1, 'r-2': 3 } });
+test.describe('Lean column', () => {
+  test('reuses the ranked ladder: team abbrs, user slot highlighted', async ({ page }) => {
+    await mount(page);
     await showAllTab(page);
     const m = await page.evaluate(() =>
-      Object.fromEntries([...document.querySelectorAll('#hub-sign .prow')].map((r) => [
-        r.dataset.id, r.querySelector('.field-n').textContent.trim(),
-      ])));
-    expect(m['r-0']).toBe('6');
-    expect(m['r-1']).toBe('1');
-    expect(m['r-2']).toBe('3');
+      Object.fromEntries([...document.querySelectorAll('#hub-sign .prow')].map((r) => {
+        const slots = [...r.querySelectorAll('.prow-lean .lb-slot')].map((s) => ({
+          tok: s.querySelector('.lb-tok').textContent.trim(),
+          you: s.classList.contains('is-you') || s.classList.contains('is-you-list'),
+          rank: s.querySelector('.rk').textContent.trim(),
+        }));
+        return [r.dataset.id, slots];
+      })));
+    // r-0 => user #1 (KET), Fairview #2. r-1 => Fairview #1, user #2. r-2 => rivals only.
+    expect(m['r-0']).toEqual([
+      { tok: 'KET', you: true, rank: '1' },
+      { tok: 'FAI', you: false, rank: '2' },
+    ]);
+    expect(m['r-1']).toEqual([
+      { tok: 'FAI', you: false, rank: '1' },
+      { tok: 'KET', you: true, rank: '2' },
+    ]);
+    expect(m['r-2']).toEqual([
+      { tok: 'FAI', you: false, rank: '1' },
+      { tok: 'BRA', you: false, rank: '2' },
+    ]);
+    expect(m['r-2'].some((s) => s.you)).toBe(false);
   });
 
-  test('a recruit absent from the counts reads "no field yet", not zero', async ({ page }) => {
-    await mount(page, { competition: { 'r-0': 4 } });
+  test('an empty ladder reads "No leans yet"', async ({ page }) => {
+    await mount(page, { emptyLean: true });
     await showAllTab(page);
-    const m = await page.evaluate(() => {
+    const lab = await page.evaluate(() => {
       const row = [...document.querySelectorAll('#hub-sign .prow')].find((r) => r.dataset.id === 'r-5');
-      return { n: row.querySelector('.field-n').textContent.trim(), lab: row.querySelector('.field-lab').textContent.trim() };
+      return row.querySelector('.prow-lean').textContent.trim();
     });
-    expect(m.n).toBe('—');
-    expect(m.lab).toBe('no field yet');
-  });
-
-  test('segment bar has one segment per program, the user\'s highlighted once funded', async ({ page }) => {
-    await mount(page, { competition: { 'r-0': 3 } });
-    const before = await page.evaluate(() => {
-      const row = [...document.querySelectorAll('#hub-sign .prow')].find((r) => r.dataset.id === 'r-0');
-      return { segs: row.querySelectorAll('.field-bar i').length, mine: row.querySelectorAll('.field-bar i.mine').length };
-    });
-    expect(before.segs).toBe(3);
-    expect(before.mine).toBe(0);
-    await page.click('#hub-sign .prow[data-id="r-0"] .stepper button[data-step="1"]');
-    const after = await page.evaluate(() => {
-      const row = [...document.querySelectorAll('#hub-sign .prow')].find((r) => r.dataset.id === 'r-0');
-      return { segs: row.querySelectorAll('.field-bar i').length, mine: row.querySelectorAll('.field-bar i.mine').length, n: row.querySelector('.field-n').textContent.trim() };
-    });
-    // Funding yourself adds your own segment; the server snapshot predates the save.
-    expect(after.segs).toBe(4);
-    expect(after.n).toBe('4');
-    expect(after.mine).toBe(1);
+    expect(lab).toBe('No leans yet');
   });
 });
 

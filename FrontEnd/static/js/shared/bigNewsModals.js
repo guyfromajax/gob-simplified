@@ -300,7 +300,12 @@
       var meta = document.createElement('div');
       meta.className = 'rc__meta';
       var wt = r.weight != null ? r.weight + ' lbs' : '--';
-      meta.textContent = [r.archetype || '--', formatHt(r.height), wt].join(' \u00b7 ');
+      // Year sits with the physicals: a signed JH and a signed JR are different
+      // propositions, and the row read identically without it.
+      var yr = typeof global.GOB_PlayerYear !== 'undefined' && global.GOB_PlayerYear
+        ? global.GOB_PlayerYear.formatAbbrev(r.year)
+        : (r.year || '--');
+      meta.textContent = [r.archetype || '--', yr, formatHt(r.height), wt].join(' \u00b7 ');
       mid.appendChild(name);
       mid.appendChild(meta);
 
@@ -308,9 +313,15 @@
       rtWrap.className = 'rc__rt';
       var rtNum = document.createElement('div');
       rtNum.className = 'rc__rtnum ' + rtClass(r.rt, r.year);
-      rtNum.textContent = typeof global.formatRtDisplay === 'function'
-        ? global.formatRtDisplay(r.rt)
-        : (r.rt != null ? String(r.rt) : '--');
+      // Current AND potential, the pair every other recruit surface shows. A lone
+      // current grade on the class you just signed hides the whole reason you signed
+      // them. formatRtWithPotentialDisplay falls back to the current grade alone when
+      // there is no basis for a ceiling.
+      rtNum.textContent = typeof global.formatRtWithPotentialDisplay === 'function'
+        ? global.formatRtWithPotentialDisplay(r.rt, r.potential_rt_ratcheted)
+        : (typeof global.formatRtDisplay === 'function'
+          ? global.formatRtDisplay(r.rt)
+          : (r.rt != null ? String(r.rt) : '--'));
       var rtLabel = document.createElement('div');
       rtLabel.className = 'rc__rtlabel';
       rtLabel.textContent = 'RT';

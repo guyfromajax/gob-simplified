@@ -6245,6 +6245,91 @@ def _run_franchise_cpu_full_simulation_core(
     return away_score, home_score, summary
 
 
+def _simulate_cpu_full_job_batch(
+    *,
+    franchise_id: Any,
+    franchise_id_str: str,
+    week: int,
+    full_jobs: list[tuple[int, Any, Any, str, str]],
+    log_context: str,
+) -> tuple[dict[int, tuple[int, int, dict]], dict[int, Exception], dict[str, Any]]:
+    """Run CPU-full sims on the same pool/thread path as the regular-season week.
+
+    ``full_jobs`` is ``(sched_idx, away_id, home_id, away_name, home_name)``.
+    Returns ``(sim_ok, sim_err, timing)``. ``timing`` carries ``engine``,
+    ``workers``, and ``full_sim_secs`` so callers can emit ``[CPU-WEEK-TIMING]``.
+    """
+    sim_ok: dict[int, tuple[int, int, dict]] = {}
+    sim_err: dict[int, Exception] = {}
+    if not full_jobs:
+        return sim_ok, sim_err, {
+            "engine": "none",
+            "workers": 0,
+            "full_sim_secs": 0.0,
+        }
+
+    max_workers = min(_franchise_cpu_full_sim_max_workers(), len(full_jobs))
+    use_pool = _franchise_cpu_use_pool()
+    engine = "pool" if use_pool else "thread"
+    workers = _franchise_cpu_pool_workers_for_log(max_workers)
+    logger.info(
+        "[%s] Parallel full CPU sims franchise_id=%s week=%s jobs=%s max_workers=%s engine=%s",
+        log_context,
+        franchise_id_str,
+        week,
+        len(full_jobs),
+        workers,
+        engine,
+    )
+    _cpu_fullsim_t0 = time.time()
+    if use_pool:
+        from BackEnd.utils.cpu_week_pool import (
+            simulate_cpu_week_pooled,
+            pool_worker_count,
+        )
+        pool_jobs = [
+            (sched_idx, franchise_id, hid, aid, hn, an)
+            for sched_idx, aid, hid, an, hn in full_jobs
+        ]
+        logger.info(
+            "[%s] POOL full CPU sims franchise_id=%s week=%s jobs=%s workers=%s",
+            log_context, franchise_id_str, week, len(pool_jobs), pool_worker_count(),
+        )
+        sim_ok, sim_err, _pool_leaks = simulate_cpu_week_pooled(
+            pool_jobs, seed_base=None, max_workers=pool_worker_count()
+        )
+        if _pool_leaks and any(_pool_leaks.values()):
+            logger.error("[%s] pool RNG leak(s): %s", log_context, _pool_leaks)
+    else:
+        logger.info(
+            "[%s] THREAD full CPU sims franchise_id=%s week=%s jobs=%s max_workers=%s",
+            log_context, franchise_id_str, week, len(full_jobs), max_workers,
+        )
+        future_meta = {}
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for sched_idx, aid, hid, an, hn in full_jobs:
+                fut = executor.submit(
+                    _run_franchise_cpu_full_simulation_core,
+                    franchise_id,
+                    hid,
+                    aid,
+                    hn,
+                    an,
+                )
+                future_meta[fut] = (sched_idx, aid, hid, an, hn)
+        for fut in as_completed(future_meta):
+            sched_idx, aid, hid, an, hn = future_meta[fut]
+            try:
+                sim_ok[sched_idx] = fut.result()
+            except Exception as ex:
+                sim_err[sched_idx] = ex
+    return sim_ok, sim_err, {
+        "engine": engine,
+        "workers": workers,
+        "full_sim_secs": time.time() - _cpu_fullsim_t0,
+    }
+
+
 def _merge_phase_a_user_row_into_week_results(
     existing_week_results: list | None, user_row: dict
 ) -> list:
@@ -9733,10 +9818,17 @@ def command_center_data(
                     and not player.get("walk_on")
                 ]
                 for _sp in response["week_35_user_recruits"]:
-                    _sp[POTENTIAL_RT_FIELD] = potential_rt_for_player(
-                        str(_sp.get("player_id") or _sp.get("recruit_id")),
-                        _sp.get("entry_tier"), _sp.get("potential_factor"),
-                        _sp.get("position_ratings") or {})
+                    # Only when signing did not already record it. The entry now carries
+                    # potential_rt_ratcheted from _week_35_result_entry_from_recruit,
+                    # keyed on recruit_id; recomputing here keyed on the freshly minted
+                    # player_id would use a different deterministic fallback whenever
+                    # potential_factor is missing, and the ceiling would change between
+                    # the pool and this modal for the same recruit.
+                    if _sp.get(POTENTIAL_RT_FIELD) is None:
+                        _sp[POTENTIAL_RT_FIELD] = potential_rt_for_player(
+                            str(_sp.get("recruit_id") or _sp.get("player_id")),
+                            _sp.get("entry_tier"), _sp.get("potential_factor"),
+                            _sp.get("position_ratings") or {})
                 response["current_week_invite_recruit"] = _fcc_current_week_invite_recruit(
                     franchise_doc,
                     str(team_id),
@@ -13155,6 +13247,29 @@ def _build_season_recruiting_results_story(
     scores = team_points_from_signings(
         [player for player in (signed_players or []) if not player.get("walk_on")]
     )
+    franchise_id = franchise_doc.get("_id")
+    if franchise_id is not None:
+        try:
+            _persist_recruiting_ranks_from_scores(franchise_id, scores)
+        except Exception:
+            logger.exception(
+                "[RECRUITING-RANK] results persist failed franchise=%s season=%s",
+                str(franchise_id),
+                season,
+            )
+    team_name_map = _format_team_name_map(franchise=franchise_doc)
+    region_letter = _user_team_region_letter(franchise_doc)
+    region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()
+    return _build_recruiting_rankings_story(
+        story_id=f"s{season}-recruiting-results",
+        week=36,
+        headline=f"Season {season} Recruiting Results",
+        story_type="recruiting_results",
+        scores=scores,
+        team_name_map=team_name_map,
+        user_region_letter=region_letter,
+        region_team_ids=region_ids,
+    )
 
 
 def _carryover_recruiting_results_story(
@@ -13186,29 +13301,6 @@ def _carryover_recruiting_results_story(
     carried["carried_into_season"] = previous_season + 1
     carried["created_at"] = datetime.utcnow()
     return carried
-    franchise_id = franchise_doc.get("_id")
-    if franchise_id is not None:
-        try:
-            _persist_recruiting_ranks_from_scores(franchise_id, scores)
-        except Exception:
-            logger.exception(
-                "[RECRUITING-RANK] results persist failed franchise=%s season=%s",
-                str(franchise_id),
-                season,
-            )
-    team_name_map = _format_team_name_map(franchise=franchise_doc)
-    region_letter = _user_team_region_letter(franchise_doc)
-    region_ids = _region_team_ids_for_letter(region_letter) if region_letter else set()
-    return _build_recruiting_rankings_story(
-        story_id=f"s{season}-recruiting-results",
-        week=36,
-        headline=f"Season {season} Recruiting Results",
-        story_type="recruiting_results",
-        scores=scores,
-        team_name_map=team_name_map,
-        user_region_letter=region_letter,
-        region_team_ids=region_ids,
-    )
 
 
 def _build_week_upset_report_story(
@@ -17555,9 +17647,27 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
             raise HTTPException(status_code=400, detail="No games in current EOS round.")
 
     _user_team_name, user_team_id_str = get_user_team_from_franchise(franchise_doc)
+    franchise_id_str = str(franchise_id)
 
-    results = []
-    for g in week_games_meta:
+    # Same identity gate as complete-week: sim-rest is a fourth CPU-sim entry point
+    # and must not skip assignment when the user is eliminated.
+    try:
+        from BackEnd.utils.franchise_identity import ensure_franchise_identities
+
+        _identity_summary = ensure_franchise_identities(
+            franchise_id,
+            int(franchise_doc.get("current_season") or 1),
+            int(franchise_doc.get("week") or week or 1),
+        )
+        if _identity_summary.get("assigned"):
+            logger.warning("🧬 [IDENTITY] franchise=%s %s", franchise_id_str, _identity_summary)
+    except Exception as _identity_err:
+        logger.error("[IDENTITY] assignment failed for %s: %s", franchise_id_str, _identity_err)
+
+    # [CPU-WEEK-TIMING] same split as weeks 1–27: parallel sim block, then persist.
+    _cpu_week_t0 = time.time()
+    full_jobs: list[tuple[int, Any, Any, str, str]] = []
+    for idx, g in enumerate(week_games_meta):
         away_id = g["away_id"]
         home_id = g["home_id"]
         home_doc = db.teams.find_one({"_id": home_id}, {"name": 1}) or {}
@@ -17567,62 +17677,149 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         if not home_name or not away_name:
             logger.error("❌ [EOS] Missing team names for sim round")
             continue
-        try:
-            gm = run_simulation(home_name, away_name)
-            home_score = gm.score.get(home_name, 0)
-            away_score = gm.score.get(away_name, 0)
-            summary = _mark_completed_full_game_summary_final(summarize_game_state(gm))
-            game_id = generate_game_id()
-            summary["_id"] = game_id
-            summary["franchise_id"] = str(franchise_id)
-            summary["week"] = week
-            db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
-            stat_updater.finalize_game(game_id, mode="franchise", franchise_id=str(franchise_id))
-            winner_id = home_id if home_score > away_score else away_id
-            ftp.record_tournament_game_result(
-                franchise_doc,
-                g,
-                week=week,
-                franchise_id_str=str(franchise_id),
-                game_id=str(game_id),
-                team1_id=away_id,
-                team2_id=home_id,
-                team1_score=away_score,
-                team2_score=home_score,
-                source="cpu_full",
-                skip_games_upsert=True,
+        full_jobs.append((idx, away_id, home_id, away_name, home_name))
+
+    results = []
+    sim_ok: dict[int, tuple[int, int, dict]] = {}
+    sim_err: dict[int, Exception] = {}
+    _timing = {"engine": "none", "workers": 0, "full_sim_secs": 0.0}
+    if full_jobs:
+        sim_ok, sim_err, _timing = _simulate_cpu_full_job_batch(
+            franchise_id=franchise_id,
+            franchise_id_str=franchise_id_str,
+            week=week,
+            full_jobs=full_jobs,
+            log_context="EOS-SIM-REST",
+        )
+        _fullsim_secs = float(_timing.get("full_sim_secs") or 0.0)
+        logger.warning(
+            "[CPU-WEEK-TIMING] franchise=%s week=%s | full_tbt=%s | "
+            "engine=%s workers=%s | full_sim_block=%.1fs (%.2fs/full-game) total_so_far=%.1fs | failures=%s | path=sim_rest",
+            franchise_id_str, week, len(full_jobs),
+            _timing.get("engine") or "none",
+            _timing.get("workers") or 0,
+            _fullsim_secs, _fullsim_secs / max(1, len(full_jobs)),
+            time.time() - _cpu_week_t0, len(sim_err),
+        )
+
+        _persist_t0 = time.time()
+        _sub = {"games_write": 0.0, "finalize_game": 0.0, "records": 0.0,
+                "team_attrs": 0.0, "momentum": 0.0}
+        stat_updater.reset_finalize_subtiming()
+        for job_idx, aid, hid, an, hn in sorted(full_jobs, key=lambda t: t[0]):
+            g = week_games_meta[job_idx] if job_idx < len(week_games_meta) else None
+            if job_idx in sim_err:
+                logger.error(
+                    "❌ [EOS] Parallel full-sim core failed franchise_id=%s week=%s idx=%s %s vs %s",
+                    franchise_id_str,
+                    week,
+                    job_idx,
+                    an,
+                    hn,
+                    exc_info=sim_err[job_idx],
+                )
+                continue
+            if job_idx not in sim_ok:
+                logger.error(
+                    "❌ [EOS] Missing sim result franchise_id=%s week=%s idx=%s %s vs %s",
+                    franchise_id_str, week, job_idx, an, hn,
+                )
+                continue
+            try:
+                away_score, home_score, summary = sim_ok[job_idx]
+                summary = _mark_completed_full_game_summary_final(dict(summary or {}))
+                game_id = generate_game_id()
+                summary["_id"] = game_id
+                summary["franchise_id"] = franchise_id_str
+                summary["week"] = week
+                _s = time.time()
+                db.games.update_one({"_id": game_id}, {"$set": summary}, upsert=True)
+                _sub["games_write"] += time.time() - _s
+                _s = time.time()
+                stat_updater.finalize_game(
+                    game_id, mode="franchise", franchise_id=franchise_id_str
+                )
+                _sub["finalize_game"] += time.time() - _s
+                winner_id = hid if home_score > away_score else aid
+                _s = time.time()
+                if g is not None:
+                    ftp.record_tournament_game_result(
+                        franchise_doc,
+                        g,
+                        week=week,
+                        franchise_id_str=franchise_id_str,
+                        game_id=str(game_id),
+                        team1_id=aid,
+                        team2_id=hid,
+                        team1_score=away_score,
+                        team2_score=home_score,
+                        source="cpu_full",
+                        skip_games_upsert=True,
+                    )
+                _sub["records"] += time.time() - _s
+                results.append({
+                    "away_id": str(aid),
+                    "home_id": str(hid),
+                    "away_score": away_score,
+                    "home_score": home_score,
+                })
+                maybe_award_franchise_win_geek_points(
+                    owner_user_id=franchise_doc.get("user_id"),
+                    user_team_id_str=user_team_id_str,
+                    winner_team_id=winner_id,
+                    week=week,
+                    eos_game_meta=g,
+                )
+                maybe_award_franchise_loss_geek_points(
+                    owner_user_id=franchise_doc.get("user_id"),
+                    user_team_id_str=user_team_id_str,
+                    winner_team_id=winner_id,
+                    participant_team_ids=(aid, hid),
+                    week=week,
+                    eos_game_meta=g,
+                )
+                maybe_award_franchise_eos_title_championship(
+                    owner_user_id=franchise_doc.get("user_id"),
+                    user_team_id_str=user_team_id_str,
+                    winner_team_id=winner_id,
+                    week=week,
+                    eos_game_meta=g,
+                )
+                logger.info("✅ [EOS] Simulated %s: %s vs %s", (g or {}).get("phase"), an, hn)
+            except Exception as e:
+                logger.error("❌ [EOS] Error persisting game: %s", e, exc_info=True)
+
+        _persist_secs = time.time() - _persist_t0
+        _pg_n = len(full_jobs)
+        logger.warning(
+            "[CPU-PERSIST-TIMING] franchise=%s week=%s | games=%s | persist_loop=%.1fs (%.3fs/game) | path=sim_rest",
+            franchise_id_str, week, _pg_n, _persist_secs, _persist_secs / max(1, _pg_n),
+        )
+        logger.warning(
+            "[CPU-PERSIST-SUBTIMING] franchise=%s week=%s | games=%s | "
+            "games_write=%.1fs finalize_game=%.1fs records=%.1fs team_attrs=%.1fs momentum=%.1fs "
+            "| accounted=%.1fs/%.1fs | path=sim_rest",
+            franchise_id_str, week, _pg_n,
+            _sub["games_write"], _sub["finalize_game"], _sub["records"],
+            _sub["team_attrs"], _sub["momentum"],
+            sum(_sub.values()), _persist_secs,
+        )
+        _fsub = stat_updater.pop_finalize_subtiming()
+        if _fsub:
+            logger.warning(
+                "[FINALIZE-SUBTIMING] franchise=%s week=%s | read_claim_names=%.1fs career=%.1fs "
+                "box_rollup=%.1fs fpd_write=%.1fs season_stats=%.1fs | path=sim_rest",
+                franchise_id_str, week,
+                _fsub.get("read_claim_names", 0.0), _fsub.get("career", 0.0),
+                _fsub.get("box_rollup", 0.0), _fsub.get("fpd_write", 0.0),
+                _fsub.get("season_stats", 0.0),
             )
-            results.append({
-                "away_id": str(away_id),
-                "home_id": str(home_id),
-                "away_score": away_score,
-                "home_score": home_score,
-            })
-            maybe_award_franchise_win_geek_points(
-                owner_user_id=franchise_doc.get("user_id"),
-                user_team_id_str=user_team_id_str,
-                winner_team_id=winner_id,
-                week=week,
-                eos_game_meta=g,
-            )
-            maybe_award_franchise_loss_geek_points(
-                owner_user_id=franchise_doc.get("user_id"),
-                user_team_id_str=user_team_id_str,
-                winner_team_id=winner_id,
-                participant_team_ids=(away_id, home_id),
-                week=week,
-                eos_game_meta=g,
-            )
-            maybe_award_franchise_eos_title_championship(
-                owner_user_id=franchise_doc.get("user_id"),
-                user_team_id_str=user_team_id_str,
-                winner_team_id=winner_id,
-                week=week,
-                eos_game_meta=g,
-            )
-            logger.info("✅ [EOS] Simulated %s: %s vs %s", g["phase"], away_name, home_name)
-        except Exception as e:
-            logger.error("❌ [EOS] Error simulating game: %s", e, exc_info=True)
+    else:
+        logger.warning(
+            "[CPU-WEEK-TIMING] franchise=%s week=%s | full_tbt=0 | "
+            "engine=none workers=0 | full_sim_block=0.0s (0.00s/full-game) total_so_far=%.1fs | failures=0 | path=sim_rest",
+            franchise_id_str, week, time.time() - _cpu_week_t0,
+        )
 
     existing_results = franchise_doc.get("results", {})
     existing_results[str(week)] = results
@@ -17632,7 +17829,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         franchise_doc,
         franchise_id,
         week,
-        franchise_id_str=str(franchise_id),
+        franchise_id_str=franchise_id_str,
         log_conference_bracket_snapshots=False,
     )
     update_fields.update(eos_updates)
@@ -17642,6 +17839,10 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
         update_fields.update(ts_reset)
 
     db.franchises.update_one({"_id": franchise_id}, {"$set": update_fields})
+    logger.warning(
+        "[EOS-SIM-REST] franchise=%s week=%s | total=%.1fs | next_week=%s",
+        franchise_id_str, week, time.time() - _cpu_week_t0, update_fields.get("week", week),
+    )
     if update_fields.get("week") == 35:
         refreshed = db.franchises.find_one({"_id": franchise_id})
         if refreshed:

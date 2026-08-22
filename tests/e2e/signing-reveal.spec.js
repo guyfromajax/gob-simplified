@@ -124,6 +124,10 @@ async function mountPool(page, opts = {}) {
       buildUrl: (p) => `https://stub.local${p}`,
       getAuthHeaders: () => ({}),
       getRecruitImageUrl: (id) => `https://stub.local/img/${id}.png`,
+      // The signed-player (uniformed) master. Must exist on the stub or the reveal card
+      // silently falls back to the white recruit master and the portrait assertion
+      // tests the stub instead of the code.
+      getPlayerImageUrl: (pid) => `https://stub.local/players/master/${pid}.png`,
       ensureRecruitImage: () => Promise.resolve({ status: 'skip' }),
     };
     window.__fixture = data;
@@ -186,10 +190,10 @@ function conferenceFixture({ mine = 3, others = 12, walkOns = 4 } = {}) {
   // RT-pair, and without them the fixture would prove only that '--' renders.
   const YEARS = ['JH', 'Freshman', 'Sophomore', 'Junior'];
   let rt = 99;
-  for (let i = 0; i < mine; i += 1) signed.push({ recruit_id: `r-${i}`, name: `Mine ${i}`, pos: 'PF', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: USER, team_name: 'South Lancaster' });
-  for (let i = 0; i < others; i += 1) signed.push({ recruit_id: `r-${100 + i}`, name: `Rival ${i}`, pos: 'SG', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c9-${(i % 7) + 1}`, team_name: `Rival ${i % 7}` });
-  for (let i = 0; i < 5; i += 1) signed.push({ recruit_id: `r-${200 + i}`, name: `Sister ${i}`, pos: 'C', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c10-${(i % 4) + 1}`, team_name: `Sister ${i % 4}` });
-  for (let i = 0; i < 4; i += 1) signed.push({ recruit_id: `r-${300 + i}`, name: `Far ${i}`, pos: 'PG', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c3-${(i % 3) + 1}`, team_name: `Far ${i % 3}` });
+  for (let i = 0; i < mine; i += 1) signed.push({ player_id: `p-m${i}`, image_id: `img-m${i}`, recruit_id: `r-${i}`, name: `Mine ${i}`, pos: 'PF', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: USER, team_name: 'South Lancaster' });
+  for (let i = 0; i < others; i += 1) signed.push({ player_id: `p-v${i}`, image_id: `img-v${i}`, recruit_id: `r-${100 + i}`, name: `Rival ${i}`, pos: 'SG', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c9-${(i % 7) + 1}`, team_name: `Rival ${i % 7}` });
+  for (let i = 0; i < 5; i += 1) signed.push({ player_id: `p-s${i}`, image_id: `img-s${i}`, recruit_id: `r-${200 + i}`, name: `Sister ${i}`, pos: 'C', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c10-${(i % 4) + 1}`, team_name: `Sister ${i % 4}` });
+  for (let i = 0; i < 4; i += 1) signed.push({ player_id: `p-f${i}`, image_id: `img-f${i}`, recruit_id: `r-${300 + i}`, name: `Far ${i}`, pos: 'PG', rt: rt, potential_rt_ratcheted: rt-- + 1, year: YEARS[i % 4], team_id: `c3-${(i % 3) + 1}`, team_name: `Far ${i % 3}` });
   for (let i = 0; i < walkOns; i += 1) signed.push({ name: `WalkOn ${i}`, pos: 'C', rt: 5, team_id: USER, team_name: 'South Lancaster', walk_on: true });
   const teamNames = {};
   Object.keys(byTeam).forEach(function (tid) {
@@ -237,7 +241,7 @@ const card = (page) => page.evaluate(() => {
   return {
     cls: c.className,
     nm: c.querySelector('.sd-card-nm').textContent.trim(),
-    flag: c.querySelector('.sd-flag').textContent.trim(),
+    flag: c.querySelector('.sd-card-signed').textContent.trim(),
     meta: [...c.querySelectorAll('.sd-meta b')].map((b) => b.textContent.trim()),
   };
 });
@@ -282,11 +286,24 @@ test.describe('the stage', () => {
     expect(m.prog).toContain('Region E');
   });
 
-  test('the header names the season', async ({ page }) => {
+  test('the screen names itself: season, and the region it covers', async ({ page }) => {
     await stage(page);
-    expect(await page.evaluate(() =>
-      document.querySelector('#hub-reveal .sd-brand small').textContent.trim()))
-      .toBe('Season 3 · Week 35');
+    const m = await page.evaluate(() => ({
+      eyebrow: document.querySelector('#hub-reveal .sd-brand small').textContent.trim(),
+      title: document.querySelector('#hub-reveal .sd-brand b').textContent.trim(),
+    }));
+    expect(m.eyebrow).toBe('Season 3 · Signing Day');
+    expect(m.title).toBe('Region E Signings');
+  });
+
+  test('the stage sits above the global auth bar', async ({ page }) => {
+    // auth-bar.css is position:fixed at z-index 9998. At 5000 it painted over .sd-top,
+    // which is where the title, the countdown and every control live — they rendered
+    // perfectly and sat underneath the site header.
+    await stage(page);
+    const z = await page.evaluate(() =>
+      Number(getComputedStyle(document.querySelector('#hub-reveal')).zIndex));
+    expect(z).toBeGreaterThan(9998);
   });
 
   test('a card carries name, position, year and an RT pair', async ({ page }) => {
@@ -299,14 +316,36 @@ test.describe('the stage', () => {
     expect(c.meta[2]).toContain('/');     // current/potential, not a lone grade
   });
 
-  test('the signing team is named once — on the flag, never twice', async ({ page }) => {
+  test('the signing line sits above the name, never over the portrait', async ({ page }) => {
     await stage(page);
     await page.click('#rv-skip');
     const c = await card(page);
     expect(c.cls).toContain('is-won');
     expect(c.flag).toBe('Signed with you');
-    // The eyebrow that used to repeat the team above the name is gone.
-    expect(await page.locator('#hub-reveal .sd-card-team').count()).toBe(0);
+    const m = await page.evaluate(() => {
+      const el = document.querySelector('#hub-reveal .sd-card-signed');
+      const shot = document.querySelector('#hub-reveal .sd-shot');
+      return {
+        aboveShot: el.getBoundingClientRect().bottom <= shot.getBoundingClientRect().top + 1,
+        // The old bar sat across the portrait, where white copy vanished into a white
+        // practice jersey and would clash with any painted uniform.
+        oldBar: document.querySelectorAll('#hub-reveal .sd-flag').length,
+      };
+    });
+    expect(m.aboveShot).toBe(true);
+    expect(m.oldBar).toBe(0);
+  });
+
+  test('the portrait requests the UNIFORMED master, not the white recruit one', async ({ page }) => {
+    // players/master/<player_id>.png is what the week-35 warm paint produces.
+    // recruits/white/<image_id>.png is the pre-signing white jersey — asking for that
+    // meant every card showed in a blank practice top no matter what had been painted.
+    await stage(page);
+    await page.click('#rv-skip');
+    const src = await page.evaluate(() =>
+      document.querySelector('#hub-reveal .sd-shot-img img').getAttribute('src'));
+    expect(src).toContain('players/master');
+    expect(src).not.toContain('recruits/white');
   });
 
   test('red is earned — only a recruit you funded can be a loss', async ({ page }) => {
@@ -352,13 +391,16 @@ test.describe('the stage', () => {
 });
 
 test.describe('the tallies', () => {
-  test('the region rail holds every team in the region and highlights yours', async ({ page }) => {
+  test('BOTH rails start empty and fill as teams sign', async ({ page }) => {
     await stage(page);
-    const rows = await railRows(page, false);
-    expect(rows.length).toBeGreaterThan(1);
-    expect(rows.filter((r) => r.user)).toHaveLength(1);
-    // Nothing revealed yet, so nothing scored.
-    expect(rows.every((r) => r.score === 0)).toBe(true);
+    // Listing all sixteen at zero ordered them alphabetically, which reads as a
+    // standing and gives the finishing shape away before anyone has signed.
+    expect(await railRows(page, false)).toHaveLength(0);
+    expect(await railRows(page, true)).toHaveLength(0);
+    await page.click('#rv-end');
+    const region = await railRows(page, false);
+    expect(region.length).toBeGreaterThan(0);
+    expect(region.every((r) => r.score > 0)).toBe(true);
   });
 
   test('a signing moves its team, and the moved row is marked', async ({ page }) => {

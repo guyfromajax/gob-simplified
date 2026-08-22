@@ -4099,13 +4099,29 @@ const EOS_SIM_CTA_BY_WEEK = Object.freeze({
   34: 'Sim National Championship',
 });
 
+const EOS_SIM_OVERLAY_BY_WEEK = Object.freeze({
+  28: 'Simming Conference Semifinals',
+  29: 'Simming Conference Finals',
+  30: 'Simming Region Semifinals',
+  31: 'Simming Region Finals',
+  32: 'Simming National First Round',
+  33: 'Simming National Semifinals',
+  34: 'Simming National Finals',
+});
+
+function fccEosSimOverlayCopy(week) {
+  const n = Number(week || 0);
+  return EOS_SIM_OVERLAY_BY_WEEK[n] || 'Simming Tournament Games';
+}
+
 function updatePlayButton(data) {
   const playNowBtn = document.getElementById('play-now');
   if (!data) return;
-  
+
   const eosTournamentActive = data.eos_tournament_active || false;
   const eosTournament = data.eos_tournament;
   const week = Number(data.week || 1);
+  playNowBtn.dataset.week = String(week);
   const trainingDisabledForEos = !!data.training_disabled_for_eos;
   const trainingDisabledForPostseason = !!data.training_disabled_for_postseason || week >= 27;
   const userEliminated = data.user_eliminated != null ? !!data.user_eliminated : null;
@@ -4465,8 +4481,15 @@ playNowBtn.addEventListener('click', async () => {
   if (mode === 'sim-rest-tournament') {
     const originalText = playNowBtn.textContent;
     playNowBtn.disabled = true;
-    playNowBtn.textContent = 'Simulating...';
-    
+    const week = Number(playNowBtn.dataset.week || commandCenterTopDataCache?.week || 0);
+    if (window.PageLoadOverlay && window.PageLoadOverlay.show) {
+      window.PageLoadOverlay.show({
+        variant: 'pulse',
+        title: fccEosSimOverlayCopy(week),
+        showBanner: false,
+      });
+    }
+
     try {
       const res = await fetch(API_CONFIG.buildUrl('/franchise/sim-rest-of-tournament'), {
       method: 'POST',
@@ -4478,6 +4501,7 @@ playNowBtn.addEventListener('click', async () => {
       location.reload();
     } catch (err) {
       console.error(err);
+      if (window.PageLoadOverlay && window.PageLoadOverlay.hide) window.PageLoadOverlay.hide();
       alert('Unable to simulate tournament');
       playNowBtn.disabled = false;
       playNowBtn.textContent = originalText;

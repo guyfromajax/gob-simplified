@@ -871,10 +871,11 @@
     return Number(v) || 1;
   }
 
-  // ── Standing + Field: two honest columns, no percentage anywhere ─────────────
+  // ── Standing + Lean: two honest columns, no percentage anywhere ────────────
   // There is deliberately no probability on this screen. A number like "62%" is a
-  // promise the sim cannot keep; a count and a multiplier are facts. If you ever find
-  // yourself deriving one to rank or sort, that is the old placeholder growing back.
+  // promise the sim cannot keep; a multiplier and the actual ladder are facts. If you
+  // ever find yourself deriving a percent to rank or sort, that is the old placeholder
+  // growing back.
   function standingCellHtml(r) {
     var rank = Number(r.yourRank || 0);
     var mult = leanMultiplier(rank);
@@ -891,26 +892,8 @@
     var raw = counts[String(id)];
     return raw == null ? null : Number(raw);
   }
-  // Segment bar: one segment per funding program, the user's own highlighted.
-  function fieldCellHtml(r) {
-    var id = r.recruitId;
-    var count = competitionCount(id);
-    var funded = allocOf(id).points > 0;
-    if (count == null) {
-      return '<div class="field-cell"><span class="field-n dim">—</span>' +
-        '<span class="field-lab">no field yet</span></div>';
-    }
-    // The user's own funding may not be in the server snapshot yet (it is written on
-    // save), so add it here rather than under-reporting the field.
-    var total = count + (funded && !state.week35Ran ? 1 : 0);
-    var segs = '';
-    for (var i = 0; i < Math.min(total, 12); i++) {
-      segs += '<i class="' + (funded && i === 0 ? 'mine' : '') + '"></i>';
-    }
-    return '<div class="field-cell">' +
-      '<span class="field-n">' + total + '</span>' +
-      '<span class="field-bar">' + segs + '</span>' +
-      '<span class="field-lab">' + (total === 1 ? 'program' : 'programs') + '</span></div>';
+  function leanCellHtml(r) {
+    return '<div class="prow-lean">' + Spine.Lean.ladderHtml(r.leanModel) + '</div>';
   }
 
   function allocOf(id) { return state.alloc[id] || { points: 0, promise: false }; }
@@ -962,7 +945,7 @@
       '<span class="prow-region">' + regionOf(r) + '</span>' +
       '<span class="prow-rt" data-tooltip="current/potential" title="current/potential"><span class="v ' + Spine.rtClassForYear(r.rt, r.year) + '">' + Common.formatRtWithPotential(r.rt, r.potentialRt) + '</span></span>' +
       standingCellHtml(r) +
-      fieldCellHtml(r) +
+      leanCellHtml(r) +
       '<div><div class="stepper"><button data-step="-1" data-id="' + r.recruitId + '"' + (a.points === 0 ? ' disabled' : '') + '>−</button>' +
         '<span class="val' + (a.points === 0 ? ' zero' : '') + '">' + a.points + '</span>' +
         '<button data-step="1" data-id="' + r.recruitId + '"' + (canPlus ? '' : ' disabled') + '>+</button><span class="stepper-pts">pts</span></div></div>' +
@@ -1110,7 +1093,7 @@
           segHtml('syear', YEAR_FILTERS, state.sYear) +
           '<input class="spool-search" id="sign-search" placeholder="Search name…" value="' + Common.escapeHtml(state.sSearch) + '"></div></div>' +
         '<div class="spool-colhdr"><span>Recruit</span><span class="c-num">Pos</span><span class="c-num">Region</span><span class="c-num">RT</span>' +
-          '<span class="c-num">Standing</span><span class="c-num">Field</span><span>Points</span><span>Playing Time</span></div>' +
+          '<span class="c-num">Standing</span><span>Lean</span><span>Points</span><span>Playing Time</span></div>' +
         '<div class="spool-rows" id="sign-rows">' + signFiltered().map(prowHtml).join('') + '</div></div>' +
       '<aside class="rail" id="sign-rail">' + railHtml() + '</aside>';
   }
@@ -1501,6 +1484,27 @@
       '<div class="sd-list">' + body + '</div></div>';
   }
 
+  /**
+   * The signed player's UNIFORMED portrait.
+   *
+   * Not headshotBoxHtml: that asks for `recruits/white/<image_id>.png`, the pre-signing
+   * WHITE master. The uniform lives at `players/master/<player_id>.png`, which is what
+   * the week-35 warm paint produces — so the card was requesting the one image the warm
+   * pass never touches, and every recruit showed in a blank white jersey.
+   *
+   * An unpainted master 404s and the global paint-on-miss handler in api-config.js
+   * paints then retries, so an out-of-region signing still resolves on its own.
+   */
+  function signedShotHtml(e) {
+    var pid = e && e.player_id;
+    if (!pid || typeof API_CONFIG === 'undefined' || typeof API_CONFIG.getPlayerImageUrl !== 'function') {
+      return headshotBoxHtml({ imageId: e && e.image_id }, 'sd-shot-img');
+    }
+    return '<span class="sd-shot-img"><img src="' +
+      Common.escapeHtml(API_CONFIG.getPlayerImageUrl(pid, { size: 'modal' })) +
+      '" alt="" decoding="async"></span>';
+  }
+
   function revealCardHtml(card) {
     if (!card) {
       return '<div class="sd-card-wrap"><div class="sd-card-wait">Signings begin…</div></div>';
@@ -1512,12 +1516,14 @@
     // else in the region is news, not defeat.
     var state_ = mine ? 'won' : (funded ? 'lost' : 'neutral');
     var team = teamNameOf(e.team_id, e.team_name);
+    // The signing line sits ABOVE the name, not on a bar across the portrait. Over the
+    // portrait it was white-on-white against an unpainted jersey and invisible — and it
+    // would keep clashing once uniforms paint, since team colours are arbitrary.
     return '<div class="sd-card-wrap"><div class="sd-card is-' + state_ + '">' +
+      '<div class="sd-card-signed">' +
+        (mine ? 'Signed with you' : 'Signed with ' + Common.escapeHtml(team)) + '</div>' +
       '<div class="sd-card-nm">' + Common.escapeHtml(e.name || '--') + '</div>' +
-      '<div class="sd-shot">' + headshotBoxHtml({ imageId: e.image_id }, 'sd-shot-img') +
-        // One sentence shape in this slot, always: "Signed with you", or the team.
-        '<div class="sd-flag">' + (mine ? 'Signed with you' : 'Signed with ' + Common.escapeHtml(team)) +
-        '</div></div>' +
+      '<div class="sd-shot">' + signedShotHtml(e) + '</div>' +
       '<div class="sd-meta">' +
         '<div><small>Pos</small><b>' + Common.escapeHtml(e.pos || '--') + '</b></div>' +
         '<div><small>Year</small><b>' + Common.escapeHtml(Common.formatYearAbbrev(e.year)) + '</b></div>' +
@@ -1569,7 +1575,11 @@
     var scores = revealScores(i);
     var regionIds = (state.conferences && state.conferences.region_team_ids) || [];
     var natIds = Object.keys((state.conferences && state.conferences.region_by_team_id) || {});
-    var regionRows = rankTeams(regionIds, scores);
+    // Scored teams only, same as the national rail. Listing all 16 at zero put them in
+    // alphabetical order, which reads as a standing and gives the finishing order a
+    // shape before a single recruit has signed. A team earns its row by signing someone
+    // — which means the user's own team is absent until it does.
+    var regionRows = rankTeams(regionIds, scores).filter(function (r) { return r.score > 0; });
     // Scored teams only. Ranking 128 teams that have all signed nobody puts 25 zeroes
     // in alphabetical order on screen, which says nothing — the table is supposed to
     // FILL as the league walks, so an unscored team has not earned a row yet.
@@ -1595,7 +1605,8 @@
       '<div class="sd-top">' +
         '<div class="sd-brand"><small>' +
           (season ? 'Season ' + Common.escapeHtml(String(season)) + ' · ' : '') +
-          'Week 35</small><b>Signing Day</b></div>' +
+          'Signing Day</small><b>Region ' + Common.escapeHtml(userRegion() || '--') +
+          ' Signings</b></div>' +
         '<div class="sd-prog"><div class="sd-prog-n"><b>' + i + '</b>of ' + cards.length +
           ' · Region ' + Common.escapeHtml(userRegion() || '--') +
           ' · <b>' + revealTimeLeft(i) + '</b>left</div>' +

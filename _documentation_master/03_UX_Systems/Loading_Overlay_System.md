@@ -14,12 +14,13 @@ Full-page loader shown on **initial navigation** to key gameplay and command sur
 `PageLoadOverlay.show()` accepts a string (spinner variant) or an options object with `variant`:
 
 1. **Spinner** (default) — centered `loader1.gif` + optional message line. The classic full-page loader.
-2. **Pulse** — richer "loading moment" layout: team banner image (via `getTeamAssetPath`, defaults to the general banner), Bebas title, subtitle, optional eyebrow label, and an optional **rotating stat feed** (`statLines`, default 8s interval) above an animated green pulse bar. Used for longer waits (e.g. post-game transition, training run) where we show real content while the backend works.
+2. **Pulse** — richer "loading moment" layout: team banner image (via `getTeamAssetPath`, defaults to the general banner), Bebas title, subtitle, optional eyebrow label, and an optional **rotating stat feed** (`statLines`, default 8s interval) above an animated green pulse bar. Used for longer waits (e.g. post-game transition, training run) where we show real content while the backend works. Pass `showBanner: false` to hide the banner and keep only the title (or subtitle) plus the green pulse bar — used by FCC while simming an eliminated-user EOS round.
 
 Additional API:
 
 - `PageLoadOverlay.updatePulseSubtitle(text)` — swap the pulse subtitle without re-running `show()`.
 - `PageLoadOverlay.buildPostgameStatFeed(gameDoc, { userTeamSide })` — builds the rotating stat-line feed from a game doc's `box_score` (user team first, sorted by points then minutes; player lines like "Name (#5): 12 points, 4 rebounds, … DEF: 67%").
+- Pulse option `showBanner: false` — hide the team banner; title (or subtitle) sits above the green pulse bar. FCC uses this for eliminated-user EOS sim-rest (weeks 28–34).
 
 ## Implementation
 

@@ -140,7 +140,7 @@ Returns **`$set` fragments** (`week`, bracket blobs, `eos_tournament_active`); m
 | **`GET /franchise/command-center/data`** | Reconcile regions when needed; `offer_sim_rest`, `user_eliminated`, derived `eos_tournament` for **user’s region** display. |
 | **`offer_sim_rest`** | Requires non-empty **`get_eos_week_games(..., include_completed=False)`** for that `week` among other flags. |
 | **`POST /franchise/play-next-game`** | Reconcile region (region weeks) → `get_eos_week_games(..., include_completed=False)` → resolve user matchup. Returns `{home, away, week, home_id, away_id, eos_meta}`. `eos_meta` carries `{phase, round, matchup_index, away_id, home_id, conference|region}` so FE can plumb it through to `complete-week`. |
-| **`POST /franchise/sim-rest-of-tournament`** | Reconcile → meta list → sim → `_eos_calendar_advance_update_fields`. |
+| **`POST /franchise/sim-rest-of-tournament`** | Reconcile → meta list → parallel CPU-full sims (same pool/thread path as weeks 1–27) → persist with `[CPU-WEEK-TIMING]` / `[CPU-PERSIST-TIMING]` / `[CPU-PERSIST-SUBTIMING]` / `[FINALIZE-SUBTIMING]` (`path=sim_rest`) → `_eos_calendar_advance_update_fields`. |
 | **`POST /franchise/complete-week`** & **`/complete-week/phase-a`** | Harden `req.week` (future-week guard + symmetric `game_document.week` trust) → reconcile region (region weeks) → resolve user EOS slot via `_resolve_user_eos_game_meta_or_raise` (raises 409 if EOS week and slot is unresolvable) → record bracket + `_eos_calendar_advance_update_fields` when finalizing. |
 | **`POST /franchise/complete-week/phase-b`** | `_eos_heal_all_eos_from_games` (conference + region + national) → resolve / sync → finalize → `_eos_calendar_advance_update_fields`. |
 | **`POST /franchise/sim-championship`** | National final only; do not double-advance national (see inventory). |
@@ -151,6 +151,9 @@ Returns **`$set` fragments** (`week`, bracket blobs, `eos_tournament_active`); m
 
 - **`[EOS-REGION-RECONCILE]`** — `context=fcc` \| `sim_rest` \| `play_next_game` \| `complete_week`, `week`, `franchise_id`, `persisted`, `ftd_team_count`.
 - **`[EOS-SIM-REST] empty_meta`** — right before sim-rest **400**.
+- **`[EOS-SIM-REST] Parallel full CPU sims`** / **`POOL`** / **`THREAD`** — sim-rest batch start; same pool/thread engines as complete-week.
+- **`[CPU-WEEK-TIMING]`** / **`[CPU-PERSIST-TIMING]`** / **`[CPU-PERSIST-SUBTIMING]`** / **`[FINALIZE-SUBTIMING]`** — same WARNING-level split as weeks 1–27 when the user is active; sim-rest lines carry `| path=sim_rest`. Empty week-30 slates still emit `[CPU-WEEK-TIMING]` with `full_tbt=0`.
+- **`[EOS-SIM-REST] ... total=`** — wall time including persist + calendar advance.
 - **`[COMPLETE-WEEK-WEEK-HARDEN]`** — `req.week=<n> > franchise.week=<m>` (future-week coalesce); `eos_trust_game_document week req=<rw> doc=<gw> franchise.week=<fr_w> direction=<doc_behind|doc_ahead>` (symmetric); `no_slate_match_either_week` (downstream raise expected).
 - **`[EOS-BRACKET-DEBUG] eos_meta_from_game_document`** — bracket slot taken from `req.game_document.eos_meta` (slate matching skipped).
 - **`[EOS-BRACKET-DEBUG] eos_meta_resolved_by_pair`** — slate primary missed, team-pair fallback hit.
