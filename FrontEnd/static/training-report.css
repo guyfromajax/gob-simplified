@@ -1099,85 +1099,6 @@ body.training-report-page .training-notes-brief {
   line-height: 1.3;
 }
 
-body.training-report-page .training-notes-recruit-block {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  min-width: 0;
-  max-width: min(520px, 100%);
-  text-align: right;
-}
-
-body.training-report-page .training-notes-recruit-title {
-  color: rgba(255, 255, 255, 0.72);
-  font-family: 'Inter', sans-serif;
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  white-space: nowrap;
-  padding-top: 6px;
-}
-
-body.training-report-page .training-notes-recruit-title.is-hidden {
-  display: none;
-}
-
-body.training-report-page .training-notes-recruit-meta {
-  font-family: 'Inter', sans-serif;
-  font-size: 13px;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.85);
-  line-height: 1.35;
-  white-space: normal;
-}
-
-body.training-report-page .training-notes-recruit-meta.is-hidden {
-  display: none;
-}
-
-/* Recent-leans callout — ranked-ladder rows (read-only; ladder styled by recruiting-lean-ladder.css) */
-body.training-report-page .trr-lean-list {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  align-items: flex-end;
-}
-body.training-report-page .trr-lean-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-}
-body.training-report-page .trr-lean-name {
-  font-weight: 600;
-  color: #fff;
-  font-size: 12.5px;
-  white-space: nowrap;
-}
-body.training-report-page .trr-lean-pos {
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.6);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-}
-body.training-report-page .trr-lean-rt {
-  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-size: 16px;
-  line-height: 1;
-}
-body.training-report-page .trr-lean-foot {
-  margin-top: 8px;
-}
-body.training-report-page .trr-hub-link {
-  color: #F79420;
-  text-decoration: none;
-  font-size: 11.5px;
-  font-weight: 600;
-}
-body.training-report-page .trr-hub-link:hover {
-  text-decoration: underline;
-}
 
 body.training-report-page .training-notes-rule,
 body.training-report-page .training-notes-subrule {
@@ -1392,12 +1313,6 @@ body.training-report-page .training-notes-misc-value {
   body.training-report-page .header-meta-row {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  body.training-report-page .training-notes-recruit-block {
-    max-width: 100%;
-    align-items: flex-end;
-    width: 100%;
   }
 }
 

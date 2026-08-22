@@ -2020,11 +2020,11 @@
         '<span class="vwk-pos">' + pos + '</span>' +
         '<span class="vwk-rt ' + rtCls + '">' + rt + '</span></div>' +
       headshotBoxHtml(r, 'vwk-av') +
-      // Year on its own line under the name, not beside it: inline, it took ~24px off
-      // the name and clipped it at the tile's 148px of usable width. The ladder is
-      // pinned to the bottom, so the extra line costs nothing.
-      '<div class="vwk-nm">' + name + '</div>' +
-      '<div class="vwk-yr">' + year + '</div>' +
+      // Name and year are ONE unit, centred as a pair. The name is the part that
+      // truncates and the year holds its size, so a long name clips rather than
+      // shunting the year off-centre or out of the tile.
+      '<div class="vwk-nm"><span class="vwk-nmtx">' + name + '</span>' +
+        '<span class="vwk-yr">' + year + '</span></div>' +
       '<div class="vwk-lean">' + Spine.Lean.ladderHtml(model) + '</div>' +
       '</div>';
   }

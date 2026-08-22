@@ -339,6 +339,10 @@ def main():
     ap.add_argument("--apply", action="store_true", help="Required: this harness mutates the target franchise")
     ap.add_argument("--franchise", required=True)
     ap.add_argument("--seasons", type=int, default=1)
+    ap.add_argument("--stop-week", type=int, default=None,
+                    help="Regular season only: advance until this week is reached, then stop. "
+                         "For staging a franchise to a specific phase (e.g. --stop-week 20 to "
+                         "land on the invite window). Ignores --seasons and never rolls over.")
     ap.add_argument("--measure-dir", default=None)
     args = ap.parse_args()
     if not args.apply:
@@ -359,6 +363,28 @@ def main():
         _abort(f"franchise {args.franchise} not found")
     user_team_oid = ObjectId(fdoc["user_team_object_id"])
     measure_dir = Path(args.measure_dir) if args.measure_dir else None
+
+    # Stop-at-week: a partial regular season, for putting a franchise in front of a
+    # specific feature. Deliberately does NOT record an end-season target — this path
+    # never rolls over, so the full-season resume marker would be a lie.
+    if args.stop_week is not None:
+        if not (1 <= args.stop_week <= REGULAR_SEASON_LAST_WEEK):
+            _abort(f"--stop-week must be 1..{REGULAR_SEASON_LAST_WEEK}")
+        season_no = int(fdoc.get("current_season", 1))
+        week = int(fdoc.get("week", 1))
+        print(f"✅ target={args.franchise} team={fdoc.get('user_team_id')!r} "
+              f"start=(season {season_no}, week {week}) stop_week={args.stop_week}")
+        while week < args.stop_week:
+            t0 = time.time()
+            fdoc = db.franchises.find_one({"_id": fid})
+            new_week, _ = advance_regular_week(
+                fr, db, stat_updater, fid, week, user_team_oid, fdoc, FPD=FPD)
+            print(f"  reg wk {week:>2} → {new_week:<2}  ({time.time()-t0:.0f}s)", flush=True)
+            if new_week <= week:
+                _abort(f"regular week {week} did not advance (still {new_week})")
+            week = new_week
+        print(f"\n✅ stopped at season {season_no}, week {week}")
+        return
 
     # resume-safe target: record end-season once, then advance until reached
     end_season = fdoc.get(_HARNESS_END_SEASON_FIELD)

@@ -24,14 +24,18 @@ const POS = ['PG', 'SG', 'SF', 'PF', 'C'];
 const USER = 'user-team-id';
 const WEEKS = [20, 21, 22, 23, 24, 25, 26];
 
-function recruit(i, leanRank) {
+function recruit(i, leanRank, longNames) {
   const attributes = {};
   ATTRS.forEach((k, j) => { attributes[k] = ((i * 7 + j * 11) % 91) + 5; });
   const lean = leanRank === 1 ? { 1: USER, 2: 'rival-1', 3: null }
     : leanRank === 2 ? { 1: 'rival-1', 2: USER, 3: null }
       : { 1: 'rival-1', 2: 'rival-2', 3: null };
   return {
-    recruit_id: `r-${i}`, name: `Longnameson Recruit ${String(i).padStart(2, '0')}`,
+    recruit_id: `r-${i}`,
+    name: longNames
+      ? `Longnameson Recruit ${String(i).padStart(2, '0')}`
+      : ['Ramon Mathis', 'Albert Vazquez', 'Kylo Valdez', 'Pierre Munoz',
+         'Ahmad Lucas', 'Solomon Davis', 'Bert Rowland', 'Dylan Zavala'][i % 8],
     image_id: `img-${i}`, archetype: 'Slasher', 'Home Region': 'C',
     year: 'Sophomore', height: 72, weight: 190, attributes,
     // A potential well above current makes RT render as a PAIR, so the right-hand cell
@@ -48,7 +52,9 @@ function fixture(o = {}) {
   const leans = o.leans || {};
   const week = o.week ?? 23;
   const recruits = [];
-  for (let i = 0; i < 12; i++) recruits.push(recruit(i, i % 3 === 0 ? 1 : i % 3 === 1 ? 2 : 0));
+  for (let i = 0; i < 12; i++) {
+    recruits.push(recruit(i, i % 3 === 0 ? 1 : i % 3 === 1 ? 2 : 0, !!o.longNames));
+  }
   recruits.forEach((r) => { if (leans[r.recruit_id]) r.Lean = leans[r.recruit_id]; });
   const byId = Object.fromEntries(recruits.map((r) => [r.recruit_id, r]));
   const visits = o.visits || { 20: 'r-1', 21: 'r-4' };
@@ -97,7 +103,7 @@ const tiles = (page) => page.evaluate(() =>
     return {
       cls: t.className,
       week: (t.querySelector('.vwk-wk') || {}).textContent,
-      name: (t.querySelector('.vwk-nm') || {}).textContent || null,
+      name: (t.querySelector('.vwk-nmtx') || {}).textContent || null,
       state: (t.querySelector('.vwk-state') || {}).textContent || null,
       rt: (t.querySelector('.vwk-rt') || {}).textContent || null,
       pos: (t.querySelector('.vwk-pos') || {}).textContent || null,
@@ -166,7 +172,7 @@ test.describe('a spent week shows what it bought', () => {
     await mount(page, { week: 23, visits: { 20: 'r-1' } });
     const t = (await tiles(page))[0];
     expect(t.cls).toContain('is-filled');
-    expect(t.name).toContain('Recruit 01');
+    expect(t.name).toBe('Albert Vazquez');   // fixture r-1
     expect(t.img).toBe(true);
     expect(t.rt).toBeTruthy();
     expect(t.yr).toBe('SO');
@@ -209,24 +215,49 @@ test.describe('a spent week shows what it bought', () => {
     expect(m.aboveImage).toBe(true);
   });
 
-  test('the year sits under the name, on its own line', async ({ page }) => {
-    // Inline beside the name it took ~24px off a 148px-wide tile and clipped the name.
+  test('name and year share one row, centred as a pair', async ({ page }) => {
     await mount(page, { week: 23, visits: { 20: 'r-1' } });
     const m = await page.evaluate(() => {
       const t = document.querySelector('#hub-visits .vwk.is-filled');
-      const nm = t.querySelector('.vwk-nm');
-      const nmBox = nm.getBoundingClientRect();
+      const nm = t.querySelector('.vwk-nmtx').getBoundingClientRect();
       const yr = t.querySelector('.vwk-yr').getBoundingClientRect();
+      const tile = t.getBoundingClientRect();
+      const mid = (r) => (r.top + r.bottom) / 2;
       return {
-        below: yr.top >= nmBox.bottom - 1,
-        // The name gets the tile's full usable width back.
-        nameFullWidth: nmBox.width >= t.clientWidth - 21,
-        nameClips: getComputedStyle(nm).textOverflow === 'ellipsis',
+        sameRow: Math.abs(mid(nm) - mid(yr)) < 3,
+        yearAfterName: yr.left >= nm.right - 1,
+        // The PAIR is centred, not the name — its own centre line against the tile's.
+        pairOffset: Math.abs((nm.left + yr.right) / 2 - (tile.left + tile.right) / 2),
+        belowImage: nm.top >= t.querySelector('.vwk-av').getBoundingClientRect().bottom,
       };
     });
-    expect(m.below).toBe(true);
-    expect(m.nameFullWidth).toBe(true);
+    expect(m.sameRow).toBe(true);
+    expect(m.yearAfterName).toBe(true);
+    expect(m.pairOffset).toBeLessThan(1);
+    expect(m.belowImage).toBe(true);
+  });
+
+  test('a long name clips instead of shunting the year out of the square', async ({ page }) => {
+    // Only the name flexes. If the year could shrink or be pushed, a long name would
+    // either lose it entirely or drag the pair off centre.
+    await mount(page, { week: 23, visits: { 20: 'r-1' }, longNames: true });
+    const m = await page.evaluate(() => {
+      const t = document.querySelector('#hub-visits .vwk.is-filled');
+      const nmEl = t.querySelector('.vwk-nmtx');
+      const yr = t.querySelector('.vwk-yr').getBoundingClientRect();
+      const tile = t.getBoundingClientRect();
+      const cs = getComputedStyle(nmEl);
+      return {
+        nameClips: cs.overflow === 'hidden' && cs.textOverflow === 'ellipsis',
+        nameOverflows: nmEl.scrollWidth > nmEl.clientWidth,
+        yearInside: yr.right <= tile.right && yr.left >= tile.left,
+        yearFull: yr.width > 8,
+      };
+    });
+    expect(m.nameOverflows).toBe(true);
     expect(m.nameClips).toBe(true);
+    expect(m.yearInside).toBe(true);
+    expect(m.yearFull).toBe(true);
   });
 
   test('one lean takes one third, not the whole ladder', async ({ page }) => {
