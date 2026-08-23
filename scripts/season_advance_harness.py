@@ -42,6 +42,9 @@ if str(_REPO) not in sys.path:
     sys.path.insert(0, str(_REPO))
 
 REGULAR_SEASON_LAST_WEEK = 26
+INVITE_FIRST_WEEK = 20
+INVITE_LAST_WEEK = 26
+MAX_INVITE_BOARD = 20
 EOS_LAST_WEEK = 34
 _HARNESS_END_SEASON_FIELD = "_harness_end_season"
 
@@ -169,6 +172,76 @@ def _resolve_user_matchup(fdoc, week, user_team_oid):
         if away_id == user_team_oid or home_id == user_team_oid:
             return away_id, home_id
     return None
+
+
+def save_user_invite_board(fr, db, fid, fdoc, user_team_oid, week):
+    """Save the user team's invite board for one invite week (20-26).
+
+    WHY this exists: invites are assigned inside run-training. The harness's _do_training
+    swallows exceptions, so an empty board at week 20 means training 400s, the error is
+    printed and ignored, the week advances — and the whole invite window passes with no
+    visits and therefore no visit-driven lean movement. A franchise driven to week 35
+    that way arrives with performance leans only.
+
+    Goes through the REAL save_recruiting_orders route function, with the franchise's own
+    owner id, rather than writing FTD "Recruits" directly. That field is written by that
+    function and nowhere else — the same rule that governs the watchlist seed — and going
+    around it would skip every validation the route performs.
+
+    Board: highest RT first, dropping anyone who has ALREADY VISITED so each week targets
+    someone new. A static board lets the same top recruit visit repeatedly and yields
+    fewer distinct leans by Signing Day.
+
+    Deliberately NOT "existing leans first": early in a season barely anyone leans to you,
+    so that rule ranked a 30-RT recruit above a 90-RT one purely because he already liked
+    you — manufacturing leans on players you would not want. The visit is what CREATES
+    the lean, so pointing it at the best available is what builds a class worth having.
+    """
+    user_id = fdoc.get("user_id")
+    if not user_id:
+        print(f"    week {week}: no user_id on franchise — invite board skipped")
+        return
+
+    team_key = str(user_team_oid)
+    results = fdoc.get("recruiting_results") or {}
+    visited = set()
+    for wk in range(INVITE_FIRST_WEEK, INVITE_LAST_WEEK + 1):
+        rid = (results.get(str(wk)) or {}).get(team_key)
+        if rid:
+            visited.add(str(rid))
+
+    def _rt(doc):
+        ratings = [v for v in (doc.get("position_ratings") or {}).values()
+                   if isinstance(v, (int, float))]
+        return max(ratings) if ratings else -1
+
+    ranked, leaning = [], 0
+    for doc in db.franchise_recruits_data.find(
+            {"franchise_id": str(fid)},
+            {"_id": 0, "recruit_id": 1, "position_ratings": 1, "Lean": 1}):
+        rid = str(doc.get("recruit_id") or "")
+        if not rid or rid in visited:
+            continue
+        if team_key in {str(v) for v in (doc.get("Lean") or {}).values() if v}:
+            leaning += 1
+        ranked.append((rid, _rt(doc)))
+
+    ranked.sort(key=lambda x: -x[1])
+    board = [rid for rid, _ in ranked[:MAX_INVITE_BOARD]]
+    if not board:
+        print(f"    week {week}: no eligible recruits for the invite board")
+        return
+
+    try:
+        fr.save_recruiting_orders(
+            fr.SaveRecruitingOrdersRequest(franchise_id=str(fid), recruit_ids=board),
+            user={"user_id": str(user_id)},
+        )
+        print(f"    week {week}: invite board saved "
+              f"({len(board)} ranked, top RT {ranked[0][1]}, "
+              f"{leaning} leaning, {len(visited)} already visited)")
+    except Exception as e:  # noqa: BLE001 — never let a board save stop the run
+        print(f"    week {week}: invite board FAILED ({type(e).__name__}: {e})")
 
 
 def advance_regular_week(fr, db, stat_updater, fid, week, user_team_oid, fdoc,
@@ -340,9 +413,15 @@ def main():
     ap.add_argument("--franchise", required=True)
     ap.add_argument("--seasons", type=int, default=1)
     ap.add_argument("--stop-week", type=int, default=None,
-                    help="Regular season only: advance until this week is reached, then stop. "
-                         "For staging a franchise to a specific phase (e.g. --stop-week 20 to "
-                         "land on the invite window). Ignores --seasons and never rolls over.")
+                    help="Advance until this week is reached, then stop. Covers the regular "
+                         "season (1-26) and the postseason (27-34), so --stop-week 35 lands "
+                         "ON Signing Day without running the signings. Ignores --seasons and "
+                         "never rolls over.")
+    ap.add_argument("--user-invites", action="store_true",
+                    help="Weeks 20-26: save the user team's invite board before each week's "
+                         "training, so invites are actually assigned. Without it training 400s "
+                         "on the empty week-20 board, the harness swallows the error, and the "
+                         "whole invite window passes with no visits and no lean movement.")
     ap.add_argument("--measure-dir", default=None)
     args = ap.parse_args()
     if not args.apply:
@@ -368,20 +447,32 @@ def main():
     # specific feature. Deliberately does NOT record an end-season target — this path
     # never rolls over, so the full-season resume marker would be a lie.
     if args.stop_week is not None:
-        if not (1 <= args.stop_week <= REGULAR_SEASON_LAST_WEEK):
-            _abort(f"--stop-week must be 1..{REGULAR_SEASON_LAST_WEEK}")
+        if not (1 <= args.stop_week <= EOS_LAST_WEEK + 1):
+            _abort(f"--stop-week must be 1..{EOS_LAST_WEEK + 1}")
         season_no = int(fdoc.get("current_season", 1))
         week = int(fdoc.get("week", 1))
         print(f"✅ target={args.franchise} team={fdoc.get('user_team_id')!r} "
-              f"start=(season {season_no}, week {week}) stop_week={args.stop_week}")
+              f"start=(season {season_no}, week {week}) stop_week={args.stop_week} "
+              f"user_invites={args.user_invites}")
         while week < args.stop_week:
             t0 = time.time()
             fdoc = db.franchises.find_one({"_id": fid})
-            new_week, _ = advance_regular_week(
-                fr, db, stat_updater, fid, week, user_team_oid, fdoc, FPD=FPD)
-            print(f"  reg wk {week:>2} → {new_week:<2}  ({time.time()-t0:.0f}s)", flush=True)
+            if week <= REGULAR_SEASON_LAST_WEEK:
+                # Invites are assigned INSIDE run-training, so the board has to be saved
+                # before the week runs, not after.
+                if args.user_invites and INVITE_FIRST_WEEK <= week <= INVITE_LAST_WEEK:
+                    save_user_invite_board(fr, db, fid, fdoc, user_team_oid, week)
+                new_week, _ = advance_regular_week(
+                    fr, db, stat_updater, fid, week, user_team_oid, fdoc, FPD=FPD)
+                label = "reg"
+            else:
+                # 27-34 need the bracket driver: complete_week 409s once the user team is
+                # eliminated, so it cannot carry the postseason.
+                new_week = advance_postseason_week(fr, db, fid)
+                label = "eos"
+            print(f"  {label} wk {week:>2} → {new_week:<2}  ({time.time()-t0:.0f}s)", flush=True)
             if new_week <= week:
-                _abort(f"regular week {week} did not advance (still {new_week})")
+                _abort(f"{label} week {week} did not advance (still {new_week})")
             week = new_week
         print(f"\n✅ stopped at season {season_no}, week {week}")
         return
