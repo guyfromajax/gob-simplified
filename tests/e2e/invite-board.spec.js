@@ -80,6 +80,13 @@ async function mount(page, o = {}) {
   await page.route('**/franchise-command-center*', (route) =>
     route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>fcc</body></html>' }));
   await page.setViewportSize({ width: 1440, height: 1100 });
+  // The real homepage is never used — setContent replaces the document on the next
+  // line. goto only supplies a same-origin URL (sessionStorage, location.search), so
+  // serve a stub and skip a full app page load per test. Under parallel workers those
+  // loads queue on the dev server and were the cause of intermittent timeouts here.
+  await page.route('**/', (route) => (route.request().resourceType() === 'document'
+    ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
+    : route.continue()));
   await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
   await page.setContent(`
     <style>${CSS}</style><style>body{margin:0}.doc{max-width:1360px;margin:0 auto;padding:20px}</style>
@@ -96,6 +103,9 @@ async function mount(page, o = {}) {
       const u = String(url);
       if (u.includes('/franchise/recruiting-data')) return Promise.resolve(data);
       window.__writes.push({ url: u, method: (options || {}).method || 'GET', body: (options || {}).body });
+      // Mirrored to sessionStorage: submitting now navigates immediately, so a
+      // page-scoped array is torn down before a test can read it.
+      try { sessionStorage.setItem('__writes', JSON.stringify(window.__writes)); } catch (e) { void e; }
       if (u.includes('recruiting-watchlist')) return Promise.resolve({ watching: true, count: 1, watchlist: [] });
       return Promise.resolve({ status: 'success' });
     };
@@ -276,20 +286,18 @@ test.describe('seed notice', () => {
   test('saving is the only thing that posts the order', async ({ page }) => {
     await mount(page, { week: 20, watchlist: ['r-2'], board: [], noLeans: true });
     await page.click('#dock-save');
-    await page.waitForFunction(() =>
-      window.__writes.some((w) => String(w.url).includes('recruiting-orders')));
+    await page.waitForURL('**/franchise-command-center*', { timeout: 5000 });
     const orders = await page.evaluate(() =>
-      window.__writes.filter((w) => String(w.url).includes('recruiting-orders')));
+      JSON.parse(sessionStorage.getItem('__writes') || '[]')
+        .filter((w) => String(w.url).includes('recruiting-orders')));
     expect(orders).toHaveLength(1);
     expect(JSON.parse(orders[0].body).recruit_ids).toEqual(['r-2']);
   });
 });
 
 test.describe('submitting ends the visit', () => {
-  const HOLD_MS = 2000;
-
-  /** Catch the FCC navigation instead of following it, so the page survives to assert on. */
-  async function watchNav(page) {
+  /** Follow the FCC navigation into a stub page, so assertions survive it. */
+  async function stubFcc(page) {
     const hits = [];
     await page.route('**/franchise-command-center*', (route) => {
       hits.push(route.request().url());
@@ -298,45 +306,38 @@ test.describe('submitting ends the visit', () => {
     return hits;
   }
 
-  test('the confirmation names the thing the button did', async ({ page }) => {
+  test('it leaves for the locker room immediately — no hold', async ({ page }) => {
     await mount(page, { week: 20, board: ['r-1', 'r-2'] });
-    await watchNav(page);
-    await page.click('#dock-save');
-    await page.waitForSelector('#hub-toast.show');
-    const txt = await page.evaluate(() => document.querySelector('#hub-toast').textContent);
-    // The CTA says "Submit Invites"; the confirmation used to say "Saved".
-    expect(txt).toContain('Invites Submitted');
-  });
-
-  test('it holds, then returns to the locker room', async ({ page }) => {
-    await mount(page, { week: 20, board: ['r-1', 'r-2'] });
-    const hits = await watchNav(page);
+    const hits = await stubFcc(page);
     const t0 = Date.now();
     await page.click('#dock-save');
-    await page.waitForSelector('#hub-toast.show');
-    // Still on the Hub while the confirmation is up.
-    expect(hits).toHaveLength(0);
     await page.waitForURL('**/franchise-command-center*', { timeout: 5000 });
-    const held = Date.now() - t0;
+    const elapsed = Date.now() - t0;
     expect(hits).toHaveLength(1);
-    // Bounded both ways: an instant redirect gives no time to read it, and a long one
-    // reads as a hang.
-    expect(held).toBeGreaterThanOrEqual(HOLD_MS - 250);
-    expect(held).toBeLessThan(HOLD_MS + 2000);
+    // There used to be a deliberate 2s confirmation hold here. The loading screen is
+    // the acknowledgement now, so anything near 2s means the hold came back.
+    expect(elapsed).toBeLessThan(1200);
   });
 
-  test('a second press during the hold cannot post the board twice', async ({ page }) => {
+  test('a second press while the submit is in flight cannot post twice', async ({ page }) => {
     await mount(page, { week: 20, board: ['r-1', 'r-2'] });
-    await watchNav(page);
-    await page.click('#dock-save');
-    await page.waitForSelector('#hub-toast.show');
-    const btn = await page.evaluate(() => {
-      const b = document.getElementById('dock-save');
-      return { disabled: b.disabled, label: b.textContent.trim() };
+    await stubFcc(page);
+    // Hold the POST open so the in-flight window is observable. That window is the one
+    // a double press actually lands in; the disable after the response only has to
+    // cover the moment before unload, which cannot be observed past the navigation.
+    await page.evaluate(() => {
+      const real = window.RecruitingCommon.fetchJSON;
+      window.RecruitingCommon.fetchJSON = function (url, options) {
+        if (String(url).includes('recruiting-orders')) {
+          window.__writes.push({ url: String(url), body: (options || {}).body });
+          return new Promise((res) => setTimeout(() => res({ status: 'success' }), 1500));
+        }
+        return real.call(this, url, options);
+      };
     });
-    expect(btn.disabled).toBe(true);
-    expect(btn.label).toBe('Invites Submitted');
-    // Force the press anyway — a disabled button is the guard, so prove it holds.
+    await page.click('#dock-save');
+    await page.waitForFunction(() => document.getElementById('dock-save').disabled, { timeout: 2000 });
+    // Force the press anyway — the disabled button is the guard, so prove it holds.
     await page.evaluate(() => document.getElementById('dock-save').click());
     const posts = await page.evaluate(() =>
       window.__writes.filter((w) => String(w.url).includes('recruiting-orders')).length);
@@ -345,25 +346,21 @@ test.describe('submitting ends the visit', () => {
 
   test('a failed submit stays put and re-arms the button', async ({ page }) => {
     await mount(page, { week: 20, board: ['r-1', 'r-2'] });
-    const hits = await watchNav(page);
+    const hits = await stubFcc(page);
     await page.evaluate(() => {
-      window.RecruitingCommon.fetchJSON = function () {
-        return Promise.reject(new Error('nope'));
-      };
+      window.RecruitingCommon.fetchJSON = function () { return Promise.reject(new Error('nope')); };
     });
     await page.click('#dock-save');
     await page.waitForSelector('#hub-toast.show');
-    await page.waitForTimeout(HOLD_MS + 400);
     const m = await page.evaluate(() => {
       const b = document.getElementById('dock-save');
       return { toast: document.querySelector('#hub-toast').textContent,
                disabled: b.disabled, label: b.textContent.trim() };
     });
     expect(m.toast).toContain('Submit failed');
-    // No navigation: the board was not sent, so the player must stay where they can retry.
+    // No navigation: the board was not sent, so the player stays where they can retry.
     expect(hits).toHaveLength(0);
     expect(m.disabled).toBe(false);
-    // And the label goes back to the one the board actually renders, not "Save Board".
     expect(m.label).toBe('Submit Invites');
   });
 });

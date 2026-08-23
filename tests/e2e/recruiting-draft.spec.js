@@ -70,6 +70,15 @@ function fixture(o = {}) {
  */
 async function mount(page, o = {}) {
   await page.setViewportSize({ width: 1500, height: 1100 });
+  await page.route('**/franchise-command-center*', (route) =>
+    route.fulfill({ status: 200, contentType: 'text/html', body: '<html><body>fcc</body></html>' }));
+  // The real homepage is never used — setContent replaces the document on the next
+  // line. goto only supplies a same-origin URL (sessionStorage, location.search), so
+  // serve a stub and skip a full app page load per test. Under parallel workers those
+  // loads queue on the dev server and were the cause of intermittent timeouts here.
+  await page.route('**/', (route) => (route.request().resourceType() === 'document'
+    ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
+    : route.continue()));
   await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
   await page.setContent(`
     <style>${CSS}</style><style>body{margin:0}.doc{max-width:1440px;margin:0 auto;padding:16px}</style>
@@ -86,6 +95,9 @@ async function mount(page, o = {}) {
       const u = String(url);
       if (u.includes('/franchise/recruiting-data')) return Promise.resolve(data);
       window.__writes.push({ url: u, body: (options || {}).body });
+      // Mirrored: submitting the board now leaves for the FCC on the same tick, so a
+      // page-scoped array is gone before a test can read it.
+      try { sessionStorage.setItem('__writes', JSON.stringify(window.__writes)); } catch (e) { void e; }
       if (u.includes('recruiting-watchlist')) return Promise.resolve({ watching: true, count: 1, watchlist: [] });
       return Promise.resolve({ status: 'success' });
     };
@@ -156,8 +168,7 @@ test.describe('invite board', () => {
     await mount(page, { week: 21, board: ['r-1', 'r-2', 'r-3'] });
     await page.click('#hub-board .brow[data-id="r-2"] .bx');
     await page.click('#dock-save');
-    await page.waitForFunction(() =>
-      window.__writes.some((w) => String(w.url).includes('recruiting-orders')));
+    await page.waitForURL('**/franchise-command-center*', { timeout: 5000 });
     // The server now holds ['r-1','r-3']; the next load reflects THAT, not a stale draft.
     await mount(page, { week: 21, board: ['r-1', 'r-3'] });
     expect(await boardIds(page)).toEqual(['r-1', 'r-3']);
@@ -185,8 +196,10 @@ test.describe('invite board', () => {
     await mount(page, { week: 21, board: ['r-1', 'r-2', 'r-3'] });
     expect(await boardIds(page)).toEqual(['r-1', 'r-3']);
     await page.click('#dock-save');
+    await page.waitForURL('**/franchise-command-center*', { timeout: 5000 });
     const sent = await page.evaluate(() => {
-      const w = window.__writes.find((x) => String(x.url).includes('recruiting-orders'));
+      const w = JSON.parse(sessionStorage.getItem('__writes') || '[]')
+        .find((x) => String(x.url).includes('recruiting-orders'));
       return w ? JSON.parse(w.body).recruit_ids : null;
     });
     expect(sent).toEqual(['r-1', 'r-3']);

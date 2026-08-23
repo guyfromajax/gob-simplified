@@ -1463,6 +1463,11 @@ function wireStatusLine(week, wire) {
   return '';
 }
 
+/** The footnote element inside a recruiting card, if the card has one. */
+function footerFor(card) {
+  return card ? card.querySelector('.fcc-recruiting-footnote--embed') : null;
+}
+
 function renderHomeRecruitingWire() {
   const body = document.getElementById('home-recruiting-body');
   if (!body) return;
@@ -1482,6 +1487,35 @@ function renderHomeRecruitingWire() {
   const events = Array.isArray(wire.events) ? wire.events : [];
   const statusText = wireStatusLine(week, wire);
   const card = body.closest('.fcc-home-card--recruiting');
+
+  // Once the signings have run, the card's job changes: the wire's week-by-week lean
+  // movement is a record of a race that is over, and the only thing worth reading is
+  // who you actually signed. Falls through to the wire when nothing was signed.
+  const signed = commandCenterTopDataCache?.week_35_user_recruits || [];
+  if (commandCenterTopDataCache?.week_35_recruiting_ran && signed.length) {
+    if (card) card.classList.remove('is-signing-day');
+    if (footerFor(card) && footerFor(card).parentElement !== card) card.appendChild(footerFor(card));
+    const rows = signed.map((p) => {
+      const rt = typeof window.formatRtWithPotentialDisplay === 'function'
+        ? window.formatRtWithPotentialDisplay(p.rt, p.potential_rt_ratcheted)
+        : (p.rt != null ? String(p.rt) : '--');
+      const yr = window.GOB_PlayerYear ? window.GOB_PlayerYear.formatAbbrev(p.year) : (p.year || '--');
+      return `
+        <div class="fcc-wire-row fcc-signed-row">
+          <div class="fcc-wire-line">
+            <span>${escapeHomeHtml(p.name || '--')}</span>
+            <span class="fcc-wire-line__wk">${escapeHomeHtml(p.pos || '--')} · ${escapeHomeHtml(yr)} · ${escapeHomeHtml(rt)}</span>
+          </div>
+        </div>`;
+    }).join('');
+    body.innerHTML = `
+      <div class="fcc-home-recruiting">
+        <div class="fcc-home-list-scroll">${rows}</div>
+      </div>
+      <div class="fcc-wire-status">${signed.length} signed to your program.</div>
+    `;
+    return;
+  }
   const footer = card ? card.querySelector('.fcc-recruiting-footnote--embed') : null;
 
   // Week 35 is a single call to action, not a feed. The wire's whole season of movement
@@ -2353,6 +2387,11 @@ function initFccRecruits(topData) {
       potentialRt: player.potential_rt_ratcheted != null ? Number(player.potential_rt_ratcheted) : null,
       leanDisplay: '',
       leanSortValue: '',
+      // UN-scaled, for the shared attr-tile builder — it does its own 0-10 conversion.
+      // The row renders groupedTilesHtml(rawAttrs); without this it got `undefined` and
+      // every tile came out blank. normalizeRecruits sets the same field for the lean
+      // path, which is why that table always worked and this one never did.
+      rawAttrs: attrs,
       attrs: {
         SC: Math.floor((Number(attrs.SC) || 0) / 10),
         SH: Math.floor((Number(attrs.SH) || 0) / 10),
@@ -4181,7 +4220,7 @@ function updatePlayButton(data) {
     playNowBtn.textContent = 'Run Recruiting Day';
     playNowBtn.dataset.mode = 'week35-run';
   } else if (week === 35) {
-    playNowBtn.textContent = 'Recruiting';
+    playNowBtn.textContent = 'Run Signing Day';
     playNowBtn.dataset.mode = 'week35-recruiting';
   } else if (week === 36) {
     playNowBtn.textContent = 'Go To Next Season';

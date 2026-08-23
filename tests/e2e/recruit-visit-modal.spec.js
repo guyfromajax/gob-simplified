@@ -81,6 +81,41 @@ test.describe('Recruit Visit modal', () => {
     expect(m.sub).toBeUndefined();                 // one line, not the walk-on pair
   });
 
+  test('the CTA dismisses to the locker room, it does not jump to Recruits', async ({ page }) => {
+    await mountAndWait(page, 'recruit_visit_modal',
+      { eligible: true, week: 21, recruit: player({ region: 'A' }) });
+    const m = await page.evaluate(() => {
+      const btn = document.querySelector('.sammy-modal-actions button, .sammy-modal-cta');
+      return { label: btn ? btn.textContent.trim() : null };
+    });
+    // It used to read "Go To Recruiting" and click the Recruits tab — sending the
+    // player somewhere they had not asked to go. This modal is news; the player is
+    // already standing in the locker room.
+    expect(m.label).toBe('Go To Locker Room');
+  });
+
+  test('pressing it closes the modal and leaves the tab alone', async ({ page }) => {
+    await mountAndWait(page, 'recruit_visit_modal',
+      { eligible: true, week: 21, recruit: player({ region: 'A' }) });
+    await page.evaluate(() => {
+      // The harness page has no FCC tabs, so a listener over whatever happens to exist
+      // proves nothing — the old onCta looked up [data-tab="recruits-tab"] and silently
+      // did nothing when absent. Plant the real target it used to click.
+      window.__tabClicks = 0;
+      const tab = document.createElement('button');
+      tab.setAttribute('data-tab', 'recruits-tab');
+      tab.addEventListener('click', () => { window.__tabClicks += 1; });
+      document.body.appendChild(tab);
+      document.querySelector('.sammy-modal-actions button, .sammy-modal-cta').click();
+    });
+    const m = await page.evaluate(() => ({
+      open: document.querySelectorAll('.sammy-modal-backdrop.open').length,
+      tabClicks: window.__tabClicks,
+    }));
+    expect(m.open).toBe(0);
+    expect(m.tabClicks).toBe(0);
+  });
+
   test('RT reads current/potential as letter grades', async ({ page }) => {
     await mountAndWait(page, 'recruit_visit_modal',
       { eligible: true, week: 22, recruit: player({ rt: 72, potential_rt: 88, region: 'E' }) });

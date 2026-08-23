@@ -105,6 +105,13 @@ async function mountPool(page, opts = {}) {
   // origin (setContent preserves whatever URL the page is already on).
   // ?action=run is the FCC's "Run Recruiting Day" handing the press to the hub, which
   // owns both the run call and the reveal.
+  // The real homepage is never used — setContent replaces the document on the next
+  // line. goto only supplies a same-origin URL (sessionStorage, location.search), so
+  // serve a stub and skip a full app page load per test. Under parallel workers those
+  // loads queue on the dev server and were the cause of intermittent timeouts here.
+  await page.route('**/', (route) => (route.request().resourceType() === 'document'
+    ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
+    : route.continue()));
   await page.goto('/?franchise_id=fid-test&team_id=user-team-id'
     + (opts.action ? `&action=${opts.action}` : ''));
   await page.setContent(`
@@ -128,6 +135,15 @@ async function mountPool(page, opts = {}) {
       // silently falls back to the white recruit master and the portrait assertion
       // tests the stub instead of the code.
       getPlayerImageUrl: (pid) => `https://stub.local/players/master/${pid}.png`,
+      // The reveal force-paints a lead of masters before opening. Absent from the stub
+      // it resolved instantly and the prep gate was never exercised at all.
+      ensurePlayerImage: (fid, pid) => {
+        window.__ensured = window.__ensured || [];
+        window.__ensured.push(String(pid));
+        return window.__ensureDelayMs
+          ? new Promise((r) => setTimeout(() => r({ status: 'painted' }), window.__ensureDelayMs))
+          : Promise.resolve({ status: 'exists' });
+      },
       ensureRecruitImage: () => Promise.resolve({ status: 'skip' }),
     };
     window.__fixture = data;
@@ -241,7 +257,7 @@ const card = (page) => page.evaluate(() => {
   return {
     cls: c.className,
     nm: c.querySelector('.sd-card-nm').textContent.trim(),
-    flag: c.querySelector('.sd-card-signed').textContent.trim(),
+    flag: c.querySelector('.sd-card-lbl').textContent.trim(),
     meta: [...c.querySelectorAll('.sd-meta b')].map((b) => b.textContent.trim()),
   };
 });
@@ -316,23 +332,32 @@ test.describe('the stage', () => {
     expect(c.meta[2]).toContain('/');     // current/potential, not a lone grade
   });
 
-  test('the signing line sits above the name, never over the portrait', async ({ page }) => {
+  test('the team is carried by its own plate, above everything', async ({ page }) => {
     await stage(page);
     await page.click('#rv-skip');
-    const c = await card(page);
-    expect(c.cls).toContain('is-won');
-    expect(c.flag).toBe('Signed with you');
     const m = await page.evaluate(() => {
-      const el = document.querySelector('#hub-reveal .sd-card-signed');
-      const shot = document.querySelector('#hub-reveal .sd-shot');
+      const card = document.querySelector('#hub-reveal .sd-card');
+      const plate = card.querySelector('.sd-plate img');
+      const lbl = card.querySelector('.sd-card-lbl').getBoundingClientRect();
+      const nm = card.querySelector('.sd-card-nm').getBoundingClientRect();
+      const shot = card.querySelector('.sd-shot-img').getBoundingClientRect();
+      const plateBox = card.querySelector('.sd-plate').getBoundingClientRect();
       return {
-        aboveShot: el.getBoundingClientRect().bottom <= shot.getBoundingClientRect().top + 1,
-        // The old bar sat across the portrait, where white copy vanished into a white
-        // practice jersey and would clash with any painted uniform.
-        oldBar: document.querySelectorAll('#hub-reveal .sd-flag').length,
+        src: plate ? plate.getAttribute('src') : null,
+        labelAbovePlate: lbl.bottom <= plateBox.top + 1,
+        plateAboveBody: plateBox.bottom <= nm.top + 1,
+        // The portrait is now supporting, not the hero — it used to be 430px square.
+        portraitW: Math.round(shot.width),
+        plateW: Math.round(plateBox.width),
+        // The old bar across the portrait is gone for good.
+        oldBar: document.querySelectorAll('#hub-reveal .sd-flag, #hub-reveal .sd-card-signed').length,
       };
     });
-    expect(m.aboveShot).toBe(true);
+    expect(m.src).toContain('/images/teams/');
+    expect(m.src).toContain('banner_primary');
+    expect(m.labelAbovePlate).toBe(true);
+    expect(m.plateAboveBody).toBe(true);
+    expect(m.portraitW).toBeLessThan(m.plateW / 2);
     expect(m.oldBar).toBe(0);
   });
 
@@ -538,6 +563,141 @@ test.describe('no replay', () => {
   });
 });
 
+test.describe('keyboard', () => {
+  test('Space pauses and resumes, matching its keycap', async ({ page }) => {
+    await stage(page);
+    await page.click('#rv-skip');
+    await page.keyboard.press('Space');
+    expect(await page.locator('#rv-pause[aria-pressed="true"]').count()).toBe(1);
+    await page.keyboard.press('Space');
+    expect(await page.locator('#rv-pause[aria-pressed="false"]').count()).toBe(1);
+  });
+
+  test('N jumps to your next signing', async ({ page }) => {
+    await stage(page);
+    await page.keyboard.press('n');
+    const c = await card(page);
+    expect(c.cls).toContain('is-won');
+  });
+
+  test('E runs to the end', async ({ page }) => {
+    await stage(page);
+    await page.keyboard.press('e');
+    await page.waitForSelector('#hub-reveal .sd-done', { timeout: 3000 });
+    expect(await page.locator('.sd-done-cta').count()).toBe(1);
+  });
+
+  test('every keycap on screen names a key that actually binds', async ({ page }) => {
+    await stage(page);
+    const caps = await page.evaluate(() =>
+      [...document.querySelectorAll('#hub-reveal .sd-btn kbd')].map((k) => k.textContent.trim()));
+    // A printed keycap is a promise. If a control gains one, it needs a binding here.
+    expect(caps).toEqual(['Space', 'N', 'E']);
+  });
+
+  test('the keys stop working once the run is over', async ({ page }) => {
+    await stage(page);
+    await page.click('#rv-end');
+    await page.keyboard.press('Space');
+    // No pause control exists any more; a stray press must not resurrect the timer.
+    expect(await page.locator('#rv-pause').count()).toBe(0);
+    expect(await page.locator('.sd-done').count()).toBe(1);
+  });
+});
+
+test.describe('prep gate', () => {
+  test('holds on "Prepping Signing Day" until the lead is painted', async ({ page }) => {
+    const { signed, conferences, teamNames } = conferenceFixture({ mine: 3, others: 14, walkOns: 4 });
+    await page.setViewportSize({ width: 1560, height: 940 });
+    await page.addInitScript(() => { window.__ensureDelayMs = 900; });
+    await mountPool(page, {
+      week: 35, signed: null, conferences, teamNames, revealSeen: false,
+      savedEntries: [{ id: 'r-0', points: 12, playing_time: false }],
+      action: 'run', runResults: signed,
+    });
+    await page.waitForSelector('#hub-reveal .sd-prep', { timeout: 8000 });
+    const during = await page.evaluate(() => ({
+      copy: document.querySelector('.sd-prep-t').textContent.trim(),
+      bar: document.querySelectorAll('.sd-prep-bar i').length,
+      cards: document.querySelectorAll('#hub-reveal .sd-card').length,
+      rails: document.querySelectorAll('#hub-reveal .sd-rail').length,
+    }));
+    expect(during.copy).toBe('Prepping Signing Day');
+    expect(during.bar).toBe(1);
+    // Nothing of the stage yet — that is the point of the gate.
+    expect(during.cards).toBe(0);
+    expect(during.rails).toBe(0);
+    await page.waitForSelector('#hub-reveal .sd-rail', { timeout: 8000 });
+    expect(await page.locator('#hub-reveal .sd-prep').count()).toBe(0);
+  });
+
+  test('force-paints a bounded lead, not the whole region', async ({ page }) => {
+    const { signed, conferences, teamNames } = conferenceFixture({ mine: 3, others: 14, walkOns: 4 });
+    await page.setViewportSize({ width: 1560, height: 940 });
+    await mountPool(page, {
+      week: 35, signed: null, conferences, teamNames, revealSeen: false,
+      savedEntries: [{ id: 'r-0', points: 12, playing_time: false }],
+      action: 'run', runResults: signed,
+    });
+    await page.waitForSelector('#hub-reveal .sd-rail', { timeout: 8000 });
+    const m = await page.evaluate(() => ({
+      ensured: (window.__ensured || []).length,
+      cards: window.__ensured ? null : null,
+    }));
+    // Painting all ~56 up front would be a 2-3 minute wait; the background warm covers
+    // the rest once the playhead is far enough ahead.
+    expect(m.ensured).toBeGreaterThan(0);
+    expect(m.ensured).toBeLessThanOrEqual(15);
+  });
+});
+
+test.describe('the end is announced', () => {
+  test('a modal names the season and offers one way out', async ({ page }) => {
+    await stage(page);
+    await page.click('#rv-end');
+    const m = await page.evaluate(() => {
+      const box = document.querySelector('#hub-reveal .sd-done');
+      return {
+        open: !!box,
+        title: box ? box.querySelector('.sd-done-t').textContent.trim() : null,
+        cta: box ? box.querySelector('.sd-done-cta').textContent.trim() : null,
+        headerBtns: document.querySelectorAll('#hub-reveal .sd-ctl button').length,
+      };
+    });
+    expect(m.open).toBe(true);
+    expect(m.title).toBe('Season 3 Signing Day is Complete');
+    expect(m.cta).toBe('Go To Locker Room');
+    // The header empties: a Continue button in the corner was what got missed.
+    expect(m.headerBtns).toBe(0);
+  });
+
+  test('its CTA leaves for the FCC', async ({ page }) => {
+    await stage(page);
+    await page.click('#rv-end');
+    const nav = page.waitForNavigation({ timeout: 5000 }).catch(() => null);
+    await page.click('.sd-done-cta');
+    await nav;
+    expect(page.url()).toContain('franchise-command-center');
+  });
+});
+
+test.describe('the clock', () => {
+  test('runs every second, not in five-second steps', async ({ page }) => {
+    await stage(page);
+    await page.click('#rv-skip');
+    const read = () => page.evaluate(() =>
+      document.getElementById('rv-clock').textContent.trim());
+    const a = await read();
+    await page.waitForTimeout(1300);
+    const b = await read();
+    await page.waitForTimeout(1300);
+    const c = await read();
+    // Three reads inside one 5s card hold: a static clock would report the same value
+    // every time.
+    expect(new Set([a, b, c]).size).toBeGreaterThan(1);
+  });
+});
+
 test.describe('week 36 league list', () => {
   test('groups by conference: yours, then sister, then ascending', async ({ page }) => {
     const { signed, conferences } = conferenceFixture();
@@ -717,21 +877,39 @@ test.describe('league list layout', () => {
   });
 
   test('the four cells stay on the same rails across teams', async ({ page }) => {
-    // Only the name flexes; if Pos/Yr/RT drifted per card, four columns would be
-    // unreadable.
-    const { signed, conferences } = conferenceFixture({ mine: 3, others: 14, walkOns: 4 });
-    await mountPool(page, { week: 36, signed, conferences, revealSeen: true });
-    const m = await page.evaluate(() => {
-      const cards = [...document.querySelectorAll('#hub-signings .lsteam')].slice(0, 4);
+    // The RT column used to be `auto`, so it sized to the widest RT in ITS OWN card.
+    // This fixture is built to expose that: one team's class tops out at A+/A++ and
+    // another's at F, so a content-sized column makes the two cards disagree and drags
+    // Pos and Yr to different offsets. Uniform rails are what make four columns
+    // scannable at all.
+    const { conferences, teamNames } = conferenceFixture({ mine: 0, others: 0, walkOns: 0 });
+    const ids = Object.keys(conferences.by_team_id).slice(0, 6);
+    const signed = [];
+    ids.forEach((tid, i) => {
+      // Alternate wide (A+/A++) and narrow (F) classes.
+      const rt = i % 2 === 0 ? 99 : 18;
+      for (let k = 0; k < 2; k += 1) {
+        signed.push({
+          recruit_id: `x-${i}-${k}`, player_id: `px-${i}-${k}`, image_id: `ix-${i}-${k}`,
+          name: k ? 'Al Vo' : 'Bartholomew Fitzwilliam',   // and divergent name lengths
+          pos: 'SF', year: 'Sophomore', rt, potential_rt_ratcheted: rt + 6,
+          team_id: tid, team_name: teamNames[tid],
+        });
+      }
+    });
+    await page.setViewportSize({ width: 1560, height: 940 });
+    await mountPool(page, { week: 36, signed, conferences, teamNames, revealSeen: true });
+    const rails = await page.evaluate(() => {
+      const cards = [...document.querySelectorAll('#hub-signings .lsteam')];
       return cards.map((c) => {
         const row = c.querySelector('.lsrow');
-        const box = (s) => row.querySelector(s).getBoundingClientRect();
         const left = c.getBoundingClientRect().left;
-        return [box('.lspos').left - left, box('.lsyr').left - left, box('.lsrt').right - left]
-          .map((n) => Math.round(n));
+        const at = (sel) => Math.round(row.querySelector(sel).getBoundingClientRect().left - left);
+        return [at('.lspos'), at('.lsyr'), at('.lsrt')];
       });
     });
-    for (const rails of m.slice(1)) expect(rails).toEqual(m[0]);
+    expect(rails.length).toBeGreaterThan(2);
+    for (const r of rails.slice(1)) expect(r).toEqual(rails[0]);
   });
 });
 

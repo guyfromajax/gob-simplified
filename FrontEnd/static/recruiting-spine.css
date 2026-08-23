@@ -560,9 +560,17 @@ tr.region-row td{padding:0;border:0}
 /* Seven equal columns, always — the row IS the season, so it never wraps or scrolls.
    aspect-ratio keeps them square; min-height keeps the content legible if the page
    is ever narrower than the squares want to be. */
+/* align-items defaults to STRETCH, and that is what makes every tile in the row the
+   same height — the filled ones set it and the empty ones follow. Set it to `start`
+   and the empty weeks collapse to their own content. Load-bearing; do not "tidy". */
 .vcal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:10px}
-.vwk{aspect-ratio:1/1;min-height:152px;min-width:0;display:flex;flex-direction:column;align-items:center;
-  gap:6px;padding:10px 10px 9px;border-radius:14px;border:1px solid var(--border-soft);
+/* Height comes from the CONTENT, not a forced square. aspect-ratio:1/1 held every tile
+   at 168px and the ladder had to be floated to the bottom of it, leaving ~29px of dead
+   air under the name. Grid stretch still makes every tile in the row identical — the
+   filled ones set the height and the empty ones follow — so they stay uniform without
+   being padded out. */
+.vwk{min-height:0;min-width:0;display:flex;flex-direction:column;align-items:center;
+  gap:5px;padding:10px 10px 9px;border-radius:14px;border:1px solid var(--border-soft);
   background:rgba(255,255,255,.022);overflow:hidden}
 /* Week, position, RT on one line — left, centre, right. A 1fr/auto/1fr grid, not
    space-between, so the position holds the tile's centre line whatever the week and RT
@@ -587,7 +595,10 @@ tr.region-row td{padding:0;border:0}
 /* Three fixed thirds, NOT flex: a lone lean must occupy one third and leave the other
    two empty, so a recruit with one lean and a recruit with three read as different
    states rather than as two full-width ladders. */
-.vwk-lean{width:100%;margin-top:auto}
+/* Sits directly under the name. The gap it used to leave came from aspect-ratio, not
+   from here — margin-top:auto had a fixed 168px square to push into. With the height
+   content-driven there is nothing to push into, so this is packing, not a fix. */
+.vwk-lean{width:100%;margin-top:1px}
 .vwk .lean-b{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;align-items:start}
 .vwk .lb-slot{width:auto;min-width:0;padding:3px 2px;gap:2px}
 .vwk .lb-slot .rk{font-size:7.5px}
@@ -598,7 +609,9 @@ tr.region-row td{padding:0;border:0}
 .vwk.is-filled{background:rgba(255,255,255,.045);border-color:var(--border)}
 
 /* Empty squares keep the same shape — the row must stay a row of seven. */
-.vwk-empty{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}
+/* Fills whatever height the filled tiles set, and centres within it. */
+.vwk-empty{flex:1;width:100%;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px}
 .vwk-mark{width:50px;height:50px;border-radius:10px;border:1px dashed var(--muted-3);background:transparent}
 .vwk-state{font:700 10.5px/1 var(--body);letter-spacing:.03em;color:var(--muted-2)}
 .vwk-note{font:500 9.5px/1 var(--body);color:var(--muted-3)}

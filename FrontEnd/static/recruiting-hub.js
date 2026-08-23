@@ -796,9 +796,6 @@
     bindHeadshotFallbacks(host);
   }
 
-  // Long enough to read the confirmation, short enough not to feel like a wait.
-  var SUBMIT_HOLD_MS = 2000;
-
   function saveBoard() {
     var btn = document.getElementById('dock-save'); if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
     Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-orders'), {
@@ -810,18 +807,19 @@
       clearSeedNotice();
       // The server copy now IS the board, so the draft has nothing left to preserve.
       clearDraft();
-      renderDock();
-      showToast();
-      // Submitting ends the visit in the Hub: the confirmation holds, then the player is
-      // returned to the locker room, where the green button is waiting on the next step.
+      // Straight to the locker room — no confirmation hold. The loading screen IS the
+      // acknowledgement, and a 2s toast in front of it read as a stall rather than a
+      // beat. No success toast either: it would be torn down by the navigation before
+      // anyone could read it.
       //
-      // Re-queried, NOT the `btn` captured above: renderDock() rebuilds the whole panel,
-      // so that reference is detached by now and disabling it guards nothing. The button
-      // is deliberately never re-armed on success — a second press during the hold would
-      // post the same board again and re-stamp board_saved_week.
+      // The button is disabled first and never re-armed: the navigation is not
+      // instantaneous, and a second press in that window would post the same board again
+      // and re-stamp board_saved_week. Re-queried, NOT the `btn` captured above —
+      // renderDock() above rebuilds the panel, so that reference is already detached.
+      renderDock();
       var live = document.getElementById('dock-save');
-      if (live) { live.disabled = true; live.textContent = 'Invites Submitted'; }
-      setTimeout(function () { window.location.href = Common.buildFccUrl(context); }, SUBMIT_HOLD_MS);
+      if (live) live.disabled = true;
+      window.location.href = Common.buildFccUrl(context);
     })
       .catch(function (err) {
         console.error(err);
@@ -1516,20 +1514,32 @@
     // else in the region is news, not defeat.
     var state_ = mine ? 'won' : (funded ? 'lost' : 'neutral');
     var team = teamNameOf(e.team_id, e.team_name);
-    // The signing line sits ABOVE the name, not on a bar across the portrait. Over the
-    // portrait it was white-on-white against an unpainted jersey and invisible — and it
-    // would keep clashing once uniforms paint, since team colours are arbitrary.
+    // The team's own branding IS the answer to the question the card asks, so the plate
+    // carries it. Typography alone could not make a 9.5px team name compete with a
+    // 430px portrait; a full-width banner does it without demoting the player's name.
+    //
+    // getTeamAssetPath (not a hand-built path): it resolves Team Builder overlays to
+    // generated art, so a franchise with custom chrome gets its own banner. All 129
+    // teams have one on disk, so there is no missing-asset case. banner_primary, not
+    // banner_card — the latter is a ~400px picker derivative and this plate is ~860.
+    var plate = '';
+    if (typeof getTeamAssetPath === 'function') {
+      plate = '<div class="sd-plate"><img src="' +
+        Common.escapeHtml(getTeamAssetPath(team, 'banner_primary')) + '" alt="" decoding="async"></div>';
+    }
     return '<div class="sd-card-wrap"><div class="sd-card is-' + state_ + '">' +
-      '<div class="sd-card-signed">' +
-        (mine ? 'Signed with you' : 'Signed with ' + Common.escapeHtml(team)) + '</div>' +
-      '<div class="sd-card-nm">' + Common.escapeHtml(e.name || '--') + '</div>' +
-      '<div class="sd-shot">' + signedShotHtml(e) + '</div>' +
+      '<div class="sd-card-lbl">' + (mine ? 'Signs with you' : 'Signs with') + '</div>' +
+      plate +
+      '<div class="sd-card-body">' +
+        signedShotHtml(e) +
+        '<div class="sd-card-id">' +
+          '<div class="sd-card-nm">' + Common.escapeHtml(e.name || '--') + '</div>' +
       '<div class="sd-meta">' +
         '<div><small>Pos</small><b>' + Common.escapeHtml(e.pos || '--') + '</b></div>' +
         '<div><small>Year</small><b>' + Common.escapeHtml(Common.formatYearAbbrev(e.year)) + '</b></div>' +
         '<div><small>RT</small><b class="' + Spine.rtClassForYear(e.rt, e.year) + '">' +
           Common.formatRtWithPotential(e.rt, e.potential_rt_ratcheted) + '</b></div>' +
-      '</div></div></div>';
+      '</div></div></div></div></div>';
   }
 
   /** One tile per funded recruit, in board order, resolving as his signing shows. */
@@ -1546,7 +1556,7 @@
       var r = state.byId[String(id)];
       var e = shownIds[String(id)];
       var cls = 'is-open';
-      var status = (funded[String(id)].points || 0) + ' pts · pending';
+      var status = (funded[String(id)].points || 0) + ' pts · unsigned';
       if (e) {
         if (isUserSigning(e)) { cls = 'is-won'; status = 'Signed with you'; }
         else { cls = 'is-lost'; status = 'Lost · ' + teamNameOf(e.team_id, e.team_name); }
@@ -1561,11 +1571,31 @@
       '<b>Funded Targets</b></div><div class="sd-tgts">' + tiles + '</div></div>';
   }
 
-  /** mm:ss left, from the cards actually remaining — never a hard-coded total. */
+  /**
+   * mm:ss left, from the cards actually remaining — never a hard-coded total.
+   *
+   * The card on screen counts down in real time: whole cards still ahead of it, plus
+   * whatever is unspent of its own hold. Counting whole cards alone made the clock sit
+   * still for five seconds and then jump.
+   */
   function revealTimeLeft(cardIndex) {
-    var left = Math.max(0, revealCards().length - cardIndex);
-    var secs = Math.round(left * REVEAL_HOLD_MS / 1000);
+    var whole = Math.max(0, revealCards().length - cardIndex);
+    var ms = whole * REVEAL_HOLD_MS;
+    if (whole > 0 && state.reveal.cardAt && !state.reveal.paused) {
+      ms -= Math.max(0, Math.min(REVEAL_HOLD_MS, Date.now() - state.reveal.cardAt));
+    }
+    var secs = Math.max(0, Math.round(ms / 1000));
     return Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
+  }
+
+  /** End-of-run announcement. Centre of screen, one action, impossible to miss. */
+  function revealDoneModalHtml(season) {
+    return '<div class="sd-done" role="dialog" aria-modal="true" aria-label="Signing Day complete">' +
+      '<div class="sd-done-box">' +
+        '<div class="sd-done-t">Season ' + Common.escapeHtml(String(season || '1')) +
+          ' Signing Day is Complete</div>' +
+        '<button class="sd-done-cta" id="rv-done" type="button">Go To Locker Room</button>' +
+      '</div></div>';
   }
 
   function revealHtml() {
@@ -1590,15 +1620,25 @@
     var remaining = nextUserIndex(cards, i);
     var mineLeft = cards.slice(i).filter(function (c) { return isUserSigning(c.entry); }).length;
 
-    var controls = state.reveal.done
-      ? '<button class="sd-btn is-go" id="rv-done" type="button">Continue</button>'
-      : '<button class="sd-btn is-pause" id="rv-pause" type="button" ' +
-          'aria-pressed="' + (state.reveal.paused ? 'true' : 'false') + '" ' +
-          'title="' + (state.reveal.paused ? 'Resume' : 'Pause') + '">' +
-          (state.reveal.paused ? '▶' : '❙❙') + '</button>' +
-        '<button class="sd-btn" id="rv-skip" type="button">' +
-          (remaining === -1 ? 'Skip To End' : 'Skip To My Next') + '</button>' +
-        (remaining === -1 ? '' : '<button class="sd-btn" id="rv-end" type="button">Skip To End</button>');
+    // Nothing in the header once it is over: the end is announced by a modal
+    // (revealDoneModalHtml) because a small Continue button in the top-right corner
+    // was being missed at the end of a five-minute screen.
+    // Nothing in the header once it is over: the end is announced by a modal
+    // (revealDoneModalHtml) because a small Continue button in the top-right corner
+    // was being missed at the end of a five-minute screen.
+    //
+    // Each control carries its keycap, and REVEAL_KEYS binds the same three keys — the
+    // cap is a promise, so the shortcut has to actually exist.
+    var controls = state.reveal.done ? '' :
+      '<button class="sd-btn is-pause" id="rv-pause" type="button" ' +
+        'aria-pressed="' + (state.reveal.paused ? 'true' : 'false') + '">' +
+        '<span class="ic">' + (state.reveal.paused ? '\u25B6' : '\u2759\u2759') + '</span>' +
+        (state.reveal.paused ? 'Resume' : 'Pause') + '<kbd>Space</kbd></button>' +
+      '<button class="sd-btn is-next" id="rv-skip" type="button">' +
+        '<span class="ic">\u25B6|</span>' +
+        (remaining === -1 ? 'No more of yours' : 'My Next') + '<kbd>N</kbd></button>' +
+      '<button class="sd-btn" id="rv-end" type="button">' +
+        '<span class="ic">\u25B6\u25B6</span>End<kbd>E</kbd></button>';
 
     var season = state.season || '';
     return '<div class="sd">' +
@@ -1609,7 +1649,7 @@
           ' Signings</b></div>' +
         '<div class="sd-prog"><div class="sd-prog-n"><b>' + i + '</b>of ' + cards.length +
           ' · Region ' + Common.escapeHtml(userRegion() || '--') +
-          ' · <b>' + revealTimeLeft(i) + '</b>left</div>' +
+          ' · <b id="rv-clock">' + revealTimeLeft(i) + '</b>left</div>' +
           '<div class="sd-prog-bar"><i style="width:' + pct.toFixed(1) + '%"></i></div></div>' +
         '<div class="sd-ctl">' + controls + '</div>' +
       '</div>' +
@@ -1626,6 +1666,7 @@
         }) +
       '</div>' +
       revealTargetsHtml(i) +
+      (state.reveal.done ? revealDoneModalHtml(season) : '') +
       '</div>';
   }
 
@@ -1670,6 +1711,7 @@
     state.reveal.prevNatRanks = prev;
 
     state.reveal.index = Math.max(0, Math.min(index, cards.length));
+    state.reveal.cardAt = Date.now();          // this card's hold starts now
     if (state.reveal.index >= cards.length) {
       state.reveal.done = true;
       stopReveal();
@@ -1682,18 +1724,64 @@
 
   function startRevealTimer() {
     stopReveal();
+    state.reveal.cardAt = Date.now();
     state.reveal.timer = setInterval(revealTick, REVEAL_HOLD_MS);
+    // The clock gets its own 1s interval. Driven off the card interval it moved in 5s
+    // steps, which reads as a stalled timer rather than a countdown. Only the clock
+    // text is repainted, so the card and both rails stay untouched.
+    stopRevealClock();
+    state.reveal.clock = setInterval(paintRevealClock, 1000);
+  }
+
+  /**
+   * Space / N / E, matching the keycaps printed on the controls.
+   *
+   * Bound on the document while the stage is up and removed when it closes — the
+   * reveal owns the screen, so it owns the keyboard. Ignored once the run is done so
+   * a stray keypress cannot act on a finished screen, and ignored while focus is in a
+   * field in case one ever appears here.
+   */
+  function revealKeyHandler(e) {
+    if (!document.getElementById('hub-reveal') || state.reveal.done) return;
+    var t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    var k = e.key;
+    if (k === ' ' || k === 'Spacebar') { e.preventDefault(); toggleRevealPause(); return; }
+    if (k === 'n' || k === 'N') {
+      e.preventDefault();
+      var cards = revealCards();
+      var next = nextUserIndex(cards, state.reveal.index);
+      revealTo(next === -1 ? cards.length : next + 1);
+      return;
+    }
+    if (k === 'e' || k === 'E') { e.preventDefault(); revealTo(revealCards().length); }
+  }
+
+  function bindRevealKeys(on) {
+    if (on) document.addEventListener('keydown', revealKeyHandler);
+    else document.removeEventListener('keydown', revealKeyHandler);
+  }
+
+  function stopRevealClock() {
+    if (state.reveal.clock) { clearInterval(state.reveal.clock); state.reveal.clock = null; }
+  }
+
+  /** Repaint just the countdown — no re-render, so nothing else moves. */
+  function paintRevealClock() {
+    var el = document.getElementById('rv-clock');
+    if (el) el.textContent = revealTimeLeft(state.reveal.index);
   }
 
   function toggleRevealPause() {
     if (state.reveal.done) return;
     state.reveal.paused = !state.reveal.paused;
-    if (state.reveal.paused) stopReveal(); else startRevealTimer();
+    if (state.reveal.paused) { stopReveal(); } else { startRevealTimer(); }
     renderReveal();
   }
 
   function stopReveal() {
     if (state.reveal.timer) { clearInterval(state.reveal.timer); state.reveal.timer = null; }
+    stopRevealClock();
   }
 
   /** Season-stamped so a refresh after submitting does not replay it. */
@@ -1708,11 +1796,48 @@
 
   function finishReveal() {
     stopReveal();
+    bindRevealKeys(false);
     revealMusic(false);
     var host = document.getElementById('hub-reveal');
     if (host) host.remove();
     // The confirm modal now comes BEFORE the run, so Continue leaves for the FCC.
     window.location.href = Common.buildFccUrl(context);
+  }
+
+  // How many masters to force-paint before the stage opens. The background warm on the
+  // server paints the whole region, but it starts cold and each master costs ~1.2s of
+  // CPU plus R2 round trips — so the playhead (one card per 5s) outran it and the first
+  // ~20 cards showed a blank white jersey. Painting this many up front puts the warm
+  // that far ahead, and it stays ahead for the rest of the run.
+  var REVEAL_PREPAINT = 15;
+
+  /**
+   * Force the first N cards' uniformed masters, then resolve.
+   *
+   * /player-image/ensure paints synchronously and returns `exists` when it is already
+   * there, so a second visit is nearly free. Failures resolve too: a master that cannot
+   * be painted must not hold the screen shut — the card falls back to paint-on-miss and
+   * then the generic frame, exactly as it does today.
+   */
+  function prepaintLead(cards) {
+    if (typeof API_CONFIG === 'undefined' || typeof API_CONFIG.ensurePlayerImage !== 'function') {
+      return Promise.resolve();
+    }
+    var ids = [];
+    for (var i = 0; i < cards.length && ids.length < REVEAL_PREPAINT; i++) {
+      var pid = cards[i].entry && cards[i].entry.player_id;
+      if (pid) ids.push(String(pid));
+    }
+    if (!ids.length) return Promise.resolve();
+    return Promise.all(ids.map(function (pid) {
+      return API_CONFIG.ensurePlayerImage(context.franchiseId, pid).catch(function () { return null; });
+    }));
+  }
+
+  function prepHostHtml() {
+    return '<div class="sd sd-prep"><div class="sd-prep-box">' +
+      '<div class="sd-prep-t">Prepping Signing Day</div>' +
+      '<div class="sd-prep-bar"><i></i></div></div></div>';
   }
 
   function startReveal() {
@@ -1731,8 +1856,15 @@
     host.className = 'rvhost';
     host.id = 'hub-reveal';
     document.body.appendChild(host);
-    renderReveal();
-    startRevealTimer();
+    // Hold on "Prepping Signing Day" until the lead is painted, so the opening cards
+    // arrive in team colours rather than blank white.
+    host.innerHTML = prepHostHtml();
+    bindRevealKeys(true);
+    prepaintLead(revealCards()).then(function () {
+      if (!document.getElementById('hub-reveal')) return;   // player left during the prep
+      renderReveal();
+      startRevealTimer();
+    });
   }
 
   function submitOrders() {

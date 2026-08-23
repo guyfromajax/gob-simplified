@@ -121,9 +121,10 @@ test.describe('week 35 — orders submitted', () => {
 test.describe('week 35 — before orders exist', () => {
   test('the green button still opens the board, with its cut offer intact', async ({ page }) => {
     const r = await runWith(page, { week: 35, ...NOT_SUBMITTED });
-    // week35-recruiting is the mode that raises "Cut Players?" before entering the hub.
-    // Renaming or re-pointing it here would silently drop the pre-recruiting cut.
-    expect(r.text).toBe('Recruiting');
+    // The label says what pressing it starts; the MODE is what matters structurally —
+    // week35-recruiting is what raises "Cut Players?" before entering the hub, so
+    // re-pointing it would silently drop the pre-recruiting cut.
+    expect(r.text).toBe('Run Signing Day');
     expect(r.mode).toBe('week35-recruiting');
   });
 

@@ -58,6 +58,13 @@ function fixture(o = {}) {
 
 async function mount(page, o = {}) {
   await page.setViewportSize({ width: 1500, height: 1100 });
+  // The real homepage is never used — setContent replaces the document on the next
+  // line. goto only supplies a same-origin URL (sessionStorage, location.search), so
+  // serve a stub and skip a full app page load per test. Under parallel workers those
+  // loads queue on the dev server and were the cause of intermittent timeouts here.
+  await page.route('**/', (route) => (route.request().resourceType() === 'document'
+    ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
+    : route.continue()));
   await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
   await page.setContent(`
     <style>${CSS}</style><style>body{margin:0}.doc{max-width:1440px;margin:0 auto;padding:16px}</style>

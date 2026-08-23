@@ -77,6 +77,13 @@ function fixture(o = {}) {
 
 async function mount(page, o = {}) {
   await page.setViewportSize({ width: o.width || 1440, height: 1200 });
+  // The real homepage is never used — setContent replaces the document on the next
+  // line. goto only supplies a same-origin URL (sessionStorage, location.search), so
+  // serve a stub and skip a full app page load per test. Under parallel workers those
+  // loads queue on the dev server and were the cause of intermittent timeouts here.
+  await page.route('**/', (route) => (route.request().resourceType() === 'document'
+    ? route.fulfill({ status: 200, contentType: 'text/html', body: '<!doctype html><title>o</title>' })
+    : route.continue()));
   await page.goto('/?franchise_id=fid-test&team_id=user-team-id');
   await page.setContent(`
     <style>${CSS}</style><style>body{margin:0}.doc{max-width:1360px;margin:0 auto;padding:20px}</style>
@@ -123,10 +130,12 @@ test.describe('shape', () => {
     expect(t.map((x) => x.week)).toEqual(WEEKS.map((w) => `Wk ${w}`));
     // One row: every tile shares a top edge.
     expect(new Set(t.map((x) => Math.round(x.top))).size).toBe(1);
-    // Actually square at the shipped page width (.doc caps at 1360), and all one size.
-    // min-height only takes over well below that, so a square here is a real square.
+    // One size, width AND height. The tiles were square until the layout was
+    // compressed — a forced aspect-ratio held them at 168px and the ladder had to be
+    // floated to the bottom of it. Height now comes from the content, and grid stretch
+    // is what keeps the row uniform: the filled tiles set it, the empty ones follow.
     expect(new Set(t.map((x) => Math.round(x.w))).size).toBe(1);
-    for (const x of t) expect(Math.abs(x.w - x.h)).toBeLessThan(1);
+    expect(new Set(t.map((x) => Math.round(x.h))).size).toBe(1);
   });
 
   test('nothing overflows its square, at 1440 or at 1280', async ({ page }) => {
@@ -137,6 +146,31 @@ test.describe('shape', () => {
           t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1).length);
       expect(bad, `width ${width}`).toBe(0);
     }
+  });
+
+  test('the ladder sits under the name, not floated to the floor', async ({ page }) => {
+    await mount(page, { week: 22, visits: { 20: 'r-1', 21: 'r-3' } });
+    const m = await page.evaluate(() => {
+      const f = document.querySelector('#hub-visits .vwk.is-filled');
+      const nm = f.querySelector('.vwk-nm').getBoundingClientRect();
+      const lean = f.querySelector('.vwk-lean').getBoundingClientRect();
+      return { gap: lean.top - nm.bottom, tileH: f.getBoundingClientRect().height };
+    });
+    // ~29px of dead air before: aspect-ratio:1/1 forced a 168px square and the ladder
+    // was floated to the bottom of it. Removing the forced square is the fix — the
+    // margin-top change alone does nothing once height follows content.
+    expect(m.gap).toBeLessThan(12);
+    expect(m.tileH).toBeLessThan(160);
+  });
+
+  test('an empty week is no taller than a spent one', async ({ page }) => {
+    await mount(page, { week: 22, visits: { 20: 'r-1', 21: 'r-3' } });
+    const m = await page.evaluate(() => {
+      const h = (sel) => Math.round(document.querySelector(sel).getBoundingClientRect().height);
+      return { filled: h('.vwk.is-filled'), upcoming: h('.vwk.is-upcoming'), pending: h('.vwk.is-pending') };
+    });
+    expect(m.upcoming).toBe(m.filled);
+    expect(m.pending).toBe(m.filled);
   });
 
   test('it sits above the invite board', async ({ page }) => {

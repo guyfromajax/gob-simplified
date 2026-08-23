@@ -195,14 +195,15 @@
     title.className = 'bn-title';
     title.textContent = opts.title || '';
 
+    var subText = opts.subtitle || '';
     var sub = document.createElement('div');
     sub.className = 'bn-sub';
-    sub.textContent = opts.subtitle || '';
+    sub.textContent = subText;
 
     head.appendChild(emblem);
     head.appendChild(eyebrow);
     head.appendChild(title);
-    head.appendChild(sub);
+    if (subText) head.appendChild(sub);
 
     var body = document.createElement('div');
     body.className = 'bn-body';
@@ -397,7 +398,9 @@
       emblemSvg: TROPHY_SVG,
       eyebrow: payload.eyebrow || '',
       title: opts.title || 'The Bracket Is Set!',
-      subtitle: opts.subtitle || 'Eight teams. One title. Here\u2019s the road ahead.',
+      subtitle: opts.subtitle !== undefined
+        ? opts.subtitle
+        : 'Eight teams. One title. Here\u2019s the road ahead.',
       ctaLabel: opts.ctaLabel || 'Got it',
       confettiCount: typeof opts.confettiCount === 'number' ? opts.confettiCount : 60,
       bodyNode: fit,
@@ -436,7 +439,7 @@
     presentedBracketUpdate = true;
     mountBracketModal(payload, topData, maps, {
       title: 'Tournament Update',
-      subtitle: 'Here\u2019s the latest bracket for your conference, region, or national path.',
+      subtitle: '',
       confettiCount: 0,
       revealMode: false,
       onDismiss: function () {

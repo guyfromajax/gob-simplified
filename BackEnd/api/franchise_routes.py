@@ -4035,6 +4035,10 @@ def _build_recruiting_results_modal_payload(
     team_id: str | None,
 ) -> dict[str, Any] | None:
     """Recruiting Results modal: first FCC entry after week-35 signings for the user team."""
+    # Imported locally, like every other user of it in this module — it is not a
+    # module-level name here.
+    from BackEnd.utils.rt_projection import POTENTIAL_RT_FIELD
+
     if not franchise_doc or not team_id:
         return None
     if not franchise_doc.get("week_35_recruiting_ran"):
@@ -4067,14 +4071,20 @@ def _build_recruiting_results_modal_payload(
                 "weight": player.get("weight"),
                 "year": player.get("year") or "JH",
                 "rt": player.get("rt"),
+                # The modal shows current/potential like every other recruit surface.
+                # Recorded at signing (_week_35_result_entry_from_recruit); None when
+                # there is no basis, which renders as the current grade alone.
+                POTENTIAL_RT_FIELD: player.get(POTENTIAL_RT_FIELD),
             }
         )
 
     return {
         "eligible": True,
         "recruits": recruits,
-        "count": len(recruits),
-        # NOTE: count reflects the capped list above, not the full signing class.
+        # The LIST is capped at five; the count is the real class size, so a coach who
+        # signed seven is not told they signed five.
+        "count": len(signed),
+        "shown": len(recruits),
     }
 
 

@@ -195,14 +195,13 @@
       showSammyModal({
         eyebrow: 'Week ' + (payload.week || '') + ' \u00b7 Invite Season',
         body: buildBody([recruit]),
-        ctaLabel: 'Go To Recruiting',
+        // Dismiss, not a jump. The player is already standing in the locker room —
+        // this modal is news, and sending them into the Recruits tab put them somewhere
+        // they had not asked to go. No onCta: the default no-op just closes it.
+        ctaLabel: 'Go To Locker Room',
         imageSrc: getTeamSammyImage(data.team || ''),
         modalClass: 'is-wide',
         primaryClass: 'is-orange',
-        onCta: function () {
-          var tab = document.querySelector('[data-tab="recruits-tab"]');
-          if (tab) tab.click();
-        },
       });
       return markSeen(fid);
     }).catch(function (err) {

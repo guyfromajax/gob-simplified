@@ -4098,6 +4098,14 @@ body.team-stats-page #franchise-container .fcc-team-stats-grid tbody tr.totals-r
   box-shadow:inset 3px 0 0 rgba(255,255,255,0.14);
 }
 
+/* Your own signings, once week 35 has run. Same row shape as the wire it replaces —
+   green rail because these are yours, which is the app-wide meaning of that colour. */
+.fcc-signed-row {
+  box-shadow:inset 3px 0 0 rgba(52,236,39,0.55);
+  background:rgba(52,236,39,0.05);
+}
+.fcc-signed-row .fcc-wire-line__wk { color:rgba(169,255,156,0.72); }
+
 .fcc-wire-line {
   display:flex; align-items:baseline; gap:8px; justify-content:space-between;
   font-family:'Inter', sans-serif; font-size:12px; line-height:1.45;

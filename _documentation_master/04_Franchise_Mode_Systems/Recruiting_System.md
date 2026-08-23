@@ -191,7 +191,7 @@ without a counter doing the arithmetic.
 | Region | Contents |
 |---|---|
 | Panel header | `Invite Board` · **shape tiles** (centred) · `n/20` · **Submit Invites**. No eyebrow, no footer bar. |
-| Submit | Posts the board, confirms *Invites Submitted*, holds `SUBMIT_HOLD_MS` (2000ms), returns to the FCC |
+| Submit | Posts the board, then leaves for the FCC immediately — the loading screen is the acknowledgement |
 | Position tiles | PG · SG · SF · PF · C with the board's count at each. All five always drawn, zero included — the gap is the point, and a tile that vanishes at zero hides what is worth seeing. Derived from `state.board` on every render, so they follow edits. |
 | Row | Headshot · name + archetype (+ visit pill) · Pos · RT (cur/pot) · Yr · Ht · Wt · Lean ladder · remove |
 | Visit pill | `1 visit` / `2 visits` … beside the archetype, on a recruit who has visited you |
@@ -230,8 +230,12 @@ year off-centre or out of the square. Real names fit at the tile's ~148px of usa
 width; an earlier build measured this with deliberately long fixture names and wrongly
 concluded the pair had to be split across two lines.
 
-Squares are square by `aspect-ratio`, with a `min-height` floor that only takes over well
-below the page's 1360px cap. **No counter and no eyebrow** — seven squares are already the
+Tile height comes from the **content**, not a forced square. `aspect-ratio: 1/1` held
+every tile at 168px, which forced the lean ladder to the bottom via `margin-top: auto`
+and left ~29px of dead air under the name; without it the row sits at ~143px. What keeps
+the seven uniform is the grid's default `align-items: stretch` — the filled tiles set the
+height, the empty ones follow. Set that to `start` and the upcoming weeks collapse to
+their own content, so it is load-bearing. **No counter and no eyebrow** — seven squares are already the
 count, and a number beside them restated the row.
 
 **Shape tiles** answer "what does this board look like" without reading twenty rows. Two
@@ -249,13 +253,15 @@ it. Counts are derived on each `renderDock()`, so they follow every edit. Years 
 `yearDisplay`, which is already the abbreviation `formatYearAbbrev` produced, so the tiles
 and the rows cannot drift.
 
-**Submitting ends the visit.** The confirmation holds for 2s, then the player is returned
-to the locker room where the green button is waiting on the next step. Two rules on that
-path:
+**Submitting ends the visit, immediately.** There is no confirmation hold and no success
+toast: the FCC's loading screen is the acknowledgement, and a 2s beat in front of it read
+as a stall. A toast would be torn down by the navigation before it could be read. Two
+rules survive on that path:
 
-- The button is **never re-armed on success** — a second press during the hold would post
-  the same board again and re-stamp `board_saved_week`. It has to be re-queried after
-  `renderDock()`, which rebuilds the panel and detaches the original reference.
+- The button is disabled and **never re-armed on success** — the navigation is not
+  instantaneous, and a second press in that window would post the same board again and
+  re-stamp `board_saved_week`. It must be re-queried after `renderDock()`, which rebuilds
+  the panel and detaches the original reference.
 - A **failed** submit neither navigates nor stays disabled: the board was not sent, so the
   player stays where they can retry, and the label returns to `Submit Invites`.
 
@@ -287,6 +293,9 @@ chrome announces the recruit visiting the user's team: *"Hey Coach, here is this
 - **Sammy image** comes from `getTeamSammyImage()`: the team-coloured portrait for the eight teams
   in `TEAM_COACH_ABBR` (conference 1), the generic white Sammy otherwise. No conference check of its
   own — the mapping already encodes it.
+- **CTA is `Go To Locker Room`**, and it only dismisses. It used to read
+  *Go To Recruiting* and click through to the Recruits tab — the player is already
+  standing in the locker room, and this modal is news, not a summons.
 - **No visit, no modal.** An empty board, or the user's pick losing the prestige-weighted draw,
   ends the week silently rather than announcing nothing.
 - **Once per week**, via `recruit_visit_modal_seen_week` and
