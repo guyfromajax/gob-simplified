@@ -19,7 +19,7 @@
 /* ---- sticky live shot-weights strip ---- */
 .playbooks-shot-weights-strip {
   position: sticky;
-  top: 74px;
+  top: var(--playbooks-sticky-under-header, 96px);
   z-index: 10;
   border: 1px solid var(--border);
   border-radius: 14px;

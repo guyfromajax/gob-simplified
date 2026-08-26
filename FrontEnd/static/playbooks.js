@@ -341,7 +341,20 @@
       await this.loadData();
       this.restoreDraftState();
       this.render();
+      this.syncStickyOffsets();
       this.scheduleShotWeightsPreview(true);
+    }
+
+    syncStickyOffsets() {
+      const body = document.querySelector(".playbooks-page-card-body");
+      const header = document.querySelector(".playbooks-page-card-header");
+      if (!body || !header) return;
+      const stickyTop = parseFloat(window.getComputedStyle(header).top) || 10;
+      const gap = 12;
+      body.style.setProperty(
+        "--playbooks-sticky-under-header",
+        `${Math.ceil(stickyTop + header.offsetHeight + gap)}px`
+      );
     }
 
     buildDraftStorageKey() {
@@ -471,6 +484,7 @@
         playSound("click-tiny.wav");
         this.normalizeSection("hcTraps");
       });
+      window.addEventListener("resize", () => this.syncStickyOffsets());
     }
 
     applyTab() {

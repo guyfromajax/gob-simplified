@@ -1698,8 +1698,6 @@ body.has-auth-bar #franchise-container {
 .fcc-tb-name {
   min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   font-weight: 500;
   color: rgba(255, 255, 255, 0.55);
 }
@@ -2188,7 +2186,8 @@ body.has-auth-bar #franchise-container {
   font-size: 13px;
   font-weight: 700;
   color: #ffffff;
-  text-decoration: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .fcc-standings-full-link:hover {

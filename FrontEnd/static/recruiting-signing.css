@@ -4,7 +4,7 @@
 .hub-body-sign{display:grid;grid-template-columns:minmax(0,1fr) 322px;gap:18px;padding:16px 22px 22px;align-items:start}
 
 /* ---------- main: working pool table ---------- */
-.spool{border:1px solid var(--border);border-radius:16px;background:var(--panel-2);overflow:hidden}
+.spool{border:1px solid var(--border);border-radius:16px;background:var(--panel-2);overflow-x:auto;overflow-y:hidden}
 .spool-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--hair);background:linear-gradient(180deg,rgba(247,148,32,.05),transparent)}
 .spool-title{font:400 24px/1 var(--display);letter-spacing:.02em}
 .spool-title small{display:block;font:700 9.5px/1 var(--body);letter-spacing:.14em;text-transform:uppercase;color:#ffc06a;margin-bottom:5px}
@@ -19,7 +19,7 @@
 .spool-region{height:32px;padding:0 26px 0 11px;border-radius:8px;border:1px solid var(--border);background:rgba(0,0,0,.26);color:var(--text);font:600 11.5px/1 var(--body);cursor:pointer;appearance:none}
 .spool-region:focus{outline:none;border-color:var(--muted-3)}
 
-.spool-colhdr,.prow{display:grid;grid-template-columns:minmax(170px,1fr) 42px 60px 62px 72px 186px 132px 138px;align-items:center;gap:10px}
+.spool-colhdr,.prow{display:grid;grid-template-columns:minmax(140px,1fr) 42px 56px 58px 68px minmax(120px,186px) minmax(108px,132px) minmax(108px,138px);align-items:center;gap:10px}
 .spool-colhdr{padding:9px 18px;font:800 9.5px/1 var(--body);letter-spacing:.09em;text-transform:uppercase;color:var(--muted-2);border-bottom:1px solid var(--border);background:rgba(255,255,255,.02);position:sticky;top:0;z-index:2}
 .spool-colhdr .c-num{text-align:center}
 .spool-rows{max-height:600px;overflow-y:auto}
@@ -125,7 +125,7 @@
 @media (max-width:1180px){
   .hub-body-sign{grid-template-columns:1fr}
   .rail{position:static;max-height:none;order:2}
-  .spool-colhdr,.prow{grid-template-columns:minmax(110px,1fr) 36px 48px 50px 60px 172px 110px 118px;gap:8px}
+  .spool-colhdr,.prow{grid-template-columns:minmax(110px,1fr) 36px 48px 50px 60px minmax(120px,172px) minmax(108px,110px) minmax(108px,118px);gap:8px}
 }
 
 /* ============================================================

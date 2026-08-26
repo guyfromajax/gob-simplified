@@ -479,7 +479,7 @@
       || player.team
       || 'Free Agent';
     const team = normalizeTeamName(rawTeam);
-    const heightValue = player.height || player.HT || 75;
+    const heightValue = player.height_in || player.height || player.HT || 75;
     const height = formatHeight(heightValue);
     const weightValue = player.weight || player.WT || '--';
     const jersey = (typeof player.jersey === 'number') ? player.jersey : (player.jersey !== undefined && player.jersey !== null && player.jersey !== '' ? player.jersey : '');
