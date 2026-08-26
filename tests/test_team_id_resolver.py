@@ -10,7 +10,8 @@ from BackEnd.utils.team_id_resolver import (
     resolve_team_id_to_canonical,
     resolve_team_id_to_object_id,
     _is_canonical_format,
-    _is_objectid_string
+    _is_objectid_string,
+    find_team_row,
 )
 
 
@@ -221,6 +222,39 @@ class TestErrorHandling:
                 "NONEXISTENT_TEAM",
                 teams_collection_override=mock_collection
             )
+
+
+class TestFindTeamRow:
+    """Fuzzy teams-slot lookup used by simulate-quarter score restore."""
+
+    def test_finds_row_when_id_is_objectid_and_slot_is_slug(self):
+        teams = {
+            "CHAPEL_HILL": {
+                "name": "Chapel Hill",
+                "team_id": "CHAPEL_HILL",
+                "score": 58,
+            },
+            "BENTLEY_TRUMAN": {
+                "name": "Bentley-Truman",
+                "team_id": "BENTLEY_TRUMAN",
+                "score": 51,
+            },
+        }
+        home = find_team_row(
+            teams,
+            "69a6fcb68d2c56aa82e48a5d",
+            "Chapel Hill",
+        )
+        away = find_team_row(
+            teams,
+            "69a6fcb68d2c56aa82e48a52",
+            "Bentley-Truman",
+        )
+        assert home["score"] == 58
+        assert away["score"] == 51
+
+    def test_returns_empty_when_no_candidates_match(self):
+        assert find_team_row({"CHAPEL_HILL": {"name": "Chapel Hill"}}, "nope") == {}
 
 
 if __name__ == "__main__":

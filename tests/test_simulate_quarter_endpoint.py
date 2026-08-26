@@ -512,3 +512,238 @@ def test_simulate_quarter_restores_team_stats_from_legacy_team_fields(monkeypatc
     assert gm.team_totals["Away"]["PTS"] == 52
     assert gm.game_state["points_by_quarter"]["Home"] == [14, 17, 17, 0]
     assert gm.game_state["points_by_quarter"]["Away"] == [13, 18, 21, 0]
+
+
+def test_reconcile_zero_team_score_with_player_pts():
+    class Team:
+        def __init__(self, name):
+            self.name = name
+
+    class GM:
+        def __init__(self):
+            self.home_team = Team("Chapel Hill")
+            self.away_team = Team("Bentley-Truman")
+            self.score = {"Chapel Hill": 0, "Bentley-Truman": 0}
+            self.team_totals = {"Chapel Hill": {}, "Bentley-Truman": {}}
+
+    gm = GM()
+    api._reconcile_zero_team_score_with_player_pts(
+        gm,
+        {
+            "players": [
+                {"team": "home", "stats": {"PTS": 42}},
+                {"team": "away", "stats": {"PTS": 28}},
+            ]
+        },
+    )
+    assert gm.score["Chapel Hill"] == 42
+    assert gm.score["Bentley-Truman"] == 28
+    assert gm.team_totals["Chapel Hill"]["PTS"] == 42
+    assert gm.team_totals["Bentley-Truman"]["PTS"] == 28
+
+
+def test_reconcile_does_not_overwrite_nonzero_scores():
+    class Team:
+        def __init__(self, name):
+            self.name = name
+
+    class GM:
+        def __init__(self):
+            self.home_team = Team("Chapel Hill")
+            self.away_team = Team("Bentley-Truman")
+            self.score = {"Chapel Hill": 58, "Bentley-Truman": 51}
+            self.team_totals = {}
+
+    gm = GM()
+    api._reconcile_zero_team_score_with_player_pts(
+        gm,
+        {"players": [{"team": "home", "stats": {"PTS": 42}}]},
+    )
+    assert gm.score["Chapel Hill"] == 58
+    assert gm.score["Bentley-Truman"] == 51
+
+
+def _quarter_restore_dummies(home_team_id="home-id", away_team_id="away-id"):
+    class DummyCollection:
+        def __init__(self, doc):
+            self.doc = doc
+
+        def find_one(self, query, *_args, **_kwargs):
+            return self.doc if query.get("_id") == self.doc.get("_id") else None
+
+        def update_one(self, *_args, **_kwargs):
+            return None
+
+    class DummyTeam:
+        def __init__(self, name: str, team_id: str):
+            self.name = name
+            self.team_id = team_id
+            self.team_fouls = 0
+            self.timeouts = 4
+            self.strategy_settings = {}
+            self.playbook_settings = {}
+            self.lineup = {"PG": object()}
+
+        def get_player_by_id(self, _player_id):
+            return None
+
+    class DummyGM:
+        def __init__(self, home: str, away: str, **_kwargs):
+            self.home_team = DummyTeam(home, home_team_id)
+            self.away_team = DummyTeam(away, away_team_id)
+            self.quarter = 1
+            self.score = {home: 0, away: 0}
+            self.team_totals = {home: {}, away: {}}
+            self.game_state = {
+                "score": self.score,
+                "start_box_score": {},
+                "points_by_quarter": {home: [0, 0, 0, 0], away: [0, 0, 0, 0]},
+            }
+            self.turns = []
+
+    def fake_simulate_quarter(_gm, _home_lineup, _away_lineup, _game_id, *_args, **_kwargs):
+        return None
+
+    def fake_summarize_game_state(gm, **_kwargs):
+        return {
+            "score": dict(gm.score),
+            "teams": {
+                gm.home_team.team_id: {
+                    "name": gm.home_team.name,
+                    "totals": gm.team_totals[gm.home_team.name],
+                    "points_by_quarter": gm.game_state["points_by_quarter"][gm.home_team.name],
+                },
+                gm.away_team.team_id: {
+                    "name": gm.away_team.name,
+                    "totals": gm.team_totals[gm.away_team.name],
+                    "points_by_quarter": gm.game_state["points_by_quarter"][gm.away_team.name],
+                },
+            },
+        }
+
+    return DummyCollection, DummyGM, fake_simulate_quarter, fake_summarize_game_state
+
+
+def test_simulate_quarter_restores_score_when_team_id_is_objectid(monkeypatch):
+    """Week-18 resume shape: home_team_id is an ObjectId, teams slots are slugs."""
+    DummyCollection, DummyGM, fake_simulate_quarter, fake_summarize_game_state = (
+        _quarter_restore_dummies()
+    )
+    saved_doc = {
+        "_id": "gid-objectid-mismatch",
+        "quarter": 4,
+        "home_team_id": "69a6fcb68d2c56aa82e48a5d",
+        "away_team_id": "69a6fcb68d2c56aa82e48a52",
+        "teams": {
+            "CHAPEL_HILL": {
+                "name": "Chapel Hill",
+                "team_id": "CHAPEL_HILL",
+                "score": 58,
+                "team_fouls": 4,
+                "timeouts": 2,
+                "totals": {"PTS": 58},
+                "points_by_quarter": [18, 20, 20, 0],
+            },
+            "BENTLEY_TRUMAN": {
+                "name": "Bentley-Truman",
+                "team_id": "BENTLEY_TRUMAN",
+                "score": 51,
+                "team_fouls": 5,
+                "timeouts": 1,
+                "totals": {"PTS": 51},
+                "points_by_quarter": [15, 18, 18, 0],
+            },
+        },
+        "players": [
+            {"playerId": "p1", "team": "home", "stats": {"PTS": 22}},
+            {"playerId": "p2", "team": "away", "stats": {"PTS": 18}},
+        ],
+        "game_stats_initialized": True,
+    }
+
+    monkeypatch.setattr(api, "GameManager", DummyGM)
+    monkeypatch.setattr(api, "simulate_quarter", fake_simulate_quarter)
+    monkeypatch.setattr(api, "summarize_game_state", fake_summarize_game_state)
+    monkeypatch.setattr(api, "games_collection", DummyCollection(saved_doc))
+    monkeypatch.setattr(
+        "BackEnd.utils.team_settings_manager.load_and_apply_team_settings_to_gamemanager",
+        lambda **_kwargs: ({}, {}, {}, {}),
+    )
+    monkeypatch.setattr(api, "ongoing_games", {})
+
+    response = client.post(
+        "/api/simulate-quarter",
+        json={
+            "game_id": "gid-objectid-mismatch",
+            "home_team": "Chapel Hill",
+            "away_team": "Bentley-Truman",
+            "quarter": 4,
+            "mode": "single",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    gm = api.ongoing_games["gid-objectid-mismatch"]
+
+    assert payload["score"]["Chapel Hill"] == 58
+    assert payload["score"]["Bentley-Truman"] == 51
+    assert gm.score["Chapel Hill"] == 58
+    assert gm.score["Bentley-Truman"] == 51
+    assert gm.game_state["points_by_quarter"]["Chapel Hill"] == [18, 20, 20, 0]
+    assert gm.game_state["points_by_quarter"]["Bentley-Truman"] == [15, 18, 18, 0]
+
+
+def test_simulate_quarter_reconstructs_score_from_player_pts_when_team_score_zero(monkeypatch):
+    """Saved teams.score is 0 but players[] already have a box — do not sim from 0-0."""
+    DummyCollection, DummyGM, fake_simulate_quarter, fake_summarize_game_state = (
+        _quarter_restore_dummies()
+    )
+    saved_doc = {
+        "_id": "gid-zero-score-live-box",
+        "quarter": 4,
+        "home_team_id": "home-id",
+        "away_team_id": "away-id",
+        "teams": {
+            "home-id": {
+                "name": "Chapel Hill",
+                "score": 0,
+                "points_by_quarter": [0, 0, 0, 0],
+            },
+            "away-id": {
+                "name": "Bentley-Truman",
+                "score": 0,
+                "points_by_quarter": [0, 0, 0, 0],
+            },
+        },
+        "players": [
+            {"playerId": "p1", "team": "home", "stats": {"PTS": 42}},
+            {"playerId": "p2", "team": "away", "stats": {"PTS": 28}},
+        ],
+        "game_stats_initialized": True,
+    }
+
+    monkeypatch.setattr(api, "GameManager", DummyGM)
+    monkeypatch.setattr(api, "simulate_quarter", fake_simulate_quarter)
+    monkeypatch.setattr(api, "summarize_game_state", fake_summarize_game_state)
+    monkeypatch.setattr(api, "games_collection", DummyCollection(saved_doc))
+    monkeypatch.setattr(
+        "BackEnd.utils.team_settings_manager.load_and_apply_team_settings_to_gamemanager",
+        lambda **_kwargs: ({}, {}, {}, {}),
+    )
+    monkeypatch.setattr(api, "ongoing_games", {})
+
+    response = client.post(
+        "/api/simulate-quarter",
+        json={
+            "game_id": "gid-zero-score-live-box",
+            "home_team": "Chapel Hill",
+            "away_team": "Bentley-Truman",
+            "quarter": 4,
+            "mode": "single",
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+
+    assert payload["score"]["Chapel Hill"] == 42
+    assert payload["score"]["Bentley-Truman"] == 28

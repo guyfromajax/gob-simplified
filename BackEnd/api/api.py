@@ -3,6 +3,7 @@ import re
 import sys
 import os
 import copy
+import logging
 # ✅ PERFORMANCE: Removed debug print statements - use logger instead
 
 # Sentry - init before FastAPI (captures unhandled exceptions)
@@ -43,6 +44,71 @@ def _persisted_strategy_settings(team) -> dict:
     if isinstance(base, dict) and base:
         return base
     return getattr(team, "strategy_settings", {}) or {}
+
+
+def _saved_player_pts_by_side(saved: dict | None) -> tuple[int, int]:
+    """Sum ``players[].stats.PTS`` for home / away sides."""
+    home_pts = 0
+    away_pts = 0
+    if not isinstance(saved, dict):
+        return home_pts, away_pts
+    for row in saved.get("players") or []:
+        if not isinstance(row, dict):
+            continue
+        stats = row.get("stats") if isinstance(row.get("stats"), dict) else {}
+        try:
+            pts = int(stats.get("PTS") or 0)
+        except (TypeError, ValueError):
+            pts = 0
+        side = str(row.get("team") or "").strip().lower()
+        if side == "home":
+            home_pts += pts
+        elif side == "away":
+            away_pts += pts
+    return home_pts, away_pts
+
+
+def _reconcile_zero_team_score_with_player_pts(gm, saved: dict | None) -> None:
+    """Refuse to sim from 0-0 when the restored box already has points.
+
+    Player stats restore from top-level ``players[]``. Team score restores from
+    ``teams[home_team_id].score``. If that key misses, Q4 starts 0-0 with a live
+    box — a 42-point scorer in a 35-point team total. Reconstruct from PTS.
+    """
+    if gm is None or not isinstance(saved, dict):
+        return
+    home_name = getattr(getattr(gm, "home_team", None), "name", None)
+    away_name = getattr(getattr(gm, "away_team", None), "name", None)
+    if not home_name or not away_name:
+        return
+    score = getattr(gm, "score", None)
+    if not isinstance(score, dict):
+        return
+    try:
+        home_score = int(score.get(home_name) or 0)
+        away_score = int(score.get(away_name) or 0)
+    except (TypeError, ValueError):
+        return
+    if home_score or away_score:
+        return
+    home_pts, away_pts = _saved_player_pts_by_side(saved)
+    if home_pts == 0 and away_pts == 0:
+        return
+    logging.warning(
+        "🧭 [SCORE_RESTORE] team scores were 0-0 with player PTS home=%s away=%s; reconstructing from box",
+        home_pts,
+        away_pts,
+    )
+    gm.score[home_name] = home_pts
+    gm.score[away_name] = away_pts
+    totals = getattr(gm, "team_totals", None)
+    if isinstance(totals, dict):
+        home_tot = totals.setdefault(home_name, {})
+        away_tot = totals.setdefault(away_name, {})
+        if isinstance(home_tot, dict) and not int(home_tot.get("PTS") or 0):
+            home_tot["PTS"] = home_pts
+        if isinstance(away_tot, dict) and not int(away_tot.get("PTS") or 0):
+            away_tot["PTS"] = away_pts
 
 _startup_error = None
 try:
@@ -3577,9 +3643,29 @@ try:
                         away_team_id = saved.get("away_team_id")
                         teams_obj = saved.get("teams", {})
                         
-                        # Get team data from unified teams object
-                        home_team_data = teams_obj.get(home_team_id, {}) if home_team_id and teams_obj else {}
-                        away_team_data = teams_obj.get(away_team_id, {}) if away_team_id and teams_obj else {}
+                        # Get team data from unified teams object (slug / ObjectId / name)
+                        from BackEnd.utils.team_id_resolver import find_team_row
+
+                        home_team_data = (
+                            find_team_row(
+                                teams_obj,
+                                home_team_id,
+                                getattr(body, "home_team", None),
+                                saved.get("home_team_name"),
+                            )
+                            if isinstance(teams_obj, dict) and teams_obj
+                            else {}
+                        )
+                        away_team_data = (
+                            find_team_row(
+                                teams_obj,
+                                away_team_id,
+                                getattr(body, "away_team", None),
+                                saved.get("away_team_name"),
+                            )
+                            if isinstance(teams_obj, dict) and teams_obj
+                            else {}
+                        )
                         
                         # Extract team names from teams object
                         home = home_team_data.get("name") if home_team_data else None
@@ -3916,10 +4002,25 @@ try:
                                 # then fallback to legacy home_team/away_team documents.
                                 restore_home_team_data = {}
                                 restore_away_team_data = {}
-                                if home_team_id and isinstance(teams_obj, dict):
-                                    restore_home_team_data = teams_obj.get(home_team_id, {}) or {}
-                                if away_team_id and isinstance(teams_obj, dict):
-                                    restore_away_team_data = teams_obj.get(away_team_id, {}) or {}
+                                if isinstance(teams_obj, dict) and teams_obj:
+                                    from BackEnd.utils.team_id_resolver import find_team_row
+
+                                    restore_home_team_data = find_team_row(
+                                        teams_obj,
+                                        home_team_id,
+                                        getattr(gm.home_team, "team_id", None),
+                                        getattr(gm.home_team, "name", None),
+                                        saved.get("home_team_name"),
+                                        getattr(body, "home_team", None),
+                                    ) or {}
+                                    restore_away_team_data = find_team_row(
+                                        teams_obj,
+                                        away_team_id,
+                                        getattr(gm.away_team, "team_id", None),
+                                        getattr(gm.away_team, "name", None),
+                                        saved.get("away_team_name"),
+                                        getattr(body, "away_team", None),
+                                    ) or {}
                                 if not restore_home_team_data and isinstance(saved.get("home_team"), dict):
                                     restore_home_team_data = saved.get("home_team", {})
                                 if not restore_away_team_data and isinstance(saved.get("away_team"), dict):
@@ -3982,6 +4083,7 @@ try:
                                         "(game_id=%s); gm.game_stats_initialized will stay False → risk of stats reset in simulate_quarter",
                                         game_id,
                                     )
+                                _reconcile_zero_team_score_with_player_pts(gm, saved)
                             else:
                                 # New Q1 game - ensure stats are zeroed
                                 gm.score = {gm.home_team.name: 0, gm.away_team.name: 0}

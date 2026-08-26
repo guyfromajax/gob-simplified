@@ -346,3 +346,54 @@ def resolve_team_id_to_object_id(
         f"Cannot resolve canonical team_id '{canonical_id}' to ObjectId string"
     )
 
+
+def _norm_team_lookup_key(value) -> str:
+    return str(value or "").strip().lower().replace(" ", "_").replace("-", "_")
+
+
+def _norm_team_lookup_keys(value) -> set[str]:
+    """Normalized identity tokens for a team id / name / slug."""
+    from BackEnd.utils.team_slug import identity_slugs_for_display_name
+
+    out = {_norm_team_lookup_key(value)}
+    if value is None or value == "":
+        return out
+    raw = str(value).strip()
+    if not raw:
+        return out
+    for slug in identity_slugs_for_display_name(raw):
+        out.add(slug)
+        out.add(_norm_team_lookup_key(slug))
+    return out
+
+
+def find_team_row(teams: dict | None, *candidates) -> dict:
+    """Locate a ``teams`` slot by ObjectId, slug, or display name.
+
+    Exact ``teams.get(home_team_id)`` misses when the document keys are slugs
+    and ``home_team_id`` is an ObjectId (or the reverse). Resume-state already
+    fuzzy-matches; simulate-quarter restore must too, or Qn restarts 0-0 while
+    ``players[]`` keep their box.
+    """
+    if not isinstance(teams, dict):
+        return {}
+    raw_candidates = [str(c) for c in candidates if c is not None and str(c) != ""]
+    normalized: set[str] = set()
+    for candidate in raw_candidates:
+        normalized |= _norm_team_lookup_keys(candidate)
+    for candidate in raw_candidates:
+        row = teams.get(candidate)
+        if isinstance(row, dict):
+            return row
+    for key, row in teams.items():
+        if not isinstance(row, dict):
+            continue
+        if _norm_team_lookup_keys(key) & normalized:
+            return row
+        row_tokens: set[str] = set()
+        for field in ("team_id", "_id", "name", "slug"):
+            row_tokens |= _norm_team_lookup_keys(row.get(field))
+        if normalized.intersection(row_tokens):
+            return row
+    return {}
+

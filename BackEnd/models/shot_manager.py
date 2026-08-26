@@ -1967,8 +1967,6 @@ class ShotManager:
             # print(f"🎯 SCORING DEBUG: Awarded {points} points to {get_name_safe(shooter)} (position: {get_player_position(off_lineup, shooter)})")
 
             possession_flips = True
-            if screener:
-                screener.record_stat("SCR_S")
 
             if d_foul:
                 possession_flips = False
@@ -3090,12 +3088,11 @@ class ShotManager:
 
         # Help defense removed (will be replaced with location-based check in future)
 
-        # Screener bonus
+        # Screener bonus (shot math only; SCR_A / SCR_S come from the executed skeleton)
         if screener and screener != shooter:
             screen_attrs = screener.attributes
             screen_score = calculate_screen_score(screen_attrs)
             shot_score += screen_score * 0.15
-            screener.record_stat("SCR_A")
 
         # Gravity contribution from off-ball players
         off_lineup = self.game.offense_team.lineup

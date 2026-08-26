@@ -7485,7 +7485,34 @@ def resolve_final_turn_shot_logic(game, o_destinations, d_destinations, position
             game_state["mo_final_shot_maker_id"] = _fs_id
     shot_result["current_turn"] = shot_result.get("current_turn", "HCO")
     shot_result["offense_team_id"] = off_team.team_id
+    record_hco_screen_stats(
+        skeleton, off_lineup, shot_made=shot_result.get("result_type") == "MAKE"
+    )
     return shot_result
+
+
+def record_hco_screen_stats(skeleton, off_lineup, shot_made=False):
+    """Credit screen attempts from the executed skeleton's pos_actions.
+
+    Live play skeletons store screens as ``pos_actions[pos].action == "screen"``
+    with empty ``events``. Each such action is one SCR_A for that slot. SCR_S
+    follows the live shot rule: the same attempts succeed when the possession's
+    shot is made.
+    """
+    if not skeleton or not off_lineup:
+        return
+    for step in skeleton.get("steps") or []:
+        pos_actions = step.get("pos_actions") or {}
+        for pos, action_info in pos_actions.items():
+            action = ((action_info or {}).get("action") or "").lower().strip()
+            if action != "screen":
+                continue
+            player = off_lineup.get(pos)
+            if not player:
+                continue
+            player.record_stat("SCR_A")
+            if shot_made:
+                player.record_stat("SCR_S")
 
 
 def resolve_half_court_offense_logic(game):
@@ -8142,6 +8169,7 @@ def resolve_half_court_offense_logic(game):
         event_type = "SHOT"
 
     if event_type != "SHOT":
+        record_hco_screen_stats(skeleton, off_lineup, shot_made=False)
         # ✅ STOPER SYSTEM: Populate roles for stopper results using SS&S helper functions
         # Use same player determination logic as FCP/HCT for consistency
         
@@ -8616,6 +8644,9 @@ def resolve_half_court_offense_logic(game):
     shot_result = game.shot_manager.resolve_shot(
         roles,
         shot_attempt_geometry=shot_attempt_geometry,
+    )
+    record_hco_screen_stats(
+        skeleton, off_lineup, shot_made=shot_result.get("result_type") == "MAKE"
     )
     attach_position_snapshots(shot_result, [hco_snap])
     # UESS single-coord-source: reuse the finalized single build for the step
