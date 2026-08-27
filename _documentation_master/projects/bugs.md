@@ -3,6 +3,20 @@
 2. Improve FB Outlet Pass denied animation
 3. Latest Sentry bug report
 4. Week 1 upcoming games card during training
+5. Legacy shot handler crashes on turns with no animations[] (`ShotAnimationSystem.runSetupTween`)
+   - Symptom: `TypeError: turnData.animations is not iterable`. Caught by `processShot`, so no crash,
+     but that shot silently does not animate (possession appears to skip its shot).
+   - A SHOT_ATTEMPT reached the LEGACY handler carrying no `animations[]`. Schema turns bypass these
+     handlers entirely, so this is either (a) an un-migrated path whose backend emit produced nothing,
+     or (b) a routing bug where a turn WITH `animation_steps[]` was sent to the legacy handler anyway.
+   - NOT fixed with a `|| []` guard on purpose: that would silence the console and hide the emission
+     failure behind a shot that quietly does not animate. A `[SHOT-NO-ANIM]` diagnostic is in place
+     (2026-08-27) logging result_type / current_turn / fast_break_play / hasAnimationSteps / turnKeys.
+     `hasAnimationSteps: true` => routing bug. `false` => upstream emission bug.
+   - Next occurrence identifies the culprit; fix by migrating that path, then delete the diagnostic block.
+   - Related: `ShotAnimationSystem.js` guards `turnData.animations` inconsistently (guarded at 295/479/486,
+     bare at 352/455/572/666). Sites 572/666 remain unguarded on the final_turn-skips-setup path.
+   - Pre-existing; unrelated to the animation cleanup pass.
 
 ##Playtest Launch / In Progress
 1. Steam Video

@@ -393,6 +393,19 @@ def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
     return STANDARD_GRID_PER_GAME_SEC * ag_scale
 
 
+#: Public alias — **the** archetype rate function. Step emitters must import
+#: this rather than keep a local copy.
+#:
+#: `rim_runner_step_emitter` and `covert_release_step_emitter` each carried a
+#: near-identical private copy, and both were missing the ``drift`` branch, so
+#: drift silently resolved to ``standard`` (14 instead of 8 — a 75% overspeed)
+#: anywhere those emitters ran. Their docstrings had also gone stale, still
+#: claiming an AG=50 anchor of 12 after ``STANDARD_GRID_PER_GAME_SEC`` moved to
+#: 14. Adding an archetype in one place and not the other three is the failure
+#: mode; one implementation removes it.
+ag_grid_per_game_sec = _ag_grid_per_game_sec
+
+
 def drift_or_hold_coord(
     player: Any,
     start: GridCoord,

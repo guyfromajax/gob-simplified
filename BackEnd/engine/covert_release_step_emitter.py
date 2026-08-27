@@ -839,44 +839,13 @@ def _build_cr_drive_resolution_animation_steps(
     return steps or None
 
 
-def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
-    """Look up grid/game-sec rate for the given player + archetype.
-
-    ``ag_to_grid_per_game_sec`` is the base AG curve (AG=50 → 16). Archetype
-    multipliers come from constants (sprint=14/12, drive=1.0, shot_motion=10/12).
-    Matches the rate calculation in ``calc_ag_segment_seconds``.
-    """
-    try:
-        from BackEnd.utils.shared import ag_to_grid_per_game_sec
-        from BackEnd.constants import (
-            BURST_GRID_PER_GAME_SEC,
-            CRUISE_GRID_PER_GAME_SEC,
-            STANDARD_GRID_PER_GAME_SEC,
-            SHOT_MOTION_GRID_PER_GAME_SEC,
-            SPRINT_GRID_PER_GAME_SEC,
-        )
-    except Exception:
-        # Test-context fallback: AG=50 sprint ≈ 18.67 grid/sec.
-        return 18.67
-
-    if player is None:
-        ag = 50
-    else:
-        attrs = getattr(player, "attributes", None) or {}
-        ag = attrs.get("AG", 50) if isinstance(attrs, dict) else 50
-    ag_scale = float(ag_to_grid_per_game_sec(ag)) / float(STANDARD_GRID_PER_GAME_SEC)
-    if archetype == "standard":
-        return STANDARD_GRID_PER_GAME_SEC * ag_scale
-    if archetype in ("shot_motion", "compressed_hco"):
-        return SHOT_MOTION_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "sprint":
-        return SPRINT_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "burst":
-        return BURST_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "cruise":
-        return CRUISE_GRID_PER_GAME_SEC * ag_scale
-    # default / stationary / unknown → base AG rate.
-    return STANDARD_GRID_PER_GAME_SEC * ag_scale
+# Archetype rate: single shared implementation in animation_step_helpers.
+# This module previously kept its own copy that omitted the `drift` branch,
+# so drift resolved to `standard` (14 instead of 8). Aliased to the private
+# name so existing call sites in this file are unchanged.
+from BackEnd.utils.animation_step_helpers import (  # noqa: E402
+    ag_grid_per_game_sec as _ag_grid_per_game_sec,
+)
 
 
 def _traversal_seconds(start: GridCoord, end: GridCoord, rate: float) -> float:

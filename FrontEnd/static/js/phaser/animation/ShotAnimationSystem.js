@@ -416,11 +416,42 @@ export class ShotAnimationSystem {
    */
   async runSetupTween(turnData, ballSprite, currentBallOwnerRef) {
     if (this.scene.skipToEnd) return;
-    
+
+    // Diagnostic, not a guard. A SHOT_ATTEMPT reaching this LEGACY handler with
+    // no `animations[]` means the backend emitted no animation payload for the
+    // turn — schema turns bypass these handlers entirely. Defaulting to `[]`
+    // here would silence the console and make the shot quietly not animate,
+    // hiding the emission failure. So we still throw; we just say who did it.
+    //
+    // Delete this block once the offending path is identified and migrated.
+    if (!Array.isArray(turnData?.animations)) {
+      const steps = turnData?.animation_steps;
+      console.error('[SHOT-NO-ANIM] legacy shot handler got a turn with no animations[]', {
+        turnIndex: turnData?.index ?? null,
+        resultType: turnData?.result_type ?? null,
+        currentTurn: turnData?.current_turn ?? null,
+        fastBreakPlay: turnData?.fast_break_play ?? null,
+        isFastBreak: turnData?.fast_break ?? null,
+        finalTurn: turnData?.final_turn ?? null,
+        // If steps ARE present, the bug is routing (should have gone to schema
+        // playback). If absent, the bug is upstream emission.
+        hasAnimationSteps: Array.isArray(steps),
+        animationStepsCount: Array.isArray(steps) ? steps.length : 0,
+        animationsType: typeof turnData?.animations,
+        hasShooter: !!(turnData?.shooter || turnData?.ball_handler),
+        turnKeys: turnData ? Object.keys(turnData).sort() : null,
+      });
+      throw new TypeError(
+        `runSetupTween: turn has no animations[] `
+        + `(result_type=${turnData?.result_type}, current_turn=${turnData?.current_turn}, `
+        + `animation_steps=${Array.isArray(steps) ? steps.length : 'absent'})`,
+      );
+    }
+
     // getPlayerDuration is already imported at top of file
     const stepIndex = 0;
     const promises = [];
-    
+
     for (const anim of turnData.animations) {
       if (this.scene.skipToEnd) break;
       const sprite = this.playerSprites[anim.playerId];

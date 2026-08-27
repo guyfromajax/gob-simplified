@@ -221,40 +221,13 @@ def _is_offense_player(pid: str, off_lineup: Dict[str, Any]) -> bool:
 # --- AG-rate / interrupted-coord math ---------------------------------------
 
 
-def _ag_grid_per_game_sec(player: Any, archetype: PlayerArchetype) -> float:
-    """grid/game-sec rate for a player at a given archetype. Single AG curve
-    (``rate = 9 + (AG/100) × 6``) anchored at AG=50 → 12, multiplied by the
-    archetype constant. See ``UESS_System.md`` §9.3 (AG curve).
-    """
-    try:
-        from BackEnd.utils.shared import ag_to_grid_per_game_sec
-        from BackEnd.constants import (
-            BURST_GRID_PER_GAME_SEC,
-            CRUISE_GRID_PER_GAME_SEC,
-            STANDARD_GRID_PER_GAME_SEC,
-            SHOT_MOTION_GRID_PER_GAME_SEC,
-            SPRINT_GRID_PER_GAME_SEC,
-        )
-    except Exception:
-        return 12.0
-
-    if player is None:
-        ag = 50
-    else:
-        attrs = getattr(player, "attributes", None) or {}
-        ag = attrs.get("AG", 50) if isinstance(attrs, dict) else 50
-    ag_scale = float(ag_to_grid_per_game_sec(ag)) / float(STANDARD_GRID_PER_GAME_SEC)
-    if archetype == "standard":
-        return STANDARD_GRID_PER_GAME_SEC * ag_scale
-    if archetype in ("shot_motion", "compressed_hco"):
-        return SHOT_MOTION_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "sprint":
-        return SPRINT_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "burst":
-        return BURST_GRID_PER_GAME_SEC * ag_scale
-    if archetype == "cruise":
-        return CRUISE_GRID_PER_GAME_SEC * ag_scale
-    return STANDARD_GRID_PER_GAME_SEC * ag_scale
+# Archetype rate: single shared implementation in animation_step_helpers.
+# This module previously kept its own copy that omitted the `drift` branch,
+# so drift resolved to `standard` (14 instead of 8). Aliased to the private
+# name so existing call sites in this file are unchanged.
+from BackEnd.utils.animation_step_helpers import (  # noqa: E402
+    ag_grid_per_game_sec as _ag_grid_per_game_sec,
+)
 
 
 def _traversal_seconds(start: GridCoord, end: GridCoord, rate: float) -> float:
@@ -1287,6 +1260,7 @@ def _build_lane_pass_intercepted_step(
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
     step_start_coords: Dict[str, GridCoord],
+    previous_step: Optional[AnimationStep] = None,
     is_away_offense: bool,
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
@@ -1333,17 +1307,23 @@ def _build_lane_pass_intercepted_step(
     stealer_rate = _ag_grid_per_game_sec(stealer_player, "sprint")
     t = max(0.3, _traversal_seconds(stealer_coord, contact_grid, stealer_rate))
 
-    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
-    archetype: Dict[str, PlayerArchetype] = {
-        pid: "stationary" for pid in step_start_coords
-    }
-    destinations: Dict[str, Optional[GridCoord]] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
-    end_coords: Dict[str, GridCoord] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
+    # Carry the lane pass's unfinished movement forward. Freezing here stopped
+    # everyone except the BH, the rim runner and the stealer/deflector — so the
+    # offense's runner kept flying while the entire defense stood still. That is
+    # the "defenders stop animating mid-fast-break" beat. Reuses each player's
+    # existing destination from the prior step; invents no new movement.
+    actions, archetype, destinations, end_coords = _initialize_continuing_movement(
+        step_start_coords=step_start_coords,
+        previous_step=previous_step,
+        step_t=t,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+    )
 
+    # The passer has released the ball and holds his release position.
+    archetype[bh_id] = "stationary"
+    destinations[bh_id] = dict(step_start_coords[bh_id])
+    end_coords[bh_id] = dict(step_start_coords[bh_id])
     actions[bh_id] = "pass"
     actions[rr_id] = "cut"
     archetype[rr_id] = _rr_payload_archetype(phase)
@@ -1425,6 +1405,7 @@ def _build_lane_pass_batted_step(
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
     step_start_coords: Dict[str, GridCoord],
+    previous_step: Optional[AnimationStep] = None,
     is_away_offense: bool,
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
@@ -1474,17 +1455,23 @@ def _build_lane_pass_batted_step(
     defender_rate = _ag_grid_per_game_sec(defender_player, "sprint")
     t = max(0.3, _traversal_seconds(defender_coord, contact_grid, defender_rate))
 
-    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
-    archetype: Dict[str, PlayerArchetype] = {
-        pid: "stationary" for pid in step_start_coords
-    }
-    destinations: Dict[str, Optional[GridCoord]] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
-    end_coords: Dict[str, GridCoord] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
+    # Carry the lane pass's unfinished movement forward. Freezing here stopped
+    # everyone except the BH, the rim runner and the stealer/deflector — so the
+    # offense's runner kept flying while the entire defense stood still. That is
+    # the "defenders stop animating mid-fast-break" beat. Reuses each player's
+    # existing destination from the prior step; invents no new movement.
+    actions, archetype, destinations, end_coords = _initialize_continuing_movement(
+        step_start_coords=step_start_coords,
+        previous_step=previous_step,
+        step_t=t,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+    )
 
+    # The passer has released the ball and holds his release position.
+    archetype[bh_id] = "stationary"
+    destinations[bh_id] = dict(step_start_coords[bh_id])
+    end_coords[bh_id] = dict(step_start_coords[bh_id])
     actions[bh_id] = "pass"
     actions[rr_id] = "cut"
     archetype[rr_id] = _rr_payload_archetype(phase)
@@ -1704,6 +1691,7 @@ def _build_outlet_denied_defender_step(
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
     step_start_coords: Dict[str, GridCoord],
+    previous_step: Optional[AnimationStep],
     is_away_offense: bool,
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
@@ -1713,6 +1701,9 @@ def _build_outlet_denied_defender_step(
 
     Gate: outlet defender reaches ``(ball_holder.x + 2 toward basket,
     ball_holder.y)``. Ball stays with the ball holder — no pass fires.
+    All other players continue their unfinished burst movement (the ball
+    holder excepted); only the ball holder and the closing defender have
+    authored positions here.
 
     Ball holder = outlet passer (rebounder) normally; when
     ``skip_outlet_pass`` is true (rebounder == outlet receiver), the
@@ -1754,18 +1745,26 @@ def _build_outlet_denied_defender_step(
     defender_rate = _ag_grid_per_game_sec(defender_player, "standard")
     t = max(0.3, _traversal_seconds(defender_coord, defender_target, defender_rate))
 
-    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in step_start_coords}
-    archetype: Dict[str, PlayerArchetype] = {
-        pid: "stationary" for pid in step_start_coords
-    }
-    destinations: Dict[str, Optional[GridCoord]] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
-    end_coords: Dict[str, GridCoord] = {
-        pid: dict(coord) for pid, coord in step_start_coords.items()
-    }
+    # Carry the burst's unfinished movement forward instead of freezing the court.
+    # This step follows the burst, where all ten are sprinting; writing everyone
+    # to `stationary` here (the old behavior) stopped eight players mid-stride so
+    # only the closing defender moved — the "everyone holds while the denier walks
+    # in" beat. `_initialize_continuing_movement` reuses each player's *existing*
+    # destination from the burst step; it invents no new movement.
+    actions, archetype, destinations, end_coords = _initialize_continuing_movement(
+        step_start_coords=step_start_coords,
+        previous_step=previous_step,
+        step_t=t,
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+    )
 
+    # The ball holder is being denied — he holds the ball and his ground.
     actions[ball_holder_id] = "handle_ball"
+    archetype[ball_holder_id] = "stationary"
+    destinations[ball_holder_id] = dict(step_start_coords[ball_holder_id])
+    end_coords[ball_holder_id] = dict(step_start_coords[ball_holder_id])
+
     actions[defender_id] = "guard_ball"
     archetype[defender_id] = "standard"
     destinations[defender_id] = dict(defender_target)
@@ -2182,6 +2181,7 @@ def append_lane_pass_to_rr_resolution_steps(
             off_lineup=off_lineup,
             def_lineup=def_lineup,
             step_start_coords=coords,
+            previous_step=steps[-1] if steps else None,
             is_away_offense=is_away_offense,
             clock_remaining_at_start=clock_at,
             shot_clock_remaining_at_start=sc_at,
@@ -2197,6 +2197,7 @@ def append_lane_pass_to_rr_resolution_steps(
             off_lineup=off_lineup,
             def_lineup=def_lineup,
             step_start_coords=coords,
+            previous_step=steps[-1] if steps else None,
             is_away_offense=is_away_offense,
             clock_remaining_at_start=clock_at,
             shot_clock_remaining_at_start=sc_at,
@@ -2481,6 +2482,7 @@ def build_rim_runner_animation_steps(
             off_lineup=off_lineup,
             def_lineup=def_lineup,
             step_start_coords=last_end_coords,
+            previous_step=burst_step,
             is_away_offense=is_away_offense,
             clock_remaining_at_start=clock_remaining - elapsed,
             shot_clock_remaining_at_start=shot_clock_remaining - elapsed,

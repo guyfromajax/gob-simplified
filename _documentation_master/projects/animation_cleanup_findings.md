@@ -380,3 +380,73 @@ and `make_hold` runs *after* the rattle. Not a regression.
 **Minor pre-existing note:** hops are authored at 40ms but the FE floors every
 step at 50ms, so rattles run ~25% slower than authored. Candidate for later
 tuning, not a regression.
+
+---
+
+## 12. Implemented — freeze-by-default pass (2026-08-27)
+
+Scope agreed with user: **HCO stationary players left as-is** (idle motion descoped),
+SIP/BIP passer holds left as-is. Work limited to the FB/transition family, where
+players demonstrably had unfinished authored movement that was being dropped.
+
+### 12a. Archetype rate consolidated
+
+`_ag_grid_per_game_sec` existed in three places. `rim_runner_step_emitter` and
+`covert_release_step_emitter` each kept a private copy **missing the `drift`
+branch**, so drift silently resolved to `standard` — 14 instead of 8, a 75%
+overspeed. Their docstrings were also stale (claimed an AG=50 anchor of 12 after
+`STANDARD_GRID_PER_GAME_SEC` moved to 14).
+
+Both copies now alias the canonical `animation_step_helpers.ag_grid_per_game_sec`.
+
+**Behaviorally a no-op today:** neither emitter ever assigns `drift`, and
+`fb_drive_resolution` already imported the canonical version. This removes a trap
+rather than changing output — verified identical rates across all seven archetypes.
+
+### 12b. Continuing movement — three FB builders
+
+Replaced the freeze-everyone block with `_initialize_continuing_movement`, which
+reuses each player's **existing** destination from the prior step. No invented
+movement; gate timing (`T_game_seconds`) unchanged in all three.
+
+| Builder | Before | After |
+|---|---|---|
+| `_build_outlet_denied_defender_step` | 1/10 movers | **9/10** |
+| `_build_lane_pass_intercepted_step` | 2/10 (defenders 1/5) | **9/10 (defenders 5/5)** |
+| `_build_lane_pass_batted_step` | 2/10 (defenders 1/5) | **9/10 (defenders 5/5)** |
+
+The two lane-pass terminals run ~2.14s each, so each occurrence was carrying
+~17 player-seconds of stillness. Ball holder / passer correctly still holds his
+release position; ball ownership and clock unchanged.
+
+`_build_lane_pass_step` was deliberately **not** converted — it already commits
+every player via `_commit_lane_pass_sprint_mover`. An over-broad match caught it
+and the assertion stopped the edit.
+
+### 12c. Not done (and why)
+
+- **HCO `player_reaches_position`** (276 p-s, 43% of stillness) — untouched by user
+  decision. Root cause is play-design: skeletons author only **1.27 of 5** offensive
+  movers per step (measured across all 7 skeletons, 44 transitions), and defenders
+  track their man, so ~2.5/10 is the authored ceiling. Fixing it means richer
+  skeletons or Dynamic MM off-ball logic, not animation plumbing.
+- **SIP/BIP passer holds** (~45 p-s) — after `sip_setup_walkin` players have genuinely
+  arrived, so there is no intent to carry forward; only idle motion would help, and
+  idle motion is descoped.
+- **HCO bat-OOB** — not a step-based path at all. The FE flies the ball imperatively
+  from `turn_result.bat_oob_*` (`_finalize_hco_pass_bat_oob` +
+  `AnimationEngine._runHctBatOobBallSend`); the emitter path was removed 2026-07-13.
+  HCT bat-OOB already passes `continuing_targets`.
+
+### Test status
+
+Targeted suite (49 files): **no regressions.** The one test flagged in a sweep diff
+(`test_outlet_pass_roles_not_set_when_rebounder_is_ball_handler`) passes in isolation
+on both baseline and changed trees, and also fails in baseline sweeps — pre-existing
+order-dependence, same class as the other ~9.
+
+### Next measurement
+
+Re-run `dumpDeadAir()` on a quarter with fast breaks. Expect the FB rows
+(`outlet_denied`, lane-pass terminals) to drop toward 0 p-s. HCO rows should be
+unchanged — that is the control.
