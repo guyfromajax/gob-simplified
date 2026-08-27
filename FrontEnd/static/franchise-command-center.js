@@ -4565,27 +4565,72 @@ playNowBtn.addEventListener('click', async () => {
       const originalText = playNowBtn.textContent;
       playNowBtn.disabled = true;
       playNowBtn.textContent = 'Starting...';
-      // Take the modal down and put the cover up BEFORE the request: the old order left
-      // the dialog and a live button on screen for the whole rollover.
+      // Take the modal down BEFORE the request: the old order left the dialog and a
+      // live button on screen for the whole rollover.
       closeModal();
-      const advanceOverlay = showSeasonAdvanceOverlay(nextSeasonNumber());
-      try {
-        const res = await fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
-          method: 'POST',
-          headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ franchise_id: franchiseId }),
-        });
-        if (!res.ok) throw new Error('Finish season failed');
+
+      const goToNextSeasonFcc = () => {
         window.location.href = `/franchise-command-center.html?franchise_id=${encodeURIComponent(franchiseId)}`;
-      } catch (err) {
+      };
+      const startFinishSeason = () => fetch(API_CONFIG.buildUrl('/franchise/finish-season'), {
+        method: 'POST',
+        headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ franchise_id: franchiseId }),
+      }).then((res) => {
+        if (!res.ok) throw new Error('Finish season failed');
+        return res.json();
+      });
+      const failAdvance = (err, overlay) => {
         console.error(err);
-        // Only pull the cover down on failure — on success it stays up through the
-        // navigation, so the screen never flashes back to the old season.
-        advanceOverlay.remove();
+        if (overlay) overlay.remove();
+        if (window.SeniorTribute && window.SeniorTribute.teardown) window.SeniorTribute.teardown();
         alert('Unable to start new season');
         playNowBtn.disabled = false;
         playNowBtn.textContent = originalText;
+      };
+
+      let tribute = null;
+      try {
+        tribute = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/senior-tribute')}?franchise_id=${encodeURIComponent(franchiseId)}`);
+      } catch (err) {
+        console.warn('[TRIBUTE] snapshot failed; using load cover', err);
       }
+      const seniors = (tribute && tribute.players) || [];
+
+      // No graduating seniors — current season-transition load cover.
+      if (!seniors.length || !window.SeniorTribute) {
+        const advanceOverlay = showSeasonAdvanceOverlay(nextSeasonNumber());
+        try {
+          await startFinishSeason();
+          goToNextSeasonFcc();
+        } catch (err) {
+          failAdvance(err, advanceOverlay);
+        }
+        return;
+      }
+
+      // Sequence A: snapshot is already in hand. Start rollover behind the tribute.
+      let finishState = 'pending';
+      const finishPromise = startFinishSeason()
+        .then(() => { finishState = 'ok'; })
+        .catch((err) => { finishState = 'err'; throw err; });
+
+      window.SeniorTribute.start({
+        players: seniors,
+        season: tribute.season || commandCenterTopDataCache?.current_season || 1,
+        onAdvance: async () => {
+          let overlay = null;
+          if (finishState === 'pending') {
+            overlay = showSeasonAdvanceOverlay(nextSeasonNumber());
+          }
+          try {
+            await finishPromise;
+            goToNextSeasonFcc();
+          } catch (err) {
+            failAdvance(err, overlay);
+          }
+        },
+      });
     });
     return;
   }

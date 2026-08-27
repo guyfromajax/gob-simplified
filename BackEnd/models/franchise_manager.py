@@ -685,6 +685,7 @@ class FranchiseManager:
                 "meta": data["meta"],
                 "season": data["season"],
                 "career": data["career"],
+                "titles": {"conf_rs": 0, "conf_t": 0, "region": 0, "national": 0},
                 "attributes": data["attributes"],
                 "position_ratings": data["position_ratings"],
                 # Development pointer (§10). entry_tier/position_intent carried from

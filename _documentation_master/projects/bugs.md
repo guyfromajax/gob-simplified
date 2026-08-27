@@ -3,7 +3,7 @@
 2. Improve FB Outlet Pass denied animation
 
 ##Playtest Launch / In Progress
-1. Steam
+1. Steam Video
 -----
 2. PvP sim -- playtest post-launch / immediate parallel task
 3. Downloadable game vs Live game dynamics
@@ -11,6 +11,7 @@
 5. UX upgrade -- particularly around tabs and scrolling and back buttons (relative to browser back button), load screens
 6. UI Design upgrade, what is this game's personality?
 7. Wire Stripe into site
+8. Evolve animation from annoying to rewarding
 
 
 ##Full Product Perfection

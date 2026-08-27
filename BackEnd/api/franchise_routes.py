@@ -90,8 +90,10 @@ from BackEnd.utils.community_highlights import (
     user_geek_points_snapshot_for_franchise,
 )
 from BackEnd.utils.franchise_championships import (
+    empty_titles,
     maybe_award_conference_rs_championship,
     maybe_award_franchise_eos_title_championship,
+    normalize_titles,
 )
 from BackEnd.utils.position_ratings import compute_position_ratings
 from BackEnd.utils.team_play_utils import iter_team_plays
@@ -6970,6 +6972,7 @@ def _complete_week_process_user_game_block(
         winner_team_id=user_winner_id,
         week=req.week,
         eos_game_meta=eos_matchup_for_user,
+        franchise_id=franchise_id,
     )
     
     # ✅ SS&S: Call finalize_game() with the actual gameplay game_id (if provided)
@@ -7602,6 +7605,7 @@ def _finalize_franchise_week_after_cpu_games(
             owner_user_id=franchise_doc.get("user_id"),
             user_team_id_str=user_team_id_str,
             conference_tournaments=conference_tournaments,
+            franchise_id=franchise_id,
         )
         try:
             from BackEnd.utils.franchise_championship_moments import (
@@ -8108,6 +8112,7 @@ def _complete_week_finish_cpu_and_persist(
             winner_team_id=winner_tid,
             week=week,
             eos_game_meta=eos_meta,
+            franchise_id=franchise_id,
         )
 
     # CPU TEAM IDENTITY — assign/refresh before any game is simmed this week.
@@ -17794,6 +17799,7 @@ def sim_rest_of_tournament(req: SimRestOfTournamentRequest):
                     winner_team_id=winner_id,
                     week=week,
                     eos_game_meta=g,
+                    franchise_id=franchise_id,
                 )
                 logger.info("✅ [EOS] Simulated %s: %s vs %s", (g or {}).get("phase"), an, hn)
             except Exception as e:
@@ -17963,6 +17969,7 @@ def sim_championship(req: SimChampionshipRequest):
             winner_team_id=winner_id,
             week=week,
             eos_game_meta={"phase": "national", "round": 3},
+            franchise_id=franchise_id,
         )
         logger.info("✅ [EOS] National championship complete! Winner: %s", winner_id)
         return {
@@ -18311,6 +18318,27 @@ def _coaching_accumulator_for_player(player_id: str) -> Optional[Dict[str, float
     return None
 
 
+@router.get("/franchise/senior-tribute")
+def get_senior_tribute(
+    franchise_id: str,
+    user: dict = Depends(get_current_user),
+):
+    """Snapshot graduating active-roster seniors for the season-advance tribute.
+
+    Must be read BEFORE finish_season drops those FPDs. Empty players means the
+    client should use the existing season-advance load cover.
+    """
+    franchise_doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
+    _, user_team_object_id = get_user_team_from_franchise(franchise_doc)
+    from BackEnd.utils.senior_tribute import build_senior_tribute_payload
+
+    return build_senior_tribute_payload(
+        franchise_id=franchise_doc["_id"],
+        user_team_object_id=user_team_object_id,
+        current_season=franchise_doc.get("current_season", 1),
+    )
+
+
 @router.post("/franchise/finish-season")
 def finish_season(req: FinishSeasonRequest):
     """Finish current season and start new season."""
@@ -18417,6 +18445,7 @@ def finish_season(req: FinishSeasonRequest):
                 "meta": meta,
                 "season": zero_stats.copy(),
                 "career": (fpd_doc.get("career") or zero_stats.copy()),
+                "titles": normalize_titles(fpd_doc.get("titles")),
                 "attributes": (fpd_doc.get("attributes") or {}).copy(),
                 "position_ratings": (fpd_doc.get("position_ratings") or {}).copy(),
                 # Development pointer + identity carried forward (§10, single declared
@@ -18466,6 +18495,7 @@ def finish_season(req: FinishSeasonRequest):
             },
             "season": zero_stats.copy(),
             "career": zero_stats.copy(),
+            "titles": empty_titles(),
             "attributes": _normalize_new_franchise_player_attributes(
                 signed_player.get("attributes") or {}
             ),
