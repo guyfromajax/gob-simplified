@@ -507,3 +507,109 @@ different fixes:
 Both remedies for arrival tails were previously discussed and set aside — stretch
 was rejected long ago as "lazy drift", and idle motion is descoped. Re-open only
 with a measured tail number in hand.
+
+---
+
+## 14. Team split added to hunt the FB defect (2026-08-27)
+
+Three quarters of measurement never triggered `outlet_denied`,
+`lane_pass_intercepted`, or `lane_pass_batted`, so the §12b fixes remain
+verified only on synthetic fixtures. Meanwhile the reported defect — "the whole
+defensive team stops animating while the offense plays out the turn" — was
+invisible to the summary, because a combined movers count cannot distinguish
+5-offense/0-defense from a balanced 2/3 split.
+
+`splitMoversByTeam` now records offense/defense movers per step (via
+`sprite.team_id` vs `scene.offenseTeamId`; returns null rather than guessing
+when team identity is unresolvable). The stillness table prints
+`off M/N  def M/N` per row and appends **`<== DEFENSE FROZEN`** when offense is
+at least half in motion while defense is at most 10% — the exact signature.
+
+Verified: flags off 5/5 + def 0/5; does not flag a balanced 2/5 + 2/5, nor a
+healthy 5/5 + 5/5.
+
+### HCO stationary players — closed
+
+User confirmed after the pause removal: *"I'm actually not really bothered by
+stationary players during HCO turns now that things are moving faster without
+the pauses. It feels like real basketball. Often times in HCO sets players do
+remain stationary for moments of time."*
+
+Both HCO halves (stillness 262 p-s, arrival tails 160 p-s) are therefore
+**accepted behavior, not defects**. Do not reopen without a new request.
+
+### Next topics (user-selected, after the FB defect)
+
+1. Shot timing dynamics (root cause #3 — no catch-and-shoot vs hold-then-rise intent)
+2. 2D geography + player collisions (sprite stacking)
+
+---
+
+## 15. THE FB defect — found and fixed (2026-08-27)
+
+### Root cause
+
+Not in the FB emitters at all. `BackEnd/utils/transition_shot_board_crash.py`
+already implements board-crash destinations for transition shots — the system
+that makes players crash the glass on a shot attempt. Its assignment loop had:
+
+```python
+elif _euclid(start_coord, basket) <= radius:
+    continue          # radius = CONTEST_EUCLIDEAN_RADIUS = 11
+```
+
+Any player already within 11 grid of the basket got **no destination at all**.
+On a fast break that ends at the rim virtually everyone is inside that radius, so
+the entire non-shooter cast was skipped and stood still for the whole shot step.
+
+**The board-crash system silently no-opped in exactly the situation it was built
+for.** This is why the defect survived repeated fixes: the fix existed, and an
+early-out was hiding it.
+
+### Scope
+
+`_BOARD_CRASH_TURNS = {FAST_BREAK, HCT, FCP}` — shared helper, so the defect was
+never RR-specific. Ledger data confirmed both FB variants:
+`rim_runner :: shot_resolved` 8/10 arriving early, `triangle :: shot_resolved` 9/10.
+
+### Fix
+
+Replaced the `continue` with a sampled crash target, **scoped to FAST_BREAK**
+(HCT/FCP keep old behavior pending review). Added `_sample_crash_target`, which
+retries the disk sample until the point is at least `_MIN_CRASH_MOVE_GRID` (4.0)
+from the player's start, falling back to stepping 4 grid toward the basket when
+the player is already at the rim — otherwise a near-rim player gets a sampled
+spot ~0 grid away and still renders frozen.
+
+Deliberately **not** "everyone targets the basket coord": eight sprites converging
+on one point is the stacking problem, and the existing radius sampling exists to
+avoid it.
+
+Verified on a rim-clustered fixture: FAST_BREAK assigns 8/10 (shooter + shot
+defender correctly held), displacement 4.7–13.9 grid, all inside the rim radius;
+HCT assigns 0/10 (scoping holds).
+
+### Gameplay consequence — accepted, needs measuring
+
+`select_rebounder_by_score` weights by `1 / (1 + distance / REBOUND_DISTANCE_SCALE)`
+and can filter on `max_distance_from_bounce`. The overlay maps written here feed
+`sync_lineup_coords_from_turn`, which seeds the DREB/OREB turn. **Fast-break
+rebound outcomes will shift** — crashers get closer to the bounce spot and score
+higher. Arguably a correction, but it is a real gameplay change, accepted by the
+user with the understanding that FB OREB/DREB splits should be measured
+before/after.
+
+Also shifts the `sim_rng` stream (extra `rng.uniform` draws for previously-skipped
+players), so seeded replays will not match pre-change runs. Correct here — unlike
+announcement copy, these draws produce positions that are genuinely gameplay.
+
+### Tests
+
+No regressions. Two tests appeared in a sweep diff; both pass in isolation with
+the change, and one fails in isolation on baseline — the known order-flake set.
+
+### Note for the collision work
+
+Closest sampled destination pair on the fixture was 1.7 grid apart. Destinations
+are clamped by `rate x t` so players rarely reach them, but this is the kind of
+convergence the future sprite-collision work will need to handle.

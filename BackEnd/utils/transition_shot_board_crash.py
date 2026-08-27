@@ -81,6 +81,41 @@ def sample_coord_within_basket_radius(
     return _clamp_coord({"x": bx, "y": by})
 
 
+#: Minimum displacement (grid units) for a board-crash destination. A player
+#: already standing at the rim can otherwise be handed a sampled spot ~0 grid
+#: away, which renders as frozen — the exact defect the near-basket early-out
+#: below was masking.
+_MIN_CRASH_MOVE_GRID = 4.0
+
+
+def _sample_crash_target(
+    basket: Dict[str, Any],
+    radius: float,
+    start_coord: Dict[str, float],
+    rng: Any,
+    min_move: float = _MIN_CRASH_MOVE_GRID,
+) -> Dict[str, float]:
+    """Sample a board-crash spot far enough from ``start_coord`` to read as motion.
+
+    Retries the disk sample a bounded number of times. When the disk cannot
+    produce a distant enough point (the player is already at the rim), steps
+    ``min_move`` from his start toward the basket instead, so he still crashes
+    rather than standing.
+    """
+    for _ in range(8):
+        cand = sample_coord_within_basket_radius(basket, radius=radius, rng=rng)
+        if _euclid(start_coord, cand) >= min_move:
+            return cand
+    dist = _euclid(start_coord, basket)
+    if dist < 1e-6:
+        return _clamp_coord(dict(basket))
+    scale = min(1.0, float(min_move) / dist)
+    return _clamp_coord({
+        "x": start_coord["x"] + (float(basket["x"]) - start_coord["x"]) * scale,
+        "y": start_coord["y"] + (float(basket["y"]) - start_coord["y"]) * scale,
+    })
+
+
 def _lineup_player_ids(lineup: Dict[str, Any]) -> Set[str]:
     out: Set[str] = set()
     for player in (lineup or {}).values():
@@ -265,7 +300,20 @@ def maybe_stamp_transition_shot_board_crash_overlays(
         if moving_dest is not None:
             target = _clamp_coord(moving_dest)
         elif _euclid(start_coord, basket) <= radius:
-            continue
+            # Player is already inside the contest radius. This used to `continue`
+            # — i.e. hand him no destination at all. On a fast break that ends at
+            # the rim virtually everyone is inside 11 grid, so the entire
+            # non-shooter cast got nothing and stood still for the whole shot
+            # step. That is the "defenders don't animate toward the basket on FB
+            # shot attempts" defect: the board-crash system silently no-opped in
+            # exactly the case it was built for.
+            #
+            # Scoped to FAST_BREAK for now — in transition both teams are moving
+            # toward the same basket, so a crash target is right for offense and
+            # defense alike. HCT / FCP keep the old behavior pending review.
+            if current_turn != "FAST_BREAK":
+                continue
+            target = _sample_crash_target(basket, radius, start_coord, rng)
         else:
             target = sample_coord_within_basket_radius(basket, radius=radius, rng=rng)
 

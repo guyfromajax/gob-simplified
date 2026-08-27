@@ -113,7 +113,44 @@ export function recordFrozenStep({
  * with all 10 moving costs 0. Ranking by this surfaces exactly the steps that
  * read as posed — the outlet-denial / bat-OOB / frozen-defender family.
  */
-export function recordStillness({ durationMs, movers, step = null, turnData = null }) {
+/**
+ * Split a step's movers by team.
+ *
+ * The reported fast-break defect is "the whole defensive team stops animating
+ * while the offense plays out the turn" — a 5-offense / 0-defense step. A
+ * combined movers count cannot distinguish that from a balanced 2/3 split, so
+ * the signature is invisible without this split.
+ *
+ * Returns null when team identity cannot be resolved, so the summary reports
+ * "?" rather than asserting a wrong split.
+ */
+export function splitMoversByTeam(step, sprites, offenseTeamId) {
+  if (!sprites || offenseTeamId == null) return null;
+  const startCoords = step?.start?.coords;
+  const endCoords = step?.end?.coords;
+  if (!startCoords || !endCoords) return null;
+
+  let offMoved = 0, defMoved = 0, offTotal = 0, defTotal = 0, unknown = 0;
+  for (const [playerId, startCoord] of Object.entries(startCoords)) {
+    const endCoord = endCoords[playerId];
+    if (!startCoord || !endCoord) continue;
+    const sprite = sprites[playerId];
+    const teamId = sprite?.team_id ?? sprite?.team ?? null;
+    if (teamId == null) { unknown += 1; continue; }
+    const isOffense = String(teamId) === String(offenseTeamId);
+    const moved =
+      Math.abs(endCoord.x - startCoord.x) >= 1e-6
+      || Math.abs(endCoord.y - startCoord.y) >= 1e-6;
+    if (isOffense) { offTotal += 1; if (moved) offMoved += 1; }
+    else { defTotal += 1; if (moved) defMoved += 1; }
+  }
+  if (unknown && !offTotal && !defTotal) return null;
+  return { offMoved, defMoved, offTotal, defTotal };
+}
+
+export function recordStillness({
+  durationMs, movers, step = null, turnData = null, teamSplit = null,
+}) {
   if (!isDeadAirLedgerEnabled()) return;
   if (!Number.isFinite(durationMs) || durationMs <= 0) return;
   if (!Number.isFinite(movers) || movers < 0) return;
@@ -126,6 +163,7 @@ export function recordStillness({ durationMs, movers, step = null, turnData = nu
     ms: Math.round(durationMs),
     movers,
     total,
+    teamSplit,
     stillPlayerSeconds: (still * durationMs) / 1000,
     turnIndex: turnData?.index ?? null,
     resultType: turnData?.result_type ?? null,
@@ -246,12 +284,20 @@ function printStillness() {
   for (const r of rows) {
     const key = `${r.currentTurn || r.resultType || "?"}${r.fastBreakPlay ? `/${r.fastBreakPlay}` : ""} :: ${r.kind || r.reason || r.trigger || "?"}`;
     const g = groups.get(key)
-      || { key, count: 0, stillPS: 0, ms: 0, movers: 0, total: 0 };
+      || { key, count: 0, stillPS: 0, ms: 0, movers: 0, total: 0,
+           offMoved: 0, defMoved: 0, offTotal: 0, defTotal: 0, splitSeen: 0 };
     g.count += 1;
     g.stillPS += r.stillPlayerSeconds;
     g.ms += r.ms;
     g.movers += r.movers;
     g.total += r.total;
+    if (r.teamSplit) {
+      g.offMoved += r.teamSplit.offMoved;
+      g.defMoved += r.teamSplit.defMoved;
+      g.offTotal += r.teamSplit.offTotal;
+      g.defTotal += r.teamSplit.defTotal;
+      g.splitSeen += 1;
+    }
     groups.set(key, g);
   }
   const sorted = [...groups.values()].sort((a, b) => b.stillPS - a.stillPS);
@@ -262,11 +308,21 @@ function printStillness() {
   for (const g of sorted) {
     const avgMovers = (g.movers / g.count).toFixed(1);
     const avgOf = (g.total / g.count).toFixed(0);
+
+    let split = "  off ?/?  def ?/?";
+    let flag = "";
+    if (g.splitSeen) {
+      const om = g.offMoved / g.splitSeen, dm = g.defMoved / g.splitSeen;
+      const ot = g.offTotal / g.splitSeen, dt = g.defTotal / g.splitSeen;
+      split = `  off ${om.toFixed(1)}/${ot.toFixed(0)}  def ${dm.toFixed(1)}/${dt.toFixed(0)}`;
+      // The reported FB defect: offense in motion, defense standing still.
+      if (ot > 0 && dt > 0 && om / ot >= 0.5 && dm / dt <= 0.1) flag = "   <== DEFENSE FROZEN";
+    }
     console.log(
       `  ${g.stillPS.toFixed(1).padStart(7)} p-s  `
       + `x${String(g.count).padStart(3)}  `
       + `${String(Math.round(g.ms)).padStart(6)}ms  `
-      + `movers ${avgMovers}/${avgOf}  ${g.key}`,
+      + `movers ${avgMovers}/${avgOf}${split}  ${g.key}${flag}`,
     );
   }
   return totalPS;

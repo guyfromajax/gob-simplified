@@ -27,6 +27,7 @@ import { logEoqStep, logEoqSchemaStep, isEoqTraceEnabled } from "../utils/eoqDeb
 import { isAnnouncementBlockingForced } from "../utils/debugFlags.js";
 import {
   countStepMovers,
+  splitMoversByTeam,
   recordFrozenStep,
   recordStillness,
   recordArrivalTails,
@@ -1159,6 +1160,10 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
     movers,
     step,
     turnData: options.turnData,
+    // Offense/defense split so the "whole defense stops animating" fast-break
+    // signature is identifiable in the summary rather than hidden in a
+    // combined movers count.
+    teamSplit: splitMoversByTeam(step, sprites, scene?.offenseTeamId),
   });
   // Movers who arrive before step T then stand at their destination. Invisible
   // to recordStillness (which only asks whether start != end), and the likely
