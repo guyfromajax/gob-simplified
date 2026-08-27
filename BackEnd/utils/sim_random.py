@@ -47,11 +47,26 @@ import random as _stdlib_random
 # The engine's stream. Unseeded => OS entropy, same as the global module.
 sim_rng = _stdlib_random.Random()
 
+# Presentation stream — announcement copy, flavor text, and other cosmetic
+# choices that must never perturb gameplay.
+#
+# These draws are decided backend-side (UESS: the frontend renders, it does not
+# choose), but they are not gameplay. Sharing `sim_rng` would mean that adding a
+# foul-language variant shifts every subsequent basketball outcome — the exact
+# coupling this module exists to eliminate, just one layer up. Keeping copy on
+# its own stream means presentation changes are provably outcome-neutral.
+announcement_rng = _stdlib_random.Random()
+
 
 def seed(value: int | None) -> None:
-    """Seed the simulation stream. No-op when ``value`` is None (production)."""
+    """Seed the simulation stream. No-op when ``value`` is None (production).
+
+    Also seeds the presentation stream (offset, so the two streams never run in
+    lockstep) to keep seeded replays byte-identical including announcements.
+    """
     if value is not None:
         sim_rng.seed(value)
+        announcement_rng.seed(value + 1_000_003)
 
 
 def getstate():

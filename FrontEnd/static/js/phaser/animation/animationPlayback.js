@@ -24,6 +24,12 @@ import {
   tweenPlayerThroughPathKnots,
 } from "./pathKnotPlayback.js";
 import { logEoqStep, logEoqSchemaStep, isEoqTraceEnabled } from "../utils/eoqDebugLog.js";
+import { isAnnouncementBlockingForced } from "../utils/debugFlags.js";
+import {
+  countStepMovers,
+  recordFrozenStep,
+  recordAnnouncementFreeze,
+} from "./deadAirLedger.js";
 import { BALL_ATTACH_OFFSET } from "../setup/markerConfig.js";
 import { attachBallToPlayer } from "./ballManager.js";
 // IMPORTANT: import `detachBall` from BallControllerAdapter — not from
@@ -880,10 +886,20 @@ function startSchemaPlayerTween(scene, sprite, endCoord, durationMs, width, heig
  */
 async function runStepAnnouncement(scene, announcement, sprites = null, step = null, turnData = null) {
   if (!scene || !announcement?.text) return;
-  // Non-blocking announcements (backend `non_blocking: true`) show the overlay WITHOUT
-  // freezing play: no clock pause, no hold wait. Used where the callout should ride
-  // alongside live motion (e.g. the fast-break lane pass) instead of a boundary freeze.
-  const nonBlocking = announcement.non_blocking === true;
+  // Blocking policy — see the Announcement contract in
+  // BackEnd/utils/animation_step_schema.py. Announcements are NON-BLOCKING by
+  // default: the overlay shows and play continues underneath. A freeze (pause
+  // gameClock + shotClock, await hold_ms, resume) happens only when the backend
+  // stamps `blocking: true`.
+  //
+  // `non_blocking: true` is the deprecated pre-inversion field; it still forces
+  // the non-blocking path so older payloads render correctly.
+  //
+  // FORCE_ANNOUNCEMENT_BLOCKING (debug-only) restores the old freeze-everything
+  // behavior for A/B feel comparison.
+  const nonBlocking = announcement.non_blocking === true
+    ? true
+    : !(announcement.blocking === true || isAnnouncementBlockingForced());
   const reason = "step_announcement";
   if (!nonBlocking) {
     scene.gameClock?.pause?.(reason);
@@ -968,6 +984,7 @@ async function runStepAnnouncement(scene, announcement, sprites = null, step = n
   const holdMs = Number.isFinite(announcement.hold_ms) && announcement.hold_ms > 0
     ? announcement.hold_ms
     : DEFAULT_ANNOUNCEMENT_FREEZE_HOLD_MS;
+  recordAnnouncementFreeze({ holdMs, text: announcement.text, turnData });
   await waitMsRespectingPause(scene, holdMs);
   scene.gameClock?.resume?.(reason);
   scene.shotClock?.resume?.(reason);
@@ -1119,18 +1136,21 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       ? Math.max(durationMs, SHOT_BALL_MIN_WALL_CLOCK_MS)
       : durationMs;
 
+  // Dead-air ledger: a step where no player's coords change is time on the wall
+  // clock with a static court. Recorded with `ballMoved` so the summary can
+  // separate legitimate ball-motion beats (passes, shot flight) from genuine
+  // frozen steps. See deadAirLedger.js.
+  const movers = countStepMovers(step);
+  if (movers === 0) {
+    recordFrozenStep({
+      durationMs: stepWaitMs,
+      step,
+      turnData: options.turnData,
+      ballMoved: isPassStep || isShotBallMotionStep(step),
+    });
+  }
+
   if (shouldTracePlayback(scene)) {
-    let movers = 0;
-    for (const [playerId, startCoord] of Object.entries(step.start.coords || {})) {
-      const endCoord = step.end?.coords?.[playerId];
-      if (!startCoord || !endCoord) continue;
-      if (
-        Math.abs(endCoord.x - startCoord.x) >= 1e-6 ||
-        Math.abs(endCoord.y - startCoord.y) >= 1e-6
-      ) {
-        movers += 1;
-      }
-    }
     tracePlayback(scene, "step:start", {
       turnIndex: options.turnData?.index ?? null,
       resultType: options.turnData?.result_type ?? null,

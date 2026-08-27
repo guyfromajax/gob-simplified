@@ -52,6 +52,19 @@ export function setAnimationDebugEnabled(value) {
   }
 }
 
+/**
+ * A/B toggle for the announcement-blocking inversion (animation cleanup, §8).
+ *
+ * Production contract: announcements are non-blocking unless the backend stamps
+ * `blocking: true`. Set `window.FORCE_ANNOUNCEMENT_BLOCKING = true` in the
+ * console to restore the old "every announcement freezes the court" behavior
+ * for side-by-side feel comparison. Debug-only — it never ships on, and it is
+ * not a gameplay knob: the real policy lives in the backend payload.
+ */
+export function isAnnouncementBlockingForced() {
+  return resolveFeatureFlag('FORCE_ANNOUNCEMENT_BLOCKING', false);
+}
+
 // DEPRECATED: PossessionRunner removed from production
 // Keeping these functions for backward compatibility but they always return false
 export function isPossessionRunnerEnabled() {

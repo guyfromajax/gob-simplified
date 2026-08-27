@@ -145,11 +145,26 @@ class TimedSfx(TypedDict, total=False):
 
 
 class Announcement(TypedDict, total=False):
-    """In-step announcement with mandatory pause-the-world behavior. Optional
-    field on StepStart (plays before step tweens fire) or StepEnd (plays
-    after step tweens complete and sprites snap). Playback engine pauses
-    `gameClock` and `shotClock`, calls the announcement system, awaits the
-    hold duration, then resumes clocks.
+    """In-step announcement. Optional field on StepStart (plays before step
+    tweens fire) or StepEnd (plays after step tweens complete and sprites snap).
+
+    **Blocking policy (contract, backend-owned).** Announcements are
+    **non-blocking by default**: the overlay is shown and play continues
+    underneath. An announcement freezes the world (playback pauses `gameClock`
+    + `shotClock`, awaits ``hold_ms``, then resumes) **only** when it carries
+    ``blocking: True``.
+
+    This default was inverted in the animation cleanup pass. Previously every
+    announcement froze the court unless it opted out via ``non_blocking``,
+    which made 44 of 54 announcement literals clock-pinned freezes and diluted
+    the 350ms wall-clock-per-game-second scale. See
+    `projects/animation_cleanup_findings.md` §8.
+
+    **An announcement must never be load-bearing for timing.** It shows a
+    callout; the *step* owns the duration (via ``T_game_seconds`` or
+    ``advance_trigger.metadata.wall_clock_hold_ms``). If a beat disappears when
+    its announcement stops blocking, the step is under-authored — fix the step,
+    do not restore the freeze.
     """
 
     text: str
@@ -164,8 +179,22 @@ class Announcement(TypedDict, total=False):
     meta: Optional[Dict[str, object]]
     """Optional extras: ``{decision_pill_text?, decision_pill_tone?, sfx?}``."""
 
+    blocking: bool
+    """Opt-in freeze. ``True`` → playback pauses gameClock + shotClock for
+    ``hold_ms``, then resumes. Absent/``False`` → the callout rides alongside
+    live motion (schema default). Only events that genuinely need dwell to read
+    should set this (e.g. the AND-1 foul card's two-portrait layout)."""
+
+    non_blocking: bool
+    """**Deprecated** — superseded by ``blocking``. Retained so pre-inversion
+    payloads still render correctly: ``non_blocking: True`` continues to force
+    the non-blocking path. New emitters should omit this field entirely."""
+
     hold_ms: float
-    """Wall-clock duration to keep the world paused (default 700)."""
+    """Wall-clock freeze duration, applied only when ``blocking`` is True.
+    Ignored for non-blocking announcements — their on-screen display duration
+    is owned by the overlay. Never use this to give a *step* its duration; see
+    the class docstring."""
 
     style: Literal["primary", "secondary", "and_one", "shooting_foul"]
     """Optional. ``"primary"`` (default — large centered banner via

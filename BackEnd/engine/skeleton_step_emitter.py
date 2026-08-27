@@ -2582,12 +2582,13 @@ def _build_make_hold_sub_step(
       - All players hold their post-[ball_flight] positions (frozen).
       - Ball sits at the sweet spot.
       - ``start.announcement`` fires "It's Good!" or the And-1 foul card
-        (``style: "and_one"``) — the FE's ``runStepAnnouncement`` pauses
-        gameClock + shotClock for ``hold_ms`` (currently
-        ``ANNOUNCEMENT_FREEZE_HOLD_MS`` wall-clock), then resumes.
-      - Step T = 0 game-sec → no additional wall-clock wait after the
-        announcement; ``snapBallToEndState`` then runs and we proceed to
-        the SHOT_ATTEMPT turn_stop.
+        (``style: "and_one"``).
+      - Step T = 0 game-sec, but the beat's dwell is owned by the STEP via
+        ``advance_trigger.metadata.wall_clock_hold_ms`` (= ``MAKE_HOLD_MS``),
+        not by the announcement's ``hold_ms``. The announcement is a callout;
+        the step owns the duration. This keeps the make-hold beat intact
+        regardless of whether the announcement freezes the court — see
+        `projects/animation_cleanup_findings.md` §8.
       - Clock fields pinned (no game/shot clock decrement during hold).
 
     And-one detection mirrors the legacy ``ShotAnimationSystem``: when
@@ -2679,7 +2680,11 @@ def _build_make_hold_sub_step(
     trigger: AdvanceTrigger = {
         "condition": "fixed_duration",
         "T_game_seconds": 0.0,
-        "metadata": {"kind": "make_hold"},
+        # Step-owned dwell. Previously this beat existed only for as long as the
+        # announcement froze the court, so making the announcement non-blocking
+        # deleted the make-hold outright. The step now owns its own wall-clock
+        # duration; the announcement is presentation only.
+        "metadata": {"kind": "make_hold", "wall_clock_hold_ms": float(MAKE_HOLD_MS)},
     }
 
     step: AnimationStep = {

@@ -1,3 +1,14 @@
+/**
+ * DEPRECATED fallback tables.
+ *
+ * These are a verbatim copy of the pre-inversion backend tables, kept only so
+ * legacy turn payloads that carry no `foul_announcement_text` still render
+ * something sensible. They are NOT role-aware — they cannot tell an on-ball
+ * foul from an off-ball one, which is exactly why copy selection moved to
+ * `BackEnd/engine/foul_announcement_language.py`.
+ *
+ * Delete this file once every foul path stamps `foul_announcement_text`.
+ */
 const LANE_LOCATIONS = new Set([
   "upper lowpost",
   "lower lowpost",
@@ -84,12 +95,30 @@ export function isLaneFoulContext(turnData) {
   return false;
 }
 
+/**
+ * Backend-authored copy, when present.
+ *
+ * Choosing foul language is game logic and belongs on the backend
+ * (`BackEnd/engine/foul_announcement_language.py` is the single source of
+ * truth — it is also the only copy that knows whether the fouler was the
+ * on-ball defender, which the tables below cannot distinguish). The frontend
+ * renders what it is given.
+ */
+function backendFoulText(turnData) {
+  const text = turnData?.foul_announcement_text;
+  return typeof text === "string" && text.trim() ? text.trim() : null;
+}
+
 export function pickOffensiveFoulAnnouncementText(turnData, randomFn = Math.random) {
+  const backend = backendFoulText(turnData);
+  if (backend) return backend;
   const weights = isLaneFoulContext(turnData) ? OFFENSIVE_WEIGHTS.lane : OFFENSIVE_WEIGHTS.nonLane;
   return weightedPick(weights, randomFn) || "OFFENSIVE FOUL!";
 }
 
 export function pickDefensiveFoulAnnouncementText(turnData, randomFn = Math.random) {
+  const backend = backendFoulText(turnData);
+  if (backend) return backend;
   const weights = isLaneFoulContext(turnData) ? DEFENSIVE_WEIGHTS.lane : DEFENSIVE_WEIGHTS.nonLane;
   return weightedPick(weights, randomFn) || "DEFENSIVE FOUL!";
 }

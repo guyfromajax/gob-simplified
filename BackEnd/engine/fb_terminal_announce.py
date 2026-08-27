@@ -10,9 +10,9 @@ The matching legacy frontend turn-end callouts
 turn result (``suppress_turn_prep_turnover_announce`` /
 ``suppress_turn_prep_foul_announce``) so there is no double banner.
 
-Foul flavor language and dead-ball turnover text are ported here from the
-frontend (``foulAnnouncementLanguage.js`` / ``gameAnnouncements.js``) so the
-selection is now backend-owned and deterministic per turn.
+Foul flavor language lives in ``foul_announcement_language.py`` (the single
+source of truth, role-aware); dead-ball turnover text is owned here. Both are
+backend-selected and deterministic per turn.
 
 Scope (see Fast_Break_System.md / Announcement_System.md):
   * ``CHARGE``           — offensive foul on the drive → "CHARGE!"
@@ -31,65 +31,14 @@ from BackEnd.utils.sim_random import sim_rng as _random_module
 from typing import Any, Dict, List, Optional
 
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
+from BackEnd.engine.foul_announcement_language import (
+    pick_defensive_foul_text,
+    pick_offensive_foul_text,
+)
 
 FB_TERMINAL_ANNOUNCE_HOLD_MS = ANNOUNCEMENT_FREEZE_HOLD_MS
 _FOUL_WHISTLE_SFX = "whistle-1-lowervol.wav"
 _CHARGE_SFX = ["whistle-1-lowervol.wav", "duke-charging.wav"]
-
-# Ported verbatim from FrontEnd/static/js/phaser/utils/foulAnnouncementLanguage.js
-_LANE_LOCATIONS = frozenset(
-    {
-        "upper lowpost",
-        "lower lowpost",
-        "midpost",
-        "highpost",
-        "basketspot",
-        "midlane",
-        "toplane",
-    }
-)
-
-_OFFENSIVE_WEIGHTS = {
-    "nonLane": [
-        ("Push Off!", 30),
-        ("Illegal Screen!", 20),
-        ("Arm Extension!", 15),
-        ("Hooking!", 5),
-        ("Illegal Use Of Hands!", 10),
-        ("Elbowing!", 20),
-        ("Illegal Post Up!", 0),
-    ],
-    "lane": [
-        ("Push Off!", 10),
-        ("Illegal Screen!", 10),
-        ("Arm Extension!", 10),
-        ("Hooking!", 5),
-        ("Illegal Use Of Hands!", 5),
-        ("Elbowing!", 20),
-        ("Illegal Post Up!", 40),
-    ],
-}
-
-_DEFENSIVE_WEIGHTS = {
-    "nonLane": [
-        ("Blocking Foul!", 25),
-        ("Hand-Checking!", 25),
-        ("Illegal Contact!", 10),
-        ("Holding!", 15),
-        ("Arm Bar!", 15),
-        ("Pushing!", 10),
-        ("Illegal Post Defense!", 0),
-    ],
-    "lane": [
-        ("Blocking Foul!", 5),
-        ("Hand-Checking!", 0),
-        ("Illegal Contact!", 10),
-        ("Holding!", 20),
-        ("Arm Bar!", 10),
-        ("Pushing!", 30),
-        ("Illegal Post Defense!", 25),
-    ],
-}
 
 _TURNOVER_TYPE_TEXT = {
     "TRAVEL": "Travel!",
@@ -105,51 +54,6 @@ _TURNOVER_TYPE_TEXT = {
 def _norm(value: Any) -> str:
     return str(value or "").strip().lower()
 
-
-def _weighted_pick(rows, rng) -> Optional[str]:
-    total = sum(max(0, int(w)) for _t, w in rows)
-    if total <= 0:
-        return None
-    cursor = rng.random() * total
-    for text, weight in rows:
-        cursor -= max(0, int(weight))
-        if cursor < 0:
-            return text
-    return rows[-1][0] if rows else None
-
-
-def _is_lane_foul_context(turn_result: Dict[str, Any]) -> bool:
-    candidates = [
-        _norm(turn_result.get("location")),
-        _norm(turn_result.get("spot")),
-        _norm(turn_result.get("ball_spot")),
-        _norm(turn_result.get("foul_location")),
-        _norm(turn_result.get("foul_spot")),
-    ]
-    if any(value in _LANE_LOCATIONS for value in candidates):
-        return True
-    text = _norm(turn_result.get("text"))
-    if not text:
-        return False
-    return any(lane in text for lane in _LANE_LOCATIONS)
-
-
-def _pick_offensive_foul_text(turn_result: Dict[str, Any], rng) -> str:
-    if turn_result.get("otb_foul"):
-        return "Over The Back!"
-    pool = "lane" if _is_lane_foul_context(turn_result) else "nonLane"
-    return _weighted_pick(_OFFENSIVE_WEIGHTS[pool], rng) or "OFFENSIVE FOUL!"
-
-
-def _pick_defensive_foul_text(turn_result: Dict[str, Any], rng) -> str:
-    if turn_result.get("otb_foul"):
-        return "Over The Back!"
-    if turn_result.get("quick_foul"):
-        return "Quick Foul!"
-    if turn_result.get("reach_in_foul"):
-        return "Reaching In!"
-    pool = "lane" if _is_lane_foul_context(turn_result) else "nonLane"
-    return _weighted_pick(_DEFENSIVE_WEIGHTS[pool], rng) or "DEFENSIVE FOUL!"
 
 
 def _pick_turnover_text(turn_result: Dict[str, Any], rng) -> str:
@@ -202,10 +106,14 @@ def build_fb_terminal_announcement(
         foul_team = (turn_result.get("foul_team") or "").upper()
         fouler = turn_result.get("foul_player_id")
         if foul_team == "OFFENSE":
-            text = _pick_offensive_foul_text(turn_result, rng)
+            text = pick_offensive_foul_text(turn_result, rng)
             team = defense_side
         else:
-            text = _pick_defensive_foul_text(turn_result, rng)
+            text = pick_defensive_foul_text(
+                turn_result,
+                is_on_ball=bool(turn_result.get("foul_is_on_ball", True)),
+                rng=rng,
+            )
             team = offense_side
         return _announcement(text, team, fouler, _FOUL_WHISTLE_SFX)
 

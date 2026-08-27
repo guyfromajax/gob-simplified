@@ -517,16 +517,24 @@ def get_stealer_position_from_skeleton_step(skeleton, step_index, ball_handler_p
     return stealer_coords
 
 
-def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup):
+def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, roles=None):
     """
     Select which player committed the foul based on probabilistic logic.
-    
+
+    The 60/40 split is intentional and unchanged: not every defensive foul is on
+    the ball, so 40% land on an off-ball defender. When ``roles`` is supplied we
+    stamp ``foul_is_on_ball`` there, because this is the only point that knows
+    whether the matched defender was the one picked. Announcement copy is chosen
+    from that flag downstream (``foul_announcement_language.py``) so an off-ball
+    defender never gets described as hand-checking.
+
     Args:
         foul_team_type: "OFFENSE" or "DEFENSE"
         ball_handler: The current ball handler
         off_lineup: Dictionary of offensive players by position
         def_lineup: Dictionary of defensive players by position
-    
+        roles: Optional roles dict to stamp ``foul_is_on_ball`` onto
+
     Returns:
         Player object who committed the foul
     """
@@ -557,7 +565,15 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup):
                 weights.append(0.1)
         
         foul_player = random.choices(players, weights=weights)[0]
-    
+
+    if isinstance(roles, dict):
+        from BackEnd.engine.foul_announcement_language import defensive_foul_is_on_ball
+        roles["foul_is_on_ball"] = (
+            defensive_foul_is_on_ball(foul_player, ball_handler)
+            if str(foul_team_type or "").upper() == "DEFENSE"
+            else True
+        )
+
     return foul_player
 
 
@@ -8224,7 +8240,7 @@ def resolve_half_court_offense_logic(game):
         # Set foul_player using SS&S helper function (same as FCP/HCT)
         if event_type in ["O_FOUL", "D_FOUL"]:
             foul_team_type = "OFFENSE" if event_type == "O_FOUL" else "DEFENSE"
-            foul_player = select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup)
+            foul_player = select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, roles=roles)
             roles["foul_player"] = foul_player
             # Ensure shooter is set (needed by resolve_non_shooting_foul)
             if "shooter" not in roles or not roles["shooter"]:
@@ -9351,7 +9367,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         game_state["foul_team"] = "DEFENSE"
         # ✅ Use dynamically determined ball handler and defender
         # Select the foul player and increment their fouls
-        foul_player = select_foul_player("DEFENSE", ball_handler, off_lineup, def_lineup)
+        foul_player = select_foul_player("DEFENSE", ball_handler, off_lineup, def_lineup, roles=roles)
         foul_player.record_stat("F")
         def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
@@ -9386,7 +9402,7 @@ def resolve_full_court_press_logic(game: "GameManager"):
         game_state["foul_team"] = "OFFENSE"
         # ✅ Use dynamically determined ball handler
         # Select the foul player and increment their fouls
-        foul_player = select_foul_player("OFFENSE", ball_handler, off_lineup, def_lineup)
+        foul_player = select_foul_player("OFFENSE", ball_handler, off_lineup, def_lineup, roles=roles)
         foul_player.record_stat("F")
         off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
@@ -9557,11 +9573,24 @@ def resolve_full_court_press_logic(game: "GameManager"):
         "roles": roles,
         "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
         "foul_player_id": getattr(roles.get("foul_player"), "player_id", None) if roles.get("foul_player") else None,  # For foul announcements
+        # Defender-role axis for foul announcement copy (see
+        # foul_announcement_language.py). Stamped by select_foul_player.
+        "foul_is_on_ball": roles.get("foul_is_on_ball", True),
         "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
         "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None,  # For steal announcements
         "fouled_out": foul_out_info["fouled_out"],
         "foul_count": foul_out_info["foul_count"],
     }
+    # Resolve foul announcement copy here, backend-side, so the frontend renders
+    # rather than decides (UESS). Role-aware: an off-ball fouler never gets
+    # on-ball language. See engine/foul_announcement_language.py.
+    if str(result.get("result_type") or "").upper() in ("FOUL", "CHARGE"):
+        from BackEnd.engine.foul_announcement_language import stamp_foul_announcement_text
+        stamp_foul_announcement_text(
+            result,
+            foul_team_type=result.get("foul_team") or "DEFENSE",
+            is_on_ball=bool(result.get("foul_is_on_ball", True)),
+        )
     # ✅ FOUL OUT FIX: Add foul_out_player and context so game_manager creates timeout + frontend shows popup
     if foul_out_info["fouled_out"]:
         result["foul_out_player"] = {
@@ -10731,7 +10760,7 @@ def _resolve_full_court_press_dynamic_first_cut(game, def_scouting, text):
     elif result_type == "FOUL":
         if foul_player is None:
             foul_player = select_foul_player(
-                foul_team or "DEFENSE", ball_handler, off_lineup, def_lineup
+                foul_team or "DEFENSE", ball_handler, off_lineup, def_lineup, roles=roles
             )
         game_state["foul_team"] = foul_team
         foul_player.record_stat("F")
@@ -10981,7 +11010,7 @@ def _resolve_half_court_trap_dynamic_first_cut(game, def_scouting, text):
         # only if the engine couldn't name one.
         if foul_player is None:
             foul_player = select_foul_player(
-                foul_team or "DEFENSE", ball_handler, off_lineup, def_lineup
+                foul_team or "DEFENSE", ball_handler, off_lineup, def_lineup, roles=roles
             )
         game_state["foul_team"] = foul_team
         foul_player.record_stat("F")
@@ -11485,7 +11514,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         game_state["foul_team"] = "DEFENSE"
         # ✅ Use dynamically determined ball handler and defender
         # Select the foul player and increment their fouls
-        foul_player = select_foul_player("DEFENSE", ball_handler, off_lineup, def_lineup)
+        foul_player = select_foul_player("DEFENSE", ball_handler, off_lineup, def_lineup, roles=roles)
         foul_player.record_stat("F")
         def_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
@@ -11519,7 +11548,7 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         game_state["foul_team"] = "OFFENSE"
         # ✅ Use dynamically determined ball handler
         # Select the foul player and increment their fouls
-        foul_player = select_foul_player("OFFENSE", ball_handler, off_lineup, def_lineup)
+        foul_player = select_foul_player("OFFENSE", ball_handler, off_lineup, def_lineup, roles=roles)
         foul_player.record_stat("F")
         off_team.team_fouls += 1  # Increment team fouls
         roles["foul_player"] = foul_player
@@ -11680,11 +11709,24 @@ def resolve_half_court_trap_logic(game: "GameManager"):
         "roles": roles,
         "foul_team": game_state.get("foul_team"),  # Include foul_team for frontend announcement
         "foul_player_id": getattr(roles.get("foul_player"), "player_id", None) if roles.get("foul_player") else None,  # For foul announcements
+        # Defender-role axis for foul announcement copy (see
+        # foul_announcement_language.py). Stamped by select_foul_player.
+        "foul_is_on_ball": roles.get("foul_is_on_ball", True),
         "victim_id": getattr(roles["ball_handler"], "player_id", None),  # For turnover announcements
         "defender_id": getattr(roles["defender"], "player_id", None) if roles["defender"] else None,  # For steal announcements
         "fouled_out": foul_out_info["fouled_out"],
         "foul_count": foul_out_info["foul_count"],
     }
+    # Resolve foul announcement copy here, backend-side, so the frontend renders
+    # rather than decides (UESS). Role-aware: an off-ball fouler never gets
+    # on-ball language. See engine/foul_announcement_language.py.
+    if str(result.get("result_type") or "").upper() in ("FOUL", "CHARGE"):
+        from BackEnd.engine.foul_announcement_language import stamp_foul_announcement_text
+        stamp_foul_announcement_text(
+            result,
+            foul_team_type=result.get("foul_team") or "DEFENSE",
+            is_on_ball=bool(result.get("foul_is_on_ball", True)),
+        )
     # ✅ FOUL OUT FIX: Add foul_out_player and context so game_manager creates timeout + frontend shows popup
     if foul_out_info["fouled_out"]:
         result["foul_out_player"] = {

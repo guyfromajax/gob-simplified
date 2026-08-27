@@ -1,6 +1,8 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 2. Improve FB Outlet Pass denied animation
+3. Latest Sentry bug report
+4. Week 1 upcoming games card during training
 
 ##Playtest Launch / In Progress
 1. Steam Video
