@@ -326,3 +326,57 @@ the same way on a stashed baseline when run in isolation.
 - Root cause #3 (shot-release intent) not started.
 - FE `foulAnnouncementLanguage.js` fallback table can be deleted once every foul
   path is confirmed to stamp `foul_announcement_text`.
+
+---
+
+## 11. First measurement result (2026-08-27)
+
+Sample: turns 64–80 of a live quarter.
+
+**Announcement flip validated.** Zero `announce-freeze` entries — all 44 now ride
+alongside motion, and no beat collapsed (`make_hold` logged at its full 300ms,
+confirming the step-ownership fix). User feel report: *"much better, the pace of
+the game with those pauses removed feels very nice."*
+
+**Dead air is NOT the dominant defect.** 3,396ms across ~17 turns ≈ 108ms/turn,
+and ~46% of it is presentation the user explicitly likes:
+
+| Kind | Total | Verdict |
+|---|---|---|
+| `make_hold` x2 | 600ms | Keep — made-shot beat |
+| `ft_stationary` x3 | 366ms | Keep |
+| `bounce` | 300ms | Keep — rim action |
+| `rattle_settle` x2 | 300ms | Keep — rim action |
+| `player_reaches_position` x3 | 911ms | **Defect** — gated on arrival, nobody moves |
+| `bip_passer_hold` + `bip_fcp_passer_hold` | 700ms | **Defect** — RC#1 |
+| `bip_inbound_pass` | 219ms | **Defect** — 10 players frozen during inbound |
+
+### The instrument was measuring the wrong thing
+
+Frozen steps require **zero** movers. RC#1's actual signature — outlet denial,
+bat-OOB, frozen FB defenders — is **one mover and nine posed**, which has
+`movers > 0` and never appeared. 108ms/turn of true dead air cannot explain the
+felt clumsiness; the stiffness is in steps that technically have motion.
+
+**Fix:** `recordStillness` now runs on every step and reports *player-seconds of
+stillness* = (players that never moved) x duration. A 368ms step with 1 of 10
+moving costs 3.3 p-s; the same step with all 10 moving costs 0. Ranking by this
+surfaces the posed-court family directly.
+
+### Observer effect — instrument made silent
+
+Per-event `console.log` was measurably destructive. A `HEAVY_RATTLE` is **8
+consecutive ~50ms steps** (`RATTLE_HOP_GAME_SECONDS`, floored to 50ms by the FE's
+`Math.max(50, ...)`); synchronous console writes with DevTools open added enough
+per-step latency to make rim action visibly stutter — reported as "slower and
+jerkier" rattles. The ledger is now buffer-only; nothing prints until
+`dumpDeadAir()`.
+
+The rattle path was verified clean of all code changes: hops carry **no
+announcement** (arrival SFX only, so the blocking flip cannot touch them),
+`ball_motion_style` is `None` (so no 400ms `SHOT_BALL_MIN_WALL_CLOCK_MS` floor),
+and `make_hold` runs *after* the rattle. Not a regression.
+
+**Minor pre-existing note:** hops are authored at 40ms but the FE floors every
+step at 50ms, so rattles run ~25% slower than authored. Candidate for later
+tuning, not a regression.

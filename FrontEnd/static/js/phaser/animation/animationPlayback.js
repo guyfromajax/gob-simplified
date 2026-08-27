@@ -28,6 +28,7 @@ import { isAnnouncementBlockingForced } from "../utils/debugFlags.js";
 import {
   countStepMovers,
   recordFrozenStep,
+  recordStillness,
   recordAnnouncementFreeze,
 } from "./deadAirLedger.js";
 import { BALL_ATTACH_OFFSET } from "../setup/markerConfig.js";
@@ -1149,6 +1150,15 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       ballMoved: isPassStep || isShotBallMotionStep(step),
     });
   }
+  // Stillness is recorded for EVERY step, not just fully-frozen ones: the
+  // freeze-by-default signature is one player moving while nine stand posed,
+  // which never appears in the frozen-step tally.
+  recordStillness({
+    durationMs: stepWaitMs,
+    movers,
+    step,
+    turnData: options.turnData,
+  });
 
   if (shouldTracePlayback(scene)) {
     tracePlayback(scene, "step:start", {
