@@ -450,3 +450,60 @@ order-dependence, same class as the other ~9.
 Re-run `dumpDeadAir()` on a quarter with fast breaks. Expect the FB rows
 (`outlet_denied`, lane-pass terminals) to drop toward 0 p-s. HCO rows should be
 unchanged — that is the control.
+
+---
+
+## 13. Second measurement + the arrival-tail blind spot (2026-08-27)
+
+### Fast breaks are clean by the stillness metric
+
+Summing every `FAST_BREAK` row: **~10.0 p-s of 447.8 total (2%)**. Largest is
+`make_hold` at 0.0/10 movers, which is correct (the made-shot beat). Three rows
+score a perfect 10/10 (`rim_runner_meet`, `triangle::rim_runner_drive`,
+`rim_runner_fixed_burst_advance`).
+
+**Caveat:** none of the three converted branches (`outlet_denied`,
+`lane_pass_intercepted`, `lane_pass_batted`) appeared in either sample — those
+outcomes did not occur. The §12b fixes remain verified only on synthetic
+fixtures, not in live play.
+
+### But the user still sees frozen defenders — the metric has a blind spot
+
+`countStepMovers` asks only whether `start != end`. It cannot see **when** in the
+step a player moved. `stamp_tween_durations` sets each tween to
+`min(distance / rate, step_t)` and its docstring states the consequence plainly:
+*"each player tweens for their natural duration then idles at their end coord
+until step T elapses."*
+
+So `FAST_BREAK/triangle :: rim_runner_drive` — 1445ms, 10/10 movers — scores
+**0.0 p-s** while every player may stand for most of a second. Long steps that
+end FB possessions are exactly where this is most visible, which matches the
+report of "defenders not animating during the final steps of the turn."
+
+This is the documented natural-speed-then-idle design (§ "lazy drift"), not a
+regression.
+
+### Category 4 added: arrival tails
+
+`recordArrivalTails` computes, per mover, `stepWaitMs - (tween_duration x
+clockSecondMs)` and reports player-seconds spent standing at the destination.
+`dumpDeadAir()` now prints an ARRIVAL TAILS table plus a COMBINED STATIC TIME
+total.
+
+Verified on a synthetic reproduction of `rim_runner_drive`: 0.0 p-s stillness,
+**12.7 p-s arrival tails**; a healthy step where movers use the full duration
+scores 0.0 on both.
+
+### Why this matters for the plan
+
+`PLAYER STILLNESS` alone under-reports static time. The two categories have
+different fixes:
+
+| | Cause | Fix |
+|---|---|---|
+| Stillness | player has no destination | continuing movement / play design |
+| Arrival tail | player has a destination but reaches it early | bounded pace-to-arrive, or idle motion |
+
+Both remedies for arrival tails were previously discussed and set aside — stretch
+was rejected long ago as "lazy drift", and idle motion is descoped. Re-open only
+with a measured tail number in hand.

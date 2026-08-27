@@ -29,6 +29,7 @@ import {
   countStepMovers,
   recordFrozenStep,
   recordStillness,
+  recordArrivalTails,
   recordAnnouncementFreeze,
 } from "./deadAirLedger.js";
 import { BALL_ATTACH_OFFSET } from "../setup/markerConfig.js";
@@ -1156,6 +1157,16 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
   recordStillness({
     durationMs: stepWaitMs,
     movers,
+    step,
+    turnData: options.turnData,
+  });
+  // Movers who arrive before step T then stand at their destination. Invisible
+  // to recordStillness (which only asks whether start != end), and the likely
+  // source of "defenders stop animating during the final steps of the turn".
+  recordArrivalTails({
+    durationMs: stepWaitMs,
+    perPlayerDurations,
+    clockSecondMs,
     step,
     turnData: options.turnData,
   });

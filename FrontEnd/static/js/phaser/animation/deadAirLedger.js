@@ -11,6 +11,8 @@
  *      gameClock + shotClock for `hold_ms`. Wall time that buys zero game time.
  *   3. **Player stillness** — for EVERY step, how many of the ten players are
  *      frozen, weighted by duration ("player-seconds of stillness").
+ *   4. **Arrival tails** — for players who DO move, how long they stand at their
+ *      destination waiting for the step to end.
  *
  * (3) is the one that matters most. Frozen *steps* turned out to be a minor
  * cost (~108ms/turn measured). The real defect signature of freeze-by-default
@@ -43,6 +45,7 @@ const ledger = {
   frozenSteps: [],
   announcementFreezes: [],
   stillness: [],
+  arrivalTails: [],
 };
 
 export function isDeadAirLedgerEnabled() {
@@ -134,6 +137,69 @@ export function recordStillness({ durationMs, movers, step = null, turnData = nu
   });
 }
 
+/**
+ * Record the idle tail of every player who arrives before the step ends.
+ *
+ * `stamp_tween_durations` sets each player's tween to `min(distance / rate,
+ * step_t)` — deliberately, so fast movers travel at natural speed rather than
+ * being stretched across the step ("lazy drift"). The consequence is that a
+ * player who covers his ground in 500ms of a 1445ms step then stands frozen for
+ * 945ms.
+ *
+ * Category (3) is blind to this: it scores a player as "moving" whenever
+ * start != end, regardless of WHEN in the step he moved. So a step can report a
+ * perfect 10/10 movers and still read as a frozen court for most of its
+ * duration. That is what "defenders stop animating during the final steps of
+ * the turn" actually is.
+ */
+export function recordArrivalTails({
+  durationMs,
+  perPlayerDurations,
+  clockSecondMs,
+  step = null,
+  turnData = null,
+}) {
+  if (!isDeadAirLedgerEnabled()) return;
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return;
+
+  const startCoords = step?.start?.coords || {};
+  const endCoords = step?.end?.coords || {};
+  let tailMsTotal = 0;
+  let arrivers = 0;
+
+  for (const [playerId, startCoord] of Object.entries(startCoords)) {
+    const endCoord = endCoords[playerId];
+    if (!startCoord || !endCoord) continue;
+    // Only movers have a tail; non-movers are category (3)'s business.
+    if (
+      Math.abs(endCoord.x - startCoord.x) < 1e-6
+      && Math.abs(endCoord.y - startCoord.y) < 1e-6
+    ) continue;
+
+    const gameSec = perPlayerDurations?.[playerId];
+    if (!Number.isFinite(gameSec) || gameSec <= 0) continue;
+    const moveMs = Math.max(50, Math.round(gameSec * clockSecondMs));
+    const tail = durationMs - moveMs;
+    if (tail < MIN_RECORDED_MS) continue;
+    tailMsTotal += tail;
+    arrivers += 1;
+  }
+
+  if (!arrivers) return;
+  ledger.arrivalTails.push({
+    tailPlayerSeconds: tailMsTotal / 1000,
+    arrivers,
+    ms: Math.round(durationMs),
+    turnIndex: turnData?.index ?? null,
+    resultType: turnData?.result_type ?? null,
+    currentTurn: turnData?.current_turn ?? null,
+    fastBreakPlay: turnData?.fast_break_play ?? null,
+    kind: step?.start?.advance_trigger?.metadata?.kind ?? null,
+    reason: step?.start?.advance_trigger?.metadata?.reason ?? null,
+    trigger: step?.start?.advance_trigger?.condition ?? null,
+  });
+}
+
 export function recordAnnouncementFreeze({ holdMs, text = null, turnData = null }) {
   if (!isDeadAirLedgerEnabled()) return;
   if (!Number.isFinite(holdMs) || holdMs < MIN_RECORDED_MS) return;
@@ -206,6 +272,36 @@ function printStillness() {
   return totalPS;
 }
 
+function printArrivalTails() {
+  const rows = ledger.arrivalTails;
+  if (!rows.length) return 0;
+
+  const groups = new Map();
+  for (const r of rows) {
+    const key = `${r.currentTurn || r.resultType || "?"}${r.fastBreakPlay ? `/${r.fastBreakPlay}` : ""} :: ${r.kind || r.reason || r.trigger || "?"}`;
+    const g = groups.get(key) || { key, count: 0, tailPS: 0, ms: 0, arrivers: 0 };
+    g.count += 1;
+    g.tailPS += r.tailPlayerSeconds;
+    g.ms += r.ms;
+    g.arrivers += r.arrivers;
+    groups.set(key, g);
+  }
+  const sorted = [...groups.values()].sort((a, b) => b.tailPS - a.tailPS);
+  const totalPS = sorted.reduce((sum, g) => sum + g.tailPS, 0);
+
+  console.log(`\n=== ARRIVAL TAILS — ${totalPS.toFixed(1)} player-seconds standing at destination ===`);
+  console.log("    (movers who finished early and waited out the step; invisible to PLAYER STILLNESS)");
+  for (const g of sorted) {
+    console.log(
+      `  ${g.tailPS.toFixed(1).padStart(7)} p-s  `
+      + `x${String(g.count).padStart(3)}  `
+      + `${String(Math.round(g.ms / g.count)).padStart(5)}ms/step  `
+      + `${(g.arrivers / g.count).toFixed(1)} early/step  ${g.key}`,
+    );
+  }
+  return totalPS;
+}
+
 export function dumpDeadAir() {
   const realFrozen = ledger.frozenSteps.filter((r) => !r.ballMoved);
   const ballBeats = ledger.frozenSteps.filter((r) => r.ballMoved);
@@ -224,21 +320,25 @@ export function dumpDeadAir() {
   );
 
   const stillPS = printStillness();
+  const tailPS = printArrivalTails();
 
   console.log(
     `\n=== DEAD AIR TOTAL: ${((frozenTotal + announceTotal) / 1000).toFixed(1)}s `
     + `(${(frozenTotal / 1000).toFixed(1)}s frozen steps + ${(announceTotal / 1000).toFixed(1)}s announcement freezes)`,
   );
   console.log(`    excluded as legitimate ball motion: ${(ballTotal / 1000).toFixed(1)}s`);
-  console.log(`=== PLAYER STILLNESS TOTAL: ${stillPS.toFixed(1)} player-seconds ===\n`);
+  console.log(`=== PLAYER STILLNESS TOTAL: ${stillPS.toFixed(1)} player-seconds ===`);
+  console.log(`=== ARRIVAL TAIL TOTAL:     ${tailPS.toFixed(1)} player-seconds ===`);
+  console.log(`=== COMBINED STATIC TIME:   ${(stillPS + tailPS).toFixed(1)} player-seconds ===\n`);
 
-  return { frozenTotal, announceTotal, ballTotal, stillPS, ledger };
+  return { frozenTotal, announceTotal, ballTotal, stillPS, tailPS, ledger };
 }
 
 export function resetDeadAir() {
   ledger.frozenSteps.length = 0;
   ledger.announcementFreezes.length = 0;
   ledger.stillness.length = 0;
+  ledger.arrivalTails.length = 0;
   console.log("[DEAD-AIR] ledger reset");
 }
 
