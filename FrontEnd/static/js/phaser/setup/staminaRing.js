@@ -14,9 +14,8 @@ function staminaToVisualFill(s) {
 }
 
 function staminaColor(s) {
-  if (s > 0.89) return 0x34EC27;   // green
-  if (s >= 0.80) return 0xFFD700;  // yellow
-  if (s >= 0.70) return 0xF79420;  // orange
+  if (s >= 0.85) return 0x34EC27;  // green
+  if (s >= 0.70) return 0xFFD700;  // yellow
   return 0xff4444;                 // red
 }
 

@@ -936,7 +936,6 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 
 .engbar i.high { background: #34EC27; }
 .engbar i.medium { background: #F5C518; }
-.engbar i.low { background: #ff9f43; }
 .engbar i.critical { background: #ff6d6d; }
 
 .roster-table td.ng {
@@ -1509,7 +1508,6 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
 }
 
 .engnum.medium { color: rgba(255,255,255,0.70); }
-.engnum.low { color: rgba(255,255,255,0.90); }
 .engnum.critical { color: #ffffff; }
 
 /* Production cluster — subordinate luminance, no hue; gaps absorb surplus */

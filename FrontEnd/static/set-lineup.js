@@ -1090,15 +1090,13 @@ function getEnergyPercent(player) {
 }
 
 function getEnergyClassFromPercent(percent) {
-  if (percent >= 90) return 'high';
-  if (percent >= 80) return 'medium';
-  if (percent >= 70) return 'low';
+  if (percent >= 85) return 'high';
+  if (percent >= 70) return 'medium';
   return 'critical';
 }
 
 function getEnergyEdgeColor(energyClass) {
   if (energyClass === 'medium') return '#F5C518';
-  if (energyClass === 'low') return '#ff9f43';
   if (energyClass === 'critical') return '#ff6d6d';
   return 'transparent';
 }
@@ -3048,10 +3046,9 @@ function createCardFront(player) {
   // Add energy-based border
   const ng = player.attributes?.NG ?? 1.0;
   let borderColor;
-  if (ng > 0.89) borderColor = '#00aa00';      // Green
-  else if (ng >= 0.8) borderColor = '#cccc00'; // Yellow
-  else if (ng >= 0.7) borderColor = '#ff8800'; // Orange
-  else borderColor = '#cc0000';                // Red
+  if (ng >= 0.85) borderColor = '#00aa00';      // Green
+  else if (ng >= 0.70) borderColor = '#cccc00'; // Yellow
+  else borderColor = '#cc0000';                 // Red
   
   headshotContainer.style.border = `4px solid ${borderColor}`;
   headshotContainer.style.cursor = 'pointer';

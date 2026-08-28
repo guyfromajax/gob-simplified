@@ -1936,6 +1936,133 @@ def _build_outlet_denied_defender_step(
 # --- Post-emit hooks (canonicalize overlays + hco_setup) -------------------
 
 
+#: Steps whose beat is an intentional freeze — the made-shot hold. Defenders keep
+#: their position there rather than drifting through the celebration.
+_DEFENSE_RETREAT_SKIP_KINDS = frozenset({"make_hold"})
+
+
+def carry_defense_to_basket(
+    *,
+    steps: List[AnimationStep],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    is_away_offense: bool,
+) -> int:
+    """After the burst + outlet pass, every defender retreats toward the rim.
+
+    WHY: the burst gives non-getback defenders a 1-4 grid nudge
+    (``rim_runner_fast_break.py`` ~line 940), which at standard rate completes in
+    0.07-0.29 of the 1.0s burst. From that instant they hold NO unfinished
+    intent, so every later step legitimately reports "no destination" and every
+    carry-forward mechanism is a no-op for them — they cannot carry what was
+    already spent. That is why the defenders froze through the drive and shot no
+    matter how much step plumbing was fixed.
+
+    Real transition defence sprints back to protect the rim, so from the step
+    AFTER the outlet pass onward each defender is given the attacking basket as
+    a standing destination, interrupted per step at his sprint rate. He never
+    arrives, so the intent never runs out.
+
+    Three deliberate rules:
+      * **Fill, never override.** A defender with real authored intent (the
+        outlet-denied close-out, the shot contest, a getback target) keeps it.
+      * **Walk forward.** Step N+1's ``start.coords`` are step N's ``end.coords``,
+        so positions are threaded through rather than patched in place —
+        otherwise the rewrite would desync the seam and teleport.
+      * **Skip intentional freezes** (``make_hold``): the made-shot beat holds.
+
+    Burst and outlet-pass steps are left untouched. Returns the number of
+    per-step destinations filled.
+    """
+    if not steps:
+        return 0
+
+    def _meta(step: AnimationStep) -> Dict[str, Any]:
+        return ((step.get("start") or {}).get("advance_trigger") or {}).get("metadata") or {}
+
+    burst_i = next(
+        (i for i, st in enumerate(steps)
+         if _meta(st).get("reason") == "rim_runner_fixed_burst_advance"),
+        None,
+    )
+    if burst_i is None:
+        return 0
+    start_i = burst_i + 1
+    # Preserve the outlet pass step too, when one fired.
+    if start_i < len(steps):
+        cond = ((steps[start_i].get("start") or {}).get("advance_trigger") or {}).get("condition")
+        if cond == "ball_reaches_player":
+            start_i += 1
+    if start_i >= len(steps):
+        return 0
+
+    def_ids = {
+        str(getattr(p, "player_id", None))
+        for p in (def_lineup or {}).values() if p is not None
+    }
+    if not def_ids:
+        return 0
+
+    basket = _attacking_basket(is_away_offense)
+    seed_coords = (steps[start_i].get("start") or {}).get("coords") or {}
+    cur: Dict[str, GridCoord] = {
+        pid: dict(c) for pid, c in seed_coords.items() if pid in def_ids
+    }
+
+    filled = 0
+    for st in steps[start_i:]:
+        start = st.get("start") or {}
+        end = st.get("end") or {}
+        coords = start.get("coords") or {}
+        end_coords = end.get("coords")
+        if not isinstance(end_coords, dict):
+            continue
+        step_t = float(end.get("time_elapsed") or 0.0)
+        destinations = start.setdefault("destination", {})
+        actions = start.setdefault("action", {})
+        archetypes = start.setdefault("archetype", {})
+        skip_beat = _meta(st).get("kind") in _DEFENSE_RETREAT_SKIP_KINDS
+
+        for pid in list(coords.keys()):
+            if pid not in def_ids or pid not in cur:
+                continue
+            sc = dict(cur[pid])
+            coords[pid] = dict(sc)  # keep the seam continuous
+
+            if skip_beat or step_t <= 0:
+                end_coords[pid] = dict(sc)
+                cur[pid] = sc
+                continue
+
+            authored = destinations.get(pid)
+            has_authored = (
+                isinstance(authored, dict)
+                and authored.get("x") is not None
+                and _euclid(sc, authored) > 1e-6
+            )
+            if has_authored:
+                target = {"x": float(authored["x"]), "y": float(authored["y"])}
+                arch = archetypes.get(pid) or "standard"
+            else:
+                target = dict(basket)
+                arch = "sprint"
+                destinations[pid] = dict(basket)
+                actions[pid] = "guard_offball"
+                archetypes[pid] = arch
+                filled += 1
+
+            player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+            rate = _ag_grid_per_game_sec(player, arch)
+            new_end = _interrupted_coord(sc, target, rate, step_t)
+            end_coords[pid] = dict(new_end)
+            cur[pid] = dict(new_end)
+
+        if not skip_beat and step_t > 0:
+            _stamp_tween_durations(start, end_coords, step_t, off_lineup, def_lineup)
+
+    return filled
+
+
 def _stamp_hco_setup(
     turn_result: Dict[str, Any],
     game: Any,
@@ -2105,6 +2232,26 @@ def _finalize_rr_steps(
     _warn_if_post_shot_sfx_missing(turn_result, steps)
 
     _stamp_hco_setup(turn_result, game, steps)
+
+    # Defenders retreat to protect the rim for the remainder of the break. Runs
+    # LAST so it covers every step the turn will render — drive, shot motion,
+    # shot micro beats and post-shot sub-steps included.
+    try:
+        off_team_l = getattr(getattr(game, "offense_team", None), "lineup", {}) or {}
+        def_team_l = getattr(getattr(game, "defense_team", None), "lineup", {}) or {}
+        _away_id = getattr(getattr(game, "away_team", None), "team_id", None)
+        _off_id = getattr(getattr(game, "offense_team", None), "team_id", None)
+        _away_off = bool(
+            _away_id is not None and _off_id is not None and str(_off_id) == str(_away_id)
+        )
+        carry_defense_to_basket(
+            steps=steps,
+            off_lineup=off_team_l,
+            def_lineup=def_team_l,
+            is_away_offense=_away_off,
+        )
+    except Exception:
+        logging.exception("carry_defense_to_basket failed — steps left unchanged")
 
     return steps
 

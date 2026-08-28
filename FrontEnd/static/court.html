@@ -3696,10 +3696,6 @@
       color: #ffff00;
     }
 
-    .tooltip-stat-value.energy-low {
-      color: #ff8800;
-    }
-
     .tooltip-stat-value.energy-critical {
       color: #ff0000;
     }
@@ -7477,7 +7473,7 @@
       // Energy (NG)
       const ng = stats.NG ?? stats.ng ?? 1.0;
       const energyPercent = Math.round(ng * 100);
-      const energyColor = ng > 0.89 ? '#00aa00' : ng >= 0.8 ? '#cccc00' : ng >= 0.7 ? '#ff8800' : '#cc0000';
+      const energyColor = ng >= 0.85 ? '#00aa00' : ng >= 0.70 ? '#cccc00' : '#cc0000';
       energyEl.innerHTML = `<span style="color: ${energyColor}">${energyPercent}%</span>`;
       
       // Momentum bar (using existing tooltip structure)

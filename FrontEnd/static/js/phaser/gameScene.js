@@ -1768,10 +1768,9 @@ export function createGameScene(Phaser) {
       };
 
       const getEnergyColor = (ng) => {
-        if (ng > 0.89) return '#00aa00';      // Green
-        if (ng >= 0.8) return '#cccc00';      // Yellow
-        if (ng >= 0.7) return '#ff8800';      // Orange
-        return '#cc0000';                      // Red
+        if (ng >= 0.85) return '#00aa00';     // Green
+        if (ng >= 0.70) return '#cccc00';     // Yellow
+        return '#cc0000';                     // Red
       };
 
       // Player tooltip functions
@@ -1819,9 +1818,8 @@ export function createGameScene(Phaser) {
         // Update tooltip content
         energyEl.textContent = `${ngPercent}%`;
         energyEl.className = 'tooltip-stat-value';
-        if (ng > 0.89) energyEl.classList.add('energy-high');
-        else if (ng >= 0.8) energyEl.classList.add('energy-medium');
-        else if (ng >= 0.7) energyEl.classList.add('energy-low');
+        if (ng >= 0.85) energyEl.classList.add('energy-high');
+        else if (ng >= 0.70) energyEl.classList.add('energy-medium');
         else energyEl.classList.add('energy-critical');
         
         // Update momentum bar (visual instead of text)
