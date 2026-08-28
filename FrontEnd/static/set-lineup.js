@@ -48,8 +48,19 @@ async function loadFtShooterLock() {
     if (!res.ok) return;
     const data = await res.json();
     if (data && data.next_turn_is_free_throw && data.ft_shooter_id) {
-      ftLockShooterId = String(data.ft_shooter_id);
-      ftLockActive = true;
+      const shooterId = String(data.ft_shooter_id);
+      // /ft-lock describes the game's pending shooter, who may belong to the
+      // opponent. This screen edits only the user's lineup, so its UI lock
+      // applies only when that shooter exists on the loaded user roster. CPU
+      // shooter retention is enforced by the backend lineup builder.
+      const shooterIsOnUserRoster = roster.some((player) => {
+        const playerId = getPlayerStableId(player);
+        return playerId != null && String(playerId) === shooterId;
+      });
+      if (shooterIsOnUserRoster) {
+        ftLockShooterId = shooterId;
+        ftLockActive = true;
+      }
     }
   } catch (e) { /* non-fatal: lock is a safeguard, never block lineup screen */ }
 }
