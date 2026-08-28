@@ -2,7 +2,7 @@
   'use strict';
   var timer=null, fadeTimer=null, index=0, data=null, host=null;
   var IN_SEASON=['top10','key_games','pts','treb','ast','def_pct','stl','blk','tpm','fg_pct'];
-  var PRESEASON=['pre_top10','marquee'];
+  var PRESEASON=['pre_top10','key_games'];
   var TITLES={pts:'Scoring Leaders',treb:'Rebounding Leaders',ast:'Assist Leaders',def_pct:'Defense Leaders',stl:'Steal Leaders',blk:'Block Leaders',tpm:'3PT Leaders',fg_pct:'FG% Leaders'};
   function el(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=cls;if(text!=null)n.textContent=text;return n}
   function banner(row){var img=el('img','wr-bnr');img.alt='';img.src=typeof global.getTeamAssetPath==='function'?global.getTeamAssetPath(row.team_name||row.team_slug,'banner_card'):'/images/teams/'+row.team_slug+'/'+row.team_slug+'_banner_card.webp';img.onerror=function(){img.onerror=null;img.src='/images/teams/general/general_banner_card.webp'};return img}

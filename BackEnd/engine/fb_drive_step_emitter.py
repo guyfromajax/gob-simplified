@@ -397,17 +397,22 @@ def build_fb_drive_resolution_steps(
         if is_neutral and stop_action in ("shoot", "pass"):
             if stop_action == "pass":
                 recv_id = turn_result.get("pass_receiver_id")
-                if recv_id and recv_id in step_start_coords:
+                recv_id = str(recv_id) if recv_id else ""
+                # Self-pass is degenerate (0-distance + pass SFX). Skip it and
+                # let the original ball handler take the shot.
+                if recv_id and recv_id != stealer_id and recv_id in step_start_coords:
                     try:
                         pass_step = build_pass_step(
                             off_lineup=off_lineup,
                             def_lineup=def_lineup,
                             start_coords=step_start_coords,
                             passer_id=stealer_id,
-                            receiver_id=str(recv_id),
+                            receiver_id=recv_id,
                             clock_remaining_at_start=clock_r,
                             shot_clock_remaining_at_start=shot_r,
-                            next_step_index=len(steps),
+                            # Point at the shot-drive step that is appended next
+                            # (this pass is not yet in ``steps``).
+                            next_step_index=len(steps) + 1,
                             pass_speed_grid_per_game_sec=float(
                                 PASS_GRID_SPOTS_PER_GAME_SECOND
                             ),
@@ -417,7 +422,7 @@ def build_fb_drive_resolution_steps(
                         clock_r = pass_step["end"]["clock"]["clock_remaining"]
                         shot_r = pass_step["end"]["clock"]["shot_clock_remaining"]
                         step_start_coords = dict(pass_step["end"]["coords"])
-                        stealer_id = str(recv_id)
+                        stealer_id = recv_id
                     except ValueError:
                         pass
 

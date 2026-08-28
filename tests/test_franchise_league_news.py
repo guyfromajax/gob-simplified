@@ -89,10 +89,31 @@ def test_in_season_payload_uses_completed_week_for_results_and_current_week_for_
     assert payload["leaders"]["ast"][0]["display"] == "13.3"
 
 
-def test_preseason_top10_omits_trailing_record(monkeypatch):
-    payload = news.build_franchise_league_news(_fixture(monkeypatch, week=1))
+def test_week_one_uses_only_week_one_games_and_preseason_top10_omits_record(monkeypatch):
+    fixture = _fixture(monkeypatch, week=1)
+    week_one = fixture["schedule"][0]
+    # Make Week 2 contain the strongest possible matchup. It must not leak
+    # into the Week 1 preview.
+    week_two_only = [week_one[0][0], week_one[1][0]]
+    fixture["schedule"][1] = [week_two_only] + week_one[1:]
+
+    payload = news.build_franchise_league_news(fixture)
 
     assert payload["phase"] == "preseason"
     assert len(payload["preseason"]["top10"]) == 10
-    assert len(payload["preseason"]["marquee"]) == 10
+    assert payload["preseason"]["marquee"] == []
+    assert len(payload["key_games"]) == 10
+    returned_pairs = {
+        (row["away_name"], row["home_name"])
+        for row in payload["key_games"]
+    }
+    names_by_id = {
+        str(team["_id"]): team["name"]
+        for team in news.db.teams.find({})
+    }
+    week_two_only_names = (
+        names_by_id[week_two_only[0]],
+        names_by_id[week_two_only[1]],
+    )
+    assert week_two_only_names not in returned_pairs
     assert all("wins" not in row and "losses" not in row for row in payload["preseason"]["top10"])

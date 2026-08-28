@@ -264,20 +264,15 @@ def build_franchise_league_news(franchise_doc: dict[str, Any]) -> dict[str, Any]
         "preseason": {"top10": [], "marquee": []},
     }
     if phase == "preseason":
-        all_games: list[tuple[int, Any]] = []
-        for week_number, games in enumerate(schedule, start=1):
-            all_games.extend((week_number, pair) for pair in games or [])
-        marquee_rows: list[dict[str, Any]] = []
-        for week_number, pair in all_games:
-            built = _build_games(
-                [pair], core_by_id, ranks, names, week=week_number, require_ten=False
-            )
-            if built:
-                marquee_rows.extend(built)
-        marquee_rows.sort(key=lambda row: (row["rank_sum"], row["week"], row["away_name"], row["home_name"]))
+        # Week 1 training previews the actual Week 1 slate. The previous
+        # preseason treatment ranked games from the entire 26-week schedule,
+        # which surfaced future matchups and could show both legs of the same
+        # conference pairing.
+        current_games = schedule[0] if schedule else []
+        payload["key_games"] = _build_games(current_games, core_by_id, ranks, names)
         payload["preseason"] = {
             "top10": _build_top10(core_by_id, ranks, names, standings, include_record=False),
-            "marquee": marquee_rows[:10] if len(marquee_rows) >= 10 else [],
+            "marquee": [],
         }
         return payload
 

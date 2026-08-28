@@ -1692,24 +1692,29 @@ export async function playTurn(scene, steps, sprites, ballSprite, options = {}) 
     }
     if (next.kind === "next_step") {
       if (next.index === currentIndex) {
-        repeatCount = repeatIndex === currentIndex ? repeatCount + 1 : 1;
-        repeatIndex = currentIndex;
-        if (repeatCount === repeatDiagnosticThreshold || repeatCount % repeatDiagnosticThreshold === 0) {
-          logPlaybackLoopGuard({
-            turnIndex: options.turnData?.index ?? null,
-            resultType: options.turnData?.result_type ?? null,
-            currentTurn: options.turnData?.current_turn ?? null,
-            currentIndex,
-            next,
-            repeatCount,
-            stepsExecuted,
-            stepCount: steps.length,
-            step,
-          });
+        // Self-pointer is never valid. Skip ahead so we don't replay the
+        // same step (and its SFX) until maxStepsGuard throws.
+        logPlaybackLoopGuard({
+          turnIndex: options.turnData?.index ?? null,
+          resultType: options.turnData?.result_type ?? null,
+          currentTurn: options.turnData?.current_turn ?? null,
+          currentIndex,
+          next,
+          repeatCount: 1,
+          stepsExecuted,
+          stepCount: steps.length,
+          step,
+          recoveredTo: currentIndex + 1 < steps.length ? currentIndex + 1 : null,
+        });
+        const fallbackIndex = currentIndex + 1;
+        if (fallbackIndex < steps.length) {
+          currentIndex = fallbackIndex;
+          repeatIndex = null;
+          repeatCount = 0;
+          continue;
         }
-      } else {
-        repeatIndex = null;
-        repeatCount = 0;
+        if (scene) scene.__lastPlayTurnStepsExecuted = stepsExecuted;
+        return { turnStop: null, stepsExecuted };
       }
       currentIndex = next.index;
       continue;

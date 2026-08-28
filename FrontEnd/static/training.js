@@ -221,8 +221,8 @@ function resetPlayerMaximizerResolvedState() {
 }
 
 function trainingNewswireCacheKey(franchiseId, season, week) {
-  // v2 invalidates payloads cached before PTS/REB/AST moved to per-game values.
-  return `gob_training_newswire_v2_${franchiseId}_s${season}_w${week}`;
+  // v3 invalidates Week 1 payloads that ranked matchups across the full season.
+  return `gob_training_newswire_v3_${franchiseId}_s${season}_w${week}`;
 }
 
 function prefetchTrainingNewswire(franchiseId) {

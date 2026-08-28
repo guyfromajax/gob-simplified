@@ -302,6 +302,106 @@ def test_fb_drive_schema_contract_for_all_families(
         assert steps[-1]["end"]["next"]["event"] == "DEAD_BALL_TURNOVER"
 
 
+def _neutral_stop_pass_turn(*, receiver_id="off-SG"):
+    """NEUTRAL meet + kick-ahead pass + MAKE — the after_steal_stop_pass path."""
+    result = _turn_result(result_type="MAKE", outcome="NEUTRAL", play_key="after_steal")
+    result["result_type"] = "MAKE"
+    result["stop_decision_action"] = "pass"
+    result["pass_receiver_id"] = receiver_id
+    result["fb_drive_resolution"]["stop_decision"] = {"action": "pass"}
+    return result
+
+
+def test_fb_drive_stop_pass_next_step_does_not_self_loop():
+    """Regression: stop-pass used next_step_index=len(steps) before append,
+    so the pass step pointed at itself and the FE replayed pass SFX forever."""
+    game = _game()
+    off_lineup = game.offense_team.lineup
+    def_lineup = game.defense_team.lineup
+    start_coords = _start_coords(off_lineup, def_lineup)
+    turn_result = _neutral_stop_pass_turn(receiver_id="off-SG")
+    end_coords = _end_coords(start_coords, shooter_id="off-SG")
+
+    steps = build_fb_drive_resolution_steps(
+        turn_result=turn_result,
+        game=game,
+        start_coords=start_coords,
+        end_coords=end_coords,
+        stealer_id="off-PG",
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        is_away_offense=False,
+        clock_remaining=235.0,
+        shot_clock_remaining=30.0,
+        fb_roles=turn_result.get("roles") or {},
+        kind_prefix="after_steal",
+        stamp_fb_start_announcement=True,
+        suppress_stinger=True,
+        crash_off_ball_to_basket=False,
+        author_offball_spread=False,
+    )
+
+    assert steps is not None
+    pass_steps = [
+        (idx, step)
+        for idx, step in enumerate(steps)
+        if (step.get("start") or {}).get("advance_trigger", {}).get("metadata", {}).get(
+            "reason"
+        )
+        == "after_steal_stop_pass"
+    ]
+    assert pass_steps, "expected a stop-pass step"
+    idx, pass_step = pass_steps[0]
+    nxt = pass_step["end"]["next"]
+    assert nxt.get("kind") == "next_step"
+    assert nxt.get("index") == idx + 1
+    assert nxt.get("index") != idx
+    ball = pass_step["start"]["ball"]
+    assert ball["from_player_id"] == "off-PG"
+    assert ball["to_player_id"] == "off-SG"
+    _assert_schema_chain(steps)
+
+
+def test_fb_drive_stop_pass_skips_self_pass():
+    """A stop-pass whose receiver is the ball handler is a 0-distance self-pass;
+    skip it so we don't emit pass SFX for a player throwing to himself."""
+    game = _game()
+    off_lineup = game.offense_team.lineup
+    def_lineup = game.defense_team.lineup
+    start_coords = _start_coords(off_lineup, def_lineup)
+    turn_result = _neutral_stop_pass_turn(receiver_id="off-PG")
+    end_coords = _end_coords(start_coords)
+
+    steps = build_fb_drive_resolution_steps(
+        turn_result=turn_result,
+        game=game,
+        start_coords=start_coords,
+        end_coords=end_coords,
+        stealer_id="off-PG",
+        off_lineup=off_lineup,
+        def_lineup=def_lineup,
+        is_away_offense=False,
+        clock_remaining=235.0,
+        shot_clock_remaining=30.0,
+        fb_roles=turn_result.get("roles") or {},
+        kind_prefix="after_steal",
+        stamp_fb_start_announcement=True,
+        suppress_stinger=True,
+        crash_off_ball_to_basket=False,
+        author_offball_spread=False,
+    )
+
+    assert steps is not None
+    reasons = [
+        (step.get("start") or {}).get("advance_trigger", {}).get("metadata", {}).get(
+            "reason"
+        )
+        for step in steps
+    ]
+    assert "after_steal_stop_pass" not in reasons
+    _assert_schema_chain(steps)
+
+
 @pytest.mark.parametrize(
     "wrapper,play_key",
     [
