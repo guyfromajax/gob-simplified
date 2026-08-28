@@ -791,6 +791,8 @@ def build_triangle_animation_steps(
             off_lineup=off_lineup,
             def_lineup=def_lineup,
             step_start_coords=last_end_coords,
+            # Carry the burst's unfinished movement forward, same as Rim Runner.
+            previous_step=burst_step,
             is_away_offense=is_away_offense,
             clock_remaining_at_start=clock_remaining - elapsed,
             shot_clock_remaining_at_start=shot_clock_remaining - elapsed,

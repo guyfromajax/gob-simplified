@@ -1353,11 +1353,21 @@ def build_skeleton_animation_steps(
             in_back_court = (bh_x < 71.0) if not away_offense else (bh_x > 29.0)
             bh_neq_step0 = (str(current_bh_id) != str(step0_bh_id))
 
+            # `prior_*` fields matter for seam teleports: when the prior turn
+            # emitted NO animation_steps it rendered through the legacy path,
+            # so the FE's final sprite positions are whatever the legacy
+            # renderer produced — while this orchestrator builds the handoff
+            # from `prior_final_coords` (the backend's record). If those two
+            # disagree, every player jumps at the turn seam even though the
+            # handoff steps were built correctly.
             _hco_entry_log.warning(
                 "🏠 [ENTRY] current_bh=%s step0_bh=%s bh_x=%.1f away=%s "
-                "in_back_court=%s bh_neq_step0=%s",
+                "in_back_court=%s bh_neq_step0=%s prior=%s/%s prior_has_steps=%s",
                 current_bh_id, step0_bh_id, bh_x, away_offense,
                 in_back_court, bh_neq_step0,
+                (prior_turn.get("current_turn") if isinstance(prior_turn, dict) else None),
+                (prior_turn.get("fast_break_play") if isinstance(prior_turn, dict) else None),
+                (bool(prior_turn.get("animation_steps")) if isinstance(prior_turn, dict) else None),
             )
 
             clock_r = clock_remaining_at_turn_start - elapsed_so_far

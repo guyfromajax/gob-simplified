@@ -890,6 +890,13 @@ function startSchemaPlayerTween(scene, sprite, endCoord, durationMs, width, heig
     return Promise.resolve();
   }
   const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
+  // A sprite may still be mid-tween from the previous step (the shot gate no
+  // longer kills player tweens). Phaser would run both and they would fight
+  // frame by frame, so the incoming tween takes ownership. It starts from the
+  // sprite's live position, which is what makes the cross-step handoff smooth.
+  if (scene.tweens.killTweensOf) {
+    scene.tweens.killTweensOf(sprite);
+  }
   return new Promise((resolve) => {
     scene.tweens.add({
       targets: sprite,
@@ -1369,7 +1376,15 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
     });
   }
 
-  if (releaseShotOnShooterSettle) {
+  // GUARD: the gate exists to release the shot the moment the shooter SETTLES.
+  // `shooterTweenDurationMs` is only assigned inside the mover loop, which
+  // `continue`s for anyone whose start == end. On a fast break the shooter is
+  // already standing on the shot spot, so that assignment never runs and the
+  // duration stays 0 — the gate then "waits" for a shooter with nothing to wait
+  // for, fires at elapsedMs 0, and truncates the step for everyone else.
+  // Measured: shooterTweenMs 0, elapsedMs 0, cutShortByMs 140, killedSprites 8.
+  // With no shooter tween there is nothing to gate on, so play the step normally.
+  if (releaseShotOnShooterSettle && shooterTweenDurationMs > 0) {
     const shotGateResult = await awaitTweenOrDuration(
       scene,
       shooterTweenPromise,
@@ -1377,9 +1392,16 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       { tweenStarted: false, durationFallback: true },
     );
     if (scene?.tweens?.killTweensOf) {
-      for (const sprite of activeStepTweenSprites) {
-        scene.tweens.killTweensOf(sprite);
-      }
+      // Player sprite tweens are deliberately NOT killed here. Killing them
+      // froze every non-shooter mid-stride, and because this branch returns
+      // before the end-of-step snap, the next step then placed them at their
+      // authored end coords — a visible teleport. Their motion is allowed to
+      // continue across the step boundary instead; `startSchemaPlayerTween`
+      // clears the prior tween and picks up from the sprite's live position,
+      // so the handoff into [ball_flight] is seamless.
+      //
+      // The ball and shadow kills below are kept: they stop a stale ball tween
+      // fighting the shot arc.
       if (ballSprite) {
         scene.tweens.killTweensOf(ballSprite);
       }
@@ -1408,6 +1430,15 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       next: step.end?.next ?? null,
     });
     return step.end?.next ?? null;
+  }
+
+  if (releaseShotOnShooterSettle && shooterTweenDurationMs <= 0) {
+    fbShotTrace(scene, step, options.turnData, {
+      event: "GATE SUPPRESSED — shooter had no tween; step plays in full",
+      shooterTweenMs: Math.round(shooterTweenDurationMs),
+      stepWaitMs: Math.round(stepWaitMs),
+      movingSprites: activeStepTweenSprites.length,
+    });
   }
 
   // Wait the prescribed wall-clock duration (only while not user-paused).

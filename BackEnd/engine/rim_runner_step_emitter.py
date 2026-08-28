@@ -1691,7 +1691,13 @@ def _build_outlet_denied_defender_step(
     off_lineup: Dict[str, Any],
     def_lineup: Dict[str, Any],
     step_start_coords: Dict[str, GridCoord],
-    previous_step: Optional[AnimationStep],
+    # Optional, deliberately. Making this required broke `triangle_step_emitter`,
+    # which calls this builder too — every DEFENSIVE_STOP Triangle with a denied
+    # outlet raised TypeError, was swallowed by the emitter's try/except, and
+    # silently fell back to legacy rendering (which then cold-started the next
+    # HCO turn = teleport). With a default, a caller that cannot supply the prior
+    # step degrades to the old freeze behaviour instead of killing the whole turn.
+    previous_step: Optional[AnimationStep] = None,
     is_away_offense: bool,
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,

@@ -683,3 +683,53 @@ was unreachable dead code and was removed.
 `test_outlet_pass_roles_not_set_when_rebounder_is_ball_handler` and
 `test_deep_key_anchor_backcourt_side` fail intermittently (~1 in 5) on **both**
 baseline and changed trees — genuinely nondeterministic, not regressions.
+
+---
+
+## 17. ROOT CAUSE FOUND — self-inflicted (2026-08-28)
+
+Sentry `PYTHON-FASTAPI-9M`:
+
+```
+🚨 [TRIANGLE EMITTER EXCEPTION] result_type=DEFENSIVE_STOP:
+_build_outlet_denied_defender_step() missing 1 required keyword-only
+argument: 'previous_step' — animation_steps not set, FE → LEGACY
+```
+
+**Introduced by the §12b continuing-movement change.** `previous_step` was added
+as a *required* keyword-only argument, and only the Rim Runner call site was
+updated. `triangle_step_emitter.py:789` calls the same shared builder and was
+never checked.
+
+Every `DEFENSIVE_STOP` Triangle with a denied outlet raised `TypeError` →
+swallowed by the emitter's `try/except` → no `animation_steps` → legacy render →
+HCO entry lost `current_bh_id` → cold start → **teleport**.
+
+This is the actual cause of everything in §16, and of the "no FB_EMITTER_FALLBACK
+hits" puzzle: it was never a guard, it was an exception.
+
+### Fix
+1. `previous_step` is now `Optional[...] = None` — a caller that cannot supply it
+   degrades to the old freeze behaviour instead of killing the turn.
+2. Triangle's call site passes `previous_step=burst_step`, matching Rim Runner,
+   so it gets real continuing movement (verified: 1/10 → 9/10 movers).
+
+### Guard added
+`tests/test_fb_step_builder_call_sites.py` — statically binds every call site of
+the shared FB builders against its signature across all three emitters, and
+asserts `previous_step` keeps a default. Verified by re-introducing the exact
+defect: the guard fails with
+`triangle_step_emitter.py:789 _build_outlet_denied_defender_step() missing ['previous_step']`.
+
+### Why this escaped everything
+- Shared builders live in `rim_runner_step_emitter` but are imported by Triangle
+  and Covert Release; grepping one file finds one call site.
+- The branch is rare (DEFENSIVE_STOP + denied outlet), so no test exercised it.
+- The emitter's `try/except` converts a hard crash into a silent legacy fallback.
+- Verification used **synthetic fixtures calling the builders directly**, which
+  cannot catch a caller/callee signature mismatch.
+
+**Lesson:** changing a shared signature requires enumerating call sites across
+every module, not just the one being edited. A fixture that calls the function
+directly proves the function works and says nothing about whether callers can
+reach it.
