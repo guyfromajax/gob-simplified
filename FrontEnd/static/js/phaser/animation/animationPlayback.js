@@ -28,6 +28,7 @@ import { isAnnouncementBlockingForced } from "../utils/debugFlags.js";
 import {
   countStepMovers,
   splitMoversByTeam,
+  detectDefenseFrozen,
   recordFrozenStep,
   recordStillness,
   recordArrivalTails,
@@ -1203,6 +1204,19 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       ballMoved: isPassStep || isShotBallMotionStep(step),
     });
   }
+  // Live detector for the reported defect: offense moving, defense static.
+  // Fires on ANY turn type / step kind and states whether the cause is backend
+  // authoring or frontend rendering, so a single occurrence is diagnostic.
+  detectDefenseFrozen({
+    step,
+    sprites,
+    offenseTeamId: scene?.offenseTeamId,
+    turnData: options.turnData,
+    stepWaitMs,
+    perPlayerDurations,
+    clockSecondMs,
+  });
+
   // Stillness is recorded for EVERY step, not just fully-frozen ones: the
   // freeze-by-default signature is one player moving while nine stand posed,
   // which never appears in the frozen-step tally.

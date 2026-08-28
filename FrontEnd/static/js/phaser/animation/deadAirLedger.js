@@ -148,6 +148,97 @@ export function splitMoversByTeam(step, sprites, offenseTeamId) {
   return { offMoved, defMoved, offTotal, defTotal };
 }
 
+/**
+ * LIVE "defense frozen" detector — fires on the symptom itself.
+ *
+ * The reported defect is always the same shape: offense keeps moving while the
+ * defensive team stands still. Everything else in this module is an aggregate
+ * you have to ask for after the fact; this fires the moment it happens, on any
+ * turn type and any step kind, and prints enough to tell BACKEND authoring from
+ * FRONTEND rendering without another round trip.
+ *
+ * The discriminator is `defState`:
+ *   - "no destination"  => the backend never gave those defenders anywhere to go.
+ *                          Authoring bug: fix the step emitter.
+ *   - "destination, end==start" => intent existed but the interrupted-coord math
+ *                          resolved to zero travel. Authoring bug: step T or rate.
+ *   - "end!=start"      => the backend DID author movement and the sprite still
+ *                          did not move. Rendering bug: fix the frontend.
+ *
+ * Silent unless the defect occurs, so it costs nothing on healthy steps.
+ * Disable with `window.DEF_FROZEN_TRACE = false`.
+ */
+export function detectDefenseFrozen({
+  step, sprites, offenseTeamId, turnData, stepWaitMs, perPlayerDurations, clockSecondMs,
+}) {
+  if (typeof window !== "undefined" && window.DEF_FROZEN_TRACE === false) return;
+  if (!step?.start?.coords || !step?.end?.coords || !sprites || offenseTeamId == null) return;
+
+  const startCoords = step.start.coords;
+  const endCoords = step.end.coords;
+  const destinations = step.start.destination || {};
+
+  const moved = (pid) => {
+    const a = startCoords[pid], b = endCoords[pid];
+    if (!a || !b) return false;
+    return Math.abs(b.x - a.x) >= 1e-6 || Math.abs(b.y - a.y) >= 1e-6;
+  };
+
+  const off = [], def = [];
+  for (const pid of Object.keys(startCoords)) {
+    const sprite = sprites[pid];
+    const teamId = sprite?.team_id ?? sprite?.team ?? null;
+    if (teamId == null) return;               // can't classify — say nothing
+    (String(teamId) === String(offenseTeamId) ? off : def).push(pid);
+  }
+  if (!off.length || !def.length) return;
+
+  const offMoved = off.filter(moved);
+  const defMoved = def.filter(moved);
+
+  // The defect: offense in motion, defense entirely static.
+  if (!offMoved.length || defMoved.length) return;
+
+  // Classify what the BACKEND authored for the frozen defenders.
+  let withDest = 0, destEqualsStart = 0;
+  for (const pid of def) {
+    const d = destinations[pid], a = startCoords[pid];
+    if (!d || !a) continue;
+    withDest += 1;
+    if (Math.abs(d.x - a.x) < 1e-6 && Math.abs(d.y - a.y) < 1e-6) destEqualsStart += 1;
+  }
+  const defState = withDest === 0
+    ? "no destination (backend never authored one)"
+    : destEqualsStart === withDest
+      ? "destination == start (backend authored a no-op)"
+      : "destination differs from start (backend authored movement)";
+
+  const defTweens = {};
+  for (const pid of def) {
+    const gs = perPlayerDurations?.[pid];
+    defTweens[String(pid).slice(0, 4)] =
+      Number.isFinite(gs) && gs > 0 ? Math.max(50, Math.round(gs * clockSecondMs)) : "(none)";
+  }
+
+  console.warn(
+    `[DEF-FROZEN] ${turnData?.current_turn || turnData?.result_type || "?"}`
+    + `${turnData?.fast_break_play ? `/${turnData.fast_break_play}` : ""}`
+    + ` :: ${step?.start?.advance_trigger?.metadata?.kind
+             || step?.start?.advance_trigger?.condition || "?"}`,
+    {
+      turnIndex: turnData?.index ?? null,
+      stepWaitMs: Math.round(stepWaitMs),
+      offenseMoving: `${offMoved.length}/${off.length}`,
+      defenseMoving: `0/${def.length}`,
+      defState,
+      defTweenMs: defTweens,
+      verdict: defState.startsWith("destination differs")
+        ? "FRONTEND — backend authored movement, sprites did not render it"
+        : "BACKEND — emitter did not author defender movement for this step",
+    },
+  );
+}
+
 export function recordStillness({
   durationMs, movers, step = null, turnData = null, teamSplit = null,
 }) {
