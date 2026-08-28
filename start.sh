@@ -17,6 +17,19 @@
 # See BackEnd/utils/repro and _documentation_master/projects/bugs.md.
 export PYTHONHASHSEED=0
 
+# Memory: glibc gives a threaded process up to 8 x CPU-count malloc arenas. On the
+# 32-vCPU Railway service that ceiling let RSS ratchet from ~1 GB to 6.34 GB with
+# only 2-3 users. Nothing leaked -- objects were freed, but glibc returns memory to
+# the OS only from the top of an arena, so each arena kept its own high-water mark
+# and RSS fell only on redeploy. Memory was 92% of the Railway bill ($19.57 of
+# $21.17, Aug 2026); capping arenas at 2 took steady-state RSS from ~2.5 GB to
+# ~110 MB. Diagnosis: RSS climbing while tracemalloc stays flat, plateauing rather
+# than growing without bound, is allocator retention -- not a leak.
+# Must be set before the process starts. Inherited by the cpu_week_pool spawn
+# workers, so it caps their peaks too. Keep this on any long-running Python
+# service; re-verify under real playtest load, where peak allocations are larger.
+export MALLOC_ARENA_MAX=2
+
 GCC_LIBS="$(echo /nix/store/*gcc*-lib/lib | tr ' ' ':')"
 export LD_LIBRARY_PATH="${GCC_LIBS}:${LD_LIBRARY_PATH}"
 
