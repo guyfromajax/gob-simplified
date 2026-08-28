@@ -554,3 +554,268 @@ MONGO_URI="" MONGO_DB_NAME="gob-test" python3 dynamic_setplay_prototype.py
 - Defender does not read, he inside defends:
   - Good defense: he fronts the post up
   - Poor defense: he sits behind the post up
+
+
+## Tunable Constants — Pass Contest (HCO)
+
+HCO passes resolve through `_hco_resolve_dish_contest` → `pass_contest.resolve_pass_contest`.
+
+### Gate order
+
+| # | Gate | Test | Fail → |
+|---|---|---|---|
+| 1 | Possession engagement | `rand(1,100) <= MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION[slider]` (5/20/35/50/75) | COMPLETE |
+| 2 | In the lane | within `HCO_PASS_LANE_DIST_BY_AGGRESSION` (aggressive 5.0 / passive 6.0 / normal `randint(5,6)`, cached per game) | COMPLETE |
+| 3 | Can reach it | `distance / AG_rate − IQ_headstart <= ball_flight_time` (`PASS_IQ_ANTICIPATION_MAX_SEC` = 0.15) | COMPLETE |
+| 4 | Gambles | `rand(1,100) <= INTERCEPT_ATTEMPT_PCT_BY_CALL` (aggressive 80 / normal 40 / passive 0) | COMPLETE |
+| 5 | Passer evades | `((PS·0.6+CH·0.2+IQ·0.2)+off_eff) × rand(1,6) > HCO_PASS_SAFETY_BASE − off_eff` | (pass) COMPLETE |
+| 6 | Deflected | `((OD·0.6+CH·0.2+IQ·0.2)+def_eff) × rand(1,6) > HCO_PASS_INTERCEPT_TIER_MID − def_eff` | COMPLETE |
+| 7 | Kind | `rand(1, HCO_PASS_DEFLECT_KIND_D) < (CH+IQ)` | INTERCEPT / BAT_OOB |
+
+Gate 4 fires only when a defensive posture is set; the legacy path contests every eligible defender.
+
+### Constants
+
+| Constant | Value | Effect |
+|---|---|---|
+| `HCO_PASS_SAFETY_BASE` | 175.0 | Passer bar. ↑ = more deflections |
+| `HCO_PASS_INTERCEPT_TIER_MID` | 170.0 | Deflection threshold. ↓ = more deflections |
+| `HCO_PASS_DEFLECT_KIND_D` | **250** | INTERCEPT/BAT_OOB split **only**. ↑ = more batted balls |
+| `HCO_PASS_INTERCEPT_TIER_HI` | 200.0 | **Dead** — retained for signature parity |
+
+**Completion rate and the kind split are independent dials.** `SAFETY_BASE` +
+`TIER_MID` govern how often a pass is deflected; `DEFLECT_KIND_D` governs only
+what a deflection becomes. To shift the mix without moving completions, change D
+alone.
+
+At CH=50/IQ=50: D=200 → 49.5% INTERCEPT; **D=250 → 39.6% INTERCEPT / 60.4% BAT_OOB**
+(set 2026-08-28). HCT/FCP keep the shared `PASS_DEFLECT_KIND_D` = 200.
+
+### Which attribute acts where
+
+| Attribute | Gate |
+|---|---|
+| AG | 3 only — closing speed (eligibility). Contributes nothing to any score |
+| OD | 6 only — 0.6 weight in the deflection composite |
+| CH | 6 (0.2 weight) **and** 7 |
+| IQ | 3 (anticipation), 6 (0.2 weight) **and** 7 |
+
+`rand(1,6)` is the largest single term in gates 5 and 6 — at average attributes the
+composite is ~50, so the score spans 50–300 against a 170 bar. Narrow
+`PASS_INTERCEPT_ROLL_MIN/MAX` to make interceptions more skill-driven.
+
+### Missed gamble (2026-08-28)
+
+A defender who clears gate 4 but loses at gate 5 or 6 now still **animates to the
+contact point**. `resolve_pass_contest` reports `attempt_deflector` +
+`attempt_contact_point` on every outcome after the contester commits, and
+`_hco_contest_skeleton_pass` stamps an `_attack_drive.defender_overrides` entry
+with action **`steal_miss`**.
+
+`steal_miss`, not `steal_reach`: the skeleton emitter attaches the **ball** to a
+`steal_reach` defender (that is the interception render). The animator honours any
+override for placement, so a distinct action moves him without transferring
+possession. Do not merge the two action names.
+
+Previously a missed gamble was invisible — the defender never moved and an
+aggressive defence paid no visible price for gambling.
+
+#### Consequence: the receiver attacks (2026-08-28)
+
+Moving the gambler is only half the price. When the gambler is **the receiver's own
+defender**, the receiver catches the ball with nobody in front of him — so the walk
+abandons the remaining play skeleton and drives immediately.
+
+| Stage | Where | Behaviour |
+|---|---|---|
+| Signal | `_hco_contest_skeleton_pass` (`phase_resolution.py`) | On a non-`INTERCEPT`/`BAT_OOB` outcome, stamps `game_state["_hco_gamble_miss_drive"]` — **only** when `off_to_def[receiver] == attempt_deflector`'s position |
+| Trigger | `_resolve_hco_offense_shot_dynamic`, immediately after the contest call | Pops the signal, resolves the receiver's location from the step's `pos_actions`, and returns `_execute_motion_decision(..., {"action": "SHOOT", "shooter_pos": receiver, "shot_type": "attack"})` |
+| Bypass | `build_attack_drive_sequence` (`attack_drive_clearance.py`) | `primary_beaten` (kwarg **or** `game_state["_hco_primary_beaten"]`) forces the **primary** contest to Tier A / stop 1.0 |
+
+**Unconditional.** Every missed gamble by the receiver's own defender produces the
+drive — no second roll. The play skeleton is abandoned from that step; the drive
+machinery supplies the rest of the possession.
+
+**The bypass beats the primary, not the defense.** S2c help-cutoff still runs, so a
+rotating helper can wall off the blow-by (Tier B/C from the cutoff, S2d path-stop,
+S2e pull-up/dish). `_resolve_hco_help_cutoff` already excludes the primary from the
+help race, so the stranded gambler is out of **both** roles with no special-casing.
+
+**Flag hygiene.** Both keys are possession-scoped:
+
+- `_hco_primary_beaten` is popped in a `finally` around the drive build.
+- `_hco_gamble_miss_drive` is popped by the trigger, popped again at walk entry, and
+  discarded by `_hco_contest_final_skeleton` — that coverage patch runs *after* the
+  skeleton is final and cannot act on a missed gamble, so a signal it stamps would
+  otherwise be inherited by the next possession as a phantom advantage.
+
+`build_attack_drive_sequence` reads `_hco_primary_beaten` off `game_state` rather
+than taking a parameter from the walk: threading one through
+`_create_attack_drive_shoot_steps` would change a signature with three existing call
+sites, which is exactly the shape of the `previous_step` production regression.
+
+Tests: `test_motion_dynamic_resolver.py::test_missed_gamble_*`,
+`test_attack_drive_clearance.py::test_beaten_primary_*`.
+
+---
+
+## Loose balls (2026-08-28)
+
+A deflected pass used to have exactly one outcome — out of bounds, offense retains
+on a side inbound. Every successful deflection was therefore a dead ball. Half of
+them now stay in play and both teams scramble.
+
+```
+deflection (BAT_OOB)
+  ├─ 50%  out of bounds, offense retains      (unchanged, `_finalize_hco_pass_bat_oob`)
+  └─ 50%  loose ball
+            ├─ bounce spot lands off the court → treated as out of bounds (above)
+            └─ bounce spot in play → scramble
+                  ├─ offense recovers → possession continues, shot clock NOT reset
+                  └─ defense recovers → turnover (passer) + steal (recoverer)
+```
+
+**HCO only.** `BAT_OOB` also fires in HCT and FCP; those remain pure batted-OOB.
+
+### The carom
+
+A uniformly random direction and a uniformly random distance in `[4, 12]` from the
+contact point. The result may land off the court — deliberately. That is what makes
+a deflection near a sideline usually go out while one at half court never does, with
+no second roll. Measured: **100% in play at half court, ~59% two grid spots off the
+baseline.**
+
+### Who comes up with it
+
+Modelled on `select_rebounder_by_score`, with different inputs — a scramble rewards
+different qualities than boxing out.
+
+```
+score = ((0.3·AG + 0.3·IQ + 0.4·CH) + fight) × rand(1, 6)
+score × 1 / (1 + distance / LOOSE_BALL_DISTANCE_SCALE)
+```
+
+Every player within `LOOSE_BALL_CANDIDATE_RADIUS` of the bounce spot competes; ties
+break at random (no rebound-style modifier/MO/chemistry ladder). If nobody is inside
+the radius it expands until someone qualifies — a ball on the floor is always
+recovered by *someone*.
+
+Three deliberate departures from the rebound formula:
+
+| | Rebounds | Loose balls | Why |
+|---|---|---|---|
+| team term | `chem × rebound_modifier`, added after the die | `fight`, added **inside** the die | as a flat addend on a composite averaging ~175, ±10 is a ±5.7% nudge — smaller than one pip. Inside the parenthesis it scales with the roll |
+| distance scale | 8.0 | **4.0** — twice as steep | makes the random bounce spot, not the die, the main driver |
+| offense discount | `OREB_REBOUND_SCORE_DISCOUNT` 0.8 | none | box-out models a rebound; a scramble has no possession bias |
+
+`fight` is core-8, so it reads through `core8_gameplay()` per THE RULE in
+`team_attr_scale` (stored ±20 → gameplay ±10).
+
+**Geo is the weaker lever.** Measured over 150k simulated scrambles, the closest
+eligible player wins **49.6%** at rebound scale and **54.2%** at 4.0. `rand(1, 6)` is
+a 6× swing and dominates either way. If position needs to be more decisive than that,
+**narrow the die** (`LOOSE_BALL_ROLL_MIN`/`MAX`) — at 3–6 the closest man wins 63.7%.
+
+Measured over 60 simulated quarters (122 deflections → 55 loose balls): defense
+recovers **49.1%**, and the deflector comes up with his own deflection **14.5%** of
+the time.
+
+### Coordinates
+
+Offense from the pass step's named `pos_actions` locations, defense from
+`step["_step_state"]["defense"]` — the same stamped render grid the pass contest
+already judges geometry on, so the scramble is decided on what gets drawn.
+
+**If that grid is absent the loose ball is declined and the ball goes out of bounds.**
+Without it the legacy zone reconstruction returns HOME-frame defenders while offense
+coords are display-frame, and mixing the two would put the bounce spot on the wrong
+end of the floor. `_stamp_contest_defender_grid` runs before both the walk and the
+coverage pass, so this is a guard, not a path.
+
+### Turn routing
+
+| Recovered by | Result | Possession | Shot clock | Stats |
+|---|---|---|---|---|
+| Offense | `DEAD BALL` → `next_turn: HCO` with `kickout_deferred_to_hco_entry` (the OREB handoff; HCO entry emitter builds `hco_entry_kickout`) | continues | **not reset** | none |
+| Offense, shot clock < `LOOSE_BALL_FORCED_SHOT_CLOCK` | arms `_loose_ball_forced_shot_pending` → `_execute_forced_shot` next turn | continues | not reset | none |
+| Defense | `resolve_turnover_logic(turnover_type="STEAL")` → same FB-vs-HCO determination every steal uses | flips | reset (Rule 1) | **TO to the original passer, STL to the recoverer** |
+
+No shot-clock policy change was needed: `_should_reset_shot_clock` already returns
+False for a non-flipping, non-rebound, non-foul result, and True on a possession flip.
+
+`is_interception` stays **False** on a defensive recovery — that flag drives the FE's
+INTERCEPTION! headline and SFX, which would misread a ball won on the floor. The next
+possession's ball starts at the **bounce spot** (`last_stealer_coords`), not the
+deflection contact point.
+
+`_loose_ball_forced_shot_pending` is popped **before** the low-clock `elif` chain, not
+at its own branch: inside an `elif`, an earlier match (expiring game clock, shot-clock
+violation) would skip the pop and leak a phantom forced shot into a later possession.
+
+### The scramble animation
+
+`append_hco_loose_ball_trajectory` appends three steps at the same single point every
+HCO turn passes through (`_emit_hco_animation_steps`), alongside the batted-OOB
+trajectory. Mutually exclusive with it — a turn carries `bat_oob` **or** `loose_ball`.
+
+| Step | Reason | Gate | T | What happens |
+|---|---|---|---|---|
+| A | `hco_loose_ball_contact` | `ball_reaches_player` | ball flight | pass leaves the passer, deflector attacks the lane; the other nine carry their unfinished movement forward |
+| B | `hco_loose_ball_bounce` | `fixed_duration` | carom time | ball caroms to its resting spot while **all ten** break for it |
+| C | `hco_loose_ball_recover` | `player_reaches_position` | remainder of the winner's run | winner covers the last ground and picks it up |
+
+Total scramble = `max(bounce_t, winner_travel)`. A winner already standing on the spot
+gets `recover_t == 0` and **Step C is skipped** — the ball lands in his hands on B.
+
+### Audio
+
+Step A ends when the ball reaches the deflector, so **Step B's `sfx_on_step_start` is
+the instant the ball comes loose** — that is where the announcer call fires, before any
+tween. One clip is chosen at random per loose ball:
+
+| | |
+|---|---|
+| Clips | `braddock-loose-ball-v2.mp3`, `sammy-loose-ball-v3.mp3` (`LOOSE_BALL_SFX_FILES`) |
+| Chosen by | backend, in `pick_loose_ball_sfx()` — UESS: the FE renders, it does not decide |
+| RNG | **`announcement_rng`, not `sim_rng`** |
+
+The presentation stream is mandatory here: sharing `sim_rng` would mean adding or
+removing a clip shifts every subsequent basketball outcome. (The older hot-read coach
+VO does draw from `sim_rng` — that predates the split and is currently disabled. Do
+not copy it.)
+
+It does **not** displace Step A's `block1.wav`, the physical contact thud — the two
+layer: thud, then the call.
+
+Both clips must also be listed in `GAMEPLAY_SFX_FILES`
+(`FrontEnd/static/js/phaser/utils/gameSfx.js`). `playGameSfx` plays from a preloaded
+pool, so a clip added on the backend alone warns to the console and is **silently
+inaudible**. `test_clips_are_registered_in_the_frontend_preload_manifest` guards the
+pair against drift.
+
+**No frontend changes.** The imperative OOB ball-send is gated on `turnData.bat_oob`,
+which a loose ball never sets. The reason strings are deliberately NOT the
+`hct_bat_oob_*` pair — those are what `_hasSchemaBatOobTrajectory()` matches to
+suppress that send, and borrowing them would make a ball still in play read as one
+that left the court.
+
+### Tunable Constants — Loose Balls
+
+All in `BackEnd/engine/loose_ball.py`.
+
+| Constant | Value | Effect |
+|---|---|---|
+| `LOOSE_BALL_FROM_DEFLECTION_PCT` | `50` | share of deflections that stay in play. ↑ = more scrambles, fewer dead balls. The realised rate is lower — bounces that land off the court revert to OOB |
+| `LOOSE_BALL_BOUNCE_MIN_DIST` | `4.0` | closest the ball can come to rest from the contact point |
+| `LOOSE_BALL_BOUNCE_MAX_DIST` | `12.0` | farthest. ↑ = wilder caroms, and more of them out of bounds near a sideline |
+| `LOOSE_BALL_CANDIDATE_RADIUS` | `12.0` | how far a player can be from the bounce spot and still compete. Expands automatically if it would leave nobody |
+| `LOOSE_BALL_DISTANCE_SCALE` | `4.0` | distance discount `1/(1 + d/SCALE)`. **LOWER = distance matters MORE.** Half of `REBOUND_DISTANCE_SCALE` |
+| `LOOSE_BALL_AG_WEIGHT` / `IQ` / `CH` | `0.3` / `0.3` / `0.4` | the ability composite. Must sum to 1.0 to keep the scale comparable to rebounding's |
+| `LOOSE_BALL_ROLL_MIN` / `MAX` | `1` / `6` | the die. **The dominant variance term** — a 6× swing. Narrowing it is the strongest way to make position and ability decide loose balls |
+| `LOOSE_BALL_FORCED_SHOT_CLOCK` | `6.0` | offense recovering under this many seconds takes a forced shot instead of a fresh possession |
+| `LOOSE_BALL_BOUNCE_GRID_PER_GAME_SEC` | `= PASS_GRID_SPOTS_PER_GAME_SECOND` (24) | carom speed. Derived, not a copied literal, so it can't silently diverge from the pass rate |
+| `LOOSE_BALL_CONVERGE_ARCHETYPE` | `"sprint"` | pace the scramblers converge at |
+| `LOOSE_BALL_SFX_FILES` | braddock-v2 / sammy-v3 | announcer clips, one chosen at random per loose ball. Must also be in the FE `GAMEPLAY_SFX_FILES` manifest |
+| `LOOSE_BALL_SFX_VOLUME` | `0.7` | announcer call volume |
+
+Tests: `tests/test_loose_ball.py` (32).

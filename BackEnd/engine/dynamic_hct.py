@@ -82,6 +82,10 @@ from BackEnd.engine.pass_contest import (
     INTERCEPT,
     nearest_oob_point,
     resolve_offense_pass_modifier,
+    resolve_defense_pass_modifier,
+    HCT_PASS_SAFETY_BASE,
+    HCT_PASS_INTERCEPT_TIER_HI,
+    HCT_PASS_INTERCEPT_TIER_MID,
     resolve_pass_contest,
 )
 
@@ -2077,8 +2081,10 @@ def _resolve_hct_pass_contest(
     receiver_xy: Dict[str, Any],
     def_lineup: Dict[str, Any],
     def_coords: Dict[str, Dict[str, int]],
+    def_team: Any = None,
+    turn_type: str = "HCT",
 ) -> Dict[str, Any]:
-    """§14 — resolve the HCT outlet pass contest. Builds the passer + the
+    """§14 — resolve the HCT/FCP outlet pass contest. Builds the passer + the
     eligible defender descriptors from live coords/attributes and the HCT offense
     modifier (``pt_opp_modifier``), then delegates to the pure
     ``resolve_pass_contest``. Returns ``{outcome, deflector, contact_point}``
@@ -2117,8 +2123,19 @@ def _resolve_hct_pass_contest(
                 "IQ": d_attrs.get("IQ", 50),
             }
         )
+    # Turn type drives BOTH modifier lookups. FCP shares this resolver, so the
+    # caller passes its real turn type instead of the previously hardcoded
+    # "HCT" — FCP resolved to pt_opp_modifier only by coincidence, and
+    # OFFENSE_PASS_MODIFIER_KEYS had no FCP entry at all.
+    _tt = str(turn_type or "HCT").upper()
     offense_modifier = resolve_offense_pass_modifier(
-        "HCT", getattr(off_team, "team_attributes", None)
+        _tt, getattr(off_team, "team_attributes", None)
+    )
+    # Gate 3b previously received NO defence modifier, so the defending team's
+    # press/trap quality had zero effect on whether a pass was picked off.
+    # `pt_efficiency` now feeds it, mirroring HCO's `defensive_efficiency`.
+    defense_modifier = resolve_defense_pass_modifier(
+        _tt, getattr(def_team, "team_attributes", None)
     )
     return resolve_pass_contest(
         passer_desc,
@@ -2126,6 +2143,12 @@ def _resolve_hct_pass_contest(
         PASS_GRID_PER_GAME_SEC,
         defenders,
         offense_modifier_g=offense_modifier,
+        defense_modifier_g=defense_modifier,
+        safety_base=HCT_PASS_SAFETY_BASE,
+        tier_hi=HCT_PASS_INTERCEPT_TIER_HI,
+        tier_mid=HCT_PASS_INTERCEPT_TIER_MID,
+        # HCO parity: fold team efficiency into the composite AND the bar.
+        efficiency_in_composite=True,
     )
 
 
@@ -3215,6 +3238,11 @@ def compute_dynamic_hct_turn(
         contest = _resolve_hct_pass_contest(
             off_team, ball_handler, off_coords[passer_pos], off_coords[receiver_pos],
             def_lineup, def_coords,
+            # `turn_mode` distinguishes HCT from FCP; both map to pt_opp_modifier /
+            # pt_efficiency, but pass the real type so the lookup is correct by
+            # construction rather than by coincidence.
+            def_team=def_team,
+            turn_type=("FCP" if str(turn_mode).lower() == "fcp" else "HCT"),
         )
         if contest["outcome"] == INTERCEPT:
             interceptor_pos = contest["deflector"]

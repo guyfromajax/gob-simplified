@@ -1258,6 +1258,288 @@ def append_hco_bat_oob_trajectory(
     return True
 
 
+def append_hco_loose_ball_trajectory(
+    steps: List[AnimationStep],
+    turn_result: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> bool:
+    """Animate the scramble for a deflected pass that stayed in play.
+
+    Three steps, mirroring the batted-OOB trajectory's contact beat and then
+    diverging — because this ball does NOT leave the floor:
+
+      Step A (``hco_loose_ball_contact``, gate ``ball_reaches_player``) — the pass
+        leaves the passer and the deflector attacks the lane, converging on the
+        contact point. T is the ball's flight time. Identical in shape to
+        ``hct_bat_oob_contact``.
+      Step B (``hco_loose_ball_bounce``, gate ``fixed_duration``) — the ball caroms
+        from contact to its resting spot while ALL TEN players break for it. T is
+        the ball's carom time, so the scramble starts the instant it is deflected
+        rather than waiting for the ball to settle.
+      Step C (``hco_loose_ball_recover``, gate ``player_reaches_position``) — the
+        winner covers whatever ground is left and picks it up. T is the remainder of
+        his run; a winner already standing on the spot gets T 0 and Step C is
+        skipped entirely.
+
+    The reason strings are deliberately NOT the ``hct_bat_oob_*`` pair. The
+    frontend's ``_hasSchemaBatOobTrajectory()`` matches on those to suppress its
+    imperative out-of-bounds ball-send; a loose ball never sets ``turn_result.bat_oob``
+    so that send cannot fire anyway, and borrowing the strings would make a
+    ball-still-in-play read as one that left the court.
+
+    Clock: every step decrements ``clock_remaining`` by its own T, so
+    ``_emit_hco_animation_steps`` picks the scramble up in ``time_elapsed`` with no
+    separate reconciliation.
+
+    Returns True when the scramble was appended; False (no-op) when this turn is not
+    a loose ball or the backend geometry is missing.
+    """
+    if not steps or not isinstance(turn_result, dict):
+        return False
+    loose = turn_result.get("loose_ball")
+    if not isinstance(loose, dict):
+        return False
+
+    contact_raw = loose.get("contact")
+    bounce_raw = loose.get("bounce_spot")
+    deflector_id = _safe_id(loose.get("deflector_id"))
+    recoverer_id = _safe_id(loose.get("recoverer_id"))
+    if not isinstance(contact_raw, dict) or not isinstance(bounce_raw, dict):
+        return False
+    if not deflector_id or not recoverer_id:
+        return False
+
+    # Defensive: never double-append.
+    for st in steps:
+        meta = ((st.get("start") or {}).get("advance_trigger") or {}).get("metadata") or {}
+        if meta.get("reason", "").startswith("hco_loose_ball_"):
+            return False
+
+    last = steps[-1]
+    last_end = last.get("end") or {}
+    start_coords = last_end.get("coords") or {}
+    if not start_coords or deflector_id not in start_coords:
+        return False
+    if recoverer_id not in start_coords:
+        return False
+
+    # The ball is still with the passer — the receiver was un-caught upstream, so the
+    # pass never completed.
+    passer_id = _safe_id((last_end.get("ball") or {}).get("owner_player_id"))
+    if not passer_id or passer_id not in start_coords:
+        return False
+
+    contact: GridCoord = {"x": float(contact_raw["x"]), "y": float(contact_raw["y"])}
+    bounce: GridCoord = {"x": float(bounce_raw["x"]), "y": float(bounce_raw["y"])}
+    passer_coord = start_coords[passer_id]
+
+    pass_rate = max(1e-6, float(PASS_GRID_SPOTS_PER_GAME_SECOND))
+    contact_t = max(0.3, _euclid(passer_coord, contact) / pass_rate)
+
+    from BackEnd.engine.loose_ball import (
+        LOOSE_BALL_CONVERGE_ARCHETYPE, LOOSE_BALL_SFX_VOLUME,
+        pick_loose_ball_sfx, scramble_timing,
+    )
+    recoverer = _player_lookup_by_id(off_lineup, def_lineup, recoverer_id)
+    winner_rate = _ag_grid_per_game_sec(recoverer, LOOSE_BALL_CONVERGE_ARCHETYPE)
+    bounce_t, recover_t = scramble_timing(
+        contact=contact, bounce_spot=bounce,
+        winner_coords=start_coords[recoverer_id],
+        winner_rate_grid_per_game_sec=winner_rate)
+    bounce_t = max(0.2, bounce_t)
+
+    clock_in = dict(last_end.get("clock") or {})
+    c_rem = float(clock_in.get("clock_remaining") or 0.0)
+    sc_rem = float(clock_in.get("shot_clock_remaining") or 0.0)
+
+    off_ids = {str(getattr(pl_, "player_id", None))
+               for pl_ in (off_lineup or {}).values() if pl_ is not None}
+
+    # --- Step A: pass flies to contact; deflector converges on it ---
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
+    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in start_coords}
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(c) for pid, c in start_coords.items()}
+    contact_end_coords: Dict[str, GridCoord] = {
+        pid: dict(c) for pid, c in start_coords.items()}
+
+    # Carry the prior step's unfinished movement through the contact beat so the
+    # other nine keep playing instead of freezing while the deflector attacks.
+    prior_dest = (last.get("start") or {}).get("destination") or {}
+    prior_arch = (last.get("start") or {}).get("archetype") or {}
+    for pid, sc in start_coords.items():
+        target = prior_dest.get(pid)
+        if not isinstance(target, dict) or target.get("x") is None:
+            continue
+        tgt = {"x": float(target["x"]), "y": float(target["y"])}
+        if _euclid(sc, tgt) < 1e-6:
+            continue
+        arch = prior_arch.get(pid)
+        if arch not in ("standard", "sprint", "burst", "cruise", "drift"):
+            arch = "standard"
+        rate = _ag_grid_per_game_sec(
+            _player_lookup_by_id(off_lineup, def_lineup, pid), arch)
+        moved_end, _dur = _interpolate_step_end(sc, tgt, rate, contact_t)
+        actions[pid] = "cut" if pid in off_ids else "guard_offball"
+        archetype[pid] = arch
+        destinations[pid] = dict(tgt)
+        contact_end_coords[pid] = moved_end
+
+    actions[passer_id] = "pass"
+    actions[deflector_id] = "guard_ball"
+    archetype[deflector_id] = "sprint"
+    destinations[deflector_id] = dict(contact)
+    contact_end_coords[deflector_id] = dict(contact)
+
+    contact_start: StepStart = {
+        "coords": {pid: dict(c) for pid, c in start_coords.items()},
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": {
+            "from_player_id": str(passer_id),
+            "to_player_id": str(deflector_id),
+            "current_coords": dict(passer_coord),
+        },
+        "ball_motion_style": "pass",
+        "ball_arrival_coord": dict(contact),
+        "clock": {"clock_remaining": c_rem, "shot_clock_remaining": sc_rem},
+        "advance_trigger": {
+            "condition": "ball_reaches_player",
+            "T_game_seconds": float(contact_t),
+            "metadata": {
+                "target_player_id": str(deflector_id),
+                "target_coords": dict(contact),
+                "contact_coords": dict(contact),
+                "bounce_coords": dict(bounce),
+                "reason": "hco_loose_ball_contact",
+            },
+        },
+        "sfx_on_ball_arrival": {
+            "file": "block1.wav",
+            "volume": 0.42,
+            "event": "loose_ball_contact",
+        },
+    }
+    contact_end: StepEnd = {
+        "coords": contact_end_coords,
+        "ball": {"coords": dict(contact)},
+        "time_elapsed": float(contact_t),
+        "clock": {
+            "clock_remaining": c_rem - contact_t,
+            "shot_clock_remaining": max(0.0, sc_rem - contact_t),
+        },
+        "next": {"kind": "next_step", "index": len(steps) + 1},
+    }
+    stamp_tween_durations(contact_start, contact_end_coords, contact_t, off_lineup, def_lineup)
+
+    # --- Step B: ball caroms to its resting spot; everyone breaks for it ---
+    def _scramble_leg(
+        start: Dict[str, GridCoord], t: float, clock_r: float, shot_r: float,
+        reason: str, condition: str, extra_meta: Dict[str, Any],
+        ball_from: GridCoord, ball_to: GridCoord, next_index: Any,
+    ):
+        """One converging beat: every player runs at the loose ball for `t` game
+        seconds, stopping wherever that lands them (the interrupted-coord model)."""
+        acts: Dict[str, PlayerAction] = {}
+        archs: Dict[str, PlayerArchetype] = {}
+        dests: Dict[str, Optional[GridCoord]] = {}
+        ends: Dict[str, GridCoord] = {}
+        for pid, sc in start.items():
+            if _euclid(sc, bounce) < 1e-6:
+                acts[pid] = "handle_ball" if pid == recoverer_id else "stationary"
+                archs[pid] = "stationary"
+                dests[pid] = dict(sc)
+                ends[pid] = dict(sc)
+                continue
+            rate = _ag_grid_per_game_sec(
+                _player_lookup_by_id(off_lineup, def_lineup, pid),
+                LOOSE_BALL_CONVERGE_ARCHETYPE)
+            moved_end, _dur = _interpolate_step_end(sc, bounce, rate, t)
+            acts[pid] = "cut" if pid in off_ids else "guard_offball"
+            archs[pid] = LOOSE_BALL_CONVERGE_ARCHETYPE
+            dests[pid] = dict(bounce)
+            ends[pid] = moved_end
+        st: StepStart = {
+            "coords": {pid: dict(c) for pid, c in start.items()},
+            "destination": dests,
+            "action": acts,
+            "archetype": archs,
+            "ball": {"coords": dict(ball_from)},
+            "ball_motion_style": "pass",
+            "clock": {"clock_remaining": clock_r, "shot_clock_remaining": shot_r},
+            "advance_trigger": {
+                "condition": condition,
+                "T_game_seconds": float(t),
+                "metadata": dict(extra_meta, reason=reason,
+                                 contact_coords=dict(contact),
+                                 bounce_coords=dict(bounce)),
+            },
+        }
+        en: StepEnd = {
+            "coords": ends,
+            "ball": {"coords": dict(ball_to)},
+            "time_elapsed": float(t),
+            "clock": {
+                "clock_remaining": clock_r - t,
+                "shot_clock_remaining": max(0.0, shot_r - t),
+            },
+            "next": next_index,
+        }
+        stamp_tween_durations(st, ends, t, off_lineup, def_lineup)
+        return st, en, ends
+
+    c_after_a, sc_after_a = c_rem - contact_t, max(0.0, sc_rem - contact_t)
+    has_recover_leg = recover_t > 1e-3
+    bounce_start, bounce_end, bounce_end_coords = _scramble_leg(
+        contact_end_coords, bounce_t, c_after_a, sc_after_a,
+        "hco_loose_ball_bounce", "fixed_duration",
+        {"from_player_id": str(deflector_id), "target_coords": dict(bounce)},
+        contact, bounce,
+        {"kind": "next_step", "index": len(steps) + 2} if has_recover_leg
+        else (last_end.get("next") or {"kind": "next_step", "index": 999}),
+    )
+
+    # The announcer calls it the INSTANT it comes loose. Step A ends when the ball
+    # reaches the deflector, so Step B's step-start IS the moment of the deflection —
+    # `sfx_on_step_start` fires there, before any tween. Deliberately not Step A's
+    # `sfx_on_ball_arrival`: that slot holds `block1.wav`, the physical contact thud,
+    # and the two should layer (thud, then the call) rather than displace each other.
+    bounce_start["sfx_on_step_start"] = {
+        "file": pick_loose_ball_sfx(),
+        "volume": float(LOOSE_BALL_SFX_VOLUME),
+        "event": "loose_ball",
+    }
+
+    last_end["next"] = {"kind": "next_step", "index": len(steps)}
+    steps.append({"start": contact_start, "end": contact_end})
+    steps.append({"start": bounce_start, "end": bounce_end})
+
+    if not has_recover_leg:
+        # The winner was already standing on it — the ball lands in his hands.
+        bounce_end["coords"][recoverer_id] = dict(bounce)
+        bounce_start["action"][recoverer_id] = "handle_ball"
+        bounce_end["ball"] = {"coords": dict(bounce), "owner_player_id": str(recoverer_id)}
+        return True
+
+    # --- Step C: the winner covers the last of the ground and comes up with it ---
+    rec_start, rec_end, _rec_ends = _scramble_leg(
+        bounce_end_coords, recover_t,
+        c_after_a - bounce_t, max(0.0, sc_after_a - bounce_t),
+        "hco_loose_ball_recover", "player_reaches_position",
+        {"target_player_id": str(recoverer_id), "target_coords": dict(bounce)},
+        bounce, bounce,
+        last_end.get("next") or {"kind": "next_step", "index": 999},
+    )
+    # The winner is the one player guaranteed to ARRIVE — T was derived from his run.
+    rec_end["coords"][recoverer_id] = dict(bounce)
+    rec_start["action"][recoverer_id] = "cut"
+    rec_end["ball"] = {"coords": dict(bounce), "owner_player_id": str(recoverer_id)}
+    steps.append({"start": rec_start, "end": rec_end})
+    return True
+
+
 def build_skeleton_animation_steps(
     turn_result: Dict[str, Any],
     game: Any,

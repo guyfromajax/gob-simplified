@@ -71,6 +71,10 @@ export const GAMEPLAY_SFX_FILES = Object.freeze([
   "sammy-launch.mp3",
   "duke-heave.mp3",
   "click-beep.wav",
+  // Loose ball — announcer call fired the instant the ball is knocked loose
+  // (one chosen at random by the backend). See Dynamic_HCO_System.md.
+  "braddock-loose-ball-v2.mp3",
+  "sammy-loose-ball-v3.mp3",
 ]);
 
 /** Long-form pre-game bed (not pooled — one instance, faded out at tip-off). */

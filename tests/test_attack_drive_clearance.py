@@ -257,3 +257,96 @@ def test_stopped_pullup_value_uses_release_geometry_home_and_away():
     assert _shot_type_for_stopped_pullup_coords(
         {"x": 50, "y": 25}, True
     ) == ("outside", "Outside")
+
+
+def _beaten_gamble_drive(primary_beaten_via, seed, cutoff=None):
+    """Build one man-defense attack drive under the 3-tier posture.
+
+    `primary_beaten_via` is None (normal contest), "param" (explicit kwarg) or
+    "game_state" (the flag the HCO walk sets when a defender's gamble on the pass
+    to this receiver missed). The primary contest is pinned to a defense win so
+    any Tier A is attributable to the bypass, not to a roll; `cutoff` pins the
+    S2c help-cutoff return so the two stages can be judged independently.
+    """
+    random.seed(seed)
+    selected_step = {
+        "pos_actions": {
+            "PG": {"location": "upper wing", "action": "handle_ball"},
+            "SG": {"location": "upper bird", "action": "drift"},
+            "SF": {"location": "lower wing", "action": "drift"},
+            "PF": {"location": "lower bird", "action": "drift"},
+            "C": {"location": "key", "action": "drift"},
+        }
+    }
+    def_lineup = {
+        p: SimpleNamespace(player_id=f"def-{p}",
+                           attributes={"IQ": 12, "CH": 12, "OD": 12, "AG": 12, "BH": 12, "ST": 12})
+        for p in ["PG", "SG", "SF", "PF", "C"]
+    }
+    off_lineup = {
+        p: SimpleNamespace(player_id=f"off-{p}",
+                           attributes={"IQ": 12, "CH": 12, "BH": 12, "AG": 12, "ST": 12})
+        for p in ["PG", "SG", "SF", "PF", "C"]
+    }
+    game_state = {"defense_playcall": "man", "_hco_defense_posture": "man"}
+    if primary_beaten_via == "game_state":
+        game_state["_hco_primary_beaten"] = True
+    game = SimpleNamespace(
+        game_state=game_state,
+        offense_team=SimpleNamespace(team_attributes={"team_chemistry": 12, "offensive_efficiency": 12}),
+        defense_team=SimpleNamespace(
+            is_user_team=False,
+            team_attributes={"team_chemistry": 12, "defensive_efficiency": 12},
+            strategy_calls={"aggression_call": "normal"},
+        ),
+    )
+    with patch(
+        "BackEnd.engine.attack_drive_clearance.get_matchups_for_defending_team",
+        return_value={"PG": "PG", "SG": "SG", "SF": "SF", "PF": "PF", "C": "C"},
+    ), patch(
+        "BackEnd.engine.attack_drive_clearance._resolve_hco_drive_contest",
+        return_value=("C", 0.25, None),
+    ), patch(
+        "BackEnd.engine.attack_drive_clearance._resolve_hco_help_cutoff",
+        return_value=(cutoff or (None, "A", 1.0, None, None)),
+    ):
+        return build_attack_drive_sequence(
+            selected_step=selected_step,
+            ball_handler_pos="PG",
+            start_location="upper wing",
+            destination_location="rim",
+            timestamp=0,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            game=game,
+            is_away_offense=False,
+            primary_beaten=(primary_beaten_via == "param"),
+        )["attack_drive_meta"]
+
+
+def test_beaten_primary_forces_tier_a_via_param_and_game_state():
+    """A receiver whose own defender gambled and missed drives against nobody.
+
+    Both entry points must override the primary contest to Tier A (full drive, no
+    path-stop): the explicit kwarg, and the `_hco_primary_beaten` game_state flag
+    the HCO walk sets — the walk uses the flag so `_create_attack_drive_shoot_steps`
+    keeps its signature (a shared-signature change is what broke `previous_step`).
+    """
+    for seed in range(8):
+        assert _beaten_gamble_drive(None, seed)["drive_tier"] == "C", seed
+        for via in ("param", "game_state"):
+            meta = _beaten_gamble_drive(via, seed)
+            assert meta["drive_tier"] == "A", (via, seed, meta["drive_tier"])
+            assert meta["drive_stop_fraction"] == 1.0, (via, seed)
+
+
+def test_beaten_primary_still_subject_to_help_cutoff():
+    """The bypass beats the PRIMARY, not the whole defense: S2c still demotes.
+
+    `_resolve_hco_help_cutoff` excludes the beaten primary from the help race, so
+    the gambler is out of both roles without any special-casing — but a rotating
+    help defender must still be able to wall off the blow-by.
+    """
+    meta = _beaten_gamble_drive("game_state", 3, cutoff=("C", "C", 0.4, None, None))
+    assert meta["drive_tier"] == "C"
+    assert meta["drive_stop_fraction"] == 0.4

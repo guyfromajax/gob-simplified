@@ -408,3 +408,72 @@ Recorded via `_record_fcp_stats()` in `phase_resolution.py`.
 
 - Enhanced stopper step selection using player attributes
 - Additional FCP skeleton variants for situational press breaks
+
+## Tunable Constants — Pass Contest (interceptions & batted balls)
+
+Press/trap pass contests resolve through the shared
+[`BackEnd/engine/pass_contest.py`](../../BackEnd/engine/pass_contest.py)
+`resolve_pass_contest`, wired from `dynamic_hct._resolve_hct_pass_contest`.
+HCT and FCP share this path; `turn_mode` selects the turn type so each modifier
+is looked up correctly rather than by coincidence.
+
+### Team-attribute modifiers
+
+| Side | Attribute | Resolver | Effect |
+|---|---|---|---|
+| Offense | `pt_opp_modifier` | `resolve_offense_pass_modifier` | Higher = passer clears the safety bar more easily = fewer deflections |
+| Defense | `pt_efficiency` | `resolve_defense_pass_modifier` | Higher = lower deflection tier = more deflections |
+
+Both are `core8_gameplay()`-normalised (±10). The `_g` suffix on
+`offense_modifier_g` / `defense_modifier_g` marks that contract — never pass a
+raw ±20 team attribute.
+
+### Calibration bases
+
+| Constant | Value | Effect |
+|---|---|---|
+| `HCT_PASS_SAFETY_BASE` | 175.0 | Passer-safety bar. ↑ = harder to evade = more deflections |
+| `HCT_PASS_INTERCEPT_TIER_MID` | 170.0 | Deflection threshold. ↓ = more deflections |
+| `HCT_PASS_INTERCEPT_TIER_HI` | 200.0 | **Dead** — carried for signature parity only (see below) |
+| `PASS_DEFLECT_KIND_D` | 200 | INTERCEPT vs BAT_OOB ratio. **Shared with HCO** |
+
+Seeded at HCO parity (175 / 170) and deliberately separate from the
+`HCO_PASS_*` constants so the two families can be calibrated independently.
+
+### Formulas (`efficiency_in_composite=True`, matching HCO)
+
+```
+pass_score = ((PS·0.6 + CH·0.2 + IQ·0.2) + pt_opp_modifier) × rand(1,6)
+bar        = HCT_PASS_SAFETY_BASE − pt_opp_modifier
+intercept  = ((OD·0.6 + CH·0.2 + IQ·0.2) + pt_efficiency)  × rand(1,6)
+tier_mid   = HCT_PASS_INTERCEPT_TIER_MID − pt_efficiency
+kind       = rand(1, PASS_DEFLECT_KIND_D) < (CH + IQ) ? INTERCEPT : BAT_OOB
+```
+
+Team efficiency folds into **both** the composite and the bar — which is why the
+bases sit below the shared 200/200 defaults.
+
+### Which dial does what
+
+- **How often passes are deflected** → `HCT_PASS_SAFETY_BASE` + `HCT_PASS_INTERCEPT_TIER_MID`
+- **INTERCEPT vs BAT_OOB split** → `PASS_DEFLECT_KIND_D` only. ↑ D = more BAT_OOB, ↓ D = more clean steals. High CH+IQ defenders skew toward INTERCEPT.
+- **Lane eligibility** → `PASS_LANE_DIST = 8.0` (HCT/FCP; HCO is tighter at 5–6)
+
+### Two traps
+
+`PASS_INTERCEPT_TIER_HI` / `HCT_PASS_INTERCEPT_TIER_HI` are **dead**. The old
+hi/mid split made BAT_OOB effectively unreachable — the band was narrower than
+the score's quantization step (`composite × randint(1,6)`, step ≈ 50–100), so
+consecutive scores straddled it. Tuning them has no effect.
+
+`PASS_DEFLECT_KIND_D` is **shared across HCO, HCT and FCP**. Changing the
+intercept/bat ratio moves it for all three; splitting them needs a new constant
+plumbed the way `HCT_PASS_SAFETY_BASE` already is.
+
+### History
+
+Before 2026-08-28, HCT/FCP passed **no** `defense_modifier_g` at all — the
+defending team's press/trap quality had zero effect on interceptions — and ran
+with `efficiency_in_composite=False` against the shared 200/200 bases. FCP also
+had no entry in `OFFENSE_PASS_MODIFIER_KEYS`, so an explicit `"FCP"` turn type
+would have fallen back to `offensive_efficiency`.

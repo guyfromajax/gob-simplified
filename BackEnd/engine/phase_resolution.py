@@ -5674,6 +5674,7 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
     cases. Returns {outcome, deflector, contact_point} — COMPLETE / INTERCEPT / BAT_OOB."""
     from BackEnd.engine.pass_contest import (
         defenders_in_lane, resolve_pass_contest, resolve_offense_pass_modifier, COMPLETE,
+        HCO_PASS_DEFLECT_KIND_D,
     )
     from BackEnd.engine.dynamic_hct import PASS_GRID_PER_GAME_SEC
     from BackEnd.utils.shared import ag_to_grid_per_game_sec
@@ -5729,14 +5730,17 @@ def _hco_resolve_dish_contest(step, bh_pos, recv_pos, off_lineup, def_lineup, of
         offense_modifier_g=offense_modifier, defense_modifier_g=defense_modifier,
         lane_dist=lane_dist, rng=rng, safety_base=HCO_PASS_SAFETY_BASE,
         tier_hi=HCO_PASS_INTERCEPT_TIER_HI, tier_mid=HCO_PASS_INTERCEPT_TIER_MID,
-        efficiency_in_composite=True)
+        efficiency_in_composite=True,
+        # HCO-only kind split: more knock-aways, fewer clean picks. Completion
+        # rate is unaffected — that is safety_base + tier_mid.
+        deflect_kind_d=HCO_PASS_DEFLECT_KIND_D)
     _track_hco_intercept_gates(game_state, True, True, result.get("stage"), pass_type)
     return result
 
 
 def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lineup, off_to_def,
                                is_away_offense, def_aggr, lane_dist, zone, game_state, off_team, rng,
-                               pass_type="motion"):
+                               pass_type="motion", game=None):
     """Dynamic HCO Defense (P2b): contest a SKELETON ball-movement / reversal pass via the two-gate
     model (reuses `_hco_resolve_dish_contest` — skeleton steps carry named locations, so the posture
     reconstruction is accurate). Returns a STEAL turnover result (``pass_intercepted``) if the pass is
@@ -5767,20 +5771,132 @@ def _hco_contest_skeleton_pass(step, output_steps, skeleton, off_lineup, def_lin
         def_aggr, lane_dist, zone, game_state.get("defense_playcall"), off_team, rng,
         posture=posture, game_state=game_state, pass_type=pass_type)
     if contest.get("outcome") not in ("INTERCEPT", "BAT_OOB"):
+        # MISSED GAMBLE. The defender committed to the passing lane (Gate 2's
+        # aggression roll) and the pass completed anyway. Previously nothing was
+        # stamped, so he never moved and an aggressive defence paid no visible
+        # price for gambling. Stamp a coord override so he still lunges to the
+        # contact point.
+        #
+        # Action is `steal_miss`, NOT `steal_reach`: the skeleton emitter attaches
+        # the BALL to a `steal_reach` defender (that is the interception render).
+        # The animator honours any override for placement, so a distinct action
+        # moves him without transferring possession.
+        _miss_pos = contest.get("attempt_deflector")
+        _miss_at = contest.get("attempt_contact_point")
+        # If the gambler was the RECEIVER'S OWN defender, the receiver is now
+        # genuinely unguarded — signal the walk to abandon the play and attack.
+        # A gamble by any other defender leaves the receiver's man in place, so
+        # the turn proceeds normally (owner call 2026-08-28).
+        if _miss_pos and receiver and off_to_def.get(receiver) == _miss_pos:
+            game_state["_hco_gamble_miss_drive"] = {
+                "receiver_pos": receiver,
+                "defender_pos": _miss_pos,
+            }
+        if _miss_pos and isinstance(_miss_at, dict):
+            step.setdefault("_attack_drive", {}).setdefault(
+                "defender_overrides", {}
+            )[_miss_pos] = {
+                "coords": {"x": float(_miss_at["x"]), "y": float(_miss_at["y"])},
+                "action": "steal_miss",
+            }
         return None
     logging.debug(
         f"🪡 [HCO PASS] {contest['outcome']} on SKELETON pass {passer}→{receiver} "
         f"by {contest.get('deflector')}")
     skeleton["steps"] = list(output_steps)
+    _loose = None
+    if contest["outcome"] == "BAT_OOB":
+        # Half of all deflections stay IN PLAY as a loose ball instead of sailing out.
+        # A bounce spot that lands off the court reverts to batted-out-of-bounds, so
+        # deflections near a sideline still go out most of the time — organically.
+        _loose = _hco_resolve_loose_ball(
+            step, contest, passer, off_lineup, def_lineup, off_to_def, is_away_offense,
+            def_aggr, zone, game_state, off_team, game, rng)
     return {
         "skeleton": skeleton,
         "pass_intercepted": True,
         "interceptor_pos": contest.get("deflector"),
-        "pass_bat_oob": contest["outcome"] == "BAT_OOB",
+        # A recovered loose ball is NOT a batted-OOB: it routes to its own finalizer.
+        "pass_bat_oob": contest["outcome"] == "BAT_OOB" and _loose is None,
         "pass_contact_point": contest.get("contact_point"),
+        "loose_ball": _loose,
         "passer_pos": passer,
         "shooter": off_lineup[passer],
         "shooter_pos": passer,
+    }
+
+
+def _hco_resolve_loose_ball(step, contest, passer, off_lineup, def_lineup, off_to_def,
+                            is_away_offense, def_aggr, zone, game_state, off_team, game, rng):
+    """A deflection that stays in play: bounce the ball, then scramble for it.
+
+    Returns the loose-ball payload, or ``None`` to fall back to batted-out-of-bounds.
+    ``None`` happens three ways, all of them legitimate basketball or safe degradation:
+
+      1. the 50/50 says the ball goes out (`LOOSE_BALL_FROM_DEFLECTION_PCT`);
+      2. the bounce spot lands off the court — a deflection near a sideline SHOULD
+         usually sail out, and this is what produces that organically;
+      3. the render's defender grid isn't stamped on this step.
+
+    On (3): with the grid stamped, offense and defense coords are BOTH in the display
+    frame, so the scramble is judged — and animated — in one unified frame. Without
+    it the legacy zone reconstruction returns HOME-frame defenders, and mixing frames
+    would put the bounce spot on the wrong end of the floor. `_stamp_contest_defender_grid`
+    runs before both the walk and the coverage pass, so this is a guard, not a path.
+    """
+    from BackEnd.engine.loose_ball import (
+        deflection_stays_in_play, roll_bounce_spot, is_in_bounds,
+        select_loose_ball_recoverer,
+    )
+    contact = contest.get("contact_point")
+    if not isinstance(contact, dict) or contact.get("x") is None:
+        return None
+    # Drawn for EVERY deflection, before any early-out, so the gameplay stream
+    # advances identically whichever way the ball goes.
+    if not deflection_stays_in_play(rng):
+        return None
+    bounce = roll_bounce_spot(contact, rng)
+    if not is_in_bounds(bounce):
+        return None
+
+    stamped = ((step.get("_step_state") or {}).get("defense")) or {}
+    if not stamped:
+        return None
+    def_xy, _coord, _loc, _pt = _hco_step_def_xy(
+        step, passer, off_lineup, def_lineup, off_to_def, is_away_offense,
+        def_aggr, zone, game_state.get("defense_playcall"),
+        posture=game_state.get("_hco_defense_posture"))
+
+    pos_actions = step.get("pos_actions") or {}
+    off_entries = [(pos, off_lineup[pos], _coord(pos))
+                   for pos in off_lineup
+                   if pos in pos_actions and off_lineup.get(pos)]
+    def_entries = [(dpos, def_lineup[dpos], xy)
+                   for dpos, xy in def_xy.items() if def_lineup.get(dpos)]
+    def_team = getattr(game, "defense_team", None) if game is not None else None
+
+    winner = select_loose_ball_recoverer(
+        bounce_spot=bounce, off_entries=off_entries, def_entries=def_entries,
+        off_team=off_team, def_team=def_team, rng=rng)
+    if not winner:
+        return None
+
+    logging.debug(
+        "\U0001f3c0 [LOOSE BALL] deflection by %s stays in play \u2192 bounce (%.1f, %.1f); "
+        "%s %s recovers at d=%.1f",
+        contest.get("deflector"), bounce["x"], bounce["y"],
+        "OFFENSE" if winner["is_offense"] else "DEFENSE",
+        winner["position"], winner["distance"])
+
+    return {
+        "contact": {"x": float(contact["x"]), "y": float(contact["y"])},
+        "bounce_spot": {"x": float(bounce["x"]), "y": float(bounce["y"])},
+        "deflector_pos": contest.get("deflector"),
+        "recoverer_pos": winner["position"],
+        "recoverer_id": getattr(winner["player"], "player_id", None),
+        "recovered_by_offense": bool(winner["is_offense"]),
+        "recoverer_distance": float(winner["distance"]),
+        "passer_pos": passer,
     }
 
 
@@ -5872,12 +5988,17 @@ def _hco_contest_final_skeleton(motion_shot_info, game, off_lineup, def_lineup, 
             continue
         pick = _hco_contest_skeleton_pass(
             step, steps[:i + 1], skeleton, off_lineup, def_lineup, off_to_def, is_away_offense,
-            def_aggr, lane_dist, zone, game_state, off_team, _rng, pass_type=ptype)
+            def_aggr, lane_dist, zone, game_state, off_team, _rng, pass_type=ptype, game=game)
+        # A missed gamble here CANNOT trigger the immediate attack drive — this pass is
+        # the coverage patch running after the skeleton is already final. Discard the
+        # signal so it can't be popped by the NEXT possession's walk.
+        game_state.pop("_hco_gamble_miss_drive", None)
         if pick is not None:
             motion_shot_info["pass_intercepted"] = True
             motion_shot_info["interceptor_pos"] = pick["interceptor_pos"]
             motion_shot_info["pass_bat_oob"] = pick["pass_bat_oob"]
             motion_shot_info["pass_contact_point"] = pick["pass_contact_point"]
+            motion_shot_info["loose_ball"] = pick.get("loose_ball")
             motion_shot_info["passer_pos"] = pick["passer_pos"]
             motion_shot_info["skeleton"] = pick["skeleton"]
             return
@@ -5993,6 +6114,137 @@ def _finalize_hco_pass_interception(motion_shot_info, game, roles, off_lineup, d
         f"{getattr(interceptor, 'player_id', None)} → STEAL "
         f"[pass_pin={_pi} surviving_shot_steps={_surviving_shot} "
         f"game={game_state.get('game_id')} is_full_sim={game_state.get('_is_full_simulation')}]")
+    return turn_result
+
+
+def _finalize_hco_loose_ball(motion_shot_info, game, roles, off_lineup, def_lineup, game_state):
+    """A deflected pass that stayed in play and was recovered on the floor.
+
+    Two outcomes, and they are genuinely different turns:
+
+    OFFENSE recovers — the possession never ended. No stats, no possession flip, and
+    critically NO shot-clock reset (`_should_reset_shot_clock` returns False for a
+    non-flipping, non-rebound result, so this needs no policy change). We resume in
+    HCO with a kickout, reusing the OREB handoff: `kickout_deferred_to_hco_entry`
+    tells the HCO entry emitter to build the kickout step (`hco_entry_kickout`).
+    Under `LOOSE_BALL_FORCED_SHOT_CLOCK` there is no time to run anything, so we arm
+    the forced-shot scenario instead — the same one a possession approaching a
+    shot-clock violation gets.
+
+    DEFENSE recovers — a live-ball turnover, indistinguishable in bookkeeping from a
+    pick: TO to the ORIGINAL PASSER, STL to the recoverer, possession flips (which
+    resets the shot clock via Rule 1), and `resolve_turnover_logic` hands off to the
+    same Fast Break vs. HCO determination every steal uses.
+
+    Either way the scramble ANIMATION is appended downstream by
+    `append_hco_loose_ball_trajectory` off the `loose_ball` block on the result — no
+    steps are built here.
+    """
+    loose = motion_shot_info.get("loose_ball") or {}
+    _passer_pos = loose.get("passer_pos") or motion_shot_info.get("passer_pos")
+    passer = off_lineup.get(_passer_pos) if _passer_pos else roles.get("ball_handler")
+    recoverer_pos = loose.get("recoverer_pos")
+    by_offense = bool(loose.get("recovered_by_offense"))
+    recoverer = (off_lineup if by_offense else def_lineup).get(recoverer_pos)
+    deflector = def_lineup.get(loose.get("deflector_pos"))
+
+    # Stop the skeleton at the pass step — the ball was knocked away, so it never
+    # reaches the receiver (same treatment the pick and the batted-OOB both get).
+    _src = motion_shot_info.get("skeleton") or {}
+    _steps = (_src or {}).get("steps") or []
+    _pi = _hco_last_pass_step_index(_steps)
+    if _pi is not None:
+        game_state["_hco_pass_intercept_stop_index"] = _pi
+        _hco_uncatch_receiver_on_pass(_steps, _pi)
+    try:
+        skel = apply_stopper_system_to_skeleton(_src, "DEAD_BALL_TURNOVER", game_state)
+    finally:
+        game_state.pop("_hco_pass_intercept_stop_index", None)
+
+    # The scramble payload the emitter animates from. Carried on the turn result so
+    # the emitter needs no back-channel into the resolver.
+    loose_payload = dict(loose)
+    loose_payload["recoverer_id"] = getattr(recoverer, "player_id", None)
+    loose_payload["deflector_id"] = getattr(deflector, "player_id", None)
+    loose_payload["passer_id"] = getattr(passer, "player_id", None)
+
+    to_roles = dict(roles)
+    to_roles["ball_handler"] = passer
+    to_roles["defender"] = recoverer if not by_offense else deflector
+    # Internal tallies keyed by Player OBJECTS crash JSONResponse (convert_players only
+    # converts dict VALUES, not keys). The FE never needs them. Same strip the
+    # batted-OOB finalizer does.
+    to_roles.pop("action_timeline", None)
+    to_roles.pop("touch_counts", None)
+
+    if not by_offense:
+        if isinstance(skel, dict) and skel.get("steps"):
+            to_roles["steps"] = skel["steps"]
+        # The next possession starts with the ball where it was PICKED UP — the bounce
+        # spot — not at the deflection contact point.
+        _bounce = loose.get("bounce_spot")
+        if isinstance(_bounce, dict):
+            game_state["last_stealer_coords"] = {
+                "x": float(_bounce["x"]), "y": float(_bounce["y"])}
+        turn_result = resolve_turnover_logic(
+            to_roles, game, turnover_type="STEAL", from_resolution_system=True)
+        turn_result["current_turn"] = "HCO"
+        turn_result["skeleton"] = skel or {}
+        turn_result["loose_ball"] = loose_payload
+        turn_result["loose_ball_recovered_by"] = "DEFENSE"
+        # NOT an interception — the pass was deflected and the ball was won on the
+        # floor. `is_interception` drives the FE's INTERCEPTION! headline + SFX, which
+        # would misread the play.
+        turn_result["is_interception"] = False
+        turn_result["text"] = (
+            f"{get_name_safe(recoverer)} comes up with the loose ball")
+    else:
+        _sc = float(game_state.get("shot_clock_remaining") or 0.0)
+        from BackEnd.engine.loose_ball import LOOSE_BALL_FORCED_SHOT_CLOCK
+        _forced = 0.0 < _sc < float(LOOSE_BALL_FORCED_SHOT_CLOCK)
+        game_state["offensive_state"] = "HCO"
+        if _forced:
+            # Consumed by TurnManager's low-clock dispatch on the NEXT turn.
+            game_state["_loose_ball_forced_shot_pending"] = True
+        turn_result = {
+            "result_type": "DEAD BALL",
+            "turnover_type": "",               # possession never changed hands
+            "current_turn": "HCO",
+            "text": f"{get_name_safe(recoverer)} recovers the loose ball",
+            "possession_flips": False,
+            "next_play_type": "HCO",
+            "next_turn": "HCO",
+            "offense_team_id": game.offense_team.team_id,
+            "loose_ball": loose_payload,
+            "loose_ball_recovered_by": "OFFENSE",
+            # Reuses the OREB handoff: the HCO entry emitter builds the kickout step.
+            "kickout_deferred_to_hco_entry": True,
+            "victim_id": None,                 # no TO — offense kept it
+            "defender_id": getattr(deflector, "player_id", None),
+            "is_interception": False,
+            "events": [],
+            "roles": to_roles,
+            "skeleton": skel or {},
+        }
+        if _forced:
+            turn_result["forced_shot_next"] = True
+            turn_result["forced_shot_reason"] = "LOOSE_BALL_LOW_SHOT_CLOCK"
+
+    steps = (skel or {}).get("steps") or []
+    if steps:
+        timing = calc_skeleton_step_timing_contract(
+            steps, resolution_step_index=max(0, len(steps) - 1),
+            include_hco_step1_bringup=True, phase_type="HCO",
+            off_lineup=game.offense_team.lineup,
+        )
+        turn_result["time_elapsed"] = timing["time_elapsed"]
+        turn_result["step_clock_seconds"] = timing["step_clock_seconds"]
+        turn_result["resolution_step_index"] = timing["resolution_step_index"]
+        turn_result["executed_step_count"] = timing["executed_step_count"]
+    logging.debug(
+        "\U0001f3c0 [LOOSE BALL] recovered by %s (%s) \u2192 %s",
+        "OFFENSE" if by_offense else "DEFENSE", recoverer_pos,
+        turn_result.get("next_turn") or turn_result.get("current_turn"))
     return turn_result
 
 
@@ -6403,6 +6655,9 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     from BackEnd.utils.man_defense_matchups import get_matchups_for_defending_team
 
     game_state = game.game_state
+    # Possession-scoped signal: only valid between the contest call below and the
+    # trigger that immediately follows it. Never inherit one.
+    game_state.pop("_hco_gamble_miss_drive", None)
     off_team = game.offense_team
     is_away_offense = off_team.team_id == game.away_team.team_id
     _kind = "SETPLAY" if is_setplay else "MOTION"  # log labels only
@@ -6564,9 +6819,35 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
         # returns a STEAL turnover (routed by the outer pass_intercepted check). Flag-gated inside.
         _skel_pass_to = _hco_contest_skeleton_pass(
             steps[i], output_steps, skeleton, off_lineup, def_lineup, off_to_def, is_away_offense,
-            _def_aggr_call, _hco_lane_dist, zone, game_state, off_team, random, pass_type=_skel_pass_type)
+            _def_aggr_call, _hco_lane_dist, zone, game_state, off_team, random,
+            pass_type=_skel_pass_type, game=game)
         if _skel_pass_to is not None:
             return _skel_pass_to
+        # MISSED GAMBLE BY THE RECEIVER'S OWN DEFENDER — the pass completed and the
+        # receiver is unguarded. Abandon the remaining play skeleton and attack
+        # immediately: the drive machinery (S2c help cutoff → S2d path-stop →
+        # S2e pull-up/dish) produces the full-attack / stopped-pull-up / dish
+        # outcomes with no new logic. `_hco_primary_beaten` forces Tier A so the
+        # stranded gambler is not re-contested, and is popped straight away so it
+        # can never leak into the next possession.
+        _gm = game_state.pop("_hco_gamble_miss_drive", None)
+        if _gm and _gm.get("receiver_pos") and off_lineup.get(_gm["receiver_pos"]):
+            _gm_pos = _gm["receiver_pos"]
+            _gm_step = steps[i]
+            _gm_loc = ((_gm_step.get("pos_actions") or {}).get(_gm_pos) or {}).get("location")
+            if _gm_loc:
+                logging.debug(
+                    "🎯 [GAMBLE BEATEN] %s beat %s's gamble → immediate attack drive "
+                    "(play skeleton abandoned)", _gm_pos, _gm["defender_pos"])
+                game_state["_hco_primary_beaten"] = True
+                try:
+                    return _execute_motion_decision(
+                        skeleton, output_steps, _gm_step, _gm_pos, _gm_loc,
+                        {"action": "SHOOT", "shooter_pos": _gm_pos, "shot_type": "attack"},
+                        game, off_lineup, def_lineup, is_away_offense,
+                    )
+                finally:
+                    game_state.pop("_hco_primary_beaten", None)
         bh_pos, bh_location = _motion_bh_at_step(steps[i])
         if not bh_pos or not off_lineup.get(bh_pos):
             continue
@@ -8547,6 +8828,9 @@ def resolve_half_court_offense_logic(game):
         # §4 Stage 2: a dish/kickout picked off in the lane → STEAL (interception), not a shot.
         if motion_shot_info and motion_shot_info.get("pass_intercepted"):
             # BAT_OOB → offense retains (side inbound, no stats); INTERCEPT → STEAL turnover.
+            if motion_shot_info.get("loose_ball"):
+                return _finalize_hco_loose_ball(
+                    motion_shot_info, game, roles, off_lineup, def_lineup, game_state)
             if motion_shot_info.get("pass_bat_oob"):
                 return _finalize_hco_pass_bat_oob(
                     motion_shot_info, game, roles, off_lineup, def_lineup, game_state)

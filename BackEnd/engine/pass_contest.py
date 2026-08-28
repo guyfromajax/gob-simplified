@@ -61,6 +61,25 @@ PASS_INTERCEPT_TIER_MID = 200.0
 # OFTEN passes are deflected (that's the safety base + tier_mid). ↑ D = a smaller CH+IQ share clears
 # the roll = MORE BAT_OOB; ↓ D = MORE clean INTERCEPTs. Good defenders (high CH+IQ) skew toward INTERCEPT.
 PASS_DEFLECT_KIND_D = 200
+# HCO override (owner call 2026-08-28): raise D so the same CH+IQ clears a smaller
+# share of the roll → FEWER clean steals, MORE knock-aways, with the completion
+# rate untouched (that is governed by the safety base + tier_mid, not by D).
+# At CH=50/IQ=50: D=200 → 49.5% INTERCEPT; D=250 → 39.6%.
+HCO_PASS_DEFLECT_KIND_D = 250
+
+# HCT / FCP pass-contest calibration. Seeded at HCO parity (175 / 200 / 170) so
+# press/trap turns fold team efficiency into BOTH the composite and the bar
+# (``efficiency_in_composite=True``), exactly as HCO does:
+#   pass_score  = ((PS·0.6 + CH·0.2 + IQ·0.2) + pt_opp_modifier) × rand(1,6)
+#   bar         = HCT_PASS_SAFETY_BASE − pt_opp_modifier
+#   intercept   = ((OD·0.6 + CH·0.2 + IQ·0.2) + pt_efficiency) × rand(1,6)
+#   tier_mid    = HCT_PASS_INTERCEPT_TIER_MID − pt_efficiency
+# Separate from the HCO constants so the two families can be calibrated
+# independently. TIER_HI is carried for signature parity only — it is dead
+# (see the PASS_INTERCEPT_TIER_HI note above).
+HCT_PASS_SAFETY_BASE = 175.0
+HCT_PASS_INTERCEPT_TIER_HI = 200.0
+HCT_PASS_INTERCEPT_TIER_MID = 170.0
 
 # Turn-type → offense team_attributes key feeding the passer safety gate's
 # ``offense_modifier`` (a higher offense rating lowers the bar the passer must clear,
@@ -69,9 +88,26 @@ PASS_DEFLECT_KIND_D = 200
 OFFENSE_PASS_MODIFIER_KEYS = {
     "HCO": "offensive_efficiency",
     "HCT": "pt_opp_modifier",
+    "FCP": "pt_opp_modifier",
     "FAST_BREAK": "fb_efficiency",
 }
 DEFAULT_OFFENSE_PASS_MODIFIER_KEY = "offensive_efficiency"
+
+# Turn-type → DEFENSE team_attributes key feeding Gate 3b's ``defense_modifier``
+# (a higher defence rating lowers the interception tier, so good defences pick
+# off more passes). Mirrors the offense mapping above.
+#
+# HCT and FCP both read ``pt_efficiency`` — press/trap concentration is the
+# defending team's pressure quality, the counterpart to the offense's
+# ``pt_opp_modifier`` (opponent pressure volume). FAST_BREAK is intentionally
+# absent: FB contests are resolved by their own drive/cutoff geometry, not this
+# gate.
+DEFENSE_PASS_MODIFIER_KEYS = {
+    "HCO": "defensive_efficiency",
+    "HCT": "pt_efficiency",
+    "FCP": "pt_efficiency",
+}
+DEFAULT_DEFENSE_PASS_MODIFIER_KEY = "defensive_efficiency"
 
 COMPLETE = "COMPLETE"
 INTERCEPT = "INTERCEPT"
@@ -225,6 +261,22 @@ def resolve_offense_pass_modifier(turn_type: Any, off_team_attributes: Any) -> f
         return 0.0
 
 
+def resolve_defense_pass_modifier(turn_type: Any, def_team_attributes: Any) -> float:
+    """Resolve Gate 3b's ``defense_modifier`` from the turn type and the defence's
+    ``team_attributes`` (HCO→defensive_efficiency, HCT/FCP→pt_efficiency,
+    else→defensive_efficiency).
+
+    Mirror of ``resolve_offense_pass_modifier``. Returns a ``core8_gameplay()``
+    normalised (±10) value, satisfying the ``_g`` contract on
+    ``resolve_pass_contest(defense_modifier_g=...)``.
+    """
+    key = DEFENSE_PASS_MODIFIER_KEYS.get(turn_type, DEFAULT_DEFENSE_PASS_MODIFIER_KEY)
+    try:
+        return core8_gameplay((def_team_attributes or {}).get(key, 0))
+    except (TypeError, ValueError, AttributeError):
+        return 0.0
+
+
 def find_pass_contester(
     passer_xy: Dict[str, Any],
     receiver_xy: Dict[str, Any],
@@ -277,6 +329,7 @@ def resolve_pass_contest(
     tier_hi: float = None,
     tier_mid: float = None,
     efficiency_in_composite: bool = False,
+    deflect_kind_d: int = None,
 ) -> Dict[str, Any]:
     """Resolve a pass contest (§14). Returns
     ``{"outcome", "deflector", "contact_point"}`` where ``outcome`` is one of
@@ -322,8 +375,18 @@ def resolve_pass_contest(
     _int_add = defense_modifier_g if efficiency_in_composite else 0.0
 
     # Passer safety gate (3a) — a good passer evades the lurking defender entirely.
+    # The contester has COMMITTED by this point. Report who and where regardless of
+    # outcome so callers can animate a missed gamble — previously a miss returned
+    # deflector=None and the defender never moved, so the gamble was invisible and
+    # carried no visible cost. Additive keys; existing readers of
+    # outcome/deflector/contact_point are unaffected.
+    _attempt = {
+        "attempt_deflector": contester["defender"].get("id"),
+        "attempt_contact_point": contester["contact_point"],
+    }
     if _pass_score(passer, rng, add=_pass_add) > (_base - offense_modifier_g):
-        return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "passer_safe"}
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None,
+                "stage": "passer_safe", **_attempt}
 
     # Interceptor skill band (3b). A SINGLE deflection threshold (tier_mid, efficiency-adjusted):
     # score at/under it → COMPLETE. Over it → the pass is DEFLECTED, and the defender's ball skill
@@ -334,10 +397,12 @@ def resolve_pass_contest(
     defender = contester["defender"]
     score = _intercept_score(defender, rng, add=_int_add)
     if score <= (_mid - _int_add):
-        return {"outcome": COMPLETE, "deflector": None, "contact_point": None, "stage": "band_complete"}
+        return {"outcome": COMPLETE, "deflector": None, "contact_point": None,
+                "stage": "band_complete", **_attempt}
     ch = float(defender.get("CH", 0) or 0)
     iq = float(defender.get("IQ", 0) or 0)
-    if rng.randint(1, PASS_DEFLECT_KIND_D) < (ch + iq):
+    _kind_d = int(PASS_DEFLECT_KIND_D if deflect_kind_d is None else deflect_kind_d)
+    if rng.randint(1, _kind_d) < (ch + iq):
         outcome, stage = INTERCEPT, "intercept"
     else:
         outcome, stage = BAT_OOB, "bat_oob"
@@ -346,5 +411,6 @@ def resolve_pass_contest(
         "outcome": outcome,
         "deflector": defender.get("id"),
         "contact_point": contester["contact_point"],
+        **_attempt,
         "stage": stage,
     }

@@ -706,6 +706,7 @@ def build_attack_drive_sequence(
     game: Any,
     is_away_offense: bool,
     legacy_pos_actions_only: bool = False,
+    primary_beaten: bool = False,
 ) -> Dict[str, Any]:
     """Full motion attack drive: clearance, perimeter reads, contest, dish/shoot steps."""
     dest_half = _drive_destination_half(destination_location)
@@ -816,6 +817,16 @@ def build_attack_drive_sequence(
     # S2b (contact), S2c (help cutoff), S2d (path-stop), S2e (return-to-walk).
     _game_state = getattr(game, "game_state", {}) or {}
     _three_tier = bool(_game_state.get("_hco_defense_posture"))
+    # `primary_beaten`: the receiver's own defender gambled on the pass, missed, and
+    # is stranded at the contact point behind the play. There is nobody to beat, so
+    # the primary contest is FORCED to a blow-by. S2c still runs, and because
+    # `_resolve_hco_help_cutoff` excludes the beaten primary from the help pool, the
+    # gambler is out of BOTH roles without any special-casing.
+    # Also honoured via game_state so the HCO walk can set it without threading a
+    # parameter through `_create_attack_drive_shoot_steps` and its three call sites
+    # (a shared-signature change is what caused the `previous_step` production
+    # regression). The walk pops the flag after the drive is built.
+    _primary_beaten = bool(primary_beaten or _game_state.get("_hco_primary_beaten"))
     drive_tier = "A"
     drive_stop_fraction = 1.0
     drive_contact = None  # None | 'D_FOUL' | 'O_FOUL' | 'DEAD BALL' — routed by S2b
@@ -879,6 +890,8 @@ def build_attack_drive_sequence(
                 # from the tier so the existing override still renders until S2d/S2b consume the rest.
                 drive_tier, drive_stop_fraction, drive_contact = _resolve_hco_drive_contest(
                     driver, primary_def, off_team, def_team)
+                if _primary_beaten:
+                    drive_tier, drive_stop_fraction, drive_contact = "A", 1.0, None
                 drive_offense_wins = drive_tier == "A"
             else:
                 # Flag-off: today's binary contest, unchanged (byte-identical).
@@ -1044,6 +1057,8 @@ def build_attack_drive_sequence(
                 # from the tier so the existing override still renders until S2d/S2b consume the rest.
                 drive_tier, drive_stop_fraction, drive_contact = _resolve_hco_drive_contest(
                     driver, primary_def, off_team, def_team)
+                if _primary_beaten:
+                    drive_tier, drive_stop_fraction, drive_contact = "A", 1.0, None
                 drive_offense_wins = drive_tier == "A"
             else:
                 # Flag-off: today's binary contest, unchanged (byte-identical).

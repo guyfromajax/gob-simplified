@@ -443,3 +443,90 @@ def test_walk_no_shot_forces_terminal_shot(monkeypatch):
     # forced at last step (index 2, basketSpot → inside)
     assert res["shot_type"] == "inside"
     assert res["skeleton"]["steps"][-1]["pos_actions"]["PG"]["action"] == "shoot"
+
+
+# --- Missed-gamble immediate attack drive ------------------------------------
+# When a defender gambles on a skeleton pass, misses, and the gambler is the
+# RECEIVER'S OWN defender, the receiver catches it unguarded. The walk abandons
+# the remaining skeleton and drives immediately, with the primary contest
+# bypassed (`_hco_primary_beaten`). See Dynamic_HCO_System.md.
+
+def _arm_gamble_miss(monkeypatch, receiver_pos="SG"):
+    """Stub the pass contest so it completes the pass but stamps the missed-gamble signal."""
+    def fake_contest(step, output_steps, skeleton, off_lineup, def_lineup, off_to_def,
+                     is_away_offense, def_aggr, lane_dist, zone, game_state, off_team, rng,
+                     pass_type="motion"):
+        game_state["_hco_gamble_miss_drive"] = {
+            "receiver_pos": receiver_pos, "defender_pos": receiver_pos}
+        return None  # pass completes
+    monkeypatch.setattr(PR, "_hco_contest_skeleton_pass", fake_contest)
+
+
+def _capture_executor(monkeypatch, seen):
+    def fake_exec(skeleton, base_steps, shot_step, bh_pos, bh_location, decision,
+                  game, off_lineup, def_lineup, is_away_offense, forced_shot_penalty=0.0):
+        seen.update(bh_pos=bh_pos, bh_location=bh_location, decision=dict(decision),
+                    primary_beaten=bool(game.game_state.get("_hco_primary_beaten")))
+        return {"shooter_pos": bh_pos, "skeleton": skeleton}
+    monkeypatch.setattr(PR, "_execute_motion_decision", fake_exec)
+
+
+def _gamble_skeleton():
+    """Two steps; step 1 is a PG→SG pass the walk will contest."""
+    skel = _skeleton({"PG": "key", "SG": "upper wing"},
+                     {"PG": "key", "SG": "upper wing"},
+                     {"PG": "key", "SG": "upper wing"})
+    skel["steps"][1]["pos_actions"]["PG"]["action"] = "pass"
+    skel["steps"][1]["pos_actions"]["SG"]["action"] = "receive"
+    return skel
+
+
+def test_missed_gamble_abandons_skeleton_and_drives(monkeypatch):
+    game = _FakeGame()
+    off = _lineup(PG=_FakePlayer("bh"), SG=_FakePlayer("recv"))
+    dfn = _lineup(PG=_FakePlayer("d1"), SG=_FakePlayer("d2"))
+    seen = {}
+    _arm_gamble_miss(monkeypatch)
+    _capture_executor(monkeypatch, seen)
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.decide_step_action",
+                        lambda *a, **k: {"action": "ADVANCE"})
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot", lambda *a, **k: None)
+    monkeypatch.setattr("BackEnd.engine.motion_read_map.build_motion_read_map", lambda *a, **k: {})
+
+    res = _resolve_motion_offense_shot_dynamic(_gamble_skeleton(), game, off, dfn)
+
+    assert res is not None
+    assert seen["bh_pos"] == "SG", "the RECEIVER drives, not the passer"
+    assert seen["bh_location"] == "upper wing"
+    assert seen["decision"] == {"action": "SHOOT", "shooter_pos": "SG", "shot_type": "attack"}
+    assert seen["primary_beaten"] is True, "the drive must see the beaten-primary bypass"
+    # The flag is possession-scoped: it must not survive the drive.
+    assert "_hco_primary_beaten" not in game.game_state
+    assert "_hco_gamble_miss_drive" not in game.game_state
+
+
+def test_missed_gamble_signal_is_not_inherited_across_possessions(monkeypatch):
+    """A signal left over from a prior possession must never trigger a phantom drive.
+
+    `_hco_contest_final_skeleton` (the post-walk coverage patch) also runs the
+    contest and can stamp the signal with nobody able to act on it.
+    """
+    game = _FakeGame()
+    game.game_state["_hco_gamble_miss_drive"] = {"receiver_pos": "SG", "defender_pos": "SG"}
+    off = _lineup(PG=_FakePlayer("bh"), SG=_FakePlayer("recv"))
+    dfn = _lineup(PG=_FakePlayer("d1"), SG=_FakePlayer("d2"))
+    seen = {}
+    _capture_executor(monkeypatch, seen)
+    monkeypatch.setattr(PR, "_hco_contest_skeleton_pass", lambda *a, **k: None)
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.decide_step_action",
+                        lambda *a, **k: {"action": "ADVANCE"})
+    monkeypatch.setattr("BackEnd.engine.motion_step_decision.should_shoot", lambda *a, **k: None)
+    monkeypatch.setattr("BackEnd.engine.motion_read_map.build_motion_read_map", lambda *a, **k: {})
+
+    _resolve_motion_offense_shot_dynamic(_gamble_skeleton(), game, off, dfn)
+
+    # The terminal forced shot may legitimately be an attack drive, so assert on the
+    # bypass itself: a stale signal must never grant the beaten-primary advantage.
+    assert seen.get("primary_beaten") is not True, \
+        "stale signal granted a phantom beaten-primary bypass"
+    assert "_hco_gamble_miss_drive" not in game.game_state

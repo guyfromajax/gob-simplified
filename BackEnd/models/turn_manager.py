@@ -1703,6 +1703,12 @@ class TurnManager:
 
         clock_enforced_states = ("HCO", "FCP", "HCT", "FAST_BREAK")
 
+        # Popped HERE, not at its branch below: the branch is an `elif`, so an
+        # earlier match (expiring game clock, shot-clock violation) would skip the
+        # pop and leak the flag into a later possession as a phantom forced shot.
+        loose_ball_forced_shot = bool(
+            game_state.pop("_loose_ball_forced_shot_pending", False))
+
         low_clock_branch = None
 
         # Preview late non-HCO turns without mutating the live game. When their
@@ -1759,6 +1765,14 @@ class TurnManager:
             # Force shot-clock attempt at 1 or 0 seconds.
             result = self._execute_forced_shot(state)
             low_clock_branch = "SHOT_CLOCK_LE_1_FORCED_SHOT"
+        elif loose_ball_forced_shot:
+            # The offense recovered a loose ball under LOOSE_BALL_FORCED_SHOT_CLOCK.
+            # There is no time to run anything, so take the same forced attempt a
+            # possession approaching a shot-clock violation gets. Placed AFTER the
+            # <=0 / <=1 branches so a genuinely expiring clock keeps its own
+            # violation-vs-forced-shot handling.
+            result = self._execute_forced_shot(state)
+            low_clock_branch = "LOOSE_BALL_LOW_SHOT_CLOCK_FORCED_SHOT"
         elif (
             not eoq_preview_completed
             and should_force_eoq_last_shot(self.game, game_clock_remaining, state)
@@ -3959,6 +3973,14 @@ class TurnManager:
                 _off_l = getattr(getattr(self.game, "offense_team", None), "lineup", {}) or {}
                 _def_l = getattr(getattr(self.game, "defense_team", None), "lineup", {}) or {}
                 append_hco_bat_oob_trajectory(anim_steps, result, _off_l, _def_l)
+                # HCO loose ball: a deflection that stayed in play. Mutually
+                # exclusive with the batted-OOB append above (a turn carries
+                # `bat_oob` OR `loose_ball`, never both), and appended at the same
+                # single point every HCO turn passes through.
+                from BackEnd.engine.skeleton_step_emitter import (
+                    append_hco_loose_ball_trajectory,
+                )
+                append_hco_loose_ball_trajectory(anim_steps, result, _off_l, _def_l)
             except Exception:
                 logging.exception(
                     "append_hco_bat_oob_trajectory failed — falling back to the "
