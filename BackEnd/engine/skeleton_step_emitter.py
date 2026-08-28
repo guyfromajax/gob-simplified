@@ -1492,13 +1492,18 @@ def append_hco_loose_ball_trajectory(
 
     c_after_a, sc_after_a = c_rem - contact_t, max(0.0, sc_rem - contact_t)
     has_recover_leg = recover_t > 1e-3
+    # Where the TURN ends. Captured now because `last_end["next"]` is repointed at
+    # Step A below; reading it back after that yields the repointed value, which would
+    # make the final scramble step loop back to the contact beat and discard the real
+    # `turn_stop`. Whichever scramble step is last inherits this.
+    terminal_next = last_end.get("next") or {"kind": "next_step", "index": 999}
     bounce_start, bounce_end, bounce_end_coords = _scramble_leg(
         contact_end_coords, bounce_t, c_after_a, sc_after_a,
         "hco_loose_ball_bounce", "fixed_duration",
         {"from_player_id": str(deflector_id), "target_coords": dict(bounce)},
         contact, bounce,
         {"kind": "next_step", "index": len(steps) + 2} if has_recover_leg
-        else (last_end.get("next") or {"kind": "next_step", "index": 999}),
+        else terminal_next,
     )
 
     # The announcer calls it the INSTANT it comes loose. Step A ends when the ball
@@ -1530,7 +1535,7 @@ def append_hco_loose_ball_trajectory(
         "hco_loose_ball_recover", "player_reaches_position",
         {"target_player_id": str(recoverer_id), "target_coords": dict(bounce)},
         bounce, bounce,
-        last_end.get("next") or {"kind": "next_step", "index": 999},
+        terminal_next,
     )
     # The winner is the one player guaranteed to ARRIVE — T was derived from his run.
     rec_end["coords"][recoverer_id] = dict(bounce)

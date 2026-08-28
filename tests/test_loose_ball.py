@@ -257,6 +257,27 @@ def test_step_chain_indices_are_contiguous():
         assert s["end"]["next"] == {"kind": "next_step", "index": i + 1}, i
 
 
+def test_last_scramble_step_inherits_the_turn_terminal():
+    """REGRESSION: the terminal must be captured BEFORE `last_end["next"]` is
+    repointed at Step A. Reading it back afterwards made the final step loop to the
+    contact beat and discarded the real `turn_stop`."""
+    off, dfn = _lineups()
+    for recoverer, beats in (("def-C", 3), ("def-SG", 2)):   # 3-beat and 2-beat paths
+        terminal = {"kind": "turn_stop", "event": "dead_ball_turnover"}
+        ids = [p.player_id for p in list(off.values()) + list(dfn.values())]
+        steps = [_prior_step(ids, "off-PG")]
+        steps[0]["end"]["next"] = dict(terminal)
+        assert append_hco_loose_ball_trajectory(steps, {"loose_ball": {
+            "contact": {"x": 52.0, "y": 25.0}, "bounce_spot": {"x": 60.0, "y": 30.0},
+            "deflector_id": "def-PG", "recoverer_id": recoverer,
+            "passer_id": "off-PG"}}, off, dfn) is True
+        assert len(steps) == 1 + beats, (recoverer, len(steps))
+        assert steps[-1]["end"]["next"] == terminal, recoverer
+        # ...and nothing points backwards.
+        for i, s in enumerate(steps[:-1]):
+            assert s["end"]["next"]["index"] == i + 1, (recoverer, i)
+
+
 def test_emitter_is_a_noop_without_a_loose_ball_block():
     off, dfn = _lineups()
     steps = [_prior_step(["off-PG"], "off-PG")]
