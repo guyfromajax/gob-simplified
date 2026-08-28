@@ -733,3 +733,72 @@ defect: the guard fails with
 every module, not just the one being edited. A fixture that calls the function
 directly proves the function works and says nothing about whether callers can
 reach it.
+
+---
+
+## 18. Shot micro-movement freeze — FIXED (2026-08-28)
+
+### The bug
+`[DEF-FROZEN]` named it in one occurrence:
+```
+FAST_BREAK/triangle :: player_reaches_position
+  defState: "no destination (backend never authored one)"
+  offenseMoving 1/5   defenseMoving 0/5   stepWaitMs 121
+```
+
+`shot_micro_movements._stationary_maps` seeded EVERY player with
+`destination: None` and `action: "stationary"`, paired with
+`_advance_player_reaches` (`condition: player_reaches_position`). So during a
+pump fake / gather / jab, the other nine players stood still.
+
+**Never a fast-break bug.** `inject_shot_micro_before_post_shot` is called from
+seven emitters (rim_runner, triangle, covert_release, after_steal, fb_drive,
+dynamic_hct, skeleton), so this froze the court on shots in every turn type. No
+FB-specific fix could have touched it.
+
+### Scale — larger than the sampled instance
+A `set_pump` family is two beats: `PUMP_FAKE_FLOURISH_BEAT_T` (1.05 game-sec) +
+`MICRO_FLOURISH_BEAT_T` (0.40) = **~1.45 game-sec ≈ 507ms of frozen court**, at
+the most dramatic moment of the possession. The 121ms the user caught was a
+single short beat.
+
+### Fix
+`_carry_unfinished_movement()` — carries each player's EXISTING destination from
+the prior step through the beat, interrupted at `rate × step_t`. Invents no
+movement.
+
+Three deliberate properties:
+- **Runs AFTER the beat body**, so `step_t` is final (it varies per beat kind).
+- **Only fills players the beat did not author** (`destinations[pid] is None`), so
+  shooter / defender / dunk overrides and all flourishes still win.
+- **Local, not a cross-module private import** of the FB emitter's
+  `_initialize_continuing_movement`. Importing a shared private builder across
+  modules is what produced the `previous_step` production regression (§17); this
+  reuses already-imported public helpers instead.
+
+`previous_step` on `build_shot_micro_steps` is **optional** — a caller that cannot
+supply it degrades to the old frozen behaviour rather than raising. Chains across
+beats: the pre-shot step seeds beat 0, then each micro step seeds the next.
+
+Verified: **1/10 → 10/10 movers** on both beats (defenders 1/5 → 5/5), flourishes
+preserved on shooter and defender.
+
+### Gameplay consequence — accepted
+Micro beats now move players ~5.6 grid per beat immediately before shot
+resolution. Those positions feed the post-shot rebounder overlays and therefore
+`select_rebounder_by_score`'s distance weighting, so **rebound outcomes shift on
+every shot in the game**, not just fast breaks. User accepted this trade
+explicitly. Worth measuring OREB% before/after.
+
+### Tests
+No regressions vs baseline. `test_shot_micro_movements.py` 50 passed. The four
+`test_oreb_kickout` failures are pre-existing (present in the baseline set, fail
+identically on a stashed tree); OREB removed its micro injection anyway.
+
+### Side finding: the defender "bite" already works
+`BUCKET_BEHAVIOR["D"]["offense_win"] = "bite"` → `flourish_map[defender_id] =
+{"kind": "bite"}` → schema → `flourishes.js` `runBite`. Confirmed firing in the
+fixture (`🫨 [BITE] family=set_pump bucket=D contest=offense_win`). It only fires
+on a bucket-D pump family when `has_contest` and the defender LOSES the contest —
+so it renders the shot-defense result rather than overriding it. `runBite`
+delegates to `runReachIn` (11px, 450ms), which may simply be too subtle to notice.

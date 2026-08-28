@@ -672,6 +672,18 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
         runPumpFake(scene, sprite, flourish, opts.ballSprite);
         return;
       case "bite":
+        // TEMPORARY diagnostic — confirms the bite reaches the RENDERER, not just
+        // the emitter. The backend logs 🫨 [BITE] when it stamps one; if that
+        // fires and this does not, the flourish is being dropped in transit. If
+        // both fire and nothing is visible on court, the issue is amplitude in
+        // runBite, not logic. Silence with `window.BITE_TRACE = false`.
+        if (typeof window === "undefined" || window.BITE_TRACE !== false) {
+          console.log("🫨 [BITE rendered]", {
+            sprite: String(sprite?.player_id ?? sprite?.name ?? "?").slice(0, 8),
+            amplitudePx: flourish?.amplitude_px ?? "(config default)",
+            durationMs: flourish?.duration_ms ?? "(config default)",
+          });
+        }
         runBite(scene, sprite, flourish, opts.ballSprite);
         return;
       case "rattle":

@@ -980,6 +980,71 @@ def select_and_stamp_shot_micro(
     return family_id
 
 
+def _carry_unfinished_movement(
+    *,
+    current_coords: Dict[str, GridCoord],
+    previous_step: Optional[AnimationStep],
+    step_t: float,
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    actions: Dict[str, PlayerAction],
+    archetypes: Dict[str, PlayerArchetype],
+    destinations: Dict[str, Optional[GridCoord]],
+    end_coords: Dict[str, GridCoord],
+) -> int:
+    """Continue the prior step's unfinished movement through a micro beat.
+
+    Micro beats seed every player via ``_stationary_maps`` (destination ``None``),
+    so the nine players who are not the shooter froze for the whole beat — a few
+    hundred ms of static court at the most dramatic moment of the possession.
+    This carries each player's EXISTING destination from the previous step
+    forward; it invents no new movement, exactly like the FB emitters' own
+    continuing-movement seeding.
+
+    Only fills players the beat body did not author (``destinations[pid] is
+    None``), so shooter / defender / dunk overrides always win. Runs AFTER the
+    beat body so ``step_t`` is final. Returns the number of players carried.
+
+    Deliberately local rather than importing the FB emitter's private
+    ``_initialize_continuing_movement``: a cross-module private import on a
+    shared builder is what produced the `previous_step` production regression.
+    """
+    if previous_step is None:
+        return 0
+    prior_start = previous_step.get("start") or {}
+    prior_dest = prior_start.get("destination") or {}
+    prior_arch = prior_start.get("archetype") or {}
+    if not prior_dest:
+        return 0
+
+    carried = 0
+    for pid, start_coord in current_coords.items():
+        if destinations.get(pid) is not None:
+            continue  # authored by this beat — leave it alone
+        target = prior_dest.get(pid)
+        if not isinstance(target, dict):
+            continue
+        if target.get("x") is None or target.get("y") is None:
+            continue
+        target = {"x": float(target["x"]), "y": float(target["y"])}
+        if _euclid(start_coord, target) < 1e-6:
+            continue  # already arrived — nothing unfinished to carry
+
+        arch = prior_arch.get(pid)
+        if arch not in ("standard", "sprint", "burst", "cruise", "drift"):
+            arch = "standard"
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch)
+        new_end, _dur = _motion_end_toward_dest(start_coord, target, rate, float(step_t))
+
+        actions[pid] = "cut"
+        archetypes[pid] = arch
+        destinations[pid] = target
+        end_coords[pid] = new_end
+        carried += 1
+    return carried
+
+
 def _stationary_maps(
     coords: Dict[str, GridCoord],
 ) -> Tuple[
@@ -1243,6 +1308,10 @@ def build_shot_micro_steps(
     result_type: Optional[str] = None,
     dunk_miss: bool = False,
     is_shooting_foul: bool = False,
+    # Optional by design. A caller that cannot supply the prior step degrades to
+    # the old frozen-beat behaviour instead of raising — see the `previous_step`
+    # regression that this codebase already paid for once.
+    previous_step: Optional[AnimationStep] = None,
     pinned_move_to: Optional[GridCoord] = None,
 ) -> List[AnimationStep]:
     """Build micro-movement AnimationSteps replacing the terminal [shoot] beat."""
@@ -1271,6 +1340,10 @@ def build_shot_micro_steps(
     defender_player = (
         _player_lookup_by_id(off_lineup, def_lineup, defender_id) if defender_id else None
     )
+
+    # Chains continuation across beats: the pre-shot step seeds beat 0, then each
+    # micro step (which now carries real destinations) seeds the next.
+    prev_step_for_carry: Optional[AnimationStep] = previous_step
 
     for beat_idx, beat in enumerate(beats):
         is_last = beat_idx == len(beats) - 1
@@ -1408,6 +1481,18 @@ def build_shot_micro_steps(
                 jab_sign = _perp_jab_direction(float(current_coords[shooter_id]["y"]))
                 pump_dir = (perp_x * jab_sign, perp_y * jab_sign)
                 flourish_map[str(defender_id)] = {"kind": "bite", "target": "ball"}
+                # TEMPORARY diagnostic. The bite is fully wired (BUCKET_BEHAVIOR
+                # D/offense_win -> flourish -> schema -> flourishes.js runBite),
+                # but it needs FOUR conditions at once: a bucket-D pump family,
+                # has_contest, a contest_result, and the defender losing it. If
+                # it never appears in a session the feature is simply not being
+                # reached; if it appears and nothing is visible on court, the
+                # problem is render amplitude, not logic. Delete once answered.
+                logging.warning(
+                    "🫨 [BITE] defender=%s family=%s bucket=%s contest=%s beat_bucket=%s",
+                    str(defender_id)[:8], family_id, bucket,
+                    contest_result, beat.get("beat_bucket"),
+                )
             def_end = _apply_defender_behavior_coord(
                 defender_behavior,
                 current_coords[shooter_id],
@@ -1455,6 +1540,20 @@ def build_shot_micro_steps(
         end_ball_state: Any = (
             dunk_ball_end if dunk_ball_end is not None else {"owner_player_id": str(shooter_id)}
         )
+        # Carry the prior step's unfinished movement through this beat so the
+        # other nine players keep moving while the shooter does his micro-move.
+        _carry_unfinished_movement(
+            current_coords=current_coords,
+            previous_step=prev_step_for_carry,
+            step_t=float(step_t),
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            actions=actions,
+            archetypes=archetypes,
+            destinations=destinations,
+            end_coords=end_coords,
+        )
+
         step: AnimationStep = {
             "start": {
                 "coords": {pid: dict(c) for pid, c in current_coords.items()},
@@ -1481,6 +1580,7 @@ def build_shot_micro_steps(
             step["start"], end_coords, float(step_t), off_lineup, def_lineup,
         )
         steps.append(step)
+        prev_step_for_carry = step
         current_coords = end_coords
         elapsed_total += step_t
 
@@ -1659,6 +1759,9 @@ def apply_shot_micro_steps_to_chain(
         turn_result["shooting_foul_whistle_on_shot_beat"] = True
 
     micro_steps = build_shot_micro_steps(
+        # The step preceding the shoot step holds the unfinished movement intent
+        # (players still travelling when the shot began).
+        previous_step=steps[shoot_idx - 1] if shoot_idx > 0 else None,
         family_id=str(family_id),
         contest_result=contest_result,
         start_coords=micro_start_coords,
