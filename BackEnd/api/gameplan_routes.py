@@ -2344,7 +2344,13 @@ def get_playbooks(
         elif mode == "franchise":
             # Franchise FCC / pregame reads use FTD as the authoritative master source.
             # Gameplay with game_id should use the game doc snapshot instead of mixing sources.
-            from BackEnd.db import franchise_team_data_collection
+            # NOTE: no local `from BackEnd.db import franchise_team_data_collection` here.
+            # A function-scoped import binds the name for the WHOLE function, so the
+            # `mode in ["franchise","tournament"] and game_id` branch above (~line 2227)
+            # hit UnboundLocalError on every pass — silently swallowed by `except
+            # Exception: continue`, which made that FTD fallback block dead code.
+            # Same trap as Sentry PYTHON-FASTAPI-72 in get_team_roster. Use the
+            # module-level import at the top of this file.
             try:
                 team_object_id = ObjectId(authoritative_team_id)
             except:

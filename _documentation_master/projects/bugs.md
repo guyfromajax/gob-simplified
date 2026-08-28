@@ -18,6 +18,48 @@
      bare at 352/455/572/666). Sites 572/666 remain unguarded on the final_turn-skips-setup path.
    - Pre-existing; unrelated to the animation cleanup pass.
 
+6. RNG migration incomplete — 10 engine/sim files still draw from the GLOBAL `random` module
+   - Surfaced by the codebase's own guard (Sentry breadcrumb):
+     `🎲 [RNG LEAK] BackEnd.models.animator:between_key_and_rim:234 drew from the GLOBAL random module.`
+   - NOT a one-off. `animator.py` does a bare `import random` (line 24) with 17 draw sites, and nine
+     other engine/sim files do the same. 53 files correctly bind `sim_rng`, so this is a partial
+     migration, not a slip. Sentry just caught the site that happened to fire.
+
+   | File | draw sites |
+   |---|---|
+   | `models/animator.py` | 17 |
+   | `utils/transition_bridge.py` | 6 |
+   | `engine/after_steal_fast_break.py` | 4 |
+   | `utils/reset_step_helper.py` | 3 |
+   | `engine/dynamic_hct_shot.py` | 2 |
+   | `engine/fast_break_trigger.py` | 2 |
+   | `utils/energy_system.py` | 2 |
+   | `utils/quarter_start.py` | 2 |
+   | `engine/covert_release_drive_integration.py` | 1 |
+   | `engine/rendered_contest.py` | 0 (imports only) |
+
+   - Impact: per `BackEnd/utils/sim_random.py`, the global stream is shared with third-party libs
+     (pymongo's `bulk_write` consumes it), so these draws are not reproducible under a seed.
+     `animator.py`'s coords are not purely cosmetic — legacy `animations[]` seed the next turn's
+     `player.coords` when `animation_steps` are absent, and those positions feed contest radius and
+     rebound distance. Mitigating factor: `animator.py` short-circuits in full-sim mode
+     (lines 145, 624, 829, 1265), so the leak mostly fires during live turn-by-turn play rather than
+     seeded verification runs.
+
+   - NOT a find-and-replace. Two traps:
+     1. **Rebinding shifts gameplay.** These draws currently consume ZERO `sim_rng`. Moving them onto
+        it inserts draws into the gameplay stream and changes every downstream outcome. Requires the
+        poison-test approach (draw-count changes cannot be verified by exact diff).
+     2. **Not all of them belong on `sim_rng`.** `animator.py`'s draws are presentation coords; by the
+        same reasoning that produced `announcement_rng`, several belong on a presentation stream so
+        they are structurally incapable of perturbing basketball. Classifying each site as gameplay vs
+        presentation IS the work — the import change is trivial.
+
+   - Suggested approach: audit the ~39 sites, classify each, move gameplay sites to `sim_rng` and
+     presentation sites to a presentation stream, then verify with a poisoned-output run rather than a
+     byte-identical diff. Confirm with `scripts/perf_sim_baseline.py` that the global-draw tally is empty.
+   - Pre-existing; unrelated to the animation cleanup work. Not causing any known gameplay bug.
+
 ##Playtest Launch / In Progress
 1. Steam Video
 -----
@@ -937,3 +979,55 @@ Why it went rather than being brought in line with the attribute-tile work:
 
 Residual risk accepted: an external bookmark or link would now 404. If that surfaces,
 the fix is a 301 to `/team-roster-view.html` rather than restoring the page.
+
+## Function-scoped imports shadow module-level names (August 2026) [CLASS OF BUG]
+
+`from X import Y` inside a function makes `Y` a **local** name for the entire function
+body — decided at compile time, not at the line the import sits on. Every use of `Y`
+earlier in that function then raises `UnboundLocalError`, even though the module-level
+import is right there at the top of the file.
+
+**Confirmed instance 1 — `get_team_roster` (FIXED).** Sentry `PYTHON-FASTAPI-72`,
+`UnboundLocalError: cannot access local variable 'ObjectId'`, `/roster/HA%20Rushmore`,
+Aug 18 2026. A local `from bson import ObjectId` sat inside the Strategy-2 branch
+(`len(lookup_value) == 24 and all-hex`). Name-based lookups skipped that branch, so the
+standings lookup below hit an unbound local. `handled: yes` — users saw a roster with no
+record/standing rather than an error. Fix and rationale are commented at `api.py:6843`.
+
+**Confirmed instance 2 — `get_playbooks` (FIXED 2026-08-28).**
+`BackEnd/api/gameplan_routes.py`. A local `from BackEnd.db import
+franchise_team_data_collection` sat inside `elif mode == "franchise":` (~line 2344), while
+the `if mode in ["franchise","tournament"] and game_id:` branch (~line 1986) used the same
+name at ~line 2227. **Mutually exclusive branches of the same chain**, so the use could
+never have been preceded by the import — a guaranteed `UnboundLocalError` every time that
+path ran, not an intermittent one.
+
+Worse than instance 1 because of the handler: `except Exception: continue`, bare, no
+logging. The loop skipped every candidate, `_ftd_row` and `_fallback_ftd_row` stayed
+`None`, and **the whole FTD fallback block was dead code** on the franchise/tournament
+game path — playbook settings, play-call order and plays missing from the game-doc
+snapshot were silently not rescued. Nothing logged, so it never reached Sentry. This is
+the argument against bare `except Exception: continue` around a lookup: it converts a
+loud programming error into permanent silent degradation.
+
+Fix: delete the local import; the module-level one at `gameplan_routes.py:9` already
+provides the name.
+
+**Detection.** An AST pass over `BackEnd/**/*.py` — for each function, flag any name used
+at a line lower than the first local import of that name. Two caveats learned the hard
+way: (1) a name may be imported repeatedly (e.g. `import traceback` inside each `except`),
+so compare against the *minimum* import line, not an arbitrary one; (2) uses inside nested
+`def`s resolve at CALL time, not definition time, so they are safe if every call site
+follows the import. Both produced false positives on the first pass. After correcting for
+them, 276 files yielded exactly the two instances above plus the fragile case below.
+
+**Fragile, not broken — `capture_fast_break_animation`** (`BackEnd/models/animator.py`).
+Local `import random` at ~line 268 shadows the module-level import at line 24.
+`between_key_and_rim()` and `half_court_spot()` (defined ~231/238) close over `random`,
+but are only *called* from ~395-452, after the import runs — so it works today and breaks
+silently the moment any edit calls one of them earlier. Worth deleting the local import.
+
+Separately: that is the **global `random` module**, not `sim_rng`. Presentation code
+drawing from the stream that training and EOG still draw from is the same coupling class
+already fixed once when pymongo's `bulk_write` was found consuming the global stream. See
+the `sim_random.py` notes and the parked training_rng/EOG own-stream conversions.
