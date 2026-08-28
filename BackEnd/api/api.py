@@ -498,11 +498,6 @@ try:
     app.include_router(alpha_feedback_router)
     app.include_router(email_router)
 
-    # 🔎 Memory leak probe (diagnostic, temporary). Inert unless GOB_MEM_PROBE=1;
-    # token-gated via GOB_MEM_PROBE_TOKEN. Remove once the RSS question is settled.
-    from BackEnd.utils.memory_probe import router as memory_probe_router
-    app.include_router(memory_probe_router)
-
     @app.get("/debug/server-state")
     def debug_server_state():
         """
