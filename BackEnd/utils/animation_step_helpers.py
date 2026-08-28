@@ -129,7 +129,18 @@ def build_final_ball_handler_id(turn_result: Dict[str, Any]) -> Optional[str]:
     bh = roles.get("ball_handler") if isinstance(roles, dict) else None
     if bh is None:
         return None
-    pid = getattr(bh, "player_id", None) if not isinstance(bh, (str, int)) else bh
+    # `roles.ball_handler` appears in three shapes across turn types: a bare id,
+    # a Player object, or a serialized dict ({player_id, name, team}). The dict
+    # form was previously unhandled — `getattr(dict, "player_id")` is None — so
+    # a turn whose only surviving handle was a serialized role resolved to None.
+    # That let the HCO entry orchestrator lose `current_bh_id` and cold-start
+    # the possession (= teleport). See `_resolve_prior_ball_handler_id`.
+    if isinstance(bh, (str, int)):
+        pid = bh
+    elif isinstance(bh, dict):
+        pid = bh.get("player_id") or bh.get("playerId")
+    else:
+        pid = getattr(bh, "player_id", None)
     return str(pid) if pid else None
 
 

@@ -1295,7 +1295,9 @@ def resolve_fast_break_logic(game: "GameManager"):
                     rr_result["animation_steps"] = anim_steps
                 else:
                     # The emitter logs its own 🚨 [TRIANGLE EMITTER NULL] guard line.
-                    logging.debug(
+                    # WARNING (not debug) to match the Rim Runner branch — this
+                    # sat at debug level and hid a live UESS gap for weeks.
+                    logging.warning(
                         "🚨 [TRIANGLE EMITTER NULL CONSEQUENCE] result_type=%s "
                         "next_play_type=%s — animation_steps not set, FE → LEGACY",
                         rr_result.get("result_type"),

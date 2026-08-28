@@ -705,7 +705,14 @@ def build_triangle_animation_steps(
         )
         return None
     if game.game_state.get("_is_full_simulation", False):
-        # Intentional skip in full-sim mode (no animation needed); not a fallback.
+        # Intentional skip in full-sim mode (no animation needed); not a fallback,
+        # so no log — a real full sim would emit one of these per fast break.
+        # But it IS the only unmarked return in this emitter, which made it
+        # indistinguishable from "never called" when a live turn came through
+        # with the flag set. Stamp the reason so the HCO entry diagnostic can
+        # name it without adding noise. Triangle is the only FB emitter with
+        # this guard; RR and Covert Release have none.
+        turn_result["fb_emitter_fallback_reason"] = "triangle:full_simulation_skip"
         return None
 
     fb_roles = turn_result.get("roles") or {}

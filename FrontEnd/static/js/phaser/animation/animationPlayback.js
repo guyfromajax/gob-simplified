@@ -104,6 +104,31 @@ const SHOT_BALL_MIN_TWEEN_MS = SHOT_BALL_MIN_WALL_CLOCK_MS;
 const PASS_BALL_GRID_PER_GAME_SEC = 24;
 const DEFAULT_ANNOUNCEMENT_FREEZE_HOLD_MS = 300;
 
+/**
+ * TEMPORARY — fast-break shot-attempt teleport trace.
+ *
+ * Deliberately narrow. Full `UESS_TRACE_PLAYBACK` logs every step of every turn,
+ * and synchronous console writes at that volume measurably degrade rim action
+ * (a HEAVY RATTLE is 8 consecutive ~50ms steps). This fires only on FAST_BREAK
+ * turns, and only for the shot-motion step and the [ball_flight] step that
+ * follows it — a handful of lines per fast break.
+ *
+ * Disable with `window.FB_SHOT_TRACE = false`. DELETE once the teleport is
+ * diagnosed; it is not meant to ship on.
+ */
+function fbShotTrace(scene, step, turnData, payload) {
+  if (typeof window !== "undefined" && window.FB_SHOT_TRACE === false) return;
+  const isFb = String(turnData?.current_turn || "").toUpperCase() === "FAST_BREAK";
+  if (!isFb) return;
+  const kind = step?.start?.advance_trigger?.metadata?.kind
+    || step?.start?.advance_trigger?.condition
+    || "?";
+  console.log(
+    `[FB-SHOT] ${String(turnData?.fast_break_play || "?")} :: ${kind}`,
+    payload,
+  );
+}
+
 function shouldTracePlayback(scene = null) {
   const flag = typeof window !== "undefined" ? window.UESS_TRACE_PLAYBACK : undefined;
   if (flag === false) return false;
@@ -1139,6 +1164,25 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       ? Math.max(durationMs, SHOT_BALL_MIN_WALL_CLOCK_MS)
       : durationMs;
 
+  // TEMPORARY FB shot trace — fires only on shot-motion / ball-flight steps.
+  if (releaseShotOnShooterSettle || isShotBallMotionStep(step)) {
+    const durs = {};
+    for (const [pid, gs] of Object.entries(perPlayerDurations || {})) {
+      durs[String(pid).slice(0, 4)] = Math.max(50, Math.round(gs * clockSecondMs));
+    }
+    fbShotTrace(scene, step, options.turnData, {
+      gateOn: releaseShotOnShooterSettle,
+      shooter: shotReleaseShooterId ? String(shotReleaseShooterId).slice(0, 4) : null,
+      // If stepWaitMs > durationMs the FE stretched the step (400ms shot floor)
+      // without stretching player motion — players finish early and stand.
+      durationMs: Math.round(durationMs),
+      stepWaitMs: Math.round(stepWaitMs),
+      floored: Math.round(stepWaitMs) > Math.round(durationMs),
+      movers: countStepMovers(step),
+      tweenMs: durs,
+    });
+  }
+
   // Dead-air ledger: a step where no player's coords change is time on the wall
   // clock with a static court. Recorded with `ballMoved` so the summary can
   // separate legitimate ball-motion beats (passes, shot flight) from genuine
@@ -1343,6 +1387,17 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
         scene.tweens.killTweensOf(scene.ballShadowSprite);
       }
     }
+    fbShotTrace(scene, step, options.turnData, {
+      event: "GATE FIRED — non-shooter tweens killed here",
+      shooterTweenMs: Math.round(shooterTweenDurationMs),
+      stepWaitMs: Math.round(stepWaitMs),
+      elapsedMs: Math.round(performance.now() - stepStartedAtMs),
+      // >0 means other players were still mid-tween when they were killed.
+      // Their sprites stop there; the next step places them at its start
+      // coords = this step's end coords => visible teleport.
+      cutShortByMs: Math.round(stepWaitMs - (performance.now() - stepStartedAtMs)),
+      killedSprites: activeStepTweenSprites.length,
+    });
     tracePlayback(scene, "shot:release-on-shooter-settle", {
       turnIndex: options.turnData?.index ?? null,
       stepId: step.id ?? null,

@@ -613,3 +613,73 @@ the change, and one fails in isolation on baseline — the known order-flake set
 Closest sampled destination pair on the fixture was 1.7 grid apart. Destinations
 are clamped by `rate x t` so players rarely reach them, but this is the kind of
 convergence the future sprite-collision work will need to handle.
+
+---
+
+## 16. HCO cold-start after Triangle FB (2026-08-27) — partially resolved
+
+### Symptom
+Post-FB HCO turns skip the Handoff + dribble-up and cold-start (= teleport).
+
+### Confirmed chain (from production logs)
+`❌❌❌ [HCO ENTRY BUG]` fired 3x, every one `fast_break_play=triangle` +
+`result_type=DEFENSIVE_STOP` + `has_animation_steps=False`:
+
+no `animation_steps` → no `last_step.end.ball.owner_player_id` →
+`final_ball_handler_id=None` → `current_bh_id=None` → `has_entry_inputs` fails →
+orchestrator skips Handoff/Walk-Up → HCO cold-starts.
+
+Every rim_runner turn in the same log fired `HANDOFF FIRED` + `WALKUP FIRED`
+correctly. One branch, not a general breakage.
+
+### Fixed
+
+**1. `build_final_ball_handler_id` could not read a dict-shaped role.**
+```python
+pid = getattr(bh, "player_id", None) if not isinstance(bh, (str, int)) else bh
+```
+`roles.ball_handler` appears as a bare id, a Player object, **or a serialized
+dict** `{player_id, name, team}`. The dict case fell through `getattr` → None.
+The production log printed the dict right there in the error — the handle existed
+and the resolver couldn't see it. Now handles all three shapes; priority order
+(animation_steps → ball_handler_id → roles) unchanged and tested.
+
+This is a **general safety net**: any emitter gap now degrades to a correct
+handoff instead of a teleport.
+
+**2. Triangle's null-consequence log was `logging.debug`** while Rim Runner's
+identical branch was `logging.warning` — so Triangle emitter failures were
+invisible at normal log level. Promoted to `warning`.
+
+**3. Triangle's `_is_full_simulation` early return was the emitter's only
+unmarked exit** (RR and Covert Release have no such guard at all). It now stamps
+`fb_emitter_fallback_reason = "triangle:full_simulation_skip"` without logging —
+a real full sim would emit one per fast break.
+
+**4. The HCO entry error now prints `prior_turn.fb_emitter_fallback_reason`**, so
+the next occurrence names the exact guard that fired.
+
+### NOT yet resolved — why Triangle returned None
+
+`FB_EMITTER_FALLBACK` produced **zero** log hits, so no marked guard fired. Two
+candidates remain:
+
+- `_is_full_simulation` was set on a live turn (now distinguishable via the
+  stamped reason)
+- an exception inside `_finalize_rr_steps` → `🚨 [TRIANGLE EMITTER EXCEPTION]`
+  (ERROR level; not covered by the original grep)
+
+**Next occurrence is self-diagnosing** via fix 4. Also worth grepping
+`TRIANGLE EMITTER` (covers both NULL CONSEQUENCE and EXCEPTION).
+
+### Correction to an earlier hypothesis
+I proposed that non-rebound RR/Triangle fast breaks fall through the dispatch
+gate and added a branch for it. That is **impossible**:
+`play_key_for_fast_break_entry(is_dreb_outlet=False)` always returns
+`AFTER_STEAL`, so `fb_play_key == TRIANGLE` implies `rebound == True`. The branch
+was unreachable dead code and was removed.
+
+### Test note
+`test_outlet_pass_roles_not_set_when_rebounder_is_ball_handler` and
+`test_deep_key_anchor_backcourt_side` fail intermittently (~1 in 5) on **both**
+baseline and changed trees — genuinely nondeterministic, not regressions.

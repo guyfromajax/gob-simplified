@@ -1291,6 +1291,7 @@ def build_skeleton_animation_steps(
                     "prior_turn.result_type=%s prior_turn.current_turn=%s "
                     "prior_turn.fast_break_play=%s "
                     "prior_turn.has_animation_steps=%s "
+                    "prior_turn.fb_emitter_fallback_reason=%s "
                     "prior_turn.final_ball_handler_id=%s "
                     "prior_turn.ball_handler_id=%s prior_turn.roles.ball_handler=%s "
                     "prior_turn.rebounderId=%s prior_turn.rebound_type=%s "
@@ -1307,6 +1308,7 @@ def build_skeleton_animation_steps(
                     prior_turn.get("current_turn") if isinstance(prior_turn, dict) else None,
                     prior_turn.get("fast_break_play") if isinstance(prior_turn, dict) else None,
                     bool(prior_turn.get("animation_steps")) if isinstance(prior_turn, dict) else False,
+                    prior_turn.get("fb_emitter_fallback_reason") if isinstance(prior_turn, dict) else None,
                     prior_turn.get("final_ball_handler_id") if isinstance(prior_turn, dict) else None,
                     prior_turn.get("ball_handler_id") if isinstance(prior_turn, dict) else None,
                     (prior_turn.get("roles") or {}).get("ball_handler") if isinstance(prior_turn, dict) else None,
