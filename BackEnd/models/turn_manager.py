@@ -3945,6 +3945,25 @@ class TurnManager:
                 self._assert_eoq_animation_steps(result, anim_steps=None, context="emit_none")
                 return
             result["animation_steps"] = anim_steps
+            # HCO batted-OOB: append the schema ball trajectory (deflector
+            # converges with the pass, then the loose ball drifts OOB). Appended
+            # HERE rather than inside the emitter because
+            # `build_skeleton_animation_steps` has four return paths — this is
+            # the single point every HCO turn passes through. Mutates the list in
+            # place, so the clock derivation below picks the new steps up and
+            # `time_elapsed` stays correct with no separate reconciliation.
+            try:
+                from BackEnd.engine.skeleton_step_emitter import (
+                    append_hco_bat_oob_trajectory,
+                )
+                _off_l = getattr(getattr(self.game, "offense_team", None), "lineup", {}) or {}
+                _def_l = getattr(getattr(self.game, "defense_team", None), "lineup", {}) or {}
+                append_hco_bat_oob_trajectory(anim_steps, result, _off_l, _def_l)
+            except Exception:
+                logging.exception(
+                    "append_hco_bat_oob_trajectory failed — falling back to the "
+                    "frontend imperative ball-send"
+                )
             result.pop("eoq_schema_emit_failed", None)
             result_type_for_te = (result.get("result_type") or "").upper()
             # UESS §5 clock authority (HCO_UESS_Audit.md Task 2): derive

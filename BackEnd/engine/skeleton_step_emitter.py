@@ -1049,6 +1049,215 @@ def _resolve_final_step_next(turn_result: Dict[str, Any]) -> NextStep:
 # --- Top-level emitter -----------------------------------------------------
 
 
+def append_hco_bat_oob_trajectory(
+    steps: List[AnimationStep],
+    turn_result: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+) -> bool:
+    """Give an HCO batted-OOB pass the same schema trajectory HCT already has.
+
+    HCO previously emitted NO ball trajectory: the skeleton was truncated at the
+    pass step, a stopper step carrying only the ball handler was appended, and
+    the frontend then ran ``AnimationEngine._runHctBatOobBallSend`` — which
+    ``await``s the deflector's slide into the passing lane BEFORE flying the
+    ball. That serialisation is what reads as an extra beat where only the
+    deflector moves while the other nine stand still.
+
+    HCT instead emits two steps, and this mirrors them exactly:
+
+      Step A (``hct_bat_oob_contact``, gate ``ball_reaches_player``) — the pass
+        leaves the passer and the deflector sprints to the contact point, so the
+        two converge; T is the ball's flight time.
+      Step B (``hct_bat_oob_drift``, gate ``fixed_duration``) — the loose ball
+        drifts from contact to the OOB target while players hold.
+
+    The reason strings are deliberately identical to HCT's: the frontend's
+    ``_hasSchemaBatOobTrajectory()`` matches on them, so emitting these
+    automatically suppresses the imperative send. That is the guard against the
+    documented double-fire ("ball → OOB, then → defender → OOB again"), so the
+    strings MUST NOT be renamed without changing that check too.
+
+    Clock: both steps decrement ``clock_remaining`` by their own T.
+    ``_emit_hco_animation_steps`` derives ``time_elapsed`` from
+    ``steps[0].start.clock`` minus ``steps[-1].end.clock``, so the turn's burn
+    picks these up automatically — no separate reconciliation.
+
+    Returns True when the trajectory was appended; False (no-op) when the turn
+    is not a batted-OOB or the backend geometry is missing.
+    """
+    if not steps or not isinstance(turn_result, dict):
+        return False
+    if not turn_result.get("bat_oob"):
+        return False
+
+    contact_raw = turn_result.get("bat_oob_contact")
+    oob_raw = turn_result.get("bat_oob_target")
+    deflector_id = _safe_id(turn_result.get("bat_oob_deflector_id"))
+    if not isinstance(contact_raw, dict) or not isinstance(oob_raw, dict) or not deflector_id:
+        return False
+    if contact_raw.get("x") is None or oob_raw.get("x") is None:
+        return False
+
+    # Already carries a trajectory (defensive: never double-append).
+    for st in steps:
+        meta = ((st.get("start") or {}).get("advance_trigger") or {}).get("metadata") or {}
+        if meta.get("reason") in ("hct_bat_oob_contact", "hct_bat_oob_drift"):
+            return False
+
+    last = steps[-1]
+    last_end = last.get("end") or {}
+    start_coords = last_end.get("coords") or {}
+    if not start_coords or deflector_id not in start_coords:
+        return False
+
+    # The ball is still with the passer — the receiver was deliberately un-caught
+    # upstream (`_hco_uncatch_receiver_on_pass`), so the pass never completed.
+    ball_owner = ((last_end.get("ball") or {}).get("owner_player_id"))
+    passer_id = _safe_id(ball_owner)
+    if not passer_id or passer_id not in start_coords:
+        return False
+
+    contact: GridCoord = {"x": float(contact_raw["x"]), "y": float(contact_raw["y"])}
+    oob: GridCoord = {"x": float(oob_raw["x"]), "y": float(oob_raw["y"])}
+    passer_coord = start_coords[passer_id]
+
+    pass_rate = max(1e-6, float(PASS_GRID_SPOTS_PER_GAME_SECOND))
+    contact_t = max(0.3, _euclid(passer_coord, contact) / pass_rate)
+    drift_t = max(0.25, _euclid(contact, oob) / pass_rate)
+
+    clock_in = dict(last_end.get("clock") or {})
+    c_rem = float(clock_in.get("clock_remaining") or 0.0)
+    sc_rem = float(clock_in.get("shot_clock_remaining") or 0.0)
+
+    # --- Step A: pass flies to contact; deflector converges on it ---
+    actions: Dict[str, PlayerAction] = {pid: "stationary" for pid in start_coords}
+    archetype: Dict[str, PlayerArchetype] = {pid: "stationary" for pid in start_coords}
+    destinations: Dict[str, Optional[GridCoord]] = {
+        pid: dict(c) for pid, c in start_coords.items()
+    }
+    contact_end_coords: Dict[str, GridCoord] = {
+        pid: dict(c) for pid, c in start_coords.items()
+    }
+    # Carry the prior step's unfinished movement through the contact beat, so
+    # the other nine keep playing while the deflector attacks the ball. Without
+    # this the fix would trade a sequential beat for a frozen one.
+    prior_dest = (last.get("start") or {}).get("destination") or {}
+    prior_arch = (last.get("start") or {}).get("archetype") or {}
+    off_ids = {
+        str(getattr(pl_, "player_id", None))
+        for pl_ in (off_lineup or {}).values() if pl_ is not None
+    }
+    for pid, sc in start_coords.items():
+        target = prior_dest.get(pid)
+        if not isinstance(target, dict) or target.get("x") is None:
+            continue
+        tgt = {"x": float(target["x"]), "y": float(target["y"])}
+        if _euclid(sc, tgt) < 1e-6:
+            continue
+        arch = prior_arch.get(pid)
+        if arch not in ("standard", "sprint", "burst", "cruise", "drift"):
+            arch = "standard"
+        player = _player_lookup_by_id(off_lineup, def_lineup, pid)
+        rate = _ag_grid_per_game_sec(player, arch)
+        moved_end, _dur = _interpolate_step_end(sc, tgt, rate, contact_t)
+        actions[pid] = "cut" if pid in off_ids else "guard_offball"
+        archetype[pid] = arch
+        destinations[pid] = dict(tgt)
+        contact_end_coords[pid] = moved_end
+
+    actions[passer_id] = "pass"
+    actions[deflector_id] = "guard_ball"
+    archetype[deflector_id] = "sprint"
+    destinations[deflector_id] = dict(contact)
+    contact_end_coords[deflector_id] = dict(contact)
+
+    contact_start: StepStart = {
+        "coords": {pid: dict(c) for pid, c in start_coords.items()},
+        "destination": destinations,
+        "action": actions,
+        "archetype": archetype,
+        "ball": {
+            "from_player_id": str(passer_id),
+            "to_player_id": str(deflector_id),
+            "current_coords": dict(passer_coord),
+        },
+        "ball_motion_style": "pass",
+        "ball_arrival_coord": dict(contact),
+        "clock": {"clock_remaining": c_rem, "shot_clock_remaining": sc_rem},
+        "advance_trigger": {
+            "condition": "ball_reaches_player",
+            "T_game_seconds": float(contact_t),
+            "metadata": {
+                "target_player_id": str(deflector_id),
+                "target_coords": dict(contact),
+                "contact_coords": dict(contact),
+                "oob_coords": dict(oob),
+                "reason": "hct_bat_oob_contact",
+            },
+        },
+        "sfx_on_ball_arrival": {
+            "file": "block1.wav",
+            "volume": 0.42,
+            "event": "bat_oob_contact",
+        },
+    }
+    contact_end: StepEnd = {
+        "coords": contact_end_coords,
+        "ball": {"coords": dict(contact)},
+        "time_elapsed": float(contact_t),
+        "clock": {
+            "clock_remaining": c_rem - contact_t,
+            "shot_clock_remaining": max(0.0, sc_rem - contact_t),
+        },
+        "next": {"kind": "next_step", "index": len(steps) + 1},
+    }
+    stamp_tween_durations(contact_start, contact_end_coords, contact_t, off_lineup, def_lineup)
+
+    # --- Step B: loose ball drifts to the OOB point ---
+    drift_start: StepStart = {
+        "coords": {pid: dict(c) for pid, c in contact_end_coords.items()},
+        "destination": {pid: dict(c) for pid, c in contact_end_coords.items()},
+        "action": {pid: "stationary" for pid in contact_end_coords},
+        "archetype": {pid: "stationary" for pid in contact_end_coords},
+        "ball": {"coords": dict(contact)},
+        "ball_motion_style": "pass",
+        "clock": {
+            "clock_remaining": c_rem - contact_t,
+            "shot_clock_remaining": max(0.0, sc_rem - contact_t),
+        },
+        "advance_trigger": {
+            "condition": "fixed_duration",
+            "T_game_seconds": float(drift_t),
+            "metadata": {
+                "from_player_id": str(deflector_id),
+                "target_coords": dict(oob),
+                "contact_coords": dict(contact),
+                "oob_coords": dict(oob),
+                "reason": "hct_bat_oob_drift",
+            },
+        },
+    }
+    drift_end: StepEnd = {
+        "coords": {pid: dict(c) for pid, c in contact_end_coords.items()},
+        "ball": {"coords": dict(oob)},
+        "time_elapsed": float(drift_t),
+        "clock": {
+            "clock_remaining": c_rem - contact_t - drift_t,
+            "shot_clock_remaining": max(0.0, sc_rem - contact_t - drift_t),
+        },
+        "next": last_end.get("next") or {"kind": "next_step", "index": 999},
+    }
+    stamp_tween_durations(drift_start, drift_end["coords"], drift_t, off_lineup, def_lineup)
+
+    # The previous last step now hands off to Step A instead of ending the turn.
+    last_end["next"] = {"kind": "next_step", "index": len(steps)}
+
+    steps.append({"start": contact_start, "end": contact_end})
+    steps.append({"start": drift_start, "end": drift_end})
+    return True
+
+
 def build_skeleton_animation_steps(
     turn_result: Dict[str, Any],
     game: Any,

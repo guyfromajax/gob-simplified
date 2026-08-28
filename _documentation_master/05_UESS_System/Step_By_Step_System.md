@@ -61,6 +61,42 @@ Step 2: Inbound Pass (required)
 Step 1: Handoff (conditional)
 Step 2: Walk Up (required / conditional?)
 Steps 1-3+: Animation Skeleton (required)
+Steps N+1, N+2: Batted-OOB trajectory (conditional — `bat_oob` turns only)
+
+##HCO Batted-OOB Trajectory
+Appended by `skeleton_step_emitter.append_hco_bat_oob_trajectory`, called from
+`turn_manager._emit_hco_animation_steps` (the single point every HCO turn passes
+through — `build_skeleton_animation_steps` has four return paths, so the tail of
+the emitter is not a safe hook).
+
+Mirrors the HCT/FCP pair in `dynamic_hct_step_emitter._build_bat_oob_steps`, and
+**deliberately reuses its `reason` strings** — the frontend's
+`AnimationEngine._hasSchemaBatOobTrajectory()` matches on
+`hct_bat_oob_contact` / `hct_bat_oob_drift` and suppresses the imperative
+ball-send when it sees them. Renaming them without updating that check
+re-introduces the documented double-fire (ball → OOB, then → defender → OOB
+again).
+
+| Step | Gate | T | Movement | Ball |
+|---|---|---|---|---|
+| A `hct_bat_oob_contact` | `ball_reaches_player` | `max(0.3, dist(passer→contact) / PASS_GRID_SPOTS_PER_GAME_SECOND)` | Deflector sprints to the contact point, arriving as the ball does; all other players carry their unfinished movement from the prior step; the passer holds (he released the ball) | `BallInFlight` passer → contact, `sfx_on_ball_arrival: block1.wav` |
+| B `hct_bat_oob_drift` | `fixed_duration` | `max(0.25, dist(contact→oob) / PASS_GRID_SPOTS_PER_GAME_SECOND)` | All ten hold | `BallLoose` contact → OOB target |
+
+Step B inherits the prior last step's `end.next`, so the turn still terminates
+as it did (dead ball, offense retains, side inbound follows).
+
+**Before this existed**, HCO emitted no trajectory at all: the skeleton was
+truncated at the pass step, a stopper step carrying only the ball handler was
+appended, and the frontend `await`ed the deflector's slide into the passing lane
+*before* flying the ball. That serialisation rendered as an extra beat in which
+only the deflector moved while the other nine stood still — the visible
+difference from HCT, where deflector and ball converge in one step.
+
+Clock: both steps decrement `clock_remaining` by their own T.
+`_emit_hco_animation_steps` derives `time_elapsed` from `steps[0].start.clock`
+minus `steps[-1].end.clock`, so the turn's burn picks them up with no separate
+reconciliation. Idempotent — it refuses to append when a trajectory is already
+present.
 
 ##Handoff Step
 -Handoff Step Occurs if:

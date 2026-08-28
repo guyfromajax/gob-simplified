@@ -68,6 +68,7 @@ All detections follow this pattern:
 - **Detection:** `turn.result_type === "DEAD BALL"`
 - **Routes to:** `AnimationRouter` → `handleDefault()` when `animations[]` **or** `animation_steps[]` present; otherwise direct announcements + score updates.
 - **Notes:** Previously never routed; schema-rendered dead-ball turnovers (e.g. FB bat-OOB) now animate. Engine registers both `"DEAD BALL"` (backend spelling, with space) and `"DEAD_BALL"`.
+- **Batted-OOB ball path:** three renderers, selected by turn type. HCO **and** HCT/FCP now both emit the schema pair (`hct_bat_oob_contact` / `hct_bat_oob_drift`); `AnimationEngine._hasSchemaBatOobTrajectory()` detects those `reason`s and **suppresses** the imperative `_runHctBatOobBallSend`, which remains only as the fallback for turns that emit no trajectory. Rim Runner / Triangle use `rim_runner_bat_oob` → `_runSchemaBatOobBallSend` (players move via steps, ball overlaid from step metadata). Do not rename the two `reason` strings without updating the guard — the imperative and the schema path firing together produced a double ball flight (ball → OOB, then → defender → OOB again).
 
 ### 5. SIDE_INBOUND
 - **Detection:** `turn.result_type === "SIDE_INBOUND"`

@@ -79,7 +79,9 @@ are emitted as schema, frozen into `result["pressure_step_states"]` by
 projected step carries `_pressure_step_state`.
 
 Formal projection currently covers entry/advance/pass steps, pass
-interceptions, batted-OOB contact and drift, terminal steal/foul/dead-ball
+interceptions, batted-OOB contact and drift (HCT/FCP natively; HCO via
+`skeleton_step_emitter.append_hco_bat_oob_trajectory`, which emits the same two
+steps so both turn families share one renderer), terminal steal/foul/dead-ball
 steps, dead-ball fumbles, pressure-owned shot setup, and shared post-shot
 beats. The remaining architectural migration is upstream ownership: individual
 pressure builders still create schema first and should eventually return
