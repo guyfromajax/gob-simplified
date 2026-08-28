@@ -43,6 +43,7 @@ from BackEnd.engine.rim_runner_step_emitter import (
     _build_burst_step,
     _build_hold_up_step,
     _build_outlet_denied_defender_step,
+    converge_outlet_denied_into_burst,
     _build_outlet_pass_step,
     _build_player_data,
     _decision_pill_meta,
@@ -786,6 +787,16 @@ def build_triangle_animation_steps(
     last_end_coords = dict(burst_step["end"]["coords"])
 
     if outlet_failed:
+        # Converged: same as Rim Runner — close-out folds into the burst.
+        if converge_outlet_denied_into_burst(
+            burst_step=burst_step,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+        ):
+            return _finalize_rr_steps(turn_result, game, steps)
+
         denied = _build_outlet_denied_defender_step(
             fb_roles=fb_roles,
             off_lineup=off_lineup,

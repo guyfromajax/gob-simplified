@@ -60,6 +60,22 @@
      byte-identical diff. Confirm with `scripts/perf_sim_baseline.py` that the global-draw tally is empty.
    - Pre-existing; unrelated to the animation cleanup work. Not causing any known gameplay bug.
 
+7. Turns appear to emit / render TWICE (observed 2026-08-28, not yet investigated)
+   - Nearly every log line duplicates across BOTH systems, so it is not a logging artifact:
+     backend `🏠 [ENTRY] … HANDOFF FIRED … WALKUP FIRED` repeats per turn; frontend
+     `[DEF-FROZEN]` repeats at the SAME `turnIndex` (e.g. 12 twice, 28 twice).
+   - User independently reports "other symptoms of turns emitting or rendering 2x".
+   - Why it matters: double-rendering a turn would produce visual stutter and could be
+     contributing to animation complaints that look like separate bugs. It would also
+     double any RNG draws made during emission, shifting outcomes.
+   - Possibly benign (a preflight/dry-run emit plus the real one) — NOT yet confirmed either way.
+   - Deliberately deferred: the shot micro-movement freeze fix is not yet deployed, and
+     diagnosing animation on a build missing a known fix already cost a full cycle.
+     Investigate AFTER that deploy is verified.
+   - First step when picked up: determine whether the duplicate is emission (backend builds the
+     turn twice) or rendering (frontend plays one payload twice) — the `turnIndex` repeat in the
+     FE log suggests rendering, the duplicated `🏠 [ENTRY]` suggests emission. Both may be true.
+
 ##Playtest Launch / In Progress
 1. Steam Video
 -----

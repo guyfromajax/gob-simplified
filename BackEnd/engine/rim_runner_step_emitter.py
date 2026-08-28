@@ -598,7 +598,28 @@ def _build_burst_step(
 
     _commit_mover(rr_id, rr_end_target, "sprint", rr_archetype)
 
-    _commit_mover(receiver_id, receiver_end_target, "cut", receiver_archetype)
+    # The player holding the ball never travels during the burst — he holds the
+    # spot he rebounded at while the break develops in front of him.
+    #
+    # On the normal outlet branch that is the passer, already handled below. On
+    # `skip_outlet_pass` (rebounder IS the outlet receiver, so no pass fires) the
+    # ball owner is the RECEIVER, and he was being committed as a mover — the
+    # rebounder sprinted up the floor with the ball. Skipping his commit keeps
+    # him at the rebound spot in both branches.
+    #
+    # This also makes the outlet defender's close-out anchor a FIXED point in
+    # both branches: `outlet_defender_to` is computed from the ball holder's
+    # position, so a stationary holder means the burst target and the denied-step
+    # target are the same coordinate rather than drifting apart.
+    # Read from `phase` directly: the local `skip_outlet_pass` is assigned
+    # further down, after this point.
+    _skip_outlet = bool(phase.get("skip_outlet_pass"))
+    ball_owner_id = receiver_id if _skip_outlet else (passer_id or receiver_id)
+    if receiver_id != ball_owner_id:
+        _commit_mover(receiver_id, receiver_end_target, "cut", receiver_archetype)
+    else:
+        actions[receiver_id] = "handle_ball"
+        archetype[receiver_id] = "stationary"
 
     if passer_id and passer_id in all_start_coords:
         actions[passer_id] = "handle_ball"
@@ -1685,6 +1706,87 @@ def _build_hold_up_step(
 # --- Branch step builders: Outlet Denied (3 sub-steps) ---------------------
 
 
+def converge_outlet_denied_into_burst(
+    *,
+    burst_step: AnimationStep,
+    fb_roles: Dict[str, Any],
+    off_lineup: Dict[str, Any],
+    def_lineup: Dict[str, Any],
+    is_away_offense: bool,
+) -> bool:
+    """Fold the outlet-denied close-out into the burst step; no second step.
+
+    The close-out was its own step, which read as "everyone holds while the
+    denier walks into position". It was also redundant: the burst already
+    commits the outlet defender toward ``outlet_defender_to``, computed as
+    ``ball_holder.x + 2 toward basket`` — the identical formula and, now that
+    the ball holder never moves during the burst, the identical coordinate.
+
+    So convergence is: guarantee the defender is committed to that target inside
+    the burst, move the "FB Outlet Pass Denied!" callout onto the burst's end,
+    and let the burst terminate the turn. Every other player keeps the burst
+    targets it already gave them, so all ten are in motion through one beat.
+
+    The deleted step's ``T`` is absorbed rather than preserved: it was animating
+    a movement that had already happened, so its game-time was not earning
+    anything. Denied-outlet fast breaks therefore burn slightly less clock.
+
+    Mutates ``burst_step`` in place. Returns False when the roles needed are
+    missing, so the caller can fall back to the legacy two-step path.
+    """
+    phase = fb_roles.get("rim_runner_burst_phase") or {}
+    defender_id = _safe_id(phase.get("outlet_defender_id"))
+    passer_id = _safe_id(phase.get("outlet_passer_id"))
+    receiver_id = _safe_id(phase.get("outlet_receiver_id"))
+    ball_holder_id = passer_id or receiver_id
+    if not defender_id or not ball_holder_id:
+        return False
+
+    start = burst_step.get("start") or {}
+    end = burst_step.get("end") or {}
+    start_coords = start.get("coords") or {}
+    end_coords = end.get("coords") or {}
+    if defender_id not in start_coords or ball_holder_id not in start_coords:
+        return False
+
+    # Anchor on the ball holder's START coord: he is stationary through the
+    # burst, so start and end agree and the target is stable either way.
+    holder = start_coords[ball_holder_id]
+    x_dir = -1.0 if is_away_offense else 1.0
+    target: GridCoord = {
+        "x": float(max(4.0, min(97.0, float(holder["x"]) + 2.0 * x_dir))),
+        "y": float(holder["y"]),
+    }
+
+    # Commit the close-out inside the burst, interrupted at the burst's own T so
+    # the defender cannot teleport past it.
+    step_t = float(end.get("time_elapsed") or 0.0)
+    d_start = start_coords[defender_id]
+    d_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
+    d_rate = _ag_grid_per_game_sec(d_player, "standard")
+    start.setdefault("action", {})[defender_id] = "guard_ball"
+    start.setdefault("archetype", {})[defender_id] = "standard"
+    start.setdefault("destination", {})[defender_id] = dict(target)
+    end_coords[defender_id] = _interrupted_coord(d_start, target, d_rate, step_t)
+
+    # The callout moves with the beat it describes.
+    defender_player = _player_lookup_by_id(off_lineup, def_lineup, defender_id)
+    end["announcement"] = {
+        "text": "FB Outlet Pass Denied!",
+        "team": "home" if is_away_offense else "away",
+        "player_data": _build_player_data(defender_player, fallback_id=defender_id),
+        "meta": {"sfx": "fb_outlet_denied_court"},
+        "hold_ms": ANNOUNCEMENT_FREEZE_HOLD_MS,
+        "non_blocking": True,
+        "style": "secondary",
+    }
+
+    # Burst now ends the turn; the HCO entry orchestrator picks it up from here.
+    end["next"] = {"kind": "next_step", "index": 999}
+    _stamp_tween_durations(start, end_coords, step_t, off_lineup, def_lineup)
+    return True
+
+
 def _build_outlet_denied_defender_step(
     *,
     fb_roles: Dict[str, Any],
@@ -2483,6 +2585,17 @@ def build_rim_runner_animation_steps(
     # with the rebounder still holding the ball; hco_setup signals the next
     # HCO turn to fire Reset for the inbound to PG.
     if outlet_failed:
+        # Converged: the close-out folds into the burst (one beat, all ten moving).
+        # Falls back to the legacy second step only when roles are missing.
+        if converge_outlet_denied_into_burst(
+            burst_step=burst_step,
+            fb_roles=fb_roles,
+            off_lineup=off_lineup,
+            def_lineup=def_lineup,
+            is_away_offense=is_away_offense,
+        ):
+            return _finalize_rr_steps(turn_result, game, steps)
+
         denied_defender = _build_outlet_denied_defender_step(
             fb_roles=fb_roles,
             off_lineup=off_lineup,

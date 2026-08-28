@@ -130,6 +130,31 @@ def test_autoset_uses_waterfall_when_default_ng_too_strict():
     assert len(lineup) == 5
 
 
+def test_autoset_payload_force_includes_pending_free_throw_shooter():
+    payload = _five_distinct_payload()
+    payload.append(
+        {
+            "_id": "shooter",
+            "first_name": "Free",
+            "last_name": "Throw",
+            "attributes": _attrs(1.0),
+            "position_ratings": {"PG": 2, "SG": 2, "SF": 2, "PF": 2, "C": 2},
+            "stats": {"game": {"F": 0}},
+        }
+    )
+    gs = {
+        "quarter": 2,
+        "time_remaining": 300,
+        "timeout_next_play_type": "FREE_THROW",
+        "timeout_shooter_id": "shooter",
+    }
+
+    lineup = autoset_lineup_player_ids_from_payload(payload, gs, team_chemistry=15.0)
+
+    assert "shooter" in lineup.values()
+    assert len(lineup) == 5
+
+
 def test_fill_unified_lineup_gaps_respects_existing_slots():
     """One open slot (C); only the C specialist should fill it."""
     payload = _five_distinct_payload()

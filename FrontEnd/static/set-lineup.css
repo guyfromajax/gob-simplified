@@ -1660,6 +1660,14 @@ body.set-lineup-page .resource-page-container.fcc-brand-page-shell.set-lineup-sh
   vertical-align: middle;
 }
 
+/* The row is visually locked but remains draggable so the shooter can be
+   reassigned to another active position. */
+.roster-table tbody tr.ft-shooter-locked,
+.roster-stats-table tbody tr.ft-shooter-locked {
+  background: rgba(148, 163, 184, 0.14);
+  color: rgba(255, 255, 255, 0.68);
+}
+
 .roster-game-table tbody td {
   height: 28px;
   padding-top: 2px;

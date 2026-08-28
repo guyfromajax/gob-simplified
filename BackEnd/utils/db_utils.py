@@ -737,8 +737,12 @@ def autoset_lineup_player_ids_from_payload(
             "Fewer than 5 eligible players for autoset after waterfall (check NG/fouls/quarter)."
         )
 
+    shooter_id = pending_ft_shooter_id(gs)
     lineup_players = build_unified_autoset_lineup_from_eligible(
-        eligible, team_chemistry, position_fill_order=position_fill_order
+        eligible,
+        team_chemistry,
+        force_include_ids=([shooter_id] if shooter_id else None),
+        position_fill_order=position_fill_order,
     )
     return {pos: pl.player_id for pos, pl in lineup_players.items()}
 

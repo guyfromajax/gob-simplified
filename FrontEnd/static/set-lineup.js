@@ -42,8 +42,9 @@ function isFtLockedPlayer(playerId) {
 }
 async function loadFtShooterLock() {
   try {
-    if (!gameId || urlParams.get('resume_from_timeout') !== 'true') return;
-    const res = await fetch(API_CONFIG.buildUrl(`/api/game/${gameId}/ft-lock`), { headers: API_CONFIG.getAuthHeaders() });
+    const activeGameId = getActiveGameId();
+    if (!activeGameId || urlParams.get('resume_from_timeout') !== 'true') return;
+    const res = await fetch(API_CONFIG.buildUrl(`/api/game/${activeGameId}/ft-lock`), { headers: API_CONFIG.getAuthHeaders() });
     if (!res.ok) return;
     const data = await res.json();
     if (data && data.next_turn_is_free_throw && data.ft_shooter_id) {
@@ -1890,6 +1891,13 @@ function clearLineupSlot(pos) {
 function applyRosterDrop({ draggedPlayerId, sourcePos, dropPos }) {
   if (!draggedPlayerId || !dropPos) return;
   const existingAtDrop = lineup[dropPos] || null;
+  // A bench player dropped directly on the shooter's row would otherwise
+  // replace (and bench) the locked player. Active-to-active drops remain a
+  // swap, so the shooter can still change positions.
+  if (!sourcePos && isFtLockedPlayer(existingAtDrop)) {
+    if (typeof showToast === 'function') showToast('Free throw shooter must stay in the lineup');
+    return;
+  }
   if (sourcePos && existingAtDrop) {
     lineup[sourcePos] = existingAtDrop;
   } else if (sourcePos && !existingAtDrop) {
@@ -1982,8 +1990,10 @@ function updatePlayButton() {
   const gameplanBtn = document.getElementById('gameplan-optional');
   
   const filled = ['PG','SG','SF','PF','C'].every(pos => lineup[pos]);
+  const ftShooterPresent = !ftLockActive || Object.values(lineup).some(isFtLockedPlayer);
+  const lineupIsValid = filled && ftShooterPresent;
   
-  if (filled) {
+  if (lineupIsValid) {
     // Enable play button when lineup is complete
     if (playBtn) {
       playBtn.classList.remove('disabled');
@@ -2027,7 +2037,12 @@ function buildAutosetGameState() {
   if (isQuarterBreak || (!resumeFromTimeout && (!clockTime || clockTime === '0:00'))) {
     clockTime = q > 4 ? '4:00' : '8:00';
   }
-  return { quarter: q, time_remaining: clockStringToSecondsForAutoset(clockTime) };
+  const state = { quarter: q, time_remaining: clockStringToSecondsForAutoset(clockTime) };
+  if (ftLockActive && ftLockShooterId) {
+    state.timeout_next_play_type = 'FREE_THROW';
+    state.timeout_shooter_id = ftLockShooterId;
+  }
+  return state;
 }
 
 function rosterRowsForAutosetApi() {
@@ -2049,7 +2064,6 @@ function rosterRowsForAutosetApi() {
 
 async function autosetLineup() {
   playSound('chaotic-choice.wav');
-  LINEUP_POSITIONS.forEach((pos) => { delete lineup[pos]; });
 
   if (!roster.length || roster.length < 5) {
     showToast('Roster not loaded yet');
@@ -2089,9 +2103,16 @@ async function autosetLineup() {
     }
     const data = await res.json();
     const lu = data.lineup || {};
+    const nextLineup = {};
     ['PG', 'SG', 'SF', 'PF', 'C'].forEach(pos => {
-      if (lu[pos]) lineup[pos] = lu[pos];
+      if (lu[pos]) nextLineup[pos] = lu[pos];
     });
+    if (ftLockActive && !Object.values(nextLineup).some(isFtLockedPlayer)) {
+      showToast('Autoset could not retain the free throw shooter');
+      return;
+    }
+    LINEUP_POSITIONS.forEach((pos) => { delete lineup[pos]; });
+    Object.assign(lineup, nextLineup);
     updatePlayButton();
     refreshLineupAvailabilityDisplay();
     showToast('Lineup auto-generated!');
@@ -2634,6 +2655,11 @@ async function init() {
   if (btn) {
     btn.addEventListener('click', async () => {
       if (btn.classList.contains('disabled')) return;
+      if (ftLockActive && !Object.values(lineup).some(isFtLockedPlayer)) {
+        showToast('Free throw shooter must stay in the lineup');
+        updatePlayButton();
+        return;
+      }
       
       // ✅ SS&S: Use unified Timeout Navigation Helper for consistent parameter building
       const helper = window.TimeoutNavigationHelper;
