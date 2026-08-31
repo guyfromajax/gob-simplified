@@ -1,0 +1,66 @@
+/* ============================================================================
+ * TRAILER MODE — temporary suppression of alpha-stage UI chrome
+ * ============================================================================
+ * Added 2026-08-31 for launch-trailer footage capture.
+ *
+ * TO RE-ENABLE THE ALPHA CHROME (undo this):
+ *   Delete the single @import line marked "TRAILER MODE" at the top of
+ *   FrontEnd/static/css/fonts.css. That's the whole revert — this file can
+ *   then stay on disk (inert) or be deleted.
+ *
+ * WHY CSS AND WHY HERE:
+ *   The alpha badge and Send-feedback button are emitted from several places
+ *   (js/shared/alphaBanner.js, js/shared/authBarInit.js, and hardcoded auth-bar
+ *   markup inline in ~8 HTML pages). Suppressing them in CSS catches every
+ *   emitter at once with zero changes to app logic, so nothing can drift out of
+ *   sync while footage is being captured. fonts.css is the one stylesheet loaded
+ *   by 75 of 77 pages (the 2 exceptions are retired redirect stubs), which makes
+ *   it the only truly global hook.
+ *
+ * !important is required: alphaBanner.js and alphaFeedbackModal.js inject their
+ * own <style> blocks at runtime, which land after this file in the cascade.
+ * ========================================================================== */
+
+/* Gold "Alpha" badge — top-right of the auth bar on every screen.
+   Emitters: alphaBanner.js _injectBadge(), authBarInit.js buildAuthBar(),
+   plus inline markup in homepage / account / faqs / login / signup /
+   reset-password / coaching-archetypes{,-leaderboard} / alpha-feedback. */
+#alpha-badge,
+.alpha-badge,
+.alpha-badge.visible,
+.auth-bar .alpha-badge,
+.auth-bar .alpha-badge.visible {
+  display: none !important;
+}
+
+/* "Send feedback" button — auth-bar right cluster.
+   Emitters: authBarInit.js buildAuthBar() + ensureFeedbackButton().
+   NOTE: intentionally does NOT match .feedback-modal-btn (the modal's own
+   Cancel/Send controls), so the feedback flow itself is untouched. */
+#feedback-btn,
+.feedback-btn,
+.auth-bar .feedback-btn,
+.auth-bar .feedback-btn.is-glowing {
+  display: none !important;
+}
+
+/* ALPHA RELEASE disclaimer box — mode-select screen. */
+#alpha-disclaimer,
+.alpha-disclaimer,
+body.mode-select-page .alpha-disclaimer,
+body.mode-select-page .alpha-disclaimer.visible {
+  display: none !important;
+}
+
+/* Post-game "Help Us Make GOB Better" alpha-feedback moment modal — fires on
+   the Franchise Command Center at 4 and 8 games played (alphaFeedbackModal.js).
+   The second rule is load-bearing: the modal blurs + dims #franchise-container
+   while open, and that class is only removed by its close handler — which can
+   never run once the overlay is hidden. Without it the FCC would render blurred. */
+.afm-overlay,
+.afm-overlay.is-visible {
+  display: none !important;
+}
+#franchise-container.afm-dimmed {
+  filter: none !important;
+}

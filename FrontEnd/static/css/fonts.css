@@ -1,3 +1,8 @@
+/* TRAILER MODE — hides alpha badge, Send-feedback button, alpha disclaimer and
+   the alpha-feedback moment modal for launch-trailer capture (added 2026-08-31).
+   DELETE THIS ONE LINE (and this comment) to restore the alpha chrome. */
+@import url('/css/trailer-mode.css');
+
 /* ============================================================
    GOB Brand Fonts — canonical @font-face source (loaded app-wide)
    ------------------------------------------------------------
