@@ -178,14 +178,16 @@
   .shot-real img{cursor:zoom-in; border-radius:8px; border:1px solid var(--hairline); box-shadow:0 18px 50px rgba(0,0,0,.45);}
 
   .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:26px; align-items:start;}
+  .stack{display:flex; flex-direction:column; gap:30px;}
   .grid-main-side{display:grid; grid-template-columns:1.7fr 1fr; gap:26px; align-items:start;}
   @media (max-width:860px){ .grid-2, .grid-main-side{grid-template-columns:1fr;} }
 
 
   /* ============ PLAYER DNA PANEL ============ */
   .dna-panel{
-    position:relative; background:linear-gradient(150deg, #0E1424 0%, #0A0E1A 55%, #0C1120 100%);
-    border:1px solid var(--hairline); border-radius:8px; padding:18px 20px 6px;
+    position:relative; height:100%; box-sizing:border-box; display:flex; flex-direction:column;
+    background:linear-gradient(150deg, #0E1424 0%, #0A0E1A 55%, #0C1120 100%);
+    border:1px solid var(--hairline); border-radius:8px; padding:26px 28px 14px;
     box-shadow:0 18px 50px rgba(0,0,0,.45), 0 0 0 1px rgba(39,64,142,.14) inset;
     overflow:hidden;
   }
@@ -195,13 +197,16 @@
   }
   .dna-head{
     display:flex; align-items:baseline; justify-content:space-between; gap:12px;
-    padding-bottom:14px; border-bottom:1px solid var(--hairline);
+    padding-bottom:18px; border-bottom:1px solid var(--hairline);
   }
-  .dna-eyebrow{font:700 11px/1 var(--inter); letter-spacing:.3em; color:var(--orange); text-transform:uppercase;}
-  .dna-player{font:500 11.5px/1 var(--inter); color:var(--muted);}
-  .dna-groups{display:grid; grid-template-columns:repeat(3, 1fr);}
+  .dna-eyebrow{font:700 13px/1 var(--inter); letter-spacing:.3em; color:var(--orange); text-transform:uppercase;}
+  .dna-player{font:500 13.5px/1 var(--inter); color:var(--muted);}
+  .dna-groups{display:grid; grid-template-columns:repeat(3, 1fr); flex:1;}
   @media (max-width:560px){ .dna-groups{grid-template-columns:repeat(2, 1fr);} }
-  .dna-cell{padding:13px 14px 11px; border-right:1px solid var(--hairline); border-bottom:1px solid var(--hairline);}
+  .dna-cell{
+    display:flex; flex-direction:column; justify-content:center; gap:11px;
+    padding:20px 18px; border-right:1px solid var(--hairline); border-bottom:1px solid var(--hairline);
+  }
   .dna-cell:nth-child(3n){border-right:none;}
   .dna-cell:nth-child(n+4){border-bottom:none;}
   @media (max-width:560px){
@@ -211,19 +216,20 @@
     .dna-cell:nth-child(n+5){border-bottom:none;}
   }
   .dna-group-hed{
-    font:700 10px/1 var(--inter); letter-spacing:.24em; color:#8E99B4; text-transform:uppercase;
-    margin:0 0 9px;
+    font:700 12px/1 var(--inter); letter-spacing:.26em; color:#8E99B4; text-transform:uppercase;
+    margin:0 0 2px;
   }
-  .dna-row{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
-  .dna-row:last-child{margin-bottom:0;}
+  .dna-row{display:flex; align-items:center; gap:11px; margin:0;}
   .dna-abbr{
-    font:400 14px/1 var(--bebas); letter-spacing:.08em; color:var(--orange); text-transform:uppercase;
-    border:1px solid rgba(247,148,32,.45); border-radius:3px; padding:4px 0 2px; width:34px; text-align:center; flex:none;
+    font:400 17px/1 var(--bebas); letter-spacing:.08em; color:var(--orange); text-transform:uppercase;
+    border:1px solid rgba(247,148,32,.45); border-radius:4px; padding:6px 0 4px; width:42px; text-align:center; flex:none;
   }
-  .dna-name{font:600 11.5px/1.2 var(--inter); color:#C9D2E4; letter-spacing:.01em; white-space:nowrap;}
+  .dna-name{font:600 14px/1.2 var(--inter); color:#C9D2E4; letter-spacing:.01em; white-space:nowrap;}
 
   /* ============ §4 DNA / ATTRIBUTES ============ */
-  .dna-wrap{display:grid; grid-template-columns:1.1fr 1fr; gap:26px; align-items:start; margin-top:8px;}
+  .dna-wrap{display:grid; grid-template-columns:1.1fr 1fr; gap:26px; align-items:stretch; margin-top:8px;}
+  .dna-wrap .shot, .dna-wrap .shot-real, .dna-wrap .shot-real img{height:100%;}
+  .dna-wrap .shot-real img{object-fit:cover;}
   @media (max-width:860px){ .dna-wrap{grid-template-columns:1fr;} }
   .attr-strip{
     margin-top:26px;
@@ -386,7 +392,7 @@
         <h2>Coach Every Possession. Live.</h2>
         <p class="section-sub">Call plays and adjust in real time, possession by possession — or hand it to your staff and sim the game broadcast-style, box scores and momentum included.</p>
       </div>
-      <div class="grid-main-side">
+      <div class="stack">
         <figure class="shot">
           <div class="shot-real"><img src="./images/homepage-v3/live-coaching-tied-53-53-in.jpg" alt="Live coaching: tied 53-53 in the fourth quarter, Pick and Roll Entry Pass called with a +99 percent edge" style="width:100%;display:block;" loading="lazy"></div>
         </figure>
@@ -405,7 +411,7 @@
         <h2>Depth You Can Actually See.</h2>
         <p class="section-sub">Built for people who love box scores, trends, and the edge hidden in the data. Everything that matters, one glance away.</p>
       </div>
-      <div class="grid-2">
+      <div class="stack">
         <figure class="shot">
           <div class="shot-real"><img src="./images/homepage-v3/national-stat-leaders-points-three-pointers.jpg" alt="National stat leaders: points, three pointers made, assists, and blocks leaderboards" style="width:100%;display:block;" loading="lazy"></div>
         </figure>
