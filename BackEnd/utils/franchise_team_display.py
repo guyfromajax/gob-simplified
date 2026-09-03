@@ -289,11 +289,17 @@ def resolve_team_display(
       primary_color, secondary_color,
       asset_strategy ("core" | "generated"),
       is_custom (bool), replaced_name (optional),
+      core_missing (bool): no core ``teams`` doc for this ObjectId,
       jersey_preset (custom only: 1 SOLID | 2 SOLID WITH TRIM),
       court (custom only, optional): five colour parameters — never a render
 
     When the franchise has no overlay, or the ObjectId is not the replaced
     slot, values come from core ``teams`` unchanged.
+
+    ``name`` is "" when the core doc is missing (a reseeded ``teams`` collection
+    orphans older franchises' ObjectIds). Callers holding a better source — e.g.
+    ``franchises.user_team_id``, which bakes the team NAME — must branch on
+    ``core_missing`` rather than relying on ``name`` being falsy alone.
 
     Note: legacy overlays may still carry stale ``short_name``, ``accent_color``,
     or ``city_state`` keys; they are ignored (no consumer, no migration).
@@ -311,7 +317,10 @@ def resolve_team_display(
     base = {
         "object_id": oid,
         "team_id": core_slug,
-        "name": core_name or (oid or "?"),
+        # Never echo the ObjectId back as a display name. It is truthy, so it silently
+        # defeats every downstream `display.get("name") or <fallback>` and surfaces a raw
+        # id to the player. Branch on ``core_missing`` instead.
+        "name": core_name,
         "abbreviation": abbr_from_name(core_name),
         "mascot": core_mascot,
         "primary_color": core_primary,
@@ -321,6 +330,7 @@ def resolve_team_display(
         "replaced_name": None,
         "conference": core.get("conference"),
         "region": core.get("region"),
+        "core_missing": not core,
     }
 
     overlay = get_team_builder_overlay(franchise)
@@ -352,6 +362,7 @@ def resolve_team_display(
         "region": core.get("region"),
         "jersey_preset": normalize_jersey_preset(overlay.get("jersey_preset")),
         "banner_variant": normalize_banner_variant(overlay.get("banner_variant")),
+        "core_missing": not core,
     }
     # Parameters only — never a render. Absent on legacy overlays → FE defaults.
     court = normalize_court_params(

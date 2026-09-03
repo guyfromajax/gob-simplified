@@ -56,18 +56,28 @@
    - Symptom: Confirm on `cut-players.html` in assignment mode (week 1) swaps in the "Assigning
      Practice Squad" pulse and never leaves it. A refresh shows the assignment was in fact saved.
      Seen on a new franchise instance for an existing user.
+   - STATUS: root cause UNCONFIRMED. The client-side defects below are proven from code and are
+     worth fixing on their own terms. The backend-latency explanation is an untested HYPOTHESIS — it
+     shows the wait COULD be long, not that it WAS long in the observed occurrence. Do not treat the
+     (a)/(b) workloads as the diagnosed cause until the check under DIAGNOSTIC comes back.
+   - Leading alternative, roughly as likely: a transient network/deploy event. A blackholed socket
+     (wifi drop, laptop sleep, a container roll mid-request) hangs a `fetch` without rejecting and
+     produces an identical screen. Nothing observed so far distinguishes it from the hypothesis.
    - NOT an error. Every failure path in `cut-players.js` (`!res.ok`, `res.json()` reject, network
      reject) lands in the `.catch` and swaps the pulse for "Assignment Failed". The pulse was still
-     up, so the `fetch` never settled — this is a wait, not a throw.
-   - The wait is UNBOUNDED, which is the actual defect. `submitCuts()` (cut-players.js 280-304)
-     replaces the confirm modal with a terminal, action-less pulse and hands the remaining UX to one
+     up, so the `fetch` never settled — a wait (or a dead connection), not a throw. This is
+     consistent with BOTH the hypothesis and the network explanation; it does not choose between them.
+   - The wait is UNBOUNDED — a defect in its own right, and the one thing certainly wrong here.
+     `submitCuts()` (cut-players.js 280-304) replaces the confirm modal with a terminal, action-less
+     pulse and hands the remaining UX to one
      `fetch` plus `window.location.href = buildFccUrl()`. No timeout, no progress, no fallback, so
      latency anywhere in the chain is indistinguishable from a freeze. The browser also keeps the
      cut-players document (and its pulse) on screen until the FCC document commits, so the FCC's own
      load time sits inside the same unbounded window.
-   - Two heavy workloads run synchronously inside `POST /franchise/cut-players` (franchise_routes.py
-     15262). This is the ONLY place week-1 PS init happens for a user who owes cuts — CPU training
-     defers it (`defer_if_user_cut_pending=True`, 15892) and this endpoint owns it (`False`, 15379):
+   - HYPOTHESIS (unconfirmed — see STATUS). Two heavy workloads run synchronously inside
+     `POST /franchise/cut-players` (franchise_routes.py 15262). This is the ONLY place week-1 PS init
+     happens for a user who owes cuts — CPU training defers it (`defer_if_user_cut_pending=True`,
+     15892) and this endpoint owns it (`False`, 15379):
      (a) `initialize_practice_squad` (practice_squad/manager.py 248) does four UNPROJECTED
      franchise-wide reads — every FTD, every FPD, every recruit — plus two full `db.teams` scans
      (`_build_region_team_map`, and `_format_team_name_map` → `resolve_team_name_map` with no
@@ -83,15 +93,40 @@
      fix `_warm_walk_on_masters` threw on `not teams_collection` and the caller swallowed it, so warm
      cost was zero. The pulse modal landed one day later in `2841525c5` — it was papering over a wait
      that had just become far more expensive.
+   - UNVERIFIED PRECONDITION for (b): `is_walk_on_fpd` requires `archetype == "walk on"`. If none of
+     the active 12 were Walk Ons, `walk_ons` is empty and `assign_walk_ons_making_active_roster`
+     returns before touching R2 — branch (b) evaporates entirely. Never checked for the observed
+     franchise; the cut-players screen does not display archetype.
+   - NOT evidence, despite looking like it: "happened on a new franchise at week 1, exactly when the
+     expensive path runs." Week 1 of a new franchise is the only time this screen exists at all, so
+     the coincidence carries zero diagnostic weight.
+   - DIAGNOSTIC (do this before re-testing or writing part C). The roster commit is known to have
+     landed (assignment was saved), so one read splits the hypotheses:
+     `db.franchises.findOne({_id: ObjectId("<fid>")}, {"practice_squad.initialized": 1,
+     "practice_squad.initialized_week": 1})`
+     - `initialized: true` => the handler ran past the commit, through the warm, through PS init, to
+       the return. Server finished the work; the loss was on the wire or the FCC navigation was the
+       slow leg. Points at network/deploy; part C is NOT implicated.
+     - missing/false => the handler stalled or died between the commit and the PS write, which is
+       exactly the warm + PS-init window. Part C is implicated.
+     Corroborate in Railway logs for that franchise/timestamp: `[WALK-ON-ROSTER] franchise=… warm=N`
+     (INFO, walk_on_roster_identity.py:198) settles whether the R2 paint ran at all;
+     `[PRACTICE-SQUAD] week-1 init failed` would show a swallowed exception.
+     Observed occurrence: franchise `6a999b82b3eb46146c5710ac`, 2026-09-03 ~12:09pm ET.
+   - Re-testing is a WEAK first move: that franchise's `practice_squad.initialized` is now true, so
+     the expensive path will not run again — reproduction needs a brand-new franchise. And a
+     non-reproduction clears nothing while the transient-network explanation is live.
    - Retry trap: the roster commit (`_update_ftd_roster_state`, ~15325) lands BEFORE the slow work,
      so a user who gives up and retries hits `cut_required == false` → 400 → "Assignment Failed",
      making a succeeded first attempt look like a hard failure.
    - The older failure mode here is genuinely closed and must not be re-fixed: after the roster
      commit both remaining blocks are wrapped in `except Exception`, so this endpoint can no longer
      500 post-commit (that was `2841525c5`).
-   - Fix, in three parts. A and B are unconditional; C1 is unconditional hygiene; size C2 from a
-     measurement (DevTools TTFB on the POST vs. the following `franchise-command-center.html`
-     request — that is the only thing distinguishing "slow POST" from "slow FCC navigation").
+   - Fix. A and B ship regardless of what DIAGNOSTIC returns — an unbounded client wait and a retry
+     that 400s after a successful commit are defects on their own terms, and A is what makes a
+     genuine network blip recoverable instead of terminal. C is GATED on DIAGNOSTIC showing the
+     backend was the slow leg; if `initialized: true`, do not write C off the back of this report.
+     C1's timeout config is defensible as standalone hygiene either way.
      - A. Bound the client wait. The pulse must never be a terminal state: drive the `fetch` with an
        `AbortController` + timeout. On timeout do NOT show "Assignment Failed" (the commit may have
        landed) — re-read `/franchise/command-center/data` and navigate to the FCC when `cut_required`
@@ -105,13 +140,17 @@
        for minutes. Then drop `warm=True` at 15362 rather than optimizing it — portraits already
        paint lazily via `ensure_player_image`, which is exactly what CPU teams rely on (`warm=False`,
        12925). The eager warm buys nothing a user can perceive and it is the least bounded work in
-       the request.
+       the request. CONFIRM FIRST: the lazy-paint claim is read off docstrings/comments in
+       walk_on_portraits.py and `_warm_walk_on_masters`, not traced end-to-end. Verify
+       `ensure_player_image` actually paints an unwarmed master on demand before deleting the warm.
      - C2. Project the `initialize_practice_squad` reads. It only needs `team_id` +
        `training_squad_players` from FTD, and `player_id` / `meta` / `position_ratings` /
        `attributes` from FPD (see `gather_region_pool`, `_fpd_pool_entry`, `_frd_pool_entry`) — it
        currently pulls entire documents for ~128 teams' worth of players. Pass `team_ids` to
        `resolve_team_name_map` to scope one of the two `db.teams` scans, and stop rewriting the whole
-       `season_news` array on a write whose point is `practice_squad`.
+       `season_news` array on a write whose point is `practice_squad`. The read shapes are verified
+       against the consumers; the COST is not — nobody has timed `initialize_practice_squad`. Time it
+       before optimizing it.
    - Do NOT "fix" this by widening the pulse into a spinner-with-message or by adding a retry button
      alone. The bug is that the client has no bounded outcome and the request carries work it should
      not; a friendlier wait screen leaves both intact.

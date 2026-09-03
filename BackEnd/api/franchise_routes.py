@@ -9255,7 +9255,12 @@ def _franchise_summary_for_list(doc: dict) -> dict:
     display = resolve_team_display(doc, team_object_id) if team_object_id else {}
     primary_color = display.get("primary_color")
     secondary_color = display.get("secondary_color")
-    display_name = display.get("name") or doc.get("user_team_id")
+    # `user_team_id` bakes the team NAME at creation, so it outlives a reseeded `teams`
+    # collection that orphaned this franchise's `user_team_object_id`. Prefer it on a
+    # core miss — otherwise the card renders the raw ObjectId.
+    display_name = display.get("name")
+    if display.get("core_missing") or not display_name:
+        display_name = doc.get("user_team_id") or display_name
     home_slot = doc.get("home_slot")
     try:
         home_slot = int(home_slot) if home_slot is not None else None

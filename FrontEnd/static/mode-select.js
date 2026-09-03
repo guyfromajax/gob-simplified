@@ -1663,7 +1663,7 @@ document.addEventListener('DOMContentLoaded', async function () {
   wireAlphaBanner();
 
   try {
-    const lobbyMusic = new Audio('/sounds/crossover-21738.mp3');
+    const lobbyMusic = new Audio('/sounds/Championship_Gridlock.mp4');
     lobbyMusic.loop = true;
     lobbyMusic.volume = 0.4;
     lobbyMusic.play().catch(function () {});
