@@ -175,7 +175,7 @@
   }
   .shot-name{font:400 26px/1 var(--bebas); letter-spacing:.05em; color:#D7DDEA;}
   .shot-desc{font:500 12.5px/1.5 var(--inter); color:var(--muted); max-width:380px; text-align:center; padding:0 18px;}
-  .shot-real img{border-radius:8px; border:1px solid var(--hairline); box-shadow:0 18px 50px rgba(0,0,0,.45);}
+  .shot-real img{cursor:zoom-in; border-radius:8px; border:1px solid var(--hairline); box-shadow:0 18px 50px rgba(0,0,0,.45);}
 
   .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:26px; align-items:start;}
   .grid-main-side{display:grid; grid-template-columns:1.7fr 1fr; gap:26px; align-items:start;}
@@ -313,6 +313,14 @@
   .footer-right{margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:10px;}
   .footer-note{font:500 11.5px/1.5 var(--inter); color:#5A6478;}
   @media (max-width:720px){ .footer-right{margin-left:0; align-items:flex-start;} }
+
+  /* ============ LIGHTBOX ============ */
+  .lightbox{
+    position:fixed; inset:0; z-index:200; display:none; align-items:center; justify-content:center;
+    background:rgba(4,5,10,.92); padding:32px; cursor:zoom-out;
+  }
+  .lightbox.open{display:flex;}
+  .lightbox img{max-width:96vw; max-height:92vh; border-radius:8px; box-shadow:0 30px 90px rgba(0,0,0,.7);}
 </style>
 </head>
 <body class="has-auth-bar">
@@ -365,7 +373,6 @@
       <a class="btn-primary" id="hero-cta" href="./mode-select.html">Play the Alpha</a>
       <a class="btn-ghost" href="https://store.steampowered.com/app/5148870/GeekedOut_Basketball/">Wishlist on Steam</a>
     </div>
-    <p class="hero-micro">No download required.</p>
     <a class="hero-tertiary" href="https://discord.gg/mTXvY37p22" target="_blank" rel="noopener noreferrer">Join the Discord</a>
   </div>
 </header>
@@ -375,16 +382,16 @@
   <section class="section" id="gameplay">
     <div class="section-in">
       <div class="section-head">
-        <p class="eyebrow">Live Gameplay</p>
+        <p class="eyebrow">Gameplay</p>
         <h2>Coach Every Possession. Live.</h2>
         <p class="section-sub">Call plays and adjust in real time, possession by possession — or hand it to your staff and sim the game broadcast-style, box scores and momentum included.</p>
       </div>
       <div class="grid-main-side">
         <figure class="shot">
-          <div class="shot-real"><img src="./images/homepage-v3/live-coaching-tied-53-53-in.jpg" alt="Live coaching: tied 53-53 in the fourth quarter, Pick and Roll Entry Pass called with a +99 percent edge" style="width:100%;display:block;" loading="lazy"</div>
+          <div class="shot-real"><img src="./images/homepage-v3/live-coaching-tied-53-53-in.jpg" alt="Live coaching: tied 53-53 in the fourth quarter, Pick and Roll Entry Pass called with a +99 percent edge" style="width:100%;display:block;" loading="lazy"></div>
         </figure>
         <figure class="shot">
-          <div class="shot-real"><img src="./images/homepage-v3/broadcast-style-sim-full-game-lead.jpg" alt="Broadcast-style sim: full-game lead margin worm, live box scores, team stats" style="width:100%;display:block;" loading="lazy"</div>
+          <div class="shot-real"><img src="./images/homepage-v3/broadcast-style-sim-full-game-lead.jpg" alt="Broadcast-style sim: full-game lead margin worm, live box scores, team stats" style="width:100%;display:block;" loading="lazy"></div>
         </figure>
       </div>
     </div>
@@ -396,14 +403,14 @@
       <div class="section-head">
         <p class="eyebrow">The Numbers</p>
         <h2>Depth You Can Actually See.</h2>
-        <p class="section-sub">Built for people who love box scores, trends, and the edge hidden in the numbers. Everything that matters, one glance away.</p>
+        <p class="section-sub">Built for people who love box scores, trends, and the edge hidden in the data. Everything that matters, one glance away.</p>
       </div>
       <div class="grid-2">
         <figure class="shot">
-          <div class="shot-real"><img src="./images/homepage-v3/national-stat-leaders-points-three-pointers.jpg" alt="National stat leaders: points, three pointers made, assists, and blocks leaderboards" style="width:100%;display:block;" loading="lazy"</div>
+          <div class="shot-real"><img src="./images/homepage-v3/national-stat-leaders-points-three-pointers.jpg" alt="National stat leaders: points, three pointers made, assists, and blocks leaderboards" style="width:100%;display:block;" loading="lazy"></div>
         </figure>
         <figure class="shot">
-          <div class="shot-real"><img src="./images/homepage-v3/team-roster-player-stats-full-season.jpg" alt="Team roster player stats: full-season statistics across 22 columns" style="width:100%;display:block;" loading="lazy"</div>
+          <div class="shot-real"><img src="./images/homepage-v3/team-roster-player-stats-full-season.jpg" alt="Team roster player stats: full-season statistics across 22 columns" style="width:100%;display:block;" loading="lazy"></div>
         </figure>
       </div>
     </div>
@@ -415,12 +422,12 @@
       <div class="section-head">
         <p class="eyebrow">Recruit &amp; Develop</p>
         <h2>Build Your Roster To Fit Your System.</h2>
-        <p class="section-sub">Scout, recruit, and develop players across 12 measurable attributes. <strong>You build your teams. You don't buy them.</strong></p>
+        <p class="section-sub">Scout, recruit, and develop players across twelve measurable attributes. <strong>You build your teams. You don't buy them.</strong></p>
       </div>
       <div class="dna-wrap">
         <figure class="shot">
           <div class="dna-panel">
-            <div class="dna-head"><span class="dna-eyebrow">Player DNA</span><span class="dna-player">12 measurable attributes</span></div>
+            <div class="dna-head"><span class="dna-eyebrow">Player DNA</span><span class="dna-player">Twelve measurable attributes</span></div>
             <div class="dna-groups">
             <div class="dna-cell">
               <p class="dna-group-hed">Offense</p>
@@ -456,11 +463,11 @@
           </div>
           </figure>
         <figure class="shot">
-          <div class="shot-real"><img src="./images/homepage-v3/player-detail-12-measurable-attributes-and.jpg" alt="Player detail: 12 measurable attributes and scouting report" style="width:100%;display:block;" loading="lazy"</div>
+          <div class="shot-real"><img src="./images/homepage-v3/player-detail-12-measurable-attributes-and.jpg" alt="Player detail: 12 measurable attributes and scouting report" style="width:100%;display:block;" loading="lazy"></div>
         </figure>
       </div>
       <figure class="shot" style="margin-top:26px;">
-        <div class="shot-real"><img src="./images/homepage-v3/recruiting-hub-watchlist-with-star-tiers.jpg" alt="Recruiting Hub: watchlist with star tiers, full attribute grids, and live lean chips across a 450-player recruit pool" style="width:100%;display:block;" loading="lazy"</div>
+        <div class="shot-real"><img src="./images/homepage-v3/recruiting-hub-watchlist-with-star-tiers.jpg" alt="Recruiting Hub: watchlist with star tiers, full attribute grids, and live lean chips across a 450-player recruit pool" style="width:100%;display:block;" loading="lazy"></div>
       </figure>
     </div>
   </section>
@@ -481,19 +488,19 @@
           <button class="tab-btn" role="tab" data-tab="t4">Playbooks</button>
         </div>
         <div class="tab-panel active" id="t1">
-          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/franchise-command-center-chemistry-next-game.jpg" alt="Franchise Command Center: chemistry, next game, recruiting feed, rankings, leaders, news" style="width:100%;display:block;" loading="lazy"</div></figure>
+          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/franchise-command-center-chemistry-next-game.jpg" alt="Franchise Command Center: chemistry, next game, recruiting feed, rankings, leaders, news" style="width:100%;display:block;" loading="lazy"></div></figure>
           <p class="tab-cap">Your program's front office: everything that needs a decision, surfaced in one place.</p>
         </div>
         <div class="tab-panel" id="t2">
-          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/team-measures-eight-dimension-program-radar.jpg" alt="Team Measures: eight-dimension program radar" style="width:100%;display:block;" loading="lazy"</div></figure>
+          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/team-measures-eight-dimension-program-radar.jpg" alt="Team Measures: eight-dimension program radar" style="width:100%;display:block;" loading="lazy"></div></figure>
           <p class="tab-cap">Watch your identity take shape as training and recruiting bend the profile toward your system.</p>
         </div>
         <div class="tab-panel" id="t3">
-          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/weekly-training-report-practice-player-of.jpg" alt="Weekly Training Report: practice player of the week, regressions, locker room influence, and per-player attribute changes" style="width:100%;display:block;" loading="lazy"</div></figure>
+          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/weekly-training-report-practice-player-of.jpg" alt="Weekly Training Report: practice player of the week, regressions, locker room influence, and per-player attribute changes" style="width:100%;display:block;" loading="lazy"></div></figure>
           <p class="tab-cap">Development is earned week by week. Set the focus, run the week, read the gains.</p>
         </div>
         <div class="tab-panel" id="t4">
-          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/playbooks-usage-target-shooters-efficiency.jpg" alt="Playbooks: usage, target shooters, efficiency" style="width:100%;display:block;" loading="lazy"</div></figure>
+          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/playbooks-usage-target-shooters-efficiency.jpg" alt="Playbooks: usage, target shooters, efficiency" style="width:100%;display:block;" loading="lazy"></div></figure>
           <p class="tab-cap">Install the sets, feed your shooters, and live with the numbers your calls produce.</p>
         </div>
       </div>
@@ -504,7 +511,7 @@
   <section class="section center" id="world">
     <div class="section-in">
       <div class="section-head">
-        <p class="eyebrow">The Climb</p>
+        <p class="eyebrow">The Journey</p>
         <h2>128 Programs. One Champion.</h2>
         <p class="section-sub">Battle a 26-week season across 16 conferences. Every season is a new chapter in your program's story.</p>
       </div>
@@ -516,10 +523,10 @@
       </div>
       <div class="grid-2">
         <figure class="shot">
-          <div class="shot-real"><img src="./images/homepage-v3/national-standings-across-the-conferences.jpg" alt="National standings across the conferences" style="width:100%;display:block;" loading="lazy"</div>
+          <div class="shot-real"><img src="./images/homepage-v3/national-standings-across-the-conferences.jpg" alt="National standings across the conferences" style="width:100%;display:block;" loading="lazy"></div>
         </figure>
         <figure class="shot">
-          <div class="shot-real"><img src="./images/homepage-v3/full-26-week-season-schedule-with.jpg" alt="Full 26-week season schedule with results and the Conference, Region, and National Tournament ladder" style="width:100%;display:block;" loading="lazy"</div>
+          <div class="shot-real"><img src="./images/homepage-v3/full-26-week-season-schedule-with.jpg" alt="Full 26-week season schedule with results and the Conference, Region, and National Tournament ladder" style="width:100%;display:block;" loading="lazy"></div>
         </figure>
       </div>
     </div>
@@ -555,14 +562,12 @@
         <h2>Real Coaches. Real Games. Right Now.</h2>
         <p class="section-sub">Climb the live leaderboards, measure your program against the field, and trade war stories in the Discord.</p>
       </div>
-      <div class="grid-main-side">
-        <figure class="shot">
-          <div class="shot-real"><img src="./images/homepage-v3/live-community-leaderboard-geek-points-standings.jpg" alt="Live community leaderboard: Geek Points standings and community highlights from real coaches" style="width:100%;display:block;" loading="lazy"</div>
-        </figure>
-        <div style="display:flex; flex-direction:column; gap:18px; justify-content:center; height:100%;">
-          <a class="btn-discord" style="align-self:flex-start;" href="https://discord.gg/mTXvY37p22" target="_blank" rel="noopener noreferrer">Join the Discord</a>
-          <a class="link-arrow" href="./mode-select.html">See Where You Rank &rarr;</a>
-        </div>
+      <figure class="shot">
+        <div class="shot-real"><img src="./images/homepage-v3/live-community-leaderboard-geek-points-standings.jpg" alt="Live community leaderboard: Geek Points standings and community highlights from real coaches" style="width:100%;display:block;" loading="lazy"></div>
+      </figure>
+      <div style="display:flex; align-items:center; gap:26px; margin-top:26px; flex-wrap:wrap;">
+        <a class="btn-discord" href="https://discord.gg/mTXvY37p22" target="_blank" rel="noopener noreferrer">Join the Discord</a>
+        <a class="link-arrow" href="./mode-select.html">See Where You Rank &rarr;</a>
       </div>
     </div>
   </section>
@@ -635,5 +640,22 @@
   onScroll();
 </script>
 
+
+<div class="lightbox" id="lightbox" role="dialog" aria-label="Enlarged screenshot"><img alt=""></div>
+<script>
+  (function () {
+    const lb = document.getElementById('lightbox');
+    const lbImg = lb.querySelector('img');
+    document.querySelectorAll('.shot-real img').forEach(img => {
+      img.addEventListener('click', () => {
+        lbImg.src = img.src; lbImg.alt = img.alt || '';
+        lb.classList.add('open'); document.body.style.overflow = 'hidden';
+      });
+    });
+    function close(){ lb.classList.remove('open'); document.body.style.overflow = ''; }
+    lb.addEventListener('click', close);
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+  })();
+</script>
 </body>
 </html>
