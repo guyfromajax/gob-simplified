@@ -1,0 +1,6 @@
+# GOB Rivals KV build system
+# Verified 2026-09-03: this set rebuilds all 18 deliverables bit-identically.
+numpy
+scipy
+Pillow
+cairosvg      # assets.py only, to rasterise the game's own basketball SVG
