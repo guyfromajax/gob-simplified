@@ -1,14 +1,639 @@
 <!DOCTYPE html>
+<!-- Homepage v3 (KV rebuild) - side-by-side candidate for homepage.html. Edit here, then run: npm run sync:homepage after promoting. -->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Redirecting…</title>
-  <meta http-equiv="refresh" content="0;url=./homepage.html">
-  <script>window.location.replace("./homepage.html");</script>
-  <link rel="stylesheet" href="/css/fonts.css">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Basketball Sim | Basketball Simulation Game — Geeked Out Basketball</title>
+  <meta name="description" content="The deep basketball management sim for hardcore sports sim fans. Build an elite high school program: recruit, train, install your system, and coach every possession live.">
+  <!-- Google Tag Manager -->
+  <script src="/js/shared/gtm-loader.js"></script>
+  <!-- End Google Tag Manager -->
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <link rel="stylesheet" href="/css/auth-bar.css">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  /* ============ GOB KV SYSTEM — committed dark, single world ============ */
+  :root{
+    --ink:#07080D;            /* page ground (KV base) */
+    --panel:#0C111E;          /* raised panel */
+    --panel-2:#0A0E19;        /* deep panel */
+    --navy:#27408E;           /* brand navy */
+    --navy-glow:#16224A;
+    --orange:#F79420;         /* CTA / accent — spent sparingly */
+    --text:#EEF1F7;
+    --muted:#98A2B8;
+    --hairline:rgba(238,241,247,.08);
+    --maxw:1140px;
+    --bebas:'Bebas Neue', 'Arial Narrow', Impact, sans-serif;
+    --inter:'Inter', -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background:var(--ink);
+    color:var(--text);
+    font-family:var(--inter);
+    font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  img{max-width:100%; display:block;}
+  a{color:var(--text); text-decoration:none;}
+  :focus-visible{outline:2px solid var(--orange); outline-offset:3px; border-radius:2px;}
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important;}
+    html{scroll-behavior:auto;}
+  }
+  /* Bebas renders caps natively; the transform guarantees the varsity look on any fallback */
+  .hero h1, .section h2, .final h2, .trust-cell h3, .shot-name, .tab-btn, .btn-primary, .nav-cta{
+    text-transform:uppercase;
+  }
+
+  /* ============ NAV ============ */
+  .nav{
+    position:fixed; top:0; left:0; right:0; z-index:50;
+    background:rgba(7,8,13,.82);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--hairline);
+  }
+  .nav-in{
+    max-width:var(--maxw); margin:0 auto; padding:0 24px;
+    height:64px; display:flex; align-items:center; gap:28px;
+  }
+  .nav-logo img{height:34px; width:auto;}
+  .nav-links{display:flex; gap:24px; margin-left:8px;}
+  .nav-links a{
+    font:600 12px/1 var(--inter); letter-spacing:.14em; text-transform:uppercase;
+    color:var(--muted); padding:8px 0; transition:color .15s;
+  }
+  .nav-links a:hover{color:var(--text);}
+  .nav-right{margin-left:auto; display:flex; align-items:center; gap:18px;}
+  .nav-auth{font:600 13px/1 var(--inter); color:var(--muted); transition:color .15s;}
+  .nav-auth:hover{color:var(--text);}
+  .nav-cta{
+    font:400 17px/1 var(--bebas); letter-spacing:.09em;
+    background:var(--orange); color:#131313;
+    padding:11px 20px 9px; border-radius:4px;
+    transition:transform .12s, box-shadow .12s;
+  }
+  .nav-cta:hover{transform:translateY(-1px); box-shadow:0 6px 18px rgba(247,148,32,.28);}
+  @media (max-width:860px){ .nav-links, .nav-auth{display:none;} }
+
+  /* ============ HERO ============ */
+  .hero{
+    position:relative;
+    min-height:min(92vh, 900px);
+    display:flex; align-items:center; justify-content:center;
+    background:
+      linear-gradient(180deg, rgba(7,8,13,.10) 55%, rgba(7,8,13,.92) 96%),
+      url('./images/homepage-v3/hero-page-background.jpg');
+    background-size:cover; background-position:center 18%;
+    padding:120px 24px 96px;
+    text-align:center;
+  }
+  .hero-in{max-width:760px; display:flex; flex-direction:column; align-items:center; gap:22px;}
+  .hero-logo{width:min(340px, 64vw); height:auto; filter:drop-shadow(0 10px 30px rgba(0,0,0,.55));}
+  .hero h1{
+    font:400 clamp(54px, 8.4vw, 104px)/0.98 var(--bebas);
+    letter-spacing:.015em; text-wrap:balance;
+    text-shadow:0 4px 34px rgba(0,0,0,.65);
+  }
+  .hero-sub{
+    font:500 clamp(15px, 1.6vw, 18px)/1.65 var(--inter);
+    color:#C9D1E2; max-width:600px; text-shadow:0 2px 16px rgba(0,0,0,.8);
+  }
+  .cta-row{display:flex; gap:14px; align-items:center; flex-wrap:wrap; justify-content:center; margin-top:6px;}
+  .btn-primary{
+    font:400 24px/1 var(--bebas); letter-spacing:.1em;
+    background:var(--orange); color:#131313;
+    padding:16px 34px 13px; border-radius:5px;
+    box-shadow:0 8px 30px rgba(247,148,32,.30);
+    transition:transform .12s, box-shadow .12s;
+  }
+  .btn-primary:hover{transform:translateY(-2px); box-shadow:0 12px 38px rgba(247,148,32,.42);}
+  .btn-ghost{
+    font:600 14px/1 var(--inter); letter-spacing:.02em;
+    color:var(--text); padding:15px 24px;
+    border:1px solid rgba(238,241,247,.28); border-radius:5px;
+    transition:border-color .15s, background .15s;
+  }
+  .btn-ghost:hover{border-color:rgba(238,241,247,.6); background:rgba(238,241,247,.05);}
+  .hero-micro{font:500 13px/1 var(--inter); color:var(--muted); letter-spacing:.02em;}
+  .hero-tertiary{font:600 13px/1 var(--inter); color:var(--muted); border-bottom:1px solid rgba(152,162,184,.4); padding-bottom:2px; transition:color .15s;}
+  .hero-tertiary:hover{color:var(--text);}
+
+  /* ============ SECTIONS ============ */
+  .section{padding:104px 24px;}
+  .section-alt{background:linear-gradient(180deg, var(--ink), #090C15 50%, var(--ink));}
+  .section-in{max-width:var(--maxw); margin:0 auto;}
+  .eyebrow{
+    font:700 11px/1 var(--inter); letter-spacing:.24em; text-transform:uppercase;
+    color:var(--orange); margin-bottom:14px;
+  }
+  .section h2{
+    font:400 clamp(38px, 4.6vw, 58px)/1.02 var(--bebas);
+    letter-spacing:.02em; text-wrap:balance; margin-bottom:16px;
+  }
+  .section-sub{font:400 16px/1.7 var(--inter); color:var(--muted); max-width:640px;}
+  .section-sub strong{color:var(--text); font-weight:600;}
+  .section-head{margin-bottom:44px;}
+  .center .section-head{text-align:center;}
+  .center .section-sub{margin:0 auto;}
+  .center .eyebrow{text-align:center;}
+
+  /* ============ SHOT PLACEHOLDER FRAMES ============ */
+  .shot{position:relative; width:100%;}
+  .shot-frame{
+    position:relative; aspect-ratio:16/10; width:100%;
+    background:linear-gradient(140deg, #0E1424 0%, #0A0E1A 60%, #0C1120 100%);
+    border:1px solid var(--hairline); border-radius:8px;
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+    overflow:hidden;
+    box-shadow:0 18px 50px rgba(0,0,0,.45), 0 0 0 1px rgba(39,64,142,.14) inset;
+  }
+  .shot-frame::before{ /* faint court center-circle */
+    content:""; position:absolute; inset:0;
+    background:
+      radial-gradient(circle at 50% 118%, transparent 34%, rgba(39,64,142,.35) 34.4%, transparent 34.9%),
+      linear-gradient(rgba(39,64,142,.25), rgba(39,64,142,.25)) 50% 100% / 1px 42%no-repeat;
+    opacity:.55; pointer-events:none;
+  }
+  .shot-frame::after{ /* corner ticks */
+    content:""; position:absolute; inset:14px; pointer-events:none;
+    background:
+      linear-gradient(var(--orange), var(--orange)) 0 0 / 16px 2px,
+      linear-gradient(var(--orange), var(--orange)) 0 0 / 2px 16px,
+      linear-gradient(var(--orange), var(--orange)) 100% 100% / 16px 2px,
+      linear-gradient(var(--orange), var(--orange)) 100% 100% / 2px 16px;
+    background-repeat:no-repeat; opacity:.5;
+  }
+  .shot-tag{
+    font:700 10px/1 var(--inter); letter-spacing:.26em; color:var(--orange);
+    border:1px solid rgba(247,148,32,.45); border-radius:3px; padding:6px 10px 5px;
+  }
+  .shot-name{font:400 26px/1 var(--bebas); letter-spacing:.05em; color:#D7DDEA;}
+  .shot-desc{font:500 12.5px/1.5 var(--inter); color:var(--muted); max-width:380px; text-align:center; padding:0 18px;}
+  .shot-real img{border-radius:8px; border:1px solid var(--hairline); box-shadow:0 18px 50px rgba(0,0,0,.45);}
+
+  .grid-2{display:grid; grid-template-columns:1fr 1fr; gap:26px; align-items:start;}
+  .grid-main-side{display:grid; grid-template-columns:1.7fr 1fr; gap:26px; align-items:start;}
+  @media (max-width:860px){ .grid-2, .grid-main-side{grid-template-columns:1fr;} }
+
+
+  /* ============ PLAYER DNA PANEL ============ */
+  .dna-panel{
+    position:relative; background:linear-gradient(150deg, #0E1424 0%, #0A0E1A 55%, #0C1120 100%);
+    border:1px solid var(--hairline); border-radius:8px; padding:18px 20px 6px;
+    box-shadow:0 18px 50px rgba(0,0,0,.45), 0 0 0 1px rgba(39,64,142,.14) inset;
+    overflow:hidden;
+  }
+  .dna-panel::before{
+    content:""; position:absolute; inset:0; pointer-events:none; opacity:.5;
+    background:radial-gradient(circle at 100% 0%, rgba(39,64,142,.30), transparent 55%);
+  }
+  .dna-head{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    padding-bottom:14px; border-bottom:1px solid var(--hairline);
+  }
+  .dna-eyebrow{font:700 11px/1 var(--inter); letter-spacing:.3em; color:var(--orange); text-transform:uppercase;}
+  .dna-player{font:500 11.5px/1 var(--inter); color:var(--muted);}
+  .dna-groups{display:grid; grid-template-columns:repeat(3, 1fr);}
+  @media (max-width:560px){ .dna-groups{grid-template-columns:repeat(2, 1fr);} }
+  .dna-cell{padding:13px 14px 11px; border-right:1px solid var(--hairline); border-bottom:1px solid var(--hairline);}
+  .dna-cell:nth-child(3n){border-right:none;}
+  .dna-cell:nth-child(n+4){border-bottom:none;}
+  @media (max-width:560px){
+    .dna-cell:nth-child(3n){border-right:1px solid var(--hairline);}
+    .dna-cell:nth-child(2n){border-right:none;}
+    .dna-cell:nth-child(n+4){border-bottom:1px solid var(--hairline);}
+    .dna-cell:nth-child(n+5){border-bottom:none;}
+  }
+  .dna-group-hed{
+    font:700 10px/1 var(--inter); letter-spacing:.24em; color:#8E99B4; text-transform:uppercase;
+    margin:0 0 9px;
+  }
+  .dna-row{display:flex; align-items:center; gap:8px; margin-bottom:6px;}
+  .dna-row:last-child{margin-bottom:0;}
+  .dna-abbr{
+    font:400 14px/1 var(--bebas); letter-spacing:.08em; color:var(--orange); text-transform:uppercase;
+    border:1px solid rgba(247,148,32,.45); border-radius:3px; padding:4px 0 2px; width:34px; text-align:center; flex:none;
+  }
+  .dna-name{font:600 11.5px/1.2 var(--inter); color:#C9D2E4; letter-spacing:.01em; white-space:nowrap;}
+
+  /* ============ §4 DNA / ATTRIBUTES ============ */
+  .dna-wrap{display:grid; grid-template-columns:1.1fr 1fr; gap:26px; align-items:start; margin-top:8px;}
+  @media (max-width:860px){ .dna-wrap{grid-template-columns:1fr;} }
+  .attr-strip{
+    margin-top:26px;
+    display:grid; grid-template-columns:repeat(6, 1fr); gap:10px;
+  }
+  @media (max-width:860px){ .attr-strip{grid-template-columns:repeat(3, 1fr);} }
+  @media (max-width:520px){ .attr-strip{grid-template-columns:repeat(2, 1fr);} }
+  .attr{
+    font:400 15px/1 var(--bebas); letter-spacing:.08em; color:#C4CCDC;
+    background:rgba(39,64,142,.16); border:1px solid rgba(39,64,142,.4);
+    border-radius:4px; padding:11px 8px 9px; text-align:center;
+  }
+
+  /* ============ §5 TABS ============ */
+  .tabs{margin-top:8px;}
+  .tab-list{display:flex; gap:6px; flex-wrap:wrap; border-bottom:1px solid var(--hairline); margin-bottom:26px;}
+  .tab-btn{
+    font:400 19px/1 var(--bebas); letter-spacing:.09em; color:var(--muted);
+    background:none; border:none; cursor:pointer;
+    padding:12px 18px 11px; border-bottom:2px solid transparent;
+    transition:color .15s, border-color .15s;
+  }
+  .tab-btn:hover{color:var(--text);}
+  .tab-btn.active{color:var(--text); border-bottom-color:var(--orange);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+  .tab-cap{font:500 13.5px/1.6 var(--inter); color:var(--muted); margin-top:14px; max-width:560px;}
+
+  /* ============ §6 SCOREBOARD STRIP ============ */
+  .board{
+    display:grid; grid-template-columns:repeat(4, 1fr); gap:14px;
+    margin:38px 0 44px;
+  }
+  @media (max-width:720px){ .board{grid-template-columns:repeat(2, 1fr);} }
+  .board-tile{
+    background:var(--panel-2); border:1px solid var(--hairline); border-radius:6px;
+    padding:22px 12px 18px; text-align:center;
+  }
+  .board-num{
+    font:400 46px/1 var(--bebas); color:var(--orange); letter-spacing:.02em;
+    font-variant-numeric:tabular-nums;
+  }
+  .board-lab{font:700 10.5px/1 var(--inter); letter-spacing:.22em; text-transform:uppercase; color:var(--muted); margin-top:8px;}
+
+  /* ============ §7 TRUST BAND ============ */
+  .trust{background:linear-gradient(180deg, #0A0F1D, #0B1122); border-top:1px solid var(--hairline); border-bottom:1px solid var(--hairline);}
+  .trust-grid{display:grid; grid-template-columns:1fr 1fr; gap:0;}
+  @media (max-width:860px){ .trust-grid{grid-template-columns:1fr;} }
+  .trust-cell{padding:56px 48px;}
+  .trust-cell + .trust-cell{border-left:1px solid var(--hairline);}
+  @media (max-width:860px){ .trust-cell + .trust-cell{border-left:none; border-top:1px solid var(--hairline);} }
+  .trust-cell h3{font:400 34px/1.05 var(--bebas); letter-spacing:.03em; margin:16px 0 12px;}
+  .trust-cell p{font:400 15px/1.7 var(--inter); color:var(--muted); max-width:440px;}
+  .trust-cell p strong{color:var(--text); font-weight:600;}
+  .trust-ico{width:40px; height:40px; color:var(--orange);}
+
+  /* ============ §8 COMMUNITY ============ */
+  .btn-discord{
+    font:600 14px/1 var(--inter);
+    background:#5865F2; color:#fff;
+    padding:15px 26px; border-radius:5px;
+    transition:transform .12s, box-shadow .12s;
+  }
+  .btn-discord:hover{transform:translateY(-1px); box-shadow:0 8px 24px rgba(88,101,242,.35);}
+  .link-arrow{font:600 14px/1 var(--inter); color:var(--orange); transition:opacity .15s;}
+  .link-arrow:hover{opacity:.8;}
+
+  /* ============ §9 FINAL CTA ============ */
+  .final{
+    position:relative;
+    background:
+      linear-gradient(180deg, rgba(7,8,13,.94) 0%, rgba(7,8,13,.55) 45%, rgba(7,8,13,.94) 100%),
+      url('./images/homepage-v3/final-cta-background.jpg');
+    background-size:cover; background-position:center 22%;
+    text-align:center; padding:130px 24px;
+  }
+  .final h2{font:400 clamp(44px, 5.6vw, 72px)/1 var(--bebas); letter-spacing:.02em; margin-bottom:14px; text-shadow:0 4px 30px rgba(0,0,0,.7);}
+  .final-micro{font:600 13px/1 var(--inter); letter-spacing:.2em; text-transform:uppercase; color:var(--orange); margin-bottom:30px;}
+
+  /* ============ FOOTER ============ */
+  .footer{border-top:1px solid var(--hairline); padding:44px 24px 56px;}
+  .footer-in{max-width:var(--maxw); margin:0 auto; display:flex; align-items:center; gap:26px; flex-wrap:wrap;}
+  .footer-logo img{height:30px; width:auto; opacity:.9;}
+  .footer-links{display:flex; gap:22px; flex-wrap:wrap;}
+  .footer-links a{font:500 13px/1 var(--inter); color:var(--muted); transition:color .15s;}
+  .footer-links a:hover{color:var(--text);}
+  .footer-right{margin-left:auto; display:flex; flex-direction:column; align-items:flex-end; gap:10px;}
+  .footer-note{font:500 11.5px/1.5 var(--inter); color:#5A6478;}
+  @media (max-width:720px){ .footer-right{margin-left:0; align-items:flex-start;} }
+</style>
 </head>
-<body>
-  <p><a href="./homepage.html">Continue to Geeked Out Basketball home</a></p>
+<body class="has-auth-bar">
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+
+
+
+<!-- NAV (production auth bar - preserves login state, GTM, tutorials link) -->
+<div id="auth-bar" class="auth-bar gob-hp-nav">
+  <div class="auth-bar-left">
+    <a href="/homepage.html" class="logo-link">
+      <img src="./images/geekedout_logo.png" alt="Geeked-Out Basketball" class="logo">
+    </a>
+    <a href="/tutorial.html" class="nav-tutorials-link" aria-label="Tutorials">
+      <svg class="nav-tutorials-icon" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+        <circle cx="7" cy="7" r="6" stroke="currentColor" stroke-width="1.25"/>
+        <path d="M5.6 4.8 L9.4 7 L5.6 9.2 Z" fill="currentColor"/>
+      </svg>
+      <span class="nav-tutorials-label">Tutorials</span>
+    </a>
+  </div>
+  <img id="alpha-badge" class="alpha-badge visible" src="/images/alpha_badge_gold.png" alt="Alpha">
+  <div class="auth-bar-right">
+    <a href="./mode-select.html" class="nav-cta" id="nav-cta" aria-label="Play The Alpha">Play The Alpha</a>
+    <a href="https://www.youtube.com/@geeked-outbasketball765" target="_blank" rel="noopener noreferrer" class="nav-icon nav-icon-yt" aria-label="GOB on YouTube">
+      <img src="/images/yt_icon_red_digital.png" alt="" width="24" height="24">
+    </a>
+    <a href="https://x.com/geekedoutbball" target="_blank" rel="noopener noreferrer" class="nav-icon" aria-label="GOB on X">
+      <svg viewBox="0 0 24 24" aria-hidden="true" width="18" height="18"><path fill="currentColor" d="M18.901 1.153h3.68l-8.04 9.19L24 22.846h-7.406l-5.8-7.584-6.638 7.584H.474l8.6-9.83L0 1.154h7.594l5.243 6.932ZM17.61 20.644h2.039L6.486 3.24H4.298Z"/></svg>
+    </a>
+    <div id="auth-logged-out" class="auth-status">
+      <a href="/login.html" class="auth-link">Log In</a>
+      <span class="auth-divider">|</span>
+      <a href="/signup.html" class="auth-link">Sign Up</a>
+    </div>
+    <div id="auth-logged-in" class="auth-status" style="display:none;">
+      <span id="auth-user-email" class="auth-email"></span>
+      <button type="button" id="logout-btn" class="auth-logout-btn">Log Out</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== HERO ==================== -->
+<header class="hero" id="top">
+  <div class="hero-in">
+    <img class="hero-logo" src="./images/homepage-v3/hero-logo.png" alt="Geeked-Out Basketball">
+    <h1>Build Your Blue Blood Program</h1>
+    <p class="hero-sub">The deep basketball management sim for the fans mainstream games left behind. Recruit your roster, install your system, and coach every possession — live.</p>
+    <div class="cta-row">
+      <a class="btn-primary" id="hero-cta" href="./mode-select.html">Play the Alpha</a>
+      <a class="btn-ghost" href="https://store.steampowered.com/app/5148870/GeekedOut_Basketball/">Wishlist on Steam</a>
+    </div>
+    <p class="hero-micro">No download required.</p>
+    <a class="hero-tertiary" href="https://discord.gg/mTXvY37p22" target="_blank" rel="noopener noreferrer">Join the Discord</a>
+  </div>
+</header>
+
+<main>
+  <!-- ==================== §2 LIVE GAMEPLAY ==================== -->
+  <section class="section" id="gameplay">
+    <div class="section-in">
+      <div class="section-head">
+        <p class="eyebrow">Live Gameplay</p>
+        <h2>Coach Every Possession. Live.</h2>
+        <p class="section-sub">Call plays and adjust in real time, possession by possession — or hand it to your staff and sim the game broadcast-style, box scores and momentum included.</p>
+      </div>
+      <div class="grid-main-side">
+        <figure class="shot">
+          <div class="shot-real"><img src="./images/homepage-v3/live-coaching-tied-53-53-in.jpg" alt="Live coaching: tied 53-53 in the fourth quarter, Pick and Roll Entry Pass called with a +99 percent edge" style="width:100%;display:block;" loading="lazy"</div>
+        </figure>
+        <figure class="shot">
+          <div class="shot-real"><img src="./images/homepage-v3/broadcast-style-sim-full-game-lead.jpg" alt="Broadcast-style sim: full-game lead margin worm, live box scores, team stats" style="width:100%;display:block;" loading="lazy"</div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== §3 DEPTH ==================== -->
+  <section class="section section-alt" id="depth">
+    <div class="section-in">
+      <div class="section-head">
+        <p class="eyebrow">The Numbers</p>
+        <h2>Depth You Can Actually See.</h2>
+        <p class="section-sub">Built for people who love box scores, trends, and the edge hidden in the numbers. Everything that matters, one glance away.</p>
+      </div>
+      <div class="grid-2">
+        <figure class="shot">
+          <div class="shot-real"><img src="./images/homepage-v3/national-stat-leaders-points-three-pointers.jpg" alt="National stat leaders: points, three pointers made, assists, and blocks leaderboards" style="width:100%;display:block;" loading="lazy"</div>
+        </figure>
+        <figure class="shot">
+          <div class="shot-real"><img src="./images/homepage-v3/team-roster-player-stats-full-season.jpg" alt="Team roster player stats: full-season statistics across 22 columns" style="width:100%;display:block;" loading="lazy"</div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== §4 ROSTER / DNA ==================== -->
+  <section class="section" id="roster">
+    <div class="section-in">
+      <div class="section-head">
+        <p class="eyebrow">Recruit &amp; Develop</p>
+        <h2>Build Your Roster To Fit Your System.</h2>
+        <p class="section-sub">Scout, recruit, and develop players across 12 measurable attributes. <strong>You build your teams. You don't buy them.</strong></p>
+      </div>
+      <div class="dna-wrap">
+        <figure class="shot">
+          <div class="dna-panel">
+            <div class="dna-head"><span class="dna-eyebrow">Player DNA</span><span class="dna-player">12 measurable attributes</span></div>
+            <div class="dna-groups">
+            <div class="dna-cell">
+              <p class="dna-group-hed">Offense</p>
+              <div class="dna-row"><span class="dna-abbr">SC</span><span class="dna-name">Scoring</span></div>
+              <div class="dna-row"><span class="dna-abbr">SH</span><span class="dna-name">Shooting</span></div>
+            </div>
+            <div class="dna-cell">
+              <p class="dna-group-hed">Defense</p>
+              <div class="dna-row"><span class="dna-abbr">ID</span><span class="dna-name">Inside Defense</span></div>
+              <div class="dna-row"><span class="dna-abbr">OD</span><span class="dna-name">Outside Defense</span></div>
+            </div>
+            <div class="dna-cell">
+              <p class="dna-group-hed">Skills</p>
+              <div class="dna-row"><span class="dna-abbr">PS</span><span class="dna-name">Passing</span></div>
+              <div class="dna-row"><span class="dna-abbr">BH</span><span class="dna-name">Ball Handling</span></div>
+            </div>
+            <div class="dna-cell">
+              <p class="dna-group-hed">Grit</p>
+              <div class="dna-row"><span class="dna-abbr">RB</span><span class="dna-name">Rebounding</span></div>
+              <div class="dna-row"><span class="dna-abbr">ST</span><span class="dna-name">Strength</span></div>
+            </div>
+            <div class="dna-cell">
+              <p class="dna-group-hed">Body</p>
+              <div class="dna-row"><span class="dna-abbr">AG</span><span class="dna-name">Agility</span></div>
+              <div class="dna-row"><span class="dna-abbr">ND</span><span class="dna-name">Endurance</span></div>
+            </div>
+            <div class="dna-cell">
+              <p class="dna-group-hed">Mind</p>
+              <div class="dna-row"><span class="dna-abbr">IQ</span><span class="dna-name">Basketball IQ</span></div>
+              <div class="dna-row"><span class="dna-abbr">FT</span><span class="dna-name">Free Throws</span></div>
+            </div>
+            </div>
+          </div>
+          </figure>
+        <figure class="shot">
+          <div class="shot-real"><img src="./images/homepage-v3/player-detail-12-measurable-attributes-and.jpg" alt="Player detail: 12 measurable attributes and scouting report" style="width:100%;display:block;" loading="lazy"</div>
+        </figure>
+      </div>
+      <figure class="shot" style="margin-top:26px;">
+        <div class="shot-real"><img src="./images/homepage-v3/recruiting-hub-watchlist-with-star-tiers.jpg" alt="Recruiting Hub: watchlist with star tiers, full attribute grids, and live lean chips across a 450-player recruit pool" style="width:100%;display:block;" loading="lazy"</div>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ==================== §5 THE PROGRAM (TABS) ==================== -->
+  <section class="section section-alt" id="program">
+    <div class="section-in">
+      <div class="section-head">
+        <p class="eyebrow">The Program</p>
+        <h2>Every Job In The Building Is Yours.</h2>
+        <p class="section-sub">Recruiting, training, game plans, playbooks. Run it all from the Command Center.</p>
+      </div>
+      <div class="tabs">
+        <div class="tab-list" role="tablist">
+          <button class="tab-btn active" role="tab" data-tab="t1">Command Center</button>
+          <button class="tab-btn" role="tab" data-tab="t2">Team Measures</button>
+          <button class="tab-btn" role="tab" data-tab="t3">Training</button>
+          <button class="tab-btn" role="tab" data-tab="t4">Playbooks</button>
+        </div>
+        <div class="tab-panel active" id="t1">
+          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/franchise-command-center-chemistry-next-game.jpg" alt="Franchise Command Center: chemistry, next game, recruiting feed, rankings, leaders, news" style="width:100%;display:block;" loading="lazy"</div></figure>
+          <p class="tab-cap">Your program's front office: everything that needs a decision, surfaced in one place.</p>
+        </div>
+        <div class="tab-panel" id="t2">
+          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/team-measures-eight-dimension-program-radar.jpg" alt="Team Measures: eight-dimension program radar" style="width:100%;display:block;" loading="lazy"</div></figure>
+          <p class="tab-cap">Watch your identity take shape as training and recruiting bend the profile toward your system.</p>
+        </div>
+        <div class="tab-panel" id="t3">
+          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/weekly-training-report-practice-player-of.jpg" alt="Weekly Training Report: practice player of the week, regressions, locker room influence, and per-player attribute changes" style="width:100%;display:block;" loading="lazy"</div></figure>
+          <p class="tab-cap">Development is earned week by week. Set the focus, run the week, read the gains.</p>
+        </div>
+        <div class="tab-panel" id="t4">
+          <figure class="shot"><div class="shot-real"><img src="./images/homepage-v3/playbooks-usage-target-shooters-efficiency.jpg" alt="Playbooks: usage, target shooters, efficiency" style="width:100%;display:block;" loading="lazy"</div></figure>
+          <p class="tab-cap">Install the sets, feed your shooters, and live with the numbers your calls produce.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== §6 THE WORLD ==================== -->
+  <section class="section center" id="world">
+    <div class="section-in">
+      <div class="section-head">
+        <p class="eyebrow">The Climb</p>
+        <h2>128 Programs. One Champion.</h2>
+        <p class="section-sub">Battle a 26-week season across 16 conferences. Every season is a new chapter in your program's story.</p>
+      </div>
+      <div class="board">
+        <div class="board-tile"><div class="board-num">128</div><div class="board-lab">Programs</div></div>
+        <div class="board-tile"><div class="board-num">16</div><div class="board-lab">Conferences</div></div>
+        <div class="board-tile"><div class="board-num">26</div><div class="board-lab">Week Season</div></div>
+        <div class="board-tile"><div class="board-num">1</div><div class="board-lab">Champion</div></div>
+      </div>
+      <div class="grid-2">
+        <figure class="shot">
+          <div class="shot-real"><img src="./images/homepage-v3/national-standings-across-the-conferences.jpg" alt="National standings across the conferences" style="width:100%;display:block;" loading="lazy"</div>
+        </figure>
+        <figure class="shot">
+          <div class="shot-real"><img src="./images/homepage-v3/full-26-week-season-schedule-with.jpg" alt="Full 26-week season schedule with results and the Conference, Region, and National Tournament ladder" style="width:100%;display:block;" loading="lazy"</div>
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== §7 TRUST BAND ==================== -->
+  <section class="trust">
+    <div class="section-in trust-grid">
+      <div class="trust-cell">
+        <svg class="trust-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <path d="M12 2l8 3.5v5.6c0 5-3.4 8.6-8 10.9-4.6-2.3-8-5.9-8-10.9V5.5L12 2z"/>
+          <path d="M8.5 12l2.4 2.4 4.6-4.8"/>
+        </svg>
+        <h3>Win On Skill Alone</h3>
+        <p>No pay-to-win. Ever. <strong>You outcoach your opponent. You don't outspend them.</strong></p>
+      </div>
+      <div class="trust-cell">
+        <svg class="trust-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <rect x="3.2" y="7" width="17.6" height="13" rx="1.5"/>
+          <path d="M8 7V5.2A1.8 1.8 0 0 1 9.8 3.4h4.4A1.8 1.8 0 0 1 16 5.2V7M3.2 12h17.6"/>
+        </svg>
+        <h3>Own It With One Purchase</h3>
+        <p>The complete single-player franchise, offline forever. Recruit packs are optional and cosmetic. <strong>Nothing you buy makes your team better.</strong></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== §8 COMMUNITY ==================== -->
+  <section class="section" id="community">
+    <div class="section-in">
+      <div class="section-head">
+        <p class="eyebrow">Community</p>
+        <h2>Real Coaches. Real Games. Right Now.</h2>
+        <p class="section-sub">Climb the live leaderboards, measure your program against the field, and trade war stories in the Discord.</p>
+      </div>
+      <div class="grid-main-side">
+        <figure class="shot">
+          <div class="shot-real"><img src="./images/homepage-v3/live-community-leaderboard-geek-points-standings.jpg" alt="Live community leaderboard: Geek Points standings and community highlights from real coaches" style="width:100%;display:block;" loading="lazy"</div>
+        </figure>
+        <div style="display:flex; flex-direction:column; gap:18px; justify-content:center; height:100%;">
+          <a class="btn-discord" style="align-self:flex-start;" href="https://discord.gg/mTXvY37p22" target="_blank" rel="noopener noreferrer">Join the Discord</a>
+          <a class="link-arrow" href="./mode-select.html">See Where You Rank &rarr;</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ==================== §9 FINAL CTA ==================== -->
+  <section class="final">
+    <h2>Ready To Build Your Program?</h2>
+    <p class="final-micro">Win on skill alone.</p>
+    <div class="cta-row">
+      <a class="btn-primary" href="./mode-select.html">Play the Alpha</a>
+      <a class="btn-ghost" href="https://store.steampowered.com/app/5148870/GeekedOut_Basketball/">Wishlist on Steam</a>
+    </div>
+  </section>
+</main>
+
+<!-- ==================== FOOTER ==================== -->
+<footer class="footer">
+  <div class="footer-in">
+    <a class="footer-logo" href="#top"><img src="./images/homepage-v3/geeked-out-basketball-2.png" alt="Geeked-Out Basketball"</a>
+    <div class="footer-links">
+      <a href="./faqs.html">FAQs</a>
+      <a href="./privacy">Privacy</a>
+      <a href="./terms">Terms</a>
+      <a href="https://store.steampowered.com/app/5148870/GeekedOut_Basketball/">Steam</a>
+      <a href="https://discord.gg/mTXvY37p22" target="_blank" rel="noopener noreferrer">Discord</a>
+      <a href="https://www.youtube.com/@geeked-outbasketball765">YouTube</a>
+      <a href="https://x.com/geekedoutbball">X</a>
+    </div>
+    <div class="footer-right">
+      <span class="footer-note">&copy; Geeked-Out Basketball</span>
+      <span class="footer-note">Design prototype &middot; placeholder frames await final captures</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Tabs
+  document.querySelectorAll('.tab-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+      btn.classList.add('active');
+      var panel = document.getElementById(btn.dataset.tab);
+      if(panel){ panel.classList.add('active'); }
+    });
+  });
+</script>
+
+<script>
+  /* Sticky nav + auth-aware logo (mirrors homepage.html) */
+  const nav = document.getElementById('auth-bar');
+  const heroCta = document.getElementById('hero-cta');
+  const navCta = document.getElementById('nav-cta');
+  let heroBottom = 0;
+  function updateLogoDestination() {
+    let isLoggedIn = false;
+    try { isLoggedIn = !!(localStorage.getItem('auth_token') && localStorage.getItem('auth_user')); } catch (e) {}
+    document.querySelectorAll('.logo-link').forEach(link => { link.href = isLoggedIn ? '/mode-select.html' : '/homepage.html'; });
+  }
+  updateLogoDestination();
+  function measure() { if (heroCta) heroBottom = heroCta.getBoundingClientRect().bottom + window.scrollY; }
+  function onScroll() {
+    const y = window.scrollY;
+    nav?.classList.toggle('nav-scrolled', y > 20);
+    navCta?.classList.toggle('nav-cta-visible', y > heroBottom);
+  }
+  measure();
+  window.addEventListener('resize', measure, { passive: true });
+  window.addEventListener('scroll', onScroll, { passive: true });
+  onScroll();
+</script>
+
 </body>
 </html>

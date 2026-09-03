@@ -2283,6 +2283,32 @@ class TurnManager:
                 else:
                     result["animations"] = []  # No animation possible (e.g., free throw or turnover with no roles)
 
+        # Diagnostic: a shot leaving this gate with no animation_steps is the
+        # live hole behind bugs.md #5 (legacy shot handler / silent skip).
+        # Do not paper over it — name the family so the next occurrence can
+        # be migrated. Delete once that emit is fixed.
+        result_type_for_schema = (result.get("result_type") or "").upper()
+        if result_type_for_schema in ("MAKE", "MISS", "BLOCK") and not has_animation_steps:
+            _anims = result.get("animations")
+            _skeleton = result.get("skeleton") or {}
+            _roles = result.get("roles")
+            logging.warning(
+                "[SHOT-NO-SCHEMA] shot left turn_manager gate with no animation_steps "
+                "result_type=%s current_turn=%s fast_break=%s fast_break_play=%s "
+                "final_turn=%s flss=%s skeleton_steps=%s has_roles=%s "
+                "animations_type=%s animations_len=%s",
+                result.get("result_type"),
+                result.get("current_turn"),
+                result.get("fast_break"),
+                result.get("fast_break_play"),
+                bool(result.get("final_turn")),
+                bool(result.get("flss")),
+                len(_skeleton.get("steps") or []) if isinstance(_skeleton, dict) else 0,
+                bool(_roles),
+                type(_anims).__name__ if _anims is not None else "absent",
+                len(_anims) if isinstance(_anims, list) else None,
+            )
+
         # Universal schema finalization: any qualifying dead-ball turnover with
         # animation_steps gets the same fumble beat before the terminal turn_stop.
         # Emitter-local calls remain valid; the helper is idempotent.

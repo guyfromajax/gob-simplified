@@ -1,5 +1,43 @@
+##Marketing
+1. Homepage redesign
+2. Update GM Games page
+
+
+##Monetization
+1. Wire Stripe into site
+2. Founder's Edition monetization plan
+
+
+##App Build
+1. Downloadable game vs Live game dynamics
+2. Steam submission for review
+
+
+##Brand/Product
+1. UI Design upgrade, what is this game's personality?
+2. UX upgrade -- particularly around tabs and scrolling and back buttons (relative to browser back button), load screens
+
+
+##Features
+1. PvP sim -- playtest post-launch / immediate parallel task
+2. College and Pro setup
+3. Team Mod System
+
+
+##Animation
+1. Evolve animation from annoying to rewarding
+
+
+##Operations
+1. Test update system
+2. Dashboard
+3. Verify recruit/walk-on painting retention
+4. Add alpha badge and Feedback button back to live while delineating from production
+
+
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
+2. Still missing EOQ perfection
 5. Legacy shot handler crashes on turns with no animations[] (`ShotAnimationSystem.runSetupTween`)
    - Symptom: `TypeError: turnData.animations is not iterable`. Caught by `processShot`, so no crash,
      but that shot silently does not animate (possession appears to skip its shot).
@@ -14,18 +52,69 @@
    - Related: `ShotAnimationSystem.js` guards `turnData.animations` inconsistently (guarded at 295/479/486,
      bare at 352/455/572/666). Sites 572/666 remain unguarded on the final_turn-skips-setup path.
    - Pre-existing; unrelated to the animation cleanup pass.
-
-
-##Playtest Launch / In Progress
-1. Steam Video
------
-2. PvP sim -- playtest post-launch / immediate parallel task
-3. Downloadable game vs Live game dynamics
-4. College and Pro setup
-5. UX upgrade -- particularly around tabs and scrolling and back buttons (relative to browser back button), load screens
-6. UI Design upgrade, what is this game's personality?
-7. Wire Stripe into site
-8. Evolve animation from annoying to rewarding
+6. Practice squad assignment sits on the green pulse modal until refresh (found 2026-09-03)
+   - Symptom: Confirm on `cut-players.html` in assignment mode (week 1) swaps in the "Assigning
+     Practice Squad" pulse and never leaves it. A refresh shows the assignment was in fact saved.
+     Seen on a new franchise instance for an existing user.
+   - NOT an error. Every failure path in `cut-players.js` (`!res.ok`, `res.json()` reject, network
+     reject) lands in the `.catch` and swaps the pulse for "Assignment Failed". The pulse was still
+     up, so the `fetch` never settled — this is a wait, not a throw.
+   - The wait is UNBOUNDED, which is the actual defect. `submitCuts()` (cut-players.js 280-304)
+     replaces the confirm modal with a terminal, action-less pulse and hands the remaining UX to one
+     `fetch` plus `window.location.href = buildFccUrl()`. No timeout, no progress, no fallback, so
+     latency anywhere in the chain is indistinguishable from a freeze. The browser also keeps the
+     cut-players document (and its pulse) on screen until the FCC document commits, so the FCC's own
+     load time sits inside the same unbounded window.
+   - Two heavy workloads run synchronously inside `POST /franchise/cut-players` (franchise_routes.py
+     15262). This is the ONLY place week-1 PS init happens for a user who owes cuts — CPU training
+     defers it (`defer_if_user_cut_pending=True`, 15892) and this endpoint owns it (`False`, 15379):
+     (a) `initialize_practice_squad` (practice_squad/manager.py 248) does four UNPROJECTED
+     franchise-wide reads — every FTD, every FPD, every recruit — plus two full `db.teams` scans
+     (`_build_region_team_map`, and `_format_team_name_map` → `resolve_team_name_map` with no
+     `team_ids`), builds 48 rosters and a 336-game schedule, then `$set`s the whole `practice_squad`
+     blob AND the entire `season_news` array back onto the franchise doc.
+     (b) The walk-on portrait warm at 15362 — the only `warm=True` call site in the repo. Per
+     surviving walk-on `_warm_walk_on_masters` does 3 `head_object` + 2 `get_object` + a PIL recolor
+     composite + 1 `put_object` against R2, serialized. `r2_images._s3()` builds its boto3 client
+     with NO timeout config, so botocore defaults apply (60s connect / 60s read, legacy retries up to
+     5 attempts) — one unlucky R2 call parks the request for minutes.
+   - (b) is a latency regression, not longstanding: it only started doing work in `a1bb6cea0`
+     (2026-08-13, "Stop truth-testing pymongo Collections (walk-on warm never ran)"). Before that
+     fix `_warm_walk_on_masters` threw on `not teams_collection` and the caller swallowed it, so warm
+     cost was zero. The pulse modal landed one day later in `2841525c5` — it was papering over a wait
+     that had just become far more expensive.
+   - Retry trap: the roster commit (`_update_ftd_roster_state`, ~15325) lands BEFORE the slow work,
+     so a user who gives up and retries hits `cut_required == false` → 400 → "Assignment Failed",
+     making a succeeded first attempt look like a hard failure.
+   - The older failure mode here is genuinely closed and must not be re-fixed: after the roster
+     commit both remaining blocks are wrapped in `except Exception`, so this endpoint can no longer
+     500 post-commit (that was `2841525c5`).
+   - Fix, in three parts. A and B are unconditional; C1 is unconditional hygiene; size C2 from a
+     measurement (DevTools TTFB on the POST vs. the following `franchise-command-center.html`
+     request — that is the only thing distinguishing "slow POST" from "slow FCC navigation").
+     - A. Bound the client wait. The pulse must never be a terminal state: drive the `fetch` with an
+       `AbortController` + timeout. On timeout do NOT show "Assignment Failed" (the commit may have
+       landed) — re-read `/franchise/command-center/data` and navigate to the FCC when `cut_required`
+       is false, otherwise offer an explicit retry.
+     - B. Make the POST idempotent so a timeout or refresh resolves cleanly. When `cut_required` is
+       false, if the requested ids are already in `training_squad_players` and the active roster is
+       12, return the normal success payload instead of 400. This is what actually kills the retry
+       trap; A alone only hides it.
+     - C1. Give `r2_images._s3()` a botocore `Config` with explicit `connect_timeout` / `read_timeout`
+       and `retries={"max_attempts": 2, "mode": "standard"}`, so no single R2 op can park a request
+       for minutes. Then drop `warm=True` at 15362 rather than optimizing it — portraits already
+       paint lazily via `ensure_player_image`, which is exactly what CPU teams rely on (`warm=False`,
+       12925). The eager warm buys nothing a user can perceive and it is the least bounded work in
+       the request.
+     - C2. Project the `initialize_practice_squad` reads. It only needs `team_id` +
+       `training_squad_players` from FTD, and `player_id` / `meta` / `position_ratings` /
+       `attributes` from FPD (see `gather_region_pool`, `_fpd_pool_entry`, `_frd_pool_entry`) — it
+       currently pulls entire documents for ~128 teams' worth of players. Pass `team_ids` to
+       `resolve_team_name_map` to scope one of the two `db.teams` scans, and stop rewriting the whole
+       `season_news` array on a write whose point is `practice_squad`.
+   - Do NOT "fix" this by widening the pulse into a spinner-with-message or by adding a retry button
+     alone. The bug is that the client has no bounded outcome and the request carries work it should
+     not; a friendlier wait screen leaves both intact.
 
 
 ##Full Product Perfection
@@ -55,10 +144,6 @@
 4. Monetization plan
 5. Players as Characters
 
-##Player Images
-1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
-
-
 
 <!--
 SEARCH TAG: [CODE-CLEANUP]
@@ -69,6 +154,9 @@ This includes items in this file (Future Cleanup, P0, Fast Break backlog, FB tes
 inline notes left in individual system docs. (Sunset-mode code removal also carries its own
 "SUNSET MODE" tag inside the docs that describe those paths, and is cross-linked from here.)
 -->
+
+##Player Images
+1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
 ## Stale FB test suite — open follow-up [CODE-CLEANUP]
 
