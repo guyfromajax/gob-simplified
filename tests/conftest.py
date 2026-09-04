@@ -75,20 +75,19 @@ def override_auth_for_tests():
 
 
 @pytest.fixture(autouse=True)
-def seed_canonical_teams_for_mongomock():
-    """Mongomock starts empty; API tests need teams.name → team_id for summarize_game_state keys."""
-    from BackEnd.db import teams_collection
+def seed_canonical_teams_for_mongomock(request):
+    """Mongomock starts empty; API tests need teams.name → team_id for summarize_game_state
+    keys, and anything that tips off needs five eligible bodies to seat or
+    ``build_lineup_from_mongo`` raises. See tests/roster_fixtures.py, which also documents
+    the one module that must keep an empty roster.
+    """
+    from BackEnd.db import players_collection, teams_collection
 
-    for name, team_id in (
-        ("Morristown", "MORRISTOWN"),
-        ("Lancaster", "LANCASTER"),
-        ("Bentley-Truman", "BENTLEY_TRUMAN"),
-    ):
-        teams_collection.update_one(
-            {"name": name},
-            {"$set": {"name": name, "team_id": team_id}},
-            upsert=True,
-        )
+    from tests.roster_fixtures import seed_universal_rosters
+
+    seed_universal_rosters(
+        teams_collection, players_collection, module_name=request.path.stem
+    )
     yield
 
 
