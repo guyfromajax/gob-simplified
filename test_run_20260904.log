@@ -1,0 +1,564 @@
+........................................................................ [  3%]
+........................................................................ [  6%]
+...................F.................................................... [  9%]
+........................................................................ [ 12%]
+......................F............s.................................... [ 15%]
+........................................................................ [ 18%]
+........................................................................ [ 21%]
+........................................................................ [ 24%]
+........................................................................ [ 27%]
+........................................................................ [ 30%]
+........................................................................ [ 33%]
+........................................................................ [ 36%]
+........................................................................ [ 39%]
+........................................................................ [ 42%]
+...........................................................FFFx......... [ 45%]
+........................................................................ [ 48%]
+........FF.FF.........................................................F. [ 51%]
+.......................FF.........F...........FF.FF..................... [ 54%]
+..........FF.F..FFF..................................F.................. [ 57%]
+......F.........FFFF............FF..................FF.................. [ 60%]
+..................................FFF........FF....F...F......F..F...... [ 64%]
+............F....................FF..FF.....FF.FF....................... [ 67%]
+..............FFFFFFFFFFFF...........FFFF............................... [ 70%]
+........................................................................ [ 73%]
+.......F.....F........FFFFF............................................. [ 76%]
+...........................................FF.......F.F................. [ 79%]
+......................sFss..F........................................... [ 82%]
+............FF..FFF...............FFFFFF........F.............F......... [ 85%]
+............................F................F...F....F...F............. [ 88%]
+......FF.F...FF....F.FFFF.F.FF.F....FF.......F..............sF.....FF... [ 91%]
+........FF.F................................F.F......................... [ 94%]
+............F........................................................... [ 97%]
+...............s.................................F.FF....                [100%]
+=================================== FAILURES ===================================
+/Users/jamesdavies/gob-simplified/tests/test_core_simulation.py:31: AssertionError: assert 'DEFENSIVE_STOP' in {'DEAD BALL', 'FOUL', 'MAKE', 'MISS', 'TURNOVER'}
+/Users/jamesdavies/gob-simplified/tests/test_env_static_safety.py:15: AssertionError: assert [Violation(pa...Client'), ...] == []
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py:577: subprocess.CalledProcessError: Command '['node', '--loader', '/Users/jamesdavies/gob-simplified/tests/js/httpsLoaderNoStubBall.mjs', '/Users/jamesdavies/gob-simplified/tests/js/runFreeThrowSequence.mjs']' returned non-zero exit status 1.
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py:577: subprocess.CalledProcessError: Command '['node', '--loader', '/Users/jamesdavies/gob-simplified/tests/js/httpsLoaderNoStubBall.mjs', '/Users/jamesdavies/gob-simplified/tests/js/runFreeThrowSequence.mjs']' returned non-zero exit status 1.
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py:577: subprocess.CalledProcessError: Command '['node', '--loader', '/Users/jamesdavies/gob-simplified/tests/js/httpsLoaderNoStubBall.mjs', '/Users/jamesdavies/gob-simplified/tests/js/runFreeThrowHalftime.mjs']' returned non-zero exit status 1.
+/Users/jamesdavies/gob-simplified/tests/test_init_franchise_player_stats.py:50: AssertionError: assert {'3PTA': 0, '...'BLK': 0, ...} == {'3PTA': 0, '...'BLK': 0, ...}
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Bentley-Truman' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/tests/test_load_franchise_names.py:26: Failed: DID NOT RAISE <class 'FileNotFoundError'>
+/Users/jamesdavies/gob-simplified/tests/test_load_franchise_names.py:36: Failed: DID NOT RAISE <class 'ValueError'>
+/Users/jamesdavies/gob-simplified/tests/test_mode_init_system.py:23: AssertionError: discipline=-2 not in [-1, 1]
+/Users/jamesdavies/gob-simplified/tests/test_motion_dynamic_resolver.py:233: AssertionError: assert 9 == 4
+/Users/jamesdavies/gob-simplified/tests/test_motion_dynamic_resolver.py:259: KeyError: 'location'
+/Users/jamesdavies/gob-simplified/BackEnd/engine/phase_resolution.py:6820: TypeError: _arm_gamble_miss.<locals>.fake_contest() got an unexpected keyword argument 'game'
+/Users/jamesdavies/gob-simplified/tests/test_motion_moment.py:69: AssertionError: assert None == 'DEAD_BALL_TURNOVER'
+/Users/jamesdavies/gob-simplified/tests/test_motion_moment.py:75: AssertionError: assert None == 'O_FOUL'
+/Users/jamesdavies/gob-simplified/tests/test_motion_moment.py:96: AssertionError: assert [] == [(1, 'd_pg'), (2, 'd_pg')]
+/Users/jamesdavies/gob-simplified/tests/test_motion_moment.py:105: AssertionError: assert None == 'STEAL'
+/Users/jamesdavies/gob-simplified/tests/test_motion_should_shoot.py:43: AssertionError: assert 'outside' == 'attack'
+/Users/jamesdavies/gob-simplified/tests/test_motion_should_shoot.py:55: AttributeError: module 'BackEnd.engine.motion_step_decision' has no attribute 'SHOOT_THRESHOLD_BASE'
+/Users/jamesdavies/gob-simplified/tests/test_motion_should_shoot.py:83: assert (None)
+/Users/jamesdavies/gob-simplified/BackEnd/engine/motion_step_decision.py:511: AttributeError: 'Rng' object has no attribute 'choice'
+/Users/jamesdavies/gob-simplified/tests/test_motion_should_shoot.py:103: assert (None)
+/Users/jamesdavies/gob-simplified/tests/test_motion_should_shoot.py:112: assert (None)
+/Users/jamesdavies/gob-simplified/tests/test_motion_subtle_defense.py:54: AssertionError: assert False is True
+/Users/jamesdavies/gob-simplified/tests/test_opening_tip.py:95: assert 10 == 9
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/Users/jamesdavies/gob-simplified/tests/test_over_and_back.py:95: AssertionError: assert not True
+/Users/jamesdavies/gob-simplified/tests/test_over_and_back.py:116: assert 51 <= 0
+/Users/jamesdavies/gob-simplified/tests/test_pass_contest.py:161: TypeError: resolve_pass_contest() got an unexpected keyword argument 'offense_modifier'. Did you mean 'offense_modifier_g'?
+/Users/jamesdavies/gob-simplified/tests/test_pass_contest.py:190: AssertionError: assert 3.5 == 7
+/Users/jamesdavies/gob-simplified/tests/test_phase5_6_comprehensive_settings.py:227: assert 200 in [400, 404]
+/Users/jamesdavies/gob-simplified/tests/test_phase5_6_comprehensive_settings.py:252: assert 404 == 400
+/Users/jamesdavies/gob-simplified/tests/test_phase5_6_comprehensive_settings.py:276: assert 404 == 400
+/Users/jamesdavies/gob-simplified/tests/test_phase5_6_comprehensive_settings.py:659: AssertionError: assert 'invalid mode' in 'unsupported mode for team plays save: invalid_mode'
+/Users/jamesdavies/gob-simplified/tests/test_phase5_6_comprehensive_settings.py:682: assert 404 == 400
+/Users/jamesdavies/gob-simplified/tests/test_playbook_locks_and_preview.py:77: AssertionError: assert ['Man'] == ['man_normal']
+/Users/jamesdavies/gob-simplified/tests/test_playbooks_game_doc_precedence.py:291: AssertionError: Expected slot 1 from game doc (Base Post Play), got {'1': {'section': 'set_play_inside', 'playId': '4-1 Motion', 'playName': '4-1 Motion'}}
+/Users/jamesdavies/gob-simplified/tests/test_player.py:102: assert 5 == 10
+/Users/jamesdavies/gob-simplified/tests/test_player_coords_sync.py:61: AssertionError: assert {'x': 10.0, 'y': 10.0} == {'x': 40.0, 'y': 50.0}
+/Users/jamesdavies/gob-simplified/BackEnd/models/team_manager.py:472: TypeError: fake_load_roster() got an unexpected keyword argument 'franchise_id'
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/unittest/mock.py:1230: StopIteration
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Four Corners' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Four Corners' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Four Corners' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Four Corners' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Four Corners' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Four Corners' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Four Corners' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Four Corners' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Four Corners' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Four Corners' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Bentley-Truman' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Bentley-Truman' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/Users/jamesdavies/gob-simplified/BackEnd/utils/db_utils.py:955: ValueError: Team 'Bentley-Truman' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 0, last eligible: 0
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py:577: subprocess.CalledProcessError: Command '['node', '--loader', '/Users/jamesdavies/gob-simplified/tests/js/httpsLoaderNoStubBall.mjs', '/Users/jamesdavies/gob-simplified/tests/js/runReboundInProgress.mjs']' returned non-zero exit status 1.
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py:577: subprocess.CalledProcessError: Command '['node', '--loader', '/Users/jamesdavies/gob-simplified/tests/js/httpsLoaderNoStubBall.mjs', '/Users/jamesdavies/gob-simplified/tests/js/runDefensiveReboundFlip.mjs']' returned non-zero exit status 1.
+/Users/jamesdavies/gob-simplified/BackEnd/utils/shared.py:1842: TypeError: string indices must be integers, not 'str'
+/usr/local/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py:577: subprocess.CalledProcessError: Command '['node', '-e', '\nconst fs = require(\'fs\');\nconst vm = require(\'vm\');\nconst code = fs.readFileSync("/Users/jamesdavies/gob-simplified/FrontEnd/static/tournament.js", \'utf8\');\nconst script = code;\nconst originalLog = console.log;\nconsole.log = () => {};\nglobal.window = { DEBUG_BRACKET: false };\nglobal.formatTeamName = (n) => n;\nconst tournamentData = {\n  bracket: {\n    round1: [\n      {home_team:\'Alpha\', away_team:\'Bravo\', game_id:null, winner:\'Alpha\', score:{Alpha:70, Bravo:65}},\n      {home_team:\'Charlie\', away_team:\'Delta\', game_id:null, winner:\'Delta\', score:{Charlie:60, Delta:80}},\n      {home_team:\'Echo\', away_team:\'Foxtrot\', game_id:null, winner:\'Foxtrot\', score:{Echo:55, Foxtrot:85}},\n      {home_team:\'Golf\', away_team:\'Hotel\', game_id:null, winner:\'Golf\', score:{Golf:75, Hotel:72}}\n    ],\n    round2: [],\n    final: []\n  },\n  results: [\n    {round:1, match_index:0, home_team:\'Alpha\', away_team:\'Bravo\', score:{Alpha:70,Bravo:65}, winner:\'Alpha\'},\n    {round:1, match_index:1, home_team:\'Charlie\', away_team:\'Delta\', score:{Charlie:60,Delta:80}, winner:\'Delta\'},\n    {round:1, match_index:2, home_team:\'Echo\', away_team:\'Foxtrot\', score:{Echo:55,Foxtrot:85}, winner:\'Foxtrot\'},\n    {round:1, match_index:3, home_team:\'Golf\', away_team:\'Hotel\', score:{Golf:75,Hotel:72}, winner:\'Golf\'}\n  ],\n  current_round:2\n};\nglobal.localStorage = { getItem: () => JSON.stringify(tournamentData), setItem: () => null };\nconst bracketEl = {\n    children: [],\n    style: {},\n    appendChild(child) { this.children.push(child); },\n    set innerHTML(v) { this.children = []; }\n};\nglobal.document = {\n  getElementById(id) { return bracketEl; },\n  addEventListener() {},\n  createElement(tag) { const el = {\n     tagName: tag,\n     className: \'\',\n     style: {},\n     children: [],\n     appendChild(child) { this.children.push(child); },\n     set textContent(v) { this._text = v; },\n     get textContent() { return this._text; },\n     set innerHTML(v) { this._innerHTML = v; },\n     get innerHTML() { return this._innerHTML || \'\'; }\n  }; el.classList = { add(cls){ el.className += (el.className ? \' \' : \'\') + cls; } }; return el; }\n};\nvm.runInThisContext(script);\nrenderBracket();\nconst scores = [];\nfunction collect(node) {\n    if(node.className && node.className.includes(\'score\') && node.textContent !== undefined){\n        scores.push(node.textContent);\n    }\n    if(node.children) node.children.forEach(collect);\n}\nbracketEl.children.forEach(collect);\nconsole.log = originalLog;\nconsole.log(JSON.stringify(scores));\n']' returned non-zero exit status 1.
+/Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:10752: TypeError: test_leaders_view_scope_filters_to_user_conference.<locals>.<lambda>() got an unexpected keyword argument 'allowed_team_ids'
+/Users/jamesdavies/gob-simplified/BackEnd/models/team_manager.py:472: TypeError: fake_load_roster() got an unexpected keyword argument 'franchise_id'
+/Users/jamesdavies/gob-simplified/tests/test_rollup_game_to_franchise.py:39: KeyError: 'p1'
+/Users/jamesdavies/gob-simplified/tests/test_rollup_game_to_franchise.py:91: KeyError: 'p1'
+/Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/mongomock/aggregate.py:274: pymongo.errors.OperationFailure: Unrecognized expression '$replaceAll'
+/Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/mongomock/aggregate.py:274: pymongo.errors.OperationFailure: Unrecognized expression '$replaceAll'
+/Users/jamesdavies/gob-simplified/tests/test_setplay_dynamic_resolver.py:92: AssertionError: assert None is False
+/Users/jamesdavies/gob-simplified/tests/test_setplay_dynamic_resolver.py:107: assert False
+/Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/mongomock/aggregate.py:274: pymongo.errors.OperationFailure: Unrecognized expression '$replaceAll'
+/Users/jamesdavies/gob-simplified/tests/test_settings_persistence.py:141: AssertionError: Failed to simulate quarter: {"detail":"Team 'Lancaster' has fewer than 5 eligible players even after relaxing NG and foul limits. Total roster: 2, last eligible: 2"}
+/Users/jamesdavies/gob-simplified/tests/test_shot_manager.py:208: AssertionError: assert 'MISS' == 'MAKE'
+/Users/jamesdavies/gob-simplified/tests/test_shot_manager.py:263: AssertionError: assert 'PUTBACK_ATTEMPT' == 'KICKOUT_RESET'
+/Users/jamesdavies/gob-simplified/BackEnd/models/shot_manager.py:1160: ValueError: not enough values to unpack (expected 6, got 5)
+/Users/jamesdavies/gob-simplified/BackEnd/models/shot_manager.py:1160: ValueError: not enough values to unpack (expected 6, got 5)
+/Users/jamesdavies/gob-simplified/BackEnd/models/shot_manager.py:1160: ValueError: not enough values to unpack (expected 6, got 5)
+/Users/jamesdavies/gob-simplified/BackEnd/models/shot_manager.py:1160: ValueError: not enough values to unpack (expected 6, got 5)
+/Users/jamesdavies/gob-simplified/BackEnd/models/shot_manager.py:1160: ValueError: not enough values to unpack (expected 6, got 5)
+/Users/jamesdavies/gob-simplified/BackEnd/models/team_manager.py:472: TypeError: make_fake_load_roster.<locals>.fake_load_roster() got an unexpected keyword argument 'franchise_id'
+/Users/jamesdavies/gob-simplified/BackEnd/models/team_manager.py:472: TypeError: make_fake_load_roster.<locals>.fake_load_roster() got an unexpected keyword argument 'franchise_id'
+/Users/jamesdavies/gob-simplified/tests/test_simulate_quarter_endpoint.py:165: TypeError: simulate_quarter_endpoint() missing 1 required positional argument: 'body'
+/Users/jamesdavies/gob-simplified/tests/test_simulate_quarter_endpoint.py:202: TypeError: simulate_quarter_endpoint() missing 1 required positional argument: 'body'
+/Users/jamesdavies/gob-simplified/BackEnd/api/api.py:4711: TypeError: test_simulate_quarter_sequential_game_id.<locals>.DummyGM.__init__() got an unexpected keyword argument 'home_strategy_settings'
+/Users/jamesdavies/gob-simplified/BackEnd/api/api.py:4711: TypeError: test_simulate_quarter_mismatched_game_id.<locals>.DummyGM.__init__() got an unexpected keyword argument 'home_strategy_settings'
+/Users/jamesdavies/gob-simplified/tests/test_simulate_turn_clamp_smoke.py:76: AssertionError: assert {'x': 95.0, 'y': 2.0} == {'x': 91.0, 'y': 2.0}
+/Users/jamesdavies/gob-simplified/tests/test_simulate_turn_eog_edge.py:102: assert 500 == 200
+/Users/jamesdavies/gob-simplified/tests/test_tcc_stats_population.py:89: TypeError: GameManager.__init__() got an unexpected keyword argument 'tournament_id'
+/Users/jamesdavies/gob-simplified/tests/test_team_id_resolver.py:105: Failed: DID NOT RAISE <class 'ValueError'>
+/Users/jamesdavies/gob-simplified/tests/test_team_id_resolver.py:161: Failed: DID NOT RAISE <class 'ValueError'>
+/Users/jamesdavies/gob-simplified/tests/test_team_id_resolver.py:220: Failed: DID NOT RAISE <class 'ValueError'>
+/Users/jamesdavies/gob-simplified/tests/test_temp_lineup_court_absolute_rebound_math.py:28: assert 73 == 27
+/Users/jamesdavies/gob-simplified/tests/test_tournament_player_stats.py:51: assert 0 == 10
+/Users/jamesdavies/gob-simplified/tests/test_tournament_player_stats.py:81: KeyError: 'p1'
+/Users/jamesdavies/gob-simplified/tests/test_tournament_run_training_stub.py:17: AssertionError: assert ('Training' in 'Not Found')
+/Users/jamesdavies/gob-simplified/tests/test_tournament_sim_remaining.py:131: assert 404 == 200
+/Users/jamesdavies/gob-simplified/tests/test_tournament_state_applied_games.py:20: assert 404 == 200
+/Users/jamesdavies/gob-simplified/tests/test_training_execution_v2_thresholds.py:66: assert (-1, 0) == (-2, 0)
+/Users/jamesdavies/gob-simplified/tests/test_training_execution_v2_thresholds.py:138: AssertionError: assert ('technical_drills', 1) in [('combined', 5)]
+/Users/jamesdavies/gob-simplified/tests/test_training_execution_v2_thresholds.py:162: assert [(-1, 0), (-1..., (3, 5), ...] == [(-4, -3), (-..., (3, 5), ...]
+/Users/jamesdavies/gob-simplified/tests/test_training_execution_v2_thresholds.py:185: assert [(-1, 0), (-1...2, 4), (2, 5)] == [(-3, -1), (0...2, 4), (2, 5)]
+/Users/jamesdavies/gob-simplified/tests/test_training_execution_v2_thresholds.py:201: assert [(-3, -1), (1...1, 3), (2, 5)] == [(-5, -3), (3..., 7), (3, 10)]
+/Users/jamesdavies/gob-simplified/tests/test_training_execution_v2_thresholds.py:233: assert 0.23 == 0.26
+/Users/jamesdavies/gob-simplified/tests/test_training_execution_v2_thresholds.py:295: assert 0.30000000000000004 < 1e-09
+/Users/jamesdavies/gob-simplified/tests/test_training_execution_v2_thresholds.py:308: assert 0.6000000000000002 < 1e-09
+/Users/jamesdavies/gob-simplified/tests/test_training_gain_resolution.py:46: assert 0.28 < 1e-09
+/Users/jamesdavies/gob-simplified/tests/test_training_gain_resolution.py:117: assert 95 == 80.0
+/Users/jamesdavies/gob-simplified/tests/test_training_gain_resolution.py:143: assert 59 == 53
+/Users/jamesdavies/gob-simplified/tests/test_training_position_contract.py:63: AssertionError: assert 'pos = resolve_training_position(p)' in 'from fastapi import APIRouter, Depends, HTTPException, Query\nfrom fastapi.responses import FileResponse, RedirectRes...=========\n# 🛠️ END DEV MODE FEATURE\n# ============================================================================\n'
+/Users/jamesdavies/gob-simplified/tests/test_transition_registry.py:26: AssertionError: Expected 43 transitions, found 51
+/Users/jamesdavies/gob-simplified/tests/test_transition_registry.py:65: assert 7 == 8
+/Users/jamesdavies/gob-simplified/tests/test_transition_registry.py:77: assert 8 == 9
+/Users/jamesdavies/gob-simplified/tests/test_transition_system.py:36: ImportError: cannot import name 'resolve_opening_tip' from 'BackEnd.utils.opening_tip' (/Users/jamesdavies/gob-simplified/BackEnd/utils/opening_tip.py)
+/Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:6296: KeyError: "Position 'PG' not found in offense lineup for Home. Available positions: EMPTY"
+/Users/jamesdavies/gob-simplified/BackEnd/models/turn_manager.py:6296: KeyError: "Position 'PG' not found in offense lineup for Home. Available positions: EMPTY"
+/Users/jamesdavies/gob-simplified/tests/test_turn_manager.py:191: AssertionError: assert 'man' in ['Man', 'Zone']
+/Users/jamesdavies/gob-simplified/tests/test_turn_manager.py:207: KeyError: 'starting_possession_team_id'
+/Users/jamesdavies/gob-simplified/tests/test_turn_manager_clock_shot_families.py:56: assert 24 == 30
+/Users/jamesdavies/gob-simplified/tests/test_weekly_recruiting_training_flow.py:104: AssertionError: assert {'archetype':...d': None, ...} == {'archetype':...d': 'r1', ...}
+/Users/jamesdavies/gob-simplified/tests/test_weekly_recruiting_training_flow.py:154: AssertionError: assert {'archetype':...d': None, ...} == {'archetype':...d': 'r3', ...}
+/Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:14890: AttributeError: '_UnusedDb' object has no attribute 'franchises'
+=============================== warnings summary ===============================
+BackEnd/api/play_routes.py:46
+  /Users/jamesdavies/gob-simplified/BackEnd/api/play_routes.py:46: UserWarning: Field name "copy" in "PlayCreate" shadows an attribute in parent "BaseModel"
+    class PlayCreate(BaseModel):
+
+BackEnd/api/api.py:627
+  /Users/jamesdavies/gob-simplified/BackEnd/api/api.py:627: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+venv/lib/python3.13/site-packages/fastapi/applications.py:4495
+  /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/fastapi/applications.py:4495: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)
+
+tests/test_fpd_frd_smoke.py:59
+  /Users/jamesdavies/gob-simplified/tests/test_fpd_frd_smoke.py:59: PytestUnknownMarkWarning: Unknown pytest.mark.order - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.order("last")
+
+tests/test_game_id_persistence.py:30
+  /Users/jamesdavies/gob-simplified/tests/test_game_id_persistence.py:30: PytestCollectionWarning: cannot collect test class 'TestResult' because it has a __init__ constructor (from: tests/test_game_id_persistence.py)
+    @dataclass
+
+tests/test_oreb_kickout.py:22
+  /Users/jamesdavies/gob-simplified/tests/test_oreb_kickout.py:22: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/test_playbooks_game_doc_precedence.py:221
+  /Users/jamesdavies/gob-simplified/tests/test_playbooks_game_doc_precedence.py:221: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/test_possession_changes.py:24
+  /Users/jamesdavies/gob-simplified/tests/test_possession_changes.py:24: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/test_possession_changes.py:256
+  /Users/jamesdavies/gob-simplified/tests/test_possession_changes.py:256: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/test_possession_changes.py:351
+  /Users/jamesdavies/gob-simplified/tests/test_possession_changes.py:351: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/test_putback_miss_rebound_stats.py:41
+  /Users/jamesdavies/gob-simplified/tests/test_putback_miss_rebound_stats.py:41: PytestUnknownMarkWarning: Unknown pytest.mark.integration - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.integration
+
+tests/test_deferred_offseason.py::test_finish_season_defers_develop_and_arms_marker
+tests/test_finish_season_resets_results.py::test_finish_season_normalizes_signed_freshman_attributes
+tests/test_senior_tribute.py::test_finish_season_carries_returning_titles
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:18636: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "updated_at": datetime.utcnow(),
+
+tests/test_feedback_routes.py::test_feedback_submit_success
+tests/test_feedback_routes.py::test_feedback_submit_rate_limited
+  /Users/jamesdavies/gob-simplified/BackEnd/api/feedback_routes.py:62: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+tests/test_finish_season_resets_results.py::test_finish_season_resets_franchise_results
+tests/test_franchise_news.py::test_recruiting_results_story_carries_exact_headline_and_content_into_week_one
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:13322: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    carried["created_at"] = datetime.utcnow()
+
+tests/test_fpd_frd_smoke.py: 450 warnings
+tests/test_franchise_manager.py: 900 warnings
+tests/test_franchise_stats.py: 450 warnings
+tests/test_recruit_archetypes.py: 755 warnings
+  /Users/jamesdavies/gob-simplified/BackEnd/models/franchise_manager.py:1330: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+tests/test_fpd_frd_smoke.py::test_fpd_frd_smoke_create_franchise_and_read_paths
+tests/test_franchise_manager.py::test_initialize_season_with_128_teams_generates_26_week_schedule
+  /Users/jamesdavies/gob-simplified/BackEnd/models/franchise_manager.py:355: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+tests/test_fpd_frd_smoke.py::test_fpd_frd_smoke_create_franchise_and_read_paths
+tests/test_franchise_manager.py::test_initialize_season_produces_phase1_schedule
+tests/test_franchise_manager.py::test_initialize_season_with_128_teams_generates_26_week_schedule
+tests/test_franchise_stats.py::test_initialize_season_does_not_reset_universal_player_buckets
+  /Users/jamesdavies/gob-simplified/BackEnd/models/franchise_manager.py:638: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+tests/test_fpd_frd_smoke.py::test_fpd_frd_smoke_create_franchise_and_read_paths
+tests/test_franchise_manager.py::test_initialize_season_produces_phase1_schedule
+tests/test_franchise_manager.py::test_initialize_season_with_128_teams_generates_26_week_schedule
+tests/test_franchise_stats.py::test_initialize_season_does_not_reset_universal_player_buckets
+tests/test_recruiting_report_news.py::test_build_story_includes_national_and_region_tables
+  /Users/jamesdavies/gob-simplified/BackEnd/utils/recruiting_report_news.py:268: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+tests/test_fpd_frd_smoke.py: 128 warnings
+tests/test_franchise_manager.py: 256 warnings
+tests/test_franchise_stats.py: 128 warnings
+  /Users/jamesdavies/gob-simplified/BackEnd/models/franchise_manager.py:938: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+tests/test_fpd_frd_smoke.py: 128 warnings
+tests/test_franchise_manager.py: 256 warnings
+tests/test_franchise_stats.py: 128 warnings
+  /Users/jamesdavies/gob-simplified/BackEnd/models/franchise_manager.py:939: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "updated_at": datetime.utcnow(),
+
+tests/test_franchise_complete_week.py::test_complete_week_saves_and_simulates
+tests/test_franchise_complete_week.py::test_complete_week_saves_and_simulates
+tests/test_franchise_complete_week.py::test_start_cpu_then_phase_a_phase_b_advances_week
+tests/test_franchise_complete_week.py::test_phase_a_then_phase_b_then_second_phase_b_is_idempotent
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:3645: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow().isoformat(),
+
+tests/test_franchise_complete_week.py: 107 warnings
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:5728: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    return datetime.utcnow().isoformat() + "Z"
+
+tests/test_franchise_complete_week.py: 11 warnings
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:5963: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now_ts = datetime.utcnow().timestamp()
+
+tests/test_franchise_complete_week.py::test_complete_week_saves_and_simulates
+tests/test_franchise_complete_week.py::test_complete_week_saves_and_simulates
+tests/test_franchise_complete_week.py::test_complete_week_accepts_canonical_team_ids_single_word
+tests/test_franchise_complete_week.py::test_complete_week_accepts_canonical_team_ids_multi_word
+tests/test_franchise_complete_week.py::test_start_cpu_then_phase_a_phase_b_advances_week
+tests/test_franchise_complete_week.py::test_phase_a_then_phase_b_then_second_phase_b_is_idempotent
+  /Users/jamesdavies/gob-simplified/BackEnd/utils/recruiting_report_news.py:173: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_franchise_complete_week.py::test_start_cpu_sims_partial_persists_without_advancing_week
+tests/test_franchise_complete_week.py::test_start_cpu_then_phase_a_phase_b_advances_week
+tests/test_franchise_complete_week.py::test_start_cpu_then_phase_a_phase_b_advances_week
+tests/test_franchise_complete_week.py::test_phase_a_then_phase_b_then_second_phase_b_is_idempotent
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:5769: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow()
+
+tests/test_franchise_news.py::test_upset_report_qualification_boundary_and_format
+tests/test_franchise_news.py::test_append_franchise_week_news_prepends_and_persists_on_doc
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:13375: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+tests/test_franchise_news.py::test_ps_all_stars_qualification_and_line_format
+tests/test_franchise_news.py::test_ps_all_stars_limits_to_top_10_with_tie_overflow
+tests/test_franchise_news.py::test_ps_all_stars_two_way_tie_uses_and
+tests/test_franchise_news.py::test_append_franchise_week_news_prepends_and_persists_on_doc
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:13425: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+tests/test_franchise_news.py::test_recruiting_leans_top_rated_section_format_sort_and_rt_boundary
+tests/test_franchise_news.py::test_recruiting_leans_combines_multiple_teams_for_one_recruit
+tests/test_franchise_news.py::test_recruiting_leans_conference_section_grouping_and_sorting
+tests/test_franchise_news.py::test_recruiting_leans_conference_only_runs_without_top_rated_section
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:13584: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+tests/test_mode_init_system.py: 1 warning
+tests/test_simulate_round_results.py: 1 warning
+tests/test_tournament_active_returns_progress.py: 1 warning
+tests/test_tournament_bracket_update.py: 2 warnings
+tests/test_tournament_full_bracket_progression.py: 1 warning
+tests/test_tournament_leaders_endpoint.py: 1 warning
+tests/test_tournament_manager.py: 2 warnings
+tests/test_tournament_save_results.py: 2 warnings
+tests/test_tournament_sim_remaining.py: 2 warnings
+tests/test_tournament_state_scores.py: 1 warning
+  /Users/jamesdavies/gob-simplified/BackEnd/tournament/tournament_manager.py:173: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "created_at": datetime.utcnow(),
+
+tests/test_phase1_1_state_contract.py::test_game_id_no_localstorage_fallback
+  /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/_pytest/python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase1_1_state_contract.py::test_game_id_no_localstorage_fallback returned <class 'dict'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_phase1_1_state_contract.py::test_franchise_id_no_localstorage_fallback
+  /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/_pytest/python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase1_1_state_contract.py::test_franchise_id_no_localstorage_fallback returned <class 'dict'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_phase1_1_state_contract.py::test_missing_game_id_error
+  /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/_pytest/python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase1_1_state_contract.py::test_missing_game_id_error returned <class 'dict'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_phase1_1_state_contract.py::test_missing_franchise_id_error
+  /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/_pytest/python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase1_1_state_contract.py::test_missing_franchise_id_error returned <class 'dict'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_phase1_1_state_contract.py::test_team_id_resolution
+  /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/_pytest/python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_phase1_1_state_contract.py::test_team_id_resolution returned <class 'dict'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_practice_squad_training_job.py::test_practice_squad_week_processes_one_game_and_persists
+tests/test_practice_squad_training_job.py::test_interrupted_running_game_restarts_from_tip
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+  /Users/jamesdavies/gob-simplified/BackEnd/practice_squad/manager.py:796: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    g["started_at"] = datetime.utcnow().isoformat() + "Z"
+
+tests/test_practice_squad_training_job.py::test_practice_squad_week_processes_one_game_and_persists
+tests/test_practice_squad_training_job.py::test_interrupted_running_game_restarts_from_tip
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+  /Users/jamesdavies/gob-simplified/BackEnd/practice_squad/manager.py:809: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "updated_at": datetime.utcnow().isoformat() + "Z",
+
+tests/test_practice_squad_training_job.py::test_practice_squad_week_processes_one_game_and_persists
+tests/test_practice_squad_training_job.py::test_interrupted_running_game_restarts_from_tip
+tests/test_practice_squad_training_job.py::test_fresh_running_game_is_not_started_by_a_second_poll
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+  /Users/jamesdavies/gob-simplified/BackEnd/practice_squad/manager.py:879: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "updated_at": datetime.utcnow().isoformat() + "Z",
+
+tests/test_practice_squad_training_job.py::test_running_game_timestamp_becomes_stale_after_lease
+  /Users/jamesdavies/gob-simplified/tests/test_practice_squad_training_job.py:137: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    old = (datetime.utcnow() - timedelta(seconds=manager.PS_RUNNING_GAME_STALE_SECONDS + 1)).isoformat() + "Z"
+
+tests/test_practice_squad_training_job.py::test_running_game_timestamp_becomes_stale_after_lease
+  /Users/jamesdavies/gob-simplified/tests/test_practice_squad_training_job.py:138: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    fresh = datetime.utcnow().isoformat() + "Z"
+
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+  /Users/jamesdavies/gob-simplified/BackEnd/practice_squad/manager.py:822: DeprecationWarning: sentry_sdk.push_scope is deprecated and will be removed in the next major version. Please consult our migration guide to learn how to migrate to the new API: https://docs.sentry.io/platforms/python/migration/1.x-to-2.x#scope-pushing
+    with sentry_sdk.push_scope() as scope:
+
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+  /Users/jamesdavies/gob-simplified/BackEnd/practice_squad/manager.py:847: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    g["updated_at"] = datetime.utcnow().isoformat() + "Z"
+
+tests/test_practice_squad_training_job.py::test_failed_game_retries_twice_then_uses_terminal_fallback
+tests/test_practice_squad_training_job.py::test_fallback_score_is_deterministic
+tests/test_practice_squad_training_job.py::test_fallback_score_is_deterministic
+  /Users/jamesdavies/gob-simplified/BackEnd/practice_squad/manager.py:156: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    now = datetime.utcnow().isoformat() + "Z"
+
+tests/test_recruiting_week36.py::test_save_recruiting_orders_week35_updates_separate_ftd_field
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:14830: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "updated_at": datetime.utcnow(),
+
+tests/test_weekly_recruiting_training_flow.py::test_save_recruiting_orders_week20_only_persists_orders
+  /Users/jamesdavies/gob-simplified/BackEnd/api/franchise_routes.py:14884: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    "updated_at": datetime.utcnow(),
+
+tests/test_zone_defense_lower_corner_away_offense.py::test_131_zone_lower_corner_away_offense
+  /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/_pytest/python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_zone_defense_lower_corner_away_offense.py::test_131_zone_lower_corner_away_offense returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+tests/test_zone_defense_lower_corner_away_offense.py::test_multiple_scenarios
+  /Users/jamesdavies/gob-simplified/venv/lib/python3.13/site-packages/_pytest/python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but tests/test_zone_defense_lower_corner_away_offense.py::test_multiple_scenarios returned <class 'bool'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_core_simulation.py::test_resolve_fast_break_logic_runs - As...
+FAILED tests/test_env_static_safety.py::test_repository_passes_environment_static_safety_scan
+FAILED tests/test_frontend_free_throw_sequence.py::test_free_throw_sequence_defaults_to_rim
+FAILED tests/test_frontend_free_throw_sequence.py::test_free_throw_possession_change_event
+FAILED tests/test_frontend_free_throw_sequence.py::test_free_throw_halftime_defers_setup_to_baseline_inbound_turn
+FAILED tests/test_init_franchise_player_stats.py::test_init_franchise_player_stats_seeds_zero_blocks
+FAILED tests/test_lineup_change_sprites.py::test_lineup_change_no_benched_players
+FAILED tests/test_load_franchise_names.py::test_load_franchise_names_missing_file
+FAILED tests/test_load_franchise_names.py::test_load_franchise_names_invalid_json
+FAILED tests/test_mode_init_system.py::test_init_team_attributes_franchise_ranges
+FAILED tests/test_motion_dynamic_resolver.py::test_walk_picks_first_shot_decision
+FAILED tests/test_motion_dynamic_resolver.py::test_walk_weaves_subtle_beat_then_resumes_and_shoots
+FAILED tests/test_motion_dynamic_resolver.py::test_missed_gamble_abandons_skeleton_and_drives
+FAILED tests/test_motion_moment.py::test_moment_walk_dead_ball_maps_to_hco_result_type
+FAILED tests/test_motion_moment.py::test_moment_walk_fouls_map - AssertionErr...
+FAILED tests/test_motion_moment.py::test_moment_walk_option_b_tags_every_non_terminal_contest
+FAILED tests/test_motion_moment.py::test_moment_walk_option_b_no_tags_after_terminal
+FAILED tests/test_motion_should_shoot.py::test_weighted_pick_team_emphasis_shifts_the_boundary
+FAILED tests/test_motion_should_shoot.py::test_threshold_lowers_with_clock_and_tempo
+FAILED tests/test_motion_should_shoot.py::test_right_tier_optimal_self_shoots
+FAILED tests/test_motion_should_shoot.py::test_random_tier_shoots_or_progresses_on_coin_flip
+FAILED tests/test_motion_should_shoot.py::test_openness_lifts_a_sub_threshold_look_over_the_bar
+FAILED tests/test_motion_should_shoot.py::test_dish_to_better_positioned_teammate
+FAILED tests/test_motion_subtle_defense.py::test_freezes_when_man_did_not_move_regardless_of_read
+FAILED tests/test_opening_tip.py::test_get_height_scale_value - assert 10 == 9
+FAILED tests/test_oreb_kickout.py::TestOrebKickout::test_oreb_kickout_turn_structure
+FAILED tests/test_oreb_kickout.py::TestOrebKickout::test_oreb_kickout_multiple_instances
+FAILED tests/test_oreb_kickout.py::TestOrebKickout::test_oreb_kickout_defers_receiver_to_hco_entry
+FAILED tests/test_oreb_kickout.py::TestOrebKickout::test_oreb_kickout_no_errors
+FAILED tests/test_over_and_back.py::test_after_grace_uses_passer_awareness - ...
+FAILED tests/test_over_and_back.py::test_cross_half_urgency_target_is_frontcourt_side
+FAILED tests/test_pass_contest.py::test_offense_modifier_lowers_safety_bar - ...
+FAILED tests/test_pass_contest.py::test_offense_modifier_resolver_maps_turn_types
+FAILED tests/test_phase5_6_comprehensive_settings.py::TestNoLegacyFallbacks::test_invalid_team_id_raises_explicit_error
+FAILED tests/test_phase5_6_comprehensive_settings.py::TestNoLegacyFallbacks::test_missing_franchise_id_raises_explicit_error
+FAILED tests/test_phase5_6_comprehensive_settings.py::TestNoLegacyFallbacks::test_missing_tournament_id_raises_explicit_error
+FAILED tests/test_phase5_6_comprehensive_settings.py::TestErrorHandling::test_invalid_mode_raises_400
+FAILED tests/test_phase5_6_comprehensive_settings.py::TestErrorHandling::test_missing_required_parameters_raises_400
+FAILED tests/test_playbook_locks_and_preview.py::test_build_simplified_includes_locks
+FAILED tests/test_playbooks_game_doc_precedence.py::test_get_playbooks_franchise_with_game_id_returns_game_doc_slot_assignments
+FAILED tests/test_player.py::test_player_initialization_from_nested_attributes
+FAILED tests/test_player_coords_sync.py::test_sync_lineup_overlay_overrides_animation
+FAILED tests/test_player_stat_persistence.py::test_player_stats_persist_across_quarters
+FAILED tests/test_possession_changes.py::TestPossessionChanges::test_made_shot_no_foul_flips_possession
+FAILED tests/test_possession_changes.py::TestPossessionChanges::test_made_shot_with_foul_does_not_flip_possession
+FAILED tests/test_possession_changes.py::TestPossessionChanges::test_missed_shot_defensive_rebound_flips_possession
+FAILED tests/test_possession_changes.py::TestPossessionChanges::test_missed_shot_offensive_rebound_does_not_flip_possession
+FAILED tests/test_possession_changes.py::TestPossessionChangeSequences::test_and1_sequence_possession_changes
+FAILED tests/test_possession_changes.py::TestPossessionChangeSequences::test_miss_oreb_putback_make_possession_sequence
+FAILED tests/test_possession_changes.py::TestPossessionIntegrity::test_possession_switch_updates_teams
+FAILED tests/test_possession_changes.py::TestPossessionIntegrity::test_no_possession_switch_when_false
+FAILED tests/test_quarter_starts.py::test_q2_starts_with_baseline_inbound - V...
+FAILED tests/test_quarter_starts.py::test_q2_possession_loser_gets_ball - Val...
+FAILED tests/test_quarter_starts.py::test_q2_baseline_inbound_structure - Val...
+FAILED tests/test_quarter_starts.py::test_q3_starts_with_baseline_inbound - V...
+FAILED tests/test_quarter_starts.py::test_q3_possession_loser_gets_ball - Val...
+FAILED tests/test_quarter_starts.py::test_q3_baseline_inbound_structure - Val...
+FAILED tests/test_quarter_starts.py::test_q4_starts_with_baseline_inbound - V...
+FAILED tests/test_quarter_starts.py::test_q4_possession_winner_gets_ball - Va...
+FAILED tests/test_quarter_starts.py::test_q4_baseline_inbound_structure - Val...
+FAILED tests/test_quarter_starts.py::test_all_quarters_possession_pattern - V...
+FAILED tests/test_quarter_transition_stats.py::test_stats_persistence_across_quarters
+FAILED tests/test_quarter_transition_stats.py::test_api_game_endpoint_data - ...
+FAILED tests/test_real_quarter_stats.py::test_real_quarter_stats - ValueError...
+FAILED tests/test_rebound_in_progress_flag.py::test_rebound_in_progress_blocks_non_rebounder
+FAILED tests/test_rebound_possession_flip.py::test_defensive_rebound_flips_possession
+FAILED tests/test_rebounder_empty_pool.py::test_choose_rebounder_empty_pool_returns_none_and_no_indexerror
+FAILED tests/test_render_bracket_scores.py::test_render_bracket_displays_scores
+FAILED tests/test_resource_page_scoping.py::test_leaders_view_scope_filters_to_user_conference
+FAILED tests/test_resume_game_stats.py::test_resume_game_skips_stat_reset - T...
+FAILED tests/test_rollup_game_to_franchise.py::test_rollup_game_to_franchise_idempotent
+FAILED tests/test_rollup_game_to_franchise.py::test_rollup_game_to_franchise_validates_stats
+FAILED tests/test_roster_api.py::test_roster_single_game_mode - pymongo.error...
+FAILED tests/test_roster_api.py::test_roster_with_tournament_id - pymongo.err...
+FAILED tests/test_setplay_dynamic_resolver.py::test_offense_reads_forced_false
+FAILED tests/test_setplay_dynamic_resolver.py::test_no_pressure_walks_static_skeleton_to_forced_shot
+FAILED tests/test_settings_application_to_gameplay.py::TestSettingsApplicationToGameplay::test_settings_loaded_and_applied_to_gameplay
+FAILED tests/test_settings_persistence.py::TestSettingsPersistence::test_playbook_settings_persist_into_gameplay
+FAILED tests/test_shot_manager.py::test_putback_event_payload_and_possession[True-False-True]
+FAILED tests/test_shot_manager.py::test_kickout_reset_event_payload - Asserti...
+FAILED tests/test_shot_system_regressions.py::test_hco_assignment_overrides_geometry_for_defender_presence
+FAILED tests/test_shot_system_regressions.py::test_fast_break_no_defender_path_does_not_crash
+FAILED tests/test_shot_system_regressions.py::test_fast_break_outside_branch_can_classify_as_three
+FAILED tests/test_shot_system_regressions.py::test_regular_fast_break_miss_uses_25_grid_rebound_geo_filter
+FAILED tests/test_shot_system_regressions.py::test_regular_fast_break_rebound_falls_back_when_frontcourt_x_filter_empty
+FAILED tests/test_simulate_quarter_endpoint.py::test_simulate_quarter_short_roster[home]
+FAILED tests/test_simulate_quarter_endpoint.py::test_simulate_quarter_short_roster[away]
+FAILED tests/test_simulate_quarter_endpoint.py::test_simulate_quarter_endpoint_handles_none_games_collection
+FAILED tests/test_simulate_quarter_endpoint.py::test_simulate_quarter_unknown_id_quarter1
+FAILED tests/test_simulate_quarter_endpoint.py::test_simulate_quarter_sequential_game_id
+FAILED tests/test_simulate_quarter_endpoint.py::test_simulate_quarter_mismatched_game_id
+FAILED tests/test_simulate_turn_clamp_smoke.py::test_simulate_turn_smoke_clamps_standard_turn
+FAILED tests/test_simulate_turn_eog_edge.py::test_simulate_turn_zero_clock_with_pending_ft_executes_turn
+FAILED tests/test_tcc_stats_population.py::test_tcc_stats_population_end_to_end
+FAILED tests/test_team_id_resolver.py::TestResolveFromGameDocument::test_resolve_fails_if_not_in_document
+FAILED tests/test_team_id_resolver.py::TestResolveFromDatabase::test_resolve_fails_if_not_in_database
+FAILED tests/test_team_id_resolver.py::TestErrorHandling::test_unresolvable_team_identifier_raises_error
+FAILED tests/test_temp_lineup_court_absolute_rebound_math.py::test_temp_lineup_court_absolute_flips_and_restores_for_away
+FAILED tests/test_tournament_player_stats.py::test_apply_stats_idempotent - a...
+FAILED tests/test_tournament_player_stats.py::test_apply_stats_saved_to_tournament
+FAILED tests/test_tournament_run_training_stub.py::test_run_training_returns_404
+FAILED tests/test_tournament_sim_remaining.py::test_sim_remaining_endpoint - ...
+FAILED tests/test_tournament_state_applied_games.py::test_tournament_state_casts_applied_games_to_strings
+FAILED tests/test_training_execution_v2_thresholds.py::test_pre_training_decay_ranges_by_year
+FAILED tests/test_training_execution_v2_thresholds.py::test_rebound_modifier_uses_half_point_accrual_from_rebounding_and_scrimmages
+FAILED tests/test_training_execution_v2_thresholds.py::test_fight_and_discipline_share_training_bucket_randint_pairs
+FAILED tests/test_training_execution_v2_thresholds.py::test_standard_and_chemistry_training_bucket_ranges
+FAILED tests/test_training_execution_v2_thresholds.py::test_rebound_modifier_training_bucket_ranges
+FAILED tests/test_training_execution_v2_thresholds.py::test_rebound_modifier_training_keeps_two_decimal_precision
+FAILED tests/test_training_execution_v2_thresholds.py::test_training_gain_is_halved_when_player_starts_above_100
+FAILED tests/test_training_execution_v2_thresholds.py::test_training_gain_is_not_reduced_when_player_starts_at_99
+FAILED tests/test_training_gain_resolution.py::test_fractional_remainder_accumulates_across_weeks
+FAILED tests/test_training_gain_resolution.py::test_fit_and_class_are_gain_multipliers_not_budget_prices
+FAILED tests/test_training_gain_resolution.py::test_senior_wall_full_allocation_remains_meaningfully_positive_over_season
+FAILED tests/test_training_position_contract.py::test_all_position_consumers_use_the_canonical_resolver_or_projection
+FAILED tests/test_transition_registry.py::TestTransitionRegistry::test_registry_has_43_transitions
+FAILED tests/test_transition_registry.py::TestTransitionRegistry::test_hco_transitions
+FAILED tests/test_transition_registry.py::TestTransitionRegistry::test_oreb_transitions
+FAILED tests/test_transition_system.py::TestTransitionSystem::test_opening_tip_to_hco
+FAILED tests/test_transition_system.py::TestTransitionSystem::test_inbound_pass_to_hco
+FAILED tests/test_transition_system.py::TestTransitionSystem::test_hco_made_shot_to_inbound_pass
+FAILED tests/test_turn_manager.py::test_playcalls_are_set - AssertionError: a...
+FAILED tests/test_turn_manager.py::test_turn_result_includes_possession_ids
+FAILED tests/test_turn_manager_clock_shot_families.py::test_make_shot_family_burns_elapsed_and_resets_next_turn_shot_clock
+FAILED tests/test_weekly_recruiting_training_flow.py::test_fcc_current_week_invite_recruit_returns_assigned_visit_after_processing
+FAILED tests/test_weekly_recruiting_training_flow.py::test_fcc_current_week_invite_recruit_returns_top_remaining_order
+FAILED tests/test_weekly_recruiting_training_flow.py::test_save_recruiting_orders_week20_only_persists_orders
+127 failed, 2227 passed, 6 skipped, 1 xfailed, 3799 warnings in 158.10s (0:02:38)
