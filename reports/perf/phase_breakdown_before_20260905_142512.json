@@ -1,0 +1,298 @@
+{
+  "generated_at": "2026-09-05T14:26:08",
+  "git_commit": "4ee7368a2c4718b20f2588f66228f6c1c677d7ad",
+  "git_dirty": true,
+  "franchise_id": "6a199cdce8273f067959be3e",
+  "week": 1,
+  "mode": "cpu",
+  "workers": 1,
+  "seed": 42,
+  "probes_installed": 56,
+  "python": "3.13.5",
+  "host": "Darwin x86_64",
+  "batches": {
+    "cpu_full": {
+      "workers": 1,
+      "timing": {
+        "games": 8,
+        "total_wall_s": 50.358,
+        "sum_game_s": 50.355,
+        "min_s": 2.6583,
+        "median_s": 5.821,
+        "mean_s": 6.294,
+        "p90_s": 11.544,
+        "max_s": 11.5438
+      },
+      "phases": {
+        "core.micro_turn": {
+          "self_s": 16.81726534391055,
+          "incl_s": 40.62437167781172,
+          "calls": 1878
+        },
+        "anim.position_defenders": {
+          "self_s": 14.749031250539701,
+          "incl_s": 14.749031250539701,
+          "calls": 2808
+        },
+        "core.hco": {
+          "self_s": 4.722518362395931,
+          "incl_s": 21.79332496220013,
+          "calls": 1036
+        },
+        "emit.animation_steps": {
+          "self_s": 1.7221508788061328,
+          "incl_s": 2.6120968345203437,
+          "calls": 2684
+        },
+        "db.read.teams._refresh": {
+          "self_s": 1.6800794192240573,
+          "incl_s": 1.6800794192240573,
+          "calls": 48
+        },
+        "db.read.franchise_team_data._refresh": {
+          "self_s": 1.554746751789935,
+          "incl_s": 1.554746751789935,
+          "calls": 48
+        },
+        "anim.compute_defender_grid": {
+          "self_s": 1.4252201253548265,
+          "incl_s": 16.58036495052511,
+          "calls": 2808
+        },
+        "db.read.franchises._refresh": {
+          "self_s": 1.377087292901706,
+          "incl_s": 1.377087292901706,
+          "calls": 40
+        },
+        "core.macro_turn": {
+          "self_s": 1.3672265424393117,
+          "incl_s": 42.88191845675465,
+          "calls": 1878
+        },
+        "setup.lineup": {
+          "self_s": 1.2918946701684035,
+          "incl_s": 1.455360253166873,
+          "calls": 224
+        },
+        "db.read.franchise_players_data._refresh": {
+          "self_s": 0.6869574999436736,
+          "incl_s": 0.6869574999436736,
+          "calls": 32
+        },
+        "db.read.players._refresh": {
+          "self_s": 0.5654348337557167,
+          "incl_s": 0.5654348337557167,
+          "calls": 32
+        },
+        "core.shot_resolution": {
+          "self_s": 0.5074441665201448,
+          "incl_s": 0.5074441665201448,
+          "calls": 792
+        },
+        "anim.build_all_animations": {
+          "self_s": 0.40611357463058084,
+          "incl_s": 15.155144825170282,
+          "calls": 2808
+        },
+        "core.append_turn": {
+          "self_s": 0.37584713188698515,
+          "incl_s": 0.4094366319477558,
+          "calls": 3219
+        },
+        "core.clock": {
+          "self_s": 0.31935735791921616,
+          "incl_s": 0.31935735791921616,
+          "calls": 2423
+        },
+        "db.read.plays._refresh": {
+          "self_s": 0.16343441599747166,
+          "incl_s": 0.16343441599747166,
+          "calls": 2
+        },
+        "core.oreb_turn": {
+          "self_s": 0.1466080847894773,
+          "incl_s": 0.18987008795375004,
+          "calls": 165
+        },
+        "setup.gm_init": {
+          "self_s": 0.09531545842764899,
+          "incl_s": 4.030924746999517,
+          "calls": 8
+        },
+        "core.final_turn_shot": {
+          "self_s": 0.06991908611962572,
+          "incl_s": 0.08890637580770999,
+          "calls": 34
+        },
+        "core.free_throw": {
+          "self_s": 0.053341212566010654,
+          "incl_s": 0.05431270570261404,
+          "calls": 407
+        },
+        "setup.ftd_prepare": {
+          "self_s": 0.050547040067613125,
+          "incl_s": 0.08026304008672014,
+          "calls": 16
+        },
+        "db.read.defenses._refresh": {
+          "self_s": 0.029679832980036736,
+          "incl_s": 0.029679832980036736,
+          "calls": 2
+        },
+        "serialize.summary": {
+          "self_s": 0.017609835020266473,
+          "incl_s": 1.0616195409675129,
+          "calls": 8
+        },
+        "core.determine_next_turn": {
+          "self_s": 0.005067102727480233,
+          "incl_s": 0.005067102727480233,
+          "calls": 2043
+        },
+        "anim.skeleton_to_animations": {
+          "self_s": 0.00431481865234673,
+          "incl_s": 0.00431481865234673,
+          "calls": 2033
+        },
+        "setup.opening_tip": {
+          "self_s": 0.0039027929306030273,
+          "incl_s": 0.0039027929306030273,
+          "calls": 8
+        },
+        "db.read.teams.find_one": {
+          "self_s": 0.002191823848988861,
+          "incl_s": 1.6834092450444587,
+          "calls": 48
+        },
+        "anim.capture_halfcourt": {
+          "self_s": 0.002188626502174884,
+          "incl_s": 0.002188626502174884,
+          "calls": 960
+        },
+        "db.read.franchises.find_one": {
+          "self_s": 0.0016966222319751978,
+          "incl_s": 1.3796305819414556,
+          "calls": 40
+        },
+        "db.read.franchise_team_data.find_one": {
+          "self_s": 0.0013364592450670898,
+          "incl_s": 1.3446131671080366,
+          "calls": 32
+        },
+        "db.read.teams.find": {
+          "self_s": 0.00113800197141245,
+          "incl_s": 0.00113800197141245,
+          "calls": 48
+        },
+        "anim.capture_free_throw": {
+          "self_s": 0.0009714931366033852,
+          "incl_s": 0.0009714931366033852,
+          "calls": 407
+        },
+        "db.read.franchise_team_data.find": {
+          "self_s": 0.0008639139705337584,
+          "incl_s": 0.0008639139705337584,
+          "calls": 40
+        },
+        "db.read.franchises.find": {
+          "self_s": 0.0008466668077744544,
+          "incl_s": 0.0008466668077744544,
+          "calls": 40
+        },
+        "db.read.franchise_players_data.find": {
+          "self_s": 0.0005044189747422934,
+          "incl_s": 0.0005044189747422934,
+          "calls": 16
+        },
+        "db.read.players.find": {
+          "self_s": 0.0004285819595679641,
+          "incl_s": 0.0004285819595679641,
+          "calls": 16
+        },
+        "anim.capture_fast_break": {
+          "self_s": 0.0002875051577575505,
+          "incl_s": 0.0002875051577575505,
+          "calls": 104
+        },
+        "db.read.defenses.find": {
+          "self_s": 3.6167039070278406e-05,
+          "incl_s": 3.6167039070278406e-05,
+          "calls": 1
+        },
+        "db.read.plays.find": {
+          "self_s": 3.1167000997811556e-05,
+          "incl_s": 3.1167000997811556e-05,
+          "calls": 1
+        }
+      },
+      "per_game": [
+        {
+          "kind": "cpu_full",
+          "matchup": "Upper Peninsula @ Durham",
+          "seed": 42,
+          "wall_s": 8.5761,
+          "away_score": 57,
+          "home_score": 78
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Mynsk @ Nickel Beach",
+          "seed": 43,
+          "wall_s": 7.8524,
+          "away_score": 31,
+          "home_score": 103
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Sacred Heart @ IDA",
+          "seed": 44,
+          "wall_s": 6.8588,
+          "away_score": 55,
+          "home_score": 65
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Cleveland-Carlysle @ Cagers World",
+          "seed": 45,
+          "wall_s": 3.3139,
+          "away_score": 73,
+          "home_score": 64
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Ann Arbor @ Morristown",
+          "seed": 46,
+          "wall_s": 4.7832,
+          "away_score": 79,
+          "home_score": 93
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Hardwood Fields @ Chapel Hill",
+          "seed": 47,
+          "wall_s": 2.6583,
+          "away_score": 37,
+          "home_score": 87
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "North Columbus @ Little York",
+          "seed": 48,
+          "wall_s": 4.769,
+          "away_score": 49,
+          "home_score": 73
+        },
+        {
+          "kind": "cpu_full",
+          "matchup": "Archbishop McClellan @ Appalachia",
+          "seed": 49,
+          "wall_s": 11.5438,
+          "away_score": 69,
+          "home_score": 73
+        }
+      ],
+      "failures": [],
+      "table": "phase                                  self_s   % total     incl_s       calls\n------------------------------------------------------------------------------\ncore.micro_turn                         16.82     33.4%      40.62       1,878\nanim.position_defenders                 14.75     29.3%      14.75       2,808\ncore.hco                                 4.72      9.4%      21.79       1,036\nemit.animation_steps                     1.72      3.4%       2.61       2,684\ndb.read.teams._refresh                   1.68      3.3%       1.68          48\ndb.read.franchise_team_data._refresh       1.55      3.1%       1.55          48\nanim.compute_defender_grid               1.43      2.8%      16.58       2,808\ndb.read.franchises._refresh              1.38      2.7%       1.38          40\ncore.macro_turn                          1.37      2.7%      42.88       1,878\nsetup.lineup                             1.29      2.6%       1.46         224\ndb.read.franchise_players_data._refresh       0.69      1.4%       0.69          32\ndb.read.players._refresh                 0.57      1.1%       0.57          32\ncore.shot_resolution                     0.51      1.0%       0.51         792\nanim.build_all_animations                0.41      0.8%      15.16       2,808\ncore.append_turn                         0.38      0.7%       0.41       3,219\ncore.clock                               0.32      0.6%       0.32       2,423\ndb.read.plays._refresh                   0.16      0.3%       0.16           2\ncore.oreb_turn                           0.15      0.3%       0.19         165\nsetup.gm_init                            0.10      0.2%       4.03           8\ncore.final_turn_shot                     0.07      0.1%       0.09          34\ncore.free_throw                          0.05      0.1%       0.05         407\nsetup.ftd_prepare                        0.05      0.1%       0.08          16\ndb.read.defenses._refresh                0.03      0.1%       0.03           2\nserialize.summary                        0.02      0.0%       1.06           8\ncore.determine_next_turn                 0.01      0.0%       0.01       2,043\nanim.skeleton_to_animations              0.00      0.0%       0.00       2,033\nsetup.opening_tip                        0.00      0.0%       0.00           8\ndb.read.teams.find_one                   0.00      0.0%       1.68          48\nanim.capture_halfcourt                   0.00      0.0%       0.00         960\ndb.read.franchises.find_one              0.00      0.0%       1.38          40\ndb.read.franchise_team_data.find_one       0.00      0.0%       1.34          32\ndb.read.teams.find                       0.00      0.0%       0.00          48\nanim.capture_free_throw                  0.00      0.0%       0.00         407\ndb.read.franchise_team_data.find         0.00      0.0%       0.00          40\ndb.read.franchises.find                  0.00      0.0%       0.00          40\ndb.read.franchise_players_data.find       0.00      0.0%       0.00          16\ndb.read.players.find                     0.00      0.0%       0.00          16\nanim.capture_fast_break                  0.00      0.0%       0.00         104\ndb.read.defenses.find                    0.00      0.0%       0.00           1\ndb.read.plays.find                       0.00      0.0%       0.00           1\n------------------------------------------------------------------------------\n(unprofiled / harness overhead)          0.14      0.3%\nTOTAL WALL                              50.36    100.0%"
+    }
+  }
+}
