@@ -6,6 +6,36 @@ function playSound(filename) {
   } catch (e) {}
 }
 
+const MODE_SELECT_MUSIC_VOLUME = 0.4;
+const MODE_SELECT_MUSIC_FADE_MS = 600;
+let modeSelectMusic = null;
+let modeSelectMusicIsFading = false;
+
+function navigateFromModeSelect(url) {
+  if (modeSelectMusicIsFading) return;
+  if (!modeSelectMusic || modeSelectMusic.paused) {
+    window.location.href = url;
+    return;
+  }
+
+  modeSelectMusicIsFading = true;
+  const startingVolume = modeSelectMusic.volume;
+  const startedAt = performance.now();
+
+  function fadeFrame(now) {
+    const progress = Math.min((now - startedAt) / MODE_SELECT_MUSIC_FADE_MS, 1);
+    modeSelectMusic.volume = startingVolume * (1 - progress);
+    if (progress < 1) {
+      window.requestAnimationFrame(fadeFrame);
+      return;
+    }
+    modeSelectMusic.pause();
+    window.location.href = url;
+  }
+
+  window.requestAnimationFrame(fadeFrame);
+}
+
 const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_version';
 const ALPHA_DISCLAIMER_VERSION = '2026-08-12-player-attributes-alpha-box';
 
@@ -1378,7 +1408,7 @@ function goToFranchiseCommandCenter(franchiseId) {
         game_id: runtime.activeGameResume && runtime.activeGameResume.game_id,
         url: resumeUrl,
       });
-      window.location.href = resumeUrl;
+      navigateFromModeSelect(resumeUrl);
       return;
     }
     if (runtime.cpuSimResume) {
@@ -1390,17 +1420,17 @@ function goToFranchiseCommandCenter(franchiseId) {
         franchise_id: franchiseData.franchise_id,
         week: runtime.cpuSimResume.week,
       });
-      window.location.href = './franchise-command-center.html?' + params.toString();
+      navigateFromModeSelect('./franchise-command-center.html?' + params.toString());
       return;
     }
     console.warn('[MODE-RESUME-CLIENT] route fcc', {
       franchise_id: franchiseData.franchise_id,
     });
-    window.location.href = './franchise-command-center.html?franchise_id=' + encodeURIComponent(franchiseData.franchise_id);
+    navigateFromModeSelect('./franchise-command-center.html?franchise_id=' + encodeURIComponent(franchiseData.franchise_id));
     return;
   }
   console.warn('[MODE-RESUME-CLIENT] route franchise select', { franchiseId: franchiseId });
-  window.location.href = './franchise-select-team.html';
+  navigateFromModeSelect('./franchise-select-team.html');
 }
 
 /** Tutorial alert "I'll do this later" for Player Attributes → FCC when a franchise exists. */
@@ -1484,7 +1514,7 @@ function closeSlotsFullModal() {
 function goToNewFranchise(homeSlot) {
   const slot = Number(homeSlot);
   const q = (slot === 1 || slot === 2) ? ('?home_slot=' + encodeURIComponent(String(slot))) : '';
-  window.location.href = './franchise-select-team.html' + q;
+  navigateFromModeSelect('./franchise-select-team.html' + q);
 }
 
 function startNewFranchiseFlow(homeSlot) {
@@ -1663,10 +1693,10 @@ document.addEventListener('DOMContentLoaded', async function () {
   wireAlphaBanner();
 
   try {
-    const lobbyMusic = new Audio('/sounds/Championship_Gridlock.mp4');
-    lobbyMusic.loop = true;
-    lobbyMusic.volume = 0.4;
-    lobbyMusic.play().catch(function () {});
+    modeSelectMusic = new Audio('/sounds/Championship_Gridlock.mp4');
+    modeSelectMusic.loop = true;
+    modeSelectMusic.volume = MODE_SELECT_MUSIC_VOLUME;
+    modeSelectMusic.play().catch(function () {});
   } catch (e) {}
 
   try {
