@@ -454,6 +454,11 @@ def _build_pass_ahead_steps(
                 clock_remaining_at_start=clock_r,
                 shot_clock_remaining_at_start=shot_r,
                 next_step_index=len(steps) + 1,
+                # Carry unfinished movement forward so the cast keeps running
+                # during the pass instead of freezing. On the FIRST hop there is
+                # no prior step here, so that one still holds -- the preceding
+                # step lives outside this helper. See animation_worklist.md.
+                previous_step=steps[-1] if steps else None,
                 pass_speed_grid_per_game_sec=float(PASS_GRID_SPOTS_PER_GAME_SECOND),
                 metadata_reason="after_steal_pass_ahead",
             )

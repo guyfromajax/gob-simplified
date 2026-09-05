@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from BackEnd.constants import (
     INBOUND_PASS_GRID_PER_GAME_SECOND,
@@ -689,6 +689,68 @@ def _build_handoff_converge_substep(
     return {"start": start, "end": end}
 
 
+class _ContinueFromPrevious:
+    """Sentinel default for ``build_pass_step(continuing_targets=...)``.
+
+    Means "carry each player's unfinished movement forward from
+    ``previous_step``". It exists so that FREEZING the other eight players is
+    something a caller has to type, rather than what happens when nobody
+    decides. See projects/animation_cleanup_findings.md §2 (root cause #1):
+    the old ``None`` default made every non-opted-in builder freeze the court,
+    which is why the fast-break freeze survived five or six fixes -- each fix
+    populated one call site and the default reintroduced it at the next.
+    """
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "CONTINUE_FROM_PREVIOUS"
+
+
+CONTINUE_FROM_PREVIOUS = _ContinueFromPrevious()
+
+
+def _continuing_targets_from_previous_step(
+    *,
+    previous_step: Optional[AnimationStep],
+    start_coords: Dict[str, GridCoord],
+    exclude: tuple = (),
+) -> Optional[Dict[str, GridCoord]]:
+    """Derive per-player continuing targets from the prior step's intent.
+
+    ``end.coords`` says where a player actually reached; the prior step's
+    ``start.destination`` retains where he was still TRYING to go. Continue only
+    players with meaningful remaining distance. Mirrors the rule in
+    ``rim_runner_step_emitter._initialize_continuing_movement``; kept local so
+    ``utils`` does not import from ``engine``.
+
+    Returns ``None`` (freeze) when there is no prior step to read, so a caller
+    that cannot supply one degrades to the old behaviour instead of raising.
+    """
+    if not previous_step:
+        return None
+
+    prior_start = previous_step.get("start") or {}
+    prior_destinations = prior_start.get("destination") or {}
+
+    targets: Dict[str, GridCoord] = {}
+    for pid, start_coord in start_coords.items():
+        if pid in exclude:
+            continue
+        target = prior_destinations.get(pid)
+        if not target:
+            continue
+        try:
+            coord: GridCoord = {"x": float(target["x"]), "y": float(target["y"])}
+        except (KeyError, TypeError, ValueError):
+            continue
+        if _euclid(start_coord, coord) < 1e-6:
+            continue
+        targets[pid] = coord
+
+    return targets or None
+
+
 def build_pass_step(
     *,
     off_lineup: Dict[str, Any],
@@ -696,7 +758,10 @@ def build_pass_step(
     start_coords: Dict[str, GridCoord],
     passer_id: str,
     receiver_id: str,
-    continuing_targets: Optional[Dict[str, GridCoord]] = None,
+    continuing_targets: Union[Dict[str, GridCoord], None, _ContinueFromPrevious] = (
+        CONTINUE_FROM_PREVIOUS
+    ),
+    previous_step: Optional[AnimationStep] = None,
     continuing_archetype: PlayerArchetype = "standard",
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
@@ -707,9 +772,14 @@ def build_pass_step(
     """Universal Pass step. Strict shape: passer + receiver stationary while
     the ball arcs between them; gated on ``ball_reaches_player``.
 
-    Other 8 players optionally drift toward per-player ``continuing_targets``
-    at ``continuing_archetype`` rate (interrupted by step duration). Pass
-    over ``continuing_targets=None`` to freeze everyone except passer/receiver.
+    Other 8 players drift toward per-player ``continuing_targets`` at
+    ``continuing_archetype`` rate (interrupted by step duration).
+
+    ``continuing_targets`` defaults to ``CONTINUE_FROM_PREVIOUS``: targets are
+    derived from ``previous_step``'s retained destinations, so players who were
+    still moving keep moving. Pass an explicit dict to choose targets, or an
+    explicit ``None`` to freeze everyone except passer/receiver -- the freeze is
+    now a decision a caller states, not the default nobody chose.
 
     Step duration = pass distance / pass speed (floor: FB_PASS_MIN_GAME_SECONDS).
 
@@ -736,6 +806,13 @@ def build_pass_step(
 
     actions[passer_id] = "pass"
     actions[receiver_id] = "receive"
+
+    if continuing_targets is CONTINUE_FROM_PREVIOUS:
+        continuing_targets = _continuing_targets_from_previous_step(
+            previous_step=previous_step,
+            start_coords=start_coords,
+            exclude=(passer_id, receiver_id),
+        )
 
     if continuing_targets:
         for pid, target in continuing_targets.items():
