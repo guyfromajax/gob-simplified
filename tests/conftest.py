@@ -91,6 +91,23 @@ def seed_canonical_teams_for_mongomock(request):
     yield
 
 
+@pytest.fixture(autouse=True)
+def seed_rng_streams(request, override_auth_for_tests, seed_canonical_teams_for_mongomock):
+    """Pin every RNG stream per test, so a subset run reproduces the full-suite result.
+
+    Depends on the other two autouse fixtures ON PURPOSE, to run LAST. Seeding earlier
+    would not survive them: ``seed_canonical_teams_for_mongomock`` does a variable amount
+    of mongomock work depending on what the previous test left behind, and DB writes
+    consume the stdlib stream (see tests/rng_fixtures.py). The test body would then start
+    from a stream position that depends on its predecessors — the very coupling this
+    removes.
+    """
+    from tests.rng_fixtures import seed_all_streams
+
+    seed_all_streams(request.node.nodeid)
+    yield
+
+
 @pytest.fixture
 def mock_game_manager():
     # Uses team names that must exist in your database

@@ -1,6 +1,24 @@
-# Test suite baseline — captured 2026-09-04
-# Environment: Python 3.13 / pytest 8.4.2 (local venv). Reproduced identically on 3.10 / pytest 9.1.1.
-# Totals: 127 failed, 2227 passed, 6 skipped, 1 xfailed, 2361 collected.
+# Test suite baseline — captured 2026-09-05
+#
+# A BASELINE IS VALID ONLY FOR THE VENV THAT PRODUCED IT.
+# This one: ./venv, Python 3.13.5, pytest 8.4.2, PYTHONHASHSEED unset.
+# A different interpreter or dependency set will differ for reasons that have
+# nothing to do with your change. Regenerate before trusting a diff, and do not
+# compare a run from one venv against a baseline from another.
+#
+# Verified: 114 failures, identical across three consecutive full-suite runs.
+#
+# Determinism: tests/rng_fixtures.py seeds all four RNG streams per test (stdlib
+# random, sim_rng, announcement_rng, training_rng) off a hashlib digest of the
+# test nodeid. A SUBSET run now reproduces the full-suite result for the tests it
+# covers, so this file gates a single file or directory, not just the whole suite.
+# Before that fixture, five identical runs of three motion/setplay files failed
+# 6, 9, 6, 5 and 8 tests.
+#
+# Hash-order determinism is a SEPARATE axis and is not pinned here. If you need
+# it, set it in the environment — PYTHONHASHSEED=0 python -m pytest ...
+# Never call BackEnd.utils.repro.pin_hash_seed() from conftest: it re-execs the
+# interpreter (bugs.md, 2026-09-04 UPDATE).
 #
 # Regenerate:
 #   python -m pytest tests/test_*.py -o addopts="" --maxfail=99999 \
@@ -22,12 +40,11 @@ tests/test_load_franchise_names.py::test_load_franchise_names_invalid_json
 tests/test_load_franchise_names.py::test_load_franchise_names_missing_file
 tests/test_mode_init_system.py::test_init_team_attributes_franchise_ranges
 tests/test_motion_dynamic_resolver.py::test_missed_gamble_abandons_skeleton_and_drives
+tests/test_motion_dynamic_resolver.py::test_walk_no_shot_forces_terminal_shot
 tests/test_motion_dynamic_resolver.py::test_walk_picks_first_shot_decision
 tests/test_motion_dynamic_resolver.py::test_walk_weaves_subtle_beat_then_resumes_and_shoots
 tests/test_motion_moment.py::test_moment_walk_dead_ball_maps_to_hco_result_type
-tests/test_motion_moment.py::test_moment_walk_fouls_map
-tests/test_motion_moment.py::test_moment_walk_option_b_no_tags_after_terminal
-tests/test_motion_moment.py::test_moment_walk_option_b_tags_every_non_terminal_contest
+tests/test_motion_moment.py::test_moment_walk_fires_steal
 tests/test_motion_should_shoot.py::test_dish_to_better_positioned_teammate
 tests/test_motion_should_shoot.py::test_openness_lifts_a_sub_threshold_look_over_the_bar
 tests/test_motion_should_shoot.py::test_random_tier_shoots_or_progresses_on_coin_flip
@@ -60,21 +77,9 @@ tests/test_possession_changes.py::TestPossessionChanges::test_made_shot_no_foul_
 tests/test_possession_changes.py::TestPossessionChanges::test_made_shot_with_foul_does_not_flip_possession
 tests/test_possession_changes.py::TestPossessionChanges::test_missed_shot_defensive_rebound_flips_possession
 tests/test_possession_changes.py::TestPossessionChanges::test_missed_shot_offensive_rebound_does_not_flip_possession
+tests/test_possession_changes.py::TestPossessionChanges::test_offensive_rebound_putback_make_flips_possession
 tests/test_possession_changes.py::TestPossessionIntegrity::test_no_possession_switch_when_false
 tests/test_possession_changes.py::TestPossessionIntegrity::test_possession_switch_updates_teams
-tests/test_quarter_starts.py::test_all_quarters_possession_pattern
-tests/test_quarter_starts.py::test_q2_baseline_inbound_structure
-tests/test_quarter_starts.py::test_q2_possession_loser_gets_ball
-tests/test_quarter_starts.py::test_q2_starts_with_baseline_inbound
-tests/test_quarter_starts.py::test_q3_baseline_inbound_structure
-tests/test_quarter_starts.py::test_q3_possession_loser_gets_ball
-tests/test_quarter_starts.py::test_q3_starts_with_baseline_inbound
-tests/test_quarter_starts.py::test_q4_baseline_inbound_structure
-tests/test_quarter_starts.py::test_q4_possession_winner_gets_ball
-tests/test_quarter_starts.py::test_q4_starts_with_baseline_inbound
-tests/test_quarter_transition_stats.py::test_api_game_endpoint_data
-tests/test_quarter_transition_stats.py::test_stats_persistence_across_quarters
-tests/test_real_quarter_stats.py::test_real_quarter_stats
 tests/test_rebound_in_progress_flag.py::test_rebound_in_progress_blocks_non_rebounder
 tests/test_rebound_possession_flip.py::test_defensive_rebound_flips_possession
 tests/test_rebounder_empty_pool.py::test_choose_rebounder_empty_pool_returns_none_and_no_indexerror
@@ -85,10 +90,10 @@ tests/test_rollup_game_to_franchise.py::test_rollup_game_to_franchise_idempotent
 tests/test_rollup_game_to_franchise.py::test_rollup_game_to_franchise_validates_stats
 tests/test_roster_api.py::test_roster_single_game_mode
 tests/test_roster_api.py::test_roster_with_tournament_id
-tests/test_setplay_dynamic_resolver.py::test_no_pressure_walks_static_skeleton_to_forced_shot
+tests/test_screenshot_tool.py::test_missing_selector_has_specific_bounded_failure
+tests/test_screenshot_tool.py::test_native_viewport_and_selector_screenshots
 tests/test_setplay_dynamic_resolver.py::test_offense_reads_forced_false
 tests/test_settings_application_to_gameplay.py::TestSettingsApplicationToGameplay::test_settings_loaded_and_applied_to_gameplay
-tests/test_settings_persistence.py::TestSettingsPersistence::test_playbook_settings_persist_into_gameplay
 tests/test_shot_manager.py::test_kickout_reset_event_payload
 tests/test_shot_manager.py::test_putback_event_payload_and_possession[True-False-True]
 tests/test_shot_system_regressions.py::test_fast_break_no_defender_path_does_not_crash
