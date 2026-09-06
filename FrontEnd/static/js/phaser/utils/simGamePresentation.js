@@ -746,7 +746,7 @@ function renderCalloutsDebug(el, cadence) {
  * @returns {Promise<void>}
  */
 export function showSimGamePresentation(timeline, opts = {}) {
-  const { teams, frames } = timeline || {};
+  const { teams, frames, meta } = timeline || {};
   ensureStyles();
   document.querySelectorAll('.sgp-root').forEach((n) => n.remove());
 
@@ -791,6 +791,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
 
   let highlightsOn = true;
   let cadence = null;
+  let lastRenderedFrame = null;
   let tipMeta = { cx: FIT_W / 2, cy: WORM_PLOT_H / 2, rising: true, w: FIT_W, h: WORM_PLOT_H };
 
   const dbgEl = calloutsDebugEnabled() ? document.createElement('div') : null;
@@ -988,6 +989,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
   };
 
   const renderFrame = (frame) => {
+    lastRenderedFrame = frame;
     const wormState = frame.worm && frame.worm.samples
       ? frame.worm
       : { samples: [{ elapsed: 0, margin: 0 }], elapsed: 0, domain: 4 * REG_Q_SEC };
@@ -1077,6 +1079,9 @@ export function showSimGamePresentation(timeline, opts = {}) {
       seed: (frames && frames.length) || 7,
       onCallout: (model) => showCallout(model),
     });
+    // Copy loads asynchronously. Prime from what is actually on screen if playback
+    // has moved; otherwise use the assembler's exact Sim Rest quarter-boundary score.
+    cadence.primeScore((lastRenderedFrame && lastRenderedFrame.score) || (meta && meta.startScore));
     cadence.suspend(!highlightsOn);
     root.__cadence = cadence;
     if (dbgEl) renderCalloutsDebug(dbgEl, cadence);

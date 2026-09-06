@@ -348,6 +348,7 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
   let exitTick = 0;
 
   const worm = []; // { elapsed, margin }[] — x is game time, never sample index
+  let joinBaselineScore = null;
   const frames = [];
   const reconciliation = { checks: 0, drifts: [] };
   let teamPanel = {
@@ -621,6 +622,19 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
       curQuarter = tQ;
     }
 
+    // Sim Rest joins on an exact quarter boundary. Earlier cumulative turns still
+    // rebuild score/stats/lineups, but they are not part of the visible worm. Seed
+    // one point at the boundary using the carried score before this quarter's first
+    // turn lands, so Q3 at 44-43 begins at Q3/44-43 rather than drawing from tip-off.
+    if (startQuarter > 1 && tQ >= startQuarter && !joinBaselineScore) {
+      joinBaselineScore = { away: sb.away, home: sb.home };
+      const startClock = startQuarter > 4 ? '4:00' : '8:00';
+      worm.push({
+        elapsed: elapsedGameSeconds(startQuarter, startClock),
+        margin: sb.home - sb.away,
+      });
+    }
+
     addDeltas(turn.deltas);
 
     // Foul-out tracking (persist).
@@ -660,7 +674,7 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
 
     // Worm history: elapsed game seconds (not sample index) + home−away margin.
     const elapsed = elapsedGameSeconds(sb.quarter, sb.clock);
-    worm.push({ elapsed, margin: sb.home - sb.away });
+    if (tQ >= startQuarter) worm.push({ elapsed, margin: sb.home - sb.away });
 
     // Emit playback frames only from startQuarter onward (Sim Rest joins at Q2+).
     if (tQ >= startQuarter) {
@@ -742,6 +756,7 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
       frameCount: frames.length,
       homeWon,
       gameWinner,
+      startScore: joinBaselineScore,
       reconciliation,
     },
   };

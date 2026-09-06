@@ -4479,34 +4479,7 @@ playNowBtn.addEventListener('click', async () => {
       } catch {}
       window.location.href = recruitingUrl;
     };
-    // Offer optional pre-recruiting cuts (real cuts — players lost forever).
-    const cutParams = new URLSearchParams();
-    cutParams.set('franchise_id', franchiseId);
-    cutParams.set('team_id', userTeamId);
-    cutParams.set('mode', 'cut');
-    cutParams.set('from', 'week35');
-    cutParams.set('next_url', recruitingUrl);
-    const cutUrl = `/cut-players.html?${cutParams.toString()}`;
-
-    const overlay = document.createElement('div');
-    overlay.className = 'gob-modal-overlay fcc-cut-required-modal is-visible';
-    overlay.setAttribute('aria-hidden', 'false');
-    overlay.innerHTML = `
-      <div class="gob-modal-backdrop"></div>
-      <div class="gob-modal-box" role="dialog" aria-modal="true" aria-labelledby="fcc-wk35-cut-title" aria-describedby="fcc-wk35-cut-copy">
-        <div class="gob-modal-accent"></div>
-        <div class="gob-modal-body">
-          <h3 id="fcc-wk35-cut-title" class="gob-modal-title">Cut Players?</h3>
-          <p id="fcc-wk35-cut-copy" class="gob-modal-subtitle">Would you like to cut any players ahead of recruiting? Note any players cut will be lost forever, but you will open additional slots for recruiting.</p>
-        </div>
-        <div class="gob-modal-actions">
-          <button type="button" class="gob-modal-btn-secondary" id="fcc-wk35-cut-yes">Cut Players</button>
-          <button type="button" class="gob-modal-btn-primary" id="fcc-wk35-cut-no">No Cuts</button>
-        </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    overlay.querySelector('#fcc-wk35-cut-yes')?.addEventListener('click', () => { window.location.href = cutUrl; });
-    overlay.querySelector('#fcc-wk35-cut-no')?.addEventListener('click', () => { overlay.remove(); goRecruiting(); });
+    await goRecruiting();
     return;
   }
 

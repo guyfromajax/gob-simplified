@@ -126,6 +126,13 @@ export class CalloutCadence {
   /** HIGHLIGHTS off — suppress all callouts; nothing queues. */
   suspend(on) { this.suspended = !!on; }
 
+  /** Establish carried game state without treating it as a new scoring event. */
+  primeScore(score) {
+    if (!score) return;
+    this.lastScore = { away: num(score.away), home: num(score.home) };
+    this.run = { side: null, pts: 0 };
+  }
+
   profile() {
     const q = Math.min(4, Math.max(1, this.quarter));
     return QUARTER_PROFILES[q - 1];
@@ -302,7 +309,9 @@ export class CalloutCadence {
     });
 
     const sc = frame.score || {};
-    const prev = this.lastScore || { away: 0, home: 0 };
+    // A cadence may attach after playback has begun while its copy pack loads. Its
+    // first observed scoreboard is baseline state, never a run from an assumed 0-0.
+    const prev = this.lastScore || { away: num(sc.away), home: num(sc.home) };
     const dAway = num(sc.away) - num(prev.away);
     const dHome = num(sc.home) - num(prev.home);
     const scoreChanged = dAway > 0 || dHome > 0;

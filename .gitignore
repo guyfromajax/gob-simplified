@@ -37,3 +37,4 @@ assets_staging/
 # Portrait pipeline scratch output (reference bodies, QC sheets, sample
 # uniformed portraits, watermark extracts) — generated artifacts, never commit
 tmp/
+.claude/
