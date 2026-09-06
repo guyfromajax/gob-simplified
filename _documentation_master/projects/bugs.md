@@ -1,6 +1,5 @@
 ##Marketing
-1. Homepage redesign
-2. Update GM Games page
+1. Update GM Games page
 
 
 ##Monetization
@@ -23,7 +22,6 @@
 2. College and Pro setup
 3. Team Mod System
 4. Stronger week 36 CTA to review all Recrutiing results -- and carry forward results chart, not just report/rankings. Order chart within each conference by top to bottom team recruiting performance
-5. Change cuts from before Recruiting to assining to Practice Squad
 
 
 ##Animation
@@ -39,8 +37,6 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 2. Still missing EOQ perfection
-3. Region Tournament brackets skipped on FCC -- condition was user was eliminated and both R1 teams had a bye
-4. Don't show recruiting orders page for the few beats when running signing day
 5. Legacy shot handler crashes on turns with no animations[] (`ShotAnimationSystem.runSetupTween`)
    - Symptom: `TypeError: turnData.animations is not iterable`. Caught by `processShot`, so no crash,
      but that shot silently does not animate (possession appears to skip its shot).
@@ -168,7 +164,6 @@
 116. User account -- link X & Facebook?
 127. Get Aggressive / Get Conservative settings and Playcall Center buttons
 128. Add a badass design appraoch to New Stories
-129: Loose Balls!
 131. Centralized Turn Transition Helper / System
 137. Watermark free version of player headshots
 139. Mod system for uploading custom leagues
@@ -183,7 +178,6 @@
 ##Continuous Evolution (base is built)
 1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
 2. Advanced Topics tutorials
-4. Monetization plan
 5. Players as Characters
 
 
@@ -276,6 +270,82 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
 ---
 
 ## Open Investigations
+
+### `offensive_state` and `free_throws_remaining` are absent from the cache-refresh restore (found 2026-09-06)
+
+`game_state` is restored KEY BY KEY on the API path, so a key with no line in a restore
+function silently reverts to its `_init_game_state` default. This is the same class of hole
+that lost `frontcourt_established` before Phase 1B added it to these sites.
+
+**Missing from:**
+- `api.py:1652-1690` `refresh_game_cache_from_db` — restores `timeout_*`, `clock`,
+  `time_remaining`, `shot_clock_remaining`, `frontcourt_established`,
+  `frontcourt_ratcheted`, `score`, team fouls and timeouts. Neither FT key appears.
+- `api.py:5757-5768` deferred-computer-timeout clock restore — same omission.
+
+**Present in:** `api.py:1776-1778` (timeout resume) sets both, from
+`timeout_free_throws_remaining`.
+
+**Defaults it would revert to:** `offensive_state: "HCO"` (`game_manager.py:235`) and
+`free_throws_remaining: 0` (`:250`) — i.e. a pending free-throw trip becomes no trip at all.
+
+**TWO QUALIFICATIONS — do not overstate this.** It is logged as structural, not observed.
+1. **It is conditional, not per-turn.** `refresh_game_cache_from_db` overwrites a LIVE cached
+   GameManager key by key; it does not rebuild from defaults. Leaving `offensive_state` alone
+   therefore preserves the correct in-memory value, which is harmless. The loss requires the
+   GameManager to be reconstructed from defaults (cache miss / eviction) while a trip is
+   pending. Nobody has yet observed that sequence.
+2. **It is NOT the cause of any measured free-throw anomaly.** The 2026-09-06 "free throws
+   collapse when animation runs" result was a HARNESS ARTIFACT (see the retraction below) and
+   never touched this seam: nothing replaces `gm.game_state` anywhere except
+   `GameManager.__init__`, so `simulate_quarter` — which both probes used — never crosses a
+   restore seam at all.
+
+Not fixed here; found while investigating something else. The durable fix is the one Phase 1B
+argued for: stop restoring key by key, or gate the restore sites with a test that fails when a
+possession-scoped key has no line.
+
+### ⚠️ RETRACTED: "free throws collapse when animation runs" — harness artifact (2026-09-06)
+
+Recorded because it burned real measurement time twice, independently, and the trap is reusable.
+
+**The claim (WRONG):** with animation enabled, ~66% of awarded free-throw trips were never
+taken; shooting-foul awards specifically went to zero while non-shooting bonus awards survived.
+
+**The actual cause:** both probes built their "played" arm by assigning a `dict` subclass over
+`gm.game_state` AFTER construction. `game_manager.py:78-79` constructs `TurnManager(self)` and
+`ShotManager(self)` during `__init__`, and `shot_manager.py:286` does
+`self.game_state = game.game_state` — capturing the dict BY REFERENCE at that moment.
+`ShotManager` is the only object holding a construction-time reference; every other site takes
+`game.game_state` fresh inside a function. So the swap orphaned ShotManager on the pre-swap
+dict. Shooting fouls resolve inside ShotManager, so their awards were written to the orphan and
+were invisible to the dispatcher reading `gm.game_state`. Non-shooting fouls resolve in
+`phase_resolution`, which re-reads `game.game_state`, so they were honoured — which is exactly
+the "shooting vs non-shooting" split that looked like a real mechanism.
+
+**Reproduction:** swap the dict, then `gm.shot_manager.game_state["offensive_state"] =
+"FREE_THROW"`; `gm.game_state.get("offensive_state")` still returns `"HCO"`.
+
+**Tell that would have caught it immediately:** the arm that did NOT swap honoured ~97% of
+awards; EVERY arm that swapped landed at 23-36%, including an arm that blocked no flags at all.
+The confound tracked the swap, not the variable under test.
+
+**Fixes adopted:**
+- Never replace `gm.game_state`. To vary `_is_full_simulation` per call site, flip it IN PLACE
+  on the live dict for the duration of the call and restore after (depth-counted, since the
+  gated Animator methods nest). Measured leakage of that technique: 402 reads inside the flip
+  window, all from `BackEnd.models.animator`, ZERO from anywhere else.
+- Any harness that splits arms must report FT-awards-honoured for both arms alongside every
+  result, and refuse to print a comparison when the arms disagree on it. Count the award as
+  honoured if the free throw lands within a few turns, not strictly the next turn — a TIMEOUT
+  legitimately interposes, which is the entire reason a healthy arm scores ~97% and not 100%.
+
+**Scope of the retraction:** every `equiv-v1` figure is void, including the sim-vs-played
+divergence table (turns -10.5%, points -24.7%, BLOCK +77.2%, FREE_THROW -66.6%). The sim arm
+was never swapped and so was never confounded; only the played arm was. The
+`defender_placement` extraction commit is unaffected — its acceptance was before/after identity
+under one fixed harness plus two harness-independent proofs (byte-identical test baseline, and
+7 of 9 moved bodies AST-identical to their originals).
 
 ### "Play Quarter" Button Requires Two Clicks (Initialization Timing Bug)
 - **Issue**: On first page load, users must click "Play Quarter" twice to start the game. First click does nothing, second click works. When returning to the page (e.g., after navigating away and back), first click works correctly.
