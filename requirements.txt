@@ -22,3 +22,6 @@ Pillow
 numpy
 scipy
 boto3
+
+# Billing (Managed Payments / merchant of record). See BackEnd/services/stripe_client.py
+stripe

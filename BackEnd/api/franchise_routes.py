@@ -3925,6 +3925,27 @@ def _round1_not_started(bracket: dict[str, Any] | None) -> bool:
     return True
 
 
+def _region_direct_final_waiting(bracket: dict[str, Any] | None) -> bool:
+    """True for the valid dual-bye region shape: no R1 and an unplayed, seeded final."""
+    if not bracket or (bracket.get("round1") or []):
+        return False
+    final = bracket.get("final") or []
+    if len(final) != 1 or not isinstance(final[0], dict):
+        return False
+    matchup = final[0]
+    away = matchup.get("away_team")
+    home = matchup.get("home_team")
+
+    def _is_ready_team(value: Any) -> bool:
+        return bool(value) and not (isinstance(value, str) and value.startswith("R1_"))
+
+    return bool(
+        _is_ready_team(away)
+        and _is_ready_team(home)
+        and not matchup.get("winner")
+    )
+
+
 def _sanitize_bracket_for_reveal(bracket: dict[str, Any] | None, *, keep_final: bool = False) -> dict[str, Any]:
     b = deepcopy(bracket or {})
     for round_key in ("round1", "round2", "final"):
@@ -3963,7 +3984,10 @@ def _build_bracket_reveal_modal_payload(
         return None
 
     raw, seeds = _user_eos_bracket_and_seeds(franchise_doc, team_doc, tier)
-    if not raw or not _round1_not_started(raw):
+    phase_not_started = _round1_not_started(raw)
+    if tier == "region":
+        phase_not_started = phase_not_started or _region_direct_final_waiting(raw)
+    if not raw or not phase_not_started:
         return None
 
     if tier == "region":
@@ -3971,7 +3995,7 @@ def _build_bracket_reveal_modal_payload(
     else:
         bracket = _sanitize_bracket_for_reveal(raw)
 
-    if not bracket or not (bracket.get("round1") or []):
+    if not bracket or not ((bracket.get("round1") or []) or (bracket.get("final") or [])):
         return None
 
     return {
@@ -4013,7 +4037,13 @@ def _build_bracket_update_modal_payload(
         return None
 
     bracket, seeds = _user_eos_bracket_and_seeds(franchise_doc, team_doc, tier)
-    if not bracket or not _bracket_has_any_winner(bracket):
+    has_progress = _bracket_has_any_winner(bracket)
+    if tier == "region":
+        # With two conference double-winners, this region has no R1 games to produce
+        # a winner in week 30. Its ready final is nevertheless the correct week-31
+        # tournament status for both active and eliminated users in that region.
+        has_progress = has_progress or _region_direct_final_waiting(bracket)
+    if not bracket or not has_progress:
         return None
     if tier in ("conference", "national") and not (bracket.get("round1") or []):
         return None

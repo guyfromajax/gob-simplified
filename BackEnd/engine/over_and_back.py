@@ -42,6 +42,15 @@ def update_frontcourt_established(
 
     Call on the live ball-handler each loop beat and on the pass **catch spot**
     when frontcourt is established by pass receipt (not only by dribble advance).
+
+    "This possession" is a contract on the CALLER, not something this function
+    can enforce — it is pure, and returns only what the ``frontcourt_established``
+    it was handed and this ``xy`` imply. So the flag has to LIVE for the
+    possession: ``dynamic_hct`` carries it on ``game_state`` across turn seams and
+    only ``GameManager.reset_frontcourt_state`` clears it. Until 2026-09-06 the
+    caller kept it in a ``compute_dynamic_hct_turn`` local that reset every turn,
+    and this line over-promised: the 10-second rule re-armed mid-possession, and
+    an over-and-back after the establishing turn could not be detected at all.
     """
     if frontcourt_established:
         return True
@@ -131,6 +140,30 @@ def gate_offense_backcourt_reentry(
             ratcheted.add(pos)
         elif pos in ratcheted:
             off_coords[pos]["x"] = HALF_COURT_X
+
+
+def clamp_target_to_frontcourt(
+    current_xy: Dict[str, Any],
+    target_xy: Dict[str, Any],
+    is_away_offense: bool,
+) -> Dict[str, Any]:
+    """Stop a mover who is already at-or-past half court from targeting behind it.
+
+    AVOIDANCE ONLY, and deliberately gated on the mover's CURRENT side rather
+    than on ``frontcourt_established``: at target-selection time he has not yet
+    crossed back, so his own side is a sound proxy and needs no possession
+    bookkeeping. The same proxy is USELESS for detection — once he is behind the
+    line it reports "not established", which is inverted from what a violation
+    check needs. Detection must read the flag. Mirrors the clamp in
+    ``transition_bridge._pick_pg_receive_target``.
+    """
+    if in_backcourt(float(current_xy.get("x", 50)), is_away_offense):
+        return target_xy
+    x = float(target_xy.get("x", 50))
+    x = min(HALF_COURT_X, x) if is_away_offense else max(HALF_COURT_X, x)
+    clamped = dict(target_xy)
+    clamped["x"] = round(x, 1)
+    return clamped
 
 
 def should_hold_instead_of_backcourt_pass(

@@ -2420,18 +2420,28 @@ def compute_dynamic_hct_turn(
     # established). Empty for a defense-forced dead ball (FE renders a generic
     # travel/double-dribble) and for non-turnover outcomes.
     turnover_type = ""
-    # True once the ball crosses half court (x≥50 home / x≤50 away) this turn;
-    # clears when the turn ends. Drives the 10-second rule (no longer applies
-    # after establishment) and over-and-back detection on backcourt passes.
-    frontcourt_established = False
+    # True once the ball crosses half court (x≥50 home / x≤50 away) this
+    # POSSESSION. Carried on ``game_state`` exactly the way ``shot_clock_remaining``
+    # is — read here, written back at the single exit below — and cleared only by
+    # ``GameManager.reset_frontcourt_state`` at a possession boundary. It was a
+    # turn-local until 2026-09-06: the flag came back False on every turn after
+    # the one that crossed half court, which re-armed the 10-second rule
+    # mid-possession and left an over-and-back undetectable once the establishing
+    # turn ended.
+    frontcourt_established = bool(game_state.get("frontcourt_established", False))
     # One-beat grace for the first BH to establish frontcourt (dribble or pass
-    # receipt): backward outlet passes become hold instead of pass.
+    # receipt): backward outlet passes become hold instead of pass. Deliberately
+    # still TURN-local — it grants grace for the beat of establishment, and on a
+    # later turn of the same possession there is no such beat.
     frontcourt_grace_bh_pos: Optional[str] = None
     # Off-ball offenders who have crossed half court while frontcourt is
     # established. Once ratcheted, a player's back-movement is gated at x=50 on
     # every subsequent beat (he may sit on the line but not re-enter the
-    # backcourt). The live BH / in-flight receiver are never gated.
-    frontcourt_ratcheted: set = set()
+    # backcourt). The live BH / in-flight receiver are never gated. Possession-
+    # scoped alongside ``frontcourt_established``: a player who crossed on turn 1
+    # must stay ratcheted on turn 2, or the gate forgets him at the seam. Stored
+    # on game_state as a list (JSON-safe); a set only inside the engine.
+    frontcourt_ratcheted: set = set(game_state.get("frontcourt_ratcheted") or ())
     # D8 — set for the emergent foul/steal terminals. ``foul_team`` is
     # "OFFENSE" (charge) or "DEFENSE" (reach); ``foul_player`` / ``stealer``
     # carry the credited Player so the wrapper can record stats + route.
@@ -3409,6 +3419,15 @@ def compute_dynamic_hct_turn(
         # Iteration backstop hit without a terminal — settle into HCO.
         result_type = "HCO"
         text_suffix = text_suffix or " they break the trap & establish their half court offense"
+
+    # Carry the possession-scoped frontcourt state back out (mirrors the
+    # ``shot_clock_remaining`` carry seeded above). Every terminal in the loop
+    # reaches here via ``break``, so this is the single write-back point; the
+    # ``bail`` return above sits before the flags exist and correctly leaves
+    # game_state untouched. Only a possession boundary may clear these —
+    # ``GameManager.reset_frontcourt_state``.
+    game_state["frontcourt_established"] = frontcourt_established
+    game_state["frontcourt_ratcheted"] = sorted(frontcourt_ratcheted)
 
     # Engine returns intermediate data only — the emitter assembles the walk-up
     # step plus one schema step per loop segment.

@@ -684,6 +684,13 @@ def simulate_quarter(
     # restored NG values when returning from lineup screen
 
     # Handle quarter start possession
+    # Every branch below assigns ``offense_team`` directly instead of going
+    # through ``switch_possession``, so clear the possession-scoped frontcourt
+    # flags once here for all of them. Without this a quarter that ended with
+    # the ball in the frontcourt would start the next quarter's opening
+    # possession already "established" — no 10-second rule, and the first
+    # backcourt pass an instant over-and-back.
+    gm.reset_frontcourt_state()
     if start_with_inbound and starting_possession:
         # Use specified starting possession (for sim buttons)
         if starting_possession == "home":

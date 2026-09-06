@@ -452,12 +452,56 @@ HCO_STRING_SPOTS = {
     # low-x starting point (see HCT_System.md).
     "hct_inbound_pg": {"x": 10, "y": 25},
     "hct_inbound_sg": {"x": 15, "y": 35},
-    # FCP inbound-side setup spots (home orientation). Pre-flipped equivalents
-    # of the FCP skeleton's step-0 opp:True spots so BIP can place offense
-    # directly without re-applying opp logic downstream.
-    "fcp_inbound_pg": {"x": 15, "y": 15},
-    "fcp_inbound_sg": {"x": 11, "y": 36},
-    "fcp_outlet_pf": {"x": 43, "y": 25},
+}
+
+# ---- Pool classification for every HCO_STRING_SPOTS key -------------------
+# This table serves two masters: it is the half-court offensive VOCABULARY and
+# also the global named-spot REGISTRY that inbound setup draws from. Motion
+# freelance assumed the former and iterated all of it, so a player running
+# half-court offense could relocate onto an inbound spot behind the half-court
+# line. The fix is pool membership, not a runtime guard: an offensive relocate
+# target is an authoring decision, and no coordinate test can express
+# "frontcourt, but not for this" (the away-mirrored side-inbound spot at x=53
+# is geometrically frontcourt and still not a relocate target).
+#
+# Membership is listed positively and exhaustively, NOT as an opt-out list: a
+# new entry must choose a side. ``test_hco_spot_pool_classification`` fails on
+# any key in neither set, which is what catches the next one.
+#
+# OWNERSHIP BLUR, noted not fixed: ``hct_inbound_*`` are HCT spots living in a
+# table named HCO_*. That blur is what let FCP entries accumulate here too —
+# ``fcp_inbound_pg`` (15, 15), ``fcp_inbound_sg`` (11, 36) and
+# ``fcp_outlet_pf`` (43, 25) were removed on 2026-09-06 as dead data: their
+# only consumer, the ``FCP_SETUP_POSITIONS`` mapping, was deleted when FCP
+# moved to ``FCP_OFFENSE_SETUP_RANGES``, and the freelance pool was the sole
+# remaining reader. Splitting the registry from the vocabulary is the real fix.
+HCO_OFFENSIVE_SPOTS = frozenset({
+    "key",
+    "upper midWing", "lower midWing",
+    "upper wing", "lower wing",
+    "upper midCorner", "lower midCorner",
+    "upper corner", "lower corner",
+    "upper highPost", "lower highPost",
+    "upper midPost", "lower midPost",
+    "upper lowPost", "lower lowPost",
+    "topLane", "midLane", "basketSpot",
+    "upper apex", "lower apex",
+    "upper bird", "lower bird",
+    "upper midBaseline", "lower midBaseline",
+    "deep key",
+    "deep lower wing", "deep lower baseline",
+    "deep upper wing", "deep upper baseline",
+    "center court",
+    "upper center court wing", "upper center court baseline",
+    "lower center court wing", "lower center court baseline",
+})
+
+# Registry-only spots: real, live, and never an offensive relocate target.
+HCO_NON_OFFENSIVE_SPOTS = {
+    "inbound_left": "baseline inbounder spot (HCT_SETUP_POSITIONS['SF'])",
+    "inbound_right": "baseline inbounder spot, away-side mirror of inbound_left",
+    "hct_inbound_pg": "HCT inbound-side setup for PG (HCT_SETUP_POSITIONS)",
+    "hct_inbound_sg": "HCT inbound-side setup for SG (HCT_SETUP_POSITIONS)",
 }
 
 # ---- HCO Setup Positions ---------------------------------------------------

@@ -130,6 +130,10 @@ _HALF_COURT_ALLOWLIST: dict[tuple[str, str], tuple[int, str]] = {
 _AUDITED_MODULES = (
     "BackEnd/engine/dynamic_hct.py",
     "BackEnd/engine/over_and_back.py",
+    # Added 2026-09-06: HCO freelance became a frontcourt decision site when the
+    # avoidance clamp and the half-court-aware collision offset landed. Without
+    # it the audit had a blind spot exactly where the new logic lives.
+    "BackEnd/engine/motion_freelance.py",
     "BackEnd/engine/fcp_offball_attack.py",
 )
 
@@ -292,6 +296,30 @@ _PROVENANCE_ALLOWLIST: dict[tuple[str, str, str, str], tuple[str, str]] = {
         "in_backcourt",
         _PARAM,
     ): (_PARAM, "Ratchet reads the local x lifted from off_coords[pos]."),
+    (
+        "BackEnd/engine/motion_freelance.py",
+        "_resolve_collisions",
+        "in_backcourt",
+        _PARAM,
+    ): (
+        _PARAM,
+        "Two sites, same provenance: the group's own collided coord `cx` (lifted "
+        "from pos_actions[pos]['coords'], the beat's authored end) and the "
+        "derived `rear` offset. Keeps a frontcourt-side collision group from "
+        "being offset across the line.",
+    ),
+    (
+        "BackEnd/engine/over_and_back.py",
+        "clamp_target_to_frontcourt",
+        "in_backcourt",
+        "CALLER_SUPPLIED_XY",
+    ): (
+        _PARAM,
+        "Avoidance clamp; reads the mover's CURRENT xy the caller passed. Gates "
+        "on current side by design, NOT on frontcourt_established: at "
+        "target-selection time he has not crossed back yet, so his side is a "
+        "sound proxy. Unsound for detection — see the docstring.",
+    ),
     (
         "BackEnd/engine/dynamic_hct.py",
         "_in_backcourt",

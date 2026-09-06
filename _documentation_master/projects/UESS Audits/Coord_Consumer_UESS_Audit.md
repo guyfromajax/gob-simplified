@@ -160,3 +160,37 @@ Hits from G1 that name "backcourt" but decide something else, also ruled out:
 - 🟢 **F4 announcement gate** (LOW) — reads the emitted end; carried only on the duplication list.
 - ✅ **Over-and-back rule path, ratchet, cross-half urgency, post-steal clamp, PG midcourt clamp** — verified compliant; see the immune list for the coord and line behind each.
 - ⚪ **Both `test_over_and_back.py` failures** — diagnosed as test defects (mock argument order; a self-contradictory boundary assertion). Deliberately not fixed. The second one needs a product decision on `>` vs `>=` before anyone touches it.
+
+## Update 2026-09-06 — HCO freelance added as a consumer (Phase 3 avoidance)
+
+The audit's scope was HCT/FCP. HCO was not on it, and HCO turned out to be the
+one path that could actually put the ball behind the line: measured **4.15
+ball-handler incursions and 1.65 illegal passes per game**, rendered, with
+nothing detecting them. Three mechanisms, two of them data rather than logic:
+
+| Mechanism | Kind | Fix |
+|---|---|---|
+| `motion_freelance.py:135` nudge — `toward` is a coin flip, clamped only to `_X_MIN/_X_MAX = 2.0/98.0` | runtime | `over_and_back.clamp_target_to_frontcourt` |
+| Relocate pool iterated all 41 `HCO_STRING_SPOTS`, six of which sit behind the line | data / scoping | `HCO_OFFENSIVE_SPOTS` (positive, exhaustive membership) |
+| `_resolve_collisions` offset ±2 in x with no half-court bound — and the clamp above parks players on x=50, manufacturing collisions on the line | runtime interaction | `is_away_offense` param; group is translated forward, not mirrored |
+
+`fcp_inbound_pg` (15, 15), `fcp_inbound_sg` (11, 36) and `fcp_outlet_pf`
+(43, 25) were deleted as dead data: their only consumer, the
+`FCP_SETUP_POSITIONS` mapping, went away when FCP moved to
+`FCP_OFFENSE_SETUP_RANGES`, leaving the freelance pool as the sole reader.
+
+New provenance entries: `over_and_back.clamp_target_to_frontcourt` and
+`motion_freelance._resolve_collisions`. **`motion_freelance.py` was added to
+`_AUDITED_MODULES`** — without it the guard had a blind spot exactly where the
+new logic lives, which is how the collision leak survived the first
+measurement pass (it cut incursions 83 → 30, not to zero).
+
+Avoidance-only residual, same seeds: **0 handler incursions, 0 off-ball
+incursions, 0 illegal passes** over 3,176 beats / 20 games. Per the phase
+constraint, no PS/CH awareness roll was added — a roll with zero opportunities
+is dead code with a green test beside it.
+
+Note the ownership blur that produced this: `HCO_STRING_SPOTS` is both the
+half-court offensive vocabulary and the global named-spot registry, and
+`hct_inbound_*` still live in an `HCO_*` table. Splitting the two is the real
+fix; the classified sets are the guard until then.

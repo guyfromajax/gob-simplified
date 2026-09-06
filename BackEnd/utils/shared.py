@@ -3090,6 +3090,13 @@ def summarize_game_state(
         "clock": game.game_state.get("clock", "8:00"),  # ✅ TIMEOUT: Save clock for resume (same as quarter breaks)
         "time_remaining": game.game_state.get("time_remaining", 480),  # ✅ TIMEOUT: Save time_remaining for resume (same as quarter breaks)
         "shot_clock_remaining": game.game_state.get("shot_clock_remaining", min(30, game.game_state.get("time_remaining", 480))),
+        # Possession-scoped frontcourt state. Persisted alongside the shot clock
+        # because it has the same lifetime: both survive a turn seam and a
+        # timeout, and both are only reset at a possession boundary. Without
+        # these two lines a reload silently clears the flag mid-possession, which
+        # re-arms the 10-second rule and makes an over-and-back uncallable.
+        "frontcourt_established": bool(game.game_state.get("frontcourt_established", False)),
+        "frontcourt_ratcheted": list(game.game_state.get("frontcourt_ratcheted") or []),
         "man_defense_matchups": game.game_state.get("man_defense_matchups", {}),  # ✅ MAN DEFENSE MATCHUPS: User team matchups for persistence
         "man_defense_matchups_computer": game.game_state.get("man_defense_matchups_computer", {}),  # Computer team matchups (default if missing)
         "rim_runner_by_team_id": game.game_state.get("rim_runner_by_team_id") or {},

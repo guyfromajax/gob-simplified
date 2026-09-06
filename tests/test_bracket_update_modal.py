@@ -93,6 +93,59 @@ def test_bracket_reveal_still_sanitizes_unplayed_round():
     assert payload["bracket"]["round1"][0].get("winner") is None
 
 
+def _dual_bye_region_doc():
+    return {
+        "current_season": 4,
+        "eos_tournament_active": True,
+        "region_tournaments": {
+            "B": {
+                "round1": [],
+                "final": [
+                    {
+                        "away_team": "active-user",
+                        "home_team": "other-bye-team",
+                        "winner": None,
+                        "score": {},
+                    }
+                ],
+                "current_round": 1,
+                "seeds": {},
+            }
+        },
+    }
+
+
+def test_region_reveal_week_30_accepts_active_user_dual_bye_final():
+    payload = fr._build_bracket_reveal_modal_payload(
+        _dual_bye_region_doc(),
+        {"team_id": "active-user", "conference": 3, "region": "B"},
+        30,
+    )
+    assert payload is not None
+    assert payload["tier"] == "region"
+    assert payload["bracket"]["round1"] == []
+    assert payload["bracket"]["final"][0]["away_team"] == "active-user"
+
+
+def test_region_update_week_31_accepts_eliminated_user_region_dual_bye_final():
+    payload = fr._build_bracket_update_modal_payload(
+        _dual_bye_region_doc(),
+        {"team_id": "eliminated-user", "conference": 3, "region": "B"},
+        31,
+    )
+    assert payload is not None
+    assert payload["tier"] == "region"
+    assert payload["bracket"]["round1"] == []
+    assert payload["bracket"]["final"][0]["home_team"] == "other-bye-team"
+
+
+def test_region_direct_final_requires_two_concrete_teams():
+    doc = _dual_bye_region_doc()
+    doc["region_tournaments"]["B"]["final"][0]["home_team"] = "R1_0"
+    assert fr._build_bracket_reveal_modal_payload(doc, {"region": "B"}, 30) is None
+    assert fr._build_bracket_update_modal_payload(doc, {"region": "B"}, 31) is None
+
+
 def test_bracket_update_modal_week_35_national_after_eos():
     franchise_doc = {
         "current_season": 1,

@@ -219,6 +219,12 @@ class GameManager:
             "time_remaining": 480,
             "clock": "8:00",
             "shot_clock_remaining": 30,
+            # Possession-scoped frontcourt state, carried across turn seams by
+            # dynamic_hct and cleared only by ``reset_frontcourt_state``.
+            # ``frontcourt_ratcheted`` is a LIST, not a set: game_state is a plain
+            # dict that other layers copy and hand around, so keep it JSON-safe.
+            "frontcourt_established": False,
+            "frontcourt_ratcheted": [],
             "time_elapsed": 0,
             "uess_clock_authority_mode": "warn",
             "uess_clock_elapsed_authority": "ledger",
@@ -2340,12 +2346,31 @@ class GameManager:
         # Default to HCO if no explicit routing
         return "HCO"
 
+    def reset_frontcourt_state(self):
+        """Clear the POSSESSION-scoped frontcourt flags on ``game_state``.
+
+        ``dynamic_hct.compute_dynamic_hct_turn`` carries ``frontcourt_established``
+        and ``frontcourt_ratcheted`` across turn seams the way it already carries
+        ``shot_clock_remaining``, so the only correct place to clear them is a
+        possession boundary. Clearing on a turn seam is precisely the defect this
+        replaced: the flag came back False on every turn after the one that
+        crossed half court, which re-armed the 10-second rule mid-possession and
+        made an over-and-back undetectable once the establishing turn ended.
+
+        Two boundaries call this: ``switch_possession`` (the live-play flip) and
+        the quarter-start possession assignment in ``main.simulate_quarter``,
+        which sets ``offense_team`` directly and never routes through here.
+        """
+        self.game_state["frontcourt_established"] = False
+        self.game_state["frontcourt_ratcheted"] = []
+
     def switch_possession(self):
         self.offense_team, self.defense_team = self.defense_team, self.offense_team
         self.game_state["offense_team"] = self.offense_team.name
         self.game_state["defense_team"] = self.defense_team.name
         self.game_state["current_playcall"] = ""
         self.game_state["defense_playcall"] = ""
+        self.reset_frontcourt_state()
 
     def get_box_score(self):
         """Get box score with all players (lineup + bench) to match team totals."""
