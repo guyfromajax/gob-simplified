@@ -6,7 +6,8 @@ sensitive that is to the tunable constants. Reuses the REAL S1 functions so a sw
 the shipped logic (not a re-implementation):
 
   A  `_roll_defender_reads_graded`  (phase_resolution)  — the read roll → {follows, margin}
-  B  `_defender_lag_fraction` + OPENNESS_LAG_*  (animator) — margin → how far the beaten defender lags
+  B  `_defender_lag_fraction` + OPENNESS_LAG_*  (engine.defender_placement) — margin → how far the
+     beaten defender lags
   C  `_proximity_contest_factor` + PROXIMITY_*  (shot_manager) — defender distance → defensive weight
 
 The shot make math is replicated verbatim from `ShotManager.calculate_shot_score`
@@ -30,9 +31,9 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from BackEnd.engine.phase_resolution import _roll_defender_reads_graded
-import BackEnd.models.animator as animator
+import BackEnd.engine.defender_placement as defender_placement
 import BackEnd.models.shot_manager as shot_manager
-from BackEnd.models.animator import _defender_lag_fraction
+from BackEnd.engine.defender_placement import _defender_lag_fraction
 from BackEnd.models.shot_manager import _proximity_contest_factor
 
 SEED = 20260713
@@ -164,7 +165,7 @@ def run():
     print("-" * len(hdr))
 
     for lag_max in (0.50, 0.65, 0.80, 0.95):
-        animator.OPENNESS_LAG_MAX = lag_max            # override the REAL constant
+        defender_placement.OPENNESS_LAG_MAX = lag_max  # override the REAL constant
         rng = random.Random(SEED)                      # same stream every cell → paired comparison
         recs = _simulate(rng)
         thr = _solve_threshold(recs, BASELINE_FG)
@@ -180,7 +181,7 @@ def run():
               f"{t_s1['inside']-t_b['inside']:>+5.1f}")
 
     # Secondary sweep — the Part C proximity ramp (open-distance) at fixed LAG_MAX, so both dials show.
-    animator.OPENNESS_LAG_MAX = 0.80
+    defender_placement.OPENNESS_LAG_MAX = 0.80
     print(f"\nPROXIMITY ramp sweep (Part C, OPEN_DIST = grid at which the shot is ~open) @ LAG_MAX=0.80, "
           f"NEAR={shot_manager.PROXIMITY_CONTEST_NEAR_DIST} FLOOR={shot_manager.PROXIMITY_CONTEST_OPEN_FLOOR}")
     h2 = f"{'OPEN_DIST':>9} | {'pf|beat':>8} | {'FG base':>8} {'FG S1':>7} {'Δ':>6}"
