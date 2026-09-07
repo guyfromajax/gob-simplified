@@ -347,6 +347,88 @@ was never swapped and so was never confounded; only the played arm was. The
 under one fixed harness plus two harness-independent proofs (byte-identical test baseline, and
 7 of 9 moved bodies AST-identical to their originals).
 
+### `_hco_render_animations` — a mechanism justified by a false premise (measured 2026-09-06)
+
+The stash exists to reconcile a disagreement that is ~zero, and does not address the
+disagreement that is real. Written at `skeleton_step_emitter.py:1617`, read at
+`step_state.py:49`, and slated for deletion by the defender-placement extraction — this entry
+records that it likely deletes on its own merits regardless of what happens to that project.
+
+**The stated justification**, in both comments verbatim: "Defender placement uses RNG (a ~2px
+shade), so a *separate* draw would not match; sharing this one draw makes contest == render by
+construction." `step_state.py:47` repeats it, and `_diagnose` at `:202-206` calls a fresh redraw
+"exactly the disagreement Option A eliminates".
+
+**Measured, and it is not ~2px — it is zero.** `sim_rng` is a stdlib `Random`, so the probe
+snapshots its state, re-runs the producer on the identical skeleton with the state restored,
+runs it once more WITHOUT restoring, then restores the post-call state so the game's own stream
+is untouched:
+- same skeleton + same RNG state -> bit-identical grid, **603/603** samples.
+- same skeleton, genuine second draw -> **median 0.000, p95 0.000, mean 0.042 grid** across
+  **16,880** defender comparisons. The court is 100 grid wide.
+
+**The real disagreement is INPUT-driven.** Comparing the contest's grid against the render's
+grid defender-by-defender at the same step, split by whether that step's offensive content was
+identical (n=16 seeded games, 1,791 HCO turns):
+- identical content: n=63,365, mean 0.075 grid, **93.0% exact match**
+- differing content: n=2,230, mean **10.074** grid, median 4.250, p95 **36.497**, max **88.02**
+
+3.4% of pairs carry ~83% of all disagreement. The cause is that `_stamp_contest_defender_grid`
+runs ~4.04x per turn against a skeleton that is not final — its own docstring concedes "may
+carry recalibrated/expanded steps the pre-walk stamp didn't cover" — so only 75.3% of turns are
+byte-identical on step count and content, and ~46 steps per game are drawn having never been
+placed against at all. Sharing one draw cannot fix a mismatch of inputs.
+
+**And within the turn it feeds no contest.** Instrumented, not read off the source: of the four
+functions that read `step["_step_state"]["defense"]` (`phase_resolution.py:4460`, `:4977`,
+`:5862`, `:6334`), **0 of 5,834** played-arm reads occur after `build_step_states` overwrites
+`_step_state`; and `build_step_states`' return value is **never touched** — 0 accesses across
+883 calls, measured with a list subclass that logs every access to itself.
+
+**Still open:** cross-turn influence is NOT excluded. `step_state.py` warns "a later turn could
+still read a prior turn's stamp". The poison test that would settle it is void — see the
+arm-independence entry below.
+
+**Separate and larger, do not conflate:** the shot contest reads a DIFFERENT source in each arm.
+`_freeze_hco_shot_attempt_geometry` (`phase_resolution.py:4421`) labels its own provenance, and
+that label splits 100/0 by arm — sim is 100% `hco-stepstate-shot-step` (the stamped grid, 344
+samples), played is 100% `hco-emitter-shot-step` (live `Player.coords` synced by the emitter,
+375 samples). That is the placement-source divergence the free-throw chain actually rides on,
+and it is neither the stash nor `compute_defender_grid`-vs-render.
+
+### ⚠️ MEASUREMENT: two arms run sequentially in ONE process are NOT independent (2026-09-06)
+
+**Symptom:** run the identical arm three times in one process, changing nothing — three
+different games. Fingerprints all differ, and `sim_rng` draw counts come out
+**137,106 / 136,832 / 134,387** (2 games per arm, seeds 8000-8001, `PYTHONHASHSEED=0`, all
+three RNGs re-seeded per game).
+
+**Carrier:** player/team state persists in the mongomock DB across games and therefore across
+arms. Visible directly in the log — `Computer-team lineup exhaustion: Team 'Lancaster' randomly
+re-admitted 5 fouled-out player(s)`. Re-seeding the RNGs does not reset the DB.
+
+**How it surfaced:** a poisoned arm produced outcome fingerprints that tracked its POSITION in
+the process rather than its intervention. Two entirely different poison mechanisms, each run as
+the third arm, produced byte-identical games (seed 8000 -> `fadb4132258776c3`, 517 turns); the
+same mechanism run as the fourth arm produced a different game (`c3fb1ed17fbf7d3b`, 451 turns).
+An intervention whose effect depends on when you run it is not measuring the intervention.
+
+**Contaminated, must be re-measured one arm per process:** the `equiv-v2` sim-vs-played
+divergence table (turns +12.1%, points +4.9%, FREE_THROW +41.2%, BLOCK +51.8% et al) and the
+free-throw three-term decomposition (shots +13.7% x contested share +13.4% x foul-rate +8.9%).
+The decompositions remain internally exact within each arm's own data; it is the arm-to-arm
+ratios that are not reportable. Direction may well survive — the measured gaps are larger than
+the ~2% contamination band — but that has to be shown, not assumed.
+
+**NOT contaminated:** anything measured within a single arm, because the comparison is
+within-turn or per-call. That covers the contest-vs-render grid comparison and RNG noise floor
+above, and the `build_all_animations` mutation probe (1,165 calls, zero mutations). Structural
+facts also survive, being immune to which game got played: 0 reads after the overwrite, the
+return value never being touched, and the 100/0 shot-contest source split.
+
+**Fix for future harnesses:** one arm per process, or re-seed the database between arms and
+prove it with an identical-arm-twice control before trusting any comparison.
+
 ### "Play Quarter" Button Requires Two Clicks (Initialization Timing Bug)
 - **Issue**: On first page load, users must click "Play Quarter" twice to start the game. First click does nothing, second click works. When returning to the page (e.g., after navigating away and back), first click works correctly.
 - **Location**: `FrontEnd/static/js/phaser/bootGame.js` - `initGame()` function
