@@ -46,6 +46,8 @@ DRAWS = Counter()
 OBS = {"dists": [], "factors": [], "scores": [], "entries": 0, "fouls": 0,
        "tight": 0, "floor": 0, "shots": 0, "prox_calls": 0}
 SRC = Counter()
+POISON = Counter()
+POISON_STASH = os.environ.get("POISON_STASH") == "1"
 
 
 def _install_draw_counter():
@@ -142,6 +144,44 @@ def _install_played_arm():
         setattr(AN.Animator, meth, mk())
 
 
+def _install_poison_stash():
+    """POISON-STASH TEST for the offense converter's coordinate output (SPC principle 8).
+
+    Same shape as ``perf_sim_baseline._install_poison_stash``, which poisons
+    ``_step_state["defense"]``. That flag is bound to the DEFENDER grid and so does not
+    touch what the spot-key fix changed; this is the same method pointed at the right
+    output.
+
+    ``build_all_animations`` still runs in full, so the RNG draw count AT THE POISON SITE is
+    unchanged -- only the value it hands back is replaced with {x:-9999,y:-9999}. A seeded
+    game whose fingerprint stays identical to the clean run proves nothing downstream reads
+    this producer's coordinates.
+
+    Two bindings must be patched: ``animator`` does ``from ...defender_placement import
+    build_all_animations``, so it holds its own reference.
+    """
+    import BackEnd.engine.defender_placement as DP
+    import BackEnd.models.animator as AN
+
+    _orig = DP.build_all_animations
+
+    def poisoned(*a, **k):
+        animations, zones = _orig(*a, **k)  # real work + real draws happen here
+        POISON["calls"] += 1
+        for anim in animations or []:
+            for mv in anim.get("movement") or []:
+                if isinstance(mv.get("coords"), dict):
+                    mv["coords"] = {"x": -9999.0, "y": -9999.0}
+                    POISON["coords"] += 1
+        return animations, zones
+
+    poisoned.__poisoned__ = True
+    DP.build_all_animations = poisoned
+    if getattr(AN, "build_all_animations", None) is _orig:
+        AN.build_all_animations = poisoned
+        POISON["rebound_animator"] = 1
+
+
 def ft_invariant(turns, window=3):
     """Awards honoured. STRICT requires the free throw on the very next turn, which has a
     known false negative when a TIMEOUT legitimately interposes; WINDOWED allows it within a
@@ -167,6 +207,8 @@ def ft_invariant(turns, window=3):
 if __name__ == "__main__":
     _install_draw_counter()
     _install_instruments()
+    if POISON_STASH:
+        _install_poison_stash()
     if ARM == "played":
         _install_played_arm()
 
@@ -205,6 +247,7 @@ if __name__ == "__main__":
         "ft_awards": aw, "ft_strict": strict, "ft_windowed": wind,
         "ft_drop_reasons": dict(reasons),
         "src": dict(SRC),
+        "poison_stash": POISON_STASH, "poison": dict(POISON),
         "shots": OBS["shots"], "entries": OBS["entries"], "fouls": OBS["fouls"],
         "prox_calls": OBS["prox_calls"],
         "score_mean": st.mean(OBS["scores"]) if OBS["scores"] else None,
