@@ -145,92 +145,127 @@ fixing that will not produce anything on this page.
 
 ---
 
-# Appendix — easing and the speed archetype system
+# Appendix — easing, and why the archetype plan does not work as written
 
-*Added 2026-09-06. Constants verified at `BackEnd/constants/__init__.py:342-347`.*
+> **Revised 2026-09-06 after measurement. The original appendix proposed keying easing off
+> the `move_archetype` system. That plan is wrong for 99% of turns — see *The archetype
+> correction* below. The continuity rule survives; the archetype mapping does not.**
 
-## Current easing logic: there is none
+## Current easing logic: there is none — and it is in more places than one
 
-`animateStep.js:292` hardcodes `ease: "Linear"` — one value, every player, every step,
-every archetype. There is no logic to describe.
+`animateStep.js:292` hardcodes `ease: "Linear"`. It is **not** the only site. Also hardcoded:
 
-## The archetype system is already the right structure
+- `ShotAnimationSystem.js` — six sites (`:913, :952, :1053, :1397, :1554, :1599`), each
+  commented *"Match other player movements"*
+- `FreeThrowAnimationSystem.js` — two sites (`:353, :376`)
+
+**A change that touches only `:292` leaves shot-path and free-throw-path player movement
+linear**, which will read as inconsistent rather than as an improvement. Any easing work
+covers all nine sites or it is not worth doing.
+
+## The archetype correction
+
+The six rate constants at `BackEnd/constants/__init__.py:342-347` are real:
 
 ```
-DRIFT_GRID_PER_GAME_SEC        =  8   # slow off-ball relocation
-CRUISE_GRID_PER_GAME_SEC       = 13   # BH bring-up / settle / transition
-SHOT_MOTION_GRID_PER_GAME_SEC  = 14   # shooter during shot
-STANDARD_GRID_PER_GAME_SEC     = 14   # base / AG curve anchor @ AG=50
-SPRINT_GRID_PER_GAME_SEC       = 18   # max-effort movement
-BURST_GRID_PER_GAME_SEC        = 32   # peak explosive start (FB outlet)
+DRIFT 8 · CRUISE 13 · SHOT_MOTION 14 · STANDARD 14 · SPRINT 18 · BURST 32
 ```
 
-These are not merely speeds. They are **intents**, and an intent has a velocity *shape* as
-well as a magnitude. Today the archetype sets only how far a player travels per second and
-says nothing about how he gets there.
+But **`move_archetype` exists only in `dynamic_hct.py`** — the HCT family. Measured over
+12 seeded games: **HCT is 7 of 6,940 builds; HCO is 6,891.**
 
-**Easing is the missing half of the same idea, keyed on data the engine already authors.**
+`_defender_move_archetype` (`dynamic_hct.py:1879`) is a *defender* helper for §D15 beats, and
+the archetype is written onto segments at six sites (`:2051, 2396, 2590, 2659, 2926, 3051`),
+all in that one file. It is consumed by `dynamic_hct_step_emitter.py` (`:1275, 1320, 1364,
+1380`, plus `_build_loop_step` at `:244, 296-297`) and reaches the frontend nowhere.
 
-## Proposed mapping — a starting point, to be judged by eye
+So the original claim — *"the engine already decided it, the renderer simply is not being
+told"* — **holds for 0.1% of turns and is false for the 99% that are HCO.** On the path that
+carries the game there is no archetype to carry.
 
-| archetype | ease | rationale |
-|---|---|---|
-| `drift` | `Sine.easeInOut` | meandering, no urgency, soft at both ends |
-| `cruise` | near-linear with soft ends | sustained locomotion genuinely *is* near-constant velocity |
-| `standard` | `Sine.easeInOut` | the neutral case |
-| `shot_motion` | `Quad.easeOut` | gather and settle into the release |
-| `sprint` | `Quad.easeIn` | effort lives at the start |
-| `burst` | `Expo.easeOut` | explosive — huge initial acceleration, then coast |
+**What this means for the plan:** easing on HCO needs a different key. Options not yet
+evaluated: derive character from the step's action type (`post_up`, `cut`, `drift`,
+`handle_ball` — these exist on every pos_action), from the distance-over-duration ratio the
+tween already has, or extend archetype authorship to HCO. **Do not design this until the
+converter bug below is fixed**, because the inputs are currently wrong.
 
-`burst` is the one to get right. It fires on fast-break outlets, which is exactly where the
-game should feel most alive.
+## The catch that survives: easing must be CONTINUITY-AWARE
 
-## The catch: easing must be CONTINUITY-AWARE
-
-**Naive per-step easing will be worse than linear on multi-step movement.**
-
-If a player crosses the court over three steps and each step eases in and out, the result is
-three accelerate-decelerate cycles — a visible pulsing stutter. That is a more objectionable
-artifact than constant velocity.
-
-The rule:
+**Naive per-step easing is worse than linear on multi-step movement.** A player crossing the
+court over three steps, eased in and out on each, produces three accelerate-decelerate cycles
+— a visible pulsing stutter, more objectionable than constant velocity.
 
 - **ease IN** only on the **first** step of a movement
 - **ease OUT** only on the **last** step (where the player actually stops)
 - **linear** through the middle
 
-One acceleration and one deceleration per *journey*, never per step.
+One acceleration and one deceleration per *journey*, never per step. The `continuing_targets`
+work in `BackEnd/utils/transition_bridge.py` is the same question and may supply the signal.
 
-The signal for this already exists in concept: the `continuing_targets` work in
-`BackEnd/utils/transition_bridge.py` (freeze-by-default inversion, shipped 2026-09-04) is
-precisely the question of whether a player is mid-journey or arriving.
+This part is independent of the archetype question and is still the right first move.
 
-## Architecturally this is clean, and it is UESS-correct
+## ~~BLOCKER~~ — CLEARED 2026-09-07. Easing is no longer blocked.
 
-`_defender_move_archetype` (`BackEnd/engine/dynamic_hct.py:1879`) authors the archetype once
-and carries it on the loop segment. Its own docstring:
+The converter is fixed. `defender_placement.py` now accepts `"spot"`, and the fallthrough
+raises in dev/test and declines to place the player in production rather than substituting
+court centre. Everything below is retained as the record of what was wrong and how big it
+was; the after-numbers are at the end of the section.
 
-> *"Single-motion-spec (UESS §1, rate dimension): this is authored HERE, once, and carried in
-> the loop segment's `move_archetype` so the emitter renders at the SAME rate the engine
-> decided from — it must never re-derive its own."*
+Measured 2026-09-06, 12 seeded games, 192,393 offensive pos_actions:
 
-That discipline is already correct. **The gap is that the frontend never receives it** —
-`move_archetype` appears nowhere in `FrontEnd/static/js/phaser/` (verified 2026-09-06).
+**64.3% of off-ball pos_actions are hardcoded to court centre (50,25).** Shooters 65.0% —
+there is no shooter concentration; the rate is uniform across all five positions and every
+action type. Mean displacement **18 grid units**, a third of the floor.
 
-So the work is:
+It is **not** a fallback firing on missing data. Split by cause:
+`ELSE_NOTHING_AUTHORED: 0` · `LOCATION_MISS: 0` · `ELSE_SPOT_IGNORED: 123,890 (all)`.
+The skeleton authors the spot every time, under the key `"spot"`. The offense build at
+`defender_placement.py:176-197` checks `"coords"`, then `"location"`, then gives up — while
+**eleven other sites in the same module** read `off_action.get("location") or
+off_action.get("spot")` correctly (`:520, 535, 694, 757, 784, 1013, 1033, 1036, 1099, 1119,
+1122`), as does `attack_drive_clearance.py:252`.
 
-1. Carry `move_archetype` (and a continuity flag: first / middle / last of a journey)
-   through the emitter onto the step the FE renders.
-2. Have `animateStep` select its curve from those two fields.
-3. The engine keeps deciding; the renderer keeps rendering and authors nothing.
+**It reaches the screen.** In the schema path the client actually renders, distinct players
+at exactly (50,25) in the same step, per game:
 
-**This is the rare case where the feel work and the UESS discipline pull in the same
-direction** — the engine has already made the decision, and the renderer simply is not being
-told what it decided.
+| players stacked on the logo | buckets/game |
+|---|---|
+| 4 | 166.2 |
+| 5 | **644.5** |
+| 6 | 1.3 |
 
-## Sequencing note
+~17% of all coord buckets show four or more players on the centre logo, 99.5% of it in HCO.
 
-This supersedes item 1 in the main sequence above. Do **not** simply swap `"Linear"` for
-`"Sine.easeInOut"` globally — without the continuity rule that trade is not obviously a win.
-The minimum viable version is: continuity flag + two curves (ease-out on arrival steps,
-linear otherwise). Archetype-specific curves can follow once that reads correctly.
+**Any eye test of easing run against this would have been judging easing through players
+teleporting to and stacking on mid-court.** That was the reason to fix the converter first.
+
+### After the fix (2026-09-07)
+
+Every logo bucket in the table above is **0**, in both arms — 4-player 166.2 -> 0, 5-player
+644.5 -> 0, 6-player 1.3 -> 0. `ELSE_SPOT_IGNORED` 123,890 -> 0, with `LOCATION_MISS` and
+`SPOT_MISS` both 0, i.e. every authored name resolved to a real coordinate.
+
+Two things to carry into the easing work:
+
+- **Movement is now real, and longer.** Players travel between authored spots instead of
+  snapping to and from the logo, so the mean per-step displacement the curves have to shape
+  is different from anything observed before this date. Any easing judgement made before
+  2026-09-07 is void.
+- **Outcomes moved substantially** — points/team 65.65 -> 55.75 played, 68.95 -> 67.83 sim.
+  Balance references need re-cutting; that is separate scheduled work. Easing must not be
+  used to compensate for balance that has not yet been re-cut.
+
+About 449/game single-player coordinates still land exactly on the logo. Those survived the
+counterfactual and are most likely ordinary mid-court traffic, not misplacement. Logged open
+in `bugs.md`; they are not expected to affect the eye test.
+
+## Revised sequence
+
+1. ~~**Fix the converter**~~ — DONE 2026-09-07. One reader that did not speak the vocabulary
+   the rest of its own module speaks. It moved outcomes broadly and balance references still
+   need re-cutting; it changed where players stand on ~64% of offensive actions.
+2. **Continuity-aware easing** across all nine hardcoded sites, two curves only
+   (ease-out on arrival steps, linear otherwise).
+3. **Then** decide what keys easing character on HCO, with the archetype question reopened
+   on correct inputs.
+4. Overlap stagger, timing variation, emphasis hierarchy — as in the main document.

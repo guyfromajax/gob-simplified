@@ -17,6 +17,7 @@ the render's draw backwards into ``StepState``. Nothing about ownership changes
 here: same call sites, same order, same number of computations.
 """
 import logging
+import os
 
 from BackEnd.constants import (
     HCO_STRING_SPOTS,
@@ -52,6 +53,25 @@ def _attack_drive_defender_override(skeleton_step, def_pos):
         if ov:
             return ov
     return None
+
+
+def _strict_pos_action_keys() -> bool:
+    """Whether an unresolvable ``pos_action`` should raise instead of being skipped.
+
+    ON in tests and local development, OFF in production. The asymmetry is deliberate:
+    a skeleton that names no position for a player is a data defect we want to hear
+    about immediately while someone can fix it, and something we must not crash a
+    paying player's game over. See the key-dispatch else branch for the full reasoning.
+
+    ``GOB_STRICT_POS_ACTION_KEYS`` overrides in either direction; absent that, strict
+    is on under pytest only.
+    """
+    flag = os.getenv("GOB_STRICT_POS_ACTION_KEYS", "").strip().lower()
+    if flag in ("true", "1", "yes"):
+        return True
+    if flag in ("false", "0", "no"):
+        return False
+    return "PYTEST_CURRENT_TEST" in os.environ
 
 
 def _subtle_defender_should_freeze(skeleton_step, def_pos, anchor_off_pos):
@@ -177,9 +197,11 @@ def build_all_animations(game, skeleton, off_lineup, def_lineup, add_defenders=T
                 coords = pos_action.get("coords", {"x": 50, "y": 25})
                 # Coords already exist - these should have been set by apply_opposite_side_logic()
                 coords_already_flipped = True
-            elif "location" in pos_action:
-                # Convert location string to coordinates
-                location = pos_action.get("location", "key")
+            elif "location" in pos_action or "spot" in pos_action:
+                # Convert spot name to coordinates. Skeletons author the name under either
+                # key ("location" in the HCO/FCP families, "spot" in HCT), so accept both —
+                # the same vocabulary the eleven defender readers below already speak.
+                location = pos_action.get("location") or pos_action.get("spot") or "key"
                 
                 # ✅ SCREEN OFFSET: Use OFFSET_SPOTS for screen actions, otherwise use HCO_STRING_SPOTS
                 # This ensures screeners animate to offset positions to avoid visual overlap
@@ -194,8 +216,41 @@ def build_all_animations(game, skeleton, off_lineup, def_lineup, add_defenders=T
                 coords_from_location = True
                 coords_already_flipped = False
             else:
-                coords = {"x": 50, "y": 25}
-                coords_already_flipped = False
+                # The pos_action carries none of coords/location/spot, so where this player
+                # stands is genuinely unknown.
+                #
+                # NEVER SUBSTITUTE A COORDINATE. This branch used to answer
+                # {"x": 50, "y": 25}, which parked players on the centre logo for two years
+                # without anyone noticing, so guessing is not an option.
+                #
+                # But it must not crash a live game either. Skeletons are authored in MongoDB
+                # through the play builder -- ``phase_resolution.get_skeleton_by_lean`` reads
+                # ``play_doc["skeletons"]``, and there are fcp_skeletons / hct_skeletons
+                # collections -- so BackEnd/playcall_skeletons/ is the FALLBACK, not the only
+                # source. Persisted exports audit clean (4,325 offense pos_actions, 100%
+                # "location"), but the builder can author a new shape at any time and the live
+                # collections have not been inspected.
+                #
+                # So: raise where a human can act on it, decline where a player is mid-game.
+                # Declining is not a new code path -- it is exactly what an ABSENT pos_action
+                # already does at the top of this loop, and the emitter then backfills this
+                # player from his live ``player.coords`` (his real position, not a default) in
+                # ``skeleton_step_emitter._backfill_missing_active_coords``.
+                detail = (
+                    f"pos_action for {position} at step {step_idx} carries no position key "
+                    f"(want one of coords/location/spot, got {sorted(pos_action.keys())})"
+                )
+                if _strict_pos_action_keys():
+                    raise ValueError(detail)
+                logging.error(
+                    "🚨 [POS_ACTION] %s — declining to place this player for this step "
+                    "rather than inventing a coordinate. Skeleton is likely builder-authored "
+                    "with an unrecognised shape.", detail,
+                )
+                # step_mapping is indexed by movement position further down, so it must stay
+                # 1:1 with `movement`; this step's entry was appended before the dispatch.
+                step_mapping.pop()
+                continue
             
             # ✅ FIX: Handle "opp" field for FCP/HCT skeletons when location exists (coords need to be calculated)
             # Players with opp=True should be on the opposite side of the court

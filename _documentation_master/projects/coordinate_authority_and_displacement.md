@@ -20,16 +20,20 @@ GOB holds player positions in two forms:
 **Having both is correct and should be kept.** Names carry play intent; coordinates carry
 geometry. The names are a genuine asset.
 
-### The bug is that the conversion has more than one authority
+### The bug was that the conversion had more than one authority — FIXED 2026-09-07
 
-Two readers of the same skeleton use different key lists:
+> **Status:** the divergence described in this section no longer exists. Both readers now
+> accept the same keys, and the fallthrough no longer invents a coordinate. Part 1 is kept
+> as the diagnosis and the measured cost; the resolution is at the end of it.
 
-- `BackEnd/engine/defender_placement.py:176-197` — checks `"coords"`, then `"location"`,
-  **else hardcodes `{"x": 50, "y": 25}`**
+Two readers of the same skeleton used different key lists:
+
+- `BackEnd/engine/defender_placement.py` (offense build) — checked `"coords"`, then
+  `"location"`, **else hardcoded `{"x": 50, "y": 25}`**
 - `BackEnd/engine/phase_resolution.py:4408` — reads `(pa.get("location") or pa.get("spot") or "key")`
 
-The skeleton authors shot location under `"spot"`. The first reader does not look for that
-key, so it falls through to a hardcoded court-centre literal. The second reader resolves it
+The skeleton authors shot location under `"spot"`. The first reader did not look for that
+key, so it fell through to a hardcoded court-centre literal. The second reader resolved it
 correctly. **Same skeleton, same value, two converters, two answers.**
 
 This is the §1 violation one level up: not a coordinate with two authorities, a *conversion*
@@ -55,20 +59,48 @@ with two authorities.
   arc, and mirroring 50 for away offense gives 50 — so it reads as a three for both teams,
   every time.
 
-**Unmeasured scope note:** the same else branch serves *every position* in the animation
-build, not just shooters. Off-ball players and defenders whose `pos_action` uses `"spot"`
-would also be placed at court centre. Only shooters were measured.
+**Scope note — since measured, and it was not shooters-only.** The same else branch serves
+*every position* in the animation build. Measured 2026-09-06 over 192,393 pos_actions:
+64.3% of off-ball offensive pos_actions resolved to court centre, against 65.0% of shooters.
+There was no shooter concentration; the rate was uniform across all five positions and every
+action type, at a mean displacement of 18 grid units. In the schema path the client actually
+renders, this produced 644.5 five-player stacks on the logo per game.
 
-### The two rules that would have prevented it
+### The two rules that would have prevented it — now enforced
 
 1. **One converter, in one place.** Every caller uses it. It accepts every key the skeleton
    actually writes.
-2. **No silent fallback.** A converter that cannot resolve its input must raise or log
-   loudly, never invent an answer. `else: coords = {"x": 50, "y": 25}` shipped a hardcoded
-   logo shot on 10% of attempts and nobody knew.
+2. **No silent fallback.** A converter that cannot resolve its input must say so, never
+   invent an answer. `else: coords = {"x": 50, "y": 25}` shipped a hardcoded logo shot on
+   10% of attempts and nobody knew.
 
-Guard it the way the coord contract is guarded — a test that fails when a second converter
-appears. That is bounded work with a defined end state, unlike auditing every consumer.
+### Resolution (2026-09-07)
+
+The offense build now reads `pos_action.get("location") or pos_action.get("spot")`, matching
+the eleven defender readers in its own module. Logo stacks went to zero in both arms and
+`ELSE_SPOT_IGNORED` went 123,890 -> 0, with no name failing to resolve.
+
+Rule 2 is enforced with one deliberate asymmetry. Skeletons are primarily **MongoDB
+documents authored through the play builder** — `get_skeleton_by_lean` reads
+`play_doc["skeletons"]`, and there are `fcp_skeletons` / `hct_skeletons` collections;
+`BackEnd/playcall_skeletons/` is the fallback, not the source of record. Raising on every
+unresolvable pos_action would therefore convert a silent misplacement into a crash on a
+player's saved game, on data the engine does not control. So the fallthrough **raises** under
+`GOB_STRICT_POS_ACTION_KEYS` and under pytest, and in production **logs loudly and declines
+to place that player for that step**. Declining is not a new code path — an absent
+`pos_action` already takes it, and the emitter backfills from the player's live coordinates,
+his real position rather than a default. What it never does again is answer with a
+coordinate it made up.
+
+Guarded the way the coord contract is guarded: `tests/test_pos_action_key_contract.py` fails
+if any site tests membership of `"location"` on a pos_action without also accepting
+`"spot"`, if a second converter appears unregistered, or if the fallthrough ever assigns
+`coords` again. Six poisons, all caught.
+
+**Caveat on the evidence.** None of this was caught by the test suite and none of it is
+guarded by assertions on coordinate *values* — poisoning every resolved spot to a wrong
+coordinate still produces an empty baseline delta. See `bugs.md` item 6. Placement changes
+must be evidenced from the `equiv-v3` harness, not from a green suite.
 
 ---
 

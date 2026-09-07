@@ -75,7 +75,86 @@
      (2026-06-21, "added Standard Diamond HCT play") — the commit that introduced coordinate-based
      3PT classification — and never swept to the other branches. It was not recorded as a known
      gap; the commit's `Shot_System.md` note describes only the path it did fix.
-5. Legacy shot handler crashes on turns with no animations[] (`ShotAnimationSystem.runSetupTween`)
+5. FIXED 2026-09-07 — the offense animation build did not speak its own module's vocabulary
+   - `BackEnd/engine/defender_placement.py` (`build_all_animations`) resolved an offensive
+     player's position by testing `"coords"`, then `"location"`, then substituting
+     `{"x": 50, "y": 25}` — centre court, the logo. The skeletons author the spot NAME under
+     `"spot"`. So the third branch was not a fallback, it was the common case.
+   - Scale, 12 seeded games per arm, 192,393 pos_actions: `ELSE_SPOT_IGNORED` 123,890 —
+     every single fallthrough. `ELSE_NOTHING_AUTHORED` 0 and `LOCATION_MISS` 0, so nothing
+     else ever reached it and no authored name failed to resolve.
+   - The same module already read the key correctly at ELEVEN defender sites
+     (`off_action.get("location") or off_action.get("spot")`, :520-1122), as does
+     `attack_drive_clearance.py:252`. This was the only site in `BackEnd/` that decided which
+     key to read, and the only one that got it wrong. That is the class: not a typo, a
+     converter that did not speak the vocabulary of the module it lives in.
+   - Not two bugs. The schema path piles were traced to the same root: `skeleton_step_emitter`
+     is not a converter (zero reads of `spot`/`location`/`HCO_STRING_SPOTS`) and takes its
+     coordinates solely from `animations[i].movement[j]`, i.e. from this producer's output.
+   - Effect on placement: 4-, 5- and 6-player logo stacks went 812/game to 0, both arms.
+     Five-player stacks alone were 644.5/game.
+   - Effect on OUTCOMES, which is the part worth remembering — the bug had OPPOSITE signs in
+     the two arms. On the population whose shooter was placed by `spot` (i.e. was standing on
+     the logo), make% went 14.7 -> 29.4 played and 93.9 -> 31.5 sim. The arm gap was 79.2
+     points and is now 2.1. Played also paid 2.82 pts per make, because a shot from the centre
+     logo classifies as a three; that is now 1.93.
+   - Whole-game effect, `equiv-v3`, n=20: points/team 65.65 -> 55.75 played, 68.95 -> 67.83 sim.
+     THE BALANCE REFERENCES NEED RE-CUTTING against these numbers; that is its own scheduled
+     work and was deliberately not bundled here.
+   - Pinned by `tests/test_pos_action_key_contract.py`: no site may test membership of
+     `"location"` on a pos_action without also accepting `"spot"`, with an exact registry so a
+     second converter must be classified rather than silently added. Six poisons, all caught.
+   - THE FALLTHROUGH NO LONGER INVENTS AN ANSWER, but it does not crash a live game either.
+     Skeletons are primarily MongoDB documents authored through the play builder
+     (`get_skeleton_by_lean` reads `play_doc["skeletons"]`; there are also `fcp_skeletons` and
+     `hct_skeletons` collections) — `BackEnd/playcall_skeletons/` is the FALLBACK. So an
+     unresolvable pos_action raises under `GOB_STRICT_POS_ACTION_KEYS` and under pytest, and in
+     production logs loudly and DECLINES to place that player for that step. Declining is not a
+     new path: an absent pos_action already takes it, and the emitter then backfills from the
+     player's live `coords`. Persisted exports audit clean (4,325 offense pos_actions, 100%
+     `location`, zero keyless), but the live builder-authored collections were not inspected and
+     the builder can author a new shape tomorrow.
+   - RESIDUAL, OPEN: about 449/game single-player coordinates still land exactly on the logo.
+     These survived the counterfactual, so they are a different cause and most likely ordinary
+     mid-court traffic — a player legitimately at centre court. Not chased.
+
+6. OPEN — the test suite asserts nothing about any resolved coordinate value
+   - Found 2026-09-07 while gating the spot-key fix above. Logged separately because it is not
+     a fact about that fix, it is a fact about every coordinate change this project has made.
+   - EVIDENCE, by poison. Two mutations, each run against the full suite:
+     (a) reverting the spot-key fix, restoring the two-year-old bug that mislocated 123,890
+         pos_actions per 12 games — baseline delta EMPTY;
+     (b) resolving every `spot` to a deliberately WRONG but structurally valid coordinate —
+         baseline delta EMPTY.
+     The 114 known failures did not move in either direction, over two full-suite repetitions
+     per condition.
+   - So a green baseline is not, and has never been, evidence that a coordinate change is
+     correct. The suite checks that animations are produced and well-shaped; it never asks
+     whether any player is in the right place. Every coordinate change in this project has
+     been passing the gate for free.
+   - Consequence for how we work: for placement changes, behavioural evidence has to come from
+     the `equiv-v3` harness (logo-stack census, make rate by placement class), and
+     `baseline_failures.txt` should be read only as a "did I break something structural" check.
+   - To fix: a small number of value assertions — a fixed skeleton whose named spots resolve to
+     known coordinates, and a census assertion that no more than N players occupy the logo in a
+     single step. The second is the one that would have caught this in 2024.
+
+7. OPEN, do not chase yet — something OUTSIDE placement is driving the two arms apart, and it is
+   now the larger term
+   - Recorded 2026-09-07 from the before/after of the spot-key fix, `equiv-v3`, n=20 per arm.
+   - The placement channel converged sharply, which was the point: tight-contest divergence
+     +26.1% -> +1.4%, defender-distance median divergence -7.8% -> +1.2%.
+   - But the headline gameplay numbers diverged. Points per team: sim minus played was 3.3
+     before (68.95 vs 65.65) and is 12.1 after (67.83 vs 55.75). Turns FLIPPED SIGN: played was
+     22.2 turns ABOVE sim before (419.75 vs 397.55) and is 35.8 BELOW after (371.30 vs 407.10).
+   - Reading: placement was previously masking a second divergence by adding compensating noise
+     to both arms. With placement fixed, whatever else differs between simulated and played
+     turns is exposed and is now the dominant term. The known candidate is the one already
+     logged below — the shot contest reads live `Player.coords` in the played arm and a stamped
+     grid in the sim arm — but that is a hypothesis, not a measurement.
+   - Deliberately not chased in the placement increment. Needs its own attribution pass.
+
+8. Legacy shot handler crashes on turns with no animations[] (`ShotAnimationSystem.runSetupTween`)
    - Symptom: `TypeError: turnData.animations is not iterable`. Caught by `processShot`, so no crash,
      but that shot silently does not animate (possession appears to skip its shot).
    - A SHOT_ATTEMPT reached the LEGACY handler carrying no `animations[]`. Schema turns bypass these
@@ -89,7 +168,7 @@
    - Related: `ShotAnimationSystem.js` guards `turnData.animations` inconsistently (guarded at 295/479/486,
      bare at 352/455/572/666). Sites 572/666 remain unguarded on the final_turn-skips-setup path.
    - Pre-existing; unrelated to the animation cleanup pass.
-6. Practice squad assignment sits on the green pulse modal until refresh (found 2026-09-03)
+9. Practice squad assignment sits on the green pulse modal until refresh (found 2026-09-03)
    - Symptom: Confirm on `cut-players.html` in assignment mode (week 1) swaps in the "Assigning
      Practice Squad" pulse and never leaves it. A refresh shows the assignment was in fact saved.
      Seen on a new franchise instance for an existing user.
