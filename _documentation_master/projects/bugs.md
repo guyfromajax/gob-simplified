@@ -114,6 +114,26 @@
      player's live `coords`. Persisted exports audit clean (4,325 offense pos_actions, 100%
      `location`, zero keyless), but the live builder-authored collections were not inspected and
      the builder can author a new shape tomorrow.
+   - VERIFICATION NOTE, and a correction to how this was first reported. The SPC principle-8
+     **poison-stash test** was initially named rather than run: what was actually run was a pair
+     of pytest-baseline poisons, which is a different instrument (see item 6). The real test has
+     since been run. `perf_sim_baseline.py --poison-stash` could not be used unmodified because
+     it poisons `_step_state["defense"]`, the DEFENDER grid, and this fix changed the OFFENSE
+     converter's output; the same method was aimed at the right value instead —
+     `build_all_animations` runs in full so the draw count at the poison site is unchanged, and
+     only the coordinates it returns are replaced with `{x:-9999,y:-9999}`.
+     Result, 6 seeds x 2 arms, no exceptions in any run: the seeded fingerprint diverged 6/6 in
+     BOTH arms, over 129 intercepted builds / 7,777 poisoned coordinates played and 2,325 /
+     132,878 sim. So this producer's coordinates are genuinely read and reach outcomes — the
+     documented sentinel blind spot (a consumer that only checks key presence) does not apply.
+
+   - THE SAME TEST FOUND SOMETHING LARGER, see item 7: offense geometry feeds the GAME CLOCK.
+     Absurd coordinates took the played arm from ~370 turns to ~15 in four quarters and its draws
+     to -95.7%, with no error raised, because travel time is `dist / rate`
+     (`skeleton_step_emitter.py:816`) and the emitter decrements `clock_remaining` by it. The sim
+     arm moved far less on the same poison (draws -4.8%, turns -12%). That asymmetry is a
+     placement-owned channel into game length, and it changes the reading of item 7.
+
    - RESIDUAL, OPEN: about 449/game single-player coordinates still land exactly on the logo.
      These survived the counterfactual, so they are a different cause and most likely ordinary
      mid-court traffic — a player legitimately at centre court. Not chased.
@@ -147,12 +167,27 @@
    - But the headline gameplay numbers diverged. Points per team: sim minus played was 3.3
      before (68.95 vs 65.65) and is 12.1 after (67.83 vs 55.75). Turns FLIPPED SIGN: played was
      22.2 turns ABOVE sim before (419.75 vs 397.55) and is 35.8 BELOW after (371.30 vs 407.10).
-   - Reading: placement was previously masking a second divergence by adding compensating noise
-     to both arms. With placement fixed, whatever else differs between simulated and played
-     turns is exposed and is now the dominant term. The known candidate is the one already
-     logged below — the shot contest reads live `Player.coords` in the played arm and a stamped
-     grid in the sim arm — but that is a hypothesis, not a measurement.
-   - Deliberately not chased in the placement increment. Needs its own attribution pass.
+   - ORIGINAL READING, now partly WITHDRAWN: "placement was masking a second divergence, and
+     something outside placement is the larger term." The second clause is not supported.
+   - WHAT THE POISON-STASH TEST SHOWED (run after the above was written). Travel time is
+     `dist / rate` (`skeleton_step_emitter.py:816`) and the emitter decrements `clock_remaining`
+     by it, so **offense geometry feeds game length**. Replacing the converter's output with
+     `{x:-9999,y:-9999}` took the PLAYED arm from ~370 turns to ~15 per game and its draws to
+     -95.7%, raising no exception; the SIM arm on the identical poison moved only -12% turns and
+     -4.8% draws. 6 seeds, both arms, no errors.
+   - So placement owns a strong and STRONGLY ARM-ASYMMETRIC channel into turn count. The fix
+     increased real travel distance — players used to be co-located on the logo and now move
+     between authored spots — which is a direct mechanism for the played arm's turns falling
+     419.75 -> 371.30. That is placement, not something outside it.
+   - WHAT IS STILL OPEN, and it is narrower than first stated: why the two arms are coupled to
+     geometry to such different degrees, and whether the points/team gap widening to 12.1 is
+     fully explained by the played arm simply playing fewer possessions. Note the poison used
+     absurd geometry, so it proves the channel exists and is asymmetric; it does not quantify
+     how much of the 12.1 it accounts for.
+   - Candidate for the asymmetry, still a hypothesis: the shot contest reads live `Player.coords`
+     in the played arm and a stamped grid in the sim arm (logged separately below).
+   - Deliberately not chased in the placement increment. Needs its own attribution pass, which
+     should now start from the distance-to-clock channel rather than looking outside placement.
 
 8. Legacy shot handler crashes on turns with no animations[] (`ShotAnimationSystem.runSetupTween`)
    - Symptom: `TypeError: turnData.animations is not iterable`. Caught by `processShot`, so no crash,
