@@ -1,0 +1,10231 @@
+[
+ {
+  "arm": "sim",
+  "seed": 8000,
+  "error": null,
+  "turns": 421,
+  "score": {
+   "Lancaster": 61,
+   "Bentley-Truman": 70
+  },
+  "sync": {
+   "skeleton_fallback": 90
+  },
+  "cls": {
+   "MAKE|3PT": 8,
+   "MISS|2PT": 16,
+   "MISS|3PT": 28,
+   "MAKE|2PT": 22,
+   "MISS|unstamped": 5,
+   "BLOCK|3PT": 7,
+   "BLOCK|2PT": 9,
+   "MAKE|unstamped": 6
+  },
+  "cls_src": {
+   "shot_spot": 87,
+   "forced_two": 3
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 97,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 97,
+  "dbg_scored": [
+   [
+    1,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    5,
+    "104c7b0f",
+    false
+   ],
+   [
+    11,
+    "60d85fb6",
+    true
+   ],
+   [
+    16,
+    "a0a0f2d7",
+    false
+   ],
+   [
+    19,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    25,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    27,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    31,
+    "60d85fb6",
+    true
+   ],
+   [
+    40,
+    "a0a0f2d7",
+    false
+   ],
+   [
+    42,
+    "e590d342",
+    true
+   ],
+   [
+    46,
+    "60d85fb6",
+    false
+   ],
+   [
+    49,
+    "80f3ca79",
+    false
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8001,
+  "error": null,
+  "turns": 383,
+  "score": {
+   "Lancaster": 66,
+   "Bentley-Truman": 80
+  },
+  "sync": {
+   "skeleton_fallback": 88
+  },
+  "cls": {
+   "MAKE|2PT": 32,
+   "MAKE|3PT": 12,
+   "MISS|2PT": 11,
+   "BLOCK|3PT": 4,
+   "MISS|3PT": 27,
+   "BLOCK|2PT": 5,
+   "MISS|unstamped": 7,
+   "MAKE|unstamped": 4
+  },
+  "cls_src": {
+   "shot_spot": 85,
+   "forced_two": 6
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 95,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 95,
+  "dbg_scored": [
+   [
+    1,
+    "e590d342",
+    false
+   ],
+   [
+    4,
+    "60d85fb6",
+    true
+   ],
+   [
+    7,
+    "9c044323",
+    false
+   ],
+   [
+    11,
+    "80f3ca79",
+    true
+   ],
+   [
+    13,
+    "f608a824",
+    true
+   ],
+   [
+    16,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    20,
+    "9c044323",
+    true
+   ],
+   [
+    22,
+    "7219a92c",
+    false
+   ],
+   [
+    26,
+    "c13c8088",
+    true
+   ],
+   [
+    28,
+    "9c044323",
+    true
+   ],
+   [
+    34,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    38,
+    "19b6cdb5",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8002,
+  "error": null,
+  "turns": 364,
+  "score": {
+   "Lancaster": 68,
+   "Bentley-Truman": 78
+  },
+  "sync": {
+   "skeleton_fallback": 80
+  },
+  "cls": {
+   "MISS|2PT": 15,
+   "BLOCK|2PT": 1,
+   "MAKE|3PT": 17,
+   "MAKE|2PT": 25,
+   "MISS|3PT": 25,
+   "MISS|unstamped": 6,
+   "BLOCK|3PT": 3,
+   "MAKE|unstamped": 1
+  },
+  "cls_src": {
+   "shot_spot": 85,
+   "forced_two": 1
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 88,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 88,
+  "dbg_scored": [
+   [
+    1,
+    "9c044323",
+    true
+   ],
+   [
+    3,
+    "f608a824",
+    false
+   ],
+   [
+    8,
+    "e590d342",
+    false
+   ],
+   [
+    11,
+    "c13c8088",
+    true
+   ],
+   [
+    14,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    17,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    20,
+    "80f3ca79",
+    true
+   ],
+   [
+    23,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    26,
+    "7219a92c",
+    false
+   ],
+   [
+    29,
+    "7219a92c",
+    false
+   ],
+   [
+    31,
+    "80f3ca79",
+    false
+   ],
+   [
+    35,
+    "a0a0f2d7",
+    false
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8003,
+  "error": null,
+  "turns": 405,
+  "score": {
+   "Lancaster": 67,
+   "Bentley-Truman": 73
+  },
+  "sync": {
+   "skeleton_fallback": 86
+  },
+  "cls": {
+   "MAKE|3PT": 12,
+   "BLOCK|2PT": 8,
+   "MISS|3PT": 32,
+   "MISS|2PT": 15,
+   "MAKE|2PT": 19,
+   "MISS|unstamped": 7,
+   "MAKE|unstamped": 5,
+   "BLOCK|3PT": 4
+  },
+  "cls_src": {
+   "shot_spot": 89,
+   "forced_two": 1
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 93,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 93,
+  "dbg_scored": [
+   [
+    1,
+    "9c044323",
+    true
+   ],
+   [
+    4,
+    "7219a92c",
+    false
+   ],
+   [
+    8,
+    "7219a92c",
+    true
+   ],
+   [
+    10,
+    "c13c8088",
+    true
+   ],
+   [
+    12,
+    "7219a92c",
+    true
+   ],
+   [
+    20,
+    "104c7b0f",
+    false
+   ],
+   [
+    25,
+    "60d85fb6",
+    false
+   ],
+   [
+    27,
+    "60d85fb6",
+    true
+   ],
+   [
+    29,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    31,
+    "c13c8088",
+    false
+   ],
+   [
+    35,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    41,
+    "60d85fb6",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8004,
+  "error": null,
+  "turns": 403,
+  "score": {
+   "Lancaster": 76,
+   "Bentley-Truman": 66
+  },
+  "sync": {
+   "skeleton_fallback": 76
+  },
+  "cls": {
+   "MISS|3PT": 28,
+   "MAKE|2PT": 22,
+   "MISS|2PT": 16,
+   "MISS|unstamped": 6,
+   "BLOCK|2PT": 5,
+   "MAKE|unstamped": 6,
+   "MAKE|3PT": 10,
+   "BLOCK|3PT": 3
+  },
+  "cls_src": {
+   "shot_spot": 79,
+   "forced_two": 5
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 85,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 85,
+  "dbg_scored": [
+   [
+    1,
+    "80f3ca79",
+    true
+   ],
+   [
+    3,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    8,
+    "80f3ca79",
+    true
+   ],
+   [
+    15,
+    "80f3ca79",
+    true
+   ],
+   [
+    22,
+    "e590d342",
+    true
+   ],
+   [
+    27,
+    "c13c8088",
+    true
+   ],
+   [
+    31,
+    "7219a92c",
+    false
+   ],
+   [
+    34,
+    "e590d342",
+    false
+   ],
+   [
+    37,
+    "80f3ca79",
+    true
+   ],
+   [
+    42,
+    "e590d342",
+    true
+   ],
+   [
+    48,
+    "80f3ca79",
+    false
+   ],
+   [
+    51,
+    "104c7b0f",
+    false
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8005,
+  "error": null,
+  "turns": 406,
+  "score": {
+   "Lancaster": 72,
+   "Bentley-Truman": 67
+  },
+  "sync": {
+   "skeleton_fallback": 79
+  },
+  "cls": {
+   "MAKE|2PT": 22,
+   "BLOCK|3PT": 5,
+   "MISS|3PT": 27,
+   "MAKE|3PT": 9,
+   "MISS|unstamped": 11,
+   "BLOCK|2PT": 10,
+   "MISS|2PT": 11,
+   "MAKE|unstamped": 6
+  },
+  "cls_src": {
+   "shot_spot": 82,
+   "forced_two": 2
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 84,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 84,
+  "dbg_scored": [
+   [
+    1,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    5,
+    "80f3ca79",
+    true
+   ],
+   [
+    9,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    14,
+    "f608a824",
+    true
+   ],
+   [
+    19,
+    "104c7b0f",
+    true
+   ],
+   [
+    25,
+    "80f3ca79",
+    true
+   ],
+   [
+    27,
+    "c13c8088",
+    true
+   ],
+   [
+    29,
+    "9c044323",
+    true
+   ],
+   [
+    33,
+    "f608a824",
+    true
+   ],
+   [
+    38,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    41,
+    "7219a92c",
+    false
+   ],
+   [
+    52,
+    "7219a92c",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8006,
+  "error": null,
+  "turns": 373,
+  "score": {
+   "Lancaster": 53,
+   "Bentley-Truman": 55
+  },
+  "sync": {
+   "skeleton_fallback": 77
+  },
+  "cls": {
+   "BLOCK|2PT": 5,
+   "MAKE|2PT": 22,
+   "MISS|3PT": 37,
+   "MISS|unstamped": 6,
+   "MISS|2PT": 14,
+   "BLOCK|3PT": 3,
+   "MAKE|3PT": 5,
+   "MAKE|unstamped": 2
+  },
+  "cls_src": {
+   "shot_spot": 83,
+   "forced_two": 3
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 89,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 89,
+  "dbg_scored": [
+   [
+    1,
+    "c13c8088",
+    true
+   ],
+   [
+    3,
+    "7219a92c",
+    false
+   ],
+   [
+    8,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    12,
+    "104c7b0f",
+    false
+   ],
+   [
+    16,
+    "9c044323",
+    false
+   ],
+   [
+    19,
+    "104c7b0f",
+    true
+   ],
+   [
+    21,
+    "7219a92c",
+    false
+   ],
+   [
+    25,
+    "bad6d85c",
+    true
+   ],
+   [
+    27,
+    "80f3ca79",
+    false
+   ],
+   [
+    32,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    36,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    40,
+    "80f3ca79",
+    false
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8007,
+  "error": null,
+  "turns": 380,
+  "score": {
+   "Lancaster": 68,
+   "Bentley-Truman": 57
+  },
+  "sync": {
+   "skeleton_fallback": 84
+  },
+  "cls": {
+   "MAKE|3PT": 12,
+   "MISS|3PT": 31,
+   "MAKE|2PT": 18,
+   "MISS|unstamped": 6,
+   "MISS|2PT": 15,
+   "BLOCK|3PT": 8,
+   "MAKE|unstamped": 6,
+   "BLOCK|2PT": 4
+  },
+  "cls_src": {
+   "shot_spot": 83,
+   "forced_two": 5
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 92,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 92,
+  "dbg_scored": [
+   [
+    1,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    4,
+    "80f3ca79",
+    true
+   ],
+   [
+    11,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    14,
+    "9c044323",
+    false
+   ],
+   [
+    20,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    25,
+    "104c7b0f",
+    true
+   ],
+   [
+    28,
+    "104c7b0f",
+    true
+   ],
+   [
+    34,
+    "7219a92c",
+    true
+   ],
+   [
+    38,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    44,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    46,
+    "15901201",
+    true
+   ],
+   [
+    52,
+    "457185a0",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8008,
+  "error": null,
+  "turns": 441,
+  "score": {
+   "Lancaster": 70,
+   "Bentley-Truman": 77
+  },
+  "sync": {
+   "skeleton_fallback": 81
+  },
+  "cls": {
+   "MISS|2PT": 20,
+   "MAKE|3PT": 9,
+   "BLOCK|3PT": 9,
+   "MAKE|2PT": 23,
+   "MISS|3PT": 16,
+   "MISS|unstamped": 14,
+   "MAKE|unstamped": 5,
+   "BLOCK|2PT": 7
+  },
+  "cls_src": {
+   "shot_spot": 80,
+   "forced_two": 4
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 90,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 90,
+  "dbg_scored": [
+   [
+    1,
+    "e590d342",
+    false
+   ],
+   [
+    3,
+    "60d85fb6",
+    false
+   ],
+   [
+    9,
+    "104c7b0f",
+    true
+   ],
+   [
+    13,
+    "60d85fb6",
+    true
+   ],
+   [
+    15,
+    "9c044323",
+    false
+   ],
+   [
+    19,
+    "7219a92c",
+    false
+   ],
+   [
+    24,
+    "7219a92c",
+    false
+   ],
+   [
+    28,
+    "9c044323",
+    true
+   ],
+   [
+    34,
+    "60d85fb6",
+    true
+   ],
+   [
+    38,
+    "7219a92c",
+    false
+   ],
+   [
+    41,
+    "f608a824",
+    true
+   ],
+   [
+    47,
+    "bd5dbf1f",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8009,
+  "error": null,
+  "turns": 402,
+  "score": {
+   "Lancaster": 76,
+   "Bentley-Truman": 61
+  },
+  "sync": {
+   "skeleton_fallback": 78
+  },
+  "cls": {
+   "MAKE|3PT": 12,
+   "MAKE|2PT": 14,
+   "MISS|2PT": 12,
+   "MAKE|unstamped": 7,
+   "MISS|unstamped": 9,
+   "BLOCK|2PT": 3,
+   "MISS|3PT": 36,
+   "BLOCK|3PT": 2
+  },
+  "cls_src": {
+   "shot_spot": 78,
+   "forced_two": 1
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 85,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 85,
+  "dbg_scored": [
+   [
+    1,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    6,
+    "e590d342",
+    false
+   ],
+   [
+    9,
+    "80f3ca79",
+    false
+   ],
+   [
+    15,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    24,
+    "80f3ca79",
+    false
+   ],
+   [
+    26,
+    "e590d342",
+    false
+   ],
+   [
+    34,
+    "80f3ca79",
+    false
+   ],
+   [
+    36,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    40,
+    "a0a0f2d7",
+    false
+   ],
+   [
+    46,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    50,
+    "7219a92c",
+    false
+   ],
+   [
+    55,
+    "80f3ca79",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8010,
+  "error": null,
+  "turns": 358,
+  "score": {
+   "Lancaster": 49,
+   "Bentley-Truman": 83
+  },
+  "sync": {
+   "skeleton_fallback": 85
+  },
+  "cls": {
+   "MAKE|2PT": 46,
+   "MISS|3PT": 21,
+   "BLOCK|2PT": 5,
+   "BLOCK|3PT": 2,
+   "MISS|unstamped": 8,
+   "MISS|2PT": 14,
+   "MAKE|unstamped": 1,
+   "MAKE|3PT": 1
+  },
+  "cls_src": {
+   "shot_spot": 86,
+   "forced_two": 3
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 93,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 93,
+  "dbg_scored": [
+   [
+    1,
+    "9c044323",
+    false
+   ],
+   [
+    5,
+    "7219a92c",
+    false
+   ],
+   [
+    11,
+    "104c7b0f",
+    true
+   ],
+   [
+    13,
+    "60d85fb6",
+    true
+   ],
+   [
+    15,
+    "7219a92c",
+    false
+   ],
+   [
+    19,
+    "a0a0f2d7",
+    false
+   ],
+   [
+    22,
+    "c13c8088",
+    false
+   ],
+   [
+    24,
+    "7219a92c",
+    false
+   ],
+   [
+    30,
+    "7219a92c",
+    false
+   ],
+   [
+    34,
+    "9c044323",
+    false
+   ],
+   [
+    36,
+    "7219a92c",
+    false
+   ],
+   [
+    40,
+    "7219a92c",
+    false
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8011,
+  "error": null,
+  "turns": 391,
+  "score": {
+   "Lancaster": 80,
+   "Bentley-Truman": 62
+  },
+  "sync": {
+   "skeleton_fallback": 91
+  },
+  "cls": {
+   "MAKE|2PT": 30,
+   "MISS|3PT": 25,
+   "MISS|2PT": 14,
+   "MAKE|3PT": 12,
+   "BLOCK|2PT": 11,
+   "MISS|unstamped": 6,
+   "MAKE|unstamped": 7,
+   "BLOCK|3PT": 3
+  },
+  "cls_src": {
+   "shot_spot": 91,
+   "forced_two": 4
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 97,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 97,
+  "dbg_scored": [
+   [
+    1,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    6,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    8,
+    "9c044323",
+    true
+   ],
+   [
+    10,
+    "60d85fb6",
+    true
+   ],
+   [
+    15,
+    "104c7b0f",
+    true
+   ],
+   [
+    17,
+    "60d85fb6",
+    false
+   ],
+   [
+    23,
+    "104c7b0f",
+    true
+   ],
+   [
+    27,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    32,
+    "f608a824",
+    true
+   ],
+   [
+    34,
+    "7219a92c",
+    false
+   ],
+   [
+    37,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    41,
+    "9c044323",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8012,
+  "error": null,
+  "turns": 408,
+  "score": {
+   "Lancaster": 71,
+   "Bentley-Truman": 71
+  },
+  "sync": {
+   "skeleton_fallback": 79
+  },
+  "cls": {
+   "MAKE|2PT": 20,
+   "BLOCK|2PT": 5,
+   "MISS|3PT": 31,
+   "MAKE|unstamped": 9,
+   "MISS|2PT": 15,
+   "MISS|unstamped": 10,
+   "MAKE|3PT": 8,
+   "BLOCK|3PT": 7
+  },
+  "cls_src": {
+   "forced_two": 2,
+   "shot_spot": 84
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 89,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 89,
+  "dbg_scored": [
+   [
+    1,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    5,
+    "f608a824",
+    false
+   ],
+   [
+    10,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    12,
+    "60d85fb6",
+    true
+   ],
+   [
+    19,
+    "60d85fb6",
+    true
+   ],
+   [
+    26,
+    "80f3ca79",
+    true
+   ],
+   [
+    30,
+    "104c7b0f",
+    true
+   ],
+   [
+    36,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    43,
+    "e590d342",
+    true
+   ],
+   [
+    52,
+    "e5fd9c60",
+    false
+   ],
+   [
+    57,
+    "104c7b0f",
+    true
+   ],
+   [
+    62,
+    "c13c8088",
+    false
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8013,
+  "error": null,
+  "turns": 405,
+  "score": {
+   "Lancaster": 65,
+   "Bentley-Truman": 74
+  },
+  "sync": {
+   "skeleton_fallback": 82
+  },
+  "cls": {
+   "MAKE|2PT": 26,
+   "MISS|3PT": 24,
+   "BLOCK|3PT": 4,
+   "MISS|2PT": 16,
+   "MISS|unstamped": 9,
+   "MAKE|3PT": 7,
+   "BLOCK|2PT": 5,
+   "MAKE|unstamped": 1
+  },
+  "cls_src": {
+   "shot_spot": 79,
+   "forced_two": 3
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 89,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 89,
+  "dbg_scored": [
+   [
+    4,
+    "7219a92c",
+    false
+   ],
+   [
+    7,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    10,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    14,
+    "f608a824",
+    true
+   ],
+   [
+    16,
+    "e590d342",
+    true
+   ],
+   [
+    23,
+    "9c044323",
+    false
+   ],
+   [
+    28,
+    "c13c8088",
+    true
+   ],
+   [
+    34,
+    "104c7b0f",
+    true
+   ],
+   [
+    39,
+    "7219a92c",
+    false
+   ],
+   [
+    44,
+    "7219a92c",
+    false
+   ],
+   [
+    49,
+    "9c044323",
+    true
+   ],
+   [
+    53,
+    "15901201",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8014,
+  "error": null,
+  "turns": 415,
+  "score": {
+   "Lancaster": 72,
+   "Bentley-Truman": 85
+  },
+  "sync": {
+   "skeleton_fallback": 88
+  },
+  "cls": {
+   "MAKE|3PT": 12,
+   "BLOCK|2PT": 6,
+   "MISS|3PT": 36,
+   "MISS|2PT": 18,
+   "MAKE|2PT": 21,
+   "MAKE|unstamped": 4,
+   "MISS|unstamped": 8,
+   "BLOCK|3PT": 2
+  },
+  "cls_src": {
+   "shot_spot": 91,
+   "forced_two": 4
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 97,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 97,
+  "dbg_scored": [
+   [
+    1,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    7,
+    "e590d342",
+    false
+   ],
+   [
+    9,
+    "f608a824",
+    true
+   ],
+   [
+    15,
+    "e590d342",
+    false
+   ],
+   [
+    17,
+    "f608a824",
+    true
+   ],
+   [
+    19,
+    "e590d342",
+    true
+   ],
+   [
+    23,
+    "c13c8088",
+    true
+   ],
+   [
+    27,
+    "f608a824",
+    true
+   ],
+   [
+    32,
+    "15901201",
+    false
+   ],
+   [
+    35,
+    "80f3ca79",
+    false
+   ],
+   [
+    38,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    40,
+    "104c7b0f",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8015,
+  "error": null,
+  "turns": 379,
+  "score": {
+   "Lancaster": 71,
+   "Bentley-Truman": 59
+  },
+  "sync": {
+   "skeleton_fallback": 74
+  },
+  "cls": {
+   "MISS|3PT": 32,
+   "MAKE|2PT": 18,
+   "MISS|2PT": 16,
+   "MAKE|3PT": 7,
+   "BLOCK|2PT": 2,
+   "MAKE|unstamped": 8,
+   "MISS|unstamped": 12,
+   "BLOCK|3PT": 3
+  },
+  "cls_src": {
+   "shot_spot": 75,
+   "forced_two": 3
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 79,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 79,
+  "dbg_scored": [
+   [
+    2,
+    "e590d342",
+    true
+   ],
+   [
+    6,
+    "f608a824",
+    false
+   ],
+   [
+    14,
+    "60d85fb6",
+    false
+   ],
+   [
+    18,
+    "104c7b0f",
+    true
+   ],
+   [
+    23,
+    "f608a824",
+    false
+   ],
+   [
+    25,
+    "c13c8088",
+    true
+   ],
+   [
+    30,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    33,
+    "60d85fb6",
+    true
+   ],
+   [
+    35,
+    "f608a824",
+    true
+   ],
+   [
+    39,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    41,
+    "c13c8088",
+    true
+   ],
+   [
+    47,
+    "a0a0f2d7",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8016,
+  "error": null,
+  "turns": 393,
+  "score": {
+   "Lancaster": 62,
+   "Bentley-Truman": 70
+  },
+  "sync": {
+   "skeleton_fallback": 82
+  },
+  "cls": {
+   "MAKE|3PT": 11,
+   "MAKE|2PT": 20,
+   "MISS|2PT": 14,
+   "MISS|unstamped": 11,
+   "MISS|3PT": 33,
+   "BLOCK|3PT": 5,
+   "BLOCK|2PT": 7,
+   "MAKE|unstamped": 7
+  },
+  "cls_src": {
+   "shot_spot": 89,
+   "forced_two": 1
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 90,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 90,
+  "dbg_scored": [
+   [
+    1,
+    "e590d342",
+    true
+   ],
+   [
+    5,
+    "80f3ca79",
+    false
+   ],
+   [
+    8,
+    "c13c8088",
+    false
+   ],
+   [
+    10,
+    "7219a92c",
+    false
+   ],
+   [
+    13,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    18,
+    "9c044323",
+    true
+   ],
+   [
+    20,
+    "60d85fb6",
+    true
+   ],
+   [
+    22,
+    "80f3ca79",
+    false
+   ],
+   [
+    27,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    30,
+    "60d85fb6",
+    true
+   ],
+   [
+    34,
+    "f608a824",
+    true
+   ],
+   [
+    39,
+    "7219a92c",
+    false
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8017,
+  "error": null,
+  "turns": 379,
+  "score": {
+   "Lancaster": 64,
+   "Bentley-Truman": 83
+  },
+  "sync": {
+   "skeleton_fallback": 71
+  },
+  "cls": {
+   "MAKE|3PT": 5,
+   "MISS|3PT": 27,
+   "MAKE|2PT": 30,
+   "BLOCK|2PT": 3,
+   "MISS|2PT": 10,
+   "MAKE|unstamped": 3,
+   "MISS|unstamped": 5
+  },
+  "cls_src": {
+   "shot_spot": 72,
+   "forced_two": 3
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 77,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 77,
+  "dbg_scored": [
+   [
+    3,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    7,
+    "f608a824",
+    true
+   ],
+   [
+    14,
+    "7219a92c",
+    false
+   ],
+   [
+    19,
+    "60d85fb6",
+    true
+   ],
+   [
+    21,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    23,
+    "9c044323",
+    false
+   ],
+   [
+    28,
+    "a0a0f2d7",
+    false
+   ],
+   [
+    33,
+    "80f3ca79",
+    false
+   ],
+   [
+    36,
+    "15901201",
+    false
+   ],
+   [
+    39,
+    "a0a0f2d7",
+    false
+   ],
+   [
+    48,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    65,
+    "19b6cdb5",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8018,
+  "error": null,
+  "turns": 406,
+  "score": {
+   "Lancaster": 72,
+   "Bentley-Truman": 62
+  },
+  "sync": {
+   "skeleton_fallback": 85
+  },
+  "cls": {
+   "MAKE|3PT": 10,
+   "MISS|3PT": 34,
+   "MAKE|2PT": 17,
+   "MAKE|unstamped": 7,
+   "BLOCK|2PT": 7,
+   "MISS|2PT": 12,
+   "BLOCK|3PT": 6,
+   "MISS|unstamped": 8
+  },
+  "cls_src": {
+   "shot_spot": 84,
+   "forced_two": 2
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 91,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 91,
+  "dbg_scored": [
+   [
+    1,
+    "9c044323",
+    true
+   ],
+   [
+    5,
+    "e590d342",
+    true
+   ],
+   [
+    10,
+    "7219a92c",
+    false
+   ],
+   [
+    13,
+    "60d85fb6",
+    true
+   ],
+   [
+    18,
+    "80f3ca79",
+    false
+   ],
+   [
+    20,
+    "60d85fb6",
+    false
+   ],
+   [
+    33,
+    "60d85fb6",
+    true
+   ],
+   [
+    38,
+    "7219a92c",
+    false
+   ],
+   [
+    45,
+    "7219a92c",
+    false
+   ],
+   [
+    47,
+    "104c7b0f",
+    true
+   ],
+   [
+    49,
+    "60d85fb6",
+    true
+   ],
+   [
+    51,
+    "60d85fb6",
+    true
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "sim",
+  "seed": 8019,
+  "error": null,
+  "turns": 402,
+  "score": {
+   "Lancaster": 66,
+   "Bentley-Truman": 79
+  },
+  "sync": {
+   "skeleton_fallback": 77
+  },
+  "cls": {
+   "MISS|2PT": 16,
+   "MAKE|2PT": 16,
+   "MISS|3PT": 29,
+   "MAKE|3PT": 11,
+   "BLOCK|3PT": 4,
+   "MAKE|unstamped": 6,
+   "MISS|unstamped": 10,
+   "BLOCK|2PT": 5
+  },
+  "cls_src": {
+   "shot_spot": 81
+  },
+  "cand_n": 0,
+  "cand_flips": 0,
+  "cand_3to2": 0,
+  "cand_2to3": 0,
+  "cand_coord_differ": 0,
+  "cand_dist_mean": null,
+  "d_total": 0,
+  "d_flips": 0,
+  "d_nofinal": 84,
+  "d_examples": [],
+  "d_award_cmp": {},
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {},
+  "d_rt_all": {},
+  "d_points_err": 0,
+  "render_turns": 0,
+  "scored_turns": 84,
+  "dbg_scored": [
+   [
+    1,
+    "9c044323",
+    false
+   ],
+   [
+    7,
+    "9c044323",
+    false
+   ],
+   [
+    13,
+    "80f3ca79",
+    false
+   ],
+   [
+    17,
+    "9c044323",
+    true
+   ],
+   [
+    19,
+    "104c7b0f",
+    false
+   ],
+   [
+    23,
+    "60d85fb6",
+    false
+   ],
+   [
+    25,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    29,
+    "c13c8088",
+    true
+   ],
+   [
+    33,
+    "9c044323",
+    true
+   ],
+   [
+    37,
+    "c13c8088",
+    true
+   ],
+   [
+    43,
+    "80f3ca79",
+    true
+   ],
+   [
+    47,
+    "19b6cdb5",
+    false
+   ]
+  ],
+  "dbg_render": []
+ },
+ {
+  "arm": "played",
+  "seed": 8000,
+  "error": null,
+  "turns": 429,
+  "score": {
+   "Lancaster": 77,
+   "Bentley-Truman": 66
+  },
+  "sync": {
+   "emitter": 95
+  },
+  "cls": {
+   "MAKE|3PT": 15,
+   "BLOCK|2PT": 6,
+   "MAKE|2PT": 19,
+   "MISS|2PT": 12,
+   "MISS|3PT": 37,
+   "BLOCK|3PT": 7,
+   "MAKE|unstamped": 10,
+   "MISS|unstamped": 5
+  },
+  "cls_src": {
+   "shot_spot": 94,
+   "forced_two": 2
+  },
+  "cand_n": 95,
+  "cand_flips": 4,
+  "cand_3to2": 0,
+  "cand_2to3": 4,
+  "cand_coord_differ": 4,
+  "cand_dist_mean": 1.5441785954435578,
+  "d_total": 95,
+  "d_flips": 11,
+  "d_nofinal": 5,
+  "d_examples": [
+   {
+    "turn": 10,
+    "result": "BLOCK",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 50,
+    "result": "MISS",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 65,
+    "result": "MISS",
+    "scored": {
+     "x": 33.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 80,
+    "result": "MISS",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 163,
+    "result": "MAKE",
+    "scored": {
+     "x": 74.0,
+     "y": 32.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 73.0,
+     "y": 40.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 167,
+    "result": "MISS",
+    "scored": {
+     "x": 30.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 173,
+    "result": "MAKE",
+    "scored": {
+     "x": 26.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 381,
+    "result": "MAKE",
+    "scored": {
+     "x": 30.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 385,
+    "result": "MAKE",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 388,
+    "result": "MAKE",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MAKE": 30,
+   "BLOCK": 13,
+   "MISS": 48
+  },
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {
+   "BLOCK": 1,
+   "MISS": 5,
+   "MAKE": 5
+  },
+  "d_rt_all": {
+   "MAKE": 30,
+   "BLOCK": 13,
+   "MISS": 48,
+   "FOUL": 3,
+   "CHARGE": 1
+  },
+  "d_points_err": 5,
+  "render_turns": 96,
+  "scored_turns": 100,
+  "dbg_scored": [
+   [
+    1,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    6,
+    "f608a824",
+    true
+   ],
+   [
+    10,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    14,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    18,
+    "7219a92c",
+    false
+   ],
+   [
+    23,
+    "9c044323",
+    false
+   ],
+   [
+    29,
+    "104c7b0f",
+    true
+   ],
+   [
+    32,
+    "e590d342",
+    false
+   ],
+   [
+    34,
+    "f608a824",
+    true
+   ],
+   [
+    36,
+    "104c7b0f",
+    true
+   ],
+   [
+    41,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    50,
+    "60d85fb6",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    1,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    6,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    6,
+    "f608a824",
+    true,
+    true
+   ],
+   [
+    10,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    10,
+    "bd5dbf1f",
+    false,
+    true
+   ],
+   [
+    14,
+    "bd5dbf1f",
+    false,
+    false
+   ],
+   [
+    14,
+    "bd5dbf1f",
+    false,
+    true
+   ],
+   [
+    18,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    18,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    23,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    23,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    29,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    29,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    32,
+    "e590d342",
+    false,
+    false
+   ],
+   [
+    32,
+    "e590d342",
+    false,
+    true
+   ],
+   [
+    34,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    34,
+    "f608a824",
+    true,
+    true
+   ],
+   [
+    36,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    36,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    41,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    41,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    50,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    50,
+    "60d85fb6",
+    false,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8001,
+  "error": null,
+  "turns": 494,
+  "score": {
+   "Lancaster": 73,
+   "Bentley-Truman": 82
+  },
+  "sync": {
+   "emitter": 99
+  },
+  "cls": {
+   "BLOCK|2PT": 9,
+   "MISS|3PT": 42,
+   "MAKE|unstamped": 11,
+   "BLOCK|3PT": 8,
+   "MISS|2PT": 19,
+   "MAKE|3PT": 13,
+   "MISS|unstamped": 5,
+   "MAKE|2PT": 9
+  },
+  "cls_src": {
+   "shot_spot": 100
+  },
+  "cand_n": 99,
+  "cand_flips": 6,
+  "cand_3to2": 0,
+  "cand_2to3": 6,
+  "cand_coord_differ": 6,
+  "cand_dist_mean": 2.222681311623303,
+  "d_total": 99,
+  "d_flips": 9,
+  "d_nofinal": 5,
+  "d_examples": [
+   {
+    "turn": 13,
+    "result": "BLOCK",
+    "scored": {
+     "x": 32.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 27,
+    "result": "MISS",
+    "scored": {
+     "x": 34.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 66,
+    "result": "MISS",
+    "scored": {
+     "x": 37.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 32.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 184,
+    "result": "MISS",
+    "scored": {
+     "x": 71.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 236,
+    "result": "MAKE",
+    "scored": {
+     "x": 69.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 287,
+    "result": "MAKE",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 345,
+    "result": "MISS",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 400,
+    "result": "MAKE",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 489,
+    "result": "BLOCK",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "BLOCK": 17,
+   "MISS": 58,
+   "MAKE": 20
+  },
+  "d_award_flip": {
+   "MISS": 1
+  },
+  "d_award_ex": [
+   {
+    "turn": 128,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 62.495,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   }
+  ],
+  "d_by_rt": {
+   "BLOCK": 2,
+   "MISS": 4,
+   "MAKE": 3
+  },
+  "d_rt_all": {
+   "BLOCK": 17,
+   "MISS": 58,
+   "FOUL": 2,
+   "MAKE": 20,
+   "CHARGE": 2
+  },
+  "d_points_err": 3,
+  "render_turns": 99,
+  "scored_turns": 104,
+  "dbg_scored": [
+   [
+    1,
+    "e590d342",
+    false
+   ],
+   [
+    3,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    9,
+    "104c7b0f",
+    true
+   ],
+   [
+    11,
+    "104c7b0f",
+    true
+   ],
+   [
+    13,
+    "104c7b0f",
+    false
+   ],
+   [
+    15,
+    "7219a92c",
+    true
+   ],
+   [
+    19,
+    "c13c8088",
+    true
+   ],
+   [
+    24,
+    "60d85fb6",
+    false
+   ],
+   [
+    27,
+    "80f3ca79",
+    false
+   ],
+   [
+    29,
+    "e590d342",
+    true
+   ],
+   [
+    36,
+    "c13c8088",
+    true
+   ],
+   [
+    42,
+    "60d85fb6",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "e590d342",
+    false,
+    false
+   ],
+   [
+    1,
+    "e590d342",
+    false,
+    true
+   ],
+   [
+    3,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    3,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    9,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    9,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    11,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    11,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    13,
+    "104c7b0f",
+    false,
+    false
+   ],
+   [
+    13,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    15,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    15,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    19,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    19,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    24,
+    "60d85fb6",
+    false,
+    false
+   ],
+   [
+    24,
+    "60d85fb6",
+    false,
+    true
+   ],
+   [
+    27,
+    "80f3ca79",
+    false,
+    false
+   ],
+   [
+    27,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    36,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    36,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    42,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    42,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    49,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    49,
+    "a0a0f2d7",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8002,
+  "error": null,
+  "turns": 423,
+  "score": {
+   "Lancaster": 52,
+   "Bentley-Truman": 61
+  },
+  "sync": {
+   "emitter": 90
+  },
+  "cls": {
+   "MAKE|2PT": 16,
+   "MISS|3PT": 44,
+   "BLOCK|2PT": 12,
+   "MAKE|unstamped": 7,
+   "MISS|2PT": 9,
+   "MISS|unstamped": 8,
+   "MAKE|3PT": 7,
+   "BLOCK|3PT": 8
+  },
+  "cls_src": {
+   "shot_spot": 94,
+   "forced_two": 2
+  },
+  "cand_n": 90,
+  "cand_flips": 12,
+  "cand_3to2": 0,
+  "cand_2to3": 12,
+  "cand_coord_differ": 12,
+  "cand_dist_mean": 4.889898885571266,
+  "d_total": 90,
+  "d_flips": 5,
+  "d_nofinal": 8,
+  "d_examples": [
+   {
+    "turn": 87,
+    "result": "MISS",
+    "scored": {
+     "x": 29.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 120,
+    "result": "MISS",
+    "scored": {
+     "x": 65.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 145,
+    "result": "MISS",
+    "scored": {
+     "x": 34.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 219,
+    "result": "MISS",
+    "scored": {
+     "x": 67.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 230,
+    "result": "MISS",
+    "scored": {
+     "x": 68.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MAKE": 19,
+   "MISS": 48,
+   "BLOCK": 20
+  },
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {
+   "MISS": 5
+  },
+  "d_rt_all": {
+   "FOUL": 2,
+   "MAKE": 19,
+   "MISS": 48,
+   "BLOCK": 20,
+   "CHARGE": 1
+  },
+  "d_points_err": 0,
+  "render_turns": 92,
+  "scored_turns": 98,
+  "dbg_scored": [
+   [
+    1,
+    "9c044323",
+    true
+   ],
+   [
+    5,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    9,
+    "f608a824",
+    true
+   ],
+   [
+    13,
+    "c13c8088",
+    false
+   ],
+   [
+    17,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    26,
+    "9c044323",
+    true
+   ],
+   [
+    32,
+    "19b6cdb5",
+    false
+   ],
+   [
+    34,
+    "19b6cdb5",
+    false
+   ],
+   [
+    44,
+    "80f3ca79",
+    false
+   ],
+   [
+    50,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    52,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    77,
+    "15901201",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    1,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    5,
+    "bd5dbf1f",
+    false,
+    false
+   ],
+   [
+    5,
+    "bd5dbf1f",
+    false,
+    true
+   ],
+   [
+    9,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    9,
+    "f608a824",
+    true,
+    true
+   ],
+   [
+    13,
+    "c13c8088",
+    false,
+    false
+   ],
+   [
+    13,
+    "c13c8088",
+    false,
+    true
+   ],
+   [
+    17,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    17,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    26,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    26,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    32,
+    "19b6cdb5",
+    false,
+    false
+   ],
+   [
+    32,
+    "19b6cdb5",
+    false,
+    true
+   ],
+   [
+    34,
+    "19b6cdb5",
+    false,
+    false
+   ],
+   [
+    34,
+    "19b6cdb5",
+    false,
+    true
+   ],
+   [
+    44,
+    "80f3ca79",
+    false,
+    false
+   ],
+   [
+    44,
+    "80f3ca79",
+    false,
+    true
+   ],
+   [
+    50,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    50,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    52,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    52,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    77,
+    "15901201",
+    true,
+    false
+   ],
+   [
+    77,
+    "15901201",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8003,
+  "error": null,
+  "turns": 381,
+  "score": {
+   "Lancaster": 60,
+   "Bentley-Truman": 70
+  },
+  "sync": {
+   "emitter": 82
+  },
+  "cls": {
+   "MISS|3PT": 36,
+   "MAKE|3PT": 14,
+   "MAKE|2PT": 17,
+   "MISS|2PT": 14,
+   "BLOCK|2PT": 1,
+   "MISS|unstamped": 10,
+   "MAKE|unstamped": 6,
+   "BLOCK|3PT": 4
+  },
+  "cls_src": {
+   "shot_spot": 83,
+   "forced_two": 3
+  },
+  "cand_n": 82,
+  "cand_flips": 8,
+  "cand_3to2": 0,
+  "cand_2to3": 8,
+  "cand_coord_differ": 8,
+  "cand_dist_mean": 3.577974794320439,
+  "d_total": 82,
+  "d_flips": 5,
+  "d_nofinal": 4,
+  "d_examples": [
+   {
+    "turn": 21,
+    "result": "MAKE",
+    "scored": {
+     "x": 38.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 33.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 43,
+    "result": "MISS",
+    "scored": {
+     "x": 65.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 219,
+    "result": "MISS",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 35.505,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 263,
+    "result": "MISS",
+    "scored": {
+     "x": 69.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 296,
+    "result": "MISS",
+    "scored": {
+     "x": 28.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MISS": 49,
+   "MAKE": 28,
+   "BLOCK": 5
+  },
+  "d_award_flip": {
+   "MISS": 1
+  },
+  "d_award_ex": [
+   {
+    "turn": 229,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 62.495,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   }
+  ],
+  "d_by_rt": {
+   "MAKE": 1,
+   "MISS": 4
+  },
+  "d_rt_all": {
+   "MISS": 49,
+   "MAKE": 28,
+   "BLOCK": 5
+  },
+  "d_points_err": 1,
+  "render_turns": 84,
+  "scored_turns": 86,
+  "dbg_scored": [
+   [
+    1,
+    "9c044323",
+    true
+   ],
+   [
+    6,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    10,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    14,
+    "80f3ca79",
+    true
+   ],
+   [
+    21,
+    "f608a824",
+    true
+   ],
+   [
+    25,
+    "e590d342",
+    false
+   ],
+   [
+    29,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    31,
+    "80f3ca79",
+    false
+   ],
+   [
+    34,
+    "9c044323",
+    true
+   ],
+   [
+    39,
+    "9c044323",
+    false
+   ],
+   [
+    43,
+    "c13c8088",
+    false
+   ],
+   [
+    48,
+    "c13c8088",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    1,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    6,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    6,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    10,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    10,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    14,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    14,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    21,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    21,
+    "f608a824",
+    false,
+    true
+   ],
+   [
+    25,
+    "e590d342",
+    false,
+    false
+   ],
+   [
+    25,
+    "e590d342",
+    false,
+    true
+   ],
+   [
+    29,
+    "bd5dbf1f",
+    false,
+    false
+   ],
+   [
+    29,
+    "bd5dbf1f",
+    false,
+    true
+   ],
+   [
+    31,
+    "80f3ca79",
+    false,
+    false
+   ],
+   [
+    31,
+    "80f3ca79",
+    false,
+    true
+   ],
+   [
+    34,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    34,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    39,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    39,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    43,
+    "c13c8088",
+    false,
+    false
+   ],
+   [
+    43,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    48,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    48,
+    "c13c8088",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8004,
+  "error": null,
+  "turns": 431,
+  "score": {
+   "Lancaster": 88,
+   "Bentley-Truman": 71
+  },
+  "sync": {
+   "emitter": 98
+  },
+  "cls": {
+   "MISS|3PT": 37,
+   "MAKE|3PT": 16,
+   "MAKE|2PT": 17,
+   "BLOCK|2PT": 3,
+   "BLOCK|3PT": 5,
+   "MISS|unstamped": 8,
+   "MISS|2PT": 19,
+   "MAKE|unstamped": 7
+  },
+  "cls_src": {
+   "shot_spot": 97
+  },
+  "cand_n": 98,
+  "cand_flips": 9,
+  "cand_3to2": 0,
+  "cand_2to3": 9,
+  "cand_coord_differ": 9,
+  "cand_dist_mean": 3.368042599755719,
+  "d_total": 98,
+  "d_flips": 8,
+  "d_nofinal": 3,
+  "d_examples": [
+   {
+    "turn": 27,
+    "result": "MAKE",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 64.495,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 61,
+    "result": "MISS",
+    "scored": {
+     "x": 67.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 79,
+    "result": "MISS",
+    "scored": {
+     "x": 69.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 110,
+    "result": "BLOCK",
+    "scored": {
+     "x": 37.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 32.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 185,
+    "result": "MAKE",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 64.495,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 234,
+    "result": "MAKE",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 269,
+    "result": "MISS",
+    "scored": {
+     "x": 27.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 377,
+    "result": "MISS",
+    "scored": {
+     "x": 32.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MISS": 53,
+   "MAKE": 33,
+   "BLOCK": 8
+  },
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {
+   "MAKE": 3,
+   "MISS": 4,
+   "BLOCK": 1
+  },
+  "d_rt_all": {
+   "MISS": 53,
+   "MAKE": 33,
+   "BLOCK": 8,
+   "CHARGE": 4
+  },
+  "d_points_err": 3,
+  "render_turns": 100,
+  "scored_turns": 101,
+  "dbg_scored": [
+   [
+    1,
+    "80f3ca79",
+    true
+   ],
+   [
+    4,
+    "60d85fb6",
+    true
+   ],
+   [
+    6,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    13,
+    "f608a824",
+    true
+   ],
+   [
+    19,
+    "7219a92c",
+    true
+   ],
+   [
+    23,
+    "c13c8088",
+    false
+   ],
+   [
+    27,
+    "9c044323",
+    true
+   ],
+   [
+    31,
+    "7219a92c",
+    true
+   ],
+   [
+    36,
+    "e590d342",
+    true
+   ],
+   [
+    43,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    46,
+    "e590d342",
+    true
+   ],
+   [
+    50,
+    "c13c8088",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    1,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    4,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    4,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    6,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    6,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    13,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    13,
+    "f608a824",
+    true,
+    true
+   ],
+   [
+    19,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    19,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    23,
+    "c13c8088",
+    false,
+    false
+   ],
+   [
+    23,
+    "c13c8088",
+    false,
+    true
+   ],
+   [
+    27,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    27,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    31,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    31,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    36,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    36,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    43,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    43,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    46,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    46,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    50,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    50,
+    "c13c8088",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8005,
+  "error": null,
+  "turns": 460,
+  "score": {
+   "Lancaster": 81,
+   "Bentley-Truman": 89
+  },
+  "sync": {
+   "emitter": 79
+  },
+  "cls": {
+   "MAKE|2PT": 17,
+   "MISS|unstamped": 13,
+   "MAKE|unstamped": 13,
+   "MAKE|3PT": 11,
+   "MISS|3PT": 27,
+   "MISS|2PT": 19,
+   "BLOCK|3PT": 7
+  },
+  "cls_src": {
+   "shot_spot": 80,
+   "forced_two": 1
+  },
+  "cand_n": 79,
+  "cand_flips": 10,
+  "cand_3to2": 0,
+  "cand_2to3": 10,
+  "cand_coord_differ": 10,
+  "cand_dist_mean": 4.6423090685803166,
+  "d_total": 79,
+  "d_flips": 4,
+  "d_nofinal": 5,
+  "d_examples": [
+   {
+    "turn": 1,
+    "result": "MAKE",
+    "scored": {
+     "x": 61.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 65.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 13,
+    "result": "MAKE",
+    "scored": {
+     "x": 26.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 96,
+    "result": "MISS",
+    "scored": {
+     "x": 71.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 348,
+    "result": "MAKE",
+    "scored": {
+     "x": 69.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MAKE": 24,
+   "MISS": 45,
+   "BLOCK": 7
+  },
+  "d_award_flip": {
+   "MISS": 2
+  },
+  "d_award_ex": [
+   {
+    "turn": 25,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   },
+   {
+    "turn": 254,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 39.505,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 40.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   }
+  ],
+  "d_by_rt": {
+   "MAKE": 3,
+   "MISS": 1
+  },
+  "d_rt_all": {
+   "MAKE": 24,
+   "MISS": 45,
+   "CHARGE": 2,
+   "BLOCK": 7,
+   "FOUL": 1
+  },
+  "d_points_err": 3,
+  "render_turns": 80,
+  "scored_turns": 84,
+  "dbg_scored": [
+   [
+    1,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    7,
+    "e590d342",
+    false
+   ],
+   [
+    13,
+    "104c7b0f",
+    false
+   ],
+   [
+    17,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    23,
+    "f608a824",
+    true
+   ],
+   [
+    25,
+    "e590d342",
+    true
+   ],
+   [
+    30,
+    "80f3ca79",
+    true
+   ],
+   [
+    32,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    38,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    47,
+    "104c7b0f",
+    true
+   ],
+   [
+    53,
+    "9c044323",
+    false
+   ],
+   [
+    57,
+    "457185a0",
+    false
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    1,
+    "bd5dbf1f",
+    false,
+    true
+   ],
+   [
+    7,
+    "e590d342",
+    false,
+    false
+   ],
+   [
+    7,
+    "e590d342",
+    false,
+    true
+   ],
+   [
+    13,
+    "104c7b0f",
+    false,
+    false
+   ],
+   [
+    13,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    17,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    17,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    23,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    23,
+    "f608a824",
+    true,
+    true
+   ],
+   [
+    25,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    25,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    30,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    30,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    32,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    32,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    38,
+    "bd5dbf1f",
+    false,
+    false
+   ],
+   [
+    38,
+    "bd5dbf1f",
+    false,
+    true
+   ],
+   [
+    47,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    47,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    53,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    53,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    57,
+    "457185a0",
+    false,
+    false
+   ],
+   [
+    57,
+    "457185a0",
+    false,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8006,
+  "error": null,
+  "turns": 441,
+  "score": {
+   "Lancaster": 51,
+   "Bentley-Truman": 55
+  },
+  "sync": {
+   "emitter": 91
+  },
+  "cls": {
+   "BLOCK|2PT": 9,
+   "MISS|3PT": 45,
+   "BLOCK|3PT": 9,
+   "MISS|2PT": 13,
+   "MAKE|2PT": 9,
+   "MISS|unstamped": 16,
+   "MAKE|unstamped": 7,
+   "MAKE|3PT": 4
+  },
+  "cls_src": {
+   "shot_spot": 86,
+   "forced_two": 3
+  },
+  "cand_n": 91,
+  "cand_flips": 11,
+  "cand_3to2": 0,
+  "cand_2to3": 11,
+  "cand_coord_differ": 11,
+  "cand_dist_mean": 4.4331500885673565,
+  "d_total": 91,
+  "d_flips": 12,
+  "d_nofinal": 2,
+  "d_examples": [
+   {
+    "turn": 188,
+    "result": "MISS",
+    "scored": {
+     "x": 34.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 194,
+    "result": "MISS",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 196,
+    "result": "MISS",
+    "scored": {
+     "x": 31.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 224,
+    "result": "BLOCK",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 239,
+    "result": "BLOCK",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 252,
+    "result": "MISS",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 258,
+    "result": "MISS",
+    "scored": {
+     "x": 74.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 279,
+    "result": "MISS",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 291,
+    "result": "MISS",
+    "scored": {
+     "x": 37.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 32.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 341,
+    "result": "BLOCK",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "BLOCK": 18,
+   "MISS": 58,
+   "MAKE": 11
+  },
+  "d_award_flip": {
+   "MISS": 3
+  },
+  "d_award_ex": [
+   {
+    "turn": 31,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 60.495,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 60.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   },
+   {
+    "turn": 287,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 63.495,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 63.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   },
+   {
+    "turn": 384,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   }
+  ],
+  "d_by_rt": {
+   "MISS": 9,
+   "BLOCK": 3
+  },
+  "d_rt_all": {
+   "FOUL": 1,
+   "BLOCK": 18,
+   "MISS": 58,
+   "CHARGE": 3,
+   "MAKE": 11
+  },
+  "d_points_err": 0,
+  "render_turns": 95,
+  "scored_turns": 93,
+  "dbg_scored": [
+   [
+    1,
+    "c13c8088",
+    true
+   ],
+   [
+    3,
+    "9c044323",
+    false
+   ],
+   [
+    5,
+    "80f3ca79",
+    true
+   ],
+   [
+    12,
+    "7219a92c",
+    false
+   ],
+   [
+    14,
+    "e590d342",
+    true
+   ],
+   [
+    17,
+    "7219a92c",
+    true
+   ],
+   [
+    19,
+    "7219a92c",
+    true
+   ],
+   [
+    24,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    31,
+    "60d85fb6",
+    true
+   ],
+   [
+    36,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    38,
+    "e590d342",
+    false
+   ],
+   [
+    44,
+    "80f3ca79",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    1,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    3,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    3,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    5,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    5,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    12,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    12,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    14,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    14,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    17,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    17,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    19,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    19,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    24,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    24,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    31,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    31,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    36,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    36,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    44,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    44,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    51,
+    "a0a0f2d7",
+    false,
+    false
+   ],
+   [
+    51,
+    "a0a0f2d7",
+    false,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8007,
+  "error": null,
+  "turns": 407,
+  "score": {
+   "Lancaster": 59,
+   "Bentley-Truman": 66
+  },
+  "sync": {
+   "emitter": 82
+  },
+  "cls": {
+   "MISS|3PT": 38,
+   "MAKE|unstamped": 10,
+   "BLOCK|2PT": 10,
+   "MISS|2PT": 16,
+   "MAKE|3PT": 12,
+   "BLOCK|3PT": 3,
+   "MISS|unstamped": 9,
+   "MAKE|2PT": 6
+  },
+  "cls_src": {
+   "shot_spot": 83,
+   "forced_two": 2
+  },
+  "cand_n": 82,
+  "cand_flips": 2,
+  "cand_3to2": 0,
+  "cand_2to3": 2,
+  "cand_coord_differ": 2,
+  "cand_dist_mean": 0.8944936985801097,
+  "d_total": 82,
+  "d_flips": 11,
+  "d_nofinal": 2,
+  "d_examples": [
+   {
+    "turn": 36,
+    "result": "MISS",
+    "scored": {
+     "x": 65.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 46,
+    "result": "MISS",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 35.505,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 122,
+    "result": "MISS",
+    "scored": {
+     "x": 26.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 145,
+    "result": "MISS",
+    "scored": {
+     "x": 74.0,
+     "y": 19.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 73.0,
+     "y": 10.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 159,
+    "result": "MAKE",
+    "scored": {
+     "x": 40.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 35.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 191,
+    "result": "MISS",
+    "scored": {
+     "x": 40.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 35.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 209,
+    "result": "BLOCK",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 217,
+    "result": "MISS",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 268,
+    "result": "MISS",
+    "scored": {
+     "x": 60.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 64.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 326,
+    "result": "MISS",
+    "scored": {
+     "x": 34.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MISS": 52,
+   "BLOCK": 13,
+   "MAKE": 17
+  },
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {
+   "MISS": 9,
+   "MAKE": 1,
+   "BLOCK": 1
+  },
+  "d_rt_all": {
+   "MISS": 52,
+   "BLOCK": 13,
+   "MAKE": 17
+  },
+  "d_points_err": 1,
+  "render_turns": 85,
+  "scored_turns": 84,
+  "dbg_scored": [
+   [
+    1,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    7,
+    "9c044323",
+    false
+   ],
+   [
+    9,
+    "9c044323",
+    false
+   ],
+   [
+    13,
+    "7219a92c",
+    false
+   ],
+   [
+    15,
+    "e590d342",
+    true
+   ],
+   [
+    17,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    21,
+    "a0a0f2d7",
+    false
+   ],
+   [
+    26,
+    "e590d342",
+    true
+   ],
+   [
+    31,
+    "9c044323",
+    false
+   ],
+   [
+    36,
+    "60d85fb6",
+    false
+   ],
+   [
+    42,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    46,
+    "bad6d85c",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    1,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    7,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    7,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    9,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    9,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    13,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    13,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    15,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    15,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    17,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    17,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    21,
+    "a0a0f2d7",
+    false,
+    false
+   ],
+   [
+    21,
+    "a0a0f2d7",
+    false,
+    true
+   ],
+   [
+    26,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    26,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    31,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    31,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    36,
+    "60d85fb6",
+    false,
+    false
+   ],
+   [
+    36,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    42,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    42,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    46,
+    "bad6d85c",
+    true,
+    false
+   ],
+   [
+    46,
+    "bad6d85c",
+    false,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8008,
+  "error": null,
+  "turns": 457,
+  "score": {
+   "Lancaster": 72,
+   "Bentley-Truman": 70
+  },
+  "sync": {
+   "emitter": 92
+  },
+  "cls": {
+   "MISS|2PT": 15,
+   "BLOCK|3PT": 11,
+   "MISS|3PT": 40,
+   "MAKE|3PT": 12,
+   "MISS|unstamped": 6,
+   "MAKE|unstamped": 8,
+   "MAKE|2PT": 9,
+   "BLOCK|2PT": 4
+  },
+  "cls_src": {
+   "shot_spot": 91
+  },
+  "cand_n": 92,
+  "cand_flips": 14,
+  "cand_3to2": 0,
+  "cand_2to3": 14,
+  "cand_coord_differ": 14,
+  "cand_dist_mean": 5.5808628585324245,
+  "d_total": 92,
+  "d_flips": 6,
+  "d_nofinal": 1,
+  "d_examples": [
+   {
+    "turn": 116,
+    "result": "BLOCK",
+    "scored": {
+     "x": 63.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 67.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 125,
+    "result": "MISS",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 127,
+    "result": "MISS",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 286,
+    "result": "MAKE",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 64.495,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 299,
+    "result": "MISS",
+    "scored": {
+     "x": 26.0,
+     "y": 32.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 399,
+    "result": "MISS",
+    "scored": {
+     "x": 26.0,
+     "y": 32.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 27.0,
+     "y": 40.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MISS": 54,
+   "BLOCK": 15,
+   "MAKE": 21
+  },
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {
+   "BLOCK": 1,
+   "MISS": 4,
+   "MAKE": 1
+  },
+  "d_rt_all": {
+   "MISS": 54,
+   "BLOCK": 15,
+   "MAKE": 21,
+   "FOUL": 1,
+   "CHARGE": 1
+  },
+  "d_points_err": 1,
+  "render_turns": 93,
+  "scored_turns": 93,
+  "dbg_scored": [
+   [
+    1,
+    "e590d342",
+    false
+   ],
+   [
+    5,
+    "7219a92c",
+    true
+   ],
+   [
+    8,
+    "e590d342",
+    true
+   ],
+   [
+    11,
+    "80f3ca79",
+    true
+   ],
+   [
+    14,
+    "60d85fb6",
+    true
+   ],
+   [
+    21,
+    "9c044323",
+    true
+   ],
+   [
+    25,
+    "7219a92c",
+    false
+   ],
+   [
+    33,
+    "7219a92c",
+    true
+   ],
+   [
+    36,
+    "c13c8088",
+    true
+   ],
+   [
+    45,
+    "80f3ca79",
+    true
+   ],
+   [
+    52,
+    "19b6cdb5",
+    false
+   ],
+   [
+    55,
+    "c13c8088",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "e590d342",
+    false,
+    false
+   ],
+   [
+    1,
+    "e590d342",
+    false,
+    true
+   ],
+   [
+    5,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    5,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    8,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    8,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    11,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    11,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    14,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    14,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    21,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    21,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    25,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    25,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    33,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    33,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    36,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    36,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    45,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    45,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    52,
+    "19b6cdb5",
+    false,
+    false
+   ],
+   [
+    52,
+    "19b6cdb5",
+    false,
+    true
+   ],
+   [
+    55,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    55,
+    "c13c8088",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8009,
+  "error": null,
+  "turns": 402,
+  "score": {
+   "Lancaster": 63,
+   "Bentley-Truman": 50
+  },
+  "sync": {
+   "emitter": 97
+  },
+  "cls": {
+   "MAKE|3PT": 8,
+   "MAKE|2PT": 15,
+   "BLOCK|3PT": 9,
+   "BLOCK|2PT": 6,
+   "MISS|3PT": 43,
+   "MISS|2PT": 21,
+   "MAKE|unstamped": 9,
+   "MISS|unstamped": 6
+  },
+  "cls_src": {
+   "shot_spot": 101,
+   "forced_two": 1
+  },
+  "cand_n": 97,
+  "cand_flips": 19,
+  "cand_3to2": 0,
+  "cand_2to3": 19,
+  "cand_coord_differ": 19,
+  "cand_dist_mean": 7.183614342205211,
+  "d_total": 97,
+  "d_flips": 9,
+  "d_nofinal": 6,
+  "d_examples": [
+   {
+    "turn": 36,
+    "result": "MISS",
+    "scored": {
+     "x": 74.0,
+     "y": 32.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 73.0,
+     "y": 40.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 79,
+    "result": "MAKE",
+    "scored": {
+     "x": 38.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 33.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 131,
+    "result": "MISS",
+    "scored": {
+     "x": 74.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 149,
+    "result": "MAKE",
+    "scored": {
+     "x": 74.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 216,
+    "result": "MISS",
+    "scored": {
+     "x": 37.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 32.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 240,
+    "result": "MISS",
+    "scored": {
+     "x": 32.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 358,
+    "result": "MISS",
+    "scored": {
+     "x": 73.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 396,
+    "result": "MISS",
+    "scored": {
+     "x": 77.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 399,
+    "result": "MISS",
+    "scored": {
+     "x": 38.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 33.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MAKE": 22,
+   "BLOCK": 15,
+   "MISS": 59
+  },
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {
+   "MISS": 7,
+   "MAKE": 2
+  },
+  "d_rt_all": {
+   "MAKE": 22,
+   "BLOCK": 15,
+   "MISS": 59,
+   "CHARGE": 1
+  },
+  "d_points_err": 2,
+  "render_turns": 98,
+  "scored_turns": 103,
+  "dbg_scored": [
+   [
+    1,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    5,
+    "9c044323",
+    false
+   ],
+   [
+    8,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    12,
+    "e590d342",
+    true
+   ],
+   [
+    16,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    20,
+    "7219a92c",
+    false
+   ],
+   [
+    23,
+    "c13c8088",
+    false
+   ],
+   [
+    27,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    29,
+    "9c044323",
+    false
+   ],
+   [
+    32,
+    "7219a92c",
+    true
+   ],
+   [
+    36,
+    "e590d342",
+    false
+   ],
+   [
+    38,
+    "104c7b0f",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    1,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    5,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    5,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    8,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    8,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    12,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    12,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    16,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    16,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    20,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    20,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    23,
+    "c13c8088",
+    false,
+    false
+   ],
+   [
+    23,
+    "c13c8088",
+    false,
+    true
+   ],
+   [
+    27,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    27,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    29,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    29,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    32,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    32,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    36,
+    "e590d342",
+    false,
+    false
+   ],
+   [
+    36,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    38,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    38,
+    "104c7b0f",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8010,
+  "error": null,
+  "turns": 450,
+  "score": {
+   "Lancaster": 56,
+   "Bentley-Truman": 68
+  },
+  "sync": {
+   "emitter": 104
+  },
+  "cls": {
+   "MAKE|2PT": 9,
+   "MISS|3PT": 46,
+   "MISS|2PT": 14,
+   "BLOCK|3PT": 17,
+   "BLOCK|2PT": 7,
+   "MAKE|unstamped": 9,
+   "MISS|unstamped": 6,
+   "MAKE|3PT": 8
+  },
+  "cls_src": {
+   "shot_spot": 98,
+   "forced_two": 3
+  },
+  "cand_n": 104,
+  "cand_flips": 19,
+  "cand_3to2": 0,
+  "cand_2to3": 19,
+  "cand_coord_differ": 19,
+  "cand_dist_mean": 6.700101838402937,
+  "d_total": 104,
+  "d_flips": 7,
+  "d_nofinal": 5,
+  "d_examples": [
+   {
+    "turn": 43,
+    "result": "BLOCK",
+    "scored": {
+     "x": 38.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 33.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 136,
+    "result": "MISS",
+    "scored": {
+     "x": 39.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 34.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 224,
+    "result": "BLOCK",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 280,
+    "result": "MISS",
+    "scored": {
+     "x": 65.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 319,
+    "result": "MISS",
+    "scored": {
+     "x": 61.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 65.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 343,
+    "result": "BLOCK",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 406,
+    "result": "MISS",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 35.505,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MAKE": 13,
+   "MISS": 59,
+   "BLOCK": 24
+  },
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {
+   "BLOCK": 3,
+   "MISS": 4
+  },
+  "d_rt_all": {
+   "MAKE": 13,
+   "MISS": 59,
+   "CHARGE": 2,
+   "BLOCK": 24,
+   "FOUL": 6
+  },
+  "d_points_err": 0,
+  "render_turns": 105,
+  "scored_turns": 109,
+  "dbg_scored": [
+   [
+    1,
+    "9c044323",
+    false
+   ],
+   [
+    5,
+    "c13c8088",
+    false
+   ],
+   [
+    13,
+    "60d85fb6",
+    true
+   ],
+   [
+    17,
+    "a0a0f2d7",
+    false
+   ],
+   [
+    24,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    26,
+    "15901201",
+    true
+   ],
+   [
+    28,
+    "7219a92c",
+    false
+   ],
+   [
+    32,
+    "7219a92c",
+    true
+   ],
+   [
+    34,
+    "7840e5cc",
+    true
+   ],
+   [
+    36,
+    "9c044323",
+    true
+   ],
+   [
+    41,
+    "15901201",
+    true
+   ],
+   [
+    43,
+    "7219a92c",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    1,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    5,
+    "c13c8088",
+    false,
+    false
+   ],
+   [
+    5,
+    "c13c8088",
+    false,
+    true
+   ],
+   [
+    13,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    13,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    17,
+    "a0a0f2d7",
+    false,
+    false
+   ],
+   [
+    17,
+    "a0a0f2d7",
+    false,
+    true
+   ],
+   [
+    24,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    24,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    28,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    28,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    32,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    32,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    34,
+    "7840e5cc",
+    true,
+    false
+   ],
+   [
+    34,
+    "7840e5cc",
+    true,
+    true
+   ],
+   [
+    36,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    36,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    41,
+    "15901201",
+    true,
+    false
+   ],
+   [
+    41,
+    "15901201",
+    true,
+    true
+   ],
+   [
+    43,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    43,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    46,
+    "15901201",
+    true,
+    false
+   ],
+   [
+    46,
+    "15901201",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8011,
+  "error": null,
+  "turns": 450,
+  "score": {
+   "Lancaster": 79,
+   "Bentley-Truman": 68
+  },
+  "sync": {
+   "emitter": 89
+  },
+  "cls": {
+   "MAKE|3PT": 13,
+   "MISS|3PT": 44,
+   "MAKE|unstamped": 8,
+   "MISS|2PT": 14,
+   "MAKE|2PT": 8,
+   "BLOCK|3PT": 5,
+   "MISS|unstamped": 6,
+   "BLOCK|2PT": 7
+  },
+  "cls_src": {
+   "shot_spot": 91
+  },
+  "cand_n": 89,
+  "cand_flips": 11,
+  "cand_3to2": 0,
+  "cand_2to3": 11,
+  "cand_coord_differ": 11,
+  "cand_dist_mean": 4.532771438872241,
+  "d_total": 89,
+  "d_flips": 7,
+  "d_nofinal": 3,
+  "d_examples": [
+   {
+    "turn": 1,
+    "result": "MAKE",
+    "scored": {
+     "x": 74.0,
+     "y": 19.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 73.0,
+     "y": 10.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 59,
+    "result": "MISS",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 64.495,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 95,
+    "result": "MISS",
+    "scored": {
+     "x": 65.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 124,
+    "result": "MAKE",
+    "scored": {
+     "x": 74.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 175,
+    "result": "BLOCK",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 280,
+    "result": "MAKE",
+    "scored": {
+     "x": 74.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 437,
+    "result": "MAKE",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MAKE": 20,
+   "MISS": 56,
+   "BLOCK": 12
+  },
+  "d_award_flip": {
+   "MISS": 1
+  },
+  "d_award_ex": [
+   {
+    "turn": 36,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 61.495,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 61.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   }
+  ],
+  "d_by_rt": {
+   "MAKE": 4,
+   "MISS": 2,
+   "BLOCK": 1
+  },
+  "d_rt_all": {
+   "MAKE": 20,
+   "MISS": 56,
+   "BLOCK": 12,
+   "FOUL": 1
+  },
+  "d_points_err": 4,
+  "render_turns": 89,
+  "scored_turns": 92,
+  "dbg_scored": [
+   [
+    1,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    4,
+    "7219a92c",
+    true
+   ],
+   [
+    13,
+    "c13c8088",
+    true
+   ],
+   [
+    17,
+    "9c044323",
+    true
+   ],
+   [
+    25,
+    "e590d342",
+    true
+   ],
+   [
+    30,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    34,
+    "7219a92c",
+    true
+   ],
+   [
+    36,
+    "c13c8088",
+    true
+   ],
+   [
+    38,
+    "7219a92c",
+    true
+   ],
+   [
+    40,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    46,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    49,
+    "bd5dbf1f",
+    false
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "bd5dbf1f",
+    false,
+    false
+   ],
+   [
+    1,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    4,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    4,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    13,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    13,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    17,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    17,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    25,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    25,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    30,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    30,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    34,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    34,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    36,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    36,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    38,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    38,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    40,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    40,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    46,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    46,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    49,
+    "bd5dbf1f",
+    false,
+    false
+   ],
+   [
+    49,
+    "bd5dbf1f",
+    false,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8012,
+  "error": null,
+  "turns": 393,
+  "score": {
+   "Lancaster": 55,
+   "Bentley-Truman": 65
+  },
+  "sync": {
+   "emitter": 91
+  },
+  "cls": {
+   "MAKE|3PT": 7,
+   "MISS|unstamped": 6,
+   "MISS|3PT": 29,
+   "MAKE|unstamped": 10,
+   "BLOCK|2PT": 12,
+   "MAKE|2PT": 18,
+   "BLOCK|3PT": 9,
+   "MISS|2PT": 11
+  },
+  "cls_src": {
+   "shot_spot": 84,
+   "forced_two": 2
+  },
+  "cand_n": 91,
+  "cand_flips": 5,
+  "cand_3to2": 0,
+  "cand_2to3": 5,
+  "cand_coord_differ": 5,
+  "cand_dist_mean": 2.015068222076071,
+  "d_total": 91,
+  "d_flips": 14,
+  "d_nofinal": 2,
+  "d_examples": [
+   {
+    "turn": 5,
+    "result": "MISS",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 22,
+    "result": "BLOCK",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 46,
+    "result": "MISS",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 54,
+    "result": "MAKE",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 58,
+    "result": "MAKE",
+    "scored": {
+     "x": 26.0,
+     "y": 19.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 27.0,
+     "y": 10.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 61,
+    "result": "MISS",
+    "scored": {
+     "x": 67.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 114,
+    "result": "MISS",
+    "scored": {
+     "x": 74.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 116,
+    "result": "BLOCK",
+    "scored": {
+     "x": 38.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 33.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 121,
+    "result": "MISS",
+    "scored": {
+     "x": 26.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 128,
+    "result": "MAKE",
+    "scored": {
+     "x": 37.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 32.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MAKE": 24,
+   "MISS": 39,
+   "BLOCK": 21
+  },
+  "d_award_flip": {
+   "MISS": 1,
+   "MAKE": 1
+  },
+  "d_award_ex": [
+   {
+    "turn": 97,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 60.495,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 60.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   },
+   {
+    "turn": 372,
+    "result": "MAKE",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 39.505,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 40.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   }
+  ],
+  "d_by_rt": {
+   "MISS": 7,
+   "BLOCK": 4,
+   "MAKE": 3
+  },
+  "d_rt_all": {
+   "MAKE": 24,
+   "MISS": 39,
+   "BLOCK": 21,
+   "CHARGE": 4,
+   "FOUL": 3
+  },
+  "d_points_err": 3,
+  "render_turns": 92,
+  "scored_turns": 93,
+  "dbg_scored": [
+   [
+    1,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    5,
+    "9c044323",
+    false
+   ],
+   [
+    11,
+    "80f3ca79",
+    true
+   ],
+   [
+    19,
+    "f608a824",
+    true
+   ],
+   [
+    22,
+    "60d85fb6",
+    true
+   ],
+   [
+    25,
+    "60d85fb6",
+    false
+   ],
+   [
+    32,
+    "9c044323",
+    true
+   ],
+   [
+    34,
+    "80f3ca79",
+    true
+   ],
+   [
+    40,
+    "9c044323",
+    false
+   ],
+   [
+    42,
+    "104c7b0f",
+    true
+   ],
+   [
+    46,
+    "7219a92c",
+    true
+   ],
+   [
+    48,
+    "f608a824",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    1,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    5,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    5,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    11,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    11,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    19,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    19,
+    "f608a824",
+    true,
+    true
+   ],
+   [
+    22,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    22,
+    "60d85fb6",
+    false,
+    true
+   ],
+   [
+    25,
+    "60d85fb6",
+    false,
+    false
+   ],
+   [
+    25,
+    "60d85fb6",
+    false,
+    true
+   ],
+   [
+    32,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    32,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    34,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    34,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    40,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    40,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    42,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    42,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    46,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    46,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    48,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    48,
+    "f608a824",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8013,
+  "error": null,
+  "turns": 430,
+  "score": {
+   "Lancaster": 50,
+   "Bentley-Truman": 50
+  },
+  "sync": {
+   "emitter": 94
+  },
+  "cls": {
+   "MISS|2PT": 22,
+   "MAKE|2PT": 8,
+   "MISS|3PT": 43,
+   "BLOCK|2PT": 8,
+   "MISS|unstamped": 4,
+   "MAKE|unstamped": 7,
+   "BLOCK|3PT": 7,
+   "MAKE|3PT": 3
+  },
+  "cls_src": {
+   "shot_spot": 91
+  },
+  "cand_n": 94,
+  "cand_flips": 8,
+  "cand_3to2": 0,
+  "cand_2to3": 8,
+  "cand_coord_differ": 8,
+  "cand_dist_mean": 3.1212120546199573,
+  "d_total": 94,
+  "d_flips": 6,
+  "d_nofinal": 2,
+  "d_examples": [
+   {
+    "turn": 100,
+    "result": "MAKE",
+    "scored": {
+     "x": 60.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 64.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 126,
+    "result": "MISS",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 153,
+    "result": "MISS",
+    "scored": {
+     "x": 68.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 230,
+    "result": "BLOCK",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 356,
+    "result": "MISS",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 410,
+    "result": "MISS",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MISS": 63,
+   "MAKE": 11,
+   "BLOCK": 15
+  },
+  "d_award_flip": {
+   "MAKE": 1,
+   "MISS": 1
+  },
+  "d_award_ex": [
+   {
+    "turn": 167,
+    "result": "MAKE",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 62.495,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   },
+   {
+    "turn": 362,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   }
+  ],
+  "d_by_rt": {
+   "MAKE": 1,
+   "MISS": 4,
+   "BLOCK": 1
+  },
+  "d_rt_all": {
+   "MISS": 63,
+   "MAKE": 11,
+   "BLOCK": 15,
+   "CHARGE": 3,
+   "FOUL": 2
+  },
+  "d_points_err": 1,
+  "render_turns": 94,
+  "scored_turns": 96,
+  "dbg_scored": [
+   [
+    5,
+    "c13c8088",
+    false
+   ],
+   [
+    8,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    13,
+    "60d85fb6",
+    true
+   ],
+   [
+    19,
+    "80f3ca79",
+    false
+   ],
+   [
+    27,
+    "80f3ca79",
+    true
+   ],
+   [
+    29,
+    "60d85fb6",
+    true
+   ],
+   [
+    31,
+    "7219a92c",
+    false
+   ],
+   [
+    44,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    46,
+    "60d85fb6",
+    false
+   ],
+   [
+    48,
+    "104c7b0f",
+    true
+   ],
+   [
+    50,
+    "60d85fb6",
+    true
+   ],
+   [
+    52,
+    "104c7b0f",
+    false
+   ]
+  ],
+  "dbg_render": [
+   [
+    5,
+    "c13c8088",
+    false,
+    false
+   ],
+   [
+    5,
+    "c13c8088",
+    false,
+    true
+   ],
+   [
+    8,
+    "bd5dbf1f",
+    false,
+    false
+   ],
+   [
+    8,
+    "bd5dbf1f",
+    false,
+    true
+   ],
+   [
+    13,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    13,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    19,
+    "80f3ca79",
+    false,
+    false
+   ],
+   [
+    19,
+    "80f3ca79",
+    false,
+    true
+   ],
+   [
+    27,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    27,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    29,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    29,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    31,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    31,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    44,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    44,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    46,
+    "60d85fb6",
+    false,
+    false
+   ],
+   [
+    46,
+    "60d85fb6",
+    false,
+    true
+   ],
+   [
+    48,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    48,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    50,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    50,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    52,
+    "104c7b0f",
+    false,
+    false
+   ],
+   [
+    52,
+    "104c7b0f",
+    false,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8014,
+  "error": null,
+  "turns": 437,
+  "score": {
+   "Lancaster": 64,
+   "Bentley-Truman": 88
+  },
+  "sync": {
+   "emitter": 96
+  },
+  "cls": {
+   "MISS|3PT": 35,
+   "MAKE|3PT": 12,
+   "MISS|unstamped": 8,
+   "BLOCK|2PT": 8,
+   "MAKE|2PT": 21,
+   "MAKE|unstamped": 5,
+   "BLOCK|3PT": 10,
+   "MISS|2PT": 10
+  },
+  "cls_src": {
+   "shot_spot": 95,
+   "forced_two": 1
+  },
+  "cand_n": 96,
+  "cand_flips": 8,
+  "cand_3to2": 0,
+  "cand_2to3": 8,
+  "cand_coord_differ": 8,
+  "cand_dist_mean": 3.0561868034820416,
+  "d_total": 96,
+  "d_flips": 7,
+  "d_nofinal": 7,
+  "d_examples": [
+   {
+    "turn": 101,
+    "result": "MAKE",
+    "scored": {
+     "x": 39.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 34.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 243,
+    "result": "MISS",
+    "scored": {
+     "x": 31.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 304,
+    "result": "MISS",
+    "scored": {
+     "x": 67.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 350,
+    "result": "MISS",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 360,
+    "result": "MISS",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 391,
+    "result": "BLOCK",
+    "scored": {
+     "x": 74.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 414,
+    "result": "BLOCK",
+    "scored": {
+     "x": 38.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 33.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MISS": 43,
+   "MAKE": 28,
+   "BLOCK": 18
+  },
+  "d_award_flip": {
+   "MISS": 1
+  },
+  "d_award_ex": [
+   {
+    "turn": 231,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 37.505,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 38.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   }
+  ],
+  "d_by_rt": {
+   "MAKE": 1,
+   "MISS": 4,
+   "BLOCK": 2
+  },
+  "d_rt_all": {
+   "MISS": 43,
+   "MAKE": 28,
+   "BLOCK": 18,
+   "FOUL": 5,
+   "CHARGE": 2
+  },
+  "d_points_err": 1,
+  "render_turns": 99,
+  "scored_turns": 103,
+  "dbg_scored": [
+   [
+    1,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    3,
+    "e590d342",
+    true
+   ],
+   [
+    8,
+    "c13c8088",
+    true
+   ],
+   [
+    11,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    14,
+    "9c044323",
+    true
+   ],
+   [
+    20,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    22,
+    "c13c8088",
+    true
+   ],
+   [
+    26,
+    "104c7b0f",
+    true
+   ],
+   [
+    29,
+    "e590d342",
+    false
+   ],
+   [
+    33,
+    "19b6cdb5",
+    false
+   ],
+   [
+    37,
+    "457185a0",
+    true
+   ],
+   [
+    43,
+    "457185a0",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    1,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    3,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    3,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    8,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    8,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    11,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    11,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    14,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    14,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    20,
+    "bd5dbf1f",
+    false,
+    false
+   ],
+   [
+    20,
+    "bd5dbf1f",
+    false,
+    true
+   ],
+   [
+    22,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    22,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    26,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    26,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    29,
+    "e590d342",
+    false,
+    false
+   ],
+   [
+    29,
+    "e590d342",
+    false,
+    true
+   ],
+   [
+    33,
+    "19b6cdb5",
+    false,
+    false
+   ],
+   [
+    33,
+    "19b6cdb5",
+    false,
+    true
+   ],
+   [
+    37,
+    "457185a0",
+    true,
+    false
+   ],
+   [
+    37,
+    "457185a0",
+    true,
+    true
+   ],
+   [
+    43,
+    "457185a0",
+    true,
+    false
+   ],
+   [
+    43,
+    "457185a0",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8015,
+  "error": null,
+  "turns": 408,
+  "score": {
+   "Lancaster": 70,
+   "Bentley-Truman": 60
+  },
+  "sync": {
+   "emitter": 84
+  },
+  "cls": {
+   "BLOCK|3PT": 4,
+   "MISS|3PT": 33,
+   "MISS|unstamped": 7,
+   "MAKE|2PT": 14,
+   "MISS|2PT": 20,
+   "MAKE|3PT": 14,
+   "MAKE|unstamped": 2,
+   "BLOCK|2PT": 1
+  },
+  "cls_src": {
+   "shot_spot": 83,
+   "forced_two": 3
+  },
+  "cand_n": 84,
+  "cand_flips": 7,
+  "cand_3to2": 0,
+  "cand_2to3": 7,
+  "cand_coord_differ": 7,
+  "cand_dist_mean": 3.0561868034820416,
+  "d_total": 84,
+  "d_flips": 15,
+  "d_nofinal": 5,
+  "d_examples": [
+   {
+    "turn": 26,
+    "result": "MAKE",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 88,
+    "result": "MAKE",
+    "scored": {
+     "x": 69.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 97,
+    "result": "MAKE",
+    "scored": {
+     "x": 15.0,
+     "y": 36.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 27.0,
+     "y": 40.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 132,
+    "result": "MAKE",
+    "scored": {
+     "x": 74.0,
+     "y": 19.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 73.0,
+     "y": 10.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 136,
+    "result": "MISS",
+    "scored": {
+     "x": 26.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 146,
+    "result": "MISS",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 35.505,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 154,
+    "result": "MISS",
+    "scored": {
+     "x": 71.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 262,
+    "result": "MISS",
+    "scored": {
+     "x": 37.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 32.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 277,
+    "result": "MAKE",
+    "scored": {
+     "x": 71.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 285,
+    "result": "MAKE",
+    "scored": {
+     "x": 34.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "BLOCK": 5,
+   "MISS": 51,
+   "MAKE": 25
+  },
+  "d_award_flip": {
+   "MISS": 3
+  },
+  "d_award_ex": [
+   {
+    "turn": 62,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 60.495,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 60.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   },
+   {
+    "turn": 146,
+    "result": "MISS",
+    "awarded_is3": true,
+    "awarded_value": 3,
+    "rendered": {
+     "x": 35.505,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "premicro": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   },
+   {
+    "turn": 354,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 36.505,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 37.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   }
+  ],
+  "d_by_rt": {
+   "MAKE": 8,
+   "MISS": 7
+  },
+  "d_rt_all": {
+   "BLOCK": 5,
+   "MISS": 51,
+   "MAKE": 25,
+   "FOUL": 3
+  },
+  "d_points_err": 8,
+  "render_turns": 86,
+  "scored_turns": 89,
+  "dbg_scored": [
+   [
+    2,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    4,
+    "f608a824",
+    true
+   ],
+   [
+    8,
+    "104c7b0f",
+    false
+   ],
+   [
+    12,
+    "c13c8088",
+    false
+   ],
+   [
+    14,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    17,
+    "104c7b0f",
+    false
+   ],
+   [
+    20,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    23,
+    "f608a824",
+    false
+   ],
+   [
+    26,
+    "60d85fb6",
+    true
+   ],
+   [
+    29,
+    "9c044323",
+    true
+   ],
+   [
+    33,
+    "80f3ca79",
+    true
+   ],
+   [
+    38,
+    "80f3ca79",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    2,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    2,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    4,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    4,
+    "f608a824",
+    true,
+    true
+   ],
+   [
+    8,
+    "104c7b0f",
+    false,
+    false
+   ],
+   [
+    8,
+    "104c7b0f",
+    false,
+    true
+   ],
+   [
+    12,
+    "c13c8088",
+    false,
+    false
+   ],
+   [
+    12,
+    "c13c8088",
+    false,
+    true
+   ],
+   [
+    14,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    14,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    17,
+    "104c7b0f",
+    false,
+    false
+   ],
+   [
+    17,
+    "104c7b0f",
+    false,
+    true
+   ],
+   [
+    20,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    20,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    23,
+    "f608a824",
+    false,
+    false
+   ],
+   [
+    23,
+    "f608a824",
+    false,
+    true
+   ],
+   [
+    26,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    26,
+    "60d85fb6",
+    false,
+    true
+   ],
+   [
+    29,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    29,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    33,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    33,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    38,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    38,
+    "80f3ca79",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8016,
+  "error": null,
+  "turns": 418,
+  "score": {
+   "Lancaster": 71,
+   "Bentley-Truman": 66
+  },
+  "sync": {
+   "emitter": 85
+  },
+  "cls": {
+   "MAKE|3PT": 15,
+   "MISS|unstamped": 12,
+   "BLOCK|3PT": 9,
+   "MAKE|2PT": 11,
+   "BLOCK|2PT": 4,
+   "MISS|3PT": 27,
+   "MISS|2PT": 16,
+   "MAKE|unstamped": 7
+  },
+  "cls_src": {
+   "shot_spot": 81,
+   "forced_two": 1
+  },
+  "cand_n": 85,
+  "cand_flips": 6,
+  "cand_3to2": 0,
+  "cand_2to3": 6,
+  "cand_coord_differ": 6,
+  "cand_dist_mean": 2.5887699982436114,
+  "d_total": 85,
+  "d_flips": 4,
+  "d_nofinal": 3,
+  "d_examples": [
+   {
+    "turn": 279,
+    "result": "MISS",
+    "scored": {
+     "x": 73.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 311,
+    "result": "BLOCK",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 333,
+    "result": "MAKE",
+    "scored": {
+     "x": 31.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 382,
+    "result": "MAKE",
+    "scored": {
+     "x": 34.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MAKE": 25,
+   "BLOCK": 13,
+   "MISS": 41
+  },
+  "d_award_flip": {
+   "MISS": 1
+  },
+  "d_award_ex": [
+   {
+    "turn": 252,
+    "result": "MISS",
+    "awarded_is3": false,
+    "awarded_value": 2,
+    "rendered": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "rendered_is3": true,
+    "premicro": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "premicro_is3": true
+   }
+  ],
+  "d_by_rt": {
+   "MISS": 1,
+   "BLOCK": 1,
+   "MAKE": 2
+  },
+  "d_rt_all": {
+   "MAKE": 25,
+   "FOUL": 5,
+   "BLOCK": 13,
+   "CHARGE": 1,
+   "MISS": 41
+  },
+  "d_points_err": 2,
+  "render_turns": 87,
+  "scored_turns": 88,
+  "dbg_scored": [
+   [
+    1,
+    "e590d342",
+    true
+   ],
+   [
+    4,
+    "80f3ca79",
+    true
+   ],
+   [
+    14,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    20,
+    "f608a824",
+    true
+   ],
+   [
+    22,
+    "7219a92c",
+    true
+   ],
+   [
+    27,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    31,
+    "e590d342",
+    false
+   ],
+   [
+    38,
+    "e590d342",
+    false
+   ],
+   [
+    40,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    43,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    51,
+    "19b6cdb5",
+    false
+   ],
+   [
+    53,
+    "e590d342",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    1,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    4,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    4,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    14,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    14,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    20,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    20,
+    "f608a824",
+    true,
+    true
+   ],
+   [
+    22,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    22,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    27,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    27,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    31,
+    "e590d342",
+    false,
+    false
+   ],
+   [
+    31,
+    "e590d342",
+    false,
+    true
+   ],
+   [
+    38,
+    "e590d342",
+    false,
+    false
+   ],
+   [
+    38,
+    "e590d342",
+    false,
+    true
+   ],
+   [
+    40,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    40,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    43,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    43,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    51,
+    "19b6cdb5",
+    false,
+    false
+   ],
+   [
+    51,
+    "19b6cdb5",
+    false,
+    true
+   ],
+   [
+    53,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    53,
+    "e590d342",
+    true,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8017,
+  "error": null,
+  "turns": 419,
+  "score": {
+   "Lancaster": 65,
+   "Bentley-Truman": 88
+  },
+  "sync": {
+   "emitter": 84
+  },
+  "cls": {
+   "MISS|3PT": 26,
+   "MAKE|3PT": 14,
+   "BLOCK|2PT": 6,
+   "MAKE|2PT": 14,
+   "BLOCK|3PT": 9,
+   "MISS|2PT": 13,
+   "MAKE|unstamped": 5,
+   "MISS|unstamped": 6
+  },
+  "cls_src": {
+   "shot_spot": 82
+  },
+  "cand_n": 84,
+  "cand_flips": 12,
+  "cand_3to2": 0,
+  "cand_2to3": 12,
+  "cand_coord_differ": 12,
+  "cand_dist_mean": 5.239177377397785,
+  "d_total": 84,
+  "d_flips": 6,
+  "d_nofinal": 0,
+  "d_examples": [
+   {
+    "turn": 121,
+    "result": "MAKE",
+    "scored": {
+     "x": 32.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 125,
+    "result": "MISS",
+    "scored": {
+     "x": 33.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 235,
+    "result": "BLOCK",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 273,
+    "result": "MAKE",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 294,
+    "result": "MISS",
+    "scored": {
+     "x": 33.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 328,
+    "result": "MISS",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 35.505,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "MISS": 38,
+   "MAKE": 28,
+   "BLOCK": 15
+  },
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {
+   "MAKE": 2,
+   "MISS": 3,
+   "BLOCK": 1
+  },
+  "d_rt_all": {
+   "MISS": 38,
+   "MAKE": 28,
+   "BLOCK": 15,
+   "FOUL": 3
+  },
+  "d_points_err": 2,
+  "render_turns": 86,
+  "scored_turns": 84,
+  "dbg_scored": [
+   [
+    3,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    12,
+    "f608a824",
+    true
+   ],
+   [
+    20,
+    "e590d342",
+    true
+   ],
+   [
+    25,
+    "9c044323",
+    true
+   ],
+   [
+    28,
+    "104c7b0f",
+    true
+   ],
+   [
+    32,
+    "104c7b0f",
+    false
+   ],
+   [
+    34,
+    "9c044323",
+    false
+   ],
+   [
+    42,
+    "60d85fb6",
+    true
+   ],
+   [
+    50,
+    "7219a92c",
+    false
+   ],
+   [
+    65,
+    "15901201",
+    true
+   ],
+   [
+    68,
+    "104c7b0f",
+    false
+   ],
+   [
+    74,
+    "d014435a",
+    false
+   ]
+  ],
+  "dbg_render": [
+   [
+    3,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    3,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    12,
+    "f608a824",
+    true,
+    false
+   ],
+   [
+    12,
+    "f608a824",
+    true,
+    true
+   ],
+   [
+    20,
+    "e590d342",
+    true,
+    false
+   ],
+   [
+    20,
+    "e590d342",
+    true,
+    true
+   ],
+   [
+    25,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    25,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    28,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    28,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    32,
+    "104c7b0f",
+    false,
+    false
+   ],
+   [
+    32,
+    "104c7b0f",
+    false,
+    true
+   ],
+   [
+    34,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    34,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    42,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    42,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    50,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    50,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    65,
+    "15901201",
+    true,
+    false
+   ],
+   [
+    65,
+    "15901201",
+    true,
+    true
+   ],
+   [
+    68,
+    "104c7b0f",
+    false,
+    false
+   ],
+   [
+    68,
+    "104c7b0f",
+    false,
+    true
+   ],
+   [
+    74,
+    "d014435a",
+    false,
+    false
+   ],
+   [
+    74,
+    "d014435a",
+    false,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8018,
+  "error": null,
+  "turns": 387,
+  "score": {
+   "Lancaster": 67,
+   "Bentley-Truman": 57
+  },
+  "sync": {
+   "emitter": 91
+  },
+  "cls": {
+   "BLOCK|3PT": 5,
+   "BLOCK|2PT": 7,
+   "MISS|3PT": 36,
+   "MAKE|2PT": 15,
+   "MISS|2PT": 17,
+   "MISS|unstamped": 7,
+   "MAKE|3PT": 12,
+   "MAKE|unstamped": 6
+  },
+  "cls_src": {
+   "shot_spot": 91,
+   "forced_two": 1
+  },
+  "cand_n": 91,
+  "cand_flips": 3,
+  "cand_3to2": 0,
+  "cand_2to3": 3,
+  "cand_coord_differ": 3,
+  "cand_dist_mean": 1.2090409332456427,
+  "d_total": 91,
+  "d_flips": 10,
+  "d_nofinal": 5,
+  "d_examples": [
+   {
+    "turn": 5,
+    "result": "BLOCK",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 19,
+    "result": "MAKE",
+    "scored": {
+     "x": 37.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 32.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 44,
+    "result": "MAKE",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 84,
+    "result": "MISS",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 86,
+    "result": "MAKE",
+    "scored": {
+     "x": 29.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 107,
+    "result": "MAKE",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 225,
+    "result": "BLOCK",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 299,
+    "result": "MISS",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 64.495,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 346,
+    "result": "MISS",
+    "scored": {
+     "x": 36.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 31.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 356,
+    "result": "MAKE",
+    "scored": {
+     "x": 62.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 66.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "BLOCK": 12,
+   "MISS": 51,
+   "MAKE": 24
+  },
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {
+   "BLOCK": 2,
+   "MAKE": 5,
+   "MISS": 3
+  },
+  "d_rt_all": {
+   "BLOCK": 12,
+   "MISS": 51,
+   "MAKE": 24,
+   "CHARGE": 3,
+   "FOUL": 1
+  },
+  "d_points_err": 5,
+  "render_turns": 93,
+  "scored_turns": 96,
+  "dbg_scored": [
+   [
+    1,
+    "9c044323",
+    true
+   ],
+   [
+    5,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    11,
+    "c13c8088",
+    true
+   ],
+   [
+    13,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    15,
+    "c13c8088",
+    false
+   ],
+   [
+    19,
+    "80f3ca79",
+    true
+   ],
+   [
+    22,
+    "7219a92c",
+    false
+   ],
+   [
+    24,
+    "bd5dbf1f",
+    false
+   ],
+   [
+    26,
+    "60d85fb6",
+    true
+   ],
+   [
+    33,
+    "c13c8088",
+    true
+   ],
+   [
+    35,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    37,
+    "457185a0",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "9c044323",
+    true,
+    false
+   ],
+   [
+    1,
+    "9c044323",
+    true,
+    true
+   ],
+   [
+    5,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    5,
+    "a0a0f2d7",
+    false,
+    true
+   ],
+   [
+    11,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    11,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    13,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    13,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    19,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    19,
+    "80f3ca79",
+    false,
+    true
+   ],
+   [
+    22,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    22,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    24,
+    "bd5dbf1f",
+    false,
+    false
+   ],
+   [
+    24,
+    "bd5dbf1f",
+    false,
+    true
+   ],
+   [
+    26,
+    "60d85fb6",
+    true,
+    false
+   ],
+   [
+    26,
+    "60d85fb6",
+    true,
+    true
+   ],
+   [
+    33,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    33,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    35,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    35,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    37,
+    "457185a0",
+    true,
+    false
+   ],
+   [
+    37,
+    "457185a0",
+    true,
+    true
+   ],
+   [
+    44,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    44,
+    "a0a0f2d7",
+    false,
+    true
+   ]
+  ]
+ },
+ {
+  "arm": "played",
+  "seed": 8019,
+  "error": null,
+  "turns": 422,
+  "score": {
+   "Lancaster": 66,
+   "Bentley-Truman": 75
+  },
+  "sync": {
+   "emitter": 91
+  },
+  "cls": {
+   "BLOCK|2PT": 7,
+   "MISS|3PT": 42,
+   "MAKE|3PT": 15,
+   "MISS|2PT": 10,
+   "MAKE|unstamped": 12,
+   "MAKE|2PT": 11,
+   "MISS|unstamped": 4,
+   "BLOCK|3PT": 10
+  },
+  "cls_src": {
+   "shot_spot": 94,
+   "forced_two": 1
+  },
+  "cand_n": 91,
+  "cand_flips": 15,
+  "cand_3to2": 0,
+  "cand_2to3": 15,
+  "cand_coord_differ": 15,
+  "cand_dist_mean": 6.045204666228214,
+  "d_total": 91,
+  "d_flips": 9,
+  "d_nofinal": 5,
+  "d_examples": [
+   {
+    "turn": 172,
+    "result": "MAKE",
+    "scored": {
+     "x": 69.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 14.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 236,
+    "result": "BLOCK",
+    "scored": {
+     "x": 61.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 65.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 239,
+    "result": "MISS",
+    "scored": {
+     "x": 31.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 32.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 276,
+    "result": "MISS",
+    "scored": {
+     "x": 66.0,
+     "y": 25.0
+    },
+    "scored_is3": false,
+    "rendered": {
+     "x": 68.0,
+     "y": 36.0
+    },
+    "rendered_is3": true,
+    "stamped_value": 3,
+    "state": "HCO"
+   },
+   {
+    "turn": 295,
+    "result": "MISS",
+    "scored": {
+     "x": 39.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 34.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 298,
+    "result": "MISS",
+    "scored": {
+     "x": 73.0,
+     "y": 10.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 76.45699575818819,
+     "y": 12.88082979849016
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 325,
+    "result": "BLOCK",
+    "scored": {
+     "x": 63.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 67.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 354,
+    "result": "BLOCK",
+    "scored": {
+     "x": 61.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 65.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   },
+   {
+    "turn": 412,
+    "result": "MISS",
+    "scored": {
+     "x": 64.0,
+     "y": 25.0
+    },
+    "scored_is3": true,
+    "rendered": {
+     "x": 68.5,
+     "y": 25.0
+    },
+    "rendered_is3": false,
+    "stamped_value": 2,
+    "state": "HCO"
+   }
+  ],
+  "d_award_cmp": {
+   "BLOCK": 17,
+   "MISS": 50,
+   "MAKE": 23
+  },
+  "d_award_flip": {},
+  "d_award_ex": [],
+  "d_by_rt": {
+   "MAKE": 1,
+   "BLOCK": 3,
+   "MISS": 5
+  },
+  "d_rt_all": {
+   "BLOCK": 17,
+   "MISS": 50,
+   "MAKE": 23,
+   "FOUL": 1
+  },
+  "d_points_err": 1,
+  "render_turns": 92,
+  "scored_turns": 96,
+  "dbg_scored": [
+   [
+    1,
+    "9c044323",
+    false
+   ],
+   [
+    3,
+    "c13c8088",
+    true
+   ],
+   [
+    6,
+    "7219a92c",
+    true
+   ],
+   [
+    11,
+    "80f3ca79",
+    true
+   ],
+   [
+    15,
+    "7219a92c",
+    false
+   ],
+   [
+    20,
+    "a0a0f2d7",
+    true
+   ],
+   [
+    22,
+    "bd5dbf1f",
+    true
+   ],
+   [
+    29,
+    "104c7b0f",
+    true
+   ],
+   [
+    33,
+    "c13c8088",
+    false
+   ],
+   [
+    42,
+    "9c044323",
+    false
+   ],
+   [
+    44,
+    "7219a92c",
+    false
+   ],
+   [
+    49,
+    "80f3ca79",
+    true
+   ]
+  ],
+  "dbg_render": [
+   [
+    1,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    1,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    3,
+    "c13c8088",
+    true,
+    false
+   ],
+   [
+    3,
+    "c13c8088",
+    true,
+    true
+   ],
+   [
+    6,
+    "7219a92c",
+    true,
+    false
+   ],
+   [
+    6,
+    "7219a92c",
+    true,
+    true
+   ],
+   [
+    11,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    11,
+    "80f3ca79",
+    true,
+    true
+   ],
+   [
+    15,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    15,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    20,
+    "a0a0f2d7",
+    true,
+    false
+   ],
+   [
+    20,
+    "a0a0f2d7",
+    true,
+    true
+   ],
+   [
+    22,
+    "bd5dbf1f",
+    true,
+    false
+   ],
+   [
+    22,
+    "bd5dbf1f",
+    true,
+    true
+   ],
+   [
+    29,
+    "104c7b0f",
+    true,
+    false
+   ],
+   [
+    29,
+    "104c7b0f",
+    true,
+    true
+   ],
+   [
+    33,
+    "c13c8088",
+    false,
+    false
+   ],
+   [
+    33,
+    "c13c8088",
+    false,
+    true
+   ],
+   [
+    42,
+    "9c044323",
+    false,
+    false
+   ],
+   [
+    42,
+    "9c044323",
+    false,
+    true
+   ],
+   [
+    44,
+    "7219a92c",
+    false,
+    false
+   ],
+   [
+    44,
+    "7219a92c",
+    false,
+    true
+   ],
+   [
+    49,
+    "80f3ca79",
+    true,
+    false
+   ],
+   [
+    49,
+    "80f3ca79",
+    true,
+    true
+   ]
+  ]
+ }
+]
