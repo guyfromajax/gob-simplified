@@ -47,6 +47,10 @@ from typing import Any, Dict, Iterator, List, Optional
 from BackEnd.constants import AWAY_RIM_COORDS, CONTEST_EUCLIDEAN_RADIUS, HOME_RIM_COORDS
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
+from BackEnd.utils.free_throw_rules import (
+    apply_free_throw_award,
+    shooting_foul as ft_shooting_foul,
+)
 from BackEnd.utils.player_momentum import apply_made_dunk_momentum
 from BackEnd.utils.shot_geometry import classify_shot_value
 from BackEnd.utils.shot_split_tracker import record_shot_split
@@ -304,11 +308,13 @@ def resolve_hct_fast_break_shot(game: Any, dyn: Dict[str, Any]) -> Dict[str, Any
         game_state["foul_team"] = "DEFENSE"
         game_state["shooter"] = shooter
         game_state["offensive_state"] = "FREE_THROW"
-        game_state["free_throws"] = 1 if made else 2
-        game_state["free_throws_remaining"] = game_state["free_throws"]
-        game_state["one_and_one"] = False
+        # is_three is a literal False on this path (at-the-rim attack), but the count still
+        # comes from the shared rule so the branch cannot drift if that ever changes.
+        ft_award = apply_free_throw_award(
+            game_state, ft_shooting_foul(is_three=is_three, made=made)
+        )
         fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team, perform_removal=False)
-        free_throws_remaining = 1 if made else 2
+        free_throws_remaining = ft_award.remaining
         has_and_one = made
 
     # Player Momentum (Player_Momentum_System.md): self-contained HCT shot path
@@ -829,11 +835,11 @@ def _finalize_ab_shot(
         game_state["foul_team"] = "DEFENSE"
         game_state["shooter"] = shooter
         game_state["offensive_state"] = "FREE_THROW"
-        game_state["free_throws"] = 1 if made else (3 if is_three else 2)
-        game_state["free_throws_remaining"] = game_state["free_throws"]
-        game_state["one_and_one"] = False
+        ft_award = apply_free_throw_award(
+            game_state, ft_shooting_foul(is_three=is_three, made=made)
+        )
         fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team, perform_removal=False)
-        free_throws_remaining = game_state["free_throws"]
+        free_throws_remaining = ft_award.remaining
         has_and_one = made
 
     # Player Momentum (Player_Momentum_System.md): self-contained AB shot path

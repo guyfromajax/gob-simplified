@@ -37,6 +37,44 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 2. Still missing EOQ perfection
+3. OPEN — a shooting foul hands off to FREE_THROW but no FREE_THROW turn follows (~0.5/game)
+   - Surfaced while measuring the fouled-3PT free-throw misaward (fixed 2026-09-07, see below).
+     After that fix the residual misaward rate is entirely this family: 6 of 221 fouled attempts
+     (played) and 7 of 203 (sim) over 12 seeded games per arm, seeds 8000-8011.
+   - Shape: the shot turn carries `next_turn == "FREE_THROW"` and the branch set a non-zero
+     `free_throws`, but zero FREE_THROW turns appear after it in `gm.turns`.
+   - NOT the count bug and NOT direction-specific: it hits 2PT and 3PT, made and missed, at
+     similar rates, and it was present at the same shape BEFORE the count fix. Independent.
+   - Two qualifications, neither excluded yet:
+     (a) the free throws may genuinely never be taken (a real dropped-possession bug), or
+     (b) the trip may be non-adjacent in the turn list — an intervening turn (foul-out
+         substitution, timeout, period bookkeeping) would break the probe's adjacency
+         assumption and make this a measurement artifact rather than a bug.
+   - Ruled out: end-of-quarter truncation. Every instance has `near_quarter_end=False` and
+     `current_turn == "HCO"`, spread through the game rather than clustered at period ends.
+   - To diagnose: record the result_type of the turn that actually follows, which distinguishes
+     (a) from (b) in one run. Probe: `scratch_ft3.py` / `scratch_ft3_run.py`.
+
+4. FIXED 2026-09-07 — fouled 3PT attempts awarded 2 free throws instead of 3
+   - Jamie's original symptom ("some 3s register as 2s"). The classification was never wrong:
+     `is_three` was correctly True and `shot_value` correctly 3. The free-throw count simply
+     did not ask. `shot_manager.py` block-reconciliation shooting foul hardcoded 2 on a miss.
+   - Measured before: 16.9% of fouled 3PT attempts misawarded (23/136) played, 23.8% (24/101)
+     sim, 12 games per arm. The `3PT|missed|awarded=2|expected=3` row was n=19 played, n=16 sim.
+   - Fixed structurally rather than by correcting the literal: `BackEnd/utils/free_throw_rules.py`
+     is now the single source of truth and no branch computes its own count. Also collapses the
+     `free_throws` / `free_throws_remaining` drift risk, since the applier writes both together.
+   - Restored 1.22 points/game (played) and 0.99 (sim), at a measured 76.8% / 74.5% FT rate.
+   - Pinned by `tests/test_free_throw_rules.py`: unit tests for the rule (including the and-one
+     and the 1-and-1 front-end split, the two clauses most likely to be "tidied" later) plus
+     three static guards in the shape of `test_uess_coord_contract.py` — no direct write to the
+     three keys in a shot-resolution module, no count recomputed into a local, and an exact
+     per-branch allowlist so a sixth branch must be classified. Each guard was poison-tested by
+     reintroducing the defect and confirming it fails.
+   - History: the same clause was fixed once at `dynamic_hct_shot.py:832` in `4690c97506`
+     (2026-06-21, "added Standard Diamond HCT play") — the commit that introduced coordinate-based
+     3PT classification — and never swept to the other branches. It was not recorded as a known
+     gap; the commit's `Shot_System.md` note describes only the path it did fix.
 5. Legacy shot handler crashes on turns with no animations[] (`ShotAnimationSystem.runSetupTween`)
    - Symptom: `TypeError: turnData.animations is not iterable`. Caught by `processShot`, so no crash,
      but that shot silently does not animate (possession appears to skip its shot).
