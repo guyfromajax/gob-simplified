@@ -42,6 +42,7 @@ from BackEnd.utils.animation_step_helpers import (
     shot_followup_timed_sfx,
     shot_launch_sfx_free_throw,
     shot_result_sfx,
+    stamp_idle_wander_on_still_players,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -596,6 +597,22 @@ def _append_ft_variant_post_shot_chain(
     return dict(cursor_coords), cursor_ball, last_appended
 
 
+def _stamp_ft_idles(steps, off_lineup, def_lineup, shooter_id) -> int:
+    """Give the nine men lined up watching a free throw a render-space idle.
+
+    FREE_THROW is the worst family in the game for stillness — 82.1% of its player-steps have
+    identical start and end coords — and it is the moment the viewer is staring hardest, because
+    nothing else is happening. The shooter is excluded: he is at the line going through his
+    routine, and the shot animation owns him.
+    """
+    return stamp_idle_wander_on_still_players(
+        steps,
+        family="free_throw",
+        exclude=[shooter_id] if shooter_id else (),
+        on_court=_all_player_ids(off_lineup, def_lineup) or None,
+    )
+
+
 def build_ft_animation_steps(
     turn_result: Dict[str, Any],
     game: Any,
@@ -824,7 +841,10 @@ def build_ft_animation_steps(
         bx = turn_result.get("ball_bounce_x")
         by = turn_result.get("ball_bounce_y")
         if bx is None or by is None:
-            return steps if steps else None
+            if not steps:
+                return None
+            _stamp_ft_idles(steps, off_lineup, def_lineup, shooter_id)
+            return steps
         bounce = {"x": float(bx), "y": float(by)}
 
         bounce_step = _ft_bounce_motion_step(
@@ -893,6 +913,9 @@ def build_ft_animation_steps(
             )
         if pid not in last["start"]["coords"]:
             last["start"]["coords"][pid] = dict(last["end"]["coords"][pid])
+
+    # Last, so the coord backfill above is included in the stillness comparison.
+    _stamp_ft_idles(steps, off_lineup, def_lineup, shooter_id)
 
     return steps
 

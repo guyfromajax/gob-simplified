@@ -831,6 +831,61 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 "SUNSET MODE" tag inside the docs that describe those paths, and is cross-linked from here.)
 -->
 
+19. OPEN, needs its own diagnosis — MISS is the largest content-free frozen family and an idle
+    loop is the WRONG fix for it
+    - MISS is 30.9% of content-free frozen steps on the played arm, the largest single family.
+      It was deliberately EXCLUDED from the idle-wander stillness work (commits below) and
+      that exclusion is the point of this entry, not an oversight.
+    - WHY IT IS DIFFERENT FROM THE FAMILIES THAT WERE STAMPED. Free throws, inbounds, dead
+      balls and the post-make hold are static basketball moments: play is stopped and men
+      standing in place is correct, so a render-space weight shift is the honest fix. A MISS is
+      LIVE play — boards crashing, guards leaking out. If those steps are frozen, the defect is
+      that NOBODY IS SPRINTING WHEN THEY SHOULD BE, and looping an idle over a rebound scramble
+      would look worse than the freeze, not better. Same error class as putting
+      CONTINUE_FROM_PREVIOUS on ball-carrying steps: right mechanism, wrong moment.
+    - WHAT THE DIAGNOSIS HAS TO ANSWER, and it is a question about authoring, not rendering:
+      what are those frozen MISS steps FOR? If they are timing padding they should be deleted.
+      If they are beats where off-ball players SHOULD have rebound-crash or leak-out
+      destinations, the fix is authoring those destinations, which is the expensive work this
+      workstream has been deferring.
+    - DO NOT stamp an idle here to make the number go down. The number going down would be the
+      defect getting harder to see.
+
+    RELATED AND MEASURED IN THE SAME PASS — DEFECT 4'S FRAMING UNDERSTATED IT BY 2.8x.
+    "Whole-step freezes" counts a step as frozen only when all ten players are still, so a step
+    where three move and seven stand around scored as NOT frozen. The eye sees seven dead
+    players. Measured on the played arm, 8 games, perceptible steps only:
+
+      | | rate | population |
+      |---|---|---|
+      | whole-step freeze (the number the workstream ran on) | 16.3% | 2,298 of 14,121 steps |
+      | **per-player stillness** | **45.6%** | 64,669 of 141,738 player-steps |
+
+    Only 14.8% of steps have everybody moving. 85.2% carry at least one visibly still player,
+    the average step has 4.6 of 10 standing, and the distribution is bimodal — the mode is one
+    still player (18.6%) with a second peak at all ten (16.0%). HCO alone holds 82% of it
+    (52,813 of 64,669), which is invisible on the sim arm per standing rule 6b.
+    Per-family stillness: FREE_THROW 82.1%, SIDE_INBOUND 66.7%, OREB 61.9%, BASELINE_INBOUND
+    60.0%, FCP 48.9%, HCO 44.6%, HCT 41.1%, FAST_BREAK 33.9%, DREB 7.9%.
+    STILL UNADDRESSED after the idle work: OREB (1,695 still player-steps), FCP (1,147),
+    HCT (908). Out of scope by decision, not by measurement.
+
+20. OPEN, small but real — BASELINE_INBOUND steps carry 16 to 20 player ids in `start.coords`,
+    not ten
+    - Measured on the played arm: BIP steps average 12.6 paired players, with individual steps
+      carrying 16, 17 and 20. Every other family carries exactly 10.
+    - CONSEQUENCE. Any per-player writer that iterates `start.coords` and trusts it to mean
+      "players on court" will act on players who are not in the game. The idle-wander writer
+      works around it with an explicit `on_court` intersection built from the lineups
+      (`transition_bridge.py` `_stamp_inbound_idles`), and has a poisoned guard against the
+      workaround being dropped — but the workaround is not the fix.
+    - NOT DIAGNOSED: whether these are the outgoing lineup after a substitution, both teams'
+      full rosters, or stale ids from the prior possession. Nobody has followed a specific
+      extra id back to where it was written.
+    - This is the same shape as the coord-authority problems already logged: a map that names
+      more players than are playing is a fact about authorship, and the renderer being
+      defensive about it hides rather than fixes it.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 

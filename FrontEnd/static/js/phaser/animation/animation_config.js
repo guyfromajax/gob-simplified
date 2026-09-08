@@ -166,7 +166,21 @@ const defaults = {
       byFamily: {
         // Half-court offense between beats. Keeps the geography-aware style the resolver
         // rolled — an inside player jockeys, a perimeter defender shuffles.
+        // Half-court offense between beats, and DEAD BALL — those steps resolve through the
+        // same emitter, so they arrive under this family. Keeps the geography-aware style the
+        // resolver rolled: an inside player jockeys (~4in), a perimeter defender shuffles
+        // (~7in), a perimeter off-ball player jabs (~9in).
         hco_still: { amplitudeScale: 0.6, style: null },
+        // Free throw, the worst family at 82.1% still and the one the viewer stares at
+        // hardest. survey_rock is a gentle lateral weight shift — ~3.5in here. Ten men on the
+        // lane should look like they are waiting, which is small and slow, not restless.
+        free_throw: { amplitudeScale: 0.6, style: 'survey_rock' },
+        // Inbound, 66.7% still on the side and 60.0% on the baseline. Bodies jostling for
+        // position off the ball, so jockey — a grounded lean at ~4in. The passer gets none.
+        inbound: { amplitudeScale: 0.6, style: 'jockey' },
+        // The zero-clock beat after a bucket. Players reset and breathe rather than jostle,
+        // so survey_rock at ~3.5in.
+        make_hold: { amplitudeScale: 0.6, style: 'survey_rock' },
       },
     },
   },

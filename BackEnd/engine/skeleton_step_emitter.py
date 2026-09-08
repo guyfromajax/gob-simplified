@@ -2803,6 +2803,19 @@ def build_skeleton_animation_steps(
     # is where the defect actually lives; DEAD BALL turns resolve through here too.
     stamp_idle_wander_on_still_players(steps, family="hco_still")
 
+    # MAKE, make_hold ONLY. That beat is a deliberate zero-clock dwell after a bucket — the step
+    # owns its own wall clock (MAKE_HOLD_MS) and nobody is meant to be going anywhere — so
+    # players resetting in place is exactly an idle. The rest of a MAKE turn is live play and is
+    # left alone; `only_step_kinds` is what keeps ball_flight and bounce out of it.
+    #
+    # Deliberately NOT MISS, which is the largest content-free frozen family at 30.9%. A miss is
+    # live play: boards crashing, guards leaking out. If those steps are frozen the defect is
+    # that nobody is sprinting when they should be, and an idle loop over a rebound scramble
+    # would look worse than the freeze. Logged in bugs.md as needing its own diagnosis.
+    stamp_idle_wander_on_still_players(
+        steps, family="make_hold", only_step_kinds=["make_hold"],
+    )
+
     return steps
 
 

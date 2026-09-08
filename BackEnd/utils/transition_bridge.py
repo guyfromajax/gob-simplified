@@ -29,6 +29,7 @@ from BackEnd.utils.animation_step_helpers import (
     _player_lookup_by_id,
     pass_arrival_sfx,
     pass_release_sfx,
+    stamp_idle_wander_on_still_players,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -1384,7 +1385,35 @@ def build_bip_animation_steps(
         step["start"]["clock"]["clock_remaining"] = pinned_game_clock
         step["end"]["clock"]["clock_remaining"] = pinned_game_clock
 
-    return [step1, step2, step3, pass_step]
+    bip_steps = [step1, step2, step3, pass_step]
+    _stamp_inbound_idles(bip_steps, off_lineup, def_lineup, passer_id=sf_id)
+    return bip_steps
+
+
+def _stamp_inbound_idles(steps, off_lineup, def_lineup, *, passer_id) -> int:
+    """Give the players standing around on an inbound a render-space idle.
+
+    An inbound is a dead-ball reset: nine men jostle for position while one puts the ball in
+    play. SIDE_INBOUND measured 66.7% still per player-step and BASELINE_INBOUND 60.0%, and
+    neither emitter contained the word "flourish" before this. The passer is excluded — he has a
+    real job, and a man about to make a pass should not be shifting his weight.
+
+    ``on_court`` is not optional here. BASELINE_INBOUND steps carry 16 to 20 player ids in
+    ``start.coords`` rather than ten, so stamping straight off the coord map would hand the
+    renderer sprites for players who are not in the game.
+    """
+    on_court = {
+        str(getattr(p, "player_id", "") or "")
+        for lineup in (off_lineup or {}, def_lineup or {})
+        for p in (lineup or {}).values()
+        if p is not None and getattr(p, "player_id", None)
+    }
+    return stamp_idle_wander_on_still_players(
+        steps,
+        family="inbound",
+        exclude=[passer_id] if passer_id else (),
+        on_court=on_court or None,
+    )
 
 
 def build_sip_animation_steps(
@@ -1523,7 +1552,9 @@ def build_sip_animation_steps(
         step["start"]["clock"] = dict(pinned_clock)
         step["end"]["clock"] = dict(pinned_clock)
 
-    return [setup_step, hold_step, pass_step]
+    sip_steps = [setup_step, hold_step, pass_step]
+    _stamp_inbound_idles(sip_steps, off_lineup, def_lineup, passer_id=sf_id)
+    return sip_steps
 
 
 def build_ot_to_hco_bridge_steps(

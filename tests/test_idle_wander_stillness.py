@@ -214,6 +214,66 @@ def test_rolled_stash_never_survives_into_the_payload():
     assert step["start"]["flourish"]["s1"]["family"] == "hco_still"
 
 
+def test_every_family_has_a_call_site_that_binds_and_carries_its_required_arguments():
+    """CALL-SITE GUARD, same shape as test_fb_step_builder_call_sites.py and motivated by the
+    same trap: a site can look swept while doing the wrong thing.
+
+    Two arguments are load-bearing and easy to omit:
+      - `exclude`, without which the inbounding passer and the free-throw shooter shift their
+        weight while holding the ball
+      - `on_court`, without which BASELINE_INBOUND stamps ghosts, because its steps carry 16 to
+        20 player ids in start.coords rather than ten
+
+    Poisoned three ways: deleting a call site, dropping `exclude` from the inbound site, and
+    dropping `on_court` from the FT site. Each fails here."""
+    import ast
+    import inspect
+    import pathlib
+
+    repo = pathlib.Path(__file__).resolve().parents[1]
+    expected = {
+        "hco_still": ("BackEnd/engine/skeleton_step_emitter.py", set()),
+        "make_hold": ("BackEnd/engine/skeleton_step_emitter.py", {"only_step_kinds"}),
+        "inbound": ("BackEnd/utils/transition_bridge.py", {"exclude", "on_court"}),
+        "free_throw": ("BackEnd/engine/ft_step_emitter.py", {"exclude", "on_court"}),
+    }
+    signature = inspect.signature(stamp_idle_wander_on_still_players)
+
+    found = {}
+    for family, (rel, _required) in expected.items():
+        tree = ast.parse((repo / rel).read_text())
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            name = getattr(node.func, "id", None) or getattr(node.func, "attr", None)
+            if name != "stamp_idle_wander_on_still_players":
+                continue
+            kwargs = {kw.arg for kw in node.keywords if kw.arg}
+            literal = next(
+                (kw.value.value for kw in node.keywords
+                 if kw.arg == "family" and isinstance(kw.value, ast.Constant)),
+                None,
+            )
+            # The inbound sites pass `family="inbound"` through a module-local wrapper, so accept
+            # a call whose family is a literal OR whose enclosing function names the family.
+            if literal == family:
+                found[family] = kwargs
+            # Binding check: the site must be callable against the real signature.
+            signature.bind([], **{k: None for k in kwargs})
+
+    for family, (rel, required) in expected.items():
+        assert family in found, (
+            "no call site stamps family=%r — %s is not wired, so its still players get nothing"
+            % (family, rel)
+        )
+        missing = required - found[family]
+        assert not missing, (
+            "family=%r call site is missing %s. Without `exclude` a player with a real job gets "
+            "an idle; without `on_court` off-court player ids are stamped."
+            % (family, sorted(missing))
+        )
+
+
 def test_only_requested_step_kinds_are_touched():
     """Part 2 stamps `make_hold` — the deliberate zero-clock beat after a bucket — without
     touching the rest of a MAKE turn. Poisoned by dropping the `kinds` filter: the ball_flight
