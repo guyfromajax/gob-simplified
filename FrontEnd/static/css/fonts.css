@@ -1,6 +1,5 @@
-/* TRAILER MODE — hides alpha badge, Send-feedback button, alpha disclaimer and
-   the alpha-feedback moment modal for launch-trailer capture (added 2026-08-31).
-   DELETE THIS ONE LINE (and this comment) to restore the alpha chrome. */
+/* TRAILER MODE — keeps the alpha disclaimer and automatic feedback moment hidden.
+   Production nav badge + manual Feedback button are intentionally enabled. */
 @import url('/css/trailer-mode.css');
 
 /* ============================================================
