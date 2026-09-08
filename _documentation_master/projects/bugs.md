@@ -138,9 +138,26 @@
      These survived the counterfactual, so they are a different cause and most likely ordinary
      mid-court traffic — a player legitimately at centre court. Not chased.
 
-6. OPEN — the test suite asserts nothing about any resolved coordinate value
-   - Found 2026-09-07 while gating the spot-key fix above. Logged separately because it is not
-     a fact about that fix, it is a fact about every coordinate change this project has made.
+6. OPEN — a green baseline is evidence of nothing except that the guards we wrote ourselves
+   still pass
+   - Found 2026-09-07 while gating the spot-key fix above, and CONFIRMED TWICE MORE since. Logged
+     separately because it is not a fact about any one fix — it is a fact about how this project
+     verifies itself. Three independent dimensions have now been poisoned and the baseline did not
+     move for any of them:
+       · **coordinates** (2026-09-07) — mislocating 123,890 pos_actions per 12 games: delta EMPTY
+       · **clock payload** (2026-09-08, item 10) — reverting the terminal clock fix so the buzzer
+         displays a clock that does not exist: delta EMPTY with the new guard excluded
+       · **animation emission** (2026-09-08, item 11) — re-stranding the FLSS skeleton so shots
+         render nobody moving at all: delta EMPTY
+   - The honest statement is stronger than three observations. `baseline_failures.txt` going green
+     does not mean a change is correct, and it never has. It means the assertions we happened to
+     write are still passing. Everything nobody wrote an assertion for — where players stand, what
+     the clock says, whether anything renders — is outside the gate entirely, and each of those was
+     shipped wrong for a long time without a single test objecting.
+   - The corollary is what actually changes behaviour: **every increment must bring its own
+     evidence.** A guard for the dimension it touches (the coord contract, the free-throw contract,
+     the terminal clock contract) plus a poison proving that guard fails when the defect returns.
+     A green baseline is a "did I break something structural" check and nothing more.
    - EVIDENCE, by poison. Two mutations, each run against the full suite:
      (a) reverting the spot-key fix, restoring the two-year-old bug that mislocated 123,890
          pos_actions per 12 games — baseline delta EMPTY;
@@ -199,7 +216,13 @@
      failure behind a shot that quietly does not animate. A `[SHOT-NO-ANIM]` diagnostic is in place
      (2026-08-27) logging result_type / current_turn / fast_break_play / hasAnimationSteps / turnKeys.
      `hasAnimationSteps: true` => routing bug. `false` => upstream emission bug.
-   - Next occurrence identifies the culprit; fix by migrating that path, then delete the diagnostic block.
+   - ✅ DIAGNOSTIC ANSWERED 2026-09-08 by measurement, not by waiting for a report: **`false` — an
+     upstream emission bug**, so (a), not (b). The culprit is named and fixed in item 11: FLSS
+     normal/penalty shots stranded their skeleton on a local `roles` dict, so neither payload was
+     emitted. 5 such turns per 8 games; render-nothing turns now 0.
+   - Still open here, and NOT addressed by that fix: the inconsistent `turnData.animations` guarding
+     in `ShotAnimationSystem.js` below. The emission gap that used to reach it is closed, but the
+     handler remains unguarded at 572/666 and would still throw on any future empty payload.
    - Related: `ShotAnimationSystem.js` guards `turnData.animations` inconsistently (guarded at 295/479/486,
      bare at 352/455/572/666). Sites 572/666 remain unguarded on the final_turn-skips-setup path.
    - Pre-existing; unrelated to the animation cleanup pass.
@@ -355,11 +378,41 @@
      than a final shot at `time_remaining <= 2`. Together they create the 1-2 second window — which
      the clock then correctly consumes, and only the payload misreported.
 
-11. OPEN — shot turns at a quarter boundary that emit NO animation payload of either kind
-    (traced 2026-09-07)
-   - MEASURED: **5 of 64 boundaries** had a MISS or MAKE carrying zero `animation_steps` AND zero
-     legacy `animations`, all with `next_turn=HCO`. The shot resolved and the clock advanced with
-     nothing emitted to move anybody.
+11. RESOLVED 2026-09-08 — FLSS shots stranded their skeleton on a local and emitted nothing to render
+   - ⚠️ RE-SCOPED. Previously logged as "5 of 64 boundaries". Of the 7 boundaries with neither
+     payload, **5 were RUN_OUT_CLOCK, which legitimately carries no coords**, so the real boundary
+     population was 2. Measured game-wide, the true population is **5 render-nothing shot turns per
+     8 games (0.625/game)**, of which only 2 sit on a boundary and 3 are mid-quarter. It was never
+     boundary-specific — that was an artifact of only ever sampling boundaries.
+   - ROOT CAUSE, the same CLASS as item 5: a producer that never hands its output to the consumer.
+     In `resolve_flss_shot_logic` (`eoq_perfection.py`) the normal/penalty zones build
+     `skeleton_steps` into a local `roles` dict, then return `result = shot_manager.resolve_shot(roles)`
+     — a DIFFERENT dict. The skeleton stays on the local and never travels. The heave zone does not
+     have the bug: it returns its own literal carrying `"skeleton": {"steps": skeleton_steps}`.
+   - Consequence chain, measured end to end: `turn_manager.py:2096` gates the ENTIRE FLSS emit block
+     on `result.get("skeleton")` → skipped → no `animation_steps`. FLSS never carries `roles` either
+     (0 of 11 resolutions), so the legacy fallback lands on `turn_manager.py:2283` `animations = []`.
+     Both payloads empty; the frontend is correct on empty input and renders no movement.
+   - Split before the fix, 11 FLSS resolutions across 8 games: heave 6, **all** carrying a skeleton;
+     normal 4 + penalty 1, **all** without. Exactly the 5 render-nothing turns.
+   - ANSWERS ITEM 8's open diagnostic: `hasAnimationSteps` is **false** — an upstream emission gap,
+     not a routing bug.
+   - DEAD HYPOTHESIS, recorded so nobody re-derives it: the "Quick Shot fallback" path, which logs
+     constantly during these games and looked like the obvious culprit. `quick_shot` is False on 5/5;
+     `flss` is True on 5/5.
+   - FIX: the normal/penalty path stamps `result["skeleton"]`, matching what the heave branch already
+     does. ACCEPTANCE: render-nothing shot turns **5 → 0**; `[SHOT-NO-SCHEMA]` fires 30 → 25.
+   - ⚠️ THIS HALF IS NOT COSMETIC, which was not anticipated at design time. The skipped block also
+     contained `finalize_flss_post_emit` — EOQ CLOCK logic — which fired 6 times before the fix and
+     13 after. Restoring it moves game trajectories: turn counts changed on 5 of 8 seeds (e.g.
+     366 → 397). This is why the two halves are reported separately.
+   - SPC principle 8 (draws moved, so no exact diff applies): poisoning the newly supplied FLSS
+     geometry (mirror x) diverged 1 of 8 games. Weak but positive, and expected — an FLSS shot is by
+     construction the last of its period, so its geometry usually has nothing downstream left to
+     affect. The trajectory movement above comes from the restored `finalize_flss_post_emit`, not
+     from travel time.
+   - ORIGINAL 2026-09-07 OBSERVATION, retained for the frontend reasoning which still holds:
+     the shot resolved and the clock advanced with nothing emitted to move anybody.
    - THE FRONTEND IS CORRECT ON EMPTY INPUT and is not the failing side here. The schema path
      requires a non-empty array (`AnimationEngine.js:646-647`,
      `Array.isArray(...) && length > 0`), so with both payloads empty it falls through to
@@ -432,6 +485,10 @@
      not implicated in the EOQ symptom.
    - Also rejected in the same trace, with its own reasoning: the drain's terminal predicate as the
      cause of item 10 (see item 10 — it would have looked like a fix).
+   - Added 2026-09-08: **(c) the "Quick Shot fallback" as the cause of the empty shot payload** —
+     it logs constantly during these games and looked obvious. `quick_shot` is False on 5/5 of the
+     render-nothing turns. It is FLSS (item 11). And **(d) the whole call-site theory for item 10**,
+     which was measured to be a no-op before any code was written.
 
 15. OPEN, LARGER THAN WHAT WAS FIXED — `time_remaining` disagrees with `clock_end` on 17.4% of
     MID-QUARTER turns (measured 2026-09-08)
@@ -473,6 +530,33 @@
      the clock dimension on 2026-09-08 — with the new guard excluded, reverting the terminal clock
      fix produces **zero** new test failures, and re-stranding the FLSS skeleton also produces
      **zero**. An empty baseline delta remains evidence of nothing.
+
+17. HAZARD, structural — a block gated on ONE concern was silently carrying an UNRELATED one
+    (found 2026-09-08 while fixing item 11)
+   - What happened: the FLSS emit block at `turn_manager.py:2096` is gated on
+     `result.get("flss") and result.get("skeleton")`. Its name, position and guard all say it is
+     about EMITTING ANIMATION. But it also contains `finalize_flss_post_emit` — **EOQ clock
+     finalization**, which has nothing to do with whether anything renders.
+   - So for the 5 shots per 8 games whose skeleton was stranded (item 11), the missing skeleton did
+     not merely suppress animation. It skipped clock finalization for those turns as well, and
+     nothing anywhere reported a clock problem. MEASURED: `finalize_flss_post_emit` fired **6 times
+     before the fix and 13 after**. Turn counts moved on 5 of 8 seeds (e.g. 366 → 397).
+   - THE HAZARD, stated generally: when a block is gated on one condition but performs two jobs, a
+     failure of the gate silently disables the job the gate was never about. The visible half
+     (nothing renders) gets reported and investigated; the invisible half (clock finalization
+     skipped) does not, because there is no symptom attached to it. Fixing the visible half then
+     "unexpectedly" changes simulation behaviour — which is exactly what happened here, and would
+     have looked like a regression from the fix rather than a restoration.
+   - This is distinct from the hazards already logged. It is not a stale field (item 10), not a
+     missing assertion (item 6), and not a lost key on reload (item 12). It is **scope creep inside
+     a conditional**: the guard is correct for one concern and accidental for the other.
+   - WHY IT MATTERS BEYOND THIS SITE: we cannot currently tell how often this shape exists. Any
+     `if <render precondition>:` block that also mutates `game_state` or clock fields has the same
+     property. Worth a sweep — the search is cheap (blocks gated on animation/skeleton/steps
+     predicates that also call clock or state finalizers) and the payoff is finding the next one
+     before a rendering fix moves the simulation.
+   - NOT SWEPT. The single known instance is fixed as a side effect of item 11; the class is open.
+
 
 ##Full Product Perfection
 1. Training Camp News Report

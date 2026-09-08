@@ -91,7 +91,13 @@ Tracked from archived [`Z-Completed/Fast_Break_Refactor.md`](Z-Completed/Fast_Br
      failure behind a shot that quietly does not animate. A `[SHOT-NO-ANIM]` diagnostic is in place
      (2026-08-27) logging result_type / current_turn / fast_break_play / hasAnimationSteps / turnKeys.
      `hasAnimationSteps: true` => routing bug. `false` => upstream emission bug.
-   - Next occurrence identifies the culprit; fix by migrating that path, then delete the diagnostic block.
+   - ✅ ANSWERED 2026-09-08 by measurement rather than by waiting for the next occurrence:
+     **`false` — an upstream emission bug.** FLSS normal/penalty shots built a skeleton into a local
+     `roles` dict and returned a different dict from `resolve_shot`, so the skeleton never travelled;
+     `turn_manager.py:2096` gates the whole FLSS emit block on it, and FLSS carries no `roles` for
+     the legacy fallback either. 5 render-nothing shot turns per 8 games, now 0. See bugs.md item 11.
+   - The FE-side cleanup below is still open — the emission gap that reached it is closed, but the
+     handler stays unguarded at 572/666.
    - Related: `ShotAnimationSystem.js` guards `turnData.animations` inconsistently (guarded at 295/479/486,
      bare at 352/455/572/666). Sites 572/666 remain unguarded on the final_turn-skips-setup path.
    - Pre-existing; unrelated to the animation cleanup pass.
@@ -162,7 +168,9 @@ because the default kept reintroducing it — is the same story from the other s
 
 The `[SHOT-NO-ANIM]` diagnostic already in the tree is the right instinct, and the deliberate
 refusal to add a `|| []` guard (recorded in the orphan above) is the right call for the same
-reason. **Worth considering as its own work item:** an emitter-level counter for every
+reason. It paid off on 2026-09-08: its backend twin `[SHOT-NO-SCHEMA]` is what made the FLSS
+stranded-skeleton defect countable (30 fires per 8 games, 5 of them rendering nothing at all),
+and a `|| []` guard would have hidden exactly those 5. **Worth considering as its own work item:** an emitter-level counter for every
 schema→legacy fallback, surfaced rather than swallowed, so the rate is visible instead of
 inferred. Today a fallback is indistinguishable from normal operation until a user reports a
 teleport.

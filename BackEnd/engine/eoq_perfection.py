@@ -844,6 +844,14 @@ def resolve_flss_shot_logic(
         pass
 
     result["flss"] = True
+    # The skeleton built above lives on `roles`; `resolve_shot` returns a DIFFERENT dict,
+    # so without this the steps are stranded on a local and never travel with the turn.
+    # turn_manager.py:2096 gates the whole FLSS emit block on `result.get("skeleton")`,
+    # so a stranded skeleton means no animation_steps — and FLSS never carries `roles`
+    # either, so the legacy fallback yields animations=[] and NOTHING renders. The heave
+    # branch above already returns its skeleton on the result; this is the same contract
+    # for the normal/penalty zones, which are the only two that reach here.
+    result["skeleton"] = {"steps": skeleton_steps}
     # FLSS coach VO is schema-stamped on the terminal shoot step (sfx_on_step_start);
     # suppress the redundant Final Shot announcement stinger on all FLSS turns.
     result["suppress_final_shot_sfx"] = True
