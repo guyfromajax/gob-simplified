@@ -886,6 +886,84 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       more players than are playing is a fact about authorship, and the renderer being
       defensive about it hides rather than fixes it.
 
+21. NOT REPRODUCED on the played arm — the fouled-three misread, and the one population that
+    looks like it from the stands
+    - THE REPORT: half-court set, released from behind the arc, shooter fouled, shot missed, two
+      free throws awarded; box score and announcement also read a two. Observed on staging.
+    - MEASURED, 8 played games, 820 field-goal attempts through `resolve_shot`, 174
+      shooting-foul free-throw awards, `PYTHONHASHSEED=0`, one game per process. Null control:
+      probe installed but silent produced 137,949 sim_rng draws against 137,949 unprobed on
+      seed 1, and matched the unprobed count on all 8 seeds, so the probe does not perturb.
+    - ZERO reproductions. No attempt was scored as a two while the coord it was classified from
+      was behind the arc. Free-throw awards were consistent with `is_three` on 174 of 174
+      (missed three → 3, missed two → 2, any make → 1). Coverage is total: 174 of 174 awards
+      occurred inside `resolve_shot`, so no shot path escaped the records.
+    - ALL FOUR BRIEFED CANDIDATES MEASURE EXACTLY ZERO:
+      1. `release.get("x") is None` skipping the `roles["shot_spot"]` write
+         (`shot_manager.py:845`) — 0 of 820. `compute_micro_release_coord`
+         (`shot_micro_movements.py:554`) builds its return from `shooter_coord` and always
+         carries both keys, so the guard cannot fail.
+      2. The `release.get("y", pre_micro_sy)` blend at `:848` — 0 of 820, unreachable for the
+         same reason. The fallback is dead code, not a live blend.
+      3. Inverted `is_away_offense` — 0 disagreements of 860 between the value
+         `_build_shot_classification` computes at `:586` and the one passed to the micro plan at
+         `:836`. The proposed quarter correlation cannot exist at all: nothing in `BackEnd/`
+         switches ends between periods (grep: `switch_ends|swap_baskets|flip_court`, zero hits),
+         so home always attacks x≈91 and away x≈9 for all four quarters.
+      4. The dunk branch zeroing `is_three` at `:1720` — 0 of 820. The branch is unguarded but
+         the block enclosing it is not: `:1686` requires `shot_type in ("inside", "attack")`.
+         362 attempts entered it, every one of them `inside` or `attack`, never `outside`.
+    - THE ONE POPULATION THAT MATCHES WHAT A VIEWER WOULD REPORT, and it is not a defect in the
+      classifier: 45 attempts (5.62/game) where the shooter set up behind or exactly on the arc
+      and the micro footwork carried him inside it before release. 11 drew a shooting foul
+      (1.38/game), 7 were fouled misses awarded two free throws (0.88/game). Every one is
+      `shot_type="attack"` with micro family `strong_attack`, which moves exactly one
+      `MICRO_STEP_GRID` rimward — 4.5 grid units, ~4.2 ft
+      (`constants/shot_micro_movements_constants.py:8`, `shot_micro_movements.py:1208-1211`).
+      42% of them started *exactly on* the line; the median start was 1.0 unit behind it.
+      Scoring these as twos is correct basketball: the man drove. But the rendered distance
+      between "behind the arc" and "inside it" is four feet at the top of the key, so a viewer
+      reasonably reads it as a three that paid two. UNTESTED: whether the animation makes that
+      4.5-unit step legible on screen. That is a render question, on the arm the human is
+      looking at, and it is the next thing to measure — not the classifier.
+    - CONFIRMED THE EXISTING INSTRUMENT WORKS. The `[3PT-READ]` diagnostic at `:1053` fired on
+      109 of 109 HCO attempts on seed 1 with DEBUG on, and cost nothing: 137,949 draws with it
+      on, 137,949 with it off. `resolved_is_three` agreed with `role_spot_is_three` 109 of 109,
+      which is the direct refutation of the brief's premise. It disagreed with `coord_is_three`
+      on 12 of 109, which is BY DESIGN and documented in place at `:932` — "Contest geometry
+      uses pre-micro shoot spot; classification uses release." Anyone reading that field as a
+      misread signal will chase these 12 and find nothing.
+    - PREMISES OF THE BRIEF THAT SURVIVED VERIFICATION: `is_three` at `:2116` is the same
+      variable assigned at `:865`, sole reassignment between them at `:1720` (grep for
+      `is_three` across the file, one assignment each at 860/865/1720); `_build_shot_classification`
+      does prefer `roles["shot_spot"]` then `shooter.coords` then the spot name (`:584-617`);
+      the fast-break `allow_three` gate at `:854` is not implicated, and in fact the spot-name
+      fallback never ran once — all 820 classifications sourced from `shot_spot`, 0 from
+      `legacy_spot_fallback` and 0 from `missing_coords`.
+    - STILL OPEN, and the reason this is NOT REPRODUCED rather than NOT A BUG: Jamie saw it on
+      staging and this measurement is local HEAD (`5b73d722b`; `0fc2dc1dd` is an ancestor, so
+      the free-throw arithmetic fix is present). If staging runs a different commit the
+      measurement does not cover it. The frontend was ruled out as an independent source — it
+      carries no 2-vs-3 determination of its own (grep `is_three|isThree|three_point|threePoint`
+      across `FrontEnd/static/js`: one test file, no production reader).
+
+22. OPEN hazard, not currently a bug — 22.3% of shots are classified by a knife-edge comparison
+    - The authored arc spots sit EXACTLY on the classification boundary. The `key` spot
+      normalizes to x=64.0 and `_three_point_boundary_x(25.0)` returns 64.0
+      (`shot_geometry.py:12-22`). The test is `normalized_x <= boundary_x` (`:80`), so equality
+      resolves as a three.
+    - MEASURED: 153 of 686 attempts (22.3%) have a pre-micro coord sitting exactly on the
+      boundary — 65 at `key`, plus `upper wing`, `lower wing`, both midwings, all the
+      midcorners. They currently resolve correctly as threes only because the comparison is
+      `<=` rather than `<`.
+    - THE HAZARD: a 0.01-unit change to the arc table, the normalization, or the authored spot
+      coords reflips 22.3% of the shot population in one direction, and a `<=`→`<` edit — the
+      kind of change that looks like a tidy-up — silently converts every arc spot to a two.
+      Nothing in the suite asserts the value of a resolved classification, which is item 6's
+      territory: the coordinate-assertion gap logged there covers this exactly.
+    - NOT A DEFECT TODAY. Logged because the population is large, the margin is zero, and the
+      failure would present as a league-wide scoring shift rather than as a broken test.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
