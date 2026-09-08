@@ -302,9 +302,122 @@
        `season_news` array on a write whose point is `practice_squad`. The read shapes are verified
        against the consumers; the COST is not — nobody has timed `initialize_practice_squad`. Time it
        before optimizing it.
-   - Do NOT "fix" this by widening the pulse into a spinner-with-message or by adding a retry button
-     alone. The bug is that the client has no bounded outcome and the request carries work it should
-     not; a friendlier wait screen leaves both intact.
+    - Do NOT "fix" this by widening the pulse into a spinner-with-message or by adding a retry button
+      alone. The bug is that the client has no bounded outcome and the request carries work it should
+      not; a friendlier wait screen leaves both intact.
+
+10. OPEN — the quarter-end clock drain never reaches the rebound family (traced 2026-09-07)
+   - Symptom, as reported: the game clock "stops early — freezes with time still on it", at some
+     quarter boundaries but not others.
+   - MEASURED, 16 seeded games, 64 quarter boundaries, played arm: **11/64 = 17.2% of boundaries end
+     with clock unconsumed.** Entirely the rebound family:
+     DREB `0:01` in 7 of 9 · PUTBACK_MISS `0:01` and `0:02` (2 of 2) · PUTBACK_MAKE `0:02` (1 of 1).
+     Quarters ending on MISS (29), MAKE (3), BASELINE_INBOUND (5), FREE_THROW (2), HCO, FOUL all end
+     at `0:00`.
+   - ROOT CAUSE IS CALL-SITE COVERAGE. `ensure_quarter_end_clock_drain`
+     (`BackEnd/utils/eoq_clock_progression.py:456`) exists to force the residual clock onto the turn.
+     Over 1,723 observed calls it is **never invoked with a DREB result — zero times** — nor with
+     PUTBACK_MAKE or PUTBACK_MISS. And `finalize_terminal_dreb_turn`, whose entire job is to drain a
+     terminal defensive rebound, **fired 0 times across 3 games that each contain DREB-terminated
+     quarters.** The drain is effectively dead code on this path.
+   - The second chance also fails, by design-as-written: `normalize_quarter_end_after_clock_update`
+     IS called (384 times for DREB) but returns early at `:504` while `time_remaining > 0`, which is
+     exactly the condition being complained about. It bailed on 2,491 of 2,529 calls.
+   - REJECTED EXPLANATION, recorded because it would have looked like a fix. A module audit proposed
+     the cause was `DREB` being absent from the drain's terminal predicate:
+     `{"MAKE","MISS","BLOCK","PUTBACK_MAKE","PUTBACK_MISS","RUN_OUT_CLOCK"}` (`:466`). That set
+     membership is real, and adding `DREB` to it is the obvious one-line change — but it is NOT the
+     cause and would not fix this. PUTBACK_MAKE and PUTBACK_MISS are ALREADY in the set and still
+     leave residue, because they never reach the predicate either. Editing the set would change
+     nothing and would close this entry falsely. Fix the call sites.
+   - Contributing, not causal: a terminal DREB burns a minimum of 1 second regardless of clock
+     remaining (`game_manager.py:1200`, `int(round(t)) if t >= 1 else 1`), and the post-DREB FLSS
+     threshold routes to terminal rather than a final shot at `time_remaining <= 2`
+     (`POST_DREB_FLSS_MIN_CLOCK = 2`, `:20`/`:171`). Together these set up the 1-2 second window the
+     missing drain then fails to clear.
+   - NOT FIXED. Correctness change at a quarter boundary; wants its own scoped increment.
+
+11. OPEN — shot turns at a quarter boundary that emit NO animation payload of either kind
+    (traced 2026-09-07)
+   - MEASURED: **5 of 64 boundaries** had a MISS or MAKE carrying zero `animation_steps` AND zero
+     legacy `animations`, all with `next_turn=HCO`. The shot resolved and the clock advanced with
+     nothing emitted to move anybody.
+   - THE FRONTEND IS CORRECT ON EMPTY INPUT and is not the failing side here. The schema path
+     requires a non-empty array (`AnimationEngine.js:646-647`,
+     `Array.isArray(...) && length > 0`), so with both payloads empty it falls through to
+     `handleShotAttempt` → `ShotAnimationSystem` with `maxSteps = 0`: shot make/miss resolution runs,
+     the movement loop is skipped entirely. That renders as "something animates but it's visibly
+     wrong" — the ball resolves, the players do not move.
+   - This is the BACKEND CAUSE of item 8 above (`ShotAnimationSystem` reaching the legacy handler
+     with no `animations[]`). Item 8's diagnostic asks whether `hasAnimationSteps` is true or false to
+     split routing bug from emission bug; this measurement answers it for the boundary case —
+     **false, an upstream emission gap**, not a routing bug.
+   - Distinguish from a related but separate observation: 22.9% of steps at a quarter-final turn have
+     nobody moving, vs 15.6% mid-quarter, and one boundary turn emitted 3 steps in which nobody moved
+     at all (1/46 at boundaries, 0/4,743 mid-quarter). That one is boundary-specific but n=1.
+   - RULED OUT as the cause of "half the team missing": coordinate coverage is complete. Across
+     16,632 emitted steps, every step carries all ten players — min 10, max 10, 0% below ten, at
+     boundaries and mid-quarter alike.
+   - Also ruled out: any frontend quarter-boundary gate. There is NO end-of-quarter handler in the
+     renderer at all — EOQ is layered onto the generic turn pipeline via `result_type` and flags like
+     `quarter_ends_after`, and nothing flushes or short-circuits the animation queue on a quarter
+     change. There is no gate here to be closing wrongly.
+   - NOT FIXED.
+
+12. OPEN — every EOQ chain key is absent from BOTH `_init_game_state` and the reload restore list
+    (traced 2026-09-07)
+   - Same family as the `frontcourt_established` / `offensive_state` gap already logged below, and
+     unswept: `game_state` is restored KEY BY KEY at `BackEnd/api/api.py:1652-1690`, and the code
+     says so itself — "game_state is restored key-by-key, so a key with no line here is silently
+     lost on every reload." (That comment block is duplicated at 1668-1671.)
+   - The EOQ chain keys appear in neither place, so on a reload they come back as `_init_game_state`
+     defaults, i.e. absent: `late_clock_eoq_chain_active`, `flss_possession_pending`, `flss_from_dreb`,
+     `_flss_after_dreb_rebounder_id`, `final_shot_possession_active`, `final_shot_ran_this_chain`,
+     `suppress_final_shot_sfx`, `pending_oreb`, `final_turn_shot_this_turn`, `_last_final_turn_quarter`,
+     `_shot_dreb_fb_play_key`, `eoq_trace_seq`, `eoq_trace_turn_in_seq`.
+   - HAZARD, NOT A ROUTINE PATH — this qualification matters. The rebuild requires the in-process
+     `ongoing_games` cache to be dropped, and the drops are new-game, resume-anchor and
+     timeout-resume. Timeout-resume was the candidate mechanism and it was MEASURED AND REJECTED:
+     **0 of 32 boundaries had a timeout within the last 5 turns**, despite 71 timeouts across those
+     8 games. Engine timeouts do not cluster at quarter ends.
+   - So this bites when a user refreshes, or resumes from a timeout, NEAR a boundary while an EOQ
+     chain is mid-flight — losing the whole chain state — not on every quarter.
+   - NOT FIXED. Note it is latent: nothing observed has been attributed to it.
+
+13. OPEN, n=1, UNEXPLAINED — a single RUN_OUT_CLOCK quarter ended with `0:14` remaining
+   - One boundary out of 64 (seed 8004, Q4). Recorded deliberately as a single instance with no
+     mechanism, so it is neither forgotten nor over-read.
+   - It does not fit item 10: RUN_OUT_CLOCK IS in the drain's terminal set, the drain DOES fire for
+     it (5 terminal RUN_OUT_CLOCK calls observed), and `build_run_out_clock_result`
+     (`eoq_perfection.py:182-198`) sets `time_elapsed` to the FULL remaining clock. The other 10
+     RUN_OUT_CLOCK boundaries all ended at `0:00`.
+   - Candidates, none tested: the OREB run-out path (`turn_manager.py:5190-5224`) returns through
+     `game_manager._finalize_synthesized_clock_turn`, which does not call the drain; or
+     `time_elapsed` was not 14 at clock-update time; or `build_clock_expired_result` was conflated
+     with the run-out builder. All three are guesses.
+   - 14 seconds of game time with no animation emitted (RUN_OUT_CLOCK emits nothing, 11/11 — that
+     part is by design) would present as a hang or a skip. Worth one reproduction attempt before
+     theorising further.
+
+14. RULED OUT 2026-09-07 — two EOQ hypotheses killed by measurement; do not re-derive them
+   - Recorded because both are re-derivable from reading the code and both look right on paper. The
+     lesson generalises: on this codebase, reading establishes what should happen and repeatedly is
+     not what does.
+   - (a) **`final_turn_pacing._step_action_coords` is spot-blind.** It reads `coords` then
+     `location` and never `spot` (`final_turn_pacing.py:116-124`), returning `None` otherwise, and it
+     feeds `_slowest_offense_move_seconds` — travel time, hence the final turn's pacing, hence the
+     clock. That is the exact defect shape of the converter bug fixed the same day (item 5), sitting
+     in the EOQ path. It looked like the cause of the clock symptom.
+     MEASURED: **55 calls, 55 resolved, zero `None` returns.** It never sees a spot-only pos_action.
+     Corroborated independently: that module performs no `game_state` or turn_result writes at all.
+   - (b) **The converter fix in item 5 caused this.** Its fallthrough now DECLINES to place a player
+     rather than substituting court centre, which would present as missing players — a perfect match
+     for "partial animation, half the team".
+     MEASURED: **zero keyless pos_actions across 16 games**, so the decline path never fires; and
+     coordinate coverage at boundaries is complete (all 10 players in all 16,632 steps). The fix is
+     not implicated in the EOQ symptom.
+   - Also rejected in the same trace, with its own reasoning: the drain's terminal predicate as the
+     cause of item 10 (see item 10 — it would have looked like a fix).
 
 
 ##Full Product Perfection
