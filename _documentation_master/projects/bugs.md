@@ -176,6 +176,43 @@
      known coordinates, and a census assertion that no more than N players occupy the logo in a
      single step. The second is the one that would have caught this in 2024.
 
+6b. STANDING RULE — measure on the arm the human is looking at
+   - Adopted 2026-09-08. Sibling of item 6: that entry is about trusting our own assertions, this
+     one is about trusting our own *harness*. Five conclusions in the animation workstream were
+     wrong for the same reason — they were measured through `simulate_quarter` while the
+     complaint was about played games.
+   - THE MECHANISM, verified: `main.py:913` sets `game_state["_is_full_simulation"] = True` for
+     `simulate_quarter`. `animator.py:1213` returns `[]` on that flag, so `animations` is empty,
+     so `build_skeleton_animation_steps` bails at its `if not skeleton_steps or not animations`
+     guard (`skeleton_step_emitter.py:1604`) and **HCO emits zero animation steps**. A played game
+     pops the flag (`api.py:5503`) and takes the other branch. Measured on one seed: 110/110
+     emitter calls returned `None` on the sim arm; 233/233 returned steps on the played arm.
+   - SO THE SIM ARM CANNOT SEE THE LARGEST TURN FAMILY IN THE GAME. Same seed, same game:
+
+     | | HCO turns | HCO steps emitted | total steps |
+     |---|---|---|---|
+     | sim arm | 108 | **0** | 825 |
+     | played arm | 126 | **1,666** | 1,961 |
+
+   - WHAT IT COST, 8 seeds per arm. Every one of these was briefed off the sim arm and is wrong
+     for a played game:
+       · overall perceptible whole-step freeze rate: **24.7% sim -> 16.3% played**
+       · HCO's share of all emitted steps: **0.2% sim -> 83% played**
+       · "inbounds are ~85% of content-free frozen steps": **82.1% sim -> 17.3% played.** On the
+         played arm the top families are MISS 30.9%, SIDE_INBOUND 14.1%, MAKE 13.9%,
+         DEAD BALL 12.1%, FREE_THROW 7.7% — shot outcomes, not inbounds.
+       · FREE_THROW freezes at **91.3%** on 508 played steps; it was invisible before.
+       · `idle_wander` flourishes per game: **0 sim -> 1,993-2,644 played.** An entire mechanism
+         was reported dormant when it fires thousands of times a game.
+   - THE RULE. Any measurement whose conclusion is about what a human sees must run on the played
+     arm, and the report must say which arm it ran on. A sim-arm number is valid only for
+     questions about the CPU-vs-CPU path. `scratch_playedarm.py::use_played_arm(gm)` refuses the
+     one flag at the `game_state` level so a probe can walk the played path without a source edit.
+   - Note this is NOT the same hazard as item 6. A poisoned baseline going green means our
+     assertions are too weak; this means our *observations* were of a different program than the
+     one being complained about. Both produce confident wrong answers, but only this one is fixed
+     by changing how the harness is launched.
+
 7. OPEN, do not chase yet — something OUTSIDE placement is driving the two arms apart, and it is
    now the larger term
    - Recorded 2026-09-07 from the before/after of the spot-key fix, `equiv-v3`, n=20 per arm.
