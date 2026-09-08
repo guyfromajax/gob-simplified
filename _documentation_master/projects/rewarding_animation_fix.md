@@ -278,26 +278,98 @@ They produce the same complaint and have different mechanisms:
 | **defect 2** — arrive-and-freeze | player HAS a target, reaches it early, the leftover tail is dead | duration (STRETCH_CAP) |
 | **defect 4** — whole-step freeze | player has NO target for the step, so is still for all of it | authoring (continuing targets) |
 
-### It is probably the larger of the two
+### RE-MEASURED 2026-09-08 — everything below supersedes the figures this section used to carry
 
-`deadAirLedger.js` already separates *player stillness* from *arrival tails*. On the last
-measurement **stillness ran roughly 2× the arrival tails**, so the whole-step freezes
-outweigh the arrive-early tails about 2:1. Re-measure before acting — that figure predates
-the converter fix.
+The old numbers (2:1 stillness ratio, 22.9%/15.6% boundary split, "3 consecutive steps is
+boundary-specific") predated the converter fix `54a2a9c0e` and both EOQ commits `76318cea4` /
+`ea0fd79d9`. Re-measured at HEAD and again at `64f50e9f8` (the commit before the two EOQ
+commits) with the same probe, 8 seeds each, one game per process, `PYTHONHASHSEED=0`.
 
-### It has a boundary-elevated component (measured 2026-09-08)
+Instrument: emitted backend step data, not the frontend ledger. A step is a whole-step freeze
+when every player in `start.coords` has `end.coords` equal to it. Stillness and arrival-tail
+player-seconds use `deadAirLedger.js`'s own formulas (`:251-258`, `:299-315`) so the totals stay
+comparable to `dumpDeadAir()`. Detector was anti-vacuity checked against a hand-built frozen
+step before use.
 
-The EOQ trace measured stillness by position in the quarter: **22.9% of steps at a
-quarter-final turn have nobody moving, against 15.6% mid-quarter.** So the freeze problem is
-not uniform — it is roughly 1.5x worse at a period end.
+| | before (`64f50e9f8`) | HEAD | verdict |
+|---|---|---|---|
+| whole-step freeze, overall | 24.7% (1623/6568) | **25.5%** (1666/6546) | unchanged |
+| — at a quarter-final turn | 37.8% (14/37) | **41.4%** (24/58) | unchanged |
+| — mid-quarter | 24.6% | **25.3%** | unchanged |
+| boundary / mid ratio | 1.54x | **1.64x** | **persists** |
+| stillness : arrival tails | 2.12 : 1 | **2.11 : 1** | ratio holds |
 
-One boundary turn emitted three consecutive steps in which nobody moved at all. That
-occurred 1 of 46 at boundaries and 0 of 4,743 mid-quarter, so it is boundary-specific, but
-it is a single instance and no rate should be quoted off it.
+**CORRECTION 2026-09-08, same day — the boundary verdict above is WITHDRAWN. There is no
+boundary defect.** The rate in this table counts every emitted step regardless of duration.
+`deadAirLedger.js:87` deliberately drops steps under `MIN_RECORDED_MS` (60ms) as "not
+perceptible as dead air", and putback ball-arc subdivision emits runs of 40ms slices
+(`time_elapsed` 0.114 game-sec x 350 = 40ms) in which players are stationary BY DESIGN. Those
+slices concentrate at boundaries. Filtering to perceptible steps only:
 
-Two readings, untested: the EOQ defects logged as bugs.md items 10-13 may share a cause with
-this, or the period-end path may simply author fewer targets. Worth establishing before
-fixing either, since a shared cause means one fix and separate causes mean two.
+| | all steps (above) | perceptible >=60ms |
+|---|---|---|
+| overall | 25.5% | **24.2%** (1487/6137) |
+| boundary | 41.4% | **27.7%** (13/47) |
+| mid-quarter | 25.3% | **24.2%** (1474/6090) |
+| ratio | 1.64x, z=2.82, p=0.005 | **1.14x, z=0.55, p=0.58** |
+
+**The boundary elevation dissolves once sub-perceptible slices are excluded.** The reading-(ii)
+verdict was an artifact of the metric, not a finding about the period-end path. Neither reading
+(i) nor (ii) is supported: there is no measurable boundary component left to fix. Quote the
+perceptible column. The remaining defect is the uniform ~24%.
+
+Lesson, and it is the same one as item 16: the instrument had a threshold for a reason and I
+dropped it to match the brief's wording. The 60ms floor was not incidental — it is the
+difference between "the court is frozen" and "this 40ms slice of a shot arc has no footwork".
+
+**Boundary is nonetheless the small half of the problem.** Only 58 of 6,546 steps are at a
+quarter-final turn. Even at 41.4% that is 24 frozen steps against 1,642 mid-quarter. Whatever
+the boundary path does wrong, fixing it buys ~1.4% of the total. The uniform ~25% is the work.
+
+**The absolute level is higher than the old figures and the two are not comparable.** The old
+22.9%/15.6% came from the EOQ trace harness; this probe reports 41.4%/25.3% on the same
+definition in words. Both arms here used one probe, so the before/after *delta* is sound; the
+absolute levels should be quoted from this table and the old ones not quoted at all.
+
+### Jamie's report is half confirmed and half refuted
+
+Freeze rate by turn type at HEAD, 8 seeds:
+
+| | frozen / steps | rate |
+|---|---|---|
+| `PUTBACK_MAKE` | 378 / 447 | **84.6%** |
+| `PUTBACK_MISS` | 111 / 134 | **82.8%** |
+| `SIDE_INBOUND` (SIP) | 570 / 855 | **66.7%** |
+| `BASELINE_INBOUND` (BIP) | 439 / 1580 | 27.8% |
+| `DEAD BALL` | 71 / 493 | 14.4% |
+| `MAKE` | 45 / 397 | 11.3% |
+| `FOUL` | 37 / 677 | 5.5% |
+| `MISS` | 2 / 587 | 0.3% |
+| `HCO` | 1 / 569 | 0.2% |
+| `DREB` | 0 / 365 | 0.0% |
+
+By phase, `OREB` is 489/643 = **76.0%**.
+
+- **BIP: confirmed as a real offender, but it is not the worst.** It is third by rate and
+  second by volume. SIP is 2.4x worse by rate on a path nobody has mentioned.
+- **Pre-shot: REFUTED as defect 4.** `MISS` 0.3%, `HCO` 0.2%, `MAKE` 11.3%. Pre-shot steps
+  almost always author motion for somebody. What Jamie sees there is defect 2 — players who
+  have targets, reach them early, and stand in the tail. Do not sweep the sentinel at it; it
+  will not move.
+- **The biggest single offender is the putback family, which no one had flagged.** Putbacks
+  carry no skeleton by design (`turn_manager.py:5410`, `:5424`), so `oreb_step_emitter.py`
+  builds their steps by copying start coords to end coords at eight sites (`:296`, `:325`,
+  `:398`, `:413`, `:485`, `:527`, `:590`, `:604`) and never touches `build_pass_step`. It is
+  entirely outside the sentinel mechanism.
+
+### The 3-consecutive-dead-steps case: still occurs, and the old reading was wrong
+
+92 turns at HEAD (88 before) contain a run of 3+ consecutive whole-freeze steps; runs reach 12.
+The doc previously recorded this as 1-of-46 at boundaries and 0-of-4,743 mid-quarter and called
+it boundary-specific. **That is refuted.** The runs are overwhelmingly mid-quarter and
+overwhelmingly `PUTBACK_MAKE` / `PUTBACK_MISS` in the `OREB` phase. It is a putback phenomenon,
+not a period-end one. Worst observed: a 13-step `PUTBACK_MAKE` turn with 12 consecutive frozen
+steps.
 
 ### The fix already exists and has a precedent
 
@@ -307,20 +379,183 @@ default in build_pass_step") introduced the `CONTINUE_FROM_PREVIOUS` sentinel in
 targets rather than freezing when no new target is authored. It was wired into
 `after_steal_fast_break_step_emitter.py:448` and `fb_drive_step_emitter.py:405`.
 
-**That default was never swept to the other emitters.** BIP and the pre-shot path still
-freeze by default — the same defect, on the paths nobody was building at the time. This is
-the pattern behind nearly every defect found on 2026-09-06.
+**That default was never swept to the other emitters.** BIP still freezes by default — the same
+defect, on the paths nobody was building at the time. This is the pattern behind nearly every
+defect found on 2026-09-06.
 
-So the work is extension, not invention: identify every emitter that still freezes by
-default, and give it the same sentinel. `tests/test_fb_step_builder_call_sites.py` already
-contains `test_freezing_everyone_must_be_explicit` — the guard shape exists too.
+### Emitter census (2026-09-08)
+
+The sentinel is not something an emitter names. `grep -rn 'CONTINUE_FROM_PREVIOUS' BackEnd/
+tests/` returns five hits, all inside `transition_bridge.py` (`:707`, `:710`, `:762`, `:778`,
+`:810`). It is the **default value of `build_pass_step`'s `continuing_targets` parameter**
+(`transition_bridge.py:761-763`). So an emitter gets continuation by calling `build_pass_step`
+and saying nothing, and freezes by passing an explicit value.
+
+Every `build_pass_step` call site, by AST (not grep), with what it passes:
+
+| call site | `continuing_targets` | `previous_step` |
+|---|---|---|
+| `after_steal_fast_break_step_emitter.py:448` | default → **continue** | `steps[-1] if steps else None` |
+| `fb_drive_step_emitter.py:405` | default → **continue** | `steps[-1] if steps else None` |
+| `dynamic_hct_step_emitter.py:1334` | `continuing_targets` (authored) | not passed |
+| `transition_bridge.py:899` | `lane_targets` (authored) | not passed |
+| `transition_bridge.py:984` | `other_targets` (authored) | not passed |
+| `transition_bridge.py:1349` | `setup_coords` (authored) | not passed |
+| `transition_bridge.py:1499` | **explicit `None` → freeze** | not passed |
+| `dynamic_hct_step_emitter.py:1510` | **explicit `None` → freeze** | not passed |
+
+**A trap for the fix brief: the default alone is not enough.** Continuation is derived by
+`_continuing_targets_from_previous_step(previous_step=...)` (`transition_bridge.py:810-814`),
+and `previous_step` itself defaults to `None`. A call site that takes the sentinel default but
+passes no `previous_step` gets an empty target map and freezes anyway. Only the two sites that
+pass `steps[-1]` actually continue. Sweeping the sentinel without also threading `previous_step`
+reproduces the defect while looking fixed — which is the failure mode
+`tests/test_fb_step_builder_call_sites.py` was written against.
+
+Emitters that never call `build_pass_step` are outside the mechanism entirely and freeze by
+copying start coords into end coords. Ranked by measured freeze rate, this is the sweep order:
+
+1. **`oreb_step_emitter.py`** — putbacks, 84.6%/82.8%, `OREB` phase 76.0%. Freeze-by-copy at
+   `:296`, `:325`, `:398`, `:413`, `:485`, `:527`, `:590`, `:604`. Largest offender; also the
+   most dangerous to change (see blast radius).
+2. **`transition_bridge.py:1390` `build_sip_animation_steps`** — SIP, 66.7%. Its pass step is
+   one of the two deliberate freezes; see below.
+3. **`transition_bridge.py:1202` `build_bip_animation_steps`** — BIP, 27.8%. Jamie's report.
+4. `skeleton_step_emitter.py` (9 freeze-copy sites), `ft_step_emitter.py` (3),
+   `fb_outlet_pass_step_emitter.py` (3) — lower measured rates.
+5. `covert_release_step_emitter.py`, `dreb_step_emitter.py`, `dynamic_fcp_step_emitter.py`,
+   `hct_step_emitter.py`, `rim_runner_step_emitter.py`, `triangle_step_emitter.py` — no
+   freeze-by-copy sites and no `build_pass_step`; `DREB` measures 0.0%.
+
+### The two deliberate freezes, named
+
+`709ba4110`'s own message: "Fixes the two call sites that never decided (after_steal,
+fb_drive); leaves the two deliberate freezes untouched." Both pre-date it, confirmed by
+`git show 709ba4110^` — `transition_bridge.py:1429` (now `:1499`) and
+`dynamic_hct_step_emitter.py:1516` (now `:1510`). The commit touched four files and
+`dynamic_hct_step_emitter.py` was not among them.
+
+1. **`transition_bridge.py:1499` — the SIP inbound pass (SF→PG).** Stated in-line: "No
+   continuing_targets → other 8 stationary at their step 2 end coords." Correct *as a decision
+   the caller states*, which was the point of the inversion. **But it is not correct as
+   behaviour, and it should not be treated as settled**: SIP measures 66.7% whole-step freezes,
+   the second-worst family in the game. A dead-ball inbound is precisely when the other eight
+   should be jockeying for position. Flagging it rather than protecting it.
+2. **`dynamic_hct_step_emitter.py:1510` — the HCT attack-basket dish pass**
+   (`metadata_reason="hct_ab_dish"`). This one is genuinely correct. The dish is a short, fast
+   pass at the end of a drive the previous step already resolved; the drive step authored
+   everyone's destinations and the dish occupies a fraction of a second. Continuing off-ball
+   targets across it would re-drift players who have just arrived. Leave it.
 
 ### Acceptance
 
 `dumpDeadAir()` before and after. Player stillness should fall substantially; arrival tails
 should be **unchanged** (that is defect 2's territory, and if tails move the change reached
-further than intended). Two deliberate freezes were identified as correct during the
-original inversion — do not overturn them without saying which and why.
+further than intended).
+
+## STOP — the sentinel cannot reach the top three families (measured 2026-09-08)
+
+**The sweep premise "extension, not invention" is wrong for the families that carry the
+defect.** Measured before writing any emitter code, and it is the reason none was written.
+
+`_continuing_targets_from_previous_step` (`transition_bridge.py:714-751`) derives targets from
+the **previous step's `start.destination` map**, keeping only players with remaining distance.
+It invents nothing. So threading the sentinel can revive exactly those players who were already
+mid-journey toward an authored destination, and nobody else.
+
+Recovery ceiling on already-emitted data, 4 seeds — of the whole-step freezes in each family,
+the share where the previous step held at least one usable destination:
+
+| family | frozen steps | rescuable by the sentinel | prior `destination` map all-null |
+|---|---|---|---|
+| `SIDE_INBOUND` | 284 | **0 (0.0%)** | 142 |
+| `BASELINE_INBOUND` | 209 | 73 (34.9%) | 57 |
+| `PUTBACK_MAKE` | 169 | **27 (16.0%)** | 138 |
+| `PUTBACK_MISS` | 55 | **10 (18.2%)** | 45 |
+| `DEAD BALL` | 34 | 26 (76.5%) | 0 |
+| `MAKE` | 21 | 21 (100%) | 0 |
+| `FOUL` | 21 | 0 (0.0%) | 0 |
+
+The reason, shown on a real 13-step `PUTBACK_MAKE` chain: step 0 authors 9 movers with 9 usable
+destinations and **they all arrive**. Steps 1-12 then carry `destination` maps that are entirely
+null with the action map reading literally `['stationary']`. `_stationary_maps`
+(`oreb_step_emitter.py:212-216`) writes `destinations = {pid: None}` for all ten, so from step 1
+onward there is no target to continue toward. The chain is frozen from its second step and the
+sentinel has nothing to read.
+
+Same shape on SIP: step 0 (`sip_setup_walkin`) moves all ten with usable destinations and they
+arrive; step 1 (`sip_passer_hold`) nulls every destination; step 2 (`sip_inbound_pass`) carries
+10 non-null destinations of which **0 are usable** — each equals the player's own start coord.
+
+**Consequence for the planned commits.** Commit 1 (oreb) would recover 16-18% of that family's
+frozen steps. Commit 2 (SIP) would recover **zero**. And the isolated commit overturning the
+deliberate freeze at `transition_bridge.py:1499` would also be a **no-op** — that freeze is not
+the binding constraint, because step 1's hold step has already nulled every destination before
+the pass step is reached. Overturning a deliberate decision for no measurable gain is the worst
+available trade.
+
+**What the real fix is.** For SIP, BIP and the putback family the work is to **author** off-ball
+destinations in those emitters — where the other eight should be going during an inbound or a
+putback — and only then let the sentinel carry them across the following steps. That is
+invention, not extension: it decides new positions rather than continuing chosen ones, and it
+needs a design pass with the blast radius below in scope from the start. It is a different task
+with a different risk profile from the one this brief scoped.
+
+**Clamp risk, quantified for whoever writes that design.** Where continuation targets do exist,
+the remaining distances are large: median 16.7 grid units on BIP, 22.1 on `PUTBACK_MAKE`, p90 up
+to 51.9, max 73.0. A 0.5-game-second step at cruise pace covers a small fraction of that, so
+`_interrupted_coord`-style clamping is load-bearing, not a nicety. Invariant (A4) in the fix
+brief is the right thing to have worried about.
+
+## Defect 4 blast radius — the sentinel is NOT cosmetic (measured 2026-09-08)
+
+**Extending continuing targets to off-ball players changes SIM OUTCOMES, not just what is
+drawn.** Do not scope the fix as a rendering change.
+
+The propagation path, end to end:
+
+1. Emitted step end coords are committed onto **all ten** players.
+   `sync_lineup_coords_from_turn` (`shared.py:3696`) — "align all ten active players'
+   `Player.coords` with the same spatial data the frontend uses" — writes
+   `player.coords = dict(positions[pid])` in a whole-lineup loop at `shared.py:3815-3821`, and
+   `shared.py:3800-3806` states the last step's `end.coords` is authoritative and deliberately
+   wins over the overlay maps. Called from `game_manager.py:931`.
+2. `Player.coords` is then read by **whole-lineup loops that decide outcomes**, not by named
+   participants:
+   - **`resolve_over_the_back_foul` (`shared.py:878`)** loops the entire opposing lineup at
+     `:903-910`, takes the nearest by `player.coords`, and at `:911` returns `None` when
+     `nearest_distance > 4`. Only if it does not return does `:919` draw
+     `otb_roll = random.randint(1, 100)` — and `random` in this module is the seeded sim RNG
+     (`shared.py:2`, `from BackEnd.utils.sim_random import sim_rng as random`). Its return
+     names `foul_team`, `foul_player` and `victim`. Live: called at `shared.py:974` and
+     `game_manager.py:1139`.
+   - **`resolve_offensive_rebound` (`shared.py:951`)** loops the entire `def_lineup` at
+     `:1032-1043` and picks `nearest_defender` by distance from the shooter — i.e. off-ball
+     defender coords name who contests the putback. Live: `turn_manager.py:5358`.
+3. Measured, 4 seeded games, 243 `resolve_over_the_back_foul` calls: **70.4% return early with
+   no draw** and 27.2% proceed to the roll. **19.8% sit within ±1.0 grid unit of the 4.0
+   threshold** — one unit of off-ball movement flips them. Median nearest distance 6.53.
+
+So this is a **draw-count change: SPC principle 8 territory.** The fix brief must carry the
+poison-stash test, an equiv-v3 arm, and a re-cut reference — the same treatment the emission
+half of the EOQ fix needed.
+
+**What does NOT propagate**, so the brief does not over-scope: `compute_defender_grid`
+(`animator.py:1241`) takes `skeleton, off_lineup, def_lineup` and computes defender geometry
+from the *skeleton* on a deep copy, explicitly "PURE, sim-safe" (`:1242-1254`). It does not
+read `Player.coords`. The interception contest is therefore not on this path.
+
+**The decision rule the brief needs, stated now while we are honest.** Numbers will move. The
+rule cannot be "did numbers move" — it must be:
+- Whole-step freeze rate falls on the families swept, and arrival tails are unchanged.
+- The OTB-foul *rate per rebound* moves within the range implied by the ±1.0-of-threshold
+  population (19.8%), and does not move in a direction that makes fouls monotonically rarer —
+  continuing players toward their previous targets should if anything put more bodies near the
+  glass, not fewer.
+- `DREB` stays at 0.0% freezes and its outcome distribution is untouched, since no DREB emitter
+  is being swept.
+An unexplained move outside those is "we broke something", not "players are in more plausible
+places".
 
 ## Revised sequence
 
