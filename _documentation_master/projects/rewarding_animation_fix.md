@@ -259,13 +259,81 @@ About 449/game single-player coordinates still land exactly on the logo. Those s
 counterfactual and are most likely ordinary mid-court traffic, not misplacement. Logged open
 in `bugs.md`; they are not expected to affect the eye test.
 
+## Defect 4 — unnecessary whole-step freezes (added 2026-09-06)
+
+**Reported by Jamie from live observation.** Multiple steps freeze every player, or all but
+one or two, when only one player's motion is actually load-bearing:
+
+- **BIP (baseline inbound pass) turns** — everything freezes for a beat or several. Only the
+  inbound passer needs to hold; the other nine should keep moving.
+- **Pre-shot movement** — everyone except the shooter, and possibly the shot defender,
+  appears to freeze. The rest should stay in organic motion.
+
+### This is NOT defect 2
+
+They produce the same complaint and have different mechanisms:
+
+| | mechanism | fix |
+|---|---|---|
+| **defect 2** — arrive-and-freeze | player HAS a target, reaches it early, the leftover tail is dead | duration (STRETCH_CAP) |
+| **defect 4** — whole-step freeze | player has NO target for the step, so is still for all of it | authoring (continuing targets) |
+
+### It is probably the larger of the two
+
+`deadAirLedger.js` already separates *player stillness* from *arrival tails*. On the last
+measurement **stillness ran roughly 2× the arrival tails**, so the whole-step freezes
+outweigh the arrive-early tails about 2:1. Re-measure before acting — that figure predates
+the converter fix.
+
+### It has a boundary-elevated component (measured 2026-09-08)
+
+The EOQ trace measured stillness by position in the quarter: **22.9% of steps at a
+quarter-final turn have nobody moving, against 15.6% mid-quarter.** So the freeze problem is
+not uniform — it is roughly 1.5x worse at a period end.
+
+One boundary turn emitted three consecutive steps in which nobody moved at all. That
+occurred 1 of 46 at boundaries and 0 of 4,743 mid-quarter, so it is boundary-specific, but
+it is a single instance and no rate should be quoted off it.
+
+Two readings, untested: the EOQ defects logged as bugs.md items 10-13 may share a cause with
+this, or the period-end path may simply author fewer targets. Worth establishing before
+fixing either, since a shared cause means one fix and separate causes mean two.
+
+### The fix already exists and has a precedent
+
+The first animation change of this project (2026-09-04, `709ba4110` "Invert the freeze
+default in build_pass_step") introduced the `CONTINUE_FROM_PREVIOUS` sentinel in
+`BackEnd/utils/transition_bridge.py`: off-ball players continue toward their previous
+targets rather than freezing when no new target is authored. It was wired into
+`after_steal_fast_break_step_emitter.py:448` and `fb_drive_step_emitter.py:405`.
+
+**That default was never swept to the other emitters.** BIP and the pre-shot path still
+freeze by default — the same defect, on the paths nobody was building at the time. This is
+the pattern behind nearly every defect found on 2026-09-06.
+
+So the work is extension, not invention: identify every emitter that still freezes by
+default, and give it the same sentinel. `tests/test_fb_step_builder_call_sites.py` already
+contains `test_freezing_everyone_must_be_explicit` — the guard shape exists too.
+
+### Acceptance
+
+`dumpDeadAir()` before and after. Player stillness should fall substantially; arrival tails
+should be **unchanged** (that is defect 2's territory, and if tails move the change reached
+further than intended). Two deliberate freezes were identified as correct during the
+original inversion — do not overturn them without saying which and why.
+
 ## Revised sequence
 
-1. ~~**Fix the converter**~~ — DONE 2026-09-07. One reader that did not speak the vocabulary
-   the rest of its own module speaks. It moved outcomes broadly and balance references still
-   need re-cutting; it changed where players stand on ~64% of offensive actions.
-2. **Continuity-aware easing** across all nine hardcoded sites, two curves only
+1. ~~**Fix the converter**~~ — DONE, commit `54a2a9c0e`. The offense build now reads `spot`.
+2. **Whole-step freezes (defect 4)** — extension of an existing, tested mechanism; measured
+   at ~2× the arrival-tail problem; ranked above defect 2 on both size and cost.
+3. **Continuity-aware easing (defect 1)** across all nine hardcoded sites, two curves only
    (ease-out on arrival steps, linear otherwise).
-3. **Then** decide what keys easing character on HCO, with the archetype question reopened
+4. **Arrive-and-freeze (defect 2)** — STRETCH_CAP experiment, judged by eye.
+5. **Then** decide what keys easing character on HCO, with the archetype question reopened
    on correct inputs.
-4. Overlap stagger, timing variation, emphasis hierarchy — as in the main document.
+6. **Overlap stagger, timing variation (defect 3), emphasis hierarchy** — as in the main
+   document.
+
+Not on this list: the End-of-Quarter animation defect. That is a bug, not craft — it is
+logged in `bugs.md` and needs a trace, not a design pass.
