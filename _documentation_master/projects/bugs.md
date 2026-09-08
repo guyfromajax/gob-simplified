@@ -238,6 +238,29 @@
      one being complained about. Both produce confident wrong answers, but only this one is fixed
      by changing how the harness is launched.
 
+6c. STANDING RULE — a null result and a broken reader look identical in a report
+   - Adopted 2026-09-08. Recorded verbatim because the phrasing is the rule:
+
+     **"A null result and a broken reader look identical in a report."**
+
+   - Third sibling of items 6 and 6b. Item 6 is about trusting our own assertions; 6b is about
+     which arm the harness ran on; this one is about the shape of a NEGATIVE finding. "No change
+     measured" and "the probe could not see the change" arrive as the same sentence, and the
+     second one is indistinguishable from good news.
+   - It has already cost real work twice in this workstream. `scratch_foul_outcomes.py` reported
+     0 fouls and `None` scores across every game and read as "the fix changed nothing" — the
+     reader was pulling the wrong fields (`player.get_stat("F", "game")` and `gm.score` were the
+     right ones). Separately the item 22 anti-vacuity draft passed a loop that never executed
+     once, because six `PAINT_SPOTS` names resolved to no coordinate at all.
+   - THE RULE. Every null from here proves its harness is SENSITIVE first, by perturbing
+     something the harness must be able to see and showing that it moves. The worked example is
+     `scratch_sensitivity.py`: it shifted `CONTEST_EUCLIDEAN_RADIUS` in
+     `BackEnd/constants/__init__.py` and showed scores move, which is what licensed reporting
+     "item 24's fix changed no outcomes" as a finding rather than as a shrug. Without that step
+     the sentence is not a result.
+   - A sensitivity control is cheap and it is not optional. It is the only thing separating "we
+     looked and there was nothing there" from "we did not look."
+
 7. OPEN, do not chase yet — something OUTSIDE placement is driving the two arms apart, and it is
    now the larger term
    - Recorded 2026-09-07 from the before/after of the spot-key fix, `equiv-v3`, n=20 per arm.
@@ -1163,6 +1186,57 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       per-player spot fallback that yields DISTINCT coordinates. Both sites also never executed
       in 8 played games. So item 24 is not a mechanism for symptom #3, and symptom #3 still has
       no traced mechanism.
+
+26. POLICY, adopted 2026-09-08 — a coordinate fallback never invents a position
+    - Recorded as a rule because the same shape has now produced five instances and two of them
+      cost real money. The rule itself:
+
+      **A COORDINATE FALLBACK NEVER INVENTS A POSITION — it skips the candidate, or it fails.**
+
+    - WHY IT IS A RULE AND NOT A PREFERENCE. `{"x": 50, "y": 25}` is centre court, which is a
+      perfectly plausible place for a basketball player to be. That is exactly what makes it
+      expensive: a fabricated coordinate is indistinguishable from a real one at every point
+      downstream, so nothing errors, nothing looks wrong, and the defect is only visible in
+      aggregate months later. A `None` or a skipped candidate announces itself at the seam.
+    - THE DISTINCTION THAT MATTERS. Placing a sprite and MEASURING between players are different
+      contracts. A renderer needs some coordinate and centre court is a defensible choice. A
+      comparison needs to tell "no coordinate" apart from "centre court", because a stand-in
+      shared by several candidates makes every distance between them equal, and the comparison
+      silently degrades into iteration order wearing the costume of a measurement. That is
+      precisely how item 24 charged an arbitrary defender.
+    - THE FIVE INSTANCES, for whoever does the eventual sweep:
+        · the spot-key converter logo stacks (54a2a9c0e) — 644.5 five-player stacks per game,
+          and a 79.2-point make-rate gap in the misplaced population
+        · item 24's two callers — `turn_manager.py:2639`, `eoq_perfection.py:711`
+        · item 25's `grid_coords_from_player` (`phase_resolution.py:580`)
+        · `_find_closest_receiver` (`phase_resolution.py:4022`), latent on the sunset path
+        · 26 further `.get()` sites that return centre court on a miss
+    - DO NOT SWEEP THE SITES YET. Changing a fallback changes coordinates, and coordinates change
+      outcomes — item 24 alone was measured against `CONTEST_EUCLIDEAN_RADIUS` sensitivity to
+      establish that. A sweep is a balance change wearing a tidy-up costume and it belongs AFTER
+      Jamie's balance pass. This entry is the policy only; `_usable_grid_coord`
+      (`phase_resolution.py`) is the shape the eventual fix should take.
+
+27. CLOSED — both proposed mechanisms for symptom #3 are eliminated. Do not re-derive them.
+    - Symptom #3 is Jamie's long-standing report that TURNOVERS ARE ATTRIBUTED TO THE WRONG BALL
+      HANDLER. Two mechanisms were proposed on separate evidence and both are now dead. Recorded
+      together so nobody spends a third session rebuilding either one.
+    - MECHANISM A — the `offense_play_type` sunset up-front event tables (item 18). The theory
+      was that `_check_steal_attempt` and `_check_dead_ball_turnover` name the handler by a
+      different rule than the live per-step moment walk, so any turn taking the sunset path
+      would attribute turnovers inconsistently. MEASURED LATENT: the positive-list flag at
+      `phase_resolution.py:3308-3310` never admitted a falsy read across 8 seeded games, with a
+      null control proving the probe did not perturb the sim. The path does not execute, so it
+      cannot be the mechanism.
+    - MECHANISM B — item 24's arbitrary nearest-defender selector. The theory was that a
+      selector which picks by iteration order while appearing to pick by distance could be
+      naming the wrong player on a turnover. ELIMINATED BY INSPECTION AND MEASUREMENT: the
+      turnover path names the handler from `get_ball_handler_from_skeleton`, not by distance
+      (item 25), and item 24's selector chooses a CONTESTING DEFENDER, not a ball handler and
+      not a fouler. Wrong player, wrong decision, wrong path.
+    - SO SYMPTOM #3 STILL HAS NO TRACED MECHANISM, and the two obvious candidates are spent. A
+      future trace should start from the attribution WRITE — where a turnover stat is credited to
+      a player id — and work backwards, rather than from selectors that look suspicious.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

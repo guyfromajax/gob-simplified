@@ -204,6 +204,80 @@ work in `BackEnd/utils/transition_bridge.py` is the same question and may supply
 
 This part is independent of the archetype question and is still the right first move.
 
+### SHIPPED 2026-09-08 — and the departure ambiguity above was resolved as (b)
+
+The rule as written was ambiguous about a player DEPARTING from rest: "linear through the
+middle" combined with "ease IN only on the first step" already implies departure easing, but
+the summary line elsewhere in this doc said "two curves only (ease-out on arrival steps, linear
+otherwise)", which implies departures snap. Resolved as **(b) — ease-in on departure, ease-out
+on arrival, linear while continuing**, which is still two curves plus their combination. Both
+readings are now selectable: `movementCurve.departureEasing` in `animation_config.js` turns
+departure easing off, which collapses the behaviour to (a).
+
+**The backend decides, the frontend maps.** Continuity is a fact the backend already authored
+when it built the step list, so having the client re-derive it from step N+1 would create a
+second source for one fact — the same shape as `compute_defender_grid`'s second draw and the
+fresh-skeleton screen stats, both of which produced real defects here.
+`stamp_movement_curves` (`BackEnd/utils/animation_step_helpers.py`) writes a per-player intent
+name to `step.start.movement_curve`, and `resolveMovementCurve` (`animation_config.js`) is the
+only place those names become Phaser curves.
+
+**Linear is the default and is not stamped.** Mid-journey steps carry no entry, which is what
+keeps a multi-step crossing from pulsing. `resolveMovementCurve` returns `Linear` for a missing
+or unrecognised intent, so the safe direction is the default one.
+
+**The continuity population, measured on the played arm, 8 seeds, 63,995 player-steps.** This
+is what makes continuity handling load-bearing rather than theoretical:
+
+| class | player-steps | of all | of moving | curve |
+|---|---|---|---|---|
+| STILL | 34,412 | 53.8% | — | none |
+| ONE_STEP_JOURNEY | 12,686 | 19.8% | 42.9% | `ease_in_out` |
+| DEPARTING | 5,688 | 8.9% | 19.2% | `ease_in` |
+| ARRIVING | 5,688 | 8.9% | 19.2% | `ease_out` |
+| CONTINUING | 5,521 | 8.6% | 18.7% | **none — stays linear** |
+
+24,062 curves stamped across 8 games. Departures and arrivals are exactly equal, as they must
+be — every multi-step journey has one of each — and that balance is asserted in
+`tests/test_movement_curve_continuity.py`.
+
+**A turn boundary counts as REST, not as continuation.** The emitted list is all the renderer
+has, and assuming a journey continues past an edge we cannot see is what made
+`CONTINUE_FROM_PREVIOUS` unshippable. The conservative failure is one extra deceleration at a
+seam rather than a phantom mid-journey pulse.
+
+**Scope: the schema path only, and that turns out to be nearly all of it.** The doc's
+nine-site catalogue was stale — there are 34 `ease: "Linear"` sites in production, 26 of them
+player movement. Only two are on the schema path. Rather than sweep the rest, the branch that
+chooses between them was measured: `AnimationEngine.js:646-647` and `:1094` route a turn to the
+schema renderer when `animation_steps` is non-empty, and `:1319` is the inverse. Across 8
+played games (3,158 turns):
+
+- **53.9% take the schema path** and are now eased.
+- 46.1% take the legacy branch, but **45.9% of all turns carry no `animations[]` either**, so
+  the legacy renderers create zero player tweens for them — every major legacy player-movement
+  file (`ShotAnimationSystem.js:287,295`, `turnAnimation.js:986`, `freeThrow.js:88`,
+  `FreeThrowAnimationSystem.js:330`, `fastBreak.js:3431`) gates on `turnData.animations`. These
+  are not easing sites, they are empty turns.
+- **0.3% — exactly 1 per game — reach a legacy renderer with content, and all of them are
+  OPENING_TIP**, which `openingTip.js` already animates with `Quad.easeOut`.
+
+So the "24 other linear sites" are overwhelmingly unreachable in a played game. Method:
+runtime measurement of the backend-side branch condition on the played arm, not browser
+instrumentation and not static import reachability — the import graph says every legacy module
+is still imported by something and therefore discriminates nothing.
+
+**One known uneased hole inside the schema path**, stated because it is a real inconsistency:
+the path-knot branch (`animationPlayback.js:1313-1331`) does not receive the curve, because
+easing each knot segment independently would reintroduce per-segment pulsing. It is the
+fast-break ball handler only (`fb_drive_step_emitter.py:486-488`) and it is tiny — **20 of
+29,583 moving player tweens across 8 games, 0.07%, about 2.5 per game.**
+
+**Cost.** Zero new tweens; the change only sets `ease` on tweens that already existed. The
+per-frame delta is one easing evaluation instead of a passthrough: 0.26µs per frame for 10
+concurrent tweens, 0.0016% of a 16.67ms budget. That is a microbenchmark of the easing maths
+and cannot see compositing.
+
 ## ~~BLOCKER~~ — CLEARED 2026-09-07. Easing is no longer blocked.
 
 The converter is fixed. `defender_placement.py` now accepts `"spot"`, and the fallthrough
@@ -668,8 +742,12 @@ certainly needs one of them.
 1. ~~**Fix the converter**~~ — DONE, commit `54a2a9c0e`. The offense build now reads `spot`.
 2. **Whole-step freezes (defect 4)** — extension of an existing, tested mechanism; measured
    at ~2× the arrival-tail problem; ranked above defect 2 on both size and cost.
-3. **Continuity-aware easing (defect 1)** across all nine hardcoded sites, two curves only
-   (ease-out on arrival steps, linear otherwise).
+3. ~~**Continuity-aware easing (defect 1)** across all nine hardcoded sites, two curves only
+   (ease-out on arrival steps, linear otherwise).~~ **SHIPPED 2026-09-08 — see the
+   CONTINUITY-AWARE section above.** Two corrections to this line as written: there were 34
+   linear sites, not nine, and the "linear otherwise" reading was resolved as (b) — departures
+   ease too, selectable via `movementCurve.departureEasing`. Scoped to the schema path, which
+   measured as 53.9% of turns and effectively 100% of rendered player movement.
 4. **Arrive-and-freeze (defect 2)** — STRETCH_CAP experiment, judged by eye.
 5. **Then** decide what keys easing character on HCO, with the archetype question reopened
    on correct inputs.
