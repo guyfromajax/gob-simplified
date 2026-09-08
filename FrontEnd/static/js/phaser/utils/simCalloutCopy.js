@@ -12,7 +12,7 @@ const MIN_CATEGORIES = 8;
 
 /** Bundled fallback — kept in sync with FrontEnd/static/sim-callout-copy.md. */
 export const CALLOUT_PACK = {
-  version: '2026.08.e-fallback',
+  version: '2026.09.a-fallback',
   categories: {
     gamewinner: { avatar: 'headshot', color: 'gold', lines: [
       '{NAME} — Game Winning Shot!',
@@ -48,13 +48,13 @@ export const CALLOUT_PACK = {
       '{NAME} has the last *{STREAK}*', '*{STREAK}* straight for {NAME}',
     ] },
     run: { avatar: 'abbr', color: 'orange', lines: [
-      '{TEAM} on a *{RUN}* run', '*{RUN}* unanswered for {TEAM}',
+      'On a *{RUN}* run', '*{RUN}* unanswered',
     ] },
     advantage: { avatar: 'abbr', color: 'blue', lines: [
-      '*+{EDGE}* {STAT} advantage', '{TEAM} up *+{EDGE}* on {STAT}',
+      '*+{EDGE}* {STAT} advantage', 'A *+{EDGE}* edge in {STAT}',
     ] },
     disadvantage: { avatar: 'abbr', color: 'red', lines: [
-      '{TEAM} — *+{EDGE}* {STAT} disadvantage', '*+{EDGE}* {STAT} disadvantage for {TEAM}',
+      '*+{EDGE}* more {STAT}', 'On the wrong side of *+{EDGE}* {STAT}',
     ] },
     defense: { avatar: 'headshot', color: 'blue', lines: [
       '{NAME} — *{DEF}%* defense', '{NAME} locking up at *{DEF}%*',

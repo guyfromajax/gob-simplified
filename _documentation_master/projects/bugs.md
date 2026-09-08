@@ -5,6 +5,7 @@
 ##Monetization
 1. Wire Stripe into site
 2. Founder's Edition monetization plan
+3. Publish pricing
 
 
 ##App Build
@@ -31,7 +32,6 @@
 ##Operations
 1. Test update system
 2. Dashboard
-3. Verify recruit/walk-on painting retention
 
 
 ##Bugs
@@ -550,12 +550,68 @@
    - This is distinct from the hazards already logged. It is not a stale field (item 10), not a
      missing assertion (item 6), and not a lost key on reload (item 12). It is **scope creep inside
      a conditional**: the guard is correct for one concern and accidental for the other.
-   - WHY IT MATTERS BEYOND THIS SITE: we cannot currently tell how often this shape exists. Any
-     `if <render precondition>:` block that also mutates `game_state` or clock fields has the same
-     property. Worth a sweep — the search is cheap (blocks gated on animation/skeleton/steps
-     predicates that also call clock or state finalizers) and the payoff is finding the next one
-     before a rendering fix moves the simulation.
-   - NOT SWEPT. The single known instance is fixed as a side effect of item 11; the class is open.
+   - SWEPT 2026-09-08, static census of all `BackEnd/**/*.py` (AST, read-only, no instrumentation).
+     **RESULT: 1 true instance — this one — and it is still LIVE. 0 latent.**
+   - Raw enumeration: **38 candidate blocks** in 7 files — 33 `if <render precondition>:` blocks
+     whose body also touches non-render state, plus 5 functions that early-return on a missing
+     render payload and do non-render work in the tail. Broadening the body-work detector from a
+     curated hint list to "any `game_state` write, any non-render turn-dict key, any stat call"
+     moved the count 30 → 33, so the enumeration is not hint-limited.
+   - 37 of 38 are LOOKALIKES, and they fail on ONE test: **the predicate IS the body's data
+     dependency.** `if anim_steps:` guarding
+     `result["time_elapsed"] = burn(anim_steps[0], anim_steps[-1])` is not a hazard, it is a
+     function of its argument — with no steps there is no schema burn to compute and `time_elapsed`
+     correctly keeps the resolver's value. Same for every step-index/coord stamp
+     (`steal_stop_step_index`, `shot_clock_violation_step_index`, `last_stealer_coords`), the screen
+     stats counted out of `skeleton["pos_actions"]`, and the pass-interception contest that walks
+     the skeleton's own steps. Nothing is skipped in these; the work is vacuous without its input.
+   - THE DISCRIMINATOR that isolates the real instance: **the predicate is not the dependency.**
+     `finalize_flss_post_emit(game, result)` never reads `result["skeleton"]` — it reads
+     `result["flss"]`, `game_state["time_remaining"]` and `result["animation_steps"]`, and it guards
+     `animation_steps` ITSELF at `eoq_clock_progression.py:584`. The block would have done correct,
+     meaningful work had it run with the predicate false. That is what made it silent-and-wrong
+     rather than silent-and-vacuous, and it is the only site in `BackEnd/` with that property.
+     (Automatable as: a call inside a render-gated block, to a `BackEnd`-defined state mutator,
+     where no argument carries the render payload named in the predicate.)
+   - **STILL LIVE — item 11 fixed only one of the two routes into this gate.** Commit 2 made
+     `resolve_flss_shot_logic` stamp `result["skeleton"]`, closing the FLSS-shot route. But
+     `turn_manager.py:5084` also sets `result["flss"] = True` for a buzzer-fit OREB putback
+     (`fit_buzzer_putback_steps` when the putback schema is longer than the clock left), and putback
+     results carry no skeleton **by explicit design** — `turn_manager.py:5410` "Putback shots don't
+     have a skeleton", `turn_manager.py:5424` `"steps": []  # No skeleton for putbacks`. So
+     `result.get("flss")` is true and `result.get("skeleton")` is falsy, and the gate is false.
+     `finalize_flss_post_emit` has exactly ONE call site (`turn_manager.py:2120`, inside the gate),
+     so that family never reaches EOQ clock finalization at all.
+   - What is skipped on that route, named: the schema-burn `time_elapsed` realignment;
+     `mark_late_clock_eoq_turn` and `activate_late_clock_eoq_chain` (the late-clock EOQ chain never
+     activates); `result["final_shot_possession"] = True`; and the
+     `game_state.pop("final_shot_possession_active")` teardown — which then cascades, because
+     `turn_manager.py:2148` sets `final_shot_ran_this_chain` only when
+     `flss and final_shot_possession`, and `final_shot_possession` is authored solely inside the
+     gate. Severity is bounded by `turn_manager.py:2142-2146` running UNCONDITIONALLY, so the
+     generic `ensure_quarter_end_clock_drain` / `normalize_quarter_end_after_clock_update` still fire
+     for these turns — what is lost is the FLSS-specific chain and realignment, not the whole drain.
+     Note the corroboration: item 10's residue concentrated in `PUTBACK_MISS` (2) and
+     `PUTBACK_MAKE` (1), which is this family.
+   - Reachability is argued statically only; **frequency is unmeasured** (the census was scoped to
+     no runtime instrumentation). Requires an OREB turn, `PUTBACK_MAKE`/`PUTBACK_MISS`,
+     `clock_available > 0`, and schema seconds > clock left. That measurement is the follow-up.
+   - Secondary findings from the same pass, NOT instances of this shape, logged so nobody re-derives
+     them: (a) `eoq_perfection.py:361` `combine_eoq_origin_prefix` POPS
+     `eoq_origin_prefix_steps` BEFORE its own `if not prefix or not flss_steps: return` guard, so an
+     empty `animation_steps` destroys and discards the prefix — a destructive read ahead of a guard;
+     (b) `eoq_shortened_turn` and `eoq_origin_prefix_step_count` are written and have **zero**
+     consumers anywhere in `BackEnd/` or `FrontEnd/`; (c) the up-front event tables at
+     `phase_resolution.py:3292` (`_check_standard_fouls`, `_check_steal_attempt`,
+     `_check_dead_ball_turnover`, ~150 lines of steal/turnover/foul resolution) are skipped whenever
+     `offense_play_type ∈ {motion, set, set_play}`, and those are the only values any writer
+     produces — the code is dead, and `offense_play_type` is absent from `_init_game_state`, so a
+     `game_state` missing the key would re-animate it; (d) `phase_resolution.py:3400` counts screen
+     stats off a FRESH `get_hco_skeleton(None, game, lean_score=1.0)` rather than the emitted
+     skeleton, and consumes a `random.randint(1, 2)` per attempt; (e) `game_manager.py:1195`
+     abandons an entire synthesized DREB turn (`return None`) when `animation_steps` is empty — an
+     all-or-nothing gate, not the asymmetric shape, but a render precondition deciding whether a
+     turn exists.
 
 
 ##Full Product Perfection

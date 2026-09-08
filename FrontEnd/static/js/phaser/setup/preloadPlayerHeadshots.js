@@ -1,5 +1,11 @@
 import { getPlayerImageUrl } from "../utils/announcements.js";
 
+// Cap the self-heal so a broken asset zone cannot turn scene start into a stall.
+// Above this many misses something systemic is wrong and initials are the right
+// answer; below it, a paint round trip (~1-3s each, run in parallel) is worth it.
+export const HEAL_MAX = 12;
+export const HEAL_TIMEOUT_MS = 8000;
+
 export const HEADSHOT_TEXTURE_PREFIX = "headshot_";
 export const HEADSHOT_FALLBACK_KEY = "headshot_fallback";
 
@@ -28,14 +34,19 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
   const prevCrossOrigin = scene.load.crossOrigin;
   scene.load.crossOrigin = "anonymous";
 
+  const byKey = new Map();   // texture key -> { id, uniformKey } for the heal pass
   for (const player of players) {
     const id = player?.playerId ?? player?.player_id ?? player?._id;
     if (!id || id === "ball" || id === "Ball") continue;
     const key = headshotTextureKey(id);
     if (scene.textures && scene.textures.exists(key)) continue;
-    const url = getPlayerImageUrl(player.photo, id);
+    // uniform_key addresses the shared archive object; when the payload carries it
+    // the first request hits a painted object instead of 404ing.
+    const uniformKey = player?.uniform_key ?? player?.uniformKey ?? null;
+    const url = getPlayerImageUrl(player.photo, id, uniformKey);
     scene.load.image(key, url);
     queued.push(key);
+    byKey.set(key, { id, uniformKey });
     queuedUrls.push({ key, url, playerName: player.name });
   }
 
@@ -54,6 +65,7 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
     return Promise.resolve();
   }
 
+  let healed = false;
   return new Promise((resolve) => {
     const failed = [];
     const onComplete = () => {
@@ -68,6 +80,17 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
           failedKeys: failed,
         });
       }
+      // SELF-HEAL. WebGL textures are not <img> elements, so the delegated
+      // paint-on-miss handler in api-config.js never sees them — without this a
+      // single missed paint means an initials tile for the whole game and every
+      // game after, since nothing else ever triggers the paint. A pre-warm should
+      // mean this never fires; it exists so one miss is not permanent.
+      // Bounded and time-capped: a slow paint must never hold the tip-off.
+      if (!healed && failed.length && failed.length <= HEAL_MAX) {
+        healed = true;
+        healFailures(scene, failed, byKey, prevCrossOrigin).then(resolve, resolve);
+        return;
+      }
       resolve();
     };
     const onLoadError = (file) => {
@@ -80,4 +103,58 @@ export function preloadPlayerHeadshots(scene, allPlayers) {
     scene.load.on("loaderror", onLoadError);
     scene.load.start();
   });
+}
+
+
+/**
+ * Paint the misses, then re-queue them once. Resolves either way — a portrait must
+ * never be able to block the game from starting.
+ */
+function healFailures(scene, failedKeys, byKey, prevCrossOrigin) {
+  const api = (typeof window !== "undefined") && window.API_CONFIG;
+  if (!api || typeof api.ensurePlayerImage !== "function") return Promise.resolve();
+  const fid = typeof api.currentFranchiseId === "function" ? api.currentFranchiseId() : null;
+
+  const targets = failedKeys
+    .map((k) => ({ key: k, ...(byKey.get(k) || {}) }))
+    .filter((t) => t.id);
+  if (!targets.length) return Promise.resolve();
+
+  console.warn(`[headshots] self-heal: painting ${targets.length} missing master(s)`);
+
+  const paints = targets.map((t) =>
+    api.ensurePlayerImage(fid, t.id).catch(() => null)
+  );
+  const timeout = new Promise((r) => setTimeout(r, HEAL_TIMEOUT_MS));
+
+  return Promise.race([Promise.all(paints), timeout]).then((results) => {
+    const reload = [];
+    targets.forEach((t, i) => {
+      // Prefer the uniform_key the paint just reported: it addresses the shared
+      // archive object, which is what the paint actually wrote.
+      const res = Array.isArray(results) ? results[i] : null;
+      const uk = (res && res.uniform_key) || t.uniformKey || null;
+      const url = getPlayerImageUrl(null, t.id, uk);
+      // Cache-buster: the browser has a fresh 404 cached for this URL.
+      scene.load.image(t.key, url + (url.indexOf("?") === -1 ? "?" : "&") + "gobr=1");
+      reload.push(t.key);
+    });
+    if (!reload.length) return;
+
+    return new Promise((done) => {
+      let settled = false;
+      const finish = () => {
+        if (settled) return;          // "complete" and the timeout can both fire
+        settled = true;
+        scene.load.crossOrigin = prevCrossOrigin;
+        const ok = reload.filter((k) => scene.textures.exists(k));
+        console.log(`[headshots] self-heal complete — recovered ${ok.length}/${reload.length}`);
+        done();
+      };
+      scene.load.once("complete", finish);
+      scene.load.crossOrigin = "anonymous";
+      scene.load.start();
+      setTimeout(finish, HEAL_TIMEOUT_MS);
+    });
+  }).catch(() => {});
 }

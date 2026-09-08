@@ -16,7 +16,7 @@ headshot" — never a 500. No AI: the paint is a deterministic recolor.
 """
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from pydantic import BaseModel
 
 from BackEnd.db import db, franchise_players_data_collection
@@ -36,6 +36,16 @@ class EnsurePlayerImageRequest(BaseModel):
 
 class EnsureRecruitImageRequest(BaseModel):
     image_id: str
+
+
+class WarmTeamsRequest(BaseModel):
+    """Teams may be identified by ObjectId string OR by name.
+
+    The Set Lineup screen holds the user's team_id but only the opponent's display
+    name, so accepting either avoids a lookup round trip on the client.
+    """
+    franchise_id: str
+    teams: list[str]
 
 
 def _maybe_objid(value):
@@ -110,52 +120,58 @@ def delete_signed_masters_for_franchise(franchise_id) -> int:
 
 @router.post("/player-image/ensure")
 def ensure_player_image(req: EnsurePlayerImageRequest, user: dict = Depends(get_current_user)):
-    """Paint a signed player's uniformed master into R2 if it's missing."""
+    """Ensure a signed player's uniformed portrait exists, via the shared archive.
+
+    The painted artifact lives at ``uniforms/<image_id>__<color_key>.png`` and is
+    shared by every franchise whose player wears that portrait in those colours —
+    see _documentation_master/projects/Uniform_Archive_Brief.md. The legacy
+    ``players/master/<player_id>.png`` key is MIRRORED from it with a server-side
+    copy so existing read paths keep resolving while payloads are threaded with
+    uniform_key. The mirror is migration scaffolding, not the artifact; once every
+    surface reads uniform_key it can be dropped and the duplicates GC'd.
+    """
+    from BackEnd.utils import uniform_archive
+
     if not r2_images.is_configured():
         return {"status": "unconfigured"}
     master_key = f"players/master/{req.player_id}.png"
     try:
-        if r2_images.exists(master_key):
-            return {"status": "exists"}
         image_id, team_id = _resolve_signed(req.franchise_id, req.player_id)
         if not image_id:
             return {"status": "generic"}          # walk-on / dynamic with no library
-        kit_keys = None
-        try:
-            from BackEnd.utils.team_builder_portraits import resolve_kit_keys
-
-            kit_keys = resolve_kit_keys(image_id)
-        except Exception:
-            kit_keys = None
-        if kit_keys:
-            kit_key, mask_key = kit_keys
-        else:
-            kit_key = f"recruits/kit/{image_id}.png"
-            mask_key = f"recruits/kit/{image_id}.mask.png"
-        if not (r2_images.exists(kit_key) and r2_images.exists(mask_key)):
-            return {"status": "no_kit"}
         team = db.teams.find_one({"_id": _maybe_objid(team_id)}) if team_id else None
         if not team:
             return {"status": "no_team"}
         from BackEnd.utils.franchise_team_display import resolve_team_display
 
         disp = resolve_team_display(req.franchise_id, team_id, core_doc=team)
-        master = recruit_image.make_signed_master(
-            r2_images.get(kit_key), r2_images.get(mask_key),
-            disp.get("primary_color") or team.get("primary_color", "#000000"),
-            disp.get("secondary_color") or team.get("secondary_color", "#ffffff"),
-            disp.get("mascot") if disp.get("mascot") is not None else team.get("mascot", ""),
+        primary = disp.get("primary_color") or team.get("primary_color", "#000000")
+        secondary = disp.get("secondary_color") or team.get("secondary_color", "#ffffff")
+        mascot = disp.get("mascot") if disp.get("mascot") is not None else team.get("mascot", "")
+
+        result = uniform_archive.ensure_uniform(
+            image_id=image_id, primary=primary, secondary=secondary, mascot=mascot,
         )
-        r2_images.put(master_key, master)
+        if result["status"] in ("no_image_id", "no_kit"):
+            return {"status": "no_kit" if result["status"] == "no_kit" else "generic"}
+        if result["status"] == "error":
+            return {"status": "error", "detail": result.get("detail")}
+
+        # Persist the pointer. This is what lets payloads resolve the archive
+        # directly and skip the 404 -> ensure -> retry round trip entirely.
         franchise_players_data_collection.update_one(
             {"franchise_id": str(req.franchise_id), "player_id": str(req.player_id)},
-            {"$set": {"meta.image_painted": True}})
-        return {"status": "painted"}
+            {"$set": {"meta.uniform_key": result["uniform_key"], "meta.image_painted": True}})
+
+        # Mirror to the legacy key for surfaces not yet threaded. Server-side copy:
+        # no download, no repaint.
+        if not r2_images.exists(master_key):
+            r2_images.copy(result["object_key"], master_key)
+
+        return {"status": result["status"], "uniform_key": result["uniform_key"]}
     except Exception as e:  # noqa: BLE001 — never 500 a portrait; fall back to generic
         logger.exception("paint failed for player %s", req.player_id)
         return {"status": "error", "detail": str(e)[:200]}
-
-
 @router.post("/recruit-image/ensure")
 def ensure_recruit_image(req: EnsureRecruitImageRequest, user: dict = Depends(get_current_user)):
     """Paint an un-signed recruit's finished WHITE display master into R2 if missing."""
@@ -180,3 +196,143 @@ def ensure_recruit_image(req: EnsureRecruitImageRequest, user: dict = Depends(ge
     except Exception as e:  # noqa: BLE001
         logger.exception("white paint failed for image %s", req.image_id)
         return {"status": "error", "detail": str(e)[:200]}
+
+
+# ---------------------------------------------------------------------------------
+# Pre-game warm
+# ---------------------------------------------------------------------------------
+
+# Bounded so a cold franchise cannot spike RSS. Each paint holds ~48 MB of numpy
+# arrays for a 12 MP canvas, and this service runs MALLOC_ARENA_MAX=2 after an
+# allocator-retention incident. Raise only with a measurement.
+WARM_CONCURRENCY = 2
+
+# Above this, something systemic is wrong (asset zone down, kits missing) and
+# grinding through hundreds of paints on a user-facing request helps nobody.
+WARM_MAX_PLAYERS = 60
+
+
+def _resolve_team_doc(team_ref: str):
+    """Resolve a team by ObjectId string, raw _id, team_id slug, or display name."""
+    ref = str(team_ref or "").strip()
+    if not ref:
+        return None
+    try:
+        from bson import ObjectId
+
+        doc = db.teams.find_one({"_id": ObjectId(ref)})
+        if doc:
+            return doc
+    except Exception:
+        pass
+    return (
+        db.teams.find_one({"_id": ref})
+        or db.teams.find_one({"team_id": ref})
+        or db.teams.find_one({"name": ref})
+    )
+
+
+def warm_teams_now(franchise_id: str, team_refs: list[str]) -> dict:
+    """Paint any unpainted archive entries for these teams' rosters.
+
+    Idempotent and cheap in the steady state: a player already carrying
+    ``meta.uniform_key`` is skipped without touching R2, so once the backfill has
+    run this is one indexed query and no paints. It exists as a safety net, not as
+    the primary mechanism — see Uniform_Archive_Brief.md.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    from BackEnd.db import franchise_team_data_collection
+    from BackEnd.utils import uniform_archive
+    from BackEnd.utils.franchise_team_display import resolve_team_display
+
+    summary = {"considered": 0, "skipped_stamped": 0, "painted": 0, "exists": 0, "failed": 0}
+    if not r2_images.is_configured():
+        summary["status"] = "unconfigured"
+        return summary
+
+    jobs = []
+    for ref in team_refs or []:
+        core = _resolve_team_doc(ref)
+        if not core:
+            continue
+        team_oid = core.get("_id")
+        ftd = franchise_team_data_collection.find_one(
+            {"franchise_id": _maybe_objid(franchise_id), "team_id": team_oid}, {"players": 1}
+        ) or franchise_team_data_collection.find_one(
+            {"franchise_id": str(franchise_id), "team_id": team_oid}, {"players": 1}
+        ) or {}
+        pids = [str(p) for p in (ftd.get("players") or []) if p]
+        if not pids:
+            continue
+        try:
+            disp = resolve_team_display(franchise_id, team_oid, core_doc=core) or {}
+        except Exception:
+            disp = {}
+        primary = disp.get("primary_color") or core.get("primary_color")
+        secondary = disp.get("secondary_color") or core.get("secondary_color")
+        mascot = disp.get("mascot") if disp.get("mascot") is not None else core.get("mascot", "")
+
+        for fpd in franchise_players_data_collection.find(
+            {"franchise_id": str(franchise_id), "player_id": {"$in": pids},
+             "meta.image_id": {"$nin": [None, ""]}},
+            {"player_id": 1, "meta": 1},
+        ):
+            meta = fpd.get("meta") or {}
+            summary["considered"] += 1
+            if meta.get("uniform_key"):
+                summary["skipped_stamped"] += 1
+                continue
+            jobs.append({
+                "player_id": str(fpd.get("player_id")),
+                "image_id": meta.get("image_id"),
+                "primary": primary, "secondary": secondary, "mascot": mascot,
+            })
+
+    if not jobs:
+        summary["status"] = "nothing_to_do"
+        return summary
+    if len(jobs) > WARM_MAX_PLAYERS:
+        logger.warning("[WARM] capping %s jobs at %s franchise=%s",
+                       len(jobs), WARM_MAX_PLAYERS, franchise_id)
+        jobs = jobs[:WARM_MAX_PLAYERS]
+
+    def _one(job):
+        res = uniform_archive.ensure_uniform(
+            image_id=job["image_id"], primary=job["primary"],
+            secondary=job["secondary"], mascot=job["mascot"],
+        )
+        if res["status"] in ("exists", "painted"):
+            franchise_players_data_collection.update_one(
+                {"franchise_id": str(franchise_id), "player_id": job["player_id"]},
+                {"$set": {"meta.uniform_key": res["uniform_key"], "meta.image_painted": True}},
+            )
+        return res["status"]
+
+    with ThreadPoolExecutor(max_workers=WARM_CONCURRENCY) as pool:
+        for status in pool.map(_one, jobs):
+            if status in summary:
+                summary[status] += 1
+            else:
+                summary["failed"] += 1
+
+    summary["status"] = "ok"
+    logger.info("[WARM] franchise=%s teams=%s %s", franchise_id, team_refs, summary)
+    return summary
+
+
+@router.post("/player-image/warm-teams")
+def warm_teams(
+    req: WarmTeamsRequest,
+    background_tasks: BackgroundTasks,
+    user: dict = Depends(get_current_user),
+):
+    """Kick off a pre-game warm and return IMMEDIATELY.
+
+    Called when the user enters Set Lineup. Painting overlaps the time they spend on
+    that screen, so nothing blocks and no load screen is needed. If the user is
+    faster than the paint, the game still starts — the sprite preloader's self-heal
+    covers the stragglers.
+    """
+    background_tasks.add_task(warm_teams_now, req.franchise_id, req.teams)
+    return {"status": "queued", "teams": len(req.teams or [])}

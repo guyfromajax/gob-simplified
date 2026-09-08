@@ -15394,7 +15394,17 @@ def cut_franchise_players(
             franchise_doc=franchise_doc,
             current_season=current_season,
             recruit_image_pool=recruit_image_pool,
-            warm=True,
+            # Was True: the user's team painted eagerly here while CPU teams stayed
+            # lazy. Two reasons that flipped:
+            #   1. Identical treatment for user and CPU teams was requested, and the
+            #      asymmetry was the whole reason CPU sprites showed initials.
+            #   2. That eager path writes the LEGACY players/master/<player_id>.png
+            #      key, bypassing the shared uniform archive. Every object it wrote
+            #      was a per-player duplicate the archive exists to eliminate.
+            # Painting now happens in one place: the pre-game warm, which runs while
+            # the user is on Set Lineup and hits the shared archive.
+            # See _documentation_master/projects/Uniform_Archive_Brief.md
+            warm=False,
         )
     except Exception:
         logger.exception("[WALK-ON-ROSTER] user assign failed franchise=%s", str(fid))

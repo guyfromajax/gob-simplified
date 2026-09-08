@@ -45,8 +45,8 @@ const ADV_POS = [
   { key: 'paint', label: 'paint', panel: 'paint' },
 ];
 const ADV_NEG = [
-  { key: 'to', label: 'turnover', panel: 'to' },
-  { key: 'fouls', label: 'foul', panel: 'fouls' },
+  { key: 'to', label: 'turnovers', panel: 'to' },
+  { key: 'fouls', label: 'fouls', panel: 'fouls' },
 ];
 const ADV_EDGES = [10, 20];
 
@@ -255,10 +255,7 @@ export class CalloutCadence {
         if (edge < thr) return;
         const key = `${side}:${spec.key}:${thr}`;
         if (this.advLatched[key]) return;
-        candidates.push({
-          key, side, thr, label: spec.label, kind: 'advantage',
-          team: shortName((this.teams[side] || {}).name || (this.teams[side] || {}).abbr || ''),
-        });
+        candidates.push({ key, side, thr, label: spec.label, kind: 'advantage' });
       });
     });
 
@@ -273,10 +270,7 @@ export class CalloutCadence {
         if (edge < thr) return;
         const key = `${side}:${spec.key}:${thr}`;
         if (this.advLatched[key]) return;
-        candidates.push({
-          key, side, thr, label: spec.label, kind: 'disadvantage',
-          team: shortName((this.teams[side] || {}).name || (this.teams[side] || {}).abbr || ''),
-        });
+        candidates.push({ key, side, thr, label: spec.label, kind: 'disadvantage' });
       });
     });
 
@@ -474,9 +468,7 @@ export class CalloutCadence {
     if (this.run.pts >= RUN_MIN_PTS && this.t - this.lastRun > GLOBAL_GAP_S) {
       const side = this.run.side;
       const runPts = this.run.pts;
-      const team = this.teams[side] || {};
       const ok = this._try('run', {
-        TEAM: shortName(team.name || team.abbr || ''),
         RUN: `${runPts}–0`,
       }, side, null);
       if (ok) {
@@ -490,7 +482,7 @@ export class CalloutCadence {
     const adv = this._peekAdvantage(frame.teamPanel);
     if (adv) {
       const ok = this._try(adv.kind, {
-        TEAM: adv.team, EDGE: adv.thr, STAT: adv.label,
+        EDGE: adv.thr, STAT: adv.label,
       }, adv.side, null);
       if (ok) {
         this.advLatched[adv.key] = true;

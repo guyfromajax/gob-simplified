@@ -270,11 +270,51 @@ const API_CONFIG = {
    */
   getPlayerImageUrl(playerId, opts = {}) {
     const size = opts.size || 'card';
+    // Uniform archive (preferred). A painted portrait is identified by what
+    // determines its pixels -- the portrait + the team's colours/mascot -- NOT by
+    // who wears it. One object therefore serves the same recruit in the same team
+    // across every franchise, instead of being repainted per player_id forever.
+    // Falls back to the legacy per-player master whenever the payload has not been
+    // stamped yet, so this is safe to ship before the paint path moves.
+    if (opts.uniformKey) return this.getUniformImageUrl(opts.uniformKey, opts);
     if (!playerId) return this.getGenericHeadshotUrl(opts);
     if (this.usePlayerImageRemote()) {
       return this._remotePlayerImageUrl(`${this.PLAYER_IMAGE_MASTER_PREFIX}/${playerId}.png`, size);
     }
     return this.buildStaticPath(`/images/players/${playerId}.png`);
+  },
+
+  // Object prefix for the cross-franchise uniform archive.
+  // See _documentation_master/projects/Uniform_Archive_Brief.md
+  UNIFORM_IMAGE_PREFIX: 'uniforms',
+
+  /**
+   * Resolve a painted uniform portrait from the shared archive.
+   * @param {string} uniformKey - `<image_id>__<color_key>`, from the player payload
+   * @param {Object} [opts] - { size }
+   * @returns {string}
+   */
+  getUniformImageUrl(uniformKey, opts = {}) {
+    const size = opts.size || 'card';
+    if (!uniformKey) return this.getGenericHeadshotUrl(opts);
+    if (this.usePlayerImageRemote()) {
+      return this._remotePlayerImageUrl(`${this.UNIFORM_IMAGE_PREFIX}/${uniformKey}.png`, size);
+    }
+    return this.buildStaticPath(`/images/uniforms/${uniformKey}.png`);
+  },
+
+  /**
+   * Resolve straight from a player payload, preferring the archive.
+   * Accepts either camelCase or snake_case since payloads differ by surface.
+   * @param {Object} player
+   * @param {Object} [opts] - { size }
+   */
+  getPlayerPayloadImageUrl(player, opts = {}) {
+    const p = player || {};
+    const uk = p.uniformKey || p.uniform_key || (p.meta && (p.meta.uniform_key || p.meta.uniformKey));
+    if (uk) return this.getUniformImageUrl(uk, opts);
+    const pid = p.playerId || p.player_id || p._id || p.id;
+    return this.getPlayerImageUrl(pid, opts);
   },
 
   /**

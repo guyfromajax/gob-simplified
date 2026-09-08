@@ -95,6 +95,13 @@ function calloutColor(name) {
   return CALLOUT_COLORS[String(name || '').toLowerCase()] || GREEN;
 }
 
+/** Callouts use the exact presentation color selected for that team's worm line. */
+export function calloutAccentColor(model, teams) {
+  const side = model && (model.side === 'home' || model.side === 'away') ? model.side : null;
+  const teamColor = side && teams && teams[side] && teams[side].color;
+  return teamColor || calloutColor(model && model.color);
+}
+
 /** *asterisks* → <b>…</b>; everything else HTML-escaped. */
 function formatCalloutLine(line) {
   return String(line || '').split(/(\*[^*]+\*)/g).map((part) => {
@@ -252,7 +259,7 @@ function ensureStyles() {
     .sgp-root .co-av .sil{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center}
     .sgp-root .co-av .sil svg{width:80%;height:90%}
     .sgp-root .co-av.logo{width:38px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1;letter-spacing:.04em;color:#fff;padding-top:1px}
-    .sgp-root .co-txt{font-size:13.5px;font-weight:600;line-height:1.15;color:#fff;white-space:nowrap;letter-spacing:-.005em}
+    .sgp-root .co-txt{font-size:13.5px;font-weight:600;line-height:1.15;color:var(--coc);white-space:nowrap;letter-spacing:-.005em}
     .sgp-root .co-txt b{font-weight:800}
     .sgp-root .co-leader{position:absolute;z-index:3;pointer-events:none;background:var(--coc);border-radius:1px;opacity:.5;height:1px}
 
@@ -911,7 +918,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
     // later chance to show it, so it replaces whatever is up.
     if (calloutBusy && model.tier !== GAME_WINNER_TIER) return false;
     calloutBusy = true;
-    const col = calloutColor(model.color);
+    const col = calloutAccentColor(model, teams);
     activeCallout = { col, model };
 
     clearCalloutTimers();

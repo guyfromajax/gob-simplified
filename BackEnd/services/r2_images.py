@@ -78,6 +78,24 @@ def put(key: str, data: bytes, content_type: str = "image/png") -> None:
                   ContentType=content_type, CacheControl=CACHE_CONTROL)
 
 
+def copy(src_key: str, dest_key: str) -> bool:
+    """Server-side copy within the bucket. No download, no re-upload, no egress.
+
+    Used by the uniform archive migration: the archive object is the painted
+    artifact, and the legacy players/master/<player_id>.png key is mirrored from it
+    so existing read paths keep resolving while payloads are being threaded with
+    uniform_key. Cheap enough to be unremarkable -- R2 does the copy internally.
+    """
+    s3, bucket = _s3()
+    from botocore.exceptions import ClientError
+    try:
+        s3.copy_object(Bucket=bucket, Key=dest_key, CopySource={"Bucket": bucket, "Key": src_key})
+        return True
+    except ClientError:
+        logger.exception("[R2] copy failed %s -> %s", src_key, dest_key)
+        return False
+
+
 def delete(key: str) -> bool:
     """Delete an object. Returns True if the object existed and was removed, False
     if it was already absent. Idempotent — deleting a missing key is not an error."""

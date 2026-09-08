@@ -2489,12 +2489,18 @@ def summarize_game_state(
     def _display_portrait(p):
         """Persist portrait metadata only for players linked to recruit artwork."""
         image_id = getattr(p, "image_id", None)
-        if not image_id:
+        uniform_key = getattr(p, "uniform_key", None)
+        if not image_id and not uniform_key:
             return {}
-        return {
+        out = {
             "portrait_source": getattr(p, "portrait_source", "player"),
             "image_id": image_id,
         }
+        if uniform_key:
+            # Lets the client address the shared archive object directly instead of
+            # missing on players/master/<player_id>.png and waiting on a paint.
+            out["uniform_key"] = uniform_key
+        return out
 
     players = []
     for team_key, team_obj in [("home", game.home_team), ("away", game.away_team)]:
