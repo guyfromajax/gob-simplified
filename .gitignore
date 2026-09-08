@@ -38,3 +38,9 @@ assets_staging/
 # uniformed portraits, watermark extracts) — generated artifacts, never commit
 tmp/
 .claude/
+
+# Measurement/probe scratch scripts. They stay ON DISK so censuses and probes remain
+# reproducible, but they are not source and must stop riding along in unrelated commits.
+# NOTE: .gitignore does not affect ALREADY-TRACKED files. 34 older scratch_* files
+# (plus scratch_*_results.json) remain tracked and are unaffected by this rule.
+scratch_*.py
