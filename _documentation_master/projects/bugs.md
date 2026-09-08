@@ -584,15 +584,81 @@
      so that family never reaches EOQ clock finalization at all.
    - What is skipped on that route, named: the schema-burn `time_elapsed` realignment;
      `mark_late_clock_eoq_turn` and `activate_late_clock_eoq_chain` (the late-clock EOQ chain never
-     activates); `result["final_shot_possession"] = True`; and the
-     `game_state.pop("final_shot_possession_active")` teardown — which then cascades, because
-     `turn_manager.py:2148` sets `final_shot_ran_this_chain` only when
-     `flss and final_shot_possession`, and `final_shot_possession` is authored solely inside the
-     gate. Severity is bounded by `turn_manager.py:2142-2146` running UNCONDITIONALLY, so the
+     activates); and the `game_state.pop("final_shot_possession_active")` teardown.
+   - **CORRECTION 2026-09-08 — the original census entry claimed a cascade here and was wrong.**
+     It asserted `final_shot_possession` was "authored solely inside the gate", citing the single
+     line `turn_manager.py:2121`. The grep shows THREE authors —
+     `grep -rn 'final_shot_possession' BackEnd/ FrontEnd/` → `turn_manager.py:2121`, `:4549`,
+     `:5085` — and `:5085` sits directly beneath the `result["flss"] = True` at `:5084` that creates
+     this very instance. So for the buzzer-fit putback family `flss` AND `final_shot_possession` are
+     both True, `turn_manager.py:2148`'s condition IS satisfied, and `final_shot_ran_this_chain`
+     DOES get set. There is no cascade. The claim overstated the defect.
+   - Severity is bounded twice over: `turn_manager.py:2142-2146` runs UNCONDITIONALLY, so the
      generic `ensure_quarter_end_clock_drain` / `normalize_quarter_end_after_clock_update` still fire
-     for these turns — what is lost is the FLSS-specific chain and realignment, not the whole drain.
-     Note the corroboration: item 10's residue concentrated in `PUTBACK_MISS` (2) and
-     `PUTBACK_MAKE` (1), which is this family.
+     for these turns; and `final_shot_possession` is set independently at `:5085`. What is genuinely
+     lost is the FLSS-specific late-clock chain, the schema-burn realignment, and the teardown —
+     not the whole drain and not the chain-ran flag. The core finding survives:
+     `finalize_flss_post_emit` never runs for this family, and item 10's residue concentrating in
+     `PUTBACK_MISS` (2) and `PUTBACK_MAKE` (1) corroborates it.
+   - LEDGER PRACTICE, changed as a result (second time a single-site citation produced a wrong
+     conclusion in this workstream — see also item 10's retraction): any claim of the form "X is
+     authored/called only at Y" must cite **the grep**, not a line number. A line number proves the
+     site exists; it does not prove it is the only one. Where this entry claims a sole call site —
+     `finalize_flss_post_emit` at `turn_manager.py:2120` — the evidence is
+     `grep -rn 'finalize_flss_post_emit' BackEnd/`, which returns the def plus that one call and
+     nothing else.
+   - **SEVERITY DOWNGRADED 2026-09-08 after tracing what the block would actually add (Part A).**
+     Three of the four skipped effects turn out to be redundant or contra-spec for this family:
+     (1) the schema-burn `time_elapsed` realignment is ALREADY performed by the OREB path itself at
+     `turn_manager.py:5089-5113`, and `eoq_shortened_oreb` exists precisely to skip the
+     `OREB_PUTBACK_MIN_TIME_ELAPSED` floor there (`:5110`), so the value
+     `finalize_flss_post_emit` would compute is the same raw schema burn; (2)
+     `ensure_quarter_end_clock_drain` is ALREADY called unconditionally at `turn_manager.py:2142`
+     — verified by AST that its only enclosing constructs are `def run_micro_turn` and a bare
+     `Try`, no `if`; (3) `mark_late_clock_eoq_turn` and `activate_late_clock_eoq_chain` are the two
+     the spec says must NOT run — `EOQ_System.md:19` "OREB ≠ EOQ chain start", `:389` "OREB at >30s
+     or without active chain: putback only; **no `late_clock_eoq` tag, no chain activation**", and
+     `:150` "**Do not** call `activate_late_clock_eoq_chain()` on every OREB. Early-quarter OREBs
+     (e.g. at 5:00) used to permanently block Final Shot because the gate requires
+     `not late_clock_eoq_chain_active`." And (4) the `game_state.pop("final_shot_possession_active")`
+     teardown is redundant too: `clear_late_clock_eoq_chain` pops that same key
+     (`eoq_clock_progression.py:114`) and is called both from the terminal branch of
+     `ensure_quarter_end_clock_drain` (`:563`, reached unconditionally via `turn_manager.py:2142`)
+     and on every quarter change (`turn_manager.py:1586`).
+   - **NET: all four effects are redundant or contra-spec for this family, so the gate evaluating
+     false costs nothing.** The instance is LIVE in the reachability sense — the predicate really
+     can be false — but its consequence is nil. It stays logged as a HAZARD, not a bug: the shape is
+     still one gate carrying two concerns, and the next family routed through it may not be so lucky.
+   - CONSEQUENCE FOR THE FIX: **do not split the gate.** Making `finalize_flss_post_emit` run for
+     this family would arm an EOQ chain on a buzzer-beating putback, which is the documented
+     regression at `EOQ_System.md:150`. The gate evaluating false here is closer to accidentally
+     correct than to broken. Closed 2026-09-08 as NO CHANGE.
+   - ALSO REJECTED: removing the `flss` tag at `:5084`. It is load-bearing on the FRONTEND, which is
+     the non-obvious part. `AnimationEngine.js:395` routes `flss && quarter_ends_after` into
+     `_finishFinalTurnQuarterEnd` (the quarter-end finish sequence); `ShotAnimationSystem.js:1158`
+     uses `flss || final_turn` to suppress a bogus MAKE announcement when choreography is empty; and
+     `turnPreparation.js:206` uses `final_turn && flss !== true` to suppress the FINAL_SHOT stinger.
+     Dropping the tag changes all three. No measured symptom is driving that, so it is unbriefed.
+   - `infer_eoq_trace_role` mislabels a buzzer-fit putback as `"FLSS"`. Left alone, and here is the
+     verified reader inventory so the next person does not have to re-derive it — **`eoq_trace_role`
+     is consumed ONLY by the EOQ debug-log subsystem.** Across all of `FrontEnd/` it appears at
+     exactly five lines: `animationPlayback.js:1631` and `:1633`, which build a local `eoqFlow`
+     used at `:1634-1637` and `:1652-1655` and NOWHERE else (grep for `eoqFlow` in that file
+     returns those five lines), both call sites gated on `isEoqTraceEnabled(scene)` and both
+     terminating in `logEoqSchemaStep`; and `eoqDebugLog.js:30`, `:149`, `:201`, which are the log
+     module itself. Nothing branches playback on it. So changing that function's output IS a
+     log-label change, not a playback change — the opposite of what it looks like at first glance.
+   - Two ordering facts worth keeping, because they are easy to get backwards: both
+     `animationPlayback.js:1629` and `eoqDebugLog.js:199` test `flss` FIRST, so a buzzer-fit putback
+     (which has `flss` set) resolves to `'FLSS'` and NEVER reaches the `:1631`
+     `final_shot_possession` test. That test would only start covering these turns if the `flss` tag
+     were removed — which is a point in favour of removal being survivable, not evidence that the FE
+     already treats them as final-shot possessions by that route.
+   - RETRACTED, same date: the census claimed item 10's `PUTBACK_MISS`/`PUTBACK_MAKE` residue
+     "corroborates" this instance. It does not. The drain at `:2142` is unconditional, so this gate
+     never suppressed it; that residue is fully explained by item 10's own payload-consistency
+     defect (five fields, one fact), which is fixed. The corroboration was reasoning backwards from
+     a matching family name.
    - Reachability is argued statically only; **frequency is unmeasured** (the census was scoped to
      no runtime instrumentation). Requires an OREB turn, `PUTBACK_MAKE`/`PUTBACK_MISS`,
      `clock_available > 0`, and schema seconds > clock left. That measurement is the follow-up.
@@ -602,16 +668,94 @@
      empty `animation_steps` destroys and discards the prefix — a destructive read ahead of a guard;
      (b) `eoq_shortened_turn` and `eoq_origin_prefix_step_count` are written and have **zero**
      consumers anywhere in `BackEnd/` or `FrontEnd/`; (c) the up-front event tables at
-     `phase_resolution.py:3292` (`_check_standard_fouls`, `_check_steal_attempt`,
-     `_check_dead_ball_turnover`, ~150 lines of steal/turnover/foul resolution) are skipped whenever
-     `offense_play_type ∈ {motion, set, set_play}`, and those are the only values any writer
-     produces — the code is dead, and `offense_play_type` is absent from `_init_game_state`, so a
-     `game_state` missing the key would re-animate it; (d) `phase_resolution.py:3400` counts screen
+     `phase_resolution.py:3292` — **traced separately below, verdict LATENT/UNREACHABLE**;
+     (d) `phase_resolution.py:3400` counts screen
      stats off a FRESH `get_hco_skeleton(None, game, lean_score=1.0)` rather than the emitted
      skeleton, and consumes a `random.randint(1, 2)` per attempt; (e) `game_manager.py:1195`
      abandons an entire synthesized DREB turn (`return None`) when `animation_steps` is empty — an
      all-or-nothing gate, not the asymmetric shape, but a render precondition deciding whether a
      turn exists.
+
+18. LATENT, and it kills our only mechanism for symptom #3 — the sunset up-front event tables
+    cannot be re-animated (traced 2026-09-08)
+   - THE SHAPE, and why it looked dangerous: `phase_resolution.py:3308-3310` retires ~150 lines of
+     legacy foul/steal/dead-ball-turnover resolution using a POSITIVE-LIST flag over a key with no
+     guaranteed value — `_opt = game_state.get("offense_play_type", "")` then
+     `skip_upfront_events = _opt in ("motion", "set", "set_play")`. `""` is not in the tuple, so any
+     read that misses the key runs the retired code. `offense_play_type` is absent from
+     `_init_game_state` (VERIFIED: 0 occurrences in `game_manager.py`) and `api.py:3908` logs
+     "offense_play_type NOT in saved state (will be set by set_playcalls())" on load, so the key
+     genuinely can be missing from `game_state`.
+   - **VERDICT: LATENT — static argument plus an 8-seed executable control, reload path unverified.**
+     Deliberately NOT stated as "proven unreachable": see the coverage limits below.
+     The reason it does not fire is ordering, not the key's presence. `resolve_hco_outcome` (which contains 3308) has
+     one live caller, `phase_resolution.py:7862` inside `resolve_half_court_offense_logic`; that has
+     one caller, `turn_manager.py:3939` inside `resolve_half_court_offense`; that has one caller,
+     `turn_manager.py:2045`. AST shows `:2045` and the sole `set_playcalls()` call at
+     `turn_manager.py:1939` share an identical enclosing chain down to `If(1935, ELSE)`, with 1939
+     strictly before 2045. So every execution that can reach 3308 has already run `set_playcalls()`.
+   - `set_playcalls` (`turn_manager.py:2712-3080`) always writes the key before returning: exactly
+     two returns (`:2911`, `:3072`), two writes (`:2906` inside the `if user_offense` override body
+     that owns `:2911`; `:3067` at function-body top level, unconditional, dominating `:3072`).
+     Neither write can be falsy — the normal path draws from `weighted_random_from_dict`, which
+     returns a key of the passed dict and RAISES on empty or all-zero weights
+     (`shared.py:87-103`), and the override path uses `play_doc.get("play_type", "motion")` where
+     **all 23 documents in the live catalog are `motion` (4) or `set_play` (19)** — queried
+     read-only, zero anomalies. The key is never popped or blanked anywhere in `BackEnd/` (grep
+     empty). `turn_manager.py:2901-2902` shows the override path was already deliberately fixed for
+     exactly this ordering concern.
+   - The one branch that skips `set_playcalls` — `turn_manager.py:1935` `if result is not None`, the
+     Force Foul path — also skips HCO resolution entirely ("skip set_playcalls and
+     resolve_half_court_offense"), so it cannot reach 3308 either. A reload with the key missing is
+     safe for the same reason: the next HCO possession writes it at `:1939` before resolving.
+   - Note the `:3075` shape (`chosen_play_type if chosen_play_type else None`) is in the RETURN dict,
+     not the `game_state` write. It cannot introduce a `None` into `game_state`.
+   - **SYMPTOM #3 HYPOTHESIS — DEAD.** Jamie's long-standing "turnovers attributed to the wrong ball
+     handler" was hypothesised to come from these tables attributing by a different rule. The two
+     models DO name the handler differently, and the difference would have fit the symptom: the
+     sunset path identifies a ball handler via `get_ball_handler_from_skeleton` at a RANDOM step
+     index purely to score the contest, then throws it away — `_check_steal_attempt` returns
+     `("STEAL", None, None)` / `("D_FOUL", None, None)` (`:2957`, `:2959`) and
+     `_check_dead_ball_turnover` returns `("DEAD_BALL_TURNOVER", None, None)` (`:3131`), so no player
+     is propagated at all and attribution falls to whoever downstream picks. The live per-step
+     moment walk instead names the actual walked step's handler and credits a defender explicitly
+     (`phase_resolution.py:4669-4678`: `bh_pos`, `moment_defender_id`, `_hco_moment_defender_id`).
+     But since the sunset path is unreachable, this cannot be the mechanism. **Symptom #3 is now
+     without any known mechanism** — that is the useful result, because it stops the search here.
+   - NOT FIXED, deliberately. Deleting retired code is its own brief. Recorded so the next reader
+     does not re-derive the reachability argument. If the flag is ever touched, the safe shape is a
+     NEGATIVE list (skip unless explicitly legacy), not a positive one over a defaultable key.
+   - EXECUTABLE CONTROL, run 2026-09-08 (`scratch_optprobe.py`, one game per process,
+     `PYTHONHASHSEED=0`, seeds 8001-8008): **8 games, 3,193 turns, 787 HCO resolutions, ZERO falsy
+     or unexpected reads.** Distribution was `'motion'` 396 (50.3%) and `'set_play'` 391 (49.7%);
+     nothing else appeared. The FIRST read of every one of the 8 games was already valid, which
+     directly covers the "first HCO resolution of a fresh game" concern.
+   - The probe wraps `resolve_hco_outcome` and does nothing but (1) read
+     `game_state.get("offense_play_type")` with a sentinel, (2) record the value in a probe-local
+     Counter, (3) raise if it is not in `("motion", "set", "set_play")`, (4) delegate to the
+     original unchanged. It writes nothing to any game object, consumes no RNG, and changes no
+     ordering — so probed and unprobed runs have no path by which they can diverge, and no separate
+     null-control arm is needed. It wraps the function rather than line 3308 because 3308 reads into
+     a local that cannot be hooked without a source edit; the wrapper sees the same value because
+     nothing between `:3142` and `:3308` writes the key, and it runs before the function's first RNG
+     draw at `:3257`.
+   - ANTI-VACUITY (item 6's lesson — a green control is worthless unless it can go red): narrowing
+     the accept-set to `("motion",)` made a legitimate `'set_play'` read trip the assert on seed
+     8002, call 1, Q1 turn 1, with the full context captured. The raise path executes.
+   - **COVERAGE LIMITS — a clean run proves unreachable for the game shapes these 8 seeds produce,
+     not universally.** Two paths are NOT covered and remain static-argument-only:
+     (i) **the user-override path** (`turn_manager.py:2775-2911`). `user_offense` derives from
+     `game_state["user_offense_override"]`, written only by `api.py:5527` from a request body, so a
+     headless sim never takes it. Its static safety rests on the write at `:2906` preceding the
+     return at `:2911`, and on the catalog check (23 docs, all motion/set_play, `"motion"`
+     fallback). Related fixture caveat: the harness's mongomock plays catalog loads EMPTY, so
+     playcall selection falls back to `"Inside"` — harmless to `chosen_play_type`, which the
+     weighted draw still sets, but it means the catalog-backed `play_doc.get("play_type")` read is
+     untested at runtime. (ii) **mid-game reload with the key absent from saved state.** The harness
+     runs four quarters against one in-process `GameManager` and never reloads from the DB, so the
+     `api.py:3905/3908` restore path is entirely outside this control. It stays ASSUMED.
+   - So: the first-HCO-of-a-fresh-game concern is now measured and clean; the reload concern is not,
+     and a green run must not be read as covering it.
 
 
 ##Full Product Perfection
