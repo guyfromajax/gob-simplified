@@ -1081,7 +1081,16 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     - CONSEQUENCE: when the fallback fires, all five defenders collapse to `{50,25}`, every
       Euclidean distance to the victim is identical, and "closest defender" resolves to whoever
       `def_lineup` happens to iterate first. **This is the logo-stack shape again** — five
-      players at one coordinate — and the selected player is CHARGED WITH A FOUL.
+      players at one coordinate.
+
+    CORRECTION TO THIS ENTRY, made while fixing it: I wrote "the selected player is CHARGED WITH
+    A FOUL". That is wrong, and I took it from the function's own docstring ("For intentional
+    foul") rather than from its callers. The caller that actually collapses is
+    `turn_manager.py:2639` in `_execute_forced_shot` (shot-clock violation), where the selected
+    player becomes `roles["defender"]` — the CONTESTING defender on a forced shot, not a fouler.
+    The foul-charging caller is `turn_manager.py:619`, and it passes real per-position coords and
+    never collapsed in 8 games. The defect is real; its consequence was one step less severe
+    than this entry claimed.
     - The function's own docstring says the fallback uses "position-based default spots (key)".
       It does not: `key` is x=64 and the actual default is x=50. The documented intent is not
       implemented, which is why this reads as working.
@@ -1093,10 +1102,67 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       so draw counts do not move and no equivalence gate can see it. The only observable is a
       foul attributed to a defender who was not nearest — which is the same family as Jamie's
       long-standing symptom #3 (events attributed to the wrong player), still untraced.
-    - NOT FIXED HERE. The census was read-only and this is a correctness change in foul
-      attribution. It wants its own brief and a decision on what the fallback SHOULD do when a
-      caller supplies no coords — the honest options are to require coords or to read
-      `player.coords`, and both change which player is charged.
+    FIXED 2026-09-08, commit `e23fe0e81` — `phase_resolution.py`,
+    `tests/test_nearest_defender_contract.py`. Resolves from `player.coords`; a defender with no
+    usable coordinate is SKIPPED rather than given a stand-in, and the function returns None when
+    nobody can be placed. Docstring corrected: it claimed the fallback used "position-based
+    default spots (key)", but `key` is x=64 and the default was x=50, so the documented intent
+    was never implemented — a large part of why this read as working.
+
+    - CONTRACT GATE, and the only gate that means anything here: "the charged defender is the
+      nearest by measured distance to the victim." BEFORE 9 satisfied / 3 violated; AFTER 12 / 0.
+      Draw counts are identical across both arms and that is a fact about the RNG stream, NOT
+      evidence of safety — both branches consume the same `random.randint` draws, so the gate
+      that has protected every other change in this workstream is blind to this one.
+    - **NO MEASURED OUTCOME CHANGE across 8 seeds** — identical scores, per-player fouls,
+      foul-outs, team fouls and turn counts. The reason is worth recording: `resolve_shot`
+      RE-DERIVES the contest defender from coordinates and overwrites `roles["defender"]`
+      (`shot_manager.py:959/969`) unless `roles["fb_geometry_contest_resolved"]` is set, which
+      `_execute_forced_shot` does not set. So the arbitrary pick was being discarded by its own
+      consumer. Another producer/consumer seam where the producer's output does not reach the
+      decision — the same family as items 5, 11 and 23, though here the disconnection is what
+      made the defect harmless rather than what made it expensive.
+    - That null was NOT believed on its own. The outcome harness was proven sensitive first by
+      perturbing `CONTEST_EUCLIDEAN_RADIUS`, which moved scoring on 3 of 3 seeds. Worth noting
+      that the FIRST draft of that harness read `game_stats["fouls"]`, which does not exist —
+      fouls live behind `get_stat("F", "game")` — and reported zero fouls in every game on both
+      arms. A null result and a broken reader are indistinguishable in a report, which is the
+      third time this workstream a control has caught what a measurement asserted.
+    - Poisoned four ways, all caught. Reinstating the defect fails 8 of 13 assertions.
+      Defaulting a coordless defender to centre court, returning the first defender instead of
+      None, and accepting a half-coordinate each fail exactly the assertion written for them. The
+      iteration-order assertion is the one the old code could not have passed: same five
+      defenders, five different dict insertion orders, one expected winner.
+    - STILL LATENT, not fixed by this and worth knowing: `eoq_perfection.py:711` is the third
+      caller, also passes None, and never fired in 8 games (it sits behind `zone == "penalty"`).
+      It matters more than the one that does fire, because at `:716` it WRITES
+      `defender.coords` — so an arbitrarily chosen defender would be teleported to the FLSS
+      defender position. The fix covers it, since it is inside the function.
+
+25. LOGGED, NOT FIXED — found by the item 24 Part 1 search, which is why the search came first
+    - `defender_coords_by_pos_from_lineup` (`phase_resolution.py:596`) already existed and
+      builds exactly the position→coords map item 24 needed. It routes through
+      `grid_coords_from_player` (`:580`), whose fallback is `{"x": 50.0, "y": 25.0}` — so it
+      carries the same fabrication one layer down. It could not be reused for the item 24 fix
+      without reintroducing the defect, which is why `_usable_grid_coord` was added beside it
+      rather than the existing helper being called.
+    - Not currently harmful: measured 0 collapses at `turn_manager.py:619`, its consumer, across
+      8 played games, because all ten players always had coords. It is a hazard, not a bug.
+    - THE REST OF THE SEARCH CAME BACK CLEAN, and that is the useful half. The three other live
+      proximity selectors — `attack_drive_clearance.py:317` (208 calls),
+      `fb_geo_helpers.py:249` (17), `fb_stop_decision.py:43` (4) — showed ZERO collapsed
+      candidate sets across 8 played games. They are safe by construction, not by luck:
+      `_closest_pass_receiver` SKIPS candidates missing from `off_starts`, and the other two
+      receive already-built coordinate maps. `phase_resolution.py:4022`
+      `_find_closest_receiver` does default each receiver to `{50,25}` and IS the same shape,
+      but it never executed — it sits on the sunset up-front event path (item 20).
+    - THE TURNOVER ATTRIBUTION PATH DOES NOT CARRY THIS SHAPE, checked because Jamie's symptom
+      #3 made it the priority target. `_check_steal_attempt` and `_check_dead_ball_turnover`
+      name the ball handler from `get_ball_handler_from_skeleton`, not by distance, and where
+      they do build coordinates (`:2884`, `:3066`) they already prefer `player.coords` with a
+      per-player spot fallback that yields DISTINCT coordinates. Both sites also never executed
+      in 8 played games. So item 24 is not a mechanism for symptom #3, and symptom #3 still has
+      no traced mechanism.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
