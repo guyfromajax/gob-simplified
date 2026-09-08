@@ -36,7 +36,6 @@
 
 ##Full Product Perfection
 1. Training Camp News Report
-102. Team court images
 108. Message board
 113. Bring logic to screens
 114. Better individual player defense stat tracking
@@ -867,8 +866,27 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     (52,813 of 64,669), which is invisible on the sim arm per standing rule 6b.
     Per-family stillness: FREE_THROW 82.1%, SIDE_INBOUND 66.7%, OREB 61.9%, BASELINE_INBOUND
     60.0%, FCP 48.9%, HCO 44.6%, HCT 41.1%, FAST_BREAK 33.9%, DREB 7.9%.
-    STILL UNADDRESSED after the idle work: OREB (1,695 still player-steps), FCP (1,147),
-    HCT (908). Out of scope by decision, not by measurement.
+    ~~STILL UNADDRESSED after the idle work: OREB (1,695 still player-steps), FCP (1,147),
+    HCT (908). Out of scope by decision, not by measurement.~~ — **ALL THREE STAMPED
+    2026-09-08, commit `95958565b`. Defect 4 is closed;** see
+    `rewarding_animation_fix.md` "Defect 4 — CLOSED". MISS remains excluded and this entry
+    remains open for it alone.
+
+    ATTRIBUTION NOTE, since the numbers above do not reproduce keyed the same way. Item 19's
+    per-family figures came from `offensive_state`, which is not carried on the turn dict, so
+    they cannot be re-derived directly. Re-measured by EMITTER instead — which is the
+    attribution the fix actually needed, because it names the function to modify:
+    `oreb` 1,705 (`build_oreb_animation_steps`, and 1,013 + 637 + 45 from PUTBACK_MAKE /
+    PUTBACK_MISS / OREB_KICKOUT reproduces the 1,695 above exactly), `dynamic_fcp` 1,587,
+    `dynamic_hct` 2,730. The FCP/HCT figures are LARGER than item 19's 1,147 and 908 because a
+    pressure possession's terminal shot steps come from the skeleton emitter, so the two keyings
+    are not interchangeable. Do not treat them as a before/after pair.
+
+    ALSO MEASURED, and unstamped: `dreb` carries 294 still player-steps at 7.9%, the lowest of
+    any family, and `hct_step_emitter.build_hct_animation_steps` — the LEGACY HCT emitter —
+    emitted zero steps across 8 played games. The live one is `dynamic_hct`. If anyone goes
+    looking for HCT authoring, that is the file to read and the other is a candidate for
+    deletion.
 
 20. OPEN, small but real — BASELINE_INBOUND steps carry 16 to 20 player ids in `start.coords`,
     not ten
@@ -963,6 +981,41 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       territory: the coordinate-assertion gap logged there covers this exactly.
     - NOT A DEFECT TODAY. Logged because the population is large, the margin is zero, and the
       failure would present as a league-wide scoring shift rather than as a broken test.
+
+    GUARDED 2026-09-08, commit `46db3bf2a` — `tests/test_three_point_arc_boundary.py`.
+    - **The first assertion on a resolved classification value anywhere in this suite.** Item 6's
+      gap is now one hole smaller: 37 assertions covering all nine on-boundary spots at both ends
+      of the floor, through BOTH entry points (`classify_shot_value` and
+      `is_three_point_shot_from_coords` fail different counts under poison, so guarding one would
+      have left the other open).
+    - Poisoned five ways, all caught. `<=`→`<` on the two entry points separately fails 19 and 27
+      of 37. The comparison inverted outright, and the classifier stubbed to `return True`, each
+      fail only 2 — which is exactly why the paint-spot and step-inside-the-arc assertions exist.
+    - Spot coordinates NOT moved. Adding margin changes which shots are threes, so it is a balance
+      change wearing a tidy-up costume; still deferred until after Jamie's balance pass. The zero
+      margin is now load-bearing and asserted instead of incidental.
+
+23. SWEPT-ADJACENT HAZARD, found while writing the item 22 guard — spot names are CASE-SPLIT
+    across the constant tables, and a case-sensitive lookup silently undercounts
+    - `THREE_POINT_SPOTS` and `PAINT_SPOTS` name spots in lowercase (`"lower midwing"`,
+      `"basketspot"`). `HCO_STRING_SPOTS` authors the COORDINATES in camelCase
+      (`"lower midWing"`, `"basketSpot"`). Grep for `midcorner` finds only the lowercase name
+      list and concludes the spot has no coordinate authored anywhere.
+    - CONSEQUENCE, measured while enumerating item 22's population: a case-sensitive sweep of the
+      arc spots finds FIVE sitting on the classification boundary and misses the four
+      mid-wing/mid-corner ones, which are also at margin exactly zero. The real count is nine.
+      The same sweep resolves ZERO of the six `PAINT_SPOTS`, which is how the first draft of the
+      guard's anti-vacuity check passed a loop that never executed once. A `checked >= 6` floor
+      caught it; without the floor the guard would have shipped green and vacuous.
+    - THIS IS THE SAME CLASS as the spot-key converter that did not speak its own module's
+      vocabulary (`54a2a9c0e`) and as the stranded FLSS skeleton: a producer and a consumer
+      disagreeing on a name, with no error at the seam. Third appearance.
+    - NOT SWEPT. The guard resolves case-insensitively for its own purposes, which fixes the
+      test and not the codebase. What is unknown is how many PRODUCTION lookups do a
+      case-sensitive `HCO_STRING_SPOTS.get(name)` against a name sourced from one of the
+      lowercase lists, and what each returns when it misses. That is a census, not a guess, and
+      it wants its own pass — `.get()` returning `None` on a name mismatch is precisely the
+      shape that has produced silent misplacement here before.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

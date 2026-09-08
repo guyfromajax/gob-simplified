@@ -557,6 +557,112 @@ rule cannot be "did numbers move" — it must be:
 An unexplained move outside those is "we broke something", not "players are in more plausible
 places".
 
+## Defect 4 — CLOSED 2026-09-08, and NOT by the fix this section was written to justify
+
+The whole document above builds toward extending `CONTINUE_FROM_PREVIOUS`. That is not what
+shipped, and the reason is worth keeping: the sentinel could not reach the top three families
+(the "STOP" section above), and the blast-radius section established that it would have changed
+sim outcomes rather than only what is drawn. What shipped instead is a **render-space idle**,
+which changes nothing but the payload's `flourish` key.
+
+**The framing was also wrong by 2.8x.** "Whole-step freeze" only counted a step where all ten
+players were still, so a step with three moving and seven standing scored as not frozen. The eye
+sees seven dead players. Per-player stillness on the played arm is **45.6%** (64,669 of 141,738
+player-steps) against the 16.3% whole-step rate the workstream ran on. Defect 4 was measured
+against the wrong denominator from the start.
+
+### Families covered
+
+Stamped in commit order. Every one gates on the INDIVIDUAL player's `start.coords` equalling his
+`end.coords` for that step, above a 60ms perceptibility floor (`deadAirLedger.js:87`), under a
+density cap of 6 of 10 with selection ordered by how long the player has been still so nobody
+flickers in and out between steps.
+
+| family | still player-steps / 8 played games | stillness | style, amplitude | excluded role |
+|---|---|---|---|---|
+| `hco_still` | 52,813 (82% of all of it) | 44.6% | resolver's geography-aware pick, 0.6 | — |
+| `free_throw` | 1,930 | 82.1% | `survey_rock` ~3.5in, 0.6 | the shooter |
+| `inbound` (SIP + BIP) | 3,523 + 1,524 | 66.7% / 60.0% | `jockey` ~4in, 0.6 | the inbounding passer |
+| `make_hold` | 968 stamps | — | `survey_rock` ~3.5in, 0.6 | — |
+| `oreb` | 1,705 | 62.0% | `jockey` **~7in, 1.0** | putback shooter, second rebounder |
+| `fcp` | 1,587 | 48.2% | `shuffle` ~4in, 0.6 | ball handler |
+| `hct` | 2,730 | 44.9% | `shuffle` ~3.5in, 0.5 | ball handler |
+
+`oreb` is the only family that ships without the -40% still-player reduction. Boxing out is a
+legs-and-hips contest between men leaning on each other, not a wait, so it takes the widest
+amplitude in the set. Every style and amplitude is a tunable under
+`animation_config.js` `flourish.idleWander.byFamily`.
+
+One grid unit is almost exactly one foot (the 100x50 grid maps to a 94ft x 50ft court), so those
+amplitudes are readable as real weight-shift distances.
+
+### The two deliberate exclusions
+
+**MISS — not stamped, and the number going down would be the defect getting harder to see.** It
+is the largest content-free frozen family at 30.9%, and it is the one place an idle would make
+things worse. A miss is LIVE play: boards crashing, guards leaking out. If those steps are
+frozen the defect is that *nobody is sprinting when they should be*, and looping an idle over a
+rebound scramble papers over an authoring gap. Logged as `bugs.md` item 19, needing its own
+diagnosis of what those steps are FOR. Same error class as putting the sentinel on ball-carrying
+steps: right mechanism, wrong moment.
+
+**The putback rattle hold — not stamped, and the 60ms floor is what excludes it.** The putback
+chain holds every player still for 8 rattle hops while the ball is on the rim
+(`oreb_step_emitter.py` `overlay_players={}`, "putback: all players hold"), 62% of them carrying
+the ball. That stillness is correct. `RATTLE_HOP_GAME_SECONDS` is 40/350 game-seconds, which
+resolves to exactly 40.0ms of wall clock; measured, all 46 rattle hops per 8 games sit under the
+floor and 0 of 46 are candidates. Verified rather than assumed, because it was a floor and not
+an explicit filter doing the work, and guarded twice — once on the arithmetic and once on the
+constant — so a timing change elsewhere cannot silently make the hold stampable. The LONGER
+ball-on-rim beats that do clear the floor (`rattle_settle`, `bank_settle`, `bank_graze`,
+`bounce`) are stamped on purpose: men watching a ball rattle are shifting their weight.
+
+### What a "live ball" test could and could not settle
+
+Before widening to FCP and HCT I built a discriminator for the item 19 error class — is the ball
+in flight, loose, or attached to a moving owner on the steps that carry still players? It does
+not work as a veto, and the reason is instructive. `free_throw` measures 64% "live ball" by that
+test, because the shooter's own motion marks the step live while the other nine legitimately
+stand — and free throws are the family Jamie has already eye-approved. So the metric cannot
+distinguish an approved case from a proposed one. MISS stays excluded on the specific argument
+about rebound scrambles, not on this number.
+
+(The first version of that discriminator read `ball["x"]`, which exists in none of the three
+`BallState` shapes, and returned 100% "unknown" — a vacuous instrument that would have been
+reported as evidence. The anti-vacuity habit caught it.)
+
+### Gate
+
+The idle writer only ever writes `step.start.flourish`, and the gate is exact rather than merely
+weaker than byte-identical: on all 8 seeds, played arm, **draw counts and step counts identical**,
+and `flourish` the only key permitted to differ. It held on every commit. `_pressure_step_state`
+also differs, and that was worth chasing rather than waving through: its `schema_projection` is a
+complete snapshot of the emitted step during the Step 8 migration, so walking its 1,069 leaf
+paths was necessary to show 308 differ and **zero differ without `flourish` in the path**.
+
+That ordering is load-bearing, not incidental. The pressure stamp has to run BEFORE
+`_project_pressure_step` or the snapshot is stale and the flourish vanishes the moment
+`projection_source` flips to `"formal"`. Guarded structurally on source order, since no unit test
+on the helper can see it.
+
+Because the gate holds, equiv-v3 is not required and SPC principle 8 does not apply — verified,
+not expected. Determinism: two playbacks of the same seeded game are byte-identical, true only
+after `e0768409f` removed the heartbeat's `Math.random()`.
+
+Stamps rose 45,066 -> 48,229 across 8 games. **Frame time did not move in shape**: the density cap
+bounds concurrent tweens at ten regardless of stamp count, and a wander REPLACES a player's
+heartbeat rather than stacking on it, so cost is 0.294 us/frame at the shipped cap of 6 (0.0018%
+of a 60fps budget) against 0.067 at cap 0. That figure is the CPU cost of the idle update path
+against a stubbed tween manager — it cannot see compositing or draw-call cost and is not an
+end-to-end frame time.
+
+### What is still open
+
+Nothing in defect 4 itself. The expensive work it kept deferring is untouched and now has to be
+justified on its own: deleting the content-free beats, and authoring real off-ball destinations.
+Jamie's eye decides whether either is still needed. MISS (item 19) is the one family that
+certainly needs one of them.
+
 ## Revised sequence
 
 1. ~~**Fix the converter**~~ — DONE, commit `54a2a9c0e`. The offense build now reads `spot`.
