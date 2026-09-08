@@ -1,0 +1,113 @@
+{
+ "seed": 8,
+ "err": null,
+ "grand": {
+  "steps": 1749,
+  "player_steps": 17556,
+  "still_player_steps": 8203,
+  "wander_now": 1158,
+  "would_stamp_p1": 6262,
+  "skipped_subperceptible": 246,
+  "whole_frozen": 297,
+  "would_stamp_p2": 1428
+ },
+ "fam": {
+  "HCO": {
+   "steps": 1488,
+   "whole_frozen": 192,
+   "player_steps": 14880,
+   "still_player_steps": 6770,
+   "wander_now": 1158,
+   "would_stamp_p1": 6262,
+   "would_stamp_p2": 462
+  },
+  "BASELINE_INBOUND": {
+   "steps": 13,
+   "whole_frozen": 6,
+   "player_steps": 196,
+   "still_player_steps": 143,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 143
+  },
+  "FCP": {
+   "steps": 45,
+   "whole_frozen": 2,
+   "player_steps": 450,
+   "still_player_steps": 236,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 0
+  },
+  "SIDE_INBOUND": {
+   "steps": 75,
+   "whole_frozen": 50,
+   "player_steps": 750,
+   "still_player_steps": 501,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 501
+  },
+  "DREB": {
+   "steps": 48,
+   "whole_frozen": 0,
+   "player_steps": 480,
+   "still_player_steps": 34,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 0
+  },
+  "FREE_THROW": {
+   "steps": 34,
+   "whole_frozen": 28,
+   "player_steps": 340,
+   "still_player_steps": 291,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 291
+  },
+  "HCT": {
+   "steps": 18,
+   "whole_frozen": 2,
+   "player_steps": 180,
+   "still_player_steps": 48,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 31
+  },
+  "OREB": {
+   "steps": 26,
+   "whole_frozen": 17,
+   "player_steps": 260,
+   "still_player_steps": 175,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 0
+  },
+  "FAST_BREAK": {
+   "steps": 2,
+   "whole_frozen": 0,
+   "player_steps": 20,
+   "still_player_steps": 5,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 0
+  }
+ },
+ "still_hist": {
+  "1": 324,
+  "7": 151,
+  "9": 121,
+  "2": 202,
+  "3": 82,
+  "10": 292,
+  "0": 246,
+  "8": 125,
+  "5": 67,
+  "6": 96,
+  "4": 37,
+  "18": 2,
+  "20": 2,
+  "14": 2
+ }
+}

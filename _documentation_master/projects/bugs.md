@@ -34,6 +34,32 @@
 2. Dashboard
 
 
+##Full Product Perfection
+1. Training Camp News Report
+102. Team court images
+108. Message board
+113. Bring logic to screens
+114. Better individual player defense stat tracking
+116. User account -- link X & Facebook?
+127. Get Aggressive / Get Conservative settings and Playcall Center buttons
+128. Add a badass design appraoch to New Stories
+131. Centralized Turn Transition Helper / System
+137. Watermark free version of player headshots
+139. Mod system for uploading custom leagues
+140. Better logic and impact to player EM
+142. Logic and impact for play scores
+143. Nail player plumbing for Mod Teams
+144. Nail mod team balance, league-wide
+
+199. Mobile
+200. PvP live
+
+##Continuous Evolution (base is built)
+1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
+2. Advanced Topics tutorials
+5. Players as Characters
+
+
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 2. Still missing EOQ perfection
@@ -793,32 +819,6 @@
      `api.py:3905/3908` restore path is entirely outside this control. It stays ASSUMED.
    - So: the first-HCO-of-a-fresh-game concern is now measured and clean; the reload concern is not,
      and a green run must not be read as covering it.
-
-
-##Full Product Perfection
-1. Training Camp News Report
-102. Team court images
-108. Message board
-113. Bring logic to screens
-114. Better individual player defense stat tracking
-116. User account -- link X & Facebook?
-127. Get Aggressive / Get Conservative settings and Playcall Center buttons
-128. Add a badass design appraoch to New Stories
-131. Centralized Turn Transition Helper / System
-137. Watermark free version of player headshots
-139. Mod system for uploading custom leagues
-140. Better logic and impact to player EM
-142. Logic and impact for play scores
-143. Nail player plumbing for Mod Teams
-144. Nail mod team balance, league-wide
-
-199. Mobile
-200. PvP live
-
-##Continuous Evolution (base is built)
-1. In-Game SFX: Deny, Picked Up His Dribble, No Good/Missed
-2. Advanced Topics tutorials
-5. Players as Characters
 
 
 <!--

@@ -1,0 +1,12 @@
+{
+ "seed": 6,
+ "c": {
+  "stamps": 5037,
+  "on_still": 5037,
+  "still_pairs": 3900,
+  "still_pairs_hash": 3900,
+  "flicker_hash": 564,
+  "flicker": 304
+ },
+ "over_cap_examples": []
+}
