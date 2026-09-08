@@ -1571,10 +1571,7 @@ class GameManager:
                         oreb_turn["next_play_type"] = "DREB"
                         oreb_turn["next_turn"] = "DREB"
                         if oreb_turn.get("terminal_dreb_eoq"):
-                            from BackEnd.utils.eoq_clock_progression import finalize_terminal_dreb_turn
-
                             dreb_turn["terminal_dreb_eoq"] = True
-                            finalize_terminal_dreb_turn(self, dreb_turn)
                         elif oreb_turn.get("flss_after_dreb"):
                             dreb_turn["late_clock_eoq"] = bool(oreb_turn.get("late_clock_eoq"))
                             dreb_turn["flss_after_dreb"] = True
@@ -1708,10 +1705,7 @@ class GameManager:
                 result["next_turn"] = "DREB"
                 if dreb_turn.get("result_type") != "FOUL":
                     if result.get("terminal_dreb_eoq"):
-                        from BackEnd.utils.eoq_clock_progression import finalize_terminal_dreb_turn
-
                         dreb_turn["terminal_dreb_eoq"] = True
-                        finalize_terminal_dreb_turn(self, dreb_turn)
                         try:
                             from BackEnd.engine.eoq_debug_log import log_eoq_turn
 

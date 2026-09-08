@@ -306,36 +306,54 @@
       alone. The bug is that the client has no bounded outcome and the request carries work it should
       not; a friendlier wait screen leaves both intact.
 
-10. OPEN — the quarter-end clock drain never reaches the rebound family (traced 2026-09-07)
+10. RESOLVED 2026-09-08 — a terminal turn reports ONE clock through FIVE fields, and the renderer
+    read a stale one. ⚠️ THE ORIGINAL DIAGNOSIS IN THIS ENTRY WAS WRONG; retraction below.
    - Symptom, as reported: the game clock "stops early — freezes with time still on it", at some
-     quarter boundaries but not others.
-   - MEASURED, 16 seeded games, 64 quarter boundaries, played arm: **11/64 = 17.2% of boundaries end
-     with clock unconsumed.** Entirely the rebound family:
-     DREB `0:01` in 7 of 9 · PUTBACK_MISS `0:01` and `0:02` (2 of 2) · PUTBACK_MAKE `0:02` (1 of 1).
-     Quarters ending on MISS (29), MAKE (3), BASELINE_INBOUND (5), FREE_THROW (2), HCO, FOUL all end
-     at `0:00`.
-   - ROOT CAUSE IS CALL-SITE COVERAGE. `ensure_quarter_end_clock_drain`
-     (`BackEnd/utils/eoq_clock_progression.py:456`) exists to force the residual clock onto the turn.
-     Over 1,723 observed calls it is **never invoked with a DREB result — zero times** — nor with
-     PUTBACK_MAKE or PUTBACK_MISS. And `finalize_terminal_dreb_turn`, whose entire job is to drain a
-     terminal defensive rebound, **fired 0 times across 3 games that each contain DREB-terminated
-     quarters.** The drain is effectively dead code on this path.
-   - The second chance also fails, by design-as-written: `normalize_quarter_end_after_clock_update`
-     IS called (384 times for DREB) but returns early at `:504` while `time_remaining > 0`, which is
-     exactly the condition being complained about. It bailed on 2,491 of 2,529 calls.
-   - REJECTED EXPLANATION, recorded because it would have looked like a fix. A module audit proposed
-     the cause was `DREB` being absent from the drain's terminal predicate:
-     `{"MAKE","MISS","BLOCK","PUTBACK_MAKE","PUTBACK_MISS","RUN_OUT_CLOCK"}` (`:466`). That set
-     membership is real, and adding `DREB` to it is the obvious one-line change — but it is NOT the
-     cause and would not fix this. PUTBACK_MAKE and PUTBACK_MISS are ALREADY in the set and still
-     leave residue, because they never reach the predicate either. Editing the set would change
-     nothing and would close this entry falsely. Fix the call sites.
-   - Contributing, not causal: a terminal DREB burns a minimum of 1 second regardless of clock
-     remaining (`game_manager.py:1200`, `int(round(t)) if t >= 1 else 1`), and the post-DREB FLSS
-     threshold routes to terminal rather than a final shot at `time_remaining <= 2`
-     (`POST_DREB_FLSS_MIN_CLOCK = 2`, `:20`/`:171`). Together these set up the 1-2 second window the
-     missing drain then fails to clear.
-   - NOT FIXED. Correctness change at a quarter boundary; wants its own scoped increment.
+     quarter boundaries but not others. **The symptom was real.** The mechanism logged for it was not.
+   - ⚠️ RETRACTION OF THE 2026-09-07 MEASUREMENT. This entry claimed "11/64 = 17.2% of boundaries end
+     with clock unconsumed" and blamed call-site coverage of `ensure_quarter_end_clock_drain`. Both
+     are false, and the error was in the PROBE, not the game. The residue detector computed
+     `rec.get("clock_end") or rec.get("clock")`. At a drained boundary `clock_end` is the integer
+     `0` — falsy in Python — so the expression silently fell through to the pre-turn `clock` STRING
+     and reported "0:01" as residue. Re-measured without the falsiness bug, 8 games / 32 boundaries:
+     `clock_end == 0` on **32/32**, and `game_state["time_remaining"] == 0` on every one of them.
+     **The clock is fully consumed.** The same read error produced item 13 (now retracted) and
+     inflated item 11. See item 16 for the practice lesson.
+   - ACTUAL ROOT CAUSE. One fact — how much clock is left after this turn — is reported through five
+     fields: `clock_start`, `time_elapsed`, `clock_end`, `time_remaining`, `clock`. Both terminal
+     authors set `clock_end = 0` and left `time_remaining` and `clock` holding their PRE-turn values.
+     The renderer resolves the clock as `time_remaining` → `clock`/`game_clock` → `clock_end`
+     (`gameScene.js:2671-2677`), so it read the stale field first and never consulted the correct
+     one. Measured: **8 of 32 boundaries (25%) displayed a non-zero clock at the buzzer** — 6 DREB,
+     1 PUTBACK_MAKE, 1 PUTBACK_MISS, showing 0:01 or 0:02 while the authoritative clock was 0.
+   - Found by catching the WRITE rather than reading: a tracing `dict` subclass caught
+     `quarter_ends_after = True` being stamped at `eoq_clock_progression.py:530` from
+     `_finalize_synthesized_clock_turn`, 6/6 for DREB, with `time_remaining` never touched.
+   - FIX: a single author, `stamp_terminal_clock`, writes the whole reported field-set; both terminal
+     functions call it. Guarded by `tests/test_terminal_clock_contract.py`.
+   - ACCEPTANCE: FE-visible non-zero boundaries **8/32 → 0/32**. Turn counts were a GATE, not a
+     report — the fix changes no elapsed time, so every seed had to be unchanged, and all 8 were
+     (353/366/378/384/332/373/340/370, identical before and after).
+   - THE CALL-SITE THEORY WAS ALSO WRONG, recorded because it survived a design review. The asymmetry
+     it rests on is REAL: DREB, PUTBACK_MISS and PUTBACK_MAKE reach `run_micro_turn` (which drains)
+     **zero times each**, going instead through `_finalize_synthesized_clock_turn` (390/36/30), which
+     does not drain. But adding the drain there would have changed nothing: **0 of 812 synthesized
+     turns arrive with clock > 0 and no continuation**, and `quarter_ends_after` is False on all 812
+     at that moment, so the predicate would evaluate False every time. The originally "rejected
+     explanation" (add DREB to the terminal set) and its replacement (fix the call sites) were BOTH
+     no-ops. The clock was never the thing that was broken.
+   - `finalize_terminal_dreb_turn` DELETED along with its two gated call sites
+     (`game_manager.py:1574-1577`, `:1711-1714`). It fired 0 times across 8 games and would have been
+     inert if wired, for the predicate reason above — dead code shaped like a safety net.
+   - The `if time_remaining > 0: return` guard in `normalize_quarter_end_after_clock_update` is
+     CORRECT and was never the failure — it is the part that WORKS. It passed on exactly the 8
+     affected boundaries (entered at 0, proceeded, stamped terminal) and bailed 384/390 times for
+     DREB when the clock genuinely had time left. Inverting it would strip continuations from every
+     mid-quarter turn. Pinned by `test_normalize_returns_early_while_the_clock_still_runs`.
+   - Still true and still not causal: a terminal DREB burns a minimum of 1 second regardless of clock
+     remaining (`game_manager.py:1200`), and `POST_DREB_FLSS_MIN_CLOCK = 2` routes to terminal rather
+     than a final shot at `time_remaining <= 2`. Together they create the 1-2 second window — which
+     the clock then correctly consumes, and only the payload misreported.
 
 11. OPEN — shot turns at a quarter boundary that emit NO animation payload of either kind
     (traced 2026-09-07)
@@ -384,20 +402,16 @@
      chain is mid-flight — losing the whole chain state — not on every quarter.
    - NOT FIXED. Note it is latent: nothing observed has been attributed to it.
 
-13. OPEN, n=1, UNEXPLAINED — a single RUN_OUT_CLOCK quarter ended with `0:14` remaining
-   - One boundary out of 64 (seed 8004, Q4). Recorded deliberately as a single instance with no
-     mechanism, so it is neither forgotten nor over-read.
-   - It does not fit item 10: RUN_OUT_CLOCK IS in the drain's terminal set, the drain DOES fire for
-     it (5 terminal RUN_OUT_CLOCK calls observed), and `build_run_out_clock_result`
-     (`eoq_perfection.py:182-198`) sets `time_elapsed` to the FULL remaining clock. The other 10
-     RUN_OUT_CLOCK boundaries all ended at `0:00`.
-   - Candidates, none tested: the OREB run-out path (`turn_manager.py:5190-5224`) returns through
-     `game_manager._finalize_synthesized_clock_turn`, which does not call the drain; or
-     `time_elapsed` was not 14 at clock-update time; or `build_clock_expired_result` was conflated
-     with the run-out builder. All three are guesses.
-   - 14 seconds of game time with no animation emitted (RUN_OUT_CLOCK emits nothing, 11/11 — that
-     part is by design) would present as a hang or a skip. Worth one reproduction attempt before
-     theorising further.
+13. ⚠️ RETRACTED 2026-09-08 — the "0:14 RUN_OUT_CLOCK residue" was never real
+   - This entry recorded a single RUN_OUT_CLOCK quarter ending with `0:14` on the clock, deliberately
+     flagged as n=1 and unexplained. It was the SAME probe falsiness bug as item 10: the detector
+     read `clock_end or clock`, and with `clock_end == 0` being falsy it fell through and reported
+     `clock_start` as residue.
+   - Re-measured: that turn consumed all 14 seconds — `clock_start = 14`, `time_elapsed = 14`,
+     `clock_end = 0`, `time_remaining = 0`, `clock = "0:00"`. Every RUN_OUT_CLOCK boundary in the
+     sample is clean, and the builder does exactly what the entry said it should.
+   - The three untested candidates listed here were explanations for a phenomenon that did not occur.
+     No fix was needed and none was made. Nothing to chase.
 
 14. RULED OUT 2026-09-07 — two EOQ hypotheses killed by measurement; do not re-derive them
    - Recorded because both are re-derivable from reading the code and both look right on paper. The
@@ -419,6 +433,46 @@
    - Also rejected in the same trace, with its own reasoning: the drain's terminal predicate as the
      cause of item 10 (see item 10 — it would have looked like a fix).
 
+15. OPEN, LARGER THAN WHAT WAS FIXED — `time_remaining` disagrees with `clock_end` on 17.4% of
+    MID-QUARTER turns (measured 2026-09-08)
+   - The terminal case is fixed in item 10. The general case is not, and it is bigger:
+     **`time_remaining != clock_end` on 497 of 2,864 non-boundary turns (17.4%)**, versus 8 of 32
+     boundary turns before the fix.
+   - Same shape as item 10 — one fact, five fields, and a renderer that resolves
+     `time_remaining` → `clock` → `clock_end` (`gameScene.js:2671-2677`), so it reads the field
+     most likely to be stale.
+   - The ONLY reason this is invisible mid-quarter is that the next turn's payload overwrites it a
+     moment later. At a boundary there is no next turn, which is why the terminal case was the one
+     anybody noticed. That makes this latent, not benign: any consumer that reads a single turn in
+     isolation — a replay, an export, a paused frame, a resumed game — gets the wrong clock.
+   - DELIBERATELY OUT OF SCOPE for the item 10 increment, on the reasoning that fixing it moves the
+     displayed clock on roughly one turn in six across the whole game, which is a balance-visible
+     change that wants its own before/after. `tests/test_terminal_clock_contract.py` is scoped to
+     terminal turns for the same reason and would fail the tree today if widened.
+   - Owner of the general path is `turn_manager._attach_clock_contract` (`:205`), the only other
+     writer of `clock_end` in `BackEnd/`.
+
+16. PRACTICE, not a code defect — the controls have caught more than the measurements have
+    (recorded 2026-09-08)
+   - A single `or` falsiness bug in throwaway probe code produced **three wrong bugs.md entries**:
+     item 10's entire root-cause diagnosis, item 13 in full, and an inflated population for item 11.
+     The expression was `rec.get("clock_end") or rec.get("clock")`; `clock_end` is the integer `0`
+     at exactly the moment of interest, which is falsy, so it read a different field and every
+     downstream conclusion followed honestly from a bad number.
+   - This matters more here than it would elsewhere, because in this project essentially every
+     decision is justified by measurement. The measurements are written fast, once, by the same
+     person who wants a particular answer, and they are not themselves tested. The controls —
+     poisons, counterfactuals, anti-vacuity checks, independence gates — have now caught more real
+     errors than the measurements they police, including this one and the item 6 coordinate result.
+   - Cheap habits that would have caught it, in order of value: (1) assert the falsy-but-valid case
+     explicitly — `x is None` rather than `or`; (2) sanity-check a probe against a second field that
+     must agree; (3) before believing a headline number, poison the code path it measures and
+     confirm the number MOVES. The third is already policy for fixes (SPC principle 8) and should
+     apply to diagnoses too, which is the actual gap.
+   - Related: item 6 (the suite has no assertion on resolved coordinate values). Confirmed again for
+     the clock dimension on 2026-09-08 — with the new guard excluded, reverting the terminal clock
+     fix produces **zero** new test failures, and re-stranding the FLSS skeleton also produces
+     **zero**. An empty baseline delta remains evidence of nothing.
 
 ##Full Product Perfection
 1. Training Camp News Report
