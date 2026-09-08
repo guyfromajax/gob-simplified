@@ -107,6 +107,38 @@ const defaults = {
     minBpm: 75,
     maxBpm: 750,
   },
+  // Continuity-aware movement curves (defect 1). The backend stamps an INTENT per player per
+  // step — ease_in / ease_out / ease_in_out — in step.start.movement_curve, and this table is
+  // the only place those names become Phaser curves. A player with no entry renders linear,
+  // which is deliberate: mid-journey steps MUST stay linear or a multi-step crossing pulses
+  // once per step, which is worse than the constant velocity we have now.
+  //
+  // FOR JAMIE — three knobs, and the point is to see the extremes in one sitting:
+  //   1. departureEasing false vs true. False is the doc's "arrival only" rule: players snap
+  //      to full speed from a dead stop but decelerate into their destination. True also eases
+  //      them up from rest. 23.1% of moving steps are departures, so this is a visible amount
+  //      of the game, not a detail.
+  //   2. strength. 'subtle' / 'standard' / 'assertive' below. Standard ships. Look at all
+  //      three — this codebase's repeated failure has been TOO SUBTLE (the 1-inch heartbeat
+  //      was invisible), so if standard reads as nothing the answer is assertive, not "easing
+  //      does not work".
+  //   3. enabled false restores linear everywhere for an A/B against today's build.
+  movementCurve: {
+    enabled: true,
+    // false => option (a) in the brief: ease_in becomes linear and ease_in_out becomes a pure
+    // arrival curve, so only decelerations are eased.
+    departureEasing: true,
+    strength: 'standard',
+    strengths: {
+      // Sine is the gentlest curve that is still a curve.
+      subtle: { ease_in: 'Sine.easeIn', ease_out: 'Sine.easeOut', ease_in_out: 'Sine.easeInOut' },
+      // Quad reads as a person starting and stopping rather than a sprite being interpolated.
+      standard: { ease_in: 'Quad.easeIn', ease_out: 'Quad.easeOut', ease_in_out: 'Quad.easeInOut' },
+      // Cubic is a hard plant. Likely too much for a drift, possibly right for a sprint.
+      assertive: { ease_in: 'Cubic.easeIn', ease_out: 'Cubic.easeOut', ease_in_out: 'Cubic.easeInOut' },
+    },
+    linear: 'Linear',
+  },
   // Flourishes: in-place "micro-movements" rendered in RENDER SPACE only (like
   // the heartbeat — never mutates gameplay x/y). Per-kind defaults used when the
   // backend Flourish payload omits a field. See flourishes.js + animationStepSchema.js.
@@ -228,6 +260,14 @@ export const animationConfig = {
   inbound: { ...defaults.inbound, ...(overrides.inbound || {}) },
   shot: { ...defaults.shot, ...(overrides.shot || {}) },
   kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
+  movementCurve: {
+    ...defaults.movementCurve,
+    ...(overrides.movementCurve || {}),
+    strengths: {
+      ...defaults.movementCurve.strengths,
+      ...(overrides.movementCurve?.strengths || {}),
+    },
+  },
   steal: { ...defaults.steal, ...(overrides.steal || {}) },
   rebound: {
     bounceArea: {
@@ -290,5 +330,30 @@ animationConfig.outletSetup = {
   easing:
     overrides.outletSetup?.easing ?? animationConfig.pass.easing,
 };
+
+/**
+ * Map a backend movement-curve INTENT to a Phaser easing string.
+ *
+ * The backend stamps only the three eased cases; anything else — mid-journey, standing still,
+ * an unrecognised name from a future backend — resolves to linear. Defaulting to linear rather
+ * than to a curve is the safe direction: an unstamped mid-journey step that accidentally eased
+ * would reintroduce the per-step pulsing this whole mechanism exists to avoid.
+ *
+ * @param {string|null|undefined} intent 'ease_in' | 'ease_out' | 'ease_in_out'
+ * @returns {string} a Phaser ease name
+ */
+export function resolveMovementCurve(intent) {
+  const cfg = animationConfig.movementCurve || {};
+  const linear = cfg.linear || 'Linear';
+  if (!cfg.enabled || !intent) return linear;
+  const table = (cfg.strengths || {})[cfg.strength] || {};
+  if (cfg.departureEasing === false) {
+    // Option (a): decelerations only. A pure departure has nothing to ease, and a one-step
+    // journey keeps its arrival half.
+    if (intent === 'ease_in') return linear;
+    if (intent === 'ease_in_out') return table.ease_out || linear;
+  }
+  return table[intent] || linear;
+}
 
 export default animationConfig;

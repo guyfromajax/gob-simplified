@@ -34,6 +34,7 @@ import {
   recordArrivalTails,
   recordAnnouncementFreeze,
 } from "./deadAirLedger.js";
+import { resolveMovementCurve } from "./animation_config.js";
 import { BALL_ATTACH_OFFSET } from "../setup/markerConfig.js";
 import { attachBallToPlayer } from "./ballManager.js";
 // IMPORTANT: import `detachBall` from BallControllerAdapter — not from
@@ -886,7 +887,7 @@ function enrichStepAnnouncementPlayerData(scene, playerData, sprites = null) {
   };
 }
 
-function startSchemaPlayerTween(scene, sprite, endCoord, durationMs, width, height) {
+function startSchemaPlayerTween(scene, sprite, endCoord, durationMs, width, height, curveIntent) {
   if (!scene || !sprite || !endCoord) {
     return Promise.resolve();
   }
@@ -904,7 +905,10 @@ function startSchemaPlayerTween(scene, sprite, endCoord, durationMs, width, heig
       x: endPx.x,
       y: endPx.y,
       duration: Math.max(50, Math.round(durationMs)),
-      ease: "Linear",
+      // Continuity-aware easing (defect 1). The backend decided whether this step is a
+      // departure, an arrival, a whole journey or mid-flight; unstamped resolves to linear,
+      // which is what mid-journey steps must stay so a multi-step crossing does not pulse.
+      ease: resolveMovementCurve(curveIntent),
       onComplete: resolve,
       onStop: resolve,
     });
@@ -1326,7 +1330,10 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
         startSchemaPlayerTween,
         Array.isArray(pathKnots) ? pathKnots[0] : null,
       )
-      : startSchemaPlayerTween(scene, sprite, endCoord, playerDurationMs, width, height);
+      : startSchemaPlayerTween(
+        scene, sprite, endCoord, playerDurationMs, width, height,
+        step.start?.movement_curve?.[playerId],
+      );
     activeStepTweenSprites.push(sprite);
     stepMoverDurations.push({
       playerId,
