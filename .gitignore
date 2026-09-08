@@ -41,6 +41,8 @@ tmp/
 
 # Measurement/probe scratch scripts. They stay ON DISK so censuses and probes remain
 # reproducible, but they are not source and must stop riding along in unrelated commits.
-# NOTE: .gitignore does not affect ALREADY-TRACKED files. 34 older scratch_* files
-# (plus scratch_*_results.json) remain tracked and are unaffected by this rule.
-scratch_*.py
+# Widened from `scratch_*.py` to `scratch_*`: the .mjs frontend probes were still being
+# picked up, and so were the *_results.json captures.
+# NOTE: .gitignore does not affect ALREADY-TRACKED files, so the previously committed
+# scratch_* files are untracked in the same commit that widens this rule.
+scratch_*
