@@ -231,6 +231,98 @@ def stamp_idle_wander_on_still_players(
     return written
 
 
+# --- Continuity-aware movement curves (defect 1) -------------------------------------------
+#
+# Easing a player tween per STEP is worse than linear. A player crossing the floor over four
+# steps toward one destination would decelerate and re-accelerate at every boundary — four
+# pulses instead of one movement. Measured on the played arm, 28.9% of moving player-steps are
+# mid-journey and 48.2% of journeys span more than one step, so that is not a corner case.
+#
+# So the curve is a property of the JOURNEY, not the step, and the only fact needed to pick it
+# is whether the player was moving in the neighbouring steps. The backend authors that fact —
+# it holds the whole step list at emit time — and stamps an INTENT name. The frontend maps the
+# name to a Phaser curve via animation_config.js. Deliberately not a Phaser easing string here:
+# the backend should not know what a renderer calls its curves, and Jamie retunes the mapping
+# without a backend round-trip.
+#
+# Linear is the default and is NOT stamped. A step with no entry renders linear, so mid-journey
+# and still players cost nothing in payload — only the three eased cases are written.
+MOVEMENT_CURVE_KEY = "movement_curve"
+MOVEMENT_CURVE_DEPART = "ease_in"       # leaves rest, keeps going next step
+MOVEMENT_CURVE_ARRIVE = "ease_out"      # was moving, comes to rest after this step
+MOVEMENT_CURVE_SINGLE = "ease_in_out"   # the whole journey is this one step
+
+
+def _curve_moves(step: Any, pid: str) -> bool:
+    """Does this player move on this step? The defect-4 stillness test, inverted.
+
+    Reuses ``_idle_is_still`` rather than restating the comparison. Five instruments in this
+    workstream have been wrong; this one is shipped and has a poisoned guard over it.
+    """
+    if not isinstance(step, dict):
+        return False
+    start = ((step.get("start") or {}).get("coords") or {}).get(pid)
+    end = ((step.get("end") or {}).get("coords") or {}).get(pid)
+    if not isinstance(start, dict) or not isinstance(end, dict):
+        return False
+    return not _idle_is_still(start, end)
+
+
+def stamp_movement_curves(steps: Optional[List[Dict[str, Any]]]) -> int:
+    """Stamp a per-player movement-curve intent on ``steps``. Returns entries written.
+
+    Writes ``step["start"]["movement_curve"][player_id]`` for the three eased cases only.
+
+    A neighbour that is missing — the first or last step of the turn, or a player absent from
+    the adjacent step's coord map — counts as REST. The emitted payload does not show the
+    journey continuing, and assuming continuation across a boundary we cannot see is the
+    mistake that made CONTINUE_FROM_PREVIOUS unshippable. A player who really does carry on
+    into the next turn gets one extra deceleration at the seam, which is the conservative
+    failure: a stop that should have been smooth, not a pulse that should not exist.
+
+    No duration floor, unlike the idle stamp. The 60ms perceptibility floor exists there
+    because an idle wander ADDS motion that nobody can see; a curve only reshapes motion that
+    is already happening and costs nothing extra to evaluate. Flooring it would make a journey
+    whose last step is short snap to a halt, which is the defect being removed.
+    """
+    if not steps:
+        return 0
+    written = 0
+    n = len(steps)
+    for i, step in enumerate(steps):
+        if not isinstance(step, dict):
+            continue
+        start_block = step.get("start")
+        if not isinstance(start_block, dict):
+            continue
+        coords = start_block.get("coords")
+        if not isinstance(coords, dict):
+            continue
+        prev_step = steps[i - 1] if i > 0 else None
+        next_step = steps[i + 1] if i + 1 < n else None
+        curves: Dict[str, str] = {}
+        for pid in coords:
+            if not _curve_moves(step, pid):
+                continue
+            came_from_rest = not _curve_moves(prev_step, pid)
+            goes_to_rest = not _curve_moves(next_step, pid)
+            if came_from_rest and goes_to_rest:
+                curves[pid] = MOVEMENT_CURVE_SINGLE
+            elif came_from_rest:
+                curves[pid] = MOVEMENT_CURVE_DEPART
+            elif goes_to_rest:
+                curves[pid] = MOVEMENT_CURVE_ARRIVE
+            # else: mid-journey. Left unstamped so it renders linear.
+        if curves:
+            existing = start_block.get(MOVEMENT_CURVE_KEY)
+            if isinstance(existing, dict):
+                existing.update(curves)
+            else:
+                start_block[MOVEMENT_CURVE_KEY] = curves
+            written += len(curves)
+    return written
+
+
 def build_final_coords(game: Any) -> Dict[str, GridCoord]:
     """Snapshot every on-court player's current ``player.coords`` as a flat
     ``{player_id: {x, y}}`` dict. Stamped on each turn_result after

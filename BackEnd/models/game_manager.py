@@ -939,7 +939,15 @@ class GameManager:
                 build_final_coords,
                 build_final_ball_handler_id,
                 build_final_ball_coords,
+                stamp_movement_curves,
             )
+            # Continuity-aware easing (defect 1). Stamped HERE rather than in each emitter
+            # because the curve depends on the NEXT step, so it needs the finished list — and
+            # because there are 20+ sites that assign `animation_steps`, which is 20 chances to
+            # miss one. Additive render-space intent: no coords move, no steps are added or
+            # removed, no RNG is touched, so the seeded exact-diff stays byte-identical apart
+            # from the new key.
+            stamp_movement_curves(turn_result.get("animation_steps"))
             turn_result["final_coords"] = build_final_coords(self)
             turn_result["final_ball_handler_id"] = build_final_ball_handler_id(turn_result)
             # UESS §8.4 invariant 4 (HCO_UESS_Audit.md Task 3b): the ball's true
