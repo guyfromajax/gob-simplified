@@ -52,6 +52,7 @@ from BackEnd.utils.animation_step_helpers import (
     shot_launch_sfx,
     shot_result_sfx,
     stamp_hot_shot_trail_metadata,
+    stamp_idle_wander_on_still_players,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -2686,22 +2687,16 @@ def build_skeleton_animation_steps(
             # ``idle_wander`` assignments (cosmetic; fills the frozen tail of the 2-4s beat).
             # Stamp them as flourishes (FE spans each to the step's own duration). Render-only,
             # never mutates gameplay coords (UESS-safe); does not clobber a reach_in.
+            # AIM, not amplitude, was the defect: measured on the played arm, 73.4% of these
+            # stamps landed on a player who was MOVING that step, where 5-9 inches of drift
+            # against 10-20 feet of travel is a 3-5% path deviation and invisible. So the rolled
+            # params are stashed rather than stamped, and the post-pass below decides who gets
+            # one based on whether the player is actually still. The ROLL itself is untouched —
+            # it seeds from sim_rng (phase_resolution.py:4811), so narrowing it would move the
+            # draw count. Filtering what gets stamped from an unchanged roll is draw-neutral.
             idle_motion = ((skeleton_steps[i] or {}).get("_subtle_movement") or {}).get("idle_motion") or {}
             if idle_motion:
-                flourish_map = step.setdefault("start", {}).setdefault("flourish", {})
-                for _pid, _params in idle_motion.items():
-                    if _pid in flourish_map:
-                        continue
-                    flourish_map[_pid] = {
-                        "kind": "idle_wander",
-                        "style": _params.get("style", "wander"),
-                        "seed": int(_params.get("seed", 0)),
-                        "dir_x": float(_params.get("dir_x", 0.0)),
-                        "dir_y": float(_params.get("dir_y", 1.0)),
-                        "amplitude_grid": float(
-                            _params.get("amplitude_grid", _params.get("radius_grid", 1.0))
-                        ),
-                    }
+                step["_idle_rolled"] = idle_motion
         stamp_tween_durations(
             step["start"], final_end_coords, t, off_lineup, def_lineup,
         )
@@ -2800,6 +2795,13 @@ def build_skeleton_animation_steps(
                     "FLSS" if turn_result.get("flss") else "FINAL_TURN",
                     _prior_fbc, _s0_ball_pos, _seam_gap,
                 )
+
+    # Idle wander, aimed at STILL players. Runs last, over the fully assembled list, because
+    # stillness compares start.coords to end.coords and the end coords are not settled until the
+    # post-shot sub-steps and overlays above have run. Also pops the `_idle_rolled` stash so it
+    # never reaches the payload. HCO carries 82% of all still player-steps in the game, so this
+    # is where the defect actually lives; DEAD BALL turns resolve through here too.
+    stamp_idle_wander_on_still_players(steps, family="hco_still")
 
     return steps
 

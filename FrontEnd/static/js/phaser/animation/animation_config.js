@@ -147,6 +147,27 @@ const defaults = {
     idleWander: {
       radiusGrid: 1.0, // Max render-space drift radius (grid units); no gameplay coord change
       durationMs: 900, // Fallback when the backend omits a per-beat duration
+      // PER-FAMILY IDLE KNOBS. The backend stamps a `family` on every idle_wander flourish and
+      // the raw per-style amplitude; these dial it by eye without a backend round-trip.
+      //
+      // One grid unit is almost exactly one foot (the 100x50 grid maps to a 94ft x 50ft court),
+      // so amplitudes are readable as real distances. Raw style amplitudes are jockey 0.6ft,
+      // shuffle 1.0ft, jab 1.2ft, survey_rock 0.5ft — sized for players already travelling.
+      //
+      //   amplitudeScale  multiplies the backend amplitude. 0.6 = the -40% ship default for
+      //                   still players, 1.0 = no reduction, 0.3 = -70%. Worth looking at all
+      //                   three: the always-on heartbeat is ~1 inch and is invisible, so TOO
+      //                   SUBTLE is the failure mode this codebase already has. If -40% reads
+      //                   as nothing on screen the answer is to go up, not to conclude the
+      //                   mechanism is broken.
+      //   style           forces a style; null keeps the backend's pick (geography-aware on
+      //                   HCO, a family default elsewhere). One of jockey | jab | shuffle |
+      //                   survey_rock.
+      byFamily: {
+        // Half-court offense between beats. Keeps the geography-aware style the resolver
+        // rolled — an inside player jockeys, a perimeter defender shuffles.
+        hco_still: { amplitudeScale: 0.6, style: null },
+      },
     },
   },
   dunk: {
@@ -205,7 +226,17 @@ export const animationConfig = {
     gather: { ...defaults.flourish.gather, ...(overrides.flourish?.gather || {}) },
     fumble: { ...defaults.flourish.fumble, ...(overrides.flourish?.fumble || {}) },
     hack: { ...defaults.flourish.hack, ...(overrides.flourish?.hack || {}) },
-    idleWander: { ...defaults.flourish.idleWander, ...(overrides.flourish?.idleWander || {}) },
+    idleWander: {
+      ...defaults.flourish.idleWander,
+      ...(overrides.flourish?.idleWander || {}),
+      // Merged per family, so overriding one family's amplitudeScale doesn't drop the rest.
+      byFamily: Object.fromEntries(
+        Object.entries(defaults.flourish.idleWander.byFamily).map(([family, famDefaults]) => [
+          family,
+          { ...famDefaults, ...(overrides.flourish?.idleWander?.byFamily?.[family] || {}) },
+        ]),
+      ),
+    },
   },
   dunk: { ...defaults.dunk, ...(overrides.dunk || {}) },
   possession: {

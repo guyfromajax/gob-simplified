@@ -55,6 +55,182 @@ def stamp_foul_contact_rattle(
         pass
 
 
+# --- Idle wander on STILL players ------------------------------------------
+# Measured on the played arm, 8 games: 45.6% of player-steps are STILL (start coords == end
+# coords), against the 16.3% whole-step freeze rate Defect 4 was framed around. The whole-step
+# framing counted a step where three players move and seven stand around as "not frozen"; the eye
+# sees seven dead players. This is the writer that puts a render-space idle on those players.
+#
+# It runs as a POST-PASS over a fully assembled step list, not inside an emitter's build loop,
+# because stillness is a property of `start.coords` vs `end.coords` and the end coords are not
+# settled until post-shot sub-steps and overlays have been applied.
+#
+# UESS-safe: only ever writes `step.start.flourish`. Never touches coords, step count, or
+# sim_rng — every random-looking value here is a crc32 of the player id, so the draw stream is
+# untouched and the emitted-step diff can carry nothing but `flourish`.
+IDLE_STILL_MIN_STEP_MS = 60.0          # deadAirLedger.js:87 MIN_RECORDED_MS — below this nobody
+                                       # perceives motion, so a still player needs no idle.
+IDLE_STILL_DENSITY_CAP = 6             # Max players given an idle on one step, of ten.
+# NOTE ON AMPLITUDE. This writer stamps the style's UNSCALED amplitude. The reduction for still
+# players (ship default -40%) lives in animation_config.js `flourish.idleWander.byFamily[*]
+# .amplitudeScale`, deliberately, so the number a human turns is the number he is thinking about
+# rather than a multiplier on a multiplier. Do not add a second scale here.
+IDLE_CLOCK_MS_PER_GAME_SEC = 350.0     # mirrors FE gameClock.tickMs default
+IDLE_STILL_DEFAULT_STYLE = "survey_rock"
+
+
+def _idle_crc(*parts: Any) -> int:
+    """Stable non-sim_rng integer from arbitrary parts. crc32, NOT ``hash()`` — Python's hash is
+    salted per process unless PYTHONHASHSEED is pinned, and this has to reproduce in production."""
+    import zlib
+
+    return zlib.crc32("|".join(str(p) for p in parts).encode()) & 0x7FFFFFFF
+
+
+def idle_step_duration_ms(step: Optional[Dict[str, Any]]) -> float:
+    """Wall-clock duration of a step, resolved the way the FE resolves it: an explicit
+    ``advance_trigger.metadata.wall_clock_hold_ms`` wins, else the clock burn scaled by
+    ms-per-game-second."""
+    if not isinstance(step, dict):
+        return 0.0
+    meta = ((step.get("start") or {}).get("advance_trigger") or {}).get("metadata") or {}
+    hold = meta.get("wall_clock_hold_ms")
+    if isinstance(hold, (int, float)) and hold > 0:
+        return float(hold)
+    try:
+        return float((step.get("end") or {}).get("time_elapsed")) * IDLE_CLOCK_MS_PER_GAME_SEC
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _idle_is_still(a: Any, b: Any) -> bool:
+    if not isinstance(a, dict) or not isinstance(b, dict):
+        return False
+    try:
+        return abs(float(b["x"]) - float(a["x"])) < 1e-6 and abs(float(b["y"]) - float(a["y"])) < 1e-6
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def stamp_idle_wander_on_still_players(
+    steps: Optional[List[Dict[str, Any]]],
+    *,
+    family: str,
+    exclude=(),
+    on_court=None,
+    only_step_kinds=None,
+    cap: int = IDLE_STILL_DENSITY_CAP,
+    min_step_ms: float = IDLE_STILL_MIN_STEP_MS,
+    default_style: str = IDLE_STILL_DEFAULT_STYLE,
+) -> int:
+    """Give every STILL player on ``steps`` a render-space ``idle_wander`` flourish. Returns the
+    number of player-stamps written.
+
+    ``family`` is stamped onto each flourish so ``animation_config.js`` can override style and
+    amplitude per family without a backend round-trip.
+
+    ``exclude`` skips players with a real job (the inbounding passer, the free-throw shooter).
+    ``on_court`` restricts stamping to a known lineup — BASELINE_INBOUND steps carry 16-20 player
+    ids in ``start.coords``, so without this the renderer is handed sprites for players who are
+    not in the game. ``only_step_kinds`` restricts to specific ``advance_trigger.metadata.kind``
+    values (used to hit ``make_hold`` without touching the rest of a MAKE turn).
+
+    SELECTION UNDER THE CAP is ordered by how long the player has been still, then by a crc32 of
+    his player id. Run length first is both better aimed and MORE stable than a plain hash: a
+    selected player's run only ever lengthens, so he keeps his slot for as long as he stands
+    there, and a newly-still player starts at the back and cannot displace him. That avoids the
+    flicker failure — players popping in and out of idling between steps reads as broken in a way
+    that uniform stillness does not.
+    """
+    if not steps:
+        return 0
+    try:
+        from BackEnd.engine.motion_step_decision import SUBTLE_IDLE_STYLE_AMPLITUDE_GRID
+    except Exception:  # pragma: no cover - amplitude table is advisory
+        SUBTLE_IDLE_STYLE_AMPLITUDE_GRID = {}
+
+    excluded = {str(p) for p in (exclude or ()) if p is not None}
+    allowed = {str(p) for p in on_court} if on_court is not None else None
+    kinds = {str(k) for k in only_step_kinds} if only_step_kinds else None
+    still_runs: Dict[str, int] = {}
+    written = 0
+
+    for index, step in enumerate(steps):
+        if not isinstance(step, dict):
+            continue
+        # Params the HCO resolver already rolled for this beat (geography-aware style +
+        # direction). Popped, not read: it must never reach the emitted payload, because the gate
+        # permits `flourish` and nothing else to differ.
+        rolled = step.pop("_idle_rolled", None) or {}
+        start = step.get("start") or {}
+        start_coords = start.get("coords") or {}
+        end_coords = (step.get("end") or {}).get("coords") or {}
+
+        still_now = []
+        for pid, start_coord in start_coords.items():
+            end_coord = end_coords.get(pid)
+            if end_coord is None:
+                continue
+            if _idle_is_still(start_coord, end_coord):
+                key = str(pid)
+                still_runs[key] = still_runs.get(key, 0) + 1
+                still_now.append(key)
+            else:
+                still_runs.pop(str(pid), None)
+
+        if kinds is not None:
+            meta = (start.get("advance_trigger") or {}).get("metadata") or {}
+            if str(meta.get("kind")) not in kinds:
+                continue
+        # A still player in a sub-perceptible step does not need an idle. His run length still
+        # accrues above, so he keeps his priority once a longer step comes along.
+        if idle_step_duration_ms(step) < min_step_ms:
+            continue
+
+        flourish = start.get("flourish") or {}
+        candidates = [
+            pid for pid in still_now
+            if pid not in excluded
+            and pid not in flourish          # never clobber a reach_in / rattle / dunk
+            and (allowed is None or pid in allowed)
+        ]
+        if not candidates:
+            continue
+        candidates.sort(key=lambda pid: (-still_runs.get(pid, 0), _idle_crc(pid)))
+        if cap is not None and cap >= 0:
+            candidates = candidates[:cap]
+
+        target = step.setdefault("start", {}).setdefault("flourish", {})
+        for pid in candidates:
+            params = rolled.get(pid) or {}
+            style = str(params.get("style") or default_style)
+            base_amplitude = params.get("amplitude_grid", params.get("radius_grid"))
+            if not isinstance(base_amplitude, (int, float)):
+                base_amplitude = SUBTLE_IDLE_STYLE_AMPLITUDE_GRID.get(style, 0.8)
+            dir_x, dir_y = params.get("dir_x"), params.get("dir_y")
+            if not isinstance(dir_x, (int, float)) or not isinstance(dir_y, (int, float)):
+                # No rolled direction (the widened families never had one). Derive a stable
+                # per-player bearing from the id so each man sways his own way.
+                angle = (_idle_crc(pid, family, "dir") % 3600) / 3600.0 * 6.283185307
+                import math
+
+                dir_x, dir_y = math.cos(angle), math.sin(angle)
+            target[pid] = {
+                "kind": "idle_wander",
+                "family": family,
+                "style": style,
+                # crc32, not rng.randint: phase_resolution.py:4811 draws its seed from sim_rng,
+                # and any new stamp doing that would consume draws and move the draw count.
+                "seed": _idle_crc(pid, family, index),
+                "dir_x": round(float(dir_x), 3),
+                "dir_y": round(float(dir_y), 3),
+                "amplitude_grid": round(float(base_amplitude), 3),
+            }
+            written += 1
+
+    return written
+
+
 def build_final_coords(game: Any) -> Dict[str, GridCoord]:
     """Snapshot every on-court player's current ``player.coords`` as a flat
     ``{player_id: {x, y}}`` dict. Stamped on each turn_result after

@@ -698,19 +698,26 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
       case "fumble":
         runFumble(scene, sprite, flourish);
         return;
-      case "idle_wander":
+      case "idle_wander": {
         // Rides the heartbeat system (single owner of the sprite's idle offset) so it
         // can never leave a residual "ghost" offset. Spans the step's own wall-clock.
         // Backend assigns a role-based `style` + `dir` by geography; FE renders it in place.
+        // `family` selects Jamie's per-family amplitude/style knobs in animation_config.js —
+        // the backend stamps the raw style amplitude and the scale is applied here.
+        const famCfg =
+          (animationConfig.flourish?.idleWander?.byFamily || {})[flourish.family] || {};
+        const baseRadius = flourish.amplitude_grid ?? flourish.radius_grid;
+        const famScale = Number.isFinite(famCfg.amplitudeScale) ? famCfg.amplitudeScale : 1;
         applyIdleWander(scene, sprite, {
           seed: flourish.seed,
-          style: flourish.style,
+          style: famCfg.style || flourish.style,
           dirX: flourish.dir_x,
           dirY: flourish.dir_y,
-          radiusGrid: flourish.amplitude_grid ?? flourish.radius_grid,
+          radiusGrid: Number.isFinite(baseRadius) ? baseRadius * famScale : baseRadius,
           durationMs: flourish.duration_ms ?? opts.stepDurationMs,
         });
         return;
+      }
       case "shot_dip":
         runRattle(scene, sprite, { ...flourish, cycles: flourish.cycles || 1 });
         return;
