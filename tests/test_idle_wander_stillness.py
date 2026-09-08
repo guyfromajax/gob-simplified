@@ -236,6 +236,7 @@ def test_every_family_has_a_call_site_that_binds_and_carries_its_required_argume
         "make_hold": ("BackEnd/engine/skeleton_step_emitter.py", {"only_step_kinds"}),
         "inbound": ("BackEnd/utils/transition_bridge.py", {"exclude", "on_court"}),
         "free_throw": ("BackEnd/engine/ft_step_emitter.py", {"exclude", "on_court"}),
+        "oreb": ("BackEnd/engine/oreb_step_emitter.py", {"exclude", "on_court"}),
     }
     signature = inspect.signature(stamp_idle_wander_on_still_players)
 
@@ -288,3 +289,143 @@ def test_only_requested_step_kinds_are_touched():
 
     assert _wanderers(hold) == {"s1", "s2"}
     assert _wanderers(flight) == set()
+
+
+# ---------------------------------------------------------------------------------------------
+# Widening to OREB, FCP and HCT (Defect 4, final families)
+# ---------------------------------------------------------------------------------------------
+
+
+def test_rattle_hop_hold_is_excluded_by_the_perceptibility_floor():
+    """THE OREB TRAP. The putback chain holds every player still for 8 rattle hops while the ball
+    is on the rim (`oreb_step_emitter.py` `overlay_players={}`, "putback: all players hold").
+    That stillness is DELIBERATE and must never be stamped.
+
+    The mechanism that excludes it is the 60ms perceptibility floor, not the call site and not an
+    explicit kind filter: RATTLE_HOP_GAME_SECONDS is 40/350 game-seconds, which resolves to
+    exactly 40.0ms of wall clock, under the 60ms floor. This pins that arithmetic. If anyone
+    raises RATTLE_HOP_GAME_SECONDS above 60/350, or lowers the floor, the hold starts getting
+    idles and this fails.
+
+    Poisoned by setting min_step_ms=0: the hold is stamped and the assertion fires.
+    """
+    from BackEnd.constants import RATTLE_HOP_GAME_SECONDS
+    from BackEnd.utils.animation_step_helpers import (
+        IDLE_CLOCK_MS_PER_GAME_SEC,
+        IDLE_STILL_MIN_STEP_MS,
+    )
+
+    hop_ms = float(RATTLE_HOP_GAME_SECONDS) * IDLE_CLOCK_MS_PER_GAME_SEC
+    assert hop_ms < IDLE_STILL_MIN_STEP_MS, (
+        "a rattle hop is %.1fms against a %.1fms floor — the deliberate putback hold is now "
+        "long enough to be stamped, and ten men holding for the ball on the rim will start "
+        "shifting their weight" % (hop_ms, IDLE_STILL_MIN_STEP_MS)
+    )
+
+    # Built the way the emitter builds it — duration carried as `end.time_elapsed` in game
+    # seconds — so the clock conversion is exercised rather than bypassed with an explicit hold.
+    start, end = _ten(["s1", "s2", "s3"], [])
+    hop = {
+        "start": {"coords": {p: dict(c) for p, c in start.items()},
+                  "advance_trigger": {"metadata": {"kind": "rattle_hop"}}},
+        "end": {"coords": {p: dict(c) for p, c in end.items()},
+                "time_elapsed": float(RATTLE_HOP_GAME_SECONDS)},
+    }
+    assert stamp_idle_wander_on_still_players([hop], family="oreb") == 0
+    assert _wanderers(hop) == set()
+
+
+def test_putback_shooter_and_second_rebounder_get_no_idle():
+    """Both have a real job on an OREB step: the shooter runs to the bounce and puts it back, and
+    on PUTBACK_MISS `rebounderId` names the SECOND rebounder going up for the next board. Same
+    reasoning as the free-throw shooter and the inbounding passer.
+
+    Poisoned by dropping either id from `exclude`: he appears in the wanderer set."""
+    from BackEnd.engine.oreb_step_emitter import _stamp_oreb_idles
+
+    start, end = _ten(["shooter", "second", "s3", "s4"], [])
+    step = _step(start, end)
+
+    _stamp_oreb_idles(
+        [step], {}, {}, rebounder_id="shooter", second_rebounder_id="second",
+    )
+
+    wanderers = _wanderers(step)
+    assert "shooter" not in wanderers, "the putback shooter was given an idle"
+    assert "second" not in wanderers, "the second rebounder was given an idle"
+    assert {"s3", "s4"} <= wanderers, "the men boxing out got nothing"
+
+
+def test_pressure_families_are_stamped_apart():
+    """FCP delegates its whole body to the HCT builder, so ONE call site serves both. They must
+    still land under different family names or Jamie cannot tune a press break separately from a
+    half-court trap — the two knobs in animation_config.js would collapse into one.
+
+    Poisoned by hardcoding family="hct": the FCP assertion fails."""
+    from BackEnd.engine.dynamic_hct_step_emitter import _stamp_pressure_idles
+
+    def families(step):
+        return {
+            (fl or {}).get("family")
+            for fl in ((step.get("start") or {}).get("flourish") or {}).values()
+            if (fl or {}).get("kind") == "idle_wander"
+        }
+
+    start, end = _ten(["bh", "s2", "s3"], [])
+    hct_step = _step(start, end)
+    _stamp_pressure_idles([hct_step], {}, {}, bh_id="bh", turn_result={})
+    assert families(hct_step) == {"hct"}
+
+    start, end = _ten(["bh", "s2", "s3"], [])
+    fcp_step = _step(start, end)
+    _stamp_pressure_idles(
+        [fcp_step], {}, {}, bh_id="bh", turn_result={"fcp_skip_walk_up": True},
+    )
+    assert families(fcp_step) == {"fcp"}
+
+    # The ball handler is working against pressure on both.
+    assert "bh" not in _wanderers(hct_step)
+    assert "bh" not in _wanderers(fcp_step)
+
+
+def test_pressure_idles_are_stamped_before_state_projection():
+    """ORDERING, and it is the subtle one. `_pressure_step_state.schema_projection` is a complete
+    snapshot of the emitted step during the Step 8 migration. Stamping AFTER the projection loop
+    leaves that snapshot stale, and the flourish would vanish the moment `projection_source`
+    flips to "formal" and the step is rebuilt from the state.
+
+    Asserted structurally on the source, because the failure is an ordering one that a unit test
+    on the helper cannot see. Poisoned by moving the stamp call below the projection loop: the
+    line numbers invert and this fails.
+    """
+    import ast
+    import pathlib
+
+    src = (pathlib.Path(__file__).resolve().parents[1]
+           / "BackEnd/engine/dynamic_hct_step_emitter.py").read_text()
+    tree = ast.parse(src)
+    fn = next(
+        n for n in ast.walk(tree)
+        if isinstance(n, ast.FunctionDef) and n.name == "build_dynamic_hct_animation_steps"
+    )
+
+    stamp_lines = [
+        n.lineno for n in ast.walk(fn)
+        if isinstance(n, ast.Call)
+        and (getattr(n.func, "id", None) or getattr(n.func, "attr", None)) == "_stamp_pressure_idles"
+    ]
+    project_lines = [
+        n.lineno for n in ast.walk(fn)
+        if isinstance(n, ast.Call)
+        and (getattr(n.func, "id", None) or getattr(n.func, "attr", None)) == "_project_pressure_step"
+    ]
+    assert stamp_lines, "the pressure idle stamp is not called from the builder at all"
+    assert project_lines, "the projection call vanished — this guard no longer guards anything"
+    # Several per-segment projections run as steps are built; the one that matters is the FINAL
+    # authoritative re-projection pass at the return boundary, which is the last of them. The
+    # stamp has to precede that.
+    assert max(stamp_lines) < max(project_lines), (
+        "the idle stamp (line %s) runs AFTER the final pressure-state re-projection (line %s), "
+        "so _pressure_step_state.schema_projection is a stale snapshot that omits the flourish"
+        % (max(stamp_lines), max(project_lines))
+    )

@@ -51,6 +51,9 @@ from BackEnd.constants import (
     RATTLE_HOP_GAME_SECONDS,
     RATTLE_MAKE_SETTLE_GAME_SECONDS,
 )
+from BackEnd.utils.animation_step_helpers import (
+    stamp_idle_wander_on_still_players,
+)
 from BackEnd.engine.skeleton_step_emitter import (
     _RATTLE_VARIANTS,
     _build_ball_motion_sub_step,
@@ -628,7 +631,75 @@ def _build_bounce_step(
 # --- Top-level builder -----------------------------------------------------
 
 
+def _all_player_ids(off_lineup: Dict[str, Any], def_lineup: Dict[str, Any]) -> List[str]:
+    ids: List[str] = []
+    for lineup in (off_lineup, def_lineup):
+        for player in (lineup or {}).values():
+            if player is None:
+                continue
+            pid = _safe_id(player)
+            if pid:
+                ids.append(pid)
+    return ids
+
+
+def _stamp_oreb_idles(steps, off_lineup, def_lineup, *, rebounder_id, second_rebounder_id) -> int:
+    """Give the men boxing out around an offensive rebound a render-space idle.
+
+    OREB is the stillest unstamped family left — 62.0% of its player-steps have identical start
+    and end coords, 1,705 of them per 8 played games.
+
+    THE RATTLE HOLD IS NOT STAMPED, and it is the 60ms perceptibility floor inside the helper
+    that excludes it, not this call. Measured: all 46 ``rattle_hop`` steps per 8 games resolve to
+    exactly 40.0ms (``RATTLE_HOP_GAME_SECONDS`` = 40/350 game-seconds x 350 ms-per-game-second),
+    so 0 of 46 clear the floor and their 460 still player-steps are never candidates. That hold
+    is deliberate — ``overlay_players={}`` "putback: all players hold" while the ball is on the
+    rim — and it stays a hold. The longer ball-on-rim beats that DO clear the floor
+    (``rattle_settle``, ``bank_settle``, ``bank_graze``, ``bounce``) are stamped on purpose: men
+    boxing out watching a ball rattle are shifting their weight, not standing at attention.
+
+    EXCLUSIONS, both of which have a real job on these steps:
+      - ``rebounder_id`` — the putback shooter. He runs to the bounce in [rebound_capture] and
+        then shoots; the shot animation owns him. Same reasoning as the free-throw shooter and
+        the inbounding passer.
+      - ``second_rebounder_id`` — on PUTBACK_MISS ``rebounderId`` is overwritten to the SECOND
+        rebounder (see the note in ``build_oreb_animation_steps``), who is going up for the next
+        board. Excluded when it names someone other than the shooter.
+    """
+    exclude = [p for p in (rebounder_id, second_rebounder_id) if p]
+    return stamp_idle_wander_on_still_players(
+        steps,
+        family="oreb",
+        exclude=exclude,
+        on_court=_all_player_ids(off_lineup, def_lineup) or None,
+    )
+
+
 def build_oreb_animation_steps(
+    turn_result: Dict[str, Any],
+    game: Any,
+) -> Optional[List[AnimationStep]]:
+    """Convert an OREB turn_result into the unified AnimationStep[] payload.
+
+    Thin wrapper over ``_build_oreb_animation_steps`` that runs the idle-wander post-pass. The
+    inner builder has FOUR ``return steps`` sites; stamping at each would be four chances to miss
+    one, and a missed site looks swept while still freezing.
+    """
+    steps = _build_oreb_animation_steps(turn_result, game)
+    if steps:
+        off_team = getattr(game, "offense_team", None)
+        def_team = getattr(game, "defense_team", None)
+        _stamp_oreb_idles(
+            steps,
+            getattr(off_team, "lineup", {}) if off_team else {},
+            getattr(def_team, "lineup", {}) if def_team else {},
+            rebounder_id=str(turn_result.get("shooter") or "").strip() or None,
+            second_rebounder_id=str(turn_result.get("rebounderId") or "").strip() or None,
+        )
+    return steps
+
+
+def _build_oreb_animation_steps(
     turn_result: Dict[str, Any],
     game: Any,
 ) -> Optional[List[AnimationStep]]:

@@ -181,6 +181,21 @@ const defaults = {
         // The zero-clock beat after a bucket. Players reset and breathe rather than jostle,
         // so survey_rock at ~3.5in.
         make_hold: { amplitudeScale: 0.6, style: 'survey_rock' },
+        // Offensive rebound, 62.0% still. This is the one family where the men are LEANING ON
+        // EACH OTHER — boxing out is a legs-and-hips contest, not a wait — so it gets the
+        // widest amplitude of the set: jockey at scale 1.0, a full ~7in grounded lean rather
+        // than the -40% still-player reduction. Anything smaller reads as ten men politely
+        // watching a rebound. The putback shooter and the second rebounder are excluded in the
+        // backend; the rattle hold is excluded by the 60ms floor.
+        oreb: { amplitudeScale: 1.0, style: 'jockey' },
+        // Full-court press break, 48.2% still. Off-ball men are shifting their feet waiting to
+        // receive against pressure — live but stationary, so shuffle at the -40% default
+        // (~7in raw, ~4in here). Smaller than OREB: nobody is leaning on anybody yet.
+        fcp: { amplitudeScale: 0.6, style: 'shuffle' },
+        // Half-court trap, 44.9% still. Same motion as the press break but in a tighter space,
+        // so the same style one notch smaller — a trapped possession should not look busier
+        // than a rebound.
+        hct: { amplitudeScale: 0.5, style: 'shuffle' },
       },
     },
   },
