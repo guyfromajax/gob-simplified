@@ -1010,12 +1010,93 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     - THIS IS THE SAME CLASS as the spot-key converter that did not speak its own module's
       vocabulary (`54a2a9c0e`) and as the stranded FLSS skeleton: a producer and a consumer
       disagreeing on a name, with no error at the seam. Third appearance.
-    - NOT SWEPT. The guard resolves case-insensitively for its own purposes, which fixes the
-      test and not the codebase. What is unknown is how many PRODUCTION lookups do a
-      case-sensitive `HCO_STRING_SPOTS.get(name)` against a name sourced from one of the
-      lowercase lists, and what each returns when it misses. That is a census, not a guess, and
-      it wants its own pass — `.get()` returning `None` on a name mismatch is precisely the
-      shape that has produced silent misplacement here before.
+    SWEPT 2026-09-08. **ZERO measured crossings. The hazard is LATENT, not live — retire it.**
+    Census: `scratch_casecensus.py` (registry-level instrumentation), `scratch_arcresolve.py`
+    (end-to-end), `scratch_poison_retry.py` (causal). 8 played games, one per process,
+    `PYTHONHASHSEED=0`. Null control: probe installed but silent reproduced canonical draw
+    counts exactly (137,949 / 142,536), so it does not perturb. Detector proven to fire by
+    self-test on three lookups with known-in-advance outcomes (a hit, a case-crossing miss, an
+    unknown-name miss), each classified correctly.
+
+    THE URGENT QUESTION — the nine on-boundary arc spots DO resolve correctly in production.
+    101 of 101 shots authored from an on-boundary spot classified as threes, including all 16
+    from the four case-collision spots (`lower/upper midWing`, `lower/upper midCorner`). Zero
+    disagreements against what each spot's own authored coordinate implies. The item 22 guard is
+    NOT sitting over a live defect. It is also not sitting over a dead path: all 860 attempts
+    resolve with `classification_source="shot_spot"`, i.e. by COORDINATE, which is exactly the
+    path the guard asserts on.
+
+    - **Conventions: three, not two, and the split is authoring vs classification.** My original
+      wording ("THREE_POINT_SPOTS is lowercase, HCO_STRING_SPOTS is camelCase") was too coarse.
+      The coordinate/authoring registries — `HCO_STRING_SPOTS`, `OFFSET_SPOTS`,
+      `HCO_OFFENSIVE_SPOTS`, `INSIDE_PAINT_SPOT_NAMES` — use camelCase for the compound names
+      (`midWing`, `lowPost`, `basketSpot`, `midLane`, `topLane`, `highPost`, `midBaseline`,
+      `midCorner`, `midPost`). The classification registries — `THREE_POINT_SPOTS`,
+      `PAINT_SPOTS` — are all-lowercase. `turn_manager.py:2659` is a third: an inline lowercase
+      literal duplicating `PAINT_SPOTS` rather than importing it. FrontEnd
+      `courtPositions.js` is camelCase, matching the backend authoring side.
+    - **Exactly 10 names collide**, and no others: the 4 arc names (`lower/upper midcorner`,
+      `lower/upper midwing`) and the 6 paint names (`basketspot`, `lower/upper lowpost`,
+      `lower/upper midpost`, `midlane`). Note `PAINT_SPOTS` and `INSIDE_PAINT_SPOT_NAMES` name
+      THE SAME SIX SPOTS in opposite conventions.
+    - **WHY NOTHING CROSSES, measured.** 619,038 registry lookups across 8 games at 43 reached
+      sites, `miss_crossing` = **0**. Two independent reasons, both verified:
+      (a) `shot_manager.py:349` and `:360` — the two return paths of
+      `_get_shooter_position_and_spot` — apply `.lower()` at the SOURCE, so every consumer of a
+      spot name receives it pre-normalized and the lowercase classification registries match.
+      That is the choke point, and it is why the "case insensitive" comments at `:581` and
+      `:648` are honest about the contract even though the comparisons beside them are
+      case-sensitive.
+      (b) The named-spot coordinate path is BYPASSED. `THREE_POINT_SPOTS` and
+      `INSIDE_PAINT_SPOT_NAMES` were **never consulted once** in 8 games, and
+      `phase_resolution.py:4409`'s legacy named-spot fallback never executed, because the
+      skeleton carries explicit coordinates and the branch above prefers them.
+    - **`phase_resolution.py:4408-4414` is a DEAD ad-hoc workaround for this exact hazard**,
+      comment and all: "Case-insensitive lookup (skeleton may use 'upper midwing' vs constant
+      'upper midWing')". It retries case-insensitively after sniffing the `{50,25}` default.
+      Poisoned by removing it: on-boundary resolution is byte-for-byte unchanged (58/58 threes,
+      13/13 collision-set, 0 disagreements both arms), because the branch it sits in is never
+      entered. Someone hit this problem, fixed it at one site, and the fix is now unreachable.
+      **Do not treat it as the existing normalizer.** There is no shared normalizer anywhere in
+      `BackEnd/` or `FrontEnd/` — grep for `normalize_spot`, `canonical_spot`, `spot_key`,
+      `SPOT_ALIAS` returns nothing. What exists is five scattered inline `.lower()` calls.
+    - **WHAT KEEPS THIS LATENT RATHER THAN ABSENT: 83% of lookups default to a plausible
+      coordinate.** Of 59 `.get()` sites against the coordinate tables, 49 return a real-looking
+      coord on a miss — 26 give `{50,25}` (center court), 9 give `{64,25}` (the key), 7 fall
+      back to another spot lookup, 5 to a live coord variable. Only 10 return `None`. So the
+      day a producer starts emitting a name in the other convention, nothing objects and the
+      symptom is a coordinate, not an error. That is the converter-bug shape unchanged; the
+      reason it is not firing is that no producer currently crosses, not that a miss would be
+      caught.
+    - NO FIX. Normalizing names across the codebase moves coordinates and coordinates move
+      outcomes, and there is currently nothing to fix — zero crossings. The honest action is to
+      leave the conventions alone and NOT write a normalizer nobody needs.
+
+24. OPEN, found by the item 23 census and NOT a case crossing — `select_defender_closest_to_victim`
+    looks up POSITION CODES in a spot-name table, so it can never hit
+    - `phase_resolution.py:667`: `coords = HCO_STRING_SPOTS.get(pos, {"x": 50, "y": 25})` inside
+      `for pos, defender in def_lineup.items()`. `pos` is `"PG"`/`"SG"`/`"SF"`/`"PF"`/`"C"`;
+      `HCO_STRING_SPOTS` is keyed by spot NAME. **Measured 0 hits and 20 misses across 8 played
+      games — a 100% miss rate**, the only site in the census with one.
+    - CONSEQUENCE: when the fallback fires, all five defenders collapse to `{50,25}`, every
+      Euclidean distance to the victim is identical, and "closest defender" resolves to whoever
+      `def_lineup` happens to iterate first. **This is the logo-stack shape again** — five
+      players at one coordinate — and the selected player is CHARGED WITH A FOUL.
+    - The function's own docstring says the fallback uses "position-based default spots (key)".
+      It does not: `key` is x=64 and the actual default is x=50. The documented intent is not
+      implemented, which is why this reads as working.
+    - REACHABILITY, by grep — three callers. `turn_manager.py:619` passes real coords (`d_dest`)
+      and is SAFE. `turn_manager.py:2639` and `eoq_perfection.py:711` both pass `None`
+      explicitly and take the fallback. Measured 4 occasions per 8 games (~0.5/game, 5 lookups
+      each).
+    - SYMPTOM VISIBILITY: **invisible.** Both branches consume the same `random.randint` draws,
+      so draw counts do not move and no equivalence gate can see it. The only observable is a
+      foul attributed to a defender who was not nearest — which is the same family as Jamie's
+      long-standing symptom #3 (events attributed to the wrong player), still untraced.
+    - NOT FIXED HERE. The census was read-only and this is a correctness change in foul
+      attribution. It wants its own brief and a decision on what the fallback SHOULD do when a
+      caller supplies no coords — the honest options are to require coords or to read
+      `player.coords`, and both change which player is charged.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
