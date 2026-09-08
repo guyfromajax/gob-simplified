@@ -23,6 +23,19 @@ function getStore(scene) {
   return scene[HEARTBEAT_STORE_KEY];
 }
 
+// String -> int32, for seeding mulberry32 off a player id. FNV-1a, inlined rather than
+// imported for six lines. Used by the heartbeat so its per-player jitter is stable across
+// playbacks of the same game: the jitter must still DIFFER between players (otherwise ten
+// hearts beat in lockstep) but must not differ between two viewings of one game.
+function hashSeed(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i += 1) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h | 0;
+}
+
 function getSpriteKey(sprite) {
   return String(
     sprite?.playerId ??
@@ -178,7 +191,7 @@ function startHeartbeatForSprite(scene, sprite) {
   const halfCycleMs = Math.max(20, Math.round(30000 / bpm));
   const role = resolveRole(scene, sprite);
   const dir = role === "defense" ? { x: -1, y: 1 } : { x: 1, y: 1 };
-  const jitter = (Math.random() * jitterPx * 2) - jitterPx;
+  const jitter = ((mulberry32(hashSeed(key) || 1)() * jitterPx * 2)) - jitterPx;
   const delta = amplitudePx + jitter;
   const dx = delta * dir.x;
   const dy = delta * dir.y;
