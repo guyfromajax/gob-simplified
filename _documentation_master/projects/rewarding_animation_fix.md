@@ -58,6 +58,88 @@ exists.
 
 **Fix:** a STRETCH_CAP experiment — allow the duration to stretch up to some multiple of
 the natural time (try 1.0 / 1.5 / 2.0) before falling back to freeze. **Judge by eye.**
+
+#### RE-MEASURED 2026-09-08 at HEAD — defect 2 is the LARGEST remaining item, and the doc never had its size
+
+Two stale line references above: `stamp_tween_durations` is at `:1029` and the formula at
+`:1060`, not `:761`/`:792`. `STRETCH_CAP` does not exist anywhere in the tree — it is a
+proposed name in this document, not a mechanism that shipped, so there is nothing to switch on.
+
+**A tail is arithmetic the codebase already performs**, and it is reproducible from the payload
+without a browser:
+
+| | | |
+|---|---|---|
+| backend | `stamp_tween_durations` (`animation_step_helpers.py:1060`) | `tween_durations[pid] = min(dist / rate, step_t)`, game-seconds |
+| frontend | `animationPlayback.js:1307-1310` | `playerDurationMs = max(50, round(tween * clockSecondMs))`, else the STEP duration |
+| frontend | `animationPlayback.js:1064-1071` | `stepMs = wall_clock_hold_ms`, else `max(50, round(end.time_elapsed * clockSecondMs))` |
+
+so `tail_ms = stepMs - playerDurationMs`. Measured on 8 played games (`scratch_tails_miss.py`),
+with the FE's `max(50, ...)` floors applied on both sides because they change the answer for
+short steps.
+
+**NULL CONTROL.** Stripping `tween_durations` in process makes the FE fall back to step
+duration for every player, so every tail must be exactly zero — and is, on 3 seeds. The
+detector reads `tween_durations` and nothing else.
+
+**THE SIZE:**
+
+- **50.9% of moving player-steps carry a tail** (15,361 of 30,189).
+- **524.5 s of dead tail per game** — **30.7% of the wall time moving sprites are on screen**,
+  18.6% of all player-sprite time, **52.5 s per sprite per game**. (Per-player numerator needs a
+  per-player denominator: comparing 524.5 s of tail against the 278.1 s of per-STEP animation
+  time compares ten things to one and yields a nonsensical 188%.)
+- Median tail **146 ms**, p90 **722 ms**, p99 **1,352 ms**, max **1,982 ms**. The median tailed
+  step wastes **47.4%** of its duration; at p90, **80.6%**.
+
+**THE DISTRIBUTION, which is the number that decides the fix** — a 40 ms tail and a 900 ms tail
+are different problems and the old ratio could not tell them apart:
+
+| tail | share | cumulative |
+|---|---|---|
+| 0-60 ms | 24.8% | 24.8% |
+| 60-150 ms | 26.3% | 51.1% |
+| 150-300 ms | 19.4% | 70.6% |
+| 300-600 ms | 14.5% | 85.1% |
+| 600-1000 ms | 9.8% | 94.8% |
+| 1000+ ms | 5.2% | 100% |
+
+**24.8% are below the 60 ms perceptibility floor** (`deadAirLedger.js:87`) and want nothing at
+all. **29.4% are ≥300 ms** and are a visible pause.
+
+**WHERE THE DEAD TIME CONCENTRATES — 69.6% of it is in ONE population:**
+
+| continuity class | tails | share of tails | dead time | mean tail |
+|---|---|---|---|---|
+| `ease_in_out` (one-step journey) | 7,251 | 47.2% | **364.8 s/game (69.6%)** | **402 ms** |
+| `ease_out` (arriving) | 3,681 | 24.0% | 72.5 s/game (13.8%) | 158 ms |
+| `continuing` | 2,586 | 16.8% | 44.4 s/game (8.5%) | 137 ms |
+| `ease_in` (departing) | 1,843 | 12.0% | 42.8 s/game (8.2%) | 186 ms |
+
+A one-step journey is a short natural tween dropped into a long step, so it has the worst of
+both — and it is 42.9% of all moving player-steps. Any fix that only targets `ARRIVING` steps
+addresses 13.8% of the problem.
+
+**EASING DID NOT SHRINK THE TAILS, and was never going to.** A Phaser tween's duration is
+independent of its curve, so an early arrival is still an early arrival. The stillness-to-tails
+ratio is **2.23 : 1** at HEAD against 2.11 : 1 before, i.e. unchanged within noise. What easing
+changed is how the arrival *reads* — a decelerating stop rather than a halt — which may lower
+perceived severity without touching the measured quantity. That is Jamie's eye, not this table.
+
+**THE IDLE WANDER COVERS NONE OF IT, verified rather than assumed.** It gates on
+`_idle_is_still(start, end)` across the WHOLE step (`animation_step_helpers.py:174`), so a
+player who moves at all is excluded: **0 of 18,379 arriving player-steps carry a wander**, while
+20,943 wander player-steps exist elsewhere, so the detector is alive.
+
+**FILL, DO NOT STRETCH — what the measured shape suits.** Stretching durations changes timing,
+which is a wider blast radius than anything shipped in this workstream. The tails are long
+enough to fill instead: 402 ms mean on the dominant population is ample for a weight shift, the
+wander mechanism is already eye-verified, and the continuity classifier already identifies the
+steps. `applyIdleWander` starts immediately and has **no `delay` parameter**
+(`arrivalHeartbeat.js:350`), so filling needs one added — modest, but it is an addition, not a
+config change. It also snaps the sprite to authoritative rest before capturing wander bases
+(`:363-364`), which is correct for a tail because the arrival coord *is* the rest.
+The 24.8% of tails under 60 ms should be left alone.
 This one wants a person watching, not a metric.
 
 ### 3. Uniform beat length
@@ -748,7 +830,11 @@ certainly needs one of them.
    linear sites, not nine, and the "linear otherwise" reading was resolved as (b) — departures
    ease too, selectable via `movementCurve.departureEasing`. Scoped to the schema path, which
    measured as 53.9% of turns and effectively 100% of rendered player movement.
-4. **Arrive-and-freeze (defect 2)** — STRETCH_CAP experiment, judged by eye.
+4. **Arrive-and-freeze (defect 2)** — ~~STRETCH_CAP experiment~~, judged by eye. **RE-MEASURED
+   2026-09-08 and confirmed as the largest remaining item: 524.5 s/game of dead tail, 30.7% of
+   moving-sprite time.** STRETCH_CAP never existed in the tree, and the measured tail shape
+   favours FILLING the tail over stretching the duration — see the re-measured section under
+   "2. Arrive-and-freeze" and the ranking table.
 5. **Then** decide what keys easing character on HCO, with the archetype question reopened
    on correct inputs.
 6. **Overlap stagger, timing variation (defect 3), emphasis hierarchy** — as in the main
@@ -756,3 +842,107 @@ certainly needs one of them.
 
 Not on this list: the End-of-Quarter animation defect. That is a bug, not craft — it is
 logged in `bugs.md` and needs a trace, not a design pass.
+
+## MISS frozen steps — DIAGNOSED 2026-09-08, and it is SMALL
+
+`bugs.md` item 19 left MISS open as "30.9% of content-free frozen steps, the largest single
+family". Diagnosed on 8 played games (`scratch_tails_miss.py`).
+
+**FIRST, A KEYING CORRECTION.** The 30.9% cannot be reproduced by any turn-side keying, and
+item 19's own attribution note explains why: its per-family figures came from
+`offensive_state`, which lives on `game.game_state` (`opening_tip.py:115`) and is not carried
+on the turn dict. So "MISS" there and `result_type == "MISS"` here are different populations,
+and the two numbers are not a before/after pair. Everything below is keyed by `result_type`.
+
+**WHOLE-STEP FREEZES BARELY EXIST HERE: 3 of 522 MISS steps (0.6%).** The stillness is
+partial, which is exactly the understatement item 19 recorded for defect 4 generally — the mean
+MISS step has **4.02 of 10 standing**, with a mode at 5 (19.5% of steps) and only 6.3% of steps
+having everybody moving.
+
+**WHERE IN THE TURN**, read off the ball rather than off a step index, since MISS turns run 5
+to 16 steps and a quintile is not comparable between them:
+
+| phase | steps | still/10 | mean dur | share of MISS wall time |
+|---|---|---|---|---|
+| 1 ball in the shooter's hands | 273 (52.3%) | 3.4 | 272 ms | 58.3% |
+| 2 ball in flight | 97 (18.6%) | 4.6 | 173 ms | 13.2% |
+| 3 on the rim (`rattle_hop`, `bank_graze`) | 82 (15.7%) | 5.4 | **76 ms** | 4.9% |
+| 4 off the rim (`bounce`) | 51 (9.8%) | 5.3 | 300 ms | 12.0% |
+| 5 the next break | 19 (3.6%) | **0.1** | 784 ms | 11.7% |
+
+**Total MISS animation is 15.9 s per game.** The whole family is an order of magnitude smaller
+than defect 2's 524.5 s of dead tail.
+
+**IT IS AN AUTHORING ABSENCE, NOT A RENDERING FAILURE.** Of 2,098 still MISS player-steps,
+**50.2% have no authored destination at all and 49.8% are already standing on the destination
+they were given. Exactly 0% have a destination they have not reached.** So no tail, no
+mistimed tween, nothing a duration or curve change could touch — the engine explicitly says
+"do not move".
+
+**WHO IS STILL**, by authored `start.action`, cross-tabulated against phase:
+
+| action | pre-release | in flight | on rim | off rim | total | still-rate |
+|---|---|---|---|---|---|---|
+| `stationary` | 496 | 319 | 439 | 245 | 1,499 (71.4%) | 86.5% |
+| `guard_offball` | 289 | 40 | 5 | 25 | 359 (17.1%) | 35.0% |
+| `pass` / `receive` | 27 | 90 | 0 | 0 | 117 | ~99% |
+| `handle_ball` | 44 | 0 | 0 | 0 | 44 | 30.3% |
+| `shoot` | 42 | 0 | 0 | 0 | 42 | 100% |
+| `cut` / `sprint` | 6 | 0 | 0 | 2 | 8 | <2% |
+
+### The basketball verdict, per sub-population
+
+- **DEFENSIBLE — the shooter (`shoot`, 100% still, 42).** A shooter planted watching his own
+  release is real basketball. Leave it.
+- **DEFENSIBLE — `pass` / `receive` (117, ~99% still).** A passer who has just released and a
+  receiver squaring up are both legitimately planted for a beat.
+- **DEFENSIBLE — pre-release off-ball (496 `stationary` + 289 `guard_offball`).** 58.3% of MISS
+  wall time is still a live half-court set with the ball in the shooter's hands. Men holding
+  shape in a set offence, and defenders in help position, are correct. This is ordinary HCO
+  stillness that happens to fall inside a turn labelled MISS, and it belongs to defect 4's
+  already-stamped territory rather than to a rebound problem.
+- **NOT DEFENSIBLE, and this is the real finding — 1,073 off-ball player-steps (51.1% of the
+  MISS still population) are authored motionless while the ball is LOOSE.** 1,003 `stationary`
+  plus 70 `guard_offball`, spread across ball-in-flight, on-rim and off-rim. Five men on
+  average standing through a live rebound is not basketball; boards get crashed and guards leak
+  out. **But note the perceptibility split: the on-rim beats average 76 ms** (the 50 ms
+  `rattle_hop` sequence, the same deliberate rim hold excluded from the OREB stamping pass and
+  below the 60 ms floor), so the genuinely visible slice is ball-in-flight plus off-rim —
+  **629 player-steps, about 79 per game, over 4.8 s of wall time.**
+- **ALREADY CORRECT — the next break (phase 5, 0.1 of 10 still).** When the engine does author
+  a transition it authors it well. That is the proof that the loose-ball stillness is a gap in
+  authoring rather than a limit of the mechanism.
+
+**THE FIX IS AUTHORED MOVEMENT — rebound-crash and leak-out destinations for the ~79 visible
+loose-ball player-steps per game.** Item 19's instruction stands and the measurement now
+supports it: **do not stamp an idle here.** An idle loop over a live rebound would make the
+number go down while making the defect harder to see, and the honest fix is the expensive one
+this workstream has been deferring. At 4.8 s per game it is also, on measured size, the
+*smallest* remaining item — see the ranking below.
+
+**NEWLY SURFACED, nobody has logged it:** the `bounce` beat is **51 steps of 300 ms carrying
+zero ball motion, zero sound and zero announcement**, with 5.3 of 10 standing — a content-free
+perceptible 300 ms pause at the end of a miss, 12.0% of all MISS wall time. That is a
+step-deletion candidate rather than a stamping or authoring one, and it is the clearest
+instance of "an empty beat" the workstream has measured.
+
+## RANKING AT 2026-09-08, by measured size
+
+Supersedes every earlier ordering in this document. The prior ordering was written before the
+converter fix, before defect 4 closed, and before any of these quantities existed.
+
+| rank | item | measured size | cost of fix |
+|---|---|---|---|
+| 1 | **defect 2, arrive-and-freeze** | **524.5 s/game dead tail; 30.7% of moving-sprite time; 29.4% of tails ≥300 ms; 69.6% of it in one-step journeys** | low if FILLED (a `delay` on a proven mechanism); high if STRETCHED (durations move timing) |
+| 2 | sequence item 5 / 6 — easing character, archetypes, stagger, emphasis | not a defect, so not sized here; but it is now the largest *remaining* body of work by volume | design |
+| 3 | the `bounce` empty beat | 51 steps × 300 ms, content-free, 12.0% of MISS wall time | low — deletion, but step counts are principle 8 territory |
+| 4 | **MISS loose-ball stillness (item 19)** | **~79 visible player-steps/game over 4.8 s** | high — authored destinations |
+
+**Defect 2 is not close to being closeable** — it is the largest measured quantity in the
+workstream and 29.4% of its tails are visible pauses. **MISS comes back small enough to
+downgrade**, and its cheap fix is forbidden for good reason, so it should be re-ranked below
+the design work rather than treated as the next defect.
+
+Sequence items 5 and 6 were out of scope for this measurement and are design rather than defect
+work, but with defect 1 shipped, defect 4 closed and MISS downgraded, **they are now the largest
+remaining body of work** and the only defect ahead of them is defect 2.
