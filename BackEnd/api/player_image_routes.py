@@ -80,42 +80,68 @@ def _resolve_signed(franchise_id: str, player_id: str):
     return None, None
 
 
-def delete_signed_masters_for_franchise(franchise_id) -> int:
-    """Best-effort GC of a deleted franchise's signed-recruit uniform masters in R2.
+def collect_franchise_master_keys(franchise_id) -> list[str]:
+    """Return the R2 master keys owned by one franchise, for GC on delete.
 
-    Only removes players/master/<player_id>.png for THIS franchise's signed
-    recruits — identified by their FPD doc carrying meta.image_id. That is safe on
-    two counts: (1) a signed player's player_id is a fresh per-franchise uuid, so a
-    key can never belong to another franchise; (2) original/universal players have
-    no image_id, so their shared masters are never touched. The shared uniform
-    cache (recruits/uniform-cache/...) is also left intact. Never raises — a portrait
-    GC failure must not block the franchise delete. Returns count removed.
+    A key qualifies when its FPD doc carries ``meta.image_id`` — that covers signed
+    recruits AND walk-ons promoted onto an active roster (see
+    BackEnd/utils/walk_on_roster_identity.py, which stamps meta.image_id league-wide
+    per franchise and paints players/master/<player_id>.png for each). Safe to delete
+    because a signed/walk-on player_id is a fresh per-franchise uuid, so a key can
+    never belong to another franchise; original/universal players carry no image_id,
+    so their shared masters are never touched. The shared uniform archive
+    (uniforms/..., recruits/uniform-cache/...) is left intact.
 
-    Call BEFORE deleting the franchise's FPD docs (it reads them to find the keys).
+    MUST be called BEFORE the franchise's FPD docs are deleted — it reads them to
+    find the keys. Never raises; returns [] on any scan failure, and short-circuits
+    when R2 is unconfigured so no franchise delete pays for a pointless scan.
     """
     if not r2_images.is_configured():
-        return 0
-    deleted = 0
+        return []
     try:
         cursor = franchise_players_data_collection.find(
             {"franchise_id": str(franchise_id), "meta.image_id": {"$exists": True, "$ne": None}},
             {"player_id": 1},
         )
-        for doc in cursor:
-            pid = doc.get("player_id")
-            if not pid:
-                continue
-            try:
-                if r2_images.delete(f"players/master/{pid}.png"):
-                    deleted += 1
-            except Exception:
-                logger.exception("[IMG-GC] delete failed franchise_id=%s player_id=%s",
-                                 str(franchise_id), pid)
+        return [
+            f"players/master/{doc['player_id']}.png"
+            for doc in cursor
+            if doc.get("player_id")
+        ]
     except Exception:
         logger.exception("[IMG-GC] scan failed franchise_id=%s", str(franchise_id))
-    if deleted:
-        logger.info("[IMG-GC] removed %s signed masters franchise_id=%s", deleted, str(franchise_id))
-    return deleted
+        return []
+
+
+def delete_master_keys(keys, franchise_id=None) -> int:
+    """Batch-delete master keys collected by :func:`collect_franchise_master_keys`.
+
+    One DeleteObjects round trip per 1000 keys instead of two per player — a
+    league-wide franchise can carry hundreds of walk-on masters, and the old
+    per-key head+delete loop is what made franchise delete run for minutes.
+    Never raises: portrait GC must not block or fail a franchise delete.
+    """
+    if not keys or not r2_images.is_configured():
+        return 0
+    try:
+        removed = r2_images.delete_many(keys)
+    except Exception:
+        logger.exception("[IMG-GC] batch delete failed franchise_id=%s", str(franchise_id))
+        return 0
+    if removed:
+        logger.info("[IMG-GC] removed %s masters franchise_id=%s", removed, str(franchise_id))
+    return removed
+
+
+def delete_signed_masters_for_franchise(franchise_id) -> int:
+    """Synchronous collect + batch-delete of one franchise's masters. Returns count.
+
+    Kept for callers that wipe inline (admin reset). The franchise-delete route
+    splits the two halves instead so the DB cascade is not held up by R2.
+    """
+    if not r2_images.is_configured():
+        return 0
+    return delete_master_keys(collect_franchise_master_keys(franchise_id), franchise_id)
 
 
 @router.post("/player-image/ensure")

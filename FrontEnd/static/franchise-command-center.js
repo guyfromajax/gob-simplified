@@ -1,17 +1,69 @@
-async function fetchJSON(url) {
+// Returns { data, status }. status is the HTTP status, or 0 when the request never
+// got a response. Callers that need to tell "this franchise is gone" (404) apart
+// from "the network hiccuped" (0) use this; fetchJSON keeps the old null contract
+// for the ~40 call sites that only care whether they got a payload. A shared
+// module-level status would race — init fires several un-awaited loads.
+async function fetchJSONWithStatus(url) {
   try {
     const res = await fetch(url, { headers: API_CONFIG.getAuthHeaders() });
     if (res.status === 401 || res.status === 403) {
       if (typeof AccessDenied !== 'undefined' && AccessDenied.checkAccessDenied) {
         AccessDenied.checkAccessDenied(res);
       }
-      return null;
+      return { data: null, status: res.status };
     }
-    if (!res.ok) throw new Error('Request failed');
-    return await res.json();
+    if (!res.ok) {
+      console.error('Failed loading', url, res.status);
+      return { data: null, status: res.status };
+    }
+    return { data: await res.json(), status: res.status };
   } catch (err) {
     console.error('Failed loading', url, err);
-    return null;
+    return { data: null, status: 0 };
+  }
+}
+
+async function fetchJSON(url) {
+  return (await fetchJSONWithStatus(url)).data;
+}
+
+// A franchise_id that 404s is a franchise that no longer exists — almost always one
+// the user just deleted, where the delete landed server-side but the client did not
+// see the confirmation. Without this the FCC silently bailed out of init and left
+// the empty shell (header "--", every card stuck on "In Development") with no
+// explanation. Rendered above #page-load-overlay (z-index 999999) so it survives
+// the overlay hide in init's finally block.
+function showFranchiseGoneNotice() {
+  if (document.getElementById('fcc-franchise-gone')) return;
+  const panel = document.createElement('div');
+  panel.id = 'fcc-franchise-gone';
+  panel.setAttribute('role', 'alert');
+  panel.style.cssText =
+    'position:fixed;inset:0;z-index:1000000;background:rgba(4,8,16,0.96);' +
+    'display:flex;flex-direction:column;align-items:center;justify-content:center;' +
+    'gap:18px;padding:24px;text-align:center;';
+  panel.innerHTML =
+    '<div style="font-family:\'Bebas Neue Pro\',\'Bebas Neue\',sans-serif;' +
+    'font-size:38px;letter-spacing:0.03em;color:#ffffff;">This Franchise No Longer Exists</div>' +
+    '<div style="font-family:Inter,sans-serif;font-size:15px;line-height:1.5;' +
+    'color:rgba(255,255,255,0.72);max-width:440px;">It was deleted, so there is nothing left to load. ' +
+    'Your other program slot is untouched.</div>' +
+    '<button type="button" id="fcc-franchise-gone-back" style="min-width:138px;min-height:42px;' +
+    'padding:10px 18px;border:1px solid rgba(255,255,255,0.28);border-radius:10px;' +
+    'background:linear-gradient(180deg,#49ff37 0%,#34ec27 100%);color:#07101f;cursor:pointer;' +
+    'font-family:\'Bebas Neue Pro\',\'Bebas Neue\',sans-serif;font-size:14px;font-weight:700;' +
+    'letter-spacing:0.02em;box-shadow:inset 0 1px 0 rgba(255,255,255,0.18);">Back To Home Base</button>';
+  document.body.appendChild(panel);
+  const backBtn = document.getElementById('fcc-franchise-gone-back');
+  if (backBtn) {
+    backBtn.addEventListener('click', () => {
+      window.location.href = '/mode-select.html';
+    });
+  }
+  // Stale local keys for a franchise that is provably gone are safe to drop, and
+  // leaving them lets a later screen re-adopt a dead id.
+  if (window.FranchiseLS && typeof window.FranchiseLS.clearAllForFranchise === 'function') {
+    try { window.FranchiseLS.clearAllForFranchise(franchiseId); } catch (e) {}
   }
 }
 
@@ -3658,9 +3710,14 @@ async function init() {
     // showing it directly causes a stale-data flash on FCC entry.
   }
   const topDataStartTime = performance.now();
-  let topData = await fetchJSON(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+  const topDataResult = await fetchJSONWithStatus(`${API_CONFIG.buildUrl('/franchise/command-center/data')}?franchise_id=${franchiseId}&profile=1`);
+  let topData = topDataResult.data;
   const topDataEndTime = performance.now();
   console.log(`⏱️ [PERF] /franchise/command-center/data: ${(topDataEndTime - topDataStartTime).toFixed(2)}ms`);
+  if (!topData && topDataResult.status === 404) {
+    showFranchiseGoneNotice();
+    return;
+  }
   if (!topData) return; // Access denied or error - redirect already triggered for 401/403; finally block will hide page-load-overlay
   topData = await recoverCpuSimsBeforeFccRender(topData);
   if (!topData) return;

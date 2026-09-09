@@ -109,3 +109,38 @@ def delete(key: str) -> bool:
         raise
     s3.delete_object(Bucket=bucket, Key=key)
     return True
+
+
+def delete_many(keys, chunk_size: int = 1000) -> int:
+    """Batch-delete objects with S3 DeleteObjects (max 1000 keys per call).
+
+    Unlike :func:`delete` this does NOT head_object first, so it cannot report
+    whether a key existed — DeleteObjects succeeds on absent keys. Returns the
+    number of keys the bucket accepted. Use this for bulk GC (franchise delete),
+    where one round trip per 1000 keys matters far more than existence accuracy;
+    use :func:`delete` when the existed/absent distinction is load-bearing.
+
+    Never raises: a per-batch failure is logged and the remaining batches still
+    run, so a transient R2 error cannot strand the caller.
+    """
+    keys = [k for k in (keys or []) if k]
+    if not keys:
+        return 0
+    s3, bucket = _s3()
+    accepted = 0
+    for i in range(0, len(keys), chunk_size):
+        batch = keys[i:i + chunk_size]
+        try:
+            resp = s3.delete_objects(
+                Bucket=bucket,
+                Delete={"Objects": [{"Key": k} for k in batch], "Quiet": False},
+            )
+            accepted += len(resp.get("Deleted") or [])
+            for err in (resp.get("Errors") or []):
+                logger.warning(
+                    "[R2] delete_many key=%s code=%s msg=%s",
+                    err.get("Key"), err.get("Code"), err.get("Message"),
+                )
+        except Exception:
+            logger.exception("[R2] delete_many batch failed (%s keys)", len(batch))
+    return accepted

@@ -9398,13 +9398,26 @@ def _ensure_home_slots_for_user(user_id: str) -> list[dict]:
 
 
 def _cascade_delete_franchise(fid: ObjectId) -> None:
-    """Wipe one franchise and related collections. Caller must own ``fid``."""
-    # GC painted signed-recruit masters from R2 before wiping FPD (helper reads FPD).
+    """Wipe one franchise and related collections. Caller must own ``fid``.
+
+    R2 portrait GC is SNAPSHOTTED here but executed off-thread. The key list must be
+    read before FPD is wiped (the keys live on the FPD docs), while the deletes
+    themselves are network round trips to R2 that must not sit inside the request —
+    a league-wide franchise carries hundreds of walk-on masters, and holding the
+    response for them is what made delete appear to hang and then fail (the client
+    gave up long before the server did). The DB wipe below is the authoritative part
+    and stays synchronous, so a 200 means the franchise is really gone.
+
+    A killed process can strand a background batch; those objects are orphans that
+    nothing points at, which is exactly the case the R2 orphan sweeper in
+    _documentation_master/projects/gob-asset-architecture.md exists to cover.
+    """
+    master_keys = []
     try:
-        from BackEnd.api.player_image_routes import delete_signed_masters_for_franchise
-        delete_signed_masters_for_franchise(fid)
+        from BackEnd.api.player_image_routes import collect_franchise_master_keys
+        master_keys = collect_franchise_master_keys(fid)
     except Exception:
-        logger.exception("[IMG-GC] cleanup failed on franchise delete fid=%s", str(fid))
+        logger.exception("[IMG-GC] key snapshot failed on franchise delete fid=%s", str(fid))
     # FTD: ObjectId; FPD/FRD/games: string; press sessions: ObjectId (and string fallback).
     franchise_team_data_collection.delete_many({"franchise_id": fid})
     franchise_players_data_collection.delete_many({"franchise_id": str(fid)})
@@ -9417,6 +9430,20 @@ def _cascade_delete_franchise(fid: ObjectId) -> None:
     except Exception:
         logger.exception("[PRESS-GC] cleanup failed on franchise delete fid=%s", str(fid))
     db.franchises.delete_one({"_id": fid})
+
+    # Fire-and-forget: FPD is already gone, so the snapshot above is the only record
+    # of these keys. Mirrors the img-warm thread idiom used after recruiting signing.
+    if master_keys:
+        try:
+            from BackEnd.api.player_image_routes import delete_master_keys
+            threading.Thread(
+                target=delete_master_keys,
+                args=(master_keys, fid),
+                name=f"img-gc-{str(fid)[:8]}",
+                daemon=True,
+            ).start()
+        except Exception:
+            logger.exception("[IMG-GC] could not start GC thread fid=%s", str(fid))
 
 
 @router.get("/franchise/list")
@@ -9498,11 +9525,29 @@ def delete_franchise_by_id(franchise_id: str, user: dict = Depends(get_current_u
     """
     Delete a specific franchise owned by the current user (and related FTD/FPD/FRD/games/press).
     Preferred path for multi-slot — never deletes a sibling.
+
+    IDEMPOTENT: deleting an id that no longer exists returns 200 with
+    ``already_gone: True`` rather than 404. Delete is retried in practice (a client
+    that times out or is refreshed mid-flight has no way to know the server finished),
+    and answering a completed delete with "not found" reads to the user as a refusal
+    on a franchise that is in fact gone. Ownership is still enforced: a franchise
+    belonging to someone else is 403, never a silent success, so the idempotent
+    branch can only ever be reached for an id that exists for nobody.
     """
-    doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
-    fid = doc["_id"]
-    _cascade_delete_franchise(fid)
-    return {"deleted": True, "count": 1, "franchise_id": str(fid)}
+    try:
+        oid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise_id")
+    doc = db.franchises.find_one({"_id": oid}, {"user_id": 1})
+    if not doc:
+        return {"deleted": False, "already_gone": True, "count": 0,
+                "franchise_id": franchise_id}
+    doc_user_id = doc.get("user_id")
+    if doc_user_id is None or str(doc_user_id) != str(user["user_id"]):
+        raise HTTPException(status_code=403, detail="Access denied to this franchise")
+    _cascade_delete_franchise(oid)
+    return {"deleted": True, "already_gone": False, "count": 1,
+            "franchise_id": str(oid)}
 
 
 @router.get("/franchise/command-center/data")

@@ -99,7 +99,7 @@ Per §6.4 of the v2 plan, users may upload a horizontal logo and player images. 
 **Store in R2, keyed by franchise.** Requirements:
 
 - **Normalize before storing** (§6.4) — read, draw to canvas at target dimensions, re-encode, store the normalized result. Never store the raw upload.
-- **Cascade delete.** `_cascade_delete_franchise` is the existing hook; it already cleans FPD, FTD, FRD and games.
+- **Cascade delete.** `_cascade_delete_franchise` is the existing hook; it already cleans FPD, FTD, FRD, games and press sessions, and snapshots R2 master keys before the FPD wipe so a background thread can batch-delete them (`Franchise_Delete_System.md`). Uploads should join that snapshot, not add a second inline network pass — the per-object serial loop it replaced is what made delete run for minutes.
 - **An orphan sweeper.** Cascade delete handles the happy path. A partial failure leaves objects nothing points at, and nothing will ever notice. A periodic job listing stored objects and dropping any whose franchise no longer exists is cheap now and unpleasant to retrofit.
 - **Per-franchise quota**, enforced at upload, so one user cannot become an unbounded cost.
 
