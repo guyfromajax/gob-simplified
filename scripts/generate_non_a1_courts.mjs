@@ -712,6 +712,8 @@ function main() {
   ensureDir(WORKDIR);
   const force = process.argv.includes("--force");
   const teamFilter = getArgValue("--team");
+  const outputOverride = getArgValue("--out");
+  const hardwoodOverride = getArgValue("--hardwood");
   const renderTemplateVariants = process.argv.includes("--render-template-variants");
   const oracleRender = process.argv.includes("--oracle-render");
 
@@ -756,6 +758,12 @@ function main() {
   }
 
   const teams = parseTeams();
+  if (outputOverride && !teamFilter) {
+    throw new Error("--out requires --team so only one court is written");
+  }
+  if (hardwoodOverride && !HARDWOOD_VARIANTS[hardwoodOverride]) {
+    throw new Error(`Unknown --hardwood value: ${hardwoodOverride}`);
+  }
   const existing = existingCourtSlugs();
   const eligible = teams.filter((team) => {
     if (team.slug === "general") return false;
@@ -765,6 +773,9 @@ function main() {
 
   const targets = eligible.filter((team) => {
     if (teamFilter && team.slug !== teamFilter) return false;
+    // An explicit output path is always a non-canonical, caller-selected target.
+    // Permit that preview render even when the team's production court exists.
+    if (outputOverride) return true;
     if (force) return true;
     return !existing.has(team.slug);
   });
@@ -780,11 +791,12 @@ function main() {
     .map((team) =>
       renderTeamCourt({
         team,
-        hardwoodKey: hardwoodAssignments.get(team.slug),
+        hardwoodKey: hardwoodOverride || hardwoodAssignments.get(team.slug),
         laneKey: laneAssignments.get(team.slug),
         halfCircleKey: halfCircleAssignments.get(team.slug),
         oobKey: oobAssignments.get(team.slug),
         lineKey: lineAssignments.get(team.slug),
+        outputOverride,
       })
     );
 

@@ -189,12 +189,19 @@ _ANIM_METHODS = [
     ("capture_fast_break_animation", "anim.capture_fast_break"),
     ("capture_free_throw_animation", "anim.capture_free_throw"),
     ("skeleton_to_animations", "anim.skeleton_to_animations"),
-    ("_build_all_animations", "anim.build_all_animations"),
     ("compute_defender_grid", "anim.compute_defender_grid"),
-    ("_position_fcp_defenders", "anim.position_defenders"),
-    ("_position_hct_zone_defenders", "anim.position_defenders"),
-    ("_position_zone_defenders", "anim.position_defenders"),
-    ("_position_standard_defenders", "anim.position_defenders"),
+]
+
+# Defender placement moved out of Animator into BackEnd.engine.defender_placement, so these are
+# patched as module FUNCTIONS rather than methods. They kept their labels: the whole point of
+# principle 7's before/after profile is that these buckets stay comparable across the move.
+# Patching them by their old Animator names would now bind nothing and report a silent zero.
+_PLACEMENT_FUNCS = [
+    ("build_all_animations", "anim.build_all_animations"),
+    ("position_fcp_defenders", "anim.position_defenders"),
+    ("position_hct_zone_defenders", "anim.position_defenders"),
+    ("position_zone_defenders", "anim.position_defenders"),
+    ("position_standard_defenders", "anim.position_defenders"),
 ]
 
 _STEP_EMITTERS = [
@@ -278,6 +285,9 @@ def install(verbose: bool = True) -> list[str]:
 
     for attr, label in _ANIM_METHODS:
         note(_patch_method(Animator, attr, label), f"{label}:{attr}")
+
+    for fn, label in _PLACEMENT_FUNCS:
+        note(_patch_function("BackEnd.engine.defender_placement", fn, label), f"{label}:{fn}")
 
     # --- schema step emission ----------------------------------------------
     for mod_path, fn in _STEP_EMITTERS:

@@ -1,0 +1,17 @@
+kind,matchup,seed,side,team,team_id,final_score,possessions,FGM,FGA,FG_pct,TPM,TPA,TP_pct,FTM,FTA,FT_pct,TO,OREB,DREB,REB,AST,STL,BLK,PF
+cpu_full,Upper Peninsula @ Durham,,home,Durham,DURHAM,77,63.44,25,50,50.0,4,15,26.67,23,26,88.46,11,9,25,34,16,7,7,15
+cpu_full,Upper Peninsula @ Durham,,away,Upper Peninsula,UPPER_PENINSULA,67,68.64,25,56,44.64,12,22,54.55,5,6,83.33,16,6,17,23,22,8,4,24
+cpu_full,Mynsk @ Nickel Beach,,home,Nickel Beach,NICKEL_BEACH,83,57.32,26,60,43.33,12,28,42.86,19,28,67.86,9,24,21,45,12,8,4,12
+cpu_full,Mynsk @ Nickel Beach,,away,Mynsk,MYNSK,39,55.92,10,34,29.41,4,13,30.77,15,18,83.33,16,2,13,15,7,7,2,23
+cpu_full,Sacred Heart @ IDA,,home,IDA,IDA,53,63.88,15,41,36.59,2,14,14.29,21,27,77.78,18,7,29,36,10,5,12,18
+cpu_full,Sacred Heart @ IDA,,away,Sacred Heart,SACRED_HEART,44,59.6,16,53,30.19,2,19,10.53,10,15,66.67,7,7,21,28,12,9,5,23
+cpu_full,Cleveland-Carlysle @ Cagers World,,home,Cagers World,CAGERS_WORLD,66,64.72,14,50,28.0,6,21,28.57,32,38,84.21,13,15,31,46,10,10,6,16
+cpu_full,Cleveland-Carlysle @ Cagers World,,away,Cleveland-Carlysle,CLEVELAND_CARLYSLE,52,71.04,17,58,29.31,7,26,26.92,11,16,68.75,19,13,26,39,10,7,6,24
+cpu_full,Ann Arbor @ Morristown,,home,Morristown,MORRISTOWN,80,65.36,18,46,39.13,7,22,31.82,37,44,84.09,14,14,17,31,11,8,5,14
+cpu_full,Ann Arbor @ Morristown,,away,Ann Arbor,ANN_ARBOR,70,63.84,26,58,44.83,9,26,34.62,9,11,81.82,16,15,16,31,15,11,4,39
+cpu_full,Hardwood Fields @ Chapel Hill,,home,Chapel Hill,CHAPEL_HILL,71,67.0,23,57,40.35,7,21,33.33,18,25,72.0,16,17,30,47,10,10,7,6
+cpu_full,Hardwood Fields @ Chapel Hill,,away,Hardwood Fields,HARDWOOD_FIELDS,43,64.76,17,49,34.69,7,22,31.82,2,4,50.0,17,3,20,23,12,6,5,28
+cpu_full,North Columbus @ Little York,,home,Little York,LITTLE_YORK,72,73.2,22,67,32.84,5,24,20.83,23,30,76.67,9,16,30,46,9,4,7,30
+cpu_full,North Columbus @ Little York,,away,North Columbus,NORTH_COLUMBUS,73,72.48,20,54,37.04,6,17,35.29,27,42,64.29,12,12,33,45,8,6,7,24
+cpu_full,Archbishop McClellan @ Appalachia,,home,Appalachia,APPALACHIA,57,62.52,22,51,43.14,8,25,32.0,5,8,62.5,15,7,21,28,14,8,5,26
+cpu_full,Archbishop McClellan @ Appalachia,,away,Archbishop McClellan,ARCHBISHOP_MCCLELLAN,78,65.72,22,57,38.6,4,23,17.39,30,38,78.95,9,17,25,42,9,8,2,11

@@ -21,6 +21,12 @@ from BackEnd.utils.shot_split_tracker import (
 )
 from BackEnd.utils.simulation_diagnostics import calibration_diagnostics_enabled
 from BackEnd.utils.shot_geometry import classify_shot_value, is_three_point_shot_from_coords
+from BackEnd.utils.free_throw_rules import (
+    apply_free_throw_award,
+    bonus_foul as ft_bonus_foul,
+    fixed_two as ft_fixed_two,
+    shooting_foul as ft_shooting_foul,
+)
 from BackEnd.constants.shot_threshold_scale import MAX as SHOT_THRESHOLD_MAX
 from BackEnd.constants import (
     LEAGUE_MEDIAN_HEIGHT_IN,
@@ -1268,14 +1274,10 @@ class ShotManager:
                         self.game_state["foul_team"] = "DEFENSE"
                         self.game_state["shooter"] = shooter
                         self.game_state["offensive_state"] = "FREE_THROW"
-                        if made_from_foul:
-                            self.game_state["free_throws"] = 1
-                            self.game_state["free_throws_remaining"] = 1
-                            self.game_state["one_and_one"] = False
-                        else:
-                            self.game_state["free_throws"] = 2
-                            self.game_state["free_throws_remaining"] = 2
-                            self.game_state["one_and_one"] = False
+                        apply_free_throw_award(
+                            self.game_state,
+                            ft_shooting_foul(is_three=is_three, made=made_from_foul),
+                        )
                         from BackEnd.engine.phase_resolution import check_and_handle_foul_out
                         block_recon_foul_out_info = check_and_handle_foul_out(defender, self.game_state, def_team, perform_removal=False)
                         record_official_field_goal_attempt(
@@ -1507,37 +1509,19 @@ class ShotManager:
 
                         # Final Turn attack: blocking foul always awards exactly 2 FTs (no and-1, no 3 FTs for three)
                         if self.game_state.get("final_turn") and shot_type == "attack":
+                            blocking_foul_award = ft_fixed_two()
+                        else:
+                            # Bonus status (reuse logic from resolve_non_shooting_foul): double
+                            # bonus at 10+, 1-and-1 at 5-9, side inbound below that.
+                            blocking_foul_award = ft_bonus_foul(def_team.team_fouls)
+                        apply_free_throw_award(self.game_state, blocking_foul_award)
+                        if blocking_foul_award.free_throws:
                             self.game_state["offensive_state"] = "FREE_THROW"
-                            self.game_state["free_throws"] = 2
-                            self.game_state["free_throws_remaining"] = 2
-                            self.game_state["one_and_one"] = False
-                            self.game_state["last_ball_handler"] = shooter
-                            self.game_state["shooter"] = shooter
-                            next_play_type = "FREE_THROW"
-                        # Check bonus status (reuse logic from resolve_non_shooting_foul)
-                        elif def_team.team_fouls >= 10:
-                            # Double bonus (10+ fouls): 2 free throws
-                            self.game_state["offensive_state"] = "FREE_THROW"
-                            self.game_state["free_throws"] = 2
-                            self.game_state["free_throws_remaining"] = 2
-                            self.game_state["one_and_one"] = False
-                            self.game_state["last_ball_handler"] = shooter
-                            self.game_state["shooter"] = shooter
-                            next_play_type = "FREE_THROW"
-                        elif def_team.team_fouls >= 5:
-                            # Bonus (5-9 fouls): 1 & 1 free throws
-                            self.game_state["offensive_state"] = "FREE_THROW"
-                            self.game_state["free_throws"] = 2  # Maximum possible
-                            self.game_state["free_throws_remaining"] = 1  # Start with 1 (front end)
-                            self.game_state["one_and_one"] = True
                             self.game_state["last_ball_handler"] = shooter
                             self.game_state["shooter"] = shooter
                             next_play_type = "FREE_THROW"
                         else:
-                            # Less than 5 fouls: side inbound, no free throws
                             self.game_state["offensive_state"] = "HCO"
-                            self.game_state["free_throws"] = 0
-                            self.game_state["free_throws_remaining"] = 0
                             next_play_type = "SIP"
 
                         # Early return: nullify shot attempt, return result for next turn
@@ -1981,8 +1965,9 @@ class ShotManager:
                 def_team.team_fouls += 1  # Increment team fouls for shooting foul
                 self.game_state["foul_team"] = "DEFENSE"
                 self.game_state["offensive_state"] = "FREE_THROW"
-                self.game_state["free_throws"] = 1
-                self.game_state["free_throws_remaining"] = 1
+                apply_free_throw_award(
+                    self.game_state, ft_shooting_foul(is_three=is_three, made=True)
+                )
                 # ✅ FIX: Set next_play_type for AND-1 situations
                 result["next_play_type"] = "FREE_THROW"
                 text = f"{get_name_safe(shooter)} makes the shot. {get_name_safe(foul_player)} fouls him! AND-1 opportunity!"
@@ -2127,8 +2112,9 @@ class ShotManager:
                 def_team.team_fouls += 1  # Increment team fouls for shooting foul
                 self.game_state["foul_team"] = "DEFENSE"
                 self.game_state["offensive_state"] = "FREE_THROW"
-                self.game_state["free_throws"] = 3 if is_three else 2
-                self.game_state["free_throws_remaining"] = self.game_state["free_throws"]
+                apply_free_throw_award(
+                    self.game_state, ft_shooting_foul(is_three=is_three, made=False)
+                )
                 # ✅ FIX: Set next_play_type for shooting fouls on missed shots (matches AND-1 pattern)
                 result["next_play_type"] = "FREE_THROW"
                 text = f"{get_name_safe(foul_player)} fouls {get_name_safe(shooter)} on the shot."

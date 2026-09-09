@@ -1,3 +1,4 @@
 FrontEnd/static/sounds/*.mp3 filter=lfs diff=lfs merge=lfs -text
 FrontEnd/static/sounds/*.wav filter=lfs diff=lfs merge=lfs -text
 FrontEnd/static/sounds/*.ogg filter=lfs diff=lfs merge=lfs -text
+FrontEnd/static/sounds/*.mp4 filter=lfs diff=lfs merge=lfs -text

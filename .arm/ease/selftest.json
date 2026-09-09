@@ -1,0 +1,22 @@
+{
+ "got": [
+  "STILL",
+  "DEPARTING",
+  "CONTINUING",
+  "ARRIVING",
+  "STILL",
+  "ONE_STEP_JOURNEY"
+ ],
+ "want": [
+  "STILL",
+  "DEPARTING",
+  "CONTINUING",
+  "ARRIVING",
+  "STILL",
+  "ONE_STEP_JOURNEY"
+ ],
+ "q": [
+  "STILL"
+ ],
+ "detector_ok": true
+}

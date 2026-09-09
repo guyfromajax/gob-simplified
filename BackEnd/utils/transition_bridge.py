@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import math
 import random
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 from BackEnd.constants import (
     INBOUND_PASS_GRID_PER_GAME_SECOND,
@@ -29,6 +29,7 @@ from BackEnd.utils.animation_step_helpers import (
     _player_lookup_by_id,
     pass_arrival_sfx,
     pass_release_sfx,
+    stamp_idle_wander_on_still_players,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -689,6 +690,68 @@ def _build_handoff_converge_substep(
     return {"start": start, "end": end}
 
 
+class _ContinueFromPrevious:
+    """Sentinel default for ``build_pass_step(continuing_targets=...)``.
+
+    Means "carry each player's unfinished movement forward from
+    ``previous_step``". It exists so that FREEZING the other eight players is
+    something a caller has to type, rather than what happens when nobody
+    decides. See projects/animation_cleanup_findings.md §2 (root cause #1):
+    the old ``None`` default made every non-opted-in builder freeze the court,
+    which is why the fast-break freeze survived five or six fixes -- each fix
+    populated one call site and the default reintroduced it at the next.
+    """
+
+    __slots__ = ()
+
+    def __repr__(self) -> str:  # pragma: no cover - debugging aid
+        return "CONTINUE_FROM_PREVIOUS"
+
+
+CONTINUE_FROM_PREVIOUS = _ContinueFromPrevious()
+
+
+def _continuing_targets_from_previous_step(
+    *,
+    previous_step: Optional[AnimationStep],
+    start_coords: Dict[str, GridCoord],
+    exclude: tuple = (),
+) -> Optional[Dict[str, GridCoord]]:
+    """Derive per-player continuing targets from the prior step's intent.
+
+    ``end.coords`` says where a player actually reached; the prior step's
+    ``start.destination`` retains where he was still TRYING to go. Continue only
+    players with meaningful remaining distance. Mirrors the rule in
+    ``rim_runner_step_emitter._initialize_continuing_movement``; kept local so
+    ``utils`` does not import from ``engine``.
+
+    Returns ``None`` (freeze) when there is no prior step to read, so a caller
+    that cannot supply one degrades to the old behaviour instead of raising.
+    """
+    if not previous_step:
+        return None
+
+    prior_start = previous_step.get("start") or {}
+    prior_destinations = prior_start.get("destination") or {}
+
+    targets: Dict[str, GridCoord] = {}
+    for pid, start_coord in start_coords.items():
+        if pid in exclude:
+            continue
+        target = prior_destinations.get(pid)
+        if not target:
+            continue
+        try:
+            coord: GridCoord = {"x": float(target["x"]), "y": float(target["y"])}
+        except (KeyError, TypeError, ValueError):
+            continue
+        if _euclid(start_coord, coord) < 1e-6:
+            continue
+        targets[pid] = coord
+
+    return targets or None
+
+
 def build_pass_step(
     *,
     off_lineup: Dict[str, Any],
@@ -696,7 +759,10 @@ def build_pass_step(
     start_coords: Dict[str, GridCoord],
     passer_id: str,
     receiver_id: str,
-    continuing_targets: Optional[Dict[str, GridCoord]] = None,
+    continuing_targets: Union[Dict[str, GridCoord], None, _ContinueFromPrevious] = (
+        CONTINUE_FROM_PREVIOUS
+    ),
+    previous_step: Optional[AnimationStep] = None,
     continuing_archetype: PlayerArchetype = "standard",
     clock_remaining_at_start: float,
     shot_clock_remaining_at_start: float,
@@ -707,9 +773,14 @@ def build_pass_step(
     """Universal Pass step. Strict shape: passer + receiver stationary while
     the ball arcs between them; gated on ``ball_reaches_player``.
 
-    Other 8 players optionally drift toward per-player ``continuing_targets``
-    at ``continuing_archetype`` rate (interrupted by step duration). Pass
-    over ``continuing_targets=None`` to freeze everyone except passer/receiver.
+    Other 8 players drift toward per-player ``continuing_targets`` at
+    ``continuing_archetype`` rate (interrupted by step duration).
+
+    ``continuing_targets`` defaults to ``CONTINUE_FROM_PREVIOUS``: targets are
+    derived from ``previous_step``'s retained destinations, so players who were
+    still moving keep moving. Pass an explicit dict to choose targets, or an
+    explicit ``None`` to freeze everyone except passer/receiver -- the freeze is
+    now a decision a caller states, not the default nobody chose.
 
     Step duration = pass distance / pass speed (floor: FB_PASS_MIN_GAME_SECONDS).
 
@@ -736,6 +807,13 @@ def build_pass_step(
 
     actions[passer_id] = "pass"
     actions[receiver_id] = "receive"
+
+    if continuing_targets is CONTINUE_FROM_PREVIOUS:
+        continuing_targets = _continuing_targets_from_previous_step(
+            previous_step=previous_step,
+            start_coords=start_coords,
+            exclude=(passer_id, receiver_id),
+        )
 
     if continuing_targets:
         for pid, target in continuing_targets.items():
@@ -1307,7 +1385,35 @@ def build_bip_animation_steps(
         step["start"]["clock"]["clock_remaining"] = pinned_game_clock
         step["end"]["clock"]["clock_remaining"] = pinned_game_clock
 
-    return [step1, step2, step3, pass_step]
+    bip_steps = [step1, step2, step3, pass_step]
+    _stamp_inbound_idles(bip_steps, off_lineup, def_lineup, passer_id=sf_id)
+    return bip_steps
+
+
+def _stamp_inbound_idles(steps, off_lineup, def_lineup, *, passer_id) -> int:
+    """Give the players standing around on an inbound a render-space idle.
+
+    An inbound is a dead-ball reset: nine men jostle for position while one puts the ball in
+    play. SIDE_INBOUND measured 66.7% still per player-step and BASELINE_INBOUND 60.0%, and
+    neither emitter contained the word "flourish" before this. The passer is excluded — he has a
+    real job, and a man about to make a pass should not be shifting his weight.
+
+    ``on_court`` is not optional here. BASELINE_INBOUND steps carry 16 to 20 player ids in
+    ``start.coords`` rather than ten, so stamping straight off the coord map would hand the
+    renderer sprites for players who are not in the game.
+    """
+    on_court = {
+        str(getattr(p, "player_id", "") or "")
+        for lineup in (off_lineup or {}, def_lineup or {})
+        for p in (lineup or {}).values()
+        if p is not None and getattr(p, "player_id", None)
+    }
+    return stamp_idle_wander_on_still_players(
+        steps,
+        family="inbound",
+        exclude=[passer_id] if passer_id else (),
+        on_court=on_court or None,
+    )
 
 
 def build_sip_animation_steps(
@@ -1446,7 +1552,9 @@ def build_sip_animation_steps(
         step["start"]["clock"] = dict(pinned_clock)
         step["end"]["clock"] = dict(pinned_clock)
 
-    return [setup_step, hold_step, pass_step]
+    sip_steps = [setup_step, hold_step, pass_step]
+    _stamp_inbound_idles(sip_steps, off_lineup, def_lineup, passer_id=sf_id)
+    return sip_steps
 
 
 def build_ot_to_hco_bridge_steps(

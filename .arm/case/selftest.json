@@ -1,0 +1,21 @@
+{
+ "selftest": {
+  "HCO_STRING_SPOTS": {
+   "hit": 1,
+   "miss_crossing": 1,
+   "miss_unknown": 1
+  },
+  "THREE_POINT_SPOTS": {
+   "hit": 1,
+   "miss_crossing": 1,
+   "miss_unknown": 0
+  }
+ },
+ "detector_ok": true,
+ "rebound_sites": {
+  "HCO_STRING_SPOTS": 7,
+  "OFFSET_SPOTS": 2,
+  "THREE_POINT_SPOTS": 1,
+  "PAINT_SPOTS": 1
+ }
+}

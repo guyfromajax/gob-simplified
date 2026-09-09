@@ -1,0 +1,9 @@
+{
+ "seed": 1,
+ "err": null,
+ "n_steps": 825,
+ "fb_steps": 54,
+ "knot_steps": 2,
+ "knot_player_tweens": 2,
+ "moving_player_tweens": 3842
+}

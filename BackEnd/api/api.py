@@ -170,6 +170,7 @@ try:
     from .feedback_routes import router as feedback_router
     from .alpha_feedback_routes import router as alpha_feedback_router
     from .email_routes import router as email_router
+    from .billing_routes import router as billing_router
     from BackEnd.utils.auth import get_current_user
     from BackEnd.utils.ownership import verify_game_owned_by_user
     import traceback
@@ -497,6 +498,17 @@ try:
     app.include_router(feedback_router)
     app.include_router(alpha_feedback_router)
     app.include_router(email_router)
+    app.include_router(billing_router)
+
+    # One line at startup naming the billing posture (enabled? which Stripe mode?).
+    # Cheap, and it makes "is prod still on test keys?" answerable from the logs
+    # rather than from someone's memory of what they set in Railway.
+    try:
+        from BackEnd.services.stripe_client import log_configuration_at_boot
+        log_configuration_at_boot()
+    except Exception as _billing_log_exc:
+        print(f"⚠️ [BILLING] could not log configuration: {_billing_log_exc}",
+              file=sys.stderr, flush=True)
 
     @app.get("/debug/server-state")
     def debug_server_state():
@@ -1652,6 +1664,16 @@ try:
             gm.game_state["time_remaining"] = saved["time_remaining"]
         if "shot_clock_remaining" in saved:
             gm.game_state["shot_clock_remaining"] = saved["shot_clock_remaining"]
+        # Possession-scoped frontcourt state travels with the shot clock — same
+        # lifetime, same reset boundary. game_state is restored key-by-key, so a
+        # key with no line here is silently lost on every reload.
+        # Possession-scoped frontcourt state travels with the shot clock — same
+        # lifetime, same reset boundary. game_state is restored key-by-key, so a
+        # key with no line here is silently lost on every reload.
+        if "frontcourt_established" in saved:
+            gm.game_state["frontcourt_established"] = bool(saved["frontcourt_established"])
+        if "frontcourt_ratcheted" in saved:
+            gm.game_state["frontcourt_ratcheted"] = list(saved["frontcourt_ratcheted"] or [])
         
         # Update scores
         if "score" in saved and isinstance(saved["score"], dict):
@@ -1805,6 +1827,15 @@ try:
         if "shot_clock_remaining" in saved:
             gm.game_state["shot_clock_remaining"] = saved["shot_clock_remaining"]
             logging.debug(f"🔄 TIMEOUT RESUME: Restored shot_clock_remaining={saved['shot_clock_remaining']} from saved document")
+        # A timeout is a MID-POSSESSION boundary: the same team keeps the ball, so
+        # frontcourt state must survive it. Restoring is the whole point here —
+        # resetting would hand the offense a fresh 10-second count for having
+        # called timeout after crossing half court.
+        if "frontcourt_established" in saved:
+            gm.game_state["frontcourt_established"] = bool(saved["frontcourt_established"])
+            logging.debug(f"🔄 TIMEOUT RESUME: Restored frontcourt_established={saved['frontcourt_established']} from saved document")
+        if "frontcourt_ratcheted" in saved:
+            gm.game_state["frontcourt_ratcheted"] = list(saved["frontcourt_ratcheted"] or [])
         
         # ✅ COMPUTER TIMEOUT: Restore per-quarter count and checked_conditions (enforces max 1 per quarter Q1–Q3 after DB load)
         if "computer_timeouts" in saved and saved["computer_timeouts"]:
@@ -5730,6 +5761,11 @@ try:
                             gm.game_state["time_remaining"] = _saved["time_remaining"]
                         if "shot_clock_remaining" in _saved:
                             gm.game_state["shot_clock_remaining"] = _saved["shot_clock_remaining"]
+                        # Same lifetime as the shot clock (see summarize_game_state).
+                        if "frontcourt_established" in _saved:
+                            gm.game_state["frontcourt_established"] = bool(_saved["frontcourt_established"])
+                        if "frontcourt_ratcheted" in _saved:
+                            gm.game_state["frontcourt_ratcheted"] = list(_saved["frontcourt_ratcheted"] or [])
                         logging.info(
                             "💾 COMPUTER TIMEOUT: Restored clock from persisted doc for lineup/resume: clock=%s time_remaining=%s",
                             gm.game_state.get("clock"), gm.game_state.get("time_remaining"),

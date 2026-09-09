@@ -277,9 +277,12 @@ export function normalizeHeadshotUrl(url) {
 /** Build player headshot URL via the central resolver (R2 + transforms). `photo` is
  * kept for signature compatibility but ignored — id-based remote URL is canonical.
  * Card img onerror maps to generic. */
-export function getPlayerImageUrl(photo, playerId) {
+export function getPlayerImageUrl(photo, playerId, uniformKey) {
   if (typeof window !== 'undefined' && window.API_CONFIG?.getPlayerImageUrl) {
-    return window.API_CONFIG.getPlayerImageUrl(playerId, { size: 'card' });
+    // uniformKey addresses the shared archive object directly. Preferring it means
+    // the request hits a painted object first time instead of missing and waiting
+    // on a paint. Falls back to the per-player master when absent.
+    return window.API_CONFIG.getPlayerImageUrl(playerId, { size: 'card', uniformKey });
   }
   const base = (typeof window !== 'undefined' && (window.location?.hostname === 'localhost' || window.location?.hostname === '127.0.0.1')) ? '/static/images/players/' : '/images/players/';
   const filename = playerId ? `${playerId}.png` : 'generic_headshot.png';

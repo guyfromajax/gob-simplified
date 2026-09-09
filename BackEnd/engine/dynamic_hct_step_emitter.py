@@ -46,6 +46,7 @@ from BackEnd.utils.animation_step_helpers import (
     drift_or_hold_coord,
     pass_arrival_sfx,
     pass_release_sfx,
+    stamp_idle_wander_on_still_players,
     stamp_tween_durations,
 )
 from BackEnd.utils.animation_step_schema import (
@@ -969,6 +970,42 @@ def _build_ab_drive_step(
     return {"start": start, "end": end}
 
 
+def _stamp_pressure_idles(steps, off_lineup, def_lineup, *, bh_id, turn_result) -> int:
+    """Give the off-ball men on a pressure possession a render-space idle.
+
+    Covers BOTH families from one site: ``build_dynamic_fcp_animation_steps`` delegates its whole
+    body to this builder, so FCP and HCT share this call. They are stamped under SEPARATE family
+    names so ``animation_config.js`` can tune them apart — a press break and a half-court trap
+    are different-looking moments — keyed off the ``fcp_*`` aliases the FCP wrapper stamps.
+
+    ``bh_id`` is excluded: he is the ball handler working against pressure and has a real job.
+    The on-ball defender needs no exclusion here — ``_stamp_reach_in`` already gives him a
+    ``reach_in`` flourish and the helper never overwrites an existing one.
+    """
+    is_fcp = (
+        turn_result.get("fcp_loop_segments") is not None
+        or bool(turn_result.get("fcp_skip_walk_up"))
+    )
+    return stamp_idle_wander_on_still_players(
+        steps,
+        family="fcp" if is_fcp else "hct",
+        exclude=[bh_id] if bh_id else (),
+        on_court=_pressure_player_ids(off_lineup, def_lineup) or None,
+    )
+
+
+def _pressure_player_ids(off_lineup: Dict[str, Any], def_lineup: Dict[str, Any]) -> List[str]:
+    ids: List[str] = []
+    for lineup in (off_lineup, def_lineup):
+        for player in (lineup or {}).values():
+            if player is None:
+                continue
+            pid = getattr(player, "player_id", None)
+            if pid:
+                ids.append(str(pid))
+    return ids
+
+
 def build_dynamic_hct_animation_steps(
     turn_result: Dict[str, Any],
     game: Any,
@@ -1628,6 +1665,12 @@ def build_dynamic_hct_animation_steps(
     # turn_stop's next pointer and appends a fumble beat). Keep the emitter
     # return boundary authoritative: every returned pressure step goes through
     # PressureStepState projection with its final index and final next pointer.
+    # BEFORE the projection pass, deliberately. `_pressure_step_state.schema_projection` is a
+    # complete snapshot of the emitted step during the Step 8 migration, so stamping after
+    # projection would leave the snapshot stale — and the flourish would vanish the moment
+    # `projection_source` flips to "formal" and the step is rebuilt from the state.
+    _stamp_pressure_idles(steps, off_lineup, def_lineup, bh_id=bh_id, turn_result=turn_result)
+
     for idx, step in enumerate(list(steps)):
         steps[idx] = _project_pressure_step(
             step,

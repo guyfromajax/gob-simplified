@@ -1,8 +1,13 @@
 """
 Re-populate gob-staging universal teams collection from teams/128_teams.txt.
-Deletes all existing team docs and inserts 128 with: name, mascot, team_id,
+Upserts 128 teams on the stable ``team_id`` slug with: name, mascot, team_id,
 primary_color, secondary_color, region, conference, prestige, player_ids, and
-zeroed team attributes (for Single/Tournament/Franchise init).
+zeroed team attributes (for Single/Tournament/Franchise init). Slugs absent from
+the TSV are deleted.
+
+Existing ObjectIds are PRESERVED. Do not go back to delete_many + insert_many:
+_id churn here propagates to production via publish_universal_data.py and orphans
+`user_team_object_id` / FTD `team_id` on every franchise created before the reseed.
 
 TSV columns: id, team, mascot, team_id, primary_color, secondary_color, conference, region, prestige
 Region is letter (A–H). Run from repo root: python3 scripts/repopulate_teams_gob_staging.py
@@ -70,11 +75,19 @@ def main():
     if len(rows) != 128:
         print(f"⚠️ Expected 128 rows, got {len(rows)}. Proceeding anyway.")
 
-    existing_count = teams_coll.count_documents({})
-    deleted = teams_coll.delete_many({}).deleted_count if args.apply else existing_count
-    print(f"[{DB_NAME}] {'Deleted' if args.apply else 'Would delete'} {deleted} existing team(s).")
+    # Upsert on the stable ``team_id`` slug so existing ObjectIds SURVIVE a reseed.
+    # The old delete_many + insert_many minted fresh _ids every run; publish_universal_data
+    # then copies those _ids into production, orphaning `user_team_object_id` and every FTD
+    # `team_id` on franchises created before the reseed (they render raw ObjectIds and blank
+    # opponents). replace_one keeps the matched doc's _id while producing a document
+    # byte-identical to what insert_many used to write.
+    slugs = [row["team_id"] for row in rows]
+    duplicate_slugs = {s for s in slugs if slugs.count(s) > 1}
+    if duplicate_slugs:
+        print(f"⚠️ Duplicate team_id slug(s) in TSV: {sorted(duplicate_slugs)}. Last row wins.")
 
-    docs = []
+    inserted = 0
+    updated = 0
     for row in rows:
         doc = {
             "name": row["name"],
@@ -88,12 +101,33 @@ def main():
             "player_ids": [],
             **TEAM_ATTRS_ZERO,
         }
-        docs.append(doc)
+        if args.apply:
+            result = teams_coll.replace_one({"team_id": row["team_id"]}, doc, upsert=True)
+            if result.upserted_id is not None:
+                inserted += 1
+            else:
+                updated += 1
+        elif teams_coll.count_documents({"team_id": row["team_id"]}, limit=1):
+            updated += 1
+        else:
+            inserted += 1
 
-    if docs and args.apply:
-        teams_coll.insert_many(docs)
-    print(f"[{DB_NAME}] {'Inserted' if args.apply else 'Would insert'} {len(docs)} team(s).")
-    print("Done.")
+    verb = "Kept _id on" if args.apply else "Would keep _id on"
+    print(f"[{DB_NAME}] {verb} {updated} existing team(s); "
+          f"{'inserted' if args.apply else 'would insert'} {inserted} new team(s).")
+
+    # Slugs no longer in the TSV must go, or the collection drifts past 128.
+    stale_filter = {"team_id": {"$nin": slugs}}
+    stale = teams_coll.count_documents(stale_filter)
+    if stale:
+        if args.apply:
+            teams_coll.delete_many(stale_filter)
+        print(f"[{DB_NAME}] {'Deleted' if args.apply else 'Would delete'} "
+              f"{stale} team(s) whose slug is absent from the TSV.")
+
+    label = "Total teams" if args.apply else "Total teams (before any change)"
+    print(f"[{DB_NAME}] {label}: {teams_coll.count_documents({})}")
+    print("Done." if args.apply else "Dry run — pass --apply to write.")
     connection.close()
 
 

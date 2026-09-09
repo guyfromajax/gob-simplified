@@ -75,20 +75,36 @@ def override_auth_for_tests():
 
 
 @pytest.fixture(autouse=True)
-def seed_canonical_teams_for_mongomock():
-    """Mongomock starts empty; API tests need teams.name → team_id for summarize_game_state keys."""
-    from BackEnd.db import teams_collection
+def seed_canonical_teams_for_mongomock(request):
+    """Mongomock starts empty; API tests need teams.name → team_id for summarize_game_state
+    keys, and anything that tips off needs five eligible bodies to seat or
+    ``build_lineup_from_mongo`` raises. See tests/roster_fixtures.py, which also documents
+    the one module that must keep an empty roster.
+    """
+    from BackEnd.db import players_collection, teams_collection
 
-    for name, team_id in (
-        ("Morristown", "MORRISTOWN"),
-        ("Lancaster", "LANCASTER"),
-        ("Bentley-Truman", "BENTLEY_TRUMAN"),
-    ):
-        teams_collection.update_one(
-            {"name": name},
-            {"$set": {"name": name, "team_id": team_id}},
-            upsert=True,
-        )
+    from tests.roster_fixtures import seed_universal_rosters
+
+    seed_universal_rosters(
+        teams_collection, players_collection, module_name=request.path.stem
+    )
+    yield
+
+
+@pytest.fixture(autouse=True)
+def seed_rng_streams(request, override_auth_for_tests, seed_canonical_teams_for_mongomock):
+    """Pin every RNG stream per test, so a subset run reproduces the full-suite result.
+
+    Depends on the other two autouse fixtures ON PURPOSE, to run LAST. Seeding earlier
+    would not survive them: ``seed_canonical_teams_for_mongomock`` does a variable amount
+    of mongomock work depending on what the previous test left behind, and DB writes
+    consume the stdlib stream (see tests/rng_fixtures.py). The test body would then start
+    from a stream position that depends on its predecessors — the very coupling this
+    removes.
+    """
+    from tests.rng_fixtures import seed_all_streams
+
+    seed_all_streams(request.node.nodeid)
     yield
 
 

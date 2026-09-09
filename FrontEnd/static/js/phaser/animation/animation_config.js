@@ -107,6 +107,38 @@ const defaults = {
     minBpm: 75,
     maxBpm: 750,
   },
+  // Continuity-aware movement curves (defect 1). The backend stamps an INTENT per player per
+  // step — ease_in / ease_out / ease_in_out — in step.start.movement_curve, and this table is
+  // the only place those names become Phaser curves. A player with no entry renders linear,
+  // which is deliberate: mid-journey steps MUST stay linear or a multi-step crossing pulses
+  // once per step, which is worse than the constant velocity we have now.
+  //
+  // FOR JAMIE — three knobs, and the point is to see the extremes in one sitting:
+  //   1. departureEasing false vs true. False is the doc's "arrival only" rule: players snap
+  //      to full speed from a dead stop but decelerate into their destination. True also eases
+  //      them up from rest. 23.1% of moving steps are departures, so this is a visible amount
+  //      of the game, not a detail.
+  //   2. strength. 'subtle' / 'standard' / 'assertive' below. Standard ships. Look at all
+  //      three — this codebase's repeated failure has been TOO SUBTLE (the 1-inch heartbeat
+  //      was invisible), so if standard reads as nothing the answer is assertive, not "easing
+  //      does not work".
+  //   3. enabled false restores linear everywhere for an A/B against today's build.
+  movementCurve: {
+    enabled: true,
+    // false => option (a) in the brief: ease_in becomes linear and ease_in_out becomes a pure
+    // arrival curve, so only decelerations are eased.
+    departureEasing: true,
+    strength: 'standard',
+    strengths: {
+      // Sine is the gentlest curve that is still a curve.
+      subtle: { ease_in: 'Sine.easeIn', ease_out: 'Sine.easeOut', ease_in_out: 'Sine.easeInOut' },
+      // Quad reads as a person starting and stopping rather than a sprite being interpolated.
+      standard: { ease_in: 'Quad.easeIn', ease_out: 'Quad.easeOut', ease_in_out: 'Quad.easeInOut' },
+      // Cubic is a hard plant. Likely too much for a drift, possibly right for a sprint.
+      assertive: { ease_in: 'Cubic.easeIn', ease_out: 'Cubic.easeOut', ease_in_out: 'Cubic.easeInOut' },
+    },
+    linear: 'Linear',
+  },
   // Flourishes: in-place "micro-movements" rendered in RENDER SPACE only (like
   // the heartbeat — never mutates gameplay x/y). Per-kind defaults used when the
   // backend Flourish payload omits a field. See flourishes.js + animationStepSchema.js.
@@ -147,6 +179,84 @@ const defaults = {
     idleWander: {
       radiusGrid: 1.0, // Max render-space drift radius (grid units); no gameplay coord change
       durationMs: 900, // Fallback when the backend omits a per-beat duration
+      // PER-FAMILY IDLE KNOBS. The backend stamps a `family` on every idle_wander flourish and
+      // the raw per-style amplitude; these dial it by eye without a backend round-trip.
+      //
+      // One grid unit is almost exactly one foot (the 100x50 grid maps to a 94ft x 50ft court),
+      // so amplitudes are readable as real distances. Raw style amplitudes are jockey 0.6ft,
+      // shuffle 1.0ft, jab 1.2ft, survey_rock 0.5ft — sized for players already travelling.
+      //
+      //   amplitudeScale  multiplies the backend amplitude. 0.6 = the -40% ship default for
+      //                   still players, 1.0 = no reduction, 0.3 = -70%. Worth looking at all
+      //                   three: the always-on heartbeat is ~1 inch and is invisible, so TOO
+      //                   SUBTLE is the failure mode this codebase already has. If -40% reads
+      //                   as nothing on screen the answer is to go up, not to conclude the
+      //                   mechanism is broken.
+      //   style           forces a style; null keeps the backend's pick (geography-aware on
+      //                   HCO, a family default elsewhere). One of jockey | jab | shuffle |
+      //                   survey_rock.
+      byFamily: {
+        // Half-court offense between beats. Keeps the geography-aware style the resolver
+        // rolled — an inside player jockeys, a perimeter defender shuffles.
+        // Half-court offense between beats, and DEAD BALL — those steps resolve through the
+        // same emitter, so they arrive under this family. Keeps the geography-aware style the
+        // resolver rolled: an inside player jockeys (~4in), a perimeter defender shuffles
+        // (~7in), a perimeter off-ball player jabs (~9in).
+        hco_still: { amplitudeScale: 0.6, style: null },
+        // Free throw, the worst family at 82.1% still and the one the viewer stares at
+        // hardest. survey_rock is a gentle lateral weight shift — ~3.5in here. Ten men on the
+        // lane should look like they are waiting, which is small and slow, not restless.
+        free_throw: { amplitudeScale: 0.6, style: 'survey_rock' },
+        // Inbound, 66.7% still on the side and 60.0% on the baseline. Bodies jostling for
+        // position off the ball, so jockey — a grounded lean at ~4in. The passer gets none.
+        inbound: { amplitudeScale: 0.6, style: 'jockey' },
+        // The zero-clock beat after a bucket. Players reset and breathe rather than jostle,
+        // so survey_rock at ~3.5in.
+        make_hold: { amplitudeScale: 0.6, style: 'survey_rock' },
+        // Offensive rebound, 62.0% still. This is the one family where the men are LEANING ON
+        // EACH OTHER — boxing out is a legs-and-hips contest, not a wait — so it gets the
+        // widest amplitude of the set: jockey at scale 1.0, a full ~7in grounded lean rather
+        // than the -40% still-player reduction. Anything smaller reads as ten men politely
+        // watching a rebound. The putback shooter and the second rebounder are excluded in the
+        // backend; the rattle hold is excluded by the 60ms floor.
+        oreb: { amplitudeScale: 1.0, style: 'jockey' },
+        // Full-court press break, 48.2% still. Off-ball men are shifting their feet waiting to
+        // receive against pressure — live but stationary, so shuffle at the -40% default
+        // (~7in raw, ~4in here). Smaller than OREB: nobody is leaning on anybody yet.
+        fcp: { amplitudeScale: 0.6, style: 'shuffle' },
+        // Half-court trap, 44.9% still. Same motion as the press break but in a tighter space,
+        // so the same style one notch smaller — a trapped possession should not look busier
+        // than a rebound.
+        hct: { amplitudeScale: 0.5, style: 'shuffle' },
+        // ARRIVAL SETTLE (defect 2) — the biggest population in the workstream, and the only
+        // family that is NOT a standing player. This man has just travelled, reached his
+        // target early, and would otherwise stand dead for the rest of the step: 703.4 s per
+        // game, 31.7% of the time moving sprites are on screen.
+        //
+        // Its own family precisely because it is a different motion. A man who has been
+        // standing around shifts his weight idly; a man who has just sprinted and stopped
+        // DECELERATES INTO A SETTLE — he is planting, absorbing, squaring up. jockey is the
+        // grounded lean-and-jostle rather than a float, which is the closest of the four to
+        // that, and it is why this does not simply inherit hco_still.
+        //
+        // FOR JAMIE — bracket these three, and note that the aesthetic failure mode here is
+        // FIDGETING rather than invisibility, which is the opposite of every previous family:
+        //   · minTailMs — the threshold, in ms of dead tail, below which a pause is left alone.
+        //     The backend already refuses anything under 60ms (24.7% of tails, imperceptible).
+        //     150 ships: it takes everything from the 150-300ms band up, which is 56.8% of
+        //     tails, on the reasoning that 300ms+ (30.8%) is unarguably visible and the
+        //     150-300ms band probably is. Try 300 for "only fill the obvious pauses" and 60 for
+        //     "fill everything the eye could possibly catch".
+        //   · amplitudeScale — 0.6 ships, matching the still-player families (~4in of lean).
+        //     A settle should be smaller than a box-out, not larger.
+        //   · enabled: false for a clean A/B against the current dead tails.
+        arrival_settle: {
+          amplitudeScale: 0.6,
+          style: 'jockey',
+          minTailMs: 150,
+          enabled: true,
+        },
+      },
     },
   },
   dunk: {
@@ -178,6 +288,14 @@ export const animationConfig = {
   inbound: { ...defaults.inbound, ...(overrides.inbound || {}) },
   shot: { ...defaults.shot, ...(overrides.shot || {}) },
   kickout: { ...defaults.kickout, ...(overrides.kickout || {}) },
+  movementCurve: {
+    ...defaults.movementCurve,
+    ...(overrides.movementCurve || {}),
+    strengths: {
+      ...defaults.movementCurve.strengths,
+      ...(overrides.movementCurve?.strengths || {}),
+    },
+  },
   steal: { ...defaults.steal, ...(overrides.steal || {}) },
   rebound: {
     bounceArea: {
@@ -205,7 +323,17 @@ export const animationConfig = {
     gather: { ...defaults.flourish.gather, ...(overrides.flourish?.gather || {}) },
     fumble: { ...defaults.flourish.fumble, ...(overrides.flourish?.fumble || {}) },
     hack: { ...defaults.flourish.hack, ...(overrides.flourish?.hack || {}) },
-    idleWander: { ...defaults.flourish.idleWander, ...(overrides.flourish?.idleWander || {}) },
+    idleWander: {
+      ...defaults.flourish.idleWander,
+      ...(overrides.flourish?.idleWander || {}),
+      // Merged per family, so overriding one family's amplitudeScale doesn't drop the rest.
+      byFamily: Object.fromEntries(
+        Object.entries(defaults.flourish.idleWander.byFamily).map(([family, famDefaults]) => [
+          family,
+          { ...famDefaults, ...(overrides.flourish?.idleWander?.byFamily?.[family] || {}) },
+        ]),
+      ),
+    },
   },
   dunk: { ...defaults.dunk, ...(overrides.dunk || {}) },
   possession: {
@@ -230,5 +358,30 @@ animationConfig.outletSetup = {
   easing:
     overrides.outletSetup?.easing ?? animationConfig.pass.easing,
 };
+
+/**
+ * Map a backend movement-curve INTENT to a Phaser easing string.
+ *
+ * The backend stamps only the three eased cases; anything else — mid-journey, standing still,
+ * an unrecognised name from a future backend — resolves to linear. Defaulting to linear rather
+ * than to a curve is the safe direction: an unstamped mid-journey step that accidentally eased
+ * would reintroduce the per-step pulsing this whole mechanism exists to avoid.
+ *
+ * @param {string|null|undefined} intent 'ease_in' | 'ease_out' | 'ease_in_out'
+ * @returns {string} a Phaser ease name
+ */
+export function resolveMovementCurve(intent) {
+  const cfg = animationConfig.movementCurve || {};
+  const linear = cfg.linear || 'Linear';
+  if (!cfg.enabled || !intent) return linear;
+  const table = (cfg.strengths || {})[cfg.strength] || {};
+  if (cfg.departureEasing === false) {
+    // Option (a): decelerations only. A pure departure has nothing to ease, and a one-step
+    // journey keeps its arrival half.
+    if (intent === 'ease_in') return linear;
+    if (intent === 'ease_in_out') return table.ease_out || linear;
+  }
+  return table[intent] || linear;
+}
 
 export default animationConfig;

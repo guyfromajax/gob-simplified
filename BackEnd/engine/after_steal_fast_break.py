@@ -89,6 +89,10 @@ from BackEnd.constants import (
 from BackEnd.constants.fast_break_play_types import AFTER_STEAL
 from BackEnd.constants.momentum import MO_AND_ONE_DELTA
 from BackEnd.constants.shot_threshold_scale import MID as SHOT_THRESHOLD_MID
+from BackEnd.utils.free_throw_rules import (
+    apply_free_throw_award,
+    shooting_foul as ft_shooting_foul,
+)
 from BackEnd.utils.player_momentum import apply_made_dunk_momentum
 from BackEnd.utils.shot_split_tracker import record_shot_split
 from BackEnd.utils.animation_step_helpers import (
@@ -557,17 +561,16 @@ def _resolve_after_steal_legacy(game: Any) -> Dict[str, Any]:
         game_state["foul_team"] = "DEFENSE"
         game_state["shooter"] = stealer
         game_state["offensive_state"] = "FREE_THROW"
-        game_state["free_throws"] = 1 if made else 2
-        game_state["free_throws_remaining"] = game_state["free_throws"]
-        game_state["one_and_one"] = False
+        # is_three is a literal False on this path (drive-to-the-rim finish), but the count
+        # still comes from the shared rule so the branch cannot drift if that ever changes.
+        ft_award = apply_free_throw_award(
+            game_state, ft_shooting_foul(is_three=is_three, made=made)
+        )
         fouled_out_info = check_and_handle_foul_out(
             foul_player, game_state, def_team, perform_removal=False
         )
-        if made:
-            has_and_one = True
-            free_throws_remaining = 1
-        else:
-            free_throws_remaining = 2
+        has_and_one = made
+        free_throws_remaining = ft_award.remaining
 
     # Player Momentum (Player_Momentum_System.md): this self-contained shot path
     # bypasses ShotManager.resolve_shot, so record the FG attempt for the

@@ -32,7 +32,7 @@
 - **Create:** hard cap of two through `MAX_FRANCHISES_PER_USER`; creation allocates a stable `home_slot`.
 - **List:** `GET /franchise/list` returns both owned franchises in slot order.
 - **Current:** transitional `GET /franchise/current` is not used to drive the dual-slot UI.
-- **Delete:** `DELETE /franchise/{franchise_id}` verifies ownership and cascades; legacy delete-current returns 409 when it would be ambiguous.
+- **Delete:** `DELETE /franchise/{franchise_id}` verifies ownership and cascades; **idempotent** — an id that no longer exists returns `200 {already_gone: true}`, not 404 (wrong owner is still 403). Legacy delete-current returns 409 when it would be ambiguous and is *not* idempotent. Full contract + cascade order: `../04_Franchise_Mode_Systems/Franchise_Delete_System.md`.
 - **Gameplay routes:** take explicit `franchise_id` and verify ownership.
 
 ### Frontend
@@ -77,7 +77,7 @@
 - [x] Add `GET /franchise/list` → all franchises for JWT user (id, team, week, season, colors).
 - [x] Keep `GET /franchise/current` as transitional (newest franchise) for old mode-select — Phase 2 switches to list.
 - [x] Add **`DELETE /franchise/{franchise_id}`** (ownership-verified). `delete-current` remains for old UI but only when the user has ≤1 franchise (409 if two exist).
-- [x] Cascade on delete: FTD, FPD, FRD, games + press_conference_sessions + R2 signed masters.
+- [x] Cascade on delete: FTD, FPD, FRD, games + press_conference_sessions + R2 masters (masters snapshotted before the FPD wipe, then batch-deleted off-thread — see `../04_Franchise_Mode_Systems/Franchise_Delete_System.md`).
 - [x] Fix ATL / any other `find_one(user_id)` — ATL stores `franchise_id` at write and hydrates from that franchise (most recent completed game).
 - [x] **Thin Phase 3 warm-up:** `API_CONFIG.currentFranchiseId()` is URL-only (no LS fallback).
 

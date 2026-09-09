@@ -413,6 +413,9 @@ def build_fb_drive_resolution_steps(
                             # Point at the shot-drive step that is appended next
                             # (this pass is not yet in ``steps``).
                             next_step_index=len(steps) + 1,
+                            # Keep the other eight moving through the pass. Falls
+                            # back to a freeze when no meet step was appended.
+                            previous_step=steps[-1] if steps else None,
                             pass_speed_grid_per_game_sec=float(
                                 PASS_GRID_SPOTS_PER_GAME_SECOND
                             ),

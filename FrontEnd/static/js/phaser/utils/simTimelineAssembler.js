@@ -348,6 +348,7 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
   let exitTick = 0;
 
   const worm = []; // { elapsed, margin }[] — x is game time, never sample index
+  let joinBaselineScore = null;
   const frames = [];
   const reconciliation = { checks: 0, drifts: [] };
   let teamPanel = {
@@ -621,6 +622,19 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
       curQuarter = tQ;
     }
 
+    // Sim Rest joins on an exact quarter boundary. Earlier cumulative turns still
+    // rebuild score/stats/lineups, but they are not part of the visible worm. Seed
+    // one point at the boundary using the carried score before this quarter's first
+    // turn lands, so Q3 at 44-43 begins at Q3/44-43 rather than drawing from tip-off.
+    if (startQuarter > 1 && tQ >= startQuarter && !joinBaselineScore) {
+      joinBaselineScore = { away: sb.away, home: sb.home };
+      const startClock = startQuarter > 4 ? '4:00' : '8:00';
+      worm.push({
+        elapsed: elapsedGameSeconds(startQuarter, startClock),
+        margin: sb.home - sb.away,
+      });
+    }
+
     addDeltas(turn.deltas);
 
     // Foul-out tracking (persist).
@@ -660,7 +674,7 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
 
     // Worm history: elapsed game seconds (not sample index) + home−away margin.
     const elapsed = elapsedGameSeconds(sb.quarter, sb.clock);
-    worm.push({ elapsed, margin: sb.home - sb.away });
+    if (tQ >= startQuarter) worm.push({ elapsed, margin: sb.home - sb.away });
 
     // Emit playback frames only from startQuarter onward (Sim Rest joins at Q2+).
     if (tQ >= startQuarter) {
@@ -734,6 +748,41 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     }
   }
 
+  // ---- DIAGNOSTIC (temporary): Mid-Game Resume -> Sim Rest -------------------------
+  // Two gates disagree at startQuarter === 1: line ~553 pushes a tip-off ZERO-STATE
+  // pretip frame when startQuarter <= 1, while line ~629 only seeds joinBaselineScore
+  // when startQuarter > 1. If a resume lands there, playback opens at 0-0 and the
+  // carried score arrives as ONE delta -- which the cadence reads as an "XX-0 run".
+  // This prints what the assembler actually produced so the path can be identified
+  // instead of inferred. Remove once the resume bug is fixed.
+  try {
+    const _f0 = frames[0] || null;
+    const _f1 = frames[1] || null;
+    const _sc = (f) => (f && f.score ? `${f.score.away}-${f.score.home}` : 'n/a');
+    const _jump = (_f0 && _f1 && _f0.score && _f1.score)
+      ? Math.max(
+          num(_f1.score.away) - num(_f0.score.away),
+          num(_f1.score.home) - num(_f0.score.home),
+        )
+      : null;
+    console.log(
+      '%c[SIM-RESUME DIAG] assembler',
+      'color:#f79420;font-weight:bold',
+      {
+        startQuarter,
+        startScore_primed: joinBaselineScore,          // null => primeScore() no-ops
+        pretipFrameEmitted: !!(_f0 && _f0.phase === 'pretip'),
+        frameCount: frames.length,
+        firstFrame: { phase: _f0 && _f0.phase, q: _f0 && _f0.quarter, score: _sc(_f0) },
+        secondFrame: { phase: _f1 && _f1.phase, q: _f1 && _f1.quarter, score: _sc(_f1) },
+        // A jump > 3 between the first two frames is the false-run signature.
+        firstDelta: _jump,
+        SUSPECT_FALSE_RUN: _jump !== null && _jump > 3,
+      },
+    );
+  } catch (e) { /* diagnostic must never break playback */ }
+  // ---- end diagnostic --------------------------------------------------------------
+
   return {
     teams,
     frames,
@@ -742,6 +791,7 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
       frameCount: frames.length,
       homeWon,
       gameWinner,
+      startScore: joinBaselineScore,
       reconciliation,
     },
   };

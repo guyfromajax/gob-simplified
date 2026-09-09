@@ -6,6 +6,36 @@ function playSound(filename) {
   } catch (e) {}
 }
 
+const MODE_SELECT_MUSIC_VOLUME = 0.4;
+const MODE_SELECT_MUSIC_FADE_MS = 600;
+let modeSelectMusic = null;
+let modeSelectMusicIsFading = false;
+
+function navigateFromModeSelect(url) {
+  if (modeSelectMusicIsFading) return;
+  if (!modeSelectMusic || modeSelectMusic.paused) {
+    window.location.href = url;
+    return;
+  }
+
+  modeSelectMusicIsFading = true;
+  const startingVolume = modeSelectMusic.volume;
+  const startedAt = performance.now();
+
+  function fadeFrame(now) {
+    const progress = Math.min((now - startedAt) / MODE_SELECT_MUSIC_FADE_MS, 1);
+    modeSelectMusic.volume = startingVolume * (1 - progress);
+    if (progress < 1) {
+      window.requestAnimationFrame(fadeFrame);
+      return;
+    }
+    modeSelectMusic.pause();
+    window.location.href = url;
+  }
+
+  window.requestAnimationFrame(fadeFrame);
+}
+
 const ALPHA_DISMISS_STORAGE_KEY = 'alpha_disclaimer_dismissed_version';
 const ALPHA_DISCLAIMER_VERSION = '2026-08-12-player-attributes-alpha-box';
 
@@ -1378,7 +1408,7 @@ function goToFranchiseCommandCenter(franchiseId) {
         game_id: runtime.activeGameResume && runtime.activeGameResume.game_id,
         url: resumeUrl,
       });
-      window.location.href = resumeUrl;
+      navigateFromModeSelect(resumeUrl);
       return;
     }
     if (runtime.cpuSimResume) {
@@ -1390,17 +1420,17 @@ function goToFranchiseCommandCenter(franchiseId) {
         franchise_id: franchiseData.franchise_id,
         week: runtime.cpuSimResume.week,
       });
-      window.location.href = './franchise-command-center.html?' + params.toString();
+      navigateFromModeSelect('./franchise-command-center.html?' + params.toString());
       return;
     }
     console.warn('[MODE-RESUME-CLIENT] route fcc', {
       franchise_id: franchiseData.franchise_id,
     });
-    window.location.href = './franchise-command-center.html?franchise_id=' + encodeURIComponent(franchiseData.franchise_id);
+    navigateFromModeSelect('./franchise-command-center.html?franchise_id=' + encodeURIComponent(franchiseData.franchise_id));
     return;
   }
   console.warn('[MODE-RESUME-CLIENT] route franchise select', { franchiseId: franchiseId });
-  window.location.href = './franchise-select-team.html';
+  navigateFromModeSelect('./franchise-select-team.html');
 }
 
 /** Tutorial alert "I'll do this later" for Player Attributes → FCC when a franchise exists. */
@@ -1484,7 +1514,7 @@ function closeSlotsFullModal() {
 function goToNewFranchise(homeSlot) {
   const slot = Number(homeSlot);
   const q = (slot === 1 || slot === 2) ? ('?home_slot=' + encodeURIComponent(String(slot))) : '';
-  window.location.href = './franchise-select-team.html' + q;
+  navigateFromModeSelect('./franchise-select-team.html' + q);
 }
 
 function startNewFranchiseFlow(homeSlot) {
@@ -1516,12 +1546,19 @@ async function confirmDeleteFranchise() {
       API_CONFIG.buildUrl('/franchise/' + encodeURIComponent(franchiseId)),
       { method: 'DELETE', headers: getAuthHeaders() }
     );
-    if (!res.ok) {
-      console.warn('[mode-select] delete franchise failed:', res.status);
-      if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
-        window.PageLoadOverlay.hide();
-      }
-      alert('Could not delete that franchise. Try again.');
+    // 404 = already gone. The server is idempotent now, but a client running a
+    // cached bundle against an older deploy can still see one, and "not found"
+    // on a delete means the delete succeeded — treat it as success, not failure.
+    if (!res.ok && res.status !== 404) {
+      // Indeterminate, NOT known-failed: the request may have been abandoned by an
+      // edge timeout while the server completed the wipe. Reload so the slot list
+      // is re-read from the source of truth instead of leaving a stale card that
+      // navigates into a dead franchise_id. Local franchise keys are deliberately
+      // NOT cleared here — complete_week_pending / eog_pgpc_snapshot are resume
+      // state, and dropping them on a franchise that survived would lose a week.
+      console.warn('[mode-select] delete franchise unconfirmed:', res.status);
+      alert('That delete did not confirm. Reloading — if the franchise is still listed, try again.');
+      window.location.reload();
       return;
     }
     if (window.FranchiseLS && typeof window.FranchiseLS.clearAllForFranchise === 'function') {
@@ -1530,11 +1567,12 @@ async function confirmDeleteFranchise() {
     // Reload lands on mode select; initial loading panel covers the refresh.
     window.location.reload();
   } catch (e) {
+    // Network error or a fetch aborted by the user refreshing mid-delete. The
+    // server does not cancel with the client, so the wipe may well have landed —
+    // same indeterminate handling as above.
     console.warn('[mode-select] delete franchise error:', e);
-    if (window.PageLoadOverlay && typeof window.PageLoadOverlay.hide === 'function') {
-      window.PageLoadOverlay.hide();
-    }
-    alert('Could not delete that franchise. Try again.');
+    alert('That delete did not confirm. Reloading — if the franchise is still listed, try again.');
+    window.location.reload();
   } finally {
     if (deleteFranchiseModalConfirm) deleteFranchiseModalConfirm.disabled = false;
   }
@@ -1663,10 +1701,10 @@ document.addEventListener('DOMContentLoaded', async function () {
   wireAlphaBanner();
 
   try {
-    const lobbyMusic = new Audio('/sounds/crossover-21738.mp3');
-    lobbyMusic.loop = true;
-    lobbyMusic.volume = 0.4;
-    lobbyMusic.play().catch(function () {});
+    modeSelectMusic = new Audio('/sounds/Championship_Gridlock.mp4');
+    modeSelectMusic.loop = true;
+    modeSelectMusic.volume = MODE_SELECT_MUSIC_VOLUME;
+    modeSelectMusic.play().catch(function () {});
   } catch (e) {}
 
   try {

@@ -836,7 +836,25 @@ def _build_cr_drive_resolution_animation_steps(
     if dr_steps:
         rebase_animation_step_next_indices(dr_steps, len(steps))
         steps.extend(dr_steps)
+    # Guard the CONCATENATED list: the outlet-pass/drive seam only exists here.
+    _guard_step_start_continuity(steps, "covert_release")
     return steps or None
+
+
+def _guard_step_start_continuity(steps, context: str) -> None:
+    """UESS §8.1 guard. Modelled on the HCO skeleton emitter's inline merge
+    (``skeleton_step_emitter.py:2128-2138``); see
+    ``animation_step_helpers.enforce_step_start_continuity``. Expected to be a
+    no-op — it logs whenever it is not. Never raises: a guard that can break a
+    turn is worse than the discontinuity it corrects."""
+    try:
+        from BackEnd.utils.animation_step_helpers import (
+            enforce_step_start_continuity,
+        )
+
+        enforce_step_start_continuity(steps, context=context)
+    except Exception:
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
 
 
 # Archetype rate: single shared implementation in animation_step_helpers.

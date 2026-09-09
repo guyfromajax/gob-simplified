@@ -2211,6 +2211,14 @@ async function setHeader() {
   // Score dict keys = core URL names; chrome labels = display (overlay when present).
   const userTeamName = teamName;
   const opponentTeamName = myTeamSide === 'home' ? awayTeam : homeTeam;
+
+  // Pre-game portrait warm. Fires once, here, because this is the first point at
+  // which BOTH teams are known. The request returns immediately and painting
+  // overlaps the time spent on this screen, so nothing blocks and no load screen is
+  // needed. A player already carrying uniform_key is skipped without touching R2,
+  // so once the backfill has run this is a no-op.
+  // See _documentation_master/projects/Uniform_Archive_Brief.md
+  warmGamePortraitsOnce([userTeamName, opponentTeamName]);
   const userTeamLabel = myTeamSide === 'home' ? homeDisplay : (myTeamSide === 'away' ? awayDisplay : userTeamName);
   const opponentTeamLabel = myTeamSide === 'home' ? awayDisplay : homeDisplay;
 
@@ -3564,3 +3572,32 @@ document.addEventListener('DOMContentLoaded', async () => {
   
   setupSlotDragAndDrop();
 });
+
+
+// ---------------------------------------------------------------------------------
+// Pre-game portrait warm
+// ---------------------------------------------------------------------------------
+let _gobWarmFired = false;
+/**
+ * Ask the backend to paint any unpainted portraits for the two teams about to play.
+ * Fire-and-forget: the response is not awaited and failures are ignored, because a
+ * portrait must never be able to delay or block entering a game. Stragglers are
+ * covered by the sprite preloader's self-heal.
+ */
+function warmGamePortraitsOnce(teams) {
+  if (_gobWarmFired) return;
+  const list = (teams || []).filter(Boolean).map(String);
+  if (!list.length || !franchiseId) return;
+  if (typeof API_CONFIG === 'undefined' || typeof API_CONFIG.buildUrl !== 'function') return;
+  _gobWarmFired = true;
+  try {
+    fetch(API_CONFIG.buildUrl('/player-image/warm-teams'), {
+      method: 'POST',
+      headers: Object.assign(
+        { 'Content-Type': 'application/json' },
+        (typeof API_CONFIG.getAuthHeaders === 'function' ? API_CONFIG.getAuthHeaders() : {})
+      ),
+      body: JSON.stringify({ franchise_id: franchiseId, teams: list }),
+    }).catch(function () { /* portraits must never block the game */ });
+  } catch (e) { /* same */ }
+}

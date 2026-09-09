@@ -453,6 +453,30 @@ def resolve_late_clock_bip_runoff(last_turn: dict | None, time_remaining: int) -
     return max(0, min(LATE_CLOCK_BIP_RUNOFF_SECONDS, int(time_remaining)))
 
 
+def stamp_terminal_clock(result: Dict[str, Any]) -> None:
+    """Write the FULL clock field-set for a turn that ends its period.
+
+    A turn carries one fact — "how much clock is left after me" — across five fields:
+    ``clock_start``, ``time_elapsed``, ``clock_end``, ``time_remaining`` and ``clock``.
+    Authoring a subset is how the quarter-end clock defect happened: both terminal
+    functions below set ``clock_end = 0`` and left ``time_remaining`` and ``clock`` at
+    their pre-turn values, and the renderer reads ``time_remaining`` FIRST
+    (``gameScene.js:2671-2677``), so it displayed 0:01 while the authoritative clock was 0.
+
+    Every terminal author calls this instead of assigning the fields individually.
+    ``tests/test_terminal_clock_contract.py`` fails the build if one stops doing so.
+
+    Deliberately does NOT author ``time_elapsed``/``clock_start``: those describe how the
+    turn was resolved and each caller already owns them. This only closes the gap between
+    the clock the turn ENDS on and the three fields that report it.
+    """
+    result["clock_end"] = 0
+    result["time_remaining"] = 0
+    result["clock"] = "0:00"
+    if result.get("game_clock") is not None:
+        result["game_clock"] = "0:00"
+
+
 def ensure_quarter_end_clock_drain(game: Any, result: Dict[str, Any]) -> None:
     """Force remaining game clock onto the turn when the period ends on this possession."""
     if not isinstance(result, dict):
@@ -475,15 +499,14 @@ def ensure_quarter_end_clock_drain(game: Any, result: Dict[str, Any]) -> None:
         result["quarter_ends_after"] = True
         result["next_play_type"] = None
         result.pop("next_turn", None)
-        if result.get("clock_end") is None:
-            result["clock_end"] = 0
+        stamp_terminal_clock(result)
         return
     result["time_elapsed"] = clock_before
     result["clock_start"] = clock_before
-    result["clock_end"] = 0
     result["quarter_ends_after"] = True
     result["next_play_type"] = None
     result.pop("next_turn", None)
+    stamp_terminal_clock(result)
 
 
 def normalize_quarter_end_after_clock_update(game: Any, result: Dict[str, Any]) -> None:
@@ -533,7 +556,7 @@ def normalize_quarter_end_after_clock_update(game: Any, result: Dict[str, Any]) 
     result.pop("next_defensive_setup", None)
     result.pop("hco_setup", None)
     result["possession_flips"] = False
-    result["clock_end"] = 0
+    stamp_terminal_clock(result)
 
     # A terminal boundary cannot retain state that schedules another live-ball
     # possession. Quarter initialization owns the next period's fresh state.
@@ -547,13 +570,6 @@ def normalize_quarter_end_after_clock_update(game: Any, result: Dict[str, Any]) 
         "force_foul_after_dreb",
     ):
         result.pop(key, None)
-
-
-def finalize_terminal_dreb_turn(game: Any, dreb_turn: Dict[str, Any]) -> None:
-    """Burn remaining game clock after terminal late-clock DREB animation."""
-    if not dreb_turn.get("terminal_dreb_eoq"):
-        return
-    ensure_quarter_end_clock_drain(game, dreb_turn)
 
 
 def finalize_flss_post_emit(game: Any, result: Dict[str, Any]) -> None:

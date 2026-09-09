@@ -1,0 +1,112 @@
+{
+ "seed": 4,
+ "err": null,
+ "grand": {
+  "steps": 1730,
+  "player_steps": 17372,
+  "still_player_steps": 8176,
+  "wander_now": 1209,
+  "would_stamp_p1": 6115,
+  "whole_frozen": 292,
+  "would_stamp_p2": 1735,
+  "skipped_subperceptible": 212
+ },
+ "fam": {
+  "HCO": {
+   "steps": 1444,
+   "whole_frozen": 182,
+   "player_steps": 14440,
+   "still_player_steps": 6615,
+   "wander_now": 1209,
+   "would_stamp_p1": 6115,
+   "would_stamp_p2": 661
+  },
+  "FAST_BREAK": {
+   "steps": 14,
+   "whole_frozen": 3,
+   "player_steps": 140,
+   "still_player_steps": 53,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 13
+  },
+  "SIDE_INBOUND": {
+   "steps": 72,
+   "whole_frozen": 48,
+   "player_steps": 720,
+   "still_player_steps": 481,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 481
+  },
+  "BASELINE_INBOUND": {
+   "steps": 19,
+   "whole_frozen": 8,
+   "player_steps": 262,
+   "still_player_steps": 174,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 174
+  },
+  "HCT": {
+   "steps": 26,
+   "whole_frozen": 2,
+   "player_steps": 260,
+   "still_player_steps": 114,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 26
+  },
+  "DREB": {
+   "steps": 40,
+   "whole_frozen": 0,
+   "player_steps": 400,
+   "still_player_steps": 28,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 0
+  },
+  "OREB": {
+   "steps": 33,
+   "whole_frozen": 18,
+   "player_steps": 330,
+   "still_player_steps": 191,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 0
+  },
+  "FCP": {
+   "steps": 47,
+   "whole_frozen": 2,
+   "player_steps": 470,
+   "still_player_steps": 230,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 90
+  },
+  "FREE_THROW": {
+   "steps": 35,
+   "whole_frozen": 29,
+   "player_steps": 350,
+   "still_player_steps": 290,
+   "wander_now": 0,
+   "would_stamp_p1": 0,
+   "would_stamp_p2": 290
+  }
+ },
+ "still_hist": {
+  "1": 304,
+  "2": 203,
+  "5": 67,
+  "9": 143,
+  "0": 243,
+  "10": 286,
+  "4": 40,
+  "7": 156,
+  "8": 104,
+  "6": 86,
+  "3": 92,
+  "19": 4,
+  "16": 2
+ }
+}

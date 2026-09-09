@@ -454,6 +454,11 @@ def _build_pass_ahead_steps(
                 clock_remaining_at_start=clock_r,
                 shot_clock_remaining_at_start=shot_r,
                 next_step_index=len(steps) + 1,
+                # Carry unfinished movement forward so the cast keeps running
+                # during the pass instead of freezing. On the FIRST hop there is
+                # no prior step here, so that one still holds -- the preceding
+                # step lives outside this helper. See animation_worklist.md.
+                previous_step=steps[-1] if steps else None,
                 pass_speed_grid_per_game_sec=float(PASS_GRID_SPOTS_PER_GAME_SECOND),
                 metadata_reason="after_steal_pass_ahead",
             )
@@ -568,13 +573,34 @@ def _build_drive_resolution_animation_steps(
     if not dr_steps:
         return None
     if not pass_steps:
+        _guard_step_start_continuity(dr_steps, "after_steal")
         return dr_steps
     from BackEnd.utils.animation_step_helpers import (
         rebase_animation_step_next_indices,
     )
 
     rebase_animation_step_next_indices(dr_steps, len(pass_steps))
-    return pass_steps + dr_steps
+    out = pass_steps + dr_steps
+    # Guard the CONCATENATED list: the pass-preamble/drive seam is only visible
+    # here, so guarding inside the universal emitter would miss it.
+    _guard_step_start_continuity(out, "after_steal")
+    return out
+
+
+def _guard_step_start_continuity(steps, context: str) -> None:
+    """UESS §8.1 guard. Modelled on the HCO skeleton emitter's inline merge
+    (``skeleton_step_emitter.py:2128-2138``); see
+    ``animation_step_helpers.enforce_step_start_continuity``. Expected to be a
+    no-op — it logs whenever it is not. Never raises: a guard that can break a
+    turn is worse than the discontinuity it corrects."""
+    try:
+        from BackEnd.utils.animation_step_helpers import (
+            enforce_step_start_continuity,
+        )
+
+        enforce_step_start_continuity(steps, context=context)
+    except Exception:
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
 
 
 def _override_fb_make_announcement(steps: List[AnimationStep]) -> None:

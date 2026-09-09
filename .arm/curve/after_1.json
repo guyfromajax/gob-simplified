@@ -1,0 +1,137 @@
+{
+ "seed": 1,
+ "arm": "after",
+ "err": null,
+ "draws": 109397,
+ "n_turns": 393,
+ "n_steps": 825,
+ "curve_counts": {
+  "ease_in_out": 1530,
+  "ease_in": 759,
+  "ease_out": 759
+ },
+ "continuity": {
+  "ONE_STEP_JOURNEY": 1530,
+  "DEPARTING": 759,
+  "STILL": 4474,
+  "ARRIVING": 759,
+  "CONTINUING": 794
+ },
+ "stamp_mismatch": 0,
+ "by_result_type": {
+  "BASELINE_INBOUND": {
+   "ease_in_out": 373,
+   "ease_in": 272,
+   "ease_out": 272
+  },
+  "HCO": {
+   "ease_in_out": 97,
+   "ease_in": 117,
+   "ease_out": 117
+  },
+  "FOUL": {
+   "ease_in_out": 101,
+   "ease_in": 90,
+   "ease_out": 90
+  },
+  "SIDE_INBOUND": {
+   "ease_in_out": 302
+  },
+  "DREB": {
+   "ease_in_out": 290
+  },
+  "MAKE": {
+   "ease_in": 69,
+   "ease_out": 69,
+   "ease_in_out": 29
+  },
+  "OREB_KICKOUT": {
+   "ease_in_out": 100
+  },
+  "PUTBACK_MAKE": {
+   "ease_in_out": 34
+  },
+  "STEAL": {
+   "ease_in_out": 55,
+   "ease_in": 45,
+   "ease_out": 45
+  },
+  "DEFENSIVE_STOP": {
+   "ease_in_out": 30,
+   "ease_in": 9,
+   "ease_out": 9
+  },
+  "CHARGE": {
+   "ease_in": 7,
+   "ease_in_out": 2,
+   "ease_out": 7
+  },
+  "DEAD BALL": {
+   "ease_in": 51,
+   "ease_in_out": 47,
+   "ease_out": 51
+  },
+  "MISS": {
+   "ease_in": 99,
+   "ease_in_out": 40,
+   "ease_out": 99
+  },
+  "PUTBACK_MISS": {
+   "ease_in_out": 30
+  }
+ },
+ "key_digests": {
+  "start.coords": "be1460cdb831d0d4007f3c05d391b6a4076843a4",
+  "start.destination": "d41b58d9b0656914be84f958fd113aef5a90f1c0",
+  "start.action": "e8a7af7e4077ea1ec19f5a9ad3ca3799a09d37dc",
+  "start.archetype": "19fe18d8934c03084a3c6586b4988911cffbe1fd",
+  "start.ball": "083c394fbad7c444c646f9fa7707ad178e8911a7",
+  "start.clock": "77a64f0b379d644567b97c15c41cde20e1f24362",
+  "start.advance_trigger": "1e77495bb6cf9b1dfcefec5fc9e0dc2809e2db6c",
+  "start.tween_durations": "b88fe4d733a158e1bfc75d514d5e4f853cea4e24",
+  "start.movement_curve": "95140635b48a8ac100fa20b1b40376df3b385567",
+  "end.coords": "bfc1cb8d6370ac4cad76240ae78e4c603838e4e3",
+  "end.ball": "eb97ea05f430d2c0611c9439f0483851f644b584",
+  "end.time_elapsed": "b886ac5d0e0440c5e45cf83dd4c699719bd0b254",
+  "end.clock": "666d66f2a391fd7a9a3d3d049ff779817feb86bc",
+  "end.next": "8bfb6f74502bf7c0f5196707ce3c22400d2877a3",
+  "start.flourish": "8dcef742382c7353d52f0cdd34afcb9c11f9b0e1",
+  "start.sfx_on_ball_release": "1271837eaca1cd862984d4cdec5556fc577504fa",
+  "start.sfx_on_ball_arrival": "0ce30855d6a184e209d37f39e1358b160b48edae",
+  "_pressure_step_state": "4e8e6d9b6e75be224452910c5caeab13701e5574",
+  "start.ball_motion_style": "d5f2d667eebc9e86440ee1a9ce41c54690c75a25",
+  "end.announcement": "ca9382d6921f44fbdaa948a83134b1dc58057667",
+  "_fb_step_state": "1fe85a801c2ec86b1ff859c08b32fc17bd939f40",
+  "start.announcement": "7a812163dc24499c3b0130952407a7c2838551a3",
+  "start.timed_sfx": "86ccca7f25864159b59c960ccf251e4fc91d6865",
+  "start.ball_arrival_coord": "b8a483a0e59d14edc56ce6e65e4fec975cd1c52f",
+  "start.pass_grid_per_game_second": "be2b83396c30a6a2ffd7f49d51a276bba6e27401"
+ },
+ "key_counts": {
+  "start.coords": 825,
+  "start.destination": 825,
+  "start.action": 825,
+  "start.archetype": 825,
+  "start.ball": 825,
+  "start.clock": 825,
+  "start.advance_trigger": 825,
+  "start.tween_durations": 610,
+  "start.movement_curve": 580,
+  "end.coords": 825,
+  "end.ball": 825,
+  "end.time_elapsed": 825,
+  "end.clock": 825,
+  "end.next": 825,
+  "start.flourish": 608,
+  "start.sfx_on_ball_release": 153,
+  "start.sfx_on_ball_arrival": 246,
+  "_pressure_step_state": 334,
+  "start.ball_motion_style": 68,
+  "end.announcement": 74,
+  "_fb_step_state": 54,
+  "start.announcement": 24,
+  "start.timed_sfx": 5,
+  "start.ball_arrival_coord": 5,
+  "start.pass_grid_per_game_second": 1
+ }
+}

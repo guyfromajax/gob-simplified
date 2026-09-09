@@ -34,7 +34,13 @@ _sys.path.insert(0, _GOB_ROOT)
 _spec = _ilu.spec_from_file_location(
     "_gob_repro", _os.path.join(_GOB_ROOT, "BackEnd", "utils", "repro.py"))
 _repro = _ilu.module_from_spec(_spec); _spec.loader.exec_module(_repro)
-_repro.pin_hash_seed()
+# Pin only when run as a script. pin_hash_seed() re-execs the interpreter via
+# os.execve (repro.py:115). At IMPORT time -- e.g. pytest collecting
+# tests/test_verify_deploy.py, which does `from scripts import verify_deploy` --
+# that silently replaces the running pytest process, and the whole session exits 0
+# having reported nothing. CLI behaviour is unchanged.
+if __name__ == "__main__":
+    _repro.pin_hash_seed()
 
 import argparse
 import gzip

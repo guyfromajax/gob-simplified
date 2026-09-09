@@ -3925,6 +3925,27 @@ def _round1_not_started(bracket: dict[str, Any] | None) -> bool:
     return True
 
 
+def _region_direct_final_waiting(bracket: dict[str, Any] | None) -> bool:
+    """True for the valid dual-bye region shape: no R1 and an unplayed, seeded final."""
+    if not bracket or (bracket.get("round1") or []):
+        return False
+    final = bracket.get("final") or []
+    if len(final) != 1 or not isinstance(final[0], dict):
+        return False
+    matchup = final[0]
+    away = matchup.get("away_team")
+    home = matchup.get("home_team")
+
+    def _is_ready_team(value: Any) -> bool:
+        return bool(value) and not (isinstance(value, str) and value.startswith("R1_"))
+
+    return bool(
+        _is_ready_team(away)
+        and _is_ready_team(home)
+        and not matchup.get("winner")
+    )
+
+
 def _sanitize_bracket_for_reveal(bracket: dict[str, Any] | None, *, keep_final: bool = False) -> dict[str, Any]:
     b = deepcopy(bracket or {})
     for round_key in ("round1", "round2", "final"):
@@ -3963,7 +3984,10 @@ def _build_bracket_reveal_modal_payload(
         return None
 
     raw, seeds = _user_eos_bracket_and_seeds(franchise_doc, team_doc, tier)
-    if not raw or not _round1_not_started(raw):
+    phase_not_started = _round1_not_started(raw)
+    if tier == "region":
+        phase_not_started = phase_not_started or _region_direct_final_waiting(raw)
+    if not raw or not phase_not_started:
         return None
 
     if tier == "region":
@@ -3971,7 +3995,7 @@ def _build_bracket_reveal_modal_payload(
     else:
         bracket = _sanitize_bracket_for_reveal(raw)
 
-    if not bracket or not (bracket.get("round1") or []):
+    if not bracket or not ((bracket.get("round1") or []) or (bracket.get("final") or [])):
         return None
 
     return {
@@ -4013,7 +4037,13 @@ def _build_bracket_update_modal_payload(
         return None
 
     bracket, seeds = _user_eos_bracket_and_seeds(franchise_doc, team_doc, tier)
-    if not bracket or not _bracket_has_any_winner(bracket):
+    has_progress = _bracket_has_any_winner(bracket)
+    if tier == "region":
+        # With two conference double-winners, this region has no R1 games to produce
+        # a winner in week 30. Its ready final is nevertheless the correct week-31
+        # tournament status for both active and eliminated users in that region.
+        has_progress = has_progress or _region_direct_final_waiting(bracket)
+    if not bracket or not has_progress:
         return None
     if tier in ("conference", "national") and not (bracket.get("round1") or []):
         return None
@@ -9255,7 +9285,12 @@ def _franchise_summary_for_list(doc: dict) -> dict:
     display = resolve_team_display(doc, team_object_id) if team_object_id else {}
     primary_color = display.get("primary_color")
     secondary_color = display.get("secondary_color")
-    display_name = display.get("name") or doc.get("user_team_id")
+    # `user_team_id` bakes the team NAME at creation, so it outlives a reseeded `teams`
+    # collection that orphaned this franchise's `user_team_object_id`. Prefer it on a
+    # core miss — otherwise the card renders the raw ObjectId.
+    display_name = display.get("name")
+    if display.get("core_missing") or not display_name:
+        display_name = doc.get("user_team_id") or display_name
     home_slot = doc.get("home_slot")
     try:
         home_slot = int(home_slot) if home_slot is not None else None
@@ -9363,13 +9398,26 @@ def _ensure_home_slots_for_user(user_id: str) -> list[dict]:
 
 
 def _cascade_delete_franchise(fid: ObjectId) -> None:
-    """Wipe one franchise and related collections. Caller must own ``fid``."""
-    # GC painted signed-recruit masters from R2 before wiping FPD (helper reads FPD).
+    """Wipe one franchise and related collections. Caller must own ``fid``.
+
+    R2 portrait GC is SNAPSHOTTED here but executed off-thread. The key list must be
+    read before FPD is wiped (the keys live on the FPD docs), while the deletes
+    themselves are network round trips to R2 that must not sit inside the request —
+    a league-wide franchise carries hundreds of walk-on masters, and holding the
+    response for them is what made delete appear to hang and then fail (the client
+    gave up long before the server did). The DB wipe below is the authoritative part
+    and stays synchronous, so a 200 means the franchise is really gone.
+
+    A killed process can strand a background batch; those objects are orphans that
+    nothing points at, which is exactly the case the R2 orphan sweeper in
+    _documentation_master/projects/gob-asset-architecture.md exists to cover.
+    """
+    master_keys = []
     try:
-        from BackEnd.api.player_image_routes import delete_signed_masters_for_franchise
-        delete_signed_masters_for_franchise(fid)
+        from BackEnd.api.player_image_routes import collect_franchise_master_keys
+        master_keys = collect_franchise_master_keys(fid)
     except Exception:
-        logger.exception("[IMG-GC] cleanup failed on franchise delete fid=%s", str(fid))
+        logger.exception("[IMG-GC] key snapshot failed on franchise delete fid=%s", str(fid))
     # FTD: ObjectId; FPD/FRD/games: string; press sessions: ObjectId (and string fallback).
     franchise_team_data_collection.delete_many({"franchise_id": fid})
     franchise_players_data_collection.delete_many({"franchise_id": str(fid)})
@@ -9382,6 +9430,20 @@ def _cascade_delete_franchise(fid: ObjectId) -> None:
     except Exception:
         logger.exception("[PRESS-GC] cleanup failed on franchise delete fid=%s", str(fid))
     db.franchises.delete_one({"_id": fid})
+
+    # Fire-and-forget: FPD is already gone, so the snapshot above is the only record
+    # of these keys. Mirrors the img-warm thread idiom used after recruiting signing.
+    if master_keys:
+        try:
+            from BackEnd.api.player_image_routes import delete_master_keys
+            threading.Thread(
+                target=delete_master_keys,
+                args=(master_keys, fid),
+                name=f"img-gc-{str(fid)[:8]}",
+                daemon=True,
+            ).start()
+        except Exception:
+            logger.exception("[IMG-GC] could not start GC thread fid=%s", str(fid))
 
 
 @router.get("/franchise/list")
@@ -9463,11 +9525,29 @@ def delete_franchise_by_id(franchise_id: str, user: dict = Depends(get_current_u
     """
     Delete a specific franchise owned by the current user (and related FTD/FPD/FRD/games/press).
     Preferred path for multi-slot — never deletes a sibling.
+
+    IDEMPOTENT: deleting an id that no longer exists returns 200 with
+    ``already_gone: True`` rather than 404. Delete is retried in practice (a client
+    that times out or is refreshed mid-flight has no way to know the server finished),
+    and answering a completed delete with "not found" reads to the user as a refusal
+    on a franchise that is in fact gone. Ownership is still enforced: a franchise
+    belonging to someone else is 403, never a silent success, so the idempotent
+    branch can only ever be reached for an id that exists for nobody.
     """
-    doc = verify_franchise_owned_by_user(franchise_id, user["user_id"])
-    fid = doc["_id"]
-    _cascade_delete_franchise(fid)
-    return {"deleted": True, "count": 1, "franchise_id": str(fid)}
+    try:
+        oid = ObjectId(franchise_id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid franchise_id")
+    doc = db.franchises.find_one({"_id": oid}, {"user_id": 1})
+    if not doc:
+        return {"deleted": False, "already_gone": True, "count": 0,
+                "franchise_id": franchise_id}
+    doc_user_id = doc.get("user_id")
+    if doc_user_id is None or str(doc_user_id) != str(user["user_id"]):
+        raise HTTPException(status_code=403, detail="Access denied to this franchise")
+    _cascade_delete_franchise(oid)
+    return {"deleted": True, "already_gone": False, "count": 1,
+            "franchise_id": str(oid)}
 
 
 @router.get("/franchise/command-center/data")
@@ -15359,7 +15439,17 @@ def cut_franchise_players(
             franchise_doc=franchise_doc,
             current_season=current_season,
             recruit_image_pool=recruit_image_pool,
-            warm=True,
+            # Was True: the user's team painted eagerly here while CPU teams stayed
+            # lazy. Two reasons that flipped:
+            #   1. Identical treatment for user and CPU teams was requested, and the
+            #      asymmetry was the whole reason CPU sprites showed initials.
+            #   2. That eager path writes the LEGACY players/master/<player_id>.png
+            #      key, bypassing the shared uniform archive. Every object it wrote
+            #      was a per-player duplicate the archive exists to eliminate.
+            # Painting now happens in one place: the pre-game warm, which runs while
+            # the user is on Set Lineup and hits the shared archive.
+            # See _documentation_master/projects/Uniform_Archive_Brief.md
+            warm=False,
         )
     except Exception:
         logger.exception("[WALK-ON-ROSTER] user assign failed franchise=%s", str(fid))

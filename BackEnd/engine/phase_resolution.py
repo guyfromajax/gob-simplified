@@ -577,6 +577,26 @@ def select_foul_player(foul_team_type, ball_handler, off_lineup, def_lineup, rol
     return foul_player
 
 
+def _usable_grid_coord(coords):
+    """``(x, y)`` floats from a grid-coord dict, or None if there is no real coordinate there.
+
+    Deliberately unlike ``grid_coords_from_player`` below, which always returns a coordinate and
+    substitutes ``{50, 25}`` when it has none. That contract is right for placing a sprite and
+    wrong for MEASURING between players: a stand-in shared by several candidates makes every
+    distance between them equal, so a comparison silently becomes a coin toss. Callers that
+    compare distances need to be able to tell "no coordinate" apart from "centre court".
+    """
+    if not isinstance(coords, dict):
+        return None
+    x, y = coords.get("x"), coords.get("y")
+    if x is None or y is None:
+        return None
+    try:
+        return (float(x), float(y))
+    except (TypeError, ValueError):
+        return None
+
+
 def grid_coords_from_player(player, fallback=None):
     """Return ``{x, y}`` grid coords from a player's current ``coords`` attribute."""
     coords = getattr(player, "coords", None) or {}
@@ -643,30 +663,39 @@ def select_defender_closest_to_victim(victim_coords, def_lineup, defender_coords
     Args:
         victim_coords: dict with "x" and "y" (player coords, inbound oDestinations, etc.)
         def_lineup: dict position -> Player
-        defender_coords_by_pos: optional dict position -> {"x", "y"}. If None, use position-based
-            default spots (key) for all defenders as fallback.
+        defender_coords_by_pos: optional dict position -> {"x", "y"}. Where a position is absent
+            the defender's own ``player.coords`` is used, which is the authoritative position
+            under UESS. A defender with no usable coordinate from either source is SKIPPED, not
+            given a stand-in position.
 
     Returns:
-        Player object that is closest to victim_coords, or None if def_lineup empty.
+        Player object that is closest to victim_coords; None if def_lineup is empty, the victim
+        coordinate is unusable, or NO defender has a usable coordinate. A None return means "no
+        defender can be placed", which is not the same as "any defender will do" — callers must
+        not substitute an arbitrary player for it.
     """
-    if not def_lineup or not victim_coords:
+    if not def_lineup:
         return None
-    vx = victim_coords.get("x", 50)
-    vy = victim_coords.get("y", 25)
-    from BackEnd.constants import HCO_STRING_SPOTS
+    victim = _usable_grid_coord(victim_coords)
+    if victim is None:
+        return None
+    vx, vy = victim
     best_defender = None
     best_dist_sq = float("inf")
     for pos, defender in def_lineup.items():
         if defender is None:
             continue
+        coords = None
         if defender_coords_by_pos and pos in defender_coords_by_pos:
-            coords = defender_coords_by_pos[pos]
-            dx = coords.get("x", 50)
-            dy = coords.get("y", 25)
-        else:
-            coords = HCO_STRING_SPOTS.get(pos, {"x": 50, "y": 25})
-            dx = coords.get("x", 50)
-            dy = coords.get("y", 25)
+            coords = _usable_grid_coord(defender_coords_by_pos[pos])
+        if coords is None:
+            coords = _usable_grid_coord(getattr(defender, "coords", None))
+        if coords is None:
+            # Cannot place this defender. Skipping him loses a candidate; inventing a position
+            # for him loses the measurement, because a stand-in coordinate shared by several
+            # defenders makes every distance equal and hands the decision to iteration order.
+            continue
+        dx, dy = coords
         dist_sq = (dx - vx) ** 2 + (dy - vy) ** 2
         if dist_sq < best_dist_sq:
             best_dist_sq = dist_sq
@@ -4921,7 +4950,13 @@ INTERCEPT_ATTEMPT_PCT_BY_CALL = {"aggressive": 80, "normal": 40, "passive": 0}
 #      bar         = HCO_PASS_SAFETY_BASE − offensive_efficiency
 #   3b intercept   = ((OD·0.6 + CH·0.2 + IQ·0.2) + defensive_efficiency) × rand(1,6)
 #      tier_hi/mid = (HCO_PASS_INTERCEPT_TIER_HI/MID) − defensive_efficiency
-HCO_PASS_SAFETY_BASE = 175.0
+# Lowered 175.0 -> 150.0 (owner call 2026-09-09) to cut the HCO disrupted-pass rate
+# (steals + loose balls + bat-OOB). The bar is (BASE - offensive_efficiency); clearing
+# it means NO interception is in play, so this gate kills the branch outright rather
+# than shifting an outcome. Composition dials (HCO_PASS_DEFLECT_KIND_D,
+# LOOSE_BALL_FROM_DEFLECTION_PCT) are untouched -- the steal/bat-OOB RATIO is unchanged,
+# only how often a pass is contested at all.
+HCO_PASS_SAFETY_BASE = 150.0
 HCO_PASS_INTERCEPT_TIER_HI = 200.0
 HCO_PASS_INTERCEPT_TIER_MID = 170.0
 

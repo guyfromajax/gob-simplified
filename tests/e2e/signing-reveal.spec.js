@@ -619,11 +619,14 @@ test.describe('prep gate', () => {
     const during = await page.evaluate(() => ({
       copy: document.querySelector('.sd-prep-t').textContent.trim(),
       bar: document.querySelectorAll('.sd-prep-bar i').length,
+      hubShells: document.querySelectorAll('#hub-root .spine-topbar').length,
       cards: document.querySelectorAll('#hub-reveal .sd-card').length,
       rails: document.querySelectorAll('#hub-reveal .sd-rail').length,
     }));
     expect(during.copy).toBe('Prepping Signing Day');
     expect(during.bar).toBe(1);
+    // The FCC run handoff is an experience entry, not a transient Hub visit.
+    expect(during.hubShells).toBe(0);
     // Nothing of the stage yet — that is the point of the gate.
     expect(during.cards).toBe(0);
     expect(during.rails).toBe(0);

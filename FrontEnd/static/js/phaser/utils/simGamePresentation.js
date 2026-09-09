@@ -95,6 +95,13 @@ function calloutColor(name) {
   return CALLOUT_COLORS[String(name || '').toLowerCase()] || GREEN;
 }
 
+/** Callouts use the exact presentation color selected for that team's worm line. */
+export function calloutAccentColor(model, teams) {
+  const side = model && (model.side === 'home' || model.side === 'away') ? model.side : null;
+  const teamColor = side && teams && teams[side] && teams[side].color;
+  return teamColor || calloutColor(model && model.color);
+}
+
 /** *asterisks* → <b>…</b>; everything else HTML-escaped. */
 function formatCalloutLine(line) {
   return String(line || '').split(/(\*[^*]+\*)/g).map((part) => {
@@ -252,7 +259,7 @@ function ensureStyles() {
     .sgp-root .co-av .sil{position:absolute;inset:0;display:flex;align-items:flex-end;justify-content:center}
     .sgp-root .co-av .sil svg{width:80%;height:90%}
     .sgp-root .co-av.logo{width:38px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-family:'Bebas Neue',sans-serif;font-size:16px;line-height:1;letter-spacing:.04em;color:#fff;padding-top:1px}
-    .sgp-root .co-txt{font-size:13.5px;font-weight:600;line-height:1.15;color:#fff;white-space:nowrap;letter-spacing:-.005em}
+    .sgp-root .co-txt{font-size:13.5px;font-weight:600;line-height:1.15;color:var(--coc);white-space:nowrap;letter-spacing:-.005em}
     .sgp-root .co-txt b{font-weight:800}
     .sgp-root .co-leader{position:absolute;z-index:3;pointer-events:none;background:var(--coc);border-radius:1px;opacity:.5;height:1px}
 
@@ -746,7 +753,7 @@ function renderCalloutsDebug(el, cadence) {
  * @returns {Promise<void>}
  */
 export function showSimGamePresentation(timeline, opts = {}) {
-  const { teams, frames } = timeline || {};
+  const { teams, frames, meta } = timeline || {};
   ensureStyles();
   document.querySelectorAll('.sgp-root').forEach((n) => n.remove());
 
@@ -791,6 +798,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
 
   let highlightsOn = true;
   let cadence = null;
+  let lastRenderedFrame = null;
   let tipMeta = { cx: FIT_W / 2, cy: WORM_PLOT_H / 2, rising: true, w: FIT_W, h: WORM_PLOT_H };
 
   const dbgEl = calloutsDebugEnabled() ? document.createElement('div') : null;
@@ -910,7 +918,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
     // later chance to show it, so it replaces whatever is up.
     if (calloutBusy && model.tier !== GAME_WINNER_TIER) return false;
     calloutBusy = true;
-    const col = calloutColor(model.color);
+    const col = calloutAccentColor(model, teams);
     activeCallout = { col, model };
 
     clearCalloutTimers();
@@ -988,6 +996,7 @@ export function showSimGamePresentation(timeline, opts = {}) {
   };
 
   const renderFrame = (frame) => {
+    lastRenderedFrame = frame;
     const wormState = frame.worm && frame.worm.samples
       ? frame.worm
       : { samples: [{ elapsed: 0, margin: 0 }], elapsed: 0, domain: 4 * REG_Q_SEC };
@@ -1077,6 +1086,22 @@ export function showSimGamePresentation(timeline, opts = {}) {
       seed: (frames && frames.length) || 7,
       onCallout: (model) => showCallout(model),
     });
+    // Copy loads asynchronously. Prime from what is actually on screen if playback
+    // has moved; otherwise use the assembler's exact Sim Rest quarter-boundary score.
+    // ---- DIAGNOSTIC (temporary): what the cadence baseline actually got ------------
+    // primeScore() no-ops on a falsy score. If BOTH sources are empty the cadence
+    // starts with lastScore = null and the first carried score is read as a run.
+    const _primeSrc = (lastRenderedFrame && lastRenderedFrame.score)
+      ? 'lastRenderedFrame'
+      : ((meta && meta.startScore) ? 'meta.startScore' : 'NONE');
+    const _primeVal = (lastRenderedFrame && lastRenderedFrame.score) || (meta && meta.startScore);
+    console.log(
+      '%c[SIM-RESUME DIAG] primeScore',
+      'color:#f79420;font-weight:bold',
+      { source: _primeSrc, value: _primeVal || null, WILL_NOOP: !_primeVal },
+    );
+    // ---- end diagnostic ------------------------------------------------------------
+    cadence.primeScore((lastRenderedFrame && lastRenderedFrame.score) || (meta && meta.startScore));
     cadence.suspend(!highlightsOn);
     root.__cadence = cadence;
     if (dbgEl) renderCalloutsDebug(dbgEl, cadence);

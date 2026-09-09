@@ -124,7 +124,8 @@ Postseason weeks 27-34 replace the generic play/sim labels with the tournament-r
   - routes to `cut-players.html`
 - `week35-recruiting`
   - week 35 recruiting orders state
-  - routes to `recruiting-orders.html`
+  - routes directly to the Signing Day board in `recruiting.html`
+  - does not offer optional player cuts before recruiting
 - `sim-rest-tournament`
   - EOS case where user is eliminated or has a bye and can advance bracket state
   - calls `/franchise/sim-rest-of-tournament`

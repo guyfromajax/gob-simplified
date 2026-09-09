@@ -78,6 +78,24 @@ def put(key: str, data: bytes, content_type: str = "image/png") -> None:
                   ContentType=content_type, CacheControl=CACHE_CONTROL)
 
 
+def copy(src_key: str, dest_key: str) -> bool:
+    """Server-side copy within the bucket. No download, no re-upload, no egress.
+
+    Used by the uniform archive migration: the archive object is the painted
+    artifact, and the legacy players/master/<player_id>.png key is mirrored from it
+    so existing read paths keep resolving while payloads are being threaded with
+    uniform_key. Cheap enough to be unremarkable -- R2 does the copy internally.
+    """
+    s3, bucket = _s3()
+    from botocore.exceptions import ClientError
+    try:
+        s3.copy_object(Bucket=bucket, Key=dest_key, CopySource={"Bucket": bucket, "Key": src_key})
+        return True
+    except ClientError:
+        logger.exception("[R2] copy failed %s -> %s", src_key, dest_key)
+        return False
+
+
 def delete(key: str) -> bool:
     """Delete an object. Returns True if the object existed and was removed, False
     if it was already absent. Idempotent — deleting a missing key is not an error."""
@@ -91,3 +109,38 @@ def delete(key: str) -> bool:
         raise
     s3.delete_object(Bucket=bucket, Key=key)
     return True
+
+
+def delete_many(keys, chunk_size: int = 1000) -> int:
+    """Batch-delete objects with S3 DeleteObjects (max 1000 keys per call).
+
+    Unlike :func:`delete` this does NOT head_object first, so it cannot report
+    whether a key existed — DeleteObjects succeeds on absent keys. Returns the
+    number of keys the bucket accepted. Use this for bulk GC (franchise delete),
+    where one round trip per 1000 keys matters far more than existence accuracy;
+    use :func:`delete` when the existed/absent distinction is load-bearing.
+
+    Never raises: a per-batch failure is logged and the remaining batches still
+    run, so a transient R2 error cannot strand the caller.
+    """
+    keys = [k for k in (keys or []) if k]
+    if not keys:
+        return 0
+    s3, bucket = _s3()
+    accepted = 0
+    for i in range(0, len(keys), chunk_size):
+        batch = keys[i:i + chunk_size]
+        try:
+            resp = s3.delete_objects(
+                Bucket=bucket,
+                Delete={"Objects": [{"Key": k} for k in batch], "Quiet": False},
+            )
+            accepted += len(resp.get("Deleted") or [])
+            for err in (resp.get("Errors") or []):
+                logger.warning(
+                    "[R2] delete_many key=%s code=%s msg=%s",
+                    err.get("Key"), err.get("Code"), err.get("Message"),
+                )
+        except Exception:
+            logger.exception("[R2] delete_many batch failed (%s keys)", len(batch))
+    return accepted

@@ -1,0 +1,96 @@
+{
+ "seed": 4,
+ "err": null,
+ "grand": {
+  "steps": 1730,
+  "frozen": 292,
+  "with_wander": 128,
+  "frozen_with_wander": 1,
+  "frozen_no_wander": 291,
+  "moving_with_wander": 127,
+  "wander_players": 1209
+ },
+ "fam": {
+  "HCO": {
+   "steps": 1444,
+   "frozen": 182,
+   "with_wander": 128,
+   "frozen_with_wander": 1,
+   "frozen_no_wander": 181,
+   "moving_with_wander": 127,
+   "wander_players": 1209
+  },
+  "FAST_BREAK": {
+   "steps": 14,
+   "frozen": 3,
+   "with_wander": 0,
+   "frozen_with_wander": 0,
+   "frozen_no_wander": 3,
+   "moving_with_wander": 0,
+   "wander_players": 0
+  },
+  "SIDE_INBOUND": {
+   "steps": 72,
+   "frozen": 48,
+   "with_wander": 0,
+   "frozen_with_wander": 0,
+   "frozen_no_wander": 48,
+   "moving_with_wander": 0,
+   "wander_players": 0
+  },
+  "BASELINE_INBOUND": {
+   "steps": 19,
+   "frozen": 8,
+   "with_wander": 0,
+   "frozen_with_wander": 0,
+   "frozen_no_wander": 8,
+   "moving_with_wander": 0,
+   "wander_players": 0
+  },
+  "HCT": {
+   "steps": 26,
+   "frozen": 2,
+   "with_wander": 0,
+   "frozen_with_wander": 0,
+   "frozen_no_wander": 2,
+   "moving_with_wander": 0,
+   "wander_players": 0
+  },
+  "DREB": {
+   "steps": 40,
+   "frozen": 0,
+   "with_wander": 0,
+   "frozen_with_wander": 0,
+   "frozen_no_wander": 0,
+   "moving_with_wander": 0,
+   "wander_players": 0
+  },
+  "OREB": {
+   "steps": 33,
+   "frozen": 18,
+   "with_wander": 0,
+   "frozen_with_wander": 0,
+   "frozen_no_wander": 18,
+   "moving_with_wander": 0,
+   "wander_players": 0
+  },
+  "FCP": {
+   "steps": 47,
+   "frozen": 2,
+   "with_wander": 0,
+   "frozen_with_wander": 0,
+   "frozen_no_wander": 2,
+   "moving_with_wander": 0,
+   "wander_players": 0
+  },
+  "FREE_THROW": {
+   "steps": 35,
+   "frozen": 29,
+   "with_wander": 0,
+   "frozen_with_wander": 0,
+   "frozen_no_wander": 29,
+   "moving_with_wander": 0,
+   "wander_players": 0
+  }
+ }
+}

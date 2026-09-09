@@ -48,6 +48,28 @@
 - Dynamic HCT procedural attack-basket shots bypass `ShotManager.resolve_shot()`, so they call the same classification wrapper before `calculate_shot_score()` and carry `is_three_point_shot` through scoring, `3PTA`/`3PTM`, points, and shooting-foul free-throw count.
 - OREB putbacks are forced 2-point field goals and stamp a forced-two classification payload. Their nearest defender uses the shared graded proximity curve: full at ≤3, linear to 0.15 at 9, 0.15 through 11, and no contest beyond 11. Like every 2PT path, OREB receives no shooter-to-rim threshold penalty.
 - Free throws are forced 1-point attempts. They do not use field-goal 2/3 geometry.
+
+**Shooting-foul free-throw count**
+
+- Source of truth: `BackEnd.utils.free_throw_rules`. Every foul branch builds a `FreeThrowAward`
+  there and applies it with `apply_free_throw_award()`; no branch computes its own count.
+- `shooting_foul(is_three, made)` — a make is an and-one worth 1 regardless of shot value; a miss
+  is worth as many free throws as the attempt was worth in points (3 behind the arc, else 2).
+- `bonus_foul(team_fouls)` — for fouls penalised under the team-foul bonus rather than as a shot
+  (the `BLOCKING_FOUL` branch). Double bonus at 10+ gives 2; the 5-9 band gives the 1-and-1, which
+  is deliberately `free_throws=2` with `remaining=1` and `one_and_one=True` so the second shot is
+  earned by making the first; below 5 there are no free throws and possession is a side inbound.
+- `fixed_two()` — exactly 2, ignoring shot value and and-one. Used only where that is the intended
+  rule: the Final Turn attack blocking foul.
+- The applier writes `free_throws`, `free_throws_remaining` and `one_and_one` together, so the
+  count and the remaining count cannot drift apart.
+- Non-shooting team-foul bonus logic in `phase_resolution` is a separate family (`is_three` is
+  meaningless there) and is not routed through this helper.
+- Enforced, not just documented: `tests/test_free_throw_rules.py` pins the rule and guards the
+  call sites. No shot-resolution module may write `free_throws` / `free_throws_remaining` /
+  `one_and_one` directly, none may recompute the count into a local, and every branch that
+  awards free throws is allowlisted by (file, function, rule) with an exact count — so a new
+  branch has to be classified rather than silently added. All three guards are poison-tested.
 - Made-three SFX is stamped by the backend schema emitter only when `turn_result["is_three_point_shot"] is True`, not by raw `points == 3` and not by frontend inference.
 
 **Shot Resolution Flow (13 Steps)**

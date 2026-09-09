@@ -8,8 +8,7 @@
  * already goes.
  *
  * Signing Day also splits the green button: once orders are saved it RUNS the day;
- * before that it is still the way IN to the board, and still carries the pre-recruiting
- * cut offer, which is why its mode must not change.
+ * before that it is still the way IN to the board.
  *
  * Extracts the REAL functions out of franchise-command-center.js — same technique as
  * fcc-invite-step.spec.js — so the test tracks the shipped branch order rather than a
@@ -119,13 +118,19 @@ test.describe('week 35 — orders submitted', () => {
 });
 
 test.describe('week 35 — before orders exist', () => {
-  test('the green button still opens the board, with its cut offer intact', async ({ page }) => {
+  test('the green button opens the board', async ({ page }) => {
     const r = await runWith(page, { week: 35, ...NOT_SUBMITTED });
-    // The label says what pressing it starts; the MODE is what matters structurally —
-    // week35-recruiting is what raises "Cut Players?" before entering the hub, so
-    // re-pointing it would silently drop the pre-recruiting cut.
     expect(r.text).toBe('Run Signing Day');
     expect(r.mode).toBe('week35-recruiting');
+  });
+
+  test('the entry goes directly to recruiting without an optional cut step', () => {
+    const start = JS.indexOf("if (mode === 'week35-recruiting')");
+    const end = JS.indexOf("if (mode === 'cut-players')", start);
+    const branch = JS.slice(start, end);
+    expect(branch).toContain('await goRecruiting()');
+    expect(branch).not.toContain('/cut-players.html');
+    expect(branch).not.toContain('Cut Players?');
   });
 
   test('no ghost button — it would point where the green one already goes', async ({ page }) => {

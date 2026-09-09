@@ -3,13 +3,13 @@
 Small pills that appear next to the worm's action point. **Sentence case, conversational** — these
 sit close to the line and read as an aside, not a broadcast lower third.
 
-**version: 2026.08.e**
+**version: 2026.09.a**
 
 ## How to edit
 
 - `###` lines are tiers/categories — leave them alone, the engine matches on the id.
 - `-` lines are copy variants. Add, delete, rewrite freely.
-- Slots: `{NAME}` `{PTS}` `{REB}` `{AST}` `{STREAK}` `{RUN}` `{TEAM}` `{EDGE}` `{STAT}` `{DEF}` `{CATS}` `{SHOT}`
+- Slots: `{NAME}` `{PTS}` `{REB}` `{AST}` `{STREAK}` `{RUN}` `{EDGE}` `{STAT}` `{DEF}` `{CATS}` `{SHOT}`
 - `avatar headshot` uses the player portrait; `avatar abbr` uses a tinted tile with the team's
   three-letter abbreviation (there are no square team logos, so no logo is ever used here).
 - Wrap the number in `*asterisks*` to bold it — that's the only markup.
@@ -69,16 +69,16 @@ sit close to the line and read as an aside, not a broadcast lower third.
 - *{STREAK}* straight for {NAME}
 
 ### run · avatar abbr · orange
-- {TEAM} on a *{RUN}* run
-- *{RUN}* unanswered for {TEAM}
+- On a *{RUN}* run
+- *{RUN}* unanswered
 
 ### advantage · avatar abbr · blue
 - *+{EDGE}* {STAT} advantage
-- {TEAM} up *+{EDGE}* on {STAT}
+- A *+{EDGE}* edge in {STAT}
 
 ### disadvantage · avatar abbr · red
-- {TEAM} — *+{EDGE}* {STAT} disadvantage
-- *+{EDGE}* {STAT} disadvantage for {TEAM}
+- *+{EDGE}* more {STAT}
+- On the wrong side of *+{EDGE}* {STAT}
 
 ### defense · avatar headshot · blue
 - {NAME} — *{DEF}%* defense

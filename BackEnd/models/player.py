@@ -69,6 +69,12 @@ class Player:
         # white master by image_id; signed/league players resolve by player_id.
         self.portrait_source = data.get("portrait_source", "player")
         self.image_id = data.get("image_id")
+        # Pointer into the shared uniform archive: <image_id>__<color_key>. When
+        # present the view resolves the painted portrait directly and skips the
+        # 404 -> ensure -> retry round trip (the source of the pre-game lineup
+        # delay). Absent for league players and anything not yet painted, which
+        # falls back to the legacy per-player master.
+        self.uniform_key = data.get("uniform_key")
         # Optional per-position ratings (franchise / universal roster payloads)
         self.position_ratings = dict(data.get("position_ratings") or {})
         self.stats = self._init_stats()

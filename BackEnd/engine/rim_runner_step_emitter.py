@@ -228,6 +228,9 @@ def _is_offense_player(pid: str, off_lineup: Dict[str, Any]) -> bool:
 from BackEnd.utils.animation_step_helpers import (  # noqa: E402
     ag_grid_per_game_sec as _ag_grid_per_game_sec,
 )
+from BackEnd.utils.animation_step_helpers import (  # noqa: E402
+    enforce_step_start_continuity,
+)
 
 
 def _traversal_seconds(start: GridCoord, end: GridCoord, rate: float) -> float:
@@ -2176,6 +2179,7 @@ def _finalize_rr_steps(
     turn_result: Dict[str, Any],
     game: Any,
     steps: List[AnimationStep],
+    post_shot_already_built: bool = False,
 ) -> Optional[List[AnimationStep]]:
     """Single exit hook for the RR dispatcher. Re-canonicalizes post-shot
     overlays (factors in the FB-specific ``outlet_passer`` role that
@@ -2184,7 +2188,16 @@ def _finalize_rr_steps(
     MISS / BLOCK so FB shots get the same schema-pure resolution + SFX +
     announcements as HCO/OREB shots, and stamps ``hco_setup`` for
     hold-up / outlet-denied. Returns ``None`` when no steps were built so
-    the caller falls back to legacy rendering."""
+    the caller falls back to legacy rendering.
+
+    ``post_shot_already_built`` is set by the one caller that arrives here with
+    the chain already appended: the ``fb_drive_resolution`` branch of
+    ``_build_rr_drive_and_finalize``, whose ``build_fb_drive_resolution_steps``
+    ran the same two builders at ``fb_drive_step_emitter.py:564-568``. Neither
+    builder is re-entrant — ``_build_post_shot_sub_steps`` only early-returns on
+    result type and missing shooter, and ``_find_terminal_shoot_step`` scans in
+    REVERSE so it re-finds the original shoot step — so a second call appends a
+    whole second chain seeded from a stale coord. See bugs.md item 40."""
     if not steps:
         return None
     try:
@@ -2221,12 +2234,13 @@ def _finalize_rr_steps(
             and offense_team_id is not None
             and str(offense_team_id) == str(away_team_id)
         )
-        inject_shot_micro_before_post_shot(
-            steps, turn_result, off_lineup, def_lineup, away_offense,
-        )
-        _build_post_shot_sub_steps(
-            steps, turn_result, off_lineup, def_lineup, away_offense,
-        )
+        if not post_shot_already_built:
+            inject_shot_micro_before_post_shot(
+                steps, turn_result, off_lineup, def_lineup, away_offense,
+            )
+            _build_post_shot_sub_steps(
+                steps, turn_result, off_lineup, def_lineup, away_offense,
+            )
     except Exception:
         logging.exception("FB post-shot sub-steps failed")
     _warn_if_post_shot_sfx_missing(turn_result, steps)
@@ -2252,6 +2266,14 @@ def _finalize_rr_steps(
         )
     except Exception:
         logging.exception("carry_defense_to_basket failed — steps left unchanged")
+
+    # UESS §8.1 guard, LAST so it sees every builder's output. Modelled on the
+    # HCO skeleton emitter's inline merge (skeleton_step_emitter.py:2128-2138).
+    # Expected to be a no-op; it logs whenever it is not.
+    try:
+        enforce_step_start_continuity(steps, context="rim_runner/triangle")
+    except Exception:
+        logging.exception("UESS §8.1 continuity guard failed — steps left unchanged")
 
     return steps
 
@@ -2380,7 +2402,12 @@ def _build_rr_drive_and_finalize(
 
             rebase_animation_step_next_indices(dr_steps, len(steps))
             steps.extend(dr_steps)
-            return _finalize_rr_steps(turn_result, game, steps)
+            # build_fb_drive_resolution_steps already ran the post-shot builders
+            # (fb_drive_step_emitter.py:564-568). This is the ONLY path that
+            # reaches the exit hook with the chain in hand.
+            return _finalize_rr_steps(
+                turn_result, game, steps, post_shot_already_built=True
+            )
 
     shot_motion = _build_shot_motion_step(
         turn_result=turn_result,

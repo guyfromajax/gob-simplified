@@ -23,6 +23,19 @@ function getStore(scene) {
   return scene[HEARTBEAT_STORE_KEY];
 }
 
+// String -> int32, for seeding mulberry32 off a player id. FNV-1a, inlined rather than
+// imported for six lines. Used by the heartbeat so its per-player jitter is stable across
+// playbacks of the same game: the jitter must still DIFFER between players (otherwise ten
+// hearts beat in lockstep) but must not differ between two viewings of one game.
+function hashSeed(str) {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i += 1) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h | 0;
+}
+
 function getSpriteKey(sprite) {
   return String(
     sprite?.playerId ??
@@ -178,7 +191,7 @@ function startHeartbeatForSprite(scene, sprite) {
   const halfCycleMs = Math.max(20, Math.round(30000 / bpm));
   const role = resolveRole(scene, sprite);
   const dir = role === "defense" ? { x: -1, y: 1 } : { x: 1, y: 1 };
-  const jitter = (Math.random() * jitterPx * 2) - jitterPx;
+  const jitter = ((mulberry32(hashSeed(key) || 1)() * jitterPx * 2)) - jitterPx;
   const delta = amplitudePx + jitter;
   const dx = delta * dir.x;
   const dy = delta * dir.y;
@@ -334,7 +347,39 @@ function resolveWanderTargets(sprite) {
  * @param {Phaser.GameObjects.Container} sprite
  * @param {{ seed?: number, radiusGrid?: number, durationMs?: number }} opts
  */
+/**
+ * Start an idle wander, optionally waiting until the player has ARRIVED.
+ *
+ * `opts.delayMs` exists for the arrival-tail fill (defect 2): a player who reaches his target
+ * before the step ends stands dead for the remainder, and the fill puts a weight shift in that
+ * gap. The delay is that player's own tween duration, so the wander begins the moment he stops.
+ *
+ * IMPLEMENTED AS A DEFERRED CALL, not as a `delay` on the counter tween, and the difference is
+ * load-bearing. The body below takes ownership from the heartbeat, snaps the sprite to
+ * authoritative rest, and CAPTURES ITS BASE POSITIONS, all at call time. A `delay` on the tween
+ * would leave that capture where it is — mid-movement — so every offset would be measured from
+ * a position the player has already left, and the sprite would be yanked back to it. Deferring
+ * the whole body means the base is captured at rest, which is correct by construction.
+ *
+ * Default 0 calls straight through with no scheduling, so every existing caller is unchanged.
+ */
 export function applyIdleWander(scene, sprite, opts = {}) {
+  const delayMs = Number.isFinite(opts.delayMs) && opts.delayMs > 0 ? opts.delayMs : 0;
+  if (delayMs <= 0) return applyIdleWanderNow(scene, sprite, opts);
+  try {
+    if (!scene?.time?.delayedCall) return applyIdleWanderNow(scene, sprite, opts);
+    scene.time.delayedCall(delayMs, () => {
+      // delayMs is dropped so a re-entrant call cannot reschedule itself forever.
+      const { delayMs: _drop, ...rest } = opts;
+      applyIdleWanderNow(scene, sprite, rest);
+    });
+  } catch (_) {
+    // Visual-only; never throw.
+  }
+  return undefined;
+}
+
+export function applyIdleWanderNow(scene, sprite, opts = {}) {
   try {
     if (!scene?.tweens || !sprite || sprite.active === false || sprite.destroyed) return;
     if ((animationConfig.heartbeat || {}).enabled === false) return; // rides the heartbeat system

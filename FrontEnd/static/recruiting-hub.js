@@ -1291,7 +1291,14 @@
       if (res && res.results) state.week35Results = res.results;
       startReveal();
     }).catch(function (err) {
-      console.error(err); showToast('Run failed', String(err && err.message || err), false);
+      console.error(err);
+      // An FCC run entry deliberately never paints the hub while Signing Day is being
+      // prepared. If the run fails, restore the board so the player has somewhere
+      // useful to recover instead of leaving the prep cover up forever.
+      var prep = document.getElementById('hub-reveal');
+      if (context.action === 'run' && prep) prep.remove();
+      if (context.action === 'run') renderShell();
+      showToast('Run failed', String(err && err.message || err), false);
       if (btn) { btn.disabled = false; btn.textContent = 'Submit Orders'; }
     });
   }
@@ -1852,10 +1859,17 @@
       markRevealSeen(); window.location.href = Common.buildFccUrl(context); return;
     }
     revealMusic(true);
-    var host = document.createElement('div');
-    host.className = 'rvhost';
-    host.id = 'hub-reveal';
-    document.body.appendChild(host);
+    // FCC?action=run installs this cover before recruiting data is requested, so the
+    // player moves directly from the locker room into the experience. Reuse it here
+    // through result resolution and portrait prepaint instead of briefly exposing the
+    // Recruiting Hub between those phases.
+    var host = document.getElementById('hub-reveal');
+    if (!host) {
+      host = document.createElement('div');
+      host.className = 'rvhost';
+      host.id = 'hub-reveal';
+      document.body.appendChild(host);
+    }
     // Hold on "Prepping Signing Day" until the lead is painted, so the opening cards
     // arrive in team colours rather than blank white.
     host.innerHTML = prepHostHtml();
@@ -2247,6 +2261,16 @@
     var root = document.getElementById('hub-root'), backBtn = document.getElementById('back-btn');
     if (!context.franchiseId || !context.teamId) { if (root) root.innerHTML = '<div class="hub-error">Missing franchise context.</div>'; return; }
     if (backBtn) backBtn.href = Common.buildFccUrl(context);
+    // The FCC's green run action is a handoff to the Signing Day Experience, not a
+    // visit to the Recruiting Hub. Cover the page before the first request begins and
+    // keep this same pulse screen alive until the reveal is ready to paint.
+    if (context.action === 'run') {
+      var prepHost = document.createElement('div');
+      prepHost.className = 'rvhost';
+      prepHost.id = 'hub-reveal';
+      prepHost.innerHTML = prepHostHtml();
+      document.body.appendChild(prepHost);
+    }
     Common.fetchJSON(API_CONFIG.buildUrl('/franchise/recruiting-data') + '?franchise_id=' + encodeURIComponent(context.franchiseId))
       .then(function (data) {
         state.week = Number(data.week || 1);
@@ -2312,13 +2336,24 @@
         // LAST, so it lays over the server copy, the watchlist seed and the restored
         // week-35 entries alike — an unsubmitted edit is newer than all three.
         restoreDraft();
-        renderShell();
+        var canAutoRun = context.action === 'run' && state.phase === 'day' &&
+          !state.week35Ran && committedIds().length > 0;
+        if (!canAutoRun) {
+          var stalePrep = document.getElementById('hub-reveal');
+          if (stalePrep) stalePrep.remove();
+          renderShell();
+        }
         // AFTER restoreDraft: a returning player whose draft refilled the board is not
         // looking at a seed, and must not be told they are.
-        maybeShowSeedModal();
-        maybeAutoRun();
+        if (!canAutoRun) maybeShowSeedModal();
+        if (canAutoRun) runRecruiting();
       })
-      .catch(function (err) { console.error(err); if (root) root.innerHTML = '<div class="hub-error">Failed to load recruits.</div>'; });
+      .catch(function (err) {
+        console.error(err);
+        var prep = document.getElementById('hub-reveal');
+        if (prep) prep.remove();
+        if (root) root.innerHTML = '<div class="hub-error">Failed to load recruits.</div>';
+      });
   }
 
   init();

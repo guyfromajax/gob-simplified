@@ -1,0 +1,46 @@
+{
+ "seed": 5,
+ "err": null,
+ "n_turns": 396,
+ "schema": {
+  "DREB": 45,
+  "DEFENSIVE_STOP": 7,
+  "SIDE_INBOUND": 38,
+  "BASELINE_INBOUND": 49,
+  "DEAD BALL": 12,
+  "OREB_KICKOUT": 11,
+  "MAKE": 4,
+  "PUTBACK_MAKE": 8,
+  "STEAL": 7,
+  "FOUL": 18,
+  "PUTBACK_MISS": 2,
+  "HCO": 9,
+  "MISS": 6
+ },
+ "legacy": {
+  "OPENING_TIP": 1,
+  "STEAL": 5,
+  "BLOCK": 17,
+  "FOUL": 10,
+  "MISS": 51,
+  "FREE_THROW": 58,
+  "MAKE": 24,
+  "DEAD BALL": 4,
+  "TIMEOUT": 7,
+  "CHARGE": 3
+ },
+ "legacy_with_anims": {
+  "OPENING_TIP": 1
+ },
+ "legacy_empty": {
+  "STEAL": 5,
+  "BLOCK": 17,
+  "FOUL": 10,
+  "MISS": 51,
+  "FREE_THROW": 58,
+  "MAKE": 24,
+  "DEAD BALL": 4,
+  "TIMEOUT": 7,
+  "CHARGE": 3
+ }
+}

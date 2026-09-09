@@ -1,0 +1,68 @@
+{
+ "seed": 7,
+ "cov": {
+  "HCO": {
+   "still": 6359,
+   "stamped": 5051,
+   "steps": 1540
+  },
+  "SIDE_INBOUND": {
+   "still": 420,
+   "stamped": 252,
+   "steps": 63
+  },
+  "BASELINE_INBOUND": {
+   "still": 269,
+   "stamped": 130,
+   "steps": 45
+  },
+  "HCT": {
+   "still": 106,
+   "stamped": 0,
+   "steps": 28
+  },
+  "DREB": {
+   "still": 37,
+   "stamped": 0,
+   "steps": 41
+  },
+  "OREB": {
+   "still": 142,
+   "stamped": 0,
+   "steps": 28
+  },
+  "FREE_THROW": {
+   "still": 180,
+   "stamped": 108,
+   "steps": 50
+  },
+  "DEAD BALL": {
+   "still": 623,
+   "stamped": 272,
+   "steps": 109
+  },
+  "FCP": {
+   "still": 190,
+   "stamped": 0,
+   "steps": 45
+  },
+  "FAST_BREAK": {
+   "still": 16,
+   "stamped": 0,
+   "steps": 10
+  }
+ },
+ "fam": {
+  "hco_still": 5155,
+  "inbound": 382,
+  "make_hold": 168,
+  "free_throw": 108
+ },
+ "viol": {
+  "miss_family_stamps": 0
+ },
+ "aim": {
+  "stamps": 5813,
+  "on_still": 5813
+ }
+}

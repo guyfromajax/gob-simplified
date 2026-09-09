@@ -37,3 +37,15 @@ assets_staging/
 # Portrait pipeline scratch output (reference bodies, QC sheets, sample
 # uniformed portraits, watermark extracts) — generated artifacts, never commit
 tmp/
+.claude/
+
+# Measurement/probe scratch scripts. They stay ON DISK so censuses and probes remain
+# reproducible, but they are not source and must stop riding along in unrelated commits.
+# Widened from `scratch_*.py` to `scratch_*`: the .mjs frontend probes were still being
+# picked up, and so were the *_results.json captures.
+# NOTE: .gitignore does not affect ALREADY-TRACKED files, so the previously committed
+# scratch_* files are untracked in the same commit that widens this rule.
+scratch_*
+# Probe output. The gate arms write per-seed digests here; they are reproducible from the
+# scratch probes and have no business riding along in a source commit.
+.arm/

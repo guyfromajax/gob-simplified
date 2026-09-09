@@ -1,0 +1,1289 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-09-08T20:05:43.166Z",
+  "seed": "445f107ae4849c8d1fe8f789150f47a2",
+  "rules": {
+    "selection_method": "independent weighted roll per team; percentages are not final quotas",
+    "center_court_weights": {
+      "none": 10,
+      "team_logo": 60,
+      "team_wordmark": 30
+    },
+    "non_center_logo_weights": {
+      "none": 50,
+      "deep_wing_2": 10,
+      "deep_wing_4": 5,
+      "inside_3pt_arc_2": 25,
+      "inside_3pt_arc_4": 10
+    },
+    "hardwood_weights": {
+      "classic": 15,
+      "gloss": 40,
+      "fine_plank": 25,
+      "alternating_board": 15,
+      "parquet": 5
+    },
+    "deep_wing_wordmark_count": 20,
+    "deep_wing_wordmark_note": "Twenty additional teams beyond Conference-1 reference Ocean City"
+  },
+  "excluded": {
+    "conference_1_count": 8,
+    "approved_non_conference_1": [
+      "abilene",
+      "biloxi",
+      "chapel_hill",
+      "ida",
+      "north_columbus",
+      "templeton_wesley"
+    ]
+  },
+  "assignment_count": 114,
+  "realized_counts": {
+    "center_court": {
+      "team_logo": 75,
+      "none": 11,
+      "team_wordmark": 28
+    },
+    "non_center_logos": {
+      "none": 71,
+      "inside_3pt_arc_2": 20,
+      "inside_3pt_arc_4": 9,
+      "deep_wing_2": 12,
+      "deep_wing_4": 2
+    },
+    "hardwood": {
+      "gloss": 44,
+      "fine_plank": 31,
+      "alternating_board": 21,
+      "classic": 11,
+      "parquet": 7
+    },
+    "deep_wing_wordmark_teams": 19,
+    "deep_wing_wordmark_placements": 20
+  },
+  "assignments": [
+    {
+      "team": "Ada",
+      "slug": "ada",
+      "mascot": "Falcons",
+      "conference": 11,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Amariabi International",
+      "slug": "amariabi_international",
+      "mascot": "Collective",
+      "conference": 4,
+      "center_court": "none",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null,
+      "manual_override": "Removed the upper-left mascot wordmark after visual review."
+    },
+    {
+      "team": "Amarillo Tech",
+      "slug": "amarillo_tech",
+      "mascot": "Armadillos",
+      "conference": 11,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Ann Arbor",
+      "slug": "ann_arbor",
+      "mascot": "Coyotes",
+      "conference": 5,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Appalachia",
+      "slug": "appalachia",
+      "mascot": "Rams",
+      "conference": 2,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": {
+        "text_source": "school_name",
+        "position": "lower_right"
+      },
+      "center_offset": { "x": -50, "y": 0 },
+      "manual_override": "Center court changed from mascot wordmark to team logo; shift the visible logo bounds left onto the court axis."
+    },
+    {
+      "team": "Archbishop McClellan",
+      "slug": "archbishop_mcclellan",
+      "mascot": "Hawks",
+      "conference": 6,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "classic",
+      "deep_wing_wordmark": null,
+      "center_offset": { "x": -40, "y": 0 },
+      "manual_override": "Shift the asymmetric portrait left so the mitre point meets the center line."
+    },
+    {
+      "team": "Austin",
+      "slug": "austin",
+      "mascot": "Wolves",
+      "conference": 12,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Austin West",
+      "slug": "austin_west",
+      "mascot": "Defenders",
+      "conference": 12,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null,
+      "manual_override": "Remove the Austin West deep-wing wordmark."
+    },
+    {
+      "team": "Barton Lutheran",
+      "slug": "barton_lutheran",
+      "mascot": "Panthers",
+      "conference": 13,
+      "center_court": "team_wordmark",
+      "non_center_logos": "deep_wing_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null,
+      "center_offset": { "x": 0, "y": 60 },
+      "manual_override": "Center the complete Panthers wordmark horizontally and lower it onto the basket/three-point-arc-tip axis."
+    },
+    {
+      "team": "Bayou District",
+      "slug": "bayou_district",
+      "mascot": "Airboats",
+      "conference": 12,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "parquet",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Berkley",
+      "slug": "berkley",
+      "mascot": "Wasps",
+      "conference": 15,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Boise",
+      "slug": "boise",
+      "mascot": "Mountaineers",
+      "conference": 14,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Border Academy",
+      "slug": "border_academy",
+      "mascot": "Swordsmen",
+      "conference": 13,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Burroughs",
+      "slug": "burroughs",
+      "mascot": "Bears",
+      "conference": 6,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Cagers World",
+      "slug": "cagers_world",
+      "mascot": "Mustangs",
+      "conference": 2,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Cardinal Conor",
+      "slug": "cardinal_conor",
+      "mascot": "Monarchs",
+      "conference": 14,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "classic",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Casino Row",
+      "slug": "casino_row",
+      "mascot": "Blackjacks",
+      "conference": 2,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Chambless Global",
+      "slug": "chambless_global",
+      "mascot": "Raiders",
+      "conference": 12,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Circus Circus",
+      "slug": "circus_circus",
+      "mascot": "Ringmasters",
+      "conference": 13,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": {
+        "text_source": "mascot_name",
+        "position": "upper_right",
+        "scale": 1.25,
+        "offset_x": 40
+      },
+      "manual_override": "Use a clean Ringmasters-only wordmark; enlarge the deep-wing mark 25% and shift it right."
+    },
+    {
+      "team": "Cleveland-Carlysle",
+      "slug": "cleveland_carlysle",
+      "mascot": "Bobcats",
+      "conference": 5,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": {
+        "text_source": "mascot_name",
+        "position": "lower_right",
+        "scale": 1.25,
+        "offset_x": 40
+      },
+      "manual_override": "Use a clean Kings-only wordmark; enlarge the deep-wing mark 25% and shift it right."
+    },
+    {
+      "team": "Columbus",
+      "slug": "columbus",
+      "mascot": "Beavers",
+      "conference": 5,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Concord",
+      "slug": "concord",
+      "mascot": "Rams",
+      "conference": 3,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null,
+      "force_reflections": true,
+      "manual_override": "Remove the deep-wing logos and add the established lower-half overhead reflections."
+    },
+    {
+      "team": "Couer d'Alene",
+      "slug": "couer_dalene",
+      "mascot": "Grizzlies",
+      "conference": 14,
+      "center_court": "team_logo",
+      "non_center_logos": "deep_wing_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Crickstown",
+      "slug": "crickstown",
+      "mascot": "Caribou",
+      "conference": 2,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Crimson County",
+      "slug": "crimson_county",
+      "mascot": "Cowboys",
+      "conference": 7,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "classic",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Crofton",
+      "slug": "crofton",
+      "mascot": "Cardinals",
+      "conference": 10,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Cupertino",
+      "slug": "cupertino",
+      "mascot": "Diamondbacks",
+      "conference": 16,
+      "center_court": "none",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "D1 Institute",
+      "slug": "d1_institute",
+      "mascot": "Orioles",
+      "conference": 3,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Dade Academy",
+      "slug": "dade_academy",
+      "mascot": "Captains",
+      "conference": 8,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "parquet",
+      "deep_wing_wordmark": null,
+      "center_offset": { "x": 0, "y": 0 },
+      "manual_override": "Move the center logo right onto the court-center anchor."
+    },
+    {
+      "team": "DeCatur Dei",
+      "slug": "decatur_dei",
+      "mascot": "Pelicans",
+      "conference": 15,
+      "center_court": "none",
+      "non_center_logos": "none",
+      "hardwood": "classic",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "DeLand",
+      "slug": "deland",
+      "mascot": "Lions",
+      "conference": 8,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Desert Regional",
+      "slug": "desert_regional",
+      "mascot": "Mesas",
+      "conference": 13,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null,
+      "deep_wing_wordmarks": [
+        { "text_source": "school_name", "position": "upper_right", "rotate": 0 },
+        { "text_source": "school_name", "position": "lower_left", "rotate": 180 }
+      ],
+      "manual_override": "Removed both deep-wing logos and mirrored the school-name wordmark at upper-right and lower-left."
+    },
+    {
+      "team": "Dillinger",
+      "slug": "dillinger",
+      "mascot": "Wolves",
+      "conference": 6,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": {
+        "text_source": "school_name",
+        "position": "upper_right"
+      }
+    },
+    {
+      "team": "Durham",
+      "slug": "durham",
+      "mascot": "Generals",
+      "conference": 2,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null,
+      "force_reflections": true,
+      "manual_override": "Remove both deep-wing logos and add the established lower-half overhead reflections."
+    },
+    {
+      "team": "East Rockies",
+      "slug": "east_rockies",
+      "mascot": "Mountain Lions",
+      "conference": 13,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": {
+        "text_source": "school_name",
+        "position": "lower_right"
+      }
+    },
+    {
+      "team": "Empire City",
+      "slug": "empire_city",
+      "mascot": "Hawks",
+      "conference": 4,
+      "center_court": "none",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Evanston",
+      "slug": "evanston",
+      "mascot": "Wildcats",
+      "conference": 6,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Falls Academy",
+      "slug": "falls_academy",
+      "mascot": "Sailors",
+      "conference": 4,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "parquet",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Fielding",
+      "slug": "fielding",
+      "mascot": "Force",
+      "conference": 9,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Gainesville",
+      "slug": "gainesville",
+      "mascot": "Swamp Creatures",
+      "conference": 8,
+      "center_court": "team_wordmark",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null,
+      "manual_override": "Add the team logo four times inside the 3-point arcs."
+    },
+    {
+      "team": "Garden Elites",
+      "slug": "garden_elites",
+      "mascot": "Legion",
+      "conference": 3,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "parquet",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "GP Prep School",
+      "slug": "gp_prep_school",
+      "mascot": "Elites",
+      "conference": 12,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null,
+      "manual_override": "Keep only the center-court logo; remove both deep-wing logo placements."
+    },
+    {
+      "team": "Grayson Ranch",
+      "slug": "grayson_ranch",
+      "mascot": "Warriors",
+      "conference": 8,
+      "center_court": "team_logo",
+      "non_center_logos": "deep_wing_2",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Grizzly Academy",
+      "slug": "grizzly_academy",
+      "mascot": "Patriots",
+      "conference": 16,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Grupenberg",
+      "slug": "grupenberg",
+      "mascot": "Generals",
+      "conference": 9,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "HA Rushmore",
+      "slug": "ha_rushmore",
+      "mascot": "Saloon",
+      "conference": 10,
+      "center_court": "none",
+      "non_center_logos": "none",
+      "hardwood": "classic",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Hana Road",
+      "slug": "hana_road",
+      "mascot": "Waterfalls",
+      "conference": 16,
+      "center_court": "team_wordmark",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null,
+      "manual_override": "Add the team logo twice inside the 3-point arcs."
+    },
+    {
+      "team": "Harding Central",
+      "slug": "harding_central",
+      "mascot": "Spartans",
+      "conference": 5,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Hardwood Fields",
+      "slug": "hardwood_fields",
+      "mascot": "Rams",
+      "conference": 5,
+      "center_court": "none",
+      "non_center_logos": "deep_wing_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Hollywood Prep",
+      "slug": "hollywood_prep",
+      "mascot": "Cavalry",
+      "conference": 15,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null,
+      "center_offset": { "x": 25, "y": 0 },
+      "manual_override": "Removed all four deep-wing logos and nudged the center wordmark slightly right."
+    },
+    {
+      "team": "Houston Jesuit",
+      "slug": "houston_jesuit",
+      "mascot": "Cowboys",
+      "conference": 12,
+      "center_court": "team_wordmark",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Huntington Canyon",
+      "slug": "huntington_canyon",
+      "mascot": "Rangers",
+      "conference": 15,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Hyde Methodist",
+      "slug": "hyde_methodist",
+      "mascot": "Raiders",
+      "conference": 9,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Independence",
+      "slug": "independence",
+      "mascot": "Spartans",
+      "conference": 3,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Iowa Academy",
+      "slug": "iowa_academy",
+      "mascot": "Capitals",
+      "conference": 9,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Ivy Prep",
+      "slug": "ivy_prep",
+      "mascot": "Regents",
+      "conference": 3,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Juneau-Nome",
+      "slug": "juneau_nome",
+      "mascot": "Fishermen",
+      "conference": 16,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Kenton",
+      "slug": "kenton",
+      "mascot": "Eagles",
+      "conference": 11,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Keys High",
+      "slug": "keys_high",
+      "mascot": "Dolphins",
+      "conference": 8,
+      "center_court": "team_wordmark",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Knoxville",
+      "slug": "knoxville",
+      "mascot": "Ninjas",
+      "conference": 7,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": {
+        "text_source": "school_name",
+        "position": "upper_left"
+      }
+    },
+    {
+      "team": "Lawrence",
+      "slug": "lawrence",
+      "mascot": "Eagles",
+      "conference": 9,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "parquet",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Lewis Catholic",
+      "slug": "lewis_catholic",
+      "mascot": "Saints",
+      "conference": 10,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Lexington",
+      "slug": "lexington",
+      "mascot": "Thunder",
+      "conference": 7,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Long Island Methodist",
+      "slug": "long_island_methodist",
+      "mascot": "Comets",
+      "conference": 4,
+      "center_court": "team_wordmark",
+      "non_center_logos": "deep_wing_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Mahala Alou",
+      "slug": "mahala_alou",
+      "mascot": "Sharks",
+      "conference": 16,
+      "center_court": "none",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": {
+        "text_source": "mascot_name",
+        "position": "lower_right"
+      }
+    },
+    {
+      "team": "Melbourne Americas",
+      "slug": "melbourne_americas",
+      "mascot": "Breakers",
+      "conference": 16,
+      "center_court": "team_logo",
+      "non_center_logos": "deep_wing_2",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "MiddleTEX",
+      "slug": "middletex",
+      "mascot": "Bucking Broncos",
+      "conference": 12,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Minot",
+      "slug": "minot",
+      "mascot": "Engineers",
+      "conference": 10,
+      "center_court": "team_wordmark",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Mobile",
+      "slug": "mobile",
+      "mascot": "Red Wave",
+      "conference": 7,
+      "center_court": "team_wordmark",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": {
+        "text_source": "school_name",
+        "position": "lower_right"
+      }
+    },
+    {
+      "team": "Monroe-Hayes",
+      "slug": "monroe_hayes",
+      "mascot": "Hawks",
+      "conference": 7,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Montpeiler",
+      "slug": "montpeiler",
+      "mascot": "Maples",
+      "conference": 3,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Mt Simmons",
+      "slug": "mt_simmons",
+      "mascot": "Cobras",
+      "conference": 10,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "classic",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Mynsk",
+      "slug": "mynsk",
+      "mascot": "Cougars",
+      "conference": 5,
+      "center_court": "none",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": {
+        "text_source": "school_name",
+        "position": "lower_right"
+      }
+    },
+    {
+      "team": "Myrtle Private",
+      "slug": "myrtle_private",
+      "mascot": "Carriers",
+      "conference": 7,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": {
+        "text_source": "school_name",
+        "position": "lower_left"
+      }
+    },
+    {
+      "team": "Nickel Beach",
+      "slug": "nickel_beach",
+      "mascot": "Sea Turtles",
+      "conference": 2,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": {
+        "text_source": "mascot_name",
+        "position": "lower_right",
+        "offset_x": 250
+      }
+    },
+    {
+      "team": "Norman",
+      "slug": "norman",
+      "mascot": "Tornados",
+      "conference": 11,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Ozark Centre",
+      "slug": "ozark_centre",
+      "mascot": "Devils",
+      "conference": 9,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Pacific All-Stars",
+      "slug": "pacific_all_stars",
+      "mascot": "Squad",
+      "conference": 16,
+      "center_court": "team_wordmark",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Pan Handle Limited",
+      "slug": "pan_handle_limited",
+      "mascot": "Steeds",
+      "conference": 11,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Pike's Prep",
+      "slug": "pikes_prep",
+      "mascot": "Climbers",
+      "conference": 13,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Providence",
+      "slug": "providence",
+      "mascot": "Chill",
+      "conference": 3,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Queen's Guard",
+      "slug": "queens_guard",
+      "mascot": "Sentinels",
+      "conference": 3,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Quigley Catholic",
+      "slug": "quigley_catholic",
+      "mascot": "Knights",
+      "conference": 6,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Rainier Central",
+      "slug": "rainier_central",
+      "mascot": "Patrol",
+      "conference": 14,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Rancho Estrada",
+      "slug": "rancho_estrada",
+      "mascot": "Miners",
+      "conference": 15,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Reardon-Mayes",
+      "slug": "reardon_mayes",
+      "mascot": "Golden Eagles",
+      "conference": 8,
+      "center_court": "team_wordmark",
+      "non_center_logos": "deep_wing_4_and_inside_3pt_arc_4",
+      "hardwood": "parquet",
+      "deep_wing_wordmark": null,
+      "manual_override": "Removed the deep-wing wordmark and added four inside-arc logos in addition to the four deep-wing logos after visual review."
+    },
+    {
+      "team": "Redwood High",
+      "slug": "redwood_high",
+      "mascot": "Owls",
+      "conference": 16,
+      "center_court": "none",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "classic",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Reyes-Santiago",
+      "slug": "reyes_santiago",
+      "mascot": "Cacti",
+      "conference": 11,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": {
+        "text_source": "mascot_name",
+        "position": "lower_right"
+      }
+    },
+    {
+      "team": "River's Edge",
+      "slug": "rivers_edge",
+      "mascot": "Catfish",
+      "conference": 11,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Rodeo Circuit",
+      "slug": "rodeo_circuit",
+      "mascot": "Clowns",
+      "conference": 10,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null,
+      "manual_override": "Replaced the center-court mascot wordmark with the team logo after visual review."
+    },
+    {
+      "team": "Sacred Heart",
+      "slug": "sacred_heart",
+      "mascot": "Leopards",
+      "conference": 6,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Salem",
+      "slug": "salem",
+      "mascot": "Woodchucks",
+      "conference": 14,
+      "center_court": "team_logo",
+      "non_center_logos": "deep_wing_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "San Jose",
+      "slug": "san_jose",
+      "mascot": "Kings",
+      "conference": 15,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": {
+        "text_source": "mascot_name",
+        "position": "upper_left"
+      }
+    },
+    {
+      "team": "Seattle AAA",
+      "slug": "seattle_aaa",
+      "mascot": "Sound",
+      "conference": 14,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "classic",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Southwest Miner",
+      "slug": "southwest_miner",
+      "mascot": "Cowboys",
+      "conference": 13,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "St Peters",
+      "slug": "st_peters",
+      "mascot": "Titans",
+      "conference": 4,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Stormwood",
+      "slug": "stormwood",
+      "mascot": "Tigers",
+      "conference": 11,
+      "center_court": "none",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Swoosh",
+      "slug": "swoosh",
+      "mascot": "Knights",
+      "conference": 14,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Syracuse",
+      "slug": "syracuse",
+      "mascot": "Tigers",
+      "conference": 4,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "parquet",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Tallahassee",
+      "slug": "tallahassee",
+      "mascot": "Ratsnakes",
+      "conference": 8,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Toronto Limited",
+      "slug": "toronto_limited",
+      "mascot": "Lions",
+      "conference": 4,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "classic",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Tower Academy",
+      "slug": "tower_academy",
+      "mascot": "Royals",
+      "conference": 10,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Tri-Cities Prep",
+      "slug": "tri_cities_prep",
+      "mascot": "Sorcerers",
+      "conference": 9,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Tucson",
+      "slug": "tucson",
+      "mascot": "Rattlesnakes",
+      "conference": 13,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "classic",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Two Rivers",
+      "slug": "two_rivers",
+      "mascot": "Pointers",
+      "conference": 10,
+      "center_court": "team_logo",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": {
+        "text_source": "school_name",
+        "position": "lower_right"
+      }
+    },
+    {
+      "team": "Upper Peninsula",
+      "slug": "upper_peninsula",
+      "mascot": "Huskies",
+      "conference": 5,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Upstate",
+      "slug": "upstate",
+      "mascot": "Wolverines",
+      "conference": 4,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Valdosta Valley",
+      "slug": "valdosta_valley",
+      "mascot": "Falcons",
+      "conference": 8,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "classic",
+      "deep_wing_wordmark": {
+        "text_source": "mascot_name",
+        "position": "upper_right"
+      }
+    },
+    {
+      "team": "Valley High",
+      "slug": "valley_high",
+      "mascot": "Orcas",
+      "conference": 15,
+      "center_court": "team_wordmark",
+      "non_center_logos": "inside_3pt_arc_4",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null,
+      "manual_override": "Added four Orca logos inside the 3-point arcs after visual review."
+    },
+    {
+      "team": "Vancouver",
+      "slug": "vancouver",
+      "mascot": "Bears",
+      "conference": 14,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Wacker West",
+      "slug": "wacker_west",
+      "mascot": "Hitmen",
+      "conference": 6,
+      "center_court": "team_wordmark",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Wash U Prep",
+      "slug": "wash_u_prep",
+      "mascot": "Knights",
+      "conference": 9,
+      "center_court": "team_logo",
+      "non_center_logos": "none",
+      "hardwood": "fine_plank",
+      "deep_wing_wordmark": null
+    },
+    {
+      "team": "Washington Carver",
+      "slug": "washington_carver",
+      "mascot": "Cougars",
+      "conference": 7,
+      "center_court": "none",
+      "non_center_logos": "none",
+      "hardwood": "gloss",
+      "deep_wing_wordmark": {
+        "text_source": "school_name",
+        "position": "upper_left"
+      },
+      "suppress_reflections": true
+    },
+    {
+      "team": "West Ocean City",
+      "slug": "west_ocean_city",
+      "mascot": "Mariners",
+      "conference": 15,
+      "center_court": "team_wordmark",
+      "non_center_logos": "inside_3pt_arc_2",
+      "hardwood": "alternating_board",
+      "deep_wing_wordmark": null
+    }
+  ]
+}

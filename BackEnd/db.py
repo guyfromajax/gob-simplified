@@ -211,6 +211,10 @@ if not USING_MONGOMOCK:
     # container filesystem is EPHEMERAL and declares no volume, so the file sink
     # produces nothing retrievable in production. TTL-expired, see ensure_eog_band_log_index.
     eog_band_log_collection = db["eog_band_log"]
+    # Stripe webhook event log. The Stripe event id is used as _id, so a redelivered
+    # event is a duplicate-key no-op — idempotency by construction rather than by a
+    # remembered check. Recorded only; nothing consumes these yet.
+    stripe_events_collection = db["stripe_events"]
     print("🔵 [DEBUG] db.py: Collections initialized", file=sys.stderr, flush=True)
 else:
     print("🔵 [DEBUG] db.py: Using explicitly selected mongomock", file=sys.stderr, flush=True)
@@ -245,6 +249,7 @@ else:
     # Alpha 12-question feedback survey (lazily created on first insert).
     alpha_feedback_collection = db["alpha_feedback"]
     eog_band_log_collection = db["eog_band_log"]
+    stripe_events_collection = db["stripe_events"]
     print("🔵 [DEBUG] db.py: Mongomock collections initialized", file=sys.stderr, flush=True)
 
 print("🔵 [DEBUG] db.py: Module initialization complete", file=sys.stderr, flush=True)

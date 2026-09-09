@@ -219,6 +219,12 @@ class GameManager:
             "time_remaining": 480,
             "clock": "8:00",
             "shot_clock_remaining": 30,
+            # Possession-scoped frontcourt state, carried across turn seams by
+            # dynamic_hct and cleared only by ``reset_frontcourt_state``.
+            # ``frontcourt_ratcheted`` is a LIST, not a set: game_state is a plain
+            # dict that other layers copy and hand around, so keep it JSON-safe.
+            "frontcourt_established": False,
+            "frontcourt_ratcheted": [],
             "time_elapsed": 0,
             "uess_clock_authority_mode": "warn",
             "uess_clock_elapsed_authority": "ledger",
@@ -922,6 +928,19 @@ class GameManager:
                 logging.error(f"⚠️ Team fouls/timeouts stamp failed: {e}")
 
         if isinstance(turn_result, dict):
+            steps = turn_result.get("animation_steps")
+            if isinstance(steps, list) and steps:
+                from BackEnd.utils.animation_step_helpers import (
+                    announce_ball_owner_seam,
+                    announce_unrendered_tail,
+                )
+
+                fam = "%s/%s" % (
+                    turn_result.get("current_turn") or "?",
+                    turn_result.get("result_type") or "?",
+                )
+                announce_unrendered_tail(steps, context=fam)
+                announce_ball_owner_seam(steps, context=fam, family=fam)
             sync_lineup_coords_from_turn(self, turn_result)
 
         # Universal end-of-turn stamps. Read by cross-turn bridges (Handoff,
@@ -933,7 +952,21 @@ class GameManager:
                 build_final_coords,
                 build_final_ball_handler_id,
                 build_final_ball_coords,
+                stamp_movement_curves,
+                stamp_arrival_settle,
             )
+            # Continuity-aware easing (defect 1). Stamped HERE rather than in each emitter
+            # because the curve depends on the NEXT step, so it needs the finished list — and
+            # because there are 20+ sites that assign `animation_steps`, which is 20 chances to
+            # miss one. Additive render-space intent: no coords move, no steps are added or
+            # removed, no RNG is touched, so the seeded exact-diff stays byte-identical apart
+            # from the new key.
+            stamp_movement_curves(turn_result.get("animation_steps"))
+            # Arrival-tail fill (defect 2). Must run AFTER every emitter's still-player pass,
+            # because it shares ONE density cap with it and enforces that by counting the idlers
+            # already on the step. Same additive contract as the curve stamp: no coords, no step
+            # counts, no RNG — `flourish` is the only key that moves.
+            stamp_arrival_settle(turn_result.get("animation_steps"))
             turn_result["final_coords"] = build_final_coords(self)
             turn_result["final_ball_handler_id"] = build_final_ball_handler_id(turn_result)
             # UESS §8.4 invariant 4 (HCO_UESS_Audit.md Task 3b): the ball's true
@@ -1565,10 +1598,7 @@ class GameManager:
                         oreb_turn["next_play_type"] = "DREB"
                         oreb_turn["next_turn"] = "DREB"
                         if oreb_turn.get("terminal_dreb_eoq"):
-                            from BackEnd.utils.eoq_clock_progression import finalize_terminal_dreb_turn
-
                             dreb_turn["terminal_dreb_eoq"] = True
-                            finalize_terminal_dreb_turn(self, dreb_turn)
                         elif oreb_turn.get("flss_after_dreb"):
                             dreb_turn["late_clock_eoq"] = bool(oreb_turn.get("late_clock_eoq"))
                             dreb_turn["flss_after_dreb"] = True
@@ -1702,10 +1732,7 @@ class GameManager:
                 result["next_turn"] = "DREB"
                 if dreb_turn.get("result_type") != "FOUL":
                     if result.get("terminal_dreb_eoq"):
-                        from BackEnd.utils.eoq_clock_progression import finalize_terminal_dreb_turn
-
                         dreb_turn["terminal_dreb_eoq"] = True
-                        finalize_terminal_dreb_turn(self, dreb_turn)
                         try:
                             from BackEnd.engine.eoq_debug_log import log_eoq_turn
 
@@ -2340,12 +2367,31 @@ class GameManager:
         # Default to HCO if no explicit routing
         return "HCO"
 
+    def reset_frontcourt_state(self):
+        """Clear the POSSESSION-scoped frontcourt flags on ``game_state``.
+
+        ``dynamic_hct.compute_dynamic_hct_turn`` carries ``frontcourt_established``
+        and ``frontcourt_ratcheted`` across turn seams the way it already carries
+        ``shot_clock_remaining``, so the only correct place to clear them is a
+        possession boundary. Clearing on a turn seam is precisely the defect this
+        replaced: the flag came back False on every turn after the one that
+        crossed half court, which re-armed the 10-second rule mid-possession and
+        made an over-and-back undetectable once the establishing turn ended.
+
+        Two boundaries call this: ``switch_possession`` (the live-play flip) and
+        the quarter-start possession assignment in ``main.simulate_quarter``,
+        which sets ``offense_team`` directly and never routes through here.
+        """
+        self.game_state["frontcourt_established"] = False
+        self.game_state["frontcourt_ratcheted"] = []
+
     def switch_possession(self):
         self.offense_team, self.defense_team = self.defense_team, self.offense_team
         self.game_state["offense_team"] = self.offense_team.name
         self.game_state["defense_team"] = self.defense_team.name
         self.game_state["current_playcall"] = ""
         self.game_state["defense_playcall"] = ""
+        self.reset_frontcourt_state()
 
     def get_box_score(self):
         """Get box score with all players (lineup + bench) to match team totals."""

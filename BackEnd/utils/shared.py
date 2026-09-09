@@ -2489,12 +2489,18 @@ def summarize_game_state(
     def _display_portrait(p):
         """Persist portrait metadata only for players linked to recruit artwork."""
         image_id = getattr(p, "image_id", None)
-        if not image_id:
+        uniform_key = getattr(p, "uniform_key", None)
+        if not image_id and not uniform_key:
             return {}
-        return {
+        out = {
             "portrait_source": getattr(p, "portrait_source", "player"),
             "image_id": image_id,
         }
+        if uniform_key:
+            # Lets the client address the shared archive object directly instead of
+            # missing on players/master/<player_id>.png and waiting on a paint.
+            out["uniform_key"] = uniform_key
+        return out
 
     players = []
     for team_key, team_obj in [("home", game.home_team), ("away", game.away_team)]:
@@ -3090,6 +3096,13 @@ def summarize_game_state(
         "clock": game.game_state.get("clock", "8:00"),  # ✅ TIMEOUT: Save clock for resume (same as quarter breaks)
         "time_remaining": game.game_state.get("time_remaining", 480),  # ✅ TIMEOUT: Save time_remaining for resume (same as quarter breaks)
         "shot_clock_remaining": game.game_state.get("shot_clock_remaining", min(30, game.game_state.get("time_remaining", 480))),
+        # Possession-scoped frontcourt state. Persisted alongside the shot clock
+        # because it has the same lifetime: both survive a turn seam and a
+        # timeout, and both are only reset at a possession boundary. Without
+        # these two lines a reload silently clears the flag mid-possession, which
+        # re-arms the 10-second rule and makes an over-and-back uncallable.
+        "frontcourt_established": bool(game.game_state.get("frontcourt_established", False)),
+        "frontcourt_ratcheted": list(game.game_state.get("frontcourt_ratcheted") or []),
         "man_defense_matchups": game.game_state.get("man_defense_matchups", {}),  # ✅ MAN DEFENSE MATCHUPS: User team matchups for persistence
         "man_defense_matchups_computer": game.game_state.get("man_defense_matchups_computer", {}),  # Computer team matchups (default if missing)
         "rim_runner_by_team_id": game.game_state.get("rim_runner_by_team_id") or {},
@@ -3737,7 +3750,43 @@ def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None
     # new schema takes precedence when a turn carries both.
     animation_steps = turn_result.get("animation_steps")
     if isinstance(animation_steps, list) and animation_steps:
-        last_step = animation_steps[-1] if animation_steps[-1] else None
+        # Drawable only. ``animation_steps[-1]`` is the array tail; the renderer
+        # stops at the first ``turn_stop`` (animationPlayback.js playTurn).
+        # Reading the tail is how item 41 seeded the next turn from a step
+        # nobody drew. When they disagree this announces (policy 26b) and
+        # still reads the drawn step — it does not rewrite the extra steps.
+        from BackEnd.utils.animation_step_helpers import (
+            last_rendered_step,
+            _coord_tail_delta_ft,
+        )
+
+        drawn_idx, last_step = last_rendered_step(animation_steps)
+        tail_idx = len(animation_steps) - 1
+        if (
+            drawn_idx is not None
+            and drawn_idx != tail_idx
+            and isinstance(last_step, dict)
+        ):
+            worst, moved = _coord_tail_delta_ft(
+                last_step, animation_steps[tail_idx]
+            )
+            logging.warning(
+                "[UESS UNRENDERED] coord sync skipped undrawn tail%s: "
+                "last_rendered=%d array_tail=%d extra=%d worst_delta=%.2f ft "
+                "moved_players=%d",
+                (
+                    " %s/%s"
+                    % (
+                        turn_result.get("current_turn") or "?",
+                        turn_result.get("result_type") or "?",
+                    )
+                ),
+                drawn_idx,
+                tail_idx,
+                tail_idx - drawn_idx,
+                worst,
+                moved,
+            )
         if isinstance(last_step, dict):
             last_end_coords = (last_step.get("end") or {}).get("coords") or {}
             if isinstance(last_end_coords, dict):

@@ -37,6 +37,10 @@ from BackEnd.utils.fb_geo_helpers import (
     pick_nearest_contesting_defender,
     stamp_fb_miss_bounce_coords,
 )
+from BackEnd.utils.free_throw_rules import (
+    apply_free_throw_award,
+    shooting_foul as ft_shooting_foul,
+)
 from BackEnd.utils.shot_split_tracker import record_shot_split
 
 
@@ -402,12 +406,14 @@ def _resolve_shot_attempt(
         game_state["foul_team"] = "DEFENSE"
         game_state["shooter"] = shooter
         game_state["offensive_state"] = "FREE_THROW"
-        game_state["free_throws"] = 1 if made else 2
-        game_state["free_throws_remaining"] = game_state["free_throws"]
-        game_state["one_and_one"] = False
+        # is_three is a literal False on this path (drive finish), but the count still comes
+        # from the shared rule so the branch cannot drift if that ever changes.
+        ft_award = apply_free_throw_award(
+            game_state, ft_shooting_foul(is_three=is_three, made=made)
+        )
         fouled_out_info = check_and_handle_foul_out(foul_player, game_state, def_team, perform_removal=False)
         has_and_one = made
-        free_throws_remaining = 1 if made else 2
+        free_throws_remaining = ft_award.remaining
 
     if made or not d_foul:
         shooter.record_shot_result(made)

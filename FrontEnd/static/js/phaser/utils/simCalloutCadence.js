@@ -45,8 +45,8 @@ const ADV_POS = [
   { key: 'paint', label: 'paint', panel: 'paint' },
 ];
 const ADV_NEG = [
-  { key: 'to', label: 'turnover', panel: 'to' },
-  { key: 'fouls', label: 'foul', panel: 'fouls' },
+  { key: 'to', label: 'turnovers', panel: 'to' },
+  { key: 'fouls', label: 'fouls', panel: 'fouls' },
 ];
 const ADV_EDGES = [10, 20];
 
@@ -125,6 +125,13 @@ export class CalloutCadence {
 
   /** HIGHLIGHTS off — suppress all callouts; nothing queues. */
   suspend(on) { this.suspended = !!on; }
+
+  /** Establish carried game state without treating it as a new scoring event. */
+  primeScore(score) {
+    if (!score) return;
+    this.lastScore = { away: num(score.away), home: num(score.home) };
+    this.run = { side: null, pts: 0 };
+  }
 
   profile() {
     const q = Math.min(4, Math.max(1, this.quarter));
@@ -248,10 +255,7 @@ export class CalloutCadence {
         if (edge < thr) return;
         const key = `${side}:${spec.key}:${thr}`;
         if (this.advLatched[key]) return;
-        candidates.push({
-          key, side, thr, label: spec.label, kind: 'advantage',
-          team: shortName((this.teams[side] || {}).name || (this.teams[side] || {}).abbr || ''),
-        });
+        candidates.push({ key, side, thr, label: spec.label, kind: 'advantage' });
       });
     });
 
@@ -266,10 +270,7 @@ export class CalloutCadence {
         if (edge < thr) return;
         const key = `${side}:${spec.key}:${thr}`;
         if (this.advLatched[key]) return;
-        candidates.push({
-          key, side, thr, label: spec.label, kind: 'disadvantage',
-          team: shortName((this.teams[side] || {}).name || (this.teams[side] || {}).abbr || ''),
-        });
+        candidates.push({ key, side, thr, label: spec.label, kind: 'disadvantage' });
       });
     });
 
@@ -302,7 +303,9 @@ export class CalloutCadence {
     });
 
     const sc = frame.score || {};
-    const prev = this.lastScore || { away: 0, home: 0 };
+    // A cadence may attach after playback has begun while its copy pack loads. Its
+    // first observed scoreboard is baseline state, never a run from an assumed 0-0.
+    const prev = this.lastScore || { away: num(sc.away), home: num(sc.home) };
     const dAway = num(sc.away) - num(prev.away);
     const dHome = num(sc.home) - num(prev.home);
     const scoreChanged = dAway > 0 || dHome > 0;
@@ -465,9 +468,7 @@ export class CalloutCadence {
     if (this.run.pts >= RUN_MIN_PTS && this.t - this.lastRun > GLOBAL_GAP_S) {
       const side = this.run.side;
       const runPts = this.run.pts;
-      const team = this.teams[side] || {};
       const ok = this._try('run', {
-        TEAM: shortName(team.name || team.abbr || ''),
         RUN: `${runPts}–0`,
       }, side, null);
       if (ok) {
@@ -481,7 +482,7 @@ export class CalloutCadence {
     const adv = this._peekAdvantage(frame.teamPanel);
     if (adv) {
       const ok = this._try(adv.kind, {
-        TEAM: adv.team, EDGE: adv.thr, STAT: adv.label,
+        EDGE: adv.thr, STAT: adv.label,
       }, adv.side, null);
       if (ok) {
         this.advLatched[adv.key] = true;

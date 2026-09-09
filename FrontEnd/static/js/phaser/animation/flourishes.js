@@ -698,19 +698,38 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
       case "fumble":
         runFumble(scene, sprite, flourish);
         return;
-      case "idle_wander":
+      case "idle_wander": {
         // Rides the heartbeat system (single owner of the sprite's idle offset) so it
         // can never leave a residual "ghost" offset. Spans the step's own wall-clock.
         // Backend assigns a role-based `style` + `dir` by geography; FE renders it in place.
+        // `family` selects Jamie's per-family amplitude/style knobs in animation_config.js —
+        // the backend stamps the raw style amplitude and the scale is applied here.
+        const famCfg =
+          (animationConfig.flourish?.idleWander?.byFamily || {})[flourish.family] || {};
+        const baseRadius = flourish.amplitude_grid ?? flourish.radius_grid;
+        const famScale = Number.isFinite(famCfg.amplitudeScale) ? famCfg.amplitudeScale : 1;
+        // Arrival-tail fill (defect 2). The backend stamps every tail above the 60ms
+        // perceptibility floor and carries `tail_ms`; `minTailMs` is Jamie's live threshold on
+        // top of that, so he can bracket "which pauses are worth filling" without a backend
+        // round-trip. Raising it can only ever stamp FEWER players, never more, so it cannot
+        // push the court past the density cap.
+        if (flourish.family === "arrival_settle") {
+          if (famCfg.enabled === false) return;
+          const minTail = Number.isFinite(famCfg.minTailMs) ? famCfg.minTailMs : 0;
+          if (Number.isFinite(flourish.tail_ms) && flourish.tail_ms < minTail) return;
+        }
         applyIdleWander(scene, sprite, {
           seed: flourish.seed,
-          style: flourish.style,
+          style: famCfg.style || flourish.style,
           dirX: flourish.dir_x,
           dirY: flourish.dir_y,
-          radiusGrid: flourish.amplitude_grid ?? flourish.radius_grid,
+          radiusGrid: Number.isFinite(baseRadius) ? baseRadius * famScale : baseRadius,
           durationMs: flourish.duration_ms ?? opts.stepDurationMs,
+          // Wait until the player actually arrives. Absent/0 for every pre-existing caller.
+          delayMs: flourish.delay_ms,
         });
         return;
+      }
       case "shot_dip":
         runRattle(scene, sprite, { ...flourish, cycles: flourish.cycles || 1 });
         return;
