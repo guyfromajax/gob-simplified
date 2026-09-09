@@ -2427,6 +2427,89 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       order of the off-ball destination item, not an encoding change. **They should be scoped
       separately — the encoding fix will not make loose balls look better.**
 
+47. **SYMPTOM #3, THIRD PASS — Jamie's "the defence's SF plays the jiggle" hypothesis is
+      REFUTED on every limb, but the pass found a REAL defect at his reported rate: the fumble
+      beat re-parents the ball to a different player with no animated handover, on 16% of
+      dead-ball fumbles.** 2026-09-09, played arm, PLAYED=1, 8 games, 50 fumble turns.
+      Diagnostic only. Probe ``scratch_fumbletarget.py``.
+
+      **THE FLOURISH IS ``kind: "fumble"``**, authored by ``dead_ball_fumble.py`` — the only
+      turnover jiggle in the codebase. Target resolved by ``_resolve_ball_handler_id``
+      (``dead_ball_fumble.py:65-77``), which tries ``victim_id``, ``shooter_id``,
+      ``ball_handler_id``, then falls back to ``turn_result["ball_handler"]``.
+
+      **THE VACUITY TRAP THAT WOULD HAVE MADE THIS PASS MEANINGLESS, and probably explains why
+      items 43/44/46 all came back clean.** ``build_dead_ball_fumble_step``
+      (``dead_ball_fumble.py:149`` and ``:159``) authors the fumble step's ball owner AND its
+      flourish key **from the same ``ball_handler_id`` local**::
+
+          ball_state = {"owner_player_id": str(ball_handler_id)}
+          ...
+          "flourish": {str(ball_handler_id): flourish},
+
+      So on the fumble step those two agree BY CONSTRUCTION, always, whether or not the id is
+      right — measured 50/50 = 100%. **Any probe comparing the flourish carrier against the ball
+      owner on that step reports perfect agreement and proves nothing.** The three prior framings
+      all compared some form of owner-vs-credit, which is why "ownership is consistent" was true
+      and yet uninformative. Rule for the next pass: *before comparing two fields, check they are
+      not written from the same local.*
+
+      **THE HYPOTHESIS, REFUTED FOUR WAYS** (each limb measured separately):
+
+      | Jamie's claim | measured | verdict |
+      |---|---|---|
+      | the carrier is the SF, at ~100% | **SF 10%** (5/50); PG 48%, SG 36%, C 4%, PF 2% | REFUTED |
+      | the carrier is on the DEFENSE | **offense-at-stamp 50/50 = 100%**, defence never | REFUTED |
+      | it is the next possession's inbounder | carrier == **TO credit 50/50 = 100%** | REFUTED |
+      | stamped AFTER possession flips | offense at stamp == offense at append, **50/50** | REFUTED |
+
+      The premise that **the SIP inbounder is a fixed SF role is CORRECT** (``constants/__init__.py:501``
+      "baseline inbounder spot (HCT_SETUP_POSITIONS['SF'])", ``quick_foul.py:246,266``,
+      ``fcp_inbound_release.py:2``) — but nothing connects it to this flourish.
+
+      **ORDERING, measured rather than read.** ``switch_possession`` and
+      ``finalize_dead_ball_fumble_for_turn`` were wrapped on one shared sequence counter. On all
+      50 stamps the possession switch lies strictly OUTSIDE the stamp
+      (``prev_switch_seq < seq_finalize < next_switch_seq``) and the offense team is unchanged
+      between stamp and turn-append. **The stamp runs while the committing team still has the
+      ball**, so the reassignment channel the hypothesis requires is never open. Reinforced by
+      the resolver census: of all **64** resolver calls, **50 resolved from ``victim_id``** and 14
+      fell through unresolved (the ``skip=no_handler_coord`` early return, which injects nothing).
+      **The ``ball_handler`` fallback was never the winning key**, and in all 50 resolved cases
+      ``victim_id == ball_handler`` anyway, so even the fallback would have named the same man.
+
+      **WHAT IS ACTUALLY WRONG, and it is at his rate.** Comparing the carrier against the ball
+      owner on the ANCHOR step (the last step before the injected beat, which is *not* written
+      from the same local and so can disagree): **8 of 50 (16.0%) diverge** — against Jamie's
+      reported 15-20%. The shape is completely uniform:
+
+      * the carrier is the **PG** in 8/8, and matches both the TO credit and the narrative text,
+        so **the flourish target is CORRECT**;
+      * the previous owner is the **SG (4)** or the **SF (4)**, **same team in 8/8**, offense in
+        8/8 — never the defence;
+      * the anchor step is **not** a pass step (0/8) and its ``end`` owner is that same player,
+        so this is a genuine boundary discontinuity and not a misread field;
+      * all 8 are **HCO**.
+
+      So the ball sits on the SF or SG, and then the next beat it is on the PG, who jiggles —
+      **an unanimated ball handover between two teammates.** This is the objectively measurable
+      cousin of the item 41 teleport work, in the ball-ownership dimension rather than the
+      coordinate one, and **nothing guards it**: ``enforce_step_start_continuity``
+      (``animation_step_helpers.py:1272``) covers ``start.coords`` per player only. There is no
+      §8.4 analogue asserting that step N+1's ball owner is reachable from step N's.
+
+      **WHY JAMIE SAW AN SF.** In half the divergences the man the ball is silently taken FROM is
+      the SF. He had the right player in frame and the wrong role: the SF is not carrying the
+      flourish, he is the one the ball vanishes from. That is a good observation with a wrong
+      mechanism attached, and it is why the refutation is worth more than a confirmation —
+      *the reported position was real evidence pointing at a different defect.*
+
+      Not fixed. Two candidates, and they are not equivalent: either the anchor's ball owner is
+      stale and should have been the PG all along (a resolution defect upstream in the HCO moment
+      walk), or the handover is real and simply needs authoring as a pass. **Which one is right
+      is not established here** and wants its own scoping — deciding it requires knowing whether
+      the HCO walk intended the SF to have the ball at that moment.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
