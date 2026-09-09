@@ -4950,7 +4950,13 @@ INTERCEPT_ATTEMPT_PCT_BY_CALL = {"aggressive": 80, "normal": 40, "passive": 0}
 #      bar         = HCO_PASS_SAFETY_BASE − offensive_efficiency
 #   3b intercept   = ((OD·0.6 + CH·0.2 + IQ·0.2) + defensive_efficiency) × rand(1,6)
 #      tier_hi/mid = (HCO_PASS_INTERCEPT_TIER_HI/MID) − defensive_efficiency
-HCO_PASS_SAFETY_BASE = 175.0
+# Lowered 175.0 -> 150.0 (owner call 2026-09-09) to cut the HCO disrupted-pass rate
+# (steals + loose balls + bat-OOB). The bar is (BASE - offensive_efficiency); clearing
+# it means NO interception is in play, so this gate kills the branch outright rather
+# than shifting an outcome. Composition dials (HCO_PASS_DEFLECT_KIND_D,
+# LOOSE_BALL_FROM_DEFLECTION_PCT) are untouched -- the steal/bat-OOB RATIO is unchanged,
+# only how often a pass is contested at all.
+HCO_PASS_SAFETY_BASE = 150.0
 HCO_PASS_INTERCEPT_TIER_HI = 200.0
 HCO_PASS_INTERCEPT_TIER_MID = 170.0
 

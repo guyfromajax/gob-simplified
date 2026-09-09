@@ -133,6 +133,23 @@ function reflectionOverlay(slug, hardwood, force = false) {
   ];
 }
 
+function fixedBasketOverlays() {
+  const leftBasket = path.join(ROOT, "tmp/court-template/bt_left_basket_alpha3.png");
+  const rightBasket = path.join(ROOT, "tmp/court-template/bt_right_basket_alpha3.png");
+  const leftRimNet = path.join(ROOT, "tmp/court-template/bt_left_rimnet_overlay.png");
+  const rightRimNet = path.join(ROOT, "tmp/court-template/bt_right_rimnet_overlay.png");
+  for (const asset of [leftBasket, rightBasket, leftRimNet, rightRimNet]) {
+    if (!existsSync(asset)) fail(`Missing fixed basket overlay: ${asset}`);
+  }
+  return [
+    "-gravity", "northwest",
+    leftBasket, "-geometry", "+126+922", "-compose", "over", "-composite",
+    rightBasket, "-geometry", "+3042+922", "-compose", "over", "-composite",
+    leftRimNet, "-geometry", "+190+930", "-compose", "over", "-composite",
+    rightRimNet, "-geometry", "+2923+930", "-compose", "over", "-composite",
+  ];
+}
+
 const slug = arg("--team");
 if (!slug || !/^[a-z0-9_]+$/.test(slug)) fail("Usage: node scripts/render_manifest_court.mjs --team <slug> --base <jpg> --out <jpg> [--force]");
 const assignment = MANIFEST.assignments.find((entry) => entry.slug === slug);
@@ -176,6 +193,9 @@ if (treatment === "deep_wing_2") {
   for (const key of ["upper_left", "lower_right"]) args.push(...overlay(logo, deepWing[key], deepWing[key].rotate));
 } else if (treatment === "deep_wing_4") {
   for (const key of Object.keys(deepWing)) args.push(...overlay(logo, deepWing[key], deepWing[key].rotate));
+} else if (treatment === "deep_wing_4_and_inside_3pt_arc_4") {
+  for (const key of Object.keys(deepWing)) args.push(...overlay(logo, deepWing[key], deepWing[key].rotate));
+  for (const key of Object.keys(insideArc)) args.push(...overlay(logo, insideArc[key], insideArc[key].rotate));
 } else if (treatment === "inside_3pt_arc_2") {
   for (const key of ["upper_left", "lower_right"]) args.push(...overlay(logo, insideArc[key], insideArc[key].rotate));
 } else if (treatment === "inside_3pt_arc_4") {
@@ -199,6 +219,9 @@ for (const wingMark of wingWordmarks) {
   }, wingMark.rotate || 0));
 }
 
+// Basket geometry is animation-critical. Keep these legacy assets and pixel
+// anchors as the final court layer; never scale or infer their placement.
+args.push(...fixedBasketOverlays());
 args.push("-quality", "92", out);
 execFileSync("magick", args, { stdio: "inherit" });
 const dimensions = execFileSync("magick", ["identify", "-format", "%wx%h", out], { encoding: "utf8" });

@@ -519,9 +519,10 @@
       "mascot": "Elites",
       "conference": 12,
       "center_court": "team_logo",
-      "non_center_logos": "deep_wing_2",
+      "non_center_logos": "none",
       "hardwood": "alternating_board",
-      "deep_wing_wordmark": null
+      "deep_wing_wordmark": null,
+      "manual_override": "Keep only the center-court logo; remove both deep-wing logo placements."
     },
     {
       "team": "Grayson Ranch",
@@ -981,12 +982,10 @@
       "mascot": "Golden Eagles",
       "conference": 8,
       "center_court": "team_wordmark",
-      "non_center_logos": "deep_wing_4",
+      "non_center_logos": "deep_wing_4_and_inside_3pt_arc_4",
       "hardwood": "parquet",
-      "deep_wing_wordmark": {
-        "text_source": "mascot_name",
-        "position": "upper_left"
-      }
+      "deep_wing_wordmark": null,
+      "manual_override": "Removed the deep-wing wordmark and added four inside-arc logos in addition to the four deep-wing logos after visual review."
     },
     {
       "team": "Redwood High",
@@ -1026,10 +1025,11 @@
       "slug": "rodeo_circuit",
       "mascot": "Clowns",
       "conference": 10,
-      "center_court": "team_wordmark",
+      "center_court": "team_logo",
       "non_center_logos": "none",
       "hardwood": "gloss",
-      "deep_wing_wordmark": null
+      "deep_wing_wordmark": null,
+      "manual_override": "Replaced the center-court mascot wordmark with the team logo after visual review."
     },
     {
       "team": "Sacred Heart",
