@@ -26,7 +26,9 @@ from __future__ import annotations
 
 import copy
 import functools
+import json
 import uuid
+from pathlib import Path
 from typing import Any, Dict, List
 
 from BackEnd.models.player import Player
@@ -202,3 +204,68 @@ def seed_universal_rosters(
         for doc in missing:
             doc["team_id"] = team_oid
         players_collection.insert_many(missing)
+
+
+# ---------------------------------------------------------------------------------------
+# The universal PLAYS catalog
+# ---------------------------------------------------------------------------------------
+#
+# Mongomock starts empty, so `plays_collection` was empty, so `plays_catalog.all_docs()`
+# returned nothing and `_get_plays_by_type_and_focus` (turn_manager.py:3254) matched nothing.
+# Every possession then took the `if not matching_plays` branch at turn_manager.py:2969 and
+# logged "No plays found for motion/set_play, using fallback" before hardcoding "Inside".
+#
+# THAT SILENCE HAS ALREADY CONFOUNDED TWO MEASUREMENTS. It contributed to the idle_wander
+# "0 fires" reading, and it makes any statement about authored OFF-BALL movement provisional,
+# because a fallback playcall carries no play skeleton and therefore no authored destinations
+# for the four men without the ball.
+#
+# Documents are NOT hand-built, for the same reason the rosters above are not: they come from
+# `play_skeletons_export.json`, the export of the real universal `plays` collection produced by
+# `scripts/export_play_skeletons.py`. Seven plays, four motion and three set_play, each carrying
+# four skeleton leans (successful / mid_play_change / contested / broken) whose steps hold real
+# `pos_actions` with `location` names and actions. Focus coverage is complete for both types
+# (motion inside/inside/outside/attack, set_play attack/outside/inside), so
+# `_choose_focus_from_strategy_settings` cannot land on an unrepresented focus and re-trigger
+# the fallback.
+PLAYS_EXPORT = Path(__file__).resolve().parent.parent / "play_skeletons_export.json"
+
+
+def canonical_play_rows() -> list[dict]:
+    """The real universal plays, straight off the export."""
+    with open(PLAYS_EXPORT) as fh:
+        return json.load(fh)
+
+
+def seed_universal_plays(plays_collection) -> None:
+    """Idempotently put the universal plays catalog in mongomock.
+
+    ``_id`` is set from the exported ``play_id`` as well as being kept under ``play_id``,
+    because the two are read by different consumers: ``plays_catalog`` indexes on ``_id``
+    (plays_catalog.py:64) while ``resolve_playbook_percentage`` reads
+    ``play.get("play_id") or play.get("_id")``. Seeding only one of them leaves the other
+    lookup missing, which is the `.get()`-shaped silence this fixture exists to remove.
+
+    Must run BEFORE anything touches the catalog: ``plays_catalog`` caches for the life of the
+    process behind a ``_loaded`` flag (plays_catalog.py:49), and ``turn_manager`` memoizes
+    type/focus queries in ``_plays_by_type_focus_cache``. Both are invalidated here so the
+    ordering cannot bite a caller that imported early.
+    """
+    rows = canonical_play_rows()
+    for doc in rows:
+        doc = copy.deepcopy(doc)
+        doc["_id"] = doc.get("play_id")
+        plays_collection.update_one({"_id": doc["_id"]}, {"$set": doc}, upsert=True)
+
+    try:
+        from BackEnd.utils import plays_catalog
+
+        plays_catalog.invalidate()
+    except Exception:  # noqa: BLE001 - fixture must not fail a test on cache plumbing
+        pass
+    try:
+        from BackEnd.models import turn_manager as _tm
+
+        _tm._plays_by_type_focus_cache.clear()
+    except Exception:  # noqa: BLE001
+        pass
