@@ -2263,7 +2263,9 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       played arm, 8 games. Found while tracing item 43; NOT that symptom, and logged separately.
 
       **THE SHAPE — a policy 26b violation in the renderer.** ``snapBallToStartState``
-      (``animationPlayback.js:779-783``) and ``snapBallToEndState`` (:816-820):
+      (``animationPlayback.js:779-783``) and ``snapBallToEndState`` (:816-820)
+      — *all line numbers in this paragraph and the two below predate ``28f97cec4``, which
+      inserted ~50 lines above them; see the AMENDED block for current citations*:
 
           if (isBallAttached(ball)) {
             const ownerSprite = sprites[ball.owner_player_id];
@@ -2287,6 +2289,27 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       step and never names the charged player (0 of 66)**, which is why it is not item 43's
       mechanism. Not fixed: it is a real contract violation but it wants its own scoping, and the
       no-``else`` is the more durable half of it.
+
+      **AMENDED 2026-09-09 — the announcement landed (``28f97cec4``), and building it corrected
+      which exit matters.** Policy 26b applied: ``warnUnresolvableBallOwner``
+      (``animationPlayback.js:443-478``) now warns whenever a ball claims an owner the renderer
+      cannot resolve, naming the phase, the step id, the owner id verbatim, and **the sprite the
+      ball stays attached to** (via ``getCurrentOwner``). Log only — the detach is the fix and is
+      deliberately NOT applied, so a capture observes current behaviour.
+
+      The poison changed the design. **Wiring the warn to the missing ``else`` alone made it
+      silent for the exact case above.** With ``owner_player_id == ""``, ``ballCoordFromState``
+      resolves ``coords[""]`` to undefined and the boundary returns at ``!coord`` — the attach
+      block is never reached, so the ``else`` never runs. The entry above already listed the
+      early-return routes, but called the no-``else`` "the more durable half"; on the measured
+      population **the coord route is the only one that fires**. Both are now instrumented and
+      separated by a ``reason`` field: ``no-coord-for-owner`` (the empty-string case) vs
+      ``no-sprite-for-owner`` (an owner with a coord but no sprite, so far unobserved).
+
+      Generalises item 6 and policy 26b: *an announcement wired to the wrong one of several silent
+      exits is itself a silent corrector.* The only thing that caught it was poisoning with the
+      real measured value rather than a convenient one. Harness: ``scratch_ballownerwarn.mjs``
+      (extracts the shipped function source — the repo has ``.test.js`` files but no jest binary).
 
 45. **OPEN OBSERVATION, awaiting specificity — Jamie: HCO "seems off in some places".** 2026-09-09.
       Recorded so it is not lost, explicitly NOT actionable yet. Too vague to trace, and the one
