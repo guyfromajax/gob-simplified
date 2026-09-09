@@ -47,6 +47,7 @@ import {
   attachBallToPlayer as attachBallToPlayerAdapter,
   clearPendingOwner,
   detachBall,
+  getCurrentOwner,
   setCurrentOwner,
   synchronizeBallState,
 } from "./BallControllerAdapter.js";
@@ -439,6 +440,43 @@ function isSchemaPassStep(step) {
   );
 }
 
+/**
+ * Policy 26b — a guard that corrects must announce.
+ *
+ * When `step.*.ball` is attached but `owner_player_id` resolves to no sprite, the
+ * attach is skipped and the ball is left parented to whoever held it last. On screen
+ * that is indistinguishable from the payload simply naming the wrong man, which is
+ * why the wrong-ball-handler turnover has never been diagnosable from a recording.
+ *
+ * Announce only. Detaching here would be the fix and would change what a capture
+ * observes, so it is deliberately not done.
+ *
+ * There are TWO exits that strand the ball, and `no-coord-for-owner` is the one the
+ * measured empty-string case takes: `ballCoordFromState` resolves `coords[""]` to
+ * undefined, so the boundary returns before the attach block is ever reached.
+ */
+function warnUnresolvableBallOwner(scene, step, ballState, phase, reason) {
+  try {
+    const ownerId = ballState?.owner_player_id;
+    const staysAttachedTo = getCurrentOwner(scene) ?? null;
+    console.warn(
+      `[BALL-OWNER-UNRESOLVED] ${phase} ${reason} step=${step?.id ?? "?"} `
+        + `owner_player_id=${JSON.stringify(ownerId)} `
+        + `staysAttachedTo=${staysAttachedTo ?? "(none)"}`,
+      {
+        phase,
+        reason,
+        stepId: step?.id ?? null,
+        ownerPlayerId: ownerId ?? null,
+        ownerPlayerIdType: ownerId === "" ? "empty-string" : typeof ownerId,
+        staysAttachedTo,
+      },
+    );
+  } catch (_) {
+    // Diagnostic only; never throw into playback.
+  }
+}
+
 function schemaPassStartOwnerId(step) {
   return isBallAttached(step?.start?.ball)
     ? String(step.start.ball.owner_player_id)
@@ -770,7 +808,12 @@ function snapBallToStartState(scene, step, sprites, ballSprite, width, height) {
   if (!ballSprite || !step?.start?.ball) return;
   const startBall = step.start.ball;
   const startCoord = ballCoordFromState(startBall, step.start.coords);
-  if (!startCoord) return;
+  if (!startCoord) {
+    if (isBallAttached(startBall)) {
+      warnUnresolvableBallOwner(scene, step, startBall, "step:start", "no-coord-for-owner");
+    }
+    return;
+  }
 
   const startPx = gridToPixels(startCoord.x, startCoord.y, width, height);
   const startAttachOffset = isBallAttached(startBall) ? BALL_ATTACH_OFFSET : { x: 0, y: 0 };
@@ -780,6 +823,8 @@ function snapBallToStartState(scene, step, sprites, ballSprite, width, height) {
     const ownerSprite = sprites[startBall.owner_player_id];
     if (ownerSprite) {
       attachBallToPlayer(scene, ballSprite, ownerSprite);
+    } else {
+      warnUnresolvableBallOwner(scene, step, startBall, "step:start", "no-sprite-for-owner");
     }
   } else {
     detachBall(scene, ballSprite);
@@ -806,7 +851,12 @@ function snapBallToEndState(scene, step, sprites, ballSprite, width, height) {
   const endBall = step.end.ball;
   if (!endBall) return;
   const endCoord = ballCoordFromState(endBall, step.end.coords);
-  if (!endCoord) return;
+  if (!endCoord) {
+    if (isBallAttached(endBall)) {
+      warnUnresolvableBallOwner(scene, step, endBall, "step:end", "no-coord-for-owner");
+    }
+    return;
+  }
 
   const endPx = gridToPixels(endCoord.x, endCoord.y, width, height);
   // Compose ball-attach offset when ball ends attached to a player (anchor at hip).
@@ -817,6 +867,8 @@ function snapBallToEndState(scene, step, sprites, ballSprite, width, height) {
     const ownerSprite = sprites[endBall.owner_player_id];
     if (ownerSprite) {
       attachBallToPlayer(scene, ballSprite, ownerSprite);
+    } else {
+      warnUnresolvableBallOwner(scene, step, endBall, "step:end", "no-sprite-for-owner");
     }
   } else {
     detachBall(scene, ballSprite);
@@ -1162,12 +1214,13 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
   let ballTransitionPromise = Promise.resolve({ tweenStarted: false });
   const stepStartedAtMs = performance.now();
   const activeStepTweenSprites = [];
-  const passStartOwnerId = isPassStep
-    ? schemaPassStartOwnerId(step)
-    : null;
-  const passEndOwnerId = isPassStep
-    ? schemaPassEndOwnerId(step)
-    : null;
+  // Captured on EVERY step, not just passes. The wrong-ball-handler turnover is
+  // diagnosed from the owner at a non-pass step, where the old `isPassStep` gate
+  // reported null — a field that looks like data and is not. Both values feed
+  // `tracePlayback` and nothing else; `isPassStep` is in the same payload for
+  // anyone who needs to tell the two cases apart.
+  const passStartOwnerId = schemaPassStartOwnerId(step);
+  const passEndOwnerId = schemaPassEndOwnerId(step);
 
   logAndDrawOobAnchorDebug(scene, step, sprites, width, height, options, "step_start");
 
