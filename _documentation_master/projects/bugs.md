@@ -2168,6 +2168,128 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       > **Tune against the SEEDED row.** The empty row exists only to be comparable with the
       > superseded 57.48 / 67.88 and does not represent a real game — it is a fixture with no HCO
       > plays catalogue.
+
+      **THE MECHANISM IS LATENT EVERYWHERE ELSE — measured, not assumed. GUARD NOT YET BUILT.**
+      ``sync_lineup_coords_from_turn`` (``shared.py:3752``) reads
+      ``animation_steps[-1].end.coords`` — the last step in the ARRAY. The renderer does not walk
+      the array: it follows ``end.next`` pointers from index 0 and stops at the first
+      ``turn_stop`` (``animationPlayback.js:1680``), so the two can disagree and the sync **cannot
+      currently distinguish a drawn step from an undrawn one at all.** Censused across 8 played
+      games and 2,572 turns by mirroring the pointer walk exactly (``scratch_unrendered.py``):
+
+      | HCO | DREB | SIDE_INBOUND | FREE_THROW | OREB | FCP | HCT | BASELINE_INBOUND | FAST_BREAK |
+      |---|---|---|---|---|---|---|---|---|
+      | 1356 | 381 | 222 | 175 | 163 | 88 | 70 | 66 | 51 |
+
+      **0 tail mismatches and 0 unreached steps in every family.** The detector is not vacuous:
+      appending one ghost step after the terminal ``turn_stop`` produces **311 detections**. So
+      the item 41 instance really is closed everywhere today, and the mechanism — an emitter may
+      append after ``turn_stop``, and the sync will read it as the turn's final position —
+      remains **unguarded**. Building that guard is scoped and outstanding, not done.
+
+43. **SYMPTOM #3 (wrong ball handler on dead-ball turnovers) — NOT REPRODUCED where Jamie sees
+      it, and the coverage hole is the honest answer.** 2026-09-09, played arm, PLAYED=1,
+      8 games. Diagnostic only.
+
+      **THE DETECTOR FIRES — proven before any low number was trusted.** Poison re-points
+      ``owner_player_id`` at a player proven different from the charged one, applied at ANALYSIS
+      time so the simulation is byte-identical between arms: **100.0% mismatch on 8 of 8 seeds**
+      (168 comparisons). A first version of this probe is VOID and is recorded rather than
+      quietly replaced — it compared the credit against the last owner ANYWHERE in the turn
+      (meaningless: after a turnover the ball legitimately changes hands) and its poison drove
+      the rate DOWN, 65% to 55.6%, because it re-pointed at ``others[0]`` which can coincidentally
+      BE the charged player, and because mutating steps mid-sim perturbed the trajectory.
+
+      **HOW THE TWO SIDES WERE NAMED.** Backend truth is the ACTUAL stat credit — all nine
+      turnover sites route through ``ball_handler.record_stat("TO")``
+      (``phase_resolution.py:2633, 9741, 9747, 11065, 11069, 11309, 11313, 11885, 11891``), so
+      wrapping ``record_stat`` captures whoever the engine charged whichever path fired. Choosing
+      a field like ``roles["turnover_player"]`` would have been a guess about which field is
+      authoritative. Frontend truth mirrors ``isBallAttached`` (``animationPlayback.js:64-69``) —
+      **presence** of ``owner_player_id``, not truthiness — and the turnover step is the last step
+      the renderer actually executes, found by mirroring ``playTurn``'s pointer walk (:1574-1763),
+      not by taking ``steps[-1]``.
+
+      | family | turns | TO credited | comparable | match | mismatch |
+      |---|---|---|---|---|---|
+      | DEAD BALL / DOUBLE_DRIBBLE | 26 | 26 | 26 | **26** | **0** |
+      | DEAD BALL / TRAVEL | 24 | 24 | 24 | **24** | **0** |
+      | DEAD BALL / TEN_SECOND | 1 | 1 | 1 | 1 | 0 |
+      | DEAD BALL / SHOT_CLOCK | 5 | 3 | 3 | 2 | 1 |
+      | DEAD BALL / OVER_BACK | 1 | 1 | 1 | — | — |
+      | **DEAD BALL / (untyped)** | **70** | **0** | **0** | — | — |
+      | STEAL | 114 | 114 | 114 | 22 | 72 |
+
+      **Typed dead-ball turnovers agree 51 of 51.** STEAL's 76.6% is correct by construction, not
+      a defect — the ball belongs to the stealer at the stop step while the TO is charged to the
+      victim, so agreement there would be the bug. ``SHOT_CLOCK`` at 1 of 3 is n=3 and a shot-clock
+      violation has no committing player in the first place.
+
+      **THE COVERAGE HOLE IS THE FINDING: 70 of 127 DEAD BALL turns (55%) carry NO
+      ``turnover_type`` and NO TO credit at all**, so there is no backend "committer" to compare
+      an owner against and this probe is structurally blind to them. Characterised over 2 games:
+      **15 of 29 are "The pass is batted out of bounds — off …"**. A batted pass is in flight
+      between two players with nobody charged, which is exactly the situation in which the
+      renderer must pick someone and could pick wrong. **This is where Jamie's 15-20% most
+      plausibly lives, and it is not measurable by comparing against a credit that does not
+      exist.** Naming what would settle it rather than guessing: an instrument keyed on the player
+      NAMED IN THE TURN TEXT versus the rendered owner, since the text is what tells a viewer who
+      is supposed to have blown it.
+
+      **A SEPARATE DEFECT FOUND ON THE WAY, and it is a labelling one:** ``turnover_type`` and the
+      narrative text routinely disagree — ``DOUBLE_DRIBBLE`` with text "*Xenon Fletcher commits a
+      travel*", ``TRAVEL`` with "*Ellis Clemons with an errant pass*", ``TRAVEL`` with "*PRESS! —
+      stripped at the point of attack*", ``DOUBLE_DRIBBLE`` with "*Benny Pena throws it out of
+      bounds*". Whatever a viewer reads, the type code is close to uncorrelated with it. Not
+      chased; logged.
+
+      **ELIMINATED, do not re-derive:** the ``offense_play_type`` sunset event tables (LATENT,
+      zero falsy reads across 787 HCO resolutions) and item 24's selector (this path names the
+      handler from the skeleton, not by distance). Adding to that list:
+      ``calculate_foul_turnover`` (``phase_resolution.py:9265``), which reassigns
+      ``roles["ball_handler"] = turnover_player`` and would be a perfect fit for the symptom, **is
+      imported at ``turn_manager.py:64`` and never called.** Dead code, by grep across ``BackEnd/``
+      — not a single call site.
+
+44. **The renderer silently keeps the ball on the PREVIOUS player when the named owner cannot be
+      resolved — and `owner_player_id` is the EMPTY STRING on ~8 boundaries per game.** 2026-09-09,
+      played arm, 8 games. Found while tracing item 43; NOT that symptom, and logged separately.
+
+      **THE SHAPE — a policy 26b violation in the renderer.** ``snapBallToStartState``
+      (``animationPlayback.js:779-783``) and ``snapBallToEndState`` (:816-820):
+
+          if (isBallAttached(ball)) {
+            const ownerSprite = sprites[ball.owner_player_id];
+            if (ownerSprite) { attachBallToPlayer(scene, ballSprite, ownerSprite); }
+          } else { detachBall(scene, ballSprite); }
+
+      **There is no ``else`` on the inner branch.** When the owner has no sprite the ball is
+      neither re-attached nor detached: it stays parented to whoever held it last and follows THAT
+      player around the court. ``ballCoordFromState`` (:81-88) returns
+      ``playerCoords[owner] || null`` and the callers early-return on null (:527, :773, :809), so
+      the same silent outcome arrives by three routes. The failure has no observable except the
+      wrong man appearing to carry the ball.
+
+      **MEASURED: 66 of 27,485 attached boundaries (0.24%) name an unresolvable owner**, 4-12 per
+      game, and the count of "missing from the step's coords map" equals the count of "not among
+      the ten on the floor" EXACTLY on all 8 seeds. The reason is that **the owner id is the empty
+      string ``""``** — not a stale or substituted player. ``isBallAttached`` returns true because
+      the KEY IS PRESENT, then ``playerCoords[""]`` is undefined.
+
+      Confined to shot families — MISS 32, MAKE 30, BLOCK 4 — and **it never occurs on a turnover
+      step and never names the charged player (0 of 66)**, which is why it is not item 43's
+      mechanism. Not fixed: it is a real contract violation but it wants its own scoping, and the
+      no-``else`` is the more durable half of it.
+
+45. **OPEN OBSERVATION, awaiting specificity — Jamie: HCO "seems off in some places".** 2026-09-09.
+      Recorded so it is not lost, explicitly NOT actionable yet. Too vague to trace, and the one
+      hard measurement pointed at HCO says it is clean: **100.00% within-turn coordinate
+      continuity across 136,910 player-step pairs** (item 41), and HCO is also the family that
+      already implements the §8.1 merge (``skeleton_step_emitter.py:2128-2138``). Note the
+      standing position from items 33/36/38: if the complaint turns out to be about how frozen or
+      how alive it looks, **that is not instrumentable from the payload** — five measures inverted
+      — and Jamie at the screen is the ranking authority. What would make this actionable: which
+      step type, what he expected, and what he saw instead.
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 

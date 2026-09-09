@@ -4,6 +4,26 @@
 
 > # ⚠ READ BEFORE USING ANY NUMBER IN THIS DOCUMENT (added 2026-09-09)
 >
+> ## 0. THE 57.48 / 67.88 SCORING REFERENCE IS SUPERSEDED. Do not tune against it.
+>
+> **Use [PLAYED] 75.16 / [SIM] 87.65 points per team, cut at `094f36ca2`** (bugs.md item 42,
+> equiv-v3, n=40, seeds 8000-8039).
+>
+> The old pair is not merely out of date — **it is not comparable, and it does not describe a
+> real game.** It was cut with `plays_collection` EMPTY, so `plays_catalog.all_docs()` returned
+> nothing, every possession took the `turn_manager.py:2969` fallback and hardcoded an `"Inside"`
+> playcall, and **no off-ball destinations were authored for the four men without the ball.**
+>
+> **The catalogue is worth ~20 points per team — roughly twenty times the effect of the
+> fast-break fix that prompted the re-cut.** Measured on the same seeds, same harness: played
+> 56.33 with the catalogue empty against 75.16 with it seeded. Any tuning done against 57.48 was
+> tuning against a fixture artefact that dwarfs whatever was being tuned.
+>
+> **PROVENANCE OF THE OLD PAIR IS `ASSUMED`, NOT VERIFIED.** The originating run cannot be found
+> — 57.48 / 67.88 appears nowhere in this repository's docs or commit history. That it was cut on
+> an empty catalogue is INFERRED from a level check (a 4-game probe lands at 60.12 / 67.00 empty
+> versus 76.12 / 88.50 seeded), not read off the original run. Treat the pair as unattributed.
+>
 > ## 1. STILL-PLAYER COUNTS DO NOT MEASURE THE COMPLAINT. They invert against a human observer.
 >
 > Calibrated against Jamie's eye on two families that point opposite ways (bugs.md item 33). He
