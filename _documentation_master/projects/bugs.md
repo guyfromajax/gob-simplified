@@ -2288,6 +2288,15 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       mechanism. Not fixed: it is a real contract violation but it wants its own scoping, and the
       no-``else`` is the more durable half of it.
 
+45. **OPEN OBSERVATION, awaiting specificity — Jamie: HCO "seems off in some places".** 2026-09-09.
+      Recorded so it is not lost, explicitly NOT actionable yet. Too vague to trace, and the one
+      hard measurement pointed at HCO says it is clean: **100.00% within-turn coordinate
+      continuity across 136,910 player-step pairs** (item 41), and HCO is also the family that
+      already implements the §8.1 merge (``skeleton_step_emitter.py:2128-2138``). Note the
+      standing position from items 33/36/38: if the complaint turns out to be about how frozen or
+      how alive it looks, **that is not instrumentable from the payload** — five measures inverted
+      — and Jamie at the screen is the ranking authority. What would make this actionable: which
+      step type, what he expected, and what he saw instead.
 46. **SYMPTOM #3, SECOND PASS — the text-keyed instrument is built, its poison fires, and it
       STILL does not reproduce the symptom on dead-ball turnovers. Plus: what "no owner" is
       encodable as, and whether a loose ball has an authored position.** 2026-09-09, played arm,
@@ -2395,15 +2404,6 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       order of the off-ball destination item, not an encoding change. **They should be scoped
       separately — the encoding fix will not make loose balls look better.**
 
-45. **OPEN OBSERVATION, awaiting specificity — Jamie: HCO "seems off in some places".** 2026-09-09.
-      Recorded so it is not lost, explicitly NOT actionable yet. Too vague to trace, and the one
-      hard measurement pointed at HCO says it is clean: **100.00% within-turn coordinate
-      continuity across 136,910 player-step pairs** (item 41), and HCO is also the family that
-      already implements the §8.1 merge (``skeleton_step_emitter.py:2128-2138``). Note the
-      standing position from items 33/36/38: if the complaint turns out to be about how frozen or
-      how alive it looks, **that is not instrumentable from the payload** — five measures inverted
-      — and Jamie at the screen is the ranking authority. What would make this actionable: which
-      step type, what he expected, and what he saw instead.
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
