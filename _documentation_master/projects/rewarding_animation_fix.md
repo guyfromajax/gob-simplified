@@ -979,8 +979,8 @@ converter fix, before defect 4 closed, and before any of these quantities existe
 
 | rank | item | measured size | cost of fix |
 |---|---|---|---|
-| 1 | **defect 2, arrive-and-freeze** | **524.5 s/game dead tail; 30.7% of moving-sprite time; 29.4% of tails ≥300 ms; 69.6% of it in one-step journeys** | low if FILLED (a `delay` on a proven mechanism); high if STRETCHED (durations move timing) |
-| 2 | sequence item 5 / 6 — easing character, archetypes, stagger, emphasis | not a defect, so not sized here; but it is now the largest *remaining* body of work by volume | design |
+| 1 | **defect 2, arrive-and-freeze** | **1,849.6 s/game dead tail** (published here as 524.5 off the SIM arm — corrected 2026-09-09); 30.7% of moving-sprite time; 29.4% of tails ≥300 ms; 69.6% of it in one-step journeys** | low if FILLED (a `delay` on a proven mechanism); high if STRETCHED (durations move timing) |
+| 2 | sequence item 5 / 6 — easing character, archetypes, stagger, emphasis | not a defect, so not sized here; **no longer the largest remaining item — MISS outranks it on corrected size** | design |
 | 3 | **MISS loose-ball stillness (item 19)** — *re-ranked up 2026-09-09* | **782 visible player-steps/game over 39.8 s** (published as ~79/game over 4.8 s off the SIM arm) | high — authored destinations |
 | 4 | the `bounce` empty beat — *re-ranked down* | 455 steps (56.9/game) × 300 ms, content-free, 17.1 s/game, 6.9% of MISS wall time | low — deletion, but step counts are principle 8 territory |
 
