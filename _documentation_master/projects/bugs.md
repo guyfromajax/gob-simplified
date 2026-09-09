@@ -1462,6 +1462,79 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       `HCO_PASS_SAFETY_BASE` 175 -> 150 (11bbaa16a) moved them, so a 2026-09-08 probe cannot be
       compared to a 2026-09-09 one by draws.
 
+32. **item 19's loose-ball figure is RETRACTED — 82% of it was correct basketball.** Measured
+      2026-09-09, played arm, `PLAYED=1` explicit, probe `scratch_overlay_channel.py`.
+
+      **THE TRIGGER.** Jamie reports by eye on staging that post-shot motion looks CORRECT:
+      shooter and shot defender hold at the shot spot, defenders box out or release, offenders
+      get back or move to rebound position. item 19's re-run said 782 visible loose-ball
+      player-steps/game over 39.8 s with 95.6% "indefensible". Both could not be true.
+
+      **THE HYPOTHESIS UNDER TEST WAS THAT THE DETECTOR READ THE WRONG CHANNEL** — that post-shot
+      movement rides the four overlay maps and a detector reading per-step start/end coords is
+      blind to it. **THAT HYPOTHESIS IS FALSE, and it is worth saying plainly because it was the
+      leading one.** Overlay motion is not a separate channel. It is baked into the same coords:
+      `_apply_overlay_motion_to_shoot_step` writes the destination into the shoot step's
+      `end.coords` and `start.destination` (`skeleton_step_emitter.py:2982-2984`), and
+      `_build_ball_motion_sub_step`, which builds EVERY loose-ball sub-step (flight `:3730`,
+      on-rim `:3796`, bounce `:3640`/`:3916`), advances overlay players at their archetype rate
+      into `end_coords` (`:3042-3048`).
+
+      RIGHT-CHANNEL PROOF (rule 6d), pointing the detector at players known to be overlay-moved:
+      of **46,232 overlay-assigned player-steps the detector reports 24,455 (52.9%) as MOVING**,
+      across all four maps (`offense_rebounder` 51.5%, `defense_rebounder` 53.9%,
+      `offense_getback` 53.0%, `defense_release` 56.5%). Worked example: an
+      `offense_rebounder_coords` player travelling 15.23 grid units in one step, action `cut`,
+      detector says moves. The detector sees the channel.
+
+      **THE REAL ERROR IS ONE LINE AWAY, AND IT IS A CLASSIFIER BUG, NOT A CHANNEL BUG.** At
+      `skeleton_step_emitter.py:3034-3038`, once an overlay player REACHES his destination he is
+      rewritten to action `stationary` with `destination = None` for every later step. In the
+      fields item 19 read, a man who has just sprinted to his rebound spot and is now holding it
+      is **indistinguishable from a man who was never given a job**. item 19 counted both as
+      indefensible. That is also why its destination split read 56.9% "no destination" and 0.0%
+      "elsewhere" — "no destination" was silently two populations.
+
+      **RE-DERIVATION.** The probe reproduces item 19's population exactly — 781.5 player-steps
+      per game against its 782, and 39.8 s/game against its 39.8 — so this is like-for-like and
+      not a different measurement.
+
+      | class of loose-ball still player-step | share | per game | verdict |
+      |---|---|---|---|
+      | arrived at his overlay spot and holding it | 45.1% | 352.2 | **correct basketball** |
+      | no job, but 8-9 team-mates DID get one (the shooter and his defender) | 18.8% | 147.1 | **correct basketball**, and exactly what Jamie describes |
+      | on a turn that assigned NOBODY an overlay | 27.2% | 212.4 | **genuine authoring gap** |
+      | overlay-assigned but stopped short of the spot | 8.9% | 69.8 | genuine, smaller |
+
+      **63.9% is defensible.** On the 84.4% of MISS turns that carry overlays, 8 or 9 of the 10
+      players get a job (mean 7.29 of 10 overall), so the men standing are the shooter and the
+      contesting defender — which is the correct read and the thing Jamie is looking at.
+
+      **WHAT SURVIVES IS A DIFFERENT AND MUCH SMALLER DEFECT: 76 of 486 MISS turns (15.6%) author
+      NO overlays at all**, and on those all ten men stand through the rebound. They are a
+      distinct family, not a random subset: **81.6% of them carry no `shot_type` and no
+      `shot_variant`** (against 0.0% of overlay-carrying turns), so they are MISS-labelled turns
+      that never went through the shot pipeline that authors the overlays. In step wall time
+      that family is **6.9 s/game of the 39.8**, with the other 32.9 s/game sitting on turns
+      where players are visibly working.
+
+      **WHY JAMIE CANNOT SEE THE RESIDUE, which was the question if the stillness turned out
+      real:** he cannot see it because on 84.4% of misses it is not there. The defect lives in a
+      15.6% minority of turns, so watching post-shot play and finding it correct is exactly what
+      a correct observer should report. His eye was right and the measurement was wrong.
+
+      **CONSEQUENCE FOR THE RANKING.** MISS was re-ranked 3rd this morning on 39.8 s/game. The
+      defensible figure is **6.9 s/game**, which is below the `bounce` empty beat (17.1 s/game).
+      MISS should drop to last on measured size, and "author rebound-crash and leak-out
+      destinations for the whole family" is NOT the fix — the overlays already do that job on
+      84.4% of turns. The remaining question is narrow: why does a MISS with no `shot_type`
+      skip overlay authoring? That is a scoping question for a separate brief, and at 6.9 s/game
+      it may not be worth one.
+
+      NOT FIXED, NOT SCOPED. `rewarding_animation_fix.md` still carries the retracted 39.8 s/game
+      at rank 3 and needs the same correction; it was left untouched because this brief made
+      bugs.md the only writable file.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
