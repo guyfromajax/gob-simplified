@@ -1616,6 +1616,82 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       CONTINUE_FROM_PREVIOUS mechanism. Given item 33, it should also not be scoped on any
       stillness count until there is an instrument that predicts perception.
 
+36. **The relative-motion hypothesis ALSO inverts. Four for four. Stopping.** Measured
+      2026-09-09, played arm, probe `scratch_relmotion_seam.py`, 8 games.
+
+      The idea was that the eye judges motion against the DOMINANT motion in the frame: on a
+      fast break the ball crosses the court while a trailing man covers 4.8 ft and reads static,
+      while after a miss the ball is local to the rim so modest movement reads proportionate.
+
+      | family | Jamie | player ft ÷ ball ft | ball ft/step | player ft/step |
+      |---|---|---|---|---|
+      | MISS post-shot | **CORRECT** | **0.229 (lowest)** | 7.20 | 2.20 |
+      | FCP | frozen | 0.291 | 0.22 | 3.14 |
+      | HCT | frozen | 0.592 | 0.26 | 6.79 |
+      | FAST_BREAK | frozen | 0.914 (highest) | 0.79 | 7.15 |
+
+      Inverted again — the family Jamie calls correct has the LOWEST ratio. **And the
+      hypothesis's physical premise is refuted outright by the same data:** it assumed the ball
+      dominates the frame on a fast break, but the ball moves **0.22-0.79 ft per step** on the
+      three "frozen" families while players move 3.1-7.2 ft. It is MISS where the ball dominates
+      (7.20 ft/step against 2.20 for players). The ball is not crossing the court within a step
+      on ANY family; per-step ball travel is small everywhere except on a shot.
+
+      Sample-size honesty: the ratio only means anything on steps where the ball actually moves,
+      which is 85.9% of MISS player-steps but only 4.0% of FCP and HCT ones. So the FCP/HCT
+      ratios rest on a thin slice — but that thinness is itself the finding, because it says the
+      ball is essentially static in the frame on exactly the families that look frozen.
+
+      The trailing-gap variant also fails: the player-to-ball gap CLOSES on both, -2.07 ft on
+      MISS and -0.90 ft on FAST_BREAK. Nothing opens.
+
+      **FOUR HYPOTHESES, FOUR INVERSIONS** (binary stillness, displacement, speed, relative
+      motion). Per the brief, stopping rather than reaching for a fifth. **Perception is not
+      instrumentable with the quantities available in the payload, and Jamie at the screen is
+      the ranking authority for feel work until that changes.** That is a legitimate outcome and
+      it is now recorded as the position, not as a gap to be filled by the next session.
+
+      NOTE ON THE PROPOSED FIX, refuted before it was scoped: Jamie's trailing-drift remedy is
+      already implemented — trailing players advance 4.80 ft (FCP) / 4.69 ft (HCT) on 65%/60% of
+      their player-steps (item 35). If a future instrument does show a proportionality problem,
+      the fix is to make that drift proportionate to the play, NOT to author destinations from
+      scratch.
+
+37. **Turns end with fully-frozen steps — ~88 s/game of it, and it is NOT BIP-specific.**
+      Measured 2026-09-09, played arm, same probe. This explains Jamie's BIP pause.
+
+      His hypothesis was that the pause sits at the BIP→HCO transition rather than inside the
+      BIP step. **He is right about where it is and wrong about the mechanism, and the cheap
+      explanation covers it completely** — so this is EXPLAINED, not confirmed.
+
+      Fully-frozen steps in an inbound turn sit ONLY at the end: SIDE_INBOUND 50% last / 50%
+      penultimate, BASELINE_INBOUND 36.8% / 63.2%, and **0% mid or first for both**. So the
+      inbound turn finishes with a run of frozen steps and the next turn starts immediately
+      after — which is experienced exactly as a pause at the transition.
+
+      | turn type | turns ending frozen | mean tail | s/game |
+      |---|---|---|---|
+      | HCO | 60.1% | 1.77 steps, 375 ms | **37.90** |
+      | FREE_THROW | 100% | 6.43 steps, 976 ms | 23.17 |
+      | SIDE_INBOUND | **100%** (212 of 212) | 2.00 steps, 526 ms | 13.93 |
+      | OREB | 61.1% | 4.94 steps, 715 ms | 8.85 |
+      | BASELINE_INBOUND | 37.9% | 1.96 steps, 524 ms | 1.64 |
+      | FCP / HCT / FAST_BREAK | 23-28% | ~1 step, 300-430 ms | 2.50 combined |
+      | **DREB** | **0%** (0 of 390) | — | 0.00 |
+
+      **THE SEAM ITSELF IS CLEAN**, which is what makes the cheap explanation sufficient and
+      means no between-turns mechanism needs inventing: across every turn-to-turn pair coordinate
+      continuity is exact (0.0% of seams show a jump > 1 ft, mean 0.00 ft) and **no `turn_stop`
+      payload anywhere carries a hold** — 0.0 ms summed over all seams and all families.
+
+      **THE LARGER FINDING the brief asked about: it is general, not BIP-specific.** HCO alone
+      carries 37.90 s/game, more than twice the inbound figure. And **DREB proves it is not
+      inevitable** — 390 turns, not one ending frozen.
+
+      CAVEAT: measured in the same frozen-step units that invert against the observer (item 33),
+      so this size must NOT be used to rank it against other work. It is recorded because it
+      explains a specific complaint a human actually made.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 

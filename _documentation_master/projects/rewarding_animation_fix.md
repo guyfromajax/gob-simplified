@@ -2,6 +2,43 @@
 
 *Written 2026-09-06. Every file:line below was verified against the tree on that date.*
 
+> # ⚠ READ BEFORE USING ANY NUMBER IN THIS DOCUMENT (added 2026-09-09)
+>
+> ## 1. STILL-PLAYER COUNTS DO NOT MEASURE THE COMPLAINT. They invert against a human observer.
+>
+> Calibrated against Jamie's eye on two families that point opposite ways (bugs.md item 33). He
+> says MISS/post-shot looks CORRECT and FCP/HCT/FAST_BREAK look FROZEN. The detector says:
+>
+> | family | Jamie | movers/10 | movers/10 (≥1 ft) | ft/sec | player ft ÷ ball ft |
+> |---|---|---|---|---|---|
+> | MISS post-shot | **CORRECT** | **3.75** | **3.47** | 11.68 | **0.229** |
+> | FCP | frozen | 4.82 | 4.30 | 13.55 | 0.291 |
+> | HCT | frozen | 6.00 | 5.82 | 21.16 | 0.592 |
+> | FAST_BREAK | frozen | 7.24 | 6.83 | 28.02 | 0.914 |
+>
+> **FOUR** formulations were tried — the binary predicate, displacement magnitude, on-screen
+> speed, and motion relative to the ball — and **all four order the families backwards**. The
+> family the human calls correct scores as the most frozen every time.
+>
+> **A FUTURE SESSION MUST NOT PICK UP A STILL-PLAYER COUNT AND TREAT IT AS A MEASURE OF "LOOKS
+> FROZEN".** The counts are arithmetically correct and they measure something real; they simply
+> do not predict what a viewer notices. Until an instrument exists that does, **Jamie at the
+> screen is the only ranking authority for feel work.** That is a legitimate outcome, not a
+> failure to try hard enough.
+>
+> ## 2. THE RANKING HAS BEEN STRUCK, not re-ordered.
+>
+> The "RANKING AT 2026-09-08, by measured size" section below is withdrawn. Re-ordering it would
+> imply we can still rank these items, and per point 1 we cannot: every entry in it was sized in
+> the units that invert.
+>
+> ## 3. ARM ATTRIBUTION. Every figure in this document is now tagged.
+>
+> The `PLAYED=1` shim bug (bugs.md items 29 and 31) meant many figures labelled "played arm" were
+> measured on the sim arm. **Any figure below NOT explicitly tagged `[PLAYED]` or `[SIM]` should
+> be read as ARM UNKNOWN and re-measured before it is relied on.** The same rule applies to
+> preserved JSON under `.arm/`: no `played_arm` field means unknown, not played.
+
 ## The distinction this document exists to make
 
 **UESS correctness and animation feel are different problems, and compliance work will not
@@ -972,19 +1009,60 @@ perceptible 300 ms pause at the end of a miss, 12.0% of all MISS wall time. That
 step-deletion candidate rather than a stamping or authoring one, and it is the clearest
 instance of "an empty beat" the workstream has measured.
 
-## RANKING AT 2026-09-08, by measured size
+## END-OF-TURN FROZEN TAILS — measured 2026-09-09 **[PLAYED]**, not yet acted on
+
+The one clean, previously unmeasured quantity to come out of the 2026-09-09 sessions, and the
+explanation for Jamie's "all players hold for a beat on BIP". His hypothesis was that the pause
+sits at the BIP→HCO transition. It does — but there is no between-turns mechanism. **Turns end
+with fully-frozen steps**, and that tail is the pause.
+
+| turn type | turns ending frozen | mean tail | s/game |
+|---|---|---|---|
+| HCO | 60.1% | 1.77 steps, 375 ms | **37.90** |
+| FREE_THROW | 100% | 6.43 steps, 976 ms | 23.17 |
+| SIDE_INBOUND | **100%** (212/212) | 2.00 steps, 526 ms | 13.93 |
+| OREB | 61.1% | 4.94 steps, 715 ms | 8.85 |
+| BASELINE_INBOUND | 37.9% | 1.96 steps, 524 ms | 1.64 |
+| FCP / HCT / FAST_BREAK | 23-28% | ~1 step, 300-430 ms | 2.50 combined |
+| **DREB** | **0%** (0/390) | — | 0.00 |
+
+**≈88 s/game of court-wide frozen tail at the ends of turns.** It is NOT BIP-specific — that is
+the larger finding. And **DREB proves it is not inevitable**: 390 turns, none of them ending
+frozen.
+
+THE SEAM ITSELF IS CLEAN, so this is the whole explanation: across every turn-to-turn pair,
+coordinate continuity is exact (0.0% jumps, mean 0.00 ft) and **no `turn_stop` payload anywhere
+carries a hold** (0.0 ms summed across all seams).
+
+CAVEAT, and it is the important one: this is measured in the same frozen-step units that invert
+against the human observer (see banner). It explains a specific complaint Jamie actually made,
+which is why it is recorded — but its **size must not be used to rank it** against anything else.
+
+## ~~RANKING AT 2026-09-08, by measured size~~ — STRUCK 2026-09-09
+
+> **This ranking is withdrawn, not corrected.** Every item in it was sized in still-player-steps
+> or in dead/frozen seconds derived from them, and those units invert against a human observer
+> (see the banner at the top of this document and bugs.md item 33). Two of the four entries have
+> also since been retracted on their own merits: MISS's loose-ball figure was 82% correct
+> basketball (bugs.md item 32), and defect 2's headline was measured on the wrong arm.
+>
+> The table is kept below **struck through, for history only**. Do not re-order it and do not
+> quote it. The next ranking of feel work has to come from Jamie at the screen until there is an
+> instrument that tracks perception.
+
+### ~~Struck table, retained for history~~
 
 Supersedes every earlier ordering in this document. The prior ordering was written before the
 converter fix, before defect 4 closed, and before any of these quantities existed.
 
 | rank | item | measured size | cost of fix |
 |---|---|---|---|
-| 1 | **defect 2, arrive-and-freeze** | **1,849.6 s/game dead tail** (published here as 524.5 off the SIM arm — corrected 2026-09-09); 30.7% of moving-sprite time; 29.4% of tails ≥300 ms; 69.6% of it in one-step journeys** | low if FILLED (a `delay` on a proven mechanism); high if STRETCHED (durations move timing) |
-| 2 | sequence item 5 / 6 — easing character, archetypes, stagger, emphasis | not a defect, so not sized here; **no longer the largest remaining item — MISS outranks it on corrected size** | design |
-| 3 | **MISS loose-ball stillness (item 19)** — *re-ranked up 2026-09-09* | **782 visible player-steps/game over 39.8 s** (published as ~79/game over 4.8 s off the SIM arm) | high — authored destinations |
-| 4 | the `bounce` empty beat — *re-ranked down* | 455 steps (56.9/game) × 300 ms, content-free, 17.1 s/game, 6.9% of MISS wall time | low — deletion, but step counts are principle 8 territory |
+| ~~1~~ | ~~defect 2, arrive-and-freeze~~ | ~~1,849.6 s/game dead tail~~ **[PLAYED]** (this doc originally published 524.5 **[SIM]**) — but the unit inverts, see banner | low if FILLED; high if STRETCHED |
+| ~~2~~ | ~~sequence item 5 / 6 — easing character, archetypes, stagger, emphasis~~ | never sized; **[N/A]** | design |
+| ~~3~~ | ~~MISS loose-ball stillness (item 19)~~ | ~~782 player-steps/game over 39.8 s~~ **[PLAYED]** — **RETRACTED, 82% of it was correct basketball** (bugs.md item 32); the genuine residue is 6.9 s/game | n/a, retracted |
+| ~~4~~ | ~~the `bounce` empty beat~~ | 455 steps (56.9/game) × 300 ms, content-free, 17.1 s/game **[PLAYED]** | low — deletion, step counts are principle 8 territory |
 
-**Defect 2 is not close to being closeable** — it is the largest measured quantity in the
+~~**Defect 2 is not close to being closeable**~~ — it is the largest measured quantity in the
 workstream and 29.4% of its tails are visible pauses.
 
 **~~MISS comes back small enough to downgrade~~ — RETRACTED 2026-09-09.** That sentence was
