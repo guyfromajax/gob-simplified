@@ -23,7 +23,6 @@
 2. College and Pro setup
 3. Team Mod System
 4. Stronger week 36 CTA to review all Recrutiing results -- and carry forward results chart, not just report/rankings. Order chart within each conference by top to bottom team recruiting performance
-5. Fix HCO drives
 6. Replace Kobe look alike image and add more walk on images
 
 
@@ -45,7 +44,6 @@
 127. Get Aggressive / Get Conservative settings and Playcall Center buttons
 128. Add a badass design appraoch to New Stories
 131. Centralized Turn Transition Helper / System
-137. Watermark free version of player headshots
 139. Mod system for uploading custom leagues
 140. Better logic and impact to player EM
 142. Logic and impact for play scores
@@ -64,6 +62,7 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 2. Still missing EOQ perfection
+2a. Fast Break animation is still sloppy and inconsistent
 3. OPEN — a shooting foul hands off to FREE_THROW but no FREE_THROW turn follows (~0.5/game)
    - Surfaced while measuring the fouled-3PT free-throw misaward (fixed 2026-09-07, see below).
      After that fix the residual misaward rate is entirely this family: 6 of 221 fouled attempts
@@ -857,9 +856,23 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 
 19. OPEN, needs its own diagnosis — MISS is the largest content-free frozen family and an idle
     loop is the WRONG fix for it
-    - MISS is 30.9% of content-free frozen steps on the played arm, the largest single family.
-      It was deliberately EXCLUDED from the idle-wander stillness work (commits below) and
-      that exclusion is the point of this entry, not an oversight.
+    - ~~MISS is 30.9% of content-free frozen steps on the played arm, the largest single
+      family.~~ **SUPERSEDED 2026-09-08 — the 30.9% was keyed on the wrong field and the real
+      population is much smaller.** That figure came from `offensive_state`, which lives on
+      `game_state` and **never reaches the turn dict**, so it was never selecting the population
+      it claimed to. Re-keyed on `turn["result_type"] == "MISS"`, the family is **15.9 s of
+      animation per game**, of which roughly **79 visible still player-steps over 4.8 s** occur
+      while the ball is loose. That is one of the SMALLEST remaining items, not the largest.
+      The exclusion below is still correct — an idle loop is the wrong fix — but it is no longer
+      a large one, and the ranking that follows from it changed accordingly. It was deliberately
+      EXCLUDED from the idle-wander stillness work (commits below) and that exclusion is the
+      point of this entry, not an oversight.
+    - Also established by the re-key: the stillness is **authored**, not a failure to reach a
+      destination — there are no unreached destinations in the population. 1,073 player-steps
+      (51.1% of still MISS players) are `stationary`/`guard_offball` while the ball is loose,
+      which is the indefensible half; `shoot`, `pass`/`receive` and pre-release stillness are
+      defensible. The fix is therefore authored movement, which is expensive, and it ranks
+      below the design work rather than above it.
     - WHY IT IS DIFFERENT FROM THE FAMILIES THAT WERE STAMPED. Free throws, inbounds, dead
       balls and the post-make hold are static basketball moments: play is stopped and men
       standing in place is correct, so a render-space weight shift is the honest fix. A MISS is
@@ -1239,6 +1252,55 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     - SO SYMPTOM #3 STILL HAS NO TRACED MECHANISM, and the two obvious candidates are spent. A
       future trace should start from the attribution WRITE — where a turnover stat is credited to
       a player id — and work backwards, rather than from selectors that look suspicious.
+
+28. NOT SWEPT, deletion candidate — the `bounce` empty beat
+
+      51 steps per game of `advance_trigger.metadata.kind == "bounce"`, 300 ms each, carrying no
+      content: no ball movement, no sound, no announcement, and no player movement. About 15
+      seconds a game of nothing.
+
+      Deliberately NOT touched by the defect 2 fill (2026-09-09). Filling it with an idle would
+      paper over a beat that probably should not exist, and **deleting it moves step counts**,
+      which puts it squarely under SPC principle 8 — a re-cut reference and a poison-stash, not a
+      tidy-up. It wants its own brief.
+
+      Establish before deleting: whether the step count feeds any RNG draw or clock burn. The
+      earlier padding census asked the same question of the putback emitter's 9 non-content steps
+      and it has not been answered for `bounce`.
+
+29. NOT DIAGNOSED — three idle-wander families write ZERO stamps, and nothing objects
+
+      Found 2026-09-09 while gating the arrival-tail fill, chasing why the brief's 48,229 stamp
+      baseline would not reproduce (measured baseline: 28,836 over 8 games).
+
+      `hco_still`, `free_throw` and `make_hold` produce **zero** stamps on the played-arm harness.
+      Measured in both gate arms, and with both an empty and a seeded plays catalogue, so it is
+      neither my change nor the fixture.
+
+      What is established:
+      - `build_skeleton_animation_steps` **is** reached, 153 times per game, and there is no early
+        return between its `def` at `skeleton_step_emitter.py:1549` and the two unconditional
+        stamp calls at `:2804` (`hco_still`) and `:2814` (`make_hold`) — the only `return` in that
+        range is the final one at `:2819`.
+      - Wrapping the emitter and reading `start.flourish` **at the moment it returns** shows an
+        empty dict for every family. So the stamps are **writing nothing**, not being stripped
+        downstream. That distinction is the whole diagnosis and it is already settled.
+      - `_stamp_ft_idles` is reached **0 times** despite 90 `FREE_THROW` result_types per game, so
+        free throws fail differently from HCO — an unreached call site rather than a call that
+        writes nothing. Two separate causes wearing one symptom.
+      - The families that DO fire (`inbound` 1,698, `oreb` 442, `hct` 587, `fcp` 786 per game) all
+        stamp from other emitters.
+
+      WHY THIS MATTERS more than the count suggests: `hco_still` was the centrepiece of the Part 1
+      redirect (14cbd4e50) — HCO was measured to carry 82% of all still player-steps in the game —
+      and `free_throw` was called the biggest visible win. Jamie verified free throws by eye on
+      staging and they read well, so **production and this harness disagree**, and until that is
+      resolved we do not know which one is telling the truth. Per standing rule 6b the arm the
+      human looks at wins, but per item 6 a green harness is evidence of nothing.
+
+      Do not "fix" this by re-stamping from a new site. Find out why the existing writes produce
+      nothing first; the last three times this shape appeared it was a producer and a consumer
+      disagreeing on a name, not a missing call.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

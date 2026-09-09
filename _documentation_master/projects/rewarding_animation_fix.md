@@ -56,8 +56,23 @@ stretching it to fill the step gives *lazy drift* — players gliding slower tha
 attributes justify. The docstring names the lazy-drift anti-pattern, which is why the cap
 exists.
 
-**Fix:** a STRETCH_CAP experiment — allow the duration to stretch up to some multiple of
-the natural time (try 1.0 / 1.5 / 2.0) before falling back to freeze. **Judge by eye.**
+~~**Fix:** a STRETCH_CAP experiment — allow the duration to stretch up to some multiple of
+the natural time (try 1.0 / 1.5 / 2.0) before falling back to freeze.~~
+
+**STRUCK 2026-09-09. The prescription was wrong and was never implemented.** `STRETCH_CAP` is a
+name in this document, not a mechanism in the tree. More importantly the direction was backwards:
+the tail is a **deliberate decision, not a bug**. `stamp_tween_durations`
+(`animation_step_helpers.py:1029`) caps each tween at the player's natural travel time precisely
+so he does not glide slower than his attributes justify, and its docstring names *lazy drift* as
+the anti-pattern it is avoiding. Stretching a tween to fill a step means slowing a man down so
+the clock catches up, and a court of players moving at wrong speeds reads worse than a court of
+players standing still. That judgement stays. What the author lacked was anything to put in the
+gap.
+
+**SHIPPED 2026-09-09 — FILL, do not stretch.** `stamp_arrival_settle` puts a delayed idle wander
+in the tail: the player travels at his natural speed exactly as before, then settles in place for
+the remainder. No duration changes anywhere, so no timing blast radius. See "Arrival-tail fill"
+below.
 
 #### RE-MEASURED 2026-09-08 at HEAD — defect 2 is the LARGEST remaining item, and the doc never had its size
 
@@ -209,7 +224,8 @@ This is the work that turns "correct" into "fun," and none of it is in the backe
 ## Recommended sequence
 
 1. **Easing (defect 1).** One line, immediate visible payoff. Do this first.
-2. **Arrive-and-freeze (defect 2).** STRETCH_CAP experiment, judged by eye.
+2. ~~**Arrive-and-freeze (defect 2).** STRETCH_CAP experiment~~ — **SHIPPED 2026-09-09 as an
+   arrival-tail FILL, not a stretch.** STRETCH_CAP never existed and the direction was backwards.
 3. **Overlap stagger.** Cheap, large perceived gain.
 4. **Timing variation (defect 3).** Needs a view on what each step type deserves.
 5. **Emphasis hierarchy.** The design pass. Largest effort, largest payoff on "rewarding."
@@ -431,7 +447,7 @@ They produce the same complaint and have different mechanisms:
 
 | | mechanism | fix |
 |---|---|---|
-| **defect 2** — arrive-and-freeze | player HAS a target, reaches it early, the leftover tail is dead | duration (STRETCH_CAP) |
+| **defect 2** — arrive-and-freeze | player HAS a target, reaches it early, the leftover tail is dead | ~~duration (STRETCH_CAP)~~ → **FILL the tail** (`stamp_arrival_settle`, shipped 2026-09-09). Durations are deliberate and unchanged. |
 | **defect 4** — whole-step freeze | player has NO target for the step, so is still for all of it | authoring (continuing targets) |
 
 ### RE-MEASURED 2026-09-08 — everything below supersedes the figures this section used to carry
@@ -946,3 +962,110 @@ the design work rather than treated as the next defect.
 Sequence items 5 and 6 were out of scope for this measurement and are design rather than defect
 work, but with defect 1 shipped, defect 4 closed and MISS downgraded, **they are now the largest
 remaining body of work** and the only defect ahead of them is defect 2.
+
+---
+
+## ARRIVAL-TAIL FILL (DEFECT 2) — SHIPPED 2026-09-09
+
+The largest single item in this workstream by measured size, and the reframe matters more than
+the code: **the tail is a deliberate decision, not a bug, and the fix is to fill it rather than
+to remove it.**
+
+### The fixture was hiding a third of it
+
+Every game in the harness had been logging `No plays found for motion/set_play, using fallback`.
+`plays_collection` was empty in mongomock, so `plays_catalog.all_docs()` returned nothing,
+`_get_plays_by_type_and_focus` (`turn_manager.py:3254`) matched nothing, and every possession
+took the fallback branch at `turn_manager.py:2969` and hardcoded an `"Inside"` playcall — which
+carries no skeleton, so **no off-ball destinations were authored for the four men without the
+ball**. That silence had already contributed to the idle_wander "0 fires" reading.
+
+`tests/roster_fixtures.py::seed_universal_plays` now seeds the real catalogue from
+`play_skeletons_export.json`: seven plays, four motion (4-1 Motion, 4-1 Flex Motion, 5-0 Motion,
+3-2 Motion) and three set_play (Pick & Roll (Lower Wing) / attack, Double Screen For SG /
+outside, Base Post Play / inside), each with four skeleton leans carrying real `pos_actions`.
+Focus coverage is complete for both types, so the fallback cannot re-trigger.
+
+**The fixture was deflating the defect, not inflating it.** Re-measured across 8 played games:
+
+| | empty catalogue | seeded | change |
+|---|---|---|---|
+| dead tail per game | 524.5 s | **703.4 s** | +34.1% |
+| share of moving-sprite wall time | 30.7% | **31.7%** | — |
+| total animation wall time | 278.1 s | 364.4 s | +31.0% |
+| moving player-steps | 30,189 | 38,193 | +26.5% |
+| player-steps carrying a tail | 15,361 | 19,651 | +27.9% |
+| stillness : tails ratio | 2.23 : 1 | 2.25 : 1 | unchanged |
+| median tail | 146 ms | 145 ms | unchanged |
+
+The distribution shape is materially identical — sub-60ms 24.8% → 24.7%, ≥300ms 29.4% → 30.8% —
+so every design conclusion drawn before the seeding survives. The item is simply larger.
+
+### Where the dead time actually sits
+
+| continuity class | share of all dead time | mean tail |
+|---|---|---|
+| `ease_in_out` (one-step journey) | **71.4%** | 417 ms |
+| `ease_out` (arriving) | 13.0% | 159 ms |
+| `continuing` | 8.0% | 141 ms |
+| `ease_in` (departing) | 7.5% | 192 ms |
+
+This is why **the gate is one line — tail over a threshold — and not a list of continuity
+classes.** A rule aimed at ARRIVING steps would have reached 13% of the problem. The classes
+were for sizing; tail size is what decides whether a human can see the pause.
+
+### What shipped
+
+- **`applyIdleWander` gained a `delayMs`** (`arrivalHeartbeat.js`). Implemented as a *deferred
+  call*, not a `delay` on the counter tween. The body takes ownership from the heartbeat, snaps
+  the sprite to rest and **captures its base positions at call time**; delaying only the tween
+  would leave that capture mid-movement and yank the sprite back to a position the player had
+  already left. Default 0 calls straight through, so the wanders shipped in 14cbd4e50 /
+  844f53ece are unchanged.
+- **`stamp_arrival_settle`** (`animation_step_helpers.py`), called from `game_manager._append_turn`
+  — the same universal seam the curve stamp uses. It runs there rather than in an emitter because
+  it must see every emitter's still-player stamps before it can share their density budget.
+- **ONE density cap, shared.** The fill counts idlers already on the step and fills only the
+  headroom. Two independent caps would let a step carry the cap twice over, which is precisely
+  the "busy court" the cap exists to prevent. Measured: 0 violations, mean idlers/step 3.31 → 4.54.
+- **Its own family, `arrival_settle`**, with independent style and amplitude, because a man who
+  has just sprinted and stopped decelerates into a settle — a different motion from a man who has
+  been standing around. `jockey` at `amplitudeScale` 0.6, `minTailMs` 150.
+- **Hard 60 ms floor in the backend** (24.7% of tails), with `minTailMs` as Jamie's tunable on
+  top so he can raise the threshold without a backend round-trip. Raising it can only ever stamp
+  fewer players, so it can never push the court past the cap.
+
+### Gate
+
+8 seeds, played arm, in-process no-op arm so both arms run byte-identical code. **25 key paths
+compared; `start.flourish` is the only one that differs.** `start.coords`, `end.coords`,
+`start.tween_durations`, `start.movement_curve`, `_pressure_step_state` and the other 20 are
+digest-identical. Draws, step counts and turn counts identical on all 8 seeds. Determinism holds
+across two separate processes.
+
+Frame time at cap 3 / 6 / 10: 0.237 / 0.340 / 0.494 µs per frame — **0.0030% of a 60 fps budget
+at cap 10**. The delayed path costs the same as the immediate one, because concurrency is bounded
+by the ten sprites on court: a delayed start cannot create an eleventh idler, only move *when*
+the tenth begins. This is CPU cost of the idle update path against a stubbed tween manager and
+cannot see compositing.
+
+Stamp total 28,836 → 39,618 over 8 games.
+
+### Two things for Jamie's eye, and they are the real risks
+
+1. **Does a player who just sprinted and then shifts his weight read as SETTLING, or as
+   FIDGETING?** That is the aesthetic failure mode of this change, and it is the *opposite* of
+   every previous family — those failed by being too subtle. Bracket `minTailMs` at 60 / 150 /
+   300 and `amplitudeScale` at 0.3 / 0.6 / 1.0, and use `enabled: false` for a clean A/B.
+2. **With arrival fills on top of the existing still-player wanders, does the court read as
+   BUSY?** The density cap is the lever here, not the amplitude.
+
+### Found while gating, NOT fixed here
+
+`hco_still`, `free_throw` and `make_hold` write **zero** stamps on this harness — in both arms,
+and with both an empty and a seeded catalogue. `build_skeleton_animation_steps` runs 153 times
+per game and returns steps carrying no flourish of any family, so those stamps are *writing
+nothing* rather than being stripped downstream. This is a pre-existing defect in the shipped
+still-player increment and it affects both gate arms identically, so it does not touch the
+result above. It also explains why the brief's 48,229 stamp baseline does not reproduce. Needs
+its own diagnosis.
