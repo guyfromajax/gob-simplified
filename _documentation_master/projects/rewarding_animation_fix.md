@@ -967,6 +967,63 @@ remaining body of work** and the only defect ahead of them is defect 2.
 
 ## ARRIVAL-TAIL FILL (DEFECT 2) — SHIPPED 2026-09-09
 
+> ### WHERE THIS LANDED, AND HOW TO REVERT IT
+>
+> **The commit message will not tell you, so read this before touching it.** The defect-2 fix was
+> swept into **`a0d509173 "adjusted drive stop logic"`** by a concurrent process mid-stage, and
+> that commit was pushed before it could be separated. History was left alone rather than
+> force-pushed over a shared branch with another process actively writing to it.
+>
+> `a0d509173` is a **94-file commit** that ALSO contains **unrelated drive-stop logic**
+> (`BackEnd/engine/attack_drive_clearance.py`) and ~85 court images. **Reverting the commit would
+> revert all of that too.** A revert of defect 2 must therefore be done **by file list**, not by
+> `git revert a0d509173`:
+>
+> | file | what it contributes |
+> |---|---|
+> | `BackEnd/utils/animation_step_helpers.py` | `stamp_arrival_settle` + `_arrival_tail_ms` and their constants |
+> | `BackEnd/models/game_manager.py` | the single `stamp_arrival_settle(...)` call in `_append_turn` |
+> | `FrontEnd/static/js/phaser/animation/arrivalHeartbeat.js` | the `delayMs` parameter and the `applyIdleWanderNow` split |
+> | `FrontEnd/static/js/phaser/animation/flourishes.js` | the `arrival_settle` branch: `enabled` and `minTailMs` gating, `delayMs` pass-through |
+> | `FrontEnd/static/js/phaser/animation/animation_config.js` | the `arrival_settle` tunables |
+> | `tests/test_arrival_settle_fill.py` | the four poisoned guards |
+> | `.gitignore` | `.arm/` probe output |
+>
+> **THE PRACTICAL ROLLBACK IS NOT GIT.** Set `flourish.idleWander.byFamily.arrival_settle.enabled`
+> to `false` in `animation_config.js`. That is a one-line, no-deploy-risk kill switch, and it
+> leaves the still-player wanders shipped in 14cbd4e50 / 844f53ece completely untouched.
+>
+> #### The kill switch is VERIFIED, not assumed
+>
+> An untested off switch is not a rollback path. `scratch_killswitch.mjs` drives the **real
+> `runFlourish` dispatch** in `flourishes.js` — not a re-implementation — with one process per arm,
+> because `animation_config.js` reads `globalThis.animation_config` once at module load and two
+> arms in one process would share whichever config loaded first.
+>
+> | | `enabled: true` | `enabled: false` |
+> |---|---|---|
+> | arrival fills fed to `runFlourish` | 5 | 5 |
+> | arrival wander tweens created | 3 | **0** |
+> | arrival delayed calls scheduled | 3 | **0** |
+> | still-player wanders fed | 5 | 5 |
+> | still-player wander tweens created | **5** | **5** |
+> | still-player delayed calls scheduled | 0 | 0 |
+>
+> So `enabled: false` renders zero arrival fills and schedules zero delayed calls, while all five
+> still-player families (`hco_still`, `inbound`, `oreb`, `fcp`, `hct`) tween exactly as before —
+> the rollback cannot take working behaviour down with it. The ON arm is checked first as an
+> **anti-vacuity** control, because "zero fills" is indistinguishable from a harness that never fed
+> the dispatch anything. The 3-of-5 figure is the shipped `minTailMs` 150 correctly dropping the
+> 80 ms and 120 ms tails.
+>
+> **Poisoned two ways, both caught:** deleting the `enabled` check outright (switch becomes a
+> no-op) → 3 fills render with the switch off, 2 checks fail; and misspelling the family so
+> `arrival_settle` never matches the gate → 5 fills render and the threshold check fails too.
+> File restored and the harness green again after each.
+>
+> The fixture seeding is clean in `157f8ff99` and these docs in `0fbc7331d`. Everything the commit
+> message *should* have said is in this section.
+
 The largest single item in this workstream by measured size, and the reframe matters more than
 the code: **the tail is a deliberate decision, not a bug, and the fix is to fill it rather than
 to remove it.**
