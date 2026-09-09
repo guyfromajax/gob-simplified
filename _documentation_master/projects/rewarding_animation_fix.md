@@ -967,6 +967,49 @@ remaining body of work** and the only defect ahead of them is defect 2.
 
 ## ARRIVAL-TAIL FILL (DEFECT 2) — SHIPPED 2026-09-09
 
+> ## ⚠ EVERY NUMBER IN THIS SECTION WAS RE-MEASURED 2026-09-09. READ THIS FIRST.
+>
+> The figures originally published here were measured on the **SIM arm** while being labelled the
+> played arm. `scratch_playedarm.py::use_played_arm(gm)` is a **no-op unless `PLAYED=1` is in the
+> environment**; every probe called it, none set the variable, and none checked its return value.
+> See bugs.md items 29 and 6d.
+>
+> **The fix itself is unaffected and its gate still passes** — re-run on the real played arm, 26
+> key paths compared, `start.flourish` is the only one that differs, draws / step counts / turn
+> counts identical on all 8 seeds, 0 delay mismatches, 0 sub-floor stamps. What was wrong was the
+> SIZING, and it was wrong in the direction of understating the problem:
+>
+> | | as published (sim arm) | **corrected (played arm)** |
+> |---|---|---|
+> | dead tail per game | 703.4 s | **1,849.6 s** |
+> | share of moving-sprite wall time | 31.7% | **38.8%** |
+> | moving player-steps | 38,193 | 90,730 |
+> | player-steps carrying a tail | 19,651 | 49,550 |
+> | median tail | 145 ms | 192 ms |
+> | total animation wall time / game | 364.4 s | 776.6 s |
+> | `arrival_settle` stamps (8 games) | 10,782 | **25,038** |
+> | idle stamp baseline (8 games) | 28,836 | **57,522** |
+>
+> **The design conclusions survive, and the one-line gate is MORE justified than before, not
+> less.** Dead time is no longer concentrated in one continuity class — it spreads across all
+> four (one-step journeys 38.3%, arriving 29.0%, continuing 18.6%, departing 14.0%, versus the
+> 71.4% / 13.0% / 8.0% / 7.5% published). A rule keyed on continuity class would therefore have
+> missed even more of the problem than originally argued. The shipped `minTailMs` of 150 now
+> catches **59.0%** of tails rather than 49.3%, and the sub-60ms hard exclusion covers 15.6%
+> rather than 24.7%.
+>
+> The 48,229 baseline the brief quoted was **right all along**; it was this session's 28,836 that
+> was fiction. `hco_still` measures 44,520 across 8 played games against the 40,175 reported by
+> the widening task, the residual being the seeded plays catalogue and the intervening
+> `HCO_PASS_SAFETY_BASE` 175 -> 150 change (11bbaa16a).
+>
+> Frame times are **unaffected** — they were measured in a node harness that never touched the
+> Python arm.
+>
+> Corrected figures are the ones to use. The tables further down this section are left as
+> published, for the record of what was claimed.
+
+
 > ### WHERE THIS LANDED, AND HOW TO REVERT IT
 >
 > **The commit message will not tell you, so read this before touching it.** The defect-2 fix was

@@ -239,6 +239,32 @@
      one being complained about. Both produce confident wrong answers, but only this one is fixed
      by changing how the harness is launched.
 
+6d. STANDING RULE — a harness that opts IN to the right arm will silently run on the wrong one
+
+   - Adopted 2026-09-09, at the cost of an entire session of measurements. Item 29 has the detail.
+
+     **"Assert the arm. A shim that returns a status nobody reads is a shim nobody ran."**
+
+   - `scratch_playedarm.py::use_played_arm(gm)` returns `False` and does nothing unless
+     `PLAYED=1` is in the environment. Every probe in the defect-2 session called it, none set
+     the variable, and none checked the return value — so every figure reported as "played arm"
+     came off the SIM arm. The corrected numbers moved by factors of 2 to 3, and three families
+     of shipped work read as completely dead when they were fine.
+   - This is the fourth sibling of 6/6b/6c and it is the nastiest, because the other three are
+     about the READER and this one is about the SUBJECT. A perfect reader on the wrong arm
+     reports flawless, reproducible, deterministic nonsense — and it passes its own anti-vacuity
+     control, because the control tests the reader.
+   - THE RULE, in two parts:
+     1. **A probe must ASSERT the arm it claims**, not request it. `use_played_arm` returns a
+        bool; a probe that ignores it has no idea what it measured. Better still, assert a
+        downstream FACT that only holds on the intended arm — on the played arm HCO emits steps,
+        so `hco_still > 0` is a one-line proof the arm is live.
+     2. **Opt-in via environment variable is the wrong default for a correctness-critical
+        switch.** The failure is silent and it looks like data. If a shim can run in two modes,
+        the mode belongs in the call, where forgetting it is a `TypeError` rather than a number.
+   - Corollary, and it generalises past this shim: any claim of the form "X is never reached" or
+     "X writes nothing" must state HOW the arm was established before the count is trusted.
+
 6c. STANDING RULE — a null result and a broken reader look identical in a report
    - Adopted 2026-09-08. Recorded verbatim because the phrasing is the rule:
 
@@ -1268,39 +1294,69 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       earlier padding census asked the same question of the putback emitter's 9 non-content steps
       and it has not been answered for `bounce`.
 
-29. NOT DIAGNOSED — three idle-wander families write ZERO stamps, and nothing objects
+29. RESOLVED 2026-09-09 — the three "zero-stamp" families were a HARNESS defect, and it
+    invalidated a whole session of measurements. Case (a): production is fine.
 
-      Found 2026-09-09 while gating the arrival-tail fill, chasing why the brief's 48,229 stamp
-      baseline would not reproduce (measured baseline: 28,836 over 8 games).
+      **THE ROOT CAUSE, and it is embarrassing rather than subtle.** `scratch_playedarm.py`'s
+      `use_played_arm(gm)` is a **no-op unless the environment variable `PLAYED=1` is set**:
 
-      `hco_still`, `free_throw` and `make_hold` produce **zero** stamps on the played-arm harness.
-      Measured in both gate arms, and with both an empty and a seeded plays catalogue, so it is
-      neither my change nor the fixture.
+          def use_played_arm(gm):
+              if os.environ.get("PLAYED") != "1":
+                  return False
 
-      What is established:
-      - `build_skeleton_animation_steps` **is** reached, 153 times per game, and there is no early
-        return between its `def` at `skeleton_step_emitter.py:1549` and the two unconditional
-        stamp calls at `:2804` (`hco_still`) and `:2814` (`make_hold`) — the only `return` in that
-        range is the final one at `:2819`.
-      - Wrapping the emitter and reading `start.flourish` **at the moment it returns** shows an
-        empty dict for every family. So the stamps are **writing nothing**, not being stripped
-        downstream. That distinction is the whole diagnosis and it is already settled.
-      - `_stamp_ft_idles` is reached **0 times** despite 90 `FREE_THROW` result_types per game, so
-        free throws fail differently from HCO — an unreached call site rather than a call that
-        writes nothing. Two separate causes wearing one symptom.
-      - The families that DO fire (`inbound` 1,698, `oreb` 442, `hct` 587, `fcp` 786 per game) all
-        stamp from other emitters.
+      Every probe in the defect-2 session called `use_played_arm(gm)` and **never set `PLAYED`**,
+      and none of them checked the returned bool. So every run labelled "played arm" was in fact
+      the **SIM arm**. `simulate_quarter` sets `_is_full_simulation` (main.py:913), `animator.py:1213`
+      returns `[]` on that flag, and `build_skeleton_animation_steps` therefore bails at
+      **skeleton_step_emitter.py:1606** (`if not skeleton_steps or not animations: return None`)
+      before ever reaching its stamp calls at `:2804` and `:2814`. HCO emitted nothing, so
+      `hco_still` and `make_hold` were zero; `_stamp_ft_idles` was likewise never reached.
 
-      WHY THIS MATTERS more than the count suggests: `hco_still` was the centrepiece of the Part 1
-      redirect (14cbd4e50) — HCO was measured to carry 82% of all still player-steps in the game —
-      and `free_throw` was called the biggest visible win. Jamie verified free throws by eye on
-      staging and they read well, so **production and this harness disagree**, and until that is
-      resolved we do not know which one is telling the truth. Per standing rule 6b the arm the
-      human looks at wins, but per item 6 a green harness is evidence of nothing.
+      Proven by running the same probe both ways on seed 1:
 
-      Do not "fix" this by re-stamping from a new site. Find out why the existing writes produce
-      nothing first; the last three times this shape appeared it was a producer and a consumer
-      disagreeing on a name, not a missing call.
+      | family | sim arm | REAL played arm |
+      |---|---|---|
+      | `hco_still` | **0** | **5,611** |
+      | `free_throw` | **0** | **474** |
+      | `make_hold` | **0** | **188** |
+      | `inbound` | 1,698 | 504 |
+      | `_stamp_ft_idles` calls | **0** | **29** |
+
+      `hco_still` at 5,611/game x 8 = 44,888, against the 40,175 the widening task reported.
+      **The widening measurement was right and item 29's was wrong.** The residual difference is
+      accounted for by the seeded plays catalogue and the intervening `HCO_PASS_SAFETY_BASE`
+      175 -> 150 balance change (11bbaa16a).
+
+      **BOTH mechanisms item 29 named were the same artefact.** The entry claimed two distinct
+      defects — a producer whose output vanishes, and a call site never executing — and asserted
+      "no early return between the `def` at :1549 and the stamp calls." That claim was false: the
+      audit used `awk '/^    return /'`, which only matches a return at exactly four spaces of
+      indent and therefore **could not see a return nested inside an `if`**. There are three, at
+      `:1606`, `:1627` and `:2172`. A grep whose pattern cannot match the thing it is looking for
+      returns zero and reads as proof.
+
+      **WHY THE ANTI-VACUITY CONTROL DID NOT CATCH IT.** The probe injected a synthetic flourish
+      and confirmed the payload reader counted it, 5/5, in both arms. That control was sound and
+      it passed — but it only proved *the reader works*, never that *the harness was on the arm
+      it claimed*. The zeros were real; the arm was wrong. **A control has to test the premise
+      that is actually load-bearing**, and "am I measuring the thing I said I was" was not tested
+      by anything.
+
+      NOT A DEFECT, retracted before it was logged: the gap between stamps *written* (8,432) and
+      stamps *in the payload* (5,611) was investigated and **cannot be attributed** with the
+      instrument used. The payload path deep-copies, so the identity comparison used to test it
+      was invalid by construction — 0 of 304 stamped step objects appear in the payload by
+      identity, including for families with no gap at all. The emitter is called ~2x per HCO turn,
+      so double-counting is the leading explanation. It is not being recorded as a loss.
+
+30. OPEN, pre-existing — the idle density cap is exceeded on the played arm
+
+      `IDLE_STILL_DENSITY_CAP` is 6, but **344 steps across 8 played games carry more than six
+      idlers**. Identical in both arms of the defect-2 gate (344 before, 344 after), so the
+      arrival fill does not cause it and does not worsen it — the fill shares one cap correctly.
+      The still-player pass itself is what exceeds it, presumably because several families stamp
+      the same step from different emitters and each only counts its own. Invisible until the
+      arm bug above was fixed, because HCO never emitted on the sim arm.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
