@@ -1888,11 +1888,130 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       FAST_BREAK is the only family that is not.** The author knew the failure mode, described it
       precisely, fixed it where he was working, and the fix never travelled.
 
-      NOT FIXED — diagnostic only. Note for whoever scopes it: the visible rate is 0.25/game, so
-      this is small by frequency, but unlike everything else in this workstream it is a
-      CONTRACT VIOLATION rather than a matter of taste, and it is measurable without needing an
-      instrument for perception. The dead-steps half changes step counts, so it is principle 8
-      territory; the §8.1 merge itself moves coords and so is outcome-affecting.
+      **FIXED 2026-09-09.** See item 41 for the fix, the gate, and the outcome movement it
+      caused. Both halves — the teleports and the post-``turn_stop`` dead steps — went to zero
+      from the single dedupe; the §8.1 merge was added as a guard afterwards and is a no-op.
+
+41. **FIX for item 40: the fast-break post-shot chain was built TWICE. Removing the second
+      build zeroes both defects — and moves game outcomes on 2 of 8 seeds.** 2026-09-09,
+      played arm, PLAYED=1.
+
+      **THE GATE FIRST — what selected the 6.5%, which item 40 could not say.** Established
+      statically and confirmed at runtime. ``_build_rr_drive_and_finalize``
+      (``rim_runner_step_emitter.py:2347``) branches on ``turn_result["fb_drive_resolution"]``:
+
+      - TRUTHY -> ``build_fb_drive_resolution_steps`` runs
+        ``inject_shot_micro_before_post_shot`` + ``_build_post_shot_sub_steps``
+        (``fb_drive_step_emitter.py:564-568``) — **build #1** — then ``:2383`` calls
+        ``_finalize_rr_steps``, which runs the SAME pair at ``:2224-2229`` — **build #2**.
+      - FALSY -> shot-motion step, then ``:2398`` ``_finalize_rr_steps`` — single build, correct.
+
+      Neither builder is re-entrant: ``_build_post_shot_sub_steps``
+      (``skeleton_step_emitter.py:3539-3558``) early-returns only on result type and missing
+      shooter, and ``_find_terminal_shoot_step`` (``:3346``) scans in REVERSE so it re-finds the
+      original shoot step after build #1. Runtime cross-tab, 8 games, 46 FAST_BREAK turns:
+
+      | play x fb_drive_resolution | turns | post-shot builds | duplicated | dead steps |
+      |---|---|---|---|---|
+      | after_steal, dr=True | 26 | 12 | 0 | 0 |
+      | covert_release, dr=True | 5 | 4 | 0 | 0 |
+      | rim_runner, dr=False | 6 | 6 | 0 | 0 |
+      | triangle, dr=False | 4 | 4 | 0 | 0 |
+      | **rim_runner, dr=True** | 2 | 3 | **1** | 11 |
+      | **triangle, dr=True** | 3 | 5 | **2** | 9 |
+
+      So the selector is: **rim-runner/triangle AND a truthy ``fb_drive_resolution`` AND the
+      drive branch actually returned steps AND a result type the post-shot builder builds for
+      (all three observed were MAKE).** 3 of 46 = the 6.5%. ``after_steal`` and
+      ``covert_release`` never duplicate because they reach only build #1 — they have no
+      equivalent of the RR exit hook.
+
+      **WHICH CALL SITE IS CORRECT — neither could simply be deleted.** Build #1 is the ONLY
+      post-shot build for after_steal (26 turns) and covert_release (5). Build #2 is the ONLY
+      one for rim_runner/triangle when ``fb_drive_resolution`` is falsy (10 turns). Both are
+      load-bearing; only their OVERLAP is wrong. Git history explains how:
+      ``_finalize_rr_steps`` is the older of the two and is documented as the *"single exit hook
+      for the RR dispatcher"*; ``ab7757deb "universal FB drive step code"`` later gave the shared
+      drive emitter its own post-shot build, correctly for the two families that had none, and
+      nobody noticed RR/triangle already had one.
+
+      **THE FIX** — ``post_shot_already_built: bool = False`` on ``_finalize_rr_steps``, passed
+      ``True`` from the one call site that arrives with the chain in hand (``:2383``). Chosen over
+      making the builders idempotent: the other six ``_finalize_rr_steps`` call sites keep the
+      behaviour they need, and the condition is stated at the call site where it is true rather
+      than inferred inside a helper.
+
+      **RESULT — both halves of item 40 go to zero from the dedupe ALONE**, before any guard:
+
+      | | before | after |
+      |---|---|---|
+      | teleports (visible) | 4 (2) | **0 (0)** |
+      | absorbed discontinuities | 12 | **0** |
+      | dead steps after ``turn_stop`` | 20 | **0** |
+      | FAST_BREAK within-turn continuity | 98.94% | **100.00%** |
+
+      All eight families are now 100.00% continuous over 169,318 player-step pairs.
+
+      **⚠ THE GATE MOVED, AND THAT IS THE FINDING.** Step counts and draw counts were expected
+      to hold if this only removed dead payload. They did not:
+
+      | seed | turns | steps | draws | verdict |
+      |---|---|---|---|---|
+      | 1, 4, 5, 7, 8 | unchanged | unchanged | unchanged | byte-identical |
+      | 3 | 312 -> 312 | 2444 -> 2433 | **unchanged** | dead duplicate only |
+      | 2 | 329 -> 319 | 2439 -> 2409 | 148,602 -> 148,930 | **trajectory diverged** |
+      | 6 | 333 -> 350 | 2453 -> 2525 | 151,396 -> 158,097 | **trajectory diverged** |
+
+      Cause, established by diffing the step kinds rather than guessed:
+      ``inject_shot_micro_before_post_shot`` was ALSO running twice, so those turns carried **two
+      sets of shot-micro beats**. On seed 3 the duplicate sat entirely after ``turn_stop``, so
+      removing it changed nothing that renders and the game is identical. On seeds 2 and 6 one
+      duplicated micro beat (t=0.32 s, t=0.34 s) sat BEFORE ``turn_stop`` — it rendered, and it
+      burned game clock. Removing it returns that time to the clock, which changes the following
+      possession and everything after it.
+
+      **So the dead duplicate was not free: part of it was consuming game time.** This is a
+      correctness improvement, not a cosmetic one, but it means the change is OUTCOME-AFFECTING
+      and SPC principle 8 applies. It is not shippable on the strength of this gate alone; it
+      wants the poison-stash and an equiv-v3 arm.
+
+      **THE §8.1 GUARD, added second and deliberately not first.** Adding the merge before the
+      dedupe would have converted every teleport into a smooth backwards slide — better-looking,
+      equally wrong, and it would have hidden the duplicate. It is therefore a guard, not the
+      fix, and it is verified to be a NO-OP: 0 corrections across 8 games.
+      ``enforce_step_start_continuity`` (``animation_step_helpers.py``) applies the same merge as
+      the HCO model (``skeleton_step_emitter.py:2128-2138``), differing only in timing — HCO
+      merges while building because it owns the loop; the FB emitters assemble from several
+      builders so theirs sweeps the finished list. It is wired at the outermost return of all
+      three FB emitters, so it sees the preamble/drive concatenation seams too.
+
+      **It LOGS every correction.** A silent repair would be the same masking described above.
+      Poisoned by reinstating the double build in source: the guard emitted 6
+      ``[UESS §8.1] discontinuity corrected`` warnings naming step, player and both coords —
+      including the exact item 40 shape, ``step 6 ... start=(90.18,24.18) prior end=(93.36,27.36)``
+      — and 0 with the fix in place.
+
+      **THE CONTRACT SWEEP — §8.1 has 4 implementers out of 13 emitters. LOGGED, NOT FIXED.**
+
+      | enforces §8.1 explicitly | does not |
+      |---|---|
+      | ``skeleton_step_emitter`` (HCO, the model) | ``dreb``, ``dynamic_fcp``, ``dynamic_hct``, ``fb_drive``, ``fb_outlet_pass``, ``ft``, ``hct``, ``oreb``, ``triangle`` |
+      | ``rim_runner``, ``after_steal_fast_break``, ``covert_release`` (added here) | |
+
+      The nine are **LATENT, not live**: every family they emit measures 100.00% continuous
+      today, and DREB's is vacuous because it emits one step per turn (item 39). They are
+      unguarded rather than broken, so a future edit could reintroduce this with nothing
+      objecting. One shape, one fix, one set of measurements — they are not touched here.
+
+      **GUARD TEST**, the durable part: ``tests/test_step_start_continuity.py``, 7 cases. Asserts
+      exact equality rather than a tolerance, and fails on ABSORBED discontinuities too, not just
+      teleports — a player gliding along a path nobody authored is also a defect. Carries the
+      renderer facts (``animationPlayback.js:1039/:1302/:1526/:1585``) in its docstring so the
+      next reader does not have to re-derive why ``start.coords`` matters when it is never drawn.
+
+      Pre-existing suite state, verified by stashing the change and re-running: 5 failures in
+      ``test_shot_system_regressions`` / ``test_core_simulation`` from a ``shot_manager.py:1166``
+      unpack error are present WITH AND WITHOUT this change and are unrelated to it.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
