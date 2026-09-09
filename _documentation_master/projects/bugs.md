@@ -1,5 +1,4 @@
 ##Marketing
-1. Update GM Games page
 
 
 ##Monetization
@@ -1288,6 +1287,37 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       Jamie's balance pass. This entry is the policy only; `_usable_grid_coord`
       (`phase_resolution.py`) is the shape the eventual fix should take.
 
+26b. POLICY, adopted 2026-09-09 — a guard that corrects must announce
+    - The companion to 26, and the same failure wearing the opposite costume. Where a fallback
+      invents a value nobody asked for, a **silent corrector destroys evidence of a value that was
+      wrong**. Both end with a downstream reader unable to tell a healthy system from a sick one.
+
+      **A GUARD THAT SILENTLY REPAIRS IS INDISTINGUISHABLE FROM AN ABSENT DEFECT, AND BECOMES THE
+      THING THAT HIDES THE BUG. IF IT CORRECTS, IT LOGS — every correction, with the value it
+      replaced.**
+
+    - THIS IS NOT HYPOTHETICAL; THE POISON PROVED IT. Item 41's UESS §8.1 continuity guard merges
+      `step[N].end.coords` into `step[N+1].start.coords`. Reinstating the double build underneath
+      it — the full item 40 defect, deliberately restored in source — the continuity probe measured
+      **0 teleports and 100.00% continuity**, the same reading as a healthy tree. The guard had
+      converted every 4.5 ft jump into a smooth backwards slide down the shooter's own drive path:
+      better-looking, equally wrong, and invisible to the only instrument pointed at it. **The
+      only thing that distinguished the two states was the six
+      `[UESS §8.1] discontinuity corrected` warnings**, naming step, player, and both coordinates.
+    - THE ORDERING CONSEQUENCE, which is the practical half. This is why item 41 landed the dedupe
+      FIRST and the guard second. Had the guard gone in first, the defect would have measured clean
+      immediately, the double build would still be there, and the real cause would never have been
+      found. **A guard added before its defect is diagnosed can end the investigation instead of
+      the defect.**
+    - WHAT THIS FORBIDS, concretely: a repair path whose only observable is the absence of the
+      symptom it repairs. Clamps, coalesces, `max(0, ...)`, `or {}` defaults, retry-with-a-
+      different-key, and merge-from-neighbour all qualify when they sit on a contract. They may
+      stay — several must — but they log.
+    - AND WHAT IT MEANS FOR MEASUREMENT: once a corrector is in place, its warning count, not the
+      defect rate, is the instrument. Item 41's guard is reported as "0 corrections across 8
+      games" for exactly this reason. A future session reading only "100% continuous" would learn
+      nothing about whether the defect had returned.
+
 27. CLOSED — both proposed mechanisms for symptom #3 are eliminated. Do not re-derive them.
     - Symptom #3 is Jamie's long-standing report that TURNOVERS ARE ATTRIBUTED TO THE WRONG BALL
       HANDLER. Two mechanisms were proposed on separate evidence and both are now dead. Recorded
@@ -1962,18 +1992,46 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       | 2 | 329 -> 319 | 2439 -> 2409 | 148,602 -> 148,930 | **trajectory diverged** |
       | 6 | 333 -> 350 | 2453 -> 2525 | 151,396 -> 158,097 | **trajectory diverged** |
 
-      Cause, established by diffing the step kinds rather than guessed:
-      ``inject_shot_micro_before_post_shot`` was ALSO running twice, so those turns carried **two
-      sets of shot-micro beats**. On seed 3 the duplicate sat entirely after ``turn_stop``, so
-      removing it changed nothing that renders and the game is identical. On seeds 2 and 6 one
-      duplicated micro beat (t=0.32 s, t=0.34 s) sat BEFORE ``turn_stop`` — it rendered, and it
-      burned game clock. Removing it returns that time to the clock, which changes the following
-      possession and everything after it.
+      **⚠ THE FIRST EXPLANATION OF THIS WAS WRONG AND IS WITHDRAWN.** This item, and the commit
+      message of ``63eb72b6c``, originally said a duplicated micro beat *"burned game clock"* and
+      that removing it *"returns that time to the clock."* That was inferred from step kinds, not
+      measured. **Both candidate clock paths are now measured, and both are REFUTED:**
 
-      **So the dead duplicate was not free: part of it was consuming game time.** This is a
-      correctness improvement, not a cosmetic one, but it means the change is OUTCOME-AFFECTING
-      and SPC principle 8 applies. It is not shippable on the strength of this gate alone; it
-      wants the poison-stash and an equiv-v3 arm.
+      - **``turn_manager.py:1840-1847``, the FAST_BREAK schema-span site** — parked all session as
+        the suspect, on the reasoning that it *"only matters if we delete steps"*, and we deleted
+        steps. It derives ``result["time_elapsed"]`` as ``steps[0].start.clock.clock_remaining -
+        steps[-1].end.clock.clock_remaining``, and ``steps[-1]`` **is** the dead duplicate's tail,
+        so the premise was sound. But the arithmetic is wrapped in ``int(round())`` and the shift
+        is sub-second: the span moves 7.443 -> 7.018 s (seed 2), 7.111 -> 6.670 s (seed 6),
+        7.214 -> 7.214 s (seed 3), and **all six values round to 7. ``time_elapsed`` never moved
+        on the three affected turns measured.** Stated at its true sample size: n=3 turns. The
+        shifts are ~0.43 s, so roughly that fraction of a larger population WOULD cross a rounding
+        boundary and hand back a whole second — but at ~0.4 duplicated fast breaks per game that is
+        under 0.2 s/game, orders of magnitude too small to explain the outcome movement. **The site
+        is real, it is the one that would carry a bulk step deletion, and it did not carry this
+        one.** It stays parked rather than closed.
+      - **RNG draws.** Counted inside each builder invocation on pre-fix source
+        (``scratch_fbdraws.py``): build #1 consumes 40-44 draws, and **build #2 and micro #2
+        consume 0 draws on all three seeds.** Removing the duplicate removes no draws, so it
+        cannot have re-aligned the stream at the point of removal.
+
+      **THE ACTUAL MECHANISM IS COORDINATES, and it is worse than the clock story.** The duplicate
+      chain re-advances players down the post-shot chain, so a turn's LAST step ends with players
+      **18-23 ft further along than they actually were** — those coordinates come from steps
+      emitted after ``turn_stop``, which the renderer never draws. The turn's final coords seed the
+      NEXT turn's step-0 start coords, measured differing for **7/10 players (seed 2), 5/10 (seed
+      3), 10/10 (seed 6)**. **So the simulation was reading player positions off animation steps
+      no viewer ever saw.** The fix stops that, and the "after" coordinates are the correct ones.
+
+      Whether that perturbation then *changes an outcome* is a separate, chaotic question, which is
+      why the divergence runs both ways and why per-seed deltas are meaningless. Seed 3 DAMPED —
+      the next turn started from 5 different positions but resolved the same, and the turn after
+      that was back to 0 differing. Seeds 2 and 6 AMPLIFIED — same result on the next turn, then a
+      different result type two turns later (``DREB/FOUL -> OREB/PUTBACK_MISS``,
+      ``OREB/OREB_KICKOUT -> OREB/PUTBACK_MAKE``).
+
+      **The change is OUTCOME-AFFECTING and SPC principle 8 applies** — see item 42 for the
+      poison-stash, the distributional equiv-v3, and the re-cut reference.
 
       **THE §8.1 GUARD, added second and deliberately not first.** Adding the merge before the
       dedupe would have converted every teleport into a smooth backwards slide — better-looking,
@@ -2013,6 +2071,103 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       ``test_shot_system_regressions`` / ``test_core_simulation`` from a ``shot_manager.py:1166``
       unpack error are present WITH AND WITHOUT this change and are unrelated to it.
 
+42. **SPC principle 8 treatment for the fast-break dedupe (item 41): the removed work was LIVE,
+      and the re-cut reference is below.** 2026-09-09, played arm, PLAYED=1.
+
+      **THE POISON-STASH — the removed work was CONSUMED, not dead.** The test exists to separate
+      two states that look identical in a diff: work that was genuinely dead where the output moved
+      only through RNG-stream drift, versus work that was live. Applied here, the stash is the
+      SECOND post-shot chain and the poison is ``{x: -9999, y: -9999}`` written over every step it
+      appends, run against pre-fix (double-build) behaviour (``scratch_fbpoison.py``). The
+      fingerprint covers turn type, result type, offense and elapsed time — deliberately NOT
+      coordinates, since the poison lands in coordinates and including them would make the verdict
+      trivially "differs".
+
+      | seed | clean pre-fix | poisoned | steps poisoned | verdict |
+      |---|---|---|---|---|
+      | 2 | ``d3353dcf`` 329 turns / 109 pts | ``1e7c7674`` 318 / 112 | 8 | **differs** |
+      | 3 | ``ecbcdab7`` 312 turns / 169 pts | ``ee015f35`` 258 / 128 | 12 | **differs** |
+      | 6 | ``035e17e6`` 333 turns / 169 pts | ``2cb81ade`` 330 / 171 | 3 | **differs** |
+
+      **3 of 3 differ, and the poison is proven to have landed** (8/12/3 steps, 2 second-calls per
+      seed) — a poison that never lands and a stash that is never read give the same "identical"
+      verdict, so the run self-voids on a zero count. **The duplicate chain's output was read by the
+      simulation.** Removing it is therefore a genuine behaviour change and equiv-v3 is required,
+      not a formality. Note seed 3, which the item 41 gate recorded as byte-identical after the
+      dedupe: it still moves 312 -> 258 turns under poison. Both are true — chain #2's coordinates
+      happened to equal chain #1's closely enough to change no decision on that seed, but they are
+      read, and a sentinel value proves it. The documented blind spot stands: the sentinel catches a
+      consumer doing arithmetic, not one that merely checks a key's presence
+      (``Sim_Perf_Capstone.md:154-157``).
+
+      **THE BEFORE-ARM IS VALIDATED, not assumed.** Both conditions run in one interpreter with the
+      pre-fix behaviour reinstated by wrapping ``_finalize_rr_steps`` to force
+      ``post_shot_already_built=False``, so the two conditions cannot differ by anything else. That
+      arm reproduces the ACTUAL pre-fix source exactly — 329 / 312 / 333 turns on seeds 2 / 3 / 6,
+      matching the item 41 gate cut from real pre-fix code, 3 for 3. One caveat recorded rather
+      than waved away: the before-arm carries the §8.1 guard, which the historical pre-fix tree did
+      not. The guard rewrites ``start.coords`` only and never ``end.coords``, which is the field
+      that propagates, and the exact turn-count match is the evidence that it does not perturb the
+      simulation.
+
+      **A HARNESS ERROR CAUGHT BY ITS OWN CONTROL, worth recording because it very nearly shipped
+      as a finding.** The first build ran all four arms sequentially in ONE process. That puts
+      "after" permanently last, so any accumulated state — mongomock writes, module caches — is
+      indistinguishable from an effect of the fix. It produced a **31-of-40 one-sided increase in
+      turns per game (+28.07 ± 13.57, apparently excluding zero)**, which reads exactly like a
+      systematic effect and is not one. Running one condition per interpreter removed it. Sequence
+      position is a confound whenever conditions share a process; the arms may, the conditions may
+      not.
+
+      **EQUIV-V3, DISTRIBUTIONAL. N=40 games per arm**, seeds 8000-8039, paired before/after on the
+      same seeds, 0 errors, free-throw invariant 99.5-99.9% on all eight arms
+      (``scratch_equiv3_fbdedupe.py``). Per-seed deltas are NOT reported and should not be quoted:
+      the perturbation is chaotic and runs both ways, so an individual seed's delta is noise. Only
+      the paired distribution is readable.
+
+      **What N=40 resolves** (paired, two-sided 95%, 80% power): **±2.1 to 2.3 points/team on the
+      played arm**, ±3.2 to 3.8 on the sim arm, ±1.3 to 2.4 possessions/game. Anything smaller than
+      that is below this harness's floor and more seeds would be needed to see it.
+
+      **⚠ THE PLAYS CATALOGUE MOVES SCORING BY ~20 POINTS/TEAM — far more than this fix — so it is
+      part of the reference's definition, not a harness detail.** The published 57.48 / 67.88 was
+      cut with ``plays_collection`` EMPTY, so every possession took the ``turn_manager.py:2969``
+      fallback and authored no off-ball skeleton. Both footings are therefore reported.
+
+      | | before | after | delta | paired 95% CI |
+      |---|---|---|---|---|
+      | **CATALOGUE EMPTY** — comparable with the published reference | | | | |
+      | points/team **[PLAYED]** | 56.11 | **56.33** | +0.21 | ±1.61 |
+      | points/team **[SIM]** | 64.33 | **67.33** | +3.00 | ±2.21 **resolved** |
+      | possessions/game [PLAYED] | 44.10 | 44.38 | +0.27 | ±0.89 |
+      | possessions/game [SIM] | 41.75 | 43.02 | +1.27 | ±1.80 |
+      | arm gap (sim − played), points | 8.21 | 11.00 | +2.79 | |
+      | **CATALOGUE SEEDED** — what a played game actually is | | | | |
+      | points/team **[PLAYED]** | 75.90 | **75.16** | −0.74 | ±1.50 |
+      | points/team **[SIM]** | 85.94 | **87.65** | +1.71 | ±2.67 |
+      | possessions/game [PLAYED] | 46.83 | 47.45 | +0.62 | ±1.64 |
+      | possessions/game [SIM] | 47.52 | 48.77 | +1.25 | ±1.72 |
+      | arm gap (sim − played), points | 10.04 | 12.49 | +2.45 | |
+
+      Reported, not judged — the balance call is Jamie's. Three observations that are measurement
+      facts rather than verdicts: **on the played arm nothing resolves on either footing**; the
+      only resolved move is sim scoring on the empty catalogue; and **21 of 40 seeds (empty) and 15
+      of 40 (seeded) are completely unchanged on the played arm**, which is the expected shape for
+      a defect that selected 6.5% of fast breaks.
+
+      **THE RE-CUT REFERENCE.** Cut at **``094f36ca2``**, which contains ``63eb72b6c`` (dedupe) and
+      ``a2fb4365c`` (§8.1 guard). Supersedes 57.48 played / 67.88 sim, which predates this fix.
+
+      > **REFERENCE, points per team, 2026-09-09, cut at ``094f36ca2``, equiv-v3, n=40, seeds
+      > 8000-8039, ``scratch_equiv3_fbdedupe.py``, Lancaster vs Bentley-Truman, all sliders 2 except
+      > ``hc_trap``/``fc_press`` 5:**
+      >
+      > - plays catalogue SEEDED — **[PLAYED] 75.16**, [SIM] 87.65, arm gap 12.49
+      > - plays catalogue EMPTY — **[PLAYED] 56.33**, [SIM] 67.33, arm gap 11.00
+      >
+      > **Tune against the SEEDED row.** The empty row exists only to be comparable with the
+      > superseded 57.48 / 67.88 and does not represent a real game — it is a fixture with no HCO
+      > plays catalogue.
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 

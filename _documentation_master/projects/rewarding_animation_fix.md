@@ -1197,6 +1197,41 @@ the two defects ahead of them are defect 2 and MISS.
 > The fixture seeding is clean in `157f8ff99` and these docs in `0fbc7331d`. Everything the commit
 > message *should* have said is in this section.
 
+
+> ### WHERE THE FAST-BREAK DEDUPE LANDED, AND HOW TO REVERT IT
+>
+> Recorded the same way as `a0d509173` above, and for the same reason: **the commit boundaries do
+> not match the logical boundaries, so a revert cannot be done one commit at a time.**
+>
+> | commit | message says | actually contains |
+> |---|---|---|
+> | `63eb72b6c` | the dedupe fix | `BackEnd/engine/rim_runner_step_emitter.py` — the dedupe **and the rim-runner §8.1 guard wiring** |
+> | `a2fb4365c` | the §8.1 guard | `after_steal_fast_break_step_emitter.py`, `covert_release_step_emitter.py`, `animation_step_helpers.py` (defines `enforce_step_start_continuity`), `tests/test_step_start_continuity.py` |
+> | `094f36ca2` | docs | `bugs.md` item 41 |
+>
+> **The guard is split across both commits — reverting `a2fb4365c` alone does not remove it**, it
+> removes its definition while leaving the rim-runner call site behind.
+>
+> **`63eb72b6c` DOES NOT BUILD ON ITS OWN.** It adds an unguarded top-level
+> `from BackEnd.utils.animation_step_helpers import enforce_step_start_continuity`, and that
+> function is not defined until `a2fb4365c`. Anything that checks out `63eb72b6c` and imports
+> `rim_runner_step_emitter` raises `ImportError`. The pair is atomic in practice; treat
+> `63eb72b6c..a2fb4365c` as one unit for revert, bisect, and cherry-pick alike.
+>
+> **To revert the BEHAVIOUR but keep the guard** — the likely want, since the guard is a verified
+> no-op — do not use git. Pass `post_shot_already_built=False` at
+> `rim_runner_step_emitter.py:2383`. That restores the double build and leaves the §8.1 merge and
+> its test in place. Note what that combination does, because it is the whole point of the policy
+> below: the guard will silently repair the teleports into smooth backwards slides and the defect
+> will measure **zero** while still being present. Read the `[UESS §8.1]` warnings, not the
+> continuity figure.
+>
+> **THIS CHANGE IS OUTCOME-AFFECTING and has had the full principle 8 treatment** — poison-stash,
+> distributional equiv-v3 at n=40, and a re-cut reference. See `bugs.md` item 42. The scoring
+> reference is now **[PLAYED] 75.16 / [SIM] 87.65 points per team, cut at `094f36ca2`**, which
+> supersedes 57.48 / 67.88. Anything tuned against the old pair was tuned against numbers this
+> change invalidates.
+
 The largest single item in this workstream by measured size, and the reframe matters more than
 the code: **the tail is a deliberate decision, not a bug, and the fix is to fill it rather than
 to remove it.**
