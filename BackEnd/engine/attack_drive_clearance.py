@@ -1419,6 +1419,46 @@ def build_attack_drive_sequence(
 
     steps: List[Dict[str, Any]] = [drive_step]
 
+    # ---- DIAGNOSTIC (temporary): drive-foul coord/name divergence -------------------
+    # Symptom under investigation: a drive that starts behind the arc and draws a foul
+    # renders as a THREE on screen while awarding two free throws. The FT count is
+    # coord-derived and correct; the question is what the EMITTER shipped.
+    #
+    # `_pos_action_for_target` prefers a named `location` and DISCARDS `coords`, so a
+    # stale name on the ball handler's target renders him at that spot's canonical
+    # coords instead of where he physically is. This logs both readings side by side
+    # whenever a drive ends in contact, which is the only case that can produce the
+    # symptom. Fires rarely (contact only), so it is safe at WARNING.
+    if drive_contact:
+        try:
+            _bh_action = drive_pos_actions.get(ball_handler_pos) or {}
+            _emitted_name = _bh_action.get("location")
+            _emitted_coords = _bh_action.get("coords")
+            _physical = (drive_end_by_pos.get(ball_handler_pos) or {}).get("coords")
+            _name_coords = (
+                _spot_display_coords(_emitted_name, is_away_offense)
+                if _emitted_name else None
+            )
+            def _three(c):
+                try:
+                    return is_three_point_shot_from_coords(c, is_away_offense=is_away_offense)
+                except Exception:
+                    return None
+
+            _rendered = _name_coords if _emitted_name else _emitted_coords
+            _phys_three, _rend_three = _three(_physical), _three(_rendered)
+            logging.warning(
+                "🔎 [DRIVE-FOUL COORDS] contact=%s tier=%s stop=%.2f bh=%s | "
+                "emitted=%s | rendered_at=%s three=%s | physical=%s three=%s | DIVERGENT=%s",
+                drive_contact, drive_tier, drive_stop_fraction, ball_handler_pos,
+                ("location:" + str(_emitted_name)) if _emitted_name else ("coords:" + str(_emitted_coords)),
+                _rendered, _rend_three, _physical, _phys_three,
+                (_phys_three is not None and _rend_three is not None and _phys_three != _rend_three),
+            )
+        except Exception:
+            logging.exception("[DRIVE-FOUL COORDS] diagnostic failed (non-fatal)")
+    # ---- end diagnostic ------------------------------------------------------------
+
     if driver_shoots and dish_target_pos is None:
         shoot_pos_actions = _stationary_pos_actions(drive_end_by_pos)
         shoot_pos_actions[ball_handler_pos] = _pos_action_for_target(
