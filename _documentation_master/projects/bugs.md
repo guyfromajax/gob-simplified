@@ -1358,6 +1358,46 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       the same step from different emitters and each only counts its own. Invisible until the
       arm bug above was fixed, because HCO never emitted on the sim arm.
 
+31. BLAST RADIUS of the PLAYED=1 shim bug (item 29) — audited 2026-09-09, no re-measurement yet
+
+      **MECHANICAL AUDIT.** 23 probes call `use_played_arm`. **NONE sets `PLAYED` internally and
+      NONE checks the returned bool** — the shim is opt-in from the command line, so the probe
+      source can never tell you which arm a figure came off. That is why this had to be settled
+      from preserved OUTPUT rather than from code.
+
+      What the source DOES show is a split in intent. 12 probes document `PLAYED=1` in their
+      usage line and 8 branch on `os.environ.get("PLAYED")`; the probes written during the
+      defect-2 session (`scratch_gate_settle`, `scratch_gate_curve`, `scratch_tails_miss`,
+      `scratch_famcensus`, `scratch_knotcount`, `scratch_legacy_reach`, `scratch_shapepeek`,
+      `scratch_survivors`) have **neither**. The earlier workstream knew about the flag. The
+      defect-2 session did not, and that is the boundary of the damage.
+
+      **THE ARM TEST USED HERE**, since no probe records its arm: on the sim arm
+      `build_skeleton_animation_steps` returns None at `skeleton_step_emitter.py:1606`, so HCO
+      emits almost nothing and **HCO idle-wander stamps are exactly zero**. Any preserved output
+      containing HCO stamps, or HCO-dominated step counts, is therefore played-arm. Scale is the
+      secondary test: ~17,700-19,800 player-steps per game on the played arm against ~8,000-10,000
+      on the sim arm.
+
+      | reported figure | probe | verdict | evidence |
+      |---|---|---|---|
+      | whole-step freeze census — 15,781 steps / 8 games, 16.3% freeze rate | `scratch_content.py` + `scratch_freeze.py` | **PLAYED — CLEAN** | `.arm/content_played_*` totals **exactly 15,781**. A companion `.arm/content_sim_*` set totals 6,350 and was NOT the figure published. `freeze_played` has turns_with_steps 1,954/1,987 = 98.3%; `freeze_sim` 1,701/3,158 = 53.9%. Both arms were deliberately run and correctly labelled. |
+      | per-player stillness — 45.6% (item 19) | `scratch_perplayer.py` | **PLAYED — CLEAN** | `.arm/pp_*`: still 64,669 of 141,738 player-steps = **45.6%**, exact. HCO is 118,540/141,738 = **83.6%**, which is the "HCO 83%" also quoted. Decisively, HCO carries `wander_now` 1,373 on seed 1 — HCO idle stamps cannot be non-zero on the sim arm. |
+      | continuity classification — 63,995 player-steps, ONE_STEP_JOURNEY 42.9% | `scratch_continuity.py` | **CITED FIGURE SUSPECT** | The preserved played-arm output `.arm/ease/live_*` totals **158,338** player-steps, with ONE_STEP_JOURNEY at 12.8% of all player-steps, 24.9% of moving ones, and 51.8% of journeys. **None of those is 42.9%**, and 63,995 is sim-arm scale (~8,000/game vs the artifact's 19,792/game). So a played-arm measurement of this exists and DISAGREES with what was published. |
+      | MISS re-keying — 15.9 s/game, ~79 visible still player-steps | `scratch_tails_miss.py` | **SIM — SUSPECT** | Defect-2 session probe: no `PLAYED` in usage, no internal guard, and the item 29 root cause applies directly. Same probe whose tail headline moved 703.4 -> 1,849.6 s/game when the arm was fixed. |
+      | item 23 lookup census — 619,038 lookups, 43 sites | `scratch_casecensus.py` | **UNDETERMINED — lower risk** | Output not preserved (`.arm/case/arc_*` is `scratch_arcresolve.py`, a different probe). The probe documents `PLAYED=1` AND carries an internal guard, so it was written arm-aware. Risk is limited because spot-name lookups sit on the RESOLUTION path, which runs on both arms; but any lookup inside an emitter would have been invisible on the sim arm, so the SITE LIST is what needs re-confirming, not the miss rate. |
+      | item 24 selector census — 12 calls, 4 collapsed | not `scratch_proximity_audit.py` | **UNDETERMINED — lower risk** | `.arm/prox/after_*` does NOT contain `select_defender_closest_to_victim`; it records three OTHER selectors (`attack_drive_clearance.py:317`, `fb_geo_helpers.py:249`, `fb_stop_decision.py:43`), all with 0 collapsed. The 12/4 figure came from an output that was not preserved. `select_defender_closest_to_victim` is on the resolution path so it runs on both arms, which caps the exposure. |
+
+      **NET: two clean, one published figure contradicted by its own artifact, one sim-arm, two
+      undetermined.** The two that drove the biggest shipped decisions — the freeze census and the
+      45.6% per-player stillness that redirected the idle wander — are both CLEAN, which is the
+      most important result here.
+
+      DO NOT re-measure any of these without deciding first which are worth it; the list is the
+      deliverable. Note when scoping that draw counts are NOT usable as a cross-era arm test:
+      `HCO_PASS_SAFETY_BASE` 175 -> 150 (11bbaa16a) moved them, so a 2026-09-08 probe cannot be
+      compared to a 2026-09-09 one by draws.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
