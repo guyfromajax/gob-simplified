@@ -748,6 +748,41 @@ export function buildSimTimeline(quarterSummaries, ctx = {}) {
     }
   }
 
+  // ---- DIAGNOSTIC (temporary): Mid-Game Resume -> Sim Rest -------------------------
+  // Two gates disagree at startQuarter === 1: line ~553 pushes a tip-off ZERO-STATE
+  // pretip frame when startQuarter <= 1, while line ~629 only seeds joinBaselineScore
+  // when startQuarter > 1. If a resume lands there, playback opens at 0-0 and the
+  // carried score arrives as ONE delta -- which the cadence reads as an "XX-0 run".
+  // This prints what the assembler actually produced so the path can be identified
+  // instead of inferred. Remove once the resume bug is fixed.
+  try {
+    const _f0 = frames[0] || null;
+    const _f1 = frames[1] || null;
+    const _sc = (f) => (f && f.score ? `${f.score.away}-${f.score.home}` : 'n/a');
+    const _jump = (_f0 && _f1 && _f0.score && _f1.score)
+      ? Math.max(
+          num(_f1.score.away) - num(_f0.score.away),
+          num(_f1.score.home) - num(_f0.score.home),
+        )
+      : null;
+    console.log(
+      '%c[SIM-RESUME DIAG] assembler',
+      'color:#f79420;font-weight:bold',
+      {
+        startQuarter,
+        startScore_primed: joinBaselineScore,          // null => primeScore() no-ops
+        pretipFrameEmitted: !!(_f0 && _f0.phase === 'pretip'),
+        frameCount: frames.length,
+        firstFrame: { phase: _f0 && _f0.phase, q: _f0 && _f0.quarter, score: _sc(_f0) },
+        secondFrame: { phase: _f1 && _f1.phase, q: _f1 && _f1.quarter, score: _sc(_f1) },
+        // A jump > 3 between the first two frames is the false-run signature.
+        firstDelta: _jump,
+        SUSPECT_FALSE_RUN: _jump !== null && _jump > 3,
+      },
+    );
+  } catch (e) { /* diagnostic must never break playback */ }
+  // ---- end diagnostic --------------------------------------------------------------
+
   return {
     teams,
     frames,

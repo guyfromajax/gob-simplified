@@ -3218,6 +3218,24 @@ export function createGameScene(Phaser) {
           // If the modal was skipped (don't-show-again, sim mode), music
           // starts immediately. Q1 opening tip is still deferred to the
           // tip-winner SFX in openingTip.js.
+          // ---- DIAGNOSTIC (temporary): music on Mid-Game Resume -> Sim Rest -------
+          // This is the ONLY gameplay-music start hook; simGamePresentation.js has
+          // no music of its own, so if this line is not reached on the resume path
+          // there is no track for the Sim Rest overlay to inherit. Logs whether the
+          // hook ran and which branch was taken. Remove once the resume bug is fixed.
+          console.log(
+            '%c[SIM-RESUME DIAG] music hook',
+            'color:#f79420;font-weight:bold',
+            {
+              reached: true,
+              isQ1Start,
+              willStartTrack: !isQ1Start,
+              quarter: this.quarter,
+              clock: urlParams.get('clock'),
+              score: `${urlParams.get('away_score')}-${urlParams.get('home_score')}`,
+            },
+          );
+          // ---- end diagnostic ------------------------------------------------------
           if (!isQ1Start) {
             evaluateGameplayTrack({
               quarter: this.quarter,

@@ -1088,6 +1088,19 @@ export function showSimGamePresentation(timeline, opts = {}) {
     });
     // Copy loads asynchronously. Prime from what is actually on screen if playback
     // has moved; otherwise use the assembler's exact Sim Rest quarter-boundary score.
+    // ---- DIAGNOSTIC (temporary): what the cadence baseline actually got ------------
+    // primeScore() no-ops on a falsy score. If BOTH sources are empty the cadence
+    // starts with lastScore = null and the first carried score is read as a run.
+    const _primeSrc = (lastRenderedFrame && lastRenderedFrame.score)
+      ? 'lastRenderedFrame'
+      : ((meta && meta.startScore) ? 'meta.startScore' : 'NONE');
+    const _primeVal = (lastRenderedFrame && lastRenderedFrame.score) || (meta && meta.startScore);
+    console.log(
+      '%c[SIM-RESUME DIAG] primeScore',
+      'color:#f79420;font-weight:bold',
+      { source: _primeSrc, value: _primeVal || null, WILL_NOOP: !_primeVal },
+    );
+    // ---- end diagnostic ------------------------------------------------------------
     cadence.primeScore((lastRenderedFrame && lastRenderedFrame.score) || (meta && meta.startScore));
     cadence.suspend(!highlightsOn);
     root.__cadence = cadence;
