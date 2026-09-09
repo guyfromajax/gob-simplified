@@ -3750,7 +3750,43 @@ def sync_lineup_coords_from_turn(game: Any, turn_result: Dict[str, Any]) -> None
     # new schema takes precedence when a turn carries both.
     animation_steps = turn_result.get("animation_steps")
     if isinstance(animation_steps, list) and animation_steps:
-        last_step = animation_steps[-1] if animation_steps[-1] else None
+        # Drawable only. ``animation_steps[-1]`` is the array tail; the renderer
+        # stops at the first ``turn_stop`` (animationPlayback.js playTurn).
+        # Reading the tail is how item 41 seeded the next turn from a step
+        # nobody drew. When they disagree this announces (policy 26b) and
+        # still reads the drawn step — it does not rewrite the extra steps.
+        from BackEnd.utils.animation_step_helpers import (
+            last_rendered_step,
+            _coord_tail_delta_ft,
+        )
+
+        drawn_idx, last_step = last_rendered_step(animation_steps)
+        tail_idx = len(animation_steps) - 1
+        if (
+            drawn_idx is not None
+            and drawn_idx != tail_idx
+            and isinstance(last_step, dict)
+        ):
+            worst, moved = _coord_tail_delta_ft(
+                last_step, animation_steps[tail_idx]
+            )
+            logging.warning(
+                "[UESS UNRENDERED] coord sync skipped undrawn tail%s: "
+                "last_rendered=%d array_tail=%d extra=%d worst_delta=%.2f ft "
+                "moved_players=%d",
+                (
+                    " %s/%s"
+                    % (
+                        turn_result.get("current_turn") or "?",
+                        turn_result.get("result_type") or "?",
+                    )
+                ),
+                drawn_idx,
+                tail_idx,
+                tail_idx - drawn_idx,
+                worst,
+                moved,
+            )
         if isinstance(last_step, dict):
             last_end_coords = (last_step.get("end") or {}).get("coords") or {}
             if isinstance(last_end_coords, dict):

@@ -14,7 +14,8 @@ stretched across the gating player's step duration. See
 """
 
 from BackEnd.utils.sim_random import sim_rng as random
-from typing import Any, Dict, List, Optional, Tuple
+import logging
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from BackEnd.constants.announcement_constants import ANNOUNCEMENT_FREEZE_HOLD_MS
 from BackEnd.utils.animation_step_schema import GridCoord, PlayerAction, PlayerArchetype
@@ -513,7 +514,14 @@ def build_final_ball_handler_id(turn_result: Dict[str, Any]) -> Optional[str]:
 
     steps = turn_result.get("animation_steps")
     if isinstance(steps, list) and steps:
-        last = steps[-1]
+        drawn_idx, last = last_rendered_step(steps)
+        if drawn_idx is not None and drawn_idx != len(steps) - 1:
+            logging.warning(
+                "[UESS UNRENDERED] final_ball_handler_id skipped undrawn tail: "
+                "last_rendered=%d array_tail=%d",
+                drawn_idx,
+                len(steps) - 1,
+            )
         if isinstance(last, dict):
             end_ball = (last.get("end") or {}).get("ball") or {}
             if isinstance(end_ball, dict):
@@ -567,7 +575,14 @@ def build_final_ball_coords(
     steps = turn_result.get("animation_steps")
     if not (isinstance(steps, list) and steps):
         return None
-    last = steps[-1]
+    drawn_idx, last = last_rendered_step(steps)
+    if drawn_idx is not None and drawn_idx != len(steps) - 1:
+        logging.warning(
+            "[UESS UNRENDERED] final_ball_coords skipped undrawn tail: "
+            "last_rendered=%d array_tail=%d",
+            drawn_idx,
+            len(steps) - 1,
+        )
     if not isinstance(last, dict):
         return None
     end = last.get("end") or {}
@@ -1325,3 +1340,236 @@ def enforce_step_start_continuity(
                 cur_coords[pid] = dict(pe)
                 fixed += 1
     return fixed
+
+
+# --- Unrendered-tail + §8.4 ball-owner seam ---------------------------------
+# Both are log-and-assert. They do not rewrite steps. A silent repair here is
+# the item 41 failure mode: the defect measures zero and the investigation ends.
+
+
+def rendered_step_indices(
+    steps: Optional[Sequence[Any]],
+    *,
+    max_guard: int = 200,
+) -> List[int]:
+    """Mirror ``animationPlayback.js playTurn``: follow ``end.next`` from index 0
+    and stop at the first ``turn_stop`` / ``end_of_turn``. Returns the indices
+    the renderer actually executes, in order.
+    """
+    if not isinstance(steps, list) or not steps:
+        return []
+    i, n, seen, order = 0, 0, set(), []
+    while 0 <= i < len(steps) and n < max_guard:
+        step = steps[i]
+        if not isinstance(step, dict):
+            break
+        if i in seen:
+            break
+        seen.add(i)
+        order.append(i)
+        n += 1
+        nxt = (step.get("end") or {}).get("next")
+        if not isinstance(nxt, dict):
+            break
+        kind = nxt.get("kind")
+        if kind in ("turn_stop", "end_of_turn"):
+            break
+        if kind == "next_step":
+            j = nxt.get("index")
+            if j == i or j is None:
+                i = i + 1
+            else:
+                i = int(j)
+        elif kind == "branch":
+            i = int(nxt.get("next_step_index", i + 1))
+        else:
+            break
+    return order
+
+
+def last_rendered_step_index(
+    steps: Optional[Sequence[Any]],
+    *,
+    max_guard: int = 200,
+) -> Optional[int]:
+    """Index of the last step ``playTurn`` draws, or None if it draws none."""
+    order = rendered_step_indices(steps, max_guard=max_guard)
+    return order[-1] if order else None
+
+
+def last_rendered_step(
+    steps: Optional[Sequence[Any]],
+) -> Tuple[Optional[int], Optional[Dict[str, Any]]]:
+    """``(index, step)`` for the last drawable step. ``(-1, steps[-1])`` is the
+    array tail and is NOT a substitute — that is the item 41/42 defect.
+    """
+    if not isinstance(steps, list) or not steps:
+        return None, None
+    idx = last_rendered_step_index(steps)
+    if idx is None or not (0 <= idx < len(steps)) or not isinstance(steps[idx], dict):
+        return None, None
+    return idx, steps[idx]
+
+
+def _coord_tail_delta_ft(
+    drawn: Optional[Dict[str, Any]],
+    tail: Optional[Dict[str, Any]],
+) -> Tuple[float, int]:
+    """Worst per-player end-coord distance (grid-ft) between two steps."""
+    if not isinstance(drawn, dict) or not isinstance(tail, dict):
+        return 0.0, 0
+    rc = (drawn.get("end") or {}).get("coords") or {}
+    ac = (tail.get("end") or {}).get("coords") or {}
+    worst, moved = 0.0, 0
+    if not isinstance(rc, dict) or not isinstance(ac, dict):
+        return 0.0, 0
+    for pid in set(rc) & set(ac):
+        a, b = rc[pid], ac[pid]
+        if not (isinstance(a, dict) and isinstance(b, dict)):
+            continue
+        try:
+            dd = (
+                (float(a.get("x", 0.0)) - float(b.get("x", 0.0))) ** 2
+                + (float(a.get("y", 0.0)) - float(b.get("y", 0.0))) ** 2
+            ) ** 0.5
+        except (TypeError, ValueError):
+            continue
+        if dd > 1e-6:
+            moved += 1
+        worst = max(worst, dd)
+    return worst, moved
+
+
+def announce_unrendered_tail(
+    steps: Optional[List[Dict[str, Any]]],
+    *,
+    context: str = "",
+) -> int:
+    """Assert no array slot sits after the terminal ``turn_stop``.
+
+    Log only — the extra steps are left in place so a census can still see
+    them. Returns the number of undrawn tail slots. Policy 26b: names the
+    last drawn index, the array tail, and the coordinate delta the sync
+    would have ingested.
+    """
+    if not isinstance(steps, list) or not steps:
+        return 0
+    drawn_idx = last_rendered_step_index(steps)
+    tail_idx = len(steps) - 1
+    if drawn_idx is None or drawn_idx == tail_idx:
+        return 0
+    extra = tail_idx - drawn_idx
+    worst, moved = _coord_tail_delta_ft(steps[drawn_idx], steps[tail_idx])
+    logging.warning(
+        "[UESS UNRENDERED] emitter produced steps after turn_stop%s: "
+        "last_rendered=%d array_tail=%d extra=%d worst_delta=%.2f ft "
+        "moved_players=%d",
+        (" " + context) if context else "",
+        drawn_idx,
+        tail_idx,
+        extra,
+        worst,
+        moved,
+    )
+    return extra
+
+
+def attached_owner_id(ball: Any) -> Optional[str]:
+    """Frontend ``isBallAttached``: the KEY's presence, not its truthiness.
+
+    Returns None when the ball is not attached (key absent / no ball object).
+    Returns ``""`` for the empty-string owner (item 44). Those two must not
+    collapse — collapsing them is how a comparison becomes a tautology.
+    """
+    if not isinstance(ball, dict):
+        return None
+    if "owner_player_id" not in ball:
+        return None
+    owner = ball.get("owner_player_id")
+    if owner is None:
+        return ""
+    return str(owner)
+
+
+def _step_transfer_label(step: Optional[Dict[str, Any]]) -> Optional[str]:
+    """Name an authored transfer beat, or None. Used in the announcement so a
+    seam swap sitting on a fumble/steal/rebound/pass is distinguishable from a
+    naked swap — it does NOT exempt the swap. Accounting is a within-step
+    owner change or a BallInFlight, per UESS §8.4 invariant 2.
+    """
+    if not isinstance(step, dict):
+        return None
+    start = step.get("start") or {}
+    end = step.get("end") or {}
+    flourish = start.get("flourish") if isinstance(start, dict) else None
+    if isinstance(flourish, dict):
+        for payload in flourish.values():
+            if isinstance(payload, dict) and payload.get("kind") == "fumble":
+                return "fumble"
+    nxt = end.get("next") if isinstance(end, dict) else None
+    if isinstance(nxt, dict) and nxt.get("kind") == "turn_stop":
+        event = str(nxt.get("event") or "").upper()
+        if event in ("STEAL", "DEAD_BALL_TURNOVER", "DEAD_BALL", "TURNOVER"):
+            return event.lower()
+        if event in ("SHOT_ATTEMPT", "MAKE", "MISS"):
+            return "shot"
+    trigger = start.get("advance_trigger") if isinstance(start, dict) else None
+    if isinstance(trigger, dict):
+        cond = str(trigger.get("condition") or "")
+        if cond in ("ball_reaches_player", "player_reaches_position", "dead_ball_fumble"):
+            return cond
+    actions = start.get("action") if isinstance(start, dict) else None
+    if isinstance(actions, dict):
+        for act in actions.values():
+            if str(act) in ("pass", "pass_ball", "make_pass", "receive"):
+                return "pass"
+    return None
+
+
+def announce_ball_owner_seam(
+    steps: Optional[List[Dict[str, Any]]],
+    *,
+    context: str = "",
+    family: str = "",
+) -> int:
+    """UESS §8.4 invariant 2: an attached-owner change across a step seam is a
+    teleport. The FE does not tween seams (``setPosition`` snap).
+
+    A change is accounted for only when it happens WITHIN a step (start A,
+    end B) or via ``BallInFlight``. A fumble/steal/rebound/pass *label* on
+    the later step does not exempt a seam swap — that is item 47: the
+    turnover beat starts already attached to the new man.
+
+    Log only. Does not rewrite ``owner_player_id``. Returns the violation count.
+    """
+    order = rendered_step_indices(steps)
+    if len(order) < 2:
+        return 0
+    fam = family or context or "?"
+    violations = 0
+    for a_idx, b_idx in zip(order, order[1:]):
+        prev_end = attached_owner_id(((steps[a_idx].get("end") or {}).get("ball")))
+        cur_start = attached_owner_id(((steps[b_idx].get("start") or {}).get("ball")))
+        if prev_end is None or cur_start is None:
+            continue
+        if prev_end == cur_start:
+            continue
+        violations += 1
+        label = _step_transfer_label(steps[b_idx]) or "none"
+        logging.warning(
+            "[UESS 8.4] unaccounted owner change%s: step %d->%d "
+            "end_owner=%s start_owner=%s family=%s beat=%s",
+            (" " + context) if context else "",
+            a_idx,
+            b_idx,
+            json_owner(prev_end),
+            json_owner(cur_start),
+            fam,
+            label,
+        )
+    return violations
+
+
+def json_owner(owner: str) -> str:
+    """Quote empty-string owners so they do not render as nothing."""
+    return '""' if owner == "" else owner

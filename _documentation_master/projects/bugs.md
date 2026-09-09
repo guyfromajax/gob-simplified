@@ -1318,6 +1318,22 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       games" for exactly this reason. A future session reading only "100% continuous" would learn
       nothing about whether the defect had returned.
 
+26c. POLICY, adopted 2026-09-09 — a comparison that returns 100% agreement deserves the
+    same suspicion as one that returns zero
+    - The companion to the PLAYED-arm rule (item 31) and to 26b. A detector that reports
+      zero and a detector that never ran look identical; a comparison that reports 100%
+      agreement and a comparison of two names for the same local look identical too.
+    - THIS IS NOT HYPOTHETICAL. Items 43, 44 and 46 each compared ball owner against TO
+      credit (or text) on dead-ball turns. ``build_dead_ball_fumble_step``
+      (``dead_ball_fumble.py:149`` and ``:159``) writes the fumble step's
+      ``owner_player_id`` AND its flourish key from the same ``ball_handler_id`` local, so
+      those two agree by construction whether or not the id is right. All three passes
+      measured a tautology and reported it as a clean result. Item 47 only became visible
+      once the comparison moved to the *anchor* step, which is not written from that local.
+    - WHAT THIS REQUIRES: before believing a perfect score, check whether both sides of the
+      comparison derive from the same expression. If they do, the instrument is void and
+      the next comparison has to be against a field that *can* disagree.
+
 27. CLOSED — both proposed mechanisms for symptom #3 are eliminated. Do not re-derive them.
     - Symptom #3 is Jamie's long-standing report that TURNOVERS ARE ATTRIBUTED TO THE WRONG BALL
       HANDLER. Two mechanisms were proposed on separate evidence and both are now dead. Recorded
@@ -2169,23 +2185,17 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       > superseded 57.48 / 67.88 and does not represent a real game — it is a fixture with no HCO
       > plays catalogue.
 
-      **THE MECHANISM IS LATENT EVERYWHERE ELSE — measured, not assumed. GUARD NOT YET BUILT.**
-      ``sync_lineup_coords_from_turn`` (``shared.py:3752``) reads
-      ``animation_steps[-1].end.coords`` — the last step in the ARRAY. The renderer does not walk
-      the array: it follows ``end.next`` pointers from index 0 and stops at the first
-      ``turn_stop`` (``animationPlayback.js:1680``), so the two can disagree and the sync **cannot
-      currently distinguish a drawn step from an undrawn one at all.** Censused across 8 played
-      games and 2,572 turns by mirroring the pointer walk exactly (``scratch_unrendered.py``):
-
-      | HCO | DREB | SIDE_INBOUND | FREE_THROW | OREB | FCP | HCT | BASELINE_INBOUND | FAST_BREAK |
-      |---|---|---|---|---|---|---|---|---|
-      | 1356 | 381 | 222 | 175 | 163 | 88 | 70 | 66 | 51 |
-
-      **0 tail mismatches and 0 unreached steps in every family.** The detector is not vacuous:
-      appending one ghost step after the terminal ``turn_stop`` produces **311 detections**. So
-      the item 41 instance really is closed everywhere today, and the mechanism — an emitter may
-      append after ``turn_stop``, and the sync will read it as the turn's final position —
-      remains **unguarded**. Building that guard is scoped and outstanding, not done.
+      **THE MECHANISM IS LATENT EVERYWHERE ELSE — measured, not assumed. GUARD NOW BUILT
+      (item 48).** The 2026-09-09 census (``scratch_unrendered.py``, 8 played games, 2,572
+      turns) found **0 tail mismatches**. The detector was not vacuous: appending one ghost
+      step after the terminal ``turn_stop`` produced **311 detections**. The instance was
+      closed; the mechanism — an emitter may append after ``turn_stop``, and a reader of
+      ``animation_steps[-1]`` will treat it as the turn's final position — was unguarded
+      until item 48. ``last_rendered_step_index`` now mirrors the ``playTurn`` walk;
+      ``sync_lineup_coords_from_turn``, ``build_final_ball_handler_id`` and
+      ``build_final_ball_coords`` read the drawn step; a disagreement announces
+      ``[UESS UNRENDERED]`` and does not rewrite the extra steps (policy 26b). Re-censused
+      on the same 8-seed footing after the guard: still **0 extra slots**.
 
 43. **SYMPTOM #3 (wrong ball handler on dead-ball turnovers) — NOT REPRODUCED where Jamie sees
       it, and the coverage hole is the honest answer.** 2026-09-09, played arm, PLAYED=1,
@@ -2509,6 +2519,71 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       walk), or the handover is real and simply needs authoring as a pass. **Which one is right
       is not established here** and wants its own scoping — deciding it requires knowing whether
       the HCO walk intended the SF to have the ball at that moment.
+
+      **CLASS SIZE, 2026-09-09 (item 48).** The §8.4 seam guard makes this visible as a class,
+      not an instance. Item 47's 8 HCO fumbles are **8 of 92** unaccounted attached-owner
+      seam swaps across 16,925 rendered pairs (0.54%) in 8 played games. The other 84 sit
+      on STEAL (39), ``player_reaches_position`` beats (46, mostly HCO/HCT shot families),
+      and 10 unlabeled HCO/STEAL "loose ball" recoveries. A fumble-only authoring fix
+      addresses the instance Jamie saw and leaves the class. Scope the fix against that
+      number, not against 8 of 50.
+
+48. **TWO GUARDS LANDED — unrendered tails (item 42) and the §8.4 ball-owner seam
+      (item 47's class).** 2026-09-09, played arm, PLAYED=1, 8 games. Log-and-assert,
+      no repair. ``scratch_ballseam.py``, ``tests/test_unrendered_and_ball_seam.py``.
+
+      **UNRENDERED TAIL.** ``rendered_step_indices`` /
+      ``last_rendered_step_index`` (``animation_step_helpers.py``) mirror
+      ``animationPlayback.js playTurn``. ``announce_unrendered_tail`` fires at
+      ``GameManager._append_turn``. ``sync_lineup_coords_from_turn``,
+      ``build_final_ball_handler_id`` and ``build_final_ball_coords`` read the last
+      *drawn* step, not ``steps[-1]``. When they disagree they announce
+      ``[UESS UNRENDERED]`` with last_rendered, array_tail, extra count, worst
+      coordinate delta and moved-player count, and they still do not delete the
+      extra steps. Poison: a ghost step 12 ft off after ``turn_stop`` — the warn
+      names index 0 vs 1 and 12.00 ft; sync writes the drawn coord, not the ghost.
+      Live rate: **0 extra slots on 2,572 turns**, same as the pre-guard census.
+
+      **§8.4 SEAM.** ``announce_ball_owner_seam``: an attached owner at step N
+      ``end`` that does not equal the attached owner at step N+1 ``start`` is a
+      teleport. The FE snaps at seams (``setPosition``); a change is accounted for
+      only *within* a step or via ``BallInFlight``. A fumble/steal/rebound *label*
+      on the later step does not exempt the swap — that is item 47. Announce names
+      the step pair, both owners, the turn family and the beat label. Does not
+      rewrite ``owner_player_id``. Poison: item 47's shape (SF → PG across the
+      fumble seam) fires and names both; the ids are left intact.
+
+      **VIOLATION RATE, 8 games, 2,572 turns with steps, 16,925 rendered pairs:**
+
+      | | n | rate |
+      |---|---|---|
+      | seam swaps (the class) | **92** | **0.54% of pairs** |
+      | within-step transfers (accounted) | 1,867 | — |
+      | unrendered extra slots | 0 | 0 |
+
+      | family | turns | pairs | swaps | % pairs | beat on the swap |
+      |---|---|---|---|---|---|
+      | HCO/STEAL | 95 | 675 | 27 | 4.0% | steal 17, none 10 |
+      | HCO/MISS | 465 | 5442 | 17 | 0.3% | player_reaches_position 17 |
+      | HCT/HCO | 19 | 88 | 9 | 10.2% | player_reaches_position 9 |
+      | HCO/DEAD BALL | 103 | 747 | **8** | 1.1% | **fumble 8** — item 47 |
+      | HCT/STEAL | 9 | 42 | 8 | 19.0% | steal 7, player_reaches_position 1 |
+      | HCO/MAKE | 349 | 4313 | 5 | 0.1% | player_reaches_position 5 |
+      | HCT/FOUL | 21 | 67 | 4 | 6.0% | player_reaches_position 4 |
+      | FCP/STEAL | 10 | 51 | 4 | 7.8% | steal 4 |
+      | HCT/DEAD BALL | 11 | 65 | 4 | 6.2% | player_reaches_position 4 |
+      | HCT/MAKE | 4 | 49 | 3 | 6.1% | player_reaches_position 3 |
+      | HCT/MISS | 6 | 66 | 2 | 3.0% | player_reaches_position 2 |
+      | HCO/BLOCK | 161 | 1493 | 1 | 0.1% | player_reaches_position 1 |
+
+      Zero on DREB, OREB, FREE_THROW, both inbound families, FCP non-steal, FAST_BREAK,
+      HCO/FOUL, HCO/CHARGE. Poison fired on 8/8 seeds.
+
+      **WHAT THIS DOES TO ITEM 47.** The 8 fumbles are real and they are 8.7% of the
+      class. Steals (39) and ``player_reaches_position`` shot-family seams (46) are
+      larger. A fix that authors a pass on the fumble beat, or that restales the
+      anchor to the PG, closes the instance Jamie recorded and leaves 84 others.
+      That is the number the design decision is made against.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

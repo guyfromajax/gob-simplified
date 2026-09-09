@@ -928,6 +928,19 @@ class GameManager:
                 logging.error(f"⚠️ Team fouls/timeouts stamp failed: {e}")
 
         if isinstance(turn_result, dict):
+            steps = turn_result.get("animation_steps")
+            if isinstance(steps, list) and steps:
+                from BackEnd.utils.animation_step_helpers import (
+                    announce_ball_owner_seam,
+                    announce_unrendered_tail,
+                )
+
+                fam = "%s/%s" % (
+                    turn_result.get("current_turn") or "?",
+                    turn_result.get("result_type") or "?",
+                )
+                announce_unrendered_tail(steps, context=fam)
+                announce_ball_owner_seam(steps, context=fam, family=fam)
             sync_lineup_coords_from_turn(self, turn_result)
 
         # Universal end-of-turn stamps. Read by cross-turn bridges (Handoff,
