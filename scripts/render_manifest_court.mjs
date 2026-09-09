@@ -116,7 +116,8 @@ function hardwoodOverlay(kind, base) {
   fail(`Unknown hardwood: ${kind}`);
 }
 
-function reflectionOverlay(slug, hardwood, force = false) {
+function reflectionOverlay(slug, hardwood, force = false, suppress = false) {
+  if (suppress) return [];
   if (!force && !["gloss", "alternating_board", "parquet"].includes(hardwood)) return [];
   let hash = 0;
   for (const char of slug) hash = ((hash * 31) + char.charCodeAt(0)) >>> 0;
@@ -168,7 +169,7 @@ if ((assignment.center_court === "team_logo" || assignment.non_center_logos !== 
 if ((assignment.center_court === "team_wordmark" || wingWordmarks.some((entry) => entry.text_source === "mascot_name")) && !existsSync(wordmark)) fail(`Missing wordmark: ${wordmark}`);
 if (wingWordmarks.some((entry) => entry.text_source === "school_name") && !existsSync(schoolName)) fail(`Missing school name: ${schoolName}`);
 
-const args = [base, ...hardwoodOverlay(assignment.hardwood, base), ...reflectionOverlay(slug, assignment.hardwood, assignment.force_reflections)];
+const args = [base, ...hardwoodOverlay(assignment.hardwood, base), ...reflectionOverlay(slug, assignment.hardwood, assignment.force_reflections, assignment.suppress_reflections)];
 
 const centerOffset = assignment.center_offset || { x: 0, y: 0 };
 const centerGeometry = `${centerOffset.x >= 0 ? "+" : ""}${centerOffset.x}${centerOffset.y >= 0 ? "+" : ""}${centerOffset.y}`;
