@@ -63,6 +63,8 @@
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 2. Still missing EOQ perfection
 2a. Fast Break animation is still sloppy and inconsistent
+2b. Still reading fouled 3 pt attempts as 2 pt shots in some instances
+2c. some HCO turnovers are still mismatched on BE and FE as to who the ball handler is. Note teh BE logic + turnover animation jiggle are synced, but sometimes a different player is holding teh ball.
 3. OPEN — a shooting foul hands off to FREE_THROW but no FREE_THROW turn follows (~0.5/game)
    - Surfaced while measuring the fouled-3PT free-throw misaward (fixed 2026-09-07, see below).
      After that fix the residual misaward rate is entirely this family: 6 of 221 fouled attempts
@@ -886,19 +888,45 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       family.~~ **SUPERSEDED 2026-09-08 — the 30.9% was keyed on the wrong field and the real
       population is much smaller.** That figure came from `offensive_state`, which lives on
       `game_state` and **never reaches the turn dict**, so it was never selecting the population
-      it claimed to. Re-keyed on `turn["result_type"] == "MISS"`, the family is **15.9 s of
-      animation per game**, of which roughly **79 visible still player-steps over 4.8 s** occur
-      while the ball is loose. That is one of the SMALLEST remaining items, not the largest.
-      The exclusion below is still correct — an idle loop is the wrong fix — but it is no longer
-      a large one, and the ranking that follows from it changed accordingly. It was deliberately
+      it claimed to. Re-keyed on `turn["result_type"] == "MISS"`, ~~the family is 15.9 s of
+      animation per game, of which roughly 79 visible still player-steps over 4.8 s occur while
+      the ball is loose. That is one of the SMALLEST remaining items, not the largest.~~
+    - **THE RE-KEY WAS ITSELF MEASURED ON THE SIM ARM. CORRECTED 2026-09-09** (items 29 and 31;
+      probe `scratch_tails_miss.py`, re-run with `PLAYED=1`, 8 seeds, detectors verified firing).
+      MISS is the family the shim bug distorts MOST, because HCO is 83% of played steps and
+      near-absent on the sim arm, so the sim run was measuring a different population: 522 MISS
+      steps across 8 games against a real 6,129.
+
+      | claim | published (SIM) | corrected (PLAYED) | factor |
+      |---|---|---|---|
+      | total MISS animation | 15.9 s/game | **247.0 s/game** | 15.5x |
+      | still MISS player-steps | 2,098 | 30,930 (3,866/game) | 14.7x |
+      | frozen MISS steps | 3 across 8 games | 928 | 309x |
+      | frozen AND content-free | 1 across 8 games | 636 (79.5/game) | 636x |
+      | visible loose-ball slice | ~79 player-steps/game over 4.8 s | **782/game over 39.8 s** | 9.9x / 8.3x |
+
+      **THIS REVERSES A LIVE DECISION.** "One of the SMALLEST remaining items" was the basis for
+      ranking MISS 4th of 4, below the `bounce` beat and below the design work. At 39.8 s/game of
+      visible loose-ball stillness it is the LARGEST remaining defect after defect 2, and it is
+      re-ranked 3rd in `rewarding_animation_fix.md`. Nothing had been built on the wrong number,
+      which is the only reason this is a correction and not a rework.
+
+      **WHAT SURVIVES.** The destination split still reads **0.0% `elsewhere`** (56.9% no
+      destination, 43.1% already there, against a published 50.2/49.8/0.0), so the authoring-
+      absence diagnosis and the no-idle-here exclusion are both untouched. Only the size moved —
+      but it moved in the direction that changes what we do next. It was deliberately
       EXCLUDED from the idle-wander stillness work (commits below) and that exclusion is the
       point of this entry, not an oversight.
     - Also established by the re-key: the stillness is **authored**, not a failure to reach a
       destination — there are no unreached destinations in the population. 1,073 player-steps
       (51.1% of still MISS players) are `stationary`/`guard_offball` while the ball is loose,
-      which is the indefensible half; `shoot`, `pass`/`receive` and pre-release stillness are
-      defensible. The fix is therefore authored movement, which is expensive, and it ranks
-      below the design work rather than above it.
+      which is the indefensible half. **CORRECTED on the played arm: 11,511 such player-steps
+      (1,439/game), 37.2% of all still MISS player-steps and 95.6% of the loose-ball still
+      population** — so the indefensible half is 10.7x larger than published and is now almost
+      the entire loose-ball population rather than half of it. `shoot`, `pass`/`receive` and
+      pre-release stillness remain the defensible remainder. The fix is therefore authored
+      movement, which is expensive — but on the corrected size it ranks ABOVE the design work,
+      not below it.
     - WHY IT IS DIFFERENT FROM THE FAMILIES THAT WERE STAMPED. Free throws, inbounds, dead
       balls and the post-make hold are static basketball moments: play is stopped and men
       standing in place is correct, so a render-space weight shift is the honest fix. A MISS is
@@ -1393,8 +1421,44 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       45.6% per-player stillness that redirected the idle wander — are both CLEAN, which is the
       most important result here.
 
-      DO NOT re-measure any of these without deciding first which are worth it; the list is the
-      deliverable. Note when scoping that draw counts are NOT usable as a cross-era arm test:
+      **RE-RUN 2026-09-09, three of the six.** Chosen by decision-relevance rather than by size
+      of the discrepancy: could a corrected number still change what we DO next. All three ran
+      `PLAYED=1`, 8 seeds, one game per process, `PYTHONHASHSEED=0`, detectors verified firing
+      (`SELFTEST detector_ok=True` on both censuses), and with a null control — the `SILENT=1`
+      arm produced byte-identical draw counts to the live arm, so the probes do not perturb the
+      sim.
+
+      | figure | published (SIM) | corrected (PLAYED) | changes a DECISION, or only the RECORD? |
+      |---|---|---|---|
+      | MISS re-keying | 15.9 s/game; ~79 visible player-steps over 4.8 s | **247.0 s/game; 782 visible player-steps over 39.8 s** | **DECISION.** MISS was ranked last of four as "one of the smallest remaining items". It is the largest remaining defect after defect 2 and is re-ranked 3rd. See item 19. |
+      | item 23 lookup census | 619,038 lookups, 43 sites, **0 crossings** -> LATENT | 643,746 lookups, 42 sites, **0 crossings** -> still LATENT | **RECORD only, and the decision is CONFIRMED.** The decisive field is unchanged at zero on the real arm, so the choice not to sweep the 26 fabricating-fallback sites stands on played-arm evidence rather than sim-arm evidence. |
+      | continuity classification | 63,995 player-steps, ONE_STEP_JOURNEY 42.9% | 164,640 player-steps; ONE_STEP_JOURNEY 12.4% of all, 24.8% of moving, 51.9% of journeys | **RECORD only.** The easing assigns curves from continuity at runtime; the measurement only described it, so a wrong description never produced wrong code. Corroborates the preserved `.arm/ease` artefact (158,338 / 12.8%) rather than the published figure. |
+
+      NOT re-run, deliberately: the freeze census and the 45.6% stillness figure, both already
+      shown CLEAN above; and item 24, which is fixed and outcome-neutral either way.
+
+      **THE INSTRUMENT IS NOW HARDENED** (`scratch_playedarm.py`, 2026-09-09):
+      - `use_played_arm` RAISES unless `PLAYED` is explicitly `1` or `0`, naming the fix in the
+        message. Running the sim arm is still allowed but must be asked for (`PLAYED=0`, or
+        `use_sim_arm`), never defaulted into. Poisoned: the raise fires on unset AND on a
+        plausible typo (`PLAYED=yes`).
+      - Every probe's `OUT` json is stamped with `played_arm`, recorded at the point the switch
+        takes effect rather than inferred afterwards. It patches `json.dump` only, and only for
+        the file named by `OUT`, so nothing else in the process is affected. The field is
+        `played_arm` and not `arm` because `scratch_tails_miss.py` already uses `arm` for its own
+        live/no-tweens contrast.
+      - **ANY PRESERVED JSON WITH NO `played_arm` FIELD PREDATES THIS AND MUST BE READ AS ARM
+        UNKNOWN — not as played.** Every artefact currently under `.arm/` except `.arm/rerun/`
+        is in that category.
+
+      A TRAP WORTH NAMING, hit during this very re-run: `SILENT=1` is the NULL CONTROL in
+      `scratch_casecensus.py` and `scratch_continuity.py` — it makes the recorder return without
+      recording. Passing it to reduce log noise produced a clean-looking run with an empty
+      counter, which is exactly the "detector reported zero / detector never ran" ambiguity item
+      29 was about. It was caught only because the output carried `keys: {}`. Probes should not
+      overload a word that means "be quiet" onto a switch that means "measure nothing".
+
+      DO NOT re-measure the remaining three without deciding first that they are worth it. Note when scoping that draw counts are NOT usable as a cross-era arm test:
       `HCO_PASS_SAFETY_BASE` 175 -> 150 (11bbaa16a) moved them, so a 2026-09-08 probe cannot be
       compared to a 2026-09-09 one by draws.
 

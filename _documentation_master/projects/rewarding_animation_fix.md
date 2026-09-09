@@ -886,8 +886,38 @@ to 16 steps and a quintile is not comparable between them:
 | 4 off the rim (`bounce`) | 51 (9.8%) | 5.3 | 300 ms | 12.0% |
 | 5 the next break | 19 (3.6%) | **0.1** | 784 ms | 11.7% |
 
-**Total MISS animation is 15.9 s per game.** The whole family is an order of magnitude smaller
-than defect 2's 524.5 s of dead tail.
+> ### ⚠ THE MISS NUMBERS BELOW WERE MEASURED ON THE SIM ARM. RE-MEASURED 2026-09-09.
+>
+> This whole section ran through the `PLAYED=1` shim bug (bugs.md items 29 and 31). MISS is the
+> family the bug distorts MOST, because HCO is 83% of played steps and near-absent on the sim
+> arm, so the MISS population measured here was a genuinely different population — 522 steps
+> across 8 games instead of 6,129.
+>
+> | claim | published (SIM) | corrected (PLAYED) | factor |
+> |---|---|---|---|
+> | total MISS wall time | 15.9 s/game | **247.0 s/game** | 15.5x |
+> | MISS steps | 65.2/game | 766.1/game | 11.7x |
+> | still MISS player-steps | 2,098 | 30,930 (3,866/game) | 14.7x |
+> | frozen MISS steps | 3 across 8 games | 928 across 8 games | 309x |
+> | frozen AND content-free | 1 across 8 games | 636 (79.5/game) | 636x |
+> | the visible loose-ball slice | ~79 player-steps/game over 4.8 s | **782/game over 39.8 s** | 9.9x / 8.3x |
+> | the `bounce` empty beat | 51 steps x 300 ms, 12.0% of MISS wall | 455 steps (56.9/game) x 300 ms, 6.9% of MISS wall | 8.9x |
+>
+> **THE DECISION THIS REVERSES.** MISS was ranked 4th of 4 — below the `bounce` beat and below
+> the design work — on the strength of "4.8 s per game, the smallest remaining item". The real
+> visible slice is 39.8 s per game, which puts it ABOVE the `bounce` beat (17.1 s/game corrected)
+> and makes it the largest remaining defect after defect 2. The ranking table below is corrected.
+>
+> **WHAT SURVIVES UNCHANGED, and it is the important part.** The destination split still reads
+> **0.0% `elsewhere`** on the played arm (56.9% no destination, 43.1% already there, against a
+> published 50.2/49.8/0.0). So the diagnosis is untouched: this is an AUTHORING ABSENCE, not a
+> tail or a mistimed tween, and no duration or curve change can reach it. The instruction not to
+> stamp an idle over a live rebound also stands. Only the SIZE was wrong — but it was wrong in
+> the direction that changes what we do next.
+
+**Total MISS animation is 247.0 s per game** (published as 15.9 s/game off the sim arm; see the
+banner above). It is not an order of magnitude smaller than defect 2: against defect 2's
+corrected 1,849.6 s/game of dead tail it is roughly one part in seven.
 
 **IT IS AN AUTHORING ABSENCE, NOT A RENDERING FAILURE.** Of 2,098 still MISS player-steps,
 **50.2% have no authored destination at all and 49.8% are already standing on the destination
@@ -951,17 +981,24 @@ converter fix, before defect 4 closed, and before any of these quantities existe
 |---|---|---|---|
 | 1 | **defect 2, arrive-and-freeze** | **524.5 s/game dead tail; 30.7% of moving-sprite time; 29.4% of tails ≥300 ms; 69.6% of it in one-step journeys** | low if FILLED (a `delay` on a proven mechanism); high if STRETCHED (durations move timing) |
 | 2 | sequence item 5 / 6 — easing character, archetypes, stagger, emphasis | not a defect, so not sized here; but it is now the largest *remaining* body of work by volume | design |
-| 3 | the `bounce` empty beat | 51 steps × 300 ms, content-free, 12.0% of MISS wall time | low — deletion, but step counts are principle 8 territory |
-| 4 | **MISS loose-ball stillness (item 19)** | **~79 visible player-steps/game over 4.8 s** | high — authored destinations |
+| 3 | **MISS loose-ball stillness (item 19)** — *re-ranked up 2026-09-09* | **782 visible player-steps/game over 39.8 s** (published as ~79/game over 4.8 s off the SIM arm) | high — authored destinations |
+| 4 | the `bounce` empty beat — *re-ranked down* | 455 steps (56.9/game) × 300 ms, content-free, 17.1 s/game, 6.9% of MISS wall time | low — deletion, but step counts are principle 8 territory |
 
 **Defect 2 is not close to being closeable** — it is the largest measured quantity in the
-workstream and 29.4% of its tails are visible pauses. **MISS comes back small enough to
-downgrade**, and its cheap fix is forbidden for good reason, so it should be re-ranked below
-the design work rather than treated as the next defect.
+workstream and 29.4% of its tails are visible pauses.
+
+**~~MISS comes back small enough to downgrade~~ — RETRACTED 2026-09-09.** That sentence was
+written off a sim-arm measurement. On the played arm MISS carries 782 visible loose-ball
+player-steps per game over 39.8 s, 8.3x what was published, which puts it above the `bounce`
+beat rather than below everything. Its cheap fix is still forbidden for the reason given — an
+idle loop over a live rebound would shrink the number while hiding the defect — so it remains
+expensive, but it is no longer small, and "expensive AND small" was the whole argument for
+deferring it.
 
 Sequence items 5 and 6 were out of scope for this measurement and are design rather than defect
-work, but with defect 1 shipped, defect 4 closed and MISS downgraded, **they are now the largest
-remaining body of work** and the only defect ahead of them is defect 2.
+work. With defect 1 shipped and defect 4 closed they remain a large body of work, but they are
+**no longer clearly the largest remaining item**: MISS now outranks them on measured size, and
+the two defects ahead of them are defect 2 and MISS.
 
 ---
 
