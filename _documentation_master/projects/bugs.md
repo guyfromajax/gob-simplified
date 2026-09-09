@@ -1793,6 +1793,107 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       measured in units that do not track perception, so it explains Jamie's complaint but cannot
       rank the work against anything else. He decides after seeing what it would look like.
 
+40. **TELEPORTS ARE REAL, and confined to FAST_BREAK: the shooter jumps 4.5 ft BACKWARDS down
+      his own drive path the instant he releases. Nothing anywhere guards this.** Measured
+      2026-09-09, played arm, PLAYED=1, `scratch_continuity_within.py`, 8 games. Corroborates
+      Jamie's note 2a ("freezing before the shot step then teleporting").
+
+      Turn SEAMS were already measured exact. This is the first measurement of continuity
+      BETWEEN STEPS WITHIN a turn: **169,318 consecutive player-step pairs, coverage 100.00%.**
+
+      | turn | pairs | continuous | TELEPORT | absorbed |
+      |---|---|---|---|---|
+      | HCO | 136,910 | 100.00% | 0 | 0 |
+      | FREE_THROW / OREB / FCP / SIDE_INBOUND / HCT / BASELINE_INBOUND | 31,898 | 100.00% | 0 | 0 |
+      | **FAST_BREAK** | 1,510 | **98.94%** | **4** | **12** |
+
+      **RESOLVED AS THE RENDERER RESOLVES IT** (rule 6d, and the lesson of item 38). Established
+      from `animationPlayback.js`: `snapSpritesToStepStart` runs ONCE, on the turn ENTRY step
+      only (`:1585`); the docstring states the rule outright — *"Engine does not snap-to-start;
+      sprite drift between steps is the caller's bug to fix"* (`:1039-1041`); at step END every
+      sprite is hard-snapped to `end.coords` (`:1526-1533`); a player's tween is SKIPPED when
+      `start.coords == end.coords` within 1e-6 (`:1302-1304`); otherwise the tween targets
+      `endCoord` ABSOLUTELY from wherever the sprite actually is (`:1333`).
+
+      So `start.coords` IS NOT DRAWN. It only decides whether to tween. That splits a
+      discontinuity into two outcomes which must never be pooled:
+
+      - **TELEPORT** (4) — player authored STILL in N+1. Tween skipped, so he sits at
+        `end.coords[N]` for the whole step and the `:1526` snap JUMPS him at step end. Visible.
+      - **ABSORBED** (12) — player authored MOVING in N+1. The tween runs from his real position
+        to the right place. No jump; wrong path and speed only.
+
+      Of the 4 teleports, **2 render** (0.25/game); the other 2 sit after the turn already ended
+      (below). All are 2-5 ft, all on the SHOOTER. **Jamie's "defenders" attribution is refuted —
+      zero defender discontinuities in 169,318 pairs.**
+
+      **THE SHAPE, one FAST_BREAK turn (triangle), shooter tracked:**
+
+      ```
+      idx  kind             start            end              action      next
+      3                     (87.0, 21.0)     (90.18, 24.18)   cut         next_step
+      4                     (90.18, 24.18)   (93.36, 27.36)   cut         next_step
+      5                     (93.36, 27.36)   (93.36, 27.36)   shoot       next_step
+      6                     (90.18, 24.18)   (90.18, 24.18)   stationary  next_step  <- JUMP 4.5 ft, VISIBLE
+      7-11 rattle_hop/settle(90.18, 24.18)   (90.18, 24.18)   stationary  next_step
+      12   make_hold        (90.18, 24.18)   (90.18, 24.18)   stationary  TURN_STOP
+      13                    (93.36, 27.36)   (93.36, 27.36)   stationary  next_step  <- JUMP 4.5 ft, DEAD
+      14-19 rattle.../make_hold (93.36, 27.36) ...            stationary  turn_stop
+      ```
+
+      He shoots at (93.36, 27.36), then step 6 parks him at (90.18, 24.18) — **the coordinate he
+      passed through one step EARLIER, at step 3's end.** On screen: he freezes at the shot spot
+      for step 6's duration, then snaps 4.5 ft backwards down his own drive path and holds there
+      through the make. That is Jamie's description almost word for word.
+
+      **ROOT CAUSE — the post-shot chain is built TWICE, from two different seeds.** Steps 6-12
+      and 13-19 are the same chain (`rattle_hop` x N, `rattle_settle`, `make_hold`). Two
+      independent call sites invoke the same pair of builders on the same `steps` list:
+      `fb_drive_step_emitter.py:564-568` (inside `build_fb_drive_resolution_steps`) and
+      `rim_runner_step_emitter.py:2224-2229` (inside `_finalize_rr_triangle_steps`). The
+      rim-runner/triangle path reaches BOTH. The first copy is seeded from the wrong step's end
+      coords and renders; the second is seeded from the true shot spot and is dead. Both affected
+      plays observed were of that family (`triangle`, `rim_runner`). VERIFIED: the two call sites
+      and that the family reaches both. NOT ESTABLISHED: why it manifests on only 6.5% of fast
+      breaks rather than all of them — do not assume every RR/triangle turn duplicates.
+
+      **SECOND DEFECT, found on the way: steps emitted AFTER the turn already stopped.** The
+      renderer follows `end.next` and halts at the first `turn_stop`, so anything after it never
+      renders. Measured: **20 dead steps across 3 of 46 FAST_BREAK turns (6.5%), 2.5 per game.**
+      **Zero in every other family** — which independently confirms that the end-of-turn frozen
+      tails in items 37 and 39 are genuinely played and not dead payload.
+
+      **NOTHING GUARDS ANY OF THIS.** There is no test, assertion, validator or runtime check
+      anywhere for within-turn player coordinate continuity. What exists is adjacent and does not
+      cover it: `test_movement_curve_continuity.py` checks easing curves, not coords;
+      `test_turn_manager_clock_transition_continuity.py` checks clocks;
+      `test_uess_coord_contract.py` explicitly excludes the step chain;
+      `test_rr_triangle_drive_resolution.py:945-955` checks meet->drive only, not
+      shoot->post-shot. The seven `[UESS SEAM]` runtime detectors
+      (`UESS_SEAM_TELEPORT_GRID_EPSILON = 1.5`, `skeleton_step_emitter.py:129`) check **the BALL,
+      at turn ENTRY, and only warn**. Per item 6 this is the expected state, not a surprise: a
+      teleport could have run in production indefinitely and nothing would object.
+
+      **THE INVARIANT IS ALREADY WRITTEN DOWN, AND ALREADY IMPLEMENTED — IN EXACTLY ONE PLACE.**
+      `skeleton_step_emitter.py:2128-2138` states it and enforces it for HCO:
+
+      > *"UESS §8.1: step N+1 start.coords MUST equal step N end.coords per player. Without this,
+      > non-gate movers interrupted at step N would teleport to the animator's skeleton waypoint
+      > at step N+1 start."*
+      > `start_coords = {**anim_start, **prior_end}`
+
+      Grepped: that merge appears in the HCO skeleton emitter and in NONE of
+      `fb_drive_step_emitter.py`, `after_steal_fast_break_step_emitter.py`,
+      `rim_runner_step_emitter.py`. **HCO is 100.00% continuous over 136,910 pairs and
+      FAST_BREAK is the only family that is not.** The author knew the failure mode, described it
+      precisely, fixed it where he was working, and the fix never travelled.
+
+      NOT FIXED — diagnostic only. Note for whoever scopes it: the visible rate is 0.25/game, so
+      this is small by frequency, but unlike everything else in this workstream it is a
+      CONTRACT VIOLATION rather than a matter of taste, and it is measurable without needing an
+      instrument for perception. The dead-steps half changes step counts, so it is principle 8
+      territory; the §8.1 merge itself moves coords and so is outcome-affecting.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
