@@ -1535,6 +1535,87 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       at rank 3 and needs the same correction; it was left untouched because this brief made
       bugs.md the only writable file.
 
+33. **THE STILLNESS DETECTOR DOES NOT TRACK WHAT A HUMAN SEES — it inverts.** Measured
+      2026-09-09, played arm, `PLAYED=1`, probe `scratch_calibrate_holds.py`, 8 games.
+      This is the first time anything in this workstream has been calibrated against an observer.
+
+      Jamie's eye gives ground truth on two families that point OPPOSITE ways: MISS/post-shot
+      looks CORRECT, FCP/HCT attack steps look like "handler and his defender animate, the other
+      eight freeze". Running the SAME detector item 19 used against both:
+
+      | family | Jamie | movers/10 (binary) | movers/10 (>=1 ft) | ft/sec on screen |
+      |---|---|---|---|---|
+      | MISS post-shot | **looks CORRECT** | **3.75** | **3.47** | 11.68 |
+      | FCP | looks FROZEN | 4.82 | 4.30 | 13.55 |
+      | HCT | looks FROZEN | 6.00 | 5.82 | 21.16 |
+      | FAST_BREAK | looks FROZEN | 7.24 | 6.83 | 28.02 |
+
+      **The family the human calls CORRECT scores as the MOST frozen on every formulation, and
+      the families he calls FROZEN score as the LEAST.** Three separate reconciliations were
+      tried and all three failed: the binary predicate, displacement magnitude (to test whether
+      sub-perceptible movement was being counted as motion — `_idle_is_still` uses a 1e-6
+      threshold at `animation_step_helpers.py:110`, so an eighth of an inch counts as MOVING),
+      and on-screen speed. The ordering is stable and inverted in all three.
+
+      **CONSEQUENCE: "still player-steps" is not a valid proxy for perceived frozenness.** Every
+      ranking in this workstream built on it — item 19's, and the sizing behind defect 4 —
+      measures something real but not the thing the complaint is about. This does NOT mean the
+      counts were wrong; it means they do not predict what a viewer notices. A replacement
+      instrument has to be found before any further stillness work is ranked, and the honest
+      position until then is that we cannot currently size a "looks frozen" complaint.
+
+      NOT YET EXPLAINED, and deliberately not guessed at: what Jamie IS reacting to on FCP/HCT.
+      Three hypotheses are dead; a fourth should be sought with him at the screen rather than
+      derived here.
+
+34. **The universal BIP pause is NOT an audio hold and NOT a hold mechanism at all.** Same probe.
+
+      **BIP and SIP steps carry ZERO `wall_clock_hold_ms` and ZERO announcements.** The pause is
+      ordinary game-time step duration on steps where all ten players are authored still:
+      BASELINE_INBOUND has **28.3% of its steps fully frozen at a 0.45 s mean**, SIDE_INBOUND
+      **66.7% fully frozen at 0.60 s**. Jamie is right that it is a DURATION complaint and right
+      that the idle wander cannot fix it — the fix is step duration or step deletion.
+
+      **COMPLETE CENSUS OF EVERY MECHANISM THAT HOLDS THE WHOLE COURT** (the brief asked for all
+      of them). Exactly three distinct values exist, 60 holds/game, **20.9 s/game total**:
+
+      | ms | per game | source | load-bearing? |
+      |---|---|---|---|
+      | 300 | 51.9 (43.4 HCO, 5.4 OREB, 2.0 FAST_BREAK, rest) | `make_hold`, `skeleton_step_emitter.py:3210` (`MAKE_HOLD_MS` = `ANNOUNCEMENT_FREEZE_HOLD_MS`) | YES — it is the only thing giving the non-blocking "It's Good!" overlay screen time, deliberately moved off the announcement's own `hold_ms` (see `animation_cleanup_findings.md:268`) |
+      | 660 | 6.4 | fumble, `dead_ball_fumble.py:164` (`FUMBLE_WALL_CLOCK_MS`) | YES — the stumble beat is the animation |
+      | 640 | 1.8 | shot micro-movements, `shot_micro_movements.py:1464` | YES — carries the micro-movement |
+
+      **NO HOLD IN THE GAME IS PROTECTING AUDIO FROM BEING CUT OFF.** The blocking-announcement
+      path (`animationPlayback.js:920-943` pauses both clocks, awaits `hold_ms`, resumes) exists
+      but is **never armed**: all 1,411 announcements across 8 games are non-blocking, because
+      the FE blocks only on `announcement.blocking === true` (`:940-942`) and nothing sets it.
+      So the "hold for the callout" model is not what is happening anywhere.
+
+35. **FCP/HCT "the other eight freeze" — REFUTED as stated, but the authoring does park them.**
+      Same probe, 8 games, played arm.
+
+      - **There are no distinct "attack step types."** 98% of FCP/HCT steps carry
+        `advance_trigger.metadata.kind` = `<none>`; the family is one undifferentiated kind, so
+        the report cannot be narrowed to a step type. FCP 61.1 steps/game, HCT 53.2/game.
+      - **Movers are 4.84 of 10 (FCP) and 6.01 of 10 (HCT), not 2.** So "handler and defender
+        only" is wrong by a factor of two to three. Directionally he is right that roughly half
+        the court holds; the count is not eight.
+      - **The still ones are PARKED BY AUTHORING, not left undefined.** Of still player-steps,
+        **93.0% (FCP) and 88.9% (HCT) are authored a destination they ALREADY OCCUPY**; only
+        7.0%/11.1% have no destination at all. The engine is explicitly saying "stand here",
+        which is the same shape as the MISS finding in item 32.
+      - **Trailing players DO get authored advance, contradicting the third sub-question.**
+        Behind-the-ball players move on **65.0% (FCP) / 60.4% (HCT)** of their player-steps, mean
+        **4.80 / 4.69 feet toward the attacking basket**. They are not authored static.
+
+      SCOPE NOTE FOR THE EVENTUAL FIX, recorded now so it is not lost: the remedy Jamie wants —
+      trailing players drifting basketward — MUST be backend-authored destinations, not a
+      render-side drift, because the coords have to carry into the next step. That moves player
+      coords, which feeds `resolve_over_the_back_foul` and the putback contest, so it is
+      OUTCOME-CHANGING and requires the poison-stash and an equiv-v3 arm. It is NOT the retired
+      CONTINUE_FROM_PREVIOUS mechanism. Given item 33, it should also not be scoped on any
+      stillness count until there is an instrument that predicts perception.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
