@@ -24,6 +24,7 @@
 3. Team Mod System
 4. Stronger week 36 CTA to review all Recrutiing results -- and carry forward results chart, not just report/rankings. Order chart within each conference by top to bottom team recruiting performance
 6. Replace Kobe look alike image and add more walk on images
+7. Auto train button on FCC
 
 
 ##Animation
@@ -62,9 +63,10 @@
 ##Bugs
 1. Getting some double rebounds (SFX, maybe animaiton, not sure about logic)
 2. Still missing EOQ perfection
-2a. Fast Break animation is still sloppy and inconsistent
+2a. Fast Break animation is still sloppy and inconsistent with defenders in particular not moving on shot steps or freezing before the shot step then teleporting
 2b. Still reading fouled 3 pt attempts as 2 pt shots in some instances
 2c. some HCO turnovers are still mismatched on BE and FE as to who the ball handler is. Note teh BE logic + turnover animation jiggle are synced, but sometimes a different player is holding teh ball.
+2d. Sometimes the deleting franchise gets stuck in an infinite loop
 3. OPEN — a shooting foul hands off to FREE_THROW but no FREE_THROW turn follows (~0.5/game)
    - Surfaced while measuring the fouled-3PT free-throw misaward (fixed 2026-09-07, see below).
      After that fix the residual misaward rate is entirely this family: 6 of 221 fouled attempts
@@ -1630,17 +1632,19 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       | HCT | frozen | 0.592 | 0.26 | 6.79 |
       | FAST_BREAK | frozen | 0.914 (highest) | 0.79 | 7.15 |
 
-      Inverted again — the family Jamie calls correct has the LOWEST ratio. **And the
-      hypothesis's physical premise is refuted outright by the same data:** it assumed the ball
-      dominates the frame on a fast break, but the ball moves **0.22-0.79 ft per step** on the
-      three "frozen" families while players move 3.1-7.2 ft. It is MISS where the ball dominates
-      (7.20 ft/step against 2.20 for players). The ball is not crossing the court within a step
-      on ANY family; per-step ball travel is small everywhere except on a shot.
-
-      Sample-size honesty: the ratio only means anything on steps where the ball actually moves,
-      which is 85.9% of MISS player-steps but only 4.0% of FCP and HCT ones. So the FCP/HCT
-      ratios rest on a thin slice — but that thinness is itself the finding, because it says the
-      ball is essentially static in the frame on exactly the families that look frozen.
+      > **⚠ EVERY BALL FIGURE IN THIS ITEM IS VOID — see item 38 (2026-09-09).** The probe read
+      > `ball.coords`, but the ball is ATTACHED to a carrier on 64-77% of steps and the renderer
+      > then draws it at the CARRIER's coord (`animationPlayback.js:81-88`), while in-flight
+      > balls use `current_coords`. Reading `coords` on an attached ball returns nothing, which
+      > this probe silently scored as ZERO displacement. Resolved the way the frontend actually
+      > resolves it, per-step ball travel is **7.86 ft (FCP), 11.71 (HCT), 8.41 (FAST_BREAK)
+      > against 7.80 on MISS** — not 0.22/0.26/0.79. The ratio table above is therefore
+      > meaningless, and the "physical premise refuted" paragraph that stood here is struck: the
+      > ball is not static on the frozen families, so that refutation was an artifact too.
+      >
+      > **The item's CONCLUSION is unchanged and is now better supported.** Ball displacement
+      > does not separate the families either — the three families Jamie calls frozen carry at
+      > least as much per-step ball travel as the one he calls correct. Still no instrument.
 
       The trailing-gap variant also fails: the player-to-ball gap CLOSES on both, -2.07 ft on
       MISS and -0.90 ft on FAST_BREAK. Nothing opens.
@@ -1691,6 +1695,103 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       CAVEAT: measured in the same frozen-step units that invert against the observer (item 33),
       so this size must NOT be used to rank it against other work. It is recorded because it
       explains a specific complaint a human actually made.
+
+38. **The ball was UNTRACKED, not static. The last surviving measure was an artifact, and the
+      search for an instrument is now CLOSED.** Measured 2026-09-09, played arm, PLAYED=1,
+      `scratch_balltrack.py`, 8 games.
+
+      Ball displacement per step was the only measure of four that appeared NOT to invert against
+      Jamie's verdict. The question put was whether the ball genuinely does not move on FCP/HCT
+      (a real defect, probably the largest left) or is merely absent from the payload (a
+      measurement gap). **It is the second — and the published figures were wrong, not merely
+      incomplete.**
+
+      | family | `ball` key | `coords` resolve | `owner_player_id` set | published ft/step | **FE-accurate ft/step** |
+      |---|---|---|---|---|---|
+      | MISS (Jamie: correct) | 100% | 27.7% | 68.6% | 2.26 | **7.80** |
+      | FCP (Jamie: frozen) | 100% | 14.7% | 63.7% | 0.22 | **7.86** |
+      | HCT (Jamie: frozen) | 100% | 15.2% | 70.1% | 0.26 | **11.71** |
+      | FAST_BREAK (Jamie: frozen) | 100% | 47.7% | 52.3% | 0.79 | **8.41** |
+
+      **MECHANISM, with file:line.** `ballCoordFromState` (`animationPlayback.js:81-88`) resolves
+      the drawn ball three different ways: **attached** -> `playerCoords[ball.owner_player_id]`,
+      i.e. the CARRIER's coord for that boundary (`:84`); **in_flight** -> `ball.current_coords`;
+      **loose** -> `ball.coords` (`:87`). `isBallAttached` (`:64-69`) selects on the mere presence
+      of the `owner_player_id` key. The probe read only `coords`, so on the 64-77% of steps where
+      the ball is attached it found nothing and scored zero displacement, and it never read
+      `current_coords` at all.
+
+      Resolved the frontend's way, the ball is locatable on **99.7-100% of steps in every
+      family**. Nothing is missing from the payload and nothing is static. What a viewer sees is
+      a ball that moves with whoever carries it — which is why the `ball` key is present 100% of
+      the time yet its own coords usually are not: for a carried ball there is nothing to author.
+
+      **CONSEQUENCE.** The corrected measure does not so much invert as fail to separate: the
+      three families Jamie calls frozen carry at least as much per-step ball travel as the one he
+      calls correct (7.86 / 11.71 / 8.41 against 7.80). Item 36's ball numbers are struck.
+      **Five measures have now been tried and none tracks the complaint. The search for an
+      instrument is closed for good — this is settled, not open.** Jamie at the screen is the
+      ranking authority for feel work.
+
+      LESSON, third of its kind in this workstream: the probe read a field that exists in the
+      schema but is not the field the renderer consumes. Same class as the spot-key converter and
+      the `PLAYED=1` arm. **A detector must mirror the CONSUMER, and where it cannot, it must
+      report its own coverage** — this one would have caught itself at any point, because its
+      coverage was 4-15% and nothing anywhere flagged that as a problem.
+
+39. **DREB never ends frozen because it emits exactly ONE step. It is not a technique and it is
+      not portable.** Measured 2026-09-09, played arm.
+
+      `build_dreb_animation_steps` builds a single step dict and ends `return [step]`
+      (`dreb_step_emitter.py:284`). Measured: **390 steps across 390 turns = 1.00 steps/turn.**
+      That one step IS the rebound action and the rebounder always moves in it, so the turn
+      cannot end on a frozen beat. There is no clever terminal handling to copy. The other
+      families end frozen because they emit multi-step sequences whose final beats are settles.
+
+      | turn | steps/turn | % of turns ending frozen |
+      |---|---|---|
+      | HCO | 11.19 | 60.1% |
+      | FREE_THROW | 6.98 | 100% |
+      | HCT / FCP | 6.48 / 6.16 | 25.4% / 23.3% |
+      | FAST_BREAK | 4.28 | 28.3% |
+      | OREB | 4.02 | 61.1% |
+      | BASELINE_INBOUND | 3.64 | 37.9% |
+      | SIDE_INBOUND | 3.00 | **100%** |
+      | **DREB** | **1.00** | **0%** |
+
+      SIDE_INBOUND is the sharpest shape in the table: **exactly 3.00 steps per turn on all 212
+      turns, of which the last two are always fully frozen.** One step of action followed by two
+      of stillness, every time.
+
+      **WHAT IS ACTUALLY IN THE TRAILING FROZEN STEPS.** This decides the cost, and it says most
+      of them are NOT empty — they are frozen but load-bearing:
+
+      | turn | frozen tail steps | ball moves | sfx | announcement | **wholly EMPTY** |
+      |---|---|---|---|---|---|
+      | HCO | 1,429 | 3.4% | 34.6% | 27.7% | **38.0%** |
+      | FREE_THROW | 1,221 | 6.9% | 54.5% | 15.6% | **23.1%** |
+      | SIDE_INBOUND | 424 | 50.0% | 50.0% | 0.0% | **50.0%** |
+      | OREB | 489 | 0.0% | 56.2% | 10.2% | **34.6%** |
+      | BASELINE_INBOUND | 49 | 51.0% | 51.0% | 0.0% | **49.0%** |
+      | FCP / HCT / FAST_BREAK | 54 | 0.0% | 0-8.7% | 47.8-100% | 0-43.5% |
+
+      On a side inbound the two frozen steps are therefore one inbound pass (ball moves, sfx
+      fires) plus one wholly empty beat. Across families the empty share is roughly a third of
+      the tail. Scaling the per-family tail seconds by the empty share puts the **purely empty**
+      portion near **30 s/game of the ~88** — flagged as APPROXIMATE, because it assumes empty
+      and non-empty tail steps have equal mean duration, which has not been measured directly.
+
+      **PORTABILITY AND COST.** The DREB shape is not portable: it is the absence of a multi-step
+      sequence, not a way of ending one. The portable change is narrower — delete or shorten only
+      the trailing steps carrying no ball motion, no sound and no announcement. Two costs. First,
+      it moves STEP COUNTS, which is SPC principle 8 territory and needs an equiv-v3 arm. Second,
+      the non-empty tail steps must be left alone, because they are carrying the rebound cue, the
+      inbound pass, or a callout, and the frozen-ness there is arguably correct — a whistle beat
+      is a moment basketball actually stands still for.
+
+      **NOT IMPLEMENTED, and deliberately not scoped further.** Per item 38 the ~88 s/game is
+      measured in units that do not track perception, so it explains Jamie's complaint but cannot
+      rank the work against anything else. He decides after seeing what it would look like.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

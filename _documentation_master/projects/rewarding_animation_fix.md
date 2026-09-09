@@ -9,22 +9,37 @@
 > Calibrated against Jamie's eye on two families that point opposite ways (bugs.md item 33). He
 > says MISS/post-shot looks CORRECT and FCP/HCT/FAST_BREAK look FROZEN. The detector says:
 >
-> | family | Jamie | movers/10 | movers/10 (≥1 ft) | ft/sec | player ft ÷ ball ft |
-> |---|---|---|---|---|---|
-> | MISS post-shot | **CORRECT** | **3.75** | **3.47** | 11.68 | **0.229** |
-> | FCP | frozen | 4.82 | 4.30 | 13.55 | 0.291 |
-> | HCT | frozen | 6.00 | 5.82 | 21.16 | 0.592 |
-> | FAST_BREAK | frozen | 7.24 | 6.83 | 28.02 | 0.914 |
+> | family | Jamie | movers/10 | movers/10 (≥1 ft) | ft/sec | ~~player ft ÷ ball ft~~ | ball ft/step (FE-accurate) |
+> |---|---|---|---|---|---|---|
+> | MISS post-shot | **CORRECT** | **3.75** | **3.47** | 11.68 | ~~0.229~~ | **7.80** |
+> | FCP | frozen | 4.82 | 4.30 | 13.55 | ~~0.291~~ | **7.86** |
+> | HCT | frozen | 6.00 | 5.82 | 21.16 | ~~0.592~~ | **11.71** |
+> | FAST_BREAK | frozen | 7.24 | 6.83 | 28.02 | ~~0.914~~ | **8.41** |
 >
-> **FOUR** formulations were tried — the binary predicate, displacement magnitude, on-screen
-> speed, and motion relative to the ball — and **all four order the families backwards**. The
-> family the human calls correct scores as the most frozen every time.
+> **FIVE** formulations were tried — the binary predicate, displacement magnitude, on-screen
+> speed, motion relative to the ball, and ball displacement itself — and **not one orders the
+> families correctly**. The family the human calls correct scores as the most frozen every time.
+>
+> The `player ft ÷ ball ft` column is **STRUCK**: it divided by a ball displacement that was
+> misread (bugs.md items 36, 38). The ball is drawn at its CARRIER on 64-77% of steps
+> (`animationPlayback.js:81-88`), so reading `ball.coords` scored a carried ball as motionless.
+> Ball travel resolved the frontend's way is the final column, and it is the fifth failure: the
+> three families Jamie calls FROZEN move the ball at least as much as the one he calls CORRECT.
+> **Ball displacement briefly looked like the one measure that survived. It did not.**
 >
 > **A FUTURE SESSION MUST NOT PICK UP A STILL-PLAYER COUNT AND TREAT IT AS A MEASURE OF "LOOKS
 > FROZEN".** The counts are arithmetically correct and they measure something real; they simply
 > do not predict what a viewer notices. Until an instrument exists that does, **Jamie at the
 > screen is the only ranking authority for feel work.** That is a legitimate outcome, not a
 > failure to try hard enough.
+>
+> **THE SEARCH IS CLOSED — do not propose a sixth measure.** Settled 2026-09-09 after the ball
+> measure fell. This is a decided position, not an open question.
+>
+> **AND CHECK YOUR COVERAGE BEFORE YOU BELIEVE A NUMBER.** Every one of these probes read a
+> field that exists in the schema; the ball probe read the wrong one and resolved on only 4-15%
+> of steps, silently scoring the rest as zero. A detector must mirror the CONSUMER of the value,
+> and where it cannot, it must report the fraction of cases it actually resolved.
 >
 > ## 2. THE RANKING HAS BEEN STRUCK, not re-ordered.
 >
