@@ -1,0 +1,9211 @@
+{
+ "seed": 4,
+ "err": null,
+ "draws": 141970,
+ "null": false,
+ "n_turns": 238,
+ "shots": [
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "inside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 77.8,
+    "y": 20.3
+   },
+   "release": {
+    "x": 73.56071014616485,
+    "y": 18.790555885376882
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "fade_away",
+   "micro_calls": [
+    {
+     "seq": 1,
+     "pre": {
+      "x": 77.8,
+      "y": 20.3
+     },
+     "rel": {
+      "x": 77.12913594905639,
+      "y": 22.184128823926734
+     },
+     "family": "jab_step"
+    },
+    {
+     "seq": 5,
+     "pre": {
+      "x": 77.8,
+      "y": 20.3
+     },
+     "rel": {
+      "x": 73.56071014616485,
+      "y": 18.790555885376882
+     },
+     "family": "fade_away"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 77.12913594905639,
+    "y": 22.184128823926734
+   },
+   "shooter_coords": {
+    "x": 77.8,
+    "y": 20.3
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 77.12913594905639,
+    "y": 22.184128823926734
+   },
+   "shooter_id": "e590d342-9121-5c78-900e-8883166655d1",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 2,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 77.12913594905639,
+      "y": 22.184128823926734
+     }
+    }
+   ],
+   "sf_calls": [
+    {
+     "seq": 3,
+     "is_three": false,
+     "made": false,
+     "n": 2
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 4,
+     "n": 2,
+     "remaining": 2,
+     "one_and_one": false
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": null,
+   "res_shot_spot": {
+    "x": 77.12913594905639,
+    "y": 22.184128823926734
+   },
+   "res_shot_classification_coord": {
+    "x": 77.12913594905639,
+    "y": 22.184128823926734
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 77.12913594905639,
+    "y": 22.184128823926734
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 64.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 6,
+     "pre": {
+      "x": 60.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 64.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 64.5,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 64.5,
+    "y": 25.0
+   },
+   "shooter_id": "bd5dbf1f-ba41-5894-9b3b-2a25c87e8736",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 7,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 64.5,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 64.5,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 64.5,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 64.5,
+    "y": 25.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 64.5,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": true,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "attack",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 8,
+     "pre": {
+      "x": 41.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 41.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "shooter_id": "80f3ca79-1e8e-56cc-8b86-36e2156abf31",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 9,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 41.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 70.0,
+    "y": 27.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 70.0,
+    "y": 27.0
+   },
+   "shooter_coords": {
+    "x": 70.0,
+    "y": 27.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 70.0,
+    "y": 27.0
+   },
+   "shooter_id": "c13c8088-81a5-5bd3-a409-7020ac6d9822",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 10,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 70.0,
+      "y": 27.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 70.0,
+    "y": 27.0
+   },
+   "res_shot_spot": {
+    "x": 70.0,
+    "y": 27.0
+   },
+   "res_shot_classification_coord": {
+    "x": 70.0,
+    "y": 27.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 70.0,
+    "y": 27.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 11,
+     "pre": {
+      "x": 60.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 60.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "shooter_id": "60d85fb6-4576-5ccd-b143-8c1cc2e308cf",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 12,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 60.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FCP",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 13,
+     "pre": {
+      "x": 55.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 55.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "shooter_id": "bd5dbf1f-ba41-5894-9b3b-2a25c87e8736",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 14,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 55.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "attack",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 15,
+     "pre": {
+      "x": 41.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 41.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "shooter_id": "104c7b0f-8d91-5b2d-abff-49e39fa11564",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 16,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 41.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "res_micro_release_coord": null,
+   "res_shot_spot": null,
+   "res_shot_classification_coord": null,
+   "res_is_three": null,
+   "res_shot_value": null,
+   "final_shot_spot": {
+    "x": 41.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 17,
+     "pre": {
+      "x": 53.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 53.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "shooter_id": "60d85fb6-4576-5ccd-b143-8c1cc2e308cf",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 18,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 53.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "attack",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 23.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 19,
+     "pre": {
+      "x": 28.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 23.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 23.5,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 23.5,
+    "y": 25.0
+   },
+   "shooter_id": "104c7b0f-8d91-5b2d-abff-49e39fa11564",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 20,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 23.5,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": true,
+   "made": true,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 21,
+     "is_three": false,
+     "made": true,
+     "n": 1
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 22,
+     "n": 1,
+     "remaining": 1,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 23.5,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 23.5,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 23.5,
+    "y": 25.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 23.5,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 54.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 23,
+     "pre": {
+      "x": 50.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 54.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 54.5,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 54.5,
+    "y": 25.0
+   },
+   "shooter_id": "bd5dbf1f-ba41-5894-9b3b-2a25c87e8736",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 24,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 54.5,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 25,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 26,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 54.5,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 54.5,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 54.5,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 54.5,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 27,
+     "pre": {
+      "x": 53.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 68.0,
+      "y": 36.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "shooter_coords": {
+    "x": 53.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "shooter_id": "60d85fb6-4576-5ccd-b143-8c1cc2e308cf",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 28,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 68.0,
+      "y": 36.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_shot_classification_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 29,
+     "pre": {
+      "x": 55.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 55.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "shooter_id": "bd5dbf1f-ba41-5894-9b3b-2a25c87e8736",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 30,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 55.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 31,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 32,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 33,
+     "pre": {
+      "x": 55.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 55.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "shooter_id": "bd5dbf1f-ba41-5894-9b3b-2a25c87e8736",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 34,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 55.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": true,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 35,
+     "is_three": true,
+     "made": true,
+     "n": 1
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 36,
+     "n": 1,
+     "remaining": 1,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 55.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 37,
+     "pre": {
+      "x": 64.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 68.0,
+      "y": 36.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "shooter_coords": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "shooter_id": "60d85fb6-4576-5ccd-b143-8c1cc2e308cf",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 38,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 68.0,
+      "y": 36.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_shot_classification_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "jab_step",
+   "micro_calls": [
+    {
+     "seq": 39,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 12.37253305758653,
+      "y": 33.16247638743819
+     },
+     "family": "jab_step"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "shooter_id": "7219a92c-c420-5a80-8f94-a2cf954cb3a9",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 40,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 12.37253305758653,
+      "y": 33.16247638743819
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_shot_classification_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FCP",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 76.0,
+    "y": 25.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 76.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 76.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 76.0,
+    "y": 25.0
+   },
+   "shooter_id": "bd5dbf1f-ba41-5894-9b3b-2a25c87e8736",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 41,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 76.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 76.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 76.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 76.0,
+    "y": 25.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 76.0,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FCP",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "set_pump",
+   "micro_calls": [
+    {
+     "seq": 42,
+     "pre": {
+      "x": 64.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 64.0,
+      "y": 25.0
+     },
+     "family": "set_pump"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "shooter_id": "c13c8088-81a5-5bd3-a409-7020ac6d9822",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 43,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 64.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 74.0,
+    "y": 30.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 74.0,
+    "y": 30.0
+   },
+   "shooter_coords": {
+    "x": 74.0,
+    "y": 30.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 74.0,
+    "y": 30.0
+   },
+   "shooter_id": "bd5dbf1f-ba41-5894-9b3b-2a25c87e8736",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 44,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 74.0,
+      "y": 30.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 74.0,
+    "y": 30.0
+   },
+   "res_shot_spot": {
+    "x": 74.0,
+    "y": 30.0
+   },
+   "res_shot_classification_coord": {
+    "x": 74.0,
+    "y": 30.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 74.0,
+    "y": 30.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 72.0,
+    "y": 22.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 72.0,
+    "y": 22.0
+   },
+   "shooter_coords": {
+    "x": 72.0,
+    "y": 22.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 72.0,
+    "y": 22.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 45,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 72.0,
+      "y": 22.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 72.0,
+    "y": 22.0
+   },
+   "res_shot_spot": {
+    "x": 72.0,
+    "y": 22.0
+   },
+   "res_shot_classification_coord": {
+    "x": 72.0,
+    "y": 22.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 72.0,
+    "y": 22.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 26.9,
+    "y": 18.7
+   },
+   "release": {
+    "x": 26.9,
+    "y": 18.7
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "set",
+   "micro_calls": [
+    {
+     "seq": 47,
+     "pre": {
+      "x": 26.9,
+      "y": 18.7
+     },
+     "rel": {
+      "x": 26.9,
+      "y": 18.7
+     },
+     "family": "set"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 26.9,
+    "y": 18.7
+   },
+   "shooter_coords": {
+    "x": 26.9,
+    "y": 18.7
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 26.9,
+    "y": 18.7
+   },
+   "shooter_id": "80f3ca79-1e8e-56cc-8b86-36e2156abf31",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 48,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 26.9,
+      "y": 18.7
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 26.9,
+    "y": 18.7
+   },
+   "res_shot_spot": {
+    "x": 26.9,
+    "y": 18.7
+   },
+   "res_shot_classification_coord": {
+    "x": 26.9,
+    "y": 18.7
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 26.9,
+    "y": 18.7
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 26.0,
+    "y": 20.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 26.0,
+    "y": 20.0
+   },
+   "shooter_coords": {
+    "x": 26.0,
+    "y": 20.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 26.0,
+    "y": 20.0
+   },
+   "shooter_id": "a0a0f2d7-935c-5c73-891a-ebcb00b784a8",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 51,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 26.0,
+      "y": 20.0
+     }
+    }
+   ],
+   "res_micro_release_coord": null,
+   "res_shot_spot": null,
+   "res_shot_classification_coord": null,
+   "res_is_three": null,
+   "res_shot_value": null,
+   "final_shot_spot": {
+    "x": 26.0,
+    "y": 20.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 52,
+     "pre": {
+      "x": 60.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 60.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 53,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 60.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 54,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 55,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 56,
+     "pre": {
+      "x": 50.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 68.0,
+      "y": 36.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "shooter_coords": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "shooter_id": "bd5dbf1f-ba41-5894-9b3b-2a25c87e8736",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 57,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 68.0,
+      "y": 36.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 58,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 59,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_shot_classification_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "release": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 60,
+     "pre": {
+      "x": 81.0,
+      "y": 7.0
+     },
+     "rel": {
+      "x": 88.0,
+      "y": 6.0
+     },
+     "family": "dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "shooter_coords": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "lower midcorner",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 61,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 88.0,
+      "y": 6.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "res_shot_spot": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "res_shot_classification_coord": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 73.0,
+    "y": 40.0
+   },
+   "release": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 62,
+     "pre": {
+      "x": 73.0,
+      "y": 40.0
+     },
+     "rel": {
+      "x": 81.0,
+      "y": 43.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "shooter_coords": {
+    "x": 73.0,
+    "y": 40.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "upper wing",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 63,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 81.0,
+      "y": 43.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "res_shot_spot": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "res_shot_classification_coord": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "straight_inside",
+   "micro_calls": [
+    {
+     "seq": 64,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "family": "straight_inside"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "shooter_id": "19b6cdb5-fa63-5f4c-bb5e-0e4ddedf17bc",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 65,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 14.0,
+      "y": 32.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "res_shot_spot": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "res_shot_classification_coord": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "shooter_id": "bad6d85c-9ec0-55c8-8946-99b873e2a0c6",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 66,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 28.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 67,
+     "n": 0,
+     "remaining": 0,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": null,
+   "res_shot_spot": null,
+   "res_shot_classification_coord": null,
+   "res_is_three": null,
+   "res_shot_value": null,
+   "final_shot_spot": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "attack",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 43.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 38.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 68,
+     "pre": {
+      "x": 43.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 38.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 38.5,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 43.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 38.5,
+    "y": 25.0
+   },
+   "shooter_id": "d014435a-5590-5dfe-8af0-c59eae718f24",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 69,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 38.5,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 70,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 71,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 38.5,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 38.5,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 38.5,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 38.5,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "shooter_id": "7840e5cc-1db0-51b3-85f1-c8ad638feec9",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 72,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 36.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": null,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 73,
+     "pre": {
+      "x": 62.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 62.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "shooter_id": "e5fd9c60-9522-5c0c-8e8b-0447200f0973",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 74,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 62.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 75,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 76,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 77,
+     "pre": {
+      "x": 62.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 62.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "shooter_id": "15901201-8878-52e1-a736-96e9c89f6488",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 78,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 62.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "fade_away",
+   "micro_calls": [
+    {
+     "seq": 79,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 16.615571871735934,
+      "y": 35.661800620430306
+     },
+     "family": "fade_away"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "shooter_id": "bad6d85c-9ec0-55c8-8946-99b873e2a0c6",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 80,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 16.615571871735934,
+      "y": 35.661800620430306
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "res_shot_spot": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "res_shot_classification_coord": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 81,
+     "pre": {
+      "x": 36.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 32.0,
+      "y": 14.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_id": "19b6cdb5-fa63-5f4c-bb5e-0e4ddedf17bc",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 82,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 32.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 59.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 59.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 83,
+     "pre": {
+      "x": 59.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 63.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    },
+    {
+     "seq": 87,
+     "pre": {
+      "x": 59.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 59.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 63.5,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 59.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 63.5,
+    "y": 25.0
+   },
+   "shooter_id": "15901201-8878-52e1-a736-96e9c89f6488",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 84,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 63.5,
+      "y": 25.0
+     }
+    }
+   ],
+   "sf_calls": [
+    {
+     "seq": 85,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 86,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": null,
+   "res_shot_spot": {
+    "x": 63.5,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 63.5,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 63.5,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "attack",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 24.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 19.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 88,
+     "pre": {
+      "x": 24.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 19.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 19.5,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 24.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 19.5,
+    "y": 25.0
+   },
+   "shooter_id": "d014435a-5590-5dfe-8af0-c59eae718f24",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 89,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 19.5,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": true,
+   "made": true,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 90,
+     "is_three": false,
+     "made": true,
+     "n": 1
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 91,
+     "n": 1,
+     "remaining": 1,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 19.5,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 19.5,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 19.5,
+    "y": 25.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 19.5,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 19.0,
+    "y": 43.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 19.0,
+    "y": 43.0
+   },
+   "shooter_coords": {
+    "x": 19.0,
+    "y": 43.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 19.0,
+    "y": 43.0
+   },
+   "shooter_id": "a0a0f2d7-935c-5c73-891a-ebcb00b784a8",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 92,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 19.0,
+      "y": 43.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 19.0,
+    "y": 43.0
+   },
+   "res_shot_spot": {
+    "x": 19.0,
+    "y": 43.0
+   },
+   "res_shot_classification_coord": {
+    "x": 19.0,
+    "y": 43.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 19.0,
+    "y": 43.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": null,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 93,
+     "pre": {
+      "x": 60.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 68.0,
+      "y": 36.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "shooter_coords": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "shooter_id": "457185a0-16c9-5a23-a3bc-ca65b5e77406",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 94,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 68.0,
+      "y": 36.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_shot_classification_coord": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 68.0,
+    "y": 36.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 95,
+     "pre": {
+      "x": 36.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 32.0,
+      "y": 14.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_id": "d014435a-5590-5dfe-8af0-c59eae718f24",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 96,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 32.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FCP",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_inside",
+   "micro_calls": [
+    {
+     "seq": 97,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 11.384428128264066,
+      "y": 28.338199379569694
+     },
+     "family": "strong_inside"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "shooter_id": "19b6cdb5-fa63-5f4c-bb5e-0e4ddedf17bc",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 98,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 11.384428128264066,
+      "y": 28.338199379569694
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "res_shot_spot": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "res_shot_classification_coord": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 19.0,
+    "y": 7.0
+   },
+   "release": {
+    "x": 27.0,
+    "y": 10.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_pump_shoot",
+   "micro_calls": [
+    {
+     "seq": 99,
+     "pre": {
+      "x": 19.0,
+      "y": 7.0
+     },
+     "rel": {
+      "x": 27.0,
+      "y": 10.0
+     },
+     "family": "dribble_pump_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 27.0,
+    "y": 10.0
+   },
+   "shooter_coords": {
+    "x": 19.0,
+    "y": 7.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 27.0,
+    "y": 10.0
+   },
+   "shooter_id": "a0a0f2d7-935c-5c73-891a-ebcb00b784a8",
+   "authored_spot": "lower midcorner",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 100,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 27.0,
+      "y": 10.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 27.0,
+    "y": 10.0
+   },
+   "res_shot_spot": {
+    "x": 27.0,
+    "y": 10.0
+   },
+   "res_shot_classification_coord": {
+    "x": 27.0,
+    "y": 10.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 27.0,
+    "y": 10.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FCP",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_inside",
+   "micro_calls": [
+    {
+     "seq": 101,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 11.384428128264066,
+      "y": 28.338199379569694
+     },
+     "family": "strong_inside"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "shooter_id": "19b6cdb5-fa63-5f4c-bb5e-0e4ddedf17bc",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 102,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 11.384428128264066,
+      "y": 28.338199379569694
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "res_shot_spot": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "res_shot_classification_coord": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FCP",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 63.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 67.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 103,
+     "pre": {
+      "x": 63.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 63.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    },
+    {
+     "seq": 107,
+     "pre": {
+      "x": 63.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 67.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 63.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 63.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 63.0,
+    "y": 25.0
+   },
+   "shooter_id": "15901201-8878-52e1-a736-96e9c89f6488",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 104,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 63.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "sf_calls": [
+    {
+     "seq": 105,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 106,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": null,
+   "res_shot_spot": {
+    "x": 63.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 63.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 63.0,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "set",
+   "micro_calls": [
+    {
+     "seq": 108,
+     "pre": {
+      "x": 66.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 66.0,
+      "y": 25.0
+     },
+     "family": "set"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "shooter_id": "b42d8179-4c9c-5340-8019-e1d655dad634",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 109,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 66.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_pump_shoot",
+   "micro_calls": [
+    {
+     "seq": 110,
+     "pre": {
+      "x": 36.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 32.0,
+      "y": 36.0
+     },
+     "family": "dribble_pump_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "shooter_coords": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "shooter_id": "d014435a-5590-5dfe-8af0-c59eae718f24",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 111,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 32.0,
+      "y": 36.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "res_shot_spot": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "res_shot_classification_coord": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "under_and_up",
+   "micro_calls": [
+    {
+     "seq": 112,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 15.62746694241347,
+      "y": 30.837523612561803
+     },
+     "family": "under_and_up"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "shooter_id": "19b6cdb5-fa63-5f4c-bb5e-0e4ddedf17bc",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 113,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 15.62746694241347,
+      "y": 30.837523612561803
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "res_shot_spot": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "res_shot_classification_coord": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 38.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 38.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "set",
+   "micro_calls": [
+    {
+     "seq": 114,
+     "pre": {
+      "x": 38.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 38.0,
+      "y": 25.0
+     },
+     "family": "set"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 38.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 38.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 38.0,
+    "y": 25.0
+   },
+   "shooter_id": "19b6cdb5-fa63-5f4c-bb5e-0e4ddedf17bc",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 115,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 38.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 38.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 38.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 38.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 38.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 40.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 117,
+     "pre": {
+      "x": 40.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 32.0,
+      "y": 14.0
+     },
+     "family": "dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 40.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_id": "d014435a-5590-5dfe-8af0-c59eae718f24",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 118,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 32.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 119,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 120,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "inside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "straight_inside",
+   "micro_calls": [
+    {
+     "seq": 123,
+     "pre": {
+      "x": 87.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 87.0,
+      "y": 25.0
+     },
+     "family": "straight_inside"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "shooter_id": "457185a0-16c9-5a23-a3bc-ca65b5e77406",
+   "authored_spot": "basketspot",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 124,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 87.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "jab_step",
+   "micro_calls": [
+    {
+     "seq": 125,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 12.37253305758653,
+      "y": 33.16247638743819
+     },
+     "family": "jab_step"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "shooter_id": "80f3ca79-1e8e-56cc-8b86-36e2156abf31",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 126,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 12.37253305758653,
+      "y": 33.16247638743819
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_shot_classification_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 127,
+     "pre": {
+      "x": 60.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 60.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "shooter_id": "60d85fb6-4576-5ccd-b143-8c1cc2e308cf",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 128,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 60.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 129,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 130,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 60.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "release": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 131,
+     "pre": {
+      "x": 88.0,
+      "y": 6.0
+     },
+     "rel": {
+      "x": 81.0,
+      "y": 7.0
+     },
+     "family": "dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "shooter_coords": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "lower corner",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 132,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 81.0,
+      "y": 7.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "res_shot_spot": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "res_shot_classification_coord": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 133,
+     "pre": {
+      "x": 64.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 68.0,
+      "y": 14.0
+     },
+     "family": "dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "shooter_id": "e590d342-9121-5c78-900e-8883166655d1",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 134,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 68.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 135,
+     "pre": {
+      "x": 64.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 64.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "shooter_id": "b43726fc-f87f-5d25-9b5b-3c03282e63e8",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 136,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 64.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "jab_step",
+   "micro_calls": [
+    {
+     "seq": 137,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 12.37253305758653,
+      "y": 33.16247638743819
+     },
+     "family": "jab_step"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "shooter_id": "80f3ca79-1e8e-56cc-8b86-36e2156abf31",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 138,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 12.37253305758653,
+      "y": 33.16247638743819
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_shot_classification_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "straight_inside",
+   "micro_calls": [
+    {
+     "seq": 139,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "family": "straight_inside"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "shooter_id": "80f3ca79-1e8e-56cc-8b86-36e2156abf31",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 140,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 14.0,
+      "y": 32.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "res_shot_spot": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "res_shot_classification_coord": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "inside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 80.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 81.07375098438631,
+    "y": 33.68732297546421
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "under_and_up",
+   "micro_calls": [
+    {
+     "seq": 141,
+     "pre": {
+      "x": 80.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 81.07375098438631,
+      "y": 33.68732297546421
+     },
+     "family": "under_and_up"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 81.07375098438631,
+    "y": 33.68732297546421
+   },
+   "shooter_coords": {
+    "x": 80.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 81.07375098438631,
+    "y": 33.68732297546421
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "upper midpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 142,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 81.07375098438631,
+      "y": 33.68732297546421
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": true,
+   "made": true,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 143,
+     "is_three": false,
+     "made": true,
+     "n": 1
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 144,
+     "n": 1,
+     "remaining": 1,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 81.07375098438631,
+    "y": 33.68732297546421
+   },
+   "res_shot_spot": {
+    "x": 81.07375098438631,
+    "y": 33.68732297546421
+   },
+   "res_shot_classification_coord": {
+    "x": 81.07375098438631,
+    "y": 33.68732297546421
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 81.07375098438631,
+    "y": 33.68732297546421
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "inside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 86.0,
+    "y": 19.0
+   },
+   "release": {
+    "x": 88.88082979849015,
+    "y": 22.456995758188192
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_inside",
+   "micro_calls": [
+    {
+     "seq": 145,
+     "pre": {
+      "x": 86.0,
+      "y": 19.0
+     },
+     "rel": {
+      "x": 88.88082979849015,
+      "y": 22.456995758188192
+     },
+     "family": "strong_inside"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 88.88082979849015,
+    "y": 22.456995758188192
+   },
+   "shooter_coords": {
+    "x": 86.0,
+    "y": 19.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 88.88082979849015,
+    "y": 22.456995758188192
+   },
+   "shooter_id": "60d85fb6-4576-5ccd-b143-8c1cc2e308cf",
+   "authored_spot": "lower lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 146,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 88.88082979849015,
+      "y": 22.456995758188192
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 88.88082979849015,
+    "y": 22.456995758188192
+   },
+   "res_shot_spot": {
+    "x": 88.88082979849015,
+    "y": 22.456995758188192
+   },
+   "res_shot_classification_coord": {
+    "x": 88.88082979849015,
+    "y": 22.456995758188192
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 88.88082979849015,
+    "y": 22.456995758188192
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "shooter_coords": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "shooter_id": "d014435a-5590-5dfe-8af0-c59eae718f24",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 147,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 26.0,
+      "y": 30.0
+     }
+    }
+   ],
+   "res_micro_release_coord": null,
+   "res_shot_spot": null,
+   "res_shot_classification_coord": null,
+   "res_is_three": null,
+   "res_shot_value": null,
+   "final_shot_spot": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 57.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 61.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 148,
+     "pre": {
+      "x": 57.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 61.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 61.5,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 57.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 61.5,
+    "y": 25.0
+   },
+   "shooter_id": "60d85fb6-4576-5ccd-b143-8c1cc2e308cf",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 149,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 61.5,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": true,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 150,
+     "is_three": true,
+     "made": true,
+     "n": 1
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 151,
+     "n": 1,
+     "remaining": 1,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 61.5,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 61.5,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 61.5,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 61.5,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "release": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_pump_shoot",
+   "micro_calls": [
+    {
+     "seq": 152,
+     "pre": {
+      "x": 88.0,
+      "y": 6.0
+     },
+     "rel": {
+      "x": 81.0,
+      "y": 7.0
+     },
+     "family": "dribble_pump_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "shooter_coords": {
+    "x": 88.0,
+    "y": 6.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "lower corner",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 153,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 81.0,
+      "y": 7.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "res_shot_spot": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "res_shot_classification_coord": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FCP",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "inside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 80.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 80.0,
+    "y": 27.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "jab_step",
+   "micro_calls": [
+    {
+     "seq": 154,
+     "pre": {
+      "x": 80.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 80.0,
+      "y": 27.0
+     },
+     "family": "jab_step"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 80.0,
+    "y": 27.0
+   },
+   "shooter_coords": {
+    "x": 80.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 80.0,
+    "y": 27.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "midlane",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 155,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 80.0,
+      "y": 27.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": true,
+   "final_is_three": false,
+   "shooting_foul": true,
+   "made": true,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 156,
+     "is_three": false,
+     "made": true,
+     "n": 1
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 157,
+     "n": 1,
+     "remaining": 1,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 88.0,
+    "y": 25.0
+   },
+   "res_shot_spot": null,
+   "res_shot_classification_coord": null,
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 80.0,
+    "y": 27.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 158,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 64.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": null,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "set_pump",
+   "micro_calls": [
+    {
+     "seq": 159,
+     "pre": {
+      "x": 36.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 36.0,
+      "y": 25.0
+     },
+     "family": "set_pump"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "shooter_id": "80f3ca79-1e8e-56cc-8b86-36e2156abf31",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 160,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 36.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 66.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 161,
+     "pre": {
+      "x": 62.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 62.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    },
+    {
+     "seq": 165,
+     "pre": {
+      "x": 62.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 66.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "shooter_id": "60d85fb6-4576-5ccd-b143-8c1cc2e308cf",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 162,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 62.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "sf_calls": [
+    {
+     "seq": 163,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 164,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": null,
+   "res_shot_spot": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "jab_step",
+   "micro_calls": [
+    {
+     "seq": 166,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 12.37253305758653,
+      "y": 33.16247638743819
+     },
+     "family": "jab_step"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "shooter_id": "80f3ca79-1e8e-56cc-8b86-36e2156abf31",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 167,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 12.37253305758653,
+      "y": 33.16247638743819
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_shot_classification_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 168,
+     "pre": {
+      "x": 36.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 32.0,
+      "y": 36.0
+     },
+     "family": "dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "shooter_coords": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "shooter_id": "0d2ae64a-5d6e-5ab5-b6ca-3e77fcef91e0",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 169,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 32.0,
+      "y": 36.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "res_shot_spot": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "res_shot_classification_coord": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FCP",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "attack",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 40.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 35.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 170,
+     "pre": {
+      "x": 40.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 35.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 35.5,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 40.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 35.5,
+    "y": 25.0
+   },
+   "shooter_id": "104c7b0f-8d91-5b2d-abff-49e39fa11564",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 171,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 35.5,
+      "y": 25.0
+     }
+    }
+   ],
+   "res_micro_release_coord": null,
+   "res_shot_spot": null,
+   "res_shot_classification_coord": null,
+   "res_is_three": null,
+   "res_shot_value": null,
+   "final_shot_spot": {
+    "x": 35.5,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": true,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 61.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 61.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 172,
+     "pre": {
+      "x": 61.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 61.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 61.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 61.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 61.0,
+    "y": 25.0
+   },
+   "shooter_id": "b43726fc-f87f-5d25-9b5b-3c03282e63e8",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 173,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 61.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 61.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 61.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 61.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 61.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "release": {
+    "x": 73.0,
+    "y": 10.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 174,
+     "pre": {
+      "x": 81.0,
+      "y": 7.0
+     },
+     "rel": {
+      "x": 73.0,
+      "y": 10.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 73.0,
+    "y": 10.0
+   },
+   "shooter_coords": {
+    "x": 81.0,
+    "y": 7.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 73.0,
+    "y": 10.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "lower midcorner",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 175,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 73.0,
+      "y": 10.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 73.0,
+    "y": 10.0
+   },
+   "res_shot_spot": {
+    "x": 73.0,
+    "y": 10.0
+   },
+   "res_shot_classification_coord": {
+    "x": 73.0,
+    "y": 10.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 73.0,
+    "y": 10.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_pump_shoot",
+   "micro_calls": [
+    {
+     "seq": 176,
+     "pre": {
+      "x": 56.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 68.0,
+      "y": 14.0
+     },
+     "family": "dribble_pump_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "shooter_id": "c13c8088-81a5-5bd3-a409-7020ac6d9822",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 177,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 68.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "shooter_id": "d014435a-5590-5dfe-8af0-c59eae718f24",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 178,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 36.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": null,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 59.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 179,
+     "pre": {
+      "x": 59.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 68.0,
+      "y": 14.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 59.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 180,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 68.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "set",
+   "micro_calls": [
+    {
+     "seq": 181,
+     "pre": {
+      "x": 28.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 28.0,
+      "y": 25.0
+     },
+     "family": "set"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "shooter_id": "0d2ae64a-5d6e-5ab5-b6ca-3e77fcef91e0",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 182,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 28.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 183,
+     "pre": {
+      "x": 39.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 32.0,
+      "y": 14.0
+     },
+     "family": "dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_id": "1eed8d16-4c22-5541-afed-127f84545b8c",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 184,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 32.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 77.0,
+    "y": 29.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 77.0,
+    "y": 29.0
+   },
+   "shooter_coords": {
+    "x": 77.0,
+    "y": 29.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 77.0,
+    "y": 29.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 185,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 77.0,
+      "y": 29.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 77.0,
+    "y": 29.0
+   },
+   "res_shot_spot": {
+    "x": 77.0,
+    "y": 29.0
+   },
+   "res_shot_classification_coord": {
+    "x": 77.0,
+    "y": 29.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 77.0,
+    "y": 29.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 186,
+     "pre": {
+      "x": 56.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 56.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "shooter_id": "e590d342-9121-5c78-900e-8883166655d1",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 187,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 56.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 73.0,
+    "y": 40.0
+   },
+   "release": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 188,
+     "pre": {
+      "x": 73.0,
+      "y": 40.0
+     },
+     "rel": {
+      "x": 81.0,
+      "y": 43.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "shooter_coords": {
+    "x": 73.0,
+    "y": 40.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "shooter_id": "9c044323-07d6-56d8-9f25-d2d3230ae6aa",
+   "authored_spot": "upper wing",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 189,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 81.0,
+      "y": 43.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "res_shot_spot": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "res_shot_classification_coord": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 81.0,
+    "y": 43.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 190,
+     "pre": {
+      "x": 36.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 32.0,
+      "y": 14.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_id": "19b6cdb5-fa63-5f4c-bb5e-0e4ddedf17bc",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 191,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 32.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": true,
+   "made": false,
+   "fga_recorded": true,
+   "sf_calls": [
+    {
+     "seq": 192,
+     "is_three": true,
+     "made": false,
+     "n": 3
+    }
+   ],
+   "ft_awards": [
+    {
+     "seq": 193,
+     "n": 3,
+     "remaining": 3,
+     "one_and_one": false
+    }
+   ],
+   "res_micro_release_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FREE_THROW",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "shooter_coords": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "shooter_id": "19b6cdb5-fa63-5f4c-bb5e-0e4ddedf17bc",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 194,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 26.0,
+      "y": 30.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "res_shot_spot": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "res_shot_classification_coord": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 26.0,
+    "y": 30.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 70.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 195,
+     "pre": {
+      "x": 66.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 70.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 70.5,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 66.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 70.5,
+    "y": 25.0
+   },
+   "shooter_id": "e590d342-9121-5c78-900e-8883166655d1",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 196,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 70.5,
+      "y": 25.0
+     }
+    }
+   ],
+   "res_micro_release_coord": null,
+   "res_shot_spot": null,
+   "res_shot_classification_coord": null,
+   "res_is_three": null,
+   "res_shot_value": null,
+   "final_shot_spot": {
+    "x": 70.5,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 197,
+     "pre": {
+      "x": 36.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 32.0,
+      "y": 14.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_id": "104c7b0f-8d91-5b2d-abff-49e39fa11564",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 198,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 32.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 25.0,
+    "y": 28.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 25.0,
+    "y": 28.0
+   },
+   "shooter_coords": {
+    "x": 25.0,
+    "y": 28.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 25.0,
+    "y": 28.0
+   },
+   "shooter_id": "7219a92c-c420-5a80-8f94-a2cf954cb3a9",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 199,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 25.0,
+      "y": 28.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 25.0,
+    "y": 28.0
+   },
+   "res_shot_spot": {
+    "x": 25.0,
+    "y": 28.0
+   },
+   "res_shot_classification_coord": {
+    "x": 25.0,
+    "y": 28.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 25.0,
+    "y": 28.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "release": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "set",
+   "micro_calls": [
+    {
+     "seq": 200,
+     "pre": {
+      "x": 32.0,
+      "y": 36.0
+     },
+     "rel": {
+      "x": 32.0,
+      "y": 36.0
+     },
+     "family": "set"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "shooter_coords": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "shooter_id": "a0a0f2d7-935c-5c73-891a-ebcb00b784a8",
+   "authored_spot": "upper midwing",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 201,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 32.0,
+      "y": 36.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "res_shot_spot": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "res_shot_classification_coord": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 32.0,
+    "y": 36.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FCP",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "attack",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 31.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 31.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 202,
+     "pre": {
+      "x": 31.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 31.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 31.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 31.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 31.0,
+    "y": 25.0
+   },
+   "shooter_id": "f608a824-01dd-5395-8c73-d2f1d1a7a1a7",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 203,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 31.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 31.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 31.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 31.0,
+    "y": 25.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 31.0,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FCP",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "outside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 204,
+     "pre": {
+      "x": 36.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 32.0,
+      "y": 14.0
+     },
+     "family": "dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 36.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "shooter_id": "a0a0f2d7-935c-5c73-891a-ebcb00b784a8",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 205,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 32.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 32.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCT",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_inside",
+   "micro_calls": [
+    {
+     "seq": 206,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 11.384428128264066,
+      "y": 28.338199379569694
+     },
+     "family": "strong_inside"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "shooter_id": "7219a92c-c420-5a80-8f94-a2cf954cb3a9",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 207,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 11.384428128264066,
+      "y": 28.338199379569694
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "res_shot_spot": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "res_shot_classification_coord": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 11.384428128264066,
+    "y": 28.338199379569694
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 72.1,
+    "y": 18.3
+   },
+   "release": {
+    "x": 72.1,
+    "y": 18.3
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 208,
+     "pre": {
+      "x": 72.1,
+      "y": 18.3
+     },
+     "rel": {
+      "x": 72.1,
+      "y": 18.3
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 72.1,
+    "y": 18.3
+   },
+   "shooter_coords": {
+    "x": 72.1,
+    "y": 18.3
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 72.1,
+    "y": 18.3
+   },
+   "shooter_id": "457185a0-16c9-5a23-a3bc-ca65b5e77406",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 209,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 72.1,
+      "y": 18.3
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 72.1,
+    "y": 18.3
+   },
+   "res_shot_spot": {
+    "x": 72.1,
+    "y": 18.3
+   },
+   "res_shot_classification_coord": {
+    "x": 72.1,
+    "y": 18.3
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 72.1,
+    "y": 18.3
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "set_pump",
+   "micro_calls": [
+    {
+     "seq": 210,
+     "pre": {
+      "x": 64.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 64.0,
+      "y": 25.0
+     },
+     "family": "set_pump"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "shooter_id": "c13c8088-81a5-5bd3-a409-7020ac6d9822",
+   "authored_spot": "key",
+   "authored_is_three": true,
+   "cls_calls": [
+    {
+     "seq": 211,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 64.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 64.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "attack",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 26.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 21.838948556863777,
+    "y": 30.28662587635567
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 212,
+     "pre": {
+      "x": 26.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 21.838948556863777,
+      "y": 30.28662587635567
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 21.838948556863777,
+    "y": 30.28662587635567
+   },
+   "shooter_coords": {
+    "x": 26.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 21.838948556863777,
+    "y": 30.28662587635567
+   },
+   "shooter_id": "19b6cdb5-fa63-5f4c-bb5e-0e4ddedf17bc",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 213,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 21.838948556863777,
+      "y": 30.28662587635567
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 21.838948556863777,
+    "y": 30.28662587635567
+   },
+   "res_shot_spot": {
+    "x": 21.838948556863777,
+    "y": 30.28662587635567
+   },
+   "res_shot_classification_coord": {
+    "x": 21.838948556863777,
+    "y": 30.28662587635567
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 21.838948556863777,
+    "y": 30.28662587635567
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "attack",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 215,
+     "pre": {
+      "x": 39.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 39.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "shooter_id": "a0a0f2d7-935c-5c73-891a-ebcb00b784a8",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 216,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 39.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 39.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "fade_away",
+   "micro_calls": [
+    {
+     "seq": 217,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 16.615571871735934,
+      "y": 35.661800620430306
+     },
+     "family": "fade_away"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "shooter_id": "7219a92c-c420-5a80-8f94-a2cf954cb3a9",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 218,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 16.615571871735934,
+      "y": 35.661800620430306
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "res_shot_spot": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "res_shot_classification_coord": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 16.615571871735934,
+    "y": 35.661800620430306
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "attack",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 45.5,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "strong_attack",
+   "micro_calls": [
+    {
+     "seq": 219,
+     "pre": {
+      "x": 50.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 45.5,
+      "y": 25.0
+     },
+     "family": "strong_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 45.5,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 45.5,
+    "y": 25.0
+   },
+   "shooter_id": "f608a824-01dd-5395-8c73-d2f1d1a7a1a7",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 220,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 45.5,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 45.5,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 45.5,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 45.5,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 45.5,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "set_pump",
+   "micro_calls": [
+    {
+     "seq": 221,
+     "pre": {
+      "x": 50.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 50.0,
+      "y": 25.0
+     },
+     "family": "set_pump"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "shooter_id": "457185a0-16c9-5a23-a3bc-ca65b5e77406",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 222,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 50.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 50.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 28.0,
+    "y": 28.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 28.0,
+    "y": 28.0
+   },
+   "shooter_coords": {
+    "x": 28.0,
+    "y": 28.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 28.0,
+    "y": 28.0
+   },
+   "shooter_id": "7219a92c-c420-5a80-8f94-a2cf954cb3a9",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 223,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 28.0,
+      "y": 28.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 28.0,
+    "y": 28.0
+   },
+   "res_shot_spot": {
+    "x": 28.0,
+    "y": 28.0
+   },
+   "res_shot_classification_coord": {
+    "x": 28.0,
+    "y": 28.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 28.0,
+    "y": 28.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 54.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 224,
+     "pre": {
+      "x": 54.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 68.0,
+      "y": 14.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 54.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "shooter_id": "c13c8088-81a5-5bd3-a409-7020ac6d9822",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 225,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 68.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "stopped_attack_pullup": true,
+   "release": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "release_has_x": true,
+   "roles_shot_spot": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "shooter_id": "19b6cdb5-fa63-5f4c-bb5e-0e4ddedf17bc",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 226,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 28.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 28.0,
+    "y": 25.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": null,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "attack",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pullup_attack",
+   "micro_calls": [
+    {
+     "seq": 228,
+     "pre": {
+      "x": 56.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 56.0,
+      "y": 25.0
+     },
+     "family": "pullup_attack"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "shooter_coords": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "shooter_id": "e590d342-9121-5c78-900e-8883166655d1",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 229,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 56.0,
+      "y": 25.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "res_shot_spot": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "res_shot_classification_coord": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 56.0,
+    "y": 25.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "jab_step",
+   "micro_calls": [
+    {
+     "seq": 230,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 12.37253305758653,
+      "y": 33.16247638743819
+     },
+     "family": "jab_step"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "shooter_id": "7219a92c-c420-5a80-8f94-a2cf954cb3a9",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 231,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 12.37253305758653,
+      "y": 33.16247638743819
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_shot_classification_coord": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 12.37253305758653,
+    "y": 33.16247638743819
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "outside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "pump_dribble_shoot",
+   "micro_calls": [
+    {
+     "seq": 232,
+     "pre": {
+      "x": 62.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 68.0,
+      "y": 14.0
+     },
+     "family": "pump_dribble_shoot"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "shooter_coords": {
+    "x": 62.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": true,
+   "cls_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "shooter_id": "e590d342-9121-5c78-900e-8883166655d1",
+   "authored_spot": "",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 233,
+     "source": "shot_spot",
+     "is_three": true,
+     "spot": {
+      "x": 68.0,
+      "y": 14.0
+     }
+    }
+   ],
+   "final_is_three": true,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_shot_classification_coord": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "res_is_three": true,
+   "res_shot_value": 3,
+   "final_shot_spot": {
+    "x": 68.0,
+    "y": 14.0
+   },
+   "release_arc": true,
+   "pre_micro_arc": true,
+   "roles_spot_arc": true,
+   "shooter_coords_arc": true,
+   "cls_coord_arc": true
+  },
+  {
+   "state": "HCO",
+   "quarter": 1,
+   "off_is_away": true,
+   "off_team": "BENTLEY_TRUMAN",
+   "shot_type": "inside",
+   "away_offense_micro": true,
+   "pre_micro": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "release": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "under_and_up",
+   "micro_calls": [
+    {
+     "seq": 234,
+     "pre": {
+      "x": 14.0,
+      "y": 32.0
+     },
+     "rel": {
+      "x": 15.62746694241347,
+      "y": 30.837523612561803
+     },
+     "family": "under_and_up"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "shooter_coords": {
+    "x": 14.0,
+    "y": 32.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "shooter_id": "7219a92c-c420-5a80-8f94-a2cf954cb3a9",
+   "authored_spot": "upper lowpost",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 235,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 15.62746694241347,
+      "y": 30.837523612561803
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": false,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": false,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "res_shot_spot": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "res_shot_classification_coord": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 15.62746694241347,
+    "y": 30.837523612561803
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  },
+  {
+   "state": "FAST_BREAK",
+   "quarter": 1,
+   "off_is_away": false,
+   "off_team": "LANCASTER",
+   "shot_type": "inside",
+   "away_offense_micro": false,
+   "pre_micro": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "release": {
+    "x": 87.0,
+    "y": 23.0
+   },
+   "release_is_dict": true,
+   "release_has_x": true,
+   "release_has_y": true,
+   "micro_family": "under_and_up",
+   "micro_calls": [
+    {
+     "seq": 236,
+     "pre": {
+      "x": 87.0,
+      "y": 25.0
+     },
+     "rel": {
+      "x": 87.0,
+      "y": 23.0
+     },
+     "family": "under_and_up"
+    }
+   ],
+   "roles_shot_spot": {
+    "x": 87.0,
+    "y": 23.0
+   },
+   "shooter_coords": {
+    "x": 87.0,
+    "y": 25.0
+   },
+   "allow_three": true,
+   "cls_source": "shot_spot",
+   "cls_is_three": false,
+   "cls_coord": {
+    "x": 87.0,
+    "y": 23.0
+   },
+   "shooter_id": "bd5dbf1f-ba41-5894-9b3b-2a25c87e8736",
+   "authored_spot": "basketspot",
+   "authored_is_three": false,
+   "cls_calls": [
+    {
+     "seq": 237,
+     "source": "shot_spot",
+     "is_three": false,
+     "spot": {
+      "x": 87.0,
+      "y": 23.0
+     }
+    }
+   ],
+   "dunk_branch_entered": true,
+   "dunk_stamp": true,
+   "final_is_three": false,
+   "shooting_foul": false,
+   "made": true,
+   "fga_recorded": true,
+   "res_micro_release_coord": {
+    "x": 88.0,
+    "y": 25.0
+   },
+   "res_shot_spot": null,
+   "res_shot_classification_coord": null,
+   "res_is_three": false,
+   "res_shot_value": 2,
+   "final_shot_spot": {
+    "x": 87.0,
+    "y": 23.0
+   },
+   "release_arc": false,
+   "pre_micro_arc": false,
+   "roles_spot_arc": false,
+   "shooter_coords_arc": false,
+   "cls_coord_arc": false
+  }
+ ],
+ "sf_all": [
+  {
+   "inside_resolve_shot": true,
+   "is_three": false,
+   "made": false,
+   "n": 2
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": false,
+   "made": true,
+   "n": 1
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": true,
+   "n": 1
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": false,
+   "made": true,
+   "n": 1
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": false,
+   "made": true,
+   "n": 1
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": true,
+   "n": 1
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": false,
+   "made": true,
+   "n": 1
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  },
+  {
+   "inside_resolve_shot": true,
+   "is_three": true,
+   "made": false,
+   "n": 3
+  }
+ ],
+ "home_score": null,
+ "away_score": null
+}

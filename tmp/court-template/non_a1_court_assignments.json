@@ -2,23 +2,23 @@
   "generated_count": 1,
   "assignments": [
     {
-      "slug": "templeton_wesley",
+      "slug": "redwood_high",
       "hardwood_variant": "medium_medium",
       "inside_tone": "medium",
       "outside_tone": "medium",
-      "lane_fill": "secondary",
-      "half_circle_fill": "primary",
+      "lane_fill": "primary",
+      "half_circle_fill": "secondary",
       "oob_fill": "primary",
       "line_fill": "white",
-      "output": "FrontEnd/static/images/teams/templeton_wesley/identity_test/templeton_wesley_alternating_base.jpg",
+      "output": "tmp/court-redesign-batch-01/redwood_high_base.jpg",
       "resolved": {
-        "primary": "#7c2b24",
-        "secondary": "#f1c40f",
+        "primary": "#d24a1b",
+        "secondary": "#000000",
         "inside_wood": "#DBB891",
         "outside_wood": "#DBB891",
-        "lane_color": "#f1c40f",
-        "half_circle_color": "#7c2b24",
-        "oob_color": "#7c2b24",
+        "lane_color": "#d24a1b",
+        "half_circle_color": "#000000",
+        "oob_color": "#d24a1b",
         "line_color": "#F4F3EF"
       }
     }

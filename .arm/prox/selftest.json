@@ -1,0 +1,33 @@
+{
+ "selftest": {
+  "calls": 2,
+  "collapsed": 1,
+  "contract_ok": 1,
+  "contract_bad": 1,
+  "contract_unknown": 0,
+  "cand_total": 10
+ },
+ "detector_ok": true,
+ "cases": [
+  {
+   "fn": "select_defender_closest_to_victim",
+   "collapsed": true,
+   "n_cand": 5,
+   "distinct_used_coords": 1,
+   "had_coords_by_pos": false,
+   "contract": "BAD",
+   "charged_pos": "PG",
+   "n_with_player_coords": 5
+  },
+  {
+   "fn": "select_defender_closest_to_victim",
+   "collapsed": false,
+   "n_cand": 5,
+   "distinct_used_coords": 5,
+   "had_coords_by_pos": true,
+   "contract": "ok",
+   "charged_pos": "SG",
+   "n_with_player_coords": 5
+  }
+ ]
+}
