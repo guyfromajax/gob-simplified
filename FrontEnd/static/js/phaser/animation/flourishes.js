@@ -708,6 +708,16 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
           (animationConfig.flourish?.idleWander?.byFamily || {})[flourish.family] || {};
         const baseRadius = flourish.amplitude_grid ?? flourish.radius_grid;
         const famScale = Number.isFinite(famCfg.amplitudeScale) ? famCfg.amplitudeScale : 1;
+        // Arrival-tail fill (defect 2). The backend stamps every tail above the 60ms
+        // perceptibility floor and carries `tail_ms`; `minTailMs` is Jamie's live threshold on
+        // top of that, so he can bracket "which pauses are worth filling" without a backend
+        // round-trip. Raising it can only ever stamp FEWER players, never more, so it cannot
+        // push the court past the density cap.
+        if (flourish.family === "arrival_settle") {
+          if (famCfg.enabled === false) return;
+          const minTail = Number.isFinite(famCfg.minTailMs) ? famCfg.minTailMs : 0;
+          if (Number.isFinite(flourish.tail_ms) && flourish.tail_ms < minTail) return;
+        }
         applyIdleWander(scene, sprite, {
           seed: flourish.seed,
           style: famCfg.style || flourish.style,
@@ -715,6 +725,8 @@ export function runFlourish(scene, sprite, flourish, opts = {}) {
           dirY: flourish.dir_y,
           radiusGrid: Number.isFinite(baseRadius) ? baseRadius * famScale : baseRadius,
           durationMs: flourish.duration_ms ?? opts.stepDurationMs,
+          // Wait until the player actually arrives. Absent/0 for every pre-existing caller.
+          delayMs: flourish.delay_ms,
         });
         return;
       }

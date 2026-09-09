@@ -23,6 +23,8 @@
 2. College and Pro setup
 3. Team Mod System
 4. Stronger week 36 CTA to review all Recrutiing results -- and carry forward results chart, not just report/rankings. Order chart within each conference by top to bottom team recruiting performance
+5. Fix HCO drives
+6. Replace Kobe look alike image and add more walk on images
 
 
 ##Animation

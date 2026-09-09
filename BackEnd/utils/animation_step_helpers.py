@@ -231,6 +231,138 @@ def stamp_idle_wander_on_still_players(
     return written
 
 
+# --- Arrival-tail fill (defect 2) ----------------------------------------------------------
+#
+# A player who reaches his target before the step ends stands dead for the remainder. Measured
+# on 8 played games with a seeded plays catalogue: 703.4 s per game, 31.7% of the wall time
+# moving sprites are on screen, 51.5% of moving player-steps affected.
+#
+# THE TAIL IS A DELIBERATE DECISION, NOT A BUG. `stamp_tween_durations` caps each tween at the
+# player's natural travel time precisely so he does not glide slower than his attributes justify
+# — the docstring names "lazy drift" as the anti-pattern it is avoiding, and that judgement was
+# correct. A court of players moving at wrong speeds reads worse than a court of players
+# standing still. What the author lacked was anything to put in the gap. So this FILLS the tail
+# instead of stretching the tween: no duration changes anywhere, no timing blast radius.
+#
+# THE GATE IS ONE LINE — tail over a threshold — not a list of continuity classes. The classes
+# were for sizing: 71.4% of all dead time sits in one-step journeys and only 13.0% in pure
+# arrivals, so a rule keyed on "ARRIVING" would reach an eighth of the problem. Tail size is the
+# thing that decides whether a human can see it.
+ARRIVAL_SETTLE_FAMILY = "arrival_settle"
+ARRIVAL_SETTLE_HARD_FLOOR_MS = IDLE_STILL_MIN_STEP_MS   # 60ms; 24.7% of tails, never stamped
+ARRIVAL_SETTLE_DEFAULT_STYLE = "jockey"
+ARRIVAL_SETTLE_CLOCK_MS_PER_GAME_SEC = IDLE_CLOCK_MS_PER_GAME_SEC
+
+
+def _arrival_tail_ms(step: Dict[str, Any], pid: str, step_wall_ms: float) -> float:
+    """Wall-clock ms this player spends standing at his destination after arriving.
+
+    Mirrors the frontend exactly, floors included, because a max(50, ...) on both sides changes
+    the answer for short steps:
+      animationPlayback.js:1307-1310  playerMs = max(50, round(tween_durations[pid] * 350))
+                                      ... falling back to the STEP duration when absent
+    A player with no `tween_durations` entry tweens for the whole step, so his tail is zero by
+    construction and he is not a candidate.
+    """
+    tw = ((step.get("start") or {}).get("tween_durations") or {}).get(pid)
+    if not isinstance(tw, (int, float)) or tw <= 0:
+        return 0.0
+    player_ms = max(50.0, round(float(tw) * ARRIVAL_SETTLE_CLOCK_MS_PER_GAME_SEC))
+    return max(0.0, step_wall_ms - player_ms)
+
+
+def stamp_arrival_settle(
+    steps: Optional[List[Dict[str, Any]]],
+    *,
+    cap: int = IDLE_STILL_DENSITY_CAP,
+    min_tail_ms: float = ARRIVAL_SETTLE_HARD_FLOOR_MS,
+    default_style: str = ARRIVAL_SETTLE_DEFAULT_STYLE,
+) -> int:
+    """Fill arrival tails with a delayed ``idle_wander``. Returns player-stamps written.
+
+    Reuses the shipped wander mechanism rather than inventing a second one; the only new fields
+    are ``family="arrival_settle"``, ``delay_ms`` and ``tail_ms``.
+
+    ONE DENSITY CAP, SHARED. The cap counts idlers ALREADY stamped on the step by the
+    still-player pass and only fills the headroom that is left. Two independent caps would let a
+    step carry the cap twice over, and a court with twice the intended number of men shifting
+    about is the "busy" failure this cap exists to prevent. Because the still-player pass runs
+    inside the emitters and this runs at the end of the turn, "already stamped" is simply
+    whatever is in ``start.flourish`` by the time we get here.
+
+    ``delay_ms`` is the player's own tween duration, so the wander starts as he stops.
+    ``tail_ms`` is carried so the FRONTEND can raise the threshold without a backend round-trip
+    — the floor here is a hard perceptibility limit, not Jamie's tuning knob.
+    """
+    if not steps:
+        return 0
+    try:
+        from BackEnd.engine.motion_step_decision import SUBTLE_IDLE_STYLE_AMPLITUDE_GRID
+    except Exception:  # pragma: no cover - amplitude table is advisory
+        SUBTLE_IDLE_STYLE_AMPLITUDE_GRID = {}
+    import math
+
+    floor = max(float(min_tail_ms), ARRIVAL_SETTLE_HARD_FLOOR_MS)
+    written = 0
+    for index, step in enumerate(steps):
+        if not isinstance(step, dict):
+            continue
+        start = step.get("start")
+        if not isinstance(start, dict):
+            continue
+        coords = start.get("coords")
+        if not isinstance(coords, dict):
+            continue
+        step_wall_ms = idle_step_duration_ms(step)
+        if step_wall_ms <= floor:
+            continue
+        existing = start.get("flourish") or {}
+        # Shared-cap headroom. Any flourish already on the step owns that sprite — a reach_in or
+        # a rattle must never be clobbered, and a still-player wander already counts as an idler.
+        headroom = cap - sum(1 for f in existing.values()
+                             if (f or {}).get("kind") == "idle_wander")
+        if cap is not None and cap >= 0 and headroom <= 0:
+            continue
+
+        candidates = []
+        for pid in coords:
+            if pid in existing:
+                continue
+            tail = _arrival_tail_ms(step, pid, step_wall_ms)
+            if tail < floor:
+                continue
+            candidates.append((pid, tail))
+        if not candidates:
+            continue
+        # Longest dead gap first, then a stable crc32 tiebreak. Ranking by tail is both better
+        # aimed than a hash and stable for the same reason run-length is in the still-player
+        # pass: it is a property of the step, not of a shuffle.
+        candidates.sort(key=lambda c: (-c[1], _idle_crc(c[0], ARRIVAL_SETTLE_FAMILY)))
+        if cap is not None and cap >= 0:
+            candidates = candidates[:headroom]
+
+        target = start.setdefault("flourish", {})
+        for pid, tail in candidates:
+            angle = (_idle_crc(pid, ARRIVAL_SETTLE_FAMILY, "dir") % 3600) / 3600.0 * 6.283185307
+            target[pid] = {
+                "kind": "idle_wander",
+                "family": ARRIVAL_SETTLE_FAMILY,
+                "style": default_style,
+                # crc32 of the player id, never rng.randint: a sim_rng draw here would move the
+                # draw count and fail the gate.
+                "seed": _idle_crc(pid, ARRIVAL_SETTLE_FAMILY, index),
+                "dir_x": round(math.cos(angle), 3),
+                "dir_y": round(math.sin(angle), 3),
+                "amplitude_grid": round(
+                    float(SUBTLE_IDLE_STYLE_AMPLITUDE_GRID.get(default_style, 0.8)), 3),
+                "delay_ms": round(step_wall_ms - tail, 1),
+                "duration_ms": round(tail, 1),
+                "tail_ms": round(tail, 1),
+            }
+            written += 1
+    return written
+
+
 # --- Continuity-aware movement curves (defect 1) -------------------------------------------
 #
 # Easing a player tween per STEP is worse than linear. A player crossing the floor over four

@@ -1226,9 +1226,10 @@
       "mascot": "Orcas",
       "conference": 15,
       "center_court": "team_wordmark",
-      "non_center_logos": "none",
+      "non_center_logos": "inside_3pt_arc_4",
       "hardwood": "gloss",
-      "deep_wing_wordmark": null
+      "deep_wing_wordmark": null,
+      "manual_override": "Added four Orca logos inside the 3-point arcs after visual review."
     },
     {
       "team": "Vancouver",

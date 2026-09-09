@@ -475,7 +475,28 @@ def _compute_drive_scores(
 # roll yields the tier + stop point + contact outcome, tuned via the shared HCT_D8_* levels. This
 # retires S2a's `_classify_drive_tier` + the `DRIVE_TIER_*` band/lean constants (never consumed).
 DRIVE_NEUTRAL_STOP_FRACTION = 0.5   # Tier B (contested NEUTRAL): BH pulls up ~midway to the rim
-DRIVE_STOPPED_MAX_GRID = 2.0        # Tier C (defense WINS): BH advances AT MOST this many grid before the wall
+# Tier C (defense WINS): the BH is walled short of the rim, but he still COVERS GROUND —
+# a stopped drive is a hard first step into a wall, not a standstill.
+#
+# Travel is a fraction of the intended drive, interpolated by how narrowly he was
+# stopped (`drive_stop_fraction` = 1 - m_norm, so 0 = resounding stop, 1 = barely):
+#
+#     travel = _full x (MIN + drive_stop_fraction x (MAX - MIN))
+#
+# WHY A FLOOR: the previous form was `drive_stop_fraction x DRIVE_STOPPED_MAX_GRID`
+# (an absolute 0-2 grid cap). `_full` cancelled out, so start distance was ignored,
+# and a decisive stop returned drive_stop_fraction = 0 EXACTLY -> zero movement. The
+# driver visibly did not move. MIN is the fix.
+#
+# WHY MAX STAYS BELOW DRIVE_NEUTRAL_STOP_FRACTION: Tier C means the defense WON, so it
+# must end SHORTER than Tier B's contested pull-up (0.5). At 0.5 the two tiers land on
+# the same spot and become indistinguishable. 0.45 keeps C visibly short of B.
+#
+# These bounds also make the old absolute ceiling unnecessary: capping at 0.45 of the
+# drive cannot reproduce the "Nice Stop but the driver kept going" runaway that the
+# 2.0-grid cap was introduced to kill. DRIVE_STOPPED_MAX_GRID is therefore retired.
+DRIVE_STOPPED_MIN_FRACTION = 0.30   # resounding stop still covers this share of the drive
+DRIVE_STOPPED_MAX_FRACTION = 0.45   # narrowest stop; must stay < DRIVE_NEUTRAL_STOP_FRACTION
 # Win/lose gate width for the HCO drive contest (± each way, in o_score/d_score points). The shared
 # default (chem+eff, a few pts) makes the neutral tier vanishingly rare; ~100 gives B real presence.
 # Tunable (S2f). Passed to `_resolve_moment(neutral_band=...)`; FB/HCT keep the chem+eff default.
@@ -1160,11 +1181,15 @@ def build_attack_drive_sequence(
     _stopped_pullup_coord = None
     if _three_tier and drive_tier in ("B", "C") and drive_stop_fraction < 1.0:
         if drive_tier == "C":
-            # Defense WON — the BH is walled almost at once: cap his advance to an ABSOLUTE 0–2 grid
-            # (scaled by how narrowly he was stopped), NOT a fraction of the full drive (which let a
-            # narrow stop carry him most of the way in). Fixes "Nice Stop but the driver kept going".
-            _full = math.hypot(drive_end["x"] - driver_start["x"], drive_end["y"] - driver_start["y"])
-            _cap_frac = min(1.0, (drive_stop_fraction * DRIVE_STOPPED_MAX_GRID) / _full) if _full > 1e-6 else 0.0
+            # Defense WON — the BH is walled short of the rim but still covers ground,
+            # scaled by BOTH how narrowly he was stopped and how far he had to go.
+            # See DRIVE_STOPPED_MIN_FRACTION / _MAX_FRACTION for why there is a floor.
+            # `_cap_frac` is a fraction of the intended drive, so the travelled
+            # distance scales with start distance automatically -- no _full term.
+            _narrowness = max(0.0, min(1.0, float(drive_stop_fraction or 0.0)))
+            _cap_frac = DRIVE_STOPPED_MIN_FRACTION + _narrowness * (
+                DRIVE_STOPPED_MAX_FRACTION - DRIVE_STOPPED_MIN_FRACTION
+            )
             _bh_stop = _drive_stop_coord(driver_start, drive_end, _cap_frac)
         else:
             _bh_stop = _drive_stop_coord(driver_start, drive_end, drive_stop_fraction)  # B: contested pull-up midway

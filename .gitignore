@@ -46,3 +46,6 @@ tmp/
 # NOTE: .gitignore does not affect ALREADY-TRACKED files, so the previously committed
 # scratch_* files are untracked in the same commit that widens this rule.
 scratch_*
+# Probe output. The gate arms write per-seed digests here; they are reproducible from the
+# scratch probes and have no business riding along in a source commit.
+.arm/

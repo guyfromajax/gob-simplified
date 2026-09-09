@@ -228,6 +228,34 @@ const defaults = {
         // so the same style one notch smaller — a trapped possession should not look busier
         // than a rebound.
         hct: { amplitudeScale: 0.5, style: 'shuffle' },
+        // ARRIVAL SETTLE (defect 2) — the biggest population in the workstream, and the only
+        // family that is NOT a standing player. This man has just travelled, reached his
+        // target early, and would otherwise stand dead for the rest of the step: 703.4 s per
+        // game, 31.7% of the time moving sprites are on screen.
+        //
+        // Its own family precisely because it is a different motion. A man who has been
+        // standing around shifts his weight idly; a man who has just sprinted and stopped
+        // DECELERATES INTO A SETTLE — he is planting, absorbing, squaring up. jockey is the
+        // grounded lean-and-jostle rather than a float, which is the closest of the four to
+        // that, and it is why this does not simply inherit hco_still.
+        //
+        // FOR JAMIE — bracket these three, and note that the aesthetic failure mode here is
+        // FIDGETING rather than invisibility, which is the opposite of every previous family:
+        //   · minTailMs — the threshold, in ms of dead tail, below which a pause is left alone.
+        //     The backend already refuses anything under 60ms (24.7% of tails, imperceptible).
+        //     150 ships: it takes everything from the 150-300ms band up, which is 56.8% of
+        //     tails, on the reasoning that 300ms+ (30.8%) is unarguably visible and the
+        //     150-300ms band probably is. Try 300 for "only fill the obvious pauses" and 60 for
+        //     "fill everything the eye could possibly catch".
+        //   · amplitudeScale — 0.6 ships, matching the still-player families (~4in of lean).
+        //     A settle should be smaller than a box-out, not larger.
+        //   · enabled: false for a clean A/B against the current dead tails.
+        arrival_settle: {
+          amplitudeScale: 0.6,
+          style: 'jockey',
+          minTailMs: 150,
+          enabled: true,
+        },
       },
     },
   },
