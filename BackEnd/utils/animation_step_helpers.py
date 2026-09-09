@@ -1267,3 +1267,61 @@ def build_foul_announcement(
         "player_data": {"playerId": str(fouler_id) if fouler_id is not None else ""},
         "meta": meta,
     }
+
+
+def enforce_step_start_continuity(
+    steps: Optional[List[Dict[str, Any]]],
+    *,
+    context: str = "",
+) -> int:
+    """UESS §8.1 guard: step N+1 ``start.coords`` MUST equal step N ``end.coords``
+    per player. Returns the number of corrections made.
+
+    Same rule and same mechanism as the HCO skeleton emitter, which enforces it
+    inline while building (``skeleton_step_emitter.py:2128-2138``)::
+
+        start_coords = {**anim_start, **prior_end}
+
+    HCO can do it at build time because it owns the whole loop. The fast-break
+    emitters assemble their step list from several independent builders, so the
+    equivalent point for them is a sweep over the finished list — the merge is
+    identical, only its timing differs.
+
+    WHY IT LOGS. A silent repair here would be worse than no guard. The renderer
+    never draws ``start.coords`` (it snaps to ``end.coords`` and skips the tween
+    when start == end, ``animationPlayback.js:1302``/``:1526``), so a
+    discontinuity shows up either as a teleport or as a player sliding along a
+    path nobody authored. Quietly rewriting the start coord converts the first
+    into the second and buries the cause. This corrects the frame AND says so,
+    so the next instance is a log line rather than an archaeology exercise. See
+    bugs.md item 40.
+    """
+    if not steps or len(steps) < 2:
+        return 0
+    import logging
+
+    fixed = 0
+    for i in range(1, len(steps)):
+        prev_end = ((steps[i - 1].get("end") or {}).get("coords")) or {}
+        cur = steps[i].get("start")
+        if not isinstance(cur, dict):
+            continue
+        cur_coords = cur.get("coords")
+        if not isinstance(cur_coords, dict) or not prev_end:
+            continue
+        for pid, pe in prev_end.items():
+            cc = cur_coords.get(pid)
+            if not isinstance(pe, dict) or not isinstance(cc, dict):
+                continue
+            if (abs(float(cc.get("x", 0.0)) - float(pe.get("x", 0.0))) > 1e-6
+                    or abs(float(cc.get("y", 0.0)) - float(pe.get("y", 0.0))) > 1e-6):
+                logging.warning(
+                    "[UESS 8.1] discontinuity corrected%s: step %d player %s "
+                    "start=(%.2f,%.2f) prior end=(%.2f,%.2f)",
+                    (" " + context) if context else "", i, pid,
+                    float(cc.get("x", 0.0)), float(cc.get("y", 0.0)),
+                    float(pe.get("x", 0.0)), float(pe.get("y", 0.0)),
+                )
+                cur_coords[pid] = dict(pe)
+                fixed += 1
+    return fixed
