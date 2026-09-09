@@ -495,8 +495,12 @@ DRIVE_NEUTRAL_STOP_FRACTION = 0.5   # Tier B (contested NEUTRAL): BH pulls up ~m
 # These bounds also make the old absolute ceiling unnecessary: capping at 0.45 of the
 # drive cannot reproduce the "Nice Stop but the driver kept going" runaway that the
 # 2.0-grid cap was introduced to kill. DRIVE_STOPPED_MAX_GRID is therefore retired.
-DRIVE_STOPPED_MIN_FRACTION = 0.30   # resounding stop still covers this share of the drive
-DRIVE_STOPPED_MAX_FRACTION = 0.45   # narrowest stop; must stay < DRIVE_NEUTRAL_STOP_FRACTION
+DRIVE_STOPPED_MIN_FRACTION = 0.35   # resounding stop still covers this share of the drive
+DRIVE_STOPPED_MAX_FRACTION = 0.48   # narrowest stop; must stay < DRIVE_NEUTRAL_STOP_FRACTION
+# 0.30/0.45 -> 0.35/0.48 (owner call 2026-09-09): more visible ground on a stopped
+# drive. MAX is now within 0.02 of Tier B, so it is effectively at its ceiling — any
+# further increase requires raising DRIVE_NEUTRAL_STOP_FRACTION first, or the two
+# tiers cross and a defense-WIN stop ends deeper than a merely contested one.
 # Win/lose gate width for the HCO drive contest (± each way, in o_score/d_score points). The shared
 # default (chem+eff, a few pts) makes the neutral tier vanishingly rare; ~100 gives B real presence.
 # Tunable (S2f). Passed to `_resolve_moment(neutral_band=...)`; FB/HCT keep the chem+eff default.
