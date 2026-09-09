@@ -2236,6 +2236,13 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       NAMED IN THE TURN TEXT versus the rendered owner, since the text is what tells a viewer who
       is supposed to have blown it.
 
+      **⚠ THAT SPECULATION IS WITHDRAWN — see item 46.** The text-keyed instrument was built and
+      its poison fires at 100%, and this population is not where the symptom lives: the real
+      string is ``"The pass is batted out of bounds — offense keeps it."``, which **names no
+      player at all**. The "off …" above is a 70-character truncation artifact of the
+      characterisation, not the text. These turns make no claim about who is responsible, so
+      nothing in them can contradict what is drawn.
+
       **A SEPARATE DEFECT FOUND ON THE WAY, and it is a labelling one:** ``turnover_type`` and the
       narrative text routinely disagree — ``DOUBLE_DRIBBLE`` with text "*Xenon Fletcher commits a
       travel*", ``TRAVEL`` with "*Ellis Clemons with an errant pass*", ``TRAVEL`` with "*PRESS! —
@@ -2280,6 +2287,113 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       step and never names the charged player (0 of 66)**, which is why it is not item 43's
       mechanism. Not fixed: it is a real contract violation but it wants its own scoping, and the
       no-``else`` is the more durable half of it.
+
+46. **SYMPTOM #3, SECOND PASS — the text-keyed instrument is built, its poison fires, and it
+      STILL does not reproduce the symptom on dead-ball turnovers. Plus: what "no owner" is
+      encodable as, and whether a loose ball has an authored position.** 2026-09-09, played arm,
+      PLAYED=1, 8 games. Diagnostic only.
+
+      **STEP 1 — item 44's exclusion is NOT an artifact of TO-credit keying.** The hypothesis was
+      that "0 of 66 on a turnover step" was measured via the TO credit, making the 70 uncredited
+      turns invisible for the same reason they were invisible to the owner comparison. Checked
+      against the probe source: ``scratch_towner3.py:139`` keys the population on
+      ``result_type``, **not** on the credit, so the untyped turns were in it all along. The
+      earlier report only *looked* like an exclusion because the display filtered zero rows.
+      Unfiltered, ``DEAD BALL/-`` carries **865 attached boundaries and 0 empty-string owners**;
+      every DEAD BALL sub-family is 0.00%. The real blind spot was different and is now closed:
+      that probe counted only ATTACHED boundaries, so loose/in-flight ones were never classified.
+      The census below covers all 38,994.
+
+      **STEP 2 — THE TEXT-KEYED INSTRUMENT. Poison fires at 100.0% on 8 of 8 seeds** (827
+      comparisons); names are matched against the ten on the floor and ``turnover_type`` is not
+      trusted anywhere. Headline: **101 of 827 (12.2%)** — which is close to Jamie's 15-20% and is
+      nevertheless **not the symptom**, because of where it sits:
+
+      | family | comparable | mismatch | rate | is a mismatch WRONG here? |
+      |---|---|---|---|---|
+      | DEFENSIVE_STOP | 16 | 16 | 100.0% | **no** — text names the stopper |
+      | FOUL | 59 | 49 | 83.1% | **no** — text names the fouling defender |
+      | STEAL | 95 | 21 | 22.1% | **no** — text names the stealer, ball is the victim's |
+      | MISS | 30 | 6 | 20.0% | unclear, n=30 |
+      | BLOCK | 19 | 1 | 5.3% | no — names the blocker |
+      | MAKE | 295 | 8 | 2.7% | yes, small |
+      | **DEAD BALL / DOUBLE_DRIBBLE** | 20 | **0** | 0.0% | — |
+      | **DEAD BALL / TRAVEL** | 17 | **0** | 0.0% | — |
+      | **DEAD BALL / untyped** | 7 | **0** | 0.0% | — |
+      | FREE_THROW / OREB_KICKOUT / PUTBACK_* | 269 | 0 | 0.0% | — |
+
+      **On dead-ball turnovers the text-named player and the rendered ball owner agree 44 of 44.**
+      The 12.2% is dominated by families where the text deliberately names a DEFENDER, and a
+      mismatch there is correct rendering, not a defect. Stated plainly, as briefed: **three
+      framings — the TO credit, the rendered owner, and now the narrative text — all measure
+      approximately zero on the population Jamie describes.**
+
+      **COVERAGE, and it is NOT near-total: the text names exactly one floor player on 827 turns,
+      NONE on 894, and SEVERAL on 851 — 32%.** Per the standing rule that is treated as a symptom
+      rather than a fact, so the uncredited population was read verbatim. It settles it:
+
+      > ``The pass is batted out of bounds — offense keeps it.``
+
+      **That text names nobody at all** — the earlier "off …" in item 43 was a 70-character
+      truncation artifact of the characterisation, not the real string, and item 43's speculation
+      that this population is where the symptom lives is **withdrawn**. These turns credit no TO,
+      name no player, and carry the ball attached to a single consistent owner across every
+      rendered boundary. **Nothing in the payload makes a claim about who is responsible, so
+      nothing can contradict what is drawn.** No fourth framing is proposed.
+
+      **WHAT WOULD STILL EXPLAIN IT.** Not measurable from this fixture: it is one matchup on
+      mongomock universal rosters. The remaining candidates are the 851 several-name turns (a
+      passer and a receiver in one sentence, where "who blew it" is genuinely ambiguous) and
+      anything specific to live rosters. Jamie pointing at one replay with the clock time would
+      be worth more than a fourth probe.
+
+      ---
+
+      **(A) IS "NOBODY HAS THE BALL" ENCODABLE UNAMBIGUOUSLY TODAY? Jamie's read is CONFIRMED, and
+      the good news is that the broken encoding is the rare one.** Census over 38,994 rendered
+      boundaries:
+
+      | encoding | count | share | what ``isBallAttached`` does | verdict |
+      |---|---|---|---|---|
+      | ``owner_player_id: <id>`` | 27,419 | 70.32% | attached | correct |
+      | key ABSENT + ``coords`` | 10,416 | 26.71% | loose branch | **correct — this is the right way to say "no owner"** |
+      | key ABSENT + ``current_coords`` | 1,093 | 2.80% | in-flight branch | correct |
+      | ``owner_player_id: ""`` | 66 | 0.17% | **attached**, lookup fails | **BROKEN (item 44)** |
+      | ``owner_player_id: null`` | 0 | 0.00% | would be broken | not emitted |
+      | ball object missing / no position | 0 | 0.00% | — | not emitted |
+
+      So the backend has and overwhelmingly uses an unambiguous encoding for "no owner" — **omit
+      the key**. The empty string is the only broken encoding present, it is the one Jamie
+      identified, and at 0.17% it is a narrow defect rather than a design gap. There is no
+      ``null`` and no missing ball object anywhere in 8 games.
+
+      **(B) IS THE LOOSE BALL'S POSITION AUTHORED? YES — presence is PERFECT. Movement is not.**
+      **11,509 of 11,509 loose boundaries carry a position; zero are missing.** The loose branch
+      is never reached empty. But presence and a trajectory are different things, and separating
+      them is the finding: **4,233 of 9,167 consecutive loose transitions (46.2%) do not move the
+      ball at all.** Whole families never move it:
+
+      | family | loose boundaries | moved | static |
+      |---|---|---|---|
+      | DREB | 371 | **0** | 0 |
+      | OREB_KICKOUT | 69 | **0** | 0 |
+      | CHARGE | 10 | **0** | 0 |
+      | MAKE | 3,230 | 1,282 | 1,572 |
+      | FREE_THROW | 1,757 | 668 | 914 |
+      | MISS | 3,502 | 1,816 | 1,205 |
+
+      (DREB/OREB_KICKOUT/CHARGE show 0 in both columns because each has one loose boundary per
+      turn, so there is no transition to measure — a parked ball by construction rather than by
+      authoring.)
+
+      **THE ANSWER TO THE COST QUESTION: A is broken and B is fine, so this is the cheap case, but
+      only for the encoding half.** Fixing (A) is small and two-sided — stop emitting ``""``, and
+      give the renderer the missing ``else`` so an unresolvable owner detaches loudly instead of
+      leaving the ball on the previous man (policy 26b). Jamie's separate report that **loose
+      balls animate weirdly generally** is NOT that fix: it is the 46.2% static figure, which is a
+      position that exists but does not describe a trajectory. That is authoring work on the
+      order of the off-ball destination item, not an encoding change. **They should be scoped
+      separately — the encoding fix will not make loose balls look better.**
 
 45. **OPEN OBSERVATION, awaiting specificity — Jamie: HCO "seems off in some places".** 2026-09-09.
       Recorded so it is not lost, explicitly NOT actionable yet. Too vague to trace, and the one
