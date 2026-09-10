@@ -4935,13 +4935,33 @@ MOMENT_ENGAGEMENT_PCT_BY_AGGRESSION = {0: 5, 1: 20, 2: 35, 3: 50, 4: 75}
 # HCO passing-lane perpendicular distance by defense aggression_call (Dynamic_HCO_System §4).
 # Tighter than HCT/FCP (8.0) — closer half-court spacing + faster passes. Normal tempo is rolled
 # once per game (randint 5-6) and cached in game_state (stable all game; no per-pass roll).
-HCO_PASS_LANE_DIST_BY_AGGRESSION = {"passive": 6.0, "aggressive": 5.0}
+# 2026-09-09 (owner call): was {"passive": 6.0, "aggressive": 5.0} with `normal` ABSENT and
+# resolved by randint(5,6). Those values were a counterweight from when passive's attempt rate
+# was 0 -- a wide passive lane cost nothing because it was multiplied by zero. Once passive was
+# raised to 5% the ordering became live and read backwards (the least aggressive posture got the
+# widest lane). Now ordered as intuition expects: aggressive sees the most, passive the least.
+#
+# `normal` is now an EXPLICIT entry. `_hco_pass_lane_dist` returns any value found here, so the
+# randint(5,6) fallback below is unreachable for all three calls -- see the note on that function.
+HCO_PASS_LANE_DIST_BY_AGGRESSION = {"aggressive": 6.0, "normal": 5.0, "passive": 4.0}
 
 # Dynamic HCO Defense — Gate 2 (Dynamic_MM_Brief §5C). When a defender is geometrically in a pass
 # lane (Gate 1), his chance to ATTEMPT the interception is set by defense aggression_call. Applied
-# only when the dynamic-defense flag is on (posture set); passive never gambles. Gate 3 (the
-# attribute contest in resolve_pass_contest) then decides if an attempt actually picks it.
-INTERCEPT_ATTEMPT_PCT_BY_CALL = {"aggressive": 80, "normal": 40, "passive": 0}
+# only when the dynamic-defense flag is on (posture set). Gate 3 (the attribute contest in
+# resolve_pass_contest) then decides if an attempt actually picks it.
+#
+# 80/40/0 -> 50/30/5 (owner call 2026-09-09): cut the HCO disrupted-pass rate. `normal` is the
+# lever that moves the aggregate — most possessions run normal aggression, so `aggressive` touches
+# a minority of them. Composes MULTIPLICATIVELY with HCO_PASS_SAFETY_BASE (lowered 175 -> 150 the
+# same day): a pass must clear this gate AND fail the passer-safety check, so the two cuts compound
+# rather than substitute.
+#
+# NOTE: passive is no longer 0, so passive defenders now gamble occasionally. That makes
+# HCO_PASS_LANE_DIST_BY_AGGRESSION["passive"] (6.0) LIVE for the first time — it was inert while
+# the attempt rate was zero. Passive therefore contests through a WIDER lane than aggressive (5.0).
+# Effective exposure is still correctly ordered (50 x 5.0 >> 5 x 6.0), but the lane values now read
+# backwards on inspection; revisit if passive interceptions look high.
+INTERCEPT_ATTEMPT_PCT_BY_CALL = {"aggressive": 50, "normal": 30, "passive": 5}
 
 # Dynamic HCO Defense — HCO-specific pass-contest calibration (owner spec 2026-07-10). Shared
 # resolve_pass_contest defaults (HCT/FCP) are BASE=200 / HI=250 / MID=200, left untouched. HCO folds
@@ -4962,8 +4982,16 @@ HCO_PASS_INTERCEPT_TIER_MID = 170.0
 
 
 def _hco_pass_lane_dist(game):
-    """HCO hot-read/kickout passing-lane distance: passive→6, aggressive→5, normal→randint(5,6)
-    rolled ONCE per game and cached in game_state['_hco_pass_lane_dist_normal']."""
+    """HCO hot-read/kickout passing-lane distance: aggressive→6, normal→5, passive→4.
+
+    All three aggression calls now resolve from HCO_PASS_LANE_DIST_BY_AGGRESSION, so the
+    randint(5,6) branch below is UNREACHABLE. It is kept (not deleted) so removing `normal`
+    from the dict restores the old rolled-per-game behaviour without rewriting this function.
+
+    ⚠️ DRAW COUNT: that randint was a `sim_rng` draw taken once per game. It no longer fires,
+    so every subsequent draw in a seeded run SHIFTS. Per Sim_Perf_Capstone standing rule 1,
+    verify this change with a poison test — an exact diff against a pre-change reference is
+    invalid and will show spurious divergence."""
     from BackEnd.utils.sim_random import sim_rng as random
     game_state = game.game_state
     def_call = (getattr(game.defense_team, "strategy_calls", {}) or {}).get("aggression_call", "normal")

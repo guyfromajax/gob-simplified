@@ -1570,6 +1570,60 @@ def announce_ball_owner_seam(
     return violations
 
 
+def announce_post_steal_premature_attach(
+    steps: Optional[List[Dict[str, Any]]],
+    *,
+    stealer_id: Optional[str] = None,
+    context: str = "",
+) -> int:
+    """A ``post_steal_hco_transition`` step must not START already attached
+    to the stealer unless the previous drawn step already ended on him.
+
+    Start-attached-to-stealer is the premature attach: the steal beat (HCT)
+    or the last skeleton step (HCO) still has the victim, and the recover
+    / this step's *end* is what delivers the ball. Log only; does not
+    rewrite owners. Returns the violation count.
+    """
+    order = rendered_step_indices(steps)
+    if len(order) < 2:
+        return 0
+    index_in_order = {idx: n for n, idx in enumerate(order)}
+    violations = 0
+    for b_idx in order:
+        step = steps[b_idx]
+        if not isinstance(step, dict):
+            continue
+        meta = ((step.get("start") or {}).get("advance_trigger") or {}).get(
+            "metadata"
+        ) or {}
+        if meta.get("kind") != "post_steal_hco_transition":
+            continue
+        start_owner = attached_owner_id(((step.get("start") or {}).get("ball")))
+        end_owner = attached_owner_id(((step.get("end") or {}).get("ball")))
+        who = str(stealer_id) if stealer_id else end_owner
+        if start_owner is None or who is None or start_owner != str(who):
+            continue
+        pos = index_in_order.get(b_idx)
+        if pos is None or pos == 0:
+            continue
+        prev_end = attached_owner_id(
+            ((steps[order[pos - 1]].get("end") or {}).get("ball"))
+        )
+        if prev_end == start_owner:
+            continue
+        violations += 1
+        logging.warning(
+            "[UESS 8.4] post-steal premature attach%s: step %d "
+            "start_owner=%s stealer=%s prior_end_owner=%s",
+            (" " + context) if context else "",
+            b_idx,
+            json_owner(start_owner),
+            json_owner(str(who)),
+            json_owner(prev_end) if prev_end is not None else "None",
+        )
+    return violations
+
+
 def json_owner(owner: str) -> str:
     """Quote empty-string owners so they do not render as nothing."""
     return '""' if owner == "" else owner

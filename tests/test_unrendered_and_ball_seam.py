@@ -11,6 +11,7 @@ import pytest
 
 from BackEnd.utils.animation_step_helpers import (
     announce_ball_owner_seam,
+    announce_post_steal_premature_attach,
     announce_unrendered_tail,
     attached_owner_id,
     build_final_ball_coords,
@@ -225,3 +226,114 @@ class TestBallOwnerSeam:
         assert attached_owner_id({"owner_player_id": ""}) == ""
         assert attached_owner_id({}) is None
         assert attached_owner_id(None) is None
+
+
+class TestPostStealPrematureAttach:
+    def _post_steal_step(self, start_owner, end_owner, *, next_index=None):
+        nxt = (
+            {"kind": "next_step", "index": next_index}
+            if next_index is not None
+            else {"kind": "turn_stop", "event": "STEAL"}
+        )
+        return {
+            "start": {
+                "ball": {"owner_player_id": start_owner} if start_owner is not None else {},
+                "advance_trigger": {
+                    "condition": "fixed_duration",
+                    "T_game_seconds": 0.5,
+                    "metadata": {"kind": "post_steal_hco_transition"},
+                },
+            },
+            "end": {
+                "ball": {"owner_player_id": end_owner} if end_owner is not None else {},
+                "next": nxt,
+            },
+        }
+
+    def test_end_only_attach_is_silent(self, caplog):
+        """Victim at start, stealer at end: the within-step delivery."""
+        steps = [
+            _step("VICTIM", "VICTIM", next_kind="next_step", next_index=1),
+            self._post_steal_step("VICTIM", "STEALER"),
+        ]
+        assert announce_post_steal_premature_attach(
+            steps, stealer_id="STEALER"
+        ) == 0
+        assert "post-steal premature attach" not in caplog.text
+        assert announce_ball_owner_seam(steps, family="HCT/STEAL") == 0
+
+    def test_poison_start_attached_stealer_is_named(self, caplog):
+        """POISON — the pre-fix shape: post-steal starts already on the stealer."""
+        steps = [
+            _step("VICTIM", "VICTIM", next_kind="next_step", next_index=1),
+            self._post_steal_step("STEALER", "STEALER"),
+        ]
+        assert announce_post_steal_premature_attach(
+            steps, stealer_id="STEALER", context="HCT/STEAL"
+        ) == 1
+        msg = caplog.text
+        assert "[UESS 8.4] post-steal premature attach HCT/STEAL" in msg
+        assert "start_owner=STEALER" in msg
+        assert "stealer=STEALER" in msg
+        assert "prior_end_owner=VICTIM" in msg
+
+    def test_poison_does_not_rewrite_the_owner(self):
+        steps = [
+            _step("VICTIM", "VICTIM", next_kind="next_step", next_index=1),
+            self._post_steal_step("STEALER", "STEALER"),
+        ]
+        announce_post_steal_premature_attach(steps, stealer_id="STEALER")
+        assert attached_owner_id(steps[1]["start"]["ball"]) == "STEALER"
+        assert attached_owner_id(steps[0]["end"]["ball"]) == "VICTIM"
+
+    def test_emitter_attaches_stealer_at_end_only(self):
+        from BackEnd.engine.skeleton_step_emitter import (
+            _append_post_steal_hco_transition,
+        )
+        from BackEnd.utils import sim_random
+
+        sim_random.seed(0)
+        stealer, victim = "STEALER", "VICTIM"
+        coords = {
+            stealer: {"x": 40.0, "y": 25.0},
+            victim: {"x": 42.0, "y": 25.0},
+        }
+        steps = [
+            {
+                "start": {
+                    "coords": dict(coords),
+                    "ball": {"owner_player_id": victim},
+                },
+                "end": {
+                    "coords": dict(coords),
+                    "ball": {"owner_player_id": victim},
+                    "clock": {
+                        "clock_remaining": 100.0,
+                        "shot_clock_remaining": 20.0,
+                    },
+                    "next": {"kind": "turn_stop", "event": "STEAL"},
+                },
+            }
+        ]
+        game = MagicMock()
+        game.defense_team = MagicMock()
+        game.defense_team.team_id = "HOME"
+        game.away_team = MagicMock()
+        game.away_team.team_id = "AWAY"
+        _append_post_steal_hco_transition(
+            steps,
+            {
+                "result_type": "STEAL",
+                "next_play_type": "HCO",
+                "stealer_id": stealer,
+                "victim_id": victim,
+            },
+            game,
+        )
+        assert len(steps) == 2
+        assert attached_owner_id(steps[1]["start"]["ball"]) == victim
+        assert attached_owner_id(steps[1]["end"]["ball"]) == stealer
+        assert announce_post_steal_premature_attach(
+            steps, stealer_id=stealer
+        ) == 0
+        assert announce_ball_owner_seam(steps, family="HCO/STEAL") == 0
