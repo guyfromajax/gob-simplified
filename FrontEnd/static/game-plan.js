@@ -46,7 +46,10 @@ const periodLabel = urlParams.get('period') || `Q${quarter}`;
 // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
 // game_id is required for Q2+ or timeout resume, optional for Q1 (will be created by init-game)
 // ✅ PHASE 1.3: Instrument state read
-const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
+// `let`, not `const`: FTE v3 can recover a missing game_id from tutorial_state and
+// must be able to write it back here — every downstream read (loadSettings, the
+// save on PLAY NOW, the forwarded query string) goes through this binding.
+let gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
 
 // ✅ PHASE 1.1: Fail loudly if game_id is required but missing
@@ -154,34 +157,7 @@ if (modeParam === 'tutorial') {
   // Save is still hidden — but replaced, not removed: the CONTINUE CTA persists
   // through the same `saveSettingsQuietly()` path and then advances the funnel, so
   // the user cannot walk away from the step with unsaved sliders.
-  // FTE v3 safety net: recover game_id from tutorial_state when the query string
-  // has lost it. Without a game_id the page 400s on GET /api/gameplan and 500s on
-  // PUT, and the user's sliders are silently never saved. tutorial_state is the
-  // durable copy (see TutorialState in auth_routes.py).
-  const recoverTutorialGameId = async () => {
-    if (gameId) return gameId;
-    try {
-      const res = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: API_CONFIG.getAuthHeaders() });
-      if (!res.ok) return null;
-      const me = await res.json();
-      const recovered = ((me && me.tutorial_state) || {}).game_id || null;
-      if (recovered) {
-        // Repair the URL in place so every later read — including the save on
-        // PLAY NOW and anything that forwards the query string — sees it.
-        const u = new URL(window.location.href);
-        u.searchParams.set('game_id', recovered);
-        window.history.replaceState({}, '', u.toString());
-        console.warn('[tutorial] recovered game_id from tutorial_state:', recovered);
-      }
-      return recovered;
-    } catch (e) {
-      console.warn('[tutorial] game_id recovery failed:', e);
-      return null;
-    }
-  };
-
   const applyTutorialMode = () => {
-    recoverTutorialGameId();
     const subhead = document.getElementById('tutorial-readonly-subhead');
     if (subhead) {
       subhead.textContent = 'Set your strategy for tonight.';
@@ -453,7 +429,42 @@ function validateOffenseSettings() {
   return true;
 }
 
+// FTE v3 safety net: recover game_id from tutorial_state when the query string
+// has lost it. Without a game_id the page 400s on GET /api/gameplan and 500s on
+// PUT, and the user's sliders are silently never saved. tutorial_state is the
+// durable copy (see TutorialState in auth_routes.py).
+const recoverTutorialGameId = async () => {
+  if (gameId) return gameId;
+  try {
+    const res = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: API_CONFIG.getAuthHeaders() });
+    if (!res.ok) return null;
+    const me = await res.json();
+    const recovered = ((me && me.tutorial_state) || {}).game_id || null;
+    if (recovered) {
+      gameId = recovered;
+      // Repair the URL in place so every later read — including the save on
+      // PLAY NOW and anything that forwards the query string — sees it.
+      const u = new URL(window.location.href);
+      u.searchParams.set('game_id', recovered);
+      window.history.replaceState({}, '', u.toString());
+      console.warn('[tutorial] recovered game_id from tutorial_state:', recovered);
+    }
+    return recovered;
+  } catch (e) {
+    console.warn('[tutorial] game_id recovery failed:', e);
+    return null;
+  }
+};
+
 async function loadSettings() {
+  // FTE v3: recover a missing game_id BEFORE the request is built. The previous
+  // version kicked recovery off without awaiting it, so the fetch still went out
+  // with no game_id, 400'd, and alerted the user — recovery then repaired the URL
+  // too late to matter.
+  if (modeParam === 'tutorial' && !gameId && typeof recoverTutorialGameId === 'function') {
+    await recoverTutorialGameId();
+  }
+
   try {
     // ✅ PHASE 2: Validate game_id before loading settings
     if (gameId && modeParam === 'single' && window.PointerValidation) {
