@@ -102,8 +102,9 @@ function paintMoment(userTeam, opponent) {
   const portraitEl = document.getElementById('tipoff-portrait');
   if (portraitEl) portraitEl.src = getTeamSammyImage(userTeam);
 
-  // Score block. User team is always home (per fte_inject_state §1-§2) and
-  // the visual hero shows the matchup; we use uppercase team names per spec.
+  // Matchup block. User team is always home (per fte_inject_state §1-§2).
+  // FTE v3 removed the score spans — the game has not been played yet, so there
+  // is no score to show; the markup now renders "HOME vs AWAY".
   const homeTeamEl = document.getElementById('tipoff-home-team');
   const awayTeamEl = document.getElementById('tipoff-away-team');
   if (homeTeamEl) homeTeamEl.textContent = userTeam.toUpperCase();
@@ -142,9 +143,16 @@ async function main() {
       // pick, because Game Plan and Lineup both write through to it. Calling
       // init again would mint a SECOND game and discard the user's strategy and
       // lineup — the two things this screen exists to pay off.
-      const gameId = new URLSearchParams(window.location.search).get('game_id');
+      // URL first, then tutorial_state. The server copy is the durable one: it
+      // survives a refresh, a hand-typed URL, or any upstream screen that drops
+      // the param. Falling back to it is what stops a lost query string from
+      // dead-ending the funnel one click from the payoff.
+      let gameId = new URLSearchParams(window.location.search).get('game_id');
       if (!gameId) {
-        console.error('[tutorial] no game_id at tip-off');
+        gameId = ((me && me.tutorial_state) || {}).game_id || null;
+      }
+      if (!gameId) {
+        console.error('[tutorial] no game_id at tip-off (URL and tutorial_state both empty)');
         window.alert('Could not start the tutorial game. Please refresh and try again.');
         ctaBtn.disabled = false;
         return;

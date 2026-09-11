@@ -3473,22 +3473,25 @@ async function initGame() {
       simFullBtn.addEventListener('click', handleSimFullGame);
     }
 
-    // FTE v3: the tutorial has already made every pre-game decision (opponent,
-    // game plan, lineup) on its own screens, so the button row would be a dead
-    // step. `sim_full_game=1` boots straight into the broadcast.
+    // FTE v3 tutorial: the user still sees the full pre-game experience (starting
+    // five card and all) — that IS the product, and skipping it would teach the
+    // wrong flow. What is removed is the CHOICE: Sim Full Game is the only path,
+    // so "Play Quarter" is hidden rather than merely discouraged.
     //
-    // Deliberately routed through the SAME handler a click uses rather than a
-    // parallel path — the tutorial must exercise the real Sim Full Game flow,
-    // since showing users that flow is the entire point of FTE v3.
+    // Gated on `sim_full_game=1` + mode=tutorial rather than mode alone, so a
+    // tutorial game opened by any other route keeps normal buttons.
     try {
-      const autoSim = new URLSearchParams(window.location.search).get('sim_full_game') === '1';
-      if (autoSim && currentQuarter < 2) {
-        setTimeout(() => {
-          if (!isSimulating) handleSimFullGame();
-        }, 0);
+      const wantsSimOnly = new URLSearchParams(window.location.search).get('sim_full_game') === '1';
+      if (wantsSimOnly && mode === 'tutorial' && currentQuarter < 2) {
+        const playBtnTut = document.querySelector('.play-button');
+        if (playBtnTut) {
+          playBtnTut.style.display = 'none';
+          playBtnTut.disabled = true;
+        }
+        simFullBtn.classList.add('is-tutorial-only');
       }
     } catch (e) {
-      console.warn('[bootGame] auto sim_full_game check failed:', e);
+      console.warn('[bootGame] tutorial sim-only button gating failed:', e);
     }
   }
   if (sim4Btn) {

@@ -2846,8 +2846,14 @@ async function init() {
           home: homeTeam,
           away: awayTeam,
           my_team: 'home',
+          team_id: homeTeam,
         });
-        if (currentGameId) tipParams.set('game_id', currentGameId);
+        // game_id must survive to the court or the broadcast has no game to run.
+        // Prefer the live URL over `currentGameId`, which is scoped to the branch
+        // above and can be undefined on this path.
+        const tipGameId = currentGameId
+          || new URLSearchParams(window.location.search).get('game_id');
+        if (tipGameId) tipParams.set('game_id', tipGameId);
         playSound('confirm-1-lowervol.wav');
         setTimeout(() => {
           window.location.href = '/tutorial-situation.html?' + tipParams.toString();
