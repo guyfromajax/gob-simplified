@@ -154,7 +154,34 @@ if (modeParam === 'tutorial') {
   // Save is still hidden — but replaced, not removed: the CONTINUE CTA persists
   // through the same `saveSettingsQuietly()` path and then advances the funnel, so
   // the user cannot walk away from the step with unsaved sliders.
+  // FTE v3 safety net: recover game_id from tutorial_state when the query string
+  // has lost it. Without a game_id the page 400s on GET /api/gameplan and 500s on
+  // PUT, and the user's sliders are silently never saved. tutorial_state is the
+  // durable copy (see TutorialState in auth_routes.py).
+  const recoverTutorialGameId = async () => {
+    if (gameId) return gameId;
+    try {
+      const res = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: API_CONFIG.getAuthHeaders() });
+      if (!res.ok) return null;
+      const me = await res.json();
+      const recovered = ((me && me.tutorial_state) || {}).game_id || null;
+      if (recovered) {
+        // Repair the URL in place so every later read — including the save on
+        // PLAY NOW and anything that forwards the query string — sees it.
+        const u = new URL(window.location.href);
+        u.searchParams.set('game_id', recovered);
+        window.history.replaceState({}, '', u.toString());
+        console.warn('[tutorial] recovered game_id from tutorial_state:', recovered);
+      }
+      return recovered;
+    } catch (e) {
+      console.warn('[tutorial] game_id recovery failed:', e);
+      return null;
+    }
+  };
+
   const applyTutorialMode = () => {
+    recoverTutorialGameId();
     const subhead = document.getElementById('tutorial-readonly-subhead');
     if (subhead) {
       subhead.textContent = 'Set your strategy for tonight.';

@@ -2852,9 +2852,17 @@ async function init() {
         nextParams.set('mode', 'tutorial');
         nextParams.set('team_id', homeTeam);
         nextParams.delete('resume_from_timeout');
-        const tutGameId = currentGameId
-          || new URLSearchParams(window.location.search).get('game_id');
-        if (tutGameId) nextParams.set('game_id', tutGameId);
+        // Read straight off the live URL first. `currentGameId` is captured earlier
+        // in this handler and has been observed empty on this path, which produced
+        // `GET /api/gameplan?...` with no game_id -> 400, and a PUT -> 500.
+        const tutGameId = new URLSearchParams(window.location.search).get('game_id')
+          || currentGameId
+          || nextParams.get('game_id');
+        if (tutGameId) {
+          nextParams.set('game_id', tutGameId);
+        } else {
+          console.error('[tutorial] no game_id when leaving set-lineup — game plan will 400');
+        }
         playSound('confirm-1-lowervol.wav');
         setTimeout(() => {
           window.location.href = '/game-plan.html?' + nextParams.toString();

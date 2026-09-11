@@ -17,7 +17,7 @@
  *   2. Opponent from the `away` param (the user's pick at step 4)
  *   3. Render the Moment modal with the user's banner background + team Sammy
  *   4. SIM GAME → tutorial-advance { step: 'in_game' }
- *      → /court.html?...&quarter=0&sim_full_game=1  (broadcast, ~80-85s)
+ *      → /court.html?...&quarter=1&sim_full_game=1  (broadcast, ~80-85s)
  *
  * Per fte_inject_state.md §1-§2 the user is always HOME in the tutorial game.
  */
@@ -85,9 +85,18 @@ function gotoBroadcast(userTeam, opponent, gameId) {
   params.set('away', opponent);
   params.set('my_team', 'home');
   params.set('team_id', userTeam);
-  // quarter=0 is the pre-anchor state handleSimFullGame() requires; whatever the
-  // lineup screen put here was for its own navigation, not the court's.
-  params.set('quarter', '0');
+  // MUST be 1, not 0.
+  //
+  // bootGame's sim loop does `let currentQ = quarter`, and BOTH of the payload
+  // branches that matter key off it:
+  //   - `if (currentQ === quarter)`  -> sends home_lineup/away_lineup (first pass only)
+  //   - `if (currentQ === 1 && ...)` -> sends strategy_settings
+  // With quarter=0 the first pass simulates a non-existent Q0: the chosen five is
+  // handed to a no-op quarter, Q1 onward falls through to auto-set lineups, and the
+  // game plan is NEVER sent because currentQ is 0 on the only pass that would send
+  // it. Observed as an empty pre-game card AND silently ignored sliders.
+  // Sim Full Game still triggers correctly — its gate is `Math.max(0, quarter) < 2`.
+  params.set('quarter', '1');
   params.set('sim_full_game', '1');
   params.delete('resume_from_timeout');
   params.delete('lineup_checkpoint');
