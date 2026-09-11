@@ -68,6 +68,48 @@ async function advanceToInGame() {
   }
 }
 
+function gotoBroadcast(userTeam, opponent, gameId) {
+  // FTE v3: the tip hands off to the COURT, not to set-lineup — strategy and
+  // roster are already done. quarter=0 is the pre-anchor state that
+  // handleSimFullGame() requires (bootGame gates Sim Full Game on
+  // `Math.max(0, quarter) < 2`); v2 sent quarter=4 because it resumed mid-Q4.
+  // `sim_full_game=1` is the tutorial's instruction to boot straight into the
+  // broadcast instead of showing the pre-game button row.
+  const params = new URLSearchParams({
+    mode: 'tutorial',
+    home: userTeam,
+    away: opponent,
+    my_team: 'home',
+    quarter: '0',
+    team_id: userTeam,
+    sim_full_game: '1',
+  });
+  if (gameId) params.set('game_id', gameId);
+  window.location.href = `/court.html?${params.toString()}`;
+}
+
+function paintMoment(userTeam, opponent) {
+  const banner = resolveTeamBanner(userTeam);
+  // Surface the banner asset to the CSS pipeline as a custom property so
+  // the modal's ::before watermark layer can read it. The darkening
+  // gradient lives in ::after now (see tutorial-tipoff.css) — JS no
+  // longer composites the gradient inline.
+  const moment = document.getElementById('tipoff-moment');
+  if (moment) {
+    moment.style.setProperty('--moment-bg-image', `url('${banner}')`);
+    moment.hidden = false;
+  }
+  const portraitEl = document.getElementById('tipoff-portrait');
+  if (portraitEl) portraitEl.src = getTeamSammyImage(userTeam);
+
+  // Score block. User team is always home (per fte_inject_state §1-§2) and
+  // the visual hero shows the matchup; we use uppercase team names per spec.
+  const homeTeamEl = document.getElementById('tipoff-home-team');
+  const awayTeamEl = document.getElementById('tipoff-away-team');
+  if (homeTeamEl) homeTeamEl.textContent = userTeam.toUpperCase();
+  if (awayTeamEl) awayTeamEl.textContent = opponent.toUpperCase();
+}
+
 async function main() {
   let me;
   try {

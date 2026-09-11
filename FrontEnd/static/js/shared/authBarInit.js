@@ -239,7 +239,12 @@
         mode: 'tutorial',
         home: teamPick,
         away: opponentPick || '',
-        my_team: 'home'
+        my_team: 'home',
+        // Required by game-plan.js / set-lineup.js in tutorial mode — without it
+        // GET /api/gameplan receives the string "null" and 400s. Must match what
+        // tutorial-pick-opponent.js sends, or a RESUMED funnel breaks where a
+        // straight-through one works.
+        team_id: teamPick
       });
       if (tutorialGameId) p.set('game_id', tutorialGameId);
       return p;

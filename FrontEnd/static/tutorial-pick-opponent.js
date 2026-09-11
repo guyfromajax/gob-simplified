@@ -156,11 +156,18 @@ ctaEl.addEventListener('click', async () => {
     });
     if (!adv.ok) throw new Error('advance HTTP ' + adv.status);
 
+    // team_id is REQUIRED by game-plan.js and set-lineup.js in tutorial mode:
+    // both resolve settings by it, and GET /api/gameplan 400s on a missing one
+    // (it arrives as the literal string "null"). In tutorial/single mode the
+    // team_id IS the team name — the backend resolves via gm.<team>.name.
+    // Every downstream screen forwards the query string verbatim, so setting it
+    // once here carries it through Game Plan -> Lineup -> Tip-off.
     const params = new URLSearchParams({
       mode: 'tutorial',
       home: userTeam,
       away: selectedName,
       my_team: 'home',
+      team_id: userTeam,
       game_id: gameId,
     });
     window.location.href = '/game-plan.html?' + params.toString();
