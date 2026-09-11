@@ -532,3 +532,58 @@ input[type="range"]::-moz-range-thumb {
     width: 100%;
   }
 }
+
+/* ─── FTE v3: "Shot diet" nest ──────────────────────────────────────────────
+ * Inside / Attack / Outside compete for the same touches. The nest makes that
+ * relationship visible without changing the two-column layout or the slider
+ * semantics. Deliberately QUIET — a faint tint and hairline, not a panel: the
+ * sliders stay the focus, the grouping is a hint.
+ */
+.slider-nest {
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.032);
+  padding: 12px 12px 4px;
+  margin-bottom: 18px;
+}
+
+.slider-nest__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.slider-nest__title {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.62);
+}
+
+/* One shared tip for the family. There is intentionally no per-slider icon —
+ * three identical icons would add noise without adding information. */
+.slider-nest__info {
+  width: 16px;
+  height: 16px;
+  line-height: 14px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.30);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.65);
+  font-family: 'Inter', sans-serif;
+  font-size: 10px;
+  font-style: italic;
+  cursor: help;
+}
+.slider-nest__info:hover,
+.slider-nest__info:focus-visible {
+  border-color: #f79420;
+  color: #f79420;
+  outline: none;
+}
+
+/* The nest supplies the bottom spacing; its last child should not double it. */
+.slider-nest .slider-group:last-child { margin-bottom: 8px; }

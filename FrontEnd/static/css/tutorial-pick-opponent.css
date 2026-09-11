@@ -1,0 +1,140 @@
+/*
+ * FTE v3 — Pick Opponent (Screen 4)
+ * Ranked vertical stack of the user's seven conference rivals, toughest first.
+ * On-system shell background per styleguide §Page Background System (Type 1),
+ * matching tutorial-persona-intro.
+ */
+
+body.tutorial-opponent-page {
+  background: #0b0d14;
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+  color: #ffffff;
+}
+
+.opp-pick {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 24px 96px;
+  text-align: center;
+}
+
+.opp-pick__head { margin-bottom: 24px; }
+
+.opp-pick__eyebrow {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.20em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0 0 6px;
+}
+
+.opp-pick__headline {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 44px;
+  line-height: 1.05;
+  letter-spacing: 0.01em;
+  margin: 0 0 8px;
+}
+
+/* The ranking criterion has to be legible or the stack is just a list. */
+.opp-pick__subhead {
+  font-size: 14px;
+  color: rgba(255, 255, 255, 0.62);
+  margin: 0;
+}
+
+.opp-pick__list {
+  list-style: none;
+  margin: 0 0 28px;
+  padding: 0;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.opp-pick__loading {
+  color: rgba(255, 255, 255, 0.45);
+  font-size: 14px;
+  padding: 24px 0;
+}
+
+.opp-card {
+  --opp-primary: #3a4152;
+  --opp-secondary: rgba(255, 255, 255, 0.18);
+  position: relative;
+  display: grid;
+  grid-template-columns: 40px 1fr 28px;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  text-align: left;
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  border-radius: 10px;
+  /* Team colour reads as a rail, not a fill — the card must stay quiet enough
+     that the RANK ORDER is what the eye follows. */
+  border-left: 4px solid var(--opp-primary);
+  transition: background 120ms ease, border-color 120ms ease, transform 120ms ease;
+}
+
+.opp-card:hover { background: rgba(255, 255, 255, 0.075); transform: translateX(2px); }
+.opp-card:focus-visible { outline: 2px solid #f79420; outline-offset: 2px; }
+
+/* Orange ring for the selected state, reusing the Pick Program affordance. */
+.opp-card.is-selected {
+  border-color: #f79420;
+  border-left-color: #f79420;
+  background: rgba(247, 148, 32, 0.10);
+  box-shadow: 0 0 0 1px #f79420 inset;
+}
+
+.opp-card__rank {
+  font-family: 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.45);
+  text-align: center;
+}
+.opp-card.is-selected .opp-card__rank { color: #f79420; }
+
+.opp-card__id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+.opp-card__name {
+  font-weight: 600;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.opp-card__mascot {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.50);
+}
+
+.opp-card__check { opacity: 0; color: #f79420; font-size: 18px; text-align: center; }
+.opp-card.is-selected .opp-card__check { opacity: 1; }
+
+.opp-pick__error {
+  color: #ff8080;
+  font-size: 13px;
+  min-height: 18px;
+  margin: 12px 0 0;
+}
+
+@media (max-width: 520px) {
+  .opp-pick { padding: 32px 16px 88px; }
+  .opp-pick__headline { font-size: 34px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opp-card { transition: none; }
+  .opp-card:hover { transform: none; }
+}

@@ -2596,15 +2596,28 @@ async function init() {
     });
   } catch (_) { /* non-fatal */ }
 
-  // FTE v2 tutorial: the slots load empty (tutorial-situation no longer
-  // forwards home_pg/etc.) — the user sets their own lineup as part of
-  // the lesson. On first paint, show a centered Functional-modal-style
-  // intro that nudges them into the task. The CTA is renamed "Return To
-  // Game" here, and clicking it shows a second modal with algorithm-
-  // chosen feedback before actual navigation.
+  // FTE v3 tutorial: the five is PRE-SET, not left empty.
+  //
+  // v2 loaded empty slots and made building a lineup the lesson. v3 reduces
+  // friction instead — autoset picks a sensible five (shot-weight ordered, same
+  // algorithm the rest of the app uses), Sammy says so, and adjusting is optional.
+  // Most users roll with the default; the ones who want to tweak still can.
   if (modeParam === 'tutorial') {
     const playBtnEl = document.getElementById('play-now');
-    if (playBtnEl) playBtnEl.textContent = 'Return To Game';
+    if (playBtnEl) playBtnEl.textContent = 'Continue';
+
+    // Only fill EMPTY slots. A user who set a five, navigated back to Game Plan
+    // and returned must not have their choices silently overwritten by autoset.
+    try {
+      const alreadySet = LINEUP_POSITIONS.every((pos) => !!lineup[pos]);
+      if (!alreadySet && typeof autosetLineup === 'function') {
+        await autosetLineup();
+      }
+    } catch (e) {
+      // A failed preset is recoverable — the user just sets the five by hand,
+      // which is exactly the v2 experience. Never block the funnel on it.
+      console.warn('[tutorial] lineup preset failed; falling back to manual:', e);
+    }
 
     const introKey = gameId
       ? `fteV2TutorialLineupModalShown_${gameId}`
@@ -2804,24 +2817,34 @@ async function init() {
       }
       DEBUG && console.log('[lineup] launching quarter', quarter);
 
-      // FTE v2 tutorial: advance the server-side step to "in_game" before
-      // navigation. Court.html will read resume_from_timeout from URL params
-      // (added by buildGameNavigationParams below) so the engine emits the SIP
-      // first turn per the timeout-resume path in BackEnd/main.py.
+      // FTE v3 tutorial: lineup hands off to the TIP-OFF screen, not straight to
+      // the court. Two v2 behaviours are deliberately gone:
+      //   - the step is now 'situation' (tip-off moved to AFTER lineup)
+      //   - resume_from_timeout is NOT set. v2 booted mid-Q4 out of a timeout and
+      //     needed the SIP emission path; v3 starts at the opening tip, so forcing
+      //     a timeout resume would emit a set-in-play for a game that never paused.
       if (modeParam === 'tutorial') {
         try {
           await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
             method: 'POST',
             headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ step: 'in_game' }),
+            body: JSON.stringify({ step: 'situation' }),
           });
         } catch (e) {
-          console.warn('[tutorial] could not advance to in_game step:', e);
+          console.warn('[tutorial] could not advance to situation step:', e);
         }
-        // Force resume_from_timeout=true so the engine routes through the
-        // existing SIP emission path for the first turn (state seeded by
-        // apply_tutorial_initial_state in PR 1).
-        params.set('resume_from_timeout', 'true');
+        const tipParams = new URLSearchParams({
+          mode: 'tutorial',
+          home: homeTeam,
+          away: awayTeam,
+          my_team: 'home',
+        });
+        if (currentGameId) tipParams.set('game_id', currentGameId);
+        playSound('confirm-1-lowervol.wav');
+        setTimeout(() => {
+          window.location.href = '/tutorial-situation.html?' + tipParams.toString();
+        }, 200);
+        return;
       }
 
       const finalUrl = `/court.html?${params.toString()}`;

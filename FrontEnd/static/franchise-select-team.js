@@ -617,12 +617,14 @@
           await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
             method: 'POST',
             headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ step: 'situation' }),
+            // FTE v3: username is now followed by Pick Opponent, not the tip-off.
+            // Tip-off ('situation') moved to AFTER lineup — see _TUTORIAL_STEP_ORDER.
+            body: JSON.stringify({ step: 'opponent_pick' }),
           });
         } catch (e) {
-          console.warn('[tutorial] could not advance to situation step:', e);
+          console.warn('[tutorial] could not advance to opponent_pick step:', e);
         }
-        window.location.href = '/tutorial-situation.html';
+        window.location.href = '/tutorial-pick-opponent.html';
       },
     });
   }

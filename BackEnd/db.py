@@ -375,6 +375,48 @@ def ensure_users_username_index():
 EOG_BAND_LOG_TTL_DAYS = int(os.environ.get("GOB_EOG_BAND_TTL_DAYS", "180") or 180)
 
 
+# FTE tutorial games are throwaway: deleted when the user clicks through to the locker
+# room. ABANDONS are not covered by that — a user who picks an opponent and never comes
+# back leaves the doc forever. Measured on gob-staging 2026-09-11: 39 orphaned
+# mode=tutorial docs against only 14 completions. FTE v3 widens the window further
+# (init-game moves from the tip-off screen to the opponent pick, four steps earlier),
+# so the leak is swept rather than left to grow.
+TUTORIAL_GAME_TTL_DAYS = int(os.environ.get("GOB_TUTORIAL_GAME_TTL_DAYS", "7") or 7)
+
+
+def ensure_tutorial_game_ttl_index():
+    """TTL sweep for abandoned FTE tutorial games. Idempotent; safe on startup.
+
+    Keyed on `tutorial_expires_at`, which ONLY tutorial game docs carry — Mongo
+    ignores documents missing the field, so franchise/tournament/single games can
+    never be touched by this index no matter how it is retuned.
+    """
+    if not client:
+        return
+    want = TUTORIAL_GAME_TTL_DAYS * 86400
+    try:
+        games_collection.create_index(
+            [("tutorial_expires_at", 1)],
+            expireAfterSeconds=want,
+            name="tutorial_game_ttl",
+        )
+    except Exception as e:
+        # Same IndexOptionsConflict trap as the EOG band TTL: create_index will not
+        # change expireAfterSeconds on an existing index, so a retune silently keeps
+        # the OLD retention unless collMod is used.
+        if getattr(e, "code", None) == 85:
+            try:
+                res = db.command("collMod", "games", index={
+                    "keyPattern": {"tutorial_expires_at": 1}, "expireAfterSeconds": want})
+                print(f"🔵 [DB] tutorial game TTL retuned "
+                      f"{res.get('expireAfterSeconds_old')}s -> {res.get('expireAfterSeconds_new')}s",
+                      file=sys.stderr, flush=True)
+            except Exception as e2:
+                print(f"⚠️ [DB] tutorial TTL collMod failed: {e2}", file=sys.stderr, flush=True)
+        else:
+            print(f"⚠️ [DB] ensure_tutorial_game_ttl_index: {e}", file=sys.stderr, flush=True)
+
+
 def ensure_eog_band_log_index():
     """TTL on `created_at` plus a (franchise_id, week) index for extraction.
     Idempotent; safe to call on startup. Skips when using mongomock."""

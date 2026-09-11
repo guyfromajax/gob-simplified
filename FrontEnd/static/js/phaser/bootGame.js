@@ -3472,6 +3472,24 @@ async function initGame() {
       simFullBtn.textContent = 'Sim Full Game';
       simFullBtn.addEventListener('click', handleSimFullGame);
     }
+
+    // FTE v3: the tutorial has already made every pre-game decision (opponent,
+    // game plan, lineup) on its own screens, so the button row would be a dead
+    // step. `sim_full_game=1` boots straight into the broadcast.
+    //
+    // Deliberately routed through the SAME handler a click uses rather than a
+    // parallel path — the tutorial must exercise the real Sim Full Game flow,
+    // since showing users that flow is the entire point of FTE v3.
+    try {
+      const autoSim = new URLSearchParams(window.location.search).get('sim_full_game') === '1';
+      if (autoSim && currentQuarter < 2) {
+        setTimeout(() => {
+          if (!isSimulating) handleSimFullGame();
+        }, 0);
+      }
+    } catch (e) {
+      console.warn('[bootGame] auto sim_full_game check failed:', e);
+    }
   }
   if (sim4Btn) {
     // Keep Sim Quarter logic dormant for possible future reintroduction, but hide it from the UI for now.

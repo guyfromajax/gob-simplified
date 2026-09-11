@@ -1,6 +1,8 @@
 # FTE v3: Sim Full Game Tutorial — Design Brief
 
-> **Status:** Design locked. Ready for implementation.
+> **Status:** BUILT (2026-09-11) — verifying in staging. Implementation notes and
+> resolved ambiguities are in §10; the design sections below are unchanged and remain
+> the rationale.
 > **Purpose:** Replace FTE v2's Play-a-Quarter tutorial with a Sim Full Game broadcast (~80–85s) that showcases the product mode users actually play, with pre-sim coaching decisions and ≤5 min wall-clock target.
 
 ---
@@ -394,3 +396,53 @@ These are **not blockers** — implementers should use judgment and document cho
 ---
 
 **End of Brief.**
+
+
+---
+
+## 10. Implementation record (2026-09-11)
+
+### Ambiguities the brief left open, and how they were resolved
+
+| # | Gap | Resolution |
+|---|---|---|
+| 1 | Game Plan persists "to the tutorial game document" — but v2 created it at the tip-off screen, *after* Game Plan in the v3 order | **init-game moved to the opponent-pick CTA.** Also removes the clobber risk: init seeds defaults, the user edits after, so init can never overwrite a choice. |
+| 2 | `apply_tutorial_initial_state` forces Q4/60-60 | **Retired.** Games start 0-0 at Q1. The three-quarter player stat overlay went with it. |
+| 3 | Brief said keep the "favorable" thresholds | **Removed.** Both sides now `MID` (90). v2 never nerfed the opponent — it buffed the user to `MIN` (forced make). |
+| 4 | Tutorial Game Plan was read-only by design | **Reversed.** Sliders interactive; CONTINUE saves via the existing `saveSettingsQuietly()` path, so the step cannot be left unsaved. |
+| 5 | "Implementer should pick the most accurate existing metric" | **`total_player_attrs`** — but it was a stale derived cache, wrong on 128/128 teams and re-ordering all 16 conferences. Repaired by `scripts/recompute_total_player_attrs.py`. Ranking now lives server-side in one endpoint. |
+| 6 | Brief's step ids matched neither the enum nor the progress thread | **Added, not renamed.** Two enum values, two dots. `tutorial_state.step` is a live resume pointer; renaming would strand users. |
+
+### Not in the brief, found during implementation
+
+- **`game_id` only existed in the URL.** With init four hops earlier, one refresh would mint a second game and orphan the first. `TutorialState` now carries `opponent_pick` + `game_id`.
+- **Orphaned tutorial games were already leaking** — 39 docs against 14 completions. `tutorial_game_ttl` now sweeps abandons; the field is tutorial-only so the index cannot reach another game.
+- **`resume_from_timeout` is gone from the tutorial path.** v2 booted mid-Q4 out of a timeout and needed the SIP emission path; v3 starts at the tip.
+
+### Files
+
+| Area | Files |
+|---|---|
+| State machine | `BackEnd/api/auth_routes.py` (enum, `TutorialState`, step order, advance, `/me`, opponents endpoint) |
+| Game init | `BackEnd/api/api.py`, `BackEnd/db.py` (TTL), `BackEnd/constants/shot_threshold_scale.py` |
+| New screen | `tutorial-pick-opponent.{html,js}`, `css/tutorial-pick-opponent.css` |
+| Modified | `authBarInit.js`, `franchise-select-team.js`, `game-plan.{html,js,css}`, `set-lineup.js`, `tutorial-situation.js`, `tutorialLineupModals.js`, `tutorialProgressThread.js`, `bootGame.js` |
+| Guard | `tests/test_fte_v3_step_contract.py` (10 assertions) |
+| Migration | `scripts/recompute_total_player_attrs.py` |
+
+### Still open
+
+- **Prod `total_player_attrs` has NOT been repaired.** Staging only. Ship FTE v3 to production without it and the opponent ranking is wrong. It also mis-feeds `franchise_rank_prestige` and Team Builder today.
+- The 39 pre-existing orphan docs predate the TTL and will not be swept (they carry no expiry field). Harmless; left alone deliberately.
+
+---
+
+## 11. Tunable Constants
+
+| Constant | Location | Value | Effect |
+|---|---|---|---|
+| `TUTORIAL_DEFAULT_OPPONENT_RANK` | `auth_routes.py` | `3` | 0-based rank pre-selected on Pick Opponent. `3` = 4th of 7, mid-table. |
+| `TUTORIAL_OPPONENT_TALENT_FIELD` | `auth_routes.py` | `total_player_attrs` | Talent signal for the ranking. **A derived cache — re-run the recompute script after any bulk attribute rewrite.** |
+| `TUTORIAL_USER` / `TUTORIAL_COMPUTER` | `shot_threshold_scale.py` | `MID` (90) | Tutorial shot thresholds. Golf score: lower = easier makes. `MIN` -10 is forced-make, `MAX` 190 unmakeable. |
+| `TUTORIAL_GAME_TTL_DAYS` | `db.py` (`GOB_TUTORIAL_GAME_TTL_DAYS`) | `7` | Abandoned-tutorial sweep. Retuning a live TTL needs `collMod`, which the helper handles. |
+| `TUTORIAL_STRATEGY_SETTINGS` | `tutorial_game.py` | all `2` (`fc_press`/`hc_trap` `1`) | Opening slider seed. A SEED only — the user overwrites it at the Game Plan step. |

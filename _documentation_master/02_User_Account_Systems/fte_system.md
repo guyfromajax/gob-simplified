@@ -3,6 +3,43 @@
 > **Purpose.** Single reference for the live First-Time Experience funnel. Future threads working on FTE without this thread's memory should read this first; it consolidates and supersedes the four files this replaced.
 >
 > **Supersedes:** `projects/fte_overview.md`, `projects/fte_tutorial_game_spec.md`, `projects/fte_implementation_plan.md`, `projects/fte_inject_state.md`.
+>
+> ⚠️ **FTE v3 shipped 2026-09-11 and changes §1-§6 materially.** The funnel is now
+> EIGHT steps, the tutorial game starts 0-0 at Q1 (not mid-Q4), the user picks their
+> own opponent, Game Plan is writable, and the game is watched as a Sim Full Game
+> broadcast rather than played. Sections below still describe v2 in places; the v3
+> delta is §0 and the full record is
+> `projects/FTE_v3_Sim_Full_Game_Brief.md` §10.
+
+---
+
+## 0. FTE v3 delta (2026-09-11)
+
+```
+signup ─▶ persona_intro ─▶ team_select ─▶ username ─▶ opponent_pick ─▶ game_plan
+                                              ─▶ set_lineup ─▶ situation ─▶ in_game ─▶ complete
+```
+
+| What | v2 | v3 |
+|---|---|---|
+| Steps | 6 + complete | **8 + complete** (`opponent_pick`, `game_plan` added) |
+| Tip-off position | before lineup | **after lineup** |
+| Game start | Q4, 4:00, 60-60, fabricated 3Q stats | **Q1, 0-0, no stat overlay** |
+| The game | played (4 min manual Q4) | **watched** (Sim Full Game broadcast, ~80-85s) |
+| Opponent | hardcoded (Xavien / South Lancaster) | **user picks** from 7 conference rivals, ranked by talent |
+| Game Plan | read-only, sliders disabled | **writable**, persisted on CONTINUE |
+| Lineup | empty slots, user builds | **autoset preset**, adjusting optional |
+| Shot thresholds | user `MIN` (-10, forced make) vs CPU `MID` | **both `MID` (90)** — neutral |
+| init-game runs at | tip-off screen | **opponent-pick CTA** (Game Plan and Lineup write to the doc) |
+| Abandoned games | leaked (39 orphans observed) | **`tutorial_game_ttl` sweeps them** |
+
+`tutorial_state` gained **`opponent_pick`** and **`game_id`**. Both are load-bearing:
+init-game now runs four hops before the court, so a refresh that lost the id would
+mint a second game and orphan the first.
+
+**Retired:** `apply_tutorial_initial_state()` (the whole mid-Q4 overlay) and
+`resume_from_timeout` on the tutorial path — v3 starts at the opening tip, so there is
+no timeout to resume.
 
 ---
 

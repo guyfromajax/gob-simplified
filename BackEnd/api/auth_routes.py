@@ -100,8 +100,10 @@ TutorialStep = Literal[
     "persona_intro",
     "team_select",
     "username",
-    "situation",
+    "opponent_pick",   # FTE v3
+    "game_plan",       # FTE v3
     "set_lineup",
+    "situation",       # FTE v3: tip-off now follows lineup (was before it in v2)
     "in_game",
     "complete",
 ]
@@ -111,6 +113,13 @@ class TutorialState(BaseModel):
     """Server-side state for the FTE v2 tutorial-game funnel."""
     step: TutorialStep
     team_pick: Optional[str] = None
+    # FTE v3. init-game now runs at the OPPONENT step, four hops before the court,
+    # so the game id can no longer be hand-carried in query params alone: one
+    # refresh or auth bounce would drop it and the next screen would init a SECOND
+    # game, orphaning the first. Persisting both here makes resume recover the
+    # existing doc instead.
+    opponent_pick: Optional[str] = None
+    game_id: Optional[str] = None
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
 
@@ -119,14 +128,20 @@ class TutorialState(BaseModel):
 # persona_intro was prepended in the FTE v2 onboarding redesign (Sammy persona
 # intro screen). Grandfathered users already past team_select don't need
 # migration — the routing logic treats their existing step as still valid.
+# FTE v3 inserts opponent_pick + game_plan and moves `situation` (tip-off) to AFTER
+# set_lineup. Keyed by NAME, so grandfathered users are unaffected by the reindex —
+# and no user is parked on a moved step (audited 2026-09-11: 28 at persona_intro,
+# 14 complete, none mid-flow).
 _TUTORIAL_STEP_ORDER = {
     "persona_intro": 0,
     "team_select": 1,
     "username": 2,
-    "situation": 3,
-    "set_lineup": 4,
-    "in_game": 5,
-    "complete": 6,
+    "opponent_pick": 3,
+    "game_plan": 4,
+    "set_lineup": 5,
+    "situation": 6,
+    "in_game": 7,
+    "complete": 8,
 }
 
 
@@ -134,6 +149,8 @@ class TutorialAdvanceRequest(BaseModel):
     """Advance the tutorial to a new step. Forward-only on the server."""
     step: TutorialStep
     team_pick: Optional[str] = None
+    opponent_pick: Optional[str] = None   # FTE v3
+    game_id: Optional[str] = None         # FTE v3 — see TutorialState
 
 
 class UserResponse(BaseModel):
@@ -914,6 +931,10 @@ async def get_me(user: dict = Depends(get_current_user)):
         tutorial_state = TutorialState(
             step=raw_tutorial_state["step"],
             team_pick=raw_tutorial_state.get("team_pick"),
+            # FTE v3 resume: routeToTutorial needs both to rebuild the URL for a
+            # mid-funnel step without re-initialising the game.
+            opponent_pick=raw_tutorial_state.get("opponent_pick"),
+            game_id=raw_tutorial_state.get("game_id"),
             started_at=_iso(raw_tutorial_state.get("started_at")),
             completed_at=_iso(raw_tutorial_state.get("completed_at")),
         )
@@ -1105,6 +1126,78 @@ async def fte_complete(user: dict = Depends(get_current_user)):
     return {"message": "FTE completed", "fte": False}
 
 
+# FTE v3 Pick Opponent. Rank index the UI highlights by default: 0-based, so 3 is
+# the 4th-toughest of seven — mid-table, per the brief ("rank ~3 or 4 out of 7").
+TUTORIAL_DEFAULT_OPPONENT_RANK = 3
+
+# Talent signal for the ranking. `total_player_attrs` is the sum of
+# core_total_player_attrs (SC SH ID OD PS BH RB ST AG ND IQ FT) over a team's roster.
+#
+# ⚠️ IT IS A DERIVED CACHE AND NOTHING RECOMPUTES IT. It drifted out of date at the
+# attribute recalibration and mis-ranked every conference in the league (audited
+# 2026-09-11: 128/128 teams wrong, mean abs error 540, all 16 conferences re-ordering).
+# Repaired by scripts/recompute_total_player_attrs.py. If team attributes are ever
+# rewritten in bulk again, RE-RUN THAT SCRIPT or this screen quietly lies about which
+# opponent is toughest.
+TUTORIAL_OPPONENT_TALENT_FIELD = "total_player_attrs"
+
+
+@router.get("/tutorial-opponents")
+async def tutorial_opponents(user: dict = Depends(get_current_user)):
+    """The user's 7 conference rivals, ranked most → least talented.
+
+    Server-side so the ranking rule has exactly one home; see the warning on
+    TUTORIAL_OPPONENT_TALENT_FIELD for why that matters.
+    """
+    db_user = users_collection.find_one({"_id": ObjectId(user["user_id"])})
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    team_pick = ((db_user.get("tutorial_state") or {}).get("team_pick") or "").strip()
+    if not team_pick:
+        raise HTTPException(status_code=400, detail="No team_pick on tutorial_state")
+
+    own = teams_collection.find_one({"name": team_pick}, {"conference": 1})
+    if not own:
+        raise HTTPException(status_code=404, detail=f"Team not found: {team_pick}")
+
+    rivals = list(
+        teams_collection.find(
+            {"conference": own.get("conference"), "name": {"$ne": team_pick}},
+            {
+                "name": 1, "mascot": 1, "team_id": 1, "conference": 1,
+                "primary_color": 1, "secondary_color": 1,
+                TUTORIAL_OPPONENT_TALENT_FIELD: 1,
+            },
+        )
+    )
+    # Sort by talent desc, then name — the tiebreak keeps the order stable across
+    # requests instead of leaving it to Mongo's natural order.
+    rivals.sort(key=lambda t: (-(t.get(TUTORIAL_OPPONENT_TALENT_FIELD) or 0), str(t.get("name") or "")))
+
+    out = []
+    for idx, t in enumerate(rivals):
+        out.append({
+            "rank": idx + 1,
+            "name": t.get("name"),
+            "mascot": t.get("mascot"),
+            "team_id": t.get("team_id"),
+            "primary_color": t.get("primary_color"),
+            "secondary_color": t.get("secondary_color"),
+            "talent": int(t.get(TUTORIAL_OPPONENT_TALENT_FIELD) or 0),
+            "object_id": str(t.get("_id")) if t.get("_id") is not None else None,
+        })
+
+    default_idx = min(TUTORIAL_DEFAULT_OPPONENT_RANK, max(0, len(out) - 1))
+    return {
+        "user_team": team_pick,
+        "conference": own.get("conference"),
+        "opponents": out,
+        "default_opponent": out[default_idx]["name"] if out else None,
+        "talent_field": TUTORIAL_OPPONENT_TALENT_FIELD,
+    }
+
+
 @router.post("/tutorial-advance")
 async def tutorial_advance(
     body: TutorialAdvanceRequest,
@@ -1140,6 +1233,10 @@ async def tutorial_advance(
     }
     if body.team_pick is not None:
         update["tutorial_state.team_pick"] = body.team_pick
+    if body.opponent_pick is not None:
+        update["tutorial_state.opponent_pick"] = body.opponent_pick
+    if body.game_id is not None:
+        update["tutorial_state.game_id"] = body.game_id
 
     users_collection.update_one(
         {"_id": ObjectId(user["user_id"])},
@@ -1148,6 +1245,8 @@ async def tutorial_advance(
     return {
         "step": target_step,
         "team_pick": body.team_pick if body.team_pick is not None else current_state.get("team_pick"),
+        "opponent_pick": body.opponent_pick if body.opponent_pick is not None else current_state.get("opponent_pick"),
+        "game_id": body.game_id if body.game_id is not None else current_state.get("game_id"),
     }
 
 

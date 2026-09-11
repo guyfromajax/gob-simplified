@@ -146,21 +146,67 @@ if (modeParam === 'tutorial') {
   // already fired (see game-plan.html: script.onload manually calls init()
   // when document.readyState !== 'loading'). So we can't wait for that
   // event — it'll never re-fire. Use readyState to branch.
-  const applyReadOnly = () => {
+  // FTE v3: the tutorial Game Plan is WRITABLE. v2 disabled every slider and hid
+  // Save because the tutorial game was a canned Q4 situation the user could not
+  // influence. v3 sims a full game from 0-0 off the user's own strategy, so the
+  // whole point of the step is that these choices reach the sim.
+  //
+  // Save is still hidden — but replaced, not removed: the CONTINUE CTA persists
+  // through the same `saveSettingsQuietly()` path and then advances the funnel, so
+  // the user cannot walk away from the step with unsaved sliders.
+  const applyTutorialMode = () => {
     const subhead = document.getElementById('tutorial-readonly-subhead');
-    if (subhead) subhead.hidden = false;
-    document.querySelectorAll('.strategy-slider').forEach((el) => {
-      el.disabled = true;
-    });
-    const slidersContainer = document.querySelector('.sliders-container');
-    if (slidersContainer) slidersContainer.classList.add('tutorial-readonly');
+    if (subhead) {
+      subhead.textContent = 'Set your strategy for tonight.';
+      subhead.hidden = false;
+    }
     const saveBtn = document.getElementById('btn-save-game-plan');
     if (saveBtn) saveBtn.style.display = 'none';
+
+    // Progress thread + Sammy. Dynamic import: game-plan.js is injected as a
+    // CLASSIC script (game-plan.html sets script.onload), so static ESM import
+    // syntax is unavailable here.
+    import('/js/shared/tutorialProgressThread.js')
+      .then((m) => m.mountTutorialProgress('gameplan'))
+      .catch(() => { /* non-fatal — the thread is decoration */ });
+    import('/js/shared/sammyModal.js')
+      .then((m) => m.showSammyModal({
+        body: 'Set your strategy. Sliders have real tradeoffs.',
+        ctaLabel: 'GOT IT',
+      }))
+      .catch(() => { /* non-fatal */ });
+
+    const actions = saveBtn ? saveBtn.parentElement : document.querySelector('.sliders-container');
+    if (!actions || document.getElementById('btn-tutorial-gameplan-continue')) return;
+    const cta = document.createElement('button');
+    cta.id = 'btn-tutorial-gameplan-continue';
+    cta.type = 'button';
+    cta.className = 'gob-btn gob-btn--action gob-btn--lg';
+    cta.textContent = 'SET LINEUP';
+    cta.addEventListener('click', async () => {
+      cta.disabled = true;
+      try {
+        await saveSettingsQuietly();
+        await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
+          method: 'POST',
+          headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ step: 'set_lineup' }),
+        });
+      } catch (e) {
+        // A failed save must not strand the user mid-funnel; the sim falls back to
+        // the seeded defaults, which is a worse game but not a broken one.
+        console.warn('[tutorial] game plan save/advance failed:', e);
+      }
+      // Carry the whole tutorial context forward verbatim — home/away/my_team/game_id.
+      const fwd = new URLSearchParams(window.location.search);
+      window.location.href = '/set-lineup.html?' + fwd.toString();
+    });
+    actions.appendChild(cta);
   };
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', applyReadOnly);
+    document.addEventListener('DOMContentLoaded', applyTutorialMode);
   } else {
-    applyReadOnly();
+    applyTutorialMode();
   }
 }
 

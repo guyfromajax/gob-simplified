@@ -29,9 +29,18 @@ BALANCING_LEADING = MAX - BALANCING_MARGIN  # 170
 FRANCHISE_INIT_LO = MID - 5   # 85
 FRANCHISE_INIT_HI = MID + 5   # 95
 
-# FTE tutorial forced make / average opponent (fte_inject_state.md §3).
-TUTORIAL_USER = MIN  # -10 — forced-make-side threshold on the current scale
-TUTORIAL_COMPUTER = MID  # 90 — winnable opponent
+# FTE tutorial thresholds. BOTH SIDES SIT AT MID — the tutorial game is played on
+# neutral terms (owner call, FTE v3, 2026-09-11).
+#
+# FTE v2 set the USER to MIN (-10), the forced-make end of the scale. Note that the
+# opponent was never nerfed: it was already at MID. The tilt was entirely a USER BUFF,
+# and it is now removed -- v3 sims a full game from 0-0 and a fabricated blowout would
+# misrepresent the product the tutorial exists to sell.
+#
+# MID (90) also sits inside FRANCHISE_INIT_LO/HI (85-95), so a tutorial game scores like
+# a normal franchise game rather than like a shooting drill.
+TUTORIAL_USER = MID  # 90 — was MIN; see above
+TUTORIAL_COMPUTER = MID  # 90 — unchanged
 
 # Rim-runner custom corner FB threshold base.
 FAST_BREAK_CORNER_THRESHOLD_BASE = MAX - BALANCING_MARGIN  # 170

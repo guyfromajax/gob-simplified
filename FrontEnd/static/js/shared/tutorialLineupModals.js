@@ -97,7 +97,10 @@ function buildModal({ teamName, message, ctaLabel, ctaVariant, onConfirm }) {
 export function showLineupIntroModal({ teamName, onDismiss }) {
   return buildModal({
     teamName,
-    message: "Here's your moment, Coach. Set your lineup for crunch time.",
+    // FTE v3 locked copy. v2 said "Set your lineup for crunch time" because the
+    // tutorial opened mid-Q4; v3 starts at the tip with a five already chosen by
+    // autoset, so the job is to REVIEW, not to build from nothing.
+    message: "I set your starting five. Adjust if you'd like.",
     ctaLabel: 'GOT IT',
     ctaVariant: 'action', // non-gating acknowledgement
     onConfirm: onDismiss,
