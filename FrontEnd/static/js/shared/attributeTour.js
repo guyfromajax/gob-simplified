@@ -47,7 +47,14 @@
 
 import { getTeamSammyImage } from '/js/shared/teamCoachAsset.js';
 
-const STYLESHEET_HREF = '/css/attribute-tour.css';
+// set-lineup.html links NEITHER of these, so the module injects them itself —
+// the same pattern tutorialLineupModals.js uses. gob-buttons is required now that
+// the GOT IT CTA is a brand .gob-btn--action; without it the button renders
+// unstyled and, crucially, SILENTLY — no console error, just a plain button.
+const STYLESHEETS = [
+  '/css/attribute-tour.css',
+  '/css/gob-buttons.css',
+];
 const DEFAULT_PERSIST_KEY = 'fteV2TutorialAttrTourShown';
 
 // Same set the canonical attributeTooltips.js helper recognizes — used to
@@ -61,11 +68,13 @@ const FALLBACK_ATTR_KEYS = new Set([
 ]);
 
 function ensureStylesheet() {
-  if (document.querySelector(`link[href="${STYLESHEET_HREF}"]`)) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = STYLESHEET_HREF;
-  document.head.appendChild(link);
+  STYLESHEETS.forEach((href) => {
+    if (document.querySelector(`link[href="${href}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = href;
+    document.head.appendChild(link);
+  });
 }
 
 function alreadySeen(persistKey) {
@@ -97,6 +106,11 @@ export function showAttributeTour(opts = {}) {
   }
   const persistKey = opts.persistKey || DEFAULT_PERSIST_KEY;
   const onDismiss = typeof opts.onDismiss === 'function' ? opts.onDismiss : null;
+  // Fired SYNCHRONOUSLY on GOT IT, before the 240ms teardown. set-lineup uses it
+  // to switch the roster view to the Attributes tab, so the columns the copy is
+  // describing are actually on screen when the card clears. onDismiss fires after
+  // teardown and is too late to feel connected to the click.
+  const onCta = typeof opts.onCta === 'function' ? opts.onCta : null;
   if (alreadySeen(persistKey)) return { close: () => {}, skipped: true };
 
   ensureStylesheet();
@@ -146,8 +160,11 @@ export function showAttributeTour(opts = {}) {
   // Sammy coach-mark.
   const sammyImg = getTeamSammyImage(opts.teamName);
   const total = cuedCells.length;
+  // Centered, matching the lineup intro modal. The previous build anchored this
+  // card under the header row, where it sat in the top-left corner and read as
+  // page furniture rather than as Sammy talking to you.
   const sammy = document.createElement('div');
-  sammy.className = 'attribute-tour__sammy';
+  sammy.className = 'attribute-tour__sammy is-centered';
   sammy.setAttribute('role', 'dialog');
   sammy.setAttribute('aria-live', 'polite');
   sammy.innerHTML = `
@@ -158,7 +175,7 @@ export function showAttributeTour(opts = {}) {
     </div>
     <div class="attribute-tour__sammy-foot">
       <span class="attribute-tour__sammy-count" id="attribute-tour-count">0 of ${total} explored</span>
-      <button type="button" class="attribute-tour__sammy-dismiss" id="attribute-tour-dismiss">GOT IT</button>
+      <button type="button" class="gob-btn gob-btn--action attribute-tour__sammy-dismiss" id="attribute-tour-dismiss">GOT IT</button>
     </div>
   `;
   document.body.appendChild(sammy);
@@ -169,6 +186,8 @@ export function showAttributeTour(opts = {}) {
   // Position Sammy just below the header row. Re-anchor on resize/scroll
   // so the bubble tracks if the page layout shifts.
   function positionSammy() {
+    // Centered variant is positioned by CSS; anchoring would fight it.
+    if (sammy.classList.contains('is-centered')) return;
     const rect = headerRow.getBoundingClientRect();
     const sammyRect = sammy.getBoundingClientRect();
     const margin = 16;
@@ -248,6 +267,10 @@ export function showAttributeTour(opts = {}) {
 
   function close() {
     markSeen(persistKey);
+    // Before any teardown, so the tab flip and the card dismissal read as one action.
+    if (onCta) {
+      try { onCta(); } catch (e) { console.warn('[attribute-tour] onCta failed:', e); }
+    }
     sammy.classList.remove('is-visible');
     // Lift the dim immediately so the page comes back into focus while
     // the Sammy bubble fades — feels more responsive than waiting for

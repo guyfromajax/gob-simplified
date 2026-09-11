@@ -2649,6 +2649,14 @@ async function init() {
             headerRow,
             teamName: homeTeam,
             persistKey: tourKey,
+            // FTE v3: GOT IT reveals the Attributes tab. The tour describes the
+            // attribute columns, which live in the Attributes pane — before this,
+            // dismissing left the user on the Game tab with no sign of what had
+            // just been explained.
+            onCta: () => {
+              const attrTab = document.getElementById('roster-view-attributes');
+              if (attrTab) attrTab.click();
+            },
             // Dim everything around the header row instead of laying a
             // scrim on top — <thead> z-index is unreliable against a
             // full-screen overlay (early build had the header rendering
