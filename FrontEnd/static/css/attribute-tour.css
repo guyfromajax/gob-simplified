@@ -318,16 +318,31 @@
   gap: 12px;
 }
 
-/* Brand orange CTA. gob-btn supplies the look; these only size it to the card
-   and defeat the ghost-button styling the anchored variant used. */
+/* Brand orange CTA.
+ *
+ * The base .attribute-tour__sammy-dismiss rule above inlines a GHOST recipe —
+ * translucent white background, hairline border, and `opacity: 0.55` — precisely so
+ * the module works without gob-buttons.css. That rule is more specific than
+ * `.gob-btn--action`, so simply adding the class left the button grey and faded.
+ * The colours are restated here (matching gob-buttons.css .gob-btn--action) rather
+ * than fought over with !important. */
 .attribute-tour__sammy.is-centered .attribute-tour__sammy-dismiss {
-  background: none;
-  border: none;
-  padding: 0;
-}
-.attribute-tour__sammy.is-centered .attribute-tour__sammy-dismiss.gob-btn {
-  padding: 10px 22px;
+  height: auto;
+  padding: 10px 24px;
+  min-width: 120px;
+  opacity: 1;
+  background: #F79420;
+  border: 1px solid rgba(247, 148, 32, 0.55);
+  color: #15181f;
   font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.attribute-tour__sammy.is-centered .attribute-tour__sammy-dismiss:hover {
+  opacity: 1;
+  background: #ffa338;
+  border-color: rgba(247, 148, 32, 0.75);
+  color: #15181f;
 }
 
 @media (prefers-reduced-motion: reduce) {

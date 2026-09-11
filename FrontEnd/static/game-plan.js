@@ -158,13 +158,25 @@ if (modeParam === 'tutorial') {
   // through the same `saveSettingsQuietly()` path and then advances the funnel, so
   // the user cannot walk away from the step with unsaved sliders.
   const applyTutorialMode = () => {
+    // FTE v3 chrome: the tutorial has ONE way forward. Anything that offers a way
+    // back or sideways is removed, so the only affordance is the orange CTA.
+    // Scoped to mode=tutorial — the franchise/single Game Plan screen is untouched.
     const subhead = document.getElementById('tutorial-readonly-subhead');
-    if (subhead) {
-      subhead.textContent = 'Set your strategy for tonight.';
-      subhead.hidden = false;
-    }
+    if (subhead) subhead.hidden = true;                       // no sub-copy
+    const backLink = document.getElementById('game-plan-back-link');
+    if (backLink) backLink.hidden = true;                     // no "Back to Locker Room"
+    const backToLineup = document.getElementById('btn-back-to-lineup');
+    if (backToLineup) backToLineup.style.display = 'none';    // no "Back To Lineup"
+    const cancelBtn = document.getElementById('btn-cancel');
+    if (cancelBtn) cancelBtn.style.display = 'none';
     const saveBtn = document.getElementById('btn-save-game-plan');
     if (saveBtn) saveBtn.style.display = 'none';
+    // With every sibling hidden the CTA is the row's only child — centre it.
+    const btnRow = document.querySelector('.button-container');
+    if (btnRow) {
+      btnRow.style.justifyContent = 'center';
+      btnRow.style.display = 'flex';
+    }
 
     // Progress thread + Sammy. Dynamic import: game-plan.js is injected as a
     // CLASSIC script (game-plan.html sets script.onload), so static ESM import

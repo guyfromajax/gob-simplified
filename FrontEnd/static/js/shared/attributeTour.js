@@ -106,11 +106,6 @@ export function showAttributeTour(opts = {}) {
   }
   const persistKey = opts.persistKey || DEFAULT_PERSIST_KEY;
   const onDismiss = typeof opts.onDismiss === 'function' ? opts.onDismiss : null;
-  // Fired SYNCHRONOUSLY on GOT IT, before the 240ms teardown. set-lineup uses it
-  // to switch the roster view to the Attributes tab, so the columns the copy is
-  // describing are actually on screen when the card clears. onDismiss fires after
-  // teardown and is too late to feel connected to the click.
-  const onCta = typeof opts.onCta === 'function' ? opts.onCta : null;
   if (alreadySeen(persistKey)) return { close: () => {}, skipped: true };
 
   ensureStylesheet();
@@ -267,10 +262,6 @@ export function showAttributeTour(opts = {}) {
 
   function close() {
     markSeen(persistKey);
-    // Before any teardown, so the tab flip and the card dismissal read as one action.
-    if (onCta) {
-      try { onCta(); } catch (e) { console.warn('[attribute-tour] onCta failed:', e); }
-    }
     sammy.classList.remove('is-visible');
     // Lift the dim immediately so the page comes back into focus while
     // the Sammy bubble fades — feels more responsive than waiting for

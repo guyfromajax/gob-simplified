@@ -3475,25 +3475,38 @@ async function initGame() {
       simFullBtn.addEventListener('click', handleSimFullGame);
     }
 
-    // FTE v3 tutorial: the user still sees the full pre-game experience (starting
-    // five card and all) — that IS the product, and skipping it would teach the
-    // wrong flow. What is removed is the CHOICE: Sim Full Game is the only path,
-    // so "Play Quarter" is hidden rather than merely discouraged.
+    // FTE v3 tutorial: no button press at all. The user already committed on the
+    // tip-off modal's SIM GAME, so asking them to press "Sim Full Game" again is a
+    // second confirmation of a decision already made.
     //
-    // Gated on `sim_full_game=1` + mode=tutorial rather than mode alone, so a
-    // tutorial game opened by any other route keeps normal buttons.
+    // They still SEE the full pre-game experience — handleSimFullGame mounts the
+    // Act 1 cover (the starting-five card) and runs it while the quarters sim
+    // underneath, so nothing is skipped; only the redundant click is.
+    //
+    // Routed through the SAME handler a click uses, never a parallel path: the
+    // tutorial must exercise the real Sim Full Game flow, because showing users
+    // that flow is the entire point of FTE v3.
+    //
+    // Gated on `sim_full_game=1` + mode=tutorial, so a tutorial game opened by any
+    // other route keeps normal buttons and no auto-start.
     try {
       const wantsSimOnly = new URLSearchParams(window.location.search).get('sim_full_game') === '1';
       if (wantsSimOnly && mode === 'tutorial' && currentQuarter < 2) {
+        // Play Quarter is not an option in the tutorial.
         const playBtnTut = document.querySelector('.play-button');
         if (playBtnTut) {
           playBtnTut.style.display = 'none';
           playBtnTut.disabled = true;
         }
         simFullBtn.classList.add('is-tutorial-only');
+        // Defer a tick so the button wiring above is fully settled before the
+        // handler tears the pre-game container down.
+        setTimeout(() => {
+          if (!isSimulating) handleSimFullGame();
+        }, 0);
       }
     } catch (e) {
-      console.warn('[bootGame] tutorial sim-only button gating failed:', e);
+      console.warn('[bootGame] tutorial auto sim-full-game failed:', e);
     }
   }
   if (sim4Btn) {

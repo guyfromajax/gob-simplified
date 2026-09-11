@@ -2640,6 +2640,12 @@ async function init() {
         ? `fteV2TutorialAttrTourShown_${gameId}`
         : 'fteV2TutorialAttrTourShown';
       const launchAttributeTour = () => {
+        // FTE v3: reveal the Attributes tab BEFORE the coach-mark, not after it.
+        // The copy says "these are your player attributes" — showing it over the
+        // GAME tab described a table the user could not see, and the columns only
+        // appeared once they dismissed the thing explaining them.
+        const attrTab = document.getElementById('roster-view-attributes');
+        if (attrTab) attrTab.click();
         const headerRow = document.querySelector('#roster-attributes-pane .roster-table thead');
         if (!headerRow) return;
         // Defer a frame so any post-intro-modal layout settles before we
@@ -2649,14 +2655,7 @@ async function init() {
             headerRow,
             teamName: homeTeam,
             persistKey: tourKey,
-            // FTE v3: GOT IT reveals the Attributes tab. The tour describes the
-            // attribute columns, which live in the Attributes pane — before this,
-            // dismissing left the user on the Game tab with no sign of what had
-            // just been explained.
-            onCta: () => {
-              const attrTab = document.getElementById('roster-view-attributes');
-              if (attrTab) attrTab.click();
-            },
+
             // Dim everything around the header row instead of laying a
             // scrim on top — <thead> z-index is unreliable against a
             // full-screen overlay (early build had the header rendering
