@@ -101,9 +101,9 @@ TutorialStep = Literal[
     "team_select",
     "username",
     "opponent_pick",   # FTE v3
+    "set_lineup",      # FTE v3: lineup now precedes game plan
     "game_plan",       # FTE v3
-    "set_lineup",
-    "situation",       # FTE v3: tip-off now follows lineup (was before it in v2)
+    "situation",       # FTE v3: tip-off now follows both (was before them in v2)
     "in_game",
     "complete",
 ]
@@ -137,8 +137,8 @@ _TUTORIAL_STEP_ORDER = {
     "team_select": 1,
     "username": 2,
     "opponent_pick": 3,
-    "game_plan": 4,
-    "set_lineup": 5,
+    "set_lineup": 4,
+    "game_plan": 5,
     "situation": 6,
     "in_game": 7,
     "complete": 8,

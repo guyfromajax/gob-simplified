@@ -14,14 +14,15 @@
  *   1. GET /api/auth/tutorial-opponents → ranked list + mid-table default
  *   2. User selects a card (default pre-selected)
  *   3. CONTINUE → POST /api/init-game (mode=tutorial) → creates the game doc
- *   4. POST /api/auth/tutorial-advance { step: 'game_plan', opponent_pick, game_id }
- *   5. → /game-plan.html?mode=tutorial&...&game_id=...
+ *   4. POST /api/auth/tutorial-advance { step: 'set_lineup', opponent_pick, game_id }
+ *   5. → /set-lineup.html?mode=tutorial&...&game_id=...
  *
  * The game_id is persisted on tutorial_state (not just the URL) so a refresh
  * resumes the SAME game instead of initialising a second one.
  */
 
 import { showSammyModal } from '/js/shared/sammyModal.js';
+import { playAdvance, playSelect } from '/js/shared/uiSfx.js';
 import { mountTutorialProgress } from '/js/shared/tutorialProgressThread.js';
 
 mountTutorialProgress('opponent');
@@ -79,6 +80,9 @@ function renderCards() {
 }
 
 function select(name) {
+  // click-tiny on every opponent tap (owner call: click-beep stays reserved for
+  // committing to YOUR program, which is the weightier choice).
+  if (name !== selectedName) playSelect();
   selectedName = name;
   Array.from(listEl.querySelectorAll('.opp-card')).forEach((el) => {
     const on = el.dataset.name === name;
@@ -140,6 +144,7 @@ async function initGame(opponent) {
 
 ctaEl.addEventListener('click', async () => {
   if (!selectedName) return;
+  playAdvance();
   ctaEl.disabled = true;
   setError('');
   try {
@@ -152,7 +157,7 @@ ctaEl.addEventListener('click', async () => {
     const adv = await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
       method: 'POST',
       headers: authHeaders(),
-      body: JSON.stringify({ step: 'game_plan', opponent_pick: selectedName, game_id: gameId }),
+      body: JSON.stringify({ step: 'set_lineup', opponent_pick: selectedName, game_id: gameId }),
     });
     if (!adv.ok) throw new Error('advance HTTP ' + adv.status);
 
@@ -161,7 +166,7 @@ ctaEl.addEventListener('click', async () => {
     // (it arrives as the literal string "null"). In tutorial/single mode the
     // team_id IS the team name — the backend resolves via gm.<team>.name.
     // Every downstream screen forwards the query string verbatim, so setting it
-    // once here carries it through Game Plan -> Lineup -> Tip-off.
+    // once here carries it through Lineup -> Game Plan -> Tip-off.
     const params = new URLSearchParams({
       mode: 'tutorial',
       home: userTeam,
@@ -170,7 +175,7 @@ ctaEl.addEventListener('click', async () => {
       team_id: userTeam,
       game_id: gameId,
     });
-    window.location.href = '/game-plan.html?' + params.toString();
+    window.location.href = '/set-lineup.html?' + params.toString();
   } catch (e) {
     console.error('[tutorial] advance failed:', e);
     setError('Something went wrong. Try again.');

@@ -2825,9 +2825,9 @@ async function init() {
       }
       DEBUG && console.log('[lineup] launching quarter', quarter);
 
-      // FTE v3 tutorial: lineup hands off to the TIP-OFF screen, not straight to
-      // the court. Two v2 behaviours are deliberately gone:
-      //   - the step is now 'situation' (tip-off moved to AFTER lineup)
+      // FTE v3 tutorial: lineup hands off to GAME PLAN (roster first, then strategy,
+      // then the tip). Two v2 behaviours are deliberately gone:
+      //   - the step is 'game_plan', not 'in_game'
       //   - resume_from_timeout is NOT set. v2 booted mid-Q4 out of a timeout and
       //     needed the SIP emission path; v3 starts at the opening tip, so forcing
       //     a timeout resume would emit a set-in-play for a game that never paused.
@@ -2836,27 +2836,28 @@ async function init() {
           await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
             method: 'POST',
             headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ step: 'situation' }),
+            body: JSON.stringify({ step: 'game_plan' }),
           });
         } catch (e) {
-          console.warn('[tutorial] could not advance to situation step:', e);
+          console.warn('[tutorial] could not advance to game_plan step:', e);
         }
-        const tipParams = new URLSearchParams({
-          mode: 'tutorial',
-          home: homeTeam,
-          away: awayTeam,
-          my_team: 'home',
-          team_id: homeTeam,
-        });
-        // game_id must survive to the court or the broadcast has no game to run.
-        // Prefer the live URL over `currentGameId`, which is scoped to the branch
-        // above and can be undefined on this path.
-        const tipGameId = currentGameId
+        // ⚠️ CARRY `params`, DO NOT REBUILD IT.
+        // `buildGameNavigationParams` writes the chosen five into the query string as
+        // home_pg / home_sg / … (timeoutNavigationHelper.js). An earlier build of this
+        // branch constructed a fresh URLSearchParams and silently dropped them, so the
+        // court received no lineup, `snapshot_opening_lineups_to_game_state` skipped
+        // ("need 5 starters"), and the pre-game card rendered empty. Every tutorial
+        // screen from here forwards the string verbatim.
+        const nextParams = new URLSearchParams(params);
+        nextParams.set('mode', 'tutorial');
+        nextParams.set('team_id', homeTeam);
+        nextParams.delete('resume_from_timeout');
+        const tutGameId = currentGameId
           || new URLSearchParams(window.location.search).get('game_id');
-        if (tipGameId) tipParams.set('game_id', tipGameId);
+        if (tutGameId) nextParams.set('game_id', tutGameId);
         playSound('confirm-1-lowervol.wav');
         setTimeout(() => {
-          window.location.href = '/tutorial-situation.html?' + tipParams.toString();
+          window.location.href = '/game-plan.html?' + nextParams.toString();
         }, 200);
         return;
       }

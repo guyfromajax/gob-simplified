@@ -409,7 +409,8 @@ These are **not blockers** — implementers should use judgment and document cho
 | 1 | Game Plan persists "to the tutorial game document" — but v2 created it at the tip-off screen, *after* Game Plan in the v3 order | **init-game moved to the opponent-pick CTA.** Also removes the clobber risk: init seeds defaults, the user edits after, so init can never overwrite a choice. |
 | 2 | `apply_tutorial_initial_state` forces Q4/60-60 | **Retired.** Games start 0-0 at Q1. The three-quarter player stat overlay went with it. |
 | 3 | Brief said keep the "favorable" thresholds | **Removed.** Both sides now `MID` (90). v2 never nerfed the opponent — it buffed the user to `MIN` (forced make). |
-| 4 | Tutorial Game Plan was read-only by design | **Reversed.** Sliders interactive; CONTINUE saves via the existing `saveSettingsQuietly()` path, so the step cannot be left unsaved. |
+| 4 | Tutorial Game Plan was read-only by design | **Reversed.** Sliders interactive; the CTA saves via the existing `saveSettingsQuietly()` path, so the step cannot be left unsaved. |
+| 7 | Brief ordered Game Plan before Lineup | **Reversed 2026-09-11 (owner call):** roster first, then strategy. Lineup CTA `CONTINUE`, Game Plan CTA `PLAY NOW`. The lineup feedback modal's `RETURN TO GAME` became `CONTINUE` — it no longer returns to a game in progress. |
 | 5 | "Implementer should pick the most accurate existing metric" | **`total_player_attrs`** — but it was a stale derived cache, wrong on 128/128 teams and re-ordering all 16 conferences. Repaired by `scripts/recompute_total_player_attrs.py`. Ranking now lives server-side in one endpoint. |
 | 6 | Brief's step ids matched neither the enum nor the progress thread | **Added, not renamed.** Two enum values, two dots. `tutorial_state.step` is a live resume pointer; renaming would strand users. |
 
@@ -418,6 +419,8 @@ These are **not blockers** — implementers should use judgment and document cho
 - **`game_id` only existed in the URL.** With init four hops earlier, one refresh would mint a second game and orphan the first. `TutorialState` now carries `opponent_pick` + `game_id`.
 - **Orphaned tutorial games were already leaking** — 39 docs against 14 completions. `tutorial_game_ttl` now sweeps abandons; the field is tutorial-only so the index cannot reach another game.
 - **`resume_from_timeout` is gone from the tutorial path.** v2 booted mid-Q4 out of a timeout and needed the SIP emission path; v3 starts at the tip.
+- **The lineup travels by query string** (`home_pg`/`home_sg`/…). Rebuilding the params at any hop drops it silently and empties the pre-game card. See `fte_system.md` §0.
+- **UX SFX had no shared module** — `playSound` was duplicated across six files, so new screens shipped silent by default. `js/shared/uiSfx.js` now owns it.
 
 ### Files
 
@@ -446,3 +449,4 @@ These are **not blockers** — implementers should use judgment and document cho
 | `TUTORIAL_USER` / `TUTORIAL_COMPUTER` | `shot_threshold_scale.py` | `MID` (90) | Tutorial shot thresholds. Golf score: lower = easier makes. `MIN` -10 is forced-make, `MAX` 190 unmakeable. |
 | `TUTORIAL_GAME_TTL_DAYS` | `db.py` (`GOB_TUTORIAL_GAME_TTL_DAYS`) | `7` | Abandoned-tutorial sweep. Retuning a live TTL needs `collMod`, which the helper handles. |
 | `TUTORIAL_STRATEGY_SETTINGS` | `tutorial_game.py` | all `2` (`fc_press`/`hc_trap` `1`) | Opening slider seed. A SEED only — the user overwrites it at the Game Plan step. |
+| `SFX_ADVANCE` / `SFX_SELECT` / `SFX_COMMIT` | `js/shared/uiSfx.js` | `confirm-1-lowervol` / `click-tiny` / `click-beep` | Funnel sounds. Change here, not at call sites. |

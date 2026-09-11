@@ -2974,6 +2974,8 @@ async function handleSimFullGame() {
         await showPreGameExperience(gid, null, normalized, {
           displayOnly: true,
           waitForSim: simDonePromise,
+          // Tutorial games carry no season, so rank/record would render "#0 0-0".
+          hideRecords: mode === 'tutorial',
         });
       } catch (coverErr) {
         console.warn('⚠️ [SIM-PRES] Act 1 cover skipped:', coverErr);

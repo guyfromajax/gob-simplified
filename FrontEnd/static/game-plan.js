@@ -182,24 +182,31 @@ if (modeParam === 'tutorial') {
     cta.id = 'btn-tutorial-gameplan-continue';
     cta.type = 'button';
     cta.className = 'gob-btn gob-btn--action gob-btn--lg';
-    cta.textContent = 'SET LINEUP';
+    // FTE v3: Game Plan is now the LAST decision before the tip (lineup moved
+    // ahead of it), so this button leaves the setup flow entirely.
+    cta.textContent = 'PLAY NOW';
     cta.addEventListener('click', async () => {
+      // Same advance sound as every other funnel CTA. game-plan.js is a classic
+      // script, so uiSfx comes in by dynamic import like the modals above.
+      import('/js/shared/uiSfx.js').then((m) => m.playAdvance()).catch(() => {});
       cta.disabled = true;
       try {
         await saveSettingsQuietly();
         await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
           method: 'POST',
           headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-          body: JSON.stringify({ step: 'set_lineup' }),
+          body: JSON.stringify({ step: 'situation' }),
         });
       } catch (e) {
         // A failed save must not strand the user mid-funnel; the sim falls back to
         // the seeded defaults, which is a worse game but not a broken one.
         console.warn('[tutorial] game plan save/advance failed:', e);
       }
-      // Carry the whole tutorial context forward verbatim — home/away/my_team/game_id.
+      // Forward the query string VERBATIM. It carries the chosen five as
+      // home_pg / home_sg / … — rebuilding it here would drop the lineup and leave
+      // the pre-game card empty.
       const fwd = new URLSearchParams(window.location.search);
-      window.location.href = '/set-lineup.html?' + fwd.toString();
+      window.location.href = '/tutorial-situation.html?' + fwd.toString();
     });
     actions.appendChild(cta);
   };

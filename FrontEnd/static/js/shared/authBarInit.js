@@ -277,6 +277,15 @@
         targetPath = '/tutorial-pick-opponent.html';
         targetUrl = OPPONENT_URL;
       }
+    } else if (step === 'set_lineup') {
+      // FTE v3: lineup precedes game plan.
+      if (!teamPick || !opponentPick) {
+        targetPath = '/tutorial-pick-opponent.html';
+        targetUrl = OPPONENT_URL;
+      } else {
+        targetPath = '/set-lineup.html';
+        targetUrl = '/set-lineup.html?' + tutorialGameParams().toString();
+      }
     } else if (step === 'game_plan') {
       if (!teamPick || !opponentPick) {
         targetPath = '/tutorial-pick-opponent.html';
@@ -284,14 +293,6 @@
       } else {
         targetPath = '/game-plan.html';
         targetUrl = '/game-plan.html?' + tutorialGameParams().toString();
-      }
-    } else if (step === 'set_lineup') {
-      if (!teamPick || !opponentPick) {
-        targetPath = '/tutorial-pick-opponent.html';
-        targetUrl = OPPONENT_URL;
-      } else {
-        targetPath = '/set-lineup.html';
-        targetUrl = '/set-lineup.html?' + tutorialGameParams().toString();
       }
     } else if (step === 'situation' || step === 'in_game') {
       // FTE v3: tip-off now follows lineup. `in_game` resumes here too — the sim is

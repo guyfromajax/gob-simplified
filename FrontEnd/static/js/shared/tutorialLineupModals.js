@@ -111,8 +111,12 @@ export function showLineupFeedbackModal({ teamName, message, onConfirm }) {
   return buildModal({
     teamName,
     message,
-    ctaLabel: 'RETURN TO GAME',
-    ctaVariant: 'gate', // gating — confirms the lineup and navigates to gameplay
+    // FTE v3: this no longer returns to a game in progress — lineup now precedes
+    // Game Plan, so the honest label is CONTINUE. "RETURN TO GAME" was accurate in
+    // v2, where the user was mid-Q4 and the next click put them back on the court.
+    ctaLabel: 'CONTINUE',
+    // Still `gate` (green): it confirms the lineup and advances the funnel.
+    ctaVariant: 'gate',
     onConfirm,
   });
 }

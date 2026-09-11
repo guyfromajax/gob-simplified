@@ -24,6 +24,7 @@
 
 import { getTeamSammyImage } from '/js/shared/teamCoachAsset.js';
 import { mountTutorialProgress } from '/js/shared/tutorialProgressThread.js';
+import { playAdvance } from '/js/shared/uiSfx.js';
 
 const DEFAULT_OPPONENT = 'Xavien';
 const XAVIEN_FALLBACK_OPPONENT = 'South Lancaster';
@@ -75,15 +76,21 @@ function gotoBroadcast(userTeam, opponent, gameId) {
   // `Math.max(0, quarter) < 2`); v2 sent quarter=4 because it resumed mid-Q4.
   // `sim_full_game=1` is the tutorial's instruction to boot straight into the
   // broadcast instead of showing the pre-game button row.
-  const params = new URLSearchParams({
-    mode: 'tutorial',
-    home: userTeam,
-    away: opponent,
-    my_team: 'home',
-    quarter: '0',
-    team_id: userTeam,
-    sim_full_game: '1',
-  });
+  // Start from the INCOMING query string, don't rebuild it. It carries the five the
+  // user set as home_pg / home_sg / … — the court needs those to seed the lineup.
+  // Rebuilding here is what emptied the pre-game card once already.
+  const params = new URLSearchParams(window.location.search);
+  params.set('mode', 'tutorial');
+  params.set('home', userTeam);
+  params.set('away', opponent);
+  params.set('my_team', 'home');
+  params.set('team_id', userTeam);
+  // quarter=0 is the pre-anchor state handleSimFullGame() requires; whatever the
+  // lineup screen put here was for its own navigation, not the court's.
+  params.set('quarter', '0');
+  params.set('sim_full_game', '1');
+  params.delete('resume_from_timeout');
+  params.delete('lineup_checkpoint');
   if (gameId) params.set('game_id', gameId);
   window.location.href = `/court.html?${params.toString()}`;
 }
@@ -137,6 +144,7 @@ async function main() {
   if (!ctaBtn) return;
   ctaBtn.addEventListener('click', async () => {
     if (ctaBtn.disabled) return;
+    playAdvance();
     ctaBtn.disabled = true;
     try {
       // FTE v3: NO init-game here. The game doc was created back at the opponent

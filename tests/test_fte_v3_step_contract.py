@@ -25,9 +25,9 @@ EXPECTED_ORDER = [
     "team_select",
     "username",
     "opponent_pick",
-    "game_plan",
     "set_lineup",
-    "situation",   # tip-off, now AFTER lineup
+    "game_plan",
+    "situation",   # tip-off, now AFTER both lineup and game plan
     "in_game",
     "complete",
 ]
@@ -51,17 +51,18 @@ def test_order_is_exact_and_contiguous():
         "indices must be contiguous — gaps/dupes break forward-only comparison"
 
 
-def test_game_plan_precedes_lineup_which_precedes_tipoff():
-    """The v3 reorder: strategy, then roster, then tip. Game Plan must come after
-    opponent pick because init-game (and therefore the doc it writes to) happens
-    at the opponent step."""
+def test_lineup_precedes_game_plan_which_precedes_tipoff():
+    """The v3 order: opponent, ROSTER, then strategy, then tip. Both screens come
+    after opponent_pick because init-game — and therefore the doc they write to —
+    happens at the opponent step."""
     o = _TUTORIAL_STEP_ORDER
-    assert o["opponent_pick"] < o["game_plan"] < o["set_lineup"] < o["situation"] < o["in_game"]
+    assert o["opponent_pick"] < o["set_lineup"] < o["game_plan"] < o["situation"] < o["in_game"]
 
 
-def test_tipoff_moved_after_lineup():
+def test_tipoff_moved_after_lineup_and_game_plan():
     """v2 had situation BEFORE set_lineup. v3 inverts it; this is the regression guard."""
     assert _TUTORIAL_STEP_ORDER["situation"] > _TUTORIAL_STEP_ORDER["set_lineup"]
+    assert _TUTORIAL_STEP_ORDER["situation"] > _TUTORIAL_STEP_ORDER["game_plan"]
 
 
 def test_complete_is_terminal():

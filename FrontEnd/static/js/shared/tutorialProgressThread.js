@@ -8,7 +8,7 @@
  *   mountTutorialProgress('username');   // step IDs below
  *
  * Steps mirror the user-visible flow, not the backend's TutorialStep enum:
- *   persona | program | username | opponent | gameplan | lineup | tipoff | gameplay
+ *   persona | program | username | opponent | lineup | gameplan | tipoff | gameplay
  *
  * FTE v3 added `opponent` + `gameplan` and moved `tipoff` AFTER `lineup` (the user
  * now sets strategy and roster before the tip, then watches a full-game sim). These
@@ -27,8 +27,8 @@ const STEPS = [
   { id: 'program', label: 'Program' },
   { id: 'username', label: 'Username' },
   { id: 'opponent', label: 'Opponent' },
-  { id: 'gameplan', label: 'Game Plan' },
   { id: 'lineup', label: 'Lineup' },
+  { id: 'gameplan', label: 'Game Plan' },
   { id: 'tipoff', label: 'Tip-off' },
   { id: 'gameplay', label: 'Gameplay' },
 ];

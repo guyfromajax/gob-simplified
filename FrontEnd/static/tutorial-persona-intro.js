@@ -10,6 +10,7 @@
  */
 
 import { mountTutorialProgress } from '/js/shared/tutorialProgressThread.js';
+import { playAdvance } from '/js/shared/uiSfx.js';
 
 const ctaBtn = document.getElementById('persona-intro-cta');
 const errorEl = document.getElementById('persona-intro-error');
@@ -61,6 +62,7 @@ async function advanceToTeamSelect() {
 if (ctaBtn) {
   ctaBtn.addEventListener('click', async () => {
     if (ctaBtn.disabled) return;
+    playAdvance();
     ctaBtn.disabled = true;
     showError('');
     try {
