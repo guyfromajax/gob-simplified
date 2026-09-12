@@ -1093,7 +1093,32 @@ async function init() {
     }
     if (btnCancel) btnCancel.style.display = 'none';
   }
-  
+
+  // FTE v3 tutorial: LAST WORD on the back controls.
+  //
+  // This runs AFTER the isFromCommandCenter branch above, deliberately. The earlier
+  // pass in applyTutorialMode() hid these, but that fires at DOM-ready while this
+  // block runs later in init() and re-showed them — the buttons came back.
+  // Overriding here, downstream of every branch, is the only placement that sticks.
+  //
+  // The tutorial has exactly one way forward: no locker room, no going back to the
+  // lineup. Scoped to mode=tutorial; franchise/single/tournament keep their nav.
+  if (modeParam === 'tutorial') {
+    if (pageBackLink) {
+      pageBackLink.hidden = true;
+      pageBackLink.style.display = 'none';
+    }
+    if (btnBackToLineup) btnBackToLineup.style.display = 'none';
+    if (btnCancel) btnCancel.style.display = 'none';
+    if (btnSaveGamePlan) btnSaveGamePlan.style.display = 'none';
+    // PLAY NOW is now the row's only child — centre it.
+    const btnRow = document.querySelector('.button-container');
+    if (btnRow) {
+      btnRow.style.display = 'flex';
+      btnRow.style.justifyContent = 'center';
+    }
+  }
+
   // ✅ TASK 0: Save Game Plan button (only button that saves to DB)
   if (btnSaveGamePlan) {
     console.log('🔍 [GAME-PLAN] init() - btnSaveGamePlan found, adding click listener');
