@@ -12,6 +12,8 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/franchise-command-center.css" />
   <link rel="stylesheet" href="/resource-pages.css" />
+  <!-- gob-buttons supplies .gob-btn--action for the FTE v3 tutorial CONTINUE CTA. -->
+  <link rel="stylesheet" href="/css/gob-buttons.css" />
   <link rel="stylesheet" href="/game-plan.css" />
   <link rel="stylesheet" href="/css/fonts.css">
 </head>
@@ -47,6 +49,19 @@
                 <span>100% Set Plays</span>
               </div>
             </div>
+
+            <!-- FTE v3 "Shot Diet" nest. Inside / Attack / Outside compete for the
+                 SAME touches, so they are grouped to make that tradeoff visible.
+                 Visual grouping ONLY — slider semantics, ids, and the
+                 offense-not-all-zero validation are untouched. One shared tip on the
+                 section title; deliberately no per-slider info icons. -->
+            <div class="slider-nest" id="shot-diet-nest">
+              <div class="slider-nest__head">
+                <span class="slider-nest__title">Shot diet</span>
+                <button type="button" class="slider-nest__info"
+                        aria-label="About the shot diet sliders"
+                        title="These three share touches — raise one, the others compete.">i</button>
+              </div>
 
             <div class="slider-group">
               <label for="slider-inside">Inside Offense</label>
@@ -86,6 +101,7 @@
                 <span>Most</span>
               </div>
             </div>
+            </div><!-- /.slider-nest -->
 
             <div class="slider-group">
               <label for="slider-tempo">Offense Tempo</label>

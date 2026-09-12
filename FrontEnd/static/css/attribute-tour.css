@@ -267,3 +267,88 @@
     height: 40px;
   }
 }
+
+/* ─── Centered variant (FTE v3) ─────────────────────────────────────────────
+ * The anchored card sat under the header row, which on a wide table put it in
+ * the top-left corner where it read as page furniture rather than as Sammy
+ * speaking. Centered, it matches the lineup intro modal and cannot be missed.
+ *
+ * Overrides the anchored rules rather than replacing them: `positionSammy()`
+ * early-returns for this variant, so the inline left/top it would otherwise set
+ * are never applied and these values stand unopposed.
+ */
+.attribute-tour__sammy.is-centered {
+  left: 50% !important;
+  top: 50% !important;
+  transform: translate(-50%, -50%) scale(0.97);
+  width: min(460px, calc(100vw - 40px));
+  padding: 22px 26px 20px;
+  grid-template-columns: 64px minmax(0, 1fr);
+  column-gap: 18px;
+  align-items: center;
+  /* Above the scrim the tour lays over the page. */
+  z-index: 1600;
+}
+
+.attribute-tour__sammy.is-centered.is-visible {
+  transform: translate(-50%, -50%) scale(1);
+}
+
+/* The anchored build drew a pointer toward the header row. A centered card has
+   nothing to point at, so the arrow is suppressed. */
+.attribute-tour__sammy.is-centered::before {
+  display: none;
+}
+
+.attribute-tour__sammy.is-centered .attribute-tour__sammy-portrait {
+  width: 64px;
+  height: 64px;
+}
+
+.attribute-tour__sammy.is-centered .attribute-tour__sammy-text {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
+.attribute-tour__sammy.is-centered .attribute-tour__sammy-foot {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+/* Brand orange CTA.
+ *
+ * The base .attribute-tour__sammy-dismiss rule above inlines a GHOST recipe —
+ * translucent white background, hairline border, and `opacity: 0.55` — precisely so
+ * the module works without gob-buttons.css. That rule is more specific than
+ * `.gob-btn--action`, so simply adding the class left the button grey and faded.
+ * The colours are restated here (matching gob-buttons.css .gob-btn--action) rather
+ * than fought over with !important. */
+.attribute-tour__sammy.is-centered .attribute-tour__sammy-dismiss {
+  height: auto;
+  padding: 10px 24px;
+  min-width: 120px;
+  opacity: 1;
+  background: #F79420;
+  border: 1px solid rgba(247, 148, 32, 0.55);
+  color: #15181f;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+}
+
+.attribute-tour__sammy.is-centered .attribute-tour__sammy-dismiss:hover {
+  opacity: 1;
+  background: #ffa338;
+  border-color: rgba(247, 148, 32, 0.75);
+  color: #15181f;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attribute-tour__sammy.is-centered,
+  .attribute-tour__sammy.is-centered.is-visible {
+    transform: translate(-50%, -50%);
+    transition: opacity 120ms ease;
+  }
+}

@@ -661,6 +661,7 @@ try:
                 ensure_games_franchise_index,
                 ensure_franchises_user_id_index,
                 ensure_eog_band_log_index,
+                ensure_tutorial_game_ttl_index,
             )
             ensure_users_username_index()
             ensure_ftd_index()
@@ -668,6 +669,7 @@ try:
             ensure_frd_index()
             ensure_games_franchise_index()
             ensure_franchises_user_id_index()
+            ensure_tutorial_game_ttl_index()
             # TTL + (franchise_id, week) for the EOG band instrumentation. Without this the
             # collection still accepts writes, so logging LOOKS fine while nothing ever
             # expires and every export is a collection scan — and GOB_EOG_BAND_TTL_DAYS
@@ -7738,14 +7740,33 @@ try:
         # Set GameManager quarter to 1 to match
         gm.quarter = 1
 
-        # FTE v2 Tutorial: overlay all mid-Q4 state onto the freshly initialized
-        # game (clock, score, possession, fouls, timeouts, points_by_quarter,
-        # player stat overlays, NG=0.95, SIP timeout-resume seed). Must run
-        # AFTER _initialize_game_stats() and the score-zeroing block above so
-        # the overlay sticks. Mutates both gm and summary.
+        # FTE v3: the tutorial game starts 0-0 at Q1 like every other game.
+        #
+        # RETIRED — `apply_tutorial_initial_state(gm, summary, user_team_side)` used to
+        # run here, overlaying mid-Q4 state: quarter 4, 4:00 on the clock, 60-60, a
+        # fabricated points_by_quarter of [14,18,28,0], 3 team fouls, 1 timeout, NG 0.95,
+        # a SIP timeout-resume seed, and a three-quarter PLAYER STAT OVERLAY. FTE v3 sims
+        # a full game from the opening tip, so every one of those is now wrong — the stat
+        # overlay especially, which would put phantom points in the box score of a game
+        # that had not been played yet. See FTE_v3_Sim_Full_Game_Brief.md §3 step 7.
+        #
+        # Still applied ABOVE, pre-init, and deliberately kept:
+        #   - prepare_tutorial_team_attributes  (shot_threshold; both sides now MID/90)
+        #   - TUTORIAL_STRATEGY_SETTINGS        (opening slider defaults)
+        # The strategy defaults are only a SEED: init-game runs at the opponent-pick step,
+        # and the user edits them at the Game Plan step immediately after, which writes
+        # through to this same game doc. Init can therefore never clobber a user choice.
         if mode == "tutorial":
-            from BackEnd.utils.tutorial_game import apply_tutorial_initial_state
-            apply_tutorial_initial_state(gm, summary, user_team_side)
+            # Abandoned-tutorial sweep. Only tutorial docs carry this field, so the TTL
+            # index cannot reach any other game. Cleared on normal completion, which
+            # deletes the doc outright well before expiry.
+            # Local import: api.py only pulls in `datetime` (line 182); timezone and
+            # timedelta are not in scope here and would NameError at runtime.
+            from datetime import timedelta, timezone as _tz
+            from BackEnd.db import TUTORIAL_GAME_TTL_DAYS
+            summary["tutorial_expires_at"] = datetime.now(_tz.utc) + timedelta(
+                days=TUTORIAL_GAME_TTL_DAYS
+            )
 
         # Save to database
         db_start = time.time()

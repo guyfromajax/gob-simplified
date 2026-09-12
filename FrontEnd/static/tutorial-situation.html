@@ -9,7 +9,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
-  <title>Crunch Time, Coach</title>
+  <title>Your Debut, Coach</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/gob-buttons.css">
   <link rel="stylesheet" href="/css/tutorial-tipoff.css">
@@ -29,18 +29,19 @@
     <div class="tipoff-moment" id="tipoff-moment" role="dialog" aria-modal="true" hidden>
       <div class="tipoff-moment__inner">
         <img class="tipoff-moment__portrait" id="tipoff-portrait" src="/images/sammy_tutorial.png" alt="">
-        <div class="tipoff-moment__eyebrow">CRUNCH TIME · Q4</div>
-        <div class="tipoff-moment__score">
+        <!-- FTE v3: this is the OPENING TIP, not a Q4 resume. The v2 build showed
+             "CRUNCH TIME · Q4" and a fabricated 60-60 scoreline; v3 sims the whole
+             game from 0-0, so a score here would be inventing one. The matchup
+             takes the score block's place as the hero. -->
+        <div class="tipoff-moment__eyebrow">YOUR DEBUT</div>
+        <div class="tipoff-moment__score tipoff-moment__score--matchup">
           <span class="tipoff-moment__team" id="tipoff-home-team">HOME</span>
-          <span class="tipoff-moment__num" id="tipoff-home-score">60</span>
-          <span class="tipoff-moment__dash">–</span>
-          <span class="tipoff-moment__num" id="tipoff-away-score">60</span>
+          <span class="tipoff-moment__dash">vs</span>
           <span class="tipoff-moment__team" id="tipoff-away-team">AWAY</span>
         </div>
-        <p class="tipoff-moment__context">Tied with four minutes left. The game's in your hands now.</p>
-        <div class="tipoff-moment__rally">GO WIN IT, COACH.</div>
+        <p class="tipoff-moment__context">You picked the opponent, set the plan and named the five. Let's see how it plays out.</p>
         <div class="tipoff-moment__actions">
-          <button id="tipoff-cta" type="button" class="gob-btn gob-btn--gate gob-btn--lg tipoff-moment__cta">SET LINEUP</button>
+          <button id="tipoff-cta" type="button" class="gob-btn gob-btn--gate gob-btn--lg tipoff-moment__cta">SIM GAME</button>
         </div>
       </div>
     </div>

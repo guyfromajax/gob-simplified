@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <!-- Google Tag Manager (production only) -->
+  <script src="/js/shared/gtm-loader.js"></script>
+  <!-- End Google Tag Manager -->
+  <script src="/js/shared/authGuard.js"></script>
+  <script src="/js/shared/sentryInit.js"></script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="icon" type="image/x-icon" href="/images/favicon.ico">
+  <title>Pick Your Opponent</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/gob-buttons.css">
+  <link rel="stylesheet" href="/css/tutorial-pick-opponent.css">
+  <link rel="stylesheet" href="/css/fonts.css">
+</head>
+<body class="tutorial-opponent-page">
+  <!-- Google Tag Manager (noscript) -->
+  <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-K69GQK3D"
+  height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+  <!-- End Google Tag Manager (noscript) -->
+
+  <main class="opp-pick">
+    <header class="opp-pick__head">
+      <p class="opp-pick__eyebrow" id="opp-eyebrow">YOUR CONFERENCE</p>
+      <h1 class="opp-pick__headline">Pick your opponent</h1>
+      <p class="opp-pick__subhead">Ranked by talent &mdash; top is toughest</p>
+    </header>
+
+    <ol class="opp-pick__list" id="opp-list" aria-label="Conference opponents, most to least talented">
+      <li class="opp-pick__loading">Loading your conference&hellip;</li>
+    </ol>
+
+    <button id="opp-cta" type="button" class="gob-btn gob-btn--action gob-btn--lg" disabled>CONTINUE</button>
+    <p id="opp-error" class="opp-pick__error" aria-live="polite"></p>
+  </main>
+
+  <script src="/js/config/api-config.js"></script>
+  <script type="module" src="/tutorial-pick-opponent.js"></script>
+</body>
+</html>

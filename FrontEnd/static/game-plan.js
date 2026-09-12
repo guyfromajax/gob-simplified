@@ -46,7 +46,10 @@ const periodLabel = urlParams.get('period') || `Q${quarter}`;
 // ✅ PHASE 1.1: Remove localStorage fallback - game_id must come from URL params only
 // game_id is required for Q2+ or timeout resume, optional for Q1 (will be created by init-game)
 // ✅ PHASE 1.3: Instrument state read
-const gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
+// `let`, not `const`: FTE v3 can recover a missing game_id from tutorial_state and
+// must be able to write it back here — every downstream read (loadSettings, the
+// save on PLAY NOW, the forwarded query string) goes through this binding.
+let gameId = window.StateTelemetry ? window.StateTelemetry.logUrlRead('game_id', urlParams.get('game_id') || null) : (urlParams.get('game_id') || null);
 const resumeFromTimeout = urlParams.get('resume_from_timeout') === 'true';
 
 // ✅ PHASE 1.1: Fail loudly if game_id is required but missing
@@ -146,21 +149,86 @@ if (modeParam === 'tutorial') {
   // already fired (see game-plan.html: script.onload manually calls init()
   // when document.readyState !== 'loading'). So we can't wait for that
   // event — it'll never re-fire. Use readyState to branch.
-  const applyReadOnly = () => {
+  // FTE v3: the tutorial Game Plan is WRITABLE. v2 disabled every slider and hid
+  // Save because the tutorial game was a canned Q4 situation the user could not
+  // influence. v3 sims a full game from 0-0 off the user's own strategy, so the
+  // whole point of the step is that these choices reach the sim.
+  //
+  // Save is still hidden — but replaced, not removed: the CONTINUE CTA persists
+  // through the same `saveSettingsQuietly()` path and then advances the funnel, so
+  // the user cannot walk away from the step with unsaved sliders.
+  const applyTutorialMode = () => {
+    // FTE v3 chrome: the tutorial has ONE way forward. Anything that offers a way
+    // back or sideways is removed, so the only affordance is the orange CTA.
+    // Scoped to mode=tutorial — the franchise/single Game Plan screen is untouched.
     const subhead = document.getElementById('tutorial-readonly-subhead');
-    if (subhead) subhead.hidden = false;
-    document.querySelectorAll('.strategy-slider').forEach((el) => {
-      el.disabled = true;
-    });
-    const slidersContainer = document.querySelector('.sliders-container');
-    if (slidersContainer) slidersContainer.classList.add('tutorial-readonly');
+    if (subhead) subhead.hidden = true;                       // no sub-copy
+    const backLink = document.getElementById('game-plan-back-link');
+    if (backLink) backLink.hidden = true;                     // no "Back to Locker Room"
+    const backToLineup = document.getElementById('btn-back-to-lineup');
+    if (backToLineup) backToLineup.style.display = 'none';    // no "Back To Lineup"
+    const cancelBtn = document.getElementById('btn-cancel');
+    if (cancelBtn) cancelBtn.style.display = 'none';
     const saveBtn = document.getElementById('btn-save-game-plan');
     if (saveBtn) saveBtn.style.display = 'none';
+    // With every sibling hidden the CTA is the row's only child — centre it.
+    const btnRow = document.querySelector('.button-container');
+    if (btnRow) {
+      btnRow.style.justifyContent = 'center';
+      btnRow.style.display = 'flex';
+    }
+
+    // Progress thread + Sammy. Dynamic import: game-plan.js is injected as a
+    // CLASSIC script (game-plan.html sets script.onload), so static ESM import
+    // syntax is unavailable here.
+    import('/js/shared/tutorialProgressThread.js')
+      .then((m) => m.mountTutorialProgress('gameplan'))
+      .catch(() => { /* non-fatal — the thread is decoration */ });
+    import('/js/shared/sammyModal.js')
+      .then((m) => m.showSammyModal({
+        body: 'Set your strategy. Sliders have real tradeoffs.',
+        ctaLabel: 'GOT IT',
+      }))
+      .catch(() => { /* non-fatal */ });
+
+    const actions = saveBtn ? saveBtn.parentElement : document.querySelector('.sliders-container');
+    if (!actions || document.getElementById('btn-tutorial-gameplan-continue')) return;
+    const cta = document.createElement('button');
+    cta.id = 'btn-tutorial-gameplan-continue';
+    cta.type = 'button';
+    cta.className = 'gob-btn gob-btn--action gob-btn--lg';
+    // FTE v3: Game Plan is now the LAST decision before the tip (lineup moved
+    // ahead of it), so this button leaves the setup flow entirely.
+    cta.textContent = 'PLAY NOW';
+    cta.addEventListener('click', async () => {
+      // Same advance sound as every other funnel CTA. game-plan.js is a classic
+      // script, so uiSfx comes in by dynamic import like the modals above.
+      import('/js/shared/uiSfx.js').then((m) => m.playAdvance()).catch(() => {});
+      cta.disabled = true;
+      try {
+        await saveSettingsQuietly();
+        await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
+          method: 'POST',
+          headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ step: 'situation' }),
+        });
+      } catch (e) {
+        // A failed save must not strand the user mid-funnel; the sim falls back to
+        // the seeded defaults, which is a worse game but not a broken one.
+        console.warn('[tutorial] game plan save/advance failed:', e);
+      }
+      // Forward the query string VERBATIM. It carries the chosen five as
+      // home_pg / home_sg / … — rebuilding it here would drop the lineup and leave
+      // the pre-game card empty.
+      const fwd = new URLSearchParams(window.location.search);
+      window.location.href = '/tutorial-situation.html?' + fwd.toString();
+    });
+    actions.appendChild(cta);
   };
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', applyReadOnly);
+    document.addEventListener('DOMContentLoaded', applyTutorialMode);
   } else {
-    applyReadOnly();
+    applyTutorialMode();
   }
 }
 
@@ -373,7 +441,42 @@ function validateOffenseSettings() {
   return true;
 }
 
+// FTE v3 safety net: recover game_id from tutorial_state when the query string
+// has lost it. Without a game_id the page 400s on GET /api/gameplan and 500s on
+// PUT, and the user's sliders are silently never saved. tutorial_state is the
+// durable copy (see TutorialState in auth_routes.py).
+const recoverTutorialGameId = async () => {
+  if (gameId) return gameId;
+  try {
+    const res = await fetch(API_CONFIG.buildUrl('/api/auth/me'), { headers: API_CONFIG.getAuthHeaders() });
+    if (!res.ok) return null;
+    const me = await res.json();
+    const recovered = ((me && me.tutorial_state) || {}).game_id || null;
+    if (recovered) {
+      gameId = recovered;
+      // Repair the URL in place so every later read — including the save on
+      // PLAY NOW and anything that forwards the query string — sees it.
+      const u = new URL(window.location.href);
+      u.searchParams.set('game_id', recovered);
+      window.history.replaceState({}, '', u.toString());
+      console.warn('[tutorial] recovered game_id from tutorial_state:', recovered);
+    }
+    return recovered;
+  } catch (e) {
+    console.warn('[tutorial] game_id recovery failed:', e);
+    return null;
+  }
+};
+
 async function loadSettings() {
+  // FTE v3: recover a missing game_id BEFORE the request is built. The previous
+  // version kicked recovery off without awaiting it, so the fetch still went out
+  // with no game_id, 400'd, and alerted the user — recovery then repaired the URL
+  // too late to matter.
+  if (modeParam === 'tutorial' && !gameId && typeof recoverTutorialGameId === 'function') {
+    await recoverTutorialGameId();
+  }
+
   try {
     // ✅ PHASE 2: Validate game_id before loading settings
     if (gameId && modeParam === 'single' && window.PointerValidation) {
@@ -990,7 +1093,32 @@ async function init() {
     }
     if (btnCancel) btnCancel.style.display = 'none';
   }
-  
+
+  // FTE v3 tutorial: LAST WORD on the back controls.
+  //
+  // This runs AFTER the isFromCommandCenter branch above, deliberately. The earlier
+  // pass in applyTutorialMode() hid these, but that fires at DOM-ready while this
+  // block runs later in init() and re-showed them — the buttons came back.
+  // Overriding here, downstream of every branch, is the only placement that sticks.
+  //
+  // The tutorial has exactly one way forward: no locker room, no going back to the
+  // lineup. Scoped to mode=tutorial; franchise/single/tournament keep their nav.
+  if (modeParam === 'tutorial') {
+    if (pageBackLink) {
+      pageBackLink.hidden = true;
+      pageBackLink.style.display = 'none';
+    }
+    if (btnBackToLineup) btnBackToLineup.style.display = 'none';
+    if (btnCancel) btnCancel.style.display = 'none';
+    if (btnSaveGamePlan) btnSaveGamePlan.style.display = 'none';
+    // PLAY NOW is now the row's only child — centre it.
+    const btnRow = document.querySelector('.button-container');
+    if (btnRow) {
+      btnRow.style.display = 'flex';
+      btnRow.style.justifyContent = 'center';
+    }
+  }
+
   // ✅ TASK 0: Save Game Plan button (only button that saves to DB)
   if (btnSaveGamePlan) {
     console.log('🔍 [GAME-PLAN] init() - btnSaveGamePlan found, adding click listener');

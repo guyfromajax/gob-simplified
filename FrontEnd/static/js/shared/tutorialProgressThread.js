@@ -1,5 +1,5 @@
 /**
- * Tutorial Progress Thread — quiet 6-step indicator for the FTE v2 funnel.
+ * Tutorial Progress Thread — quiet 8-step indicator for the FTE v3 funnel.
  *
  * Per spec: "a subtle progress indicator across the onboarding steps (quiet
  * step thread; should not compete with content)."
@@ -8,7 +8,13 @@
  *   mountTutorialProgress('username');   // step IDs below
  *
  * Steps mirror the user-visible flow, not the backend's TutorialStep enum:
- *   persona | program | username | tipoff | lineup | gameplay
+ *   persona | program | username | opponent | lineup | gameplan | tipoff | gameplay
+ *
+ * FTE v3 added `opponent` + `gameplan` and moved `tipoff` AFTER `lineup` (the user
+ * now sets strategy and roster before the tip, then watches a full-game sim). These
+ * ids are the UI thread's own vocabulary; the server's resume pointer uses the
+ * TutorialStep enum (opponent_pick / game_plan / set_lineup / situation). Keep the
+ * mapping in routeToTutorial honest when either side changes.
  *
  * The "gameplay" step is a visual hint of what's coming next — the bar is
  * never mounted on court.html (per fte_system.md §6), so gameplay is never
@@ -20,8 +26,10 @@ const STEPS = [
   { id: 'persona', label: 'Welcome' },
   { id: 'program', label: 'Program' },
   { id: 'username', label: 'Username' },
-  { id: 'tipoff', label: 'Tip-off' },
+  { id: 'opponent', label: 'Opponent' },
   { id: 'lineup', label: 'Lineup' },
+  { id: 'gameplan', label: 'Game Plan' },
+  { id: 'tipoff', label: 'Tip-off' },
   { id: 'gameplay', label: 'Gameplay' },
 ];
 

@@ -2585,6 +2585,69 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       anchor to the PG, closes the instance Jamie recorded and leaves 84 others.
       That is the number the design decision is made against.
 
+      **PRP IS NOT FULLY CHARACTERISED (logged 2026-09-09, do not chase here).**
+      Seed 1's six ``player_reaches_position`` swaps split 3 / 2 / 1: HCT
+      walk-up BH ≠ play BH (3a), HCO shoot-micro pin (3b), and a third
+      HCO/MISS at steps 3→4, ``T=1.05``, miss → rebound (Clint Workman
+      miss / Omar Nola rebound). That third shape was never opened. Closing
+      3a and 3b would not close PRP. Treat the beat-sort's 46 as a size,
+      not as two known writers.
+
+49. **POST-STEAL PREMATURE ATTACH CLOSED.** 2026-09-09, played arm,
+      PLAYED=1. One shape, one fix. ``_append_post_steal_hco_transition``
+      (``skeleton_step_emitter.py``, HCO ``:2742`` and HCT/FCP ``:1652``)
+      was attaching ``stealer_id`` at **start and end**. That is the 10
+      unlabeled HCO/STEAL "none" swaps and the steal-labelled swaps that
+      sit on this step (28 of the item-48 "39" — the other 1 is HCT/STEAL
+      ``player_reaches_position``, a PRP). The scramble (contact → bounce
+      → recover) was already authored; the defect was attaching the
+      recoverer in front of it.
+
+      **THE FIX QUESTION.** Attach the stealer at **END only**, inherit
+      the prior step's ball at start. Not-at-all is wrong for HCT (and
+      for HCO pocket steals where this step is last drawn): there is no
+      recover step, ``build_final_ball_coords`` would snapshot the
+      victim, and ``build_final_ball_handler_id`` still special-cases
+      STEAL → stealer_id — a new turn-seam teleport. End-only makes the
+      HCT pocket steal a within-step transfer (steal beat still holds
+      the victim + ``reach_in``; the 0.5s transition carries victim →
+      stealer). HCO loose-ball keeps the scramble; the seam snap is gone.
+
+      **GUARD.** ``announce_post_steal_premature_attach``: a
+      ``post_steal_hco_transition`` step that starts attached to the
+      stealer when the previous drawn step did not end on him. Log only,
+      no rewrite. Poison: victim → start-already-stealer, named, ids
+      intact. Emitter unit test: start inherits victim, end is stealer,
+      both announcers silent. ``tests/test_unrendered_and_ball_seam.py``.
+
+      **GATES, same 8-seed footing as item 48 (``scratch_ballseam.py``),
+      2,572 turns, 16,925 pairs, poison 8/8:**
+
+      | | before (item 48) | after |
+      |---|---|---|
+      | seam swaps | **92** | **54** |
+      | steal + none (this writer) | 28 + 10 | **0** |
+      | ``player_reaches_position`` | 46 | **46** (held) |
+      | fumble (item 47) | 8 | **8** (untouched) |
+      | unrendered extra | 0 | 0 |
+      | within-step transfers | 1,867 | 1,905 (+38, the accounted handovers) |
+
+      Residue of the 92: **46 PRP + 8 fumble = 54.** PRP did not move.
+      HCT/STEAL still has its 1 PRP swap.
+
+      **FINAL HANDLER.** Seed 1, 13/13 STEAL turns:
+      ``final_ball_handler_id`` unchanged, last-drawn end owner
+      unchanged (still the stealer). The STEAL special-case in
+      ``build_final_ball_handler_id`` already returned ``stealer_id``;
+      end-only keeps the last drawn end on him as well. Shown, not
+      assumed.
+
+      **PRINCIPLE 8.** Seed 1: step count 2581/2581, drawn 2581/2581,
+      per-steal coord checksum 13/13 identical. 8-seed pair count
+      held at 16,925. Coords, step counts and draw counts did not
+      move. No poison-stash / equiv-v3 arm. Reference remains
+      ``094f36ca2`` [PLAYED] 75.16 / [SIM] 87.65.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 

@@ -4017,6 +4017,9 @@ def _append_post_steal_hco_transition(
     offensive end. The step's end.coords becomes the turn's authoritative
     coord snapshot for the next HCO turn's handoff. No-op for steals that
     transition to FAST_BREAK (handled by the after_steal FB emitter).
+
+    Ball: start inherits the prior step's end ball (usually the victim);
+    end attaches the stealer. A start-of-step attach was the §8.4 seam.
     """
     from BackEnd.utils.sim_random import sim_rng as random
 
@@ -4169,13 +4172,24 @@ def _append_post_steal_hco_transition(
         },
     }
 
+    # Start inherits the prior end's ball. Attaching the stealer here was the
+    # §8.4 seam: the previous step still ended on the victim (or the passer),
+    # and the FE snaps at seams. End attaches the stealer so the change is
+    # within this step (accounted). Do not leave both ends unattached — HCT
+    # pocket steals have no recover step after this one, so the last drawn
+    # end *is* this end; build_final_ball_coords reads it.
+    prior_ball = prior_end.get("ball")
+    start_ball: BallState = (
+        dict(prior_ball) if isinstance(prior_ball, dict) else {}
+    )
+
     new_step: AnimationStep = {
         "start": {
             "coords": dict(start_coords),
             "destination": destinations,
             "action": actions,
             "archetype": archetypes,
-            "ball": {"owner_player_id": stealer_id},
+            "ball": start_ball,
             "clock": {
                 "clock_remaining": clock_remaining,
                 "shot_clock_remaining": shot_clock_remaining,
@@ -4197,3 +4211,11 @@ def _append_post_steal_hco_transition(
     # Rewire prior step's next pointer to this new step.
     prior_end["next"] = {"kind": "next_step", "index": len(steps)}
     steps.append(new_step)
+
+    from BackEnd.utils.animation_step_helpers import (
+        announce_post_steal_premature_attach,
+    )
+
+    announce_post_steal_premature_attach(
+        steps, stealer_id=stealer_id, context="post_steal_hco_transition",
+    )

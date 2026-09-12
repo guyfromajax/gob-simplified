@@ -2596,15 +2596,28 @@ async function init() {
     });
   } catch (_) { /* non-fatal */ }
 
-  // FTE v2 tutorial: the slots load empty (tutorial-situation no longer
-  // forwards home_pg/etc.) — the user sets their own lineup as part of
-  // the lesson. On first paint, show a centered Functional-modal-style
-  // intro that nudges them into the task. The CTA is renamed "Return To
-  // Game" here, and clicking it shows a second modal with algorithm-
-  // chosen feedback before actual navigation.
+  // FTE v3 tutorial: the five is PRE-SET, not left empty.
+  //
+  // v2 loaded empty slots and made building a lineup the lesson. v3 reduces
+  // friction instead — autoset picks a sensible five (shot-weight ordered, same
+  // algorithm the rest of the app uses), Sammy says so, and adjusting is optional.
+  // Most users roll with the default; the ones who want to tweak still can.
   if (modeParam === 'tutorial') {
     const playBtnEl = document.getElementById('play-now');
-    if (playBtnEl) playBtnEl.textContent = 'Return To Game';
+    if (playBtnEl) playBtnEl.textContent = 'Continue';
+
+    // Only fill EMPTY slots. A user who set a five, navigated back to Game Plan
+    // and returned must not have their choices silently overwritten by autoset.
+    try {
+      const alreadySet = LINEUP_POSITIONS.every((pos) => !!lineup[pos]);
+      if (!alreadySet && typeof autosetLineup === 'function') {
+        await autosetLineup();
+      }
+    } catch (e) {
+      // A failed preset is recoverable — the user just sets the five by hand,
+      // which is exactly the v2 experience. Never block the funnel on it.
+      console.warn('[tutorial] lineup preset failed; falling back to manual:', e);
+    }
 
     const introKey = gameId
       ? `fteV2TutorialLineupModalShown_${gameId}`
@@ -2627,6 +2640,12 @@ async function init() {
         ? `fteV2TutorialAttrTourShown_${gameId}`
         : 'fteV2TutorialAttrTourShown';
       const launchAttributeTour = () => {
+        // FTE v3: reveal the Attributes tab BEFORE the coach-mark, not after it.
+        // The copy says "these are your player attributes" — showing it over the
+        // GAME tab described a table the user could not see, and the columns only
+        // appeared once they dismissed the thing explaining them.
+        const attrTab = document.getElementById('roster-view-attributes');
+        if (attrTab) attrTab.click();
         const headerRow = document.querySelector('#roster-attributes-pane .roster-table thead');
         if (!headerRow) return;
         // Defer a frame so any post-intro-modal layout settles before we
@@ -2636,6 +2655,7 @@ async function init() {
             headerRow,
             teamName: homeTeam,
             persistKey: tourKey,
+
             // Dim everything around the header row instead of laying a
             // scrim on top — <thead> z-index is unreliable against a
             // full-screen overlay (early build had the header rendering
@@ -2804,24 +2824,49 @@ async function init() {
       }
       DEBUG && console.log('[lineup] launching quarter', quarter);
 
-      // FTE v2 tutorial: advance the server-side step to "in_game" before
-      // navigation. Court.html will read resume_from_timeout from URL params
-      // (added by buildGameNavigationParams below) so the engine emits the SIP
-      // first turn per the timeout-resume path in BackEnd/main.py.
+      // FTE v3 tutorial: lineup hands off to GAME PLAN (roster first, then strategy,
+      // then the tip). Two v2 behaviours are deliberately gone:
+      //   - the step is 'game_plan', not 'in_game'
+      //   - resume_from_timeout is NOT set. v2 booted mid-Q4 out of a timeout and
+      //     needed the SIP emission path; v3 starts at the opening tip, so forcing
+      //     a timeout resume would emit a set-in-play for a game that never paused.
       if (modeParam === 'tutorial') {
         try {
           await fetch(API_CONFIG.buildUrl('/api/auth/tutorial-advance'), {
             method: 'POST',
             headers: { ...API_CONFIG.getAuthHeaders(), 'Content-Type': 'application/json' },
-            body: JSON.stringify({ step: 'in_game' }),
+            body: JSON.stringify({ step: 'game_plan' }),
           });
         } catch (e) {
-          console.warn('[tutorial] could not advance to in_game step:', e);
+          console.warn('[tutorial] could not advance to game_plan step:', e);
         }
-        // Force resume_from_timeout=true so the engine routes through the
-        // existing SIP emission path for the first turn (state seeded by
-        // apply_tutorial_initial_state in PR 1).
-        params.set('resume_from_timeout', 'true');
+        // ⚠️ CARRY `params`, DO NOT REBUILD IT.
+        // `buildGameNavigationParams` writes the chosen five into the query string as
+        // home_pg / home_sg / … (timeoutNavigationHelper.js). An earlier build of this
+        // branch constructed a fresh URLSearchParams and silently dropped them, so the
+        // court received no lineup, `snapshot_opening_lineups_to_game_state` skipped
+        // ("need 5 starters"), and the pre-game card rendered empty. Every tutorial
+        // screen from here forwards the string verbatim.
+        const nextParams = new URLSearchParams(params);
+        nextParams.set('mode', 'tutorial');
+        nextParams.set('team_id', homeTeam);
+        nextParams.delete('resume_from_timeout');
+        // Read straight off the live URL first. `currentGameId` is captured earlier
+        // in this handler and has been observed empty on this path, which produced
+        // `GET /api/gameplan?...` with no game_id -> 400, and a PUT -> 500.
+        const tutGameId = new URLSearchParams(window.location.search).get('game_id')
+          || currentGameId
+          || nextParams.get('game_id');
+        if (tutGameId) {
+          nextParams.set('game_id', tutGameId);
+        } else {
+          console.error('[tutorial] no game_id when leaving set-lineup — game plan will 400');
+        }
+        playSound('confirm-1-lowervol.wav');
+        setTimeout(() => {
+          window.location.href = '/game-plan.html?' + nextParams.toString();
+        }, 200);
+        return;
       }
 
       const finalUrl = `/court.html?${params.toString()}`;

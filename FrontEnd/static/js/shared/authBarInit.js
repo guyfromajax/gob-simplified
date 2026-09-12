@@ -219,10 +219,36 @@
     var state = (meData && meData.tutorial_state) || { step: 'persona_intro', team_pick: null };
     var step = state.step || 'persona_intro';
     var teamPick = state.team_pick;
+    // FTE v3: init-game happens at the opponent step, so every screen after it needs
+    // the SAME game doc. These come off tutorial_state (not the URL) precisely so a
+    // refresh or auth bounce resumes the existing game instead of initialising a
+    // second one and orphaning the first.
+    var opponentPick = state.opponent_pick || null;
+    var tutorialGameId = state.game_id || null;
 
     var PERSONA_INTRO_URL = '/tutorial-persona-intro.html';
     var TEAM_SELECT_URL = '/franchise-select-team.html?mode=tutorial';
     var SITUATION_URL = '/tutorial-situation.html';
+    var OPPONENT_URL = '/tutorial-pick-opponent.html';
+    var GAME_PLAN_URL = '/game-plan.html?mode=tutorial';
+
+    // Shared query string for the post-init screens. The user is ALWAYS home in the
+    // tutorial game (fte_inject_state.md §1-§2).
+    function tutorialGameParams() {
+      var p = new URLSearchParams({
+        mode: 'tutorial',
+        home: teamPick,
+        away: opponentPick || '',
+        my_team: 'home',
+        // Required by game-plan.js / set-lineup.js in tutorial mode — without it
+        // GET /api/gameplan receives the string "null" and 400s. Must match what
+        // tutorial-pick-opponent.js sends, or a RESUMED funnel breaks where a
+        // straight-through one works.
+        team_id: teamPick
+      });
+      if (tutorialGameId) p.set('game_id', tutorialGameId);
+      return p;
+    }
     var currentPath = window.location.pathname;
 
     // FTE v2 tutorial "shoulder pages" — entered from the tutorial funnel but
@@ -241,23 +267,42 @@
     } else if (step === 'team_select' || step === 'username') {
       targetPath = '/franchise-select-team.html';
       targetUrl = TEAM_SELECT_URL;
-    } else if (step === 'situation') {
-      targetPath = '/tutorial-situation.html';
-      targetUrl = SITUATION_URL;
-    } else if (step === 'set_lineup' || step === 'in_game') {
+    } else if (step === 'opponent_pick') {
+      // No team pick yet means the funnel is further back than the server thinks;
+      // bounce to team select rather than render an opponent list for nobody.
       if (!teamPick) {
         targetPath = '/franchise-select-team.html';
         targetUrl = TEAM_SELECT_URL;
       } else {
+        targetPath = '/tutorial-pick-opponent.html';
+        targetUrl = OPPONENT_URL;
+      }
+    } else if (step === 'set_lineup') {
+      // FTE v3: lineup precedes game plan.
+      if (!teamPick || !opponentPick) {
+        targetPath = '/tutorial-pick-opponent.html';
+        targetUrl = OPPONENT_URL;
+      } else {
         targetPath = '/set-lineup.html';
-        var opp = teamPick === 'Xavien' ? 'South Lancaster' : 'Xavien';
-        var params = new URLSearchParams({
-          mode: 'tutorial',
-          home: teamPick,
-          away: opp,
-          my_team: 'home'
-        });
-        targetUrl = '/set-lineup.html?' + params.toString();
+        targetUrl = '/set-lineup.html?' + tutorialGameParams().toString();
+      }
+    } else if (step === 'game_plan') {
+      if (!teamPick || !opponentPick) {
+        targetPath = '/tutorial-pick-opponent.html';
+        targetUrl = OPPONENT_URL;
+      } else {
+        targetPath = '/game-plan.html';
+        targetUrl = '/game-plan.html?' + tutorialGameParams().toString();
+      }
+    } else if (step === 'situation' || step === 'in_game') {
+      // FTE v3: tip-off now follows lineup. `in_game` resumes here too — the sim is
+      // not resumable mid-broadcast, so the honest restart point is the tip.
+      if (!teamPick || !opponentPick) {
+        targetPath = '/tutorial-pick-opponent.html';
+        targetUrl = OPPONENT_URL;
+      } else {
+        targetPath = '/tutorial-situation.html';
+        targetUrl = SITUATION_URL + '?' + tutorialGameParams().toString();
       }
     } else {
       // 'complete' (or unknown) — should not happen when flag is false, but

@@ -188,3 +188,37 @@ body.tutorial-tipoff-page {
   .tipoff-moment__rally { font-size: 24px; }
   .tipoff-moment__team { font-size: 16px; }
 }
+
+/* ─── FTE v3: matchup hero (replaces the Q4 score block) ────────────────────
+ * v2 showed a fabricated 60-60 with the team names as small supporting text
+ * either side. v3 has no score to show — the game has not been played — so the
+ * MATCHUP becomes the hero and the team names take over the size the numerals
+ * used to carry.
+ */
+.tipoff-moment__score--matchup {
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.tipoff-moment__score--matchup .tipoff-moment__team {
+  font-size: 34px;
+  letter-spacing: 0.02em;
+  color: #ffffff;
+}
+
+/* "vs" is a connector, not a scoreline dash — smaller, lowercase, receded. */
+.tipoff-moment__score--matchup .tipoff-moment__dash {
+  font-size: 15px;
+  text-transform: lowercase;
+  letter-spacing: 0.08em;
+  color: rgba(255, 255, 255, 0.42);
+  margin: 0 2px;
+  position: relative;
+  top: 1px;
+}
+
+@media (max-width: 600px) {
+  .tipoff-moment__score--matchup .tipoff-moment__team { font-size: 24px; }
+  .tipoff-moment__score--matchup { gap: 10px; }
+}

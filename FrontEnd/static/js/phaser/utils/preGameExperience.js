@@ -253,6 +253,14 @@ function recordsStripHtml(awayTeam, homeTeam) {
     </div>`;
 }
 
+/**
+ * @param {Object} [options]
+ * @param {boolean} [options.hideRecords] - Suppress the rank/record strip.
+ *   FTE tutorial games have no season behind them: `natl_rank`, `wins` and
+ *   `losses` all come back null, so the strip renders "#0  0-0" for both teams —
+ *   inventing a record for a game that is the user's first. Hidden rather than
+ *   zero-filled.
+ */
 export function showPreGameExperience(gameId, scene, normalized, options = {}) {
   ensureStyles();
   const existing = document.querySelector(".pgxp-root");
@@ -299,7 +307,7 @@ export function showPreGameExperience(gameId, scene, normalized, options = {}) {
   root.innerHTML = `
     <div class="pgxp-head">
       <div class="pgxp-title"></div>
-      <div class="pgxp-records">${recordsStripHtml(awayTeam, homeTeam)}</div>
+      ${options.hideRecords ? "" : `<div class="pgxp-records">${recordsStripHtml(awayTeam, homeTeam)}</div>`}
     </div>
     <div class="pgxp-board"></div>
     <div class="pgxp-foot">
