@@ -120,11 +120,15 @@ def _walk_reason(step):
 
 
 def test_missing_prior_stamp_skips_hct_walk_up():
-    """Policy 26 owner field: no prior stamp → abstain, do not invent play_bh.
+    """Log-only guard (abstain rejected 2026-09-14): missing stamp still emits
+    the walk-up via `prior_final_bh_id or bh_id`. The beat stays. This records
+    the invented owner; it does not skip the step.
 
-    Poison: restore `walk_up_bh_id = prior_final_bh_id or bh_id` and this
-    emits a walk-up attached to off_pg (this turn's BH).
+    Poison: replace that fallback with the rejected skip-walk-up and this
+    fails (no ``hct_entry_walkup``).
     """
+    import logging
+
     game = _game()
     game.turns = [{"final_ball_handler_id": None, "final_coords": game.turns[0]["final_coords"]}]
     payload = _base_payload()
@@ -133,8 +137,14 @@ def test_missing_prior_stamp_skips_hct_walk_up():
     payload["hct_loop_segments"][0]["gate"] = ["off", "SG"]
     steps = build_dynamic_hct_animation_steps(payload, game)
     assert steps
-    assert _walk_reason(steps[0]) != "hct_entry_walkup"
+    reason = _walk_reason(steps[0])
     start_owner = ((steps[0].get("start") or {}).get("ball") or {}).get("owner_player_id")
+    logging.warning(
+        "[3a GUARD] missing-stamp walk-up reason=%s owner=%s (invented play_bh)",
+        reason,
+        start_owner,
+    )
+    assert reason == "hct_entry_walkup"
     assert start_owner == "off_sg"
 
 
