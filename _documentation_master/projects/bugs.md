@@ -2572,6 +2572,38 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       is not established here** and wants its own scoping — deciding it requires knowing whether
       the HCO walk intended the SF to have the ball at that moment.
 
+      **AMENDED 2026-09-14 — Phase 2 application 1 STOPPED. The handover is not real.**
+      Played arm, PLAYED=1, PYTHONHASHSEED=0, 8 seeds, ``0xB40000``. 40 fumble turns, **6 hops**
+      (published 8; same class). Poison on the hop detector fired 8/8.
+
+      The HCO walk has three DEAD_BALL writers. On-ball moment
+      (``_resolve_hco_moment`` / ``:6863-6876``) and scenario-3 trap
+      (``_resolve_hco_dead_ball:4697-4706``) **agree with the emitted last owner and the
+      fumble target** on every turn they produce (walk_eq_prev and walk_eq_fum, 20/20).
+      Those are not item 47.
+
+      **All 6 hops are ``drive_contact`` → ``DEAD_BALL_TURNOVER``**
+      (``phase_resolution.py:8011-8017``). The walk intended the driver
+      (SG 4 / PF 1 / C 1). Skeleton last step and the emitted anchor owner are that
+      same man, 6/6. ``victim_id``, the flourish, and the fumble start/end are the
+      **PG**, 6/6. ``walk_eq_prev=6/6``, ``walk_eq_fum=0/6``.
+
+      Why the PG: ``get_ball_handler_from_skeleton:392`` accepts only
+      ``handle_ball`` / ``receive`` / ``shoot``. The pinned drive step's action is
+      ``drive``. Explicit ``step_index`` inspects only that step, finds nothing,
+      and **falls back to PG** (``:399``). ``_motion_bh_at_step:4740`` also omits
+      ``drive`` (receive > handle_ball > pass). The TO credit, the narrative, and
+      the flourish are written from that fallback — they are the same local, not
+      three independent witnesses. The flavour text is ``random.choice`` in
+      ``resolve_turnover_logic:2711-2718`` and does not mean a pass occurred.
+
+      Authoring start=driver / end=PG would animate a transfer the walk never
+      made. The brief's assumed-real handover is false. The anchor is correct;
+      the **credit is stale**. Fix is upstream: teach the resolver that ``drive``
+      is possession (or credit the driver from the drive-contact payload), then
+      the fumble lands on the man who has the ball and the seam closes without
+      a pass. No ``dead_ball_fumble.py`` change in this pass.
+
       **CLASS SIZE, 2026-09-09 (item 48).** The §8.4 seam guard makes this visible as a class,
       not an instance. Item 47's 8 HCO fumbles are **8 of 92** unaccounted attached-owner
       seam swaps across 16,925 rendered pairs (0.54%) in 8 played games. The other 84 sit
@@ -2773,12 +2805,12 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       |---|---|---|
       | 3a HCT entry (23) | **one function** | One existing step already has both men; change two ball dicts + reuse ``_compute_pass_meet_point``. Not a config flag. |
       | 3b catch-and-shoot (23) | **one function** | Same shape on the first micro beat, plus thread the inbound owner into the micro writer. Replace still drops the skeleton pass, so the micro beat has to carry it. |
-      | fumble handover (8) | **one function** | Cheapest of the four. Start-owner assignment only; end and flourish stay on the PG. |
+      | fumble handover (8) | **STOPPED — not a pass** | See item 47 amended 2026-09-14. Drive-contact credit is stale (PG fallback). Do not author A→B. |
       | loose-ball trajectory (46.2%) | **new authoring** | Different payload, no owners to hang a pass on, per-family geometry (MAKE/MISS/FT already move some; DREB is one parked boundary). |
 
-      Fumble and 3a are cheap enough to pull ahead of 3b if Phase 2 is sequenced
-      by cost. Loose is a different job and should not gate the three attached
-      handovers. No Phase 2 code in this commit.
+      Item 47 is not a Phase 2 pass (amended 2026-09-14). 3a remains one function
+      if its intent gate holds. Loose is a different job and should not gate the
+      attached handovers.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

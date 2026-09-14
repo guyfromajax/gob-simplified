@@ -193,9 +193,8 @@ played games** (published 1,905). Payload is ``start.ball.owner_player_id=A``,
 |---|---|---|---|
 | 3a HCT entry pass | 23 | one function | yes — walk-up or loop step 0, both men already present |
 | 3b catch-and-shoot | 23 | one function | yes — first micro beat, thread inbound owner |
-| item 47 fumble handover | 8 | one function | yes — cheapest; start owner only |
+| item 47 fumble handover | 6 hops (was 8) | **STOPPED 2026-09-14** | no — not a real handover. All 6 are HCO ``drive_contact`` DEAD BALL: walk + anchor = driver; victim/flourish/fumble = stale PG fallback because ``get_ball_handler_from_skeleton`` does not treat ``drive`` as possession. Authoring a pass would invent a transfer. Upstream credit fix, not a fumble-beat pass. See bugs.md item 47. |
 | loose-ball trajectory | 46.2% of loose transitions | new authoring | no — parked ``coords``, no owners |
 
-Fumble and 3a are cheap enough to reorder ahead of 3b. Loose is a different job
-and must not gate the three attached handovers. Jamie looks at Phase 1 A/B by
-eye before this opens.
+Item 47 is not a Phase 2 pass. 3a is still one function if its intent gate
+holds. Loose is a different job and must not gate the attached handovers.
