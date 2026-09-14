@@ -2321,6 +2321,30 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       real measured value rather than a convenient one. Harness: ``scratch_ballownerwarn.mjs``
       (extracts the shipped function source — the repo has ``.test.js`` files but no jest binary).
 
+      **AMENDED 2026-09-14 — Phase 1 item 44. The backend omit is INVALIDATED; the FE half landed.**
+      Played arm, PLAYED=1, PYTHONHASHSEED=0, 8 seeds, Lancaster vs Bentley-Truman. Same empty-string
+      population on both ``0x8F0000`` (item 46 catalogue) and ``0xB40000`` (item 48 catalogue):
+      **70 / 70 empty-string boundaries carry neither ``ball.coords`` nor ``ball.current_coords``.**
+      Ball keys are only ``owner_player_id``. Confined to HCO/MAKE + HCO/MISS + HCO/BLOCK, start and
+      end of the same step. Detectors fired 8/8 (empty-string inject moved the counter).
+
+      The correct loose encoding is "key absent + ball.coords" (10,416 / 26.71% in item 46).
+      Omitting the key on these 70 leaves the loose branch empty — the ball has no position at
+      all. That is a different and larger change (author the loose position from the last real
+      owner or the shot spot). Not done here.
+
+      ``build_final_ball_handler_id`` and ``build_final_ball_coords`` were measured against an
+      in-process omit-the-key copy: **0 / 8 games moved on either.** Empty string is already
+      falsy in the handler reader (``if owner:``) and ``coords[""]`` already misses in the
+      coords reader, so the payload-side finals already treat these as unowned. Coords / step
+      counts / draw counts are untouched — this commit is frontend only. No equiv-v3.
+
+      FE: ``isBallAttached`` now tests the VALUE (``animationPlayback.js``, ``claimedBallOwnerId``).
+      Both silent exits — ``!coord`` at snap start/end and the missing ``else`` on no-sprite —
+      ``detachBall`` AND ``warnUnresolvableBallOwner`` (policy 26b). The announcement from
+      ``28f97cec4`` was already on; the detach is new. What is DRAWN on those 70 boundaries
+      changes (ball unparents instead of following the previous man) and that is the point.
+
 45. **OPEN OBSERVATION, awaiting specificity — Jamie: HCO "seems off in some places".** 2026-09-09.
       Recorded so it is not lost, explicitly NOT actionable yet. Too vague to trace, and the one
       hard measurement pointed at HCO says it is clean: **100.00% within-turn coordinate

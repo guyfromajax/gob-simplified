@@ -62,11 +62,22 @@ import {
 
 // --- Ball-state helpers ----------------------------------------------------
 
+function claimedBallOwnerId(ballState) {
+  if (!ballState || !Object.prototype.hasOwnProperty.call(ballState, "owner_player_id")) {
+    return null;
+  }
+  const owner = ballState.owner_player_id;
+  if (owner === null || owner === undefined || String(owner) === "") {
+    return null;
+  }
+  return owner;
+}
+
 function isBallAttached(ballState) {
-  return Boolean(
-    ballState &&
-      Object.prototype.hasOwnProperty.call(ballState, "owner_player_id"),
-  );
+  // VALUE, not key presence. `owner_player_id: ""` is the item 44 encoding —
+  // the key is present, the lookup is `coords[""]`, and treating that as
+  // attached left the ball parented to whoever held it last.
+  return claimedBallOwnerId(ballState) != null;
 }
 
 /**
@@ -448,8 +459,8 @@ function isSchemaPassStep(step) {
  * that is indistinguishable from the payload simply naming the wrong man, which is
  * why the wrong-ball-handler turnover has never been diagnosable from a recording.
  *
- * Announce only. Detaching here would be the fix and would change what a capture
- * observes, so it is deliberately not done.
+ * Policy 26b: the corrector announces AND detaches. Leaving the ball parented
+ * to the previous holder is the item 44 on-screen failure.
  *
  * There are TWO exits that strand the ball, and `no-coord-for-owner` is the one the
  * measured empty-string case takes: `ballCoordFromState` resolves `coords[""]` to
@@ -809,9 +820,13 @@ function snapBallToStartState(scene, step, sprites, ballSprite, width, height) {
   const startBall = step.start.ball;
   const startCoord = ballCoordFromState(startBall, step.start.coords);
   if (!startCoord) {
-    if (isBallAttached(startBall)) {
+    if (
+      isBallAttached(startBall)
+      || Object.prototype.hasOwnProperty.call(startBall, "owner_player_id")
+    ) {
       warnUnresolvableBallOwner(scene, step, startBall, "step:start", "no-coord-for-owner");
     }
+    detachBall(scene, ballSprite);
     return;
   }
 
@@ -825,6 +840,7 @@ function snapBallToStartState(scene, step, sprites, ballSprite, width, height) {
       attachBallToPlayer(scene, ballSprite, ownerSprite);
     } else {
       warnUnresolvableBallOwner(scene, step, startBall, "step:start", "no-sprite-for-owner");
+      detachBall(scene, ballSprite);
     }
   } else {
     detachBall(scene, ballSprite);
@@ -852,9 +868,13 @@ function snapBallToEndState(scene, step, sprites, ballSprite, width, height) {
   if (!endBall) return;
   const endCoord = ballCoordFromState(endBall, step.end.coords);
   if (!endCoord) {
-    if (isBallAttached(endBall)) {
+    if (
+      isBallAttached(endBall)
+      || Object.prototype.hasOwnProperty.call(endBall, "owner_player_id")
+    ) {
       warnUnresolvableBallOwner(scene, step, endBall, "step:end", "no-coord-for-owner");
     }
+    detachBall(scene, ballSprite);
     return;
   }
 
@@ -869,6 +889,7 @@ function snapBallToEndState(scene, step, sprites, ballSprite, width, height) {
       attachBallToPlayer(scene, ballSprite, ownerSprite);
     } else {
       warnUnresolvableBallOwner(scene, step, endBall, "step:end", "no-sprite-for-owner");
+      detachBall(scene, ballSprite);
     }
   } else {
     detachBall(scene, ballSprite);
