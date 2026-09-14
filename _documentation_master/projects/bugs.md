@@ -1410,6 +1410,12 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       earlier padding census asked the same question of the putback emitter's 9 non-content steps
       and it has not been answered for `bounce`.
 
+      **PHASE 3 (recorded 2026-09-14, do not run separately).** The 101
+      Played / 82 wrap zero-distance RIM-start rattle hops (~1.4 s/game
+      of nothing) join this bounce beat and item 37's empty tails in the
+      SAME equiv-v3 arm. Three deletions, one measurement. Hop 0 is not
+      dropped in this pass — only the arrival cue is suppressed.
+
 29. RESOLVED 2026-09-09 — the three "zero-stamp" families were a HARNESS defect, and it
     invalidated a whole session of measurements. Case (a): production is fine.
 
@@ -2413,6 +2419,50 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       ``28f97cec4`` was already on; the detach is new. What is DRAWN on those 70 boundaries
       changes (ball unparents instead of following the previous man) and that is the point.
 
+      **AMENDED 2026-09-14 — loose-ball residue 46 = this item, not a new bug.**
+      FE-today definition (``claimedBallOwnerId`` null + no ``coords`` /
+      ``current_coords``), rendered walk, consume wrap, ``0xB40000`` seeds 1–8:
+      **46 Played / 36 wrap**. Encoding is 46/46 (36/36) ``owner_player_id: ""``
+      with keys ``[owner_player_id]`` only — start and end of the same
+      ``player_reaches_position`` step (23 / 18 steps). Families this draw:
+      HCO/MISS 24, FCP/MISS 8, HCO/MAKE 6, FCP/MAKE 4, HCT/MISS 4 (Played).
+      Writer: ``bh_id_fallback = _safe_id(...) or ""`` at
+      ``skeleton_step_emitter.py:2246`` (HCO/FCP) and
+      ``hct_step_emitter.py:354`` (HCT). Poison (strip coords off one
+      positioned loose ball) moved the missing counter 8/8. Do not reopen
+      from a loose-ball census as a new item. ``ft_return_teleport`` is
+      item 53, closed by design.
+
+      **AMENDED 2026-09-14 — V1/V2 + continuity carry.** Same footing.
+      V1 (existing writes only): 4 Played / 4 wrap have a prior same-turn
+      ``ball.coords`` / ``current_coords``; 20 / 18 are step-0 and the
+      prior turn's ``final_ball_coords`` (``build_final_ball_coords`` at
+      ``animation_step_helpers.py:572``, stamped in ``_append_turn``) is
+      a real xy (20/20, 18/18). 22 / 14 have neither in the pre-fix
+      payload. V2: the two named sites were the missed ``or ""`` writers.
+      One more unswept empty-owner site remains and is NOT in this
+      population: ``covert_release_step_emitter.py:1340``
+      (``{"owner_player_id": ""}`` when ``fb_bh_id`` is missing).
+
+      Carry is a READ of those writes
+      (``carry_ball_coord_continuity``). It does not compute a position
+      from a player, a shot spot, or a basket. A carry that would open
+      a new loose-loose seam (incoming or onto an already-placed loose
+      ball) is left unplaced — that is how seam-static stays
+      **3,185 / 3,185 Played and 2,203 / 2,203 wrap** (seam-moved 0/0).
+      Encoding: both writers omit the key. Empty-string owners on this
+      census: **0**. Unplaced after carry: **30 Played / 28 wrap**, all
+      ``key_absent``. Those 30/28 stay: after an attached owner with no
+      authored ball coord, or a source that cannot be applied without
+      inventing a seam. Named in the V1 leftover (FCP/MISS after
+      inbound attach; HCO/HCT step 0 when the next step already has a
+      loose coord; the rest of an unplaced run after an isolated fill).
+      26b: each carry logs ``[UESS BALL CONTINUITY]``. Poison (strip
+      coords off one positioned loose ball) 8/8. Step count = draw
+      count (no new tails). Clock untouched. No decision path reads
+      the carried ``ball.coords`` — the write is in ``_append_turn``
+      after the turn is built.
+
 45. **OPEN OBSERVATION, awaiting specificity — Jamie: HCO "seems off in some places".** 2026-09-09.
       Recorded so it is not lost, explicitly NOT actionable yet. Too vague to trace, and the one
       hard measurement pointed at HCO says it is clean: **100.00% within-turn coordinate
@@ -2897,6 +2947,39 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     Rules question (what inbound type follows a timeout after a make) parked by
     Jamie. Animation consequence (3a's 3 hops ride the missing TIMEOUT stamp
     that a BIP would have written) parked on cost — see item 51.
+
+53. **CLOSED BY DESIGN — `ft_return_teleport` is an intentional snap, 2026-09-14.**
+    Jamie watched a missed first free throw: ball travels to the bounce
+    spot, then teleports to the shooter at the line. Confirmed. Writer:
+    `_build_ft_return_teleport_step` (`ft_step_emitter.py:392`) and FE
+    `isFtReturnTeleportStep` (`animationPlayback.js:401`, snap at `:1171`).
+    Both landed in `6257f7292` (2026-05-25) as a named exception
+    ("instant ball snap", `T=0`, no tween). That commit *deleted* a working
+    `distance/12` `_ball_motion_step` return. The Free Throw UESS Audit
+    (2026-07-05) later marked the snap LOW / acceptable by design.
+
+    Jamie's decision (2026-09-14): the snap stays. No tween, no style
+    stamp, no FE-branch removal. Do not implement against either writer.
+    The UESS table in `Free_Throw_System.md` still described the deleted
+    travel — that drift is the hazard; the row now names the snap and
+    points at `6257f7292`'s parent for when ref sprites arrive.
+
+    Do not reopen from a loose-ball census. The 92 Played
+    `ft_return_teleport` seam-static counts are incoming continuity
+    (bounce_hold end = teleport start). The step is L→A, not a missing
+    trajectory.
+
+54. **CLOSED BY DESIGN — `bounce_hold` is an intentional park, 2026-09-14.**
+    5 Played steps (10 loose boundaries), 0 wrap. Writer:
+    `_ft_ball_stationary_hold_step` (`ft_step_emitter.py:319`). Start=end
+    authored bounce, key-absent + `coords`, T≈2.857, flourish +
+    "No Good". FE same-coord return. Hold, not missing travel. Do not
+    reopen from a loose-ball census.
+
+55. **CLOSED BY DESIGN — `airball_oob` travel is expressed, 2026-09-14.**
+    8 Played / 9 wrap steps, all of which travel (flight-end →
+    `AIRBALL_OOB_*` or FLSS OOB, T≈1.14). The static counts were
+    incoming seams. Do not reopen from a loose-ball census.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

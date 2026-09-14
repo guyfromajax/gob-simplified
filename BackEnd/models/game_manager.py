@@ -933,6 +933,7 @@ class GameManager:
                 from BackEnd.utils.animation_step_helpers import (
                     announce_ball_owner_seam,
                     announce_unrendered_tail,
+                    carry_ball_coord_continuity,
                 )
 
                 fam = "%s/%s" % (
@@ -941,6 +942,16 @@ class GameManager:
                 )
                 announce_unrendered_tail(steps, context=fam)
                 announce_ball_owner_seam(steps, context=fam, family=fam)
+                prior = self.turns[-2] if len(self.turns) >= 2 else None
+                carry_ball_coord_continuity(
+                    steps,
+                    prior_final_ball_coords=(
+                        prior.get("final_ball_coords")
+                        if isinstance(prior, dict)
+                        else None
+                    ),
+                    context=fam,
+                )
             sync_lineup_coords_from_turn(self, turn_result)
 
         # Universal end-of-turn stamps. Read by cross-turn bridges (Handoff,
