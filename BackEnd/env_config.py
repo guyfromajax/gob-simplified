@@ -1,7 +1,8 @@
 """Single application-runtime environment resolver.
 
 This module owns dotenv selection for the backend application. Maintenance-script
-connection policy is intentionally deferred to env_streamlining Task 5.
+connection policy is intentionally deferred to env_streamlining Task 5
+(archived: _documentation_master/projects/Z-Completed/env_streamlining.md).
 """
 
 from __future__ import annotations

@@ -266,6 +266,8 @@ For travel / double-dribble class dead-ball turnovers (not shot clock, ten-secon
 
 **Ball-arrival ordering (split-reversal fix, 2026-07):** on a DBTO that follows a reversal pass, the ball must reach the receiver *before* the fumble beat animates/announces. `_walk_ball_owners` (`skeleton_step_emitter.py`) transfers ownership only when a step holds both `pass` and `receive`. On **split-encoded reversals** (receiver relocates into the catch → `pass` and `receive` land on separate steps) the transfer never fired, so `is_pass_step` stayed false → no timed flight → the ball stayed with the passer until the fumble step hardcoded `ball_state = victim`. Result: the fumble jitter + whistle headline fired *before* the ball arrived — on some-but-not-all HCO DBTOs. Fix: the walk now carries a **pending pass** and flips ownership on the **receive step**, so the timed flight (`ball_reaches_player`) lands first. Render-only (game outcomes unchanged); same-step reversals were already correct.
 
+**Owed (split-reversal fix):** a focused regression test for the pending-pass ownership walk — none exists in `tests/` — and an in-app confirmation on a split-reversal DBTO that the ball lands before the fumble jitter/announce. Measured game-outcome neutral (seeded 20-game signature identical on/off) and `_walk_ball_owners` is not called in the stat-sim path, so no reference re-cut is owed.
+
 **Key files:** `BackEnd/engine/dead_ball_fumble.py`, `BackEnd/constants/dead_ball_fumble_constants.py`, `BackEnd/models/turn_manager.py`, `BackEnd/engine/dynamic_fcp_step_emitter.py`, `FrontEnd/static/js/phaser/animation/flourishes.js`, `tests/test_dead_ball_fumble.py`.
 
 ### Key Implementation Details

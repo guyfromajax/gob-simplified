@@ -1,6 +1,8 @@
 # Player Stats Architecture Update
 
-> **Status (2026-06-16):** Mostly unimplemented — partial groundwork now exists, but every core objective below is still open. The plan remains valid future work. See **Current State** for the code-traced breakdown.
+> **Status (re-verified 2026-09-14):** Still accurate — `roster_builder.py` has no season/career, `/player` still emits root-level `season`/`career`, 14 frontend fallback-chain sites remain, 2 pages use RosterLoader. Line refs below are from 06-16 and have drifted (e.g. `/player` merge now ~`api.py:7890`).
+>
+> **Original status (2026-06-16):** Mostly unimplemented — partial groundwork now exists, but every core objective below is still open. The plan remains valid future work. See **Current State** for the code-traced breakdown.
 
 ## Current State (2026-06-16, code-traced)
 

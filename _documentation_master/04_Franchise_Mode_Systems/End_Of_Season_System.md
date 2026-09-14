@@ -79,6 +79,28 @@ When the user confirms `Go To Next Season`:
 
 For the detailed franchise-instance rollover process, see `Season_Init_System.md`.
 
+### Senior Tribute
+
+Pressing **Go To Next Season** plays a tribute to graduating seniors in place of the
+season-transition load screen. Module: `FrontEnd/static/js/shared/seniorTribute.js`.
+*(Merged from `projects/Senior_Tribute_Brief.md`, 2026-09-14.)*
+
+| | |
+|---|---|
+| Sequence | snapshot tribute → start `finish-season` in the background → slideshow → resolution screen → **Advance To Next Season** (load cover only if rollover is still running) |
+| Who | user team **active-roster** seniors/graduates only — training squad, practice squad and cuts are excluded |
+| Order | RT descending |
+| Hold | `HOLD_MS = 6000` per card. No skip, no pause |
+| Hero | the player headshot, not the team logo — unlike the recruiting reveal, the team is already known |
+| No seniors | tribute skipped; the normal season-transition load screen plays |
+
+**Per card:** headshot; career per-game points, rebounds, assists; career DEF%; titles won.
+**Resolution screen:** one row per player — headshot, name, stats, titles.
+
+**Titles** are player-specific on `fpd.titles` (`conf_rs`, `conf_t`, `region`, `national`),
+incremented on the user team's active roster when a title is awarded. Future-forward only — no
+historical backfill. A title kind is hidden when its count is 0.
+
 ### Coaching focus habit counters (FTD)
 
 - Each franchise team’s FTD may store **`coaching_focus`** tallies (archetype usage during the season).

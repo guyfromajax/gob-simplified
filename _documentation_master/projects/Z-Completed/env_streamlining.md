@@ -1,7 +1,7 @@
 # Environment Configuration Streamlining Work Plan
 
 **Created:** 2026-08-11  
-**Status:** Tasks 1–10 complete; Task 11 validation complete except for live Railway database-identity log confirmation  
+**Status:** **COMPLETE — all 11 tasks.** Task 11's two live identity checks confirmed 2026-09-14 (items 5 and 6). **Archived 2026-09-14** to `projects/Z-Completed/`; standing policy lives in `ENV_VARIABLES.md` and `SECURITY_BASELINE.md`.  
 **Scope:** Local environment files, deployment variables, database-target resolution,
 maintenance scripts, tests, backups, templates, and operational documentation.
 
@@ -1452,8 +1452,8 @@ Run the following as separate, observable checks:
 | 2 | **PASS** | `tests/test_env_config.py::test_missing_local_env_fails_without_dotenv_fallback` verifies that an absent `.env.local` fails even when a legacy `.env` exists. |
 | 3 | **PASS** | Resolving from `/private/tmp` still selected `/Users/jamesdavies/gob-simplified/.env.local` and `gob-staging`. |
 | 4 | **PASS** | The focused environment suite uses mongomock/test identities and rejects live targets. The complete 39-test environment/security selection passed. |
-| 5 | **PENDING LIVE LOG CONFIRMATION** | The public staging `/health` endpoint is healthy and reports commit `26fa4f22b006`, but the public payload intentionally does not expose database identity. Confirm the deployed startup log contains `environment=staging database=gob-staging ... source=railway-process`. Resolver tests already cover this exact Railway input. |
-| 6 | **PENDING LIVE LOG CONFIRMATION** | Both the production custom domain and current Railway production domain return healthy responses, but that deployed health payload predates identity fields and exposes neither environment nor database. Confirm the deployed startup log contains `environment=production database=gob ... source=railway-process`. Resolver tests cover this exact Railway input without a local file. |
+| 5 | **PASS — confirmed 2026-09-14** | Deployed staging startup log shows `🔧 [DB CONFIG] source=railway-process environment=staging database=gob-staging mode=mongo`. Original note: The public staging `/health` endpoint is healthy and reports commit `26fa4f22b006`, but the public payload intentionally does not expose database identity. Confirm the deployed startup log contains `environment=staging database=gob-staging ... source=railway-process`. Resolver tests already cover this exact Railway input. |
+| 6 | **PASS — confirmed 2026-09-14** | Production `/health` now exposes identity and returns `"environment":"production","database":"gob","db_access":"write"`. Original note: Both the production custom domain and current Railway production domain return healthy responses, but that deployed health payload predates identity fields and exposes neither environment nor database. Confirm the deployed startup log contains `environment=production database=gob ... source=railway-process`. Resolver tests cover this exact Railway input without a local file. |
 | 7 | **PASS** | `scripts/audit_legacy_migrations.py --db gob-staging` connected with read access and completed. A guarded follow-up removed three verified orphan franchise sidecar groups (264 FTD, 1,538 FPD, and 380 FRD documents; 2,182 total). The post-cleanup audit reports `malformed=0`, `active_groups=0`, and `orphan_groups=0`. |
 | 8 | **PASS** | An explicit `access=write` staging connection printed its safe preflight and completed a non-mutating Mongo `ping`. Earlier Phase B staging repairs also exercised real writes through this boundary. |
 | 9 | **PASS** | The operator ran the production migration audit with process-only `GOB_DB_ACCESS=read`; its preflight reported `environment=production database=gob access=read` and completed successfully. |

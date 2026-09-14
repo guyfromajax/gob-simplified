@@ -4,7 +4,7 @@
 
 ## Overview
 
-Hard delete of one franchise slot and everything hanging off it. There is no soft-archive — see `../projects/multi_franchises_brief.md` P7.
+Hard delete of one franchise slot and everything hanging off it. There is no soft-archive — see `Franchise_Mode_Overview.md` § Two-slot account contract (decision history: `../projects/Z-Completed/multi_franchises_brief.md` P7).
 
 Two halves, deliberately split:
 - **DB cascade** — synchronous and authoritative. A `200` means the franchise is really gone.

@@ -1,4 +1,4 @@
-"""Deferred-offseason apply (Defer_Offseason_To_Camp_Plan.md).
+"""Deferred-offseason apply (projects/Z-Completed/Defer_Offseason_To_Camp_Plan.md).
 
 The offseason develop_rollover was moved out of finish_season into the Week-1 TC training
 path via `_apply_deferred_offseason`. These pin the helper's contract: it faithfully applies

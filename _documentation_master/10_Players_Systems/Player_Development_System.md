@@ -27,6 +27,34 @@ Because the offseason ADDS (does not rescale), **in-season gains PERSIST** into 
 
 **RNG note (precise).** `potential_factor` is drawn **last** inside `generate_player`, so every *prior* draw for that same player (core attributes, CH, EM, weight) keeps its exact stream position — those fields are byte-identical to before the feature. However, the generator's `rng` is **shared across a generation run**, so consuming one extra value per player shifts the stream for every *subsequent* player in that run: **any seeded regeneration now yields a different downstream population than it did pre-feature.** This is harmless here — the retroactive pool write (Phase 5) and the projection read (Phase 4) both read stored state and never invoke generation — but a test that pins an exact seeded population across the whole run will differ.
 
+### Timing — deferred to Week-1 camp
+
+The offseason develop does **not** run at `finish_season` (week 36). It runs at the start of the
+**Week-1 Training Camp "Run Training"** step, immediately before camp, so the user sees offseason and
+camp as one combined jump. Between the season transition and camp, players show their advanced
+**year** with **undeveloped attributes** — intended; that gap is what makes camp read as an event.
+*(Merged from the archived `projects/Z-Completed/Defer_Offseason_To_Camp_Plan.md`, 2026-09-14.)*
+
+| Step | Where | What |
+|---|---|---|
+| Arm | `finish_season` | writes FTD `offseason_dev_pending_season = next_season`. Only a real season transition sets it, so a freshly created franchise never double-develops its generated roster |
+| Gate — user | `/franchise/run-training/user` | first training of the season **and** marker `== current_season` |
+| Gate — CPU | CPU camp autotrain | camp week **and** marker present (same pipeline — league parity) |
+| Apply | `_apply_deferred_offseason` | `develop_rollover` for every roster player in place, **before** `execute_training` |
+| Clear | after a successful persist | marker set to `None` |
+
+**It is not idempotent.** `develop_rollover` is a rescale; running it twice double-applies. Safety
+comes from the marker plus the once-guards (`user_training_applied_week` / `cpu_autotrain_week`),
+which clear only after a successful persist. On a pre-persist failure the undeveloped doc is re-read
+and the deterministic per-(player, season) seed reproduces the same result.
+
+**Accepted trade-off — frozen preseason numbers.** FTD `total_player_attrs` and preseason `natl_rank`
+(`rank_teams_for_week(..., week=0)`) are still computed inside `finish_season`, i.e. off **pre-camp**
+rosters. The original plan required moving both to after camp; this was consciously accepted instead
+(code note *"1b, accepted"*) because relative order is roughly preserved and the ranking weight decays
+to 0 by week 5. **Revisit if preseason ranking ever needs post-camp totals.** Guarded by
+`tests/test_deferred_offseason.py`.
+
 ### Potential Rating display
 
 Potential Rating is fully shipped. The canonical projection helper is

@@ -40,6 +40,27 @@ policy exist. The prior Monte Carlo could not express this decision.
   signed recruits.
 - **Practice Squad parity fixture:** the exact-diff harness needs a self-created durable PS fixture
   instead of a shared staging franchise that can disappear.
+- **Recruits and walk-ons relative to destination rosters — unmeasured.** *(Carried from the retired
+  `Attribute_Calibration_Measurement_Spec.md`, 2026-09-14; the four-season validation answered its
+  progression and team-strength sections but not these.)*
+  - **Recruits:** RT percentiles overall and by entry tier/year; percentile within the destination
+    team's pre-signing roster; share entering the projected starting five / top ten / neither; signed
+    RT vs the graduating player(s) whose departure created capacity; all split by prestige/recruiting
+    band so a league mean does not hide allocation.
+  - **Walk-ons:** same absolute and destination-relative tables; share entering the top ten at arrival
+    and before graduation; best walk-on vs median signed recruit; contribution by class year and
+    seasons remaining; steady-state roster share once the season-1 cohort clears. Do **not** reuse the
+    old "~20% therefore freshman-heavy" premise — years are drawn 10/40/40/10 against a 450 supply.
+- **Season-over-season team strength, decomposed.** Split starter-strength change into graduation,
+  returning development/training, recruit + walk-on entry, and lineup-selection change. Track rank
+  persistence (how many p90 teams stay p90 one, two, three seasons later).
+
+**Measurement rules for the two items above:** read-only analysis; keep generated pool, signed subset
+and active-roster entrant separate (selection changes the distribution); every percentile carries `n`;
+report starter and roster-wide readings; **pair RT with attribute/minutes-weighted and box-score
+measures** — the four-season validation proved RT can hold while basketball attributes deteriorate.
+A new longitudinal dataset via `scripts/season_advance_harness.py` is a separate mutating task on an
+explicitly disposable staging franchise. No tuning in the measurement pass.
 
 The reusable full-season/multi-season driver now exists as `scripts/season_advance_harness.py` and
 the four-season validation has been completed. “No multi-season harness” is no longer an open item.

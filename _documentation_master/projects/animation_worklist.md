@@ -13,7 +13,7 @@ The animation assessment already exists and is NOT superseded by this file:
 | Doc | What it is |
 |---|---|
 | [`animation_cleanup_findings.md`](animation_cleanup_findings.md) | **Primary.** Trace findings, 2026-08-27/28. Verdict: no overhaul needed; the missing 30% concentrates in 3 root causes. §§10-18 are implemented passes. |
-| [`animation_cleanup_brief.md`](animation_cleanup_brief.md) | Symptoms + references, in the user's words. The "what good feels like" doc. |
+| [`animation_cleanup_findings.md`](animation_cleanup_findings.md) **Appendix A** | Symptoms + references, in the user's words. The "what good feels like" doc. Merged into findings 2026-09-14 (was `animation_cleanup_brief.md`). |
 | [`UESS_Backlog.md`](UESS_Backlog.md) | Legacy audit remediation items 5, 7, 8, 9, 10, 12-17 still open |
 | [`step_transition_centralization.md`](step_transition_centralization.md) | Proposed work plan, implementation not started |
 | [`UESS Audits/`](UESS%20Audits/) | Per-path audits (BIP, DREB, FCP, FB, Final Turn, FT, HCO, HCT, OREB, Coord Consumer) |

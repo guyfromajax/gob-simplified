@@ -35,7 +35,7 @@ from BackEnd.db import (
 
 from BackEnd.constants.multi_franchise import MAX_FRANCHISES_PER_USER
 
-# Multi-franchise slots (see _documentation_master/projects/multi_franchises_brief.md).
+# Multi-franchise slots (see _documentation_master/04_Franchise_Mode_Systems/Franchise_Mode_Overview.md § Two-slot account contract).
 # Cap constant lives in BackEnd.constants.multi_franchise.
 from BackEnd.utils.shared import format_height, summarize_game_state
 from BackEnd.utils.rt_display import format_rt_display
@@ -4426,7 +4426,7 @@ def select_team(
     endpoint_start = time.time()
     print(f"🔵 [DEBUG] select_team: POST /franchise/select-team called with team: {selection.team_name}", file=sys.stderr, flush=True)
     try:
-        # Cap concurrent franchises per account (multi_franchises_brief Phase 1).
+        # Cap concurrent franchises per account (Franchise_Mode_Overview.md § Two-slot account contract).
         existing_franchises = db.franchises.count_documents({"user_id": user.get("user_id")})
         if existing_franchises >= MAX_FRANCHISES_PER_USER:
             raise HTTPException(
@@ -15448,7 +15448,7 @@ def cut_franchise_players(
             #      was a per-player duplicate the archive exists to eliminate.
             # Painting now happens in one place: the pre-game warm, which runs while
             # the user is on Set Lineup and hits the shared archive.
-            # See _documentation_master/projects/Uniform_Archive_Brief.md
+            # See _documentation_master/00_Operations/Player_Image_System.md § Uniform archive
             warm=False,
         )
     except Exception:
@@ -16434,7 +16434,7 @@ def _run_franchise_training_impl(req: FranchiseTrainingRequest, *, phase: str = 
     # develop this team's roster ONCE, before camp, so the user sees offseason + camp as one
     # jump. Runs in place on the loaded FPD docs → the player list below (and camp) build on
     # the developed values, and the post-camp FPD persist writes offseason+camp together.
-    # See Defer_Offseason_To_Camp_Plan.md.
+    # See projects/Z-Completed/Defer_Offseason_To_Camp_Plan.md.
     current_season = int(franchise_doc.get("current_season", 1) or 1)
     _offseason_reports: list[dict] = []
     _offseason_pending = (
@@ -18363,7 +18363,7 @@ def _apply_deferred_offseason(fpd_docs: list[dict], season: int) -> list[dict]:
     """Apply the DEFERRED offseason `develop_rollover` to each FPD doc IN PLACE and return
     offseason report lines. Called at Week-1 Training Camp (before camp training) by both
     the user and CPU paths; the caller GATES on the FTD `offseason_dev_pending_season`
-    marker and CLEARS it after. See Defer_Offseason_To_Camp_Plan.md.
+    marker and CLEARS it after. See projects/Z-Completed/Defer_Offseason_To_Camp_Plan.md.
 
     develop_rollover is a RESCALE, not idempotent — running it twice double-applies. Safety
     is the caller's marker + once-guards (user_training_applied_week / cpu_autotrain_week),
@@ -18487,7 +18487,7 @@ def finish_season(req: FinishSeasonRequest):
     zero_stats = _zero_stats_block()
 
     # Offseason development is DEFERRED to Week-1 TC (see per-player note below and
-    # Defer_Offseason_To_Camp_Plan.md). finish_season only advances YEAR + carries dev
+    # projects/Z-Completed/Defer_Offseason_To_Camp_Plan.md). finish_season only advances YEAR + carries dev
     # fields; develop_rollover runs at "Run Training". This report list stays empty here
     # (the offseason report is emitted with the Week-1 training report instead).
     _offseason_reports: list[dict[str, Any]] = []
@@ -18544,7 +18544,7 @@ def finish_season(req: FinishSeasonRequest):
                 **carry_dev_fields(fpd_doc),
             }
             # Offseason development is DEFERRED to Week-1 Training Camp (see
-            # projects/Defer_Offseason_To_Camp_Plan.md). The player rolls over with his
+            # projects/Z-Completed/Defer_Offseason_To_Camp_Plan.md). The player rolls over with his
             # new YEAR and carried dev fields (entry_tier/potential/development/… via
             # carry_dev_fields) but UN-developed attributes. The offseason develop_rollover
             # runs at TC "Run Training" (before camp) so the user sees offseason + camp as
@@ -18709,7 +18709,7 @@ def finish_season(req: FinishSeasonRequest):
             # Arms the DEFERRED offseason develop: Week-1 TC "Run Training" develops every
             # player once when this equals current_season, then clears it. Set only by a
             # real season transition, so a freshly-created franchise (no flag) never
-            # double-develops its generated roster. (See Defer_Offseason_To_Camp_Plan.md.)
+            # double-develops its generated roster. (See projects/Z-Completed/Defer_Offseason_To_Camp_Plan.md.)
             # NOTE (1b, accepted): total_player_attrs above is now summed off PRE-camp
             # rosters — bounded impact (relative order ~preserved; ranking weight decays to
             # 0 by wk5). Revisit if preseason ranking needs post-camp totals.

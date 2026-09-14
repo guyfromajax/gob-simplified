@@ -2217,7 +2217,7 @@ async function setHeader() {
   // overlaps the time spent on this screen, so nothing blocks and no load screen is
   // needed. A player already carrying uniform_key is skipped without touching R2,
   // so once the backfill has run this is a no-op.
-  // See _documentation_master/projects/Uniform_Archive_Brief.md
+  // See _documentation_master/00_Operations/Player_Image_System.md § Uniform archive
   warmGamePortraitsOnce([userTeamName, opponentTeamName]);
   const userTeamLabel = myTeamSide === 'home' ? homeDisplay : (myTeamSide === 'away' ? awayDisplay : userTeamName);
   const opponentTeamLabel = myTeamSide === 'home' ? awayDisplay : homeDisplay;

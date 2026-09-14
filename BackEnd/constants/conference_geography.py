@@ -5,7 +5,7 @@ Texas appears in 11 and 12; California in 15 and 16 — intentional.
 """
 from __future__ import annotations
 
-# Verbatim from team-builder-v2-plan.md §5.1
+# Verbatim from projects/Z-Completed/team-builder-v2-plan.md §5.1
 CONFERENCE_GEOGRAPHY: dict[int, tuple[str, ...]] = {
     1: ("Pennsylvania", "New Jersey", "Delaware"),
     2: ("West Virginia", "North Carolina", "Virginia", "Maryland"),

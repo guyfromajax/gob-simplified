@@ -66,6 +66,7 @@
 2a. Fast Break animation is still sloppy and inconsistent with defenders in particular not moving on shot steps or freezing before the shot step then teleporting
 2b. Still reading fouled 3 pt attempts as 2 pt shots in some instances
 2c. some HCO turnovers are still mismatched on BE and FE as to who the ball handler is. Note teh BE logic + turnover animation jiggle are synced, but sometimes a different player is holding teh ball.
+    _(Possibly related, untraced: the ~4% interception stale-victim fallback in `06_Gameplay_Systems/Dynamic_HCO_System.md` §4, and the step-0 owner bootstrap disagreement in `projects/UESS Audits/HCO_UESS_Audit.md`.)_
 2d. Sometimes the deleting franchise gets stuck in an infinite loop
 3. OPEN — a shooting foul hands off to FREE_THROW but no FREE_THROW turn follows (~0.5/game)
    - Surfaced while measuring the fouled-3PT free-throw misaward (fixed 2026-09-07, see below).
@@ -2862,6 +2863,40 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       Item 47 is not a Phase 2 pass (amended 2026-09-14). 3a is not a pass
       (abstain on a missing stamp, 2026-09-14). 3b is not the micro beat
       (shooter selection ignores ball routing). Loose is a different job.
+
+51. **PARKED — 3a's remaining 3 hops after the harvest-artifact close, 2026-09-14.**
+    Consuming-worker PlayedState census closed the 27-count as sticky pending +
+    missing BIP. Re-census: **27 → 3 hops / 8 games**. Those 3 are real, not
+    harvest. Mechanism: TIMEOUT emits no `final_ball_handler_id`
+    (`turn_manager.py` timeout path; `build_final_ball_handler_id` → None).
+    Emitter `prior_turns[-1]` is that TIMEOUT (`dynamic_hct_step_emitter.py:1098`),
+    so `prior_final_bh_id` is None and `:1118` takes `or bh_id` — the **play BH**
+    (SF/C after a pass; `hct_bh_pos` stamped post-loop at
+    `phase_resolution.py:11618`). Loop step 0 starts on the **PG** (engine entry
+    `bh_pos = "PG"` at `dynamic_hct.py:2257`; first segment
+    `ball_owner_pos="PG"`). 149/149 post-`BASELINE_INBOUND` inherits produce no
+    hop — that is the control. Side effect: `:1153` writes the play BH to engage,
+    then `:1154-1157` overwrite him with `other_offense_targets` (built excluding
+    entry PG, not the final SF/C), so **nobody occupies the ball-handler spot**.
+    Parked because the honest fix (seed walk-up from the loop's step-0 PG)
+    retimes the step: PG walks to engage, gate T changes, every interrupted end
+    moves. Owner-only attach puts the ball on a PG still standing at the TIMEOUT
+    leftover while the SF/C walks `handle_ball` — worse than the hop, will not
+    ship. equiv-v3 cannot see this seam (`_is_full_simulation` is true at
+    Pattern A; pending never set). No harness prices the body/T/clock change.
+    The only probe that sees the hops is the consuming-worker PlayedState hop
+    census (3 → 0).
+
+52. **PARKED — BIP is lost, not deferred, when Pattern A sees pending, 2026-09-14.**
+    Live chain: `game_manager.py:2124` sets `pending_computer_timeout` with
+    `turn_type=BASELINE_INBOUND` and **returns without appending the BIP**.
+    `:2026` then skips BIP for the rest of that call if pending is already set.
+    The live API (`api.py:5741-5785`) consumes pending on the *next* request and
+    `setup_timeout_turn` forces `SIDE_INBOUND` — the scheduled BIP never
+    appears. BIP-only pending rate on the TBT setter path: **26/8 = 3.25/game**.
+    Rules question (what inbound type follows a timeout after a make) parked by
+    Jamie. Animation consequence (3a's 3 hops ride the missing TIMEOUT stamp
+    that a BIP would have written) parked on cost — see item 51.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

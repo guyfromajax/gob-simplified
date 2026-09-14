@@ -3,7 +3,7 @@
  *
  * Design baseline: standard post-game modal (gameCompletionPopup). Single
  * vertical column, dark chrome, Sammy headshot at top. Stylesheet:
- * /css/sammy-modal.css (auto-loaded if missing).
+ * /css/sammy-modal.css (auto-loaded if missing; the modal appears once it has applied).
  *
  * Used by: username, situation card, set-lineup intro, tutorial post-game.
  *
@@ -39,17 +39,10 @@
  *   handle.setBusy(bool);    // disable buttons + input (e.g., during async submit)
  */
 
+import { loadStylesheet } from './stylesheetReady.js';
+
 const STYLESHEET_HREF = '/css/sammy-modal.css';
 const DEFAULT_IMAGE_SRC = '/images/sammy_tutorial.png';
-
-function ensureStylesheetLoaded() {
-  const existing = document.querySelector(`link[href="${STYLESHEET_HREF}"]`);
-  if (existing) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = STYLESHEET_HREF;
-  document.head.appendChild(link);
-}
 
 function buildBodyNode(body) {
   if (body instanceof HTMLElement) return body;
@@ -80,8 +73,6 @@ export function showSammyModal(opts) {
   // onCta defaults to a no-op so simple acknowledge-only modals
   // ("Got it" / "Let's go") don't need to wire a handler.
   const onCta = typeof opts.onCta === 'function' ? opts.onCta : (() => {});
-
-  ensureStylesheetLoaded();
 
   const backdrop = document.createElement('div');
   backdrop.className = 'sammy-modal-backdrop';
@@ -165,16 +156,12 @@ export function showSammyModal(opts) {
 
   modal.appendChild(actions);
   backdrop.appendChild(modal);
-  document.body.appendChild(backdrop);
-
-  // Force reflow so the entrance animation runs.
-  // eslint-disable-next-line no-unused-expressions
-  backdrop.offsetHeight;
-  backdrop.classList.add('open');
+  let closed = false;
 
   const dismissOnCta = opts.dismissOnCta !== false;
 
   function close() {
+    closed = true;
     if (!backdrop.parentNode) return;
     backdrop.parentNode.removeChild(backdrop);
   }
@@ -241,9 +228,19 @@ export function showSammyModal(opts) {
         primaryBtn.click();
       }
     });
-    // Autofocus the input on next tick.
-    setTimeout(() => inputEl.focus(), 0);
   }
+
+  // Append only once sammy-modal.css has applied — before that the Sammy image has
+  // no 96px sizing and paints at natural size. See stylesheetReady.js.
+  loadStylesheet(STYLESHEET_HREF).then(() => {
+    if (closed) return;
+    document.body.appendChild(backdrop);
+    // Force reflow so the entrance animation runs.
+    // eslint-disable-next-line no-unused-expressions
+    backdrop.offsetHeight;
+    backdrop.classList.add('open');
+    if (inputEl) setTimeout(() => inputEl.focus(), 0);
+  });
 
   return {
     close,

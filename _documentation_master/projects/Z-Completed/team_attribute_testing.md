@@ -1,5 +1,7 @@
 # Team Attribute Testing — rail distribution across a season
 
+> **ARCHIVED 2026-09-14.** Earlier measurement run; superseded by team_player_attribute_tuning.md. The `fb_opp_modifier` bug below is **FIXED** (`7dcb8edbc`, 2026-08-14): FB_DEF and PT_OFF get a baseline install for every team via `_REACTIVE_INSTALLS` (franchise_routes.py), not a vision.
+
 Tracks where the **core-8 team attributes** sit as a season runs, under CPU identity-driven
 training. The question is whether teams develop distinct personalities (spread toward both
 rails) or converge (everyone pinned at the same ceiling).
@@ -89,7 +91,7 @@ personality outcome the system exists to produce.
 everyone else abandons it. `discipline` and `fight` developed real spread in the back half
 (5 → 33 and 4 → 30 maxed), so authoritarian-family focuses are landing.
 
-### 🐛 `fb_opp_modifier` is untrainable — CONFIRMED BUG
+### 🐛 `fb_opp_modifier` is untrainable — FIXED 2026-08-14 (`7dcb8edbc`)
 
 Zero teams above +17 at BOTH snapshots, and the mean fell −5.3 → **−10.8** across the season.
 It is the only attribute with no upside at all.
@@ -111,7 +113,7 @@ up. A full season of data made this obvious in a way reading the table did not �
 snapshot already showed it (0 above +17) and it was logged as an open question rather than
 chased.
 
-**Proposed fix (not applied):** give `FB_DEF` to **Contain**, whose identity is conservative
+**Proposed fix (superseded — shipped as a universal baseline install, not a Contain vision change):** give `FB_DEF` to **Contain**, whose identity is conservative
 transition defence — getting back rather than gambling. It currently installs `T_DEF` + `BREAKS`.
 Needs a decision, because changing the vision table shifts every downstream number in this doc.
 
@@ -164,7 +166,7 @@ economy is. See `In_Season_Training_Summary.md`.
 
 Read directly from `ftd.team_attributes` across all 128 FTD docs — a point-in-time snapshot, not
 a delta. No sim or dry run involved, so nothing here depends on the measurement caveats that
-apply to training-gain numbers (see `cpu_identity_training_design.md` and
+apply to training-gain numbers (see `cpu_identity_design.md` Part A and
 `scripts/cpu_training_mode_ab.py`).
 
 ```
@@ -190,6 +192,6 @@ for a in CORE:
 
 ## Related
 
-* [`cpu_identity_training_design.md`](./cpu_identity_training_design.md) — the allocation system producing these
-* [`../06_Gameplay_Systems/CPU_Team_Identity_System.md`](../06_Gameplay_Systems/CPU_Team_Identity_System.md) — vision assignment and surface status
-* [`../06_Gameplay_Systems/End_Of_Game_System.md`](../06_Gameplay_Systems/End_Of_Game_System.md) — the EOG bands that move these attributes per game
+* [`cpu_identity_design.md`](../cpu_identity_design.md) Part A — the allocation system producing these
+* [`../06_Gameplay_Systems/CPU_Team_Identity_System.md`](../../06_Gameplay_Systems/CPU_Team_Identity_System.md) — vision assignment and surface status
+* [`../06_Gameplay_Systems/End_Of_Game_System.md`](../../06_Gameplay_Systems/End_Of_Game_System.md) — the EOG bands that move these attributes per game

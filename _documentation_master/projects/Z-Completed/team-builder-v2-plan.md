@@ -3,10 +3,10 @@
 **Product:** Geeked-Out Basketball (GOB)
 **Supersedes:** nothing. `team-builder-v1-spec.md` (v1.3) remains the record of what shipped.
 **Spec version:** 2.0 — implementation/decision record
-**Status:** **Phases 0–4 shipped.** Height/class budgets are live. Per-attribute shape floors are **not** enforced at Team Builder Apply (attribute totals only); floors remain in development decay clamp.
+**Status:** **ARCHIVED 2026-09-14.** Current wiring: `04_Franchise_Mode_Systems/Team_Builder_System.md`. **Phases 0–4 shipped.** Height/class budgets are live. Per-attribute shape floors are **not** enforced at Team Builder Apply (attribute totals only); floors remain in development decay clamp.
 The remaining committed feature is 3c uploads, deliberately deferred because it requires upload
 storage, cascade deletion, and orphan cleanup. Smaller outstanding verification/UX debt is tracked
-canonically in [`Team_Builder_System.md`](../04_Franchise_Mode_Systems/Team_Builder_System.md#15-unverified-and-outstanding).
+canonically in [`Team_Builder_System.md`](../../04_Franchise_Mode_Systems/Team_Builder_System.md#15-unverified-and-outstanding).
 Earlier sections preserve the decisions as they evolved and may describe paths later retired; use
 the canonical system document for current runtime behavior.
 **Last updated:** 11 August 2026
@@ -1119,4 +1119,4 @@ Height separates cleanly across five rank bands. **Class has only 18 distinct in
 Three-arm retention at graduation was control **0.147** / realistic **0.150** / extreme **0.147** — authorship is not special. The offseason α-blend homogenises **every** program the same way. TB options 2–3 (reclassify / re-derive potential) are dead; they assumed authorship was the victim.
 
 **Resolution:** development grows level while coaching owns shape. This is simulation design, not a
-TB fix. Canonical section: [`Player_Development_System.md` → Reshape vs grow](../10_Players_Systems/Player_Development_System.md#reshape-vs-grow--closed-grow-level-coach-shape).
+TB fix. Canonical section: [`Player_Development_System.md` → Reshape vs grow](../../10_Players_Systems/Player_Development_System.md#reshape-vs-grow--closed-grow-level-coach-shape).

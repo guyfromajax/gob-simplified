@@ -21,6 +21,7 @@
  */
 
 import { getTeamSammyImage } from '/js/shared/teamCoachAsset.js';
+import { loadStylesheets } from './stylesheetReady.js';
 
 const STYLESHEETS = [
   '/resource-pages.css',         // canonical .gob-modal-* classes
@@ -28,19 +29,7 @@ const STYLESHEETS = [
   '/css/tutorial-lineup-modal.css',
 ];
 
-function ensureStylesheets() {
-  STYLESHEETS.forEach((href) => {
-    if (document.querySelector(`link[href="${href}"]`)) return;
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = href;
-    document.head.appendChild(link);
-  });
-}
-
 function buildModal({ teamName, message, ctaLabel, ctaVariant, onConfirm }) {
-  ensureStylesheets();
-
   const sammySrc = getTeamSammyImage(teamName);
   // Per styleguide: --action (orange) for non-gating (intro Got It),
   // --gate (green) for gating (feedback modal Return To Game IS the
@@ -67,15 +56,25 @@ function buildModal({ teamName, message, ctaLabel, ctaVariant, onConfirm }) {
     </div>
   `;
 
-  document.body.appendChild(overlay);
-  // Force reflow so the .is-visible transition runs (matches Functional modal precedent).
-  // eslint-disable-next-line no-unused-expressions
-  overlay.offsetHeight;
-  overlay.classList.add('is-visible');
-
   const ctaBtn = overlay.querySelector('.tutorial-lineup-modal-cta');
+  let closed = false;
+
+  // Append only once the CSS has applied. The portrait's 96px circle lives in
+  // tutorial-lineup-modal.css; appended any earlier, the 3000px team Sammy PNG
+  // paints at natural size inside the clipped 420px box for a full CSS round trip.
+  // Building synchronously first keeps the caller's try/catch meaningful and lets
+  // the <img> start fetching while we wait.
+  loadStylesheets(STYLESHEETS).then(() => {
+    if (closed) return;
+    document.body.appendChild(overlay);
+    // Force reflow so the .is-visible transition runs (matches Functional modal precedent).
+    // eslint-disable-next-line no-unused-expressions
+    overlay.offsetHeight;
+    overlay.classList.add('is-visible');
+  });
 
   function close() {
+    closed = true;
     if (!overlay.parentNode) return;
     overlay.classList.remove('is-visible');
     setTimeout(() => {

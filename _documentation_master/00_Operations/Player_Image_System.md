@@ -14,7 +14,7 @@ This is the operational reference. The original design rationale lives in [proje
 | Cloudflare account zone | `geekedoutgames.com` (hosts the asset subdomain) |
 | Public asset domain | `assets.geekedoutgames.com` (CNAME `assets` → bucket) |
 | S3 API endpoint | `https://21a46b928c6e8b378d9cd96097346e7d.r2.cloudflarestorage.com` |
-| Object layout | `players/master/<player_id>.png` + `players/master/generic_headshot.png` |
+| Object layout | `uniforms/<image_id>__<color_key>.png` (painted archive, shared across franchises) · `players/master/<player_id>.png` (legacy + mirror) · `players/master/generic_headshot.png` |
 | `<player_id>` | the player document `_id` (UUID). Filenames are exactly `<_id>.png` |
 | Walk-on kits | `portrait-kits/walk_on_portraits/<image_id>.{png,mask.png,json}` (71 remapped retired-mover kits; see Recruit_Image_System) |
 | Master format | full-res transparent PNG (~3–7 MB, 3530×3412) — source of truth |
@@ -76,10 +76,57 @@ curl -sI -H "Origin: https://x" "https://assets.geekedoutgames.com/cdn-cgi/image
 
 ---
 
+## Uniform archive
+
+**Status: built 2026-09-08, not yet verified against R2** (no local R2 credentials; staging is the first
+place the archive write, mirror copy and self-heal are exercised).
+
+`make_signed_master(kit, mask, primary, secondary, mascot)` is pure — `player_id` is not an input. Keying
+painted masters by `player_id` (a fresh UUID per signing, per franchise) repainted identical images for
+every user: 10.5 MB and ~1 s CPU each, ~300 per franchise per season (~3.1 GB). The archive keys by what
+actually determines the pixels.
+
+| Key | Role |
+|---|---|
+| `uniforms/<image_id>__<color_key>.png` | The artifact. Painted once, reused by every franchise. |
+| `players/master/<player_id>.png` | Legacy. Still resolves; mirrored from the archive by server-side `copy()`. Migration scaffolding, not the artifact. |
+
+`color_key` = 12-hex sha256 of normalised `(primary, secondary, mascot)` — mascot is stamped into the pixels.
+
+**Write:** resolve `image_id` + team display → `uniform_key` → `exists()` ? done : paint + `put()` → stamp
+`meta.uniform_key` on the FPD doc. Idempotent; hit rate rises as franchises accumulate.
+
+**Read:** `getPlayerImageUrl` prefers `uniforms/<uniform_key>.png` when the payload carries `uniform_key`,
+else the legacy key. No big-bang migration.
+
+**Rebrands:** a Team Builder rebrand changes the colours → the key → the object. (The old scheme kept the
+stale master forever.)
+
+**When paints happen:** the non-blocking pre-game warm (`POST /player-image/warm-teams`, fired from Set Lineup)
+paints exactly the players about to be seen and skips anything stamped. User and CPU camp cuts are both lazy
+(`warm=False`). The sprite preloader self-heals, bounded. A Signing Day / camp-cut background queue was
+**deliberately not built** — revisit only if `[WARM] franchise=...` logs show a first-play-after-Signing-Day stall.
+
+| Piece | File |
+|---|---|
+| Key + paint-or-reuse | `BackEnd/utils/uniform_archive.py` |
+| Key contract (value pinned) | `tests/test_uniform_archive_key.py` |
+| Mirror copy | `BackEnd/services/r2_images.py` → `copy()` |
+| Ensure → archive, stamp `meta.uniform_key`; warm endpoint | `BackEnd/api/player_image_routes.py` |
+| Archive-preferring resolver | `FrontEnd/static/js/config/api-config.js` |
+| `uniform_key` on game payloads | `BackEnd/models/player.py`, `BackEnd/utils/shared.py` |
+| Preloader key + self-heal | `js/phaser/setup/preloadPlayerHeadshots.js` |
+| Backfill (dry-run default) | `scripts/backfill_uniform_archive.py` |
+
+**Open:** 10.5 MB masters — Cloudflare pulls the full original on first request per size; likely cause of
+the pre-game lineup delay on images that *are* painted.
+
+---
+
 ## Walk-on roster makers (camp cuts)
 
 When a Walk On survives camp cuts onto the active 12, the backend stamps `meta.image_id` from the
-walk-on portrait pool and paints (user eager / CPU lazy) into `players/master/<player_id>.png`
+walk-on portrait pool and paints (user eager / CPU lazy) into the uniform archive (below)
 using the same kit+mask recolor path as signed recruits (`resolve_kit_keys` →
 `make_signed_master`). Publish kits once with:
 
@@ -170,10 +217,15 @@ Note: if the local bulk images have been removed from the repo, a `false` kill-s
 | `KEY_PREFIX` | upload script | R2 key prefix uploads write to (`players/master/`) |
 | `DEFAULT_SOURCE` | upload script | default upload source dir (`assets_staging/players`) |
 | `CACHE_CONTROL` | upload script | `Cache-Control` set on uploaded masters (`public, max-age=86400`) |
+| `UNIFORM_IMAGE_PREFIX` | api-config.js | archive object prefix (`uniforms`) |
+| `UNIFORM_KEY_LEN` = 12 | `uniform_archive.py` | hex chars of the colour hash; shorter = higher collision risk |
+| `WARM_CONCURRENCY` = 2 | `player_image_routes.py` | parallel paints; each holds ~48 MB (Railway `MALLOC_ARENA_MAX=2`) — raise only with measurement |
+| `CANVAS_W, CANVAS_H` = 3530, 3412 | `recruit_image.py` | master resolution; drives the 10.5 MB size and ~1 s paint |
+| `REVEAL_PREPAINT` = 15 | `recruiting-hub.js` | reveal cards force-painted behind "Prepping Signing Day" |
 
 ---
 
 ## Not in scope here
 
-- DB has **no** `photo_asset_key` / image columns and **no** related env vars — keys are derived from `player_id`, so no backfill was needed.
+- DB has **no** `photo_asset_key` column and **no** related env vars. Legacy keys derive from `player_id`; archive keys are stamped as `meta.uniform_key` (see Uniform archive).
 - Future layered pipeline (base portrait + per-team uniform overlay compositing) is a **planned** design, documented in [projects/image_migration.md](../projects/image_migration.md), not yet built.

@@ -342,6 +342,10 @@ A defender sitting in a passing lane can disrupt an HCO pass. **Contestable:** h
 
 **Zone guard-map selection status (shipped July 2026):** the prior slot/polygon-only selection made the credited moment defender the raw nearest defender in only about 38% of measurable zone steals. Using the render's guard map raised that diagnostic to about 65% and removed the farthest-defender picks; more importantly, credited defender now matches the rendered guardian by construction. The remaining cases where that guardian is not the physically nearest defender are an intentional consequence of `assign_all_zone_defenders`, not a moment-credit bug. Because changing the selected defender also changes whose attributes resolve the strip, this was a gameplay/draw-moving fix; its recorded distributional multi-seed verification and seeded-reference re-cut remain verification debt.
 
+**Moment-defender stash credit — verification debt (Seam 3, `eddd85671`, July 2026):** the non-shot finalizer now **prefers** `_hco_moment_defender_id` over the defender-override block's position recompute, which was wrong on ~49% of non-shot outcomes (69% in zone). It is **not draw-neutral** even though the recompute still runs: the credited defender feeds fouls → foul-outs → substitutions, and a seeded 12-game before/after diverged in 8 games. In-app confirmed. Still owed: multi-seed distributional verification + seeded-reference re-cut — batch with the zone guard-map debt above.
+
+**Interception victim — open, low priority:** `_finalize_hco_pass_interception` credits the interceptor and contact correctly, but in a 20-game measurement (July 2026) ~4% of interceptions fell back to a stale victim because the passer identity was not explicit. Possibly related (untraced): `projects/bugs.md` item 2c.
+
 **Lane distance** (perpendicular, passed as a param to `resolve_pass_contest` so HCT's `8.0` is untouched):
 
 | Turn / defense | Lane dist | Source |

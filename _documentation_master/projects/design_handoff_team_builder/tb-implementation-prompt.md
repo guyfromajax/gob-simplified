@@ -2,7 +2,7 @@ You are implementing the Team Builder feature redesign in guyfromajax/gob-simpli
 
 Read design_handoff_team_builder/README.md first, in full, before writing any code. It documents seven screens with exact colors, type, spacing, copy, state and interaction behavior, plus the reasoning behind the flow's structure.
 
-Then read _documentation_master/projects/mod-system/team-builder-v2-plan.md. The README governs presentation. That document governs behaviour, and it is not optional. Where they appear to conflict, the plan wins on rules and the README wins on rendering.
+Then read _documentation_master/projects/Z-Completed/team-builder-v2-plan.md. The README governs presentation. That document governs behaviour, and it is not optional. Where they appear to conflict, the plan wins on rules and the README wins on rendering.
 
 What you are building
 

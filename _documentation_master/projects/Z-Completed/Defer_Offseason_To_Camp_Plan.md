@@ -2,7 +2,7 @@
 
 **Goal.** Make Training Camp *feel* like the moment a player develops. Offseason attribute gains are currently applied at `finish_season` (week 36) and are visible before the user runs camp. Move the offseason **attribute apply** to the **Week-1 TC "Run Training"** step so the user sees offseason + camp as one combined jump at camp.
 
-**Status.** Design agreed (this thread). Nothing implemented.
+**Status.** **SHIPPED** — Phase 1a `2d45e22ef`; user + CPU paths both gate on the FTD `offseason_dev_pending_season` marker (`franchise_routes.py`); guarded by `tests/test_deferred_offseason.py`. *(The status previously read "Nothing implemented", which was stale.)* **Archived 2026-09-14** to `projects/Z-Completed/`. The live mechanism is summarised in `10_Players_Systems/Player_Development_System.md` → *Timing — deferred to Week-1 camp*.
 
 ---
 

@@ -1,6 +1,6 @@
 # Team Builder System
 
-> **Implementation map.** Product intent lives in `_documentation_master/projects/team-builder-v2-plan.md`; presentation in `projects/design_handoff_team_builder/README.md`. When intent and code disagree, the plan states intent and this file maps wiring — raise a finding, don't silently rewrite either.
+> **Implementation map.** Product intent lives in `_documentation_master/projects/Z-Completed/team-builder-v2-plan.md` (archived; phases 0–4 shipped, 3c tracked in §15); presentation in `projects/design_handoff_team_builder/README.md`. When intent and code disagree, the plan states intent and this file maps wiring — raise a finding, don't silently rewrite either.
 >
 > **Every section below describes current behaviour.** Superseded behaviour is in §14, marked as history. If you find a claim here that the code contradicts, that is a bug in this file — fix it, don't add a warning label. This document previously carried a table listing nine of its thirteen sections as untrustworthy; that pattern is what §14 exists to prevent.
 >

@@ -62,7 +62,7 @@ HCO now freezes a `ShotAttemptGeometry` before `resolve_shot()`:
   mutable defender coords once the contract exists.
 
 This is deliberately a shot-attempt slice, not yet a universal stop-state migration. Its value-object
-shape is reusable for the broader resolve-once work in `hco_roles_audit.md` after shot behavior is
+shape is reusable for the broader resolve-once work in `../Z-Completed/hco_roles_audit.md` (archived) after shot behavior is
 validated.
 
 **Accepted-gaps rationale:** #5-#7 are all *attribution / second-order shot-difficulty* effects, not binary-outcome (contest/possession) flips. The four HIGH holes (#1-#4) that flip actual outcomes are closed. Revisit #5 if a zone-double-team or zone-FG% anomaly surfaces in tuning.

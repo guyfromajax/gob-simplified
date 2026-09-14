@@ -98,7 +98,7 @@ Once the system is final, produce a holistic **player-development infographic** 
 ---
 
 ## Prerequisite cleanup (uncommitted this session — fold in)
-SO decay fix (live) · training-report retune (`training_notes.py` + tests + doc) · doc-drift fixes · `scripts/in_season_training_net_effect.py` · `training_gain_percentages_baseline.md`.
+SO decay fix (live) · training-report retune (`training_notes.py` + tests + doc) · doc-drift fixes · `scripts/in_season_training_net_effect.py` · ~~`training_gain_percentages_baseline.md`~~ (deleted 2026-09-14 — the snapshot matched live values exactly, so the revert point was moot).
 
 ## Top risks
 - **RT runaway / tier meaning erodes** → mitigated by Phase 3 validation + soft cap.
