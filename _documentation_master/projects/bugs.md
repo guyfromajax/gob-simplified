@@ -29,6 +29,11 @@
 
 ##Animation
 1. Evolve animation from annoying to rewarding
+2. **POST-LAUNCH — §8.1 for the ball.** Emitters author a ball position
+   on every step. The 2026-09-14 continuity carry is a mitigation that
+   reads a neighbour; the remaining 30/28 unplaced steps are what is
+   left of a missing rule, not what is left of a bug. See bugs.md
+   item 57.
 
 
 ##Operations
@@ -1415,6 +1420,17 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       of nothing) join this bounce beat and item 37's empty tails in the
       SAME equiv-v3 arm. Three deletions, one measurement. Hop 0 is not
       dropped in this pass — only the arrival cue is suppressed.
+
+      **PHASE 4 (recorded 2026-09-14, do not sweep).** Same class as
+      item 26 / rule 26 — a fallback that invents a holder or a
+      position. Do not run with Phase 3.
+        · `{50,25}` coordinate fallbacks (item 26's five instances and
+          the 26 further `.get()` sites)
+        · `get_ball_handler_from_skeleton` PG fallback when the pinned
+          step's action is omitted (item 47; `drive` was the first)
+        · `covert_release_step_emitter.py:1340` still writes
+          `{"owner_player_id": ""}` when `fb_bh_id` is missing — last
+          unswept empty-owner site, outside the 46/36 population
 
 29. RESOLVED 2026-09-09 — the three "zero-stamp" families were a HARNESS defect, and it
     invalidated a whole session of measurements. Case (a): production is fine.
@@ -2987,6 +3003,22 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     firing `rattle-leather.wav` on a snap that never moves. Guard:
     `hopKind !== "rattle_hop"`. Step not dropped. Deletion of the hops
     themselves is Phase 3 with item 28 + item 37.
+
+    **H1 2026-09-14 — kind-scope == distance-scope on this population.**
+    FE-modelled `rattle-leather.wav` fires (tween arrival + step-end
+    fallback; same footing as the residue census): Played **1644 →
+    1543** (drop **101**); wrap **1054 → 972** (drop **82**). Moving
+    hops that hit the fallback: **0 / 0**. Do not re-scope.
+
+57. **POST-LAUNCH — the ball has no §8.1 rule, 2026-09-14.**
+    `carry_ball_coord_continuity` is a mitigation: it reads a
+    neighbour's authored coord onto an unplaced boundary. The backend
+    still authors no ball position on the remaining **30 Played / 28
+    wrap** steps. Those are not residue of item 44. They are what is
+    left of a missing rule. The durable fix is emitters authoring a
+    ball position on every step — effectively §8.1 for the ball. Do
+    not treat a future census of 30/28 as a reopen of the empty-string
+    omit.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
