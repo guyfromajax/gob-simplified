@@ -1415,11 +1415,19 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       earlier padding census asked the same question of the putback emitter's 9 non-content steps
       and it has not been answered for `bounce`.
 
-      **PHASE 3 (recorded 2026-09-14, do not run separately).** The 101
-      Played / 82 wrap zero-distance RIM-start rattle hops (~1.4 s/game
-      of nothing) join this bounce beat and item 37's empty tails in the
-      SAME equiv-v3 arm. Three deletions, one measurement. Hop 0 is not
-      dropped in this pass — only the arrival cue is suppressed.
+      **PHASE 3 CLOCK GATE, 2026-09-14 — NOT DELETED.** Re-harvest on the
+      consuming worker (PLAYED=1) and equiv-v3 wrap, seeds 1–8,
+      `0xB40000`, consume wrap. Published 455 steps / 17.1 s per 8 games
+      (unnamed worker, "no ball movement") is **wrong**. Played **517**
+      bounce steps, **517/517 ball travels**, 303 with player overlay
+      motion, 517 with flourish. 0 wholly empty. Clock: 469/517 decrement
+      `clock_remaining` (`_build_ball_motion_sub_step:3064-3065`,
+      `time_elapsed = step_t` at `:3095`). HCO `time_elapsed` is
+      first-start minus last-end clock (`turn_manager.py:4026-4036`), so
+      the bounce is inside the turn burn. 48/517 are FT-pinned
+      (`_pin_ft_clock:143`) — wall-clock overlay on a GAME-CLOCK writer.
+      **GAME-CLOCK. Leave it.** Fill, don't delete, if Jamie wants the
+      300 ms to carry more. Wrap 433 (428 GC / 5 wall; 431 ball-moved).
 
       **PHASE 4 (recorded 2026-09-14, do not sweep).** Same class as
       item 26 / rule 26 — a fallback that invents a holder or a
@@ -1831,6 +1839,17 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       CAVEAT: measured in the same frozen-step units that invert against the observer (item 33),
       so this size must NOT be used to rank it against other work. It is recorded because it
       explains a specific complaint a human actually made.
+
+      **PHASE 3 CLOCK GATE, 2026-09-14 — NOT DELETED.** Same footing as
+      item 28's re-harvest. Player-frozen tails (the published unit):
+      **3,632 Played / 2,213 wrap** steps, **86.7 / 64.0 s/game** wall
+      (published ~88 s/game was close). Wholly-empty predicate (no player
+      displacement AND no ball motion AND no announcement AND no SFX AND
+      no flourish): **82 Played / 46 wrap** tail steps, all 0.05 s,
+      **82/82 and 46/46 GAME-CLOCK**. Samples are unnamed HCO/FOUL and
+      HCO/CHARGE beats (`kind=""`, `T=0.05`, clock decrements). The
+      "~30 s wholly empty" guess evaporated — 4.1 s te / 8 games. **Leave
+      it.** Filling is the next conversation; deleting retimes the game.
 
 38. **The ball was UNTRACKED, not static. The last surviving measure was an artifact, and the
       search for an instrument is now CLOSED.** Measured 2026-09-09, played arm, PLAYED=1,
@@ -3003,6 +3022,17 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     firing `rattle-leather.wav` on a snap that never moves. Guard:
     `hopKind !== "rattle_hop"`. Step not dropped. Deletion of the hops
     themselves is Phase 3 with item 28 + item 37.
+
+    **PHASE 3 CLOCK GATE, 2026-09-14 — hops NOT DELETED.** Re-census
+    101 Played / 82 wrap confirmed. Writer is `_append_motion` →
+    `_build_ball_motion_sub_step` with `RATTLE_HOP_GAME_SECONDS`
+    (`40/350`). 73/101 Played and 82/82 wrap decrement
+    `clock_remaining` (`skeleton_step_emitter.py:3064-3065`,
+    `time_elapsed = step_t` at `:3095`). 28 Played are FT-pinned
+    (`_pin_ft_clock:143`), not a different writer. All 101/82 stamp
+    arrival SFX (FE suppresses the cue; the step remains). **GAME-CLOCK.
+    Leave the hops.** Phase 3 deletion is closed at the clock gate; no
+    equiv-v3 arm (nothing removed).
 
     **H1 2026-09-14 — kind-scope == distance-scope on this population.**
     FE-modelled `rattle-leather.wav` fires (tween arrival + step-end
