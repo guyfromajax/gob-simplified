@@ -1115,17 +1115,34 @@ def build_dynamic_hct_animation_steps(
             prior_final_coords, off_lineup, def_lineup
         )
 
-    walk_up_bh_id = prior_final_bh_id or bh_id
+    # Policy 26 (owner field): a missing prior stamp is not a holder.
+    # `or bh_id` invented a real player on the floor — invisible, same as
+    # {50,25}. Abstain: do not walk up. Loop still uses this turn's BH.
+    if prior_final_bh_id:
+        walk_up_bh_id = str(prior_final_bh_id)
+    else:
+        skip_walk_up = True
+        walk_up_bh_id = bh_id
 
-    if not prior_final_coords or walk_up_bh_id not in prior_final_coords:
+    if not prior_final_coords:
         if is_fcp:
             from BackEnd.engine.fcp_step_trace import log_fcp_emitter_bail
 
             log_fcp_emitter_bail(
-                "missing prior_turn.final_coords or BH not in map",
+                "missing prior_turn.final_coords",
+                prior_coord_count=0,
+                walk_up_bh_id=walk_up_bh_id,
+            )
+        return None
+    if not skip_walk_up and walk_up_bh_id not in prior_final_coords:
+        if is_fcp:
+            from BackEnd.engine.fcp_step_trace import log_fcp_emitter_bail
+
+            log_fcp_emitter_bail(
+                "walk-up BH not in prior final_coords",
                 prior_coord_count=len(prior_final_coords),
                 walk_up_bh_id=walk_up_bh_id,
-                bh_in_map=walk_up_bh_id in prior_final_coords if walk_up_bh_id else False,
+                bh_in_map=False,
             )
         return None
 
@@ -1178,9 +1195,11 @@ def build_dynamic_hct_animation_steps(
 
         # HCT-Task 2 (HCT_UESS_Audit.md #4, SIP-Task 1 parity): fix the entry
         # ball teleport. `build_walk_up_step` hardcodes the ball ATTACHED to the
-        # BH; on an in-flight/loose prior end (or prior_final_bh_id==None →
-        # fallback to this turn's BH) the ball's RENDERED rest (final_ball_coords)
-        # ≠ the BH's coord, so the attach teleports the ball at the entry seam.
+        # BH; on an in-flight/loose prior end the ball's RENDERED rest
+        # (final_ball_coords) ≠ the BH's coord, so the attach teleports the
+        # ball at the entry seam. A missing prior stamp no longer falls
+        # through to this turn's BH (Policy 26 owner field — we skip the
+        # walk-up instead).
         # ONLY override when they actually diverge (> epsilon): seed the ball
         # loose at its rest so it travels to and attaches to the BH by step end.
         # In the common case (prior handed the ball to the BH) the rest == the

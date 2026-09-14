@@ -139,7 +139,15 @@ BLOCK_PROBABILITY = {
 # else → standard shot.
 # Thresholds are independent: adjust either without affecting the other.
 BLOCK_RECONCILIATION_SHOOTING_FOUL_THRESHOLD = 150
-BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE = 60
+# 60 -> 30 (owner call 2026-09-14) to cut the block rate. This is the single
+# chokepoint every block passes through, so it is the surgical dial: it narrows the
+# block band without touching the foul band (governed independently by the 150 above)
+# or the three OR'd attempt gates, which only decide whether reconciliation RUNS.
+#
+# Effective ceiling is (BASE + core8_gameplay(defensive_efficiency)), so def-eff still
+# widens the band for good defences — note it ALSO raises defense_block_score, so it
+# influences block rate through two paths, not one.
+BLOCK_RECONCILIATION_BLOCK_THRESHOLD_BASE = 30
 # Block attempt roll: y = random.randint(BLOCK_Y_ROLL_MIN, BLOCK_Y_ROLL_MAX); attempt when y <= aggression
 BLOCK_Y_ROLL_MIN = 0
 BLOCK_Y_ROLL_MAX = 4

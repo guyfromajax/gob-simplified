@@ -1,4 +1,5 @@
 ##Marketing
+1. Wave 1 creator outreach
 
 
 ##Monetization
@@ -1286,6 +1287,21 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       establish that. A sweep is a balance change wearing a tidy-up costume and it belongs AFTER
       Jamie's balance pass. This entry is the policy only; `_usable_grid_coord`
       (`phase_resolution.py`) is the shape the eventual fix should take.
+
+    - EXTENSION, owner field, recorded 2026-09-14. The same shape, a new field.
+      **An owner fallback never invents a holder — it abstains or it fails.**
+      A fabricated owner is invisible because the invented name is always a real
+      player on the floor, exactly as `{50,25}` is always a real court position.
+      First instance: `dynamic_hct_step_emitter.py` walk-up seed
+      (`prior_final_bh_id or bh_id`). A made FT / putback correctly stamps
+      `None` (ball through the net, unattached). The `or play_bh` fallback
+      attached a live teammate and walked the ball up as if he had inbounded.
+      Abstain: skip the walk-up. Do not author an entry pass. The inbound
+      receiver is who SHOULD have it (`build_bip_animation_steps` SF→PG); that
+      turn is scheduled (`next_play_type=BASELINE_INBOUND`) and does establish
+      the holder on the 26/74 HCT entries that actually get an inbound. The
+      other 48 HCT fire with the FT/putback still as prior — Pattern A never
+      inserted the inbound. Seeding from play_bh is not that establishment.
 
 26b. POLICY, adopted 2026-09-09 — a guard that corrects must announce
     - The companion to 26, and the same failure wearing the opposite costume. Where a fallback
@@ -2838,14 +2854,14 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
 
       | application | cost | why |
       |---|---|---|
-      | 3a HCT entry (23) | **one function** | One existing step already has both men; change two ball dicts + reuse ``_compute_pass_meet_point``. Not a config flag. |
-      | 3b catch-and-shoot (23) | **one function** | Same shape on the first micro beat, plus thread the inbound owner into the micro writer. Replace still drops the skeleton pass, so the micro beat has to carry it. |
+      | 3a HCT entry (27 this tree / published 23) | **not a pass** | Intent: walk-up owner stale. After FT/putback the inbound is who SHOULD hold; Pattern A schedules it and 26/74 HCT entries get it. The other 48 fire with the FT/putback still as prior. ``:1118`` invented ``play_bh``. Policy 26 owner field: abstain (skip walk-up). Do not author an entry pass. |
+      | 3b catch-and-shoot (21 this tree / published 23) | **not the micro beat** | Verdict (iii): shooter selection ignores ball routing. ``should_shoot`` / ``_motion_bh_at_step`` / drive remap pick the shooter independently of ``_walk_ball_owners``. Do not author in the micro writer. |
       | fumble handover (8) | **CLOSED 2026-09-14 — credit, not a pass** | Item 27 mechanism C. Driver credited from the drive-contact payload. 10/10 hops on this tree gone; no A→B authored. |
       | loose-ball trajectory (46.2%) | **new authoring** | Different payload, no owners to hang a pass on, per-family geometry (MAKE/MISS/FT already move some; DREB is one parked boundary). |
 
-      Item 47 is not a Phase 2 pass (amended 2026-09-14). 3a remains one function
-      if its intent gate holds. Loose is a different job and should not gate the
-      attached handovers.
+      Item 47 is not a Phase 2 pass (amended 2026-09-14). 3a is not a pass
+      (abstain on a missing stamp, 2026-09-14). 3b is not the micro beat
+      (shooter selection ignores ball routing). Loose is a different job.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)

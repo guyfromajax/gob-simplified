@@ -191,7 +191,7 @@ played games** (published 1,905). Payload is ``start.ball.owner_player_id=A``,
 
 | application | n | cost | use the 1,905 as-is? |
 |---|---|---|---|
-| 3a HCT entry pass | 23 | one function | yes — walk-up or loop step 0, both men already present |
+| 3a HCT entry | 27 this tree (published 23) | **not a pass** — missing stamp abstains (Policy 26 owner field). Walk-up skipped when `prior_final_bh_id` is None. Do not author an entry pass. | no — inventing a handover is the same lie as `or play_bh` |
 | 3b catch-and-shoot | 23 | one function | yes — first micro beat, thread inbound owner |
 | item 47 fumble handover | 10 hops this tree (published 8; 6 at ea2c382da) | **CLOSED 2026-09-14** | no — not a real handover. Credit fix: drive-contact payload writes the driver at the TO, after pre-credit RNG. Teaching the shared resolver ``drive`` moved scores/draws/team TO. 10→0 hops, PRP 48 held, team TO held. See bugs.md items 27 / 47. |
 | loose-ball trajectory | 46.2% of loose transitions | new authoring | no — parked ``coords``, no owners |

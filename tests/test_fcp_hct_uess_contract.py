@@ -111,6 +111,44 @@ def _build_steps(payload, *, fcp=False):
     )
 
 
+def _walk_reason(step):
+    return (
+        (((step.get("start") or {}).get("advance_trigger") or {}).get("metadata") or {}).get(
+            "reason"
+        )
+    )
+
+
+def test_missing_prior_stamp_skips_hct_walk_up():
+    """Policy 26 owner field: no prior stamp → abstain, do not invent play_bh.
+
+    Poison: restore `walk_up_bh_id = prior_final_bh_id or bh_id` and this
+    emits a walk-up attached to off_pg (this turn's BH).
+    """
+    game = _game()
+    game.turns = [{"final_ball_handler_id": None, "final_coords": game.turns[0]["final_coords"]}]
+    payload = _base_payload()
+    payload["hct_bh_pos"] = "SG"
+    payload["hct_loop_segments"][0]["ball_owner_pos"] = "SG"
+    payload["hct_loop_segments"][0]["gate"] = ["off", "SG"]
+    steps = build_dynamic_hct_animation_steps(payload, game)
+    assert steps
+    assert _walk_reason(steps[0]) != "hct_entry_walkup"
+    start_owner = ((steps[0].get("start") or {}).get("ball") or {}).get("owner_player_id")
+    assert start_owner == "off_sg"
+
+
+def test_present_prior_stamp_still_walks_up():
+    """Anti-vacuity: a real inbound stamp still authors the walk-up."""
+    payload = _base_payload()
+    steps = build_dynamic_hct_animation_steps(payload, _game())
+    assert steps
+    assert _walk_reason(steps[0]) == "hct_entry_walkup"
+    start_owner = ((steps[0].get("start") or {}).get("ball") or {}).get("owner_player_id")
+    assert start_owner == "off_pg"
+
+
+
 def _terminal_step(steps):
     return steps[-1]["end"]["next"]
 
