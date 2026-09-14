@@ -1334,26 +1334,49 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       comparison derive from the same expression. If they do, the instrument is void and
       the next comparison has to be against a field that *can* disagree.
 
-27. CLOSED — both proposed mechanisms for symptom #3 are eliminated. Do not re-derive them.
+27. REOPENED 2026-09-14 — mechanisms A and B stay eliminated; mechanism C was live and is
+    now fixed. Do not read the 2026-09-09 close as "symptom #3 has no mechanism."
     - Symptom #3 is Jamie's long-standing report that TURNOVERS ARE ATTRIBUTED TO THE WRONG BALL
-      HANDLER. Two mechanisms were proposed on separate evidence and both are now dead. Recorded
-      together so nobody spends a third session rebuilding either one.
+      HANDLER. Two early candidates are dead. A third, found at item 47 (ea2c382da) and charged
+      here, was the live write.
     - MECHANISM A — the `offense_play_type` sunset up-front event tables (item 18). The theory
       was that `_check_steal_attempt` and `_check_dead_ball_turnover` name the handler by a
       different rule than the live per-step moment walk, so any turn taking the sunset path
       would attribute turnovers inconsistently. MEASURED LATENT: the positive-list flag at
       `phase_resolution.py:3308-3310` never admitted a falsy read across 8 seeded games, with a
       null control proving the probe did not perturb the sim. The path does not execute, so it
-      cannot be the mechanism.
+      cannot be the mechanism. Still dead.
     - MECHANISM B — item 24's arbitrary nearest-defender selector. The theory was that a
       selector which picks by iteration order while appearing to pick by distance could be
       naming the wrong player on a turnover. ELIMINATED BY INSPECTION AND MEASUREMENT: the
       turnover path names the handler from `get_ball_handler_from_skeleton`, not by distance
       (item 25), and item 24's selector chooses a CONTESTING DEFENDER, not a ball handler and
-      not a fouler. Wrong player, wrong decision, wrong path.
-    - SO SYMPTOM #3 STILL HAS NO TRACED MECHANISM, and the two obvious candidates are spent. A
-      future trace should start from the attribution WRITE — where a turnover stat is credited to
-      a player id — and work backwards, rather than from selectors that look suspicious.
+      not a fouler. Wrong player, wrong decision, wrong path. Still dead.
+    - MECHANISM C — HCO `drive_contact` → `DEAD_BALL_TURNOVER` (`phase_resolution.py:8011-8017`).
+      The stopper pins `step_index` on the drive step. `get_ball_handler_from_skeleton`
+      accepts only `handle_ball` / `receive` / `shoot`, misses the drive, and falls back to
+      the PG. `_resolve_ball_handler_id` then writes victim, flourish, and both fumble
+      owners from that id. 6 of 6 hops on ea2c382da; 10 of 10 fumble seams on this tree
+      (Jamie's in-flight block-threshold edit is in the working tree; same class). The
+      other two HCO dead-ball writers (on-ball moment, scenario-3 trap) were already
+      clean 20 of 20.
+    - WHY NOT TEACH THE SHARED RESOLVER `drive`. Tried. `get_ball_handler_from_skeleton`
+      also feeds shot-clock IQ (explicit pin) and the post-stop zone-defender
+      `random.choice`. Adding `drive` there moved scores, draws, possessions, and team
+      TO totals across 7 of 8 seeds. `_motion_bh_at_step` omits `drive` for a different
+      reason — the walk skips those steps so `drive_contact` owns them — and must stay
+      omitted. Three lists, three jobs. Do not unify them.
+    - FIX 2026-09-14. Credit the driver from the drive-contact payload
+      (`_hco_drive_contact_driver_id`) immediately before `resolve_turnover_logic`,
+      after the pre-credit RNG. Guard: `assert_dead_ball_victim_had_ball` — the charged
+      player's action on that step must be handle_ball / receive / shoot / drive.
+      Literal accept list, not the resolver's, so poisoning the resolver cannot
+      silence it (26c). Played arm, PLAYED=1, PYTHONHASHSEED=0, 8 seeds, `0xB40000`:
+      scores / draws / steps / possessions / team TO held 8/8; PG TO 66→56 (−10);
+      SG 33→41, SF 29→30, C 8→9; fumble hops 10→0; PRP 48 held; §8.4 58→48. No
+      pass authored. No equiv-v3 (principle 8 did not fire on the payload path).
+    - A and B are spent. C is the traced write and it is closed. A future symptom #3
+      report is a new mechanism, not a reason to rebuild A or B.
 
 28. NOT SWEPT, deletion candidate — the `bounce` empty beat
 
@@ -2604,6 +2627,18 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       the fumble lands on the man who has the ball and the seam closes without
       a pass. No ``dead_ball_fumble.py`` change in this pass.
 
+      **CLOSED 2026-09-14 — payload credit, no pass.** Teaching
+      ``get_ball_handler_from_skeleton`` ``drive`` moved the game (shot-clock
+      IQ + zone-defender draws). The driver is now taken from the
+      drive-contact payload and written onto ``roles["ball_handler"]`` only
+      at the TO credit, after that RNG. Item 27 mechanism C. On this tree
+      (played arm, 8 seeds, ``0xB40000``; block-threshold edit in the worktree):
+      **10 of 10 fumble hops closed**, PRP 48 held, §8.4 58→48, team TO /
+      scores / draws / steps / possessions held. Published residue 54→46 was
+      46 PRP + 8 fumble; this HEAD's residue was 48 PRP + 10 fumble and is
+      now 48 PRP. The 8 seams of the original item-47 class are closed; the
+      extra 2 were the same writer on this tree. No 3a / 3b / fumble-pass.
+
       **CLASS SIZE, 2026-09-09 (item 48).** The §8.4 seam guard makes this visible as a class,
       not an instance. Item 47's 8 HCO fumbles are **8 of 92** unaccounted attached-owner
       seam swaps across 16,925 rendered pairs (0.54%) in 8 played games. The other 84 sit
@@ -2805,7 +2840,7 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       |---|---|---|
       | 3a HCT entry (23) | **one function** | One existing step already has both men; change two ball dicts + reuse ``_compute_pass_meet_point``. Not a config flag. |
       | 3b catch-and-shoot (23) | **one function** | Same shape on the first micro beat, plus thread the inbound owner into the micro writer. Replace still drops the skeleton pass, so the micro beat has to carry it. |
-      | fumble handover (8) | **STOPPED — not a pass** | See item 47 amended 2026-09-14. Drive-contact credit is stale (PG fallback). Do not author A→B. |
+      | fumble handover (8) | **CLOSED 2026-09-14 — credit, not a pass** | Item 27 mechanism C. Driver credited from the drive-contact payload. 10/10 hops on this tree gone; no A→B authored. |
       | loose-ball trajectory (46.2%) | **new authoring** | Different payload, no owners to hang a pass on, per-family geometry (MAKE/MISS/FT already move some; DREB is one parked boundary). |
 
       Item 47 is not a Phase 2 pass (amended 2026-09-14). 3a remains one function

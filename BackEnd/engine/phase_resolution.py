@@ -349,6 +349,21 @@ def _find_most_recent_shot_turn(game, max_turns=10):
 
     return None
 
+# Possession for DEAD-BALL CREDIT. Drive is possession: the driver has
+# the ball. apply_stopper_system_to_skeleton already treats it that way
+# (HCO S2b). get_ball_handler_from_skeleton does NOT use this set —
+# teaching that function drive moved scores, draws, possessions and
+# team TO totals (shot-clock IQ at the explicit drive pin, then the
+# zone-defender random.choice that keys off the returned BH). Credit
+# the driver from the drive-contact payload AFTER that RNG, via
+# _apply_drive_contact_dead_ball_credit.
+#
+# Distinct from _motion_bh_at_step (receive > handle_ball > pass, no
+# drive) so the walk skips drive steps and drive_contact owns them.
+# Three lists, three jobs. Do not unify them.
+SKELETON_POSSESSION_ACTIONS = frozenset({"handle_ball", "receive", "shoot", "drive"})
+
+
 def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
     """
     Determine the ball handler from skeleton steps.
@@ -388,7 +403,11 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
         # Find who has ball at this step (normalize action so we don't miss due to casing)
         for pos, action_info in pos_actions.items():
             action = (action_info.get("action") or "").lower().strip()
-            # Actions that indicate ball possession
+            # Shot-clock IQ and post-stop defender assignment consume this
+            # return. Drive is possession for CREDIT (see
+            # SKELETON_POSSESSION_ACTIONS) but must stay out of this list
+            # or an explicit pin on a drive step changes IQ / zone RNG
+            # and moves the game.
             if action in ["handle_ball", "receive", "shoot"]:
                 # Found ball handler position
                 ball_handler_player = off_lineup.get(pos)
@@ -397,6 +416,64 @@ def get_ball_handler_from_skeleton(skeleton, off_lineup, step_index=None):
     
     # Fallback: use PG or first player (only when no step had a clear ball handler)
     return off_lineup.get("PG", list(off_lineup.values())[0])
+
+
+def assert_dead_ball_victim_had_ball(skeleton, step_index, player, off_lineup):
+    """The player charged with a dead-ball TO must have had the ball on that step.
+
+    Drive is possession. A pin on a drive step that credits the PG (who is
+    stationary / absent) is symptom #3 mechanism C. The accept list here is a
+    literal, not ``SKELETON_POSSESSION_ACTIONS``: poisoning the resolver set
+    must still fail this check (26c — shared list would void the instrument).
+    """
+    if player is None or step_index is None or not skeleton:
+        return
+    steps = skeleton.get("steps") or []
+    if not (isinstance(step_index, int) and 0 <= step_index < len(steps)):
+        return
+    pid = str(getattr(player, "player_id", "") or "")
+    if not pid:
+        return
+    action = None
+    for pos, candidate in (off_lineup or {}).items():
+        if candidate is None:
+            continue
+        if candidate is player or str(getattr(candidate, "player_id", "") or "") == pid:
+            info = (steps[step_index].get("pos_actions") or {}).get(pos) or {}
+            action = ((info.get("action") or "").lower().strip() or None)
+            break
+    if action not in ("handle_ball", "receive", "shoot", "drive"):
+        raise AssertionError(
+            "dead-ball TO charged to %s (action=%r) who did not have the ball "
+            "on step %s" % (pid, action, step_index)
+        )
+
+
+def _apply_drive_contact_dead_ball_credit(roles, game_state, skeleton, off_lineup):
+    """Charge the driver for a drive-contact dead-ball TO.
+
+    Runs AFTER the zone / steal-setup RNG that still keys off the PG
+    fallback from get_ball_handler_from_skeleton. Swapping earlier
+    desyncs the stream. Consumes ``_hco_drive_contact_driver_id``.
+    """
+    drv_id = game_state.pop("_hco_drive_contact_driver_id", None)
+    if not drv_id or not roles:
+        return
+    driver = next(
+        (p for p in (off_lineup or {}).values()
+         if p is not None and str(getattr(p, "player_id", "") or "") == str(drv_id)),
+        None,
+    )
+    if driver is None:
+        return
+    roles["ball_handler"] = driver
+    roles["ball_handler_id"] = drv_id
+    stop_idx = (
+        game_state.get("steal_stop_step_index")
+        or game_state.get("turnover_stop_step_index")
+        or game_state.get("stop_step_index")
+    )
+    assert_dead_ball_victim_had_ball(skeleton, stop_idx, driver, off_lineup)
 
 
 def _get_fcp_hct_post_inbound_start_index(skeleton, game):
@@ -4735,6 +4812,12 @@ def _motion_bh_at_step(step):
     player, producing the doubled pass animation. The dynamic walk evaluates every step, so it
     lands on pass steps and must resolve the actual holder (the legacy resolver only sampled one
     random step, so it rarely hit this).
+
+    Drive is omitted on purpose. A pure drive step returns ``(None, None)`` so the
+    walk ``continue``s and ``drive_contact`` owns that beat (HCO S2b). That is
+    not the credit-resolver contract — ``get_ball_handler_from_skeleton`` treats
+    drive as possession. Do not add drive here to "match" the credit list; the
+    walk would start rolling moments on drive steps and move outcomes.
     """
     pos_actions = step.get("pos_actions") or {}
     for wanted in ("receive", "handle_ball", "pass"):
@@ -6804,6 +6887,7 @@ def _resolve_hco_offense_shot_dynamic(skeleton, game, off_lineup, def_lineup, is
     _moment_rt_map = {"STEAL": "STEAL", "DEAD BALL": "DEAD_BALL_TURNOVER",
                       "O_FOUL": "O_FOUL", "D_FOUL": "D_FOUL"}
     game_state.pop("_hco_moment_stop_index", None)  # clear any stale pin from a prior turn
+    game_state.pop("_hco_drive_contact_driver_id", None)  # credit stash; never leak into the next walk
 
     def _apply_dish_contest(decision, result, step, passer_pos):
         """§4 Stage 2: if the executed decision threw a pass (dish/kickout), contest it. On an
@@ -8021,6 +8105,8 @@ def resolve_half_court_offense_logic(game):
                 _drv_pos = next((p for p, a in _dpa.items()
                                  if ((a or {}).get("action") or "").lower() == "drive"), None)
                 _drv_id = getattr(off_lineup.get(_drv_pos), "player_id", None) if _drv_pos else None
+                if result == "DEAD_BALL_TURNOVER" and _drv_id:
+                    game_state["_hco_drive_contact_driver_id"] = _drv_id
                 stamp_foul_contact_rattle(
                     _dsteps[_dc_pin], [_walk.get("drive_contact_defender_id"), _drv_id])
                 logging.debug("💥 [DRIVE CONTACT] %s → %s (pin=%s def=%s driver=%s)",
@@ -8641,6 +8727,8 @@ def resolve_half_court_offense_logic(game):
             # Use result to determine turnover type (STEAL vs DEAD BALL vs SHOT_CLOCK)
             if result == "DEAD_BALL_TURNOVER":
                 turnover_type = "DEAD BALL"
+                _apply_drive_contact_dead_ball_credit(
+                    roles, game_state, skeleton, off_lineup)
             elif result == "SHOT_CLOCK_VIOLATION":
                 turnover_type = "SHOT_CLOCK"
             elif result == "STEAL":

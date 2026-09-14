@@ -193,8 +193,11 @@ played games** (published 1,905). Payload is ``start.ball.owner_player_id=A``,
 |---|---|---|---|
 | 3a HCT entry pass | 23 | one function | yes — walk-up or loop step 0, both men already present |
 | 3b catch-and-shoot | 23 | one function | yes — first micro beat, thread inbound owner |
-| item 47 fumble handover | 6 hops (was 8) | **STOPPED 2026-09-14** | no — not a real handover. All 6 are HCO ``drive_contact`` DEAD BALL: walk + anchor = driver; victim/flourish/fumble = stale PG fallback because ``get_ball_handler_from_skeleton`` does not treat ``drive`` as possession. Authoring a pass would invent a transfer. Upstream credit fix, not a fumble-beat pass. See bugs.md item 47. |
+| item 47 fumble handover | 10 hops this tree (published 8; 6 at ea2c382da) | **CLOSED 2026-09-14** | no — not a real handover. Credit fix: drive-contact payload writes the driver at the TO, after pre-credit RNG. Teaching the shared resolver ``drive`` moved scores/draws/team TO. 10→0 hops, PRP 48 held, team TO held. See bugs.md items 27 / 47. |
 | loose-ball trajectory | 46.2% of loose transitions | new authoring | no — parked ``coords``, no owners |
 
-Item 47 is not a Phase 2 pass. 3a is still one function if its intent gate
-holds. Loose is a different job and must not gate the attached handovers.
+Item 47 is not a Phase 2 pass (closed by the TO-credit write, 2026-09-14).
+3a is still one function if its intent gate holds. Run that gate before
+authoring: if the HCT walk never moved the ball to the loop BH, a pass
+payload invents the same lie item 47 would have. Loose is a different job
+and must not gate the attached handovers.

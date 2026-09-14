@@ -280,6 +280,16 @@ def test_bh_at_step_handle_ball_when_no_pass():
     assert _motion_bh_at_step(step) == ("PG", "key")
 
 
+def test_bh_at_step_omits_drive():
+    # Walk contract: a pure drive step has no holder so the walk skips and
+    # drive_contact owns the beat. Credit-resolver treats drive as possession
+    # separately (SKELETON_POSSESSION_ACTIONS). Do not unify the lists.
+    from BackEnd.engine.phase_resolution import _motion_bh_at_step
+    step = {"pos_actions": {"PG": {"location": "key", "action": "stationary"},
+                            "SG": {"location": "elbow", "action": "drive"}}}
+    assert _motion_bh_at_step(step) == (None, None)
+
+
 def test_hot_read_stamps_vo_on_initiation_step(monkeypatch):
     # The VO is currently disabled (HOT_READ_VO_ENABLED=False); flip it on to verify the
     # stamping pipeline is intact for when it's re-enabled.
