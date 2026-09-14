@@ -221,6 +221,10 @@
           errorEl.style.display = 'block';
           return;
         }
+        const modalTitle = document.getElementById('access-request-modal-title');
+        modalTitle.textContent = data.status === 'waitlisted'
+          ? "Thanks Coach — we're at capacity with the alpha. You're on the list, and we'll email your code when a spot opens."
+          : "Thanks Coach, we'll send your access code shortly.";
         document.getElementById('access-request-modal-backdrop').classList.add('open');
         document.getElementById('access-request-modal-backdrop').setAttribute('aria-hidden', 'false');
       } catch (err) {

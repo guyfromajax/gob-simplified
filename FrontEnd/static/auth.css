@@ -377,7 +377,7 @@ body::after {
   border-radius: 14px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
   padding: 26px 24px 24px;
-  max-width: 360px;
+  max-width: 400px;
   text-align: center;
   overflow: hidden;
 }

@@ -2626,11 +2626,9 @@ async function init() {
       try { return sessionStorage.getItem(introKey) === '1'; } catch (_) { return false; }
     })();
     Promise.all([
-      import('/js/shared/tutorialProgressThread.js'),
       alreadyShown ? Promise.resolve(null) : import('/js/shared/tutorialLineupModals.js'),
       import('/js/shared/attributeTour.js'),
-    ]).then(([{ mountTutorialProgress }, lineupModals, { showAttributeTour }]) => {
-      mountTutorialProgress('lineup');
+    ]).then(([lineupModals, { showAttributeTour }]) => {
       // After the intro modal dismisses, fire the attribute tour. The tour
       // has its own sessionStorage gate keyed by game_id — matches the
       // intro modal's pattern, so a fresh tutorial game = fresh tour while

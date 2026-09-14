@@ -26,7 +26,6 @@
  */
 
 import { getTeamSammyImage } from '/js/shared/teamCoachAsset.js';
-import { mountTutorialProgress } from '/js/shared/tutorialProgressThread.js';
 
 const USERNAME_HINT = '3–24 characters · letters, numbers, underscores';
 const DEFAULT_SUBTITLE = "Every coach in GOB needs a username. What should the league call you?";
@@ -97,9 +96,6 @@ export function openUsernameModal(opts = {}) {
   const initialUsername = typeof opts.initialUsername === 'string' ? opts.initialUsername : '';
 
   ensureStylesheets();
-  // Username step of the funnel — quiet progress thread updates.
-  try { mountTutorialProgress('username'); } catch (_) { /* non-fatal */ }
-
   const overlay = document.createElement('div');
   overlay.className = 'gob-modal-overlay';
   overlay.setAttribute('role', 'dialog');

@@ -23,9 +23,6 @@
 
 import { showSammyModal } from '/js/shared/sammyModal.js';
 import { playAdvance, playSelect } from '/js/shared/uiSfx.js';
-import { mountTutorialProgress } from '/js/shared/tutorialProgressThread.js';
-
-mountTutorialProgress('opponent');
 
 const listEl = document.getElementById('opp-list');
 const ctaEl = document.getElementById('opp-cta');

@@ -23,13 +23,10 @@
  */
 
 import { getTeamSammyImage } from '/js/shared/teamCoachAsset.js';
-import { mountTutorialProgress } from '/js/shared/tutorialProgressThread.js';
 import { playAdvance } from '/js/shared/uiSfx.js';
 
 const DEFAULT_OPPONENT = 'Xavien';
 const XAVIEN_FALLBACK_OPPONENT = 'South Lancaster';
-
-mountTutorialProgress('tipoff');
 
 function deriveOpponent(userTeam) {
   if (!userTeam) return DEFAULT_OPPONENT;

@@ -27,6 +27,7 @@ before the tip.
 | What | v2 | v3 |
 |---|---|---|
 | Steps | 6 + complete | **8 + complete** (`opponent_pick`, `game_plan` added) |
+| Progress thread | 6-dot strip at screen bottom | **removed entirely** (2026-09-12) |
 | Tip-off position | before lineup | **after lineup AND game plan** |
 | Screen order | — | opponent → **lineup → game plan** → tip |
 | Game start | Q4, 4:00, 60-60, fabricated 3Q stats | **Q1, 0-0, no stat overlay** |
@@ -42,9 +43,23 @@ before the tip.
 init-game now runs four hops before the court, so a refresh that lost the id would
 mint a second game and orphan the first.
 
-**Retired:** `apply_tutorial_initial_state()` (the whole mid-Q4 overlay) and
-`resume_from_timeout` on the tutorial path — v3 starts at the opening tip, so there is
-no timeout to resume.
+**Retired:** `apply_tutorial_initial_state()` (the whole mid-Q4 overlay),
+`resume_from_timeout` on the tutorial path (v3 starts at the opening tip, so there is
+no timeout to resume), and the **progress thread**.
+
+### Progress thread — deleted 2026-09-12
+
+`js/shared/tutorialProgressThread.js` and `css/tutorial-progress.css` are **gone**, not
+disabled. The strip pinned itself to the bottom of every funnel screen and overlapped
+the action buttons — on Game Plan it sat on top of PLAY NOW.
+
+It was FTE-only, so removing the seven call sites (persona intro, team select,
+usernameModal, pick opponent, set lineup, game plan, tip-off) left both files with no
+consumers. Deleted rather than parked: this project has been bitten by orphaned
+mechanisms before, and git holds the files if the strip is ever wanted back.
+
+**If you reintroduce it, do not re-pin it to the viewport bottom** — that is the bug
+that got it removed.
 
 ### ⚠️ The lineup travels by query string
 
@@ -129,9 +144,16 @@ Green = gating (advances game state). Orange = non-gating primary. In the FTE fl
 
 Universal button class system: `FrontEnd/static/css/gob-buttons.css` (`.gob-btn--action` / `--gate` / `--ghost`, plus `--lg`).
 
-### Progress thread
+### Progress thread — REMOVED 2026-09-12
 
-Quiet 6-dot indicator at the bottom of every funnel screen. Module: `FrontEnd/static/js/shared/tutorialProgressThread.js`; CSS: `FrontEnd/static/css/tutorial-progress.css`. Step IDs: `persona | program | username | tipoff | lineup | gameplay`. Hidden on `court.html` — `gameplay` is therefore never the active step; it always renders as a faint pending dot, signaling the final stop.
+**This section describes FTE v2 and no longer reflects the product.** Both files were
+deleted; see §0. What follows is kept only as the historical record.
+
+> ~~Quiet 6-dot indicator at the bottom of every funnel screen. Module:
+> `FrontEnd/static/js/shared/tutorialProgressThread.js`; CSS:
+> `FrontEnd/static/css/tutorial-progress.css`. Step IDs:
+> `persona | program | username | tipoff | lineup | gameplay`. Hidden on `court.html` —
+> `gameplay` is therefore never the active step.~~
 
 ---
 
@@ -285,7 +307,7 @@ Tutorial follows the `single` path through `finalizeGame.js` (no franchise/tourn
 | File | Purpose |
 |---|---|
 | `js/shared/teamCoachAsset.js` | Team → Sammy image path |
-| `js/shared/tutorialProgressThread.js` + `css/tutorial-progress.css` | 6-dot progress indicator |
+| ~~`js/shared/tutorialProgressThread.js` + `css/tutorial-progress.css`~~ | **DELETED 2026-09-12** — progress indicator, overlapped the action buttons |
 | `js/shared/tutorialLineupModals.js` + `css/tutorial-lineup-modal.css` | Set-lineup intro + post-lineup feedback modals; also exports `pickLineupFeedbackMessage` (the algorithm) |
 | `js/shared/attributeTour.js` + `css/attribute-tour.css` | First-run attribute-discovery tour on tutorial set-lineup (scrim + lifted header row + shimmer cues + Sammy coach-mark + X-of-N counter) |
 | `js/shared/coachMark.js` + `css/coach-mark.css` | Spotlight tooltip primitive — **available but not currently used in the FTE flow** (set-lineup intro switched to a centered Functional modal); kept for future tutorials |

@@ -823,13 +823,6 @@
     if (TUTORIAL_MODE) {
       if (els.backLink) els.backLink.style.display = 'none';
       if (els.tbEntry) els.tbEntry.hidden = true;
-      import('/js/shared/tutorialProgressThread.js')
-        .then(function (m) {
-          m.mountTutorialProgress('program');
-        })
-        .catch(function (e) {
-          console.warn('[tutorial] could not mount progress thread:', e);
-        });
     } else if (els.backLink) {
       els.backLink.addEventListener('click', function (event) {
         event.preventDefault();
