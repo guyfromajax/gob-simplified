@@ -61,6 +61,11 @@ from BackEnd.utils.alpha_otp_service import (
 RESET_LINK_BASE_URL = os.getenv("RESET_LINK_BASE_URL", "https://www.geekedoutbasketball.com")
 RESET_TOKEN_EXPIRY_HOURS = 1
 ACCESS_CODE_RATE_LIMIT_PER_HOUR = int(os.getenv("ALPHA_ACCESS_CODE_RATE_LIMIT_PER_HOUR", "3"))
+ACCESS_CODE_RECEIVED_MESSAGE = "Request received. We'll send your access code shortly."
+ACCESS_CODE_WAITLIST_MESSAGE = (
+    "Thanks Coach — we're at capacity with the alpha. "
+    "You're on the list, and we'll email your code when a spot opens."
+)
 
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -400,7 +405,7 @@ async def request_access_code(request: Request, body: RequestAccessCodeRequest):
         if not sent:
             logger.warning("Failed to resend alpha welcome email to %s", _redact_email(email))
         return JSONResponse(
-            content={"message": "Request received. We'll send your access code shortly."},
+            content={"message": ACCESS_CODE_RECEIVED_MESSAGE, "status": "sent"},
             status_code=200,
         )
 
@@ -411,7 +416,7 @@ async def request_access_code(request: Request, body: RequestAccessCodeRequest):
         if not sent:
             logger.warning("Failed to send waitlist email to %s", _redact_email(email))
         return JSONResponse(
-            content={"message": "Request received. We'll send your access code shortly."},
+            content={"message": ACCESS_CODE_WAITLIST_MESSAGE, "status": "waitlisted"},
             status_code=200,
         )
 
@@ -421,7 +426,7 @@ async def request_access_code(request: Request, body: RequestAccessCodeRequest):
         status = "waitlisted" if sent else "failed"
         _record_access_code_request(email=email, now=now, status=status)
         return JSONResponse(
-            content={"message": "Request received. We'll send your access code shortly."},
+            content={"message": ACCESS_CODE_WAITLIST_MESSAGE, "status": "waitlisted"},
             status_code=200,
         )
 
@@ -431,7 +436,7 @@ async def request_access_code(request: Request, body: RequestAccessCodeRequest):
         _record_access_code_request(email=email, now=now, status="failed", otp_code=otp_code)
         logger.warning("Failed to send alpha welcome email to %s", _redact_email(email))
         return JSONResponse(
-            content={"message": "Request received. We'll send your access code shortly."},
+            content={"message": ACCESS_CODE_RECEIVED_MESSAGE, "status": "failed"},
             status_code=200,
         )
 
@@ -444,7 +449,7 @@ async def request_access_code(request: Request, body: RequestAccessCodeRequest):
     )
     logger.info("Access code email sent to %s", _redact_email(email))
     return JSONResponse(
-        content={"message": "Request received. We'll send your access code shortly."},
+        content={"message": ACCESS_CODE_RECEIVED_MESSAGE, "status": "sent"},
         status_code=200,
     )
 

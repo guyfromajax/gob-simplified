@@ -181,9 +181,6 @@ if (modeParam === 'tutorial') {
     // Progress thread + Sammy. Dynamic import: game-plan.js is injected as a
     // CLASSIC script (game-plan.html sets script.onload), so static ESM import
     // syntax is unavailable here.
-    import('/js/shared/tutorialProgressThread.js')
-      .then((m) => m.mountTutorialProgress('gameplan'))
-      .catch(() => { /* non-fatal — the thread is decoration */ });
     import('/js/shared/sammyModal.js')
       .then((m) => m.showSammyModal({
         body: 'Set your strategy. Sliders have real tradeoffs.',

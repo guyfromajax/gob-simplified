@@ -9,13 +9,10 @@
  * navigate to /franchise-select-team.html?mode=tutorial.
  */
 
-import { mountTutorialProgress } from '/js/shared/tutorialProgressThread.js';
 import { playAdvance } from '/js/shared/uiSfx.js';
 
 const ctaBtn = document.getElementById('persona-intro-cta');
 const errorEl = document.getElementById('persona-intro-error');
-
-mountTutorialProgress('persona');
 
 // Lobby music — same track + volume as mode-select / franchise-select-team
 // so the audio feels continuous across the onboarding funnel. Each page

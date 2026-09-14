@@ -49,7 +49,9 @@ The new FTE v3 flow is **eight steps**, replacing the current seven-step FTE v2:
 | 7 | **Tip-off → Sim Full Game** | Tip-off modal → `court.html?mode=tutorial` | Broadcast presentation (~80–85s) |
 | 8 | **End of Game → Handoff** | EOG modal → `mode-select.html` | Franchise/mode-select entry (unchanged from v2) |
 
-**Progress thread:** Update to 8 dots. Step IDs: `persona | program | username | opponent | gameplan | lineup | tipoff | gameplay`. The `gameplay` dot is never active (same as v2 — it signals the final stop).
+**Progress thread:** ~~Update to 8 dots.~~ **SUPERSEDED 2026-09-12 — the progress thread
+was removed from FTE entirely.** It overlapped the action buttons. The backend step ids
+are unaffected; see §10.
 
 ### Explicitly OUT of FTE v3
 
@@ -279,7 +281,7 @@ The new FTE v3 flow is **eight steps**, replacing the current seven-step FTE v2:
 - Insert `opponent_pick` step between `username` and `gameplan` (or similar step name).
 - Update `TutorialStep` enum in `auth_routes.py`.
 - Update `routeToTutorial()` in `authBarInit.js` to route `opponent_pick` step to new page.
-- Update progress thread in `tutorialProgressThread.js` to 8 dots.
+- ~~Update progress thread in `tutorialProgressThread.js` to 8 dots.~~ **Superseded — the thread was deleted (§10).**
 
 **Game Plan modifications:**
 
@@ -412,7 +414,7 @@ These are **not blockers** — implementers should use judgment and document cho
 | 4 | Tutorial Game Plan was read-only by design | **Reversed.** Sliders interactive; the CTA saves via the existing `saveSettingsQuietly()` path, so the step cannot be left unsaved. |
 | 7 | Brief ordered Game Plan before Lineup | **Reversed 2026-09-11 (owner call):** roster first, then strategy. Lineup CTA `CONTINUE`, Game Plan CTA `PLAY NOW`. The lineup feedback modal's `RETURN TO GAME` became `CONTINUE` — it no longer returns to a game in progress. |
 | 5 | "Implementer should pick the most accurate existing metric" | **`total_player_attrs`** — but it was a stale derived cache, wrong on 128/128 teams and re-ordering all 16 conferences. Repaired by `scripts/recompute_total_player_attrs.py`. Ranking now lives server-side in one endpoint. |
-| 6 | Brief's step ids matched neither the enum nor the progress thread | **Added, not renamed.** Two enum values, two dots. `tutorial_state.step` is a live resume pointer; renaming would strand users. |
+| 6 | Brief's step ids matched neither the enum nor the progress thread | **Added, not renamed.** Two enum values added; `tutorial_state.step` is a live resume pointer and renaming would strand users. The progress thread itself was later **deleted** (see below), so only the enum ids remain. |
 
 ### Not in the brief, found during implementation
 
@@ -421,6 +423,7 @@ These are **not blockers** — implementers should use judgment and document cho
 - **`resume_from_timeout` is gone from the tutorial path.** v2 booted mid-Q4 out of a timeout and needed the SIP emission path; v3 starts at the tip.
 - **The lineup travels by query string** (`home_pg`/`home_sg`/…). Rebuilding the params at any hop drops it silently and empties the pre-game card. See `fte_system.md` §0.
 - **UX SFX had no shared module** — `playSound` was duplicated across six files, so new screens shipped silent by default. `js/shared/uiSfx.js` now owns it.
+- **The progress thread was deleted (2026-09-12).** Spec §2 called for an 8-dot thread; in practice it pinned to the viewport bottom and overlapped the action buttons, covering PLAY NOW on Game Plan. `tutorialProgressThread.js` + `tutorial-progress.css` removed along with all seven call sites. **§2's "Progress thread: update to 8 dots" is superseded.**
 
 ### Files
 
@@ -429,13 +432,16 @@ These are **not blockers** — implementers should use judgment and document cho
 | State machine | `BackEnd/api/auth_routes.py` (enum, `TutorialState`, step order, advance, `/me`, opponents endpoint) |
 | Game init | `BackEnd/api/api.py`, `BackEnd/db.py` (TTL), `BackEnd/constants/shot_threshold_scale.py` |
 | New screen | `tutorial-pick-opponent.{html,js}`, `css/tutorial-pick-opponent.css` |
-| Modified | `authBarInit.js`, `franchise-select-team.js`, `game-plan.{html,js,css}`, `set-lineup.js`, `tutorial-situation.js`, `tutorialLineupModals.js`, `tutorialProgressThread.js`, `bootGame.js` |
+| Modified | `authBarInit.js`, `franchise-select-team.js`, `game-plan.{html,js,css}`, `set-lineup.js`, `tutorial-situation.{html,js}`, `tutorialLineupModals.js`, `usernameModal.js`, `attributeTour.js`, `preGameExperience.js`, `bootGame.js` |
+| Deleted | `tutorialProgressThread.js`, `css/tutorial-progress.css` |
+| New (shared) | `js/shared/uiSfx.js` |
 | Guard | `tests/test_fte_v3_step_contract.py` (10 assertions) |
 | Migration | `scripts/recompute_total_player_attrs.py` |
 
 ### Still open
 
-- **Prod `total_player_attrs` has NOT been repaired.** Staging only. Ship FTE v3 to production without it and the opponent ranking is wrong. It also mis-feeds `franchise_rank_prestige` and Team Builder today.
+- ~~Prod `total_player_attrs` has NOT been repaired.~~ **DONE 2026-09-12** — `--db gob --apply`, 128/128 modified, verify clean. Both databases now correct.
+  **This is a derived cache that nothing recomputes.** Any future bulk rewrite of player attributes silently re-breaks it, and the failure is invisible: the opponent screen just ranks off a stale list. Re-run `scripts/recompute_total_player_attrs.py` after any such migration.
 - The 39 pre-existing orphan docs predate the TTL and will not be swept (they carry no expiry field). Harmless; left alone deliberately.
 
 ---
