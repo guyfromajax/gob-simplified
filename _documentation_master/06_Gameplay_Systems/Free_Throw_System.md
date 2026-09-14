@@ -215,7 +215,7 @@ Outcome-specific tails:
 | Step | Coords | T |
 |---|---|---|
 | `[make_hold]` | Ball at MSSS; all players stationary | `0.0` game-sec; `start.announcement` = `"It's Good!"` with `hold_ms=1000` (announcement drives the 1000ms wall-clock rim hold; FE's `runStepAnnouncement` pauses both clocks during the hold) |
-| **Non-final only** — return to shooter | Ball: MSSS → shooter's lane spot | `distance / 12` game-sec; ball reattaches to shooter for next FT |
+| **Non-final only** — `ft_return_teleport` | Instant snap MSSS → shooter's lane spot; ball reattaches | `T=0`; FE skips tween (`isFtReturnTeleportStep`). Schema-only exception. **DELIBERATE** (Jamie 2026-09-14). The prior `distance/12` travel is in the parent of `6257f7292` (2026-05-25), for whenever ref sprites arrive. |
 | **Final only** — implicit turn end | — | Routes to next turn (BIP / HCO / DREB / OREB depending on `next_play_type`) |
 
 #### Non-final MISS (4-step recovery)
@@ -224,8 +224,7 @@ Outcome-specific tails:
 |---|---|---|
 | 2. Bounce | Ball: rim → bounce_spot | `distance / 12` game-sec |
 | 3. Bounce hold | Ball stationary at bounce_spot | `1000ms / 350ms-per-game-sec ≈ 2.857` game-sec (= 1000ms wall) |
-| 4a. Baseline travel | Ball: bounce_spot → baseline OOB | `distance / 12` game-sec |
-| 4b. Fast return | Ball: baseline → shooter's lane spot | `distance / 40` game-sec (FB pass rate — snappy ball-boy return). Ball reattaches to shooter. |
+| 4. `ft_return_teleport` | Instant snap bounce_spot (or airball OOB) → shooter's lane spot; ball reattaches | `T=0`; FE skips tween (`isFtReturnTeleportStep`). Same **DELIBERATE** snap as the make-path return. Prior `distance/12` and `distance/40` travels were deleted in `6257f7292`; they live in that commit's parent. |
 
 #### Final MISS
 
@@ -247,7 +246,7 @@ Direction is **away from the basket toward midcourt**:
 - Away offense (rim x=9) → bounce x = **14**
 - Home offense (rim x=91) → bounce x = **86**
 
-Y stays at the rim y (25, centered). Baseline OOB spot in step 4a is `x=3` (away offense) / `x=97` (home offense), `y=25`.
+Y stays at the rim y (25, centered). Airball OOB rest (when the miss is an airball) is `x=3` (away offense) / `x=97` (home offense), `y=25` — then the same `ft_return_teleport` snap. There is no baseline-travel step.
 
 ---
 
