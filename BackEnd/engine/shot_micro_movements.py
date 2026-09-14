@@ -69,6 +69,7 @@ from BackEnd.utils.animation_step_helpers import (
     _euclid,
     _motion_end_toward_dest,
     _player_lookup_by_id,
+    attached_owner_id,
     dunk_make_sfx,
     dunk_miss_sfx,
     shot_result_sfx,
@@ -1688,6 +1689,45 @@ def inject_shot_micro_before_post_shot(
     )
 
 
+def carry_sa1_pass_onto_first_micro(
+    shoot_step: AnimationStep,
+    micro_steps: List[AnimationStep],
+    shooter_id: str,
+) -> bool:
+    """Copy an emit-authored catch-and-shoot transfer onto the first micro beat.
+
+    The glued shoot step may already be start.ball=passer / end.ball=shooter
+    (``_sa1_within_step_pass``). Replacing that step without this carry leaves
+    beat 0 attached to the shooter while the previous step ended on the passer.
+
+    Returns True when a transfer was carried. Does not touch sim_rng.
+    """
+    if not micro_steps:
+        return False
+    start = shoot_step.get("start") or {}
+    inbound = attached_owner_id(start.get("ball"))
+    outbound = attached_owner_id((shoot_step.get("end") or {}).get("ball"))
+    # Only an emit-authored transfer (start A, end shooter, pass style).
+    # A shoot step that is still attached to the passer at both ends is the
+    # unstamped truncate — carrying that would hide the hop and void the poison.
+    if not inbound or str(inbound) == str(shooter_id):
+        return False
+    if str(outbound) != str(shooter_id) or start.get("ball_motion_style") != "pass":
+        return False
+    first = micro_steps[0]
+    first_start = first.setdefault("start", {})
+    first_start["ball"] = {"owner_player_id": str(inbound)}
+    if start.get("ball_motion_style") == "pass":
+        first_start["ball_motion_style"] = "pass"
+    arrival = start.get("ball_arrival_coord")
+    if arrival:
+        first_start["ball_arrival_coord"] = arrival
+    for key in ("sfx_on_ball_release", "sfx_on_ball_arrival"):
+        if start.get(key):
+            first_start[key] = start[key]
+    return True
+
+
 def apply_shot_micro_steps_to_chain(
     steps: List[AnimationStep],
     turn_result: Dict[str, Any],
@@ -1781,6 +1821,12 @@ def apply_shot_micro_steps_to_chain(
     )
     if not micro_steps:
         return
+
+    if not travel_shoot:
+        # Emit already authored a within-step transfer on the shoot step
+        # (shot-at-1 discarded receive). :1804 replace would pin beat-0 start
+        # to the shooter and re-open the §8.4 seam. Carry the emit stamp.
+        carry_sa1_pass_onto_first_micro(shoot_step, micro_steps, shooter_id)
 
     if travel_shoot:
         _demote_travel_shoot_step(shoot_step, shooter_id)

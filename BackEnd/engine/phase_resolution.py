@@ -4216,6 +4216,79 @@ def _create_pass_receive_step(passer_pos, receiver_pos, passer_location, receive
     }
 
 
+def _shooter_pos_from_step(step):
+    for pos, info in ((step or {}).get("pos_actions") or {}).items():
+        if ((info or {}).get("action") or "").lower() == "shoot":
+            return pos
+    return None
+
+
+def _pass_receive_on_step(step):
+    """Return (passer_pos, receiver_pos) when the step is a same-step dish, else None."""
+    pa = (step or {}).get("pos_actions") or {}
+    passer = receiver = None
+    for pos, info in pa.items():
+        action = ((info or {}).get("action") or "").lower()
+        if action == "pass":
+            passer = pos
+        elif action == "receive":
+            receiver = pos
+    if passer and receiver:
+        return passer, receiver
+    return None
+
+
+def stamp_sa1_within_step_pass(pre_steps, j, truncated_steps):
+    """If shot-at-1 discarded a receive, stamp a within-step transfer on the glued shoot.
+
+    Animation only: ``_sa1_within_step_pass`` on ``truncated_steps[-1]``. Does not
+    restore pos_actions, does not add a step, does not touch derive_passer.
+    The viewer should see the ball arrive with the shooter (catch-and-shoot),
+    so the merge lands on the glued shoot step — not prefix j, which would
+    show the pass during an earlier cut and then a jump-cut to the shot.
+
+    Returns the stamp dict or None. Invariants (step count, pos_actions, shooter)
+    are checked; violations log and still return the stamp so a bad game does
+    not crash.
+    """
+    if not pre_steps or not truncated_steps or j is None or j < 0:
+        return None
+    discarded = pre_steps[j + 1 : -1]
+    if not discarded:
+        return None
+    shoot_step = truncated_steps[-1]
+    shooter_pos = _shooter_pos_from_step(shoot_step)
+    chosen = None
+    last_any = None
+    for step in discarded:
+        pair = _pass_receive_on_step(step)
+        if not pair:
+            continue
+        last_any = pair
+        if shooter_pos and pair[1] == shooter_pos:
+            chosen = pair
+    chosen = chosen or last_any
+    if not chosen:
+        return None
+
+    pre_n = len(truncated_steps)
+    pre_shooter = shooter_pos
+    pre_pa = dict(shoot_step.get("pos_actions") or {})
+    stamp = {
+        "passer_pos": chosen[0],
+        "receiver_pos": chosen[1],
+    }
+    shoot_step["_sa1_within_step_pass"] = stamp
+
+    if len(truncated_steps) != pre_n:
+        logging.error("[SA1 XFER] step count moved on stamp (%s -> %s)", pre_n, len(truncated_steps))
+    if dict(shoot_step.get("pos_actions") or {}) != pre_pa:
+        logging.error("[SA1 XFER] pos_actions mutated on stamp — assist path touched")
+    if _shooter_pos_from_step(shoot_step) != pre_shooter:
+        logging.error("[SA1 XFER] shooter identity moved on stamp")
+    return stamp
+
+
 def _create_shoot_step(shooter_pos, shooter_location, timestamp):
     """
     Create a step for shooting.
@@ -8195,6 +8268,12 @@ def resolve_half_court_offense_logic(game):
                         if j < 0:
                             j = 0
                         truncated_steps = steps[: j + 1] + [steps[-1]]
+                        # Animation-only: if the discarded middle held a receive, stamp a
+                        # within-step transfer on the glued shoot. j is unchanged; no new
+                        # step; pos_actions untouched (assist-neutral). Contest already
+                        # ran on the discarded dish (_apply_dish_contest) — this metadata
+                        # is not a pos_actions pass, so :8977 will not re-roll it.
+                        stamp_sa1_within_step_pass(steps, j, truncated_steps)
                         final_skeleton["steps"] = truncated_steps
                         game_state["shot_at_one_second"] = True
                         game_state["_shot_at_one_second_time_elapsed"] = shot_remaining - 1
@@ -8635,10 +8714,12 @@ def resolve_half_court_offense_logic(game):
         # Dynamic HCO: the per-step moment stashed the ACTUAL contesting defender (the man matchup
         # OR the resolved zone defender). PREFER it — override the defender-override block's
         # position-on-position recompute, which is wrong on ~half of non-shot outcomes (measured 69%
-        # in zone; hco_roles_audit.md Seam 3). The `and not roles.get("defender")` guard used to
+        # in zone; projects/Z-Completed/hco_roles_audit.md Seam 3). The `and not roles.get("defender")` guard used to
         # demote this to a never-taken fallback (the override block always pre-set roles["defender"]),
-        # so the credited defender + reach-in lunge landed on the wrong player. Attribution-only /
-        # draw-neutral: the recompute (incl. its zone-tie draw) still ran; we just keep the stash.
+        # so the credited defender + reach-in lunge landed on the wrong player. NOT draw-neutral, even
+        # though the recompute (incl. its zone-tie draw) still runs: the credited defender feeds fouls →
+        # foul-outs → substitutions (seeded check: 8 of 12 games diverged). Verify changes here
+        # distributionally, not by exact diff.
         _moment_def_id = game_state.pop("_hco_moment_defender_id", None)
         if _moment_def_id:
             for _dp in def_lineup.values():
