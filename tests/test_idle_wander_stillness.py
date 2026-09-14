@@ -90,6 +90,78 @@ def test_density_cap_is_respected():
     assert len(_wanderers(step)) == IDLE_STILL_DENSITY_CAP
 
 
+def _stamp_idle_independent_caps(steps, *, family, cap=IDLE_STILL_DENSITY_CAP, **kw):
+    """The item 30 leak: honour ``cap`` on THIS pass only, ignoring idlers already
+    on the step. Production used to do this; two HCO passes then summed to 10."""
+    from BackEnd.utils.animation_step_helpers import _idle_is_still, _idle_crc
+
+    for step in steps:
+        start = step.get("start") or {}
+        start_coords = start.get("coords") or {}
+        end_coords = (step.get("end") or {}).get("coords") or {}
+        flourish = start.get("flourish") or {}
+        still_now = [
+            pid for pid, sc in start_coords.items()
+            if _idle_is_still(sc, end_coords.get(pid))
+        ]
+        candidates = [pid for pid in still_now if pid not in flourish]
+        candidates.sort(key=lambda pid: _idle_crc(pid))
+        target = step.setdefault("start", {}).setdefault("flourish", {})
+        for pid in candidates[:cap]:
+            target[pid] = {"kind": "idle_wander", "family": family, "style": "survey_rock"}
+
+
+def test_two_still_player_passes_share_one_cap():
+    """HCO's real call pattern: hco_still over the whole list, then make_hold on
+    the make_hold beat. Before the fix the second pass took its own [:6] of the
+    remaining still men and the step carried 10. Poison: `_stamp_idle_independent_caps`
+    below exceeds the cap; this assertion is what catches it."""
+    ids = ["p%d" % i for i in range(10)]
+    start, end = _ten(ids, [])
+    live = _step(start, end, kind="make_hold")
+    stamp_idle_wander_on_still_players([live], family="hco_still")
+    stamp_idle_wander_on_still_players(
+        [live], family="make_hold", only_step_kinds=["make_hold"],
+    )
+    assert len(_wanderers(live)) <= IDLE_STILL_DENSITY_CAP
+    assert len(_wanderers(live)) == IDLE_STILL_DENSITY_CAP
+
+
+def test_no_step_carries_more_idlers_than_the_cap():
+    """THE GUARD. Any step after the still-player writer (one pass or two) must
+    carry at most IDLE_STILL_DENSITY_CAP idle_wander stamps."""
+    ids = ["p%d" % i for i in range(10)]
+    start, end = _ten(ids, [])
+    steps = [_step(start, end, kind="make_hold") for _ in range(3)]
+    stamp_idle_wander_on_still_players(steps, family="hco_still")
+    stamp_idle_wander_on_still_players(
+        steps, family="make_hold", only_step_kinds=["make_hold"],
+    )
+    for i, step in enumerate(steps):
+        n = len(_wanderers(step))
+        assert n <= IDLE_STILL_DENSITY_CAP, (
+            "step %d carried %d idlers; cap is %d" % (i, n, IDLE_STILL_DENSITY_CAP)
+        )
+
+
+def test_independent_per_pass_cap_poison_exceeds():
+    """ANTI-VACUITY for the guard. Two independent [:cap] slices on one step
+    produce more than six idlers. If this ever reports <= cap, the poison no
+    longer models item 30 and the guard is unproven."""
+    ids = ["p%d" % i for i in range(10)]
+    start, end = _ten(ids, [])
+    poisoned = _step(start, end, kind="make_hold")
+    _stamp_idle_independent_caps([poisoned], family="hco_still")
+    _stamp_idle_independent_caps([poisoned], family="make_hold")
+    n = len(_wanderers(poisoned))
+    assert n > IDLE_STILL_DENSITY_CAP, (
+        "poison produced %d idlers — it no longer exceeds the cap, so "
+        "test_no_step_carries_more_idlers_than_the_cap cannot fail on the leak"
+        % n
+    )
+    assert n == 10
+
+
 def test_excluded_players_and_existing_flourishes_are_left_alone():
     """The inbounding passer and the free-throw shooter have a real job. A player already
     carrying a reach_in must not have it overwritten. Poisoned by removing the `pid not in

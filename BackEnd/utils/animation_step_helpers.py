@@ -124,8 +124,14 @@ def stamp_idle_wander_on_still_players(
     min_step_ms: float = IDLE_STILL_MIN_STEP_MS,
     default_style: str = IDLE_STILL_DEFAULT_STYLE,
 ) -> int:
-    """Give every STILL player on ``steps`` a render-space ``idle_wander`` flourish. Returns the
+    """Give still players on ``steps`` a render-space ``idle_wander`` flourish. Returns the
     number of player-stamps written.
+
+    ONE DENSITY CAP, PER STEP. ``cap`` bounds the total concurrent ``idle_wander`` stamps
+    already on the step plus the ones this pass writes. A second call (HCO's ``make_hold``
+    after ``hco_still``) must not take its own fresh ``[:cap]`` of the remaining still
+    men — that is item 30, 334 HCO/MAKE steps carrying 10 idlers. Arrival fill already
+    honoured the leftover headroom; this writer now does the same.
 
     ``family`` is stamped onto each flourish so ``animation_config.js`` can override style and
     amplitude per family without a backend round-trip.
@@ -189,6 +195,14 @@ def stamp_idle_wander_on_still_players(
             continue
 
         flourish = start.get("flourish") or {}
+        # ONE cap, per step, across every still-player pass. A second family
+        # (HCO's make_hold after hco_still) used to take its own [:cap] of the
+        # remaining still men and the court carried 10 idlers. Arrival fill
+        # already counted existing idle_wander; this pass did not.
+        existing_idlers = sum(
+            1 for f in flourish.values()
+            if isinstance(f, dict) and f.get("kind") == "idle_wander"
+        )
         candidates = [
             pid for pid in still_now
             if pid not in excluded
@@ -199,7 +213,10 @@ def stamp_idle_wander_on_still_players(
             continue
         candidates.sort(key=lambda pid: (-still_runs.get(pid, 0), _idle_crc(pid)))
         if cap is not None and cap >= 0:
-            candidates = candidates[:cap]
+            headroom = cap - existing_idlers
+            if headroom <= 0:
+                continue
+            candidates = candidates[:headroom]
 
         target = step.setdefault("start", {}).setdefault("flourish", {})
         for pid in candidates:

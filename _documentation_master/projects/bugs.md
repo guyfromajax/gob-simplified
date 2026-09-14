@@ -1425,14 +1425,42 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       identity, including for families with no gap at all. The emitter is called ~2x per HCO turn,
       so double-counting is the leading explanation. It is not being recorded as a loss.
 
-30. OPEN, pre-existing — the idle density cap is exceeded on the played arm
+30. CLOSED 2026-09-14 — the idle density cap leaked because two still-player passes
+      each honoured 6 independently
 
-      `IDLE_STILL_DENSITY_CAP` is 6, but **344 steps across 8 played games carry more than six
-      idlers**. Identical in both arms of the defect-2 gate (344 before, 344 after), so the
-      arrival fill does not cause it and does not worsen it — the fill shares one cap correctly.
-      The still-player pass itself is what exceeds it, presumably because several families stamp
-      the same step from different emitters and each only counts its own. Invisible until the
-      arm bug above was fixed, because HCO never emitted on the sim arm.
+      `IDLE_STILL_DENSITY_CAP` is 6, but **334 steps across 8 played games carried more than six
+      idlers** (published 344 on an earlier catalogue; same shape). Identical in both arms of the
+      defect-2 gate (344 before, 344 after), so the arrival fill does not cause it and does not
+      worsen it — the fill shares one cap correctly (`stamp_arrival_settle`
+      `animation_step_helpers.py:340-343` counts existing `idle_wander` and fills leftover
+      headroom).
+
+      **POPULATION.** The leak is per-step, not per-family and not per-turn. Census (played arm,
+      PLAYED=1, 8 seeds, `0xB40000` / `0x8F0000` identical): **334 / 334 over-cap steps are
+      `HCO/MAKE` carrying families `hco_still,make_hold` and exactly 10 idlers.** Arrival is on
+      none of them (`arrival_on_over=0`). `make_hold` stamps 1,336 = 334 × 4: the first pass
+      writes 6, the second writes 4 more of the remaining still men.
+
+      **CAUSE.** `stamp_idle_wander_on_still_players` (`animation_step_helpers.py:116`) applied
+      `candidates[:cap]` against *unstamped* still players and did not subtract idlers already
+      on the step. HCO calls it twice on the same list (`skeleton_step_emitter.py:2804`
+      `family="hco_still"`, then `:2815` `family="make_hold"` `only_step_kinds=["make_hold"]`).
+      Two independent caps sum past 6. HCT/FCP/OREB/FT/inbound each call once, so they held.
+
+      **FIX.** The still-player writer now counts existing `idle_wander` and slices leftover
+      headroom, same as arrival fill (`animation_step_helpers.py:202-219`). One cap bounds
+      total concurrent idlers per step. After: **0 / 8 games over the cap.** The 334 leaked
+      steps are now in the cap-6 bucket (11,247 at 6 + 334 at 10 → 11,581 at 6). `make_hold`
+      stamps dropped from 1,336 to 0 on the plays-seeded catalogue — the first pass had
+      already filled the cap, so the second pass correctly writes nothing.
+
+      **GATE.** Played arm, PLAYED=1, `scratch_gate_idle.py` (no plays seed), 8 seeds.
+      Flourish is the only key that differed, all 8. Draws 1,134,978 = 1,134,978. Steps
+      15,986 = 15,986. Stamp-count delta **−848** (71,708 → 70,860) at the shipped cap of 6.
+      No second key. No frame-time counter in this harness; draws and step counts held, so
+      the sim clock did not move. Guard: `tests/test_idle_wander_stillness.py` — two
+      HCO-shaped passes stay at 6; the independent-`[:cap]` poison produces 10.
+      Pytest: `-o addopts= --maxfail=99`, 27 passed.
 
 31. BLAST RADIUS of the PLAYED=1 shim bug (item 29) — audited 2026-09-09, no re-measurement yet
 
