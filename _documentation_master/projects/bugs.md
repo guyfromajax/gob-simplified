@@ -3050,6 +3050,19 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     not treat a future census of 30/28 as a reopen of the empty-string
     omit.
 
+58. **LOGGED, NOT FIXED, pre-balance — O_FOUL still charges the fabricated PG.**
+    2026-09-14. Same root as the drive-contact D_FOUL / FT write
+    (`get_ball_handler_from_skeleton` omits `drive`, stop-step fallback
+    invents the PG). Different consumer: `select_foul_player`
+    (`phase_resolution.py:618-628`) 60%-weights the ball handler on an
+    offensive foul, so the invented PG is the one who "commits an
+    offensive foul." Measured on the wrap arm: 2 of 20 surviving
+    drive-pin fouls per 8 games. The D_FOUL narrow write
+    (`_apply_drive_contact_foul_credit`) does not stash on O_FOUL and
+    does not touch this function. Teaching the resolver `drive` would
+    fix it and would move IQ / zone draws. Do not fold it into the
+    D_FOUL consume. Balance pass.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 

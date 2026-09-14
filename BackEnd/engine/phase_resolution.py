@@ -356,7 +356,8 @@ def _find_most_recent_shot_turn(game, max_turns=10):
 # team TO totals (shot-clock IQ at the explicit drive pin, then the
 # zone-defender random.choice that keys off the returned BH). Credit
 # the driver from the drive-contact payload AFTER that RNG, via
-# _apply_drive_contact_dead_ball_credit.
+# _apply_drive_contact_dead_ball_credit (TOs) and
+# _apply_drive_contact_foul_credit (D_FOUL text / FT shooter).
 #
 # Distinct from _motion_bh_at_step (receive > handle_ball > pass, no
 # drive) so the walk skips drive steps and drive_contact owns them.
@@ -449,6 +450,36 @@ def assert_dead_ball_victim_had_ball(skeleton, step_index, player, off_lineup):
         )
 
 
+def assert_fouled_handler_had_ball(skeleton, step_index, player, off_lineup):
+    """The player named as the fouled man must have had the ball on that step.
+
+    Same literal accept list as assert_dead_ball_victim_had_ball (26c — do
+    not share SKELETON_POSSESSION_ACTIONS). A pin on a drive step that
+    names the PG is the foul/FT twin of symptom #3 mechanism C.
+    """
+    if player is None or step_index is None or not skeleton:
+        return
+    steps = skeleton.get("steps") or []
+    if not (isinstance(step_index, int) and 0 <= step_index < len(steps)):
+        return
+    pid = str(getattr(player, "player_id", "") or "")
+    if not pid:
+        return
+    action = None
+    for pos, candidate in (off_lineup or {}).items():
+        if candidate is None:
+            continue
+        if candidate is player or str(getattr(candidate, "player_id", "") or "") == pid:
+            info = (steps[step_index].get("pos_actions") or {}).get(pos) or {}
+            action = ((info.get("action") or "").lower().strip() or None)
+            break
+    if action not in ("handle_ball", "receive", "shoot", "drive"):
+        raise AssertionError(
+            "foul/FT credited to %s (action=%r) who did not have the ball "
+            "on step %s" % (pid, action, step_index)
+        )
+
+
 def _apply_drive_contact_dead_ball_credit(roles, game_state, skeleton, off_lineup):
     """Charge the driver for a drive-contact dead-ball TO.
 
@@ -474,6 +505,47 @@ def _apply_drive_contact_dead_ball_credit(roles, game_state, skeleton, off_lineu
         or game_state.get("stop_step_index")
     )
     assert_dead_ball_victim_had_ball(skeleton, stop_idx, driver, off_lineup)
+
+
+def _apply_drive_contact_foul_credit(roles, game_state, off_lineup, skeleton=None):
+    """Name the driver as the fouled man on a drive-contact D_FOUL.
+
+    Runs at the top of resolve_non_shooting_foul, AFTER the zone /
+    select_foul_player RNG that still keys off the PG fallback.
+    Consumes ``_hco_drive_contact_driver_id``. Absence of the stash
+    is a no-op (rule 26 — do not guess).
+    """
+    drv_id = game_state.pop("_hco_drive_contact_driver_id", None)
+    if not drv_id or not roles:
+        return
+    driver = next(
+        (p for p in (off_lineup or {}).values()
+         if p is not None and str(getattr(p, "player_id", "") or "") == str(drv_id)),
+        None,
+    )
+    if driver is None:
+        return
+    fabricated = roles.get("ball_handler")
+    fabricated_id = getattr(fabricated, "player_id", None) if fabricated is not None else None
+    if str(fabricated_id or "") != str(drv_id):
+        logging.warning(
+            "[DRIVE-CONTACT FOUL] ball_handler %s (%s) -> driver %s (%s)",
+            fabricated_id,
+            get_name_safe(fabricated) if fabricated is not None else None,
+            drv_id,
+            get_name_safe(driver),
+        )
+    roles["ball_handler"] = driver
+    roles["ball_handler_id"] = drv_id
+    if skeleton is None:
+        steps = roles.get("steps")
+        skeleton = roles.get("skeleton") or ({"steps": steps} if steps else None)
+    stop_idx = (
+        game_state.get("steal_stop_step_index")
+        or game_state.get("turnover_stop_step_index")
+        or game_state.get("stop_step_index")
+    )
+    assert_fouled_handler_had_ball(skeleton, stop_idx, driver, off_lineup)
 
 
 def _get_fcp_hct_post_inbound_start_index(skeleton, game):
@@ -785,6 +857,7 @@ def resolve_non_shooting_foul(roles, game, time_elapsed_override=None):
     time_elapsed_override: if provided (e.g. situational Force Foul), use instead of tempo-based time.
     """
     game_state, off_team, def_team, off_lineup, def_lineup = unpack_game_context(game)
+    _apply_drive_contact_foul_credit(roles, game_state, off_lineup)
     foul_team = off_team if game_state["foul_team"] == "OFFENSE" else def_team
     
     ball_handler = roles["ball_handler"]
@@ -8178,7 +8251,7 @@ def resolve_half_court_offense_logic(game):
                 _drv_pos = next((p for p, a in _dpa.items()
                                  if ((a or {}).get("action") or "").lower() == "drive"), None)
                 _drv_id = getattr(off_lineup.get(_drv_pos), "player_id", None) if _drv_pos else None
-                if result == "DEAD_BALL_TURNOVER" and _drv_id:
+                if result in ("DEAD_BALL_TURNOVER", "D_FOUL") and _drv_id:
                     game_state["_hco_drive_contact_driver_id"] = _drv_id
                 stamp_foul_contact_rattle(
                     _dsteps[_dc_pin], [_walk.get("drive_contact_defender_id"), _drv_id])
