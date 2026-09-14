@@ -1580,7 +1580,12 @@ export async function playAnimationStep(scene, step, sprites, ballSprite, option
       startBallCoord && endBallCoord &&
       Math.abs(startBallCoord.x - endBallCoord.x) < 1e-6 &&
       Math.abs(startBallCoord.y - endBallCoord.y) < 1e-6;
-    if (tweenWouldEarlyReturn) {
+    // RIM-start rattle hop 0 covers zero distance by geometry (flight end
+    // is already the first hop target). Do not fire rattle-leather on a
+    // snap that never moves. Other zero-distance arrivals (DREB attach)
+    // still use this fallback.
+    const hopKind = step.start?.advance_trigger?.metadata?.kind;
+    if (tweenWouldEarlyReturn && hopKind !== "rattle_hop") {
       playGameSfx(
         scene,
         arrivalSfx.file,

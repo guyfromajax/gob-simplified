@@ -2981,6 +2981,13 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     `AIRBALL_OOB_*` or FLSS OOB, T≈1.14). The static counts were
     incoming seams. Do not reopen from a loose-ball census.
 
+56. **Rattle-hop arrival cue suppressed on zero-distance hops, 2026-09-14.**
+    101 Played / 82 wrap RIM-start hops have hop 0 start = first hop
+    target. The step-end fallback at `animationPlayback.js:1570` was
+    firing `rattle-leather.wav` on a snap that never moves. Guard:
+    `hopKind !== "rattle_hop"`. Step not dropped. Deletion of the hops
+    themselves is Phase 3 with item 28 + item 37.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
