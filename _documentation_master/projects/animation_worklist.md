@@ -174,3 +174,28 @@ and a `|| []` guard would have hidden exactly those 5. **Worth considering as it
 schema→legacy fallback, surfaced rather than swallowed, so the rate is visible instead of
 inferred. Today a fallback is indistinguishable from normal operation until a user reports a
 teleport.
+
+---
+
+## Phase 2 — within-step ball travel (scoped 2026-09-14, not started)
+
+Founder's Mode moved to 1 Nov. Phases 2–4 move outcomes and must land before Jamie's
+balance pass. Full diagnostic: [`bugs.md`](bugs.md) item 50. **No design and no code
+in that entry — what exists, and what each application would take.**
+
+The mechanism is already live: **1,938 within-step attached A→B transfers per 8
+played games** (published 1,905). Payload is ``start.ball.owner_player_id=A``,
+``end.ball.owner_player_id=B``, ``ball_motion_style="pass"``,
+``ball_arrival_coord``. Writer: ``_walk_ball_owners`` + the HCO emit loop
+(``skeleton_step_emitter.py:375``, ``:2242``, ``:2574``). Not ``BallInFlight``.
+
+| application | n | cost | use the 1,905 as-is? |
+|---|---|---|---|
+| 3a HCT entry pass | 23 | one function | yes — walk-up or loop step 0, both men already present |
+| 3b catch-and-shoot | 23 | one function | yes — first micro beat, thread inbound owner |
+| item 47 fumble handover | 8 | one function | yes — cheapest; start owner only |
+| loose-ball trajectory | 46.2% of loose transitions | new authoring | no — parked ``coords``, no owners |
+
+Fumble and 3a are cheap enough to reorder ahead of 3b. Loose is a different job
+and must not gate the three attached handovers. Jamie looks at Phase 1 A/B by
+eye before this opens.

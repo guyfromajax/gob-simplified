@@ -2700,6 +2700,86 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       move. No poison-stash / equiv-v3 arm. Reference remains
       ``094f36ca2`` [PLAYED] 75.16 / [SIM] 87.65.
 
+50. **PHASE 2 SCOPE — the 1,905 within-step transfers already exist. Diagnostic only,
+      2026-09-14.** Played arm, PLAYED=1, PYTHONHASHSEED=0, 8 seeds, Lancaster vs
+      Bentley-Truman, ``game_id`` ``0xB40000`` (item 48 catalogue). Live count on this
+      HEAD: **1,938** accounted within-step attached A→B transfers (published 1,905 after
+      item 49; +33 is catalogue/HEAD drift, not a new writer). Detectors fired 8/8.
+      Mirrored in [`animation_worklist.md`](animation_worklist.md) § Phase 2.
+
+      **1. WHAT AUTHORS THEM.** They are not ``BallInFlight``. 0 / 1,938 carry
+      ``from_player_id`` / ``to_player_id``. The payload is:
+
+          start.ball = {owner_player_id: A}
+          end.ball   = {owner_player_id: B}
+          start.ball_motion_style = "pass"          # 1,905 / 1,938
+          start.ball_arrival_coord = meet point     # 1,904 / 1,938
+          start.action includes pass and/or receive # 1,911 / 1,938
+
+      Writer: ``_walk_ball_owners`` (``skeleton_step_emitter.py:375``) produces
+      ``(start_owner_pos, end_owner_pos)``; the emit loop resolves ids
+      (``:2182-2249``) and, when they differ, sets ``is_pass_step`` (``:2299-2303``),
+      stamps ``ball_motion_style="pass"`` and ``ball_arrival_coord`` via
+      ``_compute_pass_meet_point`` (``:2574-2607``, helper at ``:2822``). The FE
+      (``animationPlayback.js`` ``isSchemaPassStep`` + ``renderBallTransition``)
+      detaches, tweens A→B, and ``snapBallToEndState`` re-parents to B.
+
+      The other 33 have the A→B owner pair and no ``ball_motion_style``: 24 are
+      ``post_steal_hco_transition`` (item 49's end-only attach, now a within-step
+      transfer); 9 have neither pass action nor that kind. HCT's
+      ``_build_loop_step`` (``dynamic_hct_step_emitter.py:357``) uses the same
+      attached-owner shape for a *single* owner (start = end), not a transfer.
+
+      **2. CAN 3a / 3b / FUMBLE USE IT AS-IS?** Yes, as a payload shape. None of
+      the three currently authors start A / end B on the beat that hops.
+
+      - **3a (HCT entry, 23).** Walk-up (``transition_bridge.py:351``,
+        ``bh_id=walk_up_bh_id`` from ``dynamic_hct_step_emitter.py:1118``) ends
+        attached to the prior BH. Loop step 0 (``_build_loop_step:357``, owner
+        from ``:1243-1244``) starts attached to the play BH. Both players are
+        already on the step. Express the handover on *one* of those two steps
+        (start A, end B, ``ball_motion_style="pass"``, meet-point) instead of
+        leaving the swap on the seam. No new mechanism.
+
+      - **3b (HCO shot-micro, 23).** ``shot_micro_movements.py:1563`` pins
+        ``owner_player_id`` to the shooter on the first micro beat; the
+        skeleton walk + emit (``:2242-2248``) is then replaced (``:1804``).
+        The passer is the previous step's end owner and is on the floor.
+        First micro beat: start = that owner, end = shooter, plus pass
+        style / arrival. The writer must be handed the inbound owner — it
+        does not currently take one.
+
+      - **Fumble (item 47, 8).** ``dead_ball_fumble.py:149`` and ``:171`` set
+        start *and* end to ``ball_handler_id`` (the PG). The teammate who
+        actually held it is the previous step's end owner. Start = that
+        owner, end = PG. The flourish stays on the PG. ``isSchemaPassStep``
+        is optional here; ``renderBallTransition`` already tweens A→B when
+        the owner pair differs and the coords differ.
+
+      **3. WHAT THE LOOSE-BALL CASE NEEDS THAT THE ATTACHED CASE DOES NOT.**
+      Item 46: 4,233 / 9,167 consecutive *loose* transitions (46.2%) have a
+      position and do not move. Presence is perfect (11,509 / 11,509). This
+      is **not** the attached A→B mechanism with coords unauthored. Loose
+      boundaries omit ``owner_player_id`` and carry ``coords`` /
+      ``current_coords``. A static loose pair is the same encoding, parked.
+      Giving it motion means authoring a changing coord (or converting the
+      span to ``BallInFlight`` with ``from_player_id`` / ``to_player_id`` /
+      ``current_coords``). The 1,905 path cannot fill this — it requires
+      two owners.
+
+      **4. COST, PER APPLICATION.**
+
+      | application | cost | why |
+      |---|---|---|
+      | 3a HCT entry (23) | **one function** | One existing step already has both men; change two ball dicts + reuse ``_compute_pass_meet_point``. Not a config flag. |
+      | 3b catch-and-shoot (23) | **one function** | Same shape on the first micro beat, plus thread the inbound owner into the micro writer. Replace still drops the skeleton pass, so the micro beat has to carry it. |
+      | fumble handover (8) | **one function** | Cheapest of the four. Start-owner assignment only; end and flourish stay on the PG. |
+      | loose-ball trajectory (46.2%) | **new authoring** | Different payload, no owners to hang a pass on, per-family geometry (MAKE/MISS/FT already move some; DREB is one parked boundary). |
+
+      Fumble and 3a are cheap enough to pull ahead of 3b if Phase 2 is sequenced
+      by cost. Loose is a different job and should not gate the three attached
+      handovers. No Phase 2 code in this commit.
+
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
 
