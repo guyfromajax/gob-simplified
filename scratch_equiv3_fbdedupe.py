@@ -29,6 +29,42 @@ from BackEnd.utils import sim_random, training_random
 from BackEnd.models.game_manager import GameManager
 from BackEnd.main import simulate_quarter
 
+# Harness-only: match api.py:5741-5785. simulate_quarter never consumes
+# pending_computer_timeout. The live turn-by-turn API does, on the next
+# request, instead of calling simulate_macro_turn. Without this wrap the
+# PlayedState harvest leaves pending set and Pattern A skips BIP.
+PENDING_CONSUMED = [0]
+_ORIG_MACRO = GameManager.simulate_macro_turn
+
+
+def consume_pending_computer_timeout_like_api(gm):
+    """Same consume as api.py:5741-5785. Returns True if a timeout was created."""
+    pending = (getattr(gm, "game_state", None) or {}).get("pending_computer_timeout")
+    if not pending:
+        return False
+    gm.call_timeout(
+        calling_team=pending["calling_team"],
+        timeout_reason="COMPUTER",
+        rebuild_both_lineups=True,
+        game_id=getattr(gm, "game_id", None),
+    )
+    gm.game_state.pop("pending_computer_timeout", None)
+    PENDING_CONSUMED[0] += 1
+    return True
+
+
+def install_api_pending_timeout_consumption():
+    if getattr(GameManager.simulate_macro_turn, "_api_pending_consume", False):
+        return
+
+    def wrapped(self, *a, **k):
+        if consume_pending_computer_timeout_like_api(self):
+            return None
+        return _ORIG_MACRO(self, *a, **k)
+
+    wrapped._api_pending_consume = True
+    GameManager.simulate_macro_turn = wrapped
+
 GAMES = int(os.environ.get("PROBE_GAMES", "1"))
 SEED_BASE = int(os.environ.get("SEED_BASE", "8000"))
 OUT = os.environ["OUT"]
