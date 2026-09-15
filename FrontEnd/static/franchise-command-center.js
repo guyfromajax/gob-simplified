@@ -4648,6 +4648,8 @@ playNowBtn.addEventListener('click', async () => {
       window.SeniorTribute.start({
         players: seniors,
         season: tribute.season || commandCenterTopDataCache?.current_season || 1,
+        // Atmosphere only (one soft radial on the tribute host).
+        teamColor: normalizeHexColor(commandCenterTopDataCache?.primary_color) || undefined,
         onAdvance: async () => {
           let overlay = null;
           if (finishState === 'pending') {

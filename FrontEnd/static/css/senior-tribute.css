@@ -1,8 +1,21 @@
-/* Senior Tribute — season-advance slideshow + resolution roster.
-   Card motion matches Signing Day (slide in from the left). The player
-   headshot is the hero; there is no team-logo reveal and no skip chrome. */
+/* Senior Tribute — "Last Page" design.
+   Handoff: _documentation_master/projects/senior-tribute-handoff/ (senior-tribute-hifi.css).
+   Ported, not re-derived: lp-* → st-*, tokens scoped to the host instead of :root, the
+   prototype-only review dock and its .narrow / .rm preview fallbacks dropped (the host is
+   always the full viewport, so the media queries are the real thing).
+   Green appears ONLY on .st-advance. Titles are orange marks. */
 
 .st-host {
+  --ink: #f7f9ff;
+  --m2: rgba(255, 255, 255, 0.6);   /* stat labels, card meta — contrast floor on #080a10 */
+  --m3: rgba(255, 255, 255, 0.46);  /* eyebrows — contrast floor */
+  --hair: rgba(255, 255, 255, 0.1);
+  --rule: rgba(255, 255, 255, 0.16);
+  --orange: #F79420;
+  --display: 'Bebas Neue Pro', 'Bebas Neue', 'Arial Narrow', sans-serif;
+  --body: 'Inter', system-ui, sans-serif;
+  --st-team: #27408E;               /* overridden inline with the user team's primary colour */
+
   position: fixed;
   inset: 0;
   /* Full-screen takeover, like the load screen it replaces — so it must sit ABOVE
@@ -12,240 +25,159 @@
   z-index: 10010;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
+  color: var(--ink);
+  font-family: var(--body);
+  -webkit-font-smoothing: antialiased;
+  /* Team colour is atmosphere only: one soft radial, never behind a numeral or copy. */
   background:
-    radial-gradient(120% 78% at 50% 22%, rgba(39, 64, 142, 0.22), transparent 62%),
-    #080a10;
-  color: #f7f9ff;
+    radial-gradient(140% 110% at 84% 62%, color-mix(in srgb, var(--st-team) 24%, transparent), transparent 72%),
+    linear-gradient(180deg, #0a0c13, #06070c 70%);
 }
+.st-host *,
+.st-host *::before,
+.st-host *::after { box-sizing: border-box; }
 
-.st-top {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 22px 32px 0;
-}
+/* ---------- chrome ---------- */
+.st-bar { position: absolute; top: 0; left: 0; right: 0; height: 2px; background: rgba(255, 255, 255, 0.08); z-index: 6; }
+.st-bar i { display: block; height: 100%; width: 100%; background: #fff; transform-origin: left; transform: scaleX(0); }
+.st-bar i.run { animation: st-fill var(--hold, 6000ms) linear forwards; }
+@keyframes st-fill { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
-.st-brand small {
-  display: block;
-  font: 700 10px/1 'Inter', sans-serif;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.48);
-  margin-bottom: 6px;
-}
+.st-top { flex: 0 0 auto; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px clamp(18px, 2.6vw, 34px) 0; position: relative; z-index: 5; }
+.st-brand small { display: block; font: 700 9.5px/1 var(--body); letter-spacing: 0.18em; text-transform: uppercase; color: var(--m3); margin-bottom: 6px; }
+.st-brand b { font: 400 clamp(24px, 2.4vw, 31px)/1 var(--display); letter-spacing: 0.05em; }
+.st-count { font: 700 10px/1 var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--m3); font-variant-numeric: tabular-nums; padding-top: 4px; }
 
-.st-brand b {
-  font: 400 34px/1 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  letter-spacing: 0.06em;
-}
+/* ---------- slide ---------- */
+.st-stage { flex: 1; min-height: 0; position: relative; z-index: 2; }
+.st-slide { position: absolute; inset: 0; padding: 0 0 0 clamp(20px, 4.5vw, 58px); }
+.st-slide.out { animation: st-out 0.3s ease forwards; }
+@keyframes st-out { to { opacity: 0; transform: translateX(-46px); } }
 
-.st-prog {
-  font: 700 11px/1 'Inter', sans-serif;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.46);
-}
+.st-copy { position: absolute; left: clamp(20px, 4.5vw, 58px); bottom: clamp(28px, 7vh, 64px); width: calc(100% - min(46vw, 520px) - clamp(20px, 4.5vw, 58px)); min-width: 0; }
+.st-eyebrow { font: 700 9.5px/1 var(--body); letter-spacing: 0.24em; text-transform: uppercase; color: var(--m3); margin-bottom: clamp(10px, 2vh, 20px); }
+.st-name { font: 400 clamp(44px, 6.6vw, 96px)/0.86 var(--display); letter-spacing: 0.015em; margin: 0; text-wrap: balance; color: inherit; text-transform: none; }
+.st-name span { display: block; color: rgba(255, 255, 255, 0.44); }
+.st-name em { display: block; font-style: normal; }
+.st-name.long { font-size: clamp(34px, 4.6vw, 64px); }
+.st-hr { height: 1px; background: linear-gradient(90deg, var(--rule), rgba(255, 255, 255, 0)); margin: clamp(14px, 2.6vh, 26px) 0 clamp(12px, 2vh, 20px); max-width: 520px; }
+.st-stats { display: flex; max-width: 540px; }
+.st-stats u { text-decoration: none; padding-right: clamp(16px, 2.4vw, 30px); margin-right: clamp(16px, 2.4vw, 30px); border-right: 1px solid var(--hair); }
+.st-stats u:last-child { border-right: 0; margin-right: 0; padding-right: 0; }
+.st-stats em { display: block; font: 700 8.5px/1 var(--body); font-style: normal; letter-spacing: 0.18em; text-transform: uppercase; color: var(--m2); margin-bottom: 8px; }
+.st-stats b { font: 400 clamp(30px, 3.4vw, 44px)/1 var(--display); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.st-career { margin-top: clamp(14px, 2.4vh, 24px); font: 500 clamp(11px, 1vw, 12.5px)/1.5 var(--body); color: var(--m2); letter-spacing: 0.02em; font-variant-numeric: tabular-nums; }
+.st-titles { margin-top: clamp(12px, 2vh, 18px); display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.st-titles span { display: flex; align-items: center; gap: 7px; font: 700 9px/1 var(--body); letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255, 255, 255, 0.76); }
+.st-titles s { width: 6px; height: 6px; background: var(--orange); text-decoration: none; flex: 0 0 auto; }
 
-.st-stage {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 18px 32px 36px;
-}
+.st-shot { position: absolute; right: 0; top: 0; bottom: 0; width: min(46vw, 520px); display: flex; align-items: flex-end; justify-content: center; }
+.st-shot-num { position: absolute; bottom: clamp(14px, 3vh, 26px); left: 50%; transform: translateX(-50%); font: 400 min(330px, 42vh)/0.8 var(--display); color: rgba(255, 255, 255, 0.055); z-index: 0; }
+.st-shot img { position: relative; z-index: 1; height: 90%; width: auto; max-width: 100%; object-fit: contain; object-position: bottom center; display: block; filter: drop-shadow(0 30px 44px rgba(0, 0, 0, 0.6)); -webkit-mask-image: linear-gradient(180deg, #000 84%, transparent 99%); mask-image: linear-gradient(180deg, #000 84%, transparent 99%); }
+.st-noshot { position: relative; z-index: 1; align-self: flex-end; margin-bottom: 8%; text-align: center; }
+.st-noshot b { display: block; font: 400 min(190px, 26vh)/0.8 var(--display); color: rgba(255, 255, 255, 0.14); }
+.st-noshot small { display: block; margin-top: 14px; font: 700 9px/1 var(--body); letter-spacing: 0.2em; text-transform: uppercase; color: var(--m3); }
 
-.st-card {
-  width: min(560px, 100%);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  animation: st-slide 0.42s cubic-bezier(0.2, 0.75, 0.2, 1);
-}
+.st-slide.in .st-shot img,
+.st-slide.in .st-noshot { animation: st-shot-in 0.62s cubic-bezier(0.2, 0.8, 0.25, 1) both; }
+.st-slide.in .st-eyebrow { animation: st-up 0.5s cubic-bezier(0.2, 0.8, 0.25, 1) both; animation-delay: 60ms; }
+.st-slide.in .st-name { animation: st-up 0.55s cubic-bezier(0.2, 0.8, 0.25, 1) both; animation-delay: 90ms; }
+.st-slide.in .st-hr { animation: st-wipe 0.5s cubic-bezier(0.2, 0.8, 0.25, 1) both; animation-delay: 200ms; }
+.st-slide.in .st-stats { animation: st-up 0.5s cubic-bezier(0.2, 0.8, 0.25, 1) both; animation-delay: 240ms; }
+.st-slide.in .st-career { animation: st-up 0.5s cubic-bezier(0.2, 0.8, 0.25, 1) both; animation-delay: 300ms; }
+.st-slide.in .st-titles { animation: st-up 0.5s cubic-bezier(0.2, 0.8, 0.25, 1) both; animation-delay: 360ms; }
+.st-slide.in .st-shot-num { animation: st-fade 0.8s ease both; }
+@keyframes st-up { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+@keyframes st-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes st-wipe { from { opacity: 0; transform: scaleX(0.2); transform-origin: left; } to { opacity: 1; transform: none; } }
+@keyframes st-shot-in { from { opacity: 0; transform: translateY(18px) scale(1.015); } to { opacity: 1; transform: none; } }
 
-.st-shot {
-  width: min(320px, 62vw);
-  aspect-ratio: 0.72 / 1;
-  border-radius: 18px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  background: linear-gradient(165deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.02));
-  box-shadow: 0 28px 70px rgba(0, 0, 0, 0.55);
-}
+/* ---------- resolution ---------- */
+.st-res { flex: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; padding: clamp(8px, 1.6vh, 16px) clamp(16px, 3vw, 40px) clamp(18px, 3vh, 28px); position: relative; z-index: 2; }
+.st-head { text-align: center; animation: st-up 0.5s ease both; }
+.st-head h2 { font: 400 clamp(28px, 3.4vw, 42px)/1 var(--display); letter-spacing: 0.04em; margin: 0; color: inherit; text-transform: none; }
+.st-head small { display: block; font: 700 9.5px/1 var(--body); letter-spacing: 0.2em; text-transform: uppercase; color: var(--m2); margin-top: 9px; }
+.st-cards { flex: 1; min-height: 0; width: 100%; max-width: 1040px; margin: 0 auto; display: grid; grid-template-columns: repeat(var(--cols, 6), minmax(0, var(--cw, 154px))); justify-content: center; align-content: center; gap: clamp(12px, 2.2vh, 26px) 20px; }
+.st-card { min-width: 0; display: flex; flex-direction: column; align-items: center; animation: st-up 0.45s ease both; animation-delay: var(--d, 0ms); }
+.st-shotbox { position: relative; width: 100%; height: var(--sh, 154px); display: flex; align-items: flex-end; justify-content: center; border-bottom: 1px solid var(--rule); }
+.st-cnum { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); font: 400 calc(var(--sh, 154px) * 0.68)/0.8 var(--display); color: rgba(255, 255, 255, 0.06); }
+.st-shotbox img { position: relative; z-index: 1; height: 100%; width: auto; max-width: 100%; object-fit: contain; object-position: bottom center; display: block; filter: drop-shadow(0 12px 18px rgba(0, 0, 0, 0.6)); }
+.st-cinit { position: relative; z-index: 1; font: 400 calc(var(--sh, 154px) * 0.34)/1 var(--display); color: rgba(255, 255, 255, 0.3); padding-bottom: 8%; }
+.st-cnm { margin-top: 12px; font: 400 clamp(17px, calc(var(--cw, 154px) * 0.15), 44px)/1 var(--display); letter-spacing: 0.02em; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+.st-cmeta { margin-top: 5px; font: 600 8.5px/1 var(--body); letter-spacing: 0.16em; text-transform: uppercase; color: var(--m3); }
+.st-cst { margin-top: 11px; width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.st-cst u { text-decoration: none; text-align: center; border-left: 1px solid var(--hair); }
+.st-cst u:first-child { border-left: 0; }
+.st-cst em { display: block; font: 700 7.5px/1 var(--body); font-style: normal; letter-spacing: 0.1em; text-transform: uppercase; color: var(--m2); margin-bottom: 5px; }
+.st-cst b { font: 400 clamp(15px, calc(var(--cw, 154px) * 0.12), 30px)/1 var(--display); font-variant-numeric: tabular-nums; }
+.st-cti { margin-top: 9px; display: flex; gap: 3px; }
+.st-cti s { width: 5px; height: 5px; background: var(--orange); text-decoration: none; }
 
-.st-shot img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top center;
-  display: block;
-}
-
-.st-name {
-  font: 400 52px/1 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  letter-spacing: 0.03em;
-  text-align: center;
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.st-meta {
-  width: 100%;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  border: 1px solid rgba(255, 255, 255, 0.16);
-  border-radius: 14px;
-  overflow: hidden;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.st-meta div {
-  padding: 12px 6px;
-  text-align: center;
-  border-right: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-.st-meta div:last-child { border-right: 0; }
-
-.st-meta small {
-  display: block;
-  font: 700 8px/1 'Inter', sans-serif;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: rgba(255, 255, 255, 0.44);
-  margin-bottom: 6px;
-}
-
-.st-meta b {
-  font: 400 26px/1 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  font-weight: 400;
-}
-
-.st-titles {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-}
-
-.st-chip {
-  font: 700 10px/1 'Inter', sans-serif;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  padding: 7px 10px;
-  border-radius: 999px;
-  border: 1px solid rgba(52, 236, 39, 0.4);
-  background: rgba(52, 236, 39, 0.1);
-  color: #9dff5a;
-}
-
-.st-res {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 8px 28px 28px;
-}
-
-.st-res-list {
-  width: min(920px, 100%);
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.st-row {
-  display: grid;
-  grid-template-columns: 56px minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 1fr);
-  align-items: center;
-  gap: 14px;
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.03);
-}
-
-.st-row-shot {
-  width: 56px;
-  height: 72px;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.04);
-}
-
-.st-row-shot img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: top center;
-  display: block;
-}
-
-.st-row-nm {
-  font: 400 26px/1 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  letter-spacing: 0.03em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.st-row-stats {
-  font: 600 13px/1.2 'Inter', sans-serif;
-  color: rgba(255, 255, 255, 0.78);
-  letter-spacing: 0.02em;
-}
-
-.st-row-titles {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.st-row-titles .st-chip { padding: 5px 8px; font-size: 9px; }
-
-.st-advance {
-  margin-top: 18px;
-  height: 48px;
-  padding: 0 28px;
-  border-radius: 10px;
-  cursor: pointer;
-  border: 1px solid rgba(52, 236, 39, 0.55);
-  background: linear-gradient(180deg, #49ff37, #34ec27);
-  color: #06210a;
-  font: 400 20px/1 'Bebas Neue Pro', 'Bebas Neue', sans-serif;
-  letter-spacing: 0.05em;
-}
-
+/* The only green on this screen — the gating action. */
+.st-advance { flex: 0 0 auto; height: 46px; padding: 0 30px; border-radius: 10px; cursor: pointer; border: 1px solid rgba(52, 236, 39, 0.55); background: linear-gradient(180deg, #49ff37, #34ec27); color: #06210a; font: 400 21px/1 var(--display); letter-spacing: 0.06em; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.3), 0 10px 26px rgba(52, 236, 39, 0.18); animation: st-fade 0.4s ease both; animation-delay: var(--d, 300ms); }
 .st-advance:hover { background: linear-gradient(180deg, #6cff57, #3dff2c); }
 .st-advance:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
 .st-advance:disabled { opacity: 0.6; cursor: wait; }
 
-@keyframes st-slide {
-  from { opacity: 0; transform: translateX(-64px); }
-  to { opacity: 1; transform: none; }
+/* Portrait travelling from the last slide into its card. Body-level, so it must clear
+   the host's own z-index. */
+.st-flip { position: fixed; z-index: 10011; object-fit: contain; object-position: bottom center; pointer-events: none; filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.6)); }
+
+/* class-size buckets */
+.st-c-1 .st-cards { --cw: 300px; --sh: min(372px, 44vh); }
+.st-c-few .st-cards { --cw: 188px; --sh: min(240px, 29vh); }
+.st-c-many .st-cards { --cw: 154px; --sh: clamp(92px, 16vh, 154px); gap: clamp(10px, 1.8vh, 20px) 18px; }
+.st-c-many .st-cnm { margin-top: 9px; }
+.st-c-many .st-cst { margin-top: 8px; }
+.st-c-many .st-cti { margin-top: 7px; }
+
+/* ---------- phone ---------- */
+@media (max-width: 820px) {
+  .st-top { padding: 16px 18px 0; }
+  .st-slide { display: flex; flex-direction: column; padding: 0; }
+  .st-shot { position: relative; right: auto; top: auto; bottom: auto; width: 100%; flex: 1 1 auto; min-height: 0; margin-top: 6px; order: 1; }
+  .st-shot img { height: 100%; max-height: 44vh; -webkit-mask-image: linear-gradient(180deg, #000 90%, transparent 100%); mask-image: linear-gradient(180deg, #000 90%, transparent 100%); }
+  .st-shot-num { font-size: min(230px, 30vh); }
+  .st-copy { position: static; width: auto; padding: 0 20px 20px; flex: 0 0 auto; order: 2; }
+  .st-name { font-size: clamp(40px, 12vw, 56px); }
+  .st-name.long { font-size: clamp(30px, 8.4vw, 40px); }
+  .st-stats u { padding-right: 14px; margin-right: 14px; }
+  .st-stats b { font-size: 28px; }
+  .st-career { font-size: 11px; }
+  .st-res { padding: 10px 14px 18px; }
+  .st-cards { gap: 16px 10px; max-width: none; }
+  .st-cst em { display: none; }
+  .st-cst b { font: 600 12px/1 var(--body); color: rgba(255, 255, 255, 0.86); }
+  .st-c-1 .st-cards { --cols: 1; --cw: min(70vw, 300px); --sh: min(340px, 40vh); }
+  .st-c-few .st-cards { --cols: 3; --cw: 1fr; --sh: min(140px, 19vh); }
+  .st-c-many .st-cards { --cols: 4; --cw: 1fr; --sh: min(104px, 14vh); }
+  .st-c-many .st-cst b { font-size: 11px; }
+  .st-cnm { margin-top: 8px; font-size: 17px; }
+  .st-c-1 .st-cnm { font-size: 34px; }
+  .st-cmeta { font-size: 7.5px; margin-top: 4px; }
+  .st-cst { margin-top: 7px; }
+  .st-advance { width: 100%; max-width: 340px; height: 44px; font-size: 19px; }
 }
 
+/* short viewports: the sub-portrait type block joins the height budget */
+@media (max-height: 660px) {
+  .st-head small { margin-top: 6px; }
+  .st-cnm { font-size: clamp(15px, calc(var(--cw, 154px) * 0.13), 30px); margin-top: 7px; }
+  .st-cmeta { font-size: 7.5px; margin-top: 3px; }
+  .st-cst { margin-top: 6px; }
+  .st-cst em { font-size: 7px; margin-bottom: 3px; }
+  .st-cst b { font-size: clamp(13px, calc(var(--cw, 154px) * 0.1), 22px); }
+  .st-cti { margin-top: 5px; }
+  .st-c-1 .st-cards { --sh: min(372px, 38vh); }
+  .st-c-few .st-cards { --sh: min(240px, 26vh); }
+  .st-c-many .st-cards { --sh: clamp(72px, 12vh, 154px); }
+}
+
+/* reduced motion: entrances become a 150ms fade, the bar steps per slide, the portrait
+   FLIP is skipped (JS), the resolution renders fully formed. Cadence unchanged. */
 @media (prefers-reduced-motion: reduce) {
-  .st-card { animation: none; }
-}
-
-@media (max-width: 720px) {
-  .st-name { font-size: 36px; }
-  .st-row {
-    grid-template-columns: 48px minmax(0, 1fr);
-    grid-template-rows: auto auto auto;
-  }
-  .st-row-stats,
-  .st-row-titles { grid-column: 2; justify-content: flex-start; }
+  .st-host, .st-host * { animation: none !important; transition: none !important; }
+  .st-slide.in > * { animation: st-fade 0.15s ease both !important; }
+  .st-bar i { transform: scaleX(var(--step, 0)); }
 }

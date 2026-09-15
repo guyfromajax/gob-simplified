@@ -96,12 +96,47 @@ season-transition load screen. Module: `FrontEnd/static/js/shared/seniorTribute.
 | Layer | full-screen takeover above the auth bar: `.st-host` z-index **10010** (bar is 9998). Below modals/toasts (10020+), maintenance banner, `PageLoadOverlay` |
 | Advance while rollover still running | the season-transition cover (`.fcc-season-advance`, z 4000) is shown and the tribute is torn down — otherwise the cover would sit hidden behind it |
 
-**Per card:** headshot; career per-game points, rebounds, assists; career DEF%; titles won.
-**Resolution screen:** one row per player — headshot, name, stats, titles.
+Design: **"Last Page"** (handoff: `projects/senior-tribute-handoff/`).
+
+**Slide:** bottom-anchored editorial layout. Left — eyebrow `Class of Season N · #jersey · POS`,
+given name (muted) over surname, hairline rule, career PPG / RPG / APG / DEF%,
+`{games} games · {points} career points`, orange title marks. Right — the transparent portrait
+bleeding off the bottom edge with the jersey number ghosted behind. A 2px bar across the top
+fills over the hold. Slides overlap on change (outgoing fades/drifts left).
+
+**Resolution:** `Class of Season N` + `N seniors · thank you`, a centred grid of portrait cards
+(name, `POS · N games`, stat strip, one orange mark per title), then the green CTA. **Never
+scrolls.** The last slide's portrait travels into its card.
+
+**Payload per senior** (`BackEnd/utils/senior_tribute.py`): `player_id, name, first_name,
+last_name, rt, ppg, rpg, apg, def_pct, titles, jersey_number` (`meta.jersey`), `position`
+(best-rated key of `position_ratings`), `games_played` (`career.GP`), `career_points`
+(`career.PTS`). No "seasons with the program" field exists, so the career line omits it.
+
+**Fallbacks:** a failed portrait shows the jersey number (or initials) on the slide and initials
+on the card — never a broken image. A missing jersey omits `#NN` and the ghost numeral.
+
+**Green** appears only on the Advance button; titles are orange marks, never chips.
+**Team primary colour** is atmosphere only — one soft radial on the host (`teamColor` from FCC).
+**Reduced motion:** entrances are a 150ms fade, the bar steps per slide, no portrait FLIP. The
+6s cadence is unchanged.
 
 **Titles** are player-specific on `fpd.titles` (`conf_rs`, `conf_t`, `region`, `national`),
 incremented on the user team's active roster when a title is awarded. Future-forward only — no
 historical backfill. A title kind is hidden when its count is 0.
+
+#### Tunable Constants — Senior Tribute
+
+| Constant | Where | Value | Effect |
+|---|---|---|---|
+| `HOLD_MS` | `seniorTribute.js` | 6000 | Time per slide; the top bar fills over it |
+| `SLIDE_OUT_MS` | `seniorTribute.js` | 320 | When the outgoing slide is removed (CSS fade/drift is 300ms) |
+| `FLIP_MS` | `seniorTribute.js` | 520 | Last portrait's travel into its resolution card |
+| `CARD_STAGGER_MS` | `seniorTribute.js` | 55 | Delay between resolution cards arriving |
+| `CTA_AFTER_LAST_CARD_MS` | `seniorTribute.js` | 300 | CTA fade-in after the last card starts |
+| `LONG_NAME_CHARS` | `seniorTribute.js` | 18 | Above this the slide name steps down a size |
+| Class-size buckets | `senior-tribute.css` `.st-c-1/-few/-many` | 1 → 300px card · 2–6 → 188px, one column each · 7–12 → 6 columns × 154px | Card width + portrait height per class size |
+| Breakpoint | `senior-tribute.css` | 820px | Slide stacks; resolution goes to 3 (2–6) / 4 (7–12) columns, stat labels drop |
 
 ### Coaching focus habit counters (FTD)
 
