@@ -157,7 +157,7 @@ def test_non_drive_call_sites_do_not_write_the_stash():
     assert len(writers) == 1, writers
     assert "phase_resolution.py" in writers[0]
     assert "DEAD_BALL_TURNOVER" in writers[0] and "D_FOUL" in writers[0]
-    assert "O_FOUL" not in writers[0]
+    assert "O_FOUL" in writers[0]
 
 
 def test_resolve_non_shooting_foul_with_stash_names_driver(caplog):

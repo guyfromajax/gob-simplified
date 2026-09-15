@@ -3050,18 +3050,17 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
     not treat a future census of 30/28 as a reopen of the empty-string
     omit.
 
-58. **LOGGED, NOT FIXED, pre-balance — O_FOUL still charges the fabricated PG.**
-    2026-09-14. Same root as the drive-contact D_FOUL / FT write
-    (`get_ball_handler_from_skeleton` omits `drive`, stop-step fallback
-    invents the PG). Different consumer: `select_foul_player`
-    (`phase_resolution.py:618-628`) 60%-weights the ball handler on an
-    offensive foul, so the invented PG is the one who "commits an
-    offensive foul." Measured on the wrap arm: 2 of 20 surviving
-    drive-pin fouls per 8 games. The D_FOUL narrow write
-    (`_apply_drive_contact_foul_credit`) does not stash on O_FOUL and
-    does not touch this function. Teaching the resolver `drive` would
-    fix it and would move IQ / zone draws. Do not fold it into the
-    D_FOUL consume. Balance pass.
+58. **CLOSED — post-draw O_FOUL charge to the driver.** 2026-09-14. Same
+    root as the D_FOUL write (`get_ball_handler_from_skeleton` omits
+    `drive`). `select_foul_player` 60%-weights the fabricated BH; the
+    slot is correct, the identity is not. `_apply_drive_contact_o_foul_charge`
+    substitutes AFTER the draw when `foul_player` is that BH and the
+    drive-contact stash is present. Stash tuple at the pin now includes
+    `O_FOUL`. Does not rewrite `ball_handler` before the draw (that
+    desynced 7 of 8 seeds). Does not touch the 40% off-ball slot, the
+    resolver, IQ, or zone. Q1 at ``bbabe427d``: 3 Played / 2 wrap per 8
+    games; fabricated F incremented 3/3 and 2/2; wrap seed 5 Von Sanborn
+    fouled out on a later foul that needed the fabricated +1.
 
 ##Player Images
 1. AI player portrait production (confs 2–16) — see [`player_image_generator.md`](player_image_generator.md)
