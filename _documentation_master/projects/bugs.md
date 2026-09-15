@@ -2493,7 +2493,13 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       from a player, a shot spot, or a basket. A carry that would open
       a new loose-loose seam (incoming or onto an already-placed loose
       ball) is left unplaced — that is how seam-static stays
-      **3,185 / 3,185 Played and 2,203 / 2,203 wrap** (seam-moved 0/0).
+      **2,754 / 2,754 Played and 2,323 / 2,323 wrap** (seam-moved 0/0).
+      Re-recorded 2026-09-15 at HEAD after the O_FOUL path shift
+      (``98a4132c3``). The previous 3,185 / 2,203 pair moved with game
+      paths, not with any seam write. This invariant re-baselines
+      whenever a commit changes which turns exist; a changed count
+      after an outcome-moving commit is not a ball-continuity
+      regression.
       Encoding: both writers omit the key. Empty-string owners on this
       census: **0**. Unplaced after carry: **30 Played / 28 wrap**, all
       ``key_absent``. Those 30/28 stay: after an attached owner with no
