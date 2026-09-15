@@ -140,6 +140,23 @@ def run_arm(played: bool):
             sim_random.seed(seed)
             training_random.seed(seed)
             _stdlib.seed(seed)
+            if not getattr(sim_random.sim_rng, "_equiv_draws", None):
+                _box = [0]
+                _gb = sim_random.sim_rng.getrandbits
+                _rnd = sim_random.sim_rng.random
+
+                def _gb_c(k, _gb=_gb, _box=_box):
+                    _box[0] += 1
+                    return _gb(k)
+
+                def _rnd_c(_rnd=_rnd, _box=_box):
+                    _box[0] += 1
+                    return _rnd()
+
+                sim_random.sim_rng.getrandbits = _gb_c
+                sim_random.sim_rng.random = _rnd_c
+                sim_random.sim_rng._equiv_draws = _box
+            sim_random.sim_rng._equiv_draws[0] = 0
             gm = GameManager("Lancaster", "Bentley-Truman")
             d = {"defense": 2, "tempo": 2, "aggression": 2, "fast_break": 2,
                  "hc_trap": 5, "fc_press": 5}
@@ -157,11 +174,13 @@ def run_arm(played: bool):
             score = dict(gm.score or {})
             poss = sum(1 for t in turns if t.get("possession_flips"))
             aw, st, wi = ft_invariant(turns)
+            draws = getattr(sim_random.sim_rng, "_equiv_draws", None)
             rows.append({
                 "seed": seed, "err": err, "turns": len(turns),
                 "points_total": sum(score.values()),
                 "points_per_team": sum(score.values()) / 2.0,
                 "possessions": poss,
+                "draws": draws[0] if draws else None,
                 "ft_awards": aw, "ft_strict": st, "ft_windowed": wi,
             })
     finally:
