@@ -2507,9 +2507,11 @@ inline notes left in individual system docs. (Sunset-mode code removal also carr
       ``animation_step_helpers.py:572``, stamped in ``_append_turn``) is
       a real xy (20/20, 18/18). 22 / 14 have neither in the pre-fix
       payload. V2: the two named sites were the missed ``or ""`` writers.
-      One more unswept empty-owner site remains and is NOT in this
+      One more unswept empty-owner site remained and was NOT in this
       population: ``covert_release_step_emitter.py:1340``
       (``{"owner_player_id": ""}`` when ``fb_bh_id`` is missing).
+      Swept 2026-09-15 — the key is omitted, same as item 44 / ``bbabe427d``.
+      Measured zero on both footings; equiv-v3 n=40 vs ``c70f92ac1`` 80/80.
 
       Carry is a READ of those writes
       (``carry_ball_coord_continuity``). It does not compute a position
