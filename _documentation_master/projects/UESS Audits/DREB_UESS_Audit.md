@@ -1,5 +1,7 @@
 # DREB ↔ UESS Compliance Audit
 
+> **Findings as of 2026-07-05. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Date:** 2026-07-05 · **Scope:** DREB (defensive rebound → secure → possession flip; OTB-foul branch) · **Method:** read-only trace, 4 parallel audits (single-coord/OTB, clock/§5, ball-seam, player-coord) · **Audit only — no code changed.** · Turn #3 of the 11-turn UESS sweep (after HCO, Final Turn, OREB).
 
 ---

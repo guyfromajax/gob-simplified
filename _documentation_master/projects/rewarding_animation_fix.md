@@ -6,18 +6,24 @@
 >
 > ## 0. THE 57.48 / 67.88 SCORING REFERENCE IS SUPERSEDED. Do not tune against it.
 >
-> **Use [PLAYED] 75.16 / [SIM] 87.65 points per team, cut at `094f36ca2`** (bugs.md item 42,
-> equiv-v3, n=40, seeds 8000-8039).
+> **`094f36ca2` 75.16 / 87.65 and `bbabe427d` 75.76 / 83.69 are both RETIRED.** Tune against
+> **`b2982fce1`**: **[PLAYED] 74.97 ±2.91 / [SIM] 83.39 ±3.02** (bugs.md Phase 6, 2026-09-15).
+> Footing (rule 6e): equiv-v3 n=40, seeds 8000–8039, `scratch_equiv3_fbdedupe.py`,
+> Lancaster vs Bentley-Truman, sliders 2 / traps 5, plays catalogue SEEDED,
+> `PYTHONHASHSEED=0`, game_id `0xE0000+(seed-8000)`, published CI = 1.96 × SEM.
+> Played arm is `_is_full_simulation` false; wrap / [SIM] is `_is_full_simulation` true.
 >
-> The old pair is not merely out of date — **it is not comparable, and it does not describe a
-> real game.** It was cut with `plays_collection` EMPTY, so `plays_catalog.all_docs()` returned
-> nothing, every possession took the `turn_manager.py:2969` fallback and hardcoded an `"Inside"`
-> playcall, and **no off-ball destinations were authored for the four men without the ball.**
+> The 57.48 / 67.88 pair is not merely out of date — **it is not comparable, and it does not
+> describe a real game.** It was cut with `plays_collection` EMPTY, so `plays_catalog.all_docs()`
+> returned nothing, every possession took the `turn_manager.py:2969` fallback and hardcoded an
+> `"Inside"` playcall, and **no off-ball destinations were authored for the four men without
+> the ball.**
 >
 > **The catalogue is worth ~20 points per team — roughly twenty times the effect of the
-> fast-break fix that prompted the re-cut.** Measured on the same seeds, same harness: played
-> 56.33 with the catalogue empty against 75.16 with it seeded. Any tuning done against 57.48 was
-> tuning against a fixture artefact that dwarfs whatever was being tuned.
+> fast-break fix that prompted the item-42 recut.** Measured on the same seeds, same harness
+> at `094f36ca2` (historical, retired stick): played 56.33 with the catalogue empty against
+> 75.16 with it seeded. Any tuning done against 57.48 was tuning against a fixture artefact
+> that dwarfs whatever was being tuned.
 >
 > **PROVENANCE OF THE OLD PAIR IS `ASSUMED`, NOT VERIFIED.** The originating run cannot be found
 > — 57.48 / 67.88 appears nowhere in this repository's docs or commit history. That it was cut on
@@ -976,9 +982,14 @@ to 16 steps and a quintile is not comparable between them:
 > | the `bounce` empty beat | 51 steps x 300 ms, 12.0% of MISS wall | 455 steps (56.9/game) x 300 ms, 6.9% of MISS wall | 8.9x |
 >
 > **THE DECISION THIS REVERSES.** MISS was ranked 4th of 4 — below the `bounce` beat and below
-> the design work — on the strength of "4.8 s per game, the smallest remaining item". The real
-> visible slice is 39.8 s per game, which puts it ABOVE the `bounce` beat (17.1 s/game corrected)
-> and makes it the largest remaining defect after defect 2. The ranking table below is corrected.
+> the design work — on the strength of "4.8 s per game, the smallest remaining item". The
+> 2026-09-09 PLAYED re-measure put the visible slice at 39.8 s/game. **That 39.8 is
+> RETRACTED** (bugs.md item 32): 82% was correct basketball; genuine residue is 6.9 s/game.
+> The `bounce` 455 steps / 17.1 s "empty beat" is also **wrong** (item 28, Phase 3 clock
+> gate, 2026-09-14): **517 Played bounce steps, 517/517 the ball travels**, 0 wholly empty.
+> Footing (rule 6e): consuming worker, `PLAYED=1` (`_is_full_simulation` false) and
+> equiv-v3 wrap `PLAYED=0` (`_is_full_simulation` true), seeds 1–8, `0xB40000`,
+> `PYTHONHASHSEED=0`, consume wrap. Do not rank from 39.8 or 17.1.
 >
 > **WHAT SURVIVES UNCHANGED, and it is the important part.** The destination split still reads
 > **0.0% `elsewhere`** on the played arm (56.9% no destination, 43.1% already there, against a
@@ -1095,18 +1106,16 @@ converter fix, before defect 4 closed, and before any of these quantities existe
 | ~~1~~ | ~~defect 2, arrive-and-freeze~~ | ~~1,849.6 s/game dead tail~~ **[PLAYED]** (this doc originally published 524.5 **[SIM]**) — but the unit inverts, see banner | low if FILLED; high if STRETCHED |
 | ~~2~~ | ~~sequence item 5 / 6 — easing character, archetypes, stagger, emphasis~~ | never sized; **[N/A]** | design |
 | ~~3~~ | ~~MISS loose-ball stillness (item 19)~~ | ~~782 player-steps/game over 39.8 s~~ **[PLAYED]** — **RETRACTED, 82% of it was correct basketball** (bugs.md item 32); the genuine residue is 6.9 s/game | n/a, retracted |
-| ~~4~~ | ~~the `bounce` empty beat~~ | 455 steps (56.9/game) × 300 ms, content-free, 17.1 s/game **[PLAYED]** | low — deletion, step counts are principle 8 territory |
+| ~~4~~ | ~~the `bounce` empty beat~~ | ~~455 steps / 17.1 s content-free~~ — **WRONG.** Phase 3 clock gate 2026-09-14 (bugs.md item 28): **517 Played**, **517/517 ball travels**, 0 wholly empty. Wrap 433 (431 ball-moved). Footing: `PLAYED=1` / wrap `PLAYED=0`, seeds 1–8, `0xB40000`, consume wrap. Not a deletion candidate. | fill if wanted; do not delete |
 
 ~~**Defect 2 is not close to being closeable**~~ — it is the largest measured quantity in the
 workstream and 29.4% of its tails are visible pauses.
 
-**~~MISS comes back small enough to downgrade~~ — RETRACTED 2026-09-09.** That sentence was
-written off a sim-arm measurement. On the played arm MISS carries 782 visible loose-ball
-player-steps per game over 39.8 s, 8.3x what was published, which puts it above the `bounce`
-beat rather than below everything. Its cheap fix is still forbidden for the reason given — an
-idle loop over a live rebound would shrink the number while hiding the defect — so it remains
-expensive, but it is no longer small, and "expensive AND small" was the whole argument for
-deferring it.
+**~~MISS comes back small enough to downgrade~~ — RETRACTED 2026-09-09, and the 39.8 s
+re-rank is RETRACTED again (bugs.md item 32).** The 39.8 s/game figure is not a defect
+size: 82% of it is correct basketball. Residue is **6.9 s/game**. The `bounce` beat is
+not an empty 17.1 s counterweight (item 28): **517 Played steps, 517/517 the ball
+travels.** Do not restore a ranking that treats 39.8 as live or bounce as content-free.
 
 Sequence items 5 and 6 were out of scope for this measurement and are design rather than defect
 work. With defect 1 shipped and defect 4 closed they remain a large body of work, but they are
@@ -1247,10 +1256,13 @@ the two defects ahead of them are defect 2 and MISS.
 > continuity figure.
 >
 > **THIS CHANGE IS OUTCOME-AFFECTING and has had the full principle 8 treatment** — poison-stash,
-> distributional equiv-v3 at n=40, and a re-cut reference. See `bugs.md` item 42. The scoring
-> reference is now **[PLAYED] 75.16 / [SIM] 87.65 points per team, cut at `094f36ca2`**, which
-> supersedes 57.48 / 67.88. Anything tuned against the old pair was tuned against numbers this
-> change invalidates.
+> distributional equiv-v3 at n=40, and a re-cut reference. See `bugs.md` item 42. The item-42
+> stick at `094f36ca2` (**[PLAYED] 75.16 / [SIM] 87.65**) is **RETIRED**, as is `bbabe427d`
+> 75.76 / 83.69. Current baseline is **`b2982fce1`**: **[PLAYED] 74.97 ±2.91 / [SIM] 83.39
+> ±3.02** (bugs.md Phase 6). Footing (rule 6e): equiv-v3 n=40, seeds 8000–8039,
+> `scratch_equiv3_fbdedupe.py`, `PYTHONHASHSEED=0`, Played `_is_full_simulation` false /
+> wrap true, published CI = 1.96 × SEM. Anything tuned against 57.48 / 67.88 or against
+> those two retired sticks is tuned against a different footing.
 
 The largest single item in this workstream by measured size, and the reframe matters more than
 the code: **the tail is a deliberate decision, not a bug, and the fix is to fill it rather than

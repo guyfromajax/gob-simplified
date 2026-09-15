@@ -1,5 +1,7 @@
 # Free Throw (FT) — UESS Compliance Audit
 
+> **Findings as of 2026-07-05. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Verdict: largely compliant — the cleanest turn since SIP.** Clock is paused correctly (as clean as SIP), §1 is compliant in effect, and the lane formation is a properly gated/reachable rendered transition. Two parity gaps (backfill all-10 + `[UESS SEAM]` detector) + a couple of LOW nits. (2026-07-05, 4-dimension parallel trace.) **Sim-verifiable** (the mock produces FTs from fouls).
 
 ## Topline
@@ -34,7 +36,7 @@
 **Lower priority / optional:**
 - **#4:** give the made-final FT a proper `turn_stop` terminal (`_implicit_turn_end_next`), matching the miss path. Control-flow tidy.
 - **#5:** collapse the duplicated FT lane config to a single shared source (or add a test asserting they're equal) — prevents latent drift.
-- **#3** (entry ball-seed): optional — render the ref handoff (seed ball at prior rest → travel to shooter). Cosmetic; low value.
+- **#3** (entry ball-seed): **CLOSED BY DESIGN** (2026-09-14). See bugs.md item 53. Jamie confirmed the snap by eye; it stays. The prior `distance/12` travel lives in the parent of `6257f7292` (2026-05-25), for whenever ref sprites arrive. Do not restore a travel-to-shooter handoff.
 
 ## Capstone flag
 #1's dropped-player `{50,25}` teleport is a **reachability** case (a player placed where he can't be) — feeds the no-teleport-by-construction capstone; the FT-Task 1 backfill is the local fix.

@@ -4652,6 +4652,10 @@ playNowBtn.addEventListener('click', async () => {
           let overlay = null;
           if (finishState === 'pending') {
             overlay = showSeasonAdvanceOverlay(nextSeasonNumber());
+            // The cover (z 4000) sits below the tribute (z 10010), so it would open
+            // invisibly behind it. Remove the tribute so this screen matches the
+            // no-seniors path exactly. failAdvance already tears it down on error.
+            window.SeniorTribute.teardown();
           }
           try {
             await finishPromise;

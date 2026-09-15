@@ -189,8 +189,23 @@ def run_arm(played: bool):
     return rows
 
 
+def published_ci95(vals):
+    """Mean and 1.96 × SEM (sample SD). Published form — never print SEM alone."""
+    n = len(vals)
+    if n < 2:
+        return None, None
+    mean = sum(vals) / float(n)
+    var = sum((v - mean) ** 2 for v in vals) / (n - 1)
+    return mean, 1.96 * ((var ** 0.5) / (n ** 0.5))
+
+
 if __name__ == "__main__":
     label = "%s_%s" % (COND, ARM)
     rows = run_arm(ARM == "played")
     json.dump({"rows": {label: rows}}, open(OUT, "w"), indent=1)
-    print("  %-16s done (%d games)" % (label, len(rows)))
+    pts = [r["points_per_team"] for r in rows if r.get("err") is None]
+    mean, ci = published_ci95(pts)
+    if mean is None:
+        print("  %-16s done (%d games)" % (label, len(rows)))
+    else:
+        print("  %-16s done (%d games)  pts/team %.2f ±%.2f" % (label, len(rows), mean, ci))

@@ -1,5 +1,7 @@
 # Group C — Trap / Press Positioning: single-coord-source fix (DECISION SETTLED, needs impl + verify)
 
+> **Findings as of 2026-07-05. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Status: framing settled (2026-07-05) — it's a correctness fix, not a gameplay-feel choice.** Consolidates the deferred "Group C" items from [HCT_UESS_Audit.md](HCT_UESS_Audit.md) (HCT-Task 7) and [FCP_UESS_Audit.md](FCP_UESS_Audit.md) (FCP-Task 3 + #6), the **same root** and the cause of the reported **over-and-back** bug.
 
 > **Implementation update (2026-07-06, code-verified):** the **BH-advance / over-and-back** half is **already implemented**. The emitter renders the BH `hct_advance` at the AG-drive rate (`dynamic_hct_step_emitter.py:279-287`, `ag_to_grid_per_game_sec(AG)`) — the *same* rate + `_interrupted_coord` as the engine's `_advance` (`dynamic_hct.py:2218`) → engine `bh_xy` == rendered BH coord, so `frontcourt_established` / 10-sec / `is_over_and_back_pass` read what's shown. The **defender-collapse** half (§ table row 1) is **still open**. Possible residual: the emitter starts the advance from the rendered chain (`prev_end_coords[bh]`) vs logic's `bh_xy`, so earlier-step clamp drift could still diverge — chase only if over-and-back is still reported live.

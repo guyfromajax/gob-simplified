@@ -1,5 +1,7 @@
 # Coord-Consumer UESS Audit — `player.coords` vs render
 
+> **Findings as of 2026-07-05 (updates through 2026-09-06). Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Question:** which game-logic consumers decide from `player.coords` (animator row-end, set by `apply_coords_from_animations_list`) instead of the emitter's rendered coord — the same defect that mis-scored 2PT/3PT classification? (2026-07-05, 3 parallel traces + probes.)
 
 ## Root cause (one line)

@@ -5,7 +5,11 @@
 .st-host {
   position: fixed;
   inset: 0;
-  z-index: 4100;
+  /* Full-screen takeover, like the load screen it replaces — so it must sit ABOVE
+     the fixed auth bar (auth-bar.css, z-index 9998). At the old 4100 the bar painted
+     over the top 72px and hid this header. Kept below modals/toasts (10020+), the
+     maintenance banner and PageLoadOverlay. */
+  z-index: 10010;
   display: flex;
   flex-direction: column;
   background:

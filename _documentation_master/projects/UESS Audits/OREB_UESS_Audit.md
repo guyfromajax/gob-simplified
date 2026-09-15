@@ -1,5 +1,7 @@
 # OREB ↔ UESS Compliance Audit
 
+> **Findings as of 2026-07-04. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Date:** 2026-07-04 · **Scope:** OREB (offensive rebound → PUTBACK shot / KICKOUT / PUTBACK_MISS→DREB) · **Method:** read-only trace, 4 parallel audits (single-coord-source, clock/§5.4, ball-seam, player-coord) · **Audit only — no code changed.** · Turn #2 of the 11-turn UESS sweep (after HCO, Final Turn).
 
 ---

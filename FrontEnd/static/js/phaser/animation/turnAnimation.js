@@ -26,6 +26,10 @@ import {
   animationDebugWarn,
 } from "../utils/debugFlags.js";
 import {
+  evaluateStepPassClockOverrun,
+  resolveHcoStepStrictMode,
+} from "../utils/hcoStepStrictContract.js";
+import {
   States,
   safeTransition,
 } from "../state/gameStateMachine.js";
@@ -3410,14 +3414,7 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
       activeTweens: activeTweens.slice(0, 12).map(describeTween),
     };
   };
-  const resolveHcoStepStrictMode = () => {
-    const scope = getDrebTelemetryScope();
-    const raw = scope?.HCO_STEP_MOVEMENT_STRICT_CONTRACT;
-    if (raw === "throw") return "throw";
-    if (raw === "off" || raw === false) return "off";
-    return "throw";
-  };
-  const hcoStepStrictMode = resolveHcoStepStrictMode();
+  const hcoStepStrictMode = resolveHcoStepStrictMode(getDrebTelemetryScope());
   const resolvePressureStepContractMode = () => {
     const scope = getDrebTelemetryScope();
     const raw = String(scope?.UESS_PRESSURE_STEP_CONTRACT_MODE ?? "warn")
@@ -5209,15 +5206,25 @@ export async function playTurnAnimation({ scene, simData, playerSprites, turnDat
         if (stepElapsedGameSeconds > hardFailThresholdSeconds) {
           emitHcoStepTelemetry("hco_step_pass_clock_overrun", passContext);
           const message = `[${contractLabel} step pass contract] clock overrun (step=${stepIndex}, elapsedGameSeconds=${stepElapsedGameSeconds.toFixed(2)}, maxWaitGameSeconds=${stepBudgetGameSeconds}, hardFailThresholdSeconds=${hardFailThresholdSeconds.toFixed(2)})`;
-          if (!isPressureSkeletonTurn || activePressureStepStrictMode === "throw") {
+          const clockAction = evaluateStepPassClockOverrun({
+            elapsedGameSeconds: stepElapsedGameSeconds,
+            hardFailThresholdSeconds,
+            isPressureSkeletonTurn,
+            pressureStepStrictMode: activePressureStepStrictMode,
+          });
+          if (clockAction === "throw") {
             throw new Error(message);
           }
-          emitPressureReworkTelemetry("pressure_step_contract_warn", {
-            ...passContext,
-            violation: "clock_overrun",
-            message,
-            activePressureStepStrictMode,
-          });
+          if (isPressureSkeletonTurn) {
+            emitPressureReworkTelemetry("pressure_step_contract_warn", {
+              ...passContext,
+              violation: "clock_overrun",
+              message,
+              activePressureStepStrictMode,
+            });
+          } else {
+            console.warn(message);
+          }
         }
         enforceUnitCompletionContract({
           contract: hcoStepPassContract,

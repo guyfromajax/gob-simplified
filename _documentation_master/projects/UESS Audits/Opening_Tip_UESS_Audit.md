@@ -1,5 +1,7 @@
 # Opening Tip — UESS Compliance Audit
 
+> **Findings as of 2026-07-05. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Verdict: benign, not-yet-migrated legacy turn.** Not a §1 problem (backend is authoritative, FE is a pure renderer); the game's first seam into HCO is clean (no teleport); game-start clock is correct. **One worthwhile fix** (a dead `time_elapsed` stamp causing FE clock jitter + log noise) + a few LOW/optional items. Migration to the schema is **backlog item 10**, a cleanup — not a correctness fix. (2026-07-05, 3 focused traces.)
 
 > **Unmigrated:** Opening Tip (+ Timeout) are the only turns that emit NO schema `animation_steps`. `execute_opening_tip` (opening_tip.py:67) returns a legacy result (`animations[]` with non-vocab `TIP_JUMP`/`CONVERGE_ON_BALL`, `ball_landing_coords`, `ball_handler_id`, `winner`), rendered by the dedicated FE `openingTip.js`. Explicitly stamped `uess_ownership_contract applicable:false` (excluded from UESS validation).

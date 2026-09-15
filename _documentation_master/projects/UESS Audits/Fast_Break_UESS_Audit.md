@@ -1,5 +1,7 @@
 # Fast Break (FB) — UESS Compliance Audit
 
+> **Findings as of 2026-07-05. Work-plan steps are HISTORICAL — check [`bugs.md`](../bugs.md) for current status before acting on any of them.**
+
 **Verdict: the richest audit in the sweep — issues on 3 of 4 dimensions across 4 families (Steal/RR/CR/Triangle + universal drive-step).** The render is reachability-safe by construction (the good pattern), but: the **clock exit seam** isn't reconciled (every family), the **ball entry seam** never got the SIP/HCT/FCP parity (×4), and the **contest/rebounder read a different coord frame than the render** on the drive step. (2026-07-05, 4-dimension parallel trace, deltas beyond the coord-consumer / three-pointer / interception docs.)
 
 > **Sim-verifiable (unlike HCT/FCP):** FB fires from DREB + steal, which the mock produces → fixes here can be validated in the mock. Trigger sources: `resolve_fast_break_logic` (phase_resolution.py:1154), DREB `rebound` branch + `AFTER_STEAL`. **No made-shot FB path exists.**

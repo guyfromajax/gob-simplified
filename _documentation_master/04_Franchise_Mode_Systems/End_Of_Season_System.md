@@ -93,6 +93,8 @@ season-transition load screen. Module: `FrontEnd/static/js/shared/seniorTribute.
 | Hold | `HOLD_MS = 6000` per card. No skip, no pause |
 | Hero | the player headshot, not the team logo — unlike the recruiting reveal, the team is already known |
 | No seniors | tribute skipped; the normal season-transition load screen plays |
+| Layer | full-screen takeover above the auth bar: `.st-host` z-index **10010** (bar is 9998). Below modals/toasts (10020+), maintenance banner, `PageLoadOverlay` |
+| Advance while rollover still running | the season-transition cover (`.fcc-season-advance`, z 4000) is shown and the tribute is torn down — otherwise the cover would sit hidden behind it |
 
 **Per card:** headshot; career per-game points, rebounds, assists; career DEF%; titles won.
 **Resolution screen:** one row per player — headshot, name, stats, titles.
